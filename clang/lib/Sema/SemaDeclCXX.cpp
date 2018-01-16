@@ -2417,9 +2417,16 @@ bool Sema::AttachBaseSpecifiers(CXXRecordDecl *Class,
   // Attach the remaining base class specifiers to the derived class.
   Class->setBases(Bases.data(), NumGoodBases);
 
+  // Check that the only base classes that are duplicate are virtual.
   for (unsigned idx = 0; idx < NumGoodBases; ++idx) {
     // Check whether this direct base is inaccessible due to ambiguity.
     QualType BaseType = Bases[idx]->getType();
+
+    // Skip all dependent types in templates being used as base specifiers.
+    // Checks below assume that the base specifier is a CXXRecord.
+    if (BaseType->isDependentType())
+      continue;
+
     CanQualType CanonicalBase = Context.getCanonicalType(BaseType)
       .getUnqualifiedType();
 
@@ -10990,11 +10997,11 @@ buildMemcpyForAssignmentOp(Sema &S, SourceLocation Loc, QualType T,
   Expr *From = FromB.build(S, Loc);
   From = new (S.Context) UnaryOperator(From, UO_AddrOf,
                          S.Context.getPointerType(From->getType()),
-                         VK_RValue, OK_Ordinary, Loc);
+                         VK_RValue, OK_Ordinary, Loc, false);
   Expr *To = ToB.build(S, Loc);
   To = new (S.Context) UnaryOperator(To, UO_AddrOf,
                        S.Context.getPointerType(To->getType()),
-                       VK_RValue, OK_Ordinary, Loc);
+                       VK_RValue, OK_Ordinary, Loc, false);
 
   const Type *E = T->getBaseElementTypeUnsafe();
   bool NeedsCollectableMemCpy =
@@ -11233,10 +11240,12 @@ buildSingleCopyAssignRecursively(Sema &S, SourceLocation Loc, QualType T,
                                      BO_NE, S.Context.BoolTy,
                                      VK_RValue, OK_Ordinary, Loc, FPOptions());
 
-  // Create the pre-increment of the iteration variable.
-  Expr *Increment
-    = new (S.Context) UnaryOperator(IterationVarRef.build(S, Loc), UO_PreInc,
-                                    SizeType, VK_LValue, OK_Ordinary, Loc);
+  // Create the pre-increment of the iteration variable. We can determine
+  // whether the increment will overflow based on the value of the array
+  // bound.
+  Expr *Increment = new (S.Context)
+      UnaryOperator(IterationVarRef.build(S, Loc), UO_PreInc, SizeType,
+                    VK_LValue, OK_Ordinary, Loc, Upper.isMaxValue());
 
   // Construct the loop that copies all elements of this array.
   return S.ActOnForStmt(

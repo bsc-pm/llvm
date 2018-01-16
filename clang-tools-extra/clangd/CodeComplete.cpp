@@ -17,12 +17,14 @@
 #include "CodeComplete.h"
 #include "CodeCompletionStrings.h"
 #include "Compiler.h"
+#include "FuzzyMatch.h"
 #include "Logger.h"
 #include "index/Index.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/Support/Format.h"
 #include <queue>
 
 namespace clang {
@@ -185,17 +187,25 @@ getOptionalParameters(const CodeCompletionString &CCS,
 
 /// A scored code completion result.
 /// It may be promoted to a CompletionItem if it's among the top-ranked results.
+///
+/// We score candidates by multiplying the symbolScore ("quality" of the result)
+/// with the filterScore (how well it matched the query).
+/// This is sensitive to the distribution of both component scores!
 struct CompletionCandidate {
-  CompletionCandidate(CodeCompletionResult &Result)
-      : Result(&Result), Score(score(Result)) {}
+  CompletionCandidate(CodeCompletionResult &Result, float FilterScore)
+      : Result(&Result) {
+    Scores.symbolScore = score(Result);  // Higher is better.
+    Scores.filterScore = FilterScore;    // 0-1, higher is better.
+    Scores.finalScore = Scores.symbolScore * Scores.filterScore;
+  }
 
   CodeCompletionResult *Result;
-  float Score; // 0 to 1, higher is better.
+  CompletionItemScores Scores;
 
   // Comparison reflects rank: better candidates are smaller.
   bool operator<(const CompletionCandidate &C) const {
-    if (Score != C.Score)
-      return Score > C.Score;
+    if (Scores.finalScore != C.Scores.finalScore)
+      return Scores.finalScore > C.Scores.finalScore;
     return *Result < *C.Result;
   }
 
@@ -205,8 +215,8 @@ struct CompletionCandidate {
   std::string sortText() const {
     std::string S, NameStorage;
     llvm::raw_string_ostream OS(S);
-    write_hex(OS, encodeFloat(-Score), llvm::HexPrintStyle::Lower,
-              /*Width=*/2 * sizeof(Score));
+    write_hex(OS, encodeFloat(-Scores.finalScore), llvm::HexPrintStyle::Lower,
+              /*Width=*/2 * sizeof(Scores.finalScore));
     OS << Result->getOrderedName(NameStorage);
     return OS.str();
   }
@@ -287,6 +297,7 @@ public:
   void ProcessCodeCompleteResults(Sema &S, CodeCompletionContext Context,
                                   CodeCompletionResult *Results,
                                   unsigned NumResults) override final {
+    FuzzyMatcher Filter(S.getPreprocessor().getCodeCompletionFilter());
     if (auto SS = Context.getCXXScopeSpecifier())
       CompletedName.SSInfo = extraCompletionScope(S, **SS);
 
@@ -294,14 +305,21 @@ public:
     std::priority_queue<CompletionCandidate> Candidates;
     for (unsigned I = 0; I < NumResults; ++I) {
       auto &Result = Results[I];
+      // We drop hidden items, as they cannot be found by the lookup after
+      // inserting the corresponding completion item and only produce noise and
+      // duplicates in the completion list. However, there is one exception. If
+      // Result has a Qualifier which is non-informative, we can refer to an
+      // item by adding that qualifier, so we don't filter out this item.
+      if (Result.Hidden && (!Result.Qualifier || Result.QualifierIsInformative))
+        continue;
       if (!ClangdOpts.IncludeIneligibleResults &&
           (Result.Availability == CXAvailability_NotAvailable ||
            Result.Availability == CXAvailability_NotAccessible))
         continue;
-      if (!CompletedName.Filter.empty() &&
-          !fuzzyMatch(S, Context, CompletedName.Filter, Result))
+      auto FilterScore = fuzzyMatch(S, Context, Filter, Result);
+      if (!FilterScore)
         continue;
-      Candidates.emplace(Result);
+      Candidates.emplace(Result, *FilterScore);
       if (ClangdOpts.Limit && Candidates.size() > ClangdOpts.Limit) {
         Candidates.pop();
         Items.isIncomplete = true;
@@ -324,37 +342,24 @@ public:
   CodeCompletionTUInfo &getCodeCompletionTUInfo() override { return CCTUInfo; }
 
 private:
-  bool fuzzyMatch(Sema &S, const CodeCompletionContext &CCCtx, StringRef Filter,
-                  CodeCompletionResult Result) {
+  llvm::Optional<float> fuzzyMatch(Sema &S, const CodeCompletionContext &CCCtx,
+                                   FuzzyMatcher &Filter,
+                                   CodeCompletionResult Result) {
     switch (Result.Kind) {
     case CodeCompletionResult::RK_Declaration:
       if (auto *ID = Result.Declaration->getIdentifier())
-        return fuzzyMatch(Filter, ID->getName());
+        return Filter.match(ID->getName());
       break;
     case CodeCompletionResult::RK_Keyword:
-      return fuzzyMatch(Filter, Result.Keyword);
+      return Filter.match(Result.Keyword);
     case CodeCompletionResult::RK_Macro:
-      return fuzzyMatch(Filter, Result.Macro->getName());
+      return Filter.match(Result.Macro->getName());
     case CodeCompletionResult::RK_Pattern:
-      return fuzzyMatch(Filter, Result.Pattern->getTypedText());
+      return Filter.match(Result.Pattern->getTypedText());
     }
     auto *CCS = Result.CreateCodeCompletionString(
         S, CCCtx, *Allocator, CCTUInfo, /*IncludeBriefComments=*/false);
-    return fuzzyMatch(Filter, CCS->getTypedText());
-  }
-
-  // Checks whether Target matches the Filter.
-  // Currently just requires a case-insensitive subsequence match.
-  // FIXME: make stricter and word-based: 'unique_ptr' should not match 'que'.
-  // FIXME: return a score to be incorporated into ranking.
-  static bool fuzzyMatch(StringRef Filter, StringRef Target) {
-    size_t TPos = 0;
-    for (char C : Filter) {
-      TPos = Target.find_lower(C, TPos);
-      if (TPos == StringRef::npos)
-        return false;
-    }
-    return true;
+    return Filter.match(CCS->getTypedText());
   }
 
   CompletionItem
@@ -367,6 +372,7 @@ private:
 
     Item.documentation = getDocumentation(CCS);
     Item.sortText = Candidate.sortText();
+    Item.scoreInfo = Candidate.Scores;
 
     Item.detail = getDetail(CCS);
     Item.filterText = getFilterText(CCS);
@@ -551,28 +557,49 @@ bool invokeCodeComplete(const Context &Ctx,
 }
 
 CompletionItem indexCompletionItem(const Symbol &Sym, llvm::StringRef Filter,
-                                   const SpecifiedScope &SSInfo) {
+                                   const SpecifiedScope &SSInfo,
+                                   llvm::StringRef DebuggingLabel = "") {
   CompletionItem Item;
   Item.kind = toCompletionItemKind(Sym.SymInfo.Kind);
-  Item.label = Sym.Name;
+  // Add DebuggingLabel to the completion results if DebuggingLabel is not
+  // empty.
+  //
+  // For symbols from static index, there are prefix "[G]" in the
+  // results (which is used for debugging purpose).
+  // So completion list will be like:
+  //   clang::symbol_from_dynamic_index
+  //   [G]clang::symbol_from_static_index
+  //
+  // FIXME: Find out a better way to show the index source.
+  if (!DebuggingLabel.empty()) {
+    llvm::raw_string_ostream Label(Item.label);
+    Label << llvm::format("[%s]%s", DebuggingLabel.str().c_str(),
+                          Sym.Name.str().c_str());
+  } else {
+    Item.label = Sym.Name;
+  }
   // FIXME(ioeric): support inserting/replacing scope qualifiers.
-  Item.insertText = Sym.Name;
+
   // FIXME(ioeric): support snippets.
+  Item.insertText = Sym.CompletionPlainInsertText;
   Item.insertTextFormat = InsertTextFormat::PlainText;
   Item.filterText = Sym.Name;
 
   // FIXME(ioeric): sort symbols appropriately.
   Item.sortText = "";
 
-  // FIXME(ioeric): use more symbol information (e.g. documentation, label) to
-  // populate the completion item.
+  if (Sym.Detail) {
+    Item.documentation = Sym.Detail->Documentation;
+    Item.detail = Sym.Detail->CompletionDetail;
+  }
 
   return Item;
 }
 
 void completeWithIndex(const Context &Ctx, const SymbolIndex &Index,
                        llvm::StringRef Code, const SpecifiedScope &SSInfo,
-                       llvm::StringRef Filter, CompletionList *Items) {
+                       llvm::StringRef Filter, CompletionList *Items,
+                       llvm::StringRef DebuggingLabel = "") {
   FuzzyFindRequest Req;
   Req.Query = Filter;
   // FIXME(ioeric): add more possible scopes based on using namespaces and
@@ -580,8 +607,9 @@ void completeWithIndex(const Context &Ctx, const SymbolIndex &Index,
   StringRef Scope = SSInfo.Resolved.empty() ? SSInfo.Written : SSInfo.Resolved;
   Req.Scopes = {Scope.trim(':').str()};
 
-  Items->isIncomplete = !Index.fuzzyFind(Ctx, Req, [&](const Symbol &Sym) {
-    Items->items.push_back(indexCompletionItem(Sym, Filter, SSInfo));
+  Items->isIncomplete |= !Index.fuzzyFind(Ctx, Req, [&](const Symbol &Sym) {
+    Items->items.push_back(
+        indexCompletionItem(Sym, Filter, SSInfo, DebuggingLabel));
   });
 }
 
@@ -614,8 +642,10 @@ clang::CodeCompleteOptions CodeCompleteOptions::getClangCompleteOpts() const {
   Result.IncludeGlobals = IncludeGlobals;
   Result.IncludeBriefComments = IncludeBriefComments;
 
-  // Enable index-based code completion when Index is provided.
-  Result.IncludeNamespaceLevelDecls = !Index;
+  // When an is used, Sema is responsible for completing the main file,
+  // the index can provide results from the preamble.
+  // Tell Sema not to deserialize the preamble to look for results.
+  Result.LoadExternal = !Index;
 
   return Result;
 }
@@ -634,14 +664,13 @@ CompletionList codeComplete(const Context &Ctx, PathRef FileName,
   invokeCodeComplete(Ctx, std::move(Consumer), Opts.getClangCompleteOpts(),
                      FileName, Command, Preamble, Contents, Pos, std::move(VFS),
                      std::move(PCHs));
-  if (Opts.Index && CompletedName.SSInfo) {
-    if (!Results.items.empty())
-      log(Ctx, "WARNING: Got completion results from sema for completion on "
-               "qualified ID while symbol index is provided.");
-    Results.items.clear();
+
+  // Got scope specifier (ns::f^) for code completion from sema, try to query
+  // global symbols from indexes.
+  // FIXME: merge with Sema results, and respect limits.
+  if (CompletedName.SSInfo && Opts.Index)
     completeWithIndex(Ctx, *Opts.Index, Contents, *CompletedName.SSInfo,
-                      CompletedName.Filter, &Results);
-  }
+                      CompletedName.Filter, &Results, /*DebuggingLabel=*/"I");
   return Results;
 }
 

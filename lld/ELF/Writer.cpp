@@ -369,9 +369,9 @@ template <class ELFT> static void createSyntheticSections() {
       false /*Sort*/);
   Add(InX::RelaIplt);
 
-  InX::Plt = make<PltSection>(Target->PltHeaderSize);
+  InX::Plt = make<PltSection>(false);
   Add(InX::Plt);
-  InX::Iplt = make<PltSection>(0);
+  InX::Iplt = make<PltSection>(true);
   Add(InX::Iplt);
 
   if (!Config->Relocatable) {
@@ -432,8 +432,8 @@ template <class ELFT> void Writer<ELFT>::run() {
   // If -compressed-debug-sections is specified, we need to compress
   // .debug_* sections. Do it right now because it changes the size of
   // output sections.
-  parallelForEach(OutputSections,
-                  [](OutputSection *Sec) { Sec->maybeCompress<ELFT>(); });
+  for (OutputSection *Sec : OutputSections)
+    Sec->maybeCompress<ELFT>();
 
   Script->allocateHeaders(Phdrs);
 

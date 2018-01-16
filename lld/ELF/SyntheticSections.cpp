@@ -1836,6 +1836,9 @@ void HashTableSection::finalizeContents() {
 }
 
 void HashTableSection::writeTo(uint8_t *Buf) {
+  // See comment in GnuHashTableSection::writeTo.
+  memset(Buf, 0, Size);
+
   unsigned NumSymbols = InX::DynSymTab->getNumSymbols();
 
   uint32_t *P = reinterpret_cast<uint32_t *>(Buf);
@@ -1855,9 +1858,9 @@ void HashTableSection::writeTo(uint8_t *Buf) {
   }
 }
 
-PltSection::PltSection(size_t S)
+PltSection::PltSection(bool IsIplt)
     : SyntheticSection(SHF_ALLOC | SHF_EXECINSTR, SHT_PROGBITS, 16, ".plt"),
-      HeaderSize(S) {
+      HeaderSize(IsIplt ? 0 : Target->PltHeaderSize), IsIplt(IsIplt) {
   // The PLT needs to be writable on SPARC as the dynamic linker will
   // modify the instructions in the PLT entries.
   if (Config->EMachine == EM_SPARCV9)
@@ -1867,7 +1870,7 @@ PltSection::PltSection(size_t S)
 void PltSection::writeTo(uint8_t *Buf) {
   // At beginning of PLT but not the IPLT, we have code to call the dynamic
   // linker to resolve dynsyms at runtime. Write such code.
-  if (HeaderSize != 0)
+  if (!IsIplt)
     Target->writePltHeader(Buf);
   size_t Off = HeaderSize;
   // The IPlt is immediately after the Plt, account for this in RelOff
@@ -1886,7 +1889,7 @@ void PltSection::writeTo(uint8_t *Buf) {
 template <class ELFT> void PltSection::addEntry(Symbol &Sym) {
   Sym.PltIndex = Entries.size();
   RelocationBaseSection *PltRelocSection = InX::RelaPlt;
-  if (HeaderSize == 0) {
+  if (IsIplt) {
     PltRelocSection = InX::RelaIplt;
     Sym.IsInIplt = true;
   }
@@ -1903,7 +1906,7 @@ size_t PltSection::getSize() const {
 // example ARM uses mapping symbols to aid disassembly
 void PltSection::addSymbols() {
   // The PLT may have symbols defined for the Header, the IPLT has no header
-  if (HeaderSize != 0)
+  if (!IsIplt)
     Target->addPltHeaderSymbols(*this);
   size_t Off = HeaderSize;
   for (size_t I = 0; I < Entries.size(); ++I) {
@@ -1913,7 +1916,7 @@ void PltSection::addSymbols() {
 }
 
 unsigned PltSection::getPltRelocOff() const {
-  return (HeaderSize == 0) ? InX::Plt->getSize() : 0;
+  return IsIplt ? InX::Plt->getSize() : 0;
 }
 
 // The string hash function for .gdb_index.
@@ -2448,10 +2451,8 @@ void MergeNoTailSection::finalizeContents() {
   parallelForEachN(0, Concurrency, [&](size_t ThreadId) {
     for (MergeInputSection *Sec : Sections) {
       for (size_t I = 0, E = Sec->Pieces.size(); I != E; ++I) {
-        if (!Sec->Pieces[I].Live)
-          continue;
         size_t ShardId = getShardId(Sec->Pieces[I].Hash);
-        if ((ShardId & (Concurrency - 1)) == ThreadId)
+        if ((ShardId & (Concurrency - 1)) == ThreadId && Sec->Pieces[I].Live)
           Sec->Pieces[I].OutputOff = Shards[ShardId].add(Sec->getData(I));
       }
     }

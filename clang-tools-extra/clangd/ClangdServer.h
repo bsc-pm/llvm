@@ -72,7 +72,7 @@ public:
 
   /// Called by ClangdServer when \p Diagnostics for \p File are ready.
   virtual void
-  onDiagnosticsReady(PathRef File,
+  onDiagnosticsReady(const Context &Ctx, PathRef File,
                      Tagged<std::vector<DiagWithFixIts>> Diagnostics) = 0;
 };
 
@@ -200,11 +200,15 @@ public:
   /// If \p BuildDynamicSymbolIndex is true, ClangdServer builds a dynamic
   /// in-memory index for symbols in all opened files and uses the index to
   /// augment code completion results.
+  ///
+  /// If \p StaticIdx is set, ClangdServer uses the index for global code
+  /// completion.
   ClangdServer(GlobalCompilationDatabase &CDB,
                DiagnosticsConsumer &DiagConsumer,
                FileSystemProvider &FSProvider, unsigned AsyncThreadsCount,
                bool StorePreamblesInMemory,
                bool BuildDynamicSymbolIndex = false,
+               SymbolIndex *StaticIdx = nullptr,
                llvm::Optional<StringRef> ResourceDir = llvm::None);
 
   /// Set the root path of the workspace.
@@ -336,8 +340,16 @@ private:
   DiagnosticsConsumer &DiagConsumer;
   FileSystemProvider &FSProvider;
   DraftStore DraftMgr;
-  /// If set, this manages index for symbols in opened files.
+  // The index used to look up symbols. This could be:
+  //   - null (all index functionality is optional)
+  //   - the dynamic index owned by ClangdServer (FileIdx)
+  //   - the static index passed to the constructor
+  //   - a merged view of a static and dynamic index (MergedIndex)
+  SymbolIndex *Index;
+  // If present, an up-to-date of symbols in open files. Read via Index.
   std::unique_ptr<FileIndex> FileIdx;
+  // If present, a merged view of FileIdx and an external index. Read via Index.
+  std::unique_ptr<SymbolIndex> MergedIndex;
   CppFileCollection Units;
   std::string ResourceDir;
   // If set, this represents the workspace path.

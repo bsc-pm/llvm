@@ -117,7 +117,7 @@ template <class ELFT> void SymbolTable::addFile(InputFile *File) {
 // not in native object file format but in the LLVM bitcode format.
 // This function compiles bitcode files into a few big native files
 // using LLVM functions and replaces bitcode symbols with the results.
-// Because all bitcode files that consist of a program are passed
+// Because all bitcode files that the program consists of are passed
 // to the compiler at once, it can do whole-program optimization.
 template <class ELFT> void SymbolTable::addCombinedLTOObject() {
   if (BitcodeFiles.empty())
@@ -488,8 +488,8 @@ void SymbolTable::addShared(StringRef Name, SharedFile<ELFT> &File,
 
   // An undefined symbol with non default visibility must be satisfied
   // in the same DSO.
-  if (WasInserted || ((S->isUndefined() || S->isLazy()) &&
-                      S->getVisibility() == STV_DEFAULT)) {
+  if (WasInserted ||
+      ((S->isUndefined() || S->isLazy()) && S->Visibility == STV_DEFAULT)) {
     uint8_t Binding = S->Binding;
     replaceSymbol<SharedSymbol>(S, File, Name, Sym.getBinding(), Sym.st_other,
                                 Sym.getType(), Sym.st_value, Sym.st_size,
@@ -762,6 +762,11 @@ void SymbolTable::scanVersionScript() {
   for (Symbol *Sym : SymVector)
     Sym->parseSymbolVersion();
 }
+
+template void SymbolTable::addFile<ELF32LE>(InputFile *);
+template void SymbolTable::addFile<ELF32BE>(InputFile *);
+template void SymbolTable::addFile<ELF64LE>(InputFile *);
+template void SymbolTable::addFile<ELF64BE>(InputFile *);
 
 template void SymbolTable::addSymbolWrap<ELF32LE>(StringRef);
 template void SymbolTable::addSymbolWrap<ELF32BE>(StringRef);

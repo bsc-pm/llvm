@@ -6726,6 +6726,7 @@ SDValue DAGCombiner::visitMSCATTER(SDNode *N) {
   SDValue DataLo, DataHi;
   std::tie(DataLo, DataHi) = DAG.SplitVector(Data, DL);
 
+  SDValue Scale = MSC->getScale();
   SDValue BasePtr = MSC->getBasePtr();
   SDValue IndexLo, IndexHi;
   std::tie(IndexLo, IndexHi) = DAG.SplitVector(MSC->getIndex(), DL);
@@ -6735,11 +6736,11 @@ SDValue DAGCombiner::visitMSCATTER(SDNode *N) {
                           MachineMemOperand::MOStore,  LoMemVT.getStoreSize(),
                           Alignment, MSC->getAAInfo(), MSC->getRanges());
 
-  SDValue OpsLo[] = { Chain, DataLo, MaskLo, BasePtr, IndexLo };
+  SDValue OpsLo[] = { Chain, DataLo, MaskLo, BasePtr, IndexLo, Scale };
   Lo = DAG.getMaskedScatter(DAG.getVTList(MVT::Other), DataLo.getValueType(),
                             DL, OpsLo, MMO);
 
-  SDValue OpsHi[] = {Chain, DataHi, MaskHi, BasePtr, IndexHi};
+  SDValue OpsHi[] = { Chain, DataHi, MaskHi, BasePtr, IndexHi, Scale };
   Hi = DAG.getMaskedScatter(DAG.getVTList(MVT::Other), DataHi.getValueType(),
                             DL, OpsHi, MMO);
 
@@ -6859,6 +6860,7 @@ SDValue DAGCombiner::visitMGATHER(SDNode *N) {
   EVT LoMemVT, HiMemVT;
   std::tie(LoMemVT, HiMemVT) = DAG.GetSplitDestVTs(MemoryVT);
 
+  SDValue Scale = MGT->getScale();
   SDValue BasePtr = MGT->getBasePtr();
   SDValue Index = MGT->getIndex();
   SDValue IndexLo, IndexHi;
@@ -6869,13 +6871,13 @@ SDValue DAGCombiner::visitMGATHER(SDNode *N) {
                           MachineMemOperand::MOLoad,  LoMemVT.getStoreSize(),
                           Alignment, MGT->getAAInfo(), MGT->getRanges());
 
-  SDValue OpsLo[] = { Chain, Src0Lo, MaskLo, BasePtr, IndexLo };
+  SDValue OpsLo[] = { Chain, Src0Lo, MaskLo, BasePtr, IndexLo, Scale };
   Lo = DAG.getMaskedGather(DAG.getVTList(LoVT, MVT::Other), LoVT, DL, OpsLo,
-                            MMO);
+                           MMO);
 
-  SDValue OpsHi[] = {Chain, Src0Hi, MaskHi, BasePtr, IndexHi};
+  SDValue OpsHi[] = { Chain, Src0Hi, MaskHi, BasePtr, IndexHi, Scale };
   Hi = DAG.getMaskedGather(DAG.getVTList(HiVT, MVT::Other), HiVT, DL, OpsHi,
-                            MMO);
+                           MMO);
 
   AddToWorklist(Lo.getNode());
   AddToWorklist(Hi.getNode());
@@ -7798,7 +7800,10 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
         SDValue Op = N0.getOperand(0);
         Op = DAG.getZeroExtendInReg(Op, SDLoc(N), MinVT.getScalarType());
         AddToWorklist(Op.getNode());
-        return DAG.getZExtOrTrunc(Op, SDLoc(N), VT);
+        SDValue ZExtOrTrunc = DAG.getZExtOrTrunc(Op, SDLoc(N), VT);
+        // Transfer the debug info; the new node is equivalent to N0.
+        DAG.transferDbgValues(N0, ZExtOrTrunc);
+        return ZExtOrTrunc;
       }
     }
 
@@ -8775,6 +8780,22 @@ SDValue DAGCombiner::visitTRUNCATE(SDNode *N) {
     auto Y = DAG.getNode(ISD::TRUNCATE, SL, VT, N0.getOperand(1));
     auto VTs = DAG.getVTList(VT, N0->getValueType(1));
     return DAG.getNode(N0.getOpcode(), SL, VTs, X, Y, N0.getOperand(2));
+  }
+
+  // fold (truncate (extract_subvector(ext x))) ->
+  //      (extract_subvector x)
+  // TODO: This can be generalized to cover cases where the truncate and extract
+  // do not fully cancel each other out.
+  if (!LegalTypes && N0.getOpcode() == ISD::EXTRACT_SUBVECTOR) {
+    SDValue N00 = N0.getOperand(0);
+    if (N00.getOpcode() == ISD::SIGN_EXTEND ||
+        N00.getOpcode() == ISD::ZERO_EXTEND ||
+        N00.getOpcode() == ISD::ANY_EXTEND) {
+      if (N00.getOperand(0)->getValueType(0).getVectorElementType() ==
+          VT.getVectorElementType())
+        return DAG.getNode(ISD::EXTRACT_SUBVECTOR, SDLoc(N0->getOperand(0)), VT,
+                           N00.getOperand(0), N0.getOperand(1));
+    }
   }
 
   if (SDValue NewVSel = matchVSelectOpSizesWithSetCC(N))

@@ -11,6 +11,7 @@
 #include "CodeComplete.h"
 #include "SourceCode.h"
 #include "XRefs.h"
+#include "index/Merge.h"
 #include "clang/Format/Format.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
@@ -134,7 +135,7 @@ ClangdServer::ClangdServer(GlobalCompilationDatabase &CDB,
                            FileSystemProvider &FSProvider,
                            unsigned AsyncThreadsCount,
                            bool StorePreamblesInMemory,
-                           bool BuildDynamicSymbolIndex,
+                           bool BuildDynamicSymbolIndex, SymbolIndex *StaticIdx,
                            llvm::Optional<StringRef> ResourceDir)
     : CDB(CDB), DiagConsumer(DiagConsumer), FSProvider(FSProvider),
       FileIdx(BuildDynamicSymbolIndex ? new FileIndex() : nullptr),
@@ -150,7 +151,17 @@ ClangdServer::ClangdServer(GlobalCompilationDatabase &CDB,
       ResourceDir(ResourceDir ? ResourceDir->str() : getStandardResourceDir()),
       PCHs(std::make_shared<PCHContainerOperations>()),
       StorePreamblesInMemory(StorePreamblesInMemory),
-      WorkScheduler(AsyncThreadsCount) {}
+      WorkScheduler(AsyncThreadsCount) {
+  if (FileIdx && StaticIdx) {
+    MergedIndex = mergeIndex(FileIdx.get(), StaticIdx);
+    Index = MergedIndex.get();
+  } else if (FileIdx)
+    Index = FileIdx.get();
+  else if (StaticIdx)
+    Index = StaticIdx;
+  else
+    Index = nullptr;
+}
 
 void ClangdServer::setRootPath(PathRef RootPath) {
   std::string NewRootPath = llvm::sys::path::convert_to_slash(
@@ -249,12 +260,19 @@ void ClangdServer::codeComplete(
       Resources->getPossiblyStalePreamble();
   // Copy completion options for passing them to async task handler.
   auto CodeCompleteOpts = Opts;
-  if (FileIdx)
-    CodeCompleteOpts.Index = FileIdx.get();
+  if (!CodeCompleteOpts.Index) // Respect overridden index.
+    CodeCompleteOpts.Index = Index;
+
+  // Copy File, as it is a PathRef that will go out of scope before Task is
+  // executed.
+  Path FileStr = File;
+  // Copy PCHs to avoid accessing this->PCHs concurrently
+  std::shared_ptr<PCHContainerOperations> PCHs = this->PCHs;
   // A task that will be run asynchronously.
   auto Task =
       // 'mutable' to reassign Preamble variable.
-      [=](Context Ctx, CallbackType Callback) mutable {
+      [FileStr, Preamble, Resources, Contents, Pos, CodeCompleteOpts, TaggedFS,
+       PCHs](Context Ctx, CallbackType Callback) mutable {
         if (!Preamble) {
           // Maybe we built some preamble before processing this request.
           Preamble = Resources->getPossiblyStalePreamble();
@@ -263,7 +281,7 @@ void ClangdServer::codeComplete(
         // both the old and the new version in case only one of them matches.
 
         CompletionList Result = clangd::codeComplete(
-            Ctx, File, Resources->getCompileCommand(),
+            Ctx, FileStr, Resources->getCompileCommand(),
             Preamble ? &Preamble->Preamble : nullptr, Contents, Pos,
             TaggedFS.Value, PCHs, CodeCompleteOpts);
 
@@ -576,7 +594,7 @@ std::future<Context> ClangdServer::scheduleReparseAndDiags(
       return;
     LastReportedDiagsVersion = Version;
 
-    DiagConsumer.onDiagnosticsReady(FileStr,
+    DiagConsumer.onDiagnosticsReady(Ctx, FileStr,
                                     make_tagged(std::move(*Diags), Tag));
   };
 

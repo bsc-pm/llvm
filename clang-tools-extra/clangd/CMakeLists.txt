@@ -25,11 +25,13 @@ add_clang_library(clangDaemon
   index/FileIndex.cpp
   index/Index.cpp
   index/MemIndex.cpp
+  index/Merge.cpp
   index/SymbolCollector.cpp
   index/SymbolYAML.cpp
 
   LINK_LIBS
   clangAST
+  clangASTMatchers
   clangBasic
   clangFormat
   clangFrontend

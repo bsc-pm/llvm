@@ -52,7 +52,7 @@ define void @call_ptr(i64 (i64)* %arg) {
 ; CHECK-NEXT:         ParamTypes:      
 ; CHECK-NEXT:           - I64
 ; CHECK-NEXT:   - Type:            FUNCTION
-; CHECK-NEXT:     FunctionTypes:   [ 0, 1, 0, 0, 2 ]
+; CHECK-NEXT:     FunctionTypes:   [ 0, 1, 0, 0, 2, 1 ]
 ; CHECK-NEXT:   - Type:            TABLE
 ; CHECK-NEXT:     Tables:
 ; CHECK-NEXT:       - ElemType:        ANYFUNC
@@ -65,7 +65,8 @@ define void @call_ptr(i64 (i64)* %arg) {
 ; CHECK-NEXT:       - Initial:         0x00000002
 ; CHECK-NEXT:   - Type:            GLOBAL
 ; CHECK-NEXT:     Globals:
-; CHECK-NEXT:       - Type:            I32
+; CHECK-NEXT:       - Index:           0
+; CHECK-NEXT:         Type:            I32
 ; CHECK-NEXT:         Mutable:         true
 ; CHECK-NEXT:         InitExpr:
 ; CHECK-NEXT:           Opcode:          I32_CONST
@@ -98,16 +99,24 @@ define void @call_ptr(i64 (i64)* %arg) {
 ; CHECK-NEXT:         Functions:       [ 0, 2 ]
 ; CHECK-NEXT:   - Type:            CODE
 ; CHECK-NEXT:     Functions:
-; CHECK-NEXT:       - Locals:
+; CHECK-NEXT:       - Index:           0
+; CHECK-NEXT:         Locals:
 ; CHECK-NEXT:         Body:            41010B
-; CHECK-NEXT:       - Locals:
+; CHECK-NEXT:       - Index:           1
+; CHECK-NEXT:         Locals:
 ; CHECK-NEXT:         Body:            410028028088808000118080808000001A0B
-; CHECK-NEXT:       - Locals:
+; CHECK-NEXT:       - Index:           2
+; CHECK-NEXT:         Locals:
 ; CHECK-NEXT:         Body:            41020B
-; CHECK-NEXT:       - Locals:
+; CHECK-NEXT:       - Index:           3
+; CHECK-NEXT:         Locals:
 ; CHECK-NEXT:         Body:            410028028888808000118080808000001A41000B
-; CHECK-NEXT:       - Locals:
+; CHECK-NEXT:       - Index:           4
+; CHECK-NEXT:         Locals:
 ; CHECK-NEXT:         Body:            42012000118380808000001A0B
+; CHECK-NEXT:       - Index:           5
+; CHECK-NEXT:         Locals:
+; CHECK-NEXT:         Body:            0B
 ; CHECK-NEXT:   - Type:            DATA
 ; CHECK-NEXT:     Segments:
 ; CHECK-NEXT:       - SectionOffset:    7
