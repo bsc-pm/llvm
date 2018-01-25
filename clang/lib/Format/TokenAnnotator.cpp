@@ -462,13 +462,15 @@ private:
           FormatToken *Previous = CurrentToken->getPreviousNonComment();
           if (Previous->is(TT_JsTypeOptionalQuestion))
             Previous = Previous->getPreviousNonComment();
-          if (((CurrentToken->is(tok::colon) &&
-                (!Contexts.back().ColonIsDictLiteral || !Style.isCpp())) ||
-               Style.Language == FormatStyle::LK_Proto ||
-               Style.Language == FormatStyle::LK_TextProto) &&
-              (Previous->Tok.getIdentifierInfo() ||
-               Previous->is(tok::string_literal)))
-            Previous->Type = TT_SelectorName;
+          if ((CurrentToken->is(tok::colon) &&
+               (!Contexts.back().ColonIsDictLiteral || !Style.isCpp())) ||
+              Style.Language == FormatStyle::LK_Proto ||
+              Style.Language == FormatStyle::LK_TextProto) {
+            Left->Type = TT_DictLiteral;
+            if (Previous->Tok.getIdentifierInfo() ||
+                Previous->is(tok::string_literal))
+              Previous->Type = TT_SelectorName;
+          }
           if (CurrentToken->is(tok::colon) ||
               Style.Language == FormatStyle::LK_JavaScript)
             Left->Type = TT_DictLiteral;
@@ -1516,7 +1518,7 @@ public:
                    AnnotatedLine &Line)
       : Style(Style), Keywords(Keywords), Current(Line.First) {}
 
-  /// \brief Parse expressions with the given operatore precedence.
+  /// \brief Parse expressions with the given operator precedence.
   void parse(int Precedence = 0) {
     // Skip 'return' and ObjC selector colons as they are not part of a binary
     // expression.

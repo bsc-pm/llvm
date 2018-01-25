@@ -651,6 +651,14 @@ CodeGenModule::mergeTBAAInfoForConditionalOperator(TBAAAccessInfo InfoA,
   return TBAA->mergeTBAAInfoForConditionalOperator(InfoA, InfoB);
 }
 
+TBAAAccessInfo
+CodeGenModule::mergeTBAAInfoForMemoryTransfer(TBAAAccessInfo DestInfo,
+                                              TBAAAccessInfo SrcInfo) {
+  if (!TBAA)
+    return TBAAAccessInfo();
+  return TBAA->mergeTBAAInfoForConditionalOperator(DestInfo, SrcInfo);
+}
+
 void CodeGenModule::DecorateInstructionWithTBAA(llvm::Instruction *Inst,
                                                 TBAAAccessInfo TBAAInfo) {
   if (llvm::MDNode *Tag = getTBAAAccessTagInfo(TBAAInfo))
@@ -694,6 +702,8 @@ llvm::ConstantInt *CodeGenModule::getSize(CharUnits size) {
 void CodeGenModule::setGlobalVisibility(llvm::GlobalValue *GV,
                                         const NamedDecl *D,
                                         ForDefinition_t IsForDefinition) const {
+  if (GV->hasDLLImportStorageClass())
+    return;
   // Internal definitions always have default visibility.
   if (GV->hasLocalLinkage()) {
     GV->setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -753,8 +763,12 @@ static void AppendTargetMangling(const CodeGenModule &CGM,
   const auto &Target = CGM.getTarget();
   TargetAttr::ParsedTargetAttr Info =
       Attr->parse([&Target](StringRef LHS, StringRef RHS) {
-                    return Target.multiVersionSortPriority(LHS) >
-                           Target.multiVersionSortPriority(RHS);
+                    // Multiversioning doesn't allow "no-${feature}", so we can
+                    // only have "+" prefixes here.
+                    assert(LHS.startswith("+") && RHS.startswith("+") &&
+                           "Features should always have a prefix.");
+                    return Target.multiVersionSortPriority(LHS.substr(1)) >
+                           Target.multiVersionSortPriority(RHS.substr(1));
                   });
 
   bool IsFirst = true;
@@ -2185,6 +2199,9 @@ void CodeGenModule::emitMultiVersionFunctions() {
 
     llvm::Function *ResolverFunc = cast<llvm::Function>(
         GetGlobalValue((getMangledName(GD) + ".resolver").str()));
+    if (supportsCOMDAT())
+      ResolverFunc->setComdat(
+          getModule().getOrInsertComdat(ResolverFunc->getName()));
     std::stable_sort(
         Options.begin(), Options.end(),
         std::greater<CodeGenFunction::MultiVersionResolverOption>());

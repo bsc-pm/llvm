@@ -4,6 +4,8 @@
 ; RUN: lld -flavor wasm -o %t.wasm %t.o %t1.o %t2.o
 ; RUN: obj2yaml %t.wasm | FileCheck %s
 
+target triple = "wasm32-unknown-unknown-wasm"
+
 declare i32 @inlineFn()
 
 define void @_start() local_unnamed_addr {
@@ -17,6 +19,12 @@ entry:
 ; CHECK-NEXT:      - Index:           0
 ; CHECK-NEXT:        Type:            I32
 ; CHECK-NEXT:        Mutable:         true
+; CHECK-NEXT:        InitExpr:
+; CHECK-NEXT:          Opcode:          I32_CONST
+; CHECK-NEXT:          Value:           66576
+; CHECK-NEXT:      - Index:           1
+; CHECK-NEXT:        Type:            I32
+; CHECK-NEXT:        Mutable:         false
 ; CHECK-NEXT:        InitExpr:
 ; CHECK-NEXT:          Opcode:          I32_CONST
 ; CHECK-NEXT:          Value:           66576
@@ -37,6 +45,9 @@ entry:
 ; CHECK-NEXT:      - Name:            callInline2
 ; CHECK-NEXT:        Kind:            FUNCTION
 ; CHECK-NEXT:        Index:           3
+; CHECK-NEXT:      - Name:            __heap_base
+; CHECK-NEXT:        Kind:            GLOBAL
+; CHECK-NEXT:        Index:           1
 ; CHECK-NEXT:  - Type:            ELEM
 ; CHECK-NEXT:    Segments:
 ; CHECK-NEXT:      - Offset:
