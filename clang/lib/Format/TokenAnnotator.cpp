@@ -1725,15 +1725,18 @@ void TokenAnnotator::setCommentLineLevels(
       }
     }
 
-    if (NextNonCommentLine && CommentLine) {
-      // If the comment is currently aligned with the line immediately following
-      // it, that's probably intentional and we should keep it.
-      bool AlignedWithNextLine =
-          NextNonCommentLine->First->NewlinesBefore <= 1 &&
-          NextNonCommentLine->First->OriginalColumn ==
-              (*I)->First->OriginalColumn;
-      if (AlignedWithNextLine)
-        (*I)->Level = NextNonCommentLine->Level;
+    // If the comment is currently aligned with the line immediately following
+    // it, that's probably intentional and we should keep it.
+    if (NextNonCommentLine && CommentLine &&
+        NextNonCommentLine->First->NewlinesBefore <= 1 &&
+        NextNonCommentLine->First->OriginalColumn ==
+            (*I)->First->OriginalColumn) {
+      // Align comments for preprocessor lines with the # in column 0.
+      // Otherwise, align with the next line.
+      (*I)->Level = (NextNonCommentLine->Type == LT_PreprocessorDirective ||
+                     NextNonCommentLine->Type == LT_ImportStatement)
+                        ? 0
+                        : NextNonCommentLine->Level;
     } else {
       NextNonCommentLine = (*I)->First->isNot(tok::r_brace) ? (*I) : nullptr;
     }
@@ -2710,9 +2713,11 @@ bool TokenAnnotator::canBreakBefore(const AnnotatedLine &Line,
             Keywords.kw_readonly, Keywords.kw_abstract, Keywords.kw_get,
             Keywords.kw_set, Keywords.kw_async, Keywords.kw_await))
       return false; // Otherwise automatic semicolon insertion would trigger.
-    if (Left.Tok.getIdentifierInfo() &&
-        Right.startsSequence(tok::l_square, tok::r_square))
-      return false;  // breaking in "foo[]" creates illegal TS type syntax.
+    if (Right.NestingLevel == 0 &&
+        (Left.Tok.getIdentifierInfo() ||
+         Left.isOneOf(tok::r_square, tok::r_paren)) &&
+        Right.isOneOf(tok::l_square, tok::l_paren))
+      return false; // Otherwise automatic semicolon insertion would trigger.
     if (Left.is(TT_JsFatArrow) && Right.is(tok::l_brace))
       return false;
     if (Left.is(TT_JsTypeColon))
