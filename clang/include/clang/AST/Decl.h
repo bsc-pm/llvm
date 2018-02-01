@@ -83,7 +83,7 @@ class VarTemplateDecl;
 /// TypeLoc TL = TypeSourceInfo->getTypeLoc();
 /// TL.getStartLoc().print(OS, SrcMgr);
 /// @endcode
-class TypeSourceInfo {
+class LLVM_ALIGNAS(8) TypeSourceInfo {
   // Contains a memory block after the class, used for type source information,
   // allocated by ASTContext.
   friend class ASTContext;
@@ -1750,6 +1750,10 @@ private:
   /// parsing it.
   unsigned WillHaveBody : 1;
 
+  /// Indicates that this function is a multiversioned function using attribute
+  /// 'target'.
+  unsigned IsMultiVersion : 1;
+
 protected:
   /// [C++17] Only used by CXXDeductionGuideDecl. Declared here to avoid
   /// increasing the size of CXXDeductionGuideDecl by the size of an unsigned
@@ -1846,9 +1850,9 @@ protected:
         IsExplicitlyDefaulted(false), HasImplicitReturnZero(false),
         IsLateTemplateParsed(false), IsConstexpr(isConstexprSpecified),
         InstantiationIsPending(false), UsesSEHTry(false), HasSkippedBody(false),
-        WillHaveBody(false), IsCopyDeductionCandidate(false), HasODRHash(false),
-        ODRHash(0), EndRangeLoc(NameInfo.getEndLoc()),
-        DNLoc(NameInfo.getInfo()) {}
+        WillHaveBody(false), IsMultiVersion(false),
+        IsCopyDeductionCandidate(false), HasODRHash(false), ODRHash(0),
+        EndRangeLoc(NameInfo.getEndLoc()), DNLoc(NameInfo.getInfo()) {}
 
   using redeclarable_base = Redeclarable<FunctionDecl>;
 
@@ -2153,6 +2157,15 @@ public:
   /// True if this function will eventually have a body, once it's fully parsed.
   bool willHaveBody() const { return WillHaveBody; }
   void setWillHaveBody(bool V = true) { WillHaveBody = V; }
+
+  /// True if this function is considered a multiversioned function.
+  bool isMultiVersion() const { return getCanonicalDecl()->IsMultiVersion; }
+
+  /// Sets the multiversion state for this declaration and all of its
+  /// redeclarations.
+  void setIsMultiVersion(bool V = true) {
+    getCanonicalDecl()->IsMultiVersion = V;
+  }
 
   void setPreviousDeclaration(FunctionDecl * PrevDecl);
 
@@ -2800,13 +2813,16 @@ public:
 
 /// Base class for declarations which introduce a typedef-name.
 class TypedefNameDecl : public TypeDecl, public Redeclarable<TypedefNameDecl> {
-  using ModedTInfo = std::pair<TypeSourceInfo *, QualType>;
-  llvm::PointerUnion<TypeSourceInfo *, ModedTInfo *> MaybeModedTInfo;
+  struct LLVM_ALIGNAS(8) ModedTInfo {
+    TypeSourceInfo *first;
+    QualType second;
+  };
 
-  // FIXME: This can be packed into the bitfields in Decl.
-  /// If 0, we have not computed IsTransparentTag.
-  /// Otherwise, IsTransparentTag is (CacheIsTransparentTag >> 1).
-  mutable unsigned CacheIsTransparentTag : 2;
+  /// If int part is 0, we have not computed IsTransparentTag.
+  /// Otherwise, IsTransparentTag is (getInt() >> 1).
+  mutable llvm::PointerIntPair<
+      llvm::PointerUnion<TypeSourceInfo *, ModedTInfo *>, 2>
+      MaybeModedTInfo;
 
   void anchor() override;
 
@@ -2815,7 +2831,7 @@ protected:
                   SourceLocation StartLoc, SourceLocation IdLoc,
                   IdentifierInfo *Id, TypeSourceInfo *TInfo)
       : TypeDecl(DK, DC, IdLoc, Id, StartLoc), redeclarable_base(C),
-        MaybeModedTInfo(TInfo), CacheIsTransparentTag(0) {}
+        MaybeModedTInfo(TInfo, 0) {}
 
   using redeclarable_base = Redeclarable<TypedefNameDecl>;
 
@@ -2842,26 +2858,29 @@ public:
   using redeclarable_base::getMostRecentDecl;
   using redeclarable_base::isFirstDecl;
 
-  bool isModed() const { return MaybeModedTInfo.is<ModedTInfo*>(); }
+  bool isModed() const {
+    return MaybeModedTInfo.getPointer().is<ModedTInfo *>();
+  }
 
   TypeSourceInfo *getTypeSourceInfo() const {
-    return isModed()
-      ? MaybeModedTInfo.get<ModedTInfo*>()->first
-      : MaybeModedTInfo.get<TypeSourceInfo*>();
+    return isModed() ? MaybeModedTInfo.getPointer().get<ModedTInfo *>()->first
+                     : MaybeModedTInfo.getPointer().get<TypeSourceInfo *>();
   }
 
   QualType getUnderlyingType() const {
-    return isModed()
-      ? MaybeModedTInfo.get<ModedTInfo*>()->second
-      : MaybeModedTInfo.get<TypeSourceInfo*>()->getType();
+    return isModed() ? MaybeModedTInfo.getPointer().get<ModedTInfo *>()->second
+                     : MaybeModedTInfo.getPointer()
+                           .get<TypeSourceInfo *>()
+                           ->getType();
   }
 
   void setTypeSourceInfo(TypeSourceInfo *newType) {
-    MaybeModedTInfo = newType;
+    MaybeModedTInfo.setPointer(newType);
   }
 
   void setModedTypeSourceInfo(TypeSourceInfo *unmodedTSI, QualType modedTy) {
-    MaybeModedTInfo = new (getASTContext()) ModedTInfo(unmodedTSI, modedTy);
+    MaybeModedTInfo.setPointer(new (getASTContext(), 8)
+                                   ModedTInfo({unmodedTSI, modedTy}));
   }
 
   /// Retrieves the canonical declaration of this typedef-name.
@@ -2878,8 +2897,8 @@ public:
   /// Determines if this typedef shares a name and spelling location with its
   /// underlying tag type, as is the case with the NS_ENUM macro.
   bool isTransparentTag() const {
-    if (CacheIsTransparentTag)
-      return CacheIsTransparentTag & 0x2;
+    if (MaybeModedTInfo.getInt())
+      return MaybeModedTInfo.getInt() & 0x2;
     return isTransparentTagSlow();
   }
 

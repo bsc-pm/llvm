@@ -14,9 +14,11 @@
 #include "SymbolTable.h"
 #include "Symbols.h"
 #include "Writer.h"
+#include "lld/Common/Args.h"
 #include "lld/Common/Driver.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
+#include "lld/Common/Timer.h"
 #include "lld/Common/Version.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -47,6 +49,8 @@ using llvm::sys::Process;
 namespace lld {
 namespace coff {
 
+static Timer InputFileTimer("Input File Reading", Timer::root());
+
 Configuration *Config;
 LinkerDriver *Driver;
 
@@ -57,9 +61,9 @@ bool link(ArrayRef<const char *> Args, bool CanExitEarly, raw_ostream &Diag) {
   errorHandler().ErrorLimitExceededMsg =
       "too many errors emitted, stopping now"
       " (use /ERRORLIMIT:0 to see all errors)";
+  errorHandler().ExitEarly = CanExitEarly;
   Config = make<Configuration>();
   Config->Argv = {Args.begin(), Args.end()};
-  Config->CanExitEarly = CanExitEarly;
 
   Symtab = make<SymbolTable>();
 
@@ -227,7 +231,29 @@ static bool isDecorated(StringRef Sym) {
 void LinkerDriver::parseDirectives(StringRef S) {
   ArgParser Parser;
   // .drectve is always tokenized using Windows shell rules.
-  opt::InputArgList Args = Parser.parseDirectives(S);
+  // /EXPORT: option can appear too many times, processing in fastpath.
+  opt::InputArgList Args;
+  std::vector<StringRef> Exports;
+  std::tie(Args, Exports) = Parser.parseDirectives(S);
+
+  for (StringRef E : Exports) {
+    // If a common header file contains dllexported function
+    // declarations, many object files may end up with having the
+    // same /EXPORT options. In order to save cost of parsing them,
+    // we dedup them first.
+    if (!DirectivesExports.insert(E).second)
+      continue;
+
+    Export Exp = parseExport(E);
+    if (Config->Machine == I386 && Config->MinGW) {
+      if (!isDecorated(Exp.Name))
+        Exp.Name = Saver.save("_" + Exp.Name);
+      if (!Exp.ExtName.empty() && !isDecorated(Exp.ExtName))
+        Exp.ExtName = Saver.save("_" + Exp.ExtName);
+    }
+    Exp.Directives = true;
+    Config->Exports.push_back(Exp);
+  }
 
   for (auto *Arg : Args) {
     switch (Arg->getOption().getUnaliasedOption().getID()) {
@@ -244,25 +270,6 @@ void LinkerDriver::parseDirectives(StringRef S) {
     case OPT_entry:
       Config->Entry = addUndefined(mangle(Arg->getValue()));
       break;
-    case OPT_export: {
-      // If a common header file contains dllexported function
-      // declarations, many object files may end up with having the
-      // same /EXPORT options. In order to save cost of parsing them,
-      // we dedup them first.
-      if (!DirectivesExports.insert(Arg->getValue()).second)
-        break;
-
-      Export E = parseExport(Arg->getValue());
-      if (Config->Machine == I386 && Config->MinGW) {
-        if (!isDecorated(E.Name))
-          E.Name = Saver.save("_" + E.Name);
-        if (!E.ExtName.empty() && !isDecorated(E.ExtName))
-          E.ExtName = Saver.save("_" + E.ExtName);
-      }
-      E.Directives = true;
-      Config->Exports.push_back(E);
-      break;
-    }
     case OPT_failifmismatch:
       checkFailIfMismatch(Arg->getValue());
       break;
@@ -533,10 +540,41 @@ static void createImportLibrary(bool AsLib) {
     Exports.push_back(E2);
   }
 
-  auto E = writeImportLibrary(getImportName(AsLib), getImplibPath(), Exports,
-                              Config->Machine, false);
-  handleAllErrors(std::move(E),
-                  [&](ErrorInfoBase &EIB) { error(EIB.message()); });
+  auto HandleError = [](Error &&E) {
+    handleAllErrors(std::move(E),
+                    [](ErrorInfoBase &EIB) { error(EIB.message()); });
+  };
+  std::string LibName = getImportName(AsLib);
+  std::string Path = getImplibPath();
+
+  // If the import library already exists, replace it only if the contents
+  // have changed.
+  ErrorOr<std::unique_ptr<MemoryBuffer>> OldBuf = MemoryBuffer::getFile(Path);
+  if (!OldBuf) {
+    HandleError(writeImportLibrary(LibName, Path, Exports, Config->Machine,
+                                   false, Config->MinGW));
+    return;
+  }
+
+  SmallString<128> TmpName;
+  if (std::error_code EC =
+          sys::fs::createUniqueFile(Path + ".tmp-%%%%%%%%.lib", TmpName))
+    fatal("cannot create temporary file for import library " + Path + ": " +
+          EC.message());
+
+  if (Error E = writeImportLibrary(LibName, TmpName, Exports, Config->Machine,
+                                   false, Config->MinGW)) {
+    HandleError(std::move(E));
+    return;
+  }
+
+  std::unique_ptr<MemoryBuffer> NewBuf = check(MemoryBuffer::getFile(TmpName));
+  if ((*OldBuf)->getBuffer() != NewBuf->getBuffer()) {
+    OldBuf->reset();
+    HandleError(errorCodeToError(sys::fs::rename(TmpName, Path)));
+  } else {
+    sys::fs::remove(TmpName);
+  }
 }
 
 static void parseModuleDefs(StringRef Path) {
@@ -634,8 +672,8 @@ filterBitcodeFiles(StringRef Path, std::vector<std::string> &TemporaryFiles) {
   log("Creating a temporary archive for " + Path + " to remove bitcode files");
 
   SmallString<128> S;
-  if (auto EC = sys::fs::createTemporaryFile("lld-" + sys::path::stem(Path),
-                                             ".lib", S))
+  if (std::error_code EC = sys::fs::createTemporaryFile(
+          "lld-" + sys::path::stem(Path), ".lib", S))
     fatal("cannot create a temporary file: " + EC.message());
   std::string Temp = S.str();
   TemporaryFiles.push_back(Temp);
@@ -711,12 +749,52 @@ void LinkerDriver::enqueueTask(std::function<void()> Task) {
 }
 
 bool LinkerDriver::run() {
+  ScopedTimer T(InputFileTimer);
+
   bool DidWork = !TaskQueue.empty();
   while (!TaskQueue.empty()) {
     TaskQueue.front()();
     TaskQueue.pop_front();
   }
   return DidWork;
+}
+
+// Parse an /order file. If an option is given, the linker places
+// COMDAT sections in the same order as their names appear in the
+// given file.
+static void parseOrderFile(StringRef Arg) {
+  // For some reason, the MSVC linker requires a filename to be
+  // preceded by "@".
+  if (!Arg.startswith("@")) {
+    error("malformed /order option: '@' missing");
+    return;
+  }
+
+  // Get a list of all comdat sections for error checking.
+  DenseSet<StringRef> Set;
+  for (Chunk *C : Symtab->getChunks())
+    if (auto *Sec = dyn_cast<SectionChunk>(C))
+      if (Sec->Sym)
+        Set.insert(Sec->Sym->getName());
+
+  // Open a file.
+  StringRef Path = Arg.substr(1);
+  std::unique_ptr<MemoryBuffer> MB = CHECK(
+      MemoryBuffer::getFile(Path, -1, false, true), "could not open " + Path);
+
+  // Parse a file. An order file contains one symbol per line.
+  // All symbols that were not present in a given order file are
+  // considered to have the lowest priority 0 and are placed at
+  // end of an output section.
+  for (std::string S : args::getLines(MB->getMemBufferRef())) {
+    if (Config->Machine == I386 && !isDecorated(S))
+      S = "_" + S;
+
+    if (Set.count(S) == 0)
+      warn("/order:" + Arg + ": missing symbol: " + S);
+    else
+      Config->Order[S] = INT_MIN + Config->Order.size();
+  }
 }
 
 void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
@@ -762,6 +840,10 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
     return;
   }
 
+  if (Args.hasArg(OPT_show_timing))
+    Config->ShowTiming = true;
+
+  ScopedTimer T(Timer::root());
   // Handle --version, which is an lld extension. This option is a bit odd
   // because it doesn't start with "/", but we deliberately chose "--" to
   // avoid conflict with /version and for compatibility with clang-cl.
@@ -1318,6 +1400,12 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   if (Config->Manifest == Configuration::SideBySide)
     createSideBySideManifest();
 
+  // Handle /order. We want to do this at this moment because we
+  // need a complete list of comdat sections to warn on nonexistent
+  // functions.
+  if (auto *Arg = Args.getLastArg(OPT_order))
+    parseOrderFile(Arg->getValue());
+
   // Identify unreferenced COMDAT sections.
   if (Config->DoGC)
     markLive(Symtab->getChunks());
@@ -1328,6 +1416,11 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
 
   // Write the result.
   writeResult();
+
+  // Stop early so we can print the results.
+  Timer::root().stop();
+  if (Config->ShowTiming)
+    Timer::root().print();
 }
 
 } // namespace coff

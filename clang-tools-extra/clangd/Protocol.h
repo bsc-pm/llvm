@@ -25,6 +25,7 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_PROTOCOL_H
 
 #include "JSONExpr.h"
+#include "URI.h"
 #include "llvm/ADT/Optional.h"
 #include <string>
 #include <vector>
@@ -47,32 +48,31 @@ enum class ErrorCode {
   RequestCancelled = -32800,
 };
 
-struct URI {
-  std::string uri;
+struct URIForFile {
   std::string file;
 
-  static URI fromUri(llvm::StringRef uri);
-  static URI fromFile(llvm::StringRef file);
+  std::string uri() const { return URI::createFile(file).toString(); }
 
-  friend bool operator==(const URI &LHS, const URI &RHS) {
-    return LHS.uri == RHS.uri;
+  friend bool operator==(const URIForFile &LHS, const URIForFile &RHS) {
+    return LHS.file == RHS.file;
   }
 
-  friend bool operator!=(const URI &LHS, const URI &RHS) {
+  friend bool operator!=(const URIForFile &LHS, const URIForFile &RHS) {
     return !(LHS == RHS);
   }
 
-  friend bool operator<(const URI &LHS, const URI &RHS) {
-    return LHS.uri < RHS.uri;
+  friend bool operator<(const URIForFile &LHS, const URIForFile &RHS) {
+    return LHS.file < RHS.file;
   }
 };
-json::Expr toJSON(const URI &U);
-bool fromJSON(const json::Expr &, URI &);
-llvm::raw_ostream &operator<<(llvm::raw_ostream &, const URI &);
+
+/// Serialize/deserialize \p URIForFile to/from a string URI.
+json::Expr toJSON(const URIForFile &U);
+bool fromJSON(const json::Expr &, URIForFile &);
 
 struct TextDocumentIdentifier {
   /// The text document's URI.
-  URI uri;
+  URIForFile uri;
 };
 bool fromJSON(const json::Expr &, TextDocumentIdentifier &);
 
@@ -116,7 +116,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &, const Range &);
 
 struct Location {
   /// The text document's URI.
-  URI uri;
+  URIForFile uri;
   Range range;
 
   friend bool operator==(const Location &LHS, const Location &RHS) {
@@ -150,10 +150,11 @@ struct TextEdit {
 };
 bool fromJSON(const json::Expr &, TextEdit &);
 json::Expr toJSON(const TextEdit &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const TextEdit &);
 
 struct TextDocumentItem {
   /// The text document's URI.
-  URI uri;
+  URIForFile uri;
 
   /// The text document's language identifier.
   std::string languageId;
@@ -194,7 +195,7 @@ struct InitializeParams {
   /// The rootUri of the workspace. Is null if no
   /// folder is open. If both `rootPath` and `rootUri` are set
   /// `rootUri` wins.
-  llvm::Optional<URI> rootUri;
+  llvm::Optional<URIForFile> rootUri;
 
   // User provided initialization options.
   // initializationOptions?: any;
@@ -252,7 +253,7 @@ bool fromJSON(const json::Expr &E, FileChangeType &Out);
 
 struct FileEvent {
   /// The file's URI.
-  URI uri;
+  URIForFile uri;
   /// The change type.
   FileChangeType type;
 };
@@ -341,6 +342,7 @@ struct LSPDiagnosticCompare {
   }
 };
 bool fromJSON(const json::Expr &, Diagnostic &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const Diagnostic &);
 
 struct CodeActionContext {
   /// An array of diagnostics.
@@ -446,6 +448,17 @@ enum class InsertTextFormat {
   Snippet = 2,
 };
 
+/// Provides details for how a completion item was scored.
+/// This can be used for client-side filtering of completion items as the
+/// user keeps typing.
+/// This is a clangd extension.
+struct CompletionItemScores {
+  float finalScore;  /// The score that items are ranked by.
+                     /// This is filterScore * symbolScore.
+  float filterScore; /// How the partial identifier matched filterText. [0-1]
+  float symbolScore; /// How the symbol fits, ignoring the partial identifier.
+};
+
 struct CompletionItem {
   /// The label of this completion item. By default also the text that is
   /// inserted when selecting this completion.
@@ -465,6 +478,9 @@ struct CompletionItem {
   /// A string that should be used when comparing this item with other items.
   /// When `falsy` the label is used.
   std::string sortText;
+
+  /// Details about the quality of this completion item. (clangd extension)
+  llvm::Optional<CompletionItemScores> scoreInfo;
 
   /// A string that should be used when filtering a set of completion items.
   /// When `falsy` the label is used.

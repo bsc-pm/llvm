@@ -10,6 +10,7 @@
 #ifndef LLD_ELF_CONFIG_H
 #define LLD_ELF_CONFIG_H
 
+#include "lld/Common/ErrorHandler.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -126,7 +127,8 @@ struct Configuration {
   bool HasDynamicList = false;
   bool HasDynSymTab;
   bool ICF;
-  bool ICFData;
+  bool IgnoreDataAddressEquality;
+  bool IgnoreFunctionAddressEquality;
   bool MergeArmExidx;
   bool MipsN32Abi = false;
   bool NoGnuUnique;
@@ -159,6 +161,7 @@ struct Configuration {
   bool ZRelro;
   bool ZRodynamic;
   bool ZText;
+  bool ZRetpolineplt;
   bool ExitEarly;
   bool ZWxneeded;
   DiscardPolicy Discard;
@@ -238,6 +241,12 @@ struct Configuration {
 // The only instance of Configuration struct.
 extern Configuration *Config;
 
+static inline void errorOrWarn(const Twine &Msg) {
+  if (!Config->NoinhibitExec)
+    error(Msg);
+  else
+    warn(Msg);
+}
 } // namespace elf
 } // namespace lld
 

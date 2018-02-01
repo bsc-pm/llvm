@@ -17,6 +17,7 @@
 #include "Symbols.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
+#include "lld/Common/Timer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -163,6 +164,9 @@ private:
 namespace lld {
 namespace coff {
 
+static Timer CodeLayoutTimer("Code Layout", Timer::root());
+static Timer DiskCommitTimer("Commit Output File", Timer::root());
+
 void writeResult() { Writer().run(); }
 
 void OutputSection::setRVA(uint64_t RVA) {
@@ -177,6 +181,9 @@ void OutputSection::setFileOffset(uint64_t Off) {
   // by the loader.
   if (Header.SizeOfRawData == 0)
     return;
+
+  // It is possible that this assignment could cause an overflow of the u32,
+  // but that should be caught by the FileSize check in OutputSection::run().
   Header.PointerToRawData = Off;
 }
 
@@ -284,6 +291,8 @@ static Optional<codeview::DebugInfo> loadExistingBuildId(StringRef Path) {
 
 // The main function of the writer.
 void Writer::run() {
+  ScopedTimer T1(CodeLayoutTimer);
+
   createSections();
   createMiscChunks();
   createImportTables();
@@ -294,6 +303,10 @@ void Writer::run() {
   removeEmptySections();
   setSectionPermissions();
   createSymbolAndStringTable();
+
+  if (FileSize > UINT32_MAX)
+    fatal("image size (" + Twine(FileSize) + ") " +
+        "exceeds maximum allowable size (" + Twine(UINT32_MAX) + ")");
 
   // We must do this before opening the output file, as it depends on being able
   // to read the contents of the existing output file.
@@ -308,14 +321,16 @@ void Writer::run() {
   sortExceptionTable();
   writeBuildId();
 
-  if (!Config->PDBPath.empty() && Config->Debug) {
+  T1.stop();
 
+  if (!Config->PDBPath.empty() && Config->Debug) {
     assert(BuildId);
     createPDB(Symtab, OutputSections, SectionTable, *BuildId->BuildId);
   }
 
   writeMapFile(OutputSections);
 
+  ScopedTimer T2(DiskCommitTimer);
   if (auto E = Buffer->commit())
     fatal("failed to write the output file: " + toString(std::move(E)));
 }
@@ -333,6 +348,21 @@ static StringRef getOutputSection(StringRef Name) {
   return It->second;
 }
 
+// For /order.
+static void sortBySectionOrder(std::vector<Chunk *> &Chunks) {
+  auto GetPriority = [](const Chunk *C) {
+    if (auto *Sec = dyn_cast<SectionChunk>(C))
+      if (Sec->Sym)
+        return Config->Order.lookup(Sec->Sym->getName());
+    return 0;
+  };
+
+  std::stable_sort(Chunks.begin(), Chunks.end(),
+                   [=](const Chunk *A, const Chunk *B) {
+                     return GetPriority(A) < GetPriority(B);
+                   });
+}
+
 // Create output section objects and add them to OutputSections.
 void Writer::createSections() {
   // First, bin chunks by name.
@@ -346,6 +376,11 @@ void Writer::createSections() {
     }
     Map[C->getSectionName()].push_back(C);
   }
+
+  // Process an /order option.
+  if (!Config->Order.empty())
+    for (auto &Pair : Map)
+      sortBySectionOrder(Pair.second);
 
   // Then create an OutputSection for each section.
   // '$' and all following characters in input section names are
@@ -546,9 +581,8 @@ void Writer::createSymbolAndStringTable() {
       continue;
     // If a section isn't discardable (i.e. will be mapped at runtime),
     // prefer a truncated section name over a long section name in
-    // the string table that is unavailable at runtime. This is different from
-    // what link.exe does, but finding ".eh_fram" instead of "/4" is useful
-    // to libunwind.
+    // the string table that is unavailable at runtime. Note that link.exe
+    // always truncates, even for discardable sections.
     if ((Sec->getPermissions() & IMAGE_SCN_MEM_DISCARDABLE) == 0)
       continue;
     Sec->setStringTableOff(addEntryToStringTable(Name));
@@ -571,10 +605,8 @@ void Writer::createSymbolAndStringTable() {
   if (OutputSymtab.empty() && Strtab.empty())
     return;
 
-  OutputSection *LastSection = OutputSections.back();
   // We position the symbol table to be adjacent to the end of the last section.
-  uint64_t FileOff = LastSection->getFileOff() +
-                     alignTo(LastSection->getRawSize(), SectorSize);
+  uint64_t FileOff = FileSize;
   PointerToSymbolTable = FileOff;
   FileOff += OutputSymtab.size() * sizeof(coff_symbol16);
   FileOff += 4 + Strtab.size();
@@ -590,7 +622,7 @@ void Writer::assignAddresses() {
   SizeOfHeaders +=
       Config->is64() ? sizeof(pe32plus_header) : sizeof(pe32_header);
   SizeOfHeaders = alignTo(SizeOfHeaders, SectorSize);
-  uint64_t RVA = 0x1000; // The first page is kept unmapped.
+  uint64_t RVA = PageSize; // The first page is kept unmapped.
   FileSize = SizeOfHeaders;
   // Move DISCARDABLE (or non-memory-mapped) sections to the end of file because
   // the loader cannot handle holes.

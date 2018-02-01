@@ -825,7 +825,7 @@ private:
   bool ParseIntelDotOperator(IntelExprStateMachine &SM, SMLoc &End);
   unsigned IdentifyIntelInlineAsmOperator(StringRef Name);
   unsigned ParseIntelInlineAsmOperator(unsigned OpKind);
-  std::unique_ptr<X86Operand> ParseRoundingModeOp(SMLoc Start, SMLoc End);
+  std::unique_ptr<X86Operand> ParseRoundingModeOp(SMLoc Start);
   bool ParseIntelNamedOperator(StringRef Name, IntelExprStateMachine &SM);
   void RewriteIntelExpression(IntelExprStateMachine &SM, SMLoc Start,
                               SMLoc End);
@@ -1595,7 +1595,7 @@ bool X86AsmParser::ParseIntelInlineAsmIdentifier(const MCExpr *&Val,
 
 //ParseRoundingModeOp - Parse AVX-512 rounding mode operand
 std::unique_ptr<X86Operand>
-X86AsmParser::ParseRoundingModeOp(SMLoc Start, SMLoc End) {
+X86AsmParser::ParseRoundingModeOp(SMLoc Start) {
   MCAsmParser &Parser = getParser();
   const AsmToken &Tok = Parser.getTok();
   // Eat "{" and mark the current place.
@@ -1616,6 +1616,7 @@ X86AsmParser::ParseRoundingModeOp(SMLoc Start, SMLoc End) {
     Parser.Lex();  // Eat the sae
     if (!getLexer().is(AsmToken::RCurly))
       return ErrorOperand(Tok.getLoc(), "Expected } at this point");
+    SMLoc End = Tok.getEndLoc();
     Parser.Lex();  // Eat "}"
     const MCExpr *RndModeOp =
       MCConstantExpr::create(rndMode, Parser.getContext());
@@ -1794,7 +1795,7 @@ std::unique_ptr<X86Operand> X86AsmParser::ParseIntelOperand() {
   // Rounding mode operand.
   if (getSTI().getFeatureBits()[X86::FeatureAVX512] &&
       getLexer().is(AsmToken::LCurly))
-    return ParseRoundingModeOp(Start, End);
+    return ParseRoundingModeOp(Start);
 
   // Register operand.
   unsigned RegNo = 0;
@@ -1895,9 +1896,9 @@ std::unique_ptr<X86Operand> X86AsmParser::ParseATTOperand() {
     return X86Operand::CreateImm(Val, Start, End);
   }
   case AsmToken::LCurly:{
-    SMLoc Start = Parser.getTok().getLoc(), End;
+    SMLoc Start = Parser.getTok().getLoc();
     if (getSTI().getFeatureBits()[X86::FeatureAVX512])
-      return ParseRoundingModeOp(Start, End);
+      return ParseRoundingModeOp(Start);
     return ErrorOperand(Start, "Unexpected '{' in expression");
   }
   }
@@ -2375,6 +2376,13 @@ bool X86AsmParser::ParseInstruction(ParseInstructionInfo &Info, StringRef Name,
             .Cases("repne", "repnz", X86::IP_HAS_REPEAT_NE)
             .Default(X86::IP_NO_PREFIX); // Invalid prefix (impossible)
     Flags |= Prefix;
+    if (getLexer().is(AsmToken::EndOfStatement)) {
+      // We don't have real instr with the given prefix
+      //  let's use the prefix as the instr.
+      // TODO: there could be several prefixes one after another
+      Flags = X86::IP_NO_PREFIX;
+      break;
+    }
     Name = Parser.getTok().getString();
     Parser.Lex(); // eat the prefix
     // Hack: we could have something like "rep # some comment" or

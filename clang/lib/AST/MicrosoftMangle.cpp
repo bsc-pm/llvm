@@ -1559,12 +1559,11 @@ MicrosoftCXXNameMangler::mangleRefQualifier(RefQualifierKind RefQualifier) {
 
 void MicrosoftCXXNameMangler::manglePointerExtQualifiers(Qualifiers Quals,
                                                          QualType PointeeType) {
-  bool HasRestrict = Quals.hasRestrict();
   if (PointersAre64Bit &&
       (PointeeType.isNull() || !PointeeType->isFunctionType()))
     Out << 'E';
 
-  if (HasRestrict)
+  if (Quals.hasRestrict())
     Out << 'I';
 
   if (Quals.hasUnaligned() ||
@@ -1833,15 +1832,12 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
     llvm_unreachable("placeholder types shouldn't get to name mangling");
 
   case BuiltinType::ObjCId:
-    Out << "PA";
     mangleArtificalTagType(TTK_Struct, "objc_object");
     break;
   case BuiltinType::ObjCClass:
-    Out << "PA";
     mangleArtificalTagType(TTK_Struct, "objc_class");
     break;
   case BuiltinType::ObjCSel:
-    Out << "PA";
     mangleArtificalTagType(TTK_Struct, "objc_selector");
     break;
 
@@ -2337,9 +2333,6 @@ void MicrosoftCXXNameMangler::mangleType(const PointerType *T, Qualifiers Quals,
 
 void MicrosoftCXXNameMangler::mangleType(const ObjCObjectPointerType *T,
                                          Qualifiers Quals, SourceRange Range) {
-  if (T->isObjCIdType() || T->isObjCClassType())
-    return mangleType(T->getPointeeType(), Range, QMM_Drop);
-
   QualType PointeeType = T->getPointeeType();
   manglePointerCVQualifiers(Quals);
   manglePointerExtQualifiers(Quals, PointeeType);
@@ -2457,9 +2450,36 @@ void MicrosoftCXXNameMangler::mangleType(const ObjCInterfaceType *T, Qualifiers,
 
 void MicrosoftCXXNameMangler::mangleType(const ObjCObjectType *T, Qualifiers,
                                          SourceRange Range) {
-  // We don't allow overloading by different protocol qualification,
-  // so mangling them isn't necessary.
-  mangleType(T->getBaseType(), Range, QMM_Drop);
+  if (T->qual_empty())
+    return mangleType(T->getBaseType(), Range, QMM_Drop);
+
+  ArgBackRefMap OuterArgsContext;
+  BackRefVec OuterTemplateContext;
+
+  TypeBackReferences.swap(OuterArgsContext);
+  NameBackReferences.swap(OuterTemplateContext);
+
+  mangleTagTypeKind(TTK_Struct);
+
+  Out << "?$";
+  if (T->isObjCId())
+    mangleSourceName("objc_object");
+  else if (T->isObjCClass())
+    mangleSourceName("objc_class");
+  else
+    mangleSourceName(T->getInterface()->getName());
+
+  for (const auto &Q : T->quals()) {
+    Out << 'Y'; // cointerface
+    mangleSourceName(Q->getName());
+    Out << '@';
+  }
+  Out << '@';
+
+  Out << '@';
+
+  TypeBackReferences.swap(OuterArgsContext);
+  NameBackReferences.swap(OuterTemplateContext);
 }
 
 void MicrosoftCXXNameMangler::mangleType(const BlockPointerType *T,

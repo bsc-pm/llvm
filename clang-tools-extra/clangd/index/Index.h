@@ -10,11 +10,11 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_INDEX_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_INDEX_INDEX_H
 
-#include "../Context.h"
 #include "clang/Index/IndexSymbol.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringExtras.h"
 #include <array>
 #include <string>
@@ -105,17 +105,17 @@ namespace clangd {
 // WARNING: Symbols do not own much of their underlying data - typically strings
 // are owned by a SymbolSlab. They should be treated as non-owning references.
 // Copies are shallow.
-// When adding new unowned data fields to Symbol, remember to update
-// SymbolSlab::Builder in Index.cpp to copy them to the slab's storage.
+// When adding new unowned data fields to Symbol, remember to update:
+//   - SymbolSlab::Builder in Index.cpp, to copy them to the slab's storage.
+//   - mergeSymbol in Merge.cpp, to properly combine two Symbols.
 struct Symbol {
   // The ID of the symbol.
   SymbolID ID;
   // The symbol information, like symbol kind.
   index::SymbolInfo SymInfo;
-  // The unqualified name of the symbol, e.g. "bar" (for "n1::n2::bar").
+  // The unqualified name of the symbol, e.g. "bar" (for ns::bar).
   llvm::StringRef Name;
-  // The scope (e.g. namespace) of the symbol, e.g. "n1::n2" (for
-  // "n1::n2::bar").
+  // The containing namespace. e.g. "" (global), "ns::" (top-level namespace).
   llvm::StringRef Scope;
   // The location of the canonical declaration of the symbol.
   //
@@ -126,10 +126,39 @@ struct Symbol {
   //     (not a definition), which is usually declared in ".h" file.
   SymbolLocation CanonicalDeclaration;
 
+  /// A brief description of the symbol that can be displayed in the completion
+  /// candidate list. For example, "Foo(X x, Y y) const" is a labal for a
+  /// function.
+  llvm::StringRef CompletionLabel;
+  /// The piece of text that the user is expected to type to match the
+  /// code-completion string, typically a keyword or the name of a declarator or
+  /// macro.
+  llvm::StringRef CompletionFilterText;
+  /// What to insert when completing this symbol (plain text version).
+  llvm::StringRef CompletionPlainInsertText;
+  /// What to insert when completing this symbol (snippet version). This is
+  /// empty if it is the same as the plain insert text above.
+  llvm::StringRef CompletionSnippetInsertText;
+
+  /// Optional symbol details that are not required to be set. For example, an
+  /// index fuzzy match can return a large number of symbol candidates, and it
+  /// is preferable to send only core symbol information in the batched results
+  /// and have clients resolve full symbol information for a specific candidate
+  /// if needed.
+  struct Details {
+    // Documentation including comment for the symbol declaration.
+    llvm::StringRef Documentation;
+    // This is what goes into the LSP detail field in a completion item. For
+    // example, the result type of a function.
+    llvm::StringRef CompletionDetail;
+  };
+
+  // Optional details of the symbol.
+  const Details *Detail = nullptr;
+
   // FIXME: add definition location of the symbol.
   // FIXME: add all occurrences support.
   // FIXME: add extra fields for index scoring signals.
-  // FIXME: add code completion information.
 };
 
 // An immutable symbol container that stores a set of symbols.
@@ -190,14 +219,14 @@ struct FuzzyFindRequest {
   /// un-qualified identifiers and should not contain qualifiers like "::".
   std::string Query;
   /// \brief If this is non-empty, symbols must be in at least one of the scopes
-  /// (e.g. namespaces) excluding nested scopes. For example, if a scope "xyz"
-  /// is provided, the matched symbols must be defined in scope "xyz" but not
-  /// "xyz::abc".
+  /// (e.g. namespaces) excluding nested scopes. For example, if a scope "xyz::"
+  /// is provided, the matched symbols must be defined in namespace xyz but not
+  /// namespace xyz::abc.
   ///
-  /// A scope must be fully qualified without leading or trailing "::" e.g.
-  /// "n1::n2". "" is interpreted as the global namespace, and "::" is invalid.
+  /// The global scope is "", a top level scope is "foo::", etc.
   std::vector<std::string> Scopes;
-  /// \brief The maxinum number of candidates to return.
+  /// \brief The number of top candidates to return. The index may choose to
+  /// return more than this, e.g. if it doesn't know which candidates are best.
   size_t MaxCandidateCount = UINT_MAX;
 };
 
@@ -209,11 +238,12 @@ public:
 
   /// \brief Matches symbols in the index fuzzily and applies \p Callback on
   /// each matched symbol before returning.
+  /// If returned Symbols are used outside Callback, they must be deep-copied!
   ///
   /// Returns true if the result list is complete, false if it was truncated due
   /// to MaxCandidateCount
   virtual bool
-  fuzzyFind(const Context &Ctx, const FuzzyFindRequest &Req,
+  fuzzyFind(const FuzzyFindRequest &Req,
             llvm::function_ref<void(const Symbol &)> Callback) const = 0;
 
   // FIXME: add interfaces for more index use cases:

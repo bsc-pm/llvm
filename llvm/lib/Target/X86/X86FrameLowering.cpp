@@ -741,6 +741,11 @@ void X86FrameLowering::emitStackProbeCall(MachineFunction &MF,
                                           bool InProlog) const {
   bool IsLargeCodeModel = MF.getTarget().getCodeModel() == CodeModel::Large;
 
+  // FIXME: Add retpoline support and remove this.
+  if (Is64Bit && IsLargeCodeModel && STI.useRetpoline())
+    report_fatal_error("Emitting stack probe calls on 64-bit with the large "
+                       "code model and retpoline not yet implemented.");
+
   unsigned CallOp;
   if (Is64Bit)
     CallOp = IsLargeCodeModel ? X86::CALL64r : X86::CALL64pcrel32;
@@ -1855,6 +1860,32 @@ bool X86FrameLowering::assignCalleeSavedSpillSlots(
   unsigned CalleeSavedFrameSize = 0;
   int SpillSlotOffset = getOffsetOfLocalArea() + X86FI->getTCReturnAddrDelta();
 
+  int64_t TailCallReturnAddrDelta = X86FI->getTCReturnAddrDelta();
+
+  if (TailCallReturnAddrDelta < 0) {
+    // create RETURNADDR area
+    //   arg
+    //   arg
+    //   RETADDR
+    //   { ...
+    //     RETADDR area
+    //     ...
+    //   }
+    //   [EBP]
+    MFI.CreateFixedObject(-TailCallReturnAddrDelta,
+                           TailCallReturnAddrDelta - SlotSize, true);
+  }
+
+  // Spill the BasePtr if it's used.
+  if (this->TRI->hasBasePointer(MF)) {
+    // Allocate a spill slot for EBP if we have a base pointer and EH funclets.
+    if (MF.hasEHFunclets()) {
+      int FI = MFI.CreateSpillStackObject(SlotSize, SlotSize);
+      X86FI->setHasSEHFramePtrSave(true);
+      X86FI->setSEHFramePtrSaveIndex(FI);
+    }
+  }
+
   if (hasFP(MF)) {
     // emitPrologue always spills frame register the first thing.
     SpillSlotOffset -= SlotSize;
@@ -2060,36 +2091,9 @@ void X86FrameLowering::determineCalleeSaves(MachineFunction &MF,
                                             RegScavenger *RS) const {
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
 
-  MachineFrameInfo &MFI = MF.getFrameInfo();
-
-  X86MachineFunctionInfo *X86FI = MF.getInfo<X86MachineFunctionInfo>();
-  int64_t TailCallReturnAddrDelta = X86FI->getTCReturnAddrDelta();
-
-  if (TailCallReturnAddrDelta < 0) {
-    // create RETURNADDR area
-    //   arg
-    //   arg
-    //   RETADDR
-    //   { ...
-    //     RETADDR area
-    //     ...
-    //   }
-    //   [EBP]
-    MFI.CreateFixedObject(-TailCallReturnAddrDelta,
-                           TailCallReturnAddrDelta - SlotSize, true);
-  }
-
   // Spill the BasePtr if it's used.
-  if (TRI->hasBasePointer(MF)) {
+  if (TRI->hasBasePointer(MF))
     SavedRegs.set(TRI->getBaseRegister());
-
-    // Allocate a spill slot for EBP if we have a base pointer and EH funclets.
-    if (MF.hasEHFunclets()) {
-      int FI = MFI.CreateSpillStackObject(SlotSize, SlotSize);
-      X86FI->setHasSEHFramePtrSave(true);
-      X86FI->setSEHFramePtrSaveIndex(FI);
-    }
-  }
 }
 
 static bool
@@ -2345,6 +2349,10 @@ void X86FrameLowering::adjustForSegmentedStacks(
     // This solution is not perfect, as it assumes that the .rodata section
     // is laid out within 2^31 bytes of each function body, but this seems
     // to be sufficient for JIT.
+    // FIXME: Add retpoline support and remove the error here..
+    if (STI.useRetpoline())
+      report_fatal_error("Emitting morestack calls on 64-bit with the large "
+                         "code model and retpoline not yet implemented.");
     BuildMI(allocMBB, DL, TII.get(X86::CALL64m))
         .addReg(X86::RIP)
         .addImm(0)

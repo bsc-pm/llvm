@@ -171,6 +171,10 @@ class VectorType;
       // Vector move f32 immediate:
       VMOVFPIMM,
 
+      // Move H <-> R, clearing top 16 bits
+      VMOVrh,
+      VMOVhr,
+
       // Vector duplicate:
       VDUP,
       VDUPLANE,
@@ -203,6 +207,8 @@ class VectorType;
       SMLALDX,      // Signed multiply accumulate long dual exchange
       SMLSLD,       // Signed multiply subtract long dual
       SMLSLDX,      // Signed multiply subtract long dual exchange
+      SMMLAR,       // Signed multiply long, round and add
+      SMMLSR,       // Signed multiply long, subtract and round
 
       // Operands of the standard BUILD_VECTOR node are not legalized, which
       // is fine if BUILD_VECTORs are always lowered to shuffles or other

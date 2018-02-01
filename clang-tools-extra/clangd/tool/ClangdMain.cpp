@@ -11,6 +11,7 @@
 #include "JSONRPCDispatcher.h"
 #include "Path.h"
 #include "Trace.h"
+#include "index/SymbolYAML.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -26,7 +27,24 @@ using namespace clang::clangd;
 
 namespace {
 enum class PCHStorageFlag { Disk, Memory };
+
+// Build an in-memory static index for global symbols from a YAML-format file.
+// The size of global symbols should be relatively small, so that all symbols
+// can be managed in memory.
+std::unique_ptr<SymbolIndex> BuildStaticIndex(llvm::StringRef YamlSymbolFile) {
+  auto Buffer = llvm::MemoryBuffer::getFile(YamlSymbolFile);
+  if (!Buffer) {
+    llvm::errs() << "Can't open " << YamlSymbolFile << "\n";
+    return nullptr;
+  }
+  auto Slab = SymbolFromYAML(Buffer.get()->getBuffer());
+  SymbolSlab::Builder SymsBuilder;
+  for (auto Sym : Slab)
+    SymsBuilder.insert(Sym);
+
+  return MemIndex::build(std::move(SymsBuilder).build());
 }
+} // namespace
 
 static llvm::cl::opt<Path> CompileCommandsDir(
     "compile-commands-dir",
@@ -68,6 +86,12 @@ static llvm::cl::opt<PCHStorageFlag> PCHStorage(
         clEnumValN(PCHStorageFlag::Memory, "memory", "store PCHs in memory")),
     llvm::cl::init(PCHStorageFlag::Disk));
 
+static llvm::cl::opt<int> LimitCompletionResult(
+    "completion-limit",
+    llvm::cl::desc("Limit the number of completion results returned by clangd. "
+                   "0 means no limit."),
+    llvm::cl::init(100));
+
 static llvm::cl::opt<bool> RunSynchronously(
     "run-synchronously",
     llvm::cl::desc("Parse on main thread. If set, -j is ignored"),
@@ -93,9 +117,18 @@ static llvm::cl::opt<Path> TraceFile(
 static llvm::cl::opt<bool> EnableIndexBasedCompletion(
     "enable-index-based-completion",
     llvm::cl::desc(
-        "Enable index-based global code completion (experimental). Clangd will "
-        "use index built from symbols in opened files"),
-    llvm::cl::init(false), llvm::cl::Hidden);
+        "Enable index-based global code completion. "
+        "Clang uses an index built from symbols in opened files"),
+    llvm::cl::init(true));
+
+static llvm::cl::opt<Path> YamlSymbolFile(
+    "yaml-symbol-file",
+    llvm::cl::desc(
+        "YAML-format global symbol file to build the static index. Clangd will "
+        "use the static index for global code completion.\n"
+        "WARNING: This option is experimental only, and will be removed "
+        "eventually. Don't rely on it."),
+    llvm::cl::init(""), llvm::cl::Hidden);
 
 int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "clangd");
@@ -182,13 +215,17 @@ int main(int argc, char *argv[]) {
   // Change stdin to binary to not lose \r\n on windows.
   llvm::sys::ChangeStdinToBinary();
 
+  std::unique_ptr<SymbolIndex> StaticIdx;
+  if (EnableIndexBasedCompletion && !YamlSymbolFile.empty())
+    StaticIdx = BuildStaticIndex(YamlSymbolFile);
   clangd::CodeCompleteOptions CCOpts;
   CCOpts.EnableSnippets = EnableSnippets;
   CCOpts.IncludeIneligibleResults = IncludeIneligibleResults;
+  CCOpts.Limit = LimitCompletionResult;
   // Initialize and run ClangdLSPServer.
   ClangdLSPServer LSPServer(Out, WorkerThreadsCount, StorePreamblesInMemory,
                             CCOpts, ResourceDirRef, CompileCommandsDirPath,
-                            EnableIndexBasedCompletion);
+                            EnableIndexBasedCompletion, StaticIdx.get());
   constexpr int NoShutdownRequestErrorCode = 1;
   llvm::set_thread_name("clangd.main");
   return LSPServer.run(std::cin) ? 0 : NoShutdownRequestErrorCode;

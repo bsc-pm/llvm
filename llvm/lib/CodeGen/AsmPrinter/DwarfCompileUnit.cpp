@@ -94,16 +94,17 @@ void DwarfCompileUnit::addLocalLabelAddress(DIE &Die,
                  DIEInteger(0));
 }
 
-unsigned DwarfCompileUnit::getOrCreateSourceID(StringRef FileName,
-                                               StringRef DirName) {
+unsigned DwarfCompileUnit::getOrCreateSourceID(const DIFile *File) {
   // If we print assembly, we can't separate .file entries according to
   // compile units. Thus all files will belong to the default compile unit.
 
   // FIXME: add a better feature test than hasRawTextSupport. Even better,
   // extend .file to support this.
+  unsigned CUID = Asm->OutStreamer->hasRawTextSupport() ? 0 : getUniqueID();
+  if (!File)
+    return Asm->OutStreamer->EmitDwarfFileDirective(0, "", "", nullptr, CUID);
   return Asm->OutStreamer->EmitDwarfFileDirective(
-      0, DirName, FileName,
-      Asm->OutStreamer->hasRawTextSupport() ? 0 : getUniqueID());
+      0, File->getDirectory(), File->getFilename(), getMD5AsBytes(File), CUID);
 }
 
 DIE *DwarfCompileUnit::getOrCreateGlobalVariableDIE(
@@ -190,6 +191,9 @@ DIE *DwarfCompileUnit::getOrCreateGlobalVariableDIE(
       DwarfExpr = llvm::make_unique<DIEDwarfExpression>(*Asm, *this, *Loc);
     }
 
+    if (Expr)
+      DwarfExpr->addFragmentOffset(Expr);
+
     if (Global) {
       const MCSymbol *Sym = Asm->getSymbol(Global);
       if (Global->isThreadLocal()) {
@@ -225,10 +229,8 @@ DIE *DwarfCompileUnit::getOrCreateGlobalVariableDIE(
         addOpAddress(*Loc, Sym);
       }
     }
-    if (Expr) {
-      DwarfExpr->addFragmentOffset(Expr);
+    if (Expr)
       DwarfExpr->addExpression(Expr);
-    }
   }
   if (Loc)
     addBlock(*VariableDIE, dwarf::DW_AT_location, DwarfExpr->finalize());
@@ -443,7 +445,7 @@ DIE *DwarfCompileUnit::constructInlinedScopeDIE(LexicalScope *Scope) {
   // Add the call site information to the DIE.
   const DILocation *IA = Scope->getInlinedAt();
   addUInt(*ScopeDIE, dwarf::DW_AT_call_file, None,
-          getOrCreateSourceID(IA->getFilename(), IA->getDirectory()));
+          getOrCreateSourceID(IA->getFile()));
   addUInt(*ScopeDIE, dwarf::DW_AT_call_line, None, IA->getLine());
   if (IA->getDiscriminator() && DD->getDwarfVersion() >= 4)
     addUInt(*ScopeDIE, dwarf::DW_AT_GNU_discriminator, None,
@@ -482,6 +484,7 @@ DIE *DwarfCompileUnit::constructVariableDIEImpl(const DbgVariable &DV,
                                                 bool Abstract) {
   // Define variable debug information entry.
   auto VariableDie = DIE::get(DIEValueAllocator, DV.getTag());
+  insertDIE(DV.getVariable(), VariableDie);
 
   if (Abstract) {
     applyVariableAttributes(DV, *VariableDie);
@@ -687,9 +690,7 @@ DIE *DwarfCompileUnit::constructImportedEntityDIE(
   else
     EntityDie = getDIE(Entity);
   assert(EntityDie);
-  auto *File = Module->getFile();
-  addSourceLine(*IMDie, Module->getLine(), File ? File->getFilename() : "",
-                File ? File->getDirectory() : "");
+  addSourceLine(*IMDie, Module->getLine(), Module->getFile());
   addDIEEntry(*IMDie, dwarf::DW_AT_import, *EntityDie);
   StringRef Name = Module->getName();
   if (!Name.empty())

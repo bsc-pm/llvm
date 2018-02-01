@@ -10,7 +10,6 @@
 #ifndef LLVM_CLANG_TOOLS_EXTRA_CLANGD_CLANGDUNIT_H
 #define LLVM_CLANG_TOOLS_EXTRA_CLANGD_CLANGDUNIT_H
 
-#include "Context.h"
 #include "Function.h"
 #include "Path.h"
 #include "Protocol.h"
@@ -58,13 +57,20 @@ struct PreambleData {
   std::vector<DiagWithFixIts> Diags;
 };
 
+/// Information required to run clang, e.g. to parse AST or do code completion.
+struct ParseInputs {
+  tooling::CompileCommand CompileCommand;
+  IntrusiveRefCntPtr<vfs::FileSystem> FS;
+  std::string Contents;
+};
+
 /// Stores and provides access to parsed AST.
 class ParsedAST {
 public:
   /// Attempts to run Clang and store parsed AST. If \p Preamble is non-null
   /// it is reused during parsing.
   static llvm::Optional<ParsedAST>
-  Build(const Context &Ctx, std::unique_ptr<clang::CompilerInvocation> CI,
+  Build(std::unique_ptr<clang::CompilerInvocation> CI,
         std::shared_ptr<const PreambleData> Preamble,
         std::unique_ptr<llvm::MemoryBuffer> Buffer,
         std::shared_ptr<PCHContainerOperations> PCHs,
@@ -79,6 +85,7 @@ public:
   const ASTContext &getASTContext() const;
 
   Preprocessor &getPreprocessor();
+  std::shared_ptr<Preprocessor> getPreprocessorPtr();
   const Preprocessor &getPreprocessor() const;
 
   /// This function returns all top-level decls, including those that come
@@ -87,6 +94,10 @@ public:
   ArrayRef<const Decl *> getTopLevelDecls();
 
   const std::vector<DiagWithFixIts> &getDiagnostics() const;
+
+  /// Returns the esitmated size of the AST and the accessory structures, in
+  /// bytes. Does not include the size of the preamble.
+  std::size_t getUsedBytes() const;
 
 private:
   ParsedAST(std::shared_ptr<const PreambleData> Preamble,
@@ -136,8 +147,7 @@ private:
   mutable llvm::Optional<ParsedAST> AST;
 };
 
-using ASTParsedCallback =
-    std::function<void(const Context &Ctx, PathRef Path, ParsedAST *)>;
+using ASTParsedCallback = std::function<void(PathRef Path, ParsedAST *)>;
 
 /// Manages resources, required by clangd. Allows to rebuild file with new
 /// contents, and provides AST and Preamble for it.
@@ -146,14 +156,12 @@ public:
   // We only allow to create CppFile as shared_ptr, because a future returned by
   // deferRebuild will hold references to it.
   static std::shared_ptr<CppFile>
-  Create(PathRef FileName, tooling::CompileCommand Command,
-         bool StorePreamblesInMemory,
+  Create(PathRef FileName, bool StorePreamblesInMemory,
          std::shared_ptr<PCHContainerOperations> PCHs,
          ASTParsedCallback ASTCallback);
 
 private:
-  CppFile(PathRef FileName, tooling::CompileCommand Command,
-          bool StorePreamblesInMemory,
+  CppFile(PathRef FileName, bool StorePreamblesInMemory,
           std::shared_ptr<PCHContainerOperations> PCHs,
           ASTParsedCallback ASTCallback);
 
@@ -176,9 +184,7 @@ public:
   /// Returns a list of diagnostics or a llvm::None, if another rebuild was
   /// requested in parallel (effectively cancelling this rebuild) before
   /// diagnostics were produced.
-  llvm::Optional<std::vector<DiagWithFixIts>>
-  rebuild(const Context &Ctx, StringRef NewContents,
-          IntrusiveRefCntPtr<vfs::FileSystem> VFS);
+  llvm::Optional<std::vector<DiagWithFixIts>> rebuild(ParseInputs &&Inputs);
 
   /// Schedule a rebuild and return a deferred computation that will finish the
   /// rebuild, that can be called on a different thread.
@@ -194,8 +200,8 @@ public:
   /// The future to finish rebuild returns a list of diagnostics built during
   /// reparse, or None, if another deferRebuild was called before this
   /// rebuild was finished.
-  UniqueFunction<llvm::Optional<std::vector<DiagWithFixIts>>(const Context &)>
-  deferRebuild(StringRef NewContents, IntrusiveRefCntPtr<vfs::FileSystem> VFS);
+  UniqueFunction<llvm::Optional<std::vector<DiagWithFixIts>>()>
+  deferRebuild(ParseInputs &&Inputs);
 
   /// Returns a future to get the most fresh PreambleData for a file. The
   /// future will wait until the Preamble is rebuilt.
@@ -211,8 +217,9 @@ public:
   /// always be non-null.
   std::shared_future<std::shared_ptr<ParsedASTWrapper>> getAST() const;
 
-  /// Get CompileCommand used to build this CppFile.
-  tooling::CompileCommand const &getCompileCommand() const;
+  /// Returns an estimated size, in bytes, currently occupied by the AST and the
+  /// Preamble.
+  std::size_t getUsedBytes() const;
 
 private:
   /// A helper guard that manages the state of CppFile during rebuild.
@@ -230,7 +237,6 @@ private:
   };
 
   Path FileName;
-  tooling::CompileCommand Command;
   bool StorePreamblesInMemory;
 
   /// Mutex protects all fields, declared below it, FileName and Command are not
@@ -242,6 +248,11 @@ private:
   bool RebuildInProgress;
   /// Condition variable to indicate changes to RebuildInProgress.
   std::condition_variable RebuildCond;
+
+  /// Size of the last built AST, in bytes.
+  std::size_t ASTMemUsage;
+  /// Size of the last build Preamble, in bytes.
+  std::size_t PreambleMemUsage;
 
   /// Promise and future for the latests AST. Fulfilled during rebuild.
   /// We use std::shared_ptr here because MVSC fails to compile non-copyable

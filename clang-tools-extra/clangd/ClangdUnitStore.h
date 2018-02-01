@@ -27,50 +27,26 @@ class CppFileCollection {
 public:
   /// \p ASTCallback is called when a file is parsed synchronously. This should
   /// not be expensive since it blocks diagnostics.
-  explicit CppFileCollection(ASTParsedCallback ASTCallback)
-      : ASTCallback(std::move(ASTCallback)) {}
+  explicit CppFileCollection(bool StorePreamblesInMemory,
+                             std::shared_ptr<PCHContainerOperations> PCHs,
+                             ASTParsedCallback ASTCallback)
+      : ASTCallback(std::move(ASTCallback)), PCHs(std::move(PCHs)),
+        StorePreamblesInMemory(StorePreamblesInMemory) {}
 
-  std::shared_ptr<CppFile>
-  getOrCreateFile(PathRef File, PathRef ResourceDir,
-                  GlobalCompilationDatabase &CDB, bool StorePreamblesInMemory,
-                  std::shared_ptr<PCHContainerOperations> PCHs) {
+  std::shared_ptr<CppFile> getOrCreateFile(PathRef File) {
     std::lock_guard<std::mutex> Lock(Mutex);
-
     auto It = OpenedFiles.find(File);
     if (It == OpenedFiles.end()) {
-      auto Command = getCompileCommand(CDB, File, ResourceDir);
-
       It = OpenedFiles
-               .try_emplace(File, CppFile::Create(File, std::move(Command),
-                                                  StorePreamblesInMemory,
-                                                  std::move(PCHs), ASTCallback))
+               .try_emplace(File, CppFile::Create(File, StorePreamblesInMemory,
+                                                  PCHs, ASTCallback))
                .first;
     }
     return It->second;
   }
 
-  struct RecreateResult {
-    /// A CppFile, stored in this CppFileCollection for the corresponding
-    /// filepath after calling recreateFileIfCompileCommandChanged.
-    std::shared_ptr<CppFile> FileInCollection;
-    /// If a new CppFile had to be created to account for changed
-    /// CompileCommand, a previous CppFile instance will be returned in this
-    /// field.
-    std::shared_ptr<CppFile> RemovedFile;
-  };
-
-  /// Similar to getOrCreateFile, but will replace a current CppFile for \p File
-  /// with a new one if CompileCommand, provided by \p CDB has changed.
-  /// If a currently stored CppFile had to be replaced, the previous instance
-  /// will be returned in RecreateResult.RemovedFile.
-  RecreateResult recreateFileIfCompileCommandChanged(
-      PathRef File, PathRef ResourceDir, GlobalCompilationDatabase &CDB,
-      bool StorePreamblesInMemory,
-      std::shared_ptr<PCHContainerOperations> PCHs);
-
-  std::shared_ptr<CppFile> getFile(PathRef File) {
+  std::shared_ptr<CppFile> getFile(PathRef File) const {
     std::lock_guard<std::mutex> Lock(Mutex);
-
     auto It = OpenedFiles.find(File);
     if (It == OpenedFiles.end())
       return nullptr;
@@ -81,16 +57,15 @@ public:
   /// returns it.
   std::shared_ptr<CppFile> removeIfPresent(PathRef File);
 
+  /// Gets used memory for each of the stored files.
+  std::vector<std::pair<Path, std::size_t>> getUsedBytesPerFile() const;
+
 private:
-  tooling::CompileCommand getCompileCommand(GlobalCompilationDatabase &CDB,
-                                            PathRef File, PathRef ResourceDir);
-
-  bool compileCommandsAreEqual(tooling::CompileCommand const &LHS,
-                               tooling::CompileCommand const &RHS);
-
-  std::mutex Mutex;
+  mutable std::mutex Mutex;
   llvm::StringMap<std::shared_ptr<CppFile>> OpenedFiles;
   ASTParsedCallback ASTCallback;
+  std::shared_ptr<PCHContainerOperations> PCHs;
+  bool StorePreamblesInMemory;
 };
 } // namespace clangd
 } // namespace clang
