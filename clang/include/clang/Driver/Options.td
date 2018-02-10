@@ -556,7 +556,7 @@ def no_cuda_version_check : Flag<["--"], "no-cuda-version-check">,
 def no_cuda_noopt_device_debug : Flag<["--"], "no-cuda-noopt-device-debug">;
 def cuda_path_EQ : Joined<["--"], "cuda-path=">, Group<i_Group>,
   HelpText<"CUDA installation path">;
-def cuda_path_ignore_env : Joined<["--"], "cuda-path-ignore-env">, Group<i_Group>,
+def cuda_path_ignore_env : Flag<["--"], "cuda-path-ignore-env">, Group<i_Group>,
   HelpText<"Ignore environment variables to detect CUDA installation">;
 def ptxas_path_EQ : Joined<["--"], "ptxas-path=">, Group<i_Group>,
   HelpText<"Path to ptxas (used for compiling CUDA code)">;
@@ -790,6 +790,10 @@ def fdiagnostics_show_template_tree : Flag<["-"], "fdiagnostics-show-template-tr
     HelpText<"Print a template comparison tree for differing templates">;
 def fdeclspec : Flag<["-"], "fdeclspec">, Group<f_clang_Group>,
   HelpText<"Allow __declspec as a keyword">, Flags<[CC1Option]>;
+def fdiscard_value_names : Flag<["-"], "fdiscard-value-names">, Group<f_clang_Group>,
+  HelpText<"Discard value names in LLVM IR">, Flags<[DriverOption]>;
+def fno_discard_value_names : Flag<["-"], "fno-discard-value-names">, Group<f_clang_Group>,
+  HelpText<"Do not discard value names in LLVM IR">, Flags<[DriverOption]>;
 def fdollars_in_identifiers : Flag<["-"], "fdollars-in-identifiers">, Group<f_Group>,
   HelpText<"Allow '$' in identifiers">, Flags<[CC1Option]>;
 def fdwarf2_cfi_asm : Flag<["-"], "fdwarf2-cfi-asm">, Group<clang_ignored_f_Group>;

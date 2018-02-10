@@ -4924,7 +4924,8 @@ bool AArch64TargetLowering::isOffsetFoldingLegal(
 bool AArch64TargetLowering::isFPImmLegal(const APFloat &Imm, EVT VT) const {
   // We can materialize #0.0 as fmov $Rd, XZR for 64-bit and 32-bit cases.
   // FIXME: We should be able to handle f128 as well with a clever lowering.
-  if (Imm.isPosZero() && (VT == MVT::f16 || VT == MVT::f64 || VT == MVT::f32)) {
+  if (Imm.isPosZero() && (VT == MVT::f64 || VT == MVT::f32 ||
+                          (VT == MVT::f16 && Subtarget->hasFullFP16()))) {
     DEBUG(dbgs() << "Legal fp imm: materialize 0 using the zero register\n");
     return true;
   }
@@ -5007,7 +5008,6 @@ SDValue AArch64TargetLowering::getSqrtEstimate(SDValue Operand,
         Step = DAG.getNode(AArch64ISD::FRSQRTS, DL, VT, Operand, Step, Flags);
         Estimate = DAG.getNode(ISD::FMUL, DL, VT, Estimate, Step, Flags);
       }
-
       if (!Reciprocal) {
         EVT CCVT = getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(),
                                       VT);

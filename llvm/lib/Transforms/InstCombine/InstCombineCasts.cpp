@@ -320,8 +320,8 @@ static bool canNotEvaluateInType(Value *V, Type *Ty) {
   assert(!isa<Constant>(V) && "Constant should already be handled.");
   if (!isa<Instruction>(V))
     return true;
-  // We can't extend or shrink something that has multiple uses: doing so would
-  // require duplicating the instruction in general, which isn't profitable.
+  // We don't extend or shrink something that has multiple uses --  doing so
+  // would require duplicating the instruction which isn't profitable.
   if (!V->hasOneUse())
     return true;
 

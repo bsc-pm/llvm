@@ -20,10 +20,8 @@ Context::Context(std::shared_ptr<const Data> DataPtr)
 
 Context Context::clone() const { return Context(DataPtr); }
 
-// The thread-local Context is scoped in a function to avoid
-// initialization-order issues. It's created when first needed.
 static Context &currentContext() {
-  static thread_local Context C = Context::empty();
+  static thread_local auto C = Context::empty();
   return C;
 }
 

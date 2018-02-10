@@ -188,8 +188,8 @@ define i1 @and_cmp4(i32 %x, i32 %y) {
 define i1 @and_cmp_const(i32 %x) {
 ; CHECK-LABEL: and_cmp_const:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    movl $43, %eax
-; CHECK-NEXT:    andnl %eax, %edi, %eax
+; CHECK-NEXT:    notl %edi
+; CHECK-NEXT:    andl $43, %edi
 ; CHECK-NEXT:    sete %al
 ; CHECK-NEXT:    retq
   %and = and i32 %x, 43
@@ -806,5 +806,20 @@ define i64 @blsr64(i64 %x)   {
   %tmp = sub i64 %x, 1
   %tmp2 = and i64 %tmp, %x
   ret i64 %tmp2
+}
+
+; PR35792 - https://bugs.llvm.org/show_bug.cgi?id=35792
+
+define i64 @blsr_disguised_constant(i64 %x) {
+; CHECK-LABEL: blsr_disguised_constant:
+; CHECK:       # %bb.0:
+; CHECK-NEXT:    leal 65535(%rdi), %eax
+; CHECK-NEXT:    andl %edi, %eax
+; CHECK-NEXT:    movzwl %ax, %eax
+; CHECK-NEXT:    retq
+  %a1 = and i64 %x, 65535
+  %a2 = add i64 %x, 65535
+  %r = and i64 %a1, %a2
+  ret i64 %r
 }
 

@@ -258,8 +258,9 @@ namespace {
     SDValue PromoteExtend(SDValue Op);
     bool PromoteLoad(SDValue Op);
 
-    void ExtendSetCCUses(const SmallVectorImpl<SDNode *> &SetCCs, SDValue Trunc,
-                         SDValue ExtLoad, const SDLoc &DL,
+    void ExtendSetCCUses(const SmallVectorImpl<SDNode *> &SetCCs,
+                         SDValue OrigLoad, SDValue ExtLoad,
+                         const SDLoc &DL,
                          ISD::NodeType ExtType);
 
     /// Call the node-specific routine that knows how to fold each
@@ -6285,6 +6286,13 @@ SDValue DAGCombiner::visitCTLZ(SDNode *N) {
   // fold (ctlz c1) -> c2
   if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
     return DAG.getNode(ISD::CTLZ, SDLoc(N), VT, N0);
+
+  // If the value is known never to be zero, switch to the undef version.
+  if (!LegalOperations || TLI.isOperationLegal(ISD::CTLZ_ZERO_UNDEF, VT)) {
+    if (DAG.isKnownNeverZero(N0))
+      return DAG.getNode(ISD::CTLZ_ZERO_UNDEF, SDLoc(N), VT, N0);
+  }
+
   return SDValue();
 }
 
@@ -6305,6 +6313,13 @@ SDValue DAGCombiner::visitCTTZ(SDNode *N) {
   // fold (cttz c1) -> c2
   if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
     return DAG.getNode(ISD::CTTZ, SDLoc(N), VT, N0);
+
+  // If the value is known never to be zero, switch to the undef version.
+  if (!LegalOperations || TLI.isOperationLegal(ISD::CTTZ_ZERO_UNDEF, VT)) {
+    if (DAG.isKnownNeverZero(N0))
+      return DAG.getNode(ISD::CTTZ_ZERO_UNDEF, SDLoc(N), VT, N0);
+  }
+
   return SDValue();
 }
 
@@ -7300,7 +7315,7 @@ static bool ExtendUsesToFormExtLoad(SDNode *N, SDValue N0,
 }
 
 void DAGCombiner::ExtendSetCCUses(const SmallVectorImpl<SDNode *> &SetCCs,
-                                  SDValue Trunc, SDValue ExtLoad,
+                                  SDValue OrigLoad, SDValue ExtLoad,
                                   const SDLoc &DL, ISD::NodeType ExtType) {
   // Extend SetCC uses if necessary.
   for (unsigned i = 0, e = SetCCs.size(); i != e; ++i) {
@@ -7309,7 +7324,7 @@ void DAGCombiner::ExtendSetCCUses(const SmallVectorImpl<SDNode *> &SetCCs,
 
     for (unsigned j = 0; j != 2; ++j) {
       SDValue SOp = SetCC->getOperand(j);
-      if (SOp == Trunc)
+      if (SOp == OrigLoad)
         Ops.push_back(ExtLoad);
       else
         Ops.push_back(DAG.getNode(ExtType, DL, ExtLoad->getValueType(0), SOp));
@@ -7412,9 +7427,9 @@ SDValue DAGCombiner::CombineExtLoad(SDNode *N) {
   // with a truncate of the concatenated sextloaded vectors.
   SDValue Trunc =
       DAG.getNode(ISD::TRUNCATE, SDLoc(N0), N0.getValueType(), NewValue);
-  CombineTo(N0.getNode(), Trunc, NewChain);
-  ExtendSetCCUses(SetCCs, Trunc, NewValue, DL,
+  ExtendSetCCUses(SetCCs, N0, NewValue, DL,
                   (ISD::NodeType)N->getOpcode());
+  CombineTo(N0.getNode(), Trunc, NewChain);
   return SDValue(N, 0); // Return N so it doesn't get rechecked!
 }
 
@@ -7545,16 +7560,17 @@ SDValue DAGCombiner::visitSIGN_EXTEND(SDNode *N) {
       SDValue ExtLoad = DAG.getExtLoad(ISD::SEXTLOAD, DL, VT, LN0->getChain(),
                                        LN0->getBasePtr(), N0.getValueType(),
                                        LN0->getMemOperand());
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
-                                  N0.getValueType(), ExtLoad);
-      ExtendSetCCUses(SetCCs, Trunc, ExtLoad, DL, ISD::SIGN_EXTEND);
+      ExtendSetCCUses(SetCCs, N0, ExtLoad, DL, ISD::SIGN_EXTEND);
       // If the load value is used only by N, replace it via CombineTo N.
       bool NoReplaceTrunc = SDValue(LN0, 0).hasOneUse();
       CombineTo(N, ExtLoad);
-      if (NoReplaceTrunc)
+      if (NoReplaceTrunc) {
         DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
-      else
+      } else {
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
+                                    N0.getValueType(), ExtLoad);
         CombineTo(LN0, Trunc, ExtLoad.getValue(1));
+      }
       return SDValue(N, 0);
     }
   }
@@ -7576,10 +7592,7 @@ SDValue DAGCombiner::visitSIGN_EXTEND(SDNode *N) {
                                        LN0->getBasePtr(), MemVT,
                                        LN0->getMemOperand());
       CombineTo(N, ExtLoad);
-      CombineTo(N0.getNode(),
-                DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
-                            N0.getValueType(), ExtLoad),
-                ExtLoad.getValue(1));
+      DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
       return SDValue(N, 0);   // Return N so it doesn't get rechecked!
     }
   }
@@ -7590,30 +7603,29 @@ SDValue DAGCombiner::visitSIGN_EXTEND(SDNode *N) {
        N0.getOpcode() == ISD::XOR) &&
       isa<LoadSDNode>(N0.getOperand(0)) &&
       N0.getOperand(1).getOpcode() == ISD::Constant &&
-      TLI.isLoadExtLegal(ISD::SEXTLOAD, VT, N0.getValueType()) &&
       (!LegalOperations && TLI.isOperationLegal(N0.getOpcode(), VT))) {
-    LoadSDNode *LN0 = cast<LoadSDNode>(N0.getOperand(0));
-    if (LN0->getExtensionType() != ISD::ZEXTLOAD && LN0->isUnindexed()) {
+    LoadSDNode *LN00 = cast<LoadSDNode>(N0.getOperand(0));
+    EVT MemVT = LN00->getMemoryVT();
+    if (TLI.isLoadExtLegal(ISD::SEXTLOAD, VT, MemVT) &&
+      LN00->getExtensionType() != ISD::ZEXTLOAD && LN00->isUnindexed()) {
       bool DoXform = true;
       SmallVector<SDNode*, 4> SetCCs;
       if (!N0.hasOneUse())
         DoXform = ExtendUsesToFormExtLoad(N, N0.getOperand(0), ISD::SIGN_EXTEND,
                                           SetCCs, TLI);
       if (DoXform) {
-        SDValue ExtLoad = DAG.getExtLoad(ISD::SEXTLOAD, SDLoc(LN0), VT,
-                                         LN0->getChain(), LN0->getBasePtr(),
-                                         LN0->getMemoryVT(),
-                                         LN0->getMemOperand());
+        SDValue ExtLoad = DAG.getExtLoad(ISD::SEXTLOAD, SDLoc(LN00), VT,
+                                         LN00->getChain(), LN00->getBasePtr(),
+                                         LN00->getMemoryVT(),
+                                         LN00->getMemOperand());
         APInt Mask = cast<ConstantSDNode>(N0.getOperand(1))->getAPIntValue();
         Mask = Mask.sext(VT.getSizeInBits());
         SDValue And = DAG.getNode(N0.getOpcode(), DL, VT,
                                   ExtLoad, DAG.getConstant(Mask, DL, VT));
-        SDValue Trunc = DAG.getNode(ISD::TRUNCATE,
-                                    SDLoc(N0.getOperand(0)),
-                                    N0.getOperand(0).getValueType(), ExtLoad);
-        ExtendSetCCUses(SetCCs, Trunc, ExtLoad, DL, ISD::SIGN_EXTEND);
+        ExtendSetCCUses(SetCCs, N0.getOperand(0), ExtLoad, DL,
+                        ISD::SIGN_EXTEND);
         bool NoReplaceTruncAnd = !N0.hasOneUse();
-        bool NoReplaceTrunc = SDValue(LN0, 0).hasOneUse();
+        bool NoReplaceTrunc = SDValue(LN00, 0).hasOneUse();
         CombineTo(N, And);
         // If N0 has multiple uses, change other uses as well.
         if (NoReplaceTruncAnd) {
@@ -7621,10 +7633,13 @@ SDValue DAGCombiner::visitSIGN_EXTEND(SDNode *N) {
               DAG.getNode(ISD::TRUNCATE, DL, N0.getValueType(), And);
           CombineTo(N0.getNode(), TruncAnd);
         }
-        if (NoReplaceTrunc)
-          DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
-        else
-          CombineTo(LN0, Trunc, ExtLoad.getValue(1));
+        if (NoReplaceTrunc) {
+          DAG.ReplaceAllUsesOfValueWith(SDValue(LN00, 1), ExtLoad.getValue(1));
+        } else {
+          SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(LN00),
+                                      LN00->getValueType(0), ExtLoad);
+          CombineTo(LN00, Trunc, ExtLoad.getValue(1));
+        }
         return SDValue(N,0); // Return N so it doesn't get rechecked!
       }
     }
@@ -7855,16 +7870,17 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
                                        LN0->getBasePtr(), N0.getValueType(),
                                        LN0->getMemOperand());
 
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
-                                  N0.getValueType(), ExtLoad);
-      ExtendSetCCUses(SetCCs, Trunc, ExtLoad, SDLoc(N), ISD::ZERO_EXTEND);
+      ExtendSetCCUses(SetCCs, N0, ExtLoad, SDLoc(N), ISD::ZERO_EXTEND);
       // If the load value is used only by N, replace it via CombineTo N.
       bool NoReplaceTrunc = SDValue(LN0, 0).hasOneUse();
       CombineTo(N, ExtLoad);
-      if (NoReplaceTrunc)
+      if (NoReplaceTrunc) {
         DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
-      else
+      } else {
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
+                                    N0.getValueType(), ExtLoad);
         CombineTo(LN0, Trunc, ExtLoad.getValue(1));
+      }
       return SDValue(N, 0); // Return N so it doesn't get rechecked!
     }
   }
@@ -7882,10 +7898,11 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
        N0.getOpcode() == ISD::XOR) &&
       isa<LoadSDNode>(N0.getOperand(0)) &&
       N0.getOperand(1).getOpcode() == ISD::Constant &&
-      TLI.isLoadExtLegal(ISD::ZEXTLOAD, VT, N0.getValueType()) &&
       (!LegalOperations && TLI.isOperationLegal(N0.getOpcode(), VT))) {
-    LoadSDNode *LN0 = cast<LoadSDNode>(N0.getOperand(0));
-    if (LN0->getExtensionType() != ISD::SEXTLOAD && LN0->isUnindexed()) {
+    LoadSDNode *LN00 = cast<LoadSDNode>(N0.getOperand(0));
+    EVT MemVT = LN00->getMemoryVT();
+    if (TLI.isLoadExtLegal(ISD::ZEXTLOAD, VT, MemVT) &&
+        LN00->getExtensionType() != ISD::SEXTLOAD && LN00->isUnindexed()) {
       bool DoXform = true;
       SmallVector<SDNode*, 4> SetCCs;
       if (!N0.hasOneUse()) {
@@ -7893,7 +7910,7 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
           auto *AndC = cast<ConstantSDNode>(N0.getOperand(1));
           EVT LoadResultTy = AndC->getValueType(0);
           EVT ExtVT;
-          if (isAndLoadExtLoad(AndC, LN0, LoadResultTy, ExtVT))
+          if (isAndLoadExtLoad(AndC, LN00, LoadResultTy, ExtVT))
             DoXform = false;
         }
         if (DoXform)
@@ -7901,21 +7918,19 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
                                             ISD::ZERO_EXTEND, SetCCs, TLI);
       }
       if (DoXform) {
-        SDValue ExtLoad = DAG.getExtLoad(ISD::ZEXTLOAD, SDLoc(LN0), VT,
-                                         LN0->getChain(), LN0->getBasePtr(),
-                                         LN0->getMemoryVT(),
-                                         LN0->getMemOperand());
+        SDValue ExtLoad = DAG.getExtLoad(ISD::ZEXTLOAD, SDLoc(LN00), VT,
+                                         LN00->getChain(), LN00->getBasePtr(),
+                                         LN00->getMemoryVT(),
+                                         LN00->getMemOperand());
         APInt Mask = cast<ConstantSDNode>(N0.getOperand(1))->getAPIntValue();
         Mask = Mask.zext(VT.getSizeInBits());
         SDLoc DL(N);
         SDValue And = DAG.getNode(N0.getOpcode(), DL, VT,
                                   ExtLoad, DAG.getConstant(Mask, DL, VT));
-        SDValue Trunc = DAG.getNode(ISD::TRUNCATE,
-                                    SDLoc(N0.getOperand(0)),
-                                    N0.getOperand(0).getValueType(), ExtLoad);
-        ExtendSetCCUses(SetCCs, Trunc, ExtLoad, DL, ISD::ZERO_EXTEND);
+        ExtendSetCCUses(SetCCs, N0.getOperand(0), ExtLoad, DL,
+                        ISD::ZERO_EXTEND);
         bool NoReplaceTruncAnd = !N0.hasOneUse();
-        bool NoReplaceTrunc = SDValue(LN0, 0).hasOneUse();
+        bool NoReplaceTrunc = SDValue(LN00, 0).hasOneUse();
         CombineTo(N, And);
         // If N0 has multiple uses, change other uses as well.
         if (NoReplaceTruncAnd) {
@@ -7923,10 +7938,13 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
               DAG.getNode(ISD::TRUNCATE, DL, N0.getValueType(), And);
           CombineTo(N0.getNode(), TruncAnd);
         }
-        if (NoReplaceTrunc)
-          DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
-        else
-          CombineTo(LN0, Trunc, ExtLoad.getValue(1));
+        if (NoReplaceTrunc) {
+          DAG.ReplaceAllUsesOfValueWith(SDValue(LN00, 1), ExtLoad.getValue(1));
+        } else {
+          SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(LN00),
+                                      LN00->getValueType(0), ExtLoad);
+          CombineTo(LN00, Trunc, ExtLoad.getValue(1));
+        }
         return SDValue(N,0); // Return N so it doesn't get rechecked!
       }
     }
@@ -7945,10 +7963,7 @@ SDValue DAGCombiner::visitZERO_EXTEND(SDNode *N) {
                                        LN0->getBasePtr(), MemVT,
                                        LN0->getMemOperand());
       CombineTo(N, ExtLoad);
-      CombineTo(N0.getNode(),
-                DAG.getNode(ISD::TRUNCATE, SDLoc(N0), N0.getValueType(),
-                            ExtLoad),
-                ExtLoad.getValue(1));
+      DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
       return SDValue(N, 0);   // Return N so it doesn't get rechecked!
     }
   }
@@ -8096,17 +8111,18 @@ SDValue DAGCombiner::visitANY_EXTEND(SDNode *N) {
                                        LN0->getChain(),
                                        LN0->getBasePtr(), N0.getValueType(),
                                        LN0->getMemOperand());
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
-                                  N0.getValueType(), ExtLoad);
-      ExtendSetCCUses(SetCCs, Trunc, ExtLoad, SDLoc(N),
+      ExtendSetCCUses(SetCCs, N0, ExtLoad, SDLoc(N),
                       ISD::ANY_EXTEND);
       // If the load value is used only by N, replace it via CombineTo N.
       bool NoReplaceTrunc = N0.hasOneUse();
       CombineTo(N, ExtLoad);
-      if (NoReplaceTrunc)
+      if (NoReplaceTrunc) {
         DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
-      else
+      } else {
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
+                                    N0.getValueType(), ExtLoad);
         CombineTo(LN0, Trunc, ExtLoad.getValue(1));
+      }
       return SDValue(N, 0); // Return N so it doesn't get rechecked!
     }
   }
@@ -8114,9 +8130,8 @@ SDValue DAGCombiner::visitANY_EXTEND(SDNode *N) {
   // fold (aext (zextload x)) -> (aext (truncate (zextload x)))
   // fold (aext (sextload x)) -> (aext (truncate (sextload x)))
   // fold (aext ( extload x)) -> (aext (truncate (extload  x)))
-  if (N0.getOpcode() == ISD::LOAD &&
-      !ISD::isNON_EXTLoad(N0.getNode()) && ISD::isUNINDEXEDLoad(N0.getNode()) &&
-      N0.hasOneUse()) {
+  if (N0.getOpcode() == ISD::LOAD && !ISD::isNON_EXTLoad(N0.getNode()) &&
+      ISD::isUNINDEXEDLoad(N0.getNode()) && N0.hasOneUse()) {
     LoadSDNode *LN0 = cast<LoadSDNode>(N0);
     ISD::LoadExtType ExtType = LN0->getExtensionType();
     EVT MemVT = LN0->getMemoryVT();
@@ -8125,10 +8140,7 @@ SDValue DAGCombiner::visitANY_EXTEND(SDNode *N) {
                                        VT, LN0->getChain(), LN0->getBasePtr(),
                                        MemVT, LN0->getMemOperand());
       CombineTo(N, ExtLoad);
-      CombineTo(N0.getNode(),
-                DAG.getNode(ISD::TRUNCATE, SDLoc(N0),
-                            N0.getValueType(), ExtLoad),
-                ExtLoad.getValue(1));
+      DAG.ReplaceAllUsesOfValueWith(SDValue(LN0, 1), ExtLoad.getValue(1));
       return SDValue(N, 0);   // Return N so it doesn't get rechecked!
     }
   }
@@ -16465,7 +16477,9 @@ SDValue DAGCombiner::visitINSERT_SUBVECTOR(SDNode *N) {
       N1.getOperand(0).getOpcode() == ISD::EXTRACT_SUBVECTOR &&
       N1.getOperand(0).getOperand(1) == N2 &&
       N1.getOperand(0).getOperand(0).getValueType().getVectorNumElements() ==
-          VT.getVectorNumElements()) {
+          VT.getVectorNumElements() &&
+      N1.getOperand(0).getOperand(0).getValueType().getSizeInBits() ==
+          VT.getSizeInBits()) {
     return DAG.getBitcast(VT, N1.getOperand(0).getOperand(0));
   }
 
@@ -17454,19 +17468,34 @@ SDValue DAGCombiner::buildSqrtEstimateImpl(SDValue Op, SDNodeFlags Flags,
             : buildSqrtNRTwoConst(Op, Est, Iterations, Flags, Reciprocal);
 
       if (!Reciprocal) {
-        // Unfortunately, Est is now NaN if the input was exactly 0.0.
-        // Select out this case and force the answer to 0.0.
+        // The estimate is now completely wrong if the input was exactly 0.0 or
+        // possibly a denormal. Force the answer to 0.0 for those cases.
         EVT VT = Op.getValueType();
         SDLoc DL(Op);
-
-        SDValue FPZero = DAG.getConstantFP(0.0, DL, VT);
         EVT CCVT = getSetCCResultType(VT);
-        SDValue ZeroCmp = DAG.getSetCC(DL, CCVT, Op, FPZero, ISD::SETEQ);
-        AddToWorklist(ZeroCmp.getNode());
-
-        Est = DAG.getNode(VT.isVector() ? ISD::VSELECT : ISD::SELECT, DL, VT,
-                          ZeroCmp, FPZero, Est);
-        AddToWorklist(Est.getNode());
+        ISD::NodeType SelOpcode = VT.isVector() ? ISD::VSELECT : ISD::SELECT;
+        const Function &F = DAG.getMachineFunction().getFunction();
+        Attribute Denorms = F.getFnAttribute("denormal-fp-math");
+        if (Denorms.getValueAsString().equals("ieee")) {
+          // fabs(X) < SmallestNormal ? 0.0 : Est
+          const fltSemantics &FltSem = DAG.EVTToAPFloatSemantics(VT);
+          APFloat SmallestNorm = APFloat::getSmallestNormalized(FltSem);
+          SDValue NormC = DAG.getConstantFP(SmallestNorm, DL, VT);
+          SDValue FPZero = DAG.getConstantFP(0.0, DL, VT);
+          SDValue Fabs = DAG.getNode(ISD::FABS, DL, VT, Op);
+          SDValue IsDenorm = DAG.getSetCC(DL, CCVT, Fabs, NormC, ISD::SETLT);
+          Est = DAG.getNode(SelOpcode, DL, VT, IsDenorm, FPZero, Est);
+          AddToWorklist(Fabs.getNode());
+          AddToWorklist(IsDenorm.getNode());
+          AddToWorklist(Est.getNode());
+        } else {
+          // X == 0.0 ? 0.0 : Est
+          SDValue FPZero = DAG.getConstantFP(0.0, DL, VT);
+          SDValue IsZero = DAG.getSetCC(DL, CCVT, Op, FPZero, ISD::SETEQ);
+          Est = DAG.getNode(SelOpcode, DL, VT, IsZero, FPZero, Est);
+          AddToWorklist(IsZero.getNode());
+          AddToWorklist(Est.getNode());
+        }
       }
     }
     return Est;

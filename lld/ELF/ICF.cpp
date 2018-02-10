@@ -391,6 +391,13 @@ void ICF<ELFT>::forEachClass(std::function<void(size_t, size_t)> Fn) {
   ++Cnt;
 }
 
+static void Print(const Twine &Prefix, InputSection *S) {
+  if (!Config->PrintIcfSections)
+    return;
+  std::string File = S->File ? S->File->getName() : "<internal>";
+  message(Prefix + " section '" + S->Name + "' from file '" + File + "'");
+};
+
 // The main function of ICF.
 template <class ELFT> void ICF<ELFT>::run() {
   // Collect sections to merge.
@@ -425,13 +432,12 @@ template <class ELFT> void ICF<ELFT>::run() {
   log("ICF needed " + Twine(Cnt) + " iterations");
 
   // Merge sections by the equivalence class.
-  forEachClass([&](size_t Begin, size_t End) {
+  forEachClassRange(0, Sections.size(), [&](size_t Begin, size_t End) {
     if (End - Begin == 1)
       return;
-
-    log("selected " + Sections[Begin]->Name);
+    Print("selected", Sections[Begin]);
     for (size_t I = Begin + 1; I < End; ++I) {
-      log("  removed " + Sections[I]->Name);
+      Print("  removing identical", Sections[I]);
       Sections[Begin]->replace(Sections[I]);
     }
   });
