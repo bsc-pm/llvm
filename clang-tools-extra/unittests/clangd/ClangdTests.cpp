@@ -10,6 +10,7 @@
 #include "ClangdLSPServer.h"
 #include "ClangdServer.h"
 #include "Matchers.h"
+#include "SyncAPI.h"
 #include "TestFS.h"
 #include "clang/Config/config.h"
 #include "llvm/ADT/SmallVector.h"
@@ -38,11 +39,6 @@ using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
 namespace {
-
-// Don't wait for async ops in clangd test more than that to avoid blocking
-// indefinitely in case of bugs.
-static const std::chrono::seconds DefaultFutureTimeout =
-    std::chrono::seconds(10);
 
 static bool diagsContainErrors(ArrayRef<DiagWithFixIts> Diagnostics) {
   for (const auto &DiagAndFixIts : Diagnostics) {
@@ -141,15 +137,9 @@ protected:
 
     FS.ExpectedFile = SourceFilename;
 
-    // Have to sync reparses because requests are processed on the calling
-    // thread.
-    auto AddDocFuture = Server.addDocument(SourceFilename, SourceContents);
-
+    Server.addDocument(SourceFilename, SourceContents);
     auto Result = dumpASTWithoutMemoryLocs(Server, SourceFilename);
-
-    // Wait for reparse to finish before checking for errors.
-    EXPECT_EQ(AddDocFuture.wait_for(DefaultFutureTimeout),
-              std::future_status::ready);
+    EXPECT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
     EXPECT_EQ(ExpectErrors, DiagConsumer.hadErrorInLastDiags());
     return Result;
   }
@@ -209,25 +199,19 @@ int b = a;
   FS.Files[FooCpp] = SourceContents;
   FS.ExpectedFile = FooCpp;
 
-  // To sync reparses before checking for errors.
-  std::future<void> ParseFuture;
-
-  ParseFuture = Server.addDocument(FooCpp, SourceContents);
+  Server.addDocument(FooCpp, SourceContents);
   auto DumpParse1 = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  ASSERT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
-  ParseFuture = Server.addDocument(FooCpp, "");
+  Server.addDocument(FooCpp, "");
   auto DumpParseEmpty = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  ASSERT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
-  ParseFuture = Server.addDocument(FooCpp, SourceContents);
+  Server.addDocument(FooCpp, SourceContents);
   auto DumpParse2 = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  ASSERT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
   EXPECT_EQ(DumpParse1, DumpParse2);
@@ -254,27 +238,21 @@ int b = a;
   FS.Files[FooCpp] = SourceContents;
   FS.ExpectedFile = FooCpp;
 
-  // To sync reparses before checking for errors.
-  std::future<void> ParseFuture;
-
-  ParseFuture = Server.addDocument(FooCpp, SourceContents);
+  Server.addDocument(FooCpp, SourceContents);
   auto DumpParse1 = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  ASSERT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
   FS.Files[FooH] = "";
-  ParseFuture = Server.forceReparse(FooCpp);
+  Server.forceReparse(FooCpp);
   auto DumpParseDifferent = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  ASSERT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_TRUE(DiagConsumer.hadErrorInLastDiags());
 
   FS.Files[FooH] = "int a;";
-  ParseFuture = Server.forceReparse(FooCpp);
+  Server.forceReparse(FooCpp);
   auto DumpParse2 = dumpASTWithoutMemoryLocs(Server, FooCpp);
-  EXPECT_EQ(ParseFuture.wait_for(DefaultFutureTimeout),
-            std::future_status::ready);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
   EXPECT_FALSE(DiagConsumer.hadErrorInLastDiags());
 
   EXPECT_EQ(DumpParse1, DumpParse2);
@@ -302,14 +280,14 @@ TEST_F(ClangdVFSTest, CheckVersions) {
   // thread.
   FS.Tag = "123";
   Server.addDocument(FooCpp, SourceContents);
-  EXPECT_EQ(Server.codeComplete(FooCpp, Position{0, 0}, CCOpts).get().Tag,
+  EXPECT_EQ(runCodeComplete(Server, FooCpp, Position{0, 0}, CCOpts).Tag,
             FS.Tag);
   EXPECT_EQ(DiagConsumer.lastVFSTag(), FS.Tag);
 
   FS.Tag = "321";
   Server.addDocument(FooCpp, SourceContents);
   EXPECT_EQ(DiagConsumer.lastVFSTag(), FS.Tag);
-  EXPECT_EQ(Server.codeComplete(FooCpp, Position{0, 0}, CCOpts).get().Tag,
+  EXPECT_EQ(runCodeComplete(Server, FooCpp, Position{0, 0}, CCOpts).Tag,
             FS.Tag);
 }
 
@@ -478,11 +456,10 @@ TEST_F(ClangdVFSTest, InvalidCompileCommand) {
   EXPECT_ERROR(Server.rename(FooCpp, Position{0, 0}, "new_name"));
   // FIXME: codeComplete and signatureHelp should also return errors when they
   // can't parse the file.
-  EXPECT_THAT(
-      Server.codeComplete(FooCpp, Position{0, 0}, clangd::CodeCompleteOptions())
-          .get()
-          .Value.items,
-      IsEmpty());
+  EXPECT_THAT(runCodeComplete(Server, FooCpp, Position{0, 0},
+                              clangd::CodeCompleteOptions())
+                  .Value.items,
+              IsEmpty());
   auto SigHelp = Server.signatureHelp(FooCpp, Position{0, 0});
   ASSERT_TRUE(bool(SigHelp)) << "signatureHelp returned an error";
   EXPECT_THAT(SigHelp->Value.signatures, IsEmpty());
@@ -672,10 +649,8 @@ int d;
       // requests as opposed to AddDocument/RemoveDocument, which are implicitly
       // cancelled by any subsequent AddDocument/RemoveDocument request to the
       // same file.
-      Server
-          .codeComplete(FilePaths[FileIndex], Pos,
-                        clangd::CodeCompleteOptions())
-          .wait();
+      runCodeComplete(Server, FilePaths[FileIndex], Pos,
+                      clangd::CodeCompleteOptions());
     };
 
     auto FindDefinitionsRequest = [&]() {
@@ -805,20 +780,24 @@ TEST_F(ClangdVFSTest, CheckSourceHeaderSwitch) {
 TEST_F(ClangdThreadingTest, NoConcurrentDiagnostics) {
   class NoConcurrentAccessDiagConsumer : public DiagnosticsConsumer {
   public:
-    NoConcurrentAccessDiagConsumer(std::promise<void> StartSecondReparse)
-        : StartSecondReparse(std::move(StartSecondReparse)) {}
+    std::atomic<int> Count = {0};
 
-    void onDiagnosticsReady(
-        PathRef File,
-        Tagged<std::vector<DiagWithFixIts>> Diagnostics) override {
+     NoConcurrentAccessDiagConsumer(std::promise<void> StartSecondReparse)
+         : StartSecondReparse(std::move(StartSecondReparse)) {}
 
+    void onDiagnosticsReady(PathRef,
+                            Tagged<std::vector<DiagWithFixIts>>) override {
+      ++Count;
       std::unique_lock<std::mutex> Lock(Mutex, std::try_to_lock_t());
       ASSERT_TRUE(Lock.owns_lock())
           << "Detected concurrent onDiagnosticsReady calls for the same file.";
+
+      // If we started the second parse immediately, it might cancel the first.
+      // So we don't allow it to start until the first has delivered diags...
       if (FirstRequest) {
         FirstRequest = false;
         StartSecondReparse.set_value();
-        // Sleep long enough for the second request to be processed.
+        // ... but then we wait long enough that the callbacks would overlap.
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
     }
@@ -844,24 +823,21 @@ int d;
 )cpp";
 
   auto FooCpp = getVirtualTestFilePath("foo.cpp");
-  llvm::StringMap<std::string> FileContents;
-  FileContents[FooCpp] = "";
-  ConstantFSProvider FS(buildTestFS(FileContents));
+  MockFSProvider FS;
+  FS.Files[FooCpp] = "";
 
-  std::promise<void> StartSecondReparsePromise;
-  std::future<void> StartSecondReparse = StartSecondReparsePromise.get_future();
+  std::promise<void> StartSecondPromise;
+  std::future<void> StartSecond = StartSecondPromise.get_future();
 
-  NoConcurrentAccessDiagConsumer DiagConsumer(
-      std::move(StartSecondReparsePromise));
-
+  NoConcurrentAccessDiagConsumer DiagConsumer(std::move(StartSecondPromise));
   MockCompilationDatabase CDB;
-  ClangdServer Server(CDB, DiagConsumer, FS, 4,
+  ClangdServer Server(CDB, DiagConsumer, FS, /*AsyncThreadsCount=*/4,
                       /*StorePreamblesInMemory=*/true);
   Server.addDocument(FooCpp, SourceContentsWithErrors);
-  StartSecondReparse.wait();
-
-  auto Future = Server.addDocument(FooCpp, SourceContentsWithoutErrors);
-  Future.wait();
+  StartSecond.wait();
+  Server.addDocument(FooCpp, SourceContentsWithoutErrors);
+  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for diagnostics";
+  ASSERT_EQ(DiagConsumer.Count, 2); // Sanity check - we actually ran both?
 }
 
 } // namespace clangd

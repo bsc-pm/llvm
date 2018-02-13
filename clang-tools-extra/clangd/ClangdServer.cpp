@@ -139,11 +139,11 @@ void ClangdServer::setRootPath(PathRef RootPath) {
     this->RootPath = NewRootPath;
 }
 
-std::future<void> ClangdServer::addDocument(PathRef File, StringRef Contents) {
+void ClangdServer::addDocument(PathRef File, StringRef Contents) {
   DocVersion Version = DraftMgr.updateDraft(File, Contents);
   auto TaggedFS = FSProvider.getTaggedFileSystem(File);
-  return scheduleReparseAndDiags(File, VersionedDraft{Version, Contents.str()},
-                                 std::move(TaggedFS));
+  scheduleReparseAndDiags(File, VersionedDraft{Version, Contents.str()},
+                          std::move(TaggedFS));
 }
 
 void ClangdServer::removeDocument(PathRef File) {
@@ -152,7 +152,7 @@ void ClangdServer::removeDocument(PathRef File) {
   WorkScheduler.remove(File);
 }
 
-std::future<void> ClangdServer::forceReparse(PathRef File) {
+void ClangdServer::forceReparse(PathRef File) {
   auto FileContents = DraftMgr.getDraft(File);
   assert(FileContents.Draft &&
          "forceReparse() was called for non-added document");
@@ -162,26 +162,7 @@ std::future<void> ClangdServer::forceReparse(PathRef File) {
   CompileArgs.invalidate(File);
 
   auto TaggedFS = FSProvider.getTaggedFileSystem(File);
-  return scheduleReparseAndDiags(File, std::move(FileContents),
-                                 std::move(TaggedFS));
-}
-
-std::future<Tagged<CompletionList>>
-ClangdServer::codeComplete(PathRef File, Position Pos,
-                           const clangd::CodeCompleteOptions &Opts,
-                           llvm::Optional<StringRef> OverridenContents,
-                           IntrusiveRefCntPtr<vfs::FileSystem> *UsedFS) {
-  std::promise<Tagged<CompletionList>> ResultPromise;
-  auto Callback = [](std::promise<Tagged<CompletionList>> ResultPromise,
-                     Tagged<CompletionList> Result) -> void {
-    ResultPromise.set_value(std::move(Result));
-  };
-
-  auto ResultFuture = ResultPromise.get_future();
-  codeComplete(File, Pos, Opts,
-               BindWithForward(Callback, std::move(ResultPromise)),
-               OverridenContents, UsedFS);
-  return ResultFuture;
+  scheduleReparseAndDiags(File, std::move(FileContents), std::move(TaggedFS));
 }
 
 void ClangdServer::codeComplete(
@@ -481,7 +462,7 @@ ClangdServer::findDocumentHighlights(PathRef File, Position Pos) {
   return blockingRunWithAST<RetType>(WorkScheduler, File, Action);
 }
 
-std::future<void> ClangdServer::scheduleReparseAndDiags(
+void ClangdServer::scheduleReparseAndDiags(
     PathRef File, VersionedDraft Contents,
     Tagged<IntrusiveRefCntPtr<vfs::FileSystem>> TaggedFS) {
   tooling::CompileCommand Command = CompileArgs.getCompileCommand(File);
@@ -492,12 +473,7 @@ std::future<void> ClangdServer::scheduleReparseAndDiags(
   Path FileStr = File.str();
   VFSTag Tag = std::move(TaggedFS.Tag);
 
-  std::promise<void> DonePromise;
-  std::future<void> DoneFuture = DonePromise.get_future();
-
-  auto Callback = [this, Version, FileStr, Tag](std::promise<void> DonePromise,
-                                                OptDiags Diags) {
-    auto Guard = llvm::make_scope_exit([&]() { DonePromise.set_value(); });
+  auto Callback = [this, Version, FileStr, Tag](OptDiags Diags) {
     if (!Diags)
       return; // A new reparse was requested before this one completed.
 
@@ -521,8 +497,7 @@ std::future<void> ClangdServer::scheduleReparseAndDiags(
                        ParseInputs{std::move(Command),
                                    std::move(TaggedFS.Value),
                                    std::move(*Contents.Draft)},
-                       BindWithForward(Callback, std::move(DonePromise)));
-  return DoneFuture;
+                       std::move(Callback));
 }
 
 void ClangdServer::onFileEvent(const DidChangeWatchedFilesParams &Params) {
@@ -533,4 +508,9 @@ void ClangdServer::onFileEvent(const DidChangeWatchedFilesParams &Params) {
 std::vector<std::pair<Path, std::size_t>>
 ClangdServer::getUsedBytesPerFile() const {
   return WorkScheduler.getUsedBytesPerFile();
+}
+
+LLVM_NODISCARD bool
+ClangdServer::blockUntilIdleForTest(llvm::Optional<double> TimeoutSeconds) {
+  return WorkScheduler.blockUntilIdle(timeoutSeconds(TimeoutSeconds));
 }
