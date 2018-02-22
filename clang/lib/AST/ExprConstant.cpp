@@ -48,6 +48,8 @@
 #include <cstring>
 #include <functional>
 
+#define DEBUG_TYPE "exprconstant"
+
 using namespace clang;
 using llvm::APSInt;
 using llvm::APFloat;
@@ -2644,10 +2646,13 @@ struct CompleteObject {
   APValue *Value;
   /// The type of the complete object.
   QualType Type;
+  bool LifetimeStartedInEvaluation;
 
   CompleteObject() : Value(nullptr) {}
-  CompleteObject(APValue *Value, QualType Type)
-      : Value(Value), Type(Type) {
+  CompleteObject(APValue *Value, QualType Type,
+                 bool LifetimeStartedInEvaluation)
+      : Value(Value), Type(Type),
+        LifetimeStartedInEvaluation(LifetimeStartedInEvaluation) {
     assert(Value && "missing value for complete object");
   }
 
@@ -2677,6 +2682,8 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
   APValue *O = Obj.Value;
   QualType ObjType = Obj.Type;
   const FieldDecl *LastField = nullptr;
+  const bool MayReadMutableMembers =
+      Obj.LifetimeStartedInEvaluation && Info.getLangOpts().CPlusPlus14;
 
   // Walk the designator's path to find the subobject.
   for (unsigned I = 0, N = Sub.Entries.size(); /**/; ++I) {
@@ -2692,7 +2699,7 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
       // cannot perform this read. (This only happens when performing a trivial
       // copy or assignment.)
       if (ObjType->isRecordType() && handler.AccessKind == AK_Read &&
-          diagnoseUnreadableFields(Info, E, ObjType))
+          !MayReadMutableMembers && diagnoseUnreadableFields(Info, E, ObjType))
         return handler.failed();
 
       if (!handler.found(*O, ObjType))
@@ -2772,7 +2779,11 @@ findSubobject(EvalInfo &Info, const Expr *E, const CompleteObject &Obj,
                                    : O->getComplexFloatReal(), ObjType);
       }
     } else if (const FieldDecl *Field = getAsField(Sub.Entries[I])) {
-      if (Field->isMutable() && handler.AccessKind == AK_Read) {
+      // In C++14 onwards, it is permitted to read a mutable member whose
+      // lifetime began within the evaluation.
+      // FIXME: Should we also allow this in C++11?
+      if (Field->isMutable() && handler.AccessKind == AK_Read &&
+          !MayReadMutableMembers) {
         Info.FFDiag(E, diag::note_constexpr_ltor_mutable, 1)
           << Field;
         Info.Note(Field->getLocation(), diag::note_declared_at);
@@ -3018,6 +3029,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   // Compute value storage location and type of base object.
   APValue *BaseVal = nullptr;
   QualType BaseType = getType(LVal.Base);
+  bool LifetimeStartedInEvaluation = Frame;
 
   if (const ValueDecl *D = LVal.Base.dyn_cast<const ValueDecl*>()) {
     // In C++98, const, non-volatile integers initialized with ICEs are ICEs.
@@ -3129,7 +3141,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
         //   int &&r = 1;
         //   int x = ++r;
         //   constexpr int k = r;
-        // Therefore we use the C++1y rules in C++11 too.
+        // Therefore we use the C++14 rules in C++11 too.
         const ValueDecl *VD = Info.EvaluatingDecl.dyn_cast<const ValueDecl*>();
         const ValueDecl *ED = MTE->getExtendingDecl();
         if (!(BaseType.isConstQualified() &&
@@ -3142,6 +3154,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
 
         BaseVal = Info.Ctx.getMaterializedTemporaryValue(MTE, false);
         assert(BaseVal && "got reference to unevaluated temporary");
+        LifetimeStartedInEvaluation = true;
       } else {
         Info.FFDiag(E);
         return CompleteObject();
@@ -3170,9 +3183,10 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
   if (Info.isEvaluatingConstructor(LVal.getLValueBase(), LVal.CallIndex)) {
     BaseType = Info.Ctx.getCanonicalType(BaseType);
     BaseType.removeLocalConst();
+    LifetimeStartedInEvaluation = true;
   }
 
-  // In C++1y, we can't safely access any mutable state when we might be
+  // In C++14, we can't safely access any mutable state when we might be
   // evaluating after an unmodeled side effect.
   //
   // FIXME: Not all local state is mutable. Allow local constant subobjects
@@ -3182,7 +3196,7 @@ static CompleteObject findCompleteObject(EvalInfo &Info, const Expr *E,
       (AK != AK_Read && Info.IsSpeculativelyEvaluating))
     return CompleteObject();
 
-  return CompleteObject(BaseVal, BaseType);
+  return CompleteObject(BaseVal, BaseType, LifetimeStartedInEvaluation);
 }
 
 /// \brief Perform an lvalue-to-rvalue conversion on the given glvalue. This
@@ -3216,14 +3230,14 @@ static bool handleLValueToRValueConversion(EvalInfo &Info, const Expr *Conv,
       APValue Lit;
       if (!Evaluate(Lit, Info, CLE->getInitializer()))
         return false;
-      CompleteObject LitObj(&Lit, Base->getType());
+      CompleteObject LitObj(&Lit, Base->getType(), false);
       return extractSubobject(Info, Conv, LitObj, LVal.Designator, RVal);
     } else if (isa<StringLiteral>(Base) || isa<PredefinedExpr>(Base)) {
       // We represent a string literal array as an lvalue pointing at the
       // corresponding expression, rather than building an array of chars.
       // FIXME: Support ObjCEncodeExpr, MakeStringConstant
       APValue Str(Base, CharUnits::Zero(), APValue::NoLValuePath(), 0);
-      CompleteObject StrObj(&Str, Base->getType());
+      CompleteObject StrObj(&Str, Base->getType(), false);
       return extractSubobject(Info, Conv, StrObj, LVal.Designator, RVal);
     }
   }
@@ -4821,7 +4835,7 @@ public:
     assert(BaseTy->castAs<RecordType>()->getDecl()->getCanonicalDecl() ==
            FD->getParent()->getCanonicalDecl() && "record / field mismatch");
 
-    CompleteObject Obj(&Val, BaseTy);
+    CompleteObject Obj(&Val, BaseTy, true);
     SubobjectDesignator Designator(BaseTy);
     Designator.addDeclUnchecked(FD);
 
@@ -6780,6 +6794,22 @@ static bool EvaluateArray(const Expr *E, const LValue &This,
   return ArrayExprEvaluator(Info, This, Result).Visit(E);
 }
 
+// Return true iff the given array filler may depend on the element index.
+static bool MaybeElementDependentArrayFiller(const Expr *FillerExpr) {
+  // For now, just whitelist non-class value-initialization and initialization
+  // lists comprised of them.
+  if (isa<ImplicitValueInitExpr>(FillerExpr))
+    return false;
+  if (const InitListExpr *ILE = dyn_cast<InitListExpr>(FillerExpr)) {
+    for (unsigned I = 0, E = ILE->getNumInits(); I != E; ++I) {
+      if (MaybeElementDependentArrayFiller(ILE->getInit(I)))
+        return true;
+    }
+    return false;
+  }
+  return true;
+}
+
 bool ArrayExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
   const ConstantArrayType *CAT = Info.Ctx.getAsConstantArrayType(E->getType());
   if (!CAT)
@@ -6809,9 +6839,12 @@ bool ArrayExprEvaluator::VisitInitListExpr(const InitListExpr *E) {
   const Expr *FillerExpr = E->hasArrayFiller() ? E->getArrayFiller() : nullptr;
 
   // If the initializer might depend on the array index, run it for each
-  // array element. For now, just whitelist non-class value-initialization.
-  if (NumEltsToInit != NumElts && !isa<ImplicitValueInitExpr>(FillerExpr))
+  // array element.
+  if (NumEltsToInit != NumElts && MaybeElementDependentArrayFiller(FillerExpr))
     NumEltsToInit = NumElts;
+
+  DEBUG(llvm::dbgs() << "The number of elements to initialize: " <<
+        NumEltsToInit << ".\n");
 
   Result = APValue(APValue::UninitArray(), NumEltsToInit, NumElts);
 

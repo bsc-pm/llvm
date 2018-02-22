@@ -10,16 +10,13 @@
 #ifndef LLD_WASM_INPUT_FILES_H
 #define LLD_WASM_INPUT_FILES_H
 
+#include "Symbols.h"
 #include "lld/Common/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/Support/MemoryBuffer.h"
-
-#include "Symbols.h"
-#include "WriterUtils.h"
-
 #include <vector>
 
 using llvm::object::Archive;
@@ -107,11 +104,13 @@ public:
 
   ArrayRef<Symbol *> getSymbols() const { return Symbols; }
 
-  Symbol *getFunctionSymbol(uint32_t Index) const {
-    return FunctionSymbols[Index];
+  FunctionSymbol *getFunctionSymbol(uint32_t Index) const {
+    return cast<FunctionSymbol>(FunctionSymbols[Index]);
   }
 
-  Symbol *getGlobalSymbol(uint32_t Index) const { return GlobalSymbols[Index]; }
+  DataSymbol *getDataSymbol(uint32_t Index) const {
+    return cast<DataSymbol>(DataSymbols[Index]);
+  }
 
 private:
   uint32_t relocateVirtualAddress(uint32_t Index) const;
@@ -119,9 +118,9 @@ private:
   uint32_t relocateGlobalIndex(uint32_t Original) const;
   uint32_t relocateTableIndex(uint32_t Original) const;
 
-  Symbol *createDefined(const WasmSymbol &Sym, Symbol::Kind Kind,
-                        InputChunk *Chunk = nullptr,
-                        uint32_t Address = UINT32_MAX);
+  Symbol *createDefinedData(const WasmSymbol &Sym, InputSegment *Segment,
+                            uint32_t Address);
+  Symbol *createDefinedFunction(const WasmSymbol &Sym, InputFunction *Function);
   Symbol *createUndefined(const WasmSymbol &Sym, Symbol::Kind Kind,
                           const WasmSignature *Signature = nullptr);
   void initializeSymbols();
@@ -138,7 +137,7 @@ private:
   std::vector<Symbol *> FunctionSymbols;
 
   // List of all global symbols indexed by the global index space
-  std::vector<Symbol *> GlobalSymbols;
+  std::vector<Symbol *> DataSymbols;
 
   uint32_t NumGlobalImports = 0;
   uint32_t NumFunctionImports = 0;

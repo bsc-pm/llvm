@@ -38,7 +38,7 @@ static const char *const DataLayoutStringSIPrivateIsZero =
     "-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64";
 
 static const char *const DataLayoutStringSIGenericIsZero =
-    "e-p:64:64-p1:64:64-p2:64:64-p3:32:32-p4:32:32-p5:32:32-p6:32:32"
+    "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32"
     "-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128"
     "-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-A5";
 
@@ -46,11 +46,11 @@ static const LangASMap AMDGPUPrivIsZeroDefIsGenMap = {
     4, // Default
     1, // opencl_global
     3, // opencl_local
-    2, // opencl_constant
+    4, // opencl_constant
     0, // opencl_private
     4, // opencl_generic
     1, // cuda_device
-    2, // cuda_constant
+    4, // cuda_constant
     3  // cuda_shared
 };
 
@@ -58,11 +58,11 @@ static const LangASMap AMDGPUGenIsZeroDefIsGenMap = {
     0, // Default
     1, // opencl_global
     3, // opencl_local
-    2, // opencl_constant
+    4, // opencl_constant
     5, // opencl_private
     0, // opencl_generic
     1, // cuda_device
-    2, // cuda_constant
+    4, // cuda_constant
     3  // cuda_shared
 };
 
@@ -70,11 +70,11 @@ static const LangASMap AMDGPUPrivIsZeroDefIsPrivMap = {
     0, // Default
     1, // opencl_global
     3, // opencl_local
-    2, // opencl_constant
+    4, // opencl_constant
     0, // opencl_private
     4, // opencl_generic
     1, // cuda_device
-    2, // cuda_constant
+    4, // cuda_constant
     3  // cuda_shared
 };
 
@@ -82,11 +82,11 @@ static const LangASMap AMDGPUGenIsZeroDefIsPrivMap = {
     5, // Default
     1, // opencl_global
     3, // opencl_local
-    2, // opencl_constant
+    4, // opencl_constant
     5, // opencl_private
     0, // opencl_generic
     1, // cuda_device
-    2, // cuda_constant
+    4, // cuda_constant
     3  // cuda_shared
 };
 } // namespace targets
@@ -161,7 +161,7 @@ bool AMDGPUTargetInfo::initFeatureMap(
     if (CPU.empty())
       CPU = "tahiti";
 
-    switch (parseAMDGCNName(CPU)) {
+    switch (parseAMDGCNName(CPU).Kind) {
     case GK_GFX6:
     case GK_GFX7:
       break;
@@ -184,7 +184,7 @@ bool AMDGPUTargetInfo::initFeatureMap(
     if (CPU.empty())
       CPU = "r600";
 
-    switch (parseR600Name(CPU)) {
+    switch (parseR600Name(CPU).Kind) {
     case GK_R600:
     case GK_R700:
     case GK_EVERGREEN:
@@ -228,37 +228,37 @@ void AMDGPUTargetInfo::adjustTargetOptions(const CodeGenOptions &CGOpts,
     TargetOpts.Features.push_back("+fp64-fp16-denormals");
 }
 
-
-constexpr AMDGPUTargetInfo::NameGPUKind AMDGPUTargetInfo::R600Names[];
-constexpr AMDGPUTargetInfo::NameGPUKind AMDGPUTargetInfo::AMDGCNNames[];
-AMDGPUTargetInfo::GPUKind AMDGPUTargetInfo::parseR600Name(StringRef Name) {
+constexpr AMDGPUTargetInfo::GPUInfo AMDGPUTargetInfo::InvalidGPU;
+constexpr AMDGPUTargetInfo::GPUInfo AMDGPUTargetInfo::R600Names[];
+constexpr AMDGPUTargetInfo::GPUInfo AMDGPUTargetInfo::AMDGCNNames[];
+AMDGPUTargetInfo::GPUInfo AMDGPUTargetInfo::parseR600Name(StringRef Name) {
   const auto *Result = llvm::find_if(
-      R600Names, [Name](const NameGPUKind &Kind) { return Kind.Name == Name; });
+      R600Names, [Name](const GPUInfo &GPU) { return GPU.Name == Name; });
 
   if (Result == std::end(R600Names))
-    return GK_NONE;
-  return Result->Kind;
+    return InvalidGPU;
+  return *Result;
 }
 
-AMDGPUTargetInfo::GPUKind AMDGPUTargetInfo::parseAMDGCNName(StringRef Name) {
+AMDGPUTargetInfo::GPUInfo AMDGPUTargetInfo::parseAMDGCNName(StringRef Name) {
   const auto *Result =
-      llvm::find_if(AMDGCNNames, [Name](const NameGPUKind &Kind) {
-        return Kind.Name == Name;
+      llvm::find_if(AMDGCNNames, [Name](const GPUInfo &GPU) {
+        return GPU.Name == Name;
       });
 
   if (Result == std::end(AMDGCNNames))
-    return GK_NONE;
-  return Result->Kind;
+    return InvalidGPU;
+  return *Result;
 }
 
 void AMDGPUTargetInfo::fillValidCPUList(
     SmallVectorImpl<StringRef> &Values) const {
   if (getTriple().getArch() == llvm::Triple::amdgcn)
-    llvm::for_each(AMDGCNNames, [&Values](const NameGPUKind &Kind) {
-                   Values.emplace_back(Kind.Name);});
+    llvm::for_each(AMDGCNNames, [&Values](const GPUInfo &GPU) {
+                   Values.emplace_back(GPU.Name);});
   else
-    llvm::for_each(R600Names, [&Values](const NameGPUKind &Kind) {
-                   Values.emplace_back(Kind.Name);});
+    llvm::for_each(R600Names, [&Values](const GPUInfo &GPU) {
+                   Values.emplace_back(GPU.Name);});
 }
 
 void AMDGPUTargetInfo::setAddressSpaceMap(bool DefaultIsPrivate) {
@@ -273,17 +273,17 @@ void AMDGPUTargetInfo::setAddressSpaceMap(bool DefaultIsPrivate) {
 
 AMDGPUTargetInfo::AMDGPUTargetInfo(const llvm::Triple &Triple,
                                    const TargetOptions &Opts)
-    : TargetInfo(Triple),
-      GPU(isAMDGCN(Triple) ? GK_GFX6 : parseR600Name(Opts.CPU)),
-      hasFP64(false), hasFMAF(false), hasLDEXPF(false),
-      AS(isGenericZero(Triple)) {
+  : TargetInfo(Triple),
+    GPU(isAMDGCN(Triple) ? AMDGCNNames[0] : parseR600Name(Opts.CPU)),
+    hasFP64(false), hasFMAF(false), hasLDEXPF(false),
+    AS(isGenericZero(Triple)) {
   if (getTriple().getArch() == llvm::Triple::amdgcn) {
     hasFP64 = true;
     hasFMAF = true;
     hasLDEXPF = true;
   }
   if (getTriple().getArch() == llvm::Triple::r600) {
-    if (GPU == GK_EVERGREEN_DOUBLE_OPS || GPU == GK_CAYMAN) {
+    if (GPU.Kind == GK_EVERGREEN_DOUBLE_OPS || GPU.Kind == GK_CAYMAN) {
       hasFMAF = true;
     }
   }
@@ -324,10 +324,16 @@ ArrayRef<Builtin::Info> AMDGPUTargetInfo::getTargetBuiltins() const {
 
 void AMDGPUTargetInfo::getTargetDefines(const LangOptions &Opts,
                                         MacroBuilder &Builder) const {
+  Builder.defineMacro("__AMD__");
+  Builder.defineMacro("__AMDGPU__");
+
   if (getTriple().getArch() == llvm::Triple::amdgcn)
     Builder.defineMacro("__AMDGCN__");
   else
     Builder.defineMacro("__R600__");
+
+  if (GPU.Kind != GK_NONE)
+    Builder.defineMacro(Twine("__") + Twine(GPU.CanonicalName) + Twine("__"));
 
   if (hasFMAF)
     Builder.defineMacro("__HAS_FMAF__");
