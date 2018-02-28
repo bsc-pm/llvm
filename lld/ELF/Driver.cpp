@@ -1080,9 +1080,10 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
   if (errorCount())
     return;
 
-  // Handle undefined symbols in DSOs.
-  if (!Config->Shared)
-    Symtab->scanShlibUndefined<ELFT>();
+  // We want to declare linker script's symbols early,
+  // so that we can version them.
+  // They also might be exported if referenced by DSOs.
+  Script->declareSymbols();
 
   // Handle the -exclude-libs option.
   if (Args.hasArg(OPT_exclude_libs))
@@ -1096,10 +1097,6 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
   // We need to create some reserved symbols such as _end. Create them.
   if (!Config->Relocatable)
     addReservedSymbols();
-
-  // We want to declare linker script's symbols early,
-  // so that we can version them.
-  Script->declareSymbols();
 
   // Apply version scripts.
   //

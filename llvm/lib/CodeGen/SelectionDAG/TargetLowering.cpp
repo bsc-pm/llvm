@@ -1536,6 +1536,24 @@ bool TargetLowering::SimplifyDemandedVectorElts(
     }
     break;
   }
+  case ISD::ADD:
+  case ISD::SUB: {
+    APInt SrcUndef, SrcZero;
+    if (SimplifyDemandedVectorElts(Op.getOperand(1), DemandedElts, SrcUndef,
+                                   SrcZero, TLO, Depth + 1))
+      return true;
+    if (SimplifyDemandedVectorElts(Op.getOperand(0), DemandedElts, KnownUndef,
+                                   KnownZero, TLO, Depth + 1))
+      return true;
+    KnownZero &= SrcZero;
+    KnownUndef &= SrcUndef;
+    break;
+  }
+  case ISD::TRUNCATE:
+    if (SimplifyDemandedVectorElts(Op.getOperand(0), DemandedElts, KnownUndef,
+                                   KnownZero, TLO, Depth + 1))
+      return true;
+    break;
   default: {
     if (Op.getOpcode() >= ISD::BUILTIN_OP_END)
       if (SimplifyDemandedVectorEltsForTargetNode(Op, DemandedElts, KnownUndef,
@@ -2012,7 +2030,7 @@ SDValue TargetLowering::SimplifySetCC(EVT VT, SDValue N0, SDValue N1,
         EVT newVT = N0.getOperand(0).getValueType();
         if (DCI.isBeforeLegalizeOps() ||
             (isOperationLegal(ISD::SETCC, newVT) &&
-             getCondCodeAction(Cond, newVT.getSimpleVT()) == Legal)) {
+             isCondCodeLegal(Cond, newVT.getSimpleVT()))) {
           EVT NewSetCCVT =
               getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), newVT);
           SDValue NewConst = DAG.getConstant(C1.trunc(InSize), dl, newVT);
@@ -2435,8 +2453,9 @@ SDValue TargetLowering::SimplifySetCC(EVT VT, SDValue N0, SDValue N1,
     // Otherwise, we can't fold it.  However, we can simplify it to SETUO/SETO
     // if it is not already.
     ISD::CondCode NewCond = UOF == 0 ? ISD::SETO : ISD::SETUO;
-    if (NewCond != Cond && (DCI.isBeforeLegalizeOps() ||
-          getCondCodeAction(NewCond, N0.getSimpleValueType()) == Legal))
+    if (NewCond != Cond &&
+        (DCI.isBeforeLegalizeOps() ||
+         isCondCodeLegal(NewCond, N0.getSimpleValueType())))
       return DAG.getSetCC(dl, VT, N0, N1, NewCond);
   }
 

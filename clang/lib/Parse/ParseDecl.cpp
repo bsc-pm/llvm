@@ -404,14 +404,28 @@ unsigned Parser::ParseClangAttributeArgs(
   AttributeList::Kind AttrKind =
       AttributeList::getKind(AttrName, ScopeName, Syntax);
 
-  if (AttrKind == AttributeList::AT_ExternalSourceSymbol) {
+  switch (AttrKind) {
+  default:
+    return ParseAttributeArgsCommon(AttrName, AttrNameLoc, Attrs, EndLoc,
+                                    ScopeName, ScopeLoc, Syntax);
+  case AttributeList::AT_ExternalSourceSymbol:
     ParseExternalSourceSymbolAttribute(*AttrName, AttrNameLoc, Attrs, EndLoc,
                                        ScopeName, ScopeLoc, Syntax);
-    return Attrs.getList() ? Attrs.getList()->getNumArgs() : 0;
+    break;
+  case AttributeList::AT_Availability:
+    ParseAvailabilityAttribute(*AttrName, AttrNameLoc, Attrs, EndLoc, ScopeName,
+                               ScopeLoc, Syntax);
+    break;
+  case AttributeList::AT_ObjCBridgeRelated:
+    ParseObjCBridgeRelatedAttribute(*AttrName, AttrNameLoc, Attrs, EndLoc,
+                                    ScopeName, ScopeLoc, Syntax);
+    break;
+  case AttributeList::AT_TypeTagForDatatype:
+    ParseTypeTagForDatatypeAttribute(*AttrName, AttrNameLoc, Attrs, EndLoc,
+                                     ScopeName, ScopeLoc, Syntax);
+    break;
   }
-
-  return ParseAttributeArgsCommon(AttrName, AttrNameLoc, Attrs, EndLoc,
-                                  ScopeName, ScopeLoc, Syntax);
+  return Attrs.getList() ? Attrs.getList()->getNumArgs() : 0;
 }
 
 bool Parser::ParseMicrosoftDeclSpecArgs(IdentifierInfo *AttrName,
@@ -1244,7 +1258,9 @@ void Parser::ParseObjCBridgeRelatedAttribute(IdentifierInfo &ObjCBridgeRelated,
     return;
   }
 
-  // Parse optional class method name.
+  // Parse class method name.  It's non-optional in the sense that a trailing
+  // comma is required, but it can be the empty string, and then we record a
+  // nullptr.
   IdentifierLoc *ClassMethod = nullptr;
   if (Tok.is(tok::identifier)) {
     ClassMethod = ParseIdentifierLoc();
@@ -1263,7 +1279,8 @@ void Parser::ParseObjCBridgeRelatedAttribute(IdentifierInfo &ObjCBridgeRelated,
     return;
   }
   
-  // Parse optional instance method name.
+  // Parse instance method name.  Also non-optional but empty string is
+  // permitted.
   IdentifierLoc *InstanceMethod = nullptr;
   if (Tok.is(tok::identifier))
     InstanceMethod = ParseIdentifierLoc();

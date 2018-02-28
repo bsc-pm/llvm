@@ -11724,7 +11724,8 @@ TEST_F(FormatTest, NoSpaceAfterSuper) {
 }
 
 TEST(FormatStyle, GetStyleWithEmptyFileName) {
-  auto Style1 = getStyle("file", "", "Google");
+  vfs::InMemoryFileSystem FS;
+  auto Style1 = getStyle("file", "", "Google", "", &FS);
   ASSERT_TRUE((bool)Style1);
   ASSERT_EQ(*Style1, getGoogleStyle());
 }
@@ -11958,33 +11959,15 @@ TEST_F(FormatTest, StructuredBindings) {
   verifyFormat("auto const &[ a, b ] = f();", Spaces);
 }
 
-struct GuessLanguageTestCase {
-  const char *const FileName;
-  const char *const Code;
-  const FormatStyle::LanguageKind ExpectedResult;
-};
-
-class GuessLanguageTest
-    : public FormatTest,
-      public ::testing::WithParamInterface<GuessLanguageTestCase> {};
-
-TEST_P(GuessLanguageTest, FileAndCode) {
-  auto TestCase = GetParam();
-  EXPECT_EQ(TestCase.ExpectedResult,
-            guessLanguage(TestCase.FileName, TestCase.Code));
+TEST_F(FormatTest, FileAndCode) {
+  EXPECT_EQ(FormatStyle::LK_Cpp, guessLanguage("foo.cc", ""));
+  EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo.m", ""));
+  EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo.mm", ""));
+  EXPECT_EQ(FormatStyle::LK_Cpp, guessLanguage("foo.h", ""));
+  EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo.h", "@interface Foo\n@end\n"));
+  EXPECT_EQ(FormatStyle::LK_Cpp, guessLanguage("foo", ""));
+  EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo", "@interface Foo\n@end\n"));
 }
-
-static const GuessLanguageTestCase TestCases[] = {
-    {"foo.cc", "", FormatStyle::LK_Cpp},
-    {"foo.m", "", FormatStyle::LK_ObjC},
-    {"foo.mm", "", FormatStyle::LK_ObjC},
-    {"foo.h", "", FormatStyle::LK_Cpp},
-    {"foo.h", "@interface Foo\n@end\n", FormatStyle::LK_ObjC},
-    {"foo", "", FormatStyle::LK_Cpp},
-    {"foo", "@interface Foo\n@end\n", FormatStyle::LK_ObjC},
-};
-INSTANTIATE_TEST_CASE_P(ValidLanguages, GuessLanguageTest,
-                        ::testing::ValuesIn(TestCases));
 
 } // end namespace
 } // end namespace format
