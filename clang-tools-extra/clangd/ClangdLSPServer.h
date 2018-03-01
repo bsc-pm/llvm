@@ -45,7 +45,8 @@ public:
   /// each instance of ClangdLSPServer.
   ///
   /// \return Wether we received a 'shutdown' request before an 'exit' request
-  bool run(std::istream &In);
+  bool run(std::istream &In,
+           JSONStreamStyle InputStyle = JSONStreamStyle::Standard);
 
 private:
   // Implement DiagnosticsConsumer.
@@ -74,6 +75,8 @@ private:
   void onFileEvent(DidChangeWatchedFilesParams &Params) override;
   void onCommand(ExecuteCommandParams &Params) override;
   void onRename(RenameParams &Parames) override;
+  void onHover(TextDocumentPositionParams &Params) override;
+  void onChangeConfiguration(DidChangeConfigurationParams &Params) override;
 
   std::vector<TextEdit> getFixIts(StringRef File, const clangd::Diagnostic &D);
 

@@ -157,14 +157,17 @@ static ExprValue sub(ExprValue A, ExprValue B) {
   return {A.Sec, false, A.getSectionOffset() - B.getValue(), A.Loc};
 }
 
-static ExprValue mul(ExprValue A, ExprValue B) {
-  return A.getValue() * B.getValue();
-}
-
 static ExprValue div(ExprValue A, ExprValue B) {
   if (uint64_t BV = B.getValue())
     return A.getValue() / BV;
   error("division by zero");
+  return 0;
+}
+
+static ExprValue mod(ExprValue A, ExprValue B) {
+  if (uint64_t BV = B.getValue())
+    return A.getValue() % BV;
+  error("modulo by zero");
   return 0;
 }
 
@@ -461,7 +464,7 @@ void ScriptParser::readSections() {
 
 static int precedence(StringRef Op) {
   return StringSwitch<int>(Op)
-      .Cases("*", "/", 5)
+      .Cases("*", "/", "%", 5)
       .Cases("+", "-", 4)
       .Cases("<<", ">>", 3)
       .Cases("<", "<=", ">", ">=", "==", "!=", 2)
@@ -617,12 +620,14 @@ uint32_t ScriptParser::readFill() {
   return V;
 }
 
-// Reads an expression and/or the special directive "(NOLOAD)" for an
-// output section definition.
+// Reads an expression and/or the special directive for an output
+// section definition. Directive is one of following: "(NOLOAD)",
+// "(COPY)", "(INFO)" or "(OVERLAY)".
 //
 // An output section name can be followed by an address expression
-// and/or by "(NOLOAD)". This grammar is not LL(1) because "(" can be
-// interpreted as either the beginning of some expression or "(NOLOAD)".
+// and/or directive. This grammar is not LL(1) because "(" can be
+// interpreted as either the beginning of some expression or beginning
+// of directive.
 //
 // https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
 // https://sourceware.org/binutils/docs/ld/Output-Section-Type.html
@@ -631,6 +636,11 @@ void ScriptParser::readSectionAddressType(OutputSection *Cmd) {
     if (consume("NOLOAD")) {
       expect(")");
       Cmd->Noload = true;
+      return;
+    }
+    if (consume("COPY") || consume("INFO") || consume("OVERLAY")) {
+      expect(")");
+      Cmd->NonAlloc = true;
       return;
     }
     Cmd->AddrExpr = readExpr();
@@ -660,6 +670,8 @@ static Expr checkAlignment(Expr E, std::string &Loc) {
 OutputSection *ScriptParser::readOutputSectionDescription(StringRef OutSec) {
   OutputSection *Cmd =
       Script->createOutputSection(OutSec, getCurrentLocation());
+
+  size_t SymbolsReferenced = Script->ReferencedSymbols.size();
 
   if (peek() != ":")
     readSectionAddressType(Cmd);
@@ -727,6 +739,8 @@ OutputSection *ScriptParser::readOutputSectionDescription(StringRef OutSec) {
   // Consume optional comma following output section command.
   consume(",");
 
+  if (Script->ReferencedSymbols.size() > SymbolsReferenced)
+    Cmd->ExpressionsUseSymbols = true;
   return Cmd;
 }
 
@@ -801,9 +815,11 @@ static Expr combine(StringRef Op, Expr L, Expr R) {
   if (Op == "-")
     return [=] { return sub(L(), R()); };
   if (Op == "*")
-    return [=] { return mul(L(), R()); };
+    return [=] { return L().getValue() * R().getValue(); };
   if (Op == "/")
     return [=] { return div(L(), R()); };
+  if (Op == "%")
+    return [=] { return mod(L(), R()); };
   if (Op == "<<")
     return [=] { return L().getValue() << R().getValue(); };
   if (Op == ">>")
@@ -873,7 +889,7 @@ Expr ScriptParser::readConstant() {
   if (S == "MAXPAGESIZE")
     return [] { return Config->MaxPageSize; };
   setError("unknown constant: " + S);
-  return {};
+  return [] { return 0; };
 }
 
 // Parses Tok as an integer. It recognizes hexadecimal (prefixed with
@@ -1036,8 +1052,10 @@ Expr ScriptParser::readPrimary() {
   }
   if (Tok == "LENGTH") {
     StringRef Name = readParenLiteral();
-    if (Script->MemoryRegions.count(Name) == 0)
+    if (Script->MemoryRegions.count(Name) == 0) {
       setError("memory region not defined: " + Name);
+      return [] { return 0; };
+    }
     return [=] { return Script->MemoryRegions[Name]->Length; };
   }
   if (Tok == "LOADADDR") {
@@ -1050,8 +1068,10 @@ Expr ScriptParser::readPrimary() {
   }
   if (Tok == "ORIGIN") {
     StringRef Name = readParenLiteral();
-    if (Script->MemoryRegions.count(Name) == 0)
+    if (Script->MemoryRegions.count(Name) == 0) {
       setError("memory region not defined: " + Name);
+      return [] { return 0; };
+    }
     return [=] { return Script->MemoryRegions[Name]->Origin; };
   }
   if (Tok == "SEGMENT_START") {
@@ -1233,6 +1253,9 @@ ScriptParser::readSymbols() {
 
 // Reads an "extern C++" directive, e.g.,
 // "extern "C++" { ns::*; "f(int, double)"; };"
+//
+// The last semicolon is optional. E.g. this is OK:
+// "extern "C++" { ns::*; "f(int, double)" };"
 std::vector<SymbolVersion> ScriptParser::readVersionExtern() {
   StringRef Tok = next();
   bool IsCXX = Tok == "\"C++\"";
@@ -1245,6 +1268,8 @@ std::vector<SymbolVersion> ScriptParser::readVersionExtern() {
     StringRef Tok = next();
     bool HasWildcard = !Tok.startswith("\"") && hasWildcard(Tok);
     Ret.push_back({unquote(Tok), IsCXX, HasWildcard});
+    if (consume("}"))
+      return Ret;
     expect(";");
   }
 

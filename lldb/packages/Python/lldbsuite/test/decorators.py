@@ -4,6 +4,7 @@ from __future__ import print_function
 # System modules
 from distutils.version import LooseVersion, StrictVersion
 from functools import wraps
+import inspect
 import os
 import platform
 import re
@@ -170,7 +171,7 @@ def _decorateTest(mode,
         skip_for_arch = _match_decorator_property(
             archs, self.getArchitecture())
         skip_for_debug_info = _match_decorator_property(
-            debug_info, self.debug_info)
+            debug_info, self.getDebugInfo())
         skip_for_triple = _match_decorator_property(
             triple, lldb.DBG.GetSelectedPlatform().GetTriple())
         skip_for_remote = _match_decorator_property(
@@ -303,9 +304,16 @@ def add_test_categories(cat):
         if isinstance(func, type) and issubclass(func, unittest2.TestCase):
             raise Exception(
                 "@add_test_categories can only be used to decorate a test method")
-        if hasattr(func, "categories"):
-            cat.extend(func.categories)
-        func.categories = cat
+
+        # Update or set the categories attribute. For instance methods, the
+        # attribute must be set on the actual function.
+        func_for_attr = func
+        if inspect.ismethod(func_for_attr):
+            func_for_attr = func.__func__
+        if hasattr(func_for_attr, "categories"):
+            cat.extend(func_for_attr.categories)
+        setattr(func_for_attr, "categories", cat)
+
         return func
 
     return impl
@@ -428,15 +436,9 @@ def expectedFlakey(expected_fn, bugnumber=None):
         return expectedFailure_impl
 
 
-def expectedFlakeyDwarf(bugnumber=None):
-    def fn(self):
-        return self.debug_info == "dwarf"
-    return expectedFlakey(fn, bugnumber)
-
-
 def expectedFlakeyDsym(bugnumber=None):
     def fn(self):
-        return self.debug_info == "dwarf"
+        return self.getDebugInfo() == "dwarf"
     return expectedFlakey(fn, bugnumber)
 
 
@@ -468,27 +470,6 @@ def expectedFlakeyNetBSD(bugnumber=None, compilers=None):
     return expectedFlakeyOS(['netbsd'], bugnumber, compilers)
 
 
-def expectedFlakeyCompiler(compiler, compiler_version=None, bugnumber=None):
-    if compiler_version is None:
-        compiler_version = ['=', None]
-
-    def fn(self):
-        return compiler in self.getCompiler() and self.expectedCompilerVersion(compiler_version)
-    return expectedFlakey(fn, bugnumber)
-
-# @expectedFlakeyClang('bugnumber', ['<=', '3.4'])
-
-
-def expectedFlakeyClang(bugnumber=None, compiler_version=None):
-    return expectedFlakeyCompiler('clang', compiler_version, bugnumber)
-
-# @expectedFlakeyGcc('bugnumber', ['<=', '3.4'])
-
-
-def expectedFlakeyGcc(bugnumber=None, compiler_version=None):
-    return expectedFlakeyCompiler('gcc', compiler_version, bugnumber)
-
-
 def expectedFlakeyAndroid(bugnumber=None, api_levels=None, archs=None):
     return expectedFlakey(
         _skip_for_android(
@@ -518,7 +499,7 @@ def skipIfNoSBHeaders(func):
                 'LLDB.h')
             if os.path.exists(header):
                 return None
-        
+
         header = os.path.join(
             os.environ["LLDB_SRC"],
             "include",
@@ -755,3 +736,11 @@ def skipUnlessAddressSanitizer(func):
             return "Compiler cannot compile with -fsanitize=address"
         return None
     return skipTestIfFn(is_compiler_with_address_sanitizer)(func)
+
+def skipIfXmlSupportMissing(func):
+    config = lldb.SBDebugger.GetBuildConfiguration()
+    xml = config.GetValueForKey("xml")
+
+    fail_value = True # More likely to notice if something goes wrong
+    have_xml = xml.GetValueForKey("value").GetBooleanValue(fail_value)
+    return unittest2.skipIf(not have_xml, "requires xml support")(func)

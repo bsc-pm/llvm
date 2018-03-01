@@ -12,74 +12,76 @@
 
 #include "Context.h"
 #include "Function.h"
+#include "llvm/ADT/Twine.h"
+#include <cassert>
 #include <condition_variable>
-#include <deque>
+#include <memory>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 namespace clang {
 namespace clangd {
-/// A simple fixed-size thread pool implementation.
-class ThreadPool {
+
+/// A threadsafe flag that is initially clear.
+class Notification {
 public:
-  /// If \p AsyncThreadsCount is 0, requests added using addToFront and addToEnd
-  /// will be processed synchronously on the calling thread.
-  // Otherwise, \p AsyncThreadsCount threads will be created to schedule the
-  // requests.
-  ThreadPool(unsigned AsyncThreadsCount);
-  /// Destructor blocks until all requests are processed and worker threads are
-  /// terminated.
-  ~ThreadPool();
-
-  /// Add a new request to run function \p F with args \p As to the start of the
-  /// queue. The request will be run on a separate thread.
-  template <class Func, class... Args>
-  void addToFront(Func &&F, Args &&... As) {
-    if (RunSynchronously) {
-      std::forward<Func>(F)(std::forward<Args>(As)...);
-      return;
-    }
-
-    {
-      std::lock_guard<std::mutex> Lock(Mutex);
-      RequestQueue.emplace_front(
-          BindWithForward(std::forward<Func>(F), std::forward<Args>(As)...),
-          Context::current().clone());
-    }
-    RequestCV.notify_one();
-  }
-
-  /// Add a new request to run function \p F with args \p As to the end of the
-  /// queue. The request will be run on a separate thread.
-  template <class Func, class... Args> void addToEnd(Func &&F, Args &&... As) {
-    if (RunSynchronously) {
-      std::forward<Func>(F)(std::forward<Args>(As)...);
-      return;
-    }
-
-    {
-      std::lock_guard<std::mutex> Lock(Mutex);
-      RequestQueue.emplace_back(
-          BindWithForward(std::forward<Func>(F), std::forward<Args>(As)...),
-          Context::current().clone());
-    }
-    RequestCV.notify_one();
-  }
+  // Sets the flag. No-op if already set.
+  void notify();
+  // Blocks until flag is set.
+  void wait() const;
 
 private:
-  bool RunSynchronously;
+  bool Notified = false;
+  mutable std::condition_variable CV;
+  mutable std::mutex Mu;
+};
+
+/// Limits the number of threads that can acquire the lock at the same time.
+class Semaphore {
+public:
+  Semaphore(std::size_t MaxLocks);
+
+  void lock();
+  void unlock();
+
+private:
+  std::mutex Mutex;
+  std::condition_variable SlotsChanged;
+  std::size_t FreeSlots;
+};
+
+/// A point in time we may wait for, or None to wait forever.
+/// (Not time_point::max(), because many std::chrono implementations overflow).
+using Deadline = llvm::Optional<std::chrono::steady_clock::time_point>;
+/// Makes a deadline from a timeout in seconds.
+Deadline timeoutSeconds(llvm::Optional<double> Seconds);
+/// Waits on a condition variable until F() is true or D expires.
+template <typename Func>
+LLVM_NODISCARD bool wait(std::unique_lock<std::mutex> &Lock,
+                         std::condition_variable &CV, Deadline D, Func F) {
+  if (D)
+    return CV.wait_until(Lock, *D, F);
+  CV.wait(Lock, F);
+  return true;
+}
+
+/// Runs tasks on separate (detached) threads and wait for all tasks to finish.
+/// Objects that need to spawn threads can own an AsyncTaskRunner to ensure they
+/// all complete on destruction.
+class AsyncTaskRunner {
+public:
+  /// Destructor waits for all pending tasks to finish.
+  ~AsyncTaskRunner();
+
+  void wait() const { (void) wait(llvm::None); }
+  LLVM_NODISCARD bool wait(Deadline D) const;
+  // The name is used for tracing and debugging (e.g. to name a spawned thread).
+  void runAsync(llvm::Twine Name, UniqueFunction<void()> Action);
+
+private:
   mutable std::mutex Mutex;
-  /// We run some tasks on separate threads(parsing, CppFile cleanup).
-  /// These threads looks into RequestQueue to find requests to handle and
-  /// terminate when Done is set to true.
-  std::vector<std::thread> Workers;
-  /// Setting Done to true will make the worker threads terminate.
-  bool Done = false;
-  /// A queue of requests.
-  std::deque<std::pair<UniqueFunction<void()>, Context>> RequestQueue;
-  /// Condition variable to wake up worker threads.
-  std::condition_variable RequestCV;
+  mutable std::condition_variable TasksReachedZero;
+  std::size_t InFlightTasks = 0;
 };
 } // namespace clangd
 } // namespace clang

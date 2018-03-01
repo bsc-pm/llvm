@@ -255,6 +255,9 @@ class DwarfDebug : public DebugHandlerBase {
   /// Whether to emit all linkage names, or just abstract subprograms.
   bool UseAllLinkageNames;
 
+  /// Use inlined strings.
+  bool UseInlineStrings = false;
+
   /// DWARF5 Experimental Options
   /// @{
   bool HasDwarfAccelTables;
@@ -266,6 +269,10 @@ class DwarfDebug : public DebugHandlerBase {
   /// The pre-DWARF v5 string offsets table for split dwarf is, in contrast,
   /// a monolithic sequence of string offsets.
   bool UseSegmentedStringOffsetsTable;
+
+  /// Whether we have emitted any type units with split DWARF (and therefore
+  /// need to emit a line table to the .dwo file).
+  bool HasSplitTypeUnits = false;
 
   /// Separated Dwarf Variables
   /// In general these will all be for bits that are left in the
@@ -290,10 +297,10 @@ class DwarfDebug : public DebugHandlerBase {
   AddressPool AddrPool;
 
   /// Apple accelerator tables.
-  AppleAccelTable<AppleAccelTableOffsetData> AccelNames;
-  AppleAccelTable<AppleAccelTableOffsetData> AccelObjC;
-  AppleAccelTable<AppleAccelTableOffsetData> AccelNamespace;
-  AppleAccelTable<AppleAccelTableTypeData> AccelTypes;
+  AccelTable<AppleAccelTableOffsetData> AccelNames;
+  AccelTable<AppleAccelTableOffsetData> AccelObjC;
+  AccelTable<AppleAccelTableOffsetData> AccelNamespace;
+  AccelTable<AppleAccelTableTypeData> AccelTypes;
 
   // Identify a debugger for "tuning" the debug info.
   DebuggerKind DebuggerTuning = DebuggerKind::Default;
@@ -490,6 +497,9 @@ public:
   /// Returns whether to use the DWARF2 format for bitfields instyead of the
   /// DWARF4 format.
   bool useDWARF2Bitfields() const { return UseDWARF2Bitfields; }
+
+  /// Returns whether to use inline strings.
+  bool useInlineStrings() const { return UseInlineStrings; }
 
   // Experimental DWARF5 features.
 

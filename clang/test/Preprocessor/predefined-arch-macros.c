@@ -974,7 +974,7 @@
 // CHECK_CNL_M32: #define __BMI2__ 1
 // CHECK_CNL_M32: #define __BMI__ 1
 // CHECK_CNL_M32: #define __CLFLUSHOPT__ 1
-// CHECK_CNL_M32: #define __CLWB__ 1
+// CHECK_CNL_M32-NOT: #define __CLWB__ 1
 // CHECK_CNL_M32: #define __F16C__ 1
 // CHECK_CNL_M32: #define __FMA__ 1
 // CHECK_CNL_M32: #define __LZCNT__ 1
@@ -1022,7 +1022,7 @@
 // CHECK_CNL_M64: #define __BMI2__ 1
 // CHECK_CNL_M64: #define __BMI__ 1
 // CHECK_CNL_M64: #define __CLFLUSHOPT__ 1
-// CHECK_CNL_M64: #define __CLWB__ 1
+// CHECK_CNL_M64-NOT: #define __CLWB__ 1
 // CHECK_CNL_M64: #define __F16C__ 1
 // CHECK_CNL_M64: #define __FMA__ 1
 // CHECK_CNL_M64: #define __LZCNT__ 1
@@ -2401,8 +2401,12 @@
 // CHECK_MYRIAD2: #define __leon__ 1
 // CHECK_MYRIAD2-1: #define __myriad2 1
 // CHECK_MYRIAD2-1: #define __myriad2__ 1
+// CHECK_MYRIAD2-2: #define __ma2x5x 1
+// CHECK_MYRIAD2-2: #define __ma2x5x__ 1
 // CHECK_MYRIAD2-2: #define __myriad2 2
 // CHECK_MYRIAD2-2: #define __myriad2__ 2
+// CHECK_MYRIAD2-3: #define __ma2x8x 1
+// CHECK_MYRIAD2-3: #define __ma2x8x__ 1
 // CHECK_MYRIAD2-3: #define __myriad2 3
 // CHECK_MYRIAD2-3: #define __myriad2__ 3
 // CHECK_SPARCEL: #define __sparc 1

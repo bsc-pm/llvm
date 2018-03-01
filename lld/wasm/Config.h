@@ -17,8 +17,6 @@
 namespace lld {
 namespace wasm {
 
-class Symbol;
-
 struct Configuration {
   bool AllowUndefined;
   bool CheckSignatures;
@@ -38,9 +36,6 @@ struct Configuration {
 
   llvm::StringSet<> AllowUndefinedSymbols;
   std::vector<llvm::StringRef> SearchPaths;
-  Symbol *StackPointerSymbol = nullptr;
-  Symbol *HeapBaseSymbol = nullptr;
-  Symbol *CtorSymbol = nullptr;
 };
 
 // The only instance of Configuration struct.

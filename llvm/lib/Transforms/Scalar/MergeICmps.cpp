@@ -71,7 +71,7 @@ struct BCEAtom {
 };
 
 // If this value is a load from a constant offset w.r.t. a base address, and
-// there are no othe rusers of the load or address, returns the base address and
+// there are no other users of the load or address, returns the base address and
 // the offset.
 BCEAtom visitICmpLoadOperand(Value *const Val) {
   BCEAtom Result;
@@ -275,9 +275,12 @@ class BCECmpChain {
 
 BCECmpChain::BCECmpChain(const std::vector<BasicBlock *> &Blocks, PHINode &Phi)
     : Phi_(Phi) {
+  assert(!Blocks.empty() && "a chain should have at least one block");
   // Now look inside blocks to check for BCE comparisons.
   std::vector<BCECmpBlock> Comparisons;
-  for (BasicBlock *Block : Blocks) {
+  for (size_t BlockIdx = 0; BlockIdx < Blocks.size(); ++BlockIdx) {
+    BasicBlock *const Block = Blocks[BlockIdx];
+    assert(Block && "invalid block");
     BCECmpBlock Comparison = visitCmpBlock(Phi.getIncomingValueForBlock(Block),
                                            Block, Phi.getParent());
     Comparison.BB = Block;
@@ -287,7 +290,7 @@ BCECmpChain::BCECmpChain(const std::vector<BasicBlock *> &Blocks, PHINode &Phi)
     }
     if (Comparison.doesOtherWork()) {
       DEBUG(dbgs() << "block does extra work besides compare\n");
-      if (Comparisons.empty()) {  // First block.
+      if (BlockIdx == 0) {  // First block.
         // TODO(courbet): The first block can do other things, and we should
         // split them apart in a separate block before the comparison chain.
         // Right now we just discard it and make the chain shorter.
@@ -328,6 +331,7 @@ BCECmpChain::BCECmpChain(const std::vector<BasicBlock *> &Blocks, PHINode &Phi)
     DEBUG(dbgs() << "\n");
     Comparisons.push_back(Comparison);
   }
+  assert(!Comparisons.empty() && "chain with no BCE basic blocks");
   EntryBlock_ = Comparisons[0].BB;
   Comparisons_ = std::move(Comparisons);
 #ifdef MERGEICMPS_DOT_ON
@@ -507,6 +511,7 @@ std::vector<BasicBlock *> getOrderedBlocks(PHINode &Phi,
                                            int NumBlocks) {
   // Walk up from the last block to find other blocks.
   std::vector<BasicBlock *> Blocks(NumBlocks);
+  assert(LastBlock && "invalid last block");
   BasicBlock *CurBlock = LastBlock;
   for (int BlockIndex = NumBlocks - 1; BlockIndex > 0; --BlockIndex) {
     if (CurBlock->hasAddressTaken()) {
@@ -564,6 +569,19 @@ bool processPhi(PHINode &Phi, const TargetLibraryInfo *const TLI) {
     if (LastBlock) {
       // There are several non-constant values.
       DEBUG(dbgs() << "skip: several non-constant values\n");
+      return false;
+    }
+    if (!isa<ICmpInst>(Phi.getIncomingValue(I)) ||
+        cast<ICmpInst>(Phi.getIncomingValue(I))->getParent() !=
+            Phi.getIncomingBlock(I)) {
+      // Non-constant incoming value is not from a cmp instruction or not
+      // produced by the last block. We could end up processing the value
+      // producing block more than once.
+      //
+      // This is an uncommon case, so we bail.
+      DEBUG(
+          dbgs()
+          << "skip: non-constant value not from cmp or not from last block.\n");
       return false;
     }
     LastBlock = Phi.getIncomingBlock(I);

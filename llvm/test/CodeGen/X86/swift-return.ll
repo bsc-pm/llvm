@@ -13,10 +13,10 @@ define i16 @test(i32 %key) {
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    movl %edi, {{[0-9]+}}(%rsp)
 ; CHECK-NEXT:    callq gen
-; CHECK-NEXT:    # kill: def %ax killed %ax def %eax
+; CHECK-NEXT:    # kill: def $ax killed $ax def $eax
 ; CHECK-NEXT:    movsbl %dl, %ecx
 ; CHECK-NEXT:    addl %ecx, %eax
-; CHECK-NEXT:    # kill: def %ax killed %ax killed %eax
+; CHECK-NEXT:    # kill: def $ax killed $ax killed $eax
 ; CHECK-NEXT:    popq %rcx
 ; CHECK-NEXT:    retq
 ;
@@ -233,17 +233,17 @@ define void @consume_i1_ret() {
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    callq produce_i1_ret
-; CHECK-NEXT:    andb $1, %al
 ; CHECK-NEXT:    movzbl %al, %eax
+; CHECK-NEXT:    andl $1, %eax
 ; CHECK-NEXT:    movl %eax, {{.*}}(%rip)
-; CHECK-NEXT:    andb $1, %dl
 ; CHECK-NEXT:    movzbl %dl, %eax
+; CHECK-NEXT:    andl $1, %eax
 ; CHECK-NEXT:    movl %eax, {{.*}}(%rip)
-; CHECK-NEXT:    andb $1, %cl
 ; CHECK-NEXT:    movzbl %cl, %eax
+; CHECK-NEXT:    andl $1, %eax
 ; CHECK-NEXT:    movl %eax, {{.*}}(%rip)
-; CHECK-NEXT:    andb $1, %r8b
 ; CHECK-NEXT:    movzbl %r8b, %eax
+; CHECK-NEXT:    andl $1, %eax
 ; CHECK-NEXT:    movl %eax, {{.*}}(%rip)
 ; CHECK-NEXT:    popq %rax
 ; CHECK-NEXT:    retq
