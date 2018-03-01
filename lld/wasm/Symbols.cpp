@@ -30,19 +30,13 @@ DefinedData *WasmSym::HeapBase;
 DefinedGlobal *WasmSym::StackPointer;
 
 WasmSymbolType Symbol::getWasmType() const {
-  switch (SymbolKind) {
-  case Symbol::DefinedFunctionKind:
-  case Symbol::UndefinedFunctionKind:
+  if (isa<FunctionSymbol>(this))
     return llvm::wasm::WASM_SYMBOL_TYPE_FUNCTION;
-  case Symbol::DefinedDataKind:
-  case Symbol::UndefinedDataKind:
+  if (isa<DataSymbol>(this))
     return llvm::wasm::WASM_SYMBOL_TYPE_DATA;
-  case Symbol::DefinedGlobalKind:
-  case Symbol::UndefinedGlobalKind:
+  if (isa<GlobalSymbol>(this))
     return llvm::wasm::WASM_SYMBOL_TYPE_GLOBAL;
-  default:
-    llvm_unreachable("invalid symbol kind");
-  }
+  llvm_unreachable("invalid symbol kind");
 }
 
 bool Symbol::hasOutputIndex() const {
@@ -183,6 +177,8 @@ DefinedGlobal::DefinedGlobal(StringRef Name, uint32_t Flags, InputFile *File,
     : GlobalSymbol(Name, DefinedGlobalKind, Flags, File,
                    Global ? &Global->getType() : nullptr),
       Global(Global) {}
+
+void LazySymbol::fetch() { cast<ArchiveFile>(File)->addMember(&ArchiveSymbol); }
 
 std::string lld::toString(const wasm::Symbol &Sym) {
   if (Config->Demangle)
