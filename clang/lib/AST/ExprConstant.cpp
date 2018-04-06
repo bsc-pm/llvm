@@ -63,14 +63,22 @@ namespace {
 
   static QualType getType(APValue::LValueBase B) {
     if (!B) return QualType();
-    if (const ValueDecl *D = B.dyn_cast<const ValueDecl*>())
+    if (const ValueDecl *D = B.dyn_cast<const ValueDecl*>()) {
       // FIXME: It's unclear where we're supposed to take the type from, and
-      // this actually matters for arrays of unknown bound. Using the type of
-      // the most recent declaration isn't clearly correct in general. Eg:
+      // this actually matters for arrays of unknown bound. Eg:
       //
       // extern int arr[]; void f() { extern int arr[3]; };
       // constexpr int *p = &arr[1]; // valid?
-      return cast<ValueDecl>(D->getMostRecentDecl())->getType();
+      //
+      // For now, we take the array bound from the most recent declaration.
+      for (auto *Redecl = cast<ValueDecl>(D->getMostRecentDecl()); Redecl;
+           Redecl = cast_or_null<ValueDecl>(Redecl->getPreviousDecl())) {
+        QualType T = Redecl->getType();
+        if (!T->isIncompleteArrayType())
+          return T;
+      }
+      return D->getType();
+    }
 
     const Expr *Base = B.get<const Expr*>();
 
@@ -4301,9 +4309,15 @@ static bool HandleFunctionCall(SourceLocation CallLoc,
     This->moveInto(Result);
     return true;
   } else if (MD && isLambdaCallOperator(MD)) {
-    // We're in a lambda; determine the lambda capture field maps.
-    MD->getParent()->getCaptureFields(Frame.LambdaCaptureFields,
-                                      Frame.LambdaThisCaptureField);
+    // We're in a lambda; determine the lambda capture field maps unless we're
+    // just constexpr checking a lambda's call operator. constexpr checking is
+    // done before the captures have been added to the closure object (unless
+    // we're inferring constexpr-ness), so we don't have access to them in this
+    // case. But since we don't need the captures to constexpr check, we can
+    // just ignore them.
+    if (!Info.checkingPotentialConstantExpression())
+      MD->getParent()->getCaptureFields(Frame.LambdaCaptureFields,
+                                        Frame.LambdaThisCaptureField);
   }
 
   StmtResult Ret = {Result, ResultSlot};
@@ -5193,10 +5207,17 @@ bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
   // to within 'E' actually represents a lambda-capture that maps to a
   // data-member/field within the closure object, and if so, evaluate to the
   // field or what the field refers to.
-  if (Info.CurrentCall && isLambdaCallOperator(Info.CurrentCall->Callee)) {
+  if (Info.CurrentCall && isLambdaCallOperator(Info.CurrentCall->Callee) &&
+      isa<DeclRefExpr>(E) &&
+      cast<DeclRefExpr>(E)->refersToEnclosingVariableOrCapture()) {
+    // We don't always have a complete capture-map when checking or inferring if
+    // the function call operator meets the requirements of a constexpr function
+    // - but we don't need to evaluate the captures to determine constexprness
+    // (dcl.constexpr C++17).
+    if (Info.checkingPotentialConstantExpression())
+      return false;
+
     if (auto *FD = Info.CurrentCall->LambdaCaptureFields.lookup(VD)) {
-      if (Info.checkingPotentialConstantExpression())
-        return false;
       // Start with 'Result' referring to the complete closure object...
       Result = *Info.CurrentCall->This;
       // ... then update it to refer to the field of the closure object
@@ -5467,9 +5488,8 @@ static bool getBytesReturnedByAllocSizeCall(const ASTContext &Ctx,
                                             llvm::APInt &Result) {
   const AllocSizeAttr *AllocSize = getAllocSizeAttr(Call);
 
-  // alloc_size args are 1-indexed, 0 means not present.
-  assert(AllocSize && AllocSize->getElemSizeParam() != 0);
-  unsigned SizeArgNo = AllocSize->getElemSizeParam() - 1;
+  assert(AllocSize && AllocSize->getElemSizeParam().isValid());
+  unsigned SizeArgNo = AllocSize->getElemSizeParam().getASTIndex();
   unsigned BitsInSizeT = Ctx.getTypeSize(Ctx.getSizeType());
   if (Call->getNumArgs() <= SizeArgNo)
     return false;
@@ -5487,14 +5507,13 @@ static bool getBytesReturnedByAllocSizeCall(const ASTContext &Ctx,
   if (!EvaluateAsSizeT(Call->getArg(SizeArgNo), SizeOfElem))
     return false;
 
-  if (!AllocSize->getNumElemsParam()) {
+  if (!AllocSize->getNumElemsParam().isValid()) {
     Result = std::move(SizeOfElem);
     return true;
   }
 
   APSInt NumberOfElems;
-  // Argument numbers start at 1
-  unsigned NumArgNo = AllocSize->getNumElemsParam() - 1;
+  unsigned NumArgNo = AllocSize->getNumElemsParam().getASTIndex();
   if (!EvaluateAsSizeT(Call->getArg(NumArgNo), NumberOfElems))
     return false;
 
@@ -8577,9 +8596,6 @@ bool IntExprEvaluator::VisitBinaryOperator(const BinaryOperator *E) {
             (LHSValue.Base && isZeroSized(RHSValue)))
           return Error(E);
         // Pointers with different bases cannot represent the same object.
-        // (Note that clang defaults to -fmerge-all-constants, which can
-        // lead to inconsistent results for comparisons involving the address
-        // of a constant; this generally doesn't matter in practice.)
         return Success(E->getOpcode() == BO_NE, E);
       }
 

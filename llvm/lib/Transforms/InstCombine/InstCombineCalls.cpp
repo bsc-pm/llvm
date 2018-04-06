@@ -24,6 +24,7 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
+#include "llvm/Analysis/Utils/Local.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
@@ -57,7 +58,6 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/InstCombine/InstCombineWorklist.h"
-#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/SimplifyLibCalls.h"
 #include <algorithm>
 #include <cassert>
@@ -279,7 +279,7 @@ Instruction *InstCombiner::SimplifyMemSet(MemSetInst *MI) {
   if (!LenC || !FillC || !FillC->getType()->isIntegerTy(8))
     return nullptr;
   uint64_t Len = LenC->getLimitedValue();
-  Alignment = MI->getAlignment();
+  Alignment = MI->getDestAlignment();
   assert(Len && "0-sized memory setting should be removed already.");
 
   // memset(s,c,n) -> store s, c (for n=1,2,4,8)
@@ -2016,37 +2016,34 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     Value *Src0 = II->getArgOperand(0);
     Value *Src1 = II->getArgOperand(1);
 
-    // Canonicalize constants into the RHS.
+    // Canonicalize constant multiply operand to Src1.
     if (isa<Constant>(Src0) && !isa<Constant>(Src1)) {
       II->setArgOperand(0, Src1);
       II->setArgOperand(1, Src0);
       std::swap(Src0, Src1);
     }
 
-    Value *LHS = nullptr;
-    Value *RHS = nullptr;
-
     // fma fneg(x), fneg(y), z -> fma x, y, z
-    if (match(Src0, m_FNeg(m_Value(LHS))) &&
-        match(Src1, m_FNeg(m_Value(RHS)))) {
-      II->setArgOperand(0, LHS);
-      II->setArgOperand(1, RHS);
+    Value *X, *Y;
+    if (match(Src0, m_FNeg(m_Value(X))) && match(Src1, m_FNeg(m_Value(Y)))) {
+      II->setArgOperand(0, X);
+      II->setArgOperand(1, Y);
       return II;
     }
 
     // fma fabs(x), fabs(x), z -> fma x, x, z
-    if (match(Src0, m_Intrinsic<Intrinsic::fabs>(m_Value(LHS))) &&
-        match(Src1, m_Intrinsic<Intrinsic::fabs>(m_Value(RHS))) && LHS == RHS) {
-      II->setArgOperand(0, LHS);
-      II->setArgOperand(1, RHS);
+    if (match(Src0, m_Intrinsic<Intrinsic::fabs>(m_Value(X))) &&
+        match(Src1, m_Intrinsic<Intrinsic::fabs>(m_Specific(X)))) {
+      II->setArgOperand(0, X);
+      II->setArgOperand(1, X);
       return II;
     }
 
     // fma x, 1, z -> fadd x, z
     if (match(Src1, m_FPOne())) {
-      Instruction *RI = BinaryOperator::CreateFAdd(Src0, II->getArgOperand(2));
-      RI->copyFastMathFlags(II);
-      return RI;
+      auto *FAdd = BinaryOperator::CreateFAdd(Src0, II->getArgOperand(2));
+      FAdd->copyFastMathFlags(II);
+      return FAdd;
     }
 
     break;
@@ -2070,17 +2067,12 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
   case Intrinsic::rint:
   case Intrinsic::trunc: {
     Value *ExtSrc;
-    if (match(II->getArgOperand(0), m_FPExt(m_Value(ExtSrc))) &&
-        II->getArgOperand(0)->hasOneUse()) {
-      // fabs (fpext x) -> fpext (fabs x)
-      Value *F = Intrinsic::getDeclaration(II->getModule(), II->getIntrinsicID(),
-                                           { ExtSrc->getType() });
-      CallInst *NewFabs = Builder.CreateCall(F, ExtSrc);
-      NewFabs->copyFastMathFlags(II);
-      NewFabs->takeName(II);
-      return new FPExtInst(NewFabs, II->getType());
+    if (match(II->getArgOperand(0), m_OneUse(m_FPExt(m_Value(ExtSrc))))) {
+      // Narrow the call: intrinsic (fpext x) -> fpext (intrinsic x)
+      Value *NarrowII = Builder.CreateIntrinsic(II->getIntrinsicID(),
+                                                { ExtSrc }, II);
+      return new FPExtInst(NarrowII, II->getType());
     }
-
     break;
   }
   case Intrinsic::cos:
@@ -2367,7 +2359,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     // Folding cmp(sub(a,b),0) -> cmp(a,b) and cmp(0,sub(a,b)) -> cmp(b,a)
     Value *Arg0 = II->getArgOperand(0);
     Value *Arg1 = II->getArgOperand(1);
-    bool Arg0IsZero = match(Arg0, m_Zero());
+    bool Arg0IsZero = match(Arg0, m_PosZeroFP());
     if (Arg0IsZero)
       std::swap(Arg0, Arg1);
     Value *A, *B;
@@ -2379,7 +2371,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     // The compare intrinsic uses the above assumptions and therefore
     // doesn't require additional flags.
     if ((match(Arg0, m_OneUse(m_FSub(m_Value(A), m_Value(B)))) &&
-         match(Arg1, m_Zero()) && isa<Instruction>(Arg0) &&
+         match(Arg1, m_PosZeroFP()) && isa<Instruction>(Arg0) &&
          cast<Instruction>(Arg0)->getFastMathFlags().noInfs())) {
       if (Arg0IsZero)
         std::swap(A, B);
@@ -4001,8 +3993,17 @@ bool InstCombiner::transformConstExprCastCall(CallSite CS) {
   if (!Callee)
     return false;
 
-  // The prototype of a thunk is a lie. Don't directly call such a function.
+  // If this is a call to a thunk function, don't remove the cast. Thunks are
+  // used to transparently forward all incoming parameters and outgoing return
+  // values, so it's important to leave the cast in place.
   if (Callee->hasFnAttribute("thunk"))
+    return false;
+
+  // If this is a musttail call, the callee's prototype must match the caller's
+  // prototype with the exception of pointee types. The code below doesn't
+  // implement that, so we can't do this transform.
+  // TODO: Do the transform if it only requires adding pointer casts.
+  if (CS.isMustTailCall())
     return false;
 
   Instruction *Caller = CS.getInstruction();

@@ -18,12 +18,12 @@
 #include "Hexagon.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/InlineAsm.h"
+#include "llvm/Support/MachineValueType.h"
 #include <cstdint>
 #include <utility>
 
@@ -120,6 +120,10 @@ namespace HexagonISD {
 
     bool isTruncateFree(Type *Ty1, Type *Ty2) const override;
     bool isTruncateFree(EVT VT1, EVT VT2) const override;
+
+    bool isCheapToSpeculateCttz() const override { return true; }
+    bool isCheapToSpeculateCtlz() const override { return true; }
+    bool isCtlzFast() const override { return true; }
 
     bool allowTruncateForTailCall(Type *Ty1, Type *Ty2) const override;
 

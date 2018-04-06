@@ -38,7 +38,6 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
@@ -70,6 +69,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/KnownBits.h"
+#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
@@ -3976,6 +3976,65 @@ AArch64TargetLowering::LowerELFGlobalTLSAddress(SDValue Op,
   return DAG.getNode(ISD::ADD, DL, PtrVT, ThreadBase, TPOff);
 }
 
+SDValue
+AArch64TargetLowering::LowerWindowsGlobalTLSAddress(SDValue Op,
+                                                    SelectionDAG &DAG) const {
+  assert(Subtarget->isTargetWindows() && "Windows specific TLS lowering");
+
+  SDValue Chain = DAG.getEntryNode();
+  EVT PtrVT = getPointerTy(DAG.getDataLayout());
+  SDLoc DL(Op);
+
+  SDValue TEB = DAG.getRegister(AArch64::X18, MVT::i64);
+
+  // Load the ThreadLocalStoragePointer from the TEB
+  // A pointer to the TLS array is located at offset 0x58 from the TEB.
+  SDValue TLSArray =
+      DAG.getNode(ISD::ADD, DL, PtrVT, TEB, DAG.getIntPtrConstant(0x58, DL));
+  TLSArray = DAG.getLoad(PtrVT, DL, Chain, TLSArray, MachinePointerInfo());
+  Chain = TLSArray.getValue(1);
+
+  // Load the TLS index from the C runtime;
+  // This does the same as getAddr(), but without having a GlobalAddressSDNode.
+  // This also does the same as LOADgot, but using a generic i32 load,
+  // while LOADgot only loads i64.
+  SDValue TLSIndexHi =
+      DAG.getTargetExternalSymbol("_tls_index", PtrVT, AArch64II::MO_PAGE);
+  SDValue TLSIndexLo = DAG.getTargetExternalSymbol(
+      "_tls_index", PtrVT, AArch64II::MO_PAGEOFF | AArch64II::MO_NC);
+  SDValue ADRP = DAG.getNode(AArch64ISD::ADRP, DL, PtrVT, TLSIndexHi);
+  SDValue TLSIndex =
+      DAG.getNode(AArch64ISD::ADDlow, DL, PtrVT, ADRP, TLSIndexLo);
+  TLSIndex = DAG.getLoad(MVT::i32, DL, Chain, TLSIndex, MachinePointerInfo());
+  Chain = TLSIndex.getValue(1);
+
+  // The pointer to the thread's TLS data area is at the TLS Index scaled by 8
+  // offset into the TLSArray.
+  TLSIndex = DAG.getNode(ISD::ZERO_EXTEND, DL, PtrVT, TLSIndex);
+  SDValue Slot = DAG.getNode(ISD::SHL, DL, PtrVT, TLSIndex,
+                             DAG.getConstant(3, DL, PtrVT));
+  SDValue TLS = DAG.getLoad(PtrVT, DL, Chain,
+                            DAG.getNode(ISD::ADD, DL, PtrVT, TLSArray, Slot),
+                            MachinePointerInfo());
+  Chain = TLS.getValue(1);
+
+  const GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(Op);
+  const GlobalValue *GV = GA->getGlobal();
+  SDValue TGAHi = DAG.getTargetGlobalAddress(
+      GV, DL, PtrVT, 0, AArch64II::MO_TLS | AArch64II::MO_HI12);
+  SDValue TGALo = DAG.getTargetGlobalAddress(
+      GV, DL, PtrVT, 0,
+      AArch64II::MO_TLS | AArch64II::MO_PAGEOFF | AArch64II::MO_NC);
+
+  // Add the offset from the start of the .tls section (section base).
+  SDValue Addr =
+      SDValue(DAG.getMachineNode(AArch64::ADDXri, DL, PtrVT, TLS, TGAHi,
+                                 DAG.getTargetConstant(0, DL, MVT::i32)),
+              0);
+  Addr = DAG.getNode(AArch64ISD::ADDlow, DL, PtrVT, Addr, TGALo);
+  return Addr;
+}
+
 SDValue AArch64TargetLowering::LowerGlobalTLSAddress(SDValue Op,
                                                      SelectionDAG &DAG) const {
   const GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(Op);
@@ -3986,6 +4045,8 @@ SDValue AArch64TargetLowering::LowerGlobalTLSAddress(SDValue Op,
     return LowerDarwinGlobalTLSAddress(Op, DAG);
   if (Subtarget->isTargetELF())
     return LowerELFGlobalTLSAddress(Op, DAG);
+  if (Subtarget->isTargetWindows())
+    return LowerWindowsGlobalTLSAddress(Op, DAG);
 
   llvm_unreachable("Unexpected platform trying to use TLS");
 }
@@ -7459,6 +7520,19 @@ AArch64TargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
   unsigned Align = cast<ConstantSDNode>(Op.getOperand(2))->getZExtValue();
   EVT VT = Node->getValueType(0);
 
+  if (DAG.getMachineFunction().getFunction().hasFnAttribute(
+          "no-stack-arg-probe")) {
+    SDValue SP = DAG.getCopyFromReg(Chain, dl, AArch64::SP, MVT::i64);
+    Chain = SP.getValue(1);
+    SP = DAG.getNode(ISD::SUB, dl, MVT::i64, SP, Size);
+    if (Align)
+      SP = DAG.getNode(ISD::AND, dl, VT, SP.getValue(0),
+                       DAG.getConstant(-(uint64_t)Align, dl, VT));
+    Chain = DAG.getCopyToReg(Chain, dl, AArch64::SP, SP);
+    SDValue Ops[2] = {SP, Chain};
+    return DAG.getMergeValues(Ops, dl);
+  }
+
   Chain = DAG.getCALLSEQ_START(Chain, 0, 0, dl);
 
   Chain = LowerWindowsDYNAMIC_STACKALLOC(Op, Chain, Size, DAG);
@@ -7466,13 +7540,10 @@ AArch64TargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
   SDValue SP = DAG.getCopyFromReg(Chain, dl, AArch64::SP, MVT::i64);
   Chain = SP.getValue(1);
   SP = DAG.getNode(ISD::SUB, dl, MVT::i64, SP, Size);
-  Chain = DAG.getCopyToReg(Chain, dl, AArch64::SP, SP);
-
-  if (Align) {
+  if (Align)
     SP = DAG.getNode(ISD::AND, dl, VT, SP.getValue(0),
                      DAG.getConstant(-(uint64_t)Align, dl, VT));
-    Chain = DAG.getCopyToReg(Chain, dl, AArch64::SP, SP);
-  }
+  Chain = DAG.getCopyToReg(Chain, dl, AArch64::SP, SP);
 
   Chain = DAG.getCALLSEQ_END(Chain, DAG.getIntPtrConstant(0, dl, true),
                              DAG.getIntPtrConstant(0, dl, true), SDValue(), dl);
@@ -7584,6 +7655,33 @@ bool AArch64TargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
   }
 
   return false;
+}
+
+bool AArch64TargetLowering::shouldReduceLoadWidth(SDNode *Load,
+                                                  ISD::LoadExtType ExtTy,
+                                                  EVT NewVT) const {
+  // If we're reducing the load width in order to avoid having to use an extra
+  // instruction to do extension then it's probably a good idea.
+  if (ExtTy != ISD::NON_EXTLOAD)
+    return true;
+  // Don't reduce load width if it would prevent us from combining a shift into
+  // the offset.
+  MemSDNode *Mem = dyn_cast<MemSDNode>(Load);
+  assert(Mem);
+  const SDValue &Base = Mem->getBasePtr();
+  if (Base.getOpcode() == ISD::ADD &&
+      Base.getOperand(1).getOpcode() == ISD::SHL &&
+      Base.getOperand(1).hasOneUse() &&
+      Base.getOperand(1).getOperand(1).getOpcode() == ISD::Constant) {
+    // The shift can be combined if it matches the size of the value being
+    // loaded (and so reducing the width would make it not match).
+    uint64_t ShiftAmount = Base.getOperand(1).getConstantOperandVal(1);
+    uint64_t LoadBytes = Mem->getMemoryVT().getSizeInBits()/8;
+    if (ShiftAmount == Log2_32(LoadBytes))
+      return false;
+  }
+  // We have no reason to disallow reducing the load width, so allow it.
+  return true;
 }
 
 // Truncations from 64-bit GPR to 32-bit GPR is free.

@@ -1926,7 +1926,6 @@ public:
 
   bool isDone() { return FoundInside; }
 };
-
 } // end anonymous namespace
 
 const SCEV *Scop::getRepresentingInvariantLoadSCEV(const SCEV *E) const {
@@ -3328,8 +3327,8 @@ Scop::Scop(Region &R, ScalarEvolution &ScalarEvolution, LoopInfo &LI,
            DominatorTree &DT, ScopDetection::DetectionContext &DC,
            OptimizationRemarkEmitter &ORE)
     : IslCtx(isl_ctx_alloc(), isl_ctx_free), SE(&ScalarEvolution), DT(&DT),
-      R(R), name(R.getNameStr()), HasSingleExitEdge(R.getExitingBlock()),
-      DC(DC), ORE(ORE), Affinator(this, LI),
+      R(R), HasSingleExitEdge(R.getExitingBlock()), DC(DC), ORE(ORE),
+      Affinator(this, LI),
       ID(getNextID((*R.getEntry()->getParent()).getName().str())) {
   if (IslOnErrorAbort)
     isl_options_set_on_error(getIslCtx().get(), ISL_ON_ERROR_ABORT);

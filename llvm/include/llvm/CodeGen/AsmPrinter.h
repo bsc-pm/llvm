@@ -444,13 +444,13 @@ public:
   void printOffset(int64_t Offset, raw_ostream &OS) const;
 
   /// Emit a byte directive and value.
-  void EmitInt8(int Value) const;
+  void emitInt8(int Value) const;
 
   /// Emit a short directive and value.
-  void EmitInt16(int Value) const;
+  void emitInt16(int Value) const;
 
   /// Emit a long directive and value.
-  void EmitInt32(int Value) const;
+  void emitInt32(int Value) const;
 
   /// Emit something like ".long Hi-Lo" where the size in bytes of the directive
   /// is specified by Size and Hi/Lo specify the labels.  This implicitly uses
@@ -474,6 +474,9 @@ public:
                           bool IsSectionRelative = false) const {
     EmitLabelPlusOffset(Label, 0, Size, IsSectionRelative);
   }
+
+  /// Emit something like ".long Label + Offset".
+  void EmitDwarfOffset(const MCSymbol *Label, uint64_t Offset) const;
 
   //===------------------------------------------------------------------===//
   // Dwarf Emission Helper Routines

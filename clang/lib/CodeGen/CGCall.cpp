@@ -29,15 +29,15 @@
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Analysis/Utils/Local.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Attributes.h"
-#include "llvm/IR/CallingConv.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/Transforms/Utils/Local.h"
+#include "llvm/IR/Intrinsics.h"
 using namespace clang;
 using namespace CodeGen;
 
@@ -513,8 +513,8 @@ CodeGenTypes::arrangeGlobalDeclaration(GlobalDecl GD) {
 /// correct type, and the caller will bitcast the function to the correct
 /// prototype.
 const CGFunctionInfo &
-CodeGenTypes::arrangeMSMemberPointerThunk(const CXXMethodDecl *MD) {
-  assert(MD->isVirtual() && "only virtual memptrs have thunks");
+CodeGenTypes::arrangeUnprototypedMustTailThunk(const CXXMethodDecl *MD) {
+  assert(MD->isVirtual() && "only methods have thunks");
   CanQual<FunctionProtoType> FTP = GetFormalType(MD);
   CanQualType ArgTys[] = { GetThisType(Context, MD->getParent()) };
   return arrangeLLVMFunctionInfo(Context.VoidTy, /*instanceMethod=*/false,
@@ -803,6 +803,7 @@ CGFunctionInfo *CGFunctionInfo::create(unsigned llvmCC,
   FI->NoReturn = info.getNoReturn();
   FI->ReturnsRetained = info.getProducesResult();
   FI->NoCallerSavedRegs = info.getNoCallerSavedRegs();
+  FI->NoCfCheck = info.getNoCfCheck();
   FI->Required = required;
   FI->HasRegParm = info.getHasRegParm();
   FI->RegParm = info.getRegParm();
@@ -904,8 +905,7 @@ getTypeExpansion(QualType Ty, const ASTContext &Context) {
       CharUnits UnionSize = CharUnits::Zero();
 
       for (const auto *FD : RD->fields()) {
-        // Skip zero length bitfields.
-        if (FD->isBitField() && FD->getBitWidthValue(Context) == 0)
+        if (FD->isZeroLengthBitField(Context))
           continue;
         assert(!FD->isBitField() &&
                "Cannot expand structure with bit-field members.");
@@ -926,8 +926,7 @@ getTypeExpansion(QualType Ty, const ASTContext &Context) {
       }
 
       for (const auto *FD : RD->fields()) {
-        // Skip zero length bitfields.
-        if (FD->isBitField() && FD->getBitWidthValue(Context) == 0)
+        if (FD->isZeroLengthBitField(Context))
           continue;
         assert(!FD->isBitField() &&
                "Cannot expand structure with bit-field members.");
@@ -1850,14 +1849,15 @@ void CodeGenModule::ConstructAttributeList(
       RetAttrs.addAttribute(llvm::Attribute::NonNull);
     if (TargetDecl->hasAttr<AnyX86NoCallerSavedRegistersAttr>())
       FuncAttrs.addAttribute("no_caller_saved_registers");
+    if (TargetDecl->hasAttr<AnyX86NoCfCheckAttr>())
+      FuncAttrs.addAttribute(llvm::Attribute::NoCfCheck);
 
     HasOptnone = TargetDecl->hasAttr<OptimizeNoneAttr>();
     if (auto *AllocSize = TargetDecl->getAttr<AllocSizeAttr>()) {
       Optional<unsigned> NumElemsParam;
-      // alloc_size args are base-1, 0 means not present.
-      if (unsigned N = AllocSize->getNumElemsParam())
-        NumElemsParam = N - 1;
-      FuncAttrs.addAllocSizeAttr(AllocSize->getElemSizeParam() - 1,
+      if (AllocSize->getNumElemsParam().isValid())
+        NumElemsParam = AllocSize->getNumElemsParam().getLLVMIndex();
+      FuncAttrs.addAllocSizeAttr(AllocSize->getElemSizeParam().getLLVMIndex(),
                                  NumElemsParam);
     }
   }
@@ -3018,7 +3018,8 @@ static AggValueSlot createPlaceholderSlot(CodeGenFunction &CGF,
                                Ty.getQualifiers(),
                                AggValueSlot::IsNotDestructed,
                                AggValueSlot::DoesNotNeedGCBarriers,
-                               AggValueSlot::IsNotAliased);
+                               AggValueSlot::IsNotAliased,
+                               AggValueSlot::DoesNotOverlap);
 }
 
 void CodeGenFunction::EmitDelegateCallArg(CallArgList &args,
@@ -3486,7 +3487,8 @@ RValue CallArg::getRValue(CodeGenFunction &CGF) const {
   if (!HasLV)
     return RV;
   LValue Copy = CGF.MakeAddrLValue(CGF.CreateMemTemp(Ty), Ty);
-  CGF.EmitAggregateCopy(Copy, LV, Ty, LV.isVolatile());
+  CGF.EmitAggregateCopy(Copy, LV, Ty, AggValueSlot::DoesNotOverlap,
+                        LV.isVolatile());
   IsUsed = true;
   return RValue::getAggregate(Copy.getAddress());
 }
@@ -3500,7 +3502,8 @@ void CallArg::copyInto(CodeGenFunction &CGF, Address Addr) const {
   else {
     auto Addr = HasLV ? LV.getAddress() : RV.getAggregateAddress();
     LValue SrcLV = CGF.MakeAddrLValue(Addr, Ty);
-    CGF.EmitAggregateCopy(Dst, SrcLV, Ty,
+    // We assume that call args are never copied into subobjects.
+    CGF.EmitAggregateCopy(Dst, SrcLV, Ty, AggValueSlot::DoesNotOverlap,
                           HasLV ? LV.isVolatileQualified()
                                 : RV.isVolatileQualified());
   }
@@ -3538,24 +3541,13 @@ void CodeGenFunction::EmitCallArg(CallArgList &args, const Expr *E,
     else
       Slot = CreateAggTemp(type, "agg.tmp");
 
-    bool DestroyedInCallee = true, NeedsEHCleanup = true;
-    if (const auto *RD = type->getAsCXXRecordDecl()) {
-      DestroyedInCallee =
-          RD && RD->hasNonTrivialDestructor() &&
-          (CGM.getCXXABI().getRecordArgABI(RD) != CGCXXABI::RAA_Default ||
-           RD->hasTrivialABIOverride());
-    } else {
-      NeedsEHCleanup = needsEHCleanup(type.isDestructedType());
-    }
-
-    if (DestroyedInCallee)
-      Slot.setExternallyDestructed();
+    Slot.setExternallyDestructed();
 
     EmitAggExpr(E, Slot);
     RValue RV = Slot.asRValue();
     args.add(RV, type);
 
-    if (DestroyedInCallee && NeedsEHCleanup) {
+    if (type->getAsCXXRecordDecl() || needsEHCleanup(type.isDestructedType())) {
       // Create a no-op GEP between the placeholder and the cleanup so we can
       // RAUW it successfully.  It also serves as a marker of the first
       // instruction where the cleanup is active.
@@ -3790,7 +3782,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   // If the call returns a temporary with struct return, create a temporary
   // alloca to hold the result, unless one is given to us.
   Address SRetPtr = Address::invalid();
-  size_t UnusedReturnSize = 0;
+  llvm::Value *UnusedReturnSizePtr = nullptr;
   if (RetAI.isIndirect() || RetAI.isInAlloca() || RetAI.isCoerceAndExpand()) {
     if (!ReturnValue.isNull()) {
       SRetPtr = ReturnValue.getValue();
@@ -3799,8 +3791,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
       if (HaveInsertPoint() && ReturnValue.isUnused()) {
         uint64_t size =
             CGM.getDataLayout().getTypeAllocSize(ConvertTypeForMem(RetTy));
-        if (EmitLifetimeStart(size, SRetPtr.getPointer()))
-          UnusedReturnSize = size;
+        UnusedReturnSizePtr = EmitLifetimeStart(size, SRetPtr.getPointer());
       }
     }
     if (IRFunctionArgs.hasSRetArg()) {
@@ -4231,6 +4222,15 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
     CannotThrow = Attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                                      llvm::Attribute::NoUnwind);
   }
+
+  // If we made a temporary, be sure to clean up after ourselves. Note that we
+  // can't depend on being inside of an ExprWithCleanups, so we need to manually
+  // pop this cleanup later on. Being eager about this is OK, since this
+  // temporary is 'invisible' outside of the callee.
+  if (UnusedReturnSizePtr)
+    pushFullExprCleanup<CallLifetimeEnd>(NormalEHLifetimeMarker, SRetPtr,
+                                         UnusedReturnSizePtr);
+
   llvm::BasicBlock *InvokeDest = CannotThrow ? nullptr : getInvokeDest();
 
   SmallVector<llvm::OperandBundleDef, 1> BundleList =
@@ -4284,9 +4284,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   // insertion point; this allows the rest of IRGen to discard
   // unreachable code.
   if (CS.doesNotReturn()) {
-    if (UnusedReturnSize)
-      EmitLifetimeEnd(llvm::ConstantInt::get(Int64Ty, UnusedReturnSize),
-                      SRetPtr.getPointer());
+    if (UnusedReturnSizePtr)
+      PopCleanupBlock();
 
     // Strip away the noreturn attribute to better diagnose unreachable UB.
     if (SanOpts.has(SanitizerKind::Unreachable)) {
@@ -4355,9 +4354,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
     case ABIArgInfo::InAlloca:
     case ABIArgInfo::Indirect: {
       RValue ret = convertTempToRValue(SRetPtr, RetTy, SourceLocation());
-      if (UnusedReturnSize)
-        EmitLifetimeEnd(llvm::ConstantInt::get(Int64Ty, UnusedReturnSize),
-                        SRetPtr.getPointer());
+      if (UnusedReturnSizePtr)
+        PopCleanupBlock();
       return ret;
     }
 
@@ -4435,7 +4433,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
                               OffsetValue);
     } else if (const auto *AA = TargetDecl->getAttr<AllocAlignAttr>()) {
       llvm::Value *ParamVal =
-          CallArgs[AA->getParamIndex() - 1].getRValue(*this).getScalarVal();
+          CallArgs[AA->getParamIndex().getLLVMIndex()].getRValue(
+              *this).getScalarVal();
       EmitAlignmentAssumption(Ret.getScalarVal(), ParamVal);
     }
   }

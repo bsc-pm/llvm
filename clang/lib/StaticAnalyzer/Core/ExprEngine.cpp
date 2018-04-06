@@ -31,6 +31,7 @@
 #include "clang/AST/Type.h"
 #include "clang/Analysis/AnalysisDeclContext.h"
 #include "clang/Analysis/CFG.h"
+#include "clang/Analysis/ConstructionContext.h"
 #include "clang/Analysis/ProgramPoint.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LLVM.h"
@@ -449,6 +450,87 @@ bool ExprEngine::areTemporaryMaterializationsClear(
   return true;
 }
 
+ProgramStateRef ExprEngine::addAllNecessaryTemporaryInfo(
+    ProgramStateRef State, const ConstructionContext *CC,
+    const LocationContext *LC, const MemRegion *R) {
+  const CXXBindTemporaryExpr *BTE = nullptr;
+  const MaterializeTemporaryExpr *MTE = nullptr;
+
+  if (CC) {
+    // If the temporary is being returned from the function, it will be
+    // destroyed or lifetime-extended in the caller stack frame.
+    if (isa<ReturnedValueConstructionContext>(CC)) {
+      const StackFrameContext *SFC = LC->getCurrentStackFrame();
+      assert(SFC);
+      LC = SFC->getParent();
+      if (!LC) {
+        // We are on the top frame. We won't ever need any info
+        // for this temporary, so don't set anything.
+        return State;
+      }
+      const CFGElement &CallElem =
+          (*SFC->getCallSiteBlock())[SFC->getIndex()];
+      auto RTCElem = CallElem.getAs<CFGCXXRecordTypedCall>();
+      if (!RTCElem) {
+        // We have a parent stack frame, but no construction context for the
+        // return value. Give up until we provide the construction context
+        // at the call site.
+        return State;
+      }
+      // We use the ReturnedValueConstructionContext as an indication that we
+      // need to look for the actual construction context on the parent stack
+      // frame. This purpose has been fulfilled, so now we replace CC with the
+      // actual construction context.
+      CC = RTCElem->getConstructionContext();
+      if (!isa<TemporaryObjectConstructionContext>(CC)) {
+        // TODO: We are not returning an object into a temporary. There must
+        // be copy elision happening at the call site. We still need to
+        // explicitly support the situation when the return value is put
+        // into another return statement, i.e.
+        // ReturnedValueConstructionContexts are chained through multiple
+        // stack frames before finally settling in a temporary.
+        // We don't seem to need to explicitly support construction into
+        // a variable after a return.
+        return State;
+      }
+      // Proceed to deal with the temporary we've found on the parent
+      // stack frame.
+    }
+
+    // In case of temporary object construction, extract data necessary for
+    // destruction and lifetime extension.
+    if (const auto *TCC = dyn_cast<TemporaryObjectConstructionContext>(CC)) {
+      if (AMgr.getAnalyzerOptions().includeTemporaryDtorsInCFG()) {
+        BTE = TCC->getCXXBindTemporaryExpr();
+        MTE = TCC->getMaterializedTemporaryExpr();
+        if (!BTE) {
+          // FIXME: Lifetime extension for temporaries without destructors
+          // is not implemented yet.
+          MTE = nullptr;
+        }
+        if (MTE && MTE->getStorageDuration() != SD_FullExpression) {
+          // If the temporary is lifetime-extended, don't save the BTE,
+          // because we don't need a temporary destructor, but an automatic
+          // destructor.
+          BTE = nullptr;
+        }
+      }
+    }
+
+    if (BTE) {
+      State = addInitializedTemporary(State, BTE, LC,
+                                      cast<CXXTempObjectRegion>(R));
+    }
+
+    if (MTE) {
+      State = addTemporaryMaterialization(State, MTE, LC,
+                                          cast<CXXTempObjectRegion>(R));
+    }
+  }
+
+  return State;
+}
+
 ProgramStateRef
 ExprEngine::setCXXNewAllocatorValue(ProgramStateRef State,
                                     const CXXNewExpr *CNE,
@@ -612,6 +694,7 @@ void ExprEngine::processCFGElement(const CFGElement E, ExplodedNode *Pred,
   switch (E.getKind()) {
     case CFGElement::Statement:
     case CFGElement::Constructor:
+    case CFGElement::CXXRecordTypedCall:
       ProcessStmt(E.castAs<CFGStmt>().getStmt(), Pred);
       return;
     case CFGElement::Initializer:
@@ -632,6 +715,8 @@ void ExprEngine::processCFGElement(const CFGElement E, ExplodedNode *Pred,
       ProcessLoopExit(E.castAs<CFGLoopExit>().getLoopStmt(), Pred);
       return;
     case CFGElement::LifetimeEnds:
+    case CFGElement::ScopeBegin:
+    case CFGElement::ScopeEnd:
       return;
   }
 }
@@ -2397,10 +2482,10 @@ void ExprEngine::VisitCommonDeclRefExpr(const Expr *Ex, const NamedDecl *D,
     assert(Ex->isGLValue() || VD->getType()->isVoidType());
     const LocationContext *LocCtxt = Pred->getLocationContext();
     const Decl *D = LocCtxt->getDecl();
-    const auto *MD = D ? dyn_cast<CXXMethodDecl>(D) : nullptr;
+    const auto *MD = dyn_cast_or_null<CXXMethodDecl>(D);
     const auto *DeclRefEx = dyn_cast<DeclRefExpr>(Ex);
-    SVal V;
-    bool IsReference;
+    Optional<std::pair<SVal, QualType>> VInfo;
+
     if (AMgr.options.shouldInlineLambdas() && DeclRefEx &&
         DeclRefEx->refersToEnclosingVariableOrCapture() && MD &&
         MD->getParent()->isLambda()) {
@@ -2409,24 +2494,22 @@ void ExprEngine::VisitCommonDeclRefExpr(const Expr *Ex, const NamedDecl *D,
       llvm::DenseMap<const VarDecl *, FieldDecl *> LambdaCaptureFields;
       FieldDecl *LambdaThisCaptureField;
       CXXRec->getCaptureFields(LambdaCaptureFields, LambdaThisCaptureField);
-      const FieldDecl *FD = LambdaCaptureFields[VD];
-      if (!FD) {
-        // When a constant is captured, sometimes no corresponding field is
-        // created in the lambda object.
-        assert(VD->getType().isConstQualified());
-        V = state->getLValue(VD, LocCtxt);
-        IsReference = false;
-      } else {
+
+      // Sema follows a sequence of complex rules to determine whether the
+      // variable should be captured.
+      if (const FieldDecl *FD = LambdaCaptureFields[VD]) {
         Loc CXXThis =
             svalBuilder.getCXXThis(MD, LocCtxt->getCurrentStackFrame());
         SVal CXXThisVal = state->getSVal(CXXThis);
-        V = state->getLValue(FD, CXXThisVal);
-        IsReference = FD->getType()->isReferenceType();
+        VInfo = std::make_pair(state->getLValue(FD, CXXThisVal), FD->getType());
       }
-    } else {
-      V = state->getLValue(VD, LocCtxt);
-      IsReference = VD->getType()->isReferenceType();
     }
+
+    if (!VInfo)
+      VInfo = std::make_pair(state->getLValue(VD, LocCtxt), VD->getType());
+
+    SVal V = VInfo->first;
+    bool IsReference = VInfo->second->isReferenceType();
 
     // For references, the 'lvalue' is the pointer address stored in the
     // reference region.
@@ -2466,7 +2549,7 @@ void ExprEngine::VisitCommonDeclRefExpr(const Expr *Ex, const NamedDecl *D,
                       ProgramPoint::PostLValueKind);
     return;
   }
-  if (const auto* BD = dyn_cast<BindingDecl>(D)) {
+  if (isa<BindingDecl>(D)) {
     // FIXME: proper support for bound declarations.
     // For now, let's just prevent crashing.
     return;

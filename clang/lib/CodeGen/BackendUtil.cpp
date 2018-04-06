@@ -46,16 +46,17 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/Coroutines.h"
-#include "llvm/Transforms/GCOVProfiler.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/BoundsChecking.h"
+#include "llvm/Transforms/Instrumentation/GCOVProfiler.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
@@ -540,6 +541,9 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
                            addObjCARCOptPass);
   }
 
+  if (LangOpts.CoroutinesTS)
+    addCoroutinePassesToExtensionPoints(PMBuilder);
+
   if (LangOpts.Sanitize.has(SanitizerKind::LocalBounds)) {
     PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
                            addBoundsCheckingPass);
@@ -597,9 +601,6 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addDataFlowSanitizerPass);
   }
-
-  if (LangOpts.CoroutinesTS)
-    addCoroutinePassesToExtensionPoints(PMBuilder);
 
   if (LangOpts.Sanitize.hasOneOf(SanitizerKind::Efficiency)) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
@@ -820,7 +821,7 @@ static PassBuilder::OptimizationLevel mapToLevel(const CodeGenOptions &Opts) {
   case 2:
     switch (Opts.OptimizeSize) {
     default:
-      llvm_unreachable("Invalide optimization level for size!");
+      llvm_unreachable("Invalid optimization level for size!");
 
     case 0:
       return PassBuilder::O2;

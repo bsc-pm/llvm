@@ -36,7 +36,6 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGAddressAnalysis.h"
@@ -60,6 +59,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/KnownBits.h"
+#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
@@ -3068,9 +3068,9 @@ SDValue DAGCombiner::visitREM(SDNode *N) {
     SDValue Div = DAG.getNode(DivOpcode, DL, VT, N0, N1);
     AddToWorklist(Div.getNode());
     SDValue OptimizedDiv = combine(Div.getNode());
-    if (OptimizedDiv.getNode() && OptimizedDiv.getNode() != Div.getNode()) {
-      assert((OptimizedDiv.getOpcode() != ISD::UDIVREM) &&
-             (OptimizedDiv.getOpcode() != ISD::SDIVREM));
+    if (OptimizedDiv.getNode() && OptimizedDiv.getNode() != Div.getNode() &&
+        OptimizedDiv.getOpcode() != ISD::UDIVREM &&
+        OptimizedDiv.getOpcode() != ISD::SDIVREM) {
       SDValue Mul = DAG.getNode(ISD::MUL, DL, VT, OptimizedDiv, N1);
       SDValue Sub = DAG.getNode(ISD::SUB, DL, VT, N0, Mul);
       AddToWorklist(Mul.getNode());
@@ -4275,7 +4275,10 @@ SDValue DAGCombiner::MatchBSwapHWordLow(SDNode *N, SDValue N0, SDValue N1,
     if (!N0.getNode()->hasOneUse())
       return SDValue();
     ConstantSDNode *N01C = dyn_cast<ConstantSDNode>(N0.getOperand(1));
-    if (!N01C || N01C->getZExtValue() != 0xFF00)
+    // Also handle 0xffff since the LHS is guaranteed to have zeros there.
+    // This is needed for X86.
+    if (!N01C || (N01C->getZExtValue() != 0xFF00 &&
+                  N01C->getZExtValue() != 0xFFFF))
       return SDValue();
     N0 = N0.getOperand(0);
     LookPassAnd0 = true;
@@ -4322,7 +4325,10 @@ SDValue DAGCombiner::MatchBSwapHWordLow(SDNode *N, SDValue N0, SDValue N1,
     if (!N10.getNode()->hasOneUse())
       return SDValue();
     ConstantSDNode *N101C = dyn_cast<ConstantSDNode>(N10.getOperand(1));
-    if (!N101C || N101C->getZExtValue() != 0xFF00)
+    // Also allow 0xFFFF since the bits will be shifted out. This is needed
+    // for X86.
+    if (!N101C || (N101C->getZExtValue() != 0xFF00 &&
+                   N101C->getZExtValue() != 0xFFFF))
       return SDValue();
     N10 = N10.getOperand(0);
     LookPassAnd1 = true;
@@ -4393,6 +4399,14 @@ static bool isBSwapHWordElement(SDValue N, MutableArrayRef<SDNode *> Parts) {
     return false;
   case 0xFF:       MaskByteOffset = 0; break;
   case 0xFF00:     MaskByteOffset = 1; break;
+  case 0xFFFF:
+    // In case demanded bits didn't clear the bits that will be shifted out.
+    // This is needed for X86.
+    if (Opc == ISD::SRL || (Opc == ISD::AND && Opc0 == ISD::SHL)) {
+      MaskByteOffset = 1;
+      break;
+    }
+    return false;
   case 0xFF0000:   MaskByteOffset = 2; break;
   case 0xFF000000: MaskByteOffset = 3; break;
   }
@@ -8445,7 +8459,7 @@ SDValue DAGCombiner::visitSIGN_EXTEND_INREG(SDNode *N) {
       return DAG.getNode(ISD::SIGN_EXTEND, SDLoc(N), VT, N00, N1);
   }
 
-  // fold (sext_in_reg (*_extend_vector_inreg x)) -> (sext_vector_in_reg x)
+  // fold (sext_in_reg (*_extend_vector_inreg x)) -> (sext_vector_inreg x)
   if ((N0.getOpcode() == ISD::ANY_EXTEND_VECTOR_INREG ||
        N0.getOpcode() == ISD::SIGN_EXTEND_VECTOR_INREG ||
        N0.getOpcode() == ISD::ZERO_EXTEND_VECTOR_INREG) &&
@@ -10731,6 +10745,15 @@ SDValue DAGCombiner::visitSINT_TO_FP(SDNode *N) {
     }
   }
 
+  // fptosi rounds towards zero, so converting from FP to integer and back is
+  // the same as an 'ftrunc': sitofp (fptosi X) --> ftrunc X
+  // We only do this if the target has legal ftrunc, otherwise we'd likely be
+  // replacing casts with a libcall.
+  if (N0.getOpcode() == ISD::FP_TO_SINT &&
+      N0.getOperand(0).getValueType() == VT &&
+      TLI.isOperationLegal(ISD::FTRUNC, VT))
+    return DAG.getNode(ISD::FTRUNC, SDLoc(N), VT, N0.getOperand(0));
+
   return SDValue();
 }
 
@@ -10769,6 +10792,15 @@ SDValue DAGCombiner::visitUINT_TO_FP(SDNode *N) {
       return DAG.getNode(ISD::SELECT_CC, DL, VT, Ops);
     }
   }
+
+  // fptoui rounds towards zero, so converting from FP to integer and back is
+  // the same as an 'ftrunc': uitofp (fptoui X) --> ftrunc X
+  // We only do this if the target has legal ftrunc, otherwise we'd likely be
+  // replacing casts with a libcall.
+  if (N0.getOpcode() == ISD::FP_TO_UINT &&
+      N0.getOperand(0).getValueType() == VT &&
+      TLI.isOperationLegal(ISD::FTRUNC, VT))
+    return DAG.getNode(ISD::FTRUNC, SDLoc(N), VT, N0.getOperand(0));
 
   return SDValue();
 }
@@ -12200,8 +12232,8 @@ static void adjustCostForPairing(SmallVectorImpl<LoadedSlice> &LoadedSlices,
 
   // Sort the slices so that elements that are likely to be next to each
   // other in memory are next to each other in the list.
-  std::sort(LoadedSlices.begin(), LoadedSlices.end(),
-            [](const LoadedSlice &LHS, const LoadedSlice &RHS) {
+  llvm::sort(LoadedSlices.begin(), LoadedSlices.end(),
+             [](const LoadedSlice &LHS, const LoadedSlice &RHS) {
     assert(LHS.Origin == RHS.Origin && "Different bases not implemented.");
     return LHS.getOffsetFromBase() < RHS.getOffsetFromBase();
   });
@@ -13102,14 +13134,10 @@ bool DAGCombiner::checkMergeStoreCandidatesForDependencies(
       Worklist.push_back(n->getOperand(j).getNode());
   }
   // Search through DAG. We can stop early if we find a store node.
-  for (unsigned i = 0; i < NumStores; ++i) {
+  for (unsigned i = 0; i < NumStores; ++i)
     if (SDNode::hasPredecessorHelper(StoreNodes[i].MemNode, Visited, Worklist,
                                      Max))
       return false;
-    // Check if we ended early, failing conservatively if so.
-    if (Visited.size() >= Max)
-      return false;
-  }
   return true;
 }
 
@@ -13156,10 +13184,10 @@ bool DAGCombiner::MergeConsecutiveStores(StoreSDNode *St) {
 
   // Sort the memory operands according to their distance from the
   // base pointer.
-  std::sort(StoreNodes.begin(), StoreNodes.end(),
-            [](MemOpLink LHS, MemOpLink RHS) {
-              return LHS.OffsetFromBase < RHS.OffsetFromBase;
-            });
+  llvm::sort(StoreNodes.begin(), StoreNodes.end(),
+             [](MemOpLink LHS, MemOpLink RHS) {
+               return LHS.OffsetFromBase < RHS.OffsetFromBase;
+             });
 
   // Store Merge attempts to merge the lowest stores. This generally
   // works out as if successful, as the remaining stores are checked
@@ -15481,7 +15509,7 @@ SDValue DAGCombiner::visitEXTRACT_SUBVECTOR(SDNode* N) {
         unsigned NumElems = ExtractSize / EltSize;
         EVT ExtractVT = EVT::getVectorVT(*DAG.getContext(),
                                          InVT.getVectorElementType(), NumElems);
-        if ((!LegalOperations ||
+        if ((Level < AfterLegalizeDAG ||
              TLI.isOperationLegal(ISD::BUILD_VECTOR, ExtractVT)) &&
             (!LegalTypes || TLI.isTypeLegal(ExtractVT))) {
           unsigned IdxVal = (Idx->getZExtValue() * NVT.getScalarSizeInBits()) /
@@ -16842,24 +16870,6 @@ SDValue DAGCombiner::SimplifySelectCC(const SDLoc &DL, SDValue N0, SDValue N1,
     // fold select_cc true, x, y -> x
     // fold select_cc false, x, y -> y
     return !SCCC->isNullValue() ? N2 : N3;
-  }
-
-  // Check to see if we can simplify the select into an fabs node
-  if (ConstantFPSDNode *CFP = dyn_cast<ConstantFPSDNode>(N1)) {
-    // Allow either -0.0 or 0.0
-    if (CFP->isZero()) {
-      // select (setg[te] X, +/-0.0), X, fneg(X) -> fabs
-      if ((CC == ISD::SETGE || CC == ISD::SETGT) &&
-          N0 == N2 && N3.getOpcode() == ISD::FNEG &&
-          N2 == N3.getOperand(0))
-        return DAG.getNode(ISD::FABS, DL, VT, N0);
-
-      // select (setl[te] X, +/-0.0), fneg(X), X -> fabs
-      if ((CC == ISD::SETLT || CC == ISD::SETLE) &&
-          N0 == N3 && N2.getOpcode() == ISD::FNEG &&
-          N2.getOperand(0) == N3)
-        return DAG.getNode(ISD::FABS, DL, VT, N3);
-    }
   }
 
   // Turn "(a cond b) ? 1.0f : 2.0f" into "load (tmp + ((a cond b) ? 0 : 4)"

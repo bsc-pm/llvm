@@ -395,8 +395,10 @@ ProgramStateRef CStringChecker::CheckBufferAccess(CheckerContext &C,
 
   // Compute the offset of the last element to be accessed: size-1.
   NonLoc One = svalBuilder.makeIntVal(1, sizeTy).castAs<NonLoc>();
-  NonLoc LastOffset = svalBuilder
-      .evalBinOpNN(state, BO_Sub, *Length, One, sizeTy).castAs<NonLoc>();
+  SVal Offset = svalBuilder.evalBinOpNN(state, BO_Sub, *Length, One, sizeTy);
+  if (Offset.isUnknown())
+    return nullptr;
+  NonLoc LastOffset = Offset.castAs<NonLoc>();
 
   // Check that the first buffer is sufficiently long.
   SVal BufStart = svalBuilder.evalCast(BufVal, PtrTy, FirstBuf->getType());
@@ -862,9 +864,10 @@ bool CStringChecker::IsFirstBufInBound(CheckerContext &C,
 
   // Compute the offset of the last element to be accessed: size-1.
   NonLoc One = svalBuilder.makeIntVal(1, sizeTy).castAs<NonLoc>();
-  NonLoc LastOffset =
-      svalBuilder.evalBinOpNN(state, BO_Sub, *Length, One, sizeTy)
-          .castAs<NonLoc>();
+  SVal Offset = svalBuilder.evalBinOpNN(state, BO_Sub, *Length, One, sizeTy);
+  if (Offset.isUnknown())
+    return true; // cf top comment
+  NonLoc LastOffset = Offset.castAs<NonLoc>();
 
   // Check that the first buffer is sufficiently long.
   SVal BufStart = svalBuilder.evalCast(BufVal, PtrTy, FirstBuf->getType());
@@ -1032,6 +1035,21 @@ void CStringChecker::evalCopyCommon(CheckerContext &C,
   // If the size can be nonzero, we have to check the other arguments.
   if (stateNonZeroSize) {
     state = stateNonZeroSize;
+
+    // Ensure the destination is not null. If it is NULL there will be a
+    // NULL pointer dereference.
+    state = checkNonNull(C, state, Dest, destVal);
+    if (!state)
+      return;
+
+    // Get the value of the Src.
+    SVal srcVal = state->getSVal(Source, LCtx);
+
+    // Ensure the source is not null. If it is NULL there will be a
+    // NULL pointer dereference.
+    state = checkNonNull(C, state, Source, srcVal);
+    if (!state)
+      return;
 
     // Ensure the accesses are valid and that the buffers do not overlap.
     const char * const writeWarning =
@@ -2017,6 +2035,12 @@ void CStringChecker::evalMemset(CheckerContext &C, const CallExpr *CE) const {
     C.addTransition(StateZeroSize);
     return;
   }
+
+  // Ensure the memory area is not null.
+  // If it is NULL there will be a NULL pointer dereference.
+  State = checkNonNull(C, StateNonZeroSize, Mem, MemVal);
+  if (!State)
+    return;
 
   State = CheckBufferAccess(C, State, Size, Mem);
   if (!State)

@@ -32,7 +32,6 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachinePassRegistry.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/RegisterPressure.h"
@@ -55,6 +54,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/GraphWriter.h"
+#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cassert>
@@ -1562,7 +1562,7 @@ void BaseMemOpClusterMutation::clusterNeighboringMemOps(
   if (MemOpRecords.size() < 2)
     return;
 
-  std::sort(MemOpRecords.begin(), MemOpRecords.end());
+  llvm::sort(MemOpRecords.begin(), MemOpRecords.end());
   unsigned ClusterLength = 1;
   for (unsigned Idx = 0, End = MemOpRecords.size(); Idx < (End - 1); ++Idx) {
     SUnit *SUa = MemOpRecords[Idx].SU;

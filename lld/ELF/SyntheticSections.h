@@ -30,6 +30,7 @@
 
 namespace lld {
 namespace elf {
+class Defined;
 class SharedSymbol;
 
 class SyntheticSection : public InputSection {
@@ -83,6 +84,7 @@ public:
   };
 
   std::vector<FdeData> getFdeData() const;
+  ArrayRef<CieRecord *> getCieRecords() const { return CieRecords; }
 
 private:
   uint64_t Size = 0;
@@ -269,7 +271,7 @@ public:
   void addEntry(Symbol &Sym);
   size_t getSize() const override;
   void writeTo(uint8_t *Buf) override;
-  bool empty() const override { return Entries.empty(); }
+  bool empty() const override;
 
 private:
   std::vector<const Symbol *> Entries;
@@ -470,7 +472,7 @@ public:
   void addSymbols(std::vector<SymbolTableEntry> &Symbols);
 
 private:
-  size_t getShift2() const { return Config->Is64 ? 6 : 5; }
+  enum { Shift2 = 6 };
 
   void writeBloomFilter(uint8_t *Buf);
   void writeHashTable(uint8_t *Buf);
@@ -683,13 +685,12 @@ public:
 class MergeSyntheticSection : public SyntheticSection {
 public:
   void addSection(MergeInputSection *MS);
+  std::vector<MergeInputSection *> Sections;
 
 protected:
   MergeSyntheticSection(StringRef Name, uint32_t Type, uint64_t Flags,
                         uint32_t Alignment)
       : SyntheticSection(Flags, Type, Alignment, Name) {}
-
-  std::vector<MergeInputSection *> Sections;
 };
 
 class MergeTailSection final : public MergeSyntheticSection {
@@ -823,9 +824,10 @@ public:
   size_t getSize() const override { return Size; }
   void writeTo(uint8_t *Buf) override;
   InputSection *getTargetInputSection() const;
+  bool assignOffsets();
 
 private:
-  std::vector<const Thunk *> Thunks;
+  std::vector<Thunk *> Thunks;
   size_t Size = 0;
 };
 
@@ -834,8 +836,8 @@ MergeInputSection *createCommentSection();
 void decompressSections();
 void mergeSections();
 
-Symbol *addSyntheticLocal(StringRef Name, uint8_t Type, uint64_t Value,
-                          uint64_t Size, InputSectionBase &Section);
+Defined *addSyntheticLocal(StringRef Name, uint8_t Type, uint64_t Value,
+                           uint64_t Size, InputSectionBase &Section);
 
 // Linker generated sections which can be used as inputs.
 struct InX {

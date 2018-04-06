@@ -174,6 +174,7 @@ StringRef llvm::getEnumName(MVT::SimpleValueType T) {
   case MVT::iPTR:     return "MVT::iPTR";
   case MVT::iPTRAny:  return "MVT::iPTRAny";
   case MVT::Untyped:  return "MVT::Untyped";
+  case MVT::ExceptRef: return "MVT::ExceptRef";
   default: llvm_unreachable("ILLEGAL VALUE TYPE!");
   }
 }
@@ -350,7 +351,7 @@ GetInstByName(const char *Name,
 
 static const char *const FixedInstrs[] = {
 #define HANDLE_TARGET_OPCODE(OPC) #OPC,
-#include "llvm/CodeGen/TargetOpcodes.def"
+#include "llvm/Support/TargetOpcodes.def"
     nullptr};
 
 unsigned CodeGenTarget::getNumFixedInstructions() {
@@ -614,8 +615,12 @@ CodeGenIntrinsic::CodeGenIntrinsic(Record *R) {
     MVT::SimpleValueType VT;
     if (TyEl->isSubClassOf("LLVMMatchType")) {
       unsigned MatchTy = TyEl->getValueAsInt("Number");
-      assert(MatchTy < OverloadedVTs.size() &&
-             "Invalid matching number!");
+      if (MatchTy >= OverloadedVTs.size()) {
+        PrintError(R->getLoc(),
+                   "Parameter #" + Twine(i) + " has out of bounds matching "
+                   "number " + Twine(MatchTy));
+        PrintFatalError(Twine("ParamTypes is ") + TypeList->getAsString());
+      }
       VT = OverloadedVTs[MatchTy];
       // It only makes sense to use the extended and truncated vector element
       // variants with iAny types; otherwise, if the intrinsic is not

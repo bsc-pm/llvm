@@ -296,16 +296,6 @@ static Type *ToVectorTy(Type *Scalar, unsigned VF) {
 // in the project. They can be effectively organized in a common Load/Store
 // utilities unit.
 
-/// A helper function that returns the pointer operand of a load or store
-/// instruction.
-static Value *getPointerOperand(Value *I) {
-  if (auto *LI = dyn_cast<LoadInst>(I))
-    return LI->getPointerOperand();
-  if (auto *SI = dyn_cast<StoreInst>(I))
-    return SI->getPointerOperand();
-  return nullptr;
-}
-
 /// A helper function that returns the type of loaded or stored value.
 static Type *getMemInstValueType(Value *I) {
   assert((isa<LoadInst>(I) || isa<StoreInst>(I)) &&
@@ -552,9 +542,9 @@ protected:
   /// Compute scalar induction steps. \p ScalarIV is the scalar induction
   /// variable on which to base the steps, \p Step is the size of the step, and
   /// \p EntryVal is the value from the original loop that maps to the steps.
-  /// Note that \p EntryVal doesn't have to be an induction variable (e.g., it
-  /// can be a truncate instruction).
-  void buildScalarSteps(Value *ScalarIV, Value *Step, Value *EntryVal,
+  /// Note that \p EntryVal doesn't have to be an induction variable - it
+  /// can also be a truncate instruction.
+  void buildScalarSteps(Value *ScalarIV, Value *Step, Instruction *EntryVal,
                         const InductionDescriptor &ID);
 
   /// Create a vector induction phi node based on an existing scalar one. \p
@@ -581,10 +571,20 @@ protected:
   /// vector loop for both the Phi and the cast. 
   /// If \p VectorLoopValue is a scalarized value, \p Lane is also specified,
   /// Otherwise, \p VectorLoopValue is a widened/vectorized value.
-  void recordVectorLoopValueForInductionCast (const InductionDescriptor &ID,
-                                              Value *VectorLoopValue, 
-                                              unsigned Part, 
-                                              unsigned Lane = UINT_MAX);
+  ///
+  /// \p EntryVal is the value from the original loop that maps to the vector
+  /// phi node and is used to distinguish what is the IV currently being
+  /// processed - original one (if \p EntryVal is a phi corresponding to the
+  /// original IV) or the "newly-created" one based on the proof mentioned above
+  /// (see also buildScalarSteps() and createVectorIntOrFPInductionPHI()). In the
+  /// latter case \p EntryVal is a TruncInst and we must not record anything for
+  /// that IV, but it's error-prone to expect callers of this routine to care
+  /// about that, hence this explicit parameter.
+  void recordVectorLoopValueForInductionCast(const InductionDescriptor &ID,
+                                             const Instruction *EntryVal,
+                                             Value *VectorLoopValue,
+                                             unsigned Part,
+                                             unsigned Lane = UINT_MAX);
 
   /// Generate a shuffle sequence that will reverse the vector Vec.
   virtual Value *reverseVector(Value *Vec);
@@ -1842,9 +1842,6 @@ public:
 
     /// Holds the maximum number of concurrent live intervals in the loop.
     unsigned MaxLocalUsers;
-
-    /// Holds the number of instructions in the loop.
-    unsigned NumInstructions;
   };
 
   /// \return Returns information about the register usages of the loop for the
@@ -2381,6 +2378,8 @@ Value *InnerLoopVectorizer::getBroadcastInstrs(Value *V) {
 
 void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
     const InductionDescriptor &II, Value *Step, Instruction *EntryVal) {
+  assert((isa<PHINode>(EntryVal) || isa<TruncInst>(EntryVal)) &&
+         "Expected either an induction phi-node or a truncate of it!");
   Value *Start = II.getStartValue();
 
   // Construct the initial value of the vector IV in the vector loop preheader
@@ -2434,8 +2433,7 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
 
     if (isa<TruncInst>(EntryVal))
       addMetadata(LastInduction, EntryVal);
-    else
-      recordVectorLoopValueForInductionCast(II, LastInduction, Part);
+    recordVectorLoopValueForInductionCast(II, EntryVal, LastInduction, Part);
 
     LastInduction = cast<Instruction>(addFastMathFlag(
         Builder.CreateBinOp(AddOp, LastInduction, SplatVF, "step.add")));
@@ -2469,8 +2467,20 @@ bool InnerLoopVectorizer::needsScalarInduction(Instruction *IV) const {
 }
 
 void InnerLoopVectorizer::recordVectorLoopValueForInductionCast(
-    const InductionDescriptor &ID, Value *VectorLoopVal, unsigned Part,
-    unsigned Lane) {
+    const InductionDescriptor &ID, const Instruction *EntryVal,
+    Value *VectorLoopVal, unsigned Part, unsigned Lane) {
+  assert((isa<PHINode>(EntryVal) || isa<TruncInst>(EntryVal)) &&
+         "Expected either an induction phi-node or a truncate of it!");
+
+  // This induction variable is not the phi from the original loop but the
+  // newly-created IV based on the proof that casted Phi is equal to the
+  // uncasted Phi in the vectorized loop (under a runtime guard possibly). It
+  // re-uses the same InductionDescriptor that original IV uses but we don't
+  // have to do any recording in this case - that is done when original IV is
+  // processed.
+  if (isa<TruncInst>(EntryVal))
+    return;
+
   const SmallVectorImpl<Instruction *> &Casts = ID.getCastInsts();
   if (Casts.empty())
     return;
@@ -2567,8 +2577,7 @@ void InnerLoopVectorizer::widenIntOrFpInduction(PHINode *IV, TruncInst *Trunc) {
       VectorLoopValueMap.setVectorValue(EntryVal, Part, EntryPart);
       if (Trunc)
         addMetadata(EntryPart, Trunc);
-      else
-        recordVectorLoopValueForInductionCast(ID, EntryPart, Part);
+      recordVectorLoopValueForInductionCast(ID, EntryVal, EntryPart, Part);
     }
   }
 
@@ -2639,7 +2648,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
 }
 
 void InnerLoopVectorizer::buildScalarSteps(Value *ScalarIV, Value *Step,
-                                           Value *EntryVal,
+                                           Instruction *EntryVal,
                                            const InductionDescriptor &ID) {
   // We shouldn't have to build scalar steps if we aren't vectorizing.
   assert(VF > 1 && "VF should be greater than one");
@@ -2674,7 +2683,7 @@ void InnerLoopVectorizer::buildScalarSteps(Value *ScalarIV, Value *Step,
       auto *Mul = addFastMathFlag(Builder.CreateBinOp(MulOp, StartIdx, Step));
       auto *Add = addFastMathFlag(Builder.CreateBinOp(AddOp, ScalarIV, Mul));
       VectorLoopValueMap.setScalarValue(EntryVal, {Part, Lane}, Add);
-      recordVectorLoopValueForInductionCast(ID, Add, Part, Lane);
+      recordVectorLoopValueForInductionCast(ID, EntryVal, Add, Part, Lane);
     }
   }
 }
@@ -2860,7 +2869,7 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(Instruction *Instr) {
     return;
 
   const DataLayout &DL = Instr->getModule()->getDataLayout();
-  Value *Ptr = getPointerOperand(Instr);
+  Value *Ptr = getLoadStorePointerOperand(Instr);
 
   // Prepare for the vector type of the interleaved load/store.
   Type *ScalarTy = getMemInstValueType(Instr);
@@ -3002,7 +3011,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
 
   Type *ScalarDataTy = getMemInstValueType(Instr);
   Type *DataTy = VectorType::get(ScalarDataTy, VF);
-  Value *Ptr = getPointerOperand(Instr);
+  Value *Ptr = getLoadStorePointerOperand(Instr);
   unsigned Alignment = getMemInstAlignment(Instr);
   // An alignment of 0 means target abi alignment. We need to use the scalar's
   // target abi alignment in such a case.
@@ -3035,8 +3044,6 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
 
   // Handle Stores:
   if (SI) {
-    assert(!Legal->isUniform(SI->getPointerOperand()) &&
-           "We do not allow storing to uniform addresses");
     setDebugLocFromInst(Builder, SI);
 
     for (unsigned Part = 0; Part < UF; ++Part) {
@@ -4799,7 +4806,7 @@ bool LoopVectorizationLegality::canVectorizeWithIfConvert() {
       continue;
 
     for (Instruction &I : *BB)
-      if (auto *Ptr = getPointerOperand(&I))
+      if (auto *Ptr = getLoadStorePointerOperand(&I))
         SafePointes.insert(Ptr);
   }
 
@@ -4835,7 +4842,7 @@ bool LoopVectorizationLegality::canVectorize() {
   // Store the result and return it at the end instead of exiting early, in case
   // allowExtraAnalysis is used to report multiple reasons for not vectorizing.
   bool Result = true;
-  
+
   bool DoExtraAnalysis = ORE->allowExtraAnalysis(DEBUG_TYPE);
   // We must have a loop in canonical form. Loops with indirectbr in them cannot
   // be canonicalized.
@@ -5250,7 +5257,7 @@ void LoopVectorizationCostModel::collectLoopScalars(unsigned VF) {
     if (auto *Store = dyn_cast<StoreInst>(MemAccess))
       if (Ptr == Store->getValueOperand())
         return WideningDecision == CM_Scalarize;
-    assert(Ptr == getPointerOperand(MemAccess) &&
+    assert(Ptr == getLoadStorePointerOperand(MemAccess) &&
            "Ptr is neither a value or pointer operand");
     return WideningDecision != CM_GatherScatter;
   };
@@ -5418,7 +5425,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I) {
   case Instruction::Store: {
     if (!Legal->isMaskRequired(I))
       return false;
-    auto *Ptr = getPointerOperand(I);
+    auto *Ptr = getLoadStorePointerOperand(I);
     auto *Ty = getMemInstValueType(I);
     return isa<LoadInst>(I) ?
         !(isLegalMaskedLoad(Ty, Ptr)  || isLegalMaskedGather(Ty))
@@ -5440,7 +5447,7 @@ bool LoopVectorizationCostModel::memoryInstructionCanBeWidened(Instruction *I,
   StoreInst *SI = dyn_cast<StoreInst>(I);
   assert((LI || SI) && "Invalid memory instruction");
 
-  auto *Ptr = getPointerOperand(I);
+  auto *Ptr = getLoadStorePointerOperand(I);
 
   // In order to be widened, the pointer should be consecutive, first of all.
   if (!Legal->isConsecutivePtr(Ptr))
@@ -5526,7 +5533,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   for (auto *BB : TheLoop->blocks())
     for (auto &I : *BB) {
       // If there's no pointer operand, there's nothing to do.
-      auto *Ptr = dyn_cast_or_null<Instruction>(getPointerOperand(&I));
+      auto *Ptr = dyn_cast_or_null<Instruction>(getLoadStorePointerOperand(&I));
       if (!Ptr)
         continue;
 
@@ -5534,7 +5541,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
       // pointer operand.
       auto UsersAreMemAccesses =
           llvm::all_of(Ptr->users(), [&](User *U) -> bool {
-            return getPointerOperand(U) == Ptr;
+            return getLoadStorePointerOperand(U) == Ptr;
           });
 
       // Ensure the memory instruction will not be scalarized or used by
@@ -5574,7 +5581,8 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
       if (llvm::all_of(OI->users(), [&](User *U) -> bool {
             auto *J = cast<Instruction>(U);
             return !TheLoop->contains(J) || Worklist.count(J) ||
-                   (OI == getPointerOperand(J) && isUniformDecision(J, VF));
+                   (OI == getLoadStorePointerOperand(J) &&
+                    isUniformDecision(J, VF));
           })) {
         Worklist.insert(OI);
         DEBUG(dbgs() << "LV: Found uniform instruction: " << *OI << "\n");
@@ -5585,7 +5593,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   // Returns true if Ptr is the pointer operand of a memory access instruction
   // I, and I is known to not require scalarization.
   auto isVectorizedMemAccessUse = [&](Instruction *I, Value *Ptr) -> bool {
-    return getPointerOperand(I) == Ptr && isUniformDecision(I, VF);
+    return getLoadStorePointerOperand(I) == Ptr && isUniformDecision(I, VF);
   };
 
   // For an instruction to be added into Worklist above, all its users inside
@@ -5746,7 +5754,7 @@ void InterleavedAccessInfo::collectConstStrideAccesses(
       if (!LI && !SI)
         continue;
 
-      Value *Ptr = getPointerOperand(&I);
+      Value *Ptr = getLoadStorePointerOperand(&I);
       // We don't check wrapping here because we don't know yet if Ptr will be
       // part of a full group or a group with gaps. Checking wrapping for all
       // pointers (even those that end up in groups with no gaps) will be overly
@@ -5996,7 +6004,7 @@ void InterleavedAccessInfo::analyzeInterleaving(
     // So we check only group member 0 (which is always guaranteed to exist),
     // and group member Factor - 1; If the latter doesn't exist we rely on
     // peeling (if it is a non-reveresed accsess -- see Case 3).
-    Value *FirstMemberPtr = getPointerOperand(Group->getMember(0));
+    Value *FirstMemberPtr = getLoadStorePointerOperand(Group->getMember(0));
     if (!getPtrStride(PSE, FirstMemberPtr, TheLoop, Strides, /*Assume=*/false,
                       /*ShouldCheckWrap=*/true)) {
       DEBUG(dbgs() << "LV: Invalidate candidate interleaved group due to "
@@ -6006,7 +6014,7 @@ void InterleavedAccessInfo::analyzeInterleaving(
     }
     Instruction *LastMember = Group->getMember(Group->getFactor() - 1);
     if (LastMember) {
-      Value *LastMemberPtr = getPointerOperand(LastMember);
+      Value *LastMemberPtr = getLoadStorePointerOperand(LastMember);
       if (!getPtrStride(PSE, LastMemberPtr, TheLoop, Strides, /*Assume=*/false,
                         /*ShouldCheckWrap=*/true)) {
         DEBUG(dbgs() << "LV: Invalidate candidate interleaved group due to "
@@ -6131,7 +6139,8 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(bool OptForSize,
   }
 
   unsigned MaxVF = MaxVectorSize;
-  if (MaximizeBandwidth && !OptForSize) {
+  if (TTI.shouldMaximizeVectorBandwidth(OptForSize) ||
+      (MaximizeBandwidth && !OptForSize)) {
     // Collect all viable vectorization factors larger than the default MaxVF
     // (i.e. MaxVectorSize).
     SmallVector<unsigned, 8> VFs;
@@ -6307,7 +6316,6 @@ unsigned LoopVectorizationCostModel::selectInterleaveCount(bool OptForSize,
   // We divide by these constants so assume that we have at least one
   // instruction that uses at least one register.
   R.MaxLocalUsers = std::max(R.MaxLocalUsers, 1U);
-  R.NumInstructions = std::max(R.NumInstructions, 1U);
 
   // We calculate the interleave count using the following formula.
   // Subtract the number of loop invariants from the number of available
@@ -6434,7 +6442,6 @@ LoopVectorizationCostModel::calculateRegisterUsage(ArrayRef<unsigned> VFs) {
   DFS.perform(LI);
 
   RegisterUsage RU;
-  RU.NumInstructions = 0;
 
   // Each 'key' in the map opens a new interval. The values
   // of the map are the index of the 'last seen' usage of the
@@ -6453,7 +6460,6 @@ LoopVectorizationCostModel::calculateRegisterUsage(ArrayRef<unsigned> VFs) {
 
   unsigned Index = 0;
   for (BasicBlock *BB : make_range(DFS.beginRPO(), DFS.endRPO())) {
-    RU.NumInstructions += BB->size();
     for (Instruction &I : *BB) {
       IdxToInstr[Index++] = &I;
 
@@ -6563,7 +6569,6 @@ LoopVectorizationCostModel::calculateRegisterUsage(ArrayRef<unsigned> VFs) {
     DEBUG(dbgs() << "LV(REG): VF = " << VFs[i] << '\n');
     DEBUG(dbgs() << "LV(REG): Found max usage: " << MaxUsages[i] << '\n');
     DEBUG(dbgs() << "LV(REG): Found invariant usage: " << Invariant << '\n');
-    DEBUG(dbgs() << "LV(REG): LoopSize: " << RU.NumInstructions << '\n');
 
     RU.LoopInvariantRegs = Invariant;
     RU.MaxLocalUsers = MaxUsages[i];
@@ -6826,7 +6831,7 @@ unsigned LoopVectorizationCostModel::getMemInstScalarizationCost(Instruction *I,
 
   unsigned Alignment = getMemInstAlignment(I);
   unsigned AS = getMemInstAddressSpace(I);
-  Value *Ptr = getPointerOperand(I);
+  Value *Ptr = getLoadStorePointerOperand(I);
   Type *PtrTy = ToVectorTy(Ptr->getType(), VF);
 
   // Figure out whether the access is strided and get the stride value
@@ -6864,7 +6869,7 @@ unsigned LoopVectorizationCostModel::getConsecutiveMemOpCost(Instruction *I,
   Type *ValTy = getMemInstValueType(I);
   Type *VectorTy = ToVectorTy(ValTy, VF);
   unsigned Alignment = getMemInstAlignment(I);
-  Value *Ptr = getPointerOperand(I);
+  Value *Ptr = getLoadStorePointerOperand(I);
   unsigned AS = getMemInstAddressSpace(I);
   int ConsecutiveStride = Legal->isConsecutivePtr(Ptr);
 
@@ -6900,7 +6905,7 @@ unsigned LoopVectorizationCostModel::getGatherScatterCost(Instruction *I,
   Type *ValTy = getMemInstValueType(I);
   Type *VectorTy = ToVectorTy(ValTy, VF);
   unsigned Alignment = getMemInstAlignment(I);
-  Value *Ptr = getPointerOperand(I);
+  Value *Ptr = getLoadStorePointerOperand(I);
 
   return TTI.getAddressComputationCost(VectorTy) +
          TTI.getGatherScatterOpCost(I->getOpcode(), VectorTy, Ptr,
@@ -6984,7 +6989,7 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(unsigned VF) {
   for (BasicBlock *BB : TheLoop->blocks()) {
     // For each instruction in the old loop.
     for (Instruction &I : *BB) {
-      Value *Ptr = getPointerOperand(&I);
+      Value *Ptr =  getLoadStorePointerOperand(&I);
       if (!Ptr)
         continue;
 
@@ -7000,7 +7005,8 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(unsigned VF) {
       // We assume that widening is the best solution when possible.
       if (memoryInstructionCanBeWidened(&I, VF)) {
         unsigned Cost = getConsecutiveMemOpCost(&I, VF);
-        int ConsecutiveStride = Legal->isConsecutivePtr(getPointerOperand(&I));
+        int ConsecutiveStride =
+               Legal->isConsecutivePtr(getLoadStorePointerOperand(&I));
         assert((ConsecutiveStride == 1 || ConsecutiveStride == -1) &&
                "Expected consecutive stride.");
         InstWidening Decision =
@@ -7070,7 +7076,7 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(unsigned VF) {
   for (BasicBlock *BB : TheLoop->blocks())
     for (Instruction &I : *BB) {
       Instruction *PtrDef =
-        dyn_cast_or_null<Instruction>(getPointerOperand(&I));
+        dyn_cast_or_null<Instruction>(getLoadStorePointerOperand(&I));
       if (PtrDef && TheLoop->contains(PtrDef) &&
           getWideningDecision(&I, VF) != CM_GatherScatter)
         AddrDefs.insert(PtrDef);
@@ -7384,7 +7390,7 @@ Pass *createLoopVectorizePass(bool NoUnrolling, bool AlwaysVectorize) {
 bool LoopVectorizationCostModel::isConsecutiveLoadOrStore(Instruction *Inst) {
   // Check if the pointer operand of a load or store instruction is
   // consecutive.
-  if (auto *Ptr = getPointerOperand(Inst))
+  if (auto *Ptr = getLoadStorePointerOperand(Inst))
     return Legal->isConsecutivePtr(Ptr);
   return false;
 }

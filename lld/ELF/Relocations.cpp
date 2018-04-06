@@ -778,9 +778,8 @@ static RelExpr processRelocAux(InputSectionBase &Sec, RelExpr Expr,
       InX::RelaDyn->addReloc(Target->RelativeRel, &Sec, Offset, &Sym, Addend,
                              Expr, Type);
       return Expr;
-    } else if (Target->isPicRel(Type)) {
-      InX::RelaDyn->addReloc(Target->getDynRel(Type), &Sec, Offset, &Sym,
-                             Addend, R_ADDEND, Type);
+    } else if (RelType Rel = Target->getDynRel(Type)) {
+      InX::RelaDyn->addReloc(Rel, &Sec, Offset, &Sym, Addend, R_ADDEND, Type);
 
       // MIPS ABI turns using of GOT and dynamic relocations inside out.
       // While regular ABI uses dynamic relocations to fill up GOT entries
@@ -814,7 +813,8 @@ static RelExpr processRelocAux(InputSectionBase &Sec, RelExpr Expr,
     error(
         "can't create dynamic relocation " + toString(Type) + " against " +
         (Sym.getName().empty() ? "local symbol" : "symbol: " + toString(Sym)) +
-        " in readonly segment; recompile object files with -fPIC" +
+        " in readonly segment; recompile object files with -fPIC "
+        "or pass '-Wl,-z,notext' to allow text relocations in the output" +
         getLocation(Sec, Sym, Offset));
     return Expr;
   }
@@ -875,6 +875,17 @@ static RelExpr processRelocAux(InputSectionBase &Sec, RelExpr Expr,
     // that points to the real function is a dedicated got entry used by the
     // plt. That is identified by special relocation types (R_X86_64_JUMP_SLOT,
     // R_386_JMP_SLOT, etc).
+
+    // For position independent executable on i386, the plt entry requires ebx
+    // to be set. This causes two problems:
+    // * If some code has a direct reference to a function, it was probably
+    //   compiled without -fPIE/-fPIC and doesn't maintain ebx.
+    // * If a library definition gets preempted to the executable, it will have
+    //   the wrong ebx value.
+    if (Config->Pie && Config->EMachine == EM_386)
+      errorOrWarn("symbol '" + toString(Sym) +
+                  "' cannot be preempted; recompile with -fPIE" +
+                  getLocation(Sec, Sym, Offset));
     Sym.NeedsPltAddr = true;
     Expr = toPlt(Expr);
     Sec.Relocations.push_back({Expr, Type, Offset, Addend, &Sym});
@@ -1206,17 +1217,30 @@ ThunkSection *ThunkCreator::getISThunkSec(InputSection *IS) {
 //
 // We follow a simple but conservative heuristic to place ThunkSections at
 // offsets that are multiples of a Target specific branch range.
-// For an InputSectionRange that is smaller than the range, a single
+// For an InputSectionDescription that is smaller than the range, a single
 // ThunkSection at the end of the range will do.
+//
+// For an InputSectionDescription that is more than twice the size of the range,
+// we place the last ThunkSection at range bytes from the end of the
+// InputSectionDescription in order to increase the likelihood that the
+// distance from a thunk to its target will be sufficiently small to
+// allow for the creation of a short thunk.
 void ThunkCreator::createInitialThunkSections(
     ArrayRef<OutputSection *> OutputSections) {
   forEachInputSectionDescription(
       OutputSections, [&](OutputSection *OS, InputSectionDescription *ISD) {
         if (ISD->Sections.empty())
           return;
+        uint32_t ISDBegin = ISD->Sections.front()->OutSecOff;
+        uint32_t ISDEnd =
+            ISD->Sections.back()->OutSecOff + ISD->Sections.back()->getSize();
+        uint32_t LastThunkLowerBound = -1;
+        if (ISDEnd - ISDBegin > Target->ThunkSectionSpacing * 2)
+          LastThunkLowerBound = ISDEnd - Target->ThunkSectionSpacing;
+
         uint32_t ISLimit;
-        uint32_t PrevISLimit = ISD->Sections.front()->OutSecOff;
-        uint32_t ThunkUpperBound = PrevISLimit + Target->ThunkSectionSpacing;
+        uint32_t PrevISLimit = ISDBegin;
+        uint32_t ThunkUpperBound = ISDBegin + Target->ThunkSectionSpacing;
 
         for (const InputSection *IS : ISD->Sections) {
           ISLimit = IS->OutSecOff + IS->getSize();
@@ -1224,6 +1248,8 @@ void ThunkCreator::createInitialThunkSections(
             addThunkSection(OS, ISD, PrevISLimit);
             ThunkUpperBound = PrevISLimit + Target->ThunkSectionSpacing;
           }
+          if (ISLimit > LastThunkLowerBound)
+            break;
           PrevISLimit = ISLimit;
         }
         addThunkSection(OS, ISD, ISLimit);
@@ -1240,17 +1266,22 @@ ThunkSection *ThunkCreator::addThunkSection(OutputSection *OS,
 
 std::pair<Thunk *, bool> ThunkCreator::getThunk(Symbol &Sym, RelType Type,
                                                 uint64_t Src) {
-  auto Res = ThunkedSymbols.insert({&Sym, std::vector<Thunk *>()});
-  if (!Res.second) {
-    // Check existing Thunks for Sym to see if they can be reused
-    for (Thunk *ET : Res.first->second)
-      if (ET->isCompatibleWith(Type) &&
-          Target->inBranchRange(Type, Src, ET->ThunkSym->getVA()))
-        return std::make_pair(ET, false);
-  }
+  std::vector<Thunk *> *ThunkVec = nullptr;
+  // We use (section, offset) pair to find the thunk position if possible so
+  // that we create only one thunk for aliased symbols or ICFed sections.
+  if (auto *D = dyn_cast<Defined>(&Sym))
+    if (!D->isInPlt() && D->Section)
+      ThunkVec = &ThunkedSymbolsBySection[{D->Section->Repl, D->Value}];
+  if (!ThunkVec)
+    ThunkVec = &ThunkedSymbols[&Sym];
+  // Check existing Thunks for Sym to see if they can be reused
+  for (Thunk *ET : *ThunkVec)
+    if (ET->isCompatibleWith(Type) &&
+        Target->inBranchRange(Type, Src, ET->getThunkTargetSym()->getVA()))
+      return std::make_pair(ET, false);
   // No existing compatible Thunk in range, create a new one
   Thunk *T = addThunk(Type, Sym);
-  Res.first->second.push_back(T);
+  ThunkVec->push_back(T);
   return std::make_pair(T, true);
 }
 
@@ -1326,7 +1357,7 @@ bool ThunkCreator::createThunks(ArrayRef<OutputSection *> OutputSections) {
       OutputSections, [&](OutputSection *OS, InputSectionDescription *ISD) {
         for (InputSection *IS : ISD->Sections)
           for (Relocation &Rel : IS->Relocations) {
-            uint64_t Src = OS->Addr + IS->OutSecOff + Rel.Offset;
+            uint64_t Src = IS->getVA(Rel.Offset);
 
             // If we are a relocation to an existing Thunk, check if it is
             // still in range. If not then Rel will be altered to point to its
@@ -1341,7 +1372,6 @@ bool ThunkCreator::createThunks(ArrayRef<OutputSection *> OutputSections) {
             bool IsNew;
             std::tie(T, IsNew) = getThunk(*Rel.Sym, Rel.Type, Src);
             if (IsNew) {
-              AddressesChanged = true;
               // Find or create a ThunkSection for the new Thunk
               ThunkSection *TS;
               if (auto *TIS = T->getTargetInputSection())
@@ -1349,13 +1379,18 @@ bool ThunkCreator::createThunks(ArrayRef<OutputSection *> OutputSections) {
               else
                 TS = getISDThunkSec(OS, IS, ISD, Rel.Type, Src);
               TS->addThunk(T);
-              Thunks[T->ThunkSym] = T;
+              Thunks[T->getThunkTargetSym()] = T;
             }
             // Redirect relocation to Thunk, we never go via the PLT to a Thunk
-            Rel.Sym = T->ThunkSym;
+            Rel.Sym = T->getThunkTargetSym();
             Rel.Expr = fromPlt(Rel.Expr);
           }
+        for (auto &P : ISD->ThunkSections)
+          AddressesChanged |= P.first->assignOffsets();
       });
+  for (auto &P : ThunkedSections)
+    AddressesChanged |= P.second->assignOffsets();
+
   // Merge all created synthetic ThunkSections back into OutputSection
   mergeThunks(OutputSections);
   ++Pass;

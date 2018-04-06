@@ -456,10 +456,10 @@ bool MachineBasicBlock::isLiveIn(MCPhysReg Reg, LaneBitmask LaneMask) const {
 }
 
 void MachineBasicBlock::sortUniqueLiveIns() {
-  std::sort(LiveIns.begin(), LiveIns.end(),
-            [](const RegisterMaskPair &LI0, const RegisterMaskPair &LI1) {
-              return LI0.PhysReg < LI1.PhysReg;
-            });
+  llvm::sort(LiveIns.begin(), LiveIns.end(),
+             [](const RegisterMaskPair &LI0, const RegisterMaskPair &LI1) {
+               return LI0.PhysReg < LI1.PhysReg;
+             });
   // Liveins are sorted by physreg now we can merge their lanemasks.
   LiveInVector::const_iterator I = LiveIns.begin();
   LiveInVector::const_iterator J;
@@ -1252,6 +1252,16 @@ MachineBasicBlock::findDebugLoc(instr_iterator MBBI) {
   MBBI = skipDebugInstructionsForward(MBBI, instr_end());
   if (MBBI != instr_end())
     return MBBI->getDebugLoc();
+  return {};
+}
+
+/// Find the previous valid DebugLoc preceding MBBI, skipping and DBG_VALUE
+/// instructions.  Return UnknownLoc if there is none.
+DebugLoc MachineBasicBlock::findPrevDebugLoc(instr_iterator MBBI) {
+  if (MBBI == instr_begin()) return {};
+  // Skip debug declarations, we don't want a DebugLoc from them.
+  MBBI = skipDebugInstructionsBackward(std::prev(MBBI), instr_begin());
+  if (!MBBI->isDebugValue()) return MBBI->getDebugLoc();
   return {};
 }
 

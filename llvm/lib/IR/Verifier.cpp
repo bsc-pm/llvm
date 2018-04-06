@@ -959,6 +959,14 @@ void Verifier::visitDICompositeType(const DICompositeType &N) {
            N.getRawVTableHolder());
   AssertDI(!hasConflictingReferenceFlags(N.getFlags()),
            "invalid reference flags", &N);
+
+  if (N.isVector()) {
+    const DINodeArray Elements = N.getElements();
+    AssertDI(Elements.size() == 1 &&
+             Elements[0]->getTag() == dwarf::DW_TAG_subrange_type,
+             "invalid vector, expected one element of type subrange", &N);
+  }
+
   if (auto *Params = N.getRawTemplateParams())
     visitTemplateParams(N, *Params);
 
@@ -1396,6 +1404,7 @@ Verifier::visitModuleFlag(const MDNode *Op,
 static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   switch (Kind) {
   case Attribute::NoReturn:
+  case Attribute::NoCfCheck:
   case Attribute::NoUnwind:
   case Attribute::NoInline:
   case Attribute::AlwaysInline:
@@ -1404,6 +1413,7 @@ static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   case Attribute::StackProtectReq:
   case Attribute::StackProtectStrong:
   case Attribute::SafeStack:
+  case Attribute::ShadowCallStack:
   case Attribute::NoRedZone:
   case Attribute::NoImplicitFloat:
   case Attribute::Naked:
@@ -1421,6 +1431,7 @@ static bool isFuncOnlyAttr(Attribute::AttrKind Kind) {
   case Attribute::Builtin:
   case Attribute::NoBuiltin:
   case Attribute::Cold:
+  case Attribute::OptForFuzzing:
   case Attribute::OptimizeNone:
   case Attribute::JumpTable:
   case Attribute::Convergent:
@@ -2246,7 +2257,7 @@ void Verifier::visitBasicBlock(BasicBlock &BB) {
   if (isa<PHINode>(BB.front())) {
     SmallVector<BasicBlock*, 8> Preds(pred_begin(&BB), pred_end(&BB));
     SmallVector<std::pair<BasicBlock*, Value*>, 8> Values;
-    std::sort(Preds.begin(), Preds.end());
+    llvm::sort(Preds.begin(), Preds.end());
     for (const PHINode &PN : BB.phis()) {
       // Ensure that PHI nodes have at least one entry!
       Assert(PN.getNumIncomingValues() != 0,
@@ -2264,7 +2275,7 @@ void Verifier::visitBasicBlock(BasicBlock &BB) {
       for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i)
         Values.push_back(
             std::make_pair(PN.getIncomingBlock(i), PN.getIncomingValue(i)));
-      std::sort(Values.begin(), Values.end());
+      llvm::sort(Values.begin(), Values.end());
 
       for (unsigned i = 0, e = Values.size(); i != e; ++i) {
         // Check to make sure that if there is more than one entry for a
@@ -2856,17 +2867,20 @@ void Verifier::verifyMustTailCall(CallInst &CI) {
   Function *F = CI.getParent()->getParent();
   FunctionType *CallerTy = F->getFunctionType();
   FunctionType *CalleeTy = CI.getFunctionType();
-  Assert(CallerTy->getNumParams() == CalleeTy->getNumParams(),
-         "cannot guarantee tail call due to mismatched parameter counts", &CI);
+  if (!CI.getCalledFunction() || !CI.getCalledFunction()->isIntrinsic()) {
+    Assert(CallerTy->getNumParams() == CalleeTy->getNumParams(),
+           "cannot guarantee tail call due to mismatched parameter counts",
+           &CI);
+    for (int I = 0, E = CallerTy->getNumParams(); I != E; ++I) {
+      Assert(
+          isTypeCongruent(CallerTy->getParamType(I), CalleeTy->getParamType(I)),
+          "cannot guarantee tail call due to mismatched parameter types", &CI);
+    }
+  }
   Assert(CallerTy->isVarArg() == CalleeTy->isVarArg(),
          "cannot guarantee tail call due to mismatched varargs", &CI);
   Assert(isTypeCongruent(CallerTy->getReturnType(), CalleeTy->getReturnType()),
          "cannot guarantee tail call due to mismatched return types", &CI);
-  for (int I = 0, E = CallerTy->getNumParams(); I != E; ++I) {
-    Assert(
-        isTypeCongruent(CallerTy->getParamType(I), CalleeTy->getParamType(I)),
-        "cannot guarantee tail call due to mismatched parameter types", &CI);
-  }
 
   // - The calling conventions of the caller and callee must match.
   Assert(F->getCallingConv() == CI.getCallingConv(),
@@ -2902,7 +2916,7 @@ void Verifier::verifyMustTailCall(CallInst &CI) {
 
   // Check the return.
   ReturnInst *Ret = dyn_cast_or_null<ReturnInst>(Next);
-  Assert(Ret, "musttail call must be precede a ret with an optional bitcast",
+  Assert(Ret, "musttail call must precede a ret with an optional bitcast",
          &CI);
   Assert(!Ret->getReturnValue() || Ret->getReturnValue() == RetVal,
          "musttail call result must be returned", Ret);

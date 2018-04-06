@@ -140,8 +140,11 @@ bool SwiftABIInfo::isLegalVectorTypeForSwift(CharUnits vectorSize,
 static CGCXXABI::RecordArgABI getRecordArgABI(const RecordType *RT,
                                               CGCXXABI &CXXABI) {
   const CXXRecordDecl *RD = dyn_cast<CXXRecordDecl>(RT->getDecl());
-  if (!RD)
+  if (!RD) {
+    if (!RT->getDecl()->canPassInRegisters())
+      return CGCXXABI::RAA_Indirect;
     return CGCXXABI::RAA_Default;
+  }
   return CXXABI.getRecordArgABI(RD);
 }
 
@@ -151,6 +154,20 @@ static CGCXXABI::RecordArgABI getRecordArgABI(QualType T,
   if (!RT)
     return CGCXXABI::RAA_Default;
   return getRecordArgABI(RT, CXXABI);
+}
+
+static bool classifyReturnType(const CGCXXABI &CXXABI, CGFunctionInfo &FI,
+                               const ABIInfo &Info) {
+  QualType Ty = FI.getReturnType();
+
+  if (const auto *RT = Ty->getAs<RecordType>())
+    if (!isa<CXXRecordDecl>(RT->getDecl()) &&
+        !RT->getDecl()->canPassInRegisters()) {
+      FI.getReturnInfo() = Info.getNaturalAlignIndirect(Ty);
+      return true;
+    }
+
+  return CXXABI.classifyReturnType(FI);
 }
 
 /// Pass transparent unions as if they were the type of the first element. Sema
@@ -1749,7 +1766,7 @@ void X86_32ABIInfo::computeInfo(CGFunctionInfo &FI) const {
   } else
     State.FreeRegs = DefaultNumRegisterParameters;
 
-  if (!getCXXABI().classifyReturnType(FI)) {
+  if (!::classifyReturnType(getCXXABI(), FI, *this)) {
     FI.getReturnInfo() = classifyReturnType(FI.getReturnType(), State);
   } else if (FI.getReturnInfo().isIndirect()) {
     // The C++ ABI is not aware of register usage, so we have to check if the
@@ -2114,8 +2131,8 @@ class X86_64ABIInfo : public SwiftABIInfo {
   /// classify it as INTEGER (for compatibility with older clang compilers).
   bool classifyIntegerMMXAsSSE() const {
     // Clang <= 3.8 did not do this.
-    if (getCodeGenOpts().getClangABICompat() <=
-        CodeGenOptions::ClangABI::Ver3_8)
+    if (getContext().getLangOpts().getClangABICompat() <=
+        LangOptions::ClangABI::Ver3_8)
       return false;
 
     const llvm::Triple &Triple = getTarget().getTriple();
@@ -3545,7 +3562,7 @@ void X86_64ABIInfo::computeInfo(CGFunctionInfo &FI) const {
   unsigned FreeSSERegs = IsRegCall ? 16 : 8;
   unsigned NeededInt, NeededSSE;
 
-  if (!getCXXABI().classifyReturnType(FI)) {
+  if (!::classifyReturnType(getCXXABI(), FI, *this)) {
     if (IsRegCall && FI.getReturnType()->getTypePtr()->isRecordType() &&
         !FI.getReturnType()->getTypePtr()->isUnionType()) {
       FI.getReturnInfo() =
@@ -4539,7 +4556,7 @@ bool ABIInfo::isHomogeneousAggregate(QualType Ty, const Type *&Base,
 
       // For compatibility with GCC, ignore empty bitfields in C++ mode.
       if (getContext().getLangOpts().CPlusPlus &&
-          FD->isBitField() && FD->getBitWidthValue(getContext()) == 0)
+          FD->isZeroLengthBitField(getContext()))
         continue;
 
       uint64_t FldMembers;
@@ -4895,7 +4912,7 @@ private:
   bool isIllegalVectorType(QualType Ty) const;
 
   void computeInfo(CGFunctionInfo &FI) const override {
-    if (!getCXXABI().classifyReturnType(FI))
+    if (!::classifyReturnType(getCXXABI(), FI, *this))
       FI.getReturnInfo() = classifyReturnType(FI.getReturnType());
 
     for (auto &it : FI.arguments())
@@ -5626,7 +5643,7 @@ void WindowsARMTargetCodeGenInfo::setTargetAttributes(
 }
 
 void ARMABIInfo::computeInfo(CGFunctionInfo &FI) const {
-  if (!getCXXABI().classifyReturnType(FI))
+  if (!::classifyReturnType(getCXXABI(), FI, *this))
     FI.getReturnInfo() =
         classifyReturnType(FI.getReturnType(), FI.isVariadic());
 
@@ -5673,18 +5690,6 @@ void ARMABIInfo::setCCs() {
   llvm::CallingConv::ID abiCC = getABIDefaultCC();
   if (abiCC != getLLVMDefaultCC())
     RuntimeCC = abiCC;
-
-  // AAPCS apparently requires runtime support functions to be soft-float, but
-  // that's almost certainly for historic reasons (Thumb1 not supporting VFP
-  // most likely). It's more convenient for AAPCS16_VFP to be hard-float.
-
-  // The Run-time ABI for the ARM Architecture section 4.1.2 requires
-  // AEABI-complying FP helper functions to use the base AAPCS.
-  // These AEABI functions are expanded in the ARM llvm backend, all the builtin
-  // support functions emitted by clang such as the _Complex helpers follow the
-  // abiCC.
-  if (abiCC != getLLVMDefaultCC())
-      BuiltinCC = abiCC;
 }
 
 ABIArgInfo ARMABIInfo::classifyArgumentType(QualType Ty,
@@ -6149,6 +6154,7 @@ public:
 
   void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
                            CodeGen::CodeGenModule &M) const override;
+  bool shouldEmitStaticExternCAliases() const override;
 
 private:
   // Adds a NamedMDNode with F, Name, and Operand as operands, and adds the
@@ -6269,6 +6275,10 @@ void NVPTXTargetCodeGenInfo::addNVVMMetadata(llvm::Function *F, StringRef Name,
           llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), Operand))};
   // Append metadata to nvvm.annotations
   MD->addOperand(llvm::MDNode::get(Ctx, MDVals));
+}
+
+bool NVPTXTargetCodeGenInfo::shouldEmitStaticExternCAliases() const {
+  return false;
 }
 }
 
@@ -6392,7 +6402,7 @@ QualType SystemZABIInfo::GetSingleElementType(QualType Ty) const {
       // Unlike isSingleElementStruct(), empty structure and array fields
       // do count.  So do anonymous bitfields that aren't zero-sized.
       if (getContext().getLangOpts().CPlusPlus &&
-          FD->isBitField() && FD->getBitWidthValue(getContext()) == 0)
+          FD->isZeroLengthBitField(getContext()))
         continue;
 
       // Unlike isSingleElementStruct(), arrays do not count.
@@ -7641,6 +7651,7 @@ public:
   createEnqueuedBlockKernel(CodeGenFunction &CGF,
                             llvm::Function *BlockInvokeFunc,
                             llvm::Value *BlockLiteral) const override;
+  bool shouldEmitStaticExternCAliases() const override;
 };
 }
 
@@ -7656,6 +7667,11 @@ void AMDGPUTargetCodeGenInfo::setTargetAttributes(
 
   const auto *ReqdWGS = M.getLangOpts().OpenCL ?
     FD->getAttr<ReqdWorkGroupSizeAttr>() : nullptr;
+
+  if (M.getLangOpts().OpenCL && FD->hasAttr<OpenCLKernelAttr>() &&
+      (M.getTriple().getOS() == llvm::Triple::AMDHSA))
+    F->addFnAttr("amdgpu-implicitarg-num-bytes", "48");
+
   const auto *FlatWGS = FD->getAttr<AMDGPUFlatWorkGroupSizeAttr>();
   if (ReqdWGS || FlatWGS) {
     unsigned Min = FlatWGS ? FlatWGS->getMin() : 0;
@@ -7765,6 +7781,10 @@ AMDGPUTargetCodeGenInfo::getLLVMSyncScopeID(SyncScope S,
     Name = "subgroup";
   }
   return C.getOrInsertSyncScopeID(Name);
+}
+
+bool AMDGPUTargetCodeGenInfo::shouldEmitStaticExternCAliases() const {
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -8503,7 +8523,7 @@ static bool appendRecordType(SmallStringEnc &Enc, const RecordType *RT,
     // The ABI requires unions to be sorted but not structures.
     // See FieldEncoding::operator< for sort algorithm.
     if (RT->isUnionType())
-      std::sort(FE.begin(), FE.end());
+      llvm::sort(FE.begin(), FE.end());
     // We can now complete the TypeString.
     unsigned E = FE.size();
     for (unsigned I = 0; I != E; ++I) {
@@ -8547,7 +8567,7 @@ static bool appendEnumType(SmallStringEnc &Enc, const EnumType *ET,
       EnumEnc += '}';
       FE.push_back(FieldEncoding(!I->getName().empty(), EnumEnc));
     }
-    std::sort(FE.begin(), FE.end());
+    llvm::sort(FE.begin(), FE.end());
     unsigned E = FE.size();
     for (unsigned I = 0; I != E; ++I) {
       if (I)

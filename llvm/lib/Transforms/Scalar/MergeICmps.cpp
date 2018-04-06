@@ -177,6 +177,15 @@ bool BCECmpBlock::doesOtherWork() const {
 // BCE atoms, returns the comparison.
 BCECmpBlock visitICmp(const ICmpInst *const CmpI,
                       const ICmpInst::Predicate ExpectedPredicate) {
+  // The comparison can only be used once:
+  //  - For intermediate blocks, as a branch condition.
+  //  - For the final block, as an incoming value for the Phi.
+  // If there are any other uses of the comparison, we cannot merge it with
+  // other comparisons as we would create an orphan use of the value.
+  if (!CmpI->hasOneUse()) {
+    DEBUG(dbgs() << "cmp has several uses\n");
+    return {};
+  }
   if (CmpI->getPredicate() == ExpectedPredicate) {
     DEBUG(dbgs() << "cmp "
                  << (ExpectedPredicate == ICmpInst::ICMP_EQ ? "eq" : "ne")
@@ -394,6 +403,18 @@ bool BCECmpChain::simplify(const TargetLibraryInfo *const TLI) {
     Phi_.removeIncomingValue(Comparison.BB, false);
   }
 
+  // If entry block is part of the chain, we need to make the first block
+  // of the chain the new entry block of the function.
+  BasicBlock *Entry = &Comparisons_[0].BB->getParent()->getEntryBlock();
+  for (size_t I = 1; I < Comparisons_.size(); ++I) {
+    if (Entry == Comparisons_[I].BB) {
+      BasicBlock *NEntryBB = BasicBlock::Create(Entry->getContext(), "",
+                                                Entry->getParent(), Entry);
+      BranchInst::Create(Entry, NEntryBB);
+      break;
+    }
+  }
+
   // Point the predecessors of the chain to the first comparison block (which is
   // the new entry point).
   if (EntryBlock_ != Comparisons_[0].BB)
@@ -450,7 +471,8 @@ void BCECmpChain::mergeComparisons(ArrayRef<BCECmpBlock> Comparisons,
     IRBuilder<> Builder(BB);
     const auto &DL = Phi.getModule()->getDataLayout();
     Value *const MemCmpCall = emitMemCmp(
-        FirstComparison.Lhs().GEP, FirstComparison.Rhs().GEP, ConstantInt::get(DL.getIntPtrType(Context), TotalSize),
+        FirstComparison.Lhs().GEP, FirstComparison.Rhs().GEP,
+        ConstantInt::get(DL.getIntPtrType(Context), TotalSize),
         Builder, DL, TLI);
     Value *const MemCmpIsZero = Builder.CreateICmpEQ(
         MemCmpCall, ConstantInt::get(Type::getInt32Ty(Context), 0));

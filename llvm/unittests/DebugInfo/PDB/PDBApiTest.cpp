@@ -11,8 +11,10 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/DebugInfo/PDB/IPDBEnumChildren.h"
+#include "llvm/DebugInfo/PDB/IPDBInjectedSource.h"
 #include "llvm/DebugInfo/PDB/IPDBLineNumber.h"
 #include "llvm/DebugInfo/PDB/IPDBRawSymbol.h"
+#include "llvm/DebugInfo/PDB/IPDBSectionContrib.h"
 #include "llvm/DebugInfo/PDB/IPDBSession.h"
 #include "llvm/DebugInfo/PDB/IPDBSourceFile.h"
 #include "llvm/DebugInfo/PDB/IPDBTable.h"
@@ -73,7 +75,14 @@ class MockSession : public IPDBSession {
   getSourceFileById(uint32_t SymbolId) const override {
     return nullptr;
   }
-
+  bool addressForVA(uint64_t VA, uint32_t &Section,
+                    uint32_t &Offset) const override {
+    return false;
+  }
+  bool addressForRVA(uint32_t RVA, uint32_t &Section,
+                     uint32_t &Offset) const override {
+    return false;
+  }
   std::unique_ptr<PDBSymbol>
   findSymbolByAddress(uint64_t Address, PDB_SymType Type) const override {
     return nullptr;
@@ -85,6 +94,15 @@ class MockSession : public IPDBSession {
   }
   std::unique_ptr<IPDBEnumLineNumbers>
   findLineNumbersByAddress(uint64_t Address, uint32_t Length) const override {
+    return nullptr;
+  }
+  std::unique_ptr<IPDBEnumLineNumbers>
+  findLineNumbersByRVA(uint32_t RVA, uint32_t Length) const override {
+    return nullptr;
+  }
+  std::unique_ptr<IPDBEnumLineNumbers>
+  findLineNumbersBySectOffset(uint32_t Section, uint32_t Offset,
+                              uint32_t Length) const override {
     return nullptr;
   }
   std::unique_ptr<IPDBEnumSourceFiles>
@@ -122,6 +140,14 @@ class MockSession : public IPDBSession {
   }
 
   std::unique_ptr<IPDBEnumTables> getEnumTables() const override {
+    return nullptr;
+  }
+
+  std::unique_ptr<IPDBEnumInjectedSources> getInjectedSources() const override {
+    return nullptr;
+  }
+
+  std::unique_ptr<IPDBEnumSectionContribs> getSectionContribs() const override {
     return nullptr;
   }
 };
@@ -467,5 +493,4 @@ TEST_F(PDBApiTest, Dyncast) {
 
   VerifyUnknownDyncasts();
 }
-
 } // end anonymous namespace

@@ -240,6 +240,9 @@ private:
   /// \sa mayInlineCXXStandardLibrary
   Optional<bool> InlineCXXStandardLibrary;
   
+  /// \sa includeScopesInCFG
+  Optional<bool> IncludeScopesInCFG;
+
   /// \sa mayInlineTemplateFunctions
   Optional<bool> InlineTemplateFunctions;
 
@@ -364,7 +367,7 @@ public:
   /// specified.
   /// @param [in] C The optional checker parameter that can be used to restrict
   /// the search to the options of this particular checker (and its parents
-  /// dependening on search mode).
+  /// depending on search mode).
   /// @param [in] SearchInParents If set to true and the searched option was not
   /// specified for the given checker the options for the parent packages will
   /// be searched as well. The inner packages take precedence over the outer
@@ -382,7 +385,7 @@ public:
   /// specified.
   /// @param [in] C The optional checker parameter that can be used to restrict
   /// the search to the options of this particular checker (and its parents
-  /// dependening on search mode).
+  /// depending on search mode).
   /// @param [in] SearchInParents If set to true and the searched option was not
   /// specified for the given checker the options for the parent packages will
   /// be searched as well. The inner packages take precedence over the outer
@@ -399,7 +402,7 @@ public:
   /// specified.
   /// @param [in] C The optional checker parameter that can be used to restrict
   /// the search to the options of this particular checker (and its parents
-  /// dependening on search mode).
+  /// depending on search mode).
   /// @param [in] SearchInParents If set to true and the searched option was not
   /// specified for the given checker the options for the parent packages will
   /// be searched as well. The inner packages take precedence over the outer
@@ -416,7 +419,7 @@ public:
   /// specified.
   /// @param [in] C The optional checker parameter that can be used to restrict
   /// the search to the options of this particular checker (and its parents
-  /// dependening on search mode).
+  /// depending on search mode).
   /// @param [in] SearchInParents If set to true and the searched option was not
   /// specified for the given checker the options for the parent packages will
   /// be searched as well. The inner packages take precedence over the outer
@@ -480,6 +483,12 @@ public:
   /// This is controlled by the 'cfg-rich-constructors' config options,
   /// which accepts the values "true" and "false".
   bool includeRichConstructorsInCFG();
+
+  /// Returns whether or not scope information should be included in the CFG.
+  ///
+  /// This is controlled by the 'cfg-scope-info' config option, which accepts
+  /// the values "true" and "false".
+  bool includeScopesInCFG();
 
   /// Returns whether or not C++ standard library functions may be considered
   /// for inlining.

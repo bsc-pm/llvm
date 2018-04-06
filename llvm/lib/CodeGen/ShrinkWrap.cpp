@@ -219,6 +219,11 @@ public:
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
+  MachineFunctionProperties getRequiredProperties() const override {
+    return MachineFunctionProperties().set(
+      MachineFunctionProperties::Property::NoVRegs);
+  }
+
   StringRef getPassName() const override { return "Shrink Wrapping analysis"; }
 
   /// \brief Perform the shrink-wrapping analysis and update
@@ -445,6 +450,22 @@ bool ShrinkWrap::runOnMachineFunction(MachineFunction &MF) {
     if (MBB.isEHFuncletEntry()) {
       DEBUG(dbgs() << "EH Funclets are not supported yet.\n");
       return false;
+    }
+
+    if (MBB.isEHPad()) {
+      // Push the prologue and epilogue outside of
+      // the region that may throw by making sure
+      // that all the landing pads are at least at the
+      // boundary of the save and restore points.
+      // The problem with exceptions is that the throw
+      // is not properly modeled and in particular, a
+      // basic block can jump out from the middle.
+      updateSaveRestorePoints(MBB, RS.get());
+      if (!ArePointsInteresting()) {
+        DEBUG(dbgs() << "EHPad prevents shrink-wrapping\n");
+        return false;
+      }
+      continue;
     }
 
     for (const MachineInstr &MI : MBB) {

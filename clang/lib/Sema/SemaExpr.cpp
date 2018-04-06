@@ -201,10 +201,11 @@ void Sema::MaybeSuggestAddingStaticToDecl(const FunctionDecl *Cur) {
 /// \returns true if there was an error (this declaration cannot be
 /// referenced), false otherwise.
 ///
-bool Sema::DiagnoseUseOfDecl(NamedDecl *D, SourceLocation Loc,
+bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
                              const ObjCInterfaceDecl *UnknownObjCClass,
                              bool ObjCPropertyAccess,
                              bool AvoidPartialAvailabilityChecks) {
+  SourceLocation Loc = Locs.front();
   if (getLangOpts().CPlusPlus && isa<FunctionDecl>(D)) {
     // If there were any diagnostics suppressed by template argument deduction,
     // emit them now.
@@ -288,7 +289,7 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, SourceLocation Loc,
     return true;
   }
 
-  DiagnoseAvailabilityOfDecl(D, Loc, UnknownObjCClass, ObjCPropertyAccess,
+  DiagnoseAvailabilityOfDecl(D, Locs, UnknownObjCClass, ObjCPropertyAccess,
                              AvoidPartialAvailabilityChecks);
 
   DiagnoseUnusedOfDecl(*this, D, Loc);
@@ -5511,7 +5512,7 @@ Sema::BuildResolvedCallExpr(Expr *Fn, NamedDecl *NDecl,
       // CUDA: Kernel calls must be to global functions
       if (FDecl && !FDecl->hasAttr<CUDAGlobalAttr>())
         return ExprError(Diag(LParenLoc,diag::err_kern_call_not_global_function)
-            << FDecl->getName() << Fn->getSourceRange());
+            << FDecl << Fn->getSourceRange());
 
       // CUDA: Kernel function must have 'void' return type
       if (!FuncT->getReturnType()->isVoidType())
@@ -5521,7 +5522,7 @@ Sema::BuildResolvedCallExpr(Expr *Fn, NamedDecl *NDecl,
       // CUDA: Calls to global functions must be configured
       if (FDecl && FDecl->hasAttr<CUDAGlobalAttr>())
         return ExprError(Diag(LParenLoc, diag::err_global_call_not_config)
-            << FDecl->getName() << Fn->getSourceRange());
+            << FDecl << Fn->getSourceRange());
     }
   }
 
@@ -5720,7 +5721,7 @@ Sema::ActOnInitList(SourceLocation LBraceLoc, MultiExprArg InitArgList,
   }
 
   // Semantic analysis for initializers is done by ActOnDeclarator() and
-  // CheckInitializer() - it requires knowledge of the object being intialized.
+  // CheckInitializer() - it requires knowledge of the object being initialized.
 
   InitListExpr *E = new (Context) InitListExpr(Context, LBraceLoc, InitArgList,
                                                RBraceLoc);
@@ -8030,7 +8031,7 @@ Sema::CheckSingleAssignmentConstraints(QualType LHSType, ExprResult &CallerRHS,
   if (Diagnose && isa<ObjCProtocolExpr>(PRE)) {
     ObjCProtocolDecl *PDecl = cast<ObjCProtocolExpr>(PRE)->getProtocol();
     if (PDecl && !PDecl->hasDefinition()) {
-      Diag(PRE->getExprLoc(), diag::warn_atprotocol_protocol) << PDecl->getName();
+      Diag(PRE->getExprLoc(), diag::warn_atprotocol_protocol) << PDecl;
       Diag(PDecl->getLocation(), diag::note_entity_declared_at) << PDecl;
     }
   }
@@ -8231,7 +8232,7 @@ static bool canConvertIntTyToFloatTy(Sema &S, ExprResult *Int,
   QualType IntTy = Int->get()->getType().getUnqualifiedType();
 
   // Determine if the integer constant can be expressed as a floating point
-  // number of the appropiate type.
+  // number of the appropriate type.
   llvm::APSInt Result;
   bool CstInt = Int->get()->EvaluateAsInt(Result, S.Context);
   uint64_t Bits = 0;
@@ -12394,7 +12395,7 @@ ExprResult Sema::CreateBuiltinUnaryOp(SourceLocation OpLoc,
     OK = Input.get()->getObjectKind();
     break;
   case UO_Coawait:
-    // It's unnessesary to represent the pass-through operator co_await in the
+    // It's unnecessary to represent the pass-through operator co_await in the
     // AST; just return the input expression instead.
     assert(!Input.get()->getType()->isDependentType() &&
                    "the co_await expression must be non-dependant before "
@@ -13126,7 +13127,7 @@ ExprResult Sema::ActOnBlockStmtExpr(SourceLocation CaretLoc,
     for (const auto &CI : Result->getBlockDecl()->captures()) {
       const VarDecl *var = CI.getVariable();
       if (var->getType().isDestructedType() != QualType::DK_none) {
-        getCurFunction()->setHasBranchProtectedScope();
+        setFunctionHasBranchProtectedScope();
         break;
       }
     }
@@ -13516,7 +13517,7 @@ bool Sema::DiagnoseAssignmentResult(AssignConvertType ConvTy,
   if (DiagKind == diag::warn_incompatible_qualified_id &&
       PDecl && IFace && !IFace->hasDefinition())
       Diag(IFace->getLocation(), diag::note_incomplete_class_and_qualified_id)
-        << IFace->getName() << PDecl->getName();
+        << IFace << PDecl;
     
   if (SecondType == Context.OverloadTy)
     NoteAllOverloadCandidates(OverloadExpr::find(SrcExpr).Expression,

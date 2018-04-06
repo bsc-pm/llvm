@@ -32,6 +32,11 @@ public:
   virtual std::unique_ptr<PDBSymbolExe> getGlobalScope() = 0;
   virtual std::unique_ptr<PDBSymbol> getSymbolById(uint32_t SymbolId) const = 0;
 
+  virtual bool addressForVA(uint64_t VA, uint32_t &Section,
+                            uint32_t &Offset) const = 0;
+  virtual bool addressForRVA(uint32_t RVA, uint32_t &Section,
+                             uint32_t &Offset) const = 0;
+
   template <typename T>
   std::unique_ptr<T> getConcreteSymbolById(uint32_t SymbolId) const {
     return unique_dyn_cast_or_null<T>(getSymbolById(SymbolId));
@@ -45,6 +50,11 @@ public:
                   const IPDBSourceFile &File) const = 0;
   virtual std::unique_ptr<IPDBEnumLineNumbers>
   findLineNumbersByAddress(uint64_t Address, uint32_t Length) const = 0;
+  virtual std::unique_ptr<IPDBEnumLineNumbers>
+  findLineNumbersByRVA(uint32_t RVA, uint32_t Length) const = 0;
+  virtual std::unique_ptr<IPDBEnumLineNumbers>
+  findLineNumbersBySectOffset(uint32_t Section, uint32_t Offset,
+                              uint32_t Length) const = 0;
 
   virtual std::unique_ptr<IPDBEnumSourceFiles>
   findSourceFiles(const PDBSymbolCompiland *Compiland, llvm::StringRef Pattern,
@@ -69,8 +79,14 @@ public:
   virtual std::unique_ptr<IPDBEnumDataStreams> getDebugStreams() const = 0;
 
   virtual std::unique_ptr<IPDBEnumTables> getEnumTables() const = 0;
+
+  virtual std::unique_ptr<IPDBEnumInjectedSources>
+  getInjectedSources() const = 0;
+
+  virtual std::unique_ptr<IPDBEnumSectionContribs>
+  getSectionContribs() const = 0;
 };
-}
-}
+} // namespace pdb
+} // namespace llvm
 
 #endif

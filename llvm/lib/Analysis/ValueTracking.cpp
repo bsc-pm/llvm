@@ -2687,7 +2687,7 @@ bool llvm::CannotBeNegativeZero(const Value *V, const TargetLibraryInfo *TLI,
       return true;
 
   // (fadd x, 0.0) is guaranteed to return +0.0, not -0.0.
-  if (match(Op, m_FAdd(m_Value(), m_Zero())))
+  if (match(Op, m_FAdd(m_Value(), m_PosZeroFP())))
     return true;
 
   // sitofp and uitofp turn into +0.0 for zero.
@@ -3965,6 +3965,15 @@ bool llvm::isGuaranteedToTransferExecutionToSuccessor(const Instruction *I) {
   }
 
   // Other instructions return normally.
+  return true;
+}
+
+bool llvm::isGuaranteedToTransferExecutionToSuccessor(const BasicBlock *BB) {
+  // TODO: This is slightly consdervative for invoke instruction since exiting
+  // via an exception *is* normal control for them.
+  for (auto I = BB->begin(), E = BB->end(); I != E; ++I)
+    if (!isGuaranteedToTransferExecutionToSuccessor(&*I))
+      return false;
   return true;
 }
 

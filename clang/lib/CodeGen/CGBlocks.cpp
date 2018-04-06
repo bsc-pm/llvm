@@ -66,7 +66,7 @@ static llvm::Constant *buildDisposeHelper(CodeGenModule &CGM,
 /// buildBlockDescriptor - Build the block descriptor meta-data for a block.
 /// buildBlockDescriptor is accessed from 5th field of the Block_literal
 /// meta-data and contains stationary information about the block literal.
-/// Its definition will have 4 (or optinally 6) words.
+/// Its definition will have 4 (or optionally 6) words.
 /// \code
 /// struct Block_descriptor {
 ///   unsigned long reserved;
@@ -330,7 +330,7 @@ static void initializeForBlockHeader(CodeGenModule &CGM, CGBlockInfo &info,
     info.BlockSize = CharUnits::fromQuantity(Offset);
   } else {
     // The header is basically 'struct { void *; int; int; void *; void *; }'.
-    // Assert that that struct is packed.
+    // Assert that the struct is packed.
     assert(CGM.getIntSize() <= CGM.getPointerSize());
     assert(CGM.getIntAlign() <= CGM.getPointerAlign());
     assert((2 * CGM.getIntSize()).isMultipleOf(CGM.getPointerAlign()));
@@ -887,7 +887,7 @@ llvm::Value *CodeGenFunction::EmitBlockLiteral(const CGBlockInfo &blockInfo) {
         const CGBlockInfo::Capture &enclosingCapture =
             BlockInfo->getCapture(variable);
 
-        // This is a [[type]]*, except that a byref entry wil just be an i8**.
+        // This is a [[type]]*, except that a byref entry will just be an i8**.
         src = Builder.CreateStructGEP(LoadBlockStruct(),
                                       enclosingCapture.getIndex(),
                                       enclosingCapture.getOffset(),
@@ -929,7 +929,8 @@ llvm::Value *CodeGenFunction::EmitBlockLiteral(const CGBlockInfo &blockInfo) {
             AggValueSlot::forAddr(blockField, Qualifiers(),
                                   AggValueSlot::IsDestructed,
                                   AggValueSlot::DoesNotNeedGCBarriers,
-                                  AggValueSlot::IsNotAliased);
+                                  AggValueSlot::IsNotAliased,
+                                  AggValueSlot::DoesNotOverlap);
         EmitAggExpr(copyExpr, Slot);
       } else {
         EmitSynthesizedCXXCopyCtor(blockField, src, copyExpr);
@@ -1525,6 +1526,9 @@ computeCopyInfoForBlockCapture(const BlockDecl::Capture &CI, QualType T,
   case QualType::PCK_Struct:
     return std::make_pair(BlockCaptureEntityKind::NonTrivialCStruct,
                           BlockFieldFlags());
+  case QualType::PCK_ARCWeak:
+    // We need to register __weak direct captures with the runtime.
+    return std::make_pair(BlockCaptureEntityKind::ARCWeak, Flags);
   case QualType::PCK_ARCStrong:
     // We need to retain the copied value for __strong direct captures.
     // If it's a block pointer, we have to copy the block and assign that to
@@ -1541,10 +1545,6 @@ computeCopyInfoForBlockCapture(const BlockDecl::Capture &CI, QualType T,
 
     // Special rules for ARC captures:
     Qualifiers QS = T.getQualifiers();
-
-    // We need to register __weak direct captures with the runtime.
-    if (QS.getObjCLifetime() == Qualifiers::OCL_Weak)
-      return std::make_pair(BlockCaptureEntityKind::ARCWeak, Flags);
 
     // Non-ARC captures of retainable pointers are strong and
     // therefore require a call to _Block_object_assign.
@@ -2586,11 +2586,11 @@ static void configureBlocksRuntimeObject(CodeGenModule &CGM,
     }
   }
 
-  if (!CGM.getLangOpts().BlocksRuntimeOptional)
-    return;
-
-  if (GV->isDeclaration() && GV->hasExternalLinkage())
+  if (CGM.getLangOpts().BlocksRuntimeOptional && GV->isDeclaration() &&
+      GV->hasExternalLinkage())
     GV->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+
+  CGM.setDSOLocal(GV);
 }
 
 llvm::Constant *CodeGenModule::getBlockObjectDispose() {

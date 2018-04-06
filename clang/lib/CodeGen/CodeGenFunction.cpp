@@ -861,6 +861,12 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
     Fn->addFnAttr(llvm::Attribute::SanitizeMemory);
   if (SanOpts.has(SanitizerKind::SafeStack))
     Fn->addFnAttr(llvm::Attribute::SafeStack);
+  if (SanOpts.has(SanitizerKind::ShadowCallStack))
+    Fn->addFnAttr(llvm::Attribute::ShadowCallStack);
+
+  // Apply fuzzing attribute to the function.
+  if (SanOpts.hasOneOf(SanitizerKind::Fuzzer | SanitizerKind::FuzzerNoLink))
+    Fn->addFnAttr(llvm::Attribute::OptForFuzzing);
 
   // Ignore TSan memory acesses from within ObjC/ObjC++ dealloc, initialize,
   // .cxx_destruct, __destroy_helper_block_ and all of their calees at run time.
@@ -1067,6 +1073,11 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   EmitStartEHSpec(CurCodeDecl);
 
   PrologueCleanupDepth = EHStack.stable_begin();
+
+  // Emit OpenMP specific initialization of the device functions.
+  if (getLangOpts().OpenMP && CurCodeDecl)
+    CGM.getOpenMPRuntime().emitFunctionProlog(*this, CurCodeDecl);
+
   EmitFunctionProlog(*CurFnInfo, CurFn, Args);
 
   if (D && isa<CXXMethodDecl>(D) && cast<CXXMethodDecl>(D)->isInstance()) {

@@ -224,6 +224,12 @@ bool AnalyzerOptions::includeRichConstructorsInCFG() {
                           /* Default = */ true);
 }
 
+bool AnalyzerOptions::includeScopesInCFG() {
+  return getBooleanOption(IncludeScopesInCFG,
+                          "cfg-scopes",
+                          /* Default = */ false);
+}
+
 bool AnalyzerOptions::mayInlineCXXStandardLibrary() {
   return getBooleanOption(InlineCXXStandardLibrary,
                           "c++-stdlib-inlining",
@@ -257,7 +263,7 @@ bool AnalyzerOptions::mayInlineCXXSharedPtrDtor() {
 bool AnalyzerOptions::mayInlineCXXTemporaryDtors() {
   return getBooleanOption(InlineCXXTemporaryDtors,
                           "c++-temp-dtor-inlining",
-                          /*Default=*/false);
+                          /*Default=*/true);
 }
 
 bool AnalyzerOptions::mayInlineObjCMethod() {

@@ -19,6 +19,7 @@
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LazyValueInfo.h"
+#include "llvm/Analysis/Utils/Local.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
@@ -28,11 +29,11 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
@@ -43,7 +44,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/Local.h"
 #include <cassert>
 #include <utility>
 
@@ -104,14 +104,14 @@ static bool processSelect(SelectInst *S, LazyValueInfo *LVI) {
   if (S->getType()->isVectorTy()) return false;
   if (isa<Constant>(S->getOperand(0))) return false;
 
-  Constant *C = LVI->getConstant(S->getOperand(0), S->getParent(), S);
+  Constant *C = LVI->getConstant(S->getCondition(), S->getParent(), S);
   if (!C) return false;
 
   ConstantInt *CI = dyn_cast<ConstantInt>(C);
   if (!CI) return false;
 
-  Value *ReplaceWith = S->getOperand(1);
-  Value *Other = S->getOperand(2);
+  Value *ReplaceWith = S->getTrueValue();
+  Value *Other = S->getFalseValue();
   if (!CI->isOne()) std::swap(ReplaceWith, Other);
   if (ReplaceWith == S) ReplaceWith = UndefValue::get(S->getType());
 

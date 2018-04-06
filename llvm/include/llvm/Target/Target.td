@@ -175,6 +175,8 @@ class Register<string n, list<string> altNames = []> {
 
   // HWEncoding - The target specific hardware encoding for this register.
   bits<16> HWEncoding = 0;
+
+  bit isArtificial = 0;
 }
 
 // RegisterWithSubRegs - This can be used to define instances of Register which
@@ -1138,6 +1140,12 @@ def FENTRY_CALL : StandardPseudoInstruction {
   let usesCustomInserter = 1;
   let mayLoad = 1;
   let mayStore = 1;
+  let hasSideEffects = 1;
+}
+def ICALL_BRANCH_FUNNEL : StandardPseudoInstruction {
+  let OutOperandList = (outs unknown:$dst);
+  let InOperandList = (ins variable_ops);
+  let AsmString = "";
   let hasSideEffects = 1;
 }
 

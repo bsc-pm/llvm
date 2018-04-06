@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_LIB_BASIC_TARGETS_AMDGPU_H
 #define LLVM_CLANG_LIB_BASIC_TARGETS_AMDGPU_H
 
+#include "clang/Basic/Cuda.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/TargetOptions.h"
 #include "llvm/ADT/StringSet.h"
@@ -174,6 +175,7 @@ class LLVM_LIBRARY_VISIBILITY AMDGPUTargetInfo final : public TargetInfo {
   static bool isAMDGCN(const llvm::Triple &TT) {
     return TT.getArch() == llvm::Triple::amdgcn;
   }
+  CudaArch GCN_Subarch;
 
 public:
   AMDGPUTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts);
@@ -285,6 +287,19 @@ public:
     return true;
   }
 
+  // \p Constraint will be left pointing at the last character of
+  // the constraint.  In practice, it won't be changed unless the
+  // constraint is longer than one character.
+  std::string convertConstraint(const char *&Constraint) const override {
+    const char *Begin = Constraint;
+    TargetInfo::ConstraintInfo Info("", "");
+    if (validateAsmConstraint(Constraint, Info))
+      return std::string(Begin).substr(0, Constraint - Begin + 1);
+
+    Constraint = Begin;
+    return std::string(1, *Constraint);
+  }
+
   bool
   initFeatureMap(llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags,
                  StringRef CPU,
@@ -317,6 +332,7 @@ public:
     else
       GPU = parseR600Name(Name);
 
+    GCN_Subarch = StringToCudaArch(Name);
     return GK_NONE != GPU.Kind;
   }
 

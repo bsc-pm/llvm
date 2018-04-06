@@ -1693,7 +1693,7 @@ void Clang::AddPPCTargetArgs(const ArgList &Args,
 void Clang::AddRISCVTargetArgs(const ArgList &Args,
                                ArgStringList &CmdArgs) const {
   // FIXME: currently defaults to the soft-float ABIs. Will need to be
-  // expanded to select ilp32f, ilp32d, lp64f, lp64d when appropiate.
+  // expanded to select ilp32f, ilp32d, lp64f, lp64d when appropriate.
   const char *ABIName = nullptr;
   const llvm::Triple &Triple = getToolChain().getTriple();
   if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
@@ -2087,7 +2087,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   // Handle various floating point optimization flags, mapping them to the
   // appropriate LLVM code generation flags. This is complicated by several
   // "umbrella" flags, so we do this by stepping through the flags incrementally
-  // adjusting what we think is enabled/disabled, then at the end settting the
+  // adjusting what we think is enabled/disabled, then at the end setting the
   // LLVM flags based on the final state.
   bool HonorINFs = true;
   bool HonorNaNs = true;
@@ -3249,7 +3249,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (JA.getType() == types::TY_LLVM_BC)
       CmdArgs.push_back("-emit-llvm-uselists");
 
-    if (D.isUsingLTO()) {
+    // Device-side jobs do not support LTO.
+    bool isDeviceOffloadAction = !(JA.isDeviceOffloading(Action::OFK_None) ||
+                                   JA.isDeviceOffloading(Action::OFK_Host));
+
+    if (D.isUsingLTO() && !isDeviceOffloadAction) {
       Args.AddLastArg(CmdArgs, options::OPT_flto, options::OPT_flto_EQ);
 
       // The Darwin and PS4 linkers currently use the legacy LTO API, which
@@ -3357,9 +3361,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddLastArg(CmdArgs, options::OPT_fveclib);
 
-  if (!Args.hasFlag(options::OPT_fmerge_all_constants,
-                    options::OPT_fno_merge_all_constants))
-    CmdArgs.push_back("-fno-merge-all-constants");
+  if (Args.hasFlag(options::OPT_fmerge_all_constants,
+                   options::OPT_fno_merge_all_constants, false))
+    CmdArgs.push_back("-fmerge-all-constants");
 
   // LLVM Code Generator Options.
 
@@ -3455,7 +3459,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     options::OPT_fno_optimize_sibling_calls))
     CmdArgs.push_back("-mdisable-tail-calls");
   if (Args.hasFlag(options::OPT_fno_escaping_block_tail_calls,
-                   options::OPT_fescaping_block_tail_calls))
+                   options::OPT_fescaping_block_tail_calls, false))
     CmdArgs.push_back("-fno-escaping-block-tail-calls");
 
   Args.AddLastArg(CmdArgs, options::OPT_ffine_grained_bitfield_accesses,
@@ -4243,7 +4247,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     !IsWindowsMSVC || IsMSVC2015Compatible))
     CmdArgs.push_back("-fno-threadsafe-statics");
 
-  // -fno-delayed-template-parsing is default, except when targetting MSVC.
+  // -fno-delayed-template-parsing is default, except when targeting MSVC.
   // Many old Windows SDK versions require this to parse.
   // FIXME: MSVC introduced /Zc:twoPhase- to disable this behavior in their
   // compiler. We should be able to disable this by default at some point.
