@@ -629,18 +629,6 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
       ppc::getPPCAsmModeForCPU(getCPUName(Args, getToolChain().getTriple())));
     break;
   }
-  case llvm::Triple::riscv32:
-  case llvm::Triple::riscv64: {
-    StringRef ABIName = riscv::getRISCVABI(Args, getToolChain().getTriple());
-    CmdArgs.push_back("-mabi");
-    CmdArgs.push_back(ABIName.data());
-    if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
-      StringRef MArch = A->getValue();
-      CmdArgs.push_back("-march");
-      CmdArgs.push_back(MArch.data());
-    }
-    break;
-  }
   case llvm::Triple::sparc:
   case llvm::Triple::sparcel: {
     CmdArgs.push_back("-32");
@@ -1897,7 +1885,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
 
   static const char *const RISCV32LibDirs[] = {"/lib", "/lib32"};
   static const char *const RISCVTriples[] = {"riscv32-unknown-linux-gnu",
-                                             "riscv64-unknown-linux-gnu"};
+                                             "riscv64-unknown-linux-gnu",
+                                             "riscv32-unknown-elf"};
 
   static const char *const SPARCv8LibDirs[] = {"/lib32", "/lib"};
   static const char *const SPARCv8Triples[] = {"sparc-linux-gnu",
