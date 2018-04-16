@@ -15,6 +15,7 @@
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/PrettyDeclStackTrace.h"
 #include "clang/Basic/AddressSpaces.h"
 #include "clang/Basic/Attributes.h"
 #include "clang/Basic/CharInfo.h"
@@ -22,7 +23,6 @@
 #include "clang/Parse/ParseDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/ParsedTemplate.h"
-#include "clang/Sema/PrettyDeclStackTrace.h"
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/SemaDiagnostic.h"
 #include "llvm/ADT/Optional.h"
@@ -2027,8 +2027,13 @@ Parser::DeclGroupPtrTy Parser::ParseDeclGroup(ParsingDeclSpec &DS,
     }
 
     Decl *ThisDecl = Actions.ActOnDeclarator(getCurScope(), D);
-    if (IsForRangeLoop)
+    if (IsForRangeLoop) {
       Actions.ActOnCXXForRangeDecl(ThisDecl);
+    } else {
+      // Obj-C for loop
+      if (auto *VD = dyn_cast_or_null<VarDecl>(ThisDecl))
+        VD->setObjCForDecl(true);
+    }
     Actions.FinalizeDeclaration(ThisDecl);
     D.complete(ThisDecl);
     return Actions.FinalizeDeclaratorGroup(getCurScope(), DS, ThisDecl);
@@ -2463,7 +2468,7 @@ bool Parser::ParseImplicitInt(DeclSpec &DS, CXXScopeSpec *SS,
 
   SourceLocation Loc = Tok.getLocation();
   // If we see an identifier that is not a type name, we normally would
-  // parse it as the identifer being declared.  However, when a typename
+  // parse it as the identifier being declared.  However, when a typename
   // is typo'd or the definition is not included, this will incorrectly
   // parse the typename as the identifier name and fall over misparsing
   // later parts of the diagnostic.
@@ -3799,7 +3804,8 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
 
     DS.SetRangeEnd(Tok.getLocation());
     if (DiagID != diag::err_bool_redeclaration)
-      ConsumeToken();
+      // After an error the next token can be an annotation token.
+      ConsumeAnyToken();
 
     AttrsLastTime = false;
   }
@@ -3908,7 +3914,7 @@ void Parser::ParseStructDeclaration(
 ///
 void Parser::ParseStructUnionBody(SourceLocation RecordLoc,
                                   unsigned TagType, Decl *TagDecl) {
-  PrettyDeclStackTraceEntry CrashInfo(Actions, TagDecl, RecordLoc,
+  PrettyDeclStackTraceEntry CrashInfo(Actions.Context, TagDecl, RecordLoc,
                                       "parsing struct/union body");
   assert(!getLangOpts().CPlusPlus && "C++ declarations not supported");
 
@@ -5119,7 +5125,7 @@ void Parser::ParseTypeQualifierListOpt(
                                  getLangOpts());
       break;
     case tok::kw___uptr:
-      // GNU libc headers in C mode use '__uptr' as an identifer which conflicts
+      // GNU libc headers in C mode use '__uptr' as an identifier which conflicts
       // with the MS modifier keyword.
       if ((AttrReqs & AR_DeclspecAttributesParsed) && !getLangOpts().CPlusPlus &&
           IdentifierRequired && DS.isEmpty() && NextToken().is(tok::semi)) {

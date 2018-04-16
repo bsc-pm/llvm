@@ -25,8 +25,8 @@ using llvm::object::WasmSection;
 using llvm::object::WasmSymbol;
 using llvm::wasm::WasmGlobal;
 using llvm::wasm::WasmImport;
-using llvm::wasm::WasmSignature;
 using llvm::wasm::WasmRelocation;
+using llvm::wasm::WasmSignature;
 
 namespace lld {
 namespace wasm {
@@ -35,6 +35,7 @@ class InputChunk;
 class InputFunction;
 class InputSegment;
 class InputGlobal;
+class InputSection;
 
 class InputFile {
 public:
@@ -94,15 +95,21 @@ public:
 
   uint32_t calcNewIndex(const WasmRelocation &Reloc) const;
   uint32_t calcNewValue(const WasmRelocation &Reloc) const;
+  uint32_t calcExpectedValue(const WasmRelocation &Reloc) const;
 
   const WasmSection *CodeSection = nullptr;
   const WasmSection *DataSection = nullptr;
 
+  // Maps input type indices to output type indices
   std::vector<uint32_t> TypeMap;
   std::vector<bool> TypeIsUsed;
+  // Maps function indices to table indices
+  std::vector<uint32_t> TableEntries;
+  std::vector<bool> UsedComdats;
   std::vector<InputSegment *> Segments;
   std::vector<InputFunction *> Functions;
   std::vector<InputGlobal *> Globals;
+  std::vector<InputSection *> CustomSections;
 
   ArrayRef<Symbol *> getSymbols() const { return Symbols; }
   Symbol *getSymbol(uint32_t Index) const { return Symbols[Index]; }

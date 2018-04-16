@@ -150,7 +150,8 @@ private:
 
   SectionChunk *
   readSection(uint32_t SectionNumber,
-              const llvm::object::coff_aux_section_definition *Def);
+              const llvm::object::coff_aux_section_definition *Def,
+              StringRef LeaderName);
 
   void readAssociativeDefinition(
       COFFSymbolRef COFFSym,
@@ -233,7 +234,7 @@ class BitcodeFile : public InputFile {
 public:
   explicit BitcodeFile(MemoryBufferRef M) : InputFile(BitcodeKind, M) {}
   static bool classof(const InputFile *F) { return F->kind() == BitcodeKind; }
-  ArrayRef<Symbol *> getSymbols() { return SymbolBodies; }
+  ArrayRef<Symbol *> getSymbols() { return Symbols; }
   MachineTypes getMachineType() override;
   static std::vector<BitcodeFile *> Instances;
   std::unique_ptr<llvm::lto::InputFile> Obj;
@@ -241,7 +242,7 @@ public:
 private:
   void parse() override;
 
-  std::vector<Symbol *> SymbolBodies;
+  std::vector<Symbol *> Symbols;
 };
 } // namespace coff
 

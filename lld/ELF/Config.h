@@ -85,6 +85,7 @@ struct Configuration {
   llvm::StringRef Init;
   llvm::StringRef LTOAAPipeline;
   llvm::StringRef LTONewPmPasses;
+  llvm::StringRef LTOSampleProfile;
   llvm::StringRef MapFile;
   llvm::StringRef OutputFile;
   llvm::StringRef OptRemarksFilename;
@@ -113,6 +114,7 @@ struct Configuration {
   bool BsymbolicFunctions;
   bool CheckSections;
   bool CompressDebugSections;
+  bool Cref;
   bool DefineCommon;
   bool Demangle = true;
   bool DisableVerify;
@@ -130,6 +132,8 @@ struct Configuration {
   bool ICF;
   bool IgnoreDataAddressEquality;
   bool IgnoreFunctionAddressEquality;
+  bool LTODebugPassManager;
+  bool LTONewPassManager;
   bool MergeArmExidx;
   bool MipsN32Abi = false;
   bool NoinhibitExec;
@@ -149,6 +153,7 @@ struct Configuration {
   bool Target1Rel;
   bool Trace;
   bool UndefinedVersion;
+  bool WarnBackrefs;
   bool WarnCommon;
   bool WarnMissingEntry;
   bool WarnSymbolOrdering;

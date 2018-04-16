@@ -18,12 +18,12 @@
 #include "sanitizer_flags.h"
 #include "sanitizer_procmaps.h"
 #include "sanitizer_report_decorator.h"
-#include "sanitizer_stackdepot.h"
 #include "sanitizer_stacktrace.h"
 #include "sanitizer_symbolizer.h"
 
 #if SANITIZER_POSIX
 #include "sanitizer_posix.h"
+#include <sys/mman.h>
 #endif
 
 namespace __sanitizer {
@@ -58,11 +58,6 @@ bool ColorizeReports() {
          (internal_strcmp(flag, "auto") == 0 && ReportSupportsColors());
 }
 
-static void (*sandboxing_callback)();
-void SetSandboxingCallback(void (*f)()) {
-  sandboxing_callback = f;
-}
-
 void ReportErrorSummary(const char *error_type, const StackTrace *stack,
                         const char *alt_tool_name) {
 #if !SANITIZER_GO
@@ -81,6 +76,35 @@ void ReportErrorSummary(const char *error_type, const StackTrace *stack,
 #endif
 }
 
+void ReportMmapWriteExec(int prot) {
+#if SANITIZER_POSIX && (!SANITIZER_GO && !SANITIZER_ANDROID)
+  if ((prot & (PROT_WRITE | PROT_EXEC)) != (PROT_WRITE | PROT_EXEC))
+    return;
+
+  ScopedErrorReportLock l;
+  SanitizerCommonDecorator d;
+
+  InternalScopedBuffer<BufferedStackTrace> stack_buffer(1);
+  BufferedStackTrace *stack = stack_buffer.data();
+  stack->Reset();
+  uptr top = 0;
+  uptr bottom = 0;
+  GET_CALLER_PC_BP_SP;
+  (void)sp;
+  bool fast = common_flags()->fast_unwind_on_fatal;
+  if (fast)
+    GetThreadStackTopAndBottom(false, &top, &bottom);
+  stack->Unwind(kStackTraceMax, pc, bp, nullptr, top, bottom, fast);
+
+  Printf("%s", d.Warning());
+  Report("WARNING: %s: writable-executable page usage\n", SanitizerToolName);
+  Printf("%s", d.Default());
+
+  stack->Print();
+  ReportErrorSummary("w-and-x-usage", stack);
+#endif
+}
+
 static void (*SoftRssLimitExceededCallback)(bool exceeded);
 void SetSoftRssLimitExceededCallback(void (*Callback)(bool exceeded)) {
   CHECK_EQ(SoftRssLimitExceededCallback, nullptr);
@@ -88,17 +112,22 @@ void SetSoftRssLimitExceededCallback(void (*Callback)(bool exceeded)) {
 }
 
 #if SANITIZER_LINUX && !SANITIZER_GO
+// Weak default implementation for when sanitizer_stackdepot is not linked in.
+SANITIZER_WEAK_ATTRIBUTE StackDepotStats *StackDepotGetStats() {
+  return nullptr;
+}
+
 void BackgroundThread(void *arg) {
-  uptr hard_rss_limit_mb = common_flags()->hard_rss_limit_mb;
-  uptr soft_rss_limit_mb = common_flags()->soft_rss_limit_mb;
-  bool heap_profile = common_flags()->heap_profile;
+  const uptr hard_rss_limit_mb = common_flags()->hard_rss_limit_mb;
+  const uptr soft_rss_limit_mb = common_flags()->soft_rss_limit_mb;
+  const bool heap_profile = common_flags()->heap_profile;
   uptr prev_reported_rss = 0;
   uptr prev_reported_stack_depot_size = 0;
   bool reached_soft_rss_limit = false;
   uptr rss_during_last_reported_profile = 0;
   while (true) {
     SleepForMillis(100);
-    uptr current_rss_mb = GetRSS() >> 20;
+    const uptr current_rss_mb = GetRSS() >> 20;
     if (Verbosity()) {
       // If RSS has grown 10% since last time, print some information.
       if (prev_reported_rss * 11 / 10 < current_rss_mb) {
@@ -107,13 +136,15 @@ void BackgroundThread(void *arg) {
       }
       // If stack depot has grown 10% since last time, print it too.
       StackDepotStats *stack_depot_stats = StackDepotGetStats();
-      if (prev_reported_stack_depot_size * 11 / 10 <
-          stack_depot_stats->allocated) {
-        Printf("%s: StackDepot: %zd ids; %zdM allocated\n",
-               SanitizerToolName,
-               stack_depot_stats->n_uniq_ids,
-               stack_depot_stats->allocated >> 20);
-        prev_reported_stack_depot_size = stack_depot_stats->allocated;
+      if (stack_depot_stats) {
+        if (prev_reported_stack_depot_size * 11 / 10 <
+            stack_depot_stats->allocated) {
+          Printf("%s: StackDepot: %zd ids; %zdM allocated\n",
+                 SanitizerToolName,
+                 stack_depot_stats->n_uniq_ids,
+                 stack_depot_stats->allocated >> 20);
+          prev_reported_stack_depot_size = stack_depot_stats->allocated;
+        }
       }
     }
     // Check RSS against the limit.
@@ -339,11 +370,16 @@ void ScopedErrorReportLock::CheckLocked() {
   CommonSanitizerReportMutex.CheckLocked();
 }
 
+static void (*sandboxing_callback)();
+void SetSandboxingCallback(void (*f)()) {
+  sandboxing_callback = f;
+}
+
 }  // namespace __sanitizer
 
 SANITIZER_INTERFACE_WEAK_DEF(void, __sanitizer_sandbox_on_notify,
                              __sanitizer_sandbox_arguments *args) {
-  __sanitizer::PrepareForSandboxing(args);
+  __sanitizer::PlatformPrepareForSandboxing(args);
   if (__sanitizer::sandboxing_callback)
     __sanitizer::sandboxing_callback();
 }

@@ -19,12 +19,11 @@
 #include "sanitizer_common.h"
 #include "sanitizer_flags.h"
 #include "sanitizer_platform_limits_netbsd.h"
+#include "sanitizer_platform_limits_openbsd.h"
 #include "sanitizer_platform_limits_posix.h"
 #include "sanitizer_platform_limits_solaris.h"
 #include "sanitizer_posix.h"
 #include "sanitizer_procmaps.h"
-#include "sanitizer_stacktrace.h"
-#include "sanitizer_symbolizer.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -42,7 +41,7 @@
 #if SANITIZER_FREEBSD
 // The MAP_NORESERVE define has been removed in FreeBSD 11.x, and even before
 // that, it was never implemented.  So just define it to zero.
-#undef  MAP_NORESERVE
+#undef MAP_NORESERVE
 #define MAP_NORESERVE 0
 #endif
 
@@ -231,7 +230,9 @@ bool SignalContext::IsStackOverflow() const {
   // take it into account.
   bool IsStackAccess = addr >= (sp & ~0xFFF) && addr < sp + 0xFFFF;
 #else
-  bool IsStackAccess = addr + 512 > sp && addr < sp + 0xFFFF;
+  // Let's accept up to a page size away from top of stack. Things like stack
+  // probing can trigger accesses with such large offsets.
+  bool IsStackAccess = addr + GetPageSizeCached() > sp && addr < sp + 0xFFFF;
 #endif
 
 #if __powerpc__
@@ -291,16 +292,12 @@ bool IsAccessibleMemoryRange(uptr beg, uptr size) {
   return result;
 }
 
-void PrepareForSandboxing(__sanitizer_sandbox_arguments *args) {
+void PlatformPrepareForSandboxing(__sanitizer_sandbox_arguments *args) {
   // Some kinds of sandboxes may forbid filesystem access, so we won't be able
   // to read the file mappings from /proc/self/maps. Luckily, neither the
   // process will be able to load additional libraries, so it's fine to use the
   // cached mappings.
   MemoryMappingLayout::CacheMemoryMappings();
-  // Same for /proc/self/exe in the symbolizer.
-#if !SANITIZER_GO
-  Symbolizer::GetOrInit()->PrepareForSandboxing();
-#endif
 }
 
 #if SANITIZER_ANDROID || SANITIZER_GO

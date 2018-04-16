@@ -621,8 +621,8 @@ def FMLS : SOpInst<"vfms", "dddd", "dQd", OP_FMLS>;
 // MUL, MLA, MLS, FMA, FMS definitions with scalar argument
 def VMUL_N_A64 : IOpInst<"vmul_n", "dds", "Qd", OP_MUL_N>;
 
-def FMLA_N : SOpInst<"vfma_n", "ddds", "fQfQd", OP_FMLA_N>;
-def FMLS_N : SOpInst<"vfms_n", "ddds", "fQfQd", OP_FMLS_N>;
+def FMLA_N : SOpInst<"vfma_n", "ddds", "fdQfQd", OP_FMLA_N>;
+def FMLS_N : SOpInst<"vfms_n", "ddds", "fdQfQd", OP_FMLS_N>;
 
 def MLA_N : SOpInst<"vmla_n", "ddds", "Qd", OP_MLA_N>;
 def MLS_N : SOpInst<"vmls_n", "ddds", "Qd", OP_MLS_N>;
@@ -1116,6 +1116,12 @@ def SCALAR_FCVTZU_N_U64 : SInst<"vcvt_n_u64", "bsi", "Sd">;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Scalar Floating-point Round to Integral
+let ArchGuard = "__ARM_ARCH >= 8 && defined(__ARM_FEATURE_DIRECTED_ROUNDING)" in {
+def SCALAR_FRINTN_S32 : SInst<"vrndn", "ss", "Sf">;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Scalar Reduce Pairwise Addition (Scalar and Floating Point)
 def SCALAR_ADDP  : SInst<"vpadd", "sd", "SfSHlSHdSHUl">;
 
@@ -1363,8 +1369,8 @@ def SCALAR_VDUP_LANE : IInst<"vdup_lane", "sdi", "ScSsSiSlSfSdSUcSUsSUiSUlSPcSPs
 def SCALAR_VDUP_LANEQ : IInst<"vdup_laneq", "sji", "ScSsSiSlSfSdSUcSUsSUiSUlSPcSPs">;
 }
 
-// ARMv8.2-A FP16 intrinsics.
-let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarch64__)" in {
+// ARMv8.2-A FP16 vector intrinsics for A32/A64.
+let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)" in {
 
   // ARMv8.2-A FP16 one-operand vector intrinsics.
 
@@ -1395,14 +1401,12 @@ let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarc
   def FRINTPH      : SInst<"vrndp", "dd", "hQh">;
   def FRINTMH      : SInst<"vrndm", "dd", "hQh">;
   def FRINTXH      : SInst<"vrndx", "dd", "hQh">;
-  def FRINTIH      : SInst<"vrndi", "dd", "hQh">;
 
   // Misc.
   def VABSH        : SInst<"vabs", "dd", "hQh">;
   def VNEGH        : SOpInst<"vneg", "dd", "hQh", OP_NEG>;
   def VRECPEH      : SInst<"vrecpe", "dd", "hQh">;
   def FRSQRTEH     : SInst<"vrsqrte", "dd", "hQh">;
-  def FSQRTH       : SInst<"vsqrt", "dd", "hQh">;
 
   // ARMv8.2-A FP16 two-operands vector intrinsics.
 
@@ -1443,18 +1447,13 @@ let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarc
 
   // Multiplication/Division
   def VMULH         : SOpInst<"vmul", "ddd", "hQh", OP_MUL>;
-  def MULXH         : SInst<"vmulx", "ddd", "hQh">;
-  def FDIVH         : IOpInst<"vdiv", "ddd",  "hQh", OP_DIV>;
 
   // Pairwise addition
-  def VPADDH        : SInst<"vpadd", "ddd", "hQh">;
+  def VPADDH        : SInst<"vpadd", "ddd", "h">;
 
   // Pairwise Max/Min
-  def VPMAXH        : SInst<"vpmax", "ddd", "hQh">;
-  def VPMINH        : SInst<"vpmin", "ddd", "hQh">;
-  // Pairwise MaxNum/MinNum
-  def FMAXNMPH      : SInst<"vpmaxnm", "ddd", "hQh">;
-  def FMINNMPH      : SInst<"vpminnm", "ddd", "hQh">;
+  def VPMAXH        : SInst<"vpmax", "ddd", "h">;
+  def VPMINH        : SInst<"vpmin", "ddd", "h">;
 
   // Reciprocal/Sqrt
   def VRECPSH       : SInst<"vrecps", "ddd", "hQh">;
@@ -1465,6 +1464,63 @@ let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarc
   // Vector fused multiply-add operations
   def VFMAH        : SInst<"vfma", "dddd", "hQh">;
   def VFMSH        : SOpInst<"vfms", "dddd", "hQh", OP_FMLS>;
+
+  // ARMv8.2-A FP16 lane vector intrinsics.
+
+  // Mul lane
+  def VMUL_LANEH    : IOpInst<"vmul_lane", "ddgi", "hQh", OP_MUL_LN>;
+  def VMUL_NH       : IOpInst<"vmul_n", "dds", "hQh", OP_MUL_N>;
+
+  // Data processing intrinsics - section 5
+
+  // Logical operations
+  let isHiddenLInst = 1 in
+  def VBSLH    : SInst<"vbsl", "dudd", "hQh">;
+
+  // Transposition operations
+  def VZIPH    : WInst<"vzip", "2dd", "hQh">;
+  def VUZPH    : WInst<"vuzp", "2dd", "hQh">;
+  def VTRNH    : WInst<"vtrn", "2dd", "hQh">;
+
+
+  let ArchGuard = "!defined(__aarch64__)" in {
+    // Set all lanes to same value.
+    // Already implemented prior to ARMv8.2-A.
+    def VMOV_NH  : WOpInst<"vmov_n", "ds", "hQh", OP_DUP>;
+    def VDUP_NH  : WOpInst<"vdup_n", "ds", "hQh", OP_DUP>;
+    def VDUP_LANE1H : WOpInst<"vdup_lane", "dgi", "hQh", OP_DUP_LN>;
+  }
+
+  // Vector Extract
+  def VEXTH      : WInst<"vext", "dddi", "hQh">;
+
+  // Reverse vector elements
+  def VREV64H    : WOpInst<"vrev64", "dd", "hQh", OP_REV64>;
+}
+
+// ARMv8.2-A FP16 vector intrinsics for A64 only.
+let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarch64__)" in {
+
+  // Vector rounding
+  def FRINTIH      : SInst<"vrndi", "dd", "hQh">;
+
+  // Misc.
+  def FSQRTH       : SInst<"vsqrt", "dd", "hQh">;
+
+  // Multiplication/Division
+  def MULXH         : SInst<"vmulx", "ddd", "hQh">;
+  def FDIVH         : IOpInst<"vdiv", "ddd",  "hQh", OP_DIV>;
+
+  // Pairwise addition
+  def VPADDH1       : SInst<"vpadd", "ddd", "Qh">;
+
+  // Pairwise Max/Min
+  def VPMAXH1       : SInst<"vpmax", "ddd", "Qh">;
+  def VPMINH1       : SInst<"vpmin", "ddd", "Qh">;
+
+  // Pairwise MaxNum/MinNum
+  def FMAXNMPH      : SInst<"vpmaxnm", "ddd", "hQh">;
+  def FMINNMPH      : SInst<"vpminnm", "ddd", "hQh">;
 
   // ARMv8.2-A FP16 lane vector intrinsics.
 
@@ -1488,9 +1544,7 @@ let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarc
   def SCALAR_FMLS_LANEQH : IOpInst<"vfms_laneq", "sssji", "Sh", OP_FMS_LNQ>;
 
   // Mul lane
-  def VMUL_LANEH    : IOpInst<"vmul_lane", "ddgi", "hQh", OP_MUL_LN>;
   def VMUL_LANEQH   : IOpInst<"vmul_laneq", "ddji", "hQh", OP_MUL_LN>;
-  def VMUL_NH       : IOpInst<"vmul_n", "dds", "hQh", OP_MUL_N>;
   // Scalar floating point  multiply (scalar, by element)
   def SCALAR_FMUL_LANEH  : IOpInst<"vmul_lane", "ssdi", "Sh", OP_SCALAR_MUL_LN>;
   def SCALAR_FMUL_LANEQH : IOpInst<"vmul_laneq", "ssji", "Sh", OP_SCALAR_MUL_LN>;
@@ -1499,40 +1553,15 @@ let ArchGuard = "defined(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC) && defined(__aarc
   def VMULX_LANEH   : IOpInst<"vmulx_lane", "ddgi", "hQh", OP_MULX_LN>;
   def VMULX_LANEQH  : IOpInst<"vmulx_laneq", "ddji", "hQh", OP_MULX_LN>;
   def VMULX_NH      : IOpInst<"vmulx_n", "dds", "hQh", OP_MULX_N>;
-  // TODO: Scalar floating point multiply extended (scalar, by element)
-  // Below ones are commented out because they need vmulx_f16(float16_t, float16_t)
-  // which will be implemented later with fp16 scalar intrinsic (arm_fp16.h)
-  //def SCALAR_FMULX_LANEH : IOpInst<"vmulx_lane", "ssdi", "Sh", OP_SCALAR_MUL_LN>;
-  //def SCALAR_FMULX_LANEQH : IOpInst<"vmulx_laneq", "ssji", "Sh", OP_SCALAR_MUL_LN>;
+  // Scalar floating point  mulx (scalar, by element)
+  def SCALAR_FMULX_LANEH : IInst<"vmulx_lane", "ssdi", "Sh">;
+  def SCALAR_FMULX_LANEQH : IInst<"vmulx_laneq", "ssji", "Sh">;
 
   // ARMv8.2-A FP16 reduction vector intrinsics.
   def VMAXVH   : SInst<"vmaxv", "sd", "hQh">;
   def VMINVH   : SInst<"vminv", "sd", "hQh">;
   def FMAXNMVH : SInst<"vmaxnmv", "sd", "hQh">;
   def FMINNMVH : SInst<"vminnmv", "sd", "hQh">;
-
-  // Data processing intrinsics - section 5
-
-  // Logical operations
-  let isHiddenLInst = 1 in
-  def VBSLH    : SInst<"vbsl", "dudd", "hQh">;
-
-  // Transposition operations
-  def VZIPH    : WInst<"vzip", "2dd", "hQh">;
-  def VUZPH    : WInst<"vuzp", "2dd", "hQh">;
-  def VTRNH    : WInst<"vtrn", "2dd", "hQh">;
-
-  // Set all lanes to same value.
-  /* Already implemented prior to ARMv8.2-A.
-  def VMOV_NH  : WOpInst<"vmov_n", "ds", "hQh", OP_DUP>;
-  def VDUP_NH  : WOpInst<"vdup_n", "ds", "hQh", OP_DUP>;
-  def VDUP_LANE1H : WOpInst<"vdup_lane", "dgi", "hQh", OP_DUP_LN>;*/
-
-  // Vector Extract
-  def VEXTH      : WInst<"vext", "dddi", "hQh">;
-
-  // Reverse vector elements
-  def VREV64H    : WOpInst<"vrev64", "dd", "hQh", OP_REV64>;
 
   // Permutation
   def VTRN1H     : SOpInst<"vtrn1", "ddd", "hQh", OP_TRN1>;

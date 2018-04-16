@@ -20,7 +20,9 @@
 #include "lld/Common/Strings.h"
 #include "lld/Common/Threads.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/BinaryFormat/Wasm.h"
+#include "llvm/Object/WasmTraits.h"
 #include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -38,36 +40,14 @@ using namespace lld::wasm;
 
 static constexpr int kStackAlignment = 16;
 static constexpr int kInitialTableOffset = 1;
+static constexpr const char *kFunctionTableName = "__indirect_function_table";
 
 namespace {
-
-// Traits for using WasmSignature in a DenseMap.
-struct WasmSignatureDenseMapInfo {
-  static WasmSignature getEmptyKey() {
-    WasmSignature Sig;
-    Sig.ReturnType = 1;
-    return Sig;
-  }
-  static WasmSignature getTombstoneKey() {
-    WasmSignature Sig;
-    Sig.ReturnType = 2;
-    return Sig;
-  }
-  static unsigned getHashValue(const WasmSignature &Sig) {
-    unsigned H = hash_value(Sig.ReturnType);
-    for (int32_t Param : Sig.ParamTypes)
-      H = hash_combine(H, Param);
-    return H;
-  }
-  static bool isEqual(const WasmSignature &LHS, const WasmSignature &RHS) {
-    return LHS == RHS;
-  }
-};
 
 // An init entry to be written to either the synthetic init func or the
 // linking metadata.
 struct WasmInitEntry {
-  const Symbol *Sym;
+  const FunctionSymbol *Sym;
   uint32_t Priority;
 };
 
@@ -93,8 +73,7 @@ private:
   void layoutMemory();
   void createHeader();
   void createSections();
-  SyntheticSection *createSyntheticSection(uint32_t Type,
-                                           StringRef Name = "");
+  SyntheticSection *createSyntheticSection(uint32_t Type, StringRef Name = "");
 
   // Builtin sections
   void createTypeSection();
@@ -107,6 +86,7 @@ private:
   void createElemSection();
   void createCodeSection();
   void createDataSection();
+  void createCustomSections();
 
   // Custom sections
   void createRelocSections();
@@ -118,9 +98,10 @@ private:
 
   uint64_t FileSize = 0;
   uint32_t NumMemoryPages = 0;
+  uint32_t MaxMemoryPages = 0;
 
   std::vector<const WasmSignature *> Types;
-  DenseMap<WasmSignature, int32_t, WasmSignatureDenseMapInfo> TypeIndices;
+  DenseMap<WasmSignature, int32_t> TypeIndices;
   std::vector<const Symbol *> ImportedSymbols;
   unsigned NumImportedFunctions = 0;
   unsigned NumImportedGlobals = 0;
@@ -132,12 +113,13 @@ private:
   std::vector<const Symbol *> SymtabEntries;
   std::vector<WasmInitEntry> InitFunctions;
 
+  llvm::StringMap<std::vector<InputSection *>> CustomSectionMapping;
+
   // Elements that are used to construct the final output
   std::string Header;
   std::vector<OutputSection *> OutputSections;
 
   std::unique_ptr<FileOutputBuffer> Buffer;
-  std::string CtorFunctionBody;
 
   std::vector<OutputSegment *> Segments;
   llvm::SmallDenseMap<StringRef, OutputSegment *> SegmentMap;
@@ -145,19 +127,11 @@ private:
 
 } // anonymous namespace
 
-static void debugPrint(const char *fmt, ...) {
-  if (!errorHandler().Verbose)
-    return;
-  fprintf(stderr, "lld: ");
-  va_list ap;
-  va_start(ap, fmt);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-}
-
 void Writer::createImportSection() {
   uint32_t NumImports = ImportedSymbols.size();
   if (Config->ImportMemory)
+    ++NumImports;
+  if (Config->ImportTable)
     ++NumImports;
 
   if (NumImports == 0)
@@ -175,6 +149,21 @@ void Writer::createImportSection() {
     Import.Kind = WASM_EXTERNAL_MEMORY;
     Import.Memory.Flags = 0;
     Import.Memory.Initial = NumMemoryPages;
+    if (MaxMemoryPages != 0) {
+      Import.Memory.Flags |= WASM_LIMITS_FLAG_HAS_MAX;
+      Import.Memory.Maximum = MaxMemoryPages;
+    }
+    writeImport(OS, Import);
+  }
+
+  if (Config->ImportTable) {
+    uint32_t TableSize = kInitialTableOffset + IndirectFunctions.size();
+    WasmImport Import;
+    Import.Module = "env";
+    Import.Field = kFunctionTableName;
+    Import.Kind = WASM_EXTERNAL_TABLE;
+    Import.Table.ElemType = WASM_TYPE_ANYFUNC;
+    Import.Table.Limits = {WASM_LIMITS_FLAG_HAS_MAX, TableSize, TableSize};
     writeImport(OS, Import);
   }
 
@@ -221,9 +210,13 @@ void Writer::createMemorySection() {
   SyntheticSection *Section = createSyntheticSection(WASM_SEC_MEMORY);
   raw_ostream &OS = Section->getStream();
 
+  bool HasMax = MaxMemoryPages != 0;
   writeUleb128(OS, 1, "memory count");
-  writeUleb128(OS, 0, "memory limits flags");
+  writeUleb128(OS, HasMax ? static_cast<unsigned>(WASM_LIMITS_FLAG_HAS_MAX) : 0,
+               "memory limits flags");
   writeUleb128(OS, NumMemoryPages, "initial pages");
+  if (HasMax)
+    writeUleb128(OS, MaxMemoryPages, "max pages");
 }
 
 void Writer::createGlobalSection() {
@@ -247,8 +240,11 @@ void Writer::createGlobalSection() {
 }
 
 void Writer::createTableSection() {
-  // Always output a table section, even if there are no indirect calls.
-  // There are two reasons for this:
+  if (Config->ImportTable)
+    return;
+
+  // Always output a table section (or table import), even if there are no
+  // indirect calls.  There are two reasons for this:
   //  1. For executables it is useful to have an empty table slot at 0
   //     which can be filled with a null function call handler.
   //  2. If we don't do this, any program that contains a call_indirect but
@@ -261,16 +257,16 @@ void Writer::createTableSection() {
   raw_ostream &OS = Section->getStream();
 
   writeUleb128(OS, 1, "table count");
-  writeU8(OS, WASM_TYPE_ANYFUNC, "table type");
-  writeUleb128(OS, WASM_LIMITS_FLAG_HAS_MAX, "table flags");
-  writeUleb128(OS, TableSize, "table initial size");
-  writeUleb128(OS, TableSize, "table max size");
+  WasmLimits Limits = {WASM_LIMITS_FLAG_HAS_MAX, TableSize, TableSize};
+  writeTableType(OS, WasmTable{WASM_TYPE_ANYFUNC, Limits});
 }
 
 void Writer::createExportSection() {
   bool ExportMemory = !Config->Relocatable && !Config->ImportMemory;
+  bool ExportTable = !Config->Relocatable && Config->ExportTable;
 
-  uint32_t NumExports = (ExportMemory ? 1 : 0) + ExportedSymbols.size();
+  uint32_t NumExports =
+      (ExportMemory ? 1 : 0) + (ExportTable ? 1 : 0) + ExportedSymbols.size();
   if (!NumExports)
     return;
 
@@ -281,6 +277,8 @@ void Writer::createExportSection() {
 
   if (ExportMemory)
     writeExport(OS, {"memory", WASM_EXTERNAL_MEMORY, 0});
+  if (ExportTable)
+    writeExport(OS, {kFunctionTableName, WASM_EXTERNAL_TABLE, 0});
 
   unsigned FakeGlobalIndex = NumImportedGlobals + InputGlobals.size();
 
@@ -289,15 +287,32 @@ void Writer::createExportSection() {
     WasmExport Export;
     DEBUG(dbgs() << "Export: " << Name << "\n");
 
-    if (isa<DefinedFunction>(Sym))
-      Export = {Name, WASM_EXTERNAL_FUNCTION, Sym->getOutputIndex()};
-    else if (isa<DefinedGlobal>(Sym))
-      Export = {Name, WASM_EXTERNAL_GLOBAL, Sym->getOutputIndex()};
+    if (auto *F = dyn_cast<DefinedFunction>(Sym))
+      Export = {Name, WASM_EXTERNAL_FUNCTION, F->getFunctionIndex()};
+    else if (auto *G = dyn_cast<DefinedGlobal>(Sym))
+      Export = {Name, WASM_EXTERNAL_GLOBAL, G->getGlobalIndex()};
     else if (isa<DefinedData>(Sym))
       Export = {Name, WASM_EXTERNAL_GLOBAL, FakeGlobalIndex++};
     else
       llvm_unreachable("unexpected symbol type");
     writeExport(OS, Export);
+  }
+}
+
+void Writer::createCustomSections() {
+  log("createCustomSections");
+  for (ObjFile *File : Symtab->ObjectFiles)
+    for (InputSection *Section : File->CustomSections)
+      CustomSectionMapping[Section->getName()].push_back(Section);
+
+  for (auto &Pair : CustomSectionMapping) {
+    StringRef Name = Pair.first();
+    // These custom sections are known the linker and synthesized rather than
+    // blindly copied
+    if (Name == "linking" || Name == "name" || Name.startswith("reloc."))
+      continue;
+    DEBUG(dbgs() << "createCustomSection: " << Name << "\n");
+    OutputSections.push_back(make<CustomSection>(Name, Pair.second));
   }
 }
 
@@ -319,7 +334,7 @@ void Writer::createElemSection() {
   uint32_t TableIndex = kInitialTableOffset;
   for (const FunctionSymbol *Sym : IndirectFunctions) {
     assert(Sym->getTableIndex() == TableIndex);
-    writeUleb128(OS, Sym->getOutputIndex(), "function index");
+    writeUleb128(OS, Sym->getFunctionIndex(), "function index");
     ++TableIndex;
   }
 }
@@ -430,14 +445,16 @@ void Writer::createLinkingSection() {
       writeU8(Sub.OS, Kind, "sym kind");
       writeUleb128(Sub.OS, Flags, "sym flags");
 
-      switch (Kind) {
-      case llvm::wasm::WASM_SYMBOL_TYPE_FUNCTION:
-      case llvm::wasm::WASM_SYMBOL_TYPE_GLOBAL:
-        writeUleb128(Sub.OS, Sym->getOutputIndex(), "index");
+      if (auto *F = dyn_cast<FunctionSymbol>(Sym)) {
+        writeUleb128(Sub.OS, F->getFunctionIndex(), "index");
         if (Sym->isDefined())
           writeStr(Sub.OS, Sym->getName(), "sym name");
-        break;
-      case llvm::wasm::WASM_SYMBOL_TYPE_DATA:
+      } else if (auto *G = dyn_cast<GlobalSymbol>(Sym)) {
+        writeUleb128(Sub.OS, G->getGlobalIndex(), "index");
+        if (Sym->isDefined())
+          writeStr(Sub.OS, Sym->getName(), "sym name");
+      } else {
+        assert(isa<DataSymbol>(Sym));
         writeStr(Sub.OS, Sym->getName(), "sym name");
         if (auto *DataSym = dyn_cast<DefinedData>(Sym)) {
           writeUleb128(Sub.OS, DataSym->getOutputSegmentIndex(), "index");
@@ -445,7 +462,6 @@ void Writer::createLinkingSection() {
                        "data offset");
           writeUleb128(Sub.OS, DataSym->getSize(), "data size");
         }
-        break;
       }
     }
 
@@ -473,23 +489,26 @@ void Writer::createLinkingSection() {
     Sub.writeTo(OS);
   }
 
-  struct ComdatEntry { unsigned Kind; uint32_t Index; };
-  std::map<StringRef,std::vector<ComdatEntry>> Comdats;
+  struct ComdatEntry {
+    unsigned Kind;
+    uint32_t Index;
+  };
+  std::map<StringRef, std::vector<ComdatEntry>> Comdats;
 
   for (const InputFunction *F : InputFunctions) {
-    StringRef Comdat = F->getComdat();
+    StringRef Comdat = F->getComdatName();
     if (!Comdat.empty())
       Comdats[Comdat].emplace_back(
-          ComdatEntry{WASM_COMDAT_FUNCTION, F->getOutputIndex()});
+          ComdatEntry{WASM_COMDAT_FUNCTION, F->getFunctionIndex()});
   }
   for (uint32_t I = 0; I < Segments.size(); ++I) {
     const auto &InputSegments = Segments[I]->InputSegments;
     if (InputSegments.empty())
       continue;
-    StringRef Comdat = InputSegments[0]->getComdat();
+    StringRef Comdat = InputSegments[0]->getComdatName();
 #ifndef NDEBUG
     for (const InputSegment *IS : InputSegments)
-      assert(IS->getComdat() == Comdat);
+      assert(IS->getComdatName() == Comdat);
 #endif
     if (!Comdat.empty())
       Comdats[Comdat].emplace_back(ComdatEntry{WASM_COMDAT_DATA, I});
@@ -530,15 +549,17 @@ void Writer::createNameSection() {
   // and InputFunctions are numbered in order with imported functions coming
   // first.
   for (const Symbol *S : ImportedSymbols) {
-    if (!isa<FunctionSymbol>(S))
-      continue;
-    writeUleb128(Sub.OS, S->getOutputIndex(), "import index");
-    writeStr(Sub.OS, S->getName(), "symbol name");
+    if (auto *F = dyn_cast<FunctionSymbol>(S)) {
+      writeUleb128(Sub.OS, F->getFunctionIndex(), "func index");
+      Optional<std::string> Name = demangleItanium(F->getName());
+      writeStr(Sub.OS, Name ? StringRef(*Name) : F->getName(), "symbol name");
+    }
   }
   for (const InputFunction *F : InputFunctions) {
     if (!F->getName().empty()) {
-      writeUleb128(Sub.OS, F->getOutputIndex(), "func index");
-      writeStr(Sub.OS, F->getName(), "symbol name");
+      writeUleb128(Sub.OS, F->getFunctionIndex(), "func index");
+      Optional<std::string> Name = demangleItanium(F->getName());
+      writeStr(Sub.OS, Name ? StringRef(*Name) : F->getName(), "symbol name");
     }
   }
 
@@ -564,7 +585,7 @@ void Writer::writeSections() {
 void Writer::layoutMemory() {
   uint32_t MemoryPtr = 0;
   MemoryPtr = Config->GlobalBase;
-  debugPrint("mem: global base = %d\n", Config->GlobalBase);
+  log("mem: global base = " + Twine(Config->GlobalBase));
 
   createOutputSegments();
 
@@ -576,8 +597,8 @@ void Writer::layoutMemory() {
   for (OutputSegment *Seg : Segments) {
     MemoryPtr = alignTo(MemoryPtr, Seg->Alignment);
     Seg->StartVA = MemoryPtr;
-    debugPrint("mem: %-15s offset=%-8d size=%-8d align=%d\n",
-               Seg->Name.str().c_str(), MemoryPtr, Seg->Size, Seg->Alignment);
+    log(formatv("mem: {0,-15} offset={1,-8} size={2,-8} align={3}", Seg->Name,
+                MemoryPtr, Seg->Size, Seg->Alignment));
     MemoryPtr += Seg->Size;
   }
 
@@ -585,29 +606,46 @@ void Writer::layoutMemory() {
   if (WasmSym::DataEnd)
     WasmSym::DataEnd->setVirtualAddress(MemoryPtr);
 
-  debugPrint("mem: static data = %d\n", MemoryPtr - Config->GlobalBase);
+  log("mem: static data = " + Twine(MemoryPtr - Config->GlobalBase));
 
   // Stack comes after static data and bss
   if (!Config->Relocatable) {
     MemoryPtr = alignTo(MemoryPtr, kStackAlignment);
     if (Config->ZStackSize != alignTo(Config->ZStackSize, kStackAlignment))
       error("stack size must be " + Twine(kStackAlignment) + "-byte aligned");
-    debugPrint("mem: stack size  = %d\n", Config->ZStackSize);
-    debugPrint("mem: stack base  = %d\n", MemoryPtr);
+    log("mem: stack size  = " + Twine(Config->ZStackSize));
+    log("mem: stack base  = " + Twine(MemoryPtr));
     MemoryPtr += Config->ZStackSize;
     WasmSym::StackPointer->Global->Global.InitExpr.Value.Int32 = MemoryPtr;
-    debugPrint("mem: stack top   = %d\n", MemoryPtr);
+    log("mem: stack top   = " + Twine(MemoryPtr));
 
     // Set `__heap_base` to directly follow the end of the stack.  We don't
     // allocate any heap memory up front, but instead really on the malloc/brk
     // implementation growing the memory at runtime.
     WasmSym::HeapBase->setVirtualAddress(MemoryPtr);
-    debugPrint("mem: heap base   = %d\n", MemoryPtr);
+    log("mem: heap base   = " + Twine(MemoryPtr));
   }
 
+  if (Config->InitialMemory != 0) {
+    if (Config->InitialMemory != alignTo(Config->InitialMemory, WasmPageSize))
+      error("initial memory must be " + Twine(WasmPageSize) + "-byte aligned");
+    if (MemoryPtr > Config->InitialMemory)
+      error("initial memory too small, " + Twine(MemoryPtr) + " bytes needed");
+    else
+      MemoryPtr = Config->InitialMemory;
+  }
   uint32_t MemSize = alignTo(MemoryPtr, WasmPageSize);
   NumMemoryPages = MemSize / WasmPageSize;
-  debugPrint("mem: total pages = %d\n", NumMemoryPages);
+  log("mem: total pages = " + Twine(NumMemoryPages));
+
+  if (Config->MaxMemory != 0) {
+    if (Config->MaxMemory != alignTo(Config->MaxMemory, WasmPageSize))
+      error("maximum memory must be " + Twine(WasmPageSize) + "-byte aligned");
+    if (MemoryPtr > Config->MaxMemory)
+      error("maximum memory too small, " + Twine(MemoryPtr) + " bytes needed");
+    MaxMemoryPages = Config->MaxMemory / WasmPageSize;
+    log("mem: max pages   = " + Twine(MaxMemoryPages));
+  }
 }
 
 SyntheticSection *Writer::createSyntheticSection(uint32_t Type,
@@ -630,11 +668,12 @@ void Writer::createSections() {
   createElemSection();
   createCodeSection();
   createDataSection();
+  createCustomSections();
 
   // Custom sections
   if (Config->Relocatable) {
-    createRelocSections();
     createLinkingSection();
+    createRelocSections();
   }
   if (!Config->StripDebug && !Config->StripAll)
     createNameSection();
@@ -656,12 +695,11 @@ void Writer::calculateImports() {
       continue;
 
     DEBUG(dbgs() << "import: " << Sym->getName() << "\n");
-    Sym->setOutputIndex(ImportedSymbols.size());
     ImportedSymbols.emplace_back(Sym);
-    if (isa<FunctionSymbol>(Sym))
-      ++NumImportedFunctions;
+    if (auto *F = dyn_cast<FunctionSymbol>(Sym))
+      F->setFunctionIndex(NumImportedFunctions++);
     else
-      ++NumImportedGlobals;
+      cast<GlobalSymbol>(Sym)->setGlobalIndex(NumImportedGlobals++);
   }
 }
 
@@ -679,14 +717,8 @@ void Writer::calculateExports() {
 
     DEBUG(dbgs() << "exporting sym: " << Sym->getName() << "\n");
 
-    if (auto *D = dyn_cast<DefinedData>(Sym)) {
-      // TODO Remove this check here; for non-relocatable output we actually
-      // used only to create fake-global exports for the synthetic symbols.  Fix
-      // this in a future commit
-      if (Sym != WasmSym::DataEnd && Sym != WasmSym::HeapBase)
-        continue;
+    if (auto *D = dyn_cast<DefinedData>(Sym))
       DefinedFakeGlobals.emplace_back(D);
-    }
     ExportedSymbols.emplace_back(Sym);
   }
 }
@@ -701,8 +733,9 @@ void Writer::assignSymtab() {
     for (Symbol *Sym : File->getSymbols()) {
       if (Sym->getFile() != File)
         continue;
-      if (!Sym->isLive())
-        return;
+      // (Since this is relocatable output, GC is not performed so symbols must
+      // be live.)
+      assert(Sym->isLive());
       Sym->setOutputSymbolIndex(SymbolIndex++);
       SymtabEntries.emplace_back(Sym);
     }
@@ -754,14 +787,20 @@ void Writer::calculateTypes() {
 
 void Writer::assignIndexes() {
   uint32_t FunctionIndex = NumImportedFunctions + InputFunctions.size();
+  auto AddDefinedFunction = [&](InputFunction *Func) {
+    if (!Func->Live)
+      return;
+    InputFunctions.emplace_back(Func);
+    Func->setFunctionIndex(FunctionIndex++);
+  };
+
+  for (InputFunction *Func : Symtab->SyntheticFunctions)
+    AddDefinedFunction(Func);
+
   for (ObjFile *File : Symtab->ObjectFiles) {
     DEBUG(dbgs() << "Functions: " << File->getName() << "\n");
-    for (InputFunction *Func : File->Functions) {
-      if (!Func->Live)
-        continue;
-      InputFunctions.emplace_back(Func);
-      Func->setOutputIndex(FunctionIndex++);
-    }
+    for (InputFunction *Func : File->Functions)
+      AddDefinedFunction(Func);
   }
 
   uint32_t TableIndex = kInitialTableOffset;
@@ -774,7 +813,7 @@ void Writer::assignIndexes() {
       if (Reloc.Type == R_WEBASSEMBLY_TABLE_INDEX_I32 ||
           Reloc.Type == R_WEBASSEMBLY_TABLE_INDEX_SLEB) {
         FunctionSymbol *Sym = File->getFunctionSymbol(Reloc.Index);
-        if (Sym->hasTableIndex() || !Sym->hasOutputIndex())
+        if (Sym->hasTableIndex() || !Sym->hasFunctionIndex())
           continue;
         Sym->setTableIndex(TableIndex++);
         IndirectFunctions.emplace_back(Sym);
@@ -805,13 +844,13 @@ void Writer::assignIndexes() {
   auto AddDefinedGlobal = [&](InputGlobal *Global) {
     if (Global->Live) {
       DEBUG(dbgs() << "AddDefinedGlobal: " << GlobalIndex << "\n");
-      Global->setOutputIndex(GlobalIndex++);
+      Global->setGlobalIndex(GlobalIndex++);
       InputGlobals.push_back(Global);
     }
   };
 
-  if (WasmSym::StackPointer)
-    AddDefinedGlobal(WasmSym::StackPointer->Global);
+  for (InputGlobal *Global : Symtab->SyntheticGlobals)
+    AddDefinedGlobal(Global);
 
   for (ObjFile *File : Symtab->ObjectFiles) {
     DEBUG(dbgs() << "Globals: " << File->getName() << "\n");
@@ -856,35 +895,28 @@ static const int OPCODE_END = 0xb;
 // Create synthetic "__wasm_call_ctors" function based on ctor functions
 // in input object.
 void Writer::createCtorFunction() {
-  uint32_t FunctionIndex = NumImportedFunctions + InputFunctions.size();
-  WasmSym::CallCtors->setOutputIndex(FunctionIndex);
-
-  // First write the body bytes to a string.
-  std::string FunctionBody;
+  // First write the body's contents to a string.
+  std::string BodyContent;
   {
-    raw_string_ostream OS(FunctionBody);
+    raw_string_ostream OS(BodyContent);
     writeUleb128(OS, 0, "num locals");
     for (const WasmInitEntry &F : InitFunctions) {
       writeU8(OS, OPCODE_CALL, "CALL");
-      writeUleb128(OS, F.Sym->getOutputIndex(), "function index");
+      writeUleb128(OS, F.Sym->getFunctionIndex(), "function index");
     }
     writeU8(OS, OPCODE_END, "END");
   }
 
   // Once we know the size of the body we can create the final function body
-  raw_string_ostream OS(CtorFunctionBody);
-  writeUleb128(OS, FunctionBody.size(), "function size");
-  OS.flush();
-  CtorFunctionBody += FunctionBody;
+  std::string FunctionBody;
+  {
+    raw_string_ostream OS(FunctionBody);
+    writeUleb128(OS, BodyContent.size(), "function size");
+    OS << BodyContent;
+  }
 
-  const WasmSignature *Sig = WasmSym::CallCtors->getFunctionType();
-  SyntheticFunction *F = make<SyntheticFunction>(
-      *Sig, toArrayRef(CtorFunctionBody), WasmSym::CallCtors->getName());
-
-  F->setOutputIndex(FunctionIndex);
-  F->Live = true;
-  WasmSym::CallCtors->Function = F;
-  InputFunctions.emplace_back(F);
+  ArrayRef<uint8_t> Body = toArrayRef(Saver.save(FunctionBody));
+  cast<SyntheticFunction>(WasmSym::CallCtors->Function)->setBody(Body);
 }
 
 // Populate InitFunctions vector with init functions from all input objects.
@@ -893,9 +925,12 @@ void Writer::createCtorFunction() {
 void Writer::calculateInitFunctions() {
   for (ObjFile *File : Symtab->ObjectFiles) {
     const WasmLinkingData &L = File->getWasmObj()->linkingData();
-    for (const WasmInitFunc &F : L.InitFunctions)
-      InitFunctions.emplace_back(
-          WasmInitEntry{File->getFunctionSymbol(F.Symbol), F.Priority});
+    for (const WasmInitFunc &F : L.InitFunctions) {
+      FunctionSymbol *Sym = File->getFunctionSymbol(F.Symbol);
+      if (*Sym->getFunctionType() != WasmSignature{{}, WASM_TYPE_NORESULT})
+        error("invalid signature for init func: " + toString(*Sym));
+      InitFunctions.emplace_back(WasmInitEntry{Sym, F.Priority});
+    }
   }
 
   // Sort in order of priority (lowest first) so that they are called

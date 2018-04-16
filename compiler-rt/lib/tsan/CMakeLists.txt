@@ -114,10 +114,11 @@ if(APPLE)
     OBJECT_LIBS RTInterception
                 RTSanitizerCommon
                 RTSanitizerCommonLibc
+                RTSanitizerCommonCoverage
                 RTUbsan
     CFLAGS ${TSAN_RTL_CFLAGS}
     LINK_FLAGS ${SANITIZER_COMMON_LINK_FLAGS} ${WEAK_SYMBOL_LINK_FLAGS}
-    LINK_LIBS ${TSAN_LINK_LIBS}
+    LINK_LIBS ${TSAN_LINK_LIBS} objc
     PARENT_TARGET tsan)
   add_compiler_rt_object_libraries(RTTsan_dynamic
     OS ${TSAN_SUPPORTED_OS}
@@ -163,6 +164,7 @@ else()
               $<TARGET_OBJECTS:RTInterception.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommon.${arch}>
               $<TARGET_OBJECTS:RTSanitizerCommonLibc.${arch}>
+              $<TARGET_OBJECTS:RTSanitizerCommonCoverage.${arch}>
               $<TARGET_OBJECTS:RTUbsan.${arch}>
       CFLAGS ${TSAN_RTL_CFLAGS}
       PARENT_TARGET tsan)
@@ -214,7 +216,7 @@ if(COMPILER_RT_LIBCXX_PATH AND
       DEPS ${TSAN_RUNTIME_LIBRARIES}
       CFLAGS ${TARGET_CFLAGS} -fsanitize=thread
       USE_TOOLCHAIN)
-    list(APPEND libcxx_tsan_deps libcxx_tsan_${arch}-install)
+    list(APPEND libcxx_tsan_deps libcxx_tsan_${arch}-build)
   endforeach()
 
   add_custom_target(libcxx_tsan DEPENDS ${libcxx_tsan_deps})

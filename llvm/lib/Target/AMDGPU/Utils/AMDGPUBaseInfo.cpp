@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPUBaseInfo.h"
+#include "AMDGPUTargetTransformInfo.h"
 #include "AMDGPU.h"
 #include "SIDefines.h"
 #include "llvm/ADT/StringRef.h"
@@ -205,6 +206,8 @@ IsaVersion getIsaVersion(const FeatureBitset &Features) {
     return {7, 0, 3};
   if (Features.test(FeatureISAVersion7_0_4))
     return {7, 0, 4};
+  if (Features.test(FeatureSeaIslands))
+    return {7, 0, 0};
 
   // GCN GFX8 (Volcanic Islands (VI)).
   if (Features.test(FeatureISAVersion8_0_1))
@@ -215,12 +218,16 @@ IsaVersion getIsaVersion(const FeatureBitset &Features) {
     return {8, 0, 3};
   if (Features.test(FeatureISAVersion8_1_0))
     return {8, 1, 0};
+  if (Features.test(FeatureVolcanicIslands))
+    return {8, 0, 0};
 
   // GCN GFX9.
   if (Features.test(FeatureISAVersion9_0_0))
     return {9, 0, 0};
   if (Features.test(FeatureISAVersion9_0_2))
     return {9, 0, 2};
+  if (Features.test(FeatureGFX9))
+    return {9, 0, 0};
 
   if (!Features.test(FeatureGCN) || Features.test(FeatureSouthernIslands))
     return {0, 0, 0};
@@ -416,7 +423,7 @@ void initDefaultAMDKernelCodeT(amd_kernel_code_t &Header,
   memset(&Header, 0, sizeof(Header));
 
   Header.amd_kernel_code_version_major = 1;
-  Header.amd_kernel_code_version_minor = 1;
+  Header.amd_kernel_code_version_minor = 2;
   Header.amd_machine_kind = 1; // AMD_MACHINE_KIND_AMDGPU
   Header.amd_machine_version_major = ISA.Major;
   Header.amd_machine_version_minor = ISA.Minor;
@@ -937,6 +944,22 @@ AMDGPUAS getAMDGPUAS(const TargetMachine &M) {
 
 AMDGPUAS getAMDGPUAS(const Module &M) {
   return getAMDGPUAS(Triple(M.getTargetTriple()));
+}
+
+namespace {
+
+struct SourceOfDivergence {
+  unsigned Intr;
+};
+const SourceOfDivergence *lookupSourceOfDivergenceByIntr(unsigned Intr);
+
+#define GET_SOURCEOFDIVERGENCE_IMPL
+#include "AMDGPUGenSearchableTables.inc"
+
+} // end anonymous namespace
+
+bool isIntrinsicSourceOfDivergence(unsigned IntrID) {
+  return lookupSourceOfDivergenceByIntr(IntrID);
 }
 } // namespace AMDGPU
 } // namespace llvm

@@ -9,6 +9,7 @@
 
 #include "lld/Common/Driver.h"
 #include "Config.h"
+#include "InputChunks.h"
 #include "InputGlobal.h"
 #include "MarkLive.h"
 #include "SymbolTable.h"
@@ -16,6 +17,7 @@
 #include "lld/Common/Args.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
+#include "lld/Common/Strings.h"
 #include "lld/Common/Threads.h"
 #include "lld/Common/Version.h"
 #include "llvm/ADT/Twine.h"
@@ -55,7 +57,6 @@ private:
   void addFile(StringRef Path);
   void addLibrary(StringRef Name);
   std::vector<InputFile *> Files;
-  llvm::wasm::WasmGlobal StackPointerGlobal;
 };
 } // anonymous namespace
 
@@ -214,6 +215,46 @@ static StringRef getEntry(opt::InputArgList &Args, StringRef Default) {
   return Arg->getValue();
 }
 
+static const uint8_t UnreachableFn[] = {
+    0x03 /* ULEB length */, 0x00 /* ULEB num locals */,
+    0x00 /* opcode unreachable */, 0x0b /* opcode end */
+};
+
+// For weak undefined functions, there may be "call" instructions that reference
+// the symbol. In this case, we need to synthesise a dummy/stub function that
+// will abort at runtime, so that relocations can still provided an operand to
+// the call instruction that passes Wasm validation.
+static void handleWeakUndefines() {
+  for (Symbol *Sym : Symtab->getSymbols()) {
+    if (!Sym->isUndefined() || !Sym->isWeak())
+      continue;
+    auto *FuncSym = dyn_cast<FunctionSymbol>(Sym);
+    if (!FuncSym)
+      continue;
+
+    // It is possible for undefined functions not to have a signature (eg. if
+    // added via "--undefined"), but weak undefined ones do have a signature.
+    assert(FuncSym->getFunctionType());
+    const WasmSignature &Sig = *FuncSym->getFunctionType();
+
+    // Add a synthetic dummy for weak undefined functions.  These dummies will
+    // be GC'd if not used as the target of any "call" instructions.
+    Optional<std::string> SymName = demangleItanium(Sym->getName());
+    StringRef StubName =
+        Saver.save("undefined function " +
+                   (SymName ? StringRef(*SymName) : Sym->getName()));
+    SyntheticFunction *Func = make<SyntheticFunction>(Sig, StubName);
+    Func->setBody(UnreachableFn);
+    // Ensure it compares equal to the null pointer, and so that table relocs
+    // don't pull in the stub body (only call-operand relocs should do that).
+    Func->setTableIndex(0);
+    Symtab->SyntheticFunctions.emplace_back(Func);
+    // Hide our dummy to prevent export.
+    uint32_t Flags = WASM_SYMBOL_VISIBILITY_HIDDEN;
+    replaceSymbol<DefinedFunction>(Sym, Sym->getName(), Flags, nullptr, Func);
+  }
+}
+
 void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   WasmOptTable Parser;
   opt::InputArgList Args = Parser.parse(ArgsArr.slice(1));
@@ -242,8 +283,11 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   Config->AllowUndefined = Args.hasArg(OPT_allow_undefined);
   Config->CheckSignatures =
       Args.hasFlag(OPT_check_signatures, OPT_no_check_signatures, false);
+  Config->Demangle = Args.hasFlag(OPT_demangle, OPT_no_demangle, true);
   Config->Entry = getEntry(Args, Args.hasArg(OPT_relocatable) ? "" : "_start");
+  Config->ExportTable = Args.hasArg(OPT_export_table);
   Config->ImportMemory = Args.hasArg(OPT_import_memory);
+  Config->ImportTable = Args.hasArg(OPT_import_table);
   Config->OutputFile = Args.getLastArgValue(OPT_o);
   Config->Relocatable = Args.hasArg(OPT_relocatable);
   Config->GcSections =
@@ -273,6 +317,9 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   if (Config->OutputFile.empty())
     error("no output file specified");
 
+  if (Config->ImportTable && Config->ExportTable)
+    error("--import-table and --export-table may not be used together");
+
   if (Config->Relocatable) {
     if (!Config->Entry.empty())
       error("entry point specified for relocatable output file");
@@ -288,16 +335,19 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
     // globals aren't yet supported in the official binary format.
     // TODO(sbc): Remove WASM_SYMBOL_VISIBILITY_HIDDEN if/when the
     // "mutable global" proposal is accepted.
-    StackPointerGlobal.Type = {WASM_TYPE_I32, true};
-    StackPointerGlobal.InitExpr.Value.Int32 = 0;
-    StackPointerGlobal.InitExpr.Opcode = WASM_OPCODE_I32_CONST;
-    InputGlobal *StackPointer = make<InputGlobal>(StackPointerGlobal);
+    llvm::wasm::WasmGlobal Global;
+    Global.Type = {WASM_TYPE_I32, true};
+    Global.InitExpr.Value.Int32 = 0;
+    Global.InitExpr.Opcode = WASM_OPCODE_I32_CONST;
+    InputGlobal *StackPointer = make<InputGlobal>(Global);
     StackPointer->Live = true;
 
     static WasmSignature NullSignature = {{}, WASM_TYPE_NORESULT};
+
     // Add synthetic symbols before any others
     WasmSym::CallCtors = Symtab->addSyntheticFunction(
-        "__wasm_call_ctors", &NullSignature, WASM_SYMBOL_VISIBILITY_HIDDEN);
+        "__wasm_call_ctors", WASM_SYMBOL_VISIBILITY_HIDDEN,
+        make<SyntheticFunction>(NullSignature, "__wasm_call_ctors"));
     WasmSym::StackPointer = Symtab->addSyntheticGlobal(
         "__stack_pointer", WASM_SYMBOL_VISIBILITY_HIDDEN, StackPointer);
     WasmSym::HeapBase = Symtab->addSyntheticDataSymbol("__heap_base", 0);
@@ -310,7 +360,7 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
                                               &NullSignature);
 
     // Handle the `--undefined <sym>` options.
-    for (auto* Arg : Args.filtered(OPT_undefined))
+    for (auto *Arg : Args.filtered(OPT_undefined))
       Symtab->addUndefinedFunction(Arg->getValue(), 0, nullptr, nullptr);
   }
 
@@ -323,6 +373,10 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   for (InputFile *F : Files)
     Symtab->addFile(F);
 
+  // Add synthetic dummies for weak undefined functions.
+  if (!Config->Relocatable)
+    handleWeakUndefines();
+
   // Make sure we have resolved all symbols.
   if (!Config->Relocatable && !Config->AllowUndefined) {
     Symtab->reportRemainingUndefines();
@@ -331,7 +385,7 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
     // -u/--undefined since these undefined symbols have only names and no
     // function signature, which means they cannot be written to the final
     // output.
-    for (auto* Arg : Args.filtered(OPT_undefined)) {
+    for (auto *Arg : Args.filtered(OPT_undefined)) {
       Symbol *Sym = Symtab->find(Arg->getValue());
       if (!Sym->isDefined())
         error("function forced with --undefined not found: " + Sym->getName());
@@ -346,7 +400,7 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
     Symbol *Sym = Symtab->find(Name);
     if (Sym && Sym->isDefined())
       Sym->setHidden(false);
-    else
+    else if (!Config->AllowUndefined)
       error("symbol exported via --export not found: " + Name);
   }
 

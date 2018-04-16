@@ -85,6 +85,13 @@ void tools::gcc::Common::ConstructJob(Compilation &C, const JobAction &JA,
           A->getOption().matches(options::OPT_W_Group))
         continue;
 
+      // Don't forward -mno-unaligned-access since GCC doesn't understand
+      // it and because it doesn't affect the assembly or link steps.
+      if ((isa<AssembleJobAction>(JA) || isa<LinkJobAction>(JA)) &&
+          (A->getOption().matches(options::OPT_munaligned_access) ||
+           A->getOption().matches(options::OPT_mno_unaligned_access)))
+        continue;
+
       A->render(Args, CmdArgs);
     }
   }
@@ -221,35 +228,6 @@ void tools::gcc::Linker::RenderExtraToolArgs(const JobAction &JA,
   // The types are (hopefully) good enough.
 }
 
-static bool addXRayRuntime(const ToolChain &TC, const ArgList &Args,
-                           ArgStringList &CmdArgs) {
-  // Do not add the XRay runtime to shared libraries.
-  if (Args.hasArg(options::OPT_shared))
-    return false;
-
-  if (Args.hasFlag(options::OPT_fxray_instrument,
-                   options::OPT_fnoxray_instrument, false)) {
-    CmdArgs.push_back("-whole-archive");
-    CmdArgs.push_back(TC.getCompilerRTArgString(Args, "xray", false));
-    CmdArgs.push_back("-no-whole-archive");
-    return true;
-  }
-
-  return false;
-}
-
-static void linkXRayRuntimeDeps(const ToolChain &TC, const ArgList &Args,
-                                ArgStringList &CmdArgs) {
-  CmdArgs.push_back("--no-as-needed");
-  CmdArgs.push_back("-lpthread");
-  CmdArgs.push_back("-lrt");
-  CmdArgs.push_back("-lm");
-
-  if (TC.getTriple().getOS() != llvm::Triple::FreeBSD &&
-      TC.getTriple().getOS() != llvm::Triple::NetBSD)
-    CmdArgs.push_back("-ldl");
-}
-
 static const char *getLDMOption(const llvm::Triple &T, const ArgList &Args) {
   switch (T.getArch()) {
   case llvm::Triple::x86:
@@ -305,7 +283,8 @@ static const char *getLDMOption(const llvm::Triple &T, const ArgList &Args) {
 }
 
 static bool getPIE(const ArgList &Args, const toolchains::Linux &ToolChain) {
-  if (Args.hasArg(options::OPT_shared) || Args.hasArg(options::OPT_static))
+  if (Args.hasArg(options::OPT_shared) || Args.hasArg(options::OPT_static) ||
+      Args.hasArg(options::OPT_r))
     return false;
 
   Arg *A = Args.getLastArg(options::OPT_pie, options::OPT_no_pie,
@@ -503,7 +482,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         linkSanitizerRuntimeDeps(ToolChain, CmdArgs);
 
       if (NeedsXRayDeps)
-        linkXRayRuntimeDeps(ToolChain, Args, CmdArgs);
+        linkXRayRuntimeDeps(ToolChain, CmdArgs);
 
       bool WantPthread = Args.hasArg(options::OPT_pthread) ||
                          Args.hasArg(options::OPT_pthreads);
@@ -1714,18 +1693,21 @@ void Generic_GCC::GCCInstallationDetector::init(
   // in /usr. This avoids accidentally enforcing the system GCC version
   // when using a custom toolchain.
   if (GCCToolchainDir == "" || GCCToolchainDir == D.SysRoot + "/usr") {
-    for (StringRef CandidateTriple : ExtraTripleAliases) {
-      if (ScanGentooGccConfig(TargetTriple, Args, CandidateTriple))
-        return;
-    }
-    for (StringRef CandidateTriple : CandidateTripleAliases) {
-      if (ScanGentooGccConfig(TargetTriple, Args, CandidateTriple))
-        return;
-    }
-    for (StringRef CandidateTriple : CandidateBiarchTripleAliases) {
-      if (ScanGentooGccConfig(TargetTriple, Args, CandidateTriple, true))
-        return;
-    }
+    SmallVector<StringRef, 16> GentooTestTriples;
+    // Try to match an exact triple as target triple first.
+    // e.g. crossdev -S x86_64-gentoo-linux-gnu will install gcc libs for
+    // x86_64-gentoo-linux-gnu. But "clang -target x86_64-gentoo-linux-gnu"
+    // may pick the libraries for x86_64-pc-linux-gnu even when exact matching
+    // triple x86_64-gentoo-linux-gnu is present.
+    GentooTestTriples.push_back(TargetTriple.str());
+    // Check rest of triples.
+    GentooTestTriples.append(ExtraTripleAliases.begin(),
+                             ExtraTripleAliases.end());
+    GentooTestTriples.append(CandidateTripleAliases.begin(),
+                             CandidateTripleAliases.end());
+    if (ScanGentooConfigs(TargetTriple, Args, GentooTestTriples,
+                          CandidateBiarchTripleAliases))
+      return;
   }
 
   // Loop over the various components which exist and select the best GCC
@@ -1738,6 +1720,9 @@ void Generic_GCC::GCCInstallationDetector::init(
       const std::string LibDir = Prefix + Suffix.str();
       if (!D.getVFS().exists(LibDir))
         continue;
+      // Try to match the exact target triple first.
+      ScanLibDirForGCCTriple(TargetTriple, Args, LibDir, TargetTriple.str());
+      // Try rest of possible triples.
       for (StringRef Candidate : ExtraTripleAliases) // Try these first.
         ScanLibDirForGCCTriple(TargetTriple, Args, LibDir, Candidate);
       for (StringRef Candidate : CandidateTripleAliases)
@@ -1810,6 +1795,7 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
   // Non-Solaris is much simpler - most systems just go with "/usr".
   if (SysRoot.empty() && TargetTriple.getOS() == llvm::Triple::Linux) {
     // Yet, still look for RHEL devtoolsets.
+    Prefixes.push_back("/opt/rh/devtoolset-7/root/usr");
     Prefixes.push_back("/opt/rh/devtoolset-6/root/usr");
     Prefixes.push_back("/opt/rh/devtoolset-4/root/usr");
     Prefixes.push_back("/opt/rh/devtoolset-3/root/usr");
@@ -2231,6 +2217,22 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
   }
 }
 
+bool Generic_GCC::GCCInstallationDetector::ScanGentooConfigs(
+    const llvm::Triple &TargetTriple, const ArgList &Args,
+    const SmallVectorImpl<StringRef> &CandidateTriples,
+    const SmallVectorImpl<StringRef> &CandidateBiarchTriples) {
+  for (StringRef CandidateTriple : CandidateTriples) {
+    if (ScanGentooGccConfig(TargetTriple, Args, CandidateTriple))
+      return true;
+  }
+
+  for (StringRef CandidateTriple : CandidateBiarchTriples) {
+    if (ScanGentooGccConfig(TargetTriple, Args, CandidateTriple, true))
+      return true;
+  }
+  return false;
+}
+
 bool Generic_GCC::GCCInstallationDetector::ScanGentooGccConfig(
     const llvm::Triple &TargetTriple, const ArgList &Args,
     StringRef CandidateTriple, bool NeedsBiarchSuffix) {
@@ -2243,23 +2245,53 @@ bool Generic_GCC::GCCInstallationDetector::ScanGentooGccConfig(
     for (StringRef Line : Lines) {
       Line = Line.trim();
       // CURRENT=triple-version
-      if (Line.consume_front("CURRENT=")) {
-        const std::pair<StringRef, StringRef> ActiveVersion =
-          Line.rsplit('-');
-        // Note: Strictly speaking, we should be reading
-        // /etc/env.d/gcc/${CURRENT} now. However, the file doesn't
-        // contain anything new or especially useful to us.
-        const std::string GentooPath = D.SysRoot + "/usr/lib/gcc/" +
-                                       ActiveVersion.first.str() + "/" +
-                                       ActiveVersion.second.str();
+      if (!Line.consume_front("CURRENT="))
+        continue;
+      // Process the config file pointed to by CURRENT.
+      llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ConfigFile =
+          D.getVFS().getBufferForFile(D.SysRoot + "/etc/env.d/gcc/" +
+                                      Line.str());
+      std::pair<StringRef, StringRef> ActiveVersion = Line.rsplit('-');
+      // List of paths to scan for libraries.
+      SmallVector<StringRef, 4> GentooScanPaths;
+      // Scan the Config file to find installed GCC libraries path.
+      // Typical content of the GCC config file:
+      // LDPATH="/usr/lib/gcc/x86_64-pc-linux-gnu/4.9.x:/usr/lib/gcc/
+      // (continued from previous line) x86_64-pc-linux-gnu/4.9.x/32"
+      // MANPATH="/usr/share/gcc-data/x86_64-pc-linux-gnu/4.9.x/man"
+      // INFOPATH="/usr/share/gcc-data/x86_64-pc-linux-gnu/4.9.x/info"
+      // STDCXX_INCDIR="/usr/lib/gcc/x86_64-pc-linux-gnu/4.9.x/include/g++-v4"
+      // We are looking for the paths listed in LDPATH=... .
+      if (ConfigFile) {
+        SmallVector<StringRef, 2> ConfigLines;
+        ConfigFile.get()->getBuffer().split(ConfigLines, "\n");
+        for (StringRef ConfLine : ConfigLines) {
+          ConfLine = ConfLine.trim();
+          if (ConfLine.consume_front("LDPATH=")) {
+            // Drop '"' from front and back if present.
+            ConfLine.consume_back("\"");
+            ConfLine.consume_front("\"");
+            // Get all paths sperated by ':'
+            ConfLine.split(GentooScanPaths, ':', -1, /*AllowEmpty*/ false);
+          }
+        }
+      }
+      // Test the path based on the version in /etc/env.d/gcc/config-{tuple}.
+      std::string basePath = "/usr/lib/gcc/" + ActiveVersion.first.str() + "/"
+          + ActiveVersion.second.str();
+      GentooScanPaths.push_back(StringRef(basePath));
+
+      // Scan all paths for GCC libraries.
+      for (const auto &GentooScanPath : GentooScanPaths) {
+        std::string GentooPath = D.SysRoot + std::string(GentooScanPath);
         if (D.getVFS().exists(GentooPath + "/crtbegin.o")) {
           if (!ScanGCCForMultilibs(TargetTriple, Args, GentooPath,
                                    NeedsBiarchSuffix))
-            return false;
+            continue;
 
           Version = GCCVersion::Parse(ActiveVersion.second);
           GCCInstallPath = GentooPath;
-          GCCParentLibPath = GentooPath + "/../../..";
+          GCCParentLibPath = GentooPath + std::string("/../../..");
           GCCTriple.setTriple(ActiveVersion.first);
           IsValid = true;
           return true;
@@ -2377,12 +2409,9 @@ void Generic_GCC::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
     return;
 
   switch (GetCXXStdlibType(DriverArgs)) {
-  case ToolChain::CST_Libcxx: {
-    std::string Path = findLibCxxIncludePath();
-    if (!Path.empty())
-      addSystemInclude(DriverArgs, CC1Args, Path);
+  case ToolChain::CST_Libcxx:
+    addLibCxxIncludePaths(DriverArgs, CC1Args);
     break;
-  }
 
   case ToolChain::CST_Libstdcxx:
     addLibStdCxxIncludePaths(DriverArgs, CC1Args);
@@ -2390,9 +2419,12 @@ void Generic_GCC::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
   }
 }
 
-std::string Generic_GCC::findLibCxxIncludePath() const {
+void
+Generic_GCC::addLibCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
+                                   llvm::opt::ArgStringList &CC1Args) const {
   // FIXME: The Linux behavior would probaby be a better approach here.
-  return getDriver().SysRoot + "/usr/include/c++/v1";
+  addSystemInclude(DriverArgs, CC1Args,
+                   getDriver().SysRoot + "/usr/include/c++/v1");
 }
 
 void

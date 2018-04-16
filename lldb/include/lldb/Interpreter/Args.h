@@ -12,7 +12,6 @@
 
 // C Includes
 // C++ Includes
-#include <list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,29 +21,10 @@
 #include "llvm/ADT/StringRef.h"
 // Project includes
 #include "lldb/Utility/Environment.h"
-#include "lldb/Utility/Status.h"
 #include "lldb/lldb-private-types.h"
 #include "lldb/lldb-types.h"
 
 namespace lldb_private {
-
-struct Option;
-
-typedef std::vector<std::tuple<std::string, int, std::string>> OptionArgVector;
-typedef std::shared_ptr<OptionArgVector> OptionArgVectorSP;
-
-struct OptionArgElement {
-  enum { eUnrecognizedArg = -1, eBareDash = -2, eBareDoubleDash = -3 };
-
-  OptionArgElement(int defs_index, int pos, int arg_pos)
-      : opt_defs_index(defs_index), opt_pos(pos), opt_arg_pos(arg_pos) {}
-
-  int opt_defs_index;
-  int opt_pos;
-  int opt_arg_pos;
-};
-
-typedef std::vector<OptionArgElement> OptionElementVector;
 
 //----------------------------------------------------------------------
 /// @class Args Args.h "lldb/Interpreter/Args.h"
@@ -161,10 +141,10 @@ public:
   llvm::ArrayRef<ArgEntry> entries() const { return m_entries; }
   char GetArgumentQuoteCharAtIndex(size_t idx) const;
 
-  std::vector<ArgEntry>::const_iterator begin() const {
-    return m_entries.begin();
-  }
-  std::vector<ArgEntry>::const_iterator end() const { return m_entries.end(); }
+  using const_iterator = std::vector<ArgEntry>::const_iterator;
+
+  const_iterator begin() const { return m_entries.begin(); }
+  const_iterator end() const { return m_entries.end(); }
 
   size_t size() const { return GetArgumentCount(); }
   const ArgEntry &operator[](size_t n) const { return m_entries[n]; }
@@ -310,44 +290,6 @@ public:
   void Unshift(llvm::StringRef arg_str, char quote_char = '\0');
 
   //------------------------------------------------------------------
-  /// Parse the arguments in the contained arguments.
-  ///
-  /// The arguments that are consumed by the argument parsing process
-  /// will be removed from the argument vector. The arguments that
-  /// get processed start at the second argument. The first argument
-  /// is assumed to be the command and will not be touched.
-  ///
-  /// param[in] platform_sp
-  ///   The platform used for option validation.  This is necessary
-  ///   because an empty execution_context is not enough to get us
-  ///   to a reasonable platform.  If the platform isn't given,
-  ///   we'll try to get it from the execution context.  If we can't
-  ///   get it from the execution context, we'll skip validation.
-  ///
-  /// param[in] require_validation
-  ///   When true, it will fail option parsing if validation could
-  ///   not occur due to not having a platform.
-  ///
-  /// @see class Options
-  //------------------------------------------------------------------
-  Status ParseOptions(Options &options, ExecutionContext *execution_context,
-                      lldb::PlatformSP platform_sp, bool require_validation);
-
-  bool IsPositionalArgument(const char *arg);
-
-  // The following works almost identically to ParseOptions, except that no
-  // option is required to have arguments, and it builds up the
-  // option_arg_vector as it parses the options.
-
-  std::string ParseAliasOptions(Options &options, CommandReturnObject &result,
-                                OptionArgVector *option_arg_vector,
-                                llvm::StringRef raw_input_line);
-
-  void ParseArgsForCompletion(Options &options,
-                              OptionElementVector &option_element_vector,
-                              uint32_t cursor_index);
-
-  //------------------------------------------------------------------
   // Clear the arguments.
   //
   // For re-setting or blanking out the list of arguments.
@@ -383,30 +325,6 @@ public:
     return min <= sval64 && sval64 <= max;
   }
 
-  static lldb::addr_t StringToAddress(const ExecutionContext *exe_ctx,
-                                      llvm::StringRef s,
-                                      lldb::addr_t fail_value, Status *error);
-
-  static bool StringToBoolean(llvm::StringRef s, bool fail_value,
-                              bool *success_ptr);
-
-  static char StringToChar(llvm::StringRef s, char fail_value,
-                           bool *success_ptr);
-
-  static int64_t StringToOptionEnum(llvm::StringRef s,
-                                    OptionEnumValueElement *enum_values,
-                                    int32_t fail_value, Status &error);
-
-  static lldb::ScriptLanguage
-  StringToScriptLanguage(llvm::StringRef s, lldb::ScriptLanguage fail_value,
-                         bool *success_ptr);
-
-  // TODO: Use StringRef
-  static Status StringToFormat(const char *s, lldb::Format &format,
-                               size_t *byte_size_ptr); // If non-NULL, then a
-                                                       // byte size can precede
-                                                       // the format character
-
   static lldb::Encoding
   StringToEncoding(llvm::StringRef s,
                    lldb::Encoding fail_value = lldb::eEncodingInvalid);
@@ -441,13 +359,8 @@ public:
                                                char quote_char);
 
 private:
-  size_t FindArgumentIndexForOption(Option *long_options,
-                                    int long_options_index) const;
-
   std::vector<ArgEntry> m_entries;
   std::vector<char *> m_argv;
-
-  void UpdateArgsAfterOptionParsing();
 };
 
 } // namespace lldb_private

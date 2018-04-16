@@ -127,6 +127,7 @@ static std::tuple<ELFKind, uint16_t, uint8_t> parseEmulation(StringRef Emul) {
           .Case("elf64btsmip", {ELF64BEKind, EM_MIPS})
           .Case("elf64ltsmip", {ELF64LEKind, EM_MIPS})
           .Case("elf64ppc", {ELF64BEKind, EM_PPC64})
+          .Case("elf64lppc", {ELF64LEKind, EM_PPC64})
           .Cases("elf_amd64", "elf_x86_64", {ELF64LEKind, EM_X86_64})
           .Case("elf_i386", {ELF32LEKind, EM_386})
           .Case("elf_iamcu", {ELF32LEKind, EM_IAMCU})
@@ -600,6 +601,17 @@ static std::vector<StringRef> getSymbolOrderingFile(MemoryBufferRef MB) {
   return Names.takeVector();
 }
 
+static void parseClangOption(StringRef Opt, const Twine &Msg) {
+  std::string Err;
+  raw_string_ostream OS(Err);
+
+  const char *Argv[] = {Config->ProgName.data(), Opt.data()};
+  if (cl::ParseCommandLineOptions(2, Argv, "", &OS))
+    return;
+  OS.flush();
+  error(Msg + ": " + StringRef(Err).trim());
+}
+
 // Initializes Config members by the command line options.
 void LinkerDriver::readConfigs(opt::InputArgList &Args) {
   errorHandler().Verbose = Args.hasArg(OPT_verbose);
@@ -617,6 +629,7 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
       Args.hasFlag(OPT_check_sections, OPT_no_check_sections, true);
   Config->Chroot = Args.getLastArgValue(OPT_chroot);
   Config->CompressDebugSections = getCompressDebugSections(Args);
+  Config->Cref = Args.hasFlag(OPT_cref, OPT_no_cref, false);
   Config->DefineCommon = Args.hasFlag(OPT_define_common, OPT_no_define_common,
                                       !Args.hasArg(OPT_relocatable));
   Config->Demangle = Args.hasFlag(OPT_demangle, OPT_no_demangle, true);
@@ -644,9 +657,12 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
       Args.hasArg(OPT_ignore_function_address_equality);
   Config->Init = Args.getLastArgValue(OPT_init, "_init");
   Config->LTOAAPipeline = Args.getLastArgValue(OPT_lto_aa_pipeline);
+  Config->LTODebugPassManager = Args.hasArg(OPT_lto_debug_pass_manager);
+  Config->LTONewPassManager = Args.hasArg(OPT_lto_new_pass_manager);
   Config->LTONewPmPasses = Args.getLastArgValue(OPT_lto_newpm_passes);
   Config->LTOO = args::getInteger(Args, OPT_lto_O, 2);
   Config->LTOPartitions = args::getInteger(Args, OPT_lto_partitions, 1);
+  Config->LTOSampleProfile = Args.getLastArgValue(OPT_lto_sample_profile);
   Config->MapFile = Args.getLastArgValue(OPT_Map);
   Config->MergeArmExidx =
       Args.hasFlag(OPT_merge_exidx_entries, OPT_no_merge_exidx_entries, true);
@@ -688,6 +704,8 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
   Config->UndefinedVersion =
       Args.hasFlag(OPT_undefined_version, OPT_no_undefined_version, true);
   Config->UnresolvedSymbols = getUnresolvedSymbolPolicy(Args);
+  Config->WarnBackrefs =
+      Args.hasFlag(OPT_warn_backrefs, OPT_no_warn_backrefs, false);
   Config->WarnCommon = Args.hasFlag(OPT_warn_common, OPT_no_warn_common, false);
   Config->WarnSymbolOrdering =
       Args.hasFlag(OPT_warn_symbol_ordering, OPT_no_warn_symbol_ordering, true);
@@ -707,7 +725,6 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
   Config->ZWxneeded = hasZOption(Args, "wxneeded");
 
   // Parse LTO plugin-related options for compatibility with gold.
-  std::vector<const char *> LTOOptions({Config->ProgName.data()});
   for (auto *Arg : Args.filtered(OPT_plugin_opt)) {
     StringRef S = Arg->getValue();
     if (S == "disable-verify")
@@ -721,15 +738,21 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
     else if (S.startswith("jobs="))
       Config->ThinLTOJobs = parseInt(S.substr(5), Arg);
     else if (S.startswith("mcpu="))
-      LTOOptions.push_back(Saver.save("-" + S).data());
+      parseClangOption(Saver.save("-" + S), Arg->getSpelling());
+    else if (S == "new-pass-manager")
+      Config->LTONewPassManager = true;
+    else if (S == "debug-pass-manager")
+      Config->LTODebugPassManager = true;
+    else if (S.startswith("sample-profile="))
+      Config->LTOSampleProfile = S.substr(strlen("sample-profile="));
     else if (!S.startswith("/") && !S.startswith("-fresolution=") &&
              !S.startswith("-pass-through=") && !S.startswith("thinlto"))
-      LTOOptions.push_back(S.data());
+      parseClangOption(S, Arg->getSpelling());
   }
-  // Parse and evaluate -mllvm options.
+
+  // Parse -mllvm options.
   for (auto *Arg : Args.filtered(OPT_mllvm))
-    LTOOptions.push_back(Arg->getValue());
-  cl::ParseCommandLineOptions(LTOOptions.size(), LTOOptions.data());
+    parseClangOption(Arg->getValue(), Arg->getSpelling());
 
   if (Config->LTOO > 3)
     error("invalid optimization level for LTO: " + Twine(Config->LTOO));
@@ -910,6 +933,22 @@ void LinkerDriver::createFiles(opt::InputArgList &Args) {
     case OPT_no_whole_archive:
       InWholeArchive = false;
       break;
+    case OPT_just_symbols:
+      if (Optional<MemoryBufferRef> MB = readFile(Arg->getValue())) {
+        Files.push_back(createObjectFile(*MB));
+        Files.back()->JustSymbols = true;
+      }
+      break;
+    case OPT_start_group:
+      if (InputFile::IsInGroup)
+        error("nested --start-group");
+      InputFile::IsInGroup = true;
+      break;
+    case OPT_end_group:
+      if (!InputFile::IsInGroup)
+        error("stray --end-group");
+      InputFile::IsInGroup = false;
+      break;
     case OPT_start_lib:
       InLib = true;
       break;
@@ -1006,6 +1045,32 @@ static void excludeLibs(opt::InputArgList &Args) {
             Sym->VersionId = VER_NDX_LOCAL;
 }
 
+// Force Sym to be entered in the output. Used for -u or equivalent.
+template <class ELFT> static void handleUndefined(StringRef Name) {
+  Symbol *Sym = Symtab->find(Name);
+  if (!Sym)
+    return;
+
+  // Since symbol S may not be used inside the program, LTO may
+  // eliminate it. Mark the symbol as "used" to prevent it.
+  Sym->IsUsedInRegularObj = true;
+
+  if (Sym->isLazy())
+    Symtab->fetchLazy<ELFT>(Sym);
+}
+
+// If all references to a DSO happen to be weak, the DSO is not added
+// to DT_NEEDED. If that happens, we need to eliminate shared symbols
+// created from the DSO. Otherwise, they become dangling references
+// that point to a non-existent DSO.
+template <class ELFT> static void demoteSharedSymbols() {
+  for (Symbol *Sym : Symtab->getSymbols())
+    if (auto *S = dyn_cast<SharedSymbol>(Sym))
+      if (!S->getFile<ELFT>().IsNeeded)
+        replaceSymbol<Undefined>(S, nullptr, S->getName(), STB_WEAK, S->StOther,
+                                 S->Type);
+}
+
 // Do actual linking. Note that when this function is called,
 // all linker scripts have already been parsed.
 template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
@@ -1070,16 +1135,20 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
 
   // Handle the `--undefined <sym>` options.
   for (StringRef S : Config->Undefined)
-    Symtab->fetchIfLazy<ELFT>(S);
+    handleUndefined<ELFT>(S);
 
   // If an entry symbol is in a static archive, pull out that file now
   // to complete the symbol table. After this, no new names except a
   // few linker-synthesized ones will be added to the symbol table.
-  Symtab->fetchIfLazy<ELFT>(Config->Entry);
+  handleUndefined<ELFT>(Config->Entry);
 
   // Return if there were name resolution errors.
   if (errorCount())
     return;
+
+  // Now when we read all script files, we want to finalize order of linker
+  // script commands, which can be not yet final because of INSERT commands.
+  Script->processInsertCommands();
 
   // We want to declare linker script's symbols early,
   // so that we can version them.
@@ -1162,6 +1231,7 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
   // Do size optimizations: garbage collection, merging of SHF_MERGE sections
   // and identical code folding.
   markLive<ELFT>();
+  demoteSharedSymbols<ELFT>();
   decompressSections();
   mergeSections();
   if (Config->ICF)

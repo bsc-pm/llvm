@@ -101,6 +101,11 @@ static cl::opt<unsigned long long> ClMappingOffset(
     cl::desc("offset of hwasan shadow mapping [EXPERIMENTAL]"), cl::Hidden,
     cl::init(0));
 
+static cl::opt<int> ClMatchAllTag(
+    "hwasan-match-all-tag",
+    cl::desc("don't report bad accesses via pointers with this tag"), cl::Hidden,
+    cl::init(-1));
+
 static cl::opt<bool> ClEnableKhwasan(
     "hwasan-kernel", cl::desc("Enable KernelHWAddressSanitizer instrumentation"),
     cl::Hidden, cl::init(false));
@@ -114,8 +119,12 @@ public:
   // Pass identification, replacement for typeid.
   static char ID;
 
-  HWAddressSanitizer(bool Recover = false)
-      : FunctionPass(ID), Recover(Recover || ClRecover) {}
+  explicit HWAddressSanitizer(bool CompileKernel = false, bool Recover = false)
+      : FunctionPass(ID) {
+    this->Recover = ClRecover.getNumOccurrences() > 0 ? ClRecover : Recover;
+    this->CompileKernel = ClEnableKhwasan.getNumOccurrences() > 0 ?
+        ClEnableKhwasan : CompileKernel;
+  }
 
   StringRef getPassName() const override { return "HWAddressSanitizer"; }
 
@@ -123,6 +132,7 @@ public:
   bool doInitialization(Module &M) override;
 
   void initializeCallbacks(Module &M);
+  void untagPointerOperand(Instruction *I, Value *Addr);
   void instrumentMemAccessInline(Value *PtrLong, bool IsWrite,
                                  unsigned AccessSizeIndex,
                                  Instruction *InsertBefore);
@@ -145,9 +155,12 @@ public:
 
 private:
   LLVMContext *C;
+  Triple TargetTriple;
+
   Type *IntptrTy;
   Type *Int8Ty;
 
+  bool CompileKernel;
   bool Recover;
 
   Function *HwasanCtorFunction;
@@ -170,8 +183,10 @@ INITIALIZE_PASS_END(
     HWAddressSanitizer, "hwasan",
     "HWAddressSanitizer: detect memory bugs using tagged addressing.", false, false)
 
-FunctionPass *llvm::createHWAddressSanitizerPass(bool Recover) {
-  return new HWAddressSanitizer(Recover);
+FunctionPass *llvm::createHWAddressSanitizerPass(bool CompileKernel,
+                                                 bool Recover) {
+  assert(!CompileKernel || Recover);
+  return new HWAddressSanitizer(CompileKernel, Recover);
 }
 
 /// \brief Module-level initialization.
@@ -181,7 +196,7 @@ bool HWAddressSanitizer::doInitialization(Module &M) {
   DEBUG(dbgs() << "Init " << M.getName() << "\n");
   auto &DL = M.getDataLayout();
 
-  Triple TargetTriple(M.getTargetTriple());
+  TargetTriple = Triple(M.getTargetTriple());
 
   C = &(M.getContext());
   IRBuilder<> IRB(*C);
@@ -189,7 +204,7 @@ bool HWAddressSanitizer::doInitialization(Module &M) {
   Int8Ty = IRB.getInt8Ty();
 
   HwasanCtorFunction = nullptr;
-  if (!ClEnableKhwasan) {
+  if (!CompileKernel) {
     std::tie(HwasanCtorFunction, std::ignore) =
         createSanitizerCtorAndInitFunctions(M, kHwasanModuleCtorName,
                                             kHwasanInitName,
@@ -228,10 +243,10 @@ void HWAddressSanitizer::initializeCallbacks(Module &M) {
 }
 
 Value *HWAddressSanitizer::isInterestingMemoryAccess(Instruction *I,
-                                                   bool *IsWrite,
-                                                   uint64_t *TypeSize,
-                                                   unsigned *Alignment,
-                                                   Value **MaybeMask) {
+                                                     bool *IsWrite,
+                                                     uint64_t *TypeSize,
+                                                     unsigned *Alignment,
+                                                     Value **MaybeMask) {
   // Skip memory accesses inserted by another instrumentation.
   if (I->getMetadata("nosanitize")) return nullptr;
 
@@ -281,17 +296,42 @@ Value *HWAddressSanitizer::isInterestingMemoryAccess(Instruction *I,
   return PtrOperand;
 }
 
+static unsigned getPointerOperandIndex(Instruction *I) {
+  if (LoadInst *LI = dyn_cast<LoadInst>(I))
+    return LI->getPointerOperandIndex();
+  if (StoreInst *SI = dyn_cast<StoreInst>(I))
+    return SI->getPointerOperandIndex();
+  if (AtomicRMWInst *RMW = dyn_cast<AtomicRMWInst>(I))
+    return RMW->getPointerOperandIndex();
+  if (AtomicCmpXchgInst *XCHG = dyn_cast<AtomicCmpXchgInst>(I))
+    return XCHG->getPointerOperandIndex();
+  report_fatal_error("Unexpected instruction");
+  return -1;
+}
+
 static size_t TypeSizeToSizeIndex(uint32_t TypeSize) {
   size_t Res = countTrailingZeros(TypeSize / 8);
   assert(Res < kNumberOfAccessSizes);
   return Res;
 }
 
+void HWAddressSanitizer::untagPointerOperand(Instruction *I, Value *Addr) {
+  if (TargetTriple.isAArch64())
+    return;
+
+  IRBuilder<> IRB(I);
+  Value *AddrLong = IRB.CreatePointerCast(Addr, IntptrTy);
+  Value *UntaggedPtr =
+      IRB.CreateIntToPtr(untagPointer(IRB, AddrLong), Addr->getType());
+  I->setOperand(getPointerOperandIndex(I), UntaggedPtr);
+}
+
 void HWAddressSanitizer::instrumentMemAccessInline(Value *PtrLong, bool IsWrite,
                                                    unsigned AccessSizeIndex,
                                                    Instruction *InsertBefore) {
   IRBuilder<> IRB(InsertBefore);
-  Value *PtrTag = IRB.CreateTrunc(IRB.CreateLShr(PtrLong, kPointerTagShift), IRB.getInt8Ty());
+  Value *PtrTag = IRB.CreateTrunc(IRB.CreateLShr(PtrLong, kPointerTagShift),
+                                  IRB.getInt8Ty());
   Value *AddrLong = untagPointer(IRB, PtrLong);
   Value *ShadowLong = IRB.CreateLShr(AddrLong, kShadowScale);
   if (ClMappingOffset)
@@ -302,18 +342,42 @@ void HWAddressSanitizer::instrumentMemAccessInline(Value *PtrLong, bool IsWrite,
       IRB.CreateLoad(IRB.CreateIntToPtr(ShadowLong, IRB.getInt8PtrTy()));
   Value *TagMismatch = IRB.CreateICmpNE(PtrTag, MemTag);
 
+  int matchAllTag = ClMatchAllTag.getNumOccurrences() > 0 ?
+      ClMatchAllTag : (CompileKernel ? 0xFF : -1);
+  if (matchAllTag != -1) {
+    Value *TagNotIgnored = IRB.CreateICmpNE(PtrTag,
+        ConstantInt::get(PtrTag->getType(), matchAllTag));
+    TagMismatch = IRB.CreateAnd(TagMismatch, TagNotIgnored);
+  }
+
   TerminatorInst *CheckTerm =
       SplitBlockAndInsertIfThen(TagMismatch, InsertBefore, !Recover,
                                 MDBuilder(*C).createBranchWeights(1, 100000));
 
   IRB.SetInsertPoint(CheckTerm);
-  // The signal handler will find the data address in x0.
-  InlineAsm *Asm = InlineAsm::get(
-      FunctionType::get(IRB.getVoidTy(), {PtrLong->getType()}, false),
-      "brk #" +
-          itostr(0x900 + Recover * 0x20 + IsWrite * 0x10 + AccessSizeIndex),
-      "{x0}",
-      /*hasSideEffects=*/true);
+  const int64_t AccessInfo = Recover * 0x20 + IsWrite * 0x10 + AccessSizeIndex;
+  InlineAsm *Asm;
+  switch (TargetTriple.getArch()) {
+    case Triple::x86_64:
+      // The signal handler will find the data address in rdi.
+      Asm = InlineAsm::get(
+          FunctionType::get(IRB.getVoidTy(), {PtrLong->getType()}, false),
+          "int3\nnopl " + itostr(0x40 + AccessInfo) + "(%rax)",
+          "{rdi}",
+          /*hasSideEffects=*/true);
+      break;
+    case Triple::aarch64:
+    case Triple::aarch64_be:
+      // The signal handler will find the data address in x0.
+      Asm = InlineAsm::get(
+          FunctionType::get(IRB.getVoidTy(), {PtrLong->getType()}, false),
+          "brk #" + itostr(0x900 + AccessInfo),
+          "{x0}",
+          /*hasSideEffects=*/true);
+      break;
+    default:
+      report_fatal_error("unsupported architecture");
+  }
   IRB.CreateCall(Asm, PtrLong);
 }
 
@@ -349,6 +413,7 @@ bool HWAddressSanitizer::instrumentMemAccess(Instruction *I) {
     IRB.CreateCall(HwasanMemoryAccessCallbackSized[IsWrite],
                    {AddrLong, ConstantInt::get(IntptrTy, TypeSize / 8)});
   }
+  untagPointerOperand(I, Addr);
 
   return true;
 }
@@ -446,7 +511,7 @@ Value *HWAddressSanitizer::getUARTag(IRBuilder<> &IRB, Value *StackTag) {
 Value *HWAddressSanitizer::tagPointer(IRBuilder<> &IRB, Type *Ty, Value *PtrLong,
                                       Value *Tag) {
   Value *TaggedPtrLong;
-  if (ClEnableKhwasan) {
+  if (CompileKernel) {
     // Kernel addresses have 0xFF in the most significant byte.
     Value *ShiftedTag = IRB.CreateOr(
         IRB.CreateShl(Tag, kPointerTagShift),
@@ -463,7 +528,7 @@ Value *HWAddressSanitizer::tagPointer(IRBuilder<> &IRB, Type *Ty, Value *PtrLong
 // Remove tag from an address.
 Value *HWAddressSanitizer::untagPointer(IRBuilder<> &IRB, Value *PtrLong) {
   Value *UntaggedPtrLong;
-  if (ClEnableKhwasan) {
+  if (CompileKernel) {
     // Kernel addresses have 0xFF in the most significant byte.
     UntaggedPtrLong = IRB.CreateOr(PtrLong,
         ConstantInt::get(PtrLong->getType(), 0xFFULL << kPointerTagShift));

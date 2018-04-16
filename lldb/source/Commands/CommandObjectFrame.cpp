@@ -620,9 +620,6 @@ protected:
 
               if (!scope_string.empty())
                 s.PutCString(scope_string);
-
-              //                            if (format != eFormatDefault)
-              //                                valobj_sp->SetFormat (format);
               if (m_option_variable.show_decl && var_sp &&
                   var_sp->GetDeclaration().GetFile()) {
                 var_sp->GetDeclaration().DumpStopContext(&s, false);
@@ -723,7 +720,14 @@ protected:
       m_interpreter.TruncationWarningGiven();
     }
 
-    return result.Succeeded();
+    // Increment statistics.
+    bool res = result.Succeeded();
+    Target *target = GetSelectedOrDummyTarget();
+    if (res)
+      target->IncrementStats(StatisticKind::FrameVarSuccess);
+    else
+      target->IncrementStats(StatisticKind::FrameVarFailure);
+    return res;
   }
 
 protected:

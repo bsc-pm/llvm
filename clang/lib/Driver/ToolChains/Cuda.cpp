@@ -21,6 +21,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include <system_error>
 
@@ -183,7 +184,7 @@ CudaInstallationDetector::CudaInstallationDetector(
         StringRef GpuArch = FileName.slice(
             LibDeviceName.size(), FileName.find('.', LibDeviceName.size()));
         LibDeviceMap[GpuArch] = FilePath.str();
-        // Insert map entries for specifc devices with this compute
+        // Insert map entries for specific devices with this compute
         // capability. NVCC's choice of the libdevice library version is
         // rather peculiar and depends on the CUDA version.
         if (GpuArch == "compute_20") {
@@ -376,6 +377,22 @@ void NVPTX::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
   C.addCommand(llvm::make_unique<Command>(JA, *this, Exec, CmdArgs, Inputs));
 }
 
+static bool shouldIncludePTX(const ArgList &Args, const char *gpu_arch) {
+  bool includePTX = true;
+  for (Arg *A : Args) {
+    if (!(A->getOption().matches(options::OPT_cuda_include_ptx_EQ) ||
+          A->getOption().matches(options::OPT_no_cuda_include_ptx_EQ)))
+      continue;
+    A->claim();
+    const StringRef ArchStr = A->getValue();
+    if (ArchStr == "all" || ArchStr == gpu_arch) {
+      includePTX = A->getOption().matches(options::OPT_cuda_include_ptx_EQ);
+      continue;
+    }
+  }
+  return includePTX;
+}
+
 // All inputs to this linker must be from CudaDeviceActions, as we need to look
 // at the Inputs' Actions in order to figure out which GPU architecture they
 // correspond to.
@@ -403,6 +420,9 @@ void NVPTX::Linker::ConstructJob(Compilation &C, const JobAction &JA,
            "Device action expected to have associated a GPU architecture!");
     CudaArch gpu_arch = StringToCudaArch(gpu_arch_str);
 
+    if (II.getType() == types::TY_PP_Asm &&
+        !shouldIncludePTX(Args, gpu_arch_str))
+      continue;
     // We need to pass an Arch of the form "sm_XX" for cubin files and
     // "compute_XX" for ptx.
     const char *Arch =
@@ -579,6 +599,44 @@ void CudaToolChain::addClangTargetOptions(
     // came with CUDA-7.0.
     CC1Args.push_back("-target-feature");
     CC1Args.push_back("+ptx42");
+  }
+
+  if (DeviceOffloadingKind == Action::OFK_OpenMP) {
+    SmallVector<StringRef, 8> LibraryPaths;
+    // Add path to lib and/or lib64 folders.
+    SmallString<256> DefaultLibPath =
+      llvm::sys::path::parent_path(getDriver().Dir);
+    llvm::sys::path::append(DefaultLibPath,
+        Twine("lib") + CLANG_LIBDIR_SUFFIX);
+    LibraryPaths.emplace_back(DefaultLibPath.c_str());
+
+    // Add user defined library paths from LIBRARY_PATH.
+    llvm::Optional<std::string> LibPath =
+        llvm::sys::Process::GetEnv("LIBRARY_PATH");
+    if (LibPath) {
+      SmallVector<StringRef, 8> Frags;
+      const char EnvPathSeparatorStr[] = {llvm::sys::EnvPathSeparator, '\0'};
+      llvm::SplitString(*LibPath, Frags, EnvPathSeparatorStr);
+      for (StringRef Path : Frags)
+        LibraryPaths.emplace_back(Path.trim());
+    }
+
+    std::string LibOmpTargetName =
+      "libomptarget-nvptx-" + GpuArch.str() + ".bc";
+    bool FoundBCLibrary = false;
+    for (StringRef LibraryPath : LibraryPaths) {
+      SmallString<128> LibOmpTargetFile(LibraryPath);
+      llvm::sys::path::append(LibOmpTargetFile, LibOmpTargetName);
+      if (llvm::sys::fs::exists(LibOmpTargetFile)) {
+        CC1Args.push_back("-mlink-cuda-bitcode");
+        CC1Args.push_back(DriverArgs.MakeArgString(LibOmpTargetFile));
+        FoundBCLibrary = true;
+        break;
+      }
+    }
+    if (!FoundBCLibrary)
+      getDriver().Diag(diag::warn_drv_omp_offload_target_missingbcruntime)
+          << LibOmpTargetName;
   }
 }
 

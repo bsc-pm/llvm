@@ -26,16 +26,6 @@ buildTestFS(StringMap<std::string> const &Files) {
   return MemFS;
 }
 
-Tagged<IntrusiveRefCntPtr<vfs::FileSystem>>
-MockFSProvider::getTaggedFileSystem(PathRef File) {
-  if (ExpectedFile) {
-    EXPECT_EQ(*ExpectedFile, File);
-  }
-
-  auto FS = buildTestFS(Files);
-  return make_tagged(FS, Tag);
-}
-
 MockCompilationDatabase::MockCompilationDatabase(bool UseRelPaths)
     : ExtraClangFlags({"-ffreestanding"}), UseRelPaths(UseRelPaths) {
   // -ffreestanding avoids implicit stdc-predef.h.
@@ -55,7 +45,7 @@ MockCompilationDatabase::getCompileCommand(PathRef File) const {
 }
 
 const char *testRoot() {
-#ifdef LLVM_ON_WIN32
+#ifdef _WIN32
   return "C:\\clangd-test";
 #else
   return "/clangd-test";

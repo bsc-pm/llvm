@@ -119,11 +119,13 @@ static void checkDataType(const Symbol *Existing, const InputFile *File) {
 }
 
 DefinedFunction *SymbolTable::addSyntheticFunction(StringRef Name,
-                                                   const WasmSignature *Type,
-                                                   uint32_t Flags) {
+                                                   uint32_t Flags,
+                                                   InputFunction *Function) {
   DEBUG(dbgs() << "addSyntheticFunction: " << Name << "\n");
   assert(!find(Name));
-  return replaceSymbol<DefinedFunction>(insert(Name).first, Name, Flags, Type);
+  SyntheticFunctions.emplace_back(Function);
+  return replaceSymbol<DefinedFunction>(insert(Name).first, Name, Flags,
+                                        nullptr, Function);
 }
 
 DefinedData *SymbolTable::addSyntheticDataSymbol(StringRef Name,
@@ -137,6 +139,7 @@ DefinedGlobal *SymbolTable::addSyntheticGlobal(StringRef Name, uint32_t Flags,
                                                InputGlobal *Global) {
   DEBUG(dbgs() << "addSyntheticGlobal: " << Name << " -> " << Global << "\n");
   assert(!find(Name));
+  SyntheticGlobals.emplace_back(Global);
   return replaceSymbol<DefinedGlobal>(insert(Name).first, Name, Flags, nullptr,
                                       Global);
 }
@@ -301,18 +304,6 @@ void SymbolTable::addLazy(ArchiveFile *File, const Archive::Symbol *Sym) {
   }
 }
 
-bool SymbolTable::addComdat(StringRef Name, ObjFile *F) {
-  DEBUG(dbgs() << "addComdat: " << Name << "\n");
-  ObjFile *&File = ComdatMap[CachedHashStringRef(Name)];
-  if (File) {
-    DEBUG(dbgs() << "COMDAT already defined\n");
-    return false;
-  }
-  File = F;
-  return true;
-}
-
-ObjFile *SymbolTable::findComdat(StringRef Name) const {
-  auto It = ComdatMap.find(CachedHashStringRef(Name));
-  return It == ComdatMap.end() ? nullptr : It->second;
+bool SymbolTable::addComdat(StringRef Name) {
+  return Comdats.insert(CachedHashStringRef(Name)).second;
 }

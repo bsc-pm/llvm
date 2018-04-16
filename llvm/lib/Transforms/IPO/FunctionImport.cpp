@@ -71,6 +71,10 @@ static cl::opt<unsigned> ImportInstrLimit(
     "import-instr-limit", cl::init(100), cl::Hidden, cl::value_desc("N"),
     cl::desc("Only import functions with less than N instructions"));
 
+static cl::opt<int> ImportCutoff(
+    "import-cutoff", cl::init(-1), cl::Hidden, cl::value_desc("N"),
+    cl::desc("Only import first N functions if N>=0 (default -1)"));
+
 static cl::opt<float>
     ImportInstrFactor("import-instr-evolution-factor", cl::init(0.7),
                       cl::Hidden, cl::value_desc("x"),
@@ -256,12 +260,11 @@ static void computeImportForReferencedGlobals(
           // Don't try to import regular LTO summaries added to dummy module.
           !RefSummary->modulePath().empty() &&
           !GlobalValue::isInterposableLinkage(RefSummary->linkage()) &&
-          // For now we don't import global variables which have outgoing
-          // refs. Otherwise we have to promote referenced vars/functions.
           RefSummary->refs().empty()) {
         ImportList[RefSummary->modulePath()][VI.getGUID()] = 1;
         if (ExportLists)
           (*ExportLists)[RefSummary->modulePath()].insert(VI.getGUID());
+        break;
       }
   }
 }
@@ -277,10 +280,17 @@ static void computeImportForFunction(
     StringMap<FunctionImporter::ExportSetTy> *ExportLists = nullptr) {
   computeImportForReferencedGlobals(Summary, DefinedGVSummaries, ImportList,
                                     ExportLists);
+  static int ImportCount = 0;
   for (auto &Edge : Summary.calls()) {
     ValueInfo VI = Edge.first;
     DEBUG(dbgs() << " edge -> " << VI.getGUID() << " Threshold:" << Threshold
                  << "\n");
+
+    if (ImportCutoff >= 0 && ImportCount >= ImportCutoff) {
+      DEBUG(dbgs() << "ignored! import-cutoff value of " << ImportCutoff
+                   << " reached.\n");
+      continue;
+    }
 
     VI = updateValueInfoForIndirectCalls(Index, VI);
     if (!VI)
@@ -343,6 +353,8 @@ static void computeImportForFunction(
     bool PreviouslyImported = ProcessedThreshold != 0;
     // Mark this function as imported in this module, with the current Threshold
     ProcessedThreshold = AdjThreshold;
+
+    ImportCount++;
 
     // Make exports in the source module.
     if (ExportLists) {
@@ -438,7 +450,8 @@ getGUID(const std::pair<const GlobalValue::GUID, unsigned> &P) {
 }
 
 template <class T>
-unsigned numGlobalVarSummaries(const ModuleSummaryIndex &Index, T &Cont) {
+static unsigned numGlobalVarSummaries(const ModuleSummaryIndex &Index,
+                                      T &Cont) {
   unsigned NumGVS = 0;
   for (auto &V : Cont)
     if (isGlobalVarSummary(Index, getGUID(V)))
@@ -611,9 +624,26 @@ void llvm::computeDeadSymbols(
       if (S->isLive())
         return;
 
-    // We do not keep live symbols that are known to be non-prevailing.
-    if (isPrevailing(VI.getGUID()) == PrevailingType::No)
-      return;
+    // We only keep live symbols that are known to be non-prevailing if any are
+    // available_externally. Those symbols are discarded later in the
+    // EliminateAvailableExternally pass and setting them to not-live breaks
+    // downstreams users of liveness information (PR36483).
+    if (isPrevailing(VI.getGUID()) == PrevailingType::No) {
+      bool AvailableExternally = false;
+      bool Interposable = false;
+      for (auto &S : VI.getSummaryList()) {
+        if (S->linkage() == GlobalValue::AvailableExternallyLinkage)
+          AvailableExternally = true;
+        else if (GlobalValue::isInterposableLinkage(S->linkage()))
+          Interposable = true;
+      }
+
+      if (!AvailableExternally)
+        return;
+
+      if (Interposable)
+        report_fatal_error("Interposable and available_externally symbol");
+    }
 
     for (auto &S : VI.getSummaryList())
       S->setLive(true);

@@ -28,7 +28,6 @@
 #include "llvm/CodeGen/MachineModuleInfoImpls.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/StackMaps.h"
-#include "llvm/CodeGen/TargetLoweringObjectFile.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Mangler.h"
@@ -44,6 +43,7 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolELF.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 
 using namespace llvm;
 
@@ -1454,7 +1454,7 @@ void X86AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   // Add a comment about EVEX-2-VEX compression for AVX-512 instrs that
   // are compressed from EVEX encoding to VEX encoding.
   if (TM.Options.MCOptions.ShowMCEncoding) {
-    if (MI->getAsmPrinterFlags() & AC_EVEX_2_VEX)
+    if (MI->getAsmPrinterFlags() & X86::AC_EVEX_2_VEX)
       OutStreamer->AddComment("EVEX TO VEX Compression ", false);
   }
 

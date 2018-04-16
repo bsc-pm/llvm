@@ -70,7 +70,7 @@ void DWARFDebugLine::Prologue::clear() {
   SegSelectorSize = 0;
   MinInstLength = MaxOpsPerInst = DefaultIsStmt = LineBase = LineRange = 0;
   OpcodeBase = 0;
-  FormParams = DWARFFormParams({0, 0, DWARF32});
+  FormParams = dwarf::FormParams({0, 0, DWARF32});
   ContentTypes = ContentTypeTracker();
   StandardOpcodeLengths.clear();
   IncludeDirectories.clear();
@@ -194,8 +194,8 @@ parseV5EntryFormat(const DWARFDataExtractor &DebugLineData, uint32_t
 static bool
 parseV5DirFileTables(const DWARFDataExtractor &DebugLineData,
                      uint32_t *OffsetPtr, uint64_t EndPrologueOffset,
-                     const DWARFFormParams &FormParams, const DWARFContext
-                     &Ctx, const DWARFUnit *U,
+                     const dwarf::FormParams &FormParams,
+                     const DWARFContext &Ctx, const DWARFUnit *U,
                      DWARFDebugLine::ContentTypeTracker &ContentTypes,
                      std::vector<DWARFFormValue> &IncludeDirectories,
                      std::vector<DWARFDebugLine::FileNameEntry> &FileNames) {
@@ -449,6 +449,9 @@ const DWARFDebugLine::LineTable *
 DWARFDebugLine::getOrParseLineTable(DWARFDataExtractor &DebugLineData,
                                     uint32_t Offset, const DWARFContext &Ctx,
                                     const DWARFUnit *U) {
+  if (!DebugLineData.isValidOffset(Offset))
+    return nullptr;
+
   std::pair<LineTableIter, bool> Pos =
       LineTableMap.insert(LineTableMapTy::value_type(Offset, LineTable()));
   LineTable *LT = &Pos.first->second;
@@ -548,8 +551,14 @@ bool DWARFDebugLine::LineTable::parse(DWARFDataExtractor &DebugLineData,
         // from the size of the operand.
         if (DebugLineData.getAddressSize() == 0)
           DebugLineData.setAddressSize(Len - 1);
-        else
-          assert(DebugLineData.getAddressSize() == Len - 1);
+        else if (DebugLineData.getAddressSize() != Len - 1) {
+          fprintf(stderr, "Mismatching address size at offset 0x%8.8" PRIx32
+                  " expected 0x%2.2" PRIx8 " found 0x%2.2" PRIx64 "\n",
+                  ExtOffset, DebugLineData.getAddressSize(), Len - 1);
+          // Skip the rest of the line-number program.
+          *OffsetPtr = EndOffset;
+          return false;
+        }
         State.Row.Address = DebugLineData.getRelocatedAddress(OffsetPtr);
         if (OS)
           *OS << format(" (0x%16.16" PRIx64 ")", State.Row.Address);
@@ -826,7 +835,7 @@ bool DWARFDebugLine::LineTable::parse(DWARFDataExtractor &DebugLineData,
 
   // Sort all sequences so that address lookup will work faster.
   if (!Sequences.empty()) {
-    std::sort(Sequences.begin(), Sequences.end(), Sequence::orderByLowPC);
+    llvm::sort(Sequences.begin(), Sequences.end(), Sequence::orderByLowPC);
     // Note: actually, instruction address ranges of sequences should not
     // overlap (in shared objects and executables). If they do, the address
     // lookup would still work, though, but result would be ambiguous.
@@ -953,6 +962,14 @@ Optional<StringRef> DWARFDebugLine::LineTable::getSourceByIndex(uint64_t FileInd
   return None;
 }
 
+static bool isPathAbsoluteOnWindowsOrPosix(const Twine &Path) {
+  // Debug info can contain paths from any OS, not necessarily
+  // an OS we're currently running on. Moreover different compilation units can
+  // be compiled on different operating systems and linked together later.
+  return sys::path::is_absolute(Path, sys::path::Style::posix) ||
+         sys::path::is_absolute(Path, sys::path::Style::windows);
+}
+
 bool DWARFDebugLine::LineTable::getFileNameByIndex(uint64_t FileIndex,
                                                    const char *CompDir,
                                                    FileLineInfoKind Kind,
@@ -962,7 +979,7 @@ bool DWARFDebugLine::LineTable::getFileNameByIndex(uint64_t FileIndex,
   const FileNameEntry &Entry = Prologue.FileNames[FileIndex - 1];
   StringRef FileName = Entry.Name.getAsCString().getValue();
   if (Kind != FileLineInfoKind::AbsoluteFilePath ||
-      sys::path::is_absolute(FileName)) {
+      isPathAbsoluteOnWindowsOrPosix(FileName)) {
     Result = FileName;
     return true;
   }
@@ -981,7 +998,7 @@ bool DWARFDebugLine::LineTable::getFileNameByIndex(uint64_t FileIndex,
   // We know that FileName is not absolute, the only way to have an
   // absolute path at this point would be if IncludeDir is absolute.
   if (CompDir && Kind == FileLineInfoKind::AbsoluteFilePath &&
-      sys::path::is_relative(IncludeDir))
+      !isPathAbsoluteOnWindowsOrPosix(IncludeDir))
     sys::path::append(FilePath, CompDir);
 
   // sys::path::append skips empty strings.

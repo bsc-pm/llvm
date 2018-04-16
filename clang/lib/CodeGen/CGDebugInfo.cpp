@@ -817,7 +817,7 @@ static SmallString<256> getUniqueTagTypeName(const TagType *Ty,
   return FullName;
 }
 
-/// \return the approproate DWARF tag for a composite type.
+/// \return the appropriate DWARF tag for a composite type.
 static llvm::dwarf::Tag getTagForRecord(const RecordDecl *RD) {
    llvm::dwarf::Tag Tag;
   if (RD->isStruct() || RD->isInterface())
@@ -1000,20 +1000,28 @@ static unsigned getDwarfCC(CallingConv CC) {
     return llvm::dwarf::DW_CC_LLVM_vectorcall;
   case CC_X86Pascal:
     return llvm::dwarf::DW_CC_BORLAND_pascal;
-
-  // FIXME: Create new DW_CC_ codes for these calling conventions.
   case CC_Win64:
+    return llvm::dwarf::DW_CC_LLVM_Win64;
   case CC_X86_64SysV:
+    return llvm::dwarf::DW_CC_LLVM_X86_64SysV;
   case CC_AAPCS:
+    return llvm::dwarf::DW_CC_LLVM_AAPCS;
   case CC_AAPCS_VFP:
+    return llvm::dwarf::DW_CC_LLVM_AAPCS_VFP;
   case CC_IntelOclBicc:
+    return llvm::dwarf::DW_CC_LLVM_IntelOclBicc;
   case CC_SpirFunction:
+    return llvm::dwarf::DW_CC_LLVM_SpirFunction;
   case CC_OpenCLKernel:
+    return llvm::dwarf::DW_CC_LLVM_OpenCLKernel;
   case CC_Swift:
+    return llvm::dwarf::DW_CC_LLVM_Swift;
   case CC_PreserveMost:
+    return llvm::dwarf::DW_CC_LLVM_PreserveMost;
   case CC_PreserveAll:
+    return llvm::dwarf::DW_CC_LLVM_PreserveAll;
   case CC_X86RegCall:
-    return 0;
+    return llvm::dwarf::DW_CC_LLVM_X86RegCall;
   }
   return 0;
 }
@@ -1405,7 +1413,7 @@ llvm::DISubprogram *CGDebugInfo::CreateCXXMemberFunction(
       // deleting dtor.
       const auto *DD = dyn_cast<CXXDestructorDecl>(Method);
       GlobalDecl GD = DD ? GlobalDecl(DD, Dtor_Deleting) : GlobalDecl(Method);
-      MicrosoftVTableContext::MethodVFTableLocation ML =
+      MethodVFTableLocation ML =
           CGM.getMicrosoftVTableContext().getMethodVFTableLocation(GD);
       VIndex = ML.Index;
 
@@ -2098,7 +2106,7 @@ CGDebugInfo::getOrCreateModuleRef(ExternalASTSource::ASTSourceDescriptor Mod,
     llvm::raw_svector_ostream OS(ConfigMacros);
     const auto &PPOpts = CGM.getPreprocessorOpts();
     unsigned I = 0;
-    // Translate the macro definitions back into a commmand line.
+    // Translate the macro definitions back into a command line.
     for (auto &M : PPOpts.Macros) {
       if (++I > 1)
         OS << " ";
@@ -2863,7 +2871,7 @@ llvm::DICompositeType *CGDebugInfo::CreateLimitedType(const RecordType *Ty) {
   case llvm::dwarf::DW_TAG_structure_type:
   case llvm::dwarf::DW_TAG_union_type:
   case llvm::dwarf::DW_TAG_class_type:
-    // Immediatley resolve to a distinct node.
+    // Immediately resolve to a distinct node.
     RealDecl =
         llvm::MDNode::replaceWithDistinct(llvm::TempDICompositeType(RealDecl));
     break;
@@ -3579,7 +3587,7 @@ llvm::DILocalVariable *CGDebugInfo::EmitDeclare(const VarDecl *VD,
     const RecordDecl *RD = RT->getDecl();
     if (RD->isUnion() && RD->isAnonymousStructOrUnion()) {
       // GDB has trouble finding local variables in anonymous unions, so we emit
-      // artifical local variables for each of the members.
+      // artificial local variables for each of the members.
       //
       // FIXME: Remove this code as soon as GDB supports this.
       // The debug info verifier in LLVM operates based on the assumption that a

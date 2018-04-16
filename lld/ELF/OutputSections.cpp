@@ -25,7 +25,6 @@
 using namespace llvm;
 using namespace llvm::dwarf;
 using namespace llvm::object;
-using namespace llvm::support::endian;
 using namespace llvm::ELF;
 
 using namespace lld;
@@ -72,9 +71,7 @@ void OutputSection::writeHeaderTo(typename ELFT::Shdr *Shdr) {
 OutputSection::OutputSection(StringRef Name, uint32_t Type, uint64_t Flags)
     : BaseCommand(OutputSectionKind),
       SectionBase(Output, Name, Flags, /*Entsize*/ 0, /*Alignment*/ 1, Type,
-                  /*Info*/ 0,
-                  /*Link*/ 0),
-      SectionIndex(INT_MAX) {
+                  /*Info*/ 0, /*Link*/ 0) {
   Live = false;
 }
 
@@ -100,7 +97,8 @@ void OutputSection::addSection(InputSection *IS) {
     Flags = IS->Flags;
   } else {
     // Otherwise, check if new type or flags are compatible with existing ones.
-    if ((Flags & (SHF_ALLOC | SHF_TLS)) != (IS->Flags & (SHF_ALLOC | SHF_TLS)))
+    unsigned Mask = SHF_ALLOC | SHF_TLS | SHF_LINK_ORDER;
+    if ((Flags & Mask) != (IS->Flags & Mask))
       error("incompatible section flags for " + Name + "\n>>> " + toString(IS) +
             ": 0x" + utohexstr(IS->Flags) + "\n>>> output section " + Name +
             ": 0x" + utohexstr(Flags));
@@ -125,7 +123,6 @@ void OutputSection::addSection(InputSection *IS) {
   Flags = AndFlags | OrFlags;
 
   Alignment = std::max(Alignment, IS->Alignment);
-  IS->OutSecOff = Size++;
 
   // If this section contains a table of fixed-size entries, sh_entsize
   // holds the element size. If it contains elements of different size we
@@ -214,11 +211,11 @@ static void writeInt(uint8_t *Buf, uint64_t Data, uint64_t Size) {
   if (Size == 1)
     *Buf = Data;
   else if (Size == 2)
-    write16(Buf, Data, Config->Endianness);
+    write16(Buf, Data);
   else if (Size == 4)
-    write32(Buf, Data, Config->Endianness);
+    write32(Buf, Data);
   else if (Size == 8)
-    write64(Buf, Data, Config->Endianness);
+    write64(Buf, Data);
   else
     llvm_unreachable("unsupported Size argument");
 }
@@ -367,8 +364,6 @@ static bool compCtors(const InputSection *A, const InputSection *B) {
   assert(Y.startswith(".ctors") || Y.startswith(".dtors"));
   X = X.substr(6);
   Y = Y.substr(6);
-  if (X.empty() && Y.empty())
-    return false;
   return X < Y;
 }
 

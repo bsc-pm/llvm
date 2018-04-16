@@ -75,6 +75,10 @@ def color_diagnostics: F<"color-diagnostics">,
 def color_diagnostics_eq: J<"color-diagnostics=">,
   HelpText<"Use colors in diagnostics">;
 
+defm cref: B<"cref",
+    "Output cross reference table",
+    "Do not output cross reference table">;
+
 defm define_common: B<"define-common",
     "Assign space to common symbols",
     "Do not assign space to common symbols">;
@@ -108,6 +112,9 @@ def emit_relocs: F<"emit-relocs">, HelpText<"Generate relocations in output">;
 
 def enable_new_dtags: F<"enable-new-dtags">,
   HelpText<"Enable new dynamic tags">;
+
+def end_group: F<"end-group">,
+  HelpText<"Ignored for compatibility with GNU unless you pass --warn-backrefs">;
 
 def end_lib: F<"end-lib">,
   HelpText<"End a grouping of objects that should be treated as if they were together in an archive">;
@@ -179,6 +186,8 @@ defm image_base : Eq<"image-base">, HelpText<"Set the base address">;
 
 defm init: Eq<"init">, HelpText<"Specify an initializer function">,
   MetaVarName<"<symbol>">;
+
+defm just_symbols: Eq<"just-symbols">, HelpText<"Just link symbols">;
 
 defm library: Eq<"library">, HelpText<"Root name of library to use">,
   MetaVarName<"<libName>">;
@@ -268,6 +277,9 @@ defm soname: Eq<"soname">, HelpText<"Set DT_SONAME">;
 defm sort_section: Eq<"sort-section">,
   HelpText<"Specifies sections sorting rule when linkerscript is used">;
 
+def start_group: F<"start-group">,
+  HelpText<"Ignored for compatibility with GNU unless you pass --warn-backrefs">;
+
 def start_lib: F<"start-lib">,
   HelpText<"Start a grouping of objects that should be treated as if they were together in an archive">;
 
@@ -317,6 +329,10 @@ def version: F<"version">, HelpText<"Display the version number and exit">;
 
 defm version_script: Eq<"version-script">, HelpText<"Read a version script">;
 
+defm warn_backrefs: B<"warn-backrefs",
+    "Warn about backward symbol references to fetch archive members",
+    "Do not warn about backward symbol references to fetch archive members">;
+
 defm warn_common: B<"warn-common",
     "Warn about duplicate common symbols",
     "Do not warn about duplicate common symbols">;
@@ -351,6 +367,7 @@ def alias_define_common_dp: F<"dp">, Alias<define_common>;
 def alias_discard_all_x: Flag<["-"], "x">, Alias<discard_all>;
 def alias_discard_locals_X: Flag<["-"], "X">, Alias<discard_locals>;
 def alias_emit_relocs: Flag<["-"], "q">, Alias<emit_relocs>;
+def alias_end_group_paren: Flag<["-"], ")">, Alias<end_group>;
 def alias_entry_e: JoinedOrSeparate<["-"], "e">, Alias<entry>;
 def alias_export_dynamic_E: Flag<["-"], "E">, Alias<export_dynamic>;
 def alias_filter: Separate<["-"], "F">, Alias<filter>;
@@ -368,6 +385,7 @@ def alias_rpath_R: JoinedOrSeparate<["-"], "R">, Alias<rpath>;
 def alias_script_T: JoinedOrSeparate<["-"], "T">, Alias<script>;
 def alias_shared_Bshareable: F<"Bshareable">, Alias<shared>;
 def alias_soname_h: JoinedOrSeparate<["-"], "h">, Alias<soname>;
+def alias_start_group_paren: Flag<["-"], "(">, Alias<start_group>;
 def alias_strip_all: Flag<["-"], "s">, Alias<strip_all>;
 def alias_strip_debug_S: Flag<["-"], "S">, Alias<strip_debug>;
 def alias_trace: Flag<["-"], "t">, Alias<trace>;
@@ -377,21 +395,19 @@ def alias_Ttext_segment_eq: Joined<["-", "--"], "Ttext-segment=">, Alias<Ttext>;
 def alias_undefined_u: JoinedOrSeparate<["-"], "u">, Alias<undefined>;
 def alias_version_V: Flag<["-"], "V">, Alias<version>;
 
-// Our symbol resolution algorithm handles symbols in archive files differently
-// than traditional linkers, so we don't need --start-group and --end-group.
-// These options are recongized for compatibility but ignored.
-def end_group: F<"end-group">;
-def end_group_paren: Flag<["-"], ")">;
-def start_group: F<"start-group">;
-def start_group_paren: Flag<["-"], "(">;
-
 // LTO-related options.
 def lto_aa_pipeline: J<"lto-aa-pipeline=">,
   HelpText<"AA pipeline to run during LTO. Used in conjunction with -lto-newpm-passes">;
+def lto_debug_pass_manager: F<"lto-debug-pass-manager">,
+  HelpText<"Debug new pass manager">;
+def lto_new_pass_manager: F<"lto-new-pass-manager">,
+  HelpText<"Use new pass manager">;
 def lto_newpm_passes: J<"lto-newpm-passes=">,
   HelpText<"Passes to run during LTO">;
 def lto_partitions: J<"lto-partitions=">,
   HelpText<"Number of LTO codegen partitions">;
+def lto_sample_profile: J<"lto-sample-profile=">,
+  HelpText<"Sample profile file path">;
 def disable_verify: F<"disable-verify">;
 defm mllvm: Eq<"mllvm">;
 def opt_remarks_filename: Separate<["--"], "opt-remarks-filename">,
@@ -418,7 +434,6 @@ defm plugin: Eq<"plugin">;
 
 // Options listed below are silently ignored for now for compatibility.
 def allow_shlib_undefined: F<"allow-shlib-undefined">;
-def cref: F<"cref">;
 def detect_odr_violations: F<"detect-odr-violations">;
 def g: Flag<["-"], "g">;
 def long_plt: F<"long-plt">;

@@ -188,7 +188,8 @@ ENUM_LANGOPT(DefaultCallingConv, DefaultCallingConvention, 3, DCC_None, "default
 LANGOPT(ShortEnums        , 1, 0, "short enum types")
 
 LANGOPT(OpenCL            , 1, 0, "OpenCL")
-LANGOPT(OpenCLVersion     , 32, 0, "OpenCL version")
+LANGOPT(OpenCLVersion     , 32, 0, "OpenCL C version")
+LANGOPT(OpenCLCPlusPlusVersion     , 32, 0, "OpenCL C++ version")
 LANGOPT(NativeHalfType    , 1, 0, "Native half type support")
 LANGOPT(NativeHalfArgsAndReturns, 1, 0, "Native half args and returns")
 LANGOPT(HalfArgsAndReturns, 1, 0, "half args and returns")
@@ -236,6 +237,7 @@ LANGOPT(ObjCAutoRefCount , 1, 0, "Objective-C automated reference counting")
 LANGOPT(ObjCWeakRuntime     , 1, 0, "__weak support in the ARC runtime")
 LANGOPT(ObjCWeak            , 1, 0, "Objective-C __weak in ARC and MRC files")
 LANGOPT(ObjCSubscriptingLegacyRuntime         , 1, 0, "Subscripting support in legacy ObjectiveC runtime")
+LANGOPT(CFProtectionBranch , 1, 0, "Control-Flow Branch Protection enabled")
 LANGOPT(FakeAddressSpaceMap , 1, 0, "OpenCL fake address space map")
 ENUM_LANGOPT(AddressSpaceMapMangling , AddrSpaceMapMangling, 2, ASMM_Target, "OpenCL address space map mangling mode")
 LANGOPT(IncludeDefaultHeader, 1, 0, "Include default header file for OpenCL")
@@ -282,6 +284,10 @@ LANGOPT(XRayAlwaysEmitCustomEvents, 1, 0,
 
 BENIGN_LANGOPT(AllowEditorPlaceholders, 1, 0,
                "allow editor placeholders in source")
+
+ENUM_LANGOPT(ClangABICompat, ClangABI, 4, ClangABI::Latest,
+             "version of Clang that we should attempt to be ABI-compatible "
+             "with")
 
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT

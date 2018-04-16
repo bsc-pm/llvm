@@ -178,6 +178,11 @@ static Error readSection(WasmSection &Section, const uint8_t *&Ptr,
   if (Ptr + Size > Eof)
     return make_error<StringError>("Section too large",
                                    object_error::parse_failed);
+  if (Section.Type == wasm::WASM_SEC_CUSTOM) {
+    const uint8_t *NameStart = Ptr;
+    Section.Name = readString(Ptr);
+    Size -= Ptr - NameStart;
+  }
   Section.Content = ArrayRef<uint8_t>(Ptr, Size);
   Ptr += Size;
   return Error::success();
@@ -339,7 +344,7 @@ Error WasmObjectFile::parseLinkingSection(const uint8_t *Ptr,
         wasm::WasmInitFunc Init;
         Init.Priority = readVaruint32(Ptr);
         Init.Symbol = readVaruint32(Ptr);
-        if (!isValidFunctionSymbolIndex(Init.Symbol))
+        if (!isValidFunctionSymbol(Init.Symbol))
           return make_error<GenericBinaryError>("Invalid function symbol: " +
                                                     Twine(Init.Symbol),
                                                 object_error::parse_failed);
@@ -403,7 +408,7 @@ Error WasmObjectFile::parseLinkingSectionSymtab(const uint8_t *&Ptr,
         Info.Name = readString(Ptr);
         unsigned FuncIndex = Info.ElementIndex - NumImportedFunctions;
         FunctionType = &Signatures[FunctionTypes[FuncIndex]];
-        auto &Function = Functions[FuncIndex];
+        wasm::WasmFunction &Function = Functions[FuncIndex];
         if (Function.Name.empty()) {
           // Use the symbol's name to set a name for the Function, but only if
           // one hasn't already been set.
@@ -422,10 +427,21 @@ Error WasmObjectFile::parseLinkingSectionSymtab(const uint8_t *&Ptr,
           IsDefined != isDefinedGlobalIndex(Info.ElementIndex))
         return make_error<GenericBinaryError>("invalid global symbol index",
                                               object_error::parse_failed);
+      if (!IsDefined &&
+          (Info.Flags & wasm::WASM_SYMBOL_BINDING_MASK) ==
+              wasm::WASM_SYMBOL_BINDING_WEAK)
+        return make_error<GenericBinaryError>("undefined weak global symbol",
+                                              object_error::parse_failed);
       if (IsDefined) {
         Info.Name = readString(Ptr);
         unsigned GlobalIndex = Info.ElementIndex - NumImportedGlobals;
-        GlobalType = &Globals[GlobalIndex].Type;
+        wasm::WasmGlobal &Global = Globals[GlobalIndex];
+        GlobalType = &Global.Type;
+        if (Global.Name.empty()) {
+          // Use the symbol's name to set a name for the Global, but only if
+          // one hasn't already been set.
+          Global.Name = Info.Name;
+        }
       } else {
         wasm::WasmImport &Import = *ImportedGlobals[Info.ElementIndex];
         Info.Name = Import.Field;
@@ -474,12 +490,12 @@ Error WasmObjectFile::parseLinkingSectionComdat(const uint8_t *&Ptr,
 {
   uint32_t ComdatCount = readVaruint32(Ptr);
   StringSet<> ComdatSet;
-  while (ComdatCount--) {
+  for (unsigned ComdatIndex = 0; ComdatIndex < ComdatCount; ++ComdatIndex) {
     StringRef Name = readString(Ptr);
     if (Name.empty() || !ComdatSet.insert(Name).second)
       return make_error<GenericBinaryError>("Bad/duplicate COMDAT name " + Twine(Name),
                                             object_error::parse_failed);
-    Comdats.emplace_back(Name);
+    LinkingData.Comdats.emplace_back(Name);
     uint32_t Flags = readVaruint32(Ptr);
     if (Flags != 0)
       return make_error<GenericBinaryError>("Unsupported COMDAT flags",
@@ -497,19 +513,19 @@ Error WasmObjectFile::parseLinkingSectionComdat(const uint8_t *&Ptr,
         if (Index >= DataSegments.size())
           return make_error<GenericBinaryError>("COMDAT data index out of range",
                                                 object_error::parse_failed);
-        if (!DataSegments[Index].Data.Comdat.empty())
+        if (DataSegments[Index].Data.Comdat != UINT32_MAX)
           return make_error<GenericBinaryError>("Data segment in two COMDATs",
                                                 object_error::parse_failed);
-        DataSegments[Index].Data.Comdat = Name;
+        DataSegments[Index].Data.Comdat = ComdatIndex;
         break;
       case wasm::WASM_COMDAT_FUNCTION:
         if (!isDefinedFunctionIndex(Index))
           return make_error<GenericBinaryError>("COMDAT function index out of range",
                                                 object_error::parse_failed);
-        if (!getDefinedFunction(Index).Comdat.empty())
+        if (getDefinedFunction(Index).Comdat != UINT32_MAX)
           return make_error<GenericBinaryError>("Function in two COMDATs",
                                                 object_error::parse_failed);
-        getDefinedFunction(Index).Comdat = Name;
+        getDefinedFunction(Index).Comdat = ComdatIndex;
         break;
       }
     }
@@ -548,9 +564,9 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, const uint8_t *Ptr,
     return make_error<GenericBinaryError>("Invalid section code",
                                           object_error::parse_failed);
   uint32_t RelocCount = readVaruint32(Ptr);
+  uint32_t EndOffset = Section->Content.size();
   while (RelocCount--) {
-    wasm::WasmRelocation Reloc;
-    memset(&Reloc, 0, sizeof(Reloc));
+    wasm::WasmRelocation Reloc = {};
     Reloc.Type = readVaruint32(Ptr);
     Reloc.Offset = readVaruint32(Ptr);
     Reloc.Index = readVaruint32(Ptr);
@@ -558,12 +574,26 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, const uint8_t *Ptr,
     case wasm::R_WEBASSEMBLY_FUNCTION_INDEX_LEB:
     case wasm::R_WEBASSEMBLY_TABLE_INDEX_SLEB:
     case wasm::R_WEBASSEMBLY_TABLE_INDEX_I32:
+      if (!isValidFunctionSymbol(Reloc.Index))
+        return make_error<GenericBinaryError>("Bad relocation function index",
+                                              object_error::parse_failed);
+      break;
     case wasm::R_WEBASSEMBLY_TYPE_INDEX_LEB:
+      if (Reloc.Index >= Signatures.size())
+        return make_error<GenericBinaryError>("Bad relocation type index",
+                                              object_error::parse_failed);
+      break;
     case wasm::R_WEBASSEMBLY_GLOBAL_INDEX_LEB:
+      if (!isValidGlobalSymbol(Reloc.Index))
+        return make_error<GenericBinaryError>("Bad relocation global index",
+                                              object_error::parse_failed);
       break;
     case wasm::R_WEBASSEMBLY_MEMORY_ADDR_LEB:
     case wasm::R_WEBASSEMBLY_MEMORY_ADDR_SLEB:
     case wasm::R_WEBASSEMBLY_MEMORY_ADDR_I32:
+      if (!isValidDataSymbol(Reloc.Index))
+        return make_error<GenericBinaryError>("Bad relocation data index",
+                                              object_error::parse_failed);
       Reloc.Addend = readVarint32(Ptr);
       break;
     default:
@@ -571,6 +601,18 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, const uint8_t *Ptr,
                                                 Twine(Reloc.Type),
                                             object_error::parse_failed);
     }
+
+    // Relocations must fit inside the section, and must appear in order.  They
+    // also shouldn't overlap a function/element boundary, but we don't bother
+    // to check that.
+    uint64_t Size = 5;
+    if (Reloc.Type == wasm::R_WEBASSEMBLY_TABLE_INDEX_I32 ||
+        Reloc.Type == wasm::R_WEBASSEMBLY_MEMORY_ADDR_I32)
+      Size = 4;
+    if (Reloc.Offset + Size > EndOffset)
+      return make_error<GenericBinaryError>("Bad relocation offset",
+                                            object_error::parse_failed);
+
     Section->Relocations.push_back(Reloc);
   }
   if (Ptr != End)
@@ -581,7 +623,6 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, const uint8_t *Ptr,
 
 Error WasmObjectFile::parseCustomSection(WasmSection &Sec,
                                          const uint8_t *Ptr, const uint8_t *End) {
-  Sec.Name = readString(Ptr);
   if (Sec.Name == "name") {
     if (Error Err = parseNameSection(Ptr, End))
       return Err;
@@ -670,8 +711,13 @@ Error WasmObjectFile::parseImportSection(const uint8_t *Ptr, const uint8_t *End)
 Error WasmObjectFile::parseFunctionSection(const uint8_t *Ptr, const uint8_t *End) {
   uint32_t Count = readVaruint32(Ptr);
   FunctionTypes.reserve(Count);
+  uint32_t NumTypes = Signatures.size();
   while (Count--) {
-    FunctionTypes.push_back(readVaruint32(Ptr));
+    uint32_t Type = readVaruint32(Ptr);
+    if (Type >= NumTypes)
+      return make_error<GenericBinaryError>("Invalid function type",
+                                            object_error::parse_failed);
+    FunctionTypes.push_back(Type);
   }
   if (Ptr != End)
     return make_error<GenericBinaryError>("Function section ended prematurely",
@@ -776,8 +822,16 @@ bool WasmObjectFile::isDefinedGlobalIndex(uint32_t Index) const {
   return Index >= NumImportedGlobals && isValidGlobalIndex(Index);
 }
 
-bool WasmObjectFile::isValidFunctionSymbolIndex(uint32_t Index) const {
+bool WasmObjectFile::isValidFunctionSymbol(uint32_t Index) const {
   return Index < Symbols.size() && Symbols[Index].isTypeFunction();
+}
+
+bool WasmObjectFile::isValidGlobalSymbol(uint32_t Index) const {
+  return Index < Symbols.size() && Symbols[Index].isTypeGlobal();
+}
+
+bool WasmObjectFile::isValidDataSymbol(uint32_t Index) const {
+  return Index < Symbols.size() && Symbols[Index].isTypeData();
 }
 
 wasm::WasmFunction &WasmObjectFile::getDefinedFunction(uint32_t Index) {
@@ -828,6 +882,8 @@ Error WasmObjectFile::parseCodeSection(const uint8_t *Ptr, const uint8_t *End) {
 
     uint32_t BodySize = FunctionEnd - Ptr;
     Function.Body = ArrayRef<uint8_t>(Ptr, BodySize);
+    // This will be set later when reading in the linking metadata section.
+    Function.Comdat = UINT32_MAX;
     Ptr += BodySize;
     assert(Ptr == FunctionEnd);
     Functions.push_back(Function);
@@ -874,8 +930,11 @@ Error WasmObjectFile::parseDataSection(const uint8_t *Ptr, const uint8_t *End) {
       return Err;
     uint32_t Size = readVaruint32(Ptr);
     Segment.Data.Content = ArrayRef<uint8_t>(Ptr, Size);
+    // The rest of these Data fields are set later, when reading in the linking
+    // metadata section.
     Segment.Data.Alignment = 0;
     Segment.Data.Flags = 0;
+    Segment.Data.Comdat = UINT32_MAX;
     Segment.SectionOffset = Ptr - Start;
     Ptr += Size;
     DataSegments.push_back(Segment);

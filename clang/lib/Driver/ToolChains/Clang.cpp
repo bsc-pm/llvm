@@ -529,6 +529,9 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
     // XCore never wants frame pointers, regardless of OS.
     // WebAssembly never wants frame pointers.
     return false;
+  case llvm::Triple::riscv32:
+  case llvm::Triple::riscv64:
+    return !areOptimizationsEnabled(Args);
   default:
     break;
   }
@@ -550,14 +553,6 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
     default:
       return true;
     }
-  }
-
-  switch (Triple.getArch()) {
-    case llvm::Triple::riscv32:
-    case llvm::Triple::riscv64:
-      return !areOptimizationsEnabled(Args);
-    default:
-      break;
   }
 
   if (Triple.isOSWindows()) {
@@ -1355,7 +1350,7 @@ void Clang::AddARMTargetArgs(const llvm::Triple &Triple, const ArgList &Args,
   // Forward the -mglobal-merge option for explicit control over the pass.
   if (Arg *A = Args.getLastArg(options::OPT_mglobal_merge,
                                options::OPT_mno_global_merge)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mno_global_merge))
       CmdArgs.push_back("-arm-global-merge=false");
     else
@@ -1469,21 +1464,21 @@ void Clang::AddAArch64TargetArgs(const ArgList &Args,
 
   if (Arg *A = Args.getLastArg(options::OPT_mfix_cortex_a53_835769,
                                options::OPT_mno_fix_cortex_a53_835769)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mfix_cortex_a53_835769))
       CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=1");
     else
       CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=0");
   } else if (Triple.isAndroid()) {
     // Enabled A53 errata (835769) workaround by default on android
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=1");
   }
 
   // Forward the -mglobal-merge option for explicit control over the pass.
   if (Arg *A = Args.getLastArg(options::OPT_mglobal_merge,
                                options::OPT_mno_global_merge)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mno_global_merge))
       CmdArgs.push_back("-aarch64-enable-global-merge=false");
     else
@@ -1693,7 +1688,7 @@ void Clang::AddPPCTargetArgs(const ArgList &Args,
 void Clang::AddRISCVTargetArgs(const ArgList &Args,
                                ArgStringList &CmdArgs) const {
   // FIXME: currently defaults to the soft-float ABIs. Will need to be
-  // expanded to select ilp32f, ilp32d, lp64f, lp64d when appropiate.
+  // expanded to select ilp32f, ilp32d, lp64f, lp64d when appropriate.
   const char *ABIName = nullptr;
   const llvm::Triple &Triple = getToolChain().getTriple();
   if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
@@ -2087,7 +2082,7 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
   // Handle various floating point optimization flags, mapping them to the
   // appropriate LLVM code generation flags. This is complicated by several
   // "umbrella" flags, so we do this by stepping through the flags incrementally
-  // adjusting what we think is enabled/disabled, then at the end settting the
+  // adjusting what we think is enabled/disabled, then at the end setting the
   // LLVM flags based on the final state.
   bool HonorINFs = true;
   bool HonorNaNs = true;
@@ -3053,13 +3048,13 @@ static void RenderDebugOptions(const ToolChain &TC, const Driver &D,
   // Always enabled for SCE tuning.
   if (Args.hasArg(options::OPT_gdwarf_aranges) ||
       DebuggerTuning == llvm::DebuggerKind::SCE) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-generate-arange-section");
   }
 
   if (Args.hasFlag(options::OPT_fdebug_types_section,
                    options::OPT_fno_debug_types_section, false)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-generate-type-units");
   }
 
@@ -3249,7 +3244,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (JA.getType() == types::TY_LLVM_BC)
       CmdArgs.push_back("-emit-llvm-uselists");
 
-    if (D.isUsingLTO()) {
+    // Device-side jobs do not support LTO.
+    bool isDeviceOffloadAction = !(JA.isDeviceOffloading(Action::OFK_None) ||
+                                   JA.isDeviceOffloading(Action::OFK_Host));
+
+    if (D.isUsingLTO() && !isDeviceOffloadAction) {
       Args.AddLastArg(CmdArgs, options::OPT_flto, options::OPT_flto_EQ);
 
       // The Darwin and PS4 linkers currently use the legacy LTO API, which
@@ -3357,9 +3356,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddLastArg(CmdArgs, options::OPT_fveclib);
 
-  if (!Args.hasFlag(options::OPT_fmerge_all_constants,
-                    options::OPT_fno_merge_all_constants))
-    CmdArgs.push_back("-fno-merge-all-constants");
+  if (Args.hasFlag(options::OPT_fmerge_all_constants,
+                   options::OPT_fno_merge_all_constants, false))
+    CmdArgs.push_back("-fmerge-all-constants");
 
   // LLVM Code Generator Options.
 
@@ -3454,6 +3453,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (!Args.hasFlag(options::OPT_foptimize_sibling_calls,
                     options::OPT_fno_optimize_sibling_calls))
     CmdArgs.push_back("-mdisable-tail-calls");
+  if (Args.hasFlag(options::OPT_fno_escaping_block_tail_calls,
+                   options::OPT_fescaping_block_tail_calls, false))
+    CmdArgs.push_back("-fno-escaping-block-tail-calls");
 
   Args.AddLastArg(CmdArgs, options::OPT_ffine_grained_bitfield_accesses,
                   options::OPT_fno_fine_grained_bitfield_accesses);
@@ -4071,17 +4073,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Arg *A = Args.getLastArg(options::OPT_mrestrict_it,
                                options::OPT_mno_restrict_it)) {
     if (A->getOption().matches(options::OPT_mrestrict_it)) {
-      CmdArgs.push_back("-backend-option");
+      CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-arm-restrict-it");
     } else {
-      CmdArgs.push_back("-backend-option");
+      CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-arm-no-restrict-it");
     }
   } else if (Triple.isOSWindows() &&
              (Triple.getArch() == llvm::Triple::arm ||
               Triple.getArch() == llvm::Triple::thumb)) {
     // Windows on ARM expects restricted IT blocks
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-arm-restrict-it");
   }
 
@@ -4240,7 +4242,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     !IsWindowsMSVC || IsMSVC2015Compatible))
     CmdArgs.push_back("-fno-threadsafe-statics");
 
-  // -fno-delayed-template-parsing is default, except when targetting MSVC.
+  // -fno-delayed-template-parsing is default, except when targeting MSVC.
   // Many old Windows SDK versions require this to parse.
   // FIXME: MSVC introduced /Zc:twoPhase- to disable this behavior in their
   // compiler. We should be able to disable this by default at some point.

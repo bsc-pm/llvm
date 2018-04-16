@@ -248,7 +248,8 @@ bool fromJSON(const json::Expr &Params, DidChangeWatchedFilesParams &R) {
 
 bool fromJSON(const json::Expr &Params, TextDocumentContentChangeEvent &R) {
   json::ObjectMapper O(Params);
-  return O && O.map("text", R.text);
+  return O && O.map("range", R.range) && O.map("rangeLength", R.rangeLength) &&
+         O.map("text", R.text);
 }
 
 bool fromJSON(const json::Expr &Params, FormattingOptions &R) {
@@ -445,6 +446,11 @@ json::Expr toJSON(const CompletionItem &CI) {
   return std::move(Result);
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &O, const CompletionItem &I) {
+  O << I.label << " - " << toJSON(I);
+  return O;
+}
+
 bool operator<(const CompletionItem &L, const CompletionItem &R) {
   return (L.sortText.empty() ? L.label : L.sortText) <
          (R.sortText.empty() ? R.label : R.sortText);
@@ -476,6 +482,12 @@ json::Expr toJSON(const SignatureInformation &SI) {
   return std::move(Result);
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &O,
+                              const SignatureInformation &I) {
+  O << I.label << " - " << toJSON(I);
+  return O;
+}
+
 json::Expr toJSON(const SignatureHelp &SH) {
   assert(SH.activeSignature >= 0 &&
          "Unexpected negative value for number of active signatures.");
@@ -499,6 +511,16 @@ json::Expr toJSON(const DocumentHighlight &DH) {
       {"range", toJSON(DH.range)},
       {"kind", static_cast<int>(DH.kind)},
   };
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &O,
+                              const DocumentHighlight &V) {
+  O << V.range;
+  if (V.kind == DocumentHighlightKind::Read)
+    O << "(r)";
+  if (V.kind == DocumentHighlightKind::Write)
+    O << "(w)";
+  return O;
 }
 
 bool fromJSON(const json::Expr &Params, DidChangeConfigurationParams &CCP) {

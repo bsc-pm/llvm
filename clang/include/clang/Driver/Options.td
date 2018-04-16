@@ -418,9 +418,9 @@ def S : Flag<["-"], "S">, Flags<[DriverOption,CC1Option]>, Group<Action_Group>,
 def Tbss : JoinedOrSeparate<["-"], "Tbss">, Group<T_Group>,
   MetaVarName<"<addr>">, HelpText<"Set starting address of BSS to <addr>">;
 def Tdata : JoinedOrSeparate<["-"], "Tdata">, Group<T_Group>,
-  MetaVarName<"<addr>">, HelpText<"Set starting address of BSS to <addr>">;
+  MetaVarName<"<addr>">, HelpText<"Set starting address of DATA to <addr>">;
 def Ttext : JoinedOrSeparate<["-"], "Ttext">, Group<T_Group>,
-  MetaVarName<"<addr>">, HelpText<"Set starting address of BSS to <addr>">;
+  MetaVarName<"<addr>">, HelpText<"Set starting address of TEXT to <addr>">;
 def T : JoinedOrSeparate<["-"], "T">, Group<T_Group>,
   MetaVarName<"<script>">, HelpText<"Specify <script> as linker script">;
 def U : JoinedOrSeparate<["-"], "U">, Group<Preprocessor_Group>,
@@ -514,7 +514,7 @@ def cl_mad_enable : Flag<["-"], "cl-mad-enable">, Group<opencl_Group>, Flags<[CC
 def cl_no_signed_zeros : Flag<["-"], "cl-no-signed-zeros">, Group<opencl_Group>, Flags<[CC1Option]>,
   HelpText<"OpenCL only. Allow use of less precise no signed zeros computations in the generated binary.">;
 def cl_std_EQ : Joined<["-"], "cl-std=">, Group<opencl_Group>, Flags<[CC1Option]>,
-  HelpText<"OpenCL language standard to compile for.">, Values<"cl,CL,cl1.1,CL1.1,cl1.2,CL1.2,cl2.0,CL2.0">;
+  HelpText<"OpenCL language standard to compile for.">, Values<"cl,CL,cl1.1,CL1.1,cl1.2,CL1.2,cl2.0,CL2.0,c++">;
 def cl_denorms_are_zero : Flag<["-"], "cl-denorms-are-zero">, Group<opencl_Group>, Flags<[CC1Option]>,
   HelpText<"OpenCL only. Allow denormals to be flushed to zero.">;
 def cl_fp32_correctly_rounded_divide_sqrt : Flag<["-"], "cl-fp32-correctly-rounded-divide-sqrt">, Group<opencl_Group>, Flags<[CC1Option]>,
@@ -546,6 +546,10 @@ def cuda_host_only : Flag<["--"], "cuda-host-only">,
 def cuda_compile_host_device : Flag<["--"], "cuda-compile-host-device">,
   HelpText<"Compile CUDA code for both host and device (default).  Has no "
            "effect on non-CUDA compilations.">;
+def cuda_include_ptx_EQ : Joined<["--"], "cuda-include-ptx=">, Flags<[DriverOption]>,
+  HelpText<"Include PTX for the follwing GPU architecture (e.g. sm_35) or 'all'. May be specified more than once.">;
+def no_cuda_include_ptx_EQ : Joined<["--"], "no-cuda-include-ptx=">, Flags<[DriverOption]>,
+  HelpText<"Do not include PTX for the follwing GPU architecture (e.g. sm_35) or 'all'. May be specified more than once.">;
 def cuda_gpu_arch_EQ : Joined<["--"], "cuda-gpu-arch=">, Flags<[DriverOption]>,
   HelpText<"CUDA GPU architecture (e.g. sm_35).  May be specified more than once.">;
 def no_cuda_gpu_arch_EQ : Joined<["--"], "no-cuda-gpu-arch=">, Flags<[DriverOption]>,
@@ -1095,17 +1099,36 @@ def fxray_instruction_threshold_ :
 def fxray_always_instrument :
   JoinedOrSeparate<["-"], "fxray-always-instrument=">,
   Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Filename defining the whitelist for imbuing the 'always instrument' XRay attribute.">;
+  HelpText<"DEPRECATED: Filename defining the whitelist for imbuing the 'always instrument' XRay attribute.">;
 def fxray_never_instrument :
   JoinedOrSeparate<["-"], "fxray-never-instrument=">,
   Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Filename defining the whitelist for imbuing the 'never instrument' XRay attribute.">;
+  HelpText<"DEPRECATED: Filename defining the whitelist for imbuing the 'never instrument' XRay attribute.">;
+def fxray_attr_list :
+  JoinedOrSeparate<["-"], "fxray-attr-list=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Filename defining the list of functions/types for imbuing XRay attributes.">;
+def fxray_modes :
+  JoinedOrSeparate<["-"], "fxray-modes=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"List of modes to link in by default into XRay instrumented binaries.">;
 
 def fxray_always_emit_customevents : Flag<["-"], "fxray-always-emit-customevents">, Group<f_Group>,
   Flags<[CC1Option]>,
   HelpText<"Determine whether to always emit __xray_customevent(...) calls even if the function it appears in is not always instrumented.">;
 def fnoxray_always_emit_customevents : Flag<["-"], "fno-xray-always-emit-customevents">, Group<f_Group>,
   Flags<[CC1Option]>;
+
+def fxray_link_deps : Flag<["-"], "fxray-link-deps">, Group<f_Group>,
+  Flags<[CC1Option]>,
+  HelpText<"Tells clang to add the link dependencies for XRay.">;
+def fnoxray_link_deps : Flag<["-"], "fnoxray-link-deps">, Group<f_Group>,
+  Flags<[CC1Option]>;
+
+def fxray_instrumentation_bundle :
+  JoinedOrSeparate<["-"], "fxray-instrumentation-bundle=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Select which XRay instrumentation points to emit. Options: all, none, function, custom. Default is 'all'.">;
 
 def ffine_grained_bitfield_accesses : Flag<["-"],
   "ffine-grained-bitfield-accesses">, Group<f_clang_Group>, Flags<[CC1Option]>,
@@ -1133,7 +1156,8 @@ def fthinlto_index_EQ : Joined<["-"], "fthinlto-index=">,
   HelpText<"Perform ThinLTO importing using provided function summary index">;
 def fmacro_backtrace_limit_EQ : Joined<["-"], "fmacro-backtrace-limit=">,
                                 Group<f_Group>, Flags<[DriverOption, CoreOption]>;
-def fmerge_all_constants : Flag<["-"], "fmerge-all-constants">, Group<f_Group>;
+def fmerge_all_constants : Flag<["-"], "fmerge-all-constants">, Group<f_Group>,
+  Flags<[CC1Option]>, HelpText<"Allow merging of constants">;
 def fmessage_length_EQ : Joined<["-"], "fmessage-length=">, Group<f_Group>;
 def fms_extensions : Flag<["-"], "fms-extensions">, Group<f_Group>, Flags<[CC1Option, CoreOption]>,
   HelpText<"Accept some non-standard constructs supported by the Microsoft compiler">;
@@ -1282,7 +1306,7 @@ def fveclib : Joined<["-"], "fveclib=">, Group<f_Group>, Flags<[CC1Option]>,
 def fno_lax_vector_conversions : Flag<["-"], "fno-lax-vector-conversions">, Group<f_Group>,
   HelpText<"Disallow implicit conversions between vectors with a different number of elements or different element types">, Flags<[CC1Option]>;
 def fno_merge_all_constants : Flag<["-"], "fno-merge-all-constants">, Group<f_Group>,
-    Flags<[CC1Option]>, HelpText<"Disallow merging of constants">;
+  HelpText<"Disallow merging of constants">;
 def fno_modules : Flag <["-"], "fno-modules">, Group<f_Group>,
   Flags<[DriverOption]>;
 def fno_implicit_module_maps : Flag <["-"], "fno-implicit-module-maps">, Group<f_Group>,
@@ -1427,9 +1451,11 @@ def fopenmp_simd : Flag<["-"], "fopenmp-simd">, Group<f_Group>, Flags<[CC1Option
   HelpText<"Emit OpenMP code only for SIMD-based constructs.">;
 def fno_openmp_simd : Flag<["-"], "fno-openmp-simd">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>;
 def fopenmp_cuda_mode : Flag<["-"], "fopenmp-cuda-mode">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>;
-def fno_openmp_cuda_mode : Flag<["-"], "fno-openmp-cuda-mode">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>;
+def fno_openmp_cuda_mode : Flag<["-"], "fno-openmp-cuda-mode">, Group<f_Group>, Flags<[NoArgumentUnused]>;
 def fno_optimize_sibling_calls : Flag<["-"], "fno-optimize-sibling-calls">, Group<f_Group>;
 def foptimize_sibling_calls : Flag<["-"], "foptimize-sibling-calls">, Group<f_Group>;
+def fno_escaping_block_tail_calls : Flag<["-"], "fno-escaping-block-tail-calls">, Group<f_Group>, Flags<[CC1Option]>;
+def fescaping_block_tail_calls : Flag<["-"], "fescaping-block-tail-calls">, Group<f_Group>;
 def force__cpusubtype__ALL : Flag<["-"], "force_cpusubtype_ALL">;
 def force__flat__namespace : Flag<["-"], "force_flat_namespace">;
 def force__load : Separate<["-"], "force_load">;
@@ -1762,7 +1788,7 @@ def iwithsysroot : JoinedOrSeparate<["-"], "iwithsysroot">, Group<clang_i_Group>
   Flags<[CC1Option]>;
 def ivfsoverlay : JoinedOrSeparate<["-"], "ivfsoverlay">, Group<clang_i_Group>, Flags<[CC1Option]>,
   HelpText<"Overlay the virtual filesystem described by file over the real file system">;
-def i : Joined<["-"], "i">, Group<i_Group>;
+def imultilib : Separate<["-"], "imultilib">, Group<gfortran_Group>;
 def keep__private__externs : Flag<["-"], "keep_private_externs">;
 def l : JoinedOrSeparate<["-"], "l">, Flags<[LinkerInput, RenderJoined]>,
         Group<Link_Group>;
@@ -1917,6 +1943,8 @@ def mnontrapping_fptoint : Flag<["-"], "mnontrapping-fptoint">, Group<m_wasm_Fea
 def mno_nontrapping_fptoint : Flag<["-"], "mno-nontrapping-fptoint">, Group<m_wasm_Features_Group>;
 def msign_ext : Flag<["-"], "msign-ext">, Group<m_wasm_Features_Group>;
 def mno_sign_ext : Flag<["-"], "mno-sign-ext">, Group<m_wasm_Features_Group>;
+def mexception_handing : Flag<["-"], "mexception-handling">, Group<m_wasm_Features_Group>;
+def mno_exception_handing : Flag<["-"], "mno-exception-handling">, Group<m_wasm_Features_Group>;
 
 def mamdgpu_debugger_abi : Joined<["-"], "mamdgpu-debugger-abi=">,
   Flags<[HelpHidden]>,
@@ -1934,6 +1962,7 @@ def maltivec : Flag<["-"], "maltivec">, Group<m_ppc_Features_Group>;
 def mno_altivec : Flag<["-"], "mno-altivec">, Group<m_ppc_Features_Group>;
 def mvsx : Flag<["-"], "mvsx">, Group<m_ppc_Features_Group>;
 def mno_vsx : Flag<["-"], "mno-vsx">, Group<m_ppc_Features_Group>;
+def msecure_plt : Flag<["-"], "msecure-plt">, Group<m_ppc_Features_Group>;
 def mpower8_vector : Flag<["-"], "mpower8-vector">,
     Group<m_ppc_Features_Group>;
 def mno_power8_vector : Flag<["-"], "mno-power8-vector">,
@@ -2397,7 +2426,8 @@ def _for_linker_EQ : Joined<["--"], "for-linker=">, Alias<Xlinker>;
 def _for_linker : Separate<["--"], "for-linker">, Alias<Xlinker>;
 def _force_link_EQ : Joined<["--"], "force-link=">, Alias<u>;
 def _force_link : Separate<["--"], "force-link">, Alias<u>;
-def _help_hidden : Flag<["--"], "help-hidden">;
+def _help_hidden : Flag<["--"], "help-hidden">,
+  HelpText<"Display help for hidden options">;
 def _imacros_EQ : Joined<["--"], "imacros=">, Alias<imacros>;
 def _include_barrier : Flag<["--"], "include-barrier">, Alias<I_>;
 def _include_directory_after_EQ : Joined<["--"], "include-directory-after=">, Alias<idirafter>;
@@ -2467,41 +2497,38 @@ def _write_dependencies : Flag<["--"], "write-dependencies">, Alias<MD>;
 def _write_user_dependencies : Flag<["--"], "write-user-dependencies">, Alias<MMD>;
 def _ : Joined<["--"], "">, Flags<[Unsupported]>;
 
-def mieee_rnd_near : Flag<["-"], "mieee-rnd-near">, Group<m_hexagon_Features_Group>;
+// Hexagon feature flags.
+def mieee_rnd_near : Flag<["-"], "mieee-rnd-near">,
+  Group<m_hexagon_Features_Group>;
 def mv4 : Flag<["-"], "mv4">, Group<m_hexagon_Features_Group>,
-          Alias<mcpu_EQ>, AliasArgs<["hexagonv4"]>;
+  Alias<mcpu_EQ>, AliasArgs<["hexagonv4"]>;
 def mv5 : Flag<["-"], "mv5">, Group<m_hexagon_Features_Group>, Alias<mcpu_EQ>,
-          AliasArgs<["hexagonv5"]>;
+  AliasArgs<["hexagonv5"]>;
 def mv55 : Flag<["-"], "mv55">, Group<m_hexagon_Features_Group>,
-           Alias<mcpu_EQ>, AliasArgs<["hexagonv55"]>;
+  Alias<mcpu_EQ>, AliasArgs<["hexagonv55"]>;
 def mv60 : Flag<["-"], "mv60">, Group<m_hexagon_Features_Group>,
-           Alias<mcpu_EQ>, AliasArgs<["hexagonv60"]>;
+  Alias<mcpu_EQ>, AliasArgs<["hexagonv60"]>;
 def mv62 : Flag<["-"], "mv62">, Group<m_hexagon_Features_Group>,
-           Alias<mcpu_EQ>, AliasArgs<["hexagonv62"]>;
+  Alias<mcpu_EQ>, AliasArgs<["hexagonv62"]>;
 def mv65 : Flag<["-"], "mv65">, Group<m_hexagon_Features_Group>,
-           Alias<mcpu_EQ>, AliasArgs<["hexagonv65"]>;
-def mhexagon_hvx : Flag<[ "-" ], "mhvx">,
-                   Group<m_hexagon_Features_HVX_Group>,
-                   HelpText<"Enable Hexagon Vector eXtensions">;
+  Alias<mcpu_EQ>, AliasArgs<["hexagonv65"]>;
+def mhexagon_hvx : Flag<[ "-" ], "mhvx">, Group<m_hexagon_Features_HVX_Group>,
+  HelpText<"Enable Hexagon Vector eXtensions">;
 def mhexagon_hvx_EQ : Joined<[ "-" ], "mhvx=">,
-                     Group<m_hexagon_Features_HVX_Group>,
-                     HelpText<"Enable Hexagon Vector eXtensions">;
+  Group<m_hexagon_Features_HVX_Group>,
+  HelpText<"Enable Hexagon Vector eXtensions">;
 def mno_hexagon_hvx : Flag<[ "-" ], "mno-hvx">,
-                      Group<m_hexagon_Features_HVX_Group>,
-                      HelpText<"Disable Hexagon Vector eXtensions">;
+  Group<m_hexagon_Features_HVX_Group>,
+  HelpText<"Disable Hexagon Vector eXtensions">;
 def mhexagon_hvx_length_EQ : Joined<[ "-" ], "mhvx-length=">,
-                        Group<m_hexagon_Features_HVX_Group>,
-                        HelpText<"Set Hexagon Vector Length">, Values<"64B,128B">;
-// hvx-double deprecrated flag.
-def mhexagon_hvx_double : Flag<[ "-" ], "mhvx-double">,
-                          Group<m_hexagon_Features_HVX_Group>,
-                          HelpText<"Enable Hexagon Double Vector eXtensions">;
-def mno_hexagon_hvx_double
-    : Flag<[ "-" ], "mno-hvx-double">,
-      Group<m_hexagon_Features_HVX_Group>,
-      HelpText<"Disable Hexagon Double Vector eXtensions">;
+  Group<m_hexagon_Features_HVX_Group>, HelpText<"Set Hexagon Vector Length">,
+  Values<"64B,128B">;
 def ffixed_r19: Flag<["-"], "ffixed-r19">,
   HelpText<"Reserve the r19 register (Hexagon only)">;
+def mpackets : Flag<["-"], "mpackets">, Group<m_hexagon_Features_Group>,
+  Flags<[CC1Option]>, HelpText<"Enable generation of instruction packets">;
+def mno_packets : Flag<["-"], "mno-packets">, Group<m_hexagon_Features_Group>,
+  Flags<[CC1Option]>, HelpText<"Disable generation of instruction packets">;
 
 
 // X86 feature flags
@@ -2572,10 +2599,14 @@ def mbmi : Flag<["-"], "mbmi">, Group<m_x86_Features_Group>;
 def mno_bmi : Flag<["-"], "mno-bmi">, Group<m_x86_Features_Group>;
 def mbmi2 : Flag<["-"], "mbmi2">, Group<m_x86_Features_Group>;
 def mno_bmi2 : Flag<["-"], "mno-bmi2">, Group<m_x86_Features_Group>;
+def mcldemote : Flag<["-"], "mcldemote">, Group<m_x86_Features_Group>;
+def mno_cldemote : Flag<["-"], "mno-cldemote">, Group<m_x86_Features_Group>;
 def mclflushopt : Flag<["-"], "mclflushopt">, Group<m_x86_Features_Group>;
 def mno_clflushopt : Flag<["-"], "mno-clflushopt">, Group<m_x86_Features_Group>;
 def mclwb : Flag<["-"], "mclwb">, Group<m_x86_Features_Group>;
 def mno_clwb : Flag<["-"], "mno-clwb">, Group<m_x86_Features_Group>;
+def mwbnoinvd : Flag<["-"], "mwbnoinvd">, Group<m_x86_Features_Group>;
+def mno_wbnoinvd : Flag<["-"], "mno-wbnoinvd">, Group<m_x86_Features_Group>;
 def mclzero : Flag<["-"], "mclzero">, Group<m_x86_Features_Group>;
 def mno_clzero : Flag<["-"], "mno-clzero">, Group<m_x86_Features_Group>;
 def mcx16 : Flag<["-"], "mcx16">, Group<m_x86_Features_Group>;

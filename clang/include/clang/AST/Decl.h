@@ -937,6 +937,9 @@ protected:
     /// for-range statement.
     unsigned CXXForRangeDecl : 1;
 
+    /// Whether this variable is the for-in loop declaration in Objective-C.
+    unsigned ObjCForDecl : 1;
+
     /// Whether this variable is an ARC pseudo-__strong
     /// variable;  see isARCPseudoStrong() for details.
     unsigned ARCPseudoStrong : 1;
@@ -1332,6 +1335,16 @@ public:
   void setCXXForRangeDecl(bool FRD) {
     assert(!isa<ParmVarDecl>(this));
     NonParmVarDeclBits.CXXForRangeDecl = FRD;
+  }
+
+  /// \brief Determine whether this variable is a for-loop declaration for a
+  /// for-in statement in Objective-C.
+  bool isObjCForDecl() const {
+    return NonParmVarDeclBits.ObjCForDecl;
+  }
+
+  void setObjCForDecl(bool FRD) {
+    NonParmVarDeclBits.ObjCForDecl = FRD;
   }
 
   /// \brief Determine whether this variable is an ARC pseudo-__strong
@@ -2622,6 +2635,11 @@ public:
     BitField = false;
   }
 
+  /// Is this a zero-length bit-field? Such bit-fields aren't really bit-fields
+  /// at all and instead act as a separator between contiguous runs of other
+  /// bit-fields.
+  bool isZeroLengthBitField(const ASTContext &Ctx) const;
+
   /// Get the kind of (C++11) default member initializer that this field has.
   InClassInitStyle getInClassInitStyle() const {
     InitStorageKind storageKind = InitStorage.getInt();
@@ -3523,6 +3541,31 @@ public:
 ///   union Y { int A, B; };     // Has body with members A and B (FieldDecls).
 /// This decl will be marked invalid if *any* members are invalid.
 class RecordDecl : public TagDecl {
+public:
+  /// Enum that represents the different ways arguments are passed to and
+  /// returned from function calls. This takes into account the target-specific
+  /// and version-specific rules along with the rules determined by the
+  /// language.
+  enum ArgPassingKind : unsigned {
+    /// The argument of this type can be passed directly in registers.
+    APK_CanPassInRegs,
+
+    /// The argument of this type cannot be passed directly in registers.
+    /// Records containing this type as a subobject are not forced to be passed
+    /// indirectly. This value is used only in C++. This value is required by
+    /// C++ because, in uncommon situations, it is possible for a class to have
+    /// only trivial copy/move constructors even when one of its subobjects has
+    /// a non-trivial copy/move constructor (if e.g. the corresponding copy/move
+    /// constructor in the derived class is deleted).
+    APK_CannotPassInRegs,
+
+    /// The argument of this type cannot be passed directly in registers.
+    /// Records containing this type as a subobject are forced to be passed
+    /// indirectly.
+    APK_CanNeverPassInRegs
+  };
+
+private:
   friend class DeclContext;
 
   // FIXME: This can be packed into the bitfields in Decl.
@@ -3552,6 +3595,17 @@ class RecordDecl : public TagDecl {
   bool NonTrivialToPrimitiveDefaultInitialize : 1;
   bool NonTrivialToPrimitiveCopy : 1;
   bool NonTrivialToPrimitiveDestroy : 1;
+
+  /// Indicates whether this struct is destroyed in the callee. This flag is
+  /// meaningless when Microsoft ABI is used since parameters are always
+  /// destroyed in the callee.
+  ///
+  /// Please note that MSVC won't merge adjacent bitfields if they don't have
+  /// the same type.
+  uint8_t ParamDestroyedInCallee : 1;
+
+  /// Represents the way this type is passed to a function.
+  uint8_t ArgPassingRestrictions : 2;
 
 protected:
   RecordDecl(Kind DK, TagKind TK, const ASTContext &C, DeclContext *DC,
@@ -3616,24 +3670,47 @@ public:
     return NonTrivialToPrimitiveDefaultInitialize;
   }
 
-  void setNonTrivialToPrimitiveDefaultInitialize() {
-    NonTrivialToPrimitiveDefaultInitialize = true;
+  void setNonTrivialToPrimitiveDefaultInitialize(bool V) {
+    NonTrivialToPrimitiveDefaultInitialize = V;
   }
 
   bool isNonTrivialToPrimitiveCopy() const {
     return NonTrivialToPrimitiveCopy;
   }
 
-  void setNonTrivialToPrimitiveCopy() {
-    NonTrivialToPrimitiveCopy = true;
+  void setNonTrivialToPrimitiveCopy(bool V) {
+    NonTrivialToPrimitiveCopy = V;
   }
 
   bool isNonTrivialToPrimitiveDestroy() const {
     return NonTrivialToPrimitiveDestroy;
   }
 
-  void setNonTrivialToPrimitiveDestroy() {
-    NonTrivialToPrimitiveDestroy = true;
+  void setNonTrivialToPrimitiveDestroy(bool V) {
+    NonTrivialToPrimitiveDestroy = V;
+  }
+
+  /// Determine whether this class can be passed in registers. In C++ mode,
+  /// it must have at least one trivial, non-deleted copy or move constructor.
+  /// FIXME: This should be set as part of completeDefinition.
+  bool canPassInRegisters() const {
+    return getArgPassingRestrictions() == APK_CanPassInRegs;
+  }
+
+  ArgPassingKind getArgPassingRestrictions() const {
+    return static_cast<ArgPassingKind>(ArgPassingRestrictions);
+  }
+
+  void setArgPassingRestrictions(ArgPassingKind Kind) {
+    ArgPassingRestrictions = static_cast<uint8_t>(Kind);
+  }
+
+  bool isParamDestroyedInCallee() const {
+    return ParamDestroyedInCallee;
+  }
+
+  void setParamDestroyedInCallee(bool V) {
+    ParamDestroyedInCallee = V;
   }
 
   /// \brief Determines whether this declaration represents the
@@ -3802,6 +3879,10 @@ private:
   bool BlockMissingReturnType : 1;
   bool IsConversionFromLambda : 1;
 
+  /// A bit that indicates this block is passed directly to a function as a
+  /// non-escaping parameter.
+  bool DoesNotEscape : 1;
+
   /// A new[]'d array of pointers to ParmVarDecls for the formal
   /// parameters of this function.  This is null if a prototype or if there are
   /// no formals.
@@ -3821,7 +3902,7 @@ protected:
   BlockDecl(DeclContext *DC, SourceLocation CaretLoc)
       : Decl(Block, DC, CaretLoc), DeclContext(Block), IsVariadic(false),
         CapturesCXXThis(false), BlockMissingReturnType(true),
-        IsConversionFromLambda(false) {}
+        IsConversionFromLambda(false), DoesNotEscape(false) {}
 
 public:
   static BlockDecl *Create(ASTContext &C, DeclContext *DC, SourceLocation L); 
@@ -3892,6 +3973,9 @@ public:
 
   bool isConversionFromLambda() const { return IsConversionFromLambda; }
   void setIsConversionFromLambda(bool val) { IsConversionFromLambda = val; }
+
+  bool doesNotEscape() const { return DoesNotEscape; }
+  void setDoesNotEscape() { DoesNotEscape = true; }
 
   bool capturesVariable(const VarDecl *var) const;
 

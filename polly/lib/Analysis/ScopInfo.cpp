@@ -1372,16 +1372,6 @@ partitionSetParts(__isl_take isl_set *S, unsigned Dim) {
   return std::make_pair(UnboundedParts, BoundedParts);
 }
 
-/// Set the dimension Ids from @p From in @p To.
-static __isl_give isl_set *setDimensionIds(__isl_keep isl_set *From,
-                                           __isl_take isl_set *To) {
-  for (unsigned u = 0, e = isl_set_n_dim(From); u < e; u++) {
-    isl_id *DimId = isl_set_get_dim_id(From, isl_dim_set, u);
-    To = isl_set_set_dim_id(To, isl_dim_set, u, DimId);
-  }
-  return To;
-}
-
 /// Create the conditions under which @p L @p Pred @p R is true.
 static __isl_give isl_set *buildConditionSet(ICmpInst::Predicate Pred,
                                              __isl_take isl_pw_aff *L,
@@ -1410,18 +1400,6 @@ static __isl_give isl_set *buildConditionSet(ICmpInst::Predicate Pred,
   default:
     llvm_unreachable("Non integer predicate not supported");
   }
-}
-
-/// Create the conditions under which @p L @p Pred @p R is true.
-///
-/// Helper function that will make sure the dimensions of the result have the
-/// same isl_id's as the @p Domain.
-static __isl_give isl_set *buildConditionSet(ICmpInst::Predicate Pred,
-                                             __isl_take isl_pw_aff *L,
-                                             __isl_take isl_pw_aff *R,
-                                             __isl_keep isl_set *Domain) {
-  isl_set *ConsequenceCondSet = buildConditionSet(Pred, L, R);
-  return setDimensionIds(Domain, ConsequenceCondSet);
 }
 
 /// Compute the isl representation for the SCEV @p E in this BB.
@@ -1468,7 +1446,7 @@ bool buildConditionSets(Scop &S, BasicBlock *BB, SwitchInst *SI, Loop *L,
 
     RHS = getPwAff(S, BB, InvalidDomainMap, SE.getSCEV(CaseValue));
     isl_set *CaseConditionSet =
-        buildConditionSet(ICmpInst::ICMP_EQ, isl_pw_aff_copy(LHS), RHS, Domain);
+        buildConditionSet(ICmpInst::ICMP_EQ, isl_pw_aff_copy(LHS), RHS);
     ConditionSets[Idx] = isl_set_coalesce(
         isl_set_intersect(CaseConditionSet, isl_set_copy(Domain)));
   }
@@ -1478,8 +1456,7 @@ bool buildConditionSets(Scop &S, BasicBlock *BB, SwitchInst *SI, Loop *L,
   for (unsigned u = 2; u < NumSuccessors; u++)
     ConditionSetUnion =
         isl_set_union(ConditionSetUnion, isl_set_copy(ConditionSets[u]));
-  ConditionSets[0] = setDimensionIds(
-      Domain, isl_set_subtract(isl_set_copy(Domain), ConditionSetUnion));
+  ConditionSets[0] = isl_set_subtract(isl_set_copy(Domain), ConditionSetUnion);
 
   isl_pw_aff_free(LHS);
 
@@ -1522,7 +1499,6 @@ buildUnsignedConditionSets(Scop &S, BasicBlock *BB, Value *Condition,
     Second = isl_pw_aff_le_set(TestVal, UpperBound);
 
   isl_set *ConsequenceCondSet = isl_set_intersect(First, Second);
-  ConsequenceCondSet = setDimensionIds(Domain, ConsequenceCondSet);
   return ConsequenceCondSet;
 }
 
@@ -1547,8 +1523,7 @@ bool buildConditionSets(Scop &S, BasicBlock *BB, Value *Condition,
     bool NonNeg = false;
     isl_pw_aff *LHS = getPwAff(S, BB, InvalidDomainMap, LHSSCEV, NonNeg);
     isl_pw_aff *RHS = getPwAff(S, BB, InvalidDomainMap, RHSSCEV, NonNeg);
-    ConsequenceCondSet =
-        buildConditionSet(ICmpInst::ICMP_SLE, LHS, RHS, Domain);
+    ConsequenceCondSet = buildConditionSet(ICmpInst::ICMP_SLE, LHS, RHS);
   } else if (auto *PHI = dyn_cast<PHINode>(Condition)) {
     auto *Unique = dyn_cast<ConstantInt>(
         getUniqueNonErrorValue(PHI, &S.getRegion(), *S.getLI(), *S.getDT()));
@@ -1629,8 +1604,7 @@ bool buildConditionSets(Scop &S, BasicBlock *BB, Value *Condition,
     default:
       LHS = getPwAff(S, BB, InvalidDomainMap, LeftOperand, NonNeg);
       RHS = getPwAff(S, BB, InvalidDomainMap, RightOperand, NonNeg);
-      ConsequenceCondSet =
-          buildConditionSet(ICond->getPredicate(), LHS, RHS, Domain);
+      ConsequenceCondSet = buildConditionSet(ICond->getPredicate(), LHS, RHS);
       break;
     }
   }
@@ -1845,13 +1819,15 @@ void ScopStmt::removeMemoryAccess(MemoryAccess *MA) {
   InstructionToAccess.erase(MA->getAccessInstruction());
 }
 
-void ScopStmt::removeSingleMemoryAccess(MemoryAccess *MA) {
-  auto MAIt = std::find(MemAccs.begin(), MemAccs.end(), MA);
-  assert(MAIt != MemAccs.end());
-  MemAccs.erase(MAIt);
+void ScopStmt::removeSingleMemoryAccess(MemoryAccess *MA, bool AfterHoisting) {
+  if (AfterHoisting) {
+    auto MAIt = std::find(MemAccs.begin(), MemAccs.end(), MA);
+    assert(MAIt != MemAccs.end());
+    MemAccs.erase(MAIt);
 
-  removeAccessData(MA);
-  Parent.removeAccessData(MA);
+    removeAccessData(MA);
+    Parent.removeAccessData(MA);
+  }
 
   auto It = InstructionToAccess.find(MA->getAccessInstruction());
   if (It != InstructionToAccess.end()) {
@@ -1952,7 +1928,6 @@ public:
 
   bool isDone() { return FoundInside; }
 };
-
 } // end anonymous namespace
 
 const SCEV *Scop::getRepresentingInvariantLoadSCEV(const SCEV *E) const {
@@ -2518,14 +2493,6 @@ static bool containsErrorBlock(RegionNode *RN, const Region &R, LoopInfo &LI,
 
 ///}
 
-static inline __isl_give isl_set *addDomainDimId(__isl_take isl_set *Domain,
-                                                 unsigned Dim, Loop *L) {
-  Domain = isl_set_lower_bound_si(Domain, isl_dim_set, Dim, -1);
-  isl_id *DimId =
-      isl_id_alloc(isl_set_get_ctx(Domain), nullptr, static_cast<void *>(L));
-  return isl_set_set_dim_id(Domain, isl_dim_set, Dim, DimId);
-}
-
 isl::set Scop::getDomainConditions(const ScopStmt *Stmt) const {
   return getDomainConditions(Stmt->getEntryBlock());
 }
@@ -2551,7 +2518,6 @@ bool Scop::buildDomains(Region *R, DominatorTree &DT, LoopInfo &LI,
   auto *S = isl_set_universe(isl_space_set_alloc(getIslCtx().get(), 0, LD + 1));
 
   while (LD-- >= 0) {
-    S = addDomainDimId(S, LD + 1, L);
     L = L->getParentLoop();
   }
 
@@ -2614,7 +2580,6 @@ static __isl_give isl_set *adjustDomainDimensions(Scop &S,
     assert(OldL->getParentLoop() == NewL->getParentLoop());
     Dom = isl_set_project_out(Dom, isl_dim_set, NewDepth, 1);
     Dom = isl_set_add_dims(Dom, isl_dim_set, 1);
-    Dom = addDomainDimId(Dom, NewDepth, NewL);
   } else if (OldDepth < NewDepth) {
     assert(OldDepth + 1 == NewDepth);
     auto &R = S.getRegion();
@@ -2622,7 +2587,6 @@ static __isl_give isl_set *adjustDomainDimensions(Scop &S,
     assert(NewL->getParentLoop() == OldL ||
            ((!OldL || !R.contains(OldL)) && R.contains(NewL)));
     Dom = isl_set_add_dims(Dom, isl_dim_set, 1);
-    Dom = addDomainDimId(Dom, NewDepth, NewL);
   } else {
     assert(OldDepth > NewDepth);
     int Diff = OldDepth - NewDepth;
@@ -3365,8 +3329,8 @@ Scop::Scop(Region &R, ScalarEvolution &ScalarEvolution, LoopInfo &LI,
            DominatorTree &DT, ScopDetection::DetectionContext &DC,
            OptimizationRemarkEmitter &ORE)
     : IslCtx(isl_ctx_alloc(), isl_ctx_free), SE(&ScalarEvolution), DT(&DT),
-      R(R), name(R.getNameStr()), HasSingleExitEdge(R.getExitingBlock()),
-      DC(DC), ORE(ORE), Affinator(this, LI),
+      R(R), HasSingleExitEdge(R.getExitingBlock()), DC(DC), ORE(ORE),
+      Affinator(this, LI),
       ID(getNextID((*R.getEntry()->getParent()).getName().str())) {
   if (IslOnErrorAbort)
     isl_options_set_on_error(getIslCtx().get(), ISL_ON_ERROR_ABORT);
@@ -3591,12 +3555,20 @@ void Scop::removeFromStmtMap(ScopStmt &Stmt) {
   }
 }
 
-void Scop::removeStmts(std::function<bool(ScopStmt &)> ShouldDelete) {
+void Scop::removeStmts(std::function<bool(ScopStmt &)> ShouldDelete,
+                       bool AfterHoisting) {
   for (auto StmtIt = Stmts.begin(), StmtEnd = Stmts.end(); StmtIt != StmtEnd;) {
     if (!ShouldDelete(*StmtIt)) {
       StmtIt++;
       continue;
     }
+
+    // Start with removing all of the statement's accesses including erasing it
+    // from all maps that are pointing to them.
+    // Make a temporary copy because removing MAs invalidates the iterator.
+    SmallVector<MemoryAccess *, 16> MAList(StmtIt->begin(), StmtIt->end());
+    for (MemoryAccess *MA : MAList)
+      StmtIt->removeSingleMemoryAccess(MA, AfterHoisting);
 
     removeFromStmtMap(*StmtIt);
     StmtIt = Stmts.erase(StmtIt);
@@ -3607,7 +3579,7 @@ void Scop::removeStmtNotInDomainMap() {
   auto ShouldDelete = [this](ScopStmt &Stmt) -> bool {
     return !this->DomainMap.lookup(Stmt.getEntryBlock());
   };
-  removeStmts(ShouldDelete);
+  removeStmts(ShouldDelete, false);
 }
 
 void Scop::simplifySCoP(bool AfterHoisting) {
@@ -3630,7 +3602,7 @@ void Scop::simplifySCoP(bool AfterHoisting) {
     return RemoveStmt;
   };
 
-  removeStmts(ShouldDelete);
+  removeStmts(ShouldDelete, AfterHoisting);
 }
 
 InvariantEquivClassTy *Scop::lookupInvariantEquivClass(Value *Val) {
@@ -4894,13 +4866,15 @@ void Scop::removeAccessData(MemoryAccess *Access) {
     ValueDefAccs.erase(Access->getAccessValue());
   } else if (Access->isOriginalValueKind() && Access->isRead()) {
     auto &Uses = ValueUseAccs[Access->getScopArrayInfo()];
-    std::remove(Uses.begin(), Uses.end(), Access);
+    auto NewEnd = std::remove(Uses.begin(), Uses.end(), Access);
+    Uses.erase(NewEnd, Uses.end());
   } else if (Access->isOriginalPHIKind() && Access->isRead()) {
     PHINode *PHI = cast<PHINode>(Access->getAccessInstruction());
     PHIReadAccs.erase(PHI);
   } else if (Access->isOriginalAnyPHIKind() && Access->isWrite()) {
     auto &Incomings = PHIIncomingAccs[Access->getScopArrayInfo()];
-    std::remove(Incomings.begin(), Incomings.end(), Access);
+    auto NewEnd = std::remove(Incomings.begin(), Incomings.end(), Access);
+    Incomings.erase(NewEnd, Incomings.end());
   }
 }
 

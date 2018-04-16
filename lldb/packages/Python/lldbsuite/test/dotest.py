@@ -301,11 +301,20 @@ def parseOptionsAndInitTestdirs():
                     configuration.compiler = candidate
                     break
 
+    if args.dsymutil:
+      os.environ['DSYMUTIL'] = args.dsymutil
+    elif platform_system == 'Darwin':
+      os.environ['DSYMUTIL'] = seven.get_command_output(
+          'xcrun -find -toolchain default dsymutil')
+
     if args.channels:
         lldbtest_config.channels = args.channels
 
     if args.log_success:
         lldbtest_config.log_success = args.log_success
+
+    if args.out_of_tree_debugserver:
+        lldbtest_config.out_of_tree_debugserver = args.out_of_tree_debugserver
 
     # Set SDKROOT if we are using an Apple SDK
     if platform_system == 'Darwin' and args.apple_sdk:
@@ -334,7 +343,7 @@ def parseOptionsAndInitTestdirs():
         configuration.categoriesList = []
 
     if args.skipCategories:
-        configuration.skipCategories = test_categories.validate(
+        configuration.skipCategories += test_categories.validate(
             args.skipCategories, False)
 
     if args.E:

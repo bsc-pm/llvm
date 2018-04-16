@@ -22,33 +22,6 @@
 
 namespace clang {
 namespace clangd {
-// Let GMock print completion items and signature help.
-void PrintTo(const CompletionItem &I, std::ostream *O) {
-  llvm::raw_os_ostream OS(*O);
-  OS << I.label << " - " << toJSON(I);
-}
-void PrintTo(const std::vector<CompletionItem> &V, std::ostream *O) {
-  *O << "{\n";
-  for (const auto &I : V) {
-    *O << "\t";
-    PrintTo(I, O);
-    *O << "\n";
-  }
-  *O << "}";
-}
-void PrintTo(const SignatureInformation &I, std::ostream *O) {
-  llvm::raw_os_ostream OS(*O);
-  OS << I.label << " - " << toJSON(I);
-}
-void PrintTo(const std::vector<SignatureInformation> &V, std::ostream *O) {
-  *O << "{\n";
-  for (const auto &I : V) {
-    *O << "\t";
-    PrintTo(I, O);
-    *O << "\n";
-  }
-  *O << "}";
-}
 
 namespace {
 using namespace llvm;
@@ -56,13 +29,13 @@ using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::Each;
 using ::testing::ElementsAre;
+using ::testing::Field;
 using ::testing::Not;
 using ::testing::UnorderedElementsAre;
-using ::testing::Field;
 
 class IgnoreDiagnostics : public DiagnosticsConsumer {
-  void onDiagnosticsReady(
-      PathRef File, Tagged<std::vector<DiagWithFixIts>> Diagnostics) override {}
+  void onDiagnosticsReady(PathRef File,
+                          std::vector<Diag> Diagnostics) override {}
 };
 
 // GMock helpers for matching completion items.
@@ -117,13 +90,12 @@ CompletionList completions(StringRef Text,
   MockFSProvider FS;
   MockCompilationDatabase CDB;
   IgnoreDiagnostics DiagConsumer;
-  ClangdServer Server(CDB, DiagConsumer, FS, getDefaultAsyncThreadsCount(),
-                      /*StorePreamblesInMemory=*/true);
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
   auto File = testPath("foo.cpp");
   Annotations Test(Text);
-  Server.addDocument(File, Test.code());
-  EXPECT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for preamble";
-  auto CompletionList = runCodeComplete(Server, File, Test.point(), Opts).Value;
+  runAddDocument(Server, File, Test.code());
+  auto CompletionList =
+      cantFail(runCodeComplete(Server, File, Test.point(), Opts));
   // Sanity-check that filterText is valid.
   EXPECT_THAT(CompletionList.items, Each(NameContainsFilter()));
   return CompletionList;
@@ -321,11 +293,11 @@ TEST(CompletionTest, CompletionOptions) {
   };
   // We used to test every combination of options, but that got too slow (2^N).
   auto Flags = {
-    &clangd::CodeCompleteOptions::IncludeMacros,
-    &clangd::CodeCompleteOptions::IncludeBriefComments,
-    &clangd::CodeCompleteOptions::EnableSnippets,
-    &clangd::CodeCompleteOptions::IncludeCodePatterns,
-    &clangd::CodeCompleteOptions::IncludeIneligibleResults,
+      &clangd::CodeCompleteOptions::IncludeMacros,
+      &clangd::CodeCompleteOptions::IncludeBriefComments,
+      &clangd::CodeCompleteOptions::EnableSnippets,
+      &clangd::CodeCompleteOptions::IncludeCodePatterns,
+      &clangd::CodeCompleteOptions::IncludeIneligibleResults,
   };
   // Test default options.
   Test({});
@@ -522,8 +494,7 @@ TEST(CompletionTest, IndexSuppressesPreambleCompletions) {
   MockFSProvider FS;
   MockCompilationDatabase CDB;
   IgnoreDiagnostics DiagConsumer;
-  ClangdServer Server(CDB, DiagConsumer, FS, getDefaultAsyncThreadsCount(),
-                      /*StorePreamblesInMemory=*/true);
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
 
   FS.Files[testPath("bar.h")] =
       R"cpp(namespace ns { struct preamble { int member; }; })cpp";
@@ -534,41 +505,39 @@ TEST(CompletionTest, IndexSuppressesPreambleCompletions) {
       void f() { ns::^; }
       void f() { ns::preamble().$2^; }
   )cpp");
-  Server.addDocument(File, Test.code());
-  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for preamble";
+  runAddDocument(Server, File, Test.code());
   clangd::CodeCompleteOptions Opts = {};
 
   auto I = memIndex({var("ns::index")});
   Opts.Index = I.get();
-  auto WithIndex = runCodeComplete(Server, File, Test.point(), Opts).Value;
+  auto WithIndex = cantFail(runCodeComplete(Server, File, Test.point(), Opts));
   EXPECT_THAT(WithIndex.items,
               UnorderedElementsAre(Named("local"), Named("index")));
   auto ClassFromPreamble =
-      runCodeComplete(Server, File, Test.point("2"), Opts).Value;
+      cantFail(runCodeComplete(Server, File, Test.point("2"), Opts));
   EXPECT_THAT(ClassFromPreamble.items, Contains(Named("member")));
 
   Opts.Index = nullptr;
-  auto WithoutIndex = runCodeComplete(Server, File, Test.point(), Opts).Value;
+  auto WithoutIndex =
+      cantFail(runCodeComplete(Server, File, Test.point(), Opts));
   EXPECT_THAT(WithoutIndex.items,
               UnorderedElementsAre(Named("local"), Named("preamble")));
-
 }
 
 TEST(CompletionTest, DynamicIndexMultiFile) {
   MockFSProvider FS;
   MockCompilationDatabase CDB;
   IgnoreDiagnostics DiagConsumer;
-  ClangdServer Server(CDB, DiagConsumer, FS, getDefaultAsyncThreadsCount(),
-                      /*StorePreamblesInMemory=*/true,
-                      /*BuildDynamicSymbolIndex=*/true);
+  auto Opts = ClangdServer::optsForTest();
+  Opts.BuildDynamicSymbolIndex = true;
+  ClangdServer Server(CDB, FS, DiagConsumer, Opts);
 
   FS.Files[testPath("foo.h")] = R"cpp(
       namespace ns { class XYZ {}; void foo(int x) {} }
   )cpp";
-  Server.addDocument(testPath("foo.cpp"), R"cpp(
+  runAddDocument(Server, testPath("foo.cpp"), R"cpp(
       #include "foo.h"
   )cpp");
-  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for preamble";
 
   auto File = testPath("bar.cpp");
   Annotations Test(R"cpp(
@@ -579,10 +548,9 @@ TEST(CompletionTest, DynamicIndexMultiFile) {
       }
       void f() { ns::^ }
   )cpp");
-  Server.addDocument(File, Test.code());
-  ASSERT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for preamble";
+  runAddDocument(Server, File, Test.code());
 
-  auto Results = runCodeComplete(Server, File, Test.point(), {}).Value;
+  auto Results = cantFail(runCodeComplete(Server, File, Test.point(), {}));
   // "XYZ" and "foo" are not included in the file being completed but are still
   // visible through the index.
   EXPECT_THAT(Results.items, Has("XYZ", CompletionItemKind::Class));
@@ -601,19 +569,64 @@ TEST(CodeCompleteTest, DisableTypoCorrection) {
   EXPECT_TRUE(Results.items.empty());
 }
 
+TEST(CodeCompleteTest, NoColonColonAtTheEnd) {
+  auto Results = completions(R"cpp(
+    namespace clang { }
+    void f() {
+      clan^
+    }
+  )cpp");
+
+  EXPECT_THAT(Results.items, Contains(Labeled("clang")));
+  EXPECT_THAT(Results.items, Not(Contains(Labeled("clang::"))));
+}
+
+TEST(CompletionTest, BacktrackCrashes) {
+  // Sema calls code completion callbacks twice in these cases.
+  auto Results = completions(R"cpp(
+      namespace ns {
+      struct FooBarBaz {};
+      } // namespace ns
+
+     int foo(ns::FooBar^
+  )cpp");
+
+  EXPECT_THAT(Results.items, ElementsAre(Labeled("FooBarBaz")));
+
+  // Check we don't crash in that case too.
+  completions(R"cpp(
+    struct FooBarBaz {};
+    void test() {
+      if (FooBarBaz * x^) {}
+    }
+)cpp");
+}
+
+TEST(CompletionTest, CompleteInExcludedPPBranch) {
+  auto Results = completions(R"cpp(
+    int bar(int param_in_bar) {
+    }
+
+    int foo(int param_in_foo) {
+#if 0
+  par^
+#endif
+    }
+)cpp");
+
+  EXPECT_THAT(Results.items, Contains(Labeled("param_in_foo")));
+  EXPECT_THAT(Results.items, Not(Contains(Labeled("param_in_bar"))));
+}
+
 SignatureHelp signatures(StringRef Text) {
   MockFSProvider FS;
   MockCompilationDatabase CDB;
   IgnoreDiagnostics DiagConsumer;
-  ClangdServer Server(CDB, DiagConsumer, FS, getDefaultAsyncThreadsCount(),
-                      /*StorePreamblesInMemory=*/true);
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
   auto File = testPath("foo.cpp");
   Annotations Test(Text);
-  Server.addDocument(File, Test.code());
-  EXPECT_TRUE(Server.blockUntilIdleForTest()) << "Waiting for preamble";
-  auto R = runSignatureHelp(Server, File, Test.point());
-  assert(R);
-  return R.get().Value;
+  runAddDocument(Server, File, Test.code());
+  return cantFail(runSignatureHelp(Server, File, Test.point()));
 }
 
 MATCHER_P(ParamsAre, P, "") {
@@ -685,6 +698,9 @@ public:
     Requests.push_back(Req);
     return true;
   }
+
+  void lookup(const LookupRequest &,
+              llvm::function_ref<void(const Symbol &)>) const override {}
 
   const std::vector<FuzzyFindRequest> allRequests() const { return Requests; }
 

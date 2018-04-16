@@ -36,7 +36,11 @@
 #define _LIBCPP_VERSION 7000
 
 #ifndef _LIBCPP_ABI_VERSION
-#define _LIBCPP_ABI_VERSION 1
+#  ifdef __Fuchsia__
+#    define _LIBCPP_ABI_VERSION 2
+#  else
+#    define _LIBCPP_ABI_VERSION 1
+#  endif
 #endif
 
 #if defined(__ELF__)
@@ -955,6 +959,7 @@ template <unsigned> struct __static_assert_check {};
 #  endif
 #endif // defined(__APPLE__)
 
+
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #define _LIBCPP_HAS_DEFAULTRUNELOCALE
 #endif
@@ -1194,6 +1199,11 @@ _LIBCPP_FUNC_VIS extern "C" void __sanitizer_annotate_contiguous_container(
 #if !defined(__cpp_coroutines) || __cpp_coroutines < 201703L
 #define _LIBCPP_HAS_NO_COROUTINES
 #endif
+
+// FIXME: Correct this macro when either (A) a feature test macro for the
+// spaceship operator is provided, or (B) a compiler provides a complete
+// implementation.
+#define _LIBCPP_HAS_NO_SPACESHIP_OPERATOR
 
 // Decide whether to use availability macros.
 #if !defined(_LIBCPP_BUILDING_LIBRARY) &&                                      \

@@ -26,6 +26,8 @@ SECTIONS {
   unary = -1 + 3;
   lshift = 1 << 5;
   rshift = 0xff >> 3;
+  precedence1 = 1 | 0xff & 1 << 1 + 1 * 2;
+  precedence2 = (1 | (0xff & (1 << (1 + (1 * 2)))));
   maxpagesize = CONSTANT (MAXPAGESIZE);
   commonpagesize = CONSTANT (COMMONPAGESIZE);
   . = 0xfff0;
@@ -34,6 +36,8 @@ SECTIONS {
   _end = .;
   minus_rel = _end - 0x10;
   minus_abs = _end - _start;
+  max = MAX(11, 22);
+  min = MIN(11, 22);
 }
 
 # CHECK: 00000000000006 *ABS* 00000000 plus
@@ -56,12 +60,16 @@ SECTIONS {
 # CHECK: 00000000000002 *ABS* 00000000 unary
 # CHECK: 00000000000020 *ABS* 00000000 lshift
 # CHECK: 0000000000001f *ABS* 00000000 rshift
+# CHECK: 00000000000009 *ABS* 00000000 precedence1
+# CHECK: 00000000000009 *ABS* 00000000 precedence2
 # CHECK: 00000000001000 *ABS* 00000000 maxpagesize
 # CHECK: 00000000001000 *ABS* 00000000 commonpagesize
 # CHECK: 0000000000ffff *ABS* 00000000 datasegmentalign
 # CHECK: 0000000000fff0 *ABS* 00000000 datasegmentalign2
 # CHECK: 0000000000ffe0 .text 00000000 minus_rel
 # CHECK: 0000000000fff0 *ABS* 00000000 minus_abs
+# CHECK: 00000000000016 *ABS* 00000000 max
+# CHECK: 0000000000000b *ABS* 00000000 min
 
 ## Mailformed number error.
 # RUN: echo "SECTIONS { . = 0x12Q41; }" > %t.script
@@ -91,7 +99,13 @@ SECTIONS {
 # RUN: echo "SECTIONS { . = 1 / 0; }" > %t.script
 # RUN: not ld.lld %t --script %t.script -o %t2 2>&1 | \
 # RUN:  FileCheck --check-prefix=DIVZERO %s
-# DIVZERO: division by zero
+# DIVZERO: {{.*}}.script:1: division by zero
+
+## Mod by zero error.
+# RUN: echo "SECTIONS { . = 1 % 0; }" > %t.script
+# RUN: not ld.lld %t --script %t.script -o %t2 2>&1 | \
+# RUN:  FileCheck --check-prefix=MODZERO %s
+# MODZERO: {{.*}}.script:1: modulo by zero
 
 ## Broken ternary operator expression.
 # RUN: echo "SECTIONS { . = 1 ? 2; }" > %t.script

@@ -1407,12 +1407,12 @@ void ARMBaseInstrInfo::expandMEMCPY(MachineBasicBlock::iterator MI) const {
   SmallVector<unsigned, 6> ScratchRegs;
   for(unsigned I = 5; I < MI->getNumOperands(); ++I)
     ScratchRegs.push_back(MI->getOperand(I).getReg());
-  std::sort(ScratchRegs.begin(), ScratchRegs.end(),
-            [&TRI](const unsigned &Reg1,
-                   const unsigned &Reg2) -> bool {
-              return TRI.getEncodingValue(Reg1) <
-                     TRI.getEncodingValue(Reg2);
-            });
+  llvm::sort(ScratchRegs.begin(), ScratchRegs.end(),
+             [&TRI](const unsigned &Reg1,
+                    const unsigned &Reg2) -> bool {
+               return TRI.getEncodingValue(Reg1) <
+                      TRI.getEncodingValue(Reg2);
+             });
 
   for (const auto &Reg : ScratchRegs) {
     LDM.addReg(Reg, RegState::Define);
@@ -4214,6 +4214,7 @@ ARMBaseInstrInfo::getOperandLatency(const InstrItineraryData *ItinData,
     case ARM::VLD3d32Pseudo:
     case ARM::VLD1d64TPseudo:
     case ARM::VLD1d64TPseudoWB_fixed:
+    case ARM::VLD1d64TPseudoWB_register:
     case ARM::VLD3d8Pseudo_UPD:
     case ARM::VLD3d16Pseudo_UPD:
     case ARM::VLD3d32Pseudo_UPD:
@@ -4231,6 +4232,7 @@ ARMBaseInstrInfo::getOperandLatency(const InstrItineraryData *ItinData,
     case ARM::VLD4d32Pseudo:
     case ARM::VLD1d64QPseudo:
     case ARM::VLD1d64QPseudoWB_fixed:
+    case ARM::VLD1d64QPseudoWB_register:
     case ARM::VLD4d8Pseudo_UPD:
     case ARM::VLD4d16Pseudo_UPD:
     case ARM::VLD4d32Pseudo_UPD:

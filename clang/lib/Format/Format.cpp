@@ -511,7 +511,7 @@ namespace clang {
 namespace format {
 
 const std::error_category &getParseCategory() {
-  static ParseErrorCategory C;
+  static const ParseErrorCategory C{};
   return C;
 }
 std::error_code make_error_code(ParseError e) {
@@ -766,6 +766,7 @@ FormatStyle getGoogleStyle(FormatStyle::LanguageKind Language) {
     GoogleStyle.JavaScriptWrapImports = false;
   } else if (Language == FormatStyle::LK_Proto) {
     GoogleStyle.AllowShortFunctionsOnASingleLine = FormatStyle::SFS_None;
+    GoogleStyle.AlwaysBreakBeforeMultilineStrings = false;
     GoogleStyle.SpacesInContainerLiterals = false;
     GoogleStyle.Cpp11BracedListStyle = false;
     // This affects protocol buffer options specifications and text protos.
@@ -1448,9 +1449,23 @@ private:
     // Keep this array sorted, since we are binary searching over it.
     static constexpr llvm::StringLiteral FoundationIdentifiers[] = {
         "CGFloat",
+        "CGPoint",
+        "CGPointMake",
+        "CGPointZero",
+        "CGRect",
+        "CGRectEdge",
+        "CGRectInfinite",
+        "CGRectMake",
+        "CGRectNull",
+        "CGRectZero",
+        "CGSize",
+        "CGSizeMake",
+        "CGVector",
+        "CGVectorMake",
         "NSAffineTransform",
         "NSArray",
         "NSAttributedString",
+        "NSBlockOperation",
         "NSBundle",
         "NSCache",
         "NSCalendar",
@@ -1466,6 +1481,7 @@ private:
         "NSIndexPath",
         "NSIndexSet",
         "NSInteger",
+        "NSInvocationOperation",
         "NSLocale",
         "NSMapTable",
         "NSMutableArray",
@@ -1480,9 +1496,13 @@ private:
         "NSNumber",
         "NSNumberFormatter",
         "NSObject",
+        "NSOperation",
+        "NSOperationQueue",
+        "NSOperationQueuePriority",
         "NSOrderedSet",
         "NSPoint",
         "NSPointerArray",
+        "NSQualityOfService",
         "NSRange",
         "NSRect",
         "NSRegularExpression",
@@ -1496,16 +1516,15 @@ private:
         "NSURLQueryItem",
         "NSUUID",
         "NSValue",
+        "UIImage",
+        "UIView",
     };
 
-    for (auto &Line : AnnotatedLines) {
-      for (FormatToken *FormatTok = Line->First; FormatTok;
+    for (auto Line : AnnotatedLines) {
+      for (const FormatToken *FormatTok = Line->First; FormatTok;
            FormatTok = FormatTok->Next) {
         if ((FormatTok->Previous && FormatTok->Previous->is(tok::at) &&
-             (FormatTok->isObjCAtKeyword(tok::objc_interface) ||
-              FormatTok->isObjCAtKeyword(tok::objc_implementation) ||
-              FormatTok->isObjCAtKeyword(tok::objc_protocol) ||
-              FormatTok->isObjCAtKeyword(tok::objc_end) ||
+             (FormatTok->Tok.getObjCKeywordID() != tok::objc_not_keyword ||
               FormatTok->isOneOf(tok::numeric_constant, tok::l_square,
                                  tok::l_brace))) ||
             (FormatTok->Tok.isAnyIdentifier() &&
@@ -1519,6 +1538,8 @@ private:
                                TT_ObjCMethodSpecifier, TT_ObjCProperty)) {
           return true;
         }
+        if (guessIsObjC(Line->Children, Keywords))
+          return true;
       }
     }
     return false;

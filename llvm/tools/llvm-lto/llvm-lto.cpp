@@ -22,7 +22,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/CodeGen/CommandFlags.def"
+#include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -40,11 +40,9 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -159,6 +157,14 @@ static cl::opt<std::string>
 static cl::opt<int>
     ThinLTOCachePruningInterval("thinlto-cache-pruning-interval",
     cl::init(1200), cl::desc("Set ThinLTO cache pruning interval."));
+
+static cl::opt<int>
+    ThinLTOCacheMaxSizeBytes("thinlto-cache-max-size-bytes",
+    cl::desc("Set ThinLTO cache pruning directory maximum size in bytes."));
+
+static cl::opt<int>
+    ThinLTOCacheMaxSizeFiles("thinlto-cache-max-size-files", cl::init(1000000),
+    cl::desc("Set ThinLTO cache pruning directory maximum number of files."));
 
 static cl::opt<std::string> ThinLTOSaveTempsPrefix(
     "thinlto-save-temps",
@@ -475,6 +481,8 @@ public:
     ThinGenerator.setTargetOptions(Options);
     ThinGenerator.setCacheDir(ThinLTOCacheDir);
     ThinGenerator.setCachePruningInterval(ThinLTOCachePruningInterval);
+    ThinGenerator.setCacheMaxSizeFiles(ThinLTOCacheMaxSizeFiles);
+    ThinGenerator.setCacheMaxSizeBytes(ThinLTOCacheMaxSizeBytes);
     ThinGenerator.setFreestanding(EnableFreestanding);
 
     // Add all the exported symbols to the table of symbols to preserve.
@@ -789,11 +797,7 @@ private:
 } // end namespace thinlto
 
 int main(int argc, char **argv) {
-  // Print a stack trace if we signal out.
-  sys::PrintStackTraceOnErrorSignal(argv[0]);
-  PrettyStackTraceProgram X(argc, argv);
-
-  llvm_shutdown_obj Y; // Call llvm_shutdown() on exit.
+  InitLLVM X(argc, argv);
   cl::ParseCommandLineOptions(argc, argv, "llvm LTO linker\n");
 
   if (OptLevel < '0' || OptLevel > '3')

@@ -17,6 +17,7 @@
 
 namespace clang {
 namespace clangd {
+
 /// Returns a number of a default async threads to use for TUScheduler.
 /// Returned value is always >= 1 (i.e. will not cause requests to be processed
 /// synchronously).
@@ -28,7 +29,8 @@ struct InputsAndAST {
 };
 
 struct InputsAndPreamble {
-  const ParseInputs &Inputs;
+  llvm::StringRef Contents;
+  const tooling::CompileCommand &Command;
   const PreambleData *Preamble;
 };
 
@@ -46,10 +48,12 @@ enum class WantDiagnostics {
 /// and scheduling tasks.
 /// Callbacks are run on a threadpool and it's appropriate to do slow work in
 /// them. Each task has a name, used for tracing (should be UpperCamelCase).
+/// FIXME(sammccall): pull out a scheduler options struct.
 class TUScheduler {
 public:
   TUScheduler(unsigned AsyncThreadsCount, bool StorePreamblesInMemory,
-              ASTParsedCallback ASTCallback);
+              ASTParsedCallback ASTCallback,
+              std::chrono::steady_clock::duration UpdateDebounce);
   ~TUScheduler();
 
   /// Returns estimated memory usage for each of the currently open files.
@@ -60,7 +64,7 @@ public:
   /// \p File was not part of it before.
   /// FIXME(ibiryukov): remove the callback from this function.
   void update(PathRef File, ParseInputs Inputs, WantDiagnostics WD,
-              UniqueFunction<void(std::vector<DiagWithFixIts>)> OnUpdated);
+              UniqueFunction<void(std::vector<Diag>)> OnUpdated);
 
   /// Remove \p File from the list of tracked files and schedule removal of its
   /// resources.
@@ -73,16 +77,19 @@ public:
   /// If an error occurs during processing, it is forwarded to the \p Action
   /// callback.
   void runWithAST(llvm::StringRef Name, PathRef File,
-                  UniqueFunction<void(llvm::Expected<InputsAndAST>)> Action);
+                  Callback<InputsAndAST> Action);
 
-  /// Schedule an async read of the Preamble. Preamble passed to \p Action may
-  /// be built for any version of the file, callers must not rely on it being
-  /// consistent with the current version of the file.
+  /// Schedule an async read of the Preamble.
+  /// The preamble may be stale, generated from an older version of the file.
+  /// Reading from locations in the preamble may cause the files to be re-read.
+  /// This gives callers two options:
+  /// - validate that the preamble is still valid, and only use it in this case
+  /// - accept that preamble contents may be outdated, and try to avoid reading
+  ///   source code from headers.
   /// If an error occurs during processing, it is forwarded to the \p Action
   /// callback.
-  void runWithPreamble(
-      llvm::StringRef Name, PathRef File,
-      UniqueFunction<void(llvm::Expected<InputsAndPreamble>)> Action);
+  void runWithPreamble(llvm::StringRef Name, PathRef File,
+                       Callback<InputsAndPreamble> Action);
 
   /// Wait until there are no scheduled or running tasks.
   /// Mostly useful for synchronizing tests.
@@ -101,6 +108,7 @@ private:
   // asynchronously.
   llvm::Optional<AsyncTaskRunner> PreambleTasks;
   llvm::Optional<AsyncTaskRunner> WorkerThreads;
+  std::chrono::steady_clock::duration UpdateDebounce;
 };
 } // namespace clangd
 } // namespace clang

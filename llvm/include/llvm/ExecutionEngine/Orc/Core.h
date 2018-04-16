@@ -17,6 +17,7 @@
 #include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/SymbolStringPool.h"
 
+#include <list>
 #include <map>
 #include <memory>
 #include <set>
@@ -25,22 +26,70 @@
 namespace llvm {
 namespace orc {
 
+// Forward declare some classes.
+class VSO;
+
 /// VModuleKey provides a unique identifier (allocated and managed by
 /// ExecutionSessions) for a module added to the JIT.
 using VModuleKey = uint64_t;
-
-class VSO;
 
 /// @brief A set of symbol names (represented by SymbolStringPtrs for
 //         efficiency).
 using SymbolNameSet = std::set<SymbolStringPtr>;
 
+/// @brief Render a SymbolNameSet to an ostream.
+raw_ostream &operator<<(raw_ostream &OS, const SymbolNameSet &Symbols);
+
 /// @brief A map from symbol names (as SymbolStringPtrs) to JITSymbols
 ///        (address/flags pairs).
 using SymbolMap = std::map<SymbolStringPtr, JITEvaluatedSymbol>;
 
+/// @brief Render a SymbolMap to an ostream.
+raw_ostream &operator<<(raw_ostream &OS, const SymbolMap &Symbols);
+
 /// @brief A map from symbol names (as SymbolStringPtrs) to JITSymbolFlags.
 using SymbolFlagsMap = std::map<SymbolStringPtr, JITSymbolFlags>;
+
+/// @brief Render a SymbolMap to an ostream.
+raw_ostream &operator<<(raw_ostream &OS, const SymbolFlagsMap &Symbols);
+
+/// @brief A base class for materialization failures that allows the failing
+///        symbols to be obtained for logging.
+class FailedToMaterialize : public ErrorInfo<FailedToMaterialize> {
+public:
+  static char ID;
+  virtual const SymbolNameSet &getSymbols() const = 0;
+};
+
+/// @brief Used to notify a VSO that the given set of symbols failed to resolve.
+class FailedToResolve : public ErrorInfo<FailedToResolve, FailedToMaterialize> {
+public:
+  static char ID;
+
+  FailedToResolve(SymbolNameSet Symbols);
+  std::error_code convertToErrorCode() const override;
+  void log(raw_ostream &OS) const override;
+  const SymbolNameSet &getSymbols() const override { return Symbols; }
+
+private:
+  SymbolNameSet Symbols;
+};
+
+/// @brief Used to notify a VSO that the given set of symbols failed to
+/// finalize.
+class FailedToFinalize
+    : public ErrorInfo<FailedToFinalize, FailedToMaterialize> {
+public:
+  static char ID;
+
+  FailedToFinalize(SymbolNameSet Symbols);
+  std::error_code convertToErrorCode() const override;
+  void log(raw_ostream &OS) const override;
+  const SymbolNameSet &getSymbols() const override { return Symbols; }
+
+private:
+  SymbolNameSet Symbols;
+};
 
 /// @brief A symbol query that returns results via a callback when results are
 ///        ready.
@@ -69,20 +118,20 @@ public:
   /// notify-finalized callback is called with the given error.
   ///
   /// It is illegal to call setFailed after both callbacks have been made.
-  void setFailed(Error Err);
+  void notifyFailed(Error Err);
 
   /// @brief Set the resolved symbol information for the given symbol name.
   ///
   /// If this symbol was the last one not resolved, this will trigger a call to
   /// the notify-finalized callback passing the completed sybol map.
-  void setDefinition(SymbolStringPtr Name, JITEvaluatedSymbol Sym);
+  void resolve(SymbolStringPtr Name, JITEvaluatedSymbol Sym);
 
   /// @brief Notify the query that a requested symbol is ready for execution.
   ///
   /// This decrements the query's internal count of not-yet-ready symbols. If
   /// this call to notifySymbolFinalized sets the counter to zero, it will call
   /// the notify-finalized callback with Error::success as the value.
-  void notifySymbolFinalized();
+  void finalizeSymbol();
 
 private:
   SymbolMap Symbols;
@@ -157,22 +206,25 @@ createSymbolResolver(LookupFlagsFn &&LookupFlags, LookupFn &&Lookup) {
       std::forward<LookupFlagsFn>(LookupFlags), std::forward<LookupFn>(Lookup));
 }
 
-/// @brief Represents a source of symbol definitions which may be materialized
-///        (turned into data / code through some materialization process) or
-///        discarded (if the definition is overridden by a stronger one).
+/// @brief A MaterializationUnit represents a set of symbol definitions that can
+///        be materialized as a group, or individually discarded (when
+///        overriding definitions are encountered).
 ///
-/// SymbolSources are used when providing lazy definitions of symbols to VSOs.
-/// The VSO will call materialize when the address of a symbol is requested via
-/// the lookup method. The VSO will call discard if a stronger definition is
-/// added or already present.
-class SymbolSource {
+/// MaterializationUnits are used when providing lazy definitions of symbols to
+/// VSOs. The VSO will call materialize when the address of a symbol is
+/// requested via the lookup method. The VSO will call discard if a stronger
+/// definition is added or already present.
+class MaterializationUnit {
 public:
-  virtual ~SymbolSource() {}
+  virtual ~MaterializationUnit() {}
 
-  /// @brief Implementations of this method should materialize the given
-  ///        symbols (plus any additional symbols required) by adding a
-  ///        Materializer to the ExecutionSession's MaterializationQueue.
-  virtual Error materialize(VSO &V, SymbolNameSet Symbols) = 0;
+  /// @brief Return the set of symbols that this source provides.
+  virtual SymbolFlagsMap getSymbols() = 0;
+
+  /// @brief Implementations of this method should materialize all symbols
+  ///        in the materialzation unit, except for those that have been
+  ///        previously discarded.
+  virtual Error materialize(VSO &V) = 0;
 
   /// @brief Implementations of this method should discard the given symbol
   ///        from the source (e.g. if the source is an LLVM IR Module and the
@@ -201,10 +253,12 @@ public:
 
   using SetDefinitionsResult =
       std::map<SymbolStringPtr, RelativeLinkageStrength>;
-  using SourceWorkMap = std::map<std::shared_ptr<SymbolSource>, SymbolNameSet>;
+
+  using MaterializationUnitList =
+      std::vector<std::unique_ptr<MaterializationUnit>>;
 
   struct LookupResult {
-    SourceWorkMap MaterializationWork;
+    MaterializationUnitList MaterializationUnits;
     SymbolNameSet UnresolvedSymbols;
   };
 
@@ -231,15 +285,20 @@ public:
   Error define(SymbolMap NewSymbols);
 
   /// @brief Adds the given symbols to the mapping as lazy symbols.
-  Error defineLazy(const SymbolFlagsMap &NewSymbols,
-                   std::shared_ptr<SymbolSource> Source);
+  Error defineLazy(std::unique_ptr<MaterializationUnit> Source);
 
   /// @brief Add the given symbol/address mappings to the dylib, but do not
   ///        mark the symbols as finalized yet.
-  void resolve(SymbolMap SymbolValues);
+  void resolve(const SymbolMap &SymbolValues);
+
+  /// @brief Notify the VSO that the given symbols failed to finalize.
+  void notifyResolutionFailed(const SymbolNameSet &Names);
 
   /// @brief Finalize the given symbols.
-  void finalize(SymbolNameSet SymbolsToFinalize);
+  void finalize(const SymbolNameSet &SymbolsToFinalize);
+
+  /// @brief Notify the VSO that the given symbols failed to finalize.
+  void notifyFinalizationFailed(const SymbolNameSet &Names);
 
   /// @brief Look up the flags for the given symbols.
   ///
@@ -263,77 +322,143 @@ public:
                       SymbolNameSet Symbols);
 
 private:
-  class MaterializationInfo {
+  class UnmaterializedInfo {
   public:
-    MaterializationInfo(JITSymbolFlags Flags,
-                        std::shared_ptr<SymbolSource> Query);
-    JITSymbolFlags getFlags() const;
-    JITTargetAddress getAddress() const;
-    void replaceWithSource(VSO &V, SymbolStringPtr Name,
-                           JITSymbolFlags NewFlags,
-                           std::shared_ptr<SymbolSource> NewSource);
-    std::shared_ptr<SymbolSource>
-    query(SymbolStringPtr Name, std::shared_ptr<AsynchronousSymbolQuery> Query);
-    void resolve(VSO &V, SymbolStringPtr Name, JITEvaluatedSymbol Sym);
-    void finalize();
+    UnmaterializedInfo(size_t SymbolsRemaining,
+                       std::unique_ptr<MaterializationUnit> MU);
 
-  private:
-    JITSymbolFlags Flags;
-    JITTargetAddress Address = 0;
-    std::shared_ptr<SymbolSource> Source;
-    std::vector<std::shared_ptr<AsynchronousSymbolQuery>> PendingResolution;
-    std::vector<std::shared_ptr<AsynchronousSymbolQuery>> PendingFinalization;
+    uint64_t SymbolsRemaining;
+    std::unique_ptr<MaterializationUnit> MU;
   };
+
+  using UnmaterializedInfoList = std::list<UnmaterializedInfo>;
+
+  using UnmaterializedInfoIterator = UnmaterializedInfoList::iterator;
+
+  class MaterializingInfo {
+  public:
+    using QueryList = std::vector<std::shared_ptr<AsynchronousSymbolQuery>>;
+
+    QueryList PendingResolution;
+    QueryList PendingFinalization;
+  };
+
+  using MaterializingInfoMap = std::map<SymbolStringPtr, MaterializingInfo>;
+
+  using MaterializingInfoIterator = MaterializingInfoMap::iterator;
 
   class SymbolTableEntry {
   public:
-    SymbolTableEntry(JITSymbolFlags Flags,
-                     std::shared_ptr<SymbolSource> Source);
+    SymbolTableEntry(JITSymbolFlags SymbolFlags,
+                     UnmaterializedInfoIterator UnmaterializedInfoItr);
     SymbolTableEntry(JITEvaluatedSymbol Sym);
     SymbolTableEntry(SymbolTableEntry &&Other);
+    SymbolTableEntry &operator=(SymbolTableEntry &&Other);
     ~SymbolTableEntry();
-    JITSymbolFlags getFlags() const;
-    void replaceWithSource(VSO &V, SymbolStringPtr Name, JITSymbolFlags Flags,
-                           std::shared_ptr<SymbolSource> NewSource);
-    std::shared_ptr<SymbolSource>
-    query(SymbolStringPtr Name, std::shared_ptr<AsynchronousSymbolQuery> Query);
-    void resolve(VSO &V, SymbolStringPtr Name, JITEvaluatedSymbol Sym);
+
+    // Change definition due to override. Only usable prior to materialization.
+    void replaceWith(VSO &V, SymbolStringPtr Name, JITEvaluatedSymbol Sym);
+
+    // Change definition due to override. Only usable prior to materialization.
+    void replaceWith(VSO &V, SymbolStringPtr Name, JITSymbolFlags Flags,
+                     UnmaterializedInfoIterator NewUMII);
+
+    // Move entry to materializing state, detach from UMII.
+    std::unique_ptr<MaterializationUnit> initMaterialize(VSO &V);
+
+    // Move entry to resolved state.
+    void resolve(VSO &V, JITEvaluatedSymbol Sym);
+
+    // Move entry to finalized state.
     void finalize();
 
-  private:
     JITSymbolFlags Flags;
+
     union {
       JITTargetAddress Address;
-      std::unique_ptr<MaterializationInfo> MatInfo;
+      UnmaterializedInfoIterator UMII;
     };
+
+  private:
+    void destroy();
   };
 
+  void detach(UnmaterializedInfoIterator UMII);
+
   std::map<SymbolStringPtr, SymbolTableEntry> Symbols;
+  UnmaterializedInfoList UnmaterializedInfos;
+  MaterializingInfoMap MaterializingInfos;
 };
 
 /// @brief An ExecutionSession represents a running JIT program.
 class ExecutionSession {
 public:
+  using ErrorReporter = std::function<void(Error)>;
+
   /// @brief Construct an ExecutionEngine.
   ///
   /// SymbolStringPools may be shared between ExecutionSessions.
-  ExecutionSession(SymbolStringPool &SSP);
+  ExecutionSession(std::shared_ptr<SymbolStringPool> SSP = nullptr)
+    : SSP(SSP ? std::move(SSP) : std::make_shared<SymbolStringPool>()) {}
 
   /// @brief Returns the SymbolStringPool for this ExecutionSession.
-  SymbolStringPool &getSymbolStringPool() const { return SSP; }
+  SymbolStringPool &getSymbolStringPool() const { return *SSP; }
+
+  /// @brief Set the error reporter function.
+  void setErrorReporter(ErrorReporter ReportError) {
+    this->ReportError = std::move(ReportError);
+  }
+
+  /// @brief Report a error for this execution session.
+  ///
+  /// Unhandled errors can be sent here to log them.
+  void reportError(Error Err) { ReportError(std::move(Err)); }
 
   /// @brief Allocate a module key for a new module to add to the JIT.
-  VModuleKey allocateVModule();
+  VModuleKey allocateVModule() { return ++LastKey; }
 
   /// @brief Return a module key to the ExecutionSession so that it can be
   ///        re-used. This should only be done once all resources associated
   ////       with the original key have been released.
-  void releaseVModule(VModuleKey Key);
+  void releaseVModule(VModuleKey Key) { /* FIXME: Recycle keys */ }
 
 public:
-  SymbolStringPool &SSP;
+  static void logErrorsToStdErr(Error Err);
+
+  std::shared_ptr<SymbolStringPool> SSP;
   VModuleKey LastKey = 0;
+  ErrorReporter ReportError = logErrorsToStdErr;
 };
+
+/// Runs Materializers on the current thread and reports errors to the given
+/// ExecutionSession.
+class MaterializeOnCurrentThread {
+public:
+  MaterializeOnCurrentThread(ExecutionSession &ES) : ES(ES) {}
+
+  void operator()(VSO &V, std::unique_ptr<MaterializationUnit> MU) {
+    if (auto Err = MU->materialize(V))
+      ES.reportError(std::move(Err));
+  }
+
+private:
+  ExecutionSession &ES;
+};
+
+/// Materialization function object wrapper for the lookup method.
+using MaterializationDispatcher =
+    std::function<void(VSO &V, std::unique_ptr<MaterializationUnit> S)>;
+
+/// @brief Look up a set of symbols by searching a list of VSOs.
+///
+/// All VSOs in the list should be non-null.
+Expected<SymbolMap> lookup(const std::vector<VSO *> &VSOs, SymbolNameSet Names,
+                           MaterializationDispatcher DispatchMaterialization);
+
+/// @brief Look up a symbol by searching a list of VSOs.
+Expected<JITEvaluatedSymbol>
+lookup(const std::vector<VSO *> VSOs, SymbolStringPtr Name,
+       MaterializationDispatcher DispatchMaterialization);
 
 } // End namespace orc
 } // End namespace llvm

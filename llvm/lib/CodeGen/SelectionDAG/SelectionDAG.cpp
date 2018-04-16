@@ -32,7 +32,6 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
-#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/SelectionDAGAddressAnalysis.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
@@ -58,6 +57,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/KnownBits.h"
+#include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Mutex.h"
@@ -950,7 +950,8 @@ SelectionDAG::SelectionDAG(const TargetMachine &tm, CodeGenOpt::Level OL)
 
 void SelectionDAG::init(MachineFunction &NewMF,
                         OptimizationRemarkEmitter &NewORE,
-                        Pass *PassPtr, const TargetLibraryInfo *LibraryInfo) {
+                        Pass *PassPtr, const TargetLibraryInfo *LibraryInfo,
+                        DivergenceAnalysis * Divergence) {
   MF = &NewMF;
   SDAGISelPass = PassPtr;
   ORE = &NewORE;
@@ -958,6 +959,7 @@ void SelectionDAG::init(MachineFunction &NewMF,
   TSI = getSubtarget().getSelectionDAGInfo();
   LibInfo = LibraryInfo;
   Context = &MF->getFunction().getContext();
+  DA = Divergence;
 }
 
 SelectionDAG::~SelectionDAG() {
@@ -1555,33 +1557,35 @@ SDValue SelectionDAG::getVectorShuffle(EVT VT, const SDLoc &dl, SDValue N1,
   if (N1.isUndef())
     commuteShuffle(N1, N2, MaskVec);
 
-  // If shuffling a splat, try to blend the splat instead. We do this here so
-  // that even when this arises during lowering we don't have to re-handle it.
-  auto BlendSplat = [&](BuildVectorSDNode *BV, int Offset) {
-    BitVector UndefElements;
-    SDValue Splat = BV->getSplatValue(&UndefElements);
-    if (!Splat)
-      return;
+  if (TLI->hasVectorBlend()) {
+    // If shuffling a splat, try to blend the splat instead. We do this here so
+    // that even when this arises during lowering we don't have to re-handle it.
+    auto BlendSplat = [&](BuildVectorSDNode *BV, int Offset) {
+      BitVector UndefElements;
+      SDValue Splat = BV->getSplatValue(&UndefElements);
+      if (!Splat)
+        return;
 
-    for (int i = 0; i < NElts; ++i) {
-      if (MaskVec[i] < Offset || MaskVec[i] >= (Offset + NElts))
-        continue;
+      for (int i = 0; i < NElts; ++i) {
+        if (MaskVec[i] < Offset || MaskVec[i] >= (Offset + NElts))
+          continue;
 
-      // If this input comes from undef, mark it as such.
-      if (UndefElements[MaskVec[i] - Offset]) {
-        MaskVec[i] = -1;
-        continue;
+        // If this input comes from undef, mark it as such.
+        if (UndefElements[MaskVec[i] - Offset]) {
+          MaskVec[i] = -1;
+          continue;
+        }
+
+        // If we can blend a non-undef lane, use that instead.
+        if (!UndefElements[i])
+          MaskVec[i] = i + Offset;
       }
-
-      // If we can blend a non-undef lane, use that instead.
-      if (!UndefElements[i])
-        MaskVec[i] = i + Offset;
-    }
-  };
-  if (auto *N1BV = dyn_cast<BuildVectorSDNode>(N1))
-    BlendSplat(N1BV, 0);
-  if (auto *N2BV = dyn_cast<BuildVectorSDNode>(N2))
-    BlendSplat(N2BV, NElts);
+    };
+    if (auto *N1BV = dyn_cast<BuildVectorSDNode>(N1))
+      BlendSplat(N1BV, 0);
+    if (auto *N2BV = dyn_cast<BuildVectorSDNode>(N2))
+      BlendSplat(N2BV, NElts);
+  }
 
   // Canonicalize all index into lhs, -> shuffle lhs, undef
   // Canonicalize all index into rhs, -> shuffle rhs, undef
@@ -1713,6 +1717,7 @@ SDValue SelectionDAG::getRegister(unsigned RegNo, EVT VT) {
     return SDValue(E, 0);
 
   auto *N = newSDNode<RegisterSDNode>(RegNo, VT);
+  N->SDNodeBits.IsDivergent = TLI->isSDNodeSourceOfDivergence(N, FLI, DA);
   CSEMap.InsertNode(N, IP);
   InsertNode(N);
   return SDValue(N, 0);
@@ -2358,10 +2363,7 @@ void SelectionDAG::computeKnownBits(SDValue Op, KnownBits &Known,
       break;
     }
 
-    // Support big-endian targets when it becomes useful.
     bool IsLE = getDataLayout().isLittleEndian();
-    if (!IsLE)
-      break;
 
     // Bitcast 'small element' vector to 'large element' scalar/vector.
     if ((BitWidth % SubBitWidth) == 0) {
@@ -2380,8 +2382,9 @@ void SelectionDAG::computeKnownBits(SDValue Op, KnownBits &Known,
       for (unsigned i = 0; i != SubScale; ++i) {
         computeKnownBits(N0, Known2, SubDemandedElts.shl(i),
                          Depth + 1);
-        Known.One |= Known2.One.zext(BitWidth).shl(SubBitWidth * i);
-        Known.Zero |= Known2.Zero.zext(BitWidth).shl(SubBitWidth * i);
+        unsigned Shifts = IsLE ? i : SubScale - 1 - i;
+        Known.One |= Known2.One.zext(BitWidth).shl(SubBitWidth * Shifts);
+        Known.Zero |= Known2.Zero.zext(BitWidth).shl(SubBitWidth * Shifts);
       }
     }
 
@@ -2403,7 +2406,8 @@ void SelectionDAG::computeKnownBits(SDValue Op, KnownBits &Known,
       Known.Zero.setAllBits(); Known.One.setAllBits();
       for (unsigned i = 0; i != NumElts; ++i)
         if (DemandedElts[i]) {
-          unsigned Offset = (i % SubScale) * BitWidth;
+          unsigned Shifts = IsLE ? i : NumElts - 1 - i;
+          unsigned Offset = (Shifts % SubScale) * BitWidth;
           Known.One &= Known2.One.lshr(Offset).trunc(BitWidth);
           Known.Zero &= Known2.Zero.lshr(Offset).trunc(BitWidth);
           // If we don't know any bits, early out.
@@ -6699,6 +6703,7 @@ SDNode *SelectionDAG::UpdateNodeOperands(SDNode *N, SDValue Op1, SDValue Op2) {
   if (N->OperandList[1] != Op2)
     N->OperandList[1].set(Op2);
 
+  updateDivergence(N);
   // If this gets put into a CSE map, add it.
   if (InsertPos) CSEMap.InsertNode(N, InsertPos);
   return N;
@@ -7340,8 +7345,9 @@ void SelectionDAG::ReplaceAllUsesWith(SDValue FromN, SDValue To) {
       SDUse &Use = UI.getUse();
       ++UI;
       Use.set(To);
+      if (To->isDivergent() != From->isDivergent())
+        updateDivergence(User);
     } while (UI != UE && *UI == User);
-
     // Now that we have modified User, add it back to the CSE maps.  If it
     // already exists there, recursively merge the results together.
     AddModifiedNodeToCSEMaps(User);
@@ -7395,6 +7401,8 @@ void SelectionDAG::ReplaceAllUsesWith(SDNode *From, SDNode *To) {
       SDUse &Use = UI.getUse();
       ++UI;
       Use.setNode(To);
+      if (To->isDivergent() != From->isDivergent())
+        updateDivergence(User);
     } while (UI != UE && *UI == User);
 
     // Now that we have modified User, add it back to the CSE maps.  If it
@@ -7439,8 +7447,9 @@ void SelectionDAG::ReplaceAllUsesWith(SDNode *From, const SDValue *To) {
       const SDValue &ToOp = To[Use.getResNo()];
       ++UI;
       Use.set(ToOp);
+      if (To->getNode()->isDivergent() != From->isDivergent())
+        updateDivergence(User);
     } while (UI != UE && *UI == User);
-
     // Now that we have modified User, add it back to the CSE maps.  If it
     // already exists there, recursively merge the results together.
     AddModifiedNodeToCSEMaps(User);
@@ -7498,8 +7507,9 @@ void SelectionDAG::ReplaceAllUsesOfValueWith(SDValue From, SDValue To){
 
       ++UI;
       Use.set(To);
+      if (To->isDivergent() != From->isDivergent())
+        updateDivergence(User);
     } while (UI != UE && *UI == User);
-
     // We are iterating over all uses of the From node, so if a use
     // doesn't use the specific value, no changes are made.
     if (!UserRemovedFromCSEMaps)
@@ -7532,6 +7542,72 @@ namespace {
 
 } // end anonymous namespace
 
+void SelectionDAG::updateDivergence(SDNode * N)
+{
+  if (TLI->isSDNodeAlwaysUniform(N))
+    return;
+  bool IsDivergent = TLI->isSDNodeSourceOfDivergence(N, FLI, DA);
+  for (auto &Op : N->ops()) {
+    if (Op.Val.getValueType() != MVT::Other)
+      IsDivergent |= Op.getNode()->isDivergent();
+  }
+  if (N->SDNodeBits.IsDivergent != IsDivergent) {
+    N->SDNodeBits.IsDivergent = IsDivergent;
+    for (auto U : N->uses()) {
+      updateDivergence(U);
+    }
+  }
+}
+
+
+void SelectionDAG::CreateTopologicalOrder(std::vector<SDNode*>& Order) {
+  DenseMap<SDNode *, unsigned> Degree;
+  Order.reserve(AllNodes.size());
+  for (auto & N : allnodes()) {
+    unsigned NOps = N.getNumOperands();
+    Degree[&N] = NOps;
+    if (0 == NOps)
+      Order.push_back(&N);
+  }
+  for (std::vector<SDNode *>::iterator I = Order.begin();
+  I!=Order.end();++I) {
+    SDNode * N = *I;
+    for (auto U : N->uses()) {
+      unsigned &UnsortedOps = Degree[U];
+      if (0 == --UnsortedOps)
+        Order.push_back(U);
+    }
+  }
+}
+
+void SelectionDAG::VerifyDAGDiverence()
+{
+  std::vector<SDNode*> TopoOrder;
+  CreateTopologicalOrder(TopoOrder);
+  const TargetLowering &TLI = getTargetLoweringInfo();
+  DenseMap<const SDNode *, bool> DivergenceMap;
+  for (auto &N : allnodes()) {
+    DivergenceMap[&N] = false;
+  }
+  for (auto N : TopoOrder) {
+    bool IsDivergent = DivergenceMap[N];
+    bool IsSDNodeDivergent = TLI.isSDNodeSourceOfDivergence(N, FLI, DA);
+    for (auto &Op : N->ops()) {
+      if (Op.Val.getValueType() != MVT::Other)
+        IsSDNodeDivergent |= DivergenceMap[Op.getNode()];
+    }
+    if (!IsDivergent && IsSDNodeDivergent && !TLI.isSDNodeAlwaysUniform(N)) {
+      DivergenceMap[N] = true;
+    }
+  }
+  for (auto &N : allnodes()) {
+    (void)N;
+    assert(DivergenceMap[&N] == N.isDivergent() &&
+           "Divergence bit inconsistency detected\n");
+  }
+}
+
+
 /// ReplaceAllUsesOfValuesWith - Replace any uses of From with To, leaving
 /// uses of other values produced by From.getNode() alone.  The same value
 /// may appear in both the From and To list.  The Deleted vector is
@@ -7563,7 +7639,7 @@ void SelectionDAG::ReplaceAllUsesOfValuesWith(const SDValue *From,
   }
 
   // Sort the uses, so that all the uses from a given User are together.
-  std::sort(Uses.begin(), Uses.end());
+  llvm::sort(Uses.begin(), Uses.end());
 
   for (unsigned UseIndex = 0, UseIndexEnd = Uses.size();
        UseIndex != UseIndexEnd; ) {
@@ -8335,6 +8411,26 @@ SDNode *SelectionDAG::isConstantFPBuildVectorOrConstantFP(SDValue N) {
     return N.getNode();
 
   return nullptr;
+}
+
+void SelectionDAG::createOperands(SDNode *Node, ArrayRef<SDValue> Vals) {
+  assert(!Node->OperandList && "Node already has operands");
+  SDUse *Ops = OperandRecycler.allocate(
+    ArrayRecycler<SDUse>::Capacity::get(Vals.size()), OperandAllocator);
+
+  bool IsDivergent = false;
+  for (unsigned I = 0; I != Vals.size(); ++I) {
+    Ops[I].setUser(Node);
+    Ops[I].setInitial(Vals[I]);
+    if (Ops[I].Val.getValueType() != MVT::Other) // Skip Chain. It does not carry divergence.
+      IsDivergent = IsDivergent || Ops[I].getNode()->isDivergent();
+  }
+  Node->NumOperands = Vals.size();
+  Node->OperandList = Ops;
+  IsDivergent |= TLI->isSDNodeSourceOfDivergence(Node, FLI, DA);
+  if (!TLI->isSDNodeAlwaysUniform(Node))
+    Node->SDNodeBits.IsDivergent = IsDivergent;
+  checkForCycles(Node);
 }
 
 #ifndef NDEBUG
