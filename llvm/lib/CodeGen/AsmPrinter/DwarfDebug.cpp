@@ -312,7 +312,11 @@ DwarfDebug::DwarfDebug(AsmPrinter *A, Module *M)
   } else
     TheAccelTableKind = AccelTables;
 
-  UseInlineStrings = DwarfInlinedStrings == Enable;
+  if (DwarfInlinedStrings == Default)
+    UseInlineStrings = TT.isNVPTX();
+  else
+    UseInlineStrings = DwarfInlinedStrings == Enable;
+
   HasAppleExtensionAttributes = tuneForLLDB();
 
   // Handle split DWARF.
@@ -327,14 +331,18 @@ DwarfDebug::DwarfDebug(AsmPrinter *A, Module *M)
   unsigned DwarfVersionNumber = Asm->TM.Options.MCOptions.DwarfVersion;
   unsigned DwarfVersion = DwarfVersionNumber ? DwarfVersionNumber
                                     : MMI->getModule()->getDwarfVersion();
-  // Use dwarf 4 by default if nothing is requested.
-  DwarfVersion = DwarfVersion ? DwarfVersion : dwarf::DWARF_VERSION;
+  // Use dwarf 4 by default if nothing is requested. For NVPTX, use dwarf 2.
+  DwarfVersion =
+      TT.isNVPTX() ? 2 : (DwarfVersion ? DwarfVersion : dwarf::DWARF_VERSION);
 
-  UsePubSections = !NoDwarfPubSections;
-  UseRangesSection = !NoDwarfRangesSection;
+  UsePubSections = !NoDwarfPubSections && !TT.isNVPTX();
+  UseRangesSection = !NoDwarfRangesSection && !TT.isNVPTX();
 
-  // Use sections as references.
-  UseSectionsAsReferences = DwarfSectionsAsReferences == Enable;
+  // Use sections as references. Force for NVPTX.
+  if (DwarfSectionsAsReferences == Default)
+    UseSectionsAsReferences = TT.isNVPTX();
+  else
+    UseSectionsAsReferences = DwarfSectionsAsReferences == Enable;
 
   // Work around a GDB bug. GDB doesn't support the standard opcode;
   // SCE doesn't support GNU's; LLDB prefers the standard opcode, which
@@ -386,13 +394,12 @@ static StringRef getObjCMethodName(StringRef In) {
 }
 
 // Add the various names to the Dwarf accelerator table names.
-// TODO: Determine whether or not we should add names for programs
-// that do not have a DW_AT_name or DW_AT_linkage_name field - this
-// is only slightly different than the lookup of non-standard ObjC names.
 void DwarfDebug::addSubprogramNames(const DISubprogram *SP, DIE &Die) {
   if (!SP->isDefinition())
     return;
-  addAccelName(SP->getName(), Die);
+
+  if (SP->getName() != "")
+    addAccelName(SP->getName(), Die);
 
   // If the linkage name is different than the name, go ahead and output
   // that as well into the name table.
@@ -1469,6 +1476,10 @@ void DwarfDebug::emitAccel(AccelTableT &Accel, MCSection *Section,
 }
 
 void DwarfDebug::emitAccelDebugNames() {
+  // Don't emit anything if we have no compilation units to index.
+  if (getUnits().empty())
+    return;
+
   Asm->OutStreamer->SwitchSection(
       Asm->getObjFileLowering().getDwarfDebugNamesSection());
   emitDWARF5AccelTable(Asm, AccelDebugNames, *this, getUnits());
@@ -2264,6 +2275,13 @@ void DwarfDebug::addDwarfTypeUnitType(DwarfCompileUnit &CU,
   CU.addDIETypeSignature(RefDie, Signature);
 }
 
+void DwarfDebug::addAccelDebugName(StringRef Name, const DIE &Die) {
+  assert(getAccelTableKind() == AccelTableKind::Dwarf);
+
+  DwarfFile &Holder = useSplitDwarf() ? SkeletonHolder : InfoHolder;
+  AccelDebugNames.addName(Holder.getStringPool().getEntry(*Asm, Name), Die);
+}
+
 // Accelerator table mutators - add each name along with its companion
 // DIE to the proper table while ensuring that the name that we're going
 // to reference is in the string table. We do this since the names we
@@ -2274,8 +2292,7 @@ void DwarfDebug::addAccelName(StringRef Name, const DIE &Die) {
     AccelNames.addName(InfoHolder.getStringPool().getEntry(*Asm, Name), &Die);
     break;
   case AccelTableKind::Dwarf:
-    AccelDebugNames.addName(InfoHolder.getStringPool().getEntry(*Asm, Name),
-                            Die);
+    addAccelDebugName(Name, Die);
     break;
   case AccelTableKind::None:
     return;
@@ -2297,8 +2314,7 @@ void DwarfDebug::addAccelNamespace(StringRef Name, const DIE &Die) {
                            &Die);
     break;
   case AccelTableKind::Dwarf:
-    AccelDebugNames.addName(InfoHolder.getStringPool().getEntry(*Asm, Name),
-                            Die);
+    addAccelDebugName(Name, Die);
     break;
   case AccelTableKind::None:
     return;
@@ -2313,8 +2329,7 @@ void DwarfDebug::addAccelType(StringRef Name, const DIE &Die, char Flags) {
     AccelTypes.addName(InfoHolder.getStringPool().getEntry(*Asm, Name), &Die);
     break;
   case AccelTableKind::Dwarf:
-    AccelDebugNames.addName(InfoHolder.getStringPool().getEntry(*Asm, Name),
-                            Die);
+    addAccelDebugName(Name, Die);
     break;
   case AccelTableKind::None:
     return;

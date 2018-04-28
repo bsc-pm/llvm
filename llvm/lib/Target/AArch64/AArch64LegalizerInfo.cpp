@@ -81,14 +81,11 @@ AArch64LegalizerInfo::AArch64LegalizerInfo(const AArch64Subtarget &ST) {
       .clampScalar(0, s32, s64)
       .widenScalarToNextPow2(0);
 
-  for (unsigned BinOp : {G_SREM, G_UREM})
-    for (auto Ty : { s1, s8, s16, s32, s64 })
-      setAction({BinOp, Ty}, Lower);
+  getActionDefinitionsBuilder({G_SREM, G_UREM})
+      .lowerFor({s1, s8, s16, s32, s64});
 
-  for (unsigned Op : {G_SMULO, G_UMULO}) {
-    setAction({Op, 0, s64}, Lower);
-    setAction({Op, 1, s1}, Legal);
-  }
+  getActionDefinitionsBuilder({G_SMULO, G_UMULO})
+      .lowerFor({{s64, s1}});
 
   getActionDefinitionsBuilder({G_SMULH, G_UMULH}).legalFor({s32, s64});
 
@@ -139,8 +136,15 @@ AArch64LegalizerInfo::AArch64LegalizerInfo(const AArch64Subtarget &ST) {
       .widenScalarToNextPow2(0);
 
   getActionDefinitionsBuilder({G_LOAD, G_STORE})
-      .legalFor(
-          {{s8, p0}, {s16, p0}, {s32, p0}, {s64, p0}, {p0, p0}, {v2s32, p0}})
+      .legalForTypesWithMemSize({{s8, p0, 8},
+                                 {s16, p0, 16},
+                                 {s32, p0, 32},
+                                 {s64, p0, 64},
+                                 {p0, p0, 64},
+                                 {v2s32, p0, 64}})
+      // TODO: We could support sum-of-pow2's but the lowering code doesn't know
+      //       how to do that yet.
+      .unsupportedIfMemSizeNotPow2()
       .clampScalar(0, s8, s64)
       .widenScalarToNextPow2(0)
       .clampNumElements(0, v2s32, v2s32);
@@ -242,9 +246,8 @@ AArch64LegalizerInfo::AArch64LegalizerInfo(const AArch64Subtarget &ST) {
   }
 
   if (ST.hasLSE()) {
-    for (auto Ty : {s8, s16, s32, s64}) {
-      setAction({G_ATOMIC_CMPXCHG_WITH_SUCCESS, Ty}, Lower);
-    }
+    getActionDefinitionsBuilder(G_ATOMIC_CMPXCHG_WITH_SUCCESS)
+        .lowerFor({s8, s16, s32, s64});
 
     getActionDefinitionsBuilder(
         {G_ATOMICRMW_XCHG, G_ATOMICRMW_ADD, G_ATOMICRMW_SUB, G_ATOMICRMW_AND,

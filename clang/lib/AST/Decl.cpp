@@ -1092,9 +1092,18 @@ getExplicitVisibilityAux(const NamedDecl *ND,
   // If there wasn't explicit visibility there, and this is a
   // specialization of a class template, check for visibility
   // on the pattern.
-  if (const auto *spec = dyn_cast<ClassTemplateSpecializationDecl>(ND))
-    return getVisibilityOf(spec->getSpecializedTemplate()->getTemplatedDecl(),
-                           kind);
+  if (const auto *spec = dyn_cast<ClassTemplateSpecializationDecl>(ND)) {
+    // Walk all the template decl till this point to see if there are
+    // explicit visibility attributes.
+    const auto *TD = spec->getSpecializedTemplate()->getTemplatedDecl();
+    while (TD != nullptr) {
+      auto Vis = getVisibilityOf(TD, kind);
+      if (Vis != None)
+        return Vis;
+      TD = TD->getPreviousDecl();
+    }
+    return None;
+  }
 
   // Use the most recent declaration.
   if (!IsMostRecent && !isa<NamespaceDecl>(ND)) {
@@ -3956,7 +3965,7 @@ RecordDecl::RecordDecl(Kind DK, TagKind TK, const ASTContext &C,
       LoadedFieldsFromExternalStorage(false),
       NonTrivialToPrimitiveDefaultInitialize(false),
       NonTrivialToPrimitiveCopy(false), NonTrivialToPrimitiveDestroy(false),
-      CanPassInRegisters(true), ParamDestroyedInCallee(false) {
+      ParamDestroyedInCallee(false), ArgPassingRestrictions(APK_CanPassInRegs) {
   assert(classof(static_cast<Decl*>(this)) && "Invalid Kind!");
 }
 

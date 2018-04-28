@@ -54,6 +54,24 @@
 
 using namespace clang;
 
+void ModuleMap::resolveLinkAsDependencies(Module *Mod) {
+  auto PendingLinkAs = PendingLinkAsModule.find(Mod->Name);
+  if (PendingLinkAs != PendingLinkAsModule.end()) {
+    for (auto &Name : PendingLinkAs->second) {
+      auto *M = findModule(Name.getKey());
+      if (M)
+        M->UseExportAsModuleLinkName = true;
+    }
+  }
+}
+
+void ModuleMap::addLinkAsDependency(Module *Mod) {
+  if (findModule(Mod->ExportAsModule))
+    Mod->UseExportAsModuleLinkName = true;
+  else
+    PendingLinkAsModule[Mod->ExportAsModule].insert(Mod->Name);
+}
+
 Module::HeaderKind ModuleMap::headerRoleToKind(ModuleHeaderRole Role) {
   switch ((int)Role) {
   default: llvm_unreachable("unknown header role");
@@ -1873,20 +1891,23 @@ void ModuleMapParser::parseModuleDecl() {
     ActiveModule->NoUndeclaredIncludes = true;
   ActiveModule->Directory = Directory;
 
+  StringRef MapFileName(ModuleMapFile->getName());
+  if (MapFileName.endswith("module.private.modulemap") ||
+      MapFileName.endswith("module_private.map")) {
+    ActiveModule->ModuleMapIsPrivate = true;
+  }
 
   // Private modules named as FooPrivate, Foo.Private or similar are likely a
   // user error; provide warnings, notes and fixits to direct users to use
   // Foo_Private instead.
   SourceLocation StartLoc =
       SourceMgr.getLocForStartOfFile(SourceMgr.getMainFileID());
-  StringRef MapFileName(ModuleMapFile->getName());
   if (Map.HeaderInfo.getHeaderSearchOpts().ImplicitModuleMaps &&
       !Diags.isIgnored(diag::warn_mmap_mismatched_private_submodule,
                        StartLoc) &&
       !Diags.isIgnored(diag::warn_mmap_mismatched_private_module_name,
                        StartLoc) &&
-      (MapFileName.endswith("module.private.modulemap") ||
-       MapFileName.endswith("module_private.map")))
+      ActiveModule->ModuleMapIsPrivate)
     diagnosePrivateModules(Map, Diags, ActiveModule, LastInlineParentLoc);
 
   bool Done = false;
@@ -2412,6 +2433,8 @@ void ModuleMapParser::parseExportAsDecl() {
   }
   
   ActiveModule->ExportAsModule = Tok.getString();
+  Map.addLinkAsDependency(ActiveModule);
+
   consumeToken();
 }
 

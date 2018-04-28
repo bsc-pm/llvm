@@ -68,16 +68,16 @@ DILocation *DILocation::getImpl(LLVMContext &Context, unsigned Line,
                    Storage, Context.pImpl->DILocations);
 }
 
-const DILocation *
-DILocation::getMergedLocation(const DILocation *LocA, const DILocation *LocB,
-                              const Instruction *ForInst) {
+const DILocation *DILocation::getMergedLocation(const DILocation *LocA,
+                                                const DILocation *LocB,
+                                                bool GenerateLocation) {
   if (!LocA || !LocB)
     return nullptr;
 
   if (LocA == LocB || !LocA->canDiscriminate(*LocB))
     return LocA;
 
-  if (!dyn_cast_or_null<CallInst>(ForInst))
+  if (!GenerateLocation)
     return nullptr;
 
   SmallPtrSet<DILocation *, 5> InlinedLocationsA;
@@ -785,12 +785,12 @@ DIExpression *DIExpression::prepend(const DIExpression *Expr, bool DerefBefore,
   if (DerefAfter)
     Ops.push_back(dwarf::DW_OP_deref);
 
-  return doPrepend(Expr, Ops, StackValue);
+  return prependOpcodes(Expr, Ops, StackValue);
 }
 
-DIExpression *DIExpression::doPrepend(const DIExpression *Expr,
-                                      SmallVectorImpl<uint64_t> &Ops,
-                                      bool StackValue) {
+DIExpression *DIExpression::prependOpcodes(const DIExpression *Expr,
+                                           SmallVectorImpl<uint64_t> &Ops,
+                                           bool StackValue) {
   if (Expr)
     for (auto Op : Expr->expr_ops()) {
       // A DW_OP_stack_value comes at the end, but before a DW_OP_LLVM_fragment.

@@ -194,9 +194,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 option(LLVM_INSTALL_BINUTILS_SYMLINKS
   "Install symlinks from the binutils tool names to the corresponding LLVM tools." OFF)
 
-option(LLVM_INSTALL_CCTOOLS_SYMLINKS
-  "Install symlinks from the cctools tool names to the corresponding LLVM tools." OFF)
-
 option(LLVM_INSTALL_UTILS "Include utility binaries in the 'install' target." OFF)
 
 option(LLVM_INSTALL_TOOLCHAIN_ONLY "Only include toolchain files in the 'install' target." OFF)
@@ -365,6 +362,8 @@ option(LLVM_ENABLE_TERMINFO "Use terminfo database if available." ON)
 set(LLVM_ENABLE_LIBXML2 "ON" CACHE STRING "Use libxml2 if available. Can be ON, OFF, or FORCE_ON")
 
 option(LLVM_ENABLE_LIBEDIT "Use libedit if available." ON)
+
+option(LLVM_ENABLE_LIBPFM "Use libpfm for performance counters if available." ON)
 
 option(LLVM_ENABLE_THREADS "Use threads if available." ON)
 

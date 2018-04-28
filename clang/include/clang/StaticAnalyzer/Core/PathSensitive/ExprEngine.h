@@ -110,6 +110,11 @@ public:
     /// 'const int &x = C().x;'.
     bool IsTemporaryLifetimeExtendedViaSubobject = false;
 
+    /// This call is a constructor for a temporary that is lifetime-extended
+    /// by binding it to a reference-type field within an aggregate,
+    /// for example 'A { const C &c; }; A a = { C() };'
+    bool IsTemporaryLifetimeExtendedViaAggregate = false;
+
     EvalCallOptions() {}
   };
 
@@ -603,6 +608,11 @@ protected:
                            ArrayRef<const MemRegion *> Regions,
                            const CallEvent *Call,
                            RegionAndSymbolInvalidationTraits &ITraits) override;
+
+  /// A simple wrapper when you only need to notify checkers of pointer-escape
+  /// of a single value.
+  ProgramStateRef escapeValue(ProgramStateRef State, SVal V,
+                              PointerEscapeKind K) const;
 
 public:
   // FIXME: 'tag' should be removed, and a LocationContext should be used

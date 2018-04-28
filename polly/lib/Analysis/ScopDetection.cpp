@@ -251,6 +251,7 @@ StringRef polly::PollySkipFnAttr = "polly.skip.fn";
 
 STATISTIC(NumScopRegions, "Number of scops");
 STATISTIC(NumLoopsInScop, "Number of loops in scops");
+STATISTIC(NumScopsDepthZero, "Number of scops with maximal loop depth 0");
 STATISTIC(NumScopsDepthOne, "Number of scops with maximal loop depth 1");
 STATISTIC(NumScopsDepthTwo, "Number of scops with maximal loop depth 2");
 STATISTIC(NumScopsDepthThree, "Number of scops with maximal loop depth 3");
@@ -262,6 +263,8 @@ STATISTIC(NumProfScopRegions, "Number of scops (profitable scops only)");
 STATISTIC(NumLoopsInProfScop,
           "Number of loops in scops (profitable scops only)");
 STATISTIC(NumLoopsOverall, "Number of total loops");
+STATISTIC(NumProfScopsDepthZero,
+          "Number of scops with maximal loop depth 0 (profitable scops only)");
 STATISTIC(NumProfScopsDepthOne,
           "Number of scops with maximal loop depth 1 (profitable scops only)");
 STATISTIC(NumProfScopsDepthTwo,
@@ -699,6 +702,12 @@ bool ScopDetection::isValidCallInst(CallInst &CI,
   // Indirect calls are not supported.
   if (CalledFunction == nullptr)
     return false;
+
+  if (isDebugCall(&CI)) {
+    DEBUG(dbgs() << "Allow call to debug function: "
+                 << CalledFunction->getName() << '\n');
+    return true;
+  }
 
   if (AllowModrefCall) {
     switch (AA.getModRefBehavior(CalledFunction)) {
@@ -1288,6 +1297,18 @@ bool ScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
   if (!hasExitingBlocks(L))
     return invalid<ReportLoopHasNoExit>(Context, /*Assert=*/true, L);
 
+  // The algorithm for domain construction assumes that loops has only a single
+  // exit block (and hence corresponds to a subregion). Note that we cannot use
+  // L->getExitBlock() because it does not check whether all exiting edges point
+  // to the same BB.
+  SmallVector<BasicBlock *, 4> ExitBlocks;
+  L->getExitBlocks(ExitBlocks);
+  BasicBlock *TheExitBlock = ExitBlocks[0];
+  for (BasicBlock *ExitBB : ExitBlocks) {
+    if (TheExitBlock != ExitBB)
+      return invalid<ReportLoopHasMultipleExits>(Context, /*Assert=*/true, L);
+  }
+
   if (canUseISLTripCount(L, Context))
     return true;
 
@@ -1757,7 +1778,9 @@ static void updateLoopCountStatistic(ScopDetection::LoopStats Stats,
     NumLoopsInScop += Stats.NumLoops;
     MaxNumLoopsInScop =
         std::max(MaxNumLoopsInScop.getValue(), (unsigned)Stats.NumLoops);
-    if (Stats.MaxDepth == 1)
+    if (Stats.MaxDepth == 0)
+      NumScopsDepthZero++;
+    else if (Stats.MaxDepth == 1)
       NumScopsDepthOne++;
     else if (Stats.MaxDepth == 2)
       NumScopsDepthTwo++;
@@ -1773,7 +1796,9 @@ static void updateLoopCountStatistic(ScopDetection::LoopStats Stats,
     NumLoopsInProfScop += Stats.NumLoops;
     MaxNumLoopsInProfScop =
         std::max(MaxNumLoopsInProfScop.getValue(), (unsigned)Stats.NumLoops);
-    if (Stats.MaxDepth == 1)
+    if (Stats.MaxDepth == 0)
+      NumProfScopsDepthZero++;
+    else if (Stats.MaxDepth == 1)
       NumProfScopsDepthOne++;
     else if (Stats.MaxDepth == 2)
       NumProfScopsDepthTwo++;

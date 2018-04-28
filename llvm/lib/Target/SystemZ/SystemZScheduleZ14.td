@@ -24,9 +24,6 @@ def Z14Model : SchedMachineModel {
 
     // Extra cycles for a mispredicted branch.
     let MispredictPenalty = 20;
-
-    // FIXME: Remove when all errors have been fixed.
-    let FullInstRWOverlapCheck = 0;
 }
 
 let SchedModel = Z14Model in  {
@@ -81,17 +78,8 @@ def : WriteRes<VecDF,   [Z14_VecUnit]> { let Latency = 8; }
 def : WriteRes<VecDF2,  [Z14_VecUnit, Z14_VecUnit]> { let Latency = 9; }
 def : WriteRes<VecDFX,  [Z14_VecUnit]> { let Latency = 1; }
 def : WriteRes<VecDFX2, [Z14_VecUnit, Z14_VecUnit]> { let Latency = 2; }
-def : WriteRes<VecFPd,  [Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit,
-                         Z14_VecFPdUnit, Z14_VecFPdUnit, Z14_VecFPdUnit]>
-                         { let Latency = 30; }
+def : WriteRes<VecFPd,  [Z14_VecFPdUnit]> { let Latency = 30;
+                                            let ResourceCycles = [30]; }
 def : WriteRes<VecMul,  [Z14_VecUnit]> { let Latency = 5; }
 def : WriteRes<VecStr,  [Z14_VecUnit]> { let Latency = 4; }
 def : WriteRes<VecXsPm, [Z14_VecUnit]> { let Latency = 3; }
@@ -158,22 +146,6 @@ def : InstRW<[FXa, FXa, FXb, Lat3, GroupAlone], (instregex "TLS_(G|L)DCALL$")>;
 // Return
 def : InstRW<[FXb, EndGroup], (instregex "Return$")>;
 def : InstRW<[FXb], (instregex "CondReturn$")>;
-
-//===----------------------------------------------------------------------===//
-// Select instructions
-//===----------------------------------------------------------------------===//
-
-// Select pseudo
-def : InstRW<[FXa], (instregex "Select(32|64|32Mux)$")>;
-
-// CondStore pseudos
-def : InstRW<[FXa], (instregex "CondStore16(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore16Mux(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore32(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore32Mux(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore64(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore8(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStore8Mux(Inv)?$")>;
 
 //===----------------------------------------------------------------------===//
 // Move instructions
@@ -604,7 +576,8 @@ def : InstRW<[LSU, LSU, Lat5, GroupAlone], (instregex "LPD(G)?$")>;
 def : InstRW<[LSU, Lat30, GroupAlone], (instregex "TR$")>;
 def : InstRW<[FXa, FXa, FXa, LSU, LSU, Lat30, GroupAlone], (instregex "TRT$")>;
 def : InstRW<[FXa, LSU, Lat30], (instregex "TRTR$")>;
-def : InstRW<[FXa, Lat30], (instregex "TR(TR)?(T)?(E|EOpt)?$")>;
+def : InstRW<[FXa, Lat30], (instregex "TRE$")>;
+def : InstRW<[FXa, Lat30], (instregex "TRT(R)?E(Opt)?$")>;
 def : InstRW<[LSU, Lat30], (instregex "TR(T|O)(T|O)(Opt)?$")>;
 def : InstRW<[FXa, Lat30], (instregex "CU(12|14|21|24|41|42)(Opt)?$")>;
 def : InstRW<[FXa, Lat30], (instregex "(CUUTF|CUTFU)(Opt)?$")>;
@@ -693,7 +666,7 @@ def : InstRW<[FXa, FXa, FXb, Lat3, GroupAlone], (instregex "BASSM$")>;
 
 // Transaction begin
 def : InstRW<[LSU, LSU, FXb, FXb, FXb, FXb, FXb, Lat15, GroupAlone],
-              (instregex "TBEGIN(C|_nofloat)?$")>;
+              (instregex "TBEGIN(C)?$")>;
 
 // Transaction end
 def : InstRW<[FXb, GroupAlone], (instregex "TEND$")>;
@@ -723,10 +696,6 @@ def : InstRW<[FXa, FXa, Lat4, GroupAlone], (instregex "FLOGR$")>;
 // Population count
 def : InstRW<[FXa, Lat3], (instregex "POPCNT$")>;
 
-// Extend
-def : InstRW<[FXa], (instregex "AEXT128$")>;
-def : InstRW<[FXa], (instregex "ZEXT128$")>;
-
 // String instructions
 def : InstRW<[FXa, LSU, Lat30], (instregex "SRST$")>;
 def : InstRW<[FXa, Lat30], (instregex "SRSTU$")>;
@@ -753,14 +722,6 @@ def : InstRW<[], (instregex "Insn.*")>;
 // ----------------------------- Floating point ----------------------------- //
 
 //===----------------------------------------------------------------------===//
-// FP: Select instructions
-//===----------------------------------------------------------------------===//
-
-def : InstRW<[FXa], (instregex "Select(F32|F64|F128|VR128)$")>;
-def : InstRW<[FXa], (instregex "CondStoreF32(Inv)?$")>;
-def : InstRW<[FXa], (instregex "CondStoreF64(Inv)?$")>;
-
-//===----------------------------------------------------------------------===//
 // FP: Move instructions
 //===----------------------------------------------------------------------===//
 
@@ -776,11 +737,10 @@ def : InstRW<[FXb, FXb, Lat2, GroupAlone], (instregex "LXR$")>;
 
 // Load and Test
 def : InstRW<[VecXsPm, Lat4], (instregex "LT(D|E)BR$")>;
-def : InstRW<[VecXsPm, Lat4], (instregex "LTEBRCompare(_VecPseudo)?$")>;
-def : InstRW<[VecXsPm, Lat4], (instregex "LTDBRCompare(_VecPseudo)?$")>;
+def : InstRW<[VecXsPm, Lat4], (instregex "LTEBRCompare$")>;
+def : InstRW<[VecXsPm, Lat4], (instregex "LTDBRCompare$")>;
 def : InstRW<[VecDF2, VecDF2, Lat11, GroupAlone], (instregex "LTXBR$")>;
-def : InstRW<[VecDF2, VecDF2, Lat11, GroupAlone],
-             (instregex "LTXBRCompare(_VecPseudo)?$")>;
+def : InstRW<[VecDF2, VecDF2, Lat11, GroupAlone], (instregex "LTXBRCompare$")>;
 
 // Copy sign
 def : InstRW<[VecXsPm], (instregex "CPSDRd(d|s)$")>;
@@ -897,7 +857,7 @@ def : InstRW<[VecFPd, Lat30], (instregex "DI(E|D)BR$")>;
 
 // Compare
 def : InstRW<[VecXsPm, LSU, Lat8], (instregex "(K|C)(E|D)B$")>;
-def : InstRW<[VecXsPm, Lat4], (instregex "(K|C)(E|D)BR?$")>;
+def : InstRW<[VecXsPm, Lat4], (instregex "(K|C)(E|D)BR$")>;
 def : InstRW<[VecDF, VecDF, Lat20, GroupAlone], (instregex "(K|C)XBR$")>;
 
 // Test Data Class

@@ -202,20 +202,21 @@ JitFunction::JitFunction(JitFunctionContext &&Context,
   LLVMLinkInMCJIT();
   uintptr_t CodeSize = 0;
   std::string Error;
+  llvm::LLVMTargetMachine *TM = FunctionContext.TM.release();
   ExecEngine.reset(
       llvm::EngineBuilder(std::move(FunctionContext.Module))
           .setErrorStr(&Error)
-          .setMCPU(FunctionContext.TM->getTargetCPU())
+          .setMCPU(TM->getTargetCPU())
           .setEngineKind(llvm::EngineKind::JIT)
           .setMCJITMemoryManager(
               llvm::make_unique<TrackingSectionMemoryManager>(&CodeSize))
-          .create(FunctionContext.TM.release()));
+          .create(TM));
   if (!ExecEngine)
     llvm::report_fatal_error(Error);
   // Adding the generated object file containing the assembled function.
   // The ExecutionEngine makes sure the object file is copied into an
   // executable page.
-  ExecEngine->addObjectFile(ObjHolder.takeBinary().first);
+  ExecEngine->addObjectFile(std::move(ObjHolder));
   // Setting function
   FunctionBytes =
       llvm::StringRef(reinterpret_cast<const char *>(

@@ -142,12 +142,8 @@ uint64_t SectionBase::getOffset(uint64_t Offset) const {
     return Offset == uint64_t(-1) ? OS->Size : Offset;
   }
   case Regular:
-    return cast<InputSection>(this->Repl)->OutSecOff + Offset;
-  case Synthetic: {
-    auto *IS = cast<InputSection>(this->Repl);
-    // For synthetic sections we treat offset -1 as the end of the section.
-    return IS->OutSecOff + (Offset == uint64_t(-1) ? IS->getSize() : Offset);
-  }
+  case Synthetic:
+    return cast<InputSection>(this)->getOffset(Offset);
   case EHFrame:
     // The file crtbeginT.o has relocations pointing to the start of an empty
     // .eh_frame that is known to be the first in the link. It does that to
@@ -156,8 +152,8 @@ uint64_t SectionBase::getOffset(uint64_t Offset) const {
   case Merge:
     const MergeInputSection *MS = cast<MergeInputSection>(this);
     if (InputSection *IS = MS->getParent())
-      return cast<InputSection>(IS->Repl)->OutSecOff + MS->getOffset(Offset);
-    return MS->getOffset(Offset);
+      return IS->getOffset(MS->getParentOffset(Offset));
+    return MS->getParentOffset(Offset);
   }
   llvm_unreachable("invalid section kind");
 }
@@ -177,7 +173,7 @@ OutputSection *SectionBase::getOutputSection() {
     Sec = EH->getParent();
   else
     return cast<OutputSection>(this);
-  return Sec ? cast<InputSection>(Sec->Repl)->getParent() : nullptr;
+  return Sec ? Sec->getParent() : nullptr;
 }
 
 // Decompress section contents if required. Note that this function
@@ -588,7 +584,18 @@ static uint64_t getRelocTargetVA(RelType Type, int64_t A, uint64_t P,
       if (InOpd)
         SymVA = read64be(&Out::OpdBuf[SymVA - OpdStart]);
     }
-    return SymVA - P;
+
+    // PPC64 V2 ABI describes two entry points to a function. The global entry
+    // point sets up the TOC base pointer. When calling a local function, the
+    // call should branch to the local entry point rather than the global entry
+    // point. Section 3.4.1 describes using the 3 most significant bits of the
+    // st_other field to find out how many instructions there are between the
+    // local and global entry point.
+    uint8_t StOther = (Sym.StOther >> 5) & 7;
+    if (StOther == 0 || StOther == 1)
+      return SymVA - P;
+
+    return SymVA - P + (1 << StOther);
   }
   case R_PPC_TOC:
     return getPPC64TocBase() + A;
@@ -710,10 +717,13 @@ void InputSectionBase::relocateAlloc(uint8_t *Buf, uint8_t *BufEnd) {
   const unsigned Bits = Config->Wordsize * 8;
 
   for (const Relocation &Rel : Relocations) {
-    uint8_t *BufLoc = Buf + getOffset(Rel.Offset);
+    uint64_t Offset = Rel.Offset;
+    if (auto *Sec = dyn_cast<InputSection>(this))
+      Offset += Sec->OutSecOff;
+    uint8_t *BufLoc = Buf + Offset;
     RelType Type = Rel.Type;
 
-    uint64_t AddrLoc = getVA(Rel.Offset);
+    uint64_t AddrLoc = getOutputSection()->Addr + Offset;
     RelExpr Expr = Rel.Expr;
     uint64_t TargetVA = SignExtend64(
         getRelocTargetVA(Type, Rel.Addend, AddrLoc, *Rel.Sym, Expr), Bits);
@@ -741,9 +751,13 @@ void InputSectionBase::relocateAlloc(uint8_t *Buf, uint8_t *BufEnd) {
       break;
     case R_PPC_PLT_OPD:
       // Patch a nop (0x60000000) to a ld.
-      if (BufLoc + 8 <= BufEnd && read32be(BufLoc + 4) == 0x60000000)
-        write32be(BufLoc + 4, 0xe8410028); // ld %r2, 40(%r1)
-      LLVM_FALLTHROUGH;
+      if (BufLoc + 8 > BufEnd || read32(BufLoc + 4) != 0x60000000) {
+        error(getErrorLocation(BufLoc) + "call lacks nop, can't restore toc");
+        break;
+      }
+      write32(BufLoc + 4, 0xe8410018); // ld %r2, 24(%r1)
+      Target->relocateOne(BufLoc, Type, TargetVA);
+      break;
     default:
       Target->relocateOne(BufLoc, Type, TargetVA);
       break;
@@ -822,10 +836,6 @@ static unsigned getReloc(IntTy Begin, IntTy Size, const ArrayRef<RelTy> &Rels,
 // .eh_frame is a sequence of CIE or FDE records.
 // This function splits an input section into records and returns them.
 template <class ELFT> void EhInputSection::split() {
-  // Early exit if already split.
-  if (!Pieces.empty())
-    return;
-
   if (AreRelocsRela)
     split<ELFT>(relas<ELFT>());
   else
@@ -923,10 +933,6 @@ void MergeInputSection::splitIntoPieces() {
   OffsetMap.reserve(Pieces.size());
   for (size_t I = 0, E = Pieces.size(); I != E; ++I)
     OffsetMap[Pieces[I].InputOff] = I;
-
-  if (Config->GcSections && (Flags & SHF_ALLOC))
-    for (uint32_t Off : LiveOffsets)
-      getSectionPiece(Off)->Live = true;
 }
 
 template <class It, class T, class Compare>
@@ -969,7 +975,7 @@ SectionPiece *MergeInputSection::getSectionPiece(uint64_t Offset) {
 // Returns the offset in an output section for a given input offset.
 // Because contents of a mergeable section is not contiguous in output,
 // it is not just an addition to a base output offset.
-uint64_t MergeInputSection::getOffset(uint64_t Offset) const {
+uint64_t MergeInputSection::getParentOffset(uint64_t Offset) const {
   // Find a string starting at a given offset.
   auto It = OffsetMap.find(Offset);
   if (It != OffsetMap.end())

@@ -78,7 +78,7 @@ public:
   // section.
   uint64_t getOffset(uint64_t Offset) const;
 
-  uint64_t getVA(uint64_t Offset) const;
+  uint64_t getVA(uint64_t Offset = 0) const;
 
 protected:
   SectionBase(Kind SectionKind, StringRef Name, uint64_t Flags,
@@ -223,15 +223,9 @@ public:
   static bool classof(const SectionBase *S) { return S->kind() == Merge; }
   void splitIntoPieces();
 
-  // Mark the piece at a given offset live. Used by GC.
-  void markLiveAt(uint64_t Offset) {
-    if (this->Flags & llvm::ELF::SHF_ALLOC)
-      LiveOffsets.insert(Offset);
-  }
-
-  // Translate an offset in the input section to an offset
-  // in the output section.
-  uint64_t getOffset(uint64_t Offset) const;
+  // Translate an offset in the input section to an offset in the parent
+  // MergeSyntheticSection.
+  uint64_t getParentOffset(uint64_t Offset) const;
 
   // Splittable sections are handled as a sequence of data
   // rather than a single large blob of data.
@@ -259,8 +253,6 @@ public:
 private:
   void splitStrings(ArrayRef<uint8_t> A, size_t Size);
   void splitNonStrings(ArrayRef<uint8_t> A, size_t Size);
-
-  llvm::DenseSet<uint32_t> LiveOffsets;
 };
 
 struct EhSectionPiece {
@@ -309,6 +301,8 @@ public:
   // Write this section to a mmap'ed file, assuming Buf is pointing to
   // beginning of the output section.
   template <class ELFT> void writeTo(uint8_t *Buf);
+
+  uint64_t getOffset(uint64_t Offset) const { return OutSecOff + Offset; }
 
   OutputSection *getParent() const;
 

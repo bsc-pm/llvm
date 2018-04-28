@@ -62,8 +62,9 @@ Improvements to Clang's diagnostics
 - ``-Wself-assign`` and ``-Wself-assign-field`` were extended to diagnose
   self-assignment operations using overloaded operators (i.e. classes).
   If you are doing such an assignment intentionally, e.g. in a unit test for
-  a data structure, the warning can be suppressed by adding ``*&`` to the
-  right-hand side or casting it to the appropriate reference type.
+  a data structure, the first warning can be disabled by passing
+  ``-Wno-self-assign-overloaded``, also the warning can be suppressed by adding
+  ``*&`` to the right-hand side or casting it to the appropriate reference type.
 
 Non-comprehensive list of changes in this release
 -------------------------------------------------
@@ -81,6 +82,15 @@ Non-comprehensive list of changes in this release
 
 New Compiler Flags
 ------------------
+
+- :option:`-ffp-cast-overflow-workaround` and
+  :option:`-fno-fp-cast-overflow-workaround`
+  enable (disable) a workaround for code that casts floating-point values to
+  integers and back to floating-point. If the floating-point value is not
+  representable in the intermediate integer type, the code is incorrect
+  according to the language standard. This flag will attempt to generate code
+  as if the result of an overflowing conversion matches the overflowing behavior
+  of a target's native float-to-int conversion instructions.
 
 - ...
 
@@ -162,6 +172,18 @@ OpenMP Support in Clang
 ----------------------------------
 
 - ...
+
+CUDA Support in Clang
+---------------------
+
+- Clang will now try to locate the CUDA installation next to :program:`ptxas`
+  in the `PATH` environment variable. This behavior can be turned off by passing
+  the new flag `--cuda-path-ignore-env`.
+
+- Clang now supports generating object files with relocatable device code. This
+  feature needs to be enabled with `-fcuda-rdc` and my result in performance
+  penalties compared to whole program compilation. Please note that NVIDIA's
+  :program:`nvcc` must be used for linking.
 
 Internal API Changes
 --------------------

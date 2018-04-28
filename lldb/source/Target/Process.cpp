@@ -30,6 +30,7 @@
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Expression/IRDynamicChecks.h"
 #include "lldb/Expression/UserExpression.h"
+#include "lldb/Expression/UtilityFunction.h"
 #include "lldb/Host/ConnectionFileDescriptor.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/Host.h"
@@ -39,6 +40,7 @@
 #include "lldb/Host/Terminal.h"
 #include "lldb/Host/ThreadLauncher.h"
 #include "lldb/Interpreter/CommandInterpreter.h"
+#include "lldb/Interpreter/OptionArgParser.h"
 #include "lldb/Interpreter/OptionValueProperties.h"
 #include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/Symbol.h"
@@ -489,7 +491,7 @@ Status ProcessLaunchCommandOptions::SetOptionValue(
   {
     bool success;
     const bool disable_aslr_arg =
-        Args::StringToBoolean(option_arg, true, &success);
+        OptionArgParser::ToBoolean(option_arg, true, &success);
     if (success)
       disable_aslr = disable_aslr_arg ? eLazyBoolYes : eLazyBoolNo;
     else
@@ -502,7 +504,8 @@ Status ProcessLaunchCommandOptions::SetOptionValue(
   case 'X': // shell expand args.
   {
     bool success;
-    const bool expand_args = Args::StringToBoolean(option_arg, true, &success);
+    const bool expand_args =
+        OptionArgParser::ToBoolean(option_arg, true, &success);
     if (success)
       launch_info.SetShellExpandArguments(expand_args);
     else
@@ -6174,11 +6177,16 @@ void Process::MapSupportedStructuredDataPlugins(
 
   // For each StructuredDataPlugin, if the plugin handles any of the
   // types in the supported_type_names, map that type name to that plugin.
-  uint32_t plugin_index = 0;
-  for (auto create_instance =
+  // Stop when we've consumed all the type names.
+  // FIXME: should we return an error if there are type names nobody 
+  // supports?
+  for (uint32_t plugin_index = 0; !const_type_names.empty(); plugin_index++) {
+    auto create_instance =
            PluginManager::GetStructuredDataPluginCreateCallbackAtIndex(
                plugin_index);
-       create_instance && !const_type_names.empty(); ++plugin_index) {
+    if (!create_instance)
+      break;
+      
     // Create the plugin.
     StructuredDataPluginSP plugin_sp = (*create_instance)(*this);
     if (!plugin_sp) {
@@ -6243,3 +6251,15 @@ Status Process::UpdateAutomaticSignalFiltering() {
   // No automatic signal filtering to speak of.
   return Status();
 }
+
+UtilityFunction *Process::GetLoadImageUtilityFunction(Platform *platform) {
+  if (platform != GetTarget().GetPlatform().get())
+    return nullptr;
+  return m_dlopen_utility_func_up.get();
+}
+
+void Process::SetLoadImageUtilityFunction(std::unique_ptr<UtilityFunction> 
+                                          utility_func_up) {
+  m_dlopen_utility_func_up.swap(utility_func_up);
+}
+

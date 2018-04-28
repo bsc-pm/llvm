@@ -241,8 +241,11 @@ SanitizerMask OpenBSD::getSupportedSanitizers() const {
   // For future use, only UBsan at the moment
   SanitizerMask Res = ToolChain::getSupportedSanitizers();
 
-  if (IsX86 || IsX86_64)
+  if (IsX86 || IsX86_64) {
     Res |= SanitizerKind::Vptr;
+    Res |= SanitizerKind::Fuzzer;
+    Res |= SanitizerKind::FuzzerNoLink;
+  }
 
   return Res;
 }
@@ -254,6 +257,14 @@ OpenBSD::OpenBSD(const Driver &D, const llvm::Triple &Triple,
     : Generic_ELF(D, Triple, Args) {
   getFilePaths().push_back(getDriver().Dir + "/../lib");
   getFilePaths().push_back("/usr/lib");
+}
+
+void OpenBSD::AddCXXStdlibLibArgs(const ArgList &Args,
+                                  ArgStringList &CmdArgs) const {
+  bool Profiling = Args.hasArg(options::OPT_pg);
+
+  CmdArgs.push_back(Profiling ? "-lc++_p" : "-lc++");
+  CmdArgs.push_back(Profiling ? "-lc++abi_p" : "-lc++abi");
 }
 
 Tool *OpenBSD::buildAssembler() const {

@@ -67,7 +67,8 @@ void RegisterFile::addRegisterFile(ArrayRef<MCRegisterCostEntry> Entries,
   // An empty set of register classes means: this register file contains all
   // the physical registers specified by the target.
   if (Entries.empty()) {
-    for (std::pair<WriteState *, IndexPlusCostPairTy> &Mapping : RegisterMappings)
+    for (std::pair<WriteState *, IndexPlusCostPairTy> &Mapping :
+         RegisterMappings)
       Mapping.second = std::make_pair(RegisterFileIndex, 1U);
     return;
   }
@@ -362,27 +363,7 @@ bool DispatchUnit::checkRCU(unsigned Index, const InstrDesc &Desc) {
 }
 
 bool DispatchUnit::checkScheduler(unsigned Index, const InstrDesc &Desc) {
-  // If this is a zero-latency instruction, then it bypasses
-  // the scheduler.
-  HWStallEvent::GenericEventType Type = HWStallEvent::Invalid;
-  switch (SC->canBeDispatched(Desc)) {
-  case Scheduler::HWS_AVAILABLE:
-    return true;
-  case Scheduler::HWS_QUEUE_UNAVAILABLE:
-    Type = HWStallEvent::SchedulerQueueFull;
-    break;
-  case Scheduler::HWS_LD_QUEUE_UNAVAILABLE:
-    Type = HWStallEvent::LoadQueueFull;
-    break;
-  case Scheduler::HWS_ST_QUEUE_UNAVAILABLE:
-    Type = HWStallEvent::StoreQueueFull;
-    break;
-  case Scheduler::HWS_DISPATCH_GROUP_RESTRICTION:
-    Type = HWStallEvent::DispatchGroupStall;
-  }
-
-  Owner->notifyStallEvent(HWStallEvent(Type, Index));
-  return false;
+  return SC->canBeDispatched(Index, Desc);
 }
 
 void DispatchUnit::updateRAWDependencies(ReadState &RS,
@@ -426,9 +407,13 @@ void DispatchUnit::dispatch(unsigned IID, Instruction *NewInst,
     AvailableEntries -= NumMicroOps;
   }
 
-  // Update RAW dependencies.
-  for (std::unique_ptr<ReadState> &RS : NewInst->getUses())
-    updateRAWDependencies(*RS, STI);
+  // Update RAW dependencies if this instruction is not a zero-latency
+  // instruction. The assumption is that a zero-latency instruction doesn't
+  // require to be issued to the scheduler for execution. More importantly, it
+  // doesn't have to wait on the register input operands.
+  if (NewInst->getDesc().MaxLatency)
+    for (std::unique_ptr<ReadState> &RS : NewInst->getUses())
+      updateRAWDependencies(*RS, STI);
 
   // Allocate new mappings.
   SmallVector<unsigned, 4> RegisterFiles(RAT->getNumRegisterFiles());

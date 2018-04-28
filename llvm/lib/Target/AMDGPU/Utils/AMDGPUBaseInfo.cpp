@@ -97,11 +97,6 @@ unsigned getVmcntBitWidthHi() { return 2; }
 
 namespace llvm {
 
-static cl::opt<bool> EnablePackedInlinableLiterals(
-    "enable-packed-inlinable-literals",
-    cl::desc("Enable packed inlinable literals (v2f16, v2i16)"),
-    cl::init(false));
-
 namespace AMDGPU {
 
 LLVM_READNONE
@@ -423,7 +418,7 @@ void initDefaultAMDKernelCodeT(amd_kernel_code_t &Header,
   memset(&Header, 0, sizeof(Header));
 
   Header.amd_kernel_code_version_major = 1;
-  Header.amd_kernel_code_version_minor = 1;
+  Header.amd_kernel_code_version_minor = 2;
   Header.amd_machine_kind = 1; // AMD_MACHINE_KIND_AMDGPU
   Header.amd_machine_version_major = ISA.Major;
   Header.amd_machine_version_minor = ISA.Minor;
@@ -876,9 +871,6 @@ bool isInlinableLiteral16(int16_t Literal, bool HasInv2Pi) {
 
 bool isInlinableLiteralV216(int32_t Literal, bool HasInv2Pi) {
   assert(HasInv2Pi);
-
-  if (!EnablePackedInlinableLiterals)
-    return false;
 
   int16_t Lo16 = static_cast<int16_t>(Literal);
   int16_t Hi16 = static_cast<int16_t>(Literal >> 16);

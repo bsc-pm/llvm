@@ -113,6 +113,11 @@ using namespace llvm;
 
 #define DEBUG_TYPE "isel"
 
+// FIXME: Remove this after the feature has proven reliable.
+static cl::opt<bool> SinkLocalValues("fast-isel-sink-local-values",
+                                     cl::init(true), cl::Hidden,
+                                     cl::desc("Sink local values in FastISel"));
+
 STATISTIC(NumFastIselSuccessIndependent, "Number of insts selected by "
                                          "target-independent selector");
 STATISTIC(NumFastIselSuccessTarget, "Number of insts selected by "
@@ -180,7 +185,7 @@ void FastISel::flushLocalValueMap() {
   // Try to sink local values down to their first use so that we can give them a
   // better debug location. This has the side effect of shrinking local value
   // live ranges, which helps out fast regalloc.
-  if (LastLocalValue != EmitStartPt) {
+  if (SinkLocalValues && LastLocalValue != EmitStartPt) {
     // Sink local value materialization instructions between EmitStartPt and
     // LastLocalValue. Visit them bottom-up, starting from LastLocalValue, to
     // avoid inserting into the range that we're iterating over.
@@ -208,6 +213,7 @@ void FastISel::flushLocalValueMap() {
   LastLocalValue = EmitStartPt;
   recomputeInsertPt();
   SavedInsertPt = FuncInfo.InsertPt;
+  LastFlushPoint = FuncInfo.InsertPt;
 }
 
 static bool isRegUsedByPhiNodes(unsigned DefReg,
@@ -221,7 +227,8 @@ static bool isRegUsedByPhiNodes(unsigned DefReg,
 /// Build a map of instruction orders. Return the first terminator and its
 /// order. Consider EH_LABEL instructions to be terminators as well, since local
 /// values for phis after invokes must be materialized before the call.
-void FastISel::InstOrderMap::initialize(MachineBasicBlock *MBB) {
+void FastISel::InstOrderMap::initialize(
+    MachineBasicBlock *MBB, MachineBasicBlock::iterator LastFlushPoint) {
   unsigned Order = 0;
   for (MachineInstr &I : *MBB) {
     if (!FirstTerminator &&
@@ -230,6 +237,10 @@ void FastISel::InstOrderMap::initialize(MachineBasicBlock *MBB) {
       FirstTerminatorOrder = Order;
     }
     Orders[&I] = Order++;
+
+    // We don't need to order instructions past the last flush point.
+    if (I.getIterator() == LastFlushPoint)
+      break;
   }
 }
 
@@ -259,13 +270,16 @@ void FastISel::sinkLocalValueMaterialization(MachineInstr &LocalMI,
   // Number the instructions if we haven't yet so we can efficiently find the
   // earliest use.
   if (OrderMap.Orders.empty())
-    OrderMap.initialize(FuncInfo.MBB);
+    OrderMap.initialize(FuncInfo.MBB, LastFlushPoint);
 
   // Find the first user in the BB.
   MachineInstr *FirstUser = nullptr;
   unsigned FirstOrder = std::numeric_limits<unsigned>::max();
   for (MachineInstr &UseInst : MRI.use_nodbg_instructions(DefReg)) {
-    unsigned UseOrder = OrderMap.Orders[&UseInst];
+    auto I = OrderMap.Orders.find(&UseInst);
+    assert(I != OrderMap.Orders.end() &&
+           "local value used by instruction outside local region");
+    unsigned UseOrder = I->second;
     if (UseOrder < FirstOrder) {
       FirstOrder = UseOrder;
       FirstUser = &UseInst;
@@ -1032,6 +1046,26 @@ bool FastISel::selectXRayCustomEvent(const CallInst *I) {
   return true;
 }
 
+bool FastISel::selectXRayTypedEvent(const CallInst *I) {
+  const auto &Triple = TM.getTargetTriple();
+  if (Triple.getArch() != Triple::x86_64 || !Triple.isOSLinux())
+    return true; // don't do anything to this instruction.
+  SmallVector<MachineOperand, 8> Ops;
+  Ops.push_back(MachineOperand::CreateReg(getRegForValue(I->getArgOperand(0)),
+                                          /*IsDef=*/false));
+  Ops.push_back(MachineOperand::CreateReg(getRegForValue(I->getArgOperand(1)),
+                                          /*IsDef=*/false));
+  Ops.push_back(MachineOperand::CreateReg(getRegForValue(I->getArgOperand(2)),
+                                          /*IsDef=*/false));
+  MachineInstrBuilder MIB =
+      BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc,
+              TII.get(TargetOpcode::PATCHABLE_TYPED_EVENT_CALL));
+  for (auto &MO : Ops)
+    MIB.add(MO);
+
+  // Insert the Patchable Typed Event Call instruction, that gets lowered properly.
+  return true;
+}
 
 /// Returns an AttributeList representing the attributes applied to the return
 /// value of the given call.
@@ -1426,6 +1460,8 @@ bool FastISel::selectIntrinsicCall(const IntrinsicInst *II) {
 
   case Intrinsic::xray_customevent:
     return selectXRayCustomEvent(II);
+  case Intrinsic::xray_typedevent:
+    return selectXRayTypedEvent(II);
   }
 
   return fastLowerIntrinsicCall(II);

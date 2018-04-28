@@ -2512,7 +2512,21 @@ let AddedComplexity = 400, Predicates = [HasP9Vector] in {
 
   // Convert (Un)Signed DWord -> QP
   def XSCVSDQP  : X_VT5_XO5_VB5_TyVB<63, 10, 836, "xscvsdqp", vfrc, []>;
+  def : Pat<(f128 (sint_to_fp i64:$src)),
+            (f128 (XSCVSDQP (COPY_TO_REGCLASS $src, VFRC)))>;
   def XSCVUDQP  : X_VT5_XO5_VB5_TyVB<63,  2, 836, "xscvudqp", vfrc, []>;
+  def : Pat<(f128 (uint_to_fp i64:$src)),
+            (f128 (XSCVUDQP (COPY_TO_REGCLASS $src, VFRC)))>;
+
+  // Convert (Un)Signed Word -> QP
+  def : Pat<(f128 (sint_to_fp i32:$src)),
+            (f128 (XSCVSDQP (MTVSRWA $src)))>;
+  def : Pat<(f128 (sint_to_fp (i32 (load xoaddr:$src)))),
+            (f128 (XSCVSDQP (LIWAX xoaddr:$src)))>;
+  def : Pat<(f128 (uint_to_fp i32:$src)),
+            (f128 (XSCVUDQP (MTVSRWZ $src)))>;
+  def : Pat<(f128 (uint_to_fp (i32 (load xoaddr:$src)))),
+            (f128 (XSCVUDQP (LIWZX xoaddr:$src)))>;
 
   let UseVSXReg = 1 in {
   //===--------------------------------------------------------------------===//
@@ -3117,6 +3131,25 @@ let AddedComplexity = 400, Predicates = [HasP9Vector] in {
             (COPY_TO_REGCLASS (DFLOADf32 ixaddr:$src), VSFRC)>;
   def : Pat<(f32 (fpround (f64 (extloadf32 ixaddr:$src)))),
             (f32 (DFLOADf32 ixaddr:$src))>;
+
+  // Convert (Un)Signed DWord in memory -> QP
+  def : Pat<(f128 (sint_to_fp (i64 (load xaddr:$src)))),
+            (f128 (XSCVSDQP (LXSDX xaddr:$src)))>;
+  def : Pat<(f128 (sint_to_fp (i64 (load ixaddr:$src)))),
+            (f128 (XSCVSDQP (LXSD ixaddr:$src)))>;
+  def : Pat<(f128 (uint_to_fp (i64 (load xaddr:$src)))),
+            (f128 (XSCVUDQP (LXSDX xaddr:$src)))>;
+  def : Pat<(f128 (uint_to_fp (i64 (load ixaddr:$src)))),
+            (f128 (XSCVUDQP (LXSD ixaddr:$src)))>;
+
+  // Convert Unsigned HWord in memory -> QP
+  def : Pat<(f128 (uint_to_fp ScalarLoads.ZELi16)),
+            (f128 (XSCVUDQP (LXSIHZX xaddr:$src)))>;
+
+  // Convert Unsigned Byte in memory -> QP
+  def : Pat<(f128 (uint_to_fp ScalarLoads.ZELi8)),
+            (f128 (XSCVUDQP (LXSIBZX xoaddr:$src)))>;
+
 } // end HasP9Vector, AddedComplexity
 
 let Predicates = [HasP9Vector] in {

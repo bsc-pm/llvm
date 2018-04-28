@@ -226,6 +226,10 @@ protected:
   /// makes sense (for example, on function calls)
   MachineInstr *EmitStartPt;
 
+  /// Last local value flush point. On a subsequent flush, no local value will
+  /// sink past this point.
+  MachineBasicBlock::iterator LastFlushPoint;
+
 public:
   virtual ~FastISel();
 
@@ -535,6 +539,7 @@ protected:
   bool selectExtractValue(const User *I);
   bool selectInsertValue(const User *I);
   bool selectXRayCustomEvent(const CallInst *II);
+  bool selectXRayTypedEvent(const CallInst *II);
 
 private:
   /// \brief Handle PHI nodes in successor blocks.
@@ -568,7 +573,8 @@ private:
     MachineInstr *FirstTerminator = nullptr;
     unsigned FirstTerminatorOrder = std::numeric_limits<unsigned>::max();
 
-    void initialize(MachineBasicBlock *MBB);
+    void initialize(MachineBasicBlock *MBB,
+                    MachineBasicBlock::iterator LastFlushPoint);
   };
 
   /// Sinks the local value materialization instruction LocalMI to its first use

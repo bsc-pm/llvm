@@ -94,11 +94,6 @@ static cl::opt<bool> EnableVGPRIndexMode(
   cl::desc("Use GPR indexing mode instead of movrel for vector indexing"),
   cl::init(false));
 
-static cl::opt<bool> EnableDS128(
-  "amdgpu-ds128",
-  cl::desc("Use DS_read/write_b128"),
-  cl::init(false));
-
 static cl::opt<unsigned> AssumeFrameIndexHighZeroBits(
   "amdgpu-frame-index-zero-bits",
   cl::desc("High bits of frame index assumed to be zero"),
@@ -484,6 +479,7 @@ SITargetLowering::SITargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FMA, MVT::v2f16, Legal);
     setOperationAction(ISD::FMINNUM, MVT::v2f16, Legal);
     setOperationAction(ISD::FMAXNUM, MVT::v2f16, Legal);
+    setOperationAction(ISD::FCANONICALIZE, MVT::v2f16, Legal);
 
     // This isn't really legal, but this avoids the legalizer unrolling it (and
     // allows matching fneg (fabs x) patterns)
@@ -4193,7 +4189,7 @@ SDValue SITargetLowering::lowerEXTRACT_VECTOR_ELT(SDValue Op,
 
   DAGCombinerInfo DCI(DAG, AfterLegalizeVectorOps, true, nullptr);
 
-  // Make sure we we do any optimizations that will make it easier to fold
+  // Make sure we do any optimizations that will make it easier to fold
   // source modifiers before obscuring it with bit operations.
 
   // XXX - Why doesn't this get called when vector_shuffle is expanded?
@@ -5300,7 +5296,7 @@ SDValue SITargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
     }
   } else if (AS == AMDGPUASI.LOCAL_ADDRESS) {
     // Use ds_read_b128 if possible.
-    if (Subtarget->useDS128(EnableDS128) && Load->getAlignment() >= 16 &&
+    if (Subtarget->useDS128() && Load->getAlignment() >= 16 &&
         MemVT.getStoreSize() == 16)
       return SDValue();
 
@@ -5703,7 +5699,7 @@ SDValue SITargetLowering::LowerSTORE(SDValue Op, SelectionDAG &DAG) const {
     }
   } else if (AS == AMDGPUASI.LOCAL_ADDRESS) {
     // Use ds_write_b128 if possible.
-    if (Subtarget->useDS128(EnableDS128) && Store->getAlignment() >= 16 &&
+    if (Subtarget->useDS128() && Store->getAlignment() >= 16 &&
         VT.getStoreSize() == 16)
       return SDValue();
 
@@ -6605,13 +6601,14 @@ SDValue SITargetLowering::performExtractVectorEltCombine(
   SDValue Vec = N->getOperand(0);
 
   SelectionDAG &DAG = DCI.DAG;
-  if (Vec.getOpcode() == ISD::FNEG && allUsesHaveSourceMods(N)) {
+  if ((Vec.getOpcode() == ISD::FNEG ||
+       Vec.getOpcode() == ISD::FABS) && allUsesHaveSourceMods(N)) {
     SDLoc SL(N);
     EVT EltVT = N->getValueType(0);
     SDValue Idx = N->getOperand(1);
     SDValue Elt = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, SL, EltVT,
                               Vec.getOperand(0), Idx);
-    return DAG.getNode(ISD::FNEG, SL, EltVT, Elt);
+    return DAG.getNode(Vec.getOpcode(), SL, EltVT, Elt);
   }
 
   return SDValue();

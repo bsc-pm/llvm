@@ -635,7 +635,7 @@ static void EmitRegisterFileInfo(const CodeGenProcModel &ProcModel,
     OS << ProcModel.ModelName << "RegisterCosts,\n  ";
   else
     OS << "nullptr,\n  ";
-  OS << NumCostEntries << " // Number of register cost entries.\n";
+  OS << NumCostEntries << ", // Number of register cost entries.\n";
 }
 
 unsigned
@@ -687,11 +687,72 @@ SubtargetEmitter::EmitRegisterFileTables(const CodeGenProcModel &ProcModel,
   return CostTblIndex;
 }
 
+static bool EmitPfmIssueCountersTable(const CodeGenProcModel &ProcModel,
+                                      raw_ostream &OS) {
+  unsigned NumCounterDefs = 1 + ProcModel.ProcResourceDefs.size();
+  std::vector<const Record *> CounterDefs(NumCounterDefs);
+  bool HasCounters = false;
+  for (const Record *CounterDef : ProcModel.PfmIssueCounterDefs) {
+    const Record *&CD = CounterDefs[ProcModel.getProcResourceIdx(
+        CounterDef->getValueAsDef("Resource"))];
+    if (CD) {
+      PrintFatalError(CounterDef->getLoc(),
+                      "multiple issue counters for " +
+                          CounterDef->getValueAsDef("Resource")->getName());
+    }
+    CD = CounterDef;
+    HasCounters = true;
+  }
+  if (!HasCounters) {
+    return false;
+  }
+  OS << "\nstatic const char* " << ProcModel.ModelName
+     << "PfmIssueCounters[] = {\n";
+  for (unsigned i = 0; i != NumCounterDefs; ++i) {
+    const Record *CounterDef = CounterDefs[i];
+    if (CounterDef) {
+      const auto PfmCounters = CounterDef->getValueAsListOfStrings("Counters");
+      if (PfmCounters.empty())
+        PrintFatalError(CounterDef->getLoc(), "empty counter list");
+      OS << "  \"" << PfmCounters[0];
+      for (unsigned p = 1, e = PfmCounters.size(); p != e; ++p)
+        OS << ",\" \"" << PfmCounters[p];
+      OS << "\",  // #" << i << " = ";
+      OS << CounterDef->getValueAsDef("Resource")->getName() << "\n";
+    } else {
+      OS << "  nullptr, // #" << i << "\n";
+    }
+  }
+  OS << "};\n";
+  return true;
+}
+
+static void EmitPfmCounters(const CodeGenProcModel &ProcModel,
+                            const bool HasPfmIssueCounters, raw_ostream &OS) {
+  OS << "  {\n";
+  // Emit the cycle counter.
+  if (ProcModel.PfmCycleCounterDef)
+    OS << "    \"" << ProcModel.PfmCycleCounterDef->getValueAsString("Counter")
+       << "\",  // Cycle counter.\n";
+  else
+    OS << "    nullptr,  // No cycle counter.\n";
+
+  // Emit a reference to issue counters table.
+  if (HasPfmIssueCounters)
+    OS << "    " << ProcModel.ModelName << "PfmIssueCounters\n";
+  else
+    OS << "    nullptr  // No issue counters.\n";
+  OS << "  }\n";
+}
+
 void SubtargetEmitter::EmitExtraProcessorInfo(const CodeGenProcModel &ProcModel,
                                               raw_ostream &OS) {
   // Generate a table of register file descriptors (one entry per each user
   // defined register file), and a table of register costs.
   unsigned NumCostEntries = EmitRegisterFileTables(ProcModel, OS);
+
+  // Generate a table of ProcRes counter names.
+  const bool HasPfmIssueCounters = EmitPfmIssueCountersTable(ProcModel, OS);
 
   // Now generate a table for the extra processor info.
   OS << "\nstatic const llvm::MCExtraProcessorInfo " << ProcModel.ModelName
@@ -704,6 +765,8 @@ void SubtargetEmitter::EmitExtraProcessorInfo(const CodeGenProcModel &ProcModel,
   // file descriptors and register costs).
   EmitRegisterFileInfo(ProcModel, ProcModel.RegisterFiles.size(),
                        NumCostEntries, OS);
+
+  EmitPfmCounters(ProcModel, HasPfmIssueCounters, OS);
 
   OS << "};\n";
 }
@@ -1308,9 +1371,9 @@ void SubtargetEmitter::EmitProcessorModels(raw_ostream &OS) {
     else
       OS << "  nullptr, // No Itinerary\n";
     if (PM.hasExtraProcessorInfo())
-      OS << "  &" << PM.ModelName << "ExtraInfo\n";
+      OS << "  &" << PM.ModelName << "ExtraInfo,\n";
     else
-      OS << "  nullptr  // No extra processor descriptor\n";
+      OS << "  nullptr // No extra processor descriptor\n";
     OS << "};\n";
   }
 }
@@ -1380,26 +1443,64 @@ void SubtargetEmitter::EmitSchedModel(raw_ostream &OS) {
   OS << "\n#undef DBGFIELD";
 }
 
+static void emitPredicateProlog(const RecordKeeper &Records, raw_ostream &OS) {
+  std::string Buffer;
+  raw_string_ostream Stream(Buffer);
+
+  // Collect all the PredicateProlog records and print them to the output
+  // stream.
+  std::vector<Record *> Prologs =
+      Records.getAllDerivedDefinitions("PredicateProlog");
+  llvm::sort(Prologs.begin(), Prologs.end(), LessRecord());
+  for (Record *P : Prologs)
+    Stream << P->getValueAsString("Code") << '\n';
+
+  Stream.flush();
+  OS << Buffer;
+}
+
+static void emitPredicates(const CodeGenSchedTransition &T,
+                           const CodeGenSchedClass &SC, unsigned ProcIdx,
+                           raw_ostream &OS) {
+  if (ProcIdx && !count(T.ProcIndices, ProcIdx))
+    return;
+
+  std::string Buffer;
+  raw_string_ostream Stream(Buffer);
+  Stream << "      if (";
+  for (RecIter RI = T.PredTerm.begin(), RE = T.PredTerm.end(); RI != RE; ++RI) {
+    if (RI != T.PredTerm.begin())
+      Stream << "\n          && ";
+    Stream << "(" << (*RI)->getValueAsString("Predicate") << ")";
+  }
+
+  Stream << ")\n"
+         << "        return " << T.ToClassIdx << "; // " << SC.Name << '\n';
+  Stream.flush();
+  OS << Buffer;
+}
+
 void SubtargetEmitter::EmitSchedModelHelpers(const std::string &ClassName,
                                              raw_ostream &OS) {
   OS << "unsigned " << ClassName
      << "\n::resolveSchedClass(unsigned SchedClass, const MachineInstr *MI,"
      << " const TargetSchedModel *SchedModel) const {\n";
 
-  std::vector<Record*> Prologs = Records.getAllDerivedDefinitions("PredicateProlog");
-  llvm::sort(Prologs.begin(), Prologs.end(), LessRecord());
-  for (Record *P : Prologs) {
-    OS << P->getValueAsString("Code") << '\n';
-  }
+  // Emit the predicate prolog code.
+  emitPredicateProlog(Records, OS);
+
+  // Collect Variant Classes.
   IdxVec VariantClasses;
   for (const CodeGenSchedClass &SC : SchedModels.schedClasses()) {
     if (SC.Transitions.empty())
       continue;
     VariantClasses.push_back(SC.Index);
   }
+
   if (!VariantClasses.empty()) {
     OS << "  switch (SchedClass) {\n";
     for (unsigned VC : VariantClasses) {
+      // Emit code for each variant scheduling class.
       const CodeGenSchedClass &SC = SchedModels.getSchedClass(VC);
       OS << "  case " << VC << ": // " << SC.Name << '\n';
       IdxVec ProcIndices;
@@ -1416,22 +1517,10 @@ void SubtargetEmitter::EmitSchedModelHelpers(const std::string &ClassName,
           OS << "if (SchedModel->getProcessorID() == " << PI << ") ";
         OS << "{ // " << (SchedModels.procModelBegin() + PI)->ModelName
            << '\n';
-        for (const CodeGenSchedTransition &T : SC.Transitions) {
-          if (PI != 0 && !std::count(T.ProcIndices.begin(),
-                                     T.ProcIndices.end(), PI)) {
-              continue;
-          }
-          OS << "      if (";
-          for (RecIter RI = T.PredTerm.begin(), RE = T.PredTerm.end();
-               RI != RE; ++RI) {
-            if (RI != T.PredTerm.begin())
-              OS << "\n          && ";
-            OS << "(" << (*RI)->getValueAsString("Predicate") << ")";
-          }
-          OS << ")\n"
-             << "        return " << T.ToClassIdx << "; // "
-             << SchedModels.getSchedClass(T.ToClassIdx).Name << '\n';
-        }
+
+        for (const CodeGenSchedTransition &T : SC.Transitions)
+          emitPredicates(T, SchedModels.getSchedClass(T.ToClassIdx), PI, OS);
+
         OS << "    }\n";
         if (PI == 0)
           break;

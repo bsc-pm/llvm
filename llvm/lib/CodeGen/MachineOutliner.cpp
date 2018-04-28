@@ -71,6 +71,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -86,6 +87,17 @@ using namespace ore;
 
 STATISTIC(NumOutlined, "Number of candidates outlined");
 STATISTIC(FunctionsCreated, "Number of functions created");
+
+// Set to true if the user wants the outliner to run on linkonceodr linkage
+// functions. This is false by default because the linker can dedupe linkonceodr
+// functions. Since the outliner is confined to a single module (modulo LTO),
+// this is off by default. It should, however, be the default behaviour in
+// LTO.
+static cl::opt<bool> EnableLinkOnceODROutlining(
+    "enable-linkonceodr-outlining",
+    cl::Hidden,
+    cl::desc("Enable the machine outliner on linkonceodr functions"),
+    cl::init(false));
 
 namespace {
 
@@ -813,8 +825,7 @@ struct MachineOutliner : public ModulePass {
     ModulePass::getAnalysisUsage(AU);
   }
 
-  MachineOutliner(bool OutlineFromLinkOnceODRs = false)
-      : ModulePass(ID), OutlineFromLinkOnceODRs(OutlineFromLinkOnceODRs) {
+  MachineOutliner() : ModulePass(ID) {
     initializeMachineOutlinerPass(*PassRegistry::getPassRegistry());
   }
 
@@ -910,8 +921,8 @@ struct MachineOutliner : public ModulePass {
 char MachineOutliner::ID = 0;
 
 namespace llvm {
-ModulePass *createMachineOutlinerPass(bool OutlineFromLinkOnceODRs) {
-  return new MachineOutliner(OutlineFromLinkOnceODRs);
+ModulePass *createMachineOutlinerPass() {
+  return new MachineOutliner();
 }
 
 } // namespace llvm
@@ -1312,6 +1323,8 @@ MachineOutliner::createOutlinedFunction(Module &M, const OutlinedFunction &OF,
     DB.finalize();
   }
 
+  // Outlined functions shouldn't preserve liveness.
+  MF.getProperties().reset(MachineFunctionProperties::Property::TracksLiveness);
   MF.getRegInfo().freezeReservedRegs(MF);
   return &MF;
 }
@@ -1345,8 +1358,6 @@ bool MachineOutliner::outline(
     assert(EndIdx < Mapper.InstrList.size() && "Candidate out of bounds!");
     MachineBasicBlock::iterator EndIt = Mapper.InstrList[EndIdx];
     assert(EndIt != MBB->end() && "EndIt out of bounds!");
-
-    EndIt++; // Erase needs one past the end index.
 
     // Does this candidate have a function yet?
     if (!OF.MF) {
@@ -1390,10 +1401,40 @@ bool MachineOutliner::outline(
     const TargetInstrInfo &TII = *STI.getInstrInfo();
 
     // Insert a call to the new function and erase the old sequence.
-    TII.insertOutlinedCall(M, *MBB, StartIt, *MF, C.MInfo);
+    auto CallInst = TII.insertOutlinedCall(M, *MBB, StartIt, *MF, C.MInfo);
     StartIt = Mapper.InstrList[C.getStartIdx()];
-    MBB->erase(StartIt, EndIt);
 
+    // If the caller tracks liveness, then we need to make sure that anything
+    // we outline doesn't break liveness assumptions.
+    // The outlined functions themselves currently don't track liveness, but
+    // we should make sure that the ranges we yank things out of aren't
+    // wrong.
+    if (MBB->getParent()->getProperties().hasProperty(
+            MachineFunctionProperties::Property::TracksLiveness)) {
+      // Helper lambda for adding implicit def operands to the call instruction.
+      auto CopyDefs = [&CallInst](MachineInstr &MI) {
+        for (MachineOperand &MOP : MI.operands()) {
+          // Skip over anything that isn't a register.
+          if (!MOP.isReg())
+            continue;
+
+          // If it's a def, add it to the call instruction.
+          if (MOP.isDef())
+            CallInst->addOperand(
+                MachineOperand::CreateReg(MOP.getReg(), true, /* isDef = true */
+                                          true /* isImp = true */));
+        }
+      };
+
+      // Copy over the defs in the outlined range.
+      // First inst in outlined range <-- Anything that's defined in this
+      // ...                           .. range has to be added as an implicit
+      // Last inst in outlined range  <-- def to the call instruction.
+      std::for_each(CallInst, EndIt, CopyDefs);
+    }
+
+    EndIt++; // Erase needs one past the end index.
+    MBB->erase(StartIt, EndIt);
     OutlinedSomething = true;
 
     // Statistics.
@@ -1424,6 +1465,10 @@ bool MachineOutliner::runOnModule(Module &M) {
           << "Skipping pass: Target does not support the MachineOutliner.\n");
     return false;
   }
+
+  // If the user specifies that they want to outline from linkonceodrs, set
+  // it here.
+  OutlineFromLinkOnceODRs = EnableLinkOnceODROutlining;
 
   InstructionMapper Mapper;
 

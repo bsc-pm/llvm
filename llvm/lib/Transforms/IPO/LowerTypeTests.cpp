@@ -456,8 +456,6 @@ struct LowerTypeTests : public ModulePass {
   }
 
   bool runOnModule(Module &M) override {
-    if (skipModule(M))
-      return false;
     if (UseCommandLine)
       return LowerTypeTestsModule::runForTesting(M);
     return LowerTypeTestsModule(M, ExportSummary, ImportSummary).lower();
@@ -1292,6 +1290,8 @@ void LowerTypeTestsModule::createJumpTable(
     // by Clang for -march=armv7.
     F->addFnAttr("target-cpu", "cortex-a8");
   }
+  // Make sure we don't emit .eh_frame for this function.
+  F->addFnAttr(Attribute::NoUnwind);
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", F);
   IRBuilder<> IRB(BB);
@@ -1871,11 +1871,11 @@ bool LowerTypeTestsModule::lower() {
     }
     Sets.emplace_back(I, MaxIndex);
   }
-  std::sort(Sets.begin(), Sets.end(),
-            [](const std::pair<GlobalClassesTy::iterator, unsigned> &S1,
-               const std::pair<GlobalClassesTy::iterator, unsigned> &S2) {
-              return S1.second < S2.second;
-            });
+  llvm::sort(Sets.begin(), Sets.end(),
+             [](const std::pair<GlobalClassesTy::iterator, unsigned> &S1,
+                const std::pair<GlobalClassesTy::iterator, unsigned> &S2) {
+               return S1.second < S2.second;
+             });
 
   // For each disjoint set we found...
   for (const auto &S : Sets) {
@@ -1896,7 +1896,7 @@ bool LowerTypeTestsModule::lower() {
 
     // Order type identifiers by global index for determinism. This ordering is
     // stable as there is a one-to-one mapping between metadata and indices.
-    std::sort(TypeIds.begin(), TypeIds.end(), [&](Metadata *M1, Metadata *M2) {
+    llvm::sort(TypeIds.begin(), TypeIds.end(), [&](Metadata *M1, Metadata *M2) {
       return TypeIdInfo[M1].Index < TypeIdInfo[M2].Index;
     });
 
@@ -1945,6 +1945,24 @@ bool LowerTypeTestsModule::lower() {
         } else {
           Alias->setName(AliasName);
         }
+      }
+    }
+  }
+
+  // Emit .symver directives for exported functions, if they exist.
+  if (ExportSummary) {
+    if (NamedMDNode *SymversMD = M.getNamedMetadata("symvers")) {
+      for (auto Symver : SymversMD->operands()) {
+        assert(Symver->getNumOperands() >= 2);
+        StringRef SymbolName =
+            cast<MDString>(Symver->getOperand(0))->getString();
+        StringRef Alias = cast<MDString>(Symver->getOperand(1))->getString();
+
+        if (!ExportedFunctions.count(SymbolName))
+          continue;
+
+        M.appendModuleInlineAsm(
+            (llvm::Twine(".symver ") + SymbolName + ", " + Alias).str());
       }
     }
   }

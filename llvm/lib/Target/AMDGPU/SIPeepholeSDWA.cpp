@@ -699,7 +699,7 @@ SIPeepholeSDWA::matchSDWAOperand(MachineInstr &MI) {
 
     MachineOperand *Dst = TII->getNamedOperand(MI, AMDGPU::OpName::vdst);
 
-    if (TRI->isPhysicalRegister(Src1->getReg()) ||
+    if (TRI->isPhysicalRegister(ValSrc->getReg()) ||
         TRI->isPhysicalRegister(Dst->getReg()))
       break;
 
@@ -888,6 +888,10 @@ bool SIPeepholeSDWA::isConvertibleToSDWA(const MachineInstr &MI,
 
   if (!ST.hasSDWAMac() && (Opc == AMDGPU::V_MAC_F16_e32 ||
                            Opc == AMDGPU::V_MAC_F32_e32))
+    return false;
+
+  // FIXME: has SDWA but require handling of implicit VCC use
+  if (Opc == AMDGPU::V_CNDMASK_B32_e32)
     return false;
 
   return true;

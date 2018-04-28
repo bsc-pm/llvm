@@ -356,6 +356,8 @@ void AppleAccelTableEmitter::emit() const {
 
 void Dwarf5AccelTableEmitter::Header::emit(
     const Dwarf5AccelTableEmitter &Ctx) const {
+  assert(CompUnitCount > 0 && "Index must have at least one CU.");
+
   AsmPrinter *Asm = Ctx.Asm;
   Asm->OutStreamer->AddComment("Header: unit length");
   Asm->EmitLabelDifference(Ctx.ContributionEnd, Ctx.ContributionStart,
@@ -414,7 +416,9 @@ void Dwarf5AccelTableEmitter::emitCUList() const {
   for (const auto &CU : enumerate(CompUnits)) {
     assert(CU.index() == CU.value()->getUniqueID());
     Asm->OutStreamer->AddComment("Compilation unit " + Twine(CU.index()));
-    Asm->emitDwarfSymbolReference(CU.value()->getLabelBegin());
+    const DwarfCompileUnit *MainCU =
+        DD.useSplitDwarf() ? CU.value()->getSkeleton() : CU.value().get();
+    Asm->emitDwarfSymbolReference(MainCU->getLabelBegin());
   }
 }
 

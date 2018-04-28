@@ -514,6 +514,38 @@ static void fixupCalleeSaveRestoreStackOffset(MachineInstr &MI,
   OffsetOpnd.setImm(OffsetOpnd.getImm() + LocalStackSize / 8);
 }
 
+static void adaptForLdStOpt(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator FirstSPPopI,
+                            MachineBasicBlock::iterator LastPopI) {
+  // Sometimes (when we restore in the same order as we save), we can end up
+  // with code like this:
+  //
+  // ldp      x26, x25, [sp]
+  // ldp      x24, x23, [sp, #16]
+  // ldp      x22, x21, [sp, #32]
+  // ldp      x20, x19, [sp, #48]
+  // add      sp, sp, #64
+  //
+  // In this case, it is always better to put the first ldp at the end, so
+  // that the load-store optimizer can run and merge the ldp and the add into
+  // a post-index ldp.
+  // If we managed to grab the first pop instruction, move it to the end.
+  if (ReverseCSRRestoreSeq)
+    MBB.splice(FirstSPPopI, &MBB, LastPopI);
+  // We should end up with something like this now:
+  //
+  // ldp      x24, x23, [sp, #16]
+  // ldp      x22, x21, [sp, #32]
+  // ldp      x20, x19, [sp, #48]
+  // ldp      x26, x25, [sp]
+  // add      sp, sp, #64
+  //
+  // and the load-store optimizer can merge the last two instructions into:
+  //
+  // ldp      x26, x25, [sp], #64
+  //
+}
+
 void AArch64FrameLowering::emitPrologue(MachineFunction &MF,
                                         MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator MBBI = MBB.begin();
@@ -526,6 +558,11 @@ void AArch64FrameLowering::emitPrologue(MachineFunction &MF,
   AArch64FunctionInfo *AFI = MF.getInfo<AArch64FunctionInfo>();
   bool needsFrameMoves = MMI.hasDebugInfo() || F.needsUnwindTableEntry();
   bool HasFP = hasFP(MF);
+
+  // At this point, we're going to decide whether or not the function uses a
+  // redzone. In most cases, the function doesn't have a redzone so let's
+  // assume that's false and set it to true in the case that there's a redzone.
+  AFI->setHasRedZone(false);
 
   // Debug location must be unknown since the first debug location is used
   // to determine the end of the prologue.
@@ -551,7 +588,6 @@ void AArch64FrameLowering::emitPrologue(MachineFunction &MF,
       AFI->setHasRedZone(true);
       ++NumRedZoneFunctions;
     } else {
-      AFI->setHasRedZone(false);
       emitFrameOffset(MBB, MBBI, DL, AArch64::SP, AArch64::SP, -NumBytes, TII,
                       MachineInstr::FrameSetup);
 
@@ -926,12 +962,20 @@ void AArch64FrameLowering::emitEpilogue(MachineFunction &MF,
     int StackRestoreBytes = RedZone ? 0 : NumBytes;
     if (NoCalleeSaveRestore)
       StackRestoreBytes += AfterCSRPopSize;
-    emitFrameOffset(MBB, LastPopI, DL, AArch64::SP, AArch64::SP,
-                    StackRestoreBytes, TII, MachineInstr::FrameDestroy);
+
     // If we were able to combine the local stack pop with the argument pop,
     // then we're done.
-    if (NoCalleeSaveRestore || AfterCSRPopSize == 0)
+    bool Done = NoCalleeSaveRestore || AfterCSRPopSize == 0;
+
+    // If we're done after this, make sure to help the load store optimizer.
+    if (Done)
+      adaptForLdStOpt(MBB, MBB.getFirstTerminator(), LastPopI);
+
+    emitFrameOffset(MBB, LastPopI, DL, AArch64::SP, AArch64::SP,
+                    StackRestoreBytes, TII, MachineInstr::FrameDestroy);
+    if (Done)
       return;
+
     NumBytes = 0;
   }
 
@@ -963,33 +1007,8 @@ void AArch64FrameLowering::emitEpilogue(MachineFunction &MF,
       FirstSPPopI = Prev;
     }
 
-    // Sometimes (when we restore in the same order as we save), we can end up
-    // with code like this:
-    //
-    // ldp      x26, x25, [sp]
-    // ldp      x24, x23, [sp, #16]
-    // ldp      x22, x21, [sp, #32]
-    // ldp      x20, x19, [sp, #48]
-    // add      sp, sp, #64
-    //
-    // In this case, it is always better to put the first ldp at the end, so
-    // that the load-store optimizer can run and merge the ldp and the add into
-    // a post-index ldp.
-    // If we managed to grab the first pop instruction, move it to the end.
-    if (LastPopI != Begin)
-      MBB.splice(FirstSPPopI, &MBB, LastPopI);
-    // We should end up with something like this now:
-    //
-    // ldp      x24, x23, [sp, #16]
-    // ldp      x22, x21, [sp, #32]
-    // ldp      x20, x19, [sp, #48]
-    // ldp      x26, x25, [sp]
-    // add      sp, sp, #64
-    //
-    // and the load-store optimizer can merge the last two instructions into:
-    //
-    // ldp      x26, x25, [sp], #64
-    //
+    adaptForLdStOpt(MBB, FirstSPPopI, LastPopI);
+
     emitFrameOffset(MBB, FirstSPPopI, DL, AArch64::SP, AArch64::SP,
                     AfterCSRPopSize, TII, MachineInstr::FrameDestroy);
   }
@@ -1019,6 +1038,8 @@ int AArch64FrameLowering::resolveFrameIndexReference(const MachineFunction &MF,
   int FPOffset = MFI.getObjectOffset(FI) + FixedObject + 16;
   int Offset = MFI.getObjectOffset(FI) + MFI.getStackSize();
   bool isFixed = MFI.isFixedObjectIndex(FI);
+  bool isCSR = !isFixed && MFI.getObjectOffset(FI) >=
+                               -((int)AFI->getCalleeSavedStackSize());
 
   // Use frame pointer to reference fixed objects. Use it for locals if
   // there are VLAs or a dynamically realigned SP (and thus the SP isn't
@@ -1032,26 +1053,48 @@ int AArch64FrameLowering::resolveFrameIndexReference(const MachineFunction &MF,
     // Argument access should always use the FP.
     if (isFixed) {
       UseFP = hasFP(MF);
-    } else if (hasFP(MF) && !RegInfo->hasBasePointer(MF) &&
-               !RegInfo->needsStackRealignment(MF)) {
-      // Use SP or FP, whichever gives us the best chance of the offset
-      // being in range for direct access. If the FPOffset is positive,
-      // that'll always be best, as the SP will be even further away.
+    } else if (isCSR && RegInfo->needsStackRealignment(MF)) {
+      // References to the CSR area must use FP if we're re-aligning the stack
+      // since the dynamically-sized alignment padding is between the SP/BP and
+      // the CSR area.
+      assert(hasFP(MF) && "Re-aligned stack must have frame pointer");
+      UseFP = true;
+    } else if (hasFP(MF) && !RegInfo->needsStackRealignment(MF)) {
       // If the FPOffset is negative, we have to keep in mind that the
       // available offset range for negative offsets is smaller than for
-      // positive ones. If we have variable sized objects, we're stuck with
-      // using the FP regardless, though, as the SP offset is unknown
-      // and we don't have a base pointer available. If an offset is
+      // positive ones. If an offset is
       // available via the FP and the SP, use whichever is closest.
-      if (PreferFP || MFI.hasVarSizedObjects() || FPOffset >= 0 ||
-          (FPOffset >= -256 && Offset > -FPOffset))
+      bool FPOffsetFits = FPOffset >= -256;
+      PreferFP |= Offset > -FPOffset;
+
+      if (MFI.hasVarSizedObjects()) {
+        // If we have variable sized objects, we can use either FP or BP, as the
+        // SP offset is unknown. We can use the base pointer if we have one and
+        // FP is not preferred. If not, we're stuck with using FP.
+        bool CanUseBP = RegInfo->hasBasePointer(MF);
+        if (FPOffsetFits && CanUseBP) // Both are ok. Pick the best.
+          UseFP = PreferFP;
+        else if (!CanUseBP) // Can't use BP. Forced to use FP.
+          UseFP = true;
+        // else we can use BP and FP, but the offset from FP won't fit.
+        // That will make us scavenge registers which we can probably avoid by
+        // using BP. If it won't fit for BP either, we'll scavenge anyway.
+      } else if (FPOffset >= 0) {
+        // Use SP or FP, whichever gives us the best chance of the offset
+        // being in range for direct access. If the FPOffset is positive,
+        // that'll always be best, as the SP will be even further away.
         UseFP = true;
+      } else {
+        // We have the choice between FP and (SP or BP).
+        if (FPOffsetFits && PreferFP) // If FP is the best fit, use it.
+          UseFP = true;
+      }
     }
   }
 
-  assert((isFixed || !RegInfo->needsStackRealignment(MF) || !UseFP) &&
+  assert(((isFixed || isCSR) || !RegInfo->needsStackRealignment(MF) || !UseFP) &&
          "In the presence of dynamic stack pointer realignment, "
-         "non-argument objects cannot be accessed through the frame pointer");
+         "non-argument/CSR objects cannot be accessed through the frame pointer");
 
   if (UseFP) {
     FrameReg = RegInfo->getFrameRegister(MF);
@@ -1062,6 +1105,8 @@ int AArch64FrameLowering::resolveFrameIndexReference(const MachineFunction &MF,
   if (RegInfo->hasBasePointer(MF))
     FrameReg = RegInfo->getBaseRegister();
   else {
+    assert(!MFI.hasVarSizedObjects() &&
+           "Can't use SP when we have var sized objects.");
     FrameReg = AArch64::SP;
     // If we're using the red zone for this function, the SP won't actually
     // be adjusted, so the offsets will be negative. They're also all

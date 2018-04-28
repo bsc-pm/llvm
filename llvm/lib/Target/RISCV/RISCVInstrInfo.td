@@ -153,11 +153,26 @@ def simm21_lsb0 : Operand<OtherVT> {
   }];
 }
 
+def BareSymbol : AsmOperandClass {
+  let Name = "BareSymbol";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidBareSymbol";
+}
+
+// A bare symbol.
+def bare_symbol : Operand<XLenVT> {
+  let ParserMatchClass = BareSymbol;
+  let MCOperandPredicate = [{
+     return MCOp.isBareSymbolRef();
+  }];
+}
+
 // A parameterized register class alternative to i32imm/i64imm from Target.td.
 def ixlenimm : Operand<XLenVT>;
 
 // Standalone (codegen-only) immleaf patterns.
-def simm32 : ImmLeaf<XLenVT, [{return isInt<32>(Imm);}]>;
+def simm32     : ImmLeaf<XLenVT, [{return isInt<32>(Imm);}]>;
+def simm32hi20 : ImmLeaf<XLenVT, [{return isShiftedInt<20, 12>(Imm);}]>;
 
 // Addressing modes.
 // Necessary because a frameindex can't be matched directly in a pattern.
@@ -521,7 +536,7 @@ def IsOrAdd: PatFrag<(ops node:$A, node:$B), (or node:$A, node:$B), [{
 /// Immediates
 
 def : Pat<(simm12:$imm), (ADDI X0, simm12:$imm)>;
-// TODO: Add a pattern for immediates with all zeroes in the lower 12 bits.
+def : Pat<(simm32hi20:$imm), (LUI (HI20 imm:$imm))>;
 def : Pat<(simm32:$imm), (ADDI (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;
 
 /// Simple arithmetic operations
@@ -620,9 +635,23 @@ def : Pat<(brind GPR:$rs1), (PseudoBRIND GPR:$rs1, 0)>;
 def : Pat<(brind (add GPR:$rs1, simm12:$imm12)),
           (PseudoBRIND GPR:$rs1, simm12:$imm12)>;
 
+// PseudoCALL is a pseudo instruction which will eventually expand to auipc
+// and jalr while encoding. This is desirable, as an auipc+jalr pair with
+// R_RISCV_CALL and R_RISCV_RELAX relocations can be be relaxed by the linker
+// if the offset fits in a signed 21-bit immediate.
+// Define AsmString to print "call" when compile with -S flag.
+// Define isCodeGenOnly = 0 to support parsing assembly "call" instruction.
+let isCall = 1, Defs = [X1], isCodeGenOnly = 0 in
+def PseudoCALL : Pseudo<(outs), (ins bare_symbol:$func),
+                        [(Call tglobaladdr:$func)]> {
+  let AsmString = "call\t$func";
+}
+
+def : Pat<(Call texternalsym:$func), (PseudoCALL texternalsym:$func)>;
+
 let isCall = 1, Defs = [X1] in
-def PseudoCALL : Pseudo<(outs), (ins GPR:$rs1), [(Call GPR:$rs1)]>,
-                 PseudoInstExpansion<(JALR X1, GPR:$rs1, 0)>;
+def PseudoCALLIndirect : Pseudo<(outs), (ins GPR:$rs1), [(Call GPR:$rs1)]>,
+                         PseudoInstExpansion<(JALR X1, GPR:$rs1, 0)>;
 
 let isBarrier = 1, isReturn = 1, isTerminator = 1 in
 def PseudoRET : Pseudo<(outs), (ins), [(RetFlag)]>,

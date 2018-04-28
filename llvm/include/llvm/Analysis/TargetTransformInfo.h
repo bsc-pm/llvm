@@ -642,6 +642,7 @@ public:
     SK_Broadcast,       ///< Broadcast element 0 to all other elements.
     SK_Reverse,         ///< Reverse the order of the vector.
     SK_Alternate,       ///< Choose alternate elements from vector.
+    SK_Transpose,       ///< Transpose two vectors.
     SK_InsertSubvector, ///< InsertSubvector. Index indicates start offset.
     SK_ExtractSubvector,///< ExtractSubvector Index indicates start offset.
     SK_PermuteTwoSrc,   ///< Merge elements from two source vectors into one
@@ -679,6 +680,11 @@ public:
   /// If false, the vectorization factor will be chosen based on the
   /// size of the widest element type.
   bool shouldMaximizeVectorBandwidth(bool OptSize) const;
+
+  /// \return The minimum vectorization factor for types of given element
+  /// bit width, or 0 if there is no mimimum VF. The returned value only
+  /// applies when shouldMaximizeVectorBandwidth returns true.
+  unsigned getMinimumVF(unsigned ElemWidth) const;
 
   /// \return True if it should be considered for address type promotion.
   /// \p AllowPromotionWithoutCommonHeader Set true if promoting \p I is
@@ -1074,6 +1080,7 @@ public:
   virtual unsigned getRegisterBitWidth(bool Vector) const = 0;
   virtual unsigned getMinVectorRegisterBitWidth() = 0;
   virtual bool shouldMaximizeVectorBandwidth(bool OptSize) const = 0;
+  virtual unsigned getMinimumVF(unsigned ElemWidth) const = 0;
   virtual bool shouldConsiderAddressTypePromotion(
       const Instruction &I, bool &AllowPromotionWithoutCommonHeader) = 0;
   virtual unsigned getCacheLineSize() = 0;
@@ -1372,6 +1379,9 @@ public:
   }
   bool shouldMaximizeVectorBandwidth(bool OptSize) const override {
     return Impl.shouldMaximizeVectorBandwidth(OptSize);
+  }
+  unsigned getMinimumVF(unsigned ElemWidth) const override {
+    return Impl.getMinimumVF(ElemWidth);
   }
   bool shouldConsiderAddressTypePromotion(
       const Instruction &I, bool &AllowPromotionWithoutCommonHeader) override {

@@ -16,7 +16,7 @@ define i64 @test_cvtpd2pi(<2 x double> %a0, <2 x double>* %a1) optsize {
 ; GENERIC:       # %bb.0:
 ; GENERIC-NEXT:    cvtpd2pi (%rdi), %mm0 # sched: [10:1.00]
 ; GENERIC-NEXT:    cvtpd2pi %xmm0, %mm1 # sched: [4:1.00]
-; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
+; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -40,7 +40,7 @@ define i64 @test_cvtpd2pi(<2 x double> %a0, <2 x double>* %a1) optsize {
 ; SANDY:       # %bb.0:
 ; SANDY-NEXT:    cvtpd2pi (%rdi), %mm0 # sched: [10:1.00]
 ; SANDY-NEXT:    cvtpd2pi %xmm0, %mm1 # sched: [4:1.00]
-; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
+; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -188,8 +188,8 @@ define <4 x float> @test_cvtpi2ps(x86_mmx %a0, x86_mmx* %a1, <4 x float> %a2, <4
 ;
 ; ATOM-LABEL: test_cvtpi2ps:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    cvtpi2ps (%rdi), %xmm1 # sched: [0:?]
-; ATOM-NEXT:    cvtpi2ps %mm0, %xmm0 # sched: [0:?]
+; ATOM-NEXT:    cvtpi2ps %mm0, %xmm0 # sched: [5:5.00]
+; ATOM-NEXT:    cvtpi2ps (%rdi), %xmm1 # sched: [5:5.00]
 ; ATOM-NEXT:    addps %xmm1, %xmm0 # sched: [5:5.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
@@ -261,7 +261,7 @@ define i64 @test_cvtps2pi(<4 x float> %a0, <4 x float>* %a1) optsize {
 ; GENERIC:       # %bb.0:
 ; GENERIC-NEXT:    cvtps2pi %xmm0, %mm0 # sched: [3:1.00]
 ; GENERIC-NEXT:    cvtps2pi (%rdi), %mm1 # sched: [9:1.00]
-; GENERIC-NEXT:    por %mm0, %mm1 # sched: [1:1.00]
+; GENERIC-NEXT:    por %mm0, %mm1 # sched: [1:0.33]
 ; GENERIC-NEXT:    movq %mm1, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -285,7 +285,7 @@ define i64 @test_cvtps2pi(<4 x float> %a0, <4 x float>* %a1) optsize {
 ; SANDY:       # %bb.0:
 ; SANDY-NEXT:    cvtps2pi %xmm0, %mm0 # sched: [3:1.00]
 ; SANDY-NEXT:    cvtps2pi (%rdi), %mm1 # sched: [9:1.00]
-; SANDY-NEXT:    por %mm0, %mm1 # sched: [1:1.00]
+; SANDY-NEXT:    por %mm0, %mm1 # sched: [1:0.33]
 ; SANDY-NEXT:    movq %mm1, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -350,7 +350,7 @@ define i64 @test_cvttpd2pi(<2 x double> %a0, <2 x double>* %a1) optsize {
 ; GENERIC:       # %bb.0:
 ; GENERIC-NEXT:    cvttpd2pi (%rdi), %mm0 # sched: [10:1.00]
 ; GENERIC-NEXT:    cvttpd2pi %xmm0, %mm1 # sched: [4:1.00]
-; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
+; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -374,7 +374,7 @@ define i64 @test_cvttpd2pi(<2 x double> %a0, <2 x double>* %a1) optsize {
 ; SANDY:       # %bb.0:
 ; SANDY-NEXT:    cvttpd2pi (%rdi), %mm0 # sched: [10:1.00]
 ; SANDY-NEXT:    cvttpd2pi %xmm0, %mm1 # sched: [4:1.00]
-; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
+; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -439,7 +439,7 @@ define i64 @test_cvttps2pi(<4 x float> %a0, <4 x float>* %a1) optsize {
 ; GENERIC:       # %bb.0:
 ; GENERIC-NEXT:    cvttps2pi %xmm0, %mm0 # sched: [3:1.00]
 ; GENERIC-NEXT:    cvttps2pi (%rdi), %mm1 # sched: [9:1.00]
-; GENERIC-NEXT:    por %mm0, %mm1 # sched: [1:1.00]
+; GENERIC-NEXT:    por %mm0, %mm1 # sched: [1:0.33]
 ; GENERIC-NEXT:    movq %mm1, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -463,7 +463,7 @@ define i64 @test_cvttps2pi(<4 x float> %a0, <4 x float>* %a1) optsize {
 ; SANDY:       # %bb.0:
 ; SANDY-NEXT:    cvttps2pi %xmm0, %mm0 # sched: [3:1.00]
 ; SANDY-NEXT:    cvttps2pi (%rdi), %mm1 # sched: [9:1.00]
-; SANDY-NEXT:    por %mm0, %mm1 # sched: [1:1.00]
+; SANDY-NEXT:    por %mm0, %mm1 # sched: [1:0.33]
 ; SANDY-NEXT:    movq %mm1, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -647,11 +647,11 @@ define i32 @test_movd(x86_mmx %a0, i32 %a1, i32 *%a2) {
 ;
 ; ATOM-LABEL: test_movd:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    movd (%rsi), %mm1 # sched: [1:1.00]
-; ATOM-NEXT:    movd %edi, %mm2 # sched: [1:1.00]
-; ATOM-NEXT:    paddd %mm2, %mm1 # sched: [1:0.50]
-; ATOM-NEXT:    paddd %mm1, %mm0 # sched: [1:0.50]
-; ATOM-NEXT:    movd %mm1, %ecx # sched: [3:3.00]
+; ATOM-NEXT:    movd %edi, %mm1 # sched: [1:1.00]
+; ATOM-NEXT:    movd (%rsi), %mm2 # sched: [1:1.00]
+; ATOM-NEXT:    paddd %mm1, %mm2 # sched: [1:0.50]
+; ATOM-NEXT:    paddd %mm2, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    movd %mm2, %ecx # sched: [3:3.00]
 ; ATOM-NEXT:    movd %mm0, %eax # sched: [3:3.00]
 ; ATOM-NEXT:    movl %ecx, (%rsi) # sched: [1:1.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
@@ -978,7 +978,7 @@ define <2 x i64> @test_movq2dq(x86_mmx %a0) optsize {
 ;
 ; ATOM-LABEL: test_movq2dq:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    movq2dq %mm0, %xmm0 # sched: [0:?]
+; ATOM-NEXT:    movq2dq %mm0, %xmm0 # sched: [1:0.50]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_movq2dq:
@@ -2127,8 +2127,8 @@ define i64 @test_palignr(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; ATOM-LABEL: test_palignr:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    palignr $1, %mm1, %mm0 # sched: [0:?]
-; ATOM-NEXT:    palignr $1, (%rdi), %mm0 # sched: [0:?]
+; ATOM-NEXT:    palignr $1, %mm1, %mm0 # sched: [1:1.00]
+; ATOM-NEXT:    palignr $1, (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
@@ -2198,8 +2198,8 @@ declare x86_mmx @llvm.x86.mmx.palignr.b(x86_mmx, x86_mmx, i8) nounwind readnone
 define i64 @test_pand(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pand:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pand %mm1, %mm0 # sched: [1:1.00]
-; GENERIC-NEXT:    pand (%rdi), %mm0 # sched: [6:1.00]
+; GENERIC-NEXT:    pand %mm1, %mm0 # sched: [1:0.33]
+; GENERIC-NEXT:    pand (%rdi), %mm0 # sched: [6:0.50]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2219,8 +2219,8 @@ define i64 @test_pand(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; SANDY-LABEL: test_pand:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pand %mm1, %mm0 # sched: [1:1.00]
-; SANDY-NEXT:    pand (%rdi), %mm0 # sched: [6:1.00]
+; SANDY-NEXT:    pand %mm1, %mm0 # sched: [1:0.33]
+; SANDY-NEXT:    pand (%rdi), %mm0 # sched: [6:0.50]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2276,8 +2276,8 @@ declare x86_mmx @llvm.x86.mmx.pand(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pandn(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pandn:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pandn %mm1, %mm0 # sched: [1:1.00]
-; GENERIC-NEXT:    pandn (%rdi), %mm0 # sched: [6:1.00]
+; GENERIC-NEXT:    pandn %mm1, %mm0 # sched: [1:0.33]
+; GENERIC-NEXT:    pandn (%rdi), %mm0 # sched: [6:0.50]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2297,8 +2297,8 @@ define i64 @test_pandn(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; SANDY-LABEL: test_pandn:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pandn %mm1, %mm0 # sched: [1:1.00]
-; SANDY-NEXT:    pandn (%rdi), %mm0 # sched: [6:1.00]
+; SANDY-NEXT:    pandn %mm1, %mm0 # sched: [1:0.33]
+; SANDY-NEXT:    pandn (%rdi), %mm0 # sched: [6:0.50]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2354,29 +2354,29 @@ declare x86_mmx @llvm.x86.mmx.pandn(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pavgb(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pavgb:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pavgb %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pavgb (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pavgb %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pavgb (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pavgb:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pavgb %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pavgb (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pavgb %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pavgb (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pavgb:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pavgb %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pavgb (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pavgb %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pavgb (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pavgb:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pavgb %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pavgb (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pavgb %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pavgb (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2410,15 +2410,15 @@ define i64 @test_pavgb(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pavgb:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pavgb %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pavgb (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pavgb %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pavgb (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pavgb:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pavgb %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pavgb (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pavgb %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pavgb (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pavg.b(x86_mmx %a0, x86_mmx %a1)
@@ -2432,29 +2432,29 @@ declare x86_mmx @llvm.x86.mmx.pavg.b(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pavgw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pavgw:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pavgw %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pavgw (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pavgw %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pavgw (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pavgw:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pavgw %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pavgw (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pavgw %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pavgw (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pavgw:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pavgw %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pavgw (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pavgw %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pavgw (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pavgw:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pavgw %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pavgw (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pavgw %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pavgw (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -2488,15 +2488,15 @@ define i64 @test_pavgw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pavgw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pavgw %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pavgw (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pavgw %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pavgw (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pavgw:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pavgw %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pavgw (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pavgw %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pavgw (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pavg.w(x86_mmx %a0, x86_mmx %a1)
@@ -2978,7 +2978,7 @@ declare x86_mmx @llvm.x86.mmx.pcmpgt.w(x86_mmx, x86_mmx) nounwind readnone
 define i32 @test_pextrw(x86_mmx %a0) optsize {
 ; GENERIC-LABEL: test_pextrw:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pextrw $0, %mm0, %eax # sched: [1:1.00]
+; GENERIC-NEXT:    pextrw $0, %mm0, %eax # sched: [3:1.00]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pextrw:
@@ -2993,7 +2993,7 @@ define i32 @test_pextrw(x86_mmx %a0) optsize {
 ;
 ; SANDY-LABEL: test_pextrw:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pextrw $0, %mm0, %eax # sched: [1:1.00]
+; SANDY-NEXT:    pextrw $0, %mm0, %eax # sched: [3:1.00]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
 ; HASWELL-LABEL: test_pextrw:
@@ -3018,7 +3018,7 @@ define i32 @test_pextrw(x86_mmx %a0) optsize {
 ;
 ; BTVER2-LABEL: test_pextrw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pextrw $0, %mm0, %eax # sched: [1:0.50]
+; BTVER2-NEXT:    pextrw $0, %mm0, %eax # sched: [3:1.00]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pextrw:
@@ -3501,16 +3501,16 @@ declare x86_mmx @llvm.x86.ssse3.phsub.w(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pinsrw(x86_mmx %a0, i32 %a1, i16* %a2) optsize {
 ; GENERIC-LABEL: test_pinsrw:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pinsrw $0, %edi, %mm0 # sched: [1:1.00]
+; GENERIC-NEXT:    pinsrw $0, %edi, %mm0 # sched: [2:1.00]
 ; GENERIC-NEXT:    movswl (%rsi), %eax # sched: [5:0.50]
-; GENERIC-NEXT:    pinsrw $1, %eax, %mm0 # sched: [1:1.00]
+; GENERIC-NEXT:    pinsrw $1, %eax, %mm0 # sched: [2:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pinsrw:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    movswl (%rsi), %eax # sched: [1:1.00]
 ; ATOM-NEXT:    pinsrw $0, %edi, %mm0 # sched: [1:1.00]
+; ATOM-NEXT:    movswl (%rsi), %eax # sched: [1:1.00]
 ; ATOM-NEXT:    pinsrw $1, %eax, %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
@@ -3525,9 +3525,9 @@ define i64 @test_pinsrw(x86_mmx %a0, i32 %a1, i16* %a2) optsize {
 ;
 ; SANDY-LABEL: test_pinsrw:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pinsrw $0, %edi, %mm0 # sched: [1:1.00]
+; SANDY-NEXT:    pinsrw $0, %edi, %mm0 # sched: [2:1.00]
 ; SANDY-NEXT:    movswl (%rsi), %eax # sched: [5:0.50]
-; SANDY-NEXT:    pinsrw $1, %eax, %mm0 # sched: [1:1.00]
+; SANDY-NEXT:    pinsrw $1, %eax, %mm0 # sched: [2:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -3746,29 +3746,29 @@ declare x86_mmx @llvm.x86.ssse3.pmadd.ub.sw(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pmaxsw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pmaxsw:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pmaxsw %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pmaxsw (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pmaxsw %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pmaxsw (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pmaxsw:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pmaxsw %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pmaxsw (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pmaxsw %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pmaxsw (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pmaxsw:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pmaxsw %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pmaxsw (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pmaxsw %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pmaxsw (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pmaxsw:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pmaxsw %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pmaxsw (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pmaxsw %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pmaxsw (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -3802,15 +3802,15 @@ define i64 @test_pmaxsw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pmaxsw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pmaxsw %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pmaxsw (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pmaxsw %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pmaxsw (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pmaxsw:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pmaxsw %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pmaxsw (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pmaxsw %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pmaxsw (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pmaxs.w(x86_mmx %a0, x86_mmx %a1)
@@ -3824,29 +3824,29 @@ declare x86_mmx @llvm.x86.mmx.pmaxs.w(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pmaxub(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pmaxub:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pmaxub %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pmaxub (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pmaxub %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pmaxub (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pmaxub:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pmaxub %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pmaxub (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pmaxub %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pmaxub (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pmaxub:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pmaxub %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pmaxub (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pmaxub %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pmaxub (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pmaxub:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pmaxub %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pmaxub (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pmaxub %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pmaxub (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -3880,15 +3880,15 @@ define i64 @test_pmaxub(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pmaxub:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pmaxub %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pmaxub (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pmaxub %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pmaxub (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pmaxub:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pmaxub %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pmaxub (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pmaxub %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pmaxub (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pmaxu.b(x86_mmx %a0, x86_mmx %a1)
@@ -3902,29 +3902,29 @@ declare x86_mmx @llvm.x86.mmx.pmaxu.b(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pminsw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pminsw:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pminsw %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pminsw (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pminsw %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pminsw (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pminsw:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pminsw %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pminsw (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pminsw %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pminsw (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pminsw:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pminsw %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pminsw (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pminsw %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pminsw (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pminsw:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pminsw %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pminsw (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pminsw %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pminsw (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -3958,15 +3958,15 @@ define i64 @test_pminsw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pminsw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pminsw %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pminsw (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pminsw %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pminsw (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pminsw:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pminsw %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pminsw (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pminsw %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pminsw (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pmins.w(x86_mmx %a0, x86_mmx %a1)
@@ -3980,29 +3980,29 @@ declare x86_mmx @llvm.x86.mmx.pmins.w(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pminub(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pminub:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pminub %mm1, %mm0 # sched: [5:1.00]
-; GENERIC-NEXT:    pminub (%rdi), %mm0 # sched: [10:1.00]
+; GENERIC-NEXT:    pminub %mm1, %mm0 # sched: [3:1.00]
+; GENERIC-NEXT:    pminub (%rdi), %mm0 # sched: [8:1.00]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; ATOM-LABEL: test_pminub:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    pminub %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    pminub (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pminub %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    pminub (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_pminub:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    pminub %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    pminub (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    pminub %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    pminub (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
 ; SANDY-LABEL: test_pminub:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pminub %mm1, %mm0 # sched: [5:1.00]
-; SANDY-NEXT:    pminub (%rdi), %mm0 # sched: [10:1.00]
+; SANDY-NEXT:    pminub %mm1, %mm0 # sched: [3:1.00]
+; SANDY-NEXT:    pminub (%rdi), %mm0 # sched: [8:1.00]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -4036,15 +4036,15 @@ define i64 @test_pminub(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_pminub:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    pminub %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    pminub (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    pminub %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    pminub (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_pminub:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    pminub %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    pminub (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    pminub %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    pminub (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.pminu.b(x86_mmx %a0, x86_mmx %a1)
@@ -4503,8 +4503,8 @@ declare x86_mmx @llvm.x86.mmx.pmulu.dq(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_por(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_por:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
-; GENERIC-NEXT:    por (%rdi), %mm0 # sched: [6:1.00]
+; GENERIC-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
+; GENERIC-NEXT:    por (%rdi), %mm0 # sched: [6:0.50]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -4524,8 +4524,8 @@ define i64 @test_por(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; SANDY-LABEL: test_por:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:1.00]
-; SANDY-NEXT:    por (%rdi), %mm0 # sched: [6:1.00]
+; SANDY-NEXT:    por %mm1, %mm0 # sched: [1:0.33]
+; SANDY-NEXT:    por (%rdi), %mm0 # sched: [6:0.50]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
@@ -4637,15 +4637,15 @@ define i64 @test_psadbw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_psadbw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    psadbw %mm1, %mm0 # sched: [2:1.00]
+; BTVER2-NEXT:    psadbw %mm1, %mm0 # sched: [2:0.50]
 ; BTVER2-NEXT:    psadbw (%rdi), %mm0 # sched: [7:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_psadbw:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    psadbw %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    psadbw (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    psadbw %mm1, %mm0 # sched: [3:1.00]
+; ZNVER1-NEXT:    psadbw (%rdi), %mm0 # sched: [10:1.00]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.mmx.psad.bw(x86_mmx %a0, x86_mmx %a1)
@@ -4822,15 +4822,15 @@ define i64 @test_psignb(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; ATOM-LABEL: test_psignb:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    psignb %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    psignb (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignb %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignb (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_psignb:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    psignb %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    psignb (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    psignb %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    psignb (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
@@ -4871,15 +4871,15 @@ define i64 @test_psignb(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_psignb:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    psignb %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    psignb (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    psignb %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    psignb (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_psignb:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    psignb %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    psignb (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    psignb %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    psignb (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.ssse3.psign.b(x86_mmx %a0, x86_mmx %a1)
@@ -4900,15 +4900,15 @@ define i64 @test_psignd(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; ATOM-LABEL: test_psignd:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    psignd %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    psignd (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignd %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignd (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_psignd:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    psignd %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    psignd (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    psignd %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    psignd (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
@@ -4949,15 +4949,15 @@ define i64 @test_psignd(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_psignd:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    psignd %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    psignd (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    psignd %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    psignd (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_psignd:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    psignd %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    psignd (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    psignd %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    psignd (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.ssse3.psign.d(x86_mmx %a0, x86_mmx %a1)
@@ -4978,15 +4978,15 @@ define i64 @test_psignw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; ATOM-LABEL: test_psignw:
 ; ATOM:       # %bb.0:
-; ATOM-NEXT:    psignw %mm1, %mm0 # sched: [1:1.00]
-; ATOM-NEXT:    psignw (%rdi), %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignw %mm1, %mm0 # sched: [1:0.50]
+; ATOM-NEXT:    psignw (%rdi), %mm0 # sched: [1:1.00]
 ; ATOM-NEXT:    movq %mm0, %rax # sched: [3:3.00]
 ; ATOM-NEXT:    retq # sched: [79:39.50]
 ;
 ; SLM-LABEL: test_psignw:
 ; SLM:       # %bb.0:
-; SLM-NEXT:    psignw %mm1, %mm0 # sched: [4:1.00]
-; SLM-NEXT:    psignw (%rdi), %mm0 # sched: [7:1.00]
+; SLM-NEXT:    psignw %mm1, %mm0 # sched: [1:0.50]
+; SLM-NEXT:    psignw (%rdi), %mm0 # sched: [4:1.00]
 ; SLM-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; SLM-NEXT:    retq # sched: [4:1.00]
 ;
@@ -5027,15 +5027,15 @@ define i64 @test_psignw(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; BTVER2-LABEL: test_psignw:
 ; BTVER2:       # %bb.0:
-; BTVER2-NEXT:    psignw %mm1, %mm0 # sched: [2:1.00]
-; BTVER2-NEXT:    psignw (%rdi), %mm0 # sched: [7:1.00]
+; BTVER2-NEXT:    psignw %mm1, %mm0 # sched: [1:0.50]
+; BTVER2-NEXT:    psignw (%rdi), %mm0 # sched: [6:1.00]
 ; BTVER2-NEXT:    movq %mm0, %rax # sched: [1:0.50]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_psignw:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    psignw %mm1, %mm0 # sched: [4:1.00]
-; ZNVER1-NEXT:    psignw (%rdi), %mm0 # sched: [11:1.00]
+; ZNVER1-NEXT:    psignw %mm1, %mm0 # sched: [1:0.25]
+; ZNVER1-NEXT:    psignw (%rdi), %mm0 # sched: [8:0.50]
 ; ZNVER1-NEXT:    movq %mm0, %rax # sched: [2:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
   %1 = call x86_mmx @llvm.x86.ssse3.psign.w(x86_mmx %a0, x86_mmx %a1)
@@ -6861,8 +6861,8 @@ declare x86_mmx @llvm.x86.mmx.punpcklwd(x86_mmx, x86_mmx) nounwind readnone
 define i64 @test_pxor(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ; GENERIC-LABEL: test_pxor:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    pxor %mm1, %mm0 # sched: [1:1.00]
-; GENERIC-NEXT:    pxor (%rdi), %mm0 # sched: [6:1.00]
+; GENERIC-NEXT:    pxor %mm1, %mm0 # sched: [1:0.33]
+; GENERIC-NEXT:    pxor (%rdi), %mm0 # sched: [6:0.50]
 ; GENERIC-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
@@ -6882,8 +6882,8 @@ define i64 @test_pxor(x86_mmx %a0, x86_mmx %a1, x86_mmx* %a2) optsize {
 ;
 ; SANDY-LABEL: test_pxor:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    pxor %mm1, %mm0 # sched: [1:1.00]
-; SANDY-NEXT:    pxor (%rdi), %mm0 # sched: [6:1.00]
+; SANDY-NEXT:    pxor %mm1, %mm0 # sched: [1:0.33]
+; SANDY-NEXT:    pxor (%rdi), %mm0 # sched: [6:0.50]
 ; SANDY-NEXT:    movq %mm0, %rax # sched: [1:0.33]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;

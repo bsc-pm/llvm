@@ -170,8 +170,8 @@ SectionChunk *ObjFile::readSection(uint32_t SectionNumber,
   // CodeView needs a linker support. We need to interpret and debug
   // info, and then write it to a separate .pdb file.
 
-  // Ignore debug info unless /debug is given.
-  if (!Config->Debug && Name.startswith(".debug"))
+  // Ignore DWARF debug info unless /debug is given.
+  if (!Config->Debug && Name.startswith(".debug_"))
     return nullptr;
 
   if (Sec->Characteristics & llvm::COFF::IMAGE_SCN_LNK_REMOVE)
@@ -326,14 +326,13 @@ Optional<Symbol *> ObjFile::createDefined(
   if (SectionNumber == llvm::COFF::IMAGE_SYM_DEBUG)
     return nullptr;
 
-  // Reserved sections numbers don't have contents.
   if (llvm::COFF::isReservedSectionNumber(SectionNumber))
-    fatal("broken object file: " + toString(this));
+    fatal(toString(this) + ": " + Name +
+          " should not refer to special section " + Twine(SectionNumber));
 
-  // This symbol references a section which is not present in the section
-  // header.
   if ((uint32_t)SectionNumber >= SparseChunks.size())
-    fatal("broken object file: " + toString(this));
+    fatal(toString(this) + ": " + Name +
+          " should not refer to non-existent section " + Twine(SectionNumber));
 
   // Handle comdat leader symbols.
   if (const coff_aux_section_definition *Def = ComdatDefs[SectionNumber]) {
@@ -465,7 +464,7 @@ void BitcodeFile::parse() {
     } else {
       Sym = Symtab->addRegular(this, SymName);
     }
-    SymbolBodies.push_back(Sym);
+    Symbols.push_back(Sym);
   }
   Directives = Obj->getCOFFLinkerOpts();
 }

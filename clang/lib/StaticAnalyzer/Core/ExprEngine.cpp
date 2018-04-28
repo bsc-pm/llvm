@@ -1086,12 +1086,14 @@ void ExprEngine::ProcessDeleteDtor(const CFGDeleteDtor Dtor,
     // This workaround will just run the first destructor (which will still
     // invalidate the entire array).
     CallOpts.IsArrayCtorOrDtor = true;
+    // Yes, it may even be a multi-dimensional array.
+    while (const auto *AT = getContext().getAsArrayType(DTy))
+      DTy = AT->getElementType();
     if (ArgR)
       ArgR = getStoreManager().GetElementZeroRegion(cast<SubRegion>(ArgR), DTy);
   }
 
-  VisitCXXDestructor(DE->getDestroyedType(), ArgR, DE, /*IsBase=*/false,
-                     Pred, Dst, CallOpts);
+  VisitCXXDestructor(DTy, ArgR, DE, /*IsBase=*/false, Pred, Dst, CallOpts);
 }
 
 void ExprEngine::ProcessBaseDtor(const CFGBaseDtor D,
@@ -1231,23 +1233,27 @@ void ExprEngine::VisitCXXBindTemporaryExpr(const CXXBindTemporaryExpr *BTE,
   }
 }
 
-namespace {
+ProgramStateRef ExprEngine::escapeValue(ProgramStateRef State, SVal V,
+                                        PointerEscapeKind K) const {
+  class CollectReachableSymbolsCallback final : public SymbolVisitor {
+    InvalidatedSymbols Symbols;
 
-class CollectReachableSymbolsCallback final : public SymbolVisitor {
-  InvalidatedSymbols Symbols;
+  public:
+    explicit CollectReachableSymbolsCallback(ProgramStateRef State) {}
 
-public:
-  explicit CollectReachableSymbolsCallback(ProgramStateRef State) {}
+    const InvalidatedSymbols &getSymbols() const { return Symbols; }
 
-  const InvalidatedSymbols &getSymbols() const { return Symbols; }
+    bool VisitSymbol(SymbolRef Sym) override {
+      Symbols.insert(Sym);
+      return true;
+    }
+  };
 
-  bool VisitSymbol(SymbolRef Sym) override {
-    Symbols.insert(Sym);
-    return true;
-  }
-};
-
-} // namespace
+  const CollectReachableSymbolsCallback &Scanner =
+      State->scanReachableSymbols<CollectReachableSymbolsCallback>(V);
+  return getCheckerManager().runCheckersForPointerEscape(
+      State, Scanner.getSymbols(), /*CallEvent*/ nullptr, K, nullptr);
+}
 
 void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
                        ExplodedNodeSet &DstTop) {
@@ -1529,17 +1535,8 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
                                       ->getType()->isRecordType()))
           for (auto Child : Ex->children()) {
             assert(Child);
-
             SVal Val = State->getSVal(Child, LCtx);
-
-            CollectReachableSymbolsCallback Scanner =
-                State->scanReachableSymbols<CollectReachableSymbolsCallback>(
-                    Val);
-            const InvalidatedSymbols &EscapedSymbols = Scanner.getSymbols();
-
-            State = getCheckerManager().runCheckersForPointerEscape(
-                State, EscapedSymbols,
-                /*CallEvent*/ nullptr, PSK_EscapeOther, nullptr);
+            State = escapeValue(State, Val, PSK_EscapeOther);
           }
 
         Bldr2.generateNode(S, N, State);
@@ -2759,15 +2756,7 @@ ProgramStateRef ExprEngine::processPointerEscapedOnBind(ProgramStateRef State,
 
   // Otherwise, find all symbols referenced by 'val' that we are tracking
   // and stop tracking them.
-  CollectReachableSymbolsCallback Scanner =
-      State->scanReachableSymbols<CollectReachableSymbolsCallback>(Val);
-  const InvalidatedSymbols &EscapedSymbols = Scanner.getSymbols();
-  State = getCheckerManager().runCheckersForPointerEscape(State,
-                                                          EscapedSymbols,
-                                                          /*CallEvent*/ nullptr,
-                                                          PSK_EscapeOnBind,
-                                                          nullptr);
-
+  State = escapeValue(State, Val, PSK_EscapeOnBind);
   return State;
 }
 

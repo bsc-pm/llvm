@@ -84,6 +84,11 @@ def : WriteRes<WriteLoad,  [SLM_MEC_RSV]> { let Latency = 3; }
 def : WriteRes<WriteMove,  [SLM_IEC_RSV01]>;
 def : WriteRes<WriteZero,  []>;
 
+// Load/store MXCSR.
+// FIXME: These are probably wrong. They are copy pasted from WriteStore/Load.
+def : WriteRes<WriteSTMXCSR, [SLM_IEC_RSV01, SLM_MEC_RSV]>;
+def : WriteRes<WriteLDMXCSR,  [SLM_MEC_RSV]> { let Latency = 3; }
+
 // Treat misc copies as a move.
 def : InstRW<[WriteMove], (instrs COPY)>;
 
@@ -92,6 +97,13 @@ defm : SLMWriteResPair<WriteIMul,  [SLM_IEC_RSV1],  3>;
 defm : SLMWriteResPair<WriteShift, [SLM_IEC_RSV0],  1>;
 defm : SLMWriteResPair<WriteJump,  [SLM_IEC_RSV1],  1>;
 defm : SLMWriteResPair<WriteCRC32, [SLM_IEC_RSV1],  3>;
+
+defm : SLMWriteResPair<WriteCMOV,  [SLM_IEC_RSV01], 2, [2]>;
+def  : WriteRes<WriteSETCC, [SLM_IEC_RSV01]>;
+def  : WriteRes<WriteSETCCStore, [SLM_IEC_RSV01, SLM_MEC_RSV]> {
+  // FIXME Latency and NumMicrOps?
+  let ResourceCycles = [2,1];
+}
 
 // This is for simple LEAs with one or two input operands.
 // The complex ones can only execute on port 1, and they require two cycles on
@@ -106,8 +118,8 @@ defm : SLMWriteResPair<WritePOPCNT,  [SLM_IEC_RSV0], 3>;
 
 // BMI1 BEXTR, BMI2 BZHI
 // NOTE: These don't exist on Silvermont. Ports are guesses.
-defm : SBWriteResPair<WriteBEXTR, [SLM_IEC_RSV0], 1>;
-defm : SBWriteResPair<WriteBZHI, [SLM_IEC_RSV0], 1>;
+defm : SLMWriteResPair<WriteBEXTR, [SLM_IEC_RSV0], 1>;
+defm : SLMWriteResPair<WriteBZHI, [SLM_IEC_RSV0], 1>;
 
 // This is quite rough, latency depends on the dividend.
 defm : SLMWriteResPair<WriteIDiv, [SLM_IEC_RSV01, SLMDivider], 25, [1,25], 1, 4>;
@@ -118,6 +130,8 @@ def  : WriteRes<WriteFLoad,        [SLM_MEC_RSV]> { let Latency = 3; }
 def  : WriteRes<WriteFMove,        [SLM_FPC_RSV01]>;
 
 defm : SLMWriteResPair<WriteFAdd,   [SLM_FPC_RSV1], 3>;
+defm : SLMWriteResPair<WriteFCmp,   [SLM_FPC_RSV1], 3>;
+defm : SLMWriteResPair<WriteFCom,   [SLM_FPC_RSV1], 3>;
 defm : SLMWriteResPair<WriteFMul,   [SLM_FPC_RSV0, SLMFPMultiplier], 5, [1,2]>;
 defm : SLMWriteResPair<WriteFDiv,   [SLM_FPC_RSV0, SLMFPDivider], 34, [1,34]>;
 defm : SLMWriteResPair<WriteFRcp,   [SLM_FPC_RSV0], 5>;
@@ -126,8 +140,14 @@ defm : SLMWriteResPair<WriteFSqrt,  [SLM_FPC_RSV0], 15>;
 defm : SLMWriteResPair<WriteCvtF2I, [SLM_FPC_RSV01], 4>;
 defm : SLMWriteResPair<WriteCvtI2F, [SLM_FPC_RSV01], 4>;
 defm : SLMWriteResPair<WriteCvtF2F, [SLM_FPC_RSV01], 4>;
+defm : SLMWriteResPair<WriteFSign,  [SLM_FPC_RSV01], 1>;
+defm : SLMWriteResPair<WriteFLogic, [SLM_FPC_RSV01], 1>;
+defm : SLMWriteResPair<WriteFLogicY, [SLM_FPC_RSV01], 1>;
 defm : SLMWriteResPair<WriteFShuffle, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteFVarShuffle, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteFVarShuffleY,[SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteFBlend,  [SLM_FPC_RSV0],  1>;
+def  : WriteRes<WriteCvtF2FSt, [SLM_FPC_RSV01, SLM_MEC_RSV]>;
 
 // Vector integer operations.
 def  : WriteRes<WriteVecStore,       [SLM_FPC_RSV01, SLM_MEC_RSV]>;
@@ -138,16 +158,32 @@ defm : SLMWriteResPair<WriteVecShift, [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteVecLogic, [SLM_FPC_RSV01], 1>;
 defm : SLMWriteResPair<WriteVecALU,   [SLM_FPC_RSV01],  1>;
 defm : SLMWriteResPair<WriteVecIMul,  [SLM_FPC_RSV0],   4>;
-defm : SLMWriteResPair<WritePMULLD,  [SLM_FPC_RSV0],   11, [11], 7>;
+// FIXME: The below is closer to correct, but caused some perf regressions.
+//defm : SLMWriteResPair<WritePMULLD,  [SLM_FPC_RSV0],   11, [11], 7>;
+defm : SLMWriteResPair<WritePMULLD,  [SLM_FPC_RSV0],   4>;
 defm : SLMWriteResPair<WriteShuffle,  [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteVarShuffle,  [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteBlend,  [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteMPSAD,  [SLM_FPC_RSV0],  7>;
+defm : SLMWriteResPair<WritePSADBW, [SLM_FPC_RSV0],  4>;
+defm : SLMWriteResPair<WritePHMINPOS,  [SLM_FPC_RSV0],   4>;
+
+// Vector insert/extract operations.
+defm : SLMWriteResPair<WriteVecInsert, [SLM_FPC_RSV0],  1>;
+
+def  : WriteRes<WriteVecExtract, [SLM_FPC_RSV0]>;
+def  : WriteRes<WriteVecExtractSt, [SLM_FPC_RSV0, SLM_MEC_RSV]> {
+  let Latency = 4;
+  let NumMicroOps = 2;
+  let ResourceCycles = [1, 2];
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Horizontal add/sub  instructions.
 ////////////////////////////////////////////////////////////////////////////////
 
 defm : SLMWriteResPair<WriteFHAdd,   [SLM_FPC_RSV01], 3, [2]>;
+defm : SLMWriteResPair<WriteFHAddY,  [SLM_FPC_RSV01], 3, [2]>;
 defm : SLMWriteResPair<WritePHAdd,   [SLM_FPC_RSV01], 1>;
 
 // String instructions.
@@ -243,12 +279,18 @@ def : WriteRes<WriteNop, []>;
 // AVX/FMA is not supported on that architecture, but we should define the basic
 // scheduling resources anyway.
 def  : WriteRes<WriteIMulH, [SLM_FPC_RSV0]>;
+defm : SLMWriteResPair<WriteFBlendY, [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteVarBlend, [SLM_FPC_RSV0], 1>;
 defm : SLMWriteResPair<WriteFVarBlend, [SLM_FPC_RSV0], 1>;
+defm : SLMWriteResPair<WriteFVarBlendY, [SLM_FPC_RSV0], 1>;
 defm : SLMWriteResPair<WriteFShuffle256, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteFVarShuffle256, [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteShuffle256, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteVarShuffle256, [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteVarVecShift, [SLM_FPC_RSV0],  1>;
 defm : SLMWriteResPair<WriteFMA, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteFMAS, [SLM_FPC_RSV0],  1>;
+defm : SLMWriteResPair<WriteFMAY, [SLM_FPC_RSV0],  1>;
 
 // Instruction overrides
 

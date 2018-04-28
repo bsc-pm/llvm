@@ -529,6 +529,9 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
     // XCore never wants frame pointers, regardless of OS.
     // WebAssembly never wants frame pointers.
     return false;
+  case llvm::Triple::riscv32:
+  case llvm::Triple::riscv64:
+    return !areOptimizationsEnabled(Args);
   default:
     break;
   }
@@ -550,14 +553,6 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
     default:
       return true;
     }
-  }
-
-  switch (Triple.getArch()) {
-    case llvm::Triple::riscv32:
-    case llvm::Triple::riscv64:
-      return !areOptimizationsEnabled(Args);
-    default:
-      break;
   }
 
   if (Triple.isOSWindows()) {
@@ -1355,7 +1350,7 @@ void Clang::AddARMTargetArgs(const llvm::Triple &Triple, const ArgList &Args,
   // Forward the -mglobal-merge option for explicit control over the pass.
   if (Arg *A = Args.getLastArg(options::OPT_mglobal_merge,
                                options::OPT_mno_global_merge)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mno_global_merge))
       CmdArgs.push_back("-arm-global-merge=false");
     else
@@ -1469,21 +1464,21 @@ void Clang::AddAArch64TargetArgs(const ArgList &Args,
 
   if (Arg *A = Args.getLastArg(options::OPT_mfix_cortex_a53_835769,
                                options::OPT_mno_fix_cortex_a53_835769)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mfix_cortex_a53_835769))
       CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=1");
     else
       CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=0");
   } else if (Triple.isAndroid()) {
     // Enabled A53 errata (835769) workaround by default on android
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-aarch64-fix-cortex-a53-835769=1");
   }
 
   // Forward the -mglobal-merge option for explicit control over the pass.
   if (Arg *A = Args.getLastArg(options::OPT_mglobal_merge,
                                options::OPT_mno_global_merge)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     if (A->getOption().matches(options::OPT_mno_global_merge))
       CmdArgs.push_back("-aarch64-enable-global-merge=false");
     else
@@ -2246,6 +2241,11 @@ static void RenderFloatingPointOptions(const ToolChain &TC, const Driver &D,
     CmdArgs.push_back("-mfpmath");
     CmdArgs.push_back(A->getValue());
   }
+
+  // Disable a codegen optimization for floating-point casts.
+  if (Args.hasFlag(options::OPT_ffp_cast_overflow_workaround,
+                   options::OPT_fno_fp_cast_overflow_workaround, false))
+    CmdArgs.push_back("-ffp-cast-overflow-workaround");
 }
 
 static void RenderAnalyzerOptions(const ArgList &Args, ArgStringList &CmdArgs,
@@ -2551,11 +2551,13 @@ static void RenderModulesOptions(Compilation &C, const Driver &D,
     CmdArgs.push_back("-fmodules-strict-decluse");
 
   // -fno-implicit-modules turns off implicitly compiling modules on demand.
+  bool ImplicitModules = false;
   if (!Args.hasFlag(options::OPT_fimplicit_modules,
                     options::OPT_fno_implicit_modules, HaveClangModules)) {
     if (HaveModules)
       CmdArgs.push_back("-fno-implicit-modules");
   } else if (HaveModules) {
+    ImplicitModules = true;
     // -fmodule-cache-path specifies where our implicitly-built module files
     // should be written.
     SmallString<128> Path;
@@ -2662,7 +2664,11 @@ static void RenderModulesOptions(Compilation &C, const Driver &D,
                     options::OPT_fmodules_validate_once_per_build_session);
   }
 
-  Args.AddLastArg(CmdArgs, options::OPT_fmodules_validate_system_headers);
+  if (Args.hasFlag(options::OPT_fmodules_validate_system_headers,
+                   options::OPT_fno_modules_validate_system_headers,
+                   ImplicitModules))
+    CmdArgs.push_back("-fmodules-validate-system-headers");
+
   Args.AddLastArg(CmdArgs, options::OPT_fmodules_disable_diagnostic_validation);
 }
 
@@ -3053,13 +3059,13 @@ static void RenderDebugOptions(const ToolChain &TC, const Driver &D,
   // Always enabled for SCE tuning.
   if (Args.hasArg(options::OPT_gdwarf_aranges) ||
       DebuggerTuning == llvm::DebuggerKind::SCE) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-generate-arange-section");
   }
 
   if (Args.hasFlag(options::OPT_fdebug_types_section,
                    options::OPT_fno_debug_types_section, false)) {
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-generate-type-units");
   }
 
@@ -3272,6 +3278,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     Args.AddLastArg(CmdArgs, options::OPT_fthinlto_index_EQ);
   }
 
+  if (Args.getLastArg(options::OPT_save_temps_EQ))
+    Args.AddLastArg(CmdArgs, options::OPT_save_temps_EQ);
+
   // Embed-bitcode option.
   if (C.getDriver().embedBitcodeInObject() && !C.getDriver().isUsingLTO() &&
       (isa<BackendJobAction>(JA) || isa<AssembleJobAction>(JA))) {
@@ -3318,6 +3327,13 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     RenderAnalyzerOptions(Args, CmdArgs, Triple, Input);
 
   CheckCodeGenerationOptions(D, Args);
+
+  unsigned FunctionAlignment = ParseFunctionAlignment(getToolChain(), Args);
+  assert(FunctionAlignment <= 31 && "function alignment will be truncated!");
+  if (FunctionAlignment) {
+    CmdArgs.push_back("-function-alignment");
+    CmdArgs.push_back(Args.MakeArgString(std::to_string(FunctionAlignment)));
+  }
 
   llvm::Reloc::Model RelocationModel;
   unsigned PICLevel;
@@ -4078,17 +4094,17 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Arg *A = Args.getLastArg(options::OPT_mrestrict_it,
                                options::OPT_mno_restrict_it)) {
     if (A->getOption().matches(options::OPT_mrestrict_it)) {
-      CmdArgs.push_back("-backend-option");
+      CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-arm-restrict-it");
     } else {
-      CmdArgs.push_back("-backend-option");
+      CmdArgs.push_back("-mllvm");
       CmdArgs.push_back("-arm-no-restrict-it");
     }
   } else if (Triple.isOSWindows() &&
              (Triple.getArch() == llvm::Triple::arm ||
               Triple.getArch() == llvm::Triple::thumb)) {
     // Windows on ARM expects restricted IT blocks
-    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-arm-restrict-it");
   }
 
@@ -4180,6 +4196,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                RawTriple.hasEnvironment())) ||
       KernelOrKext)
     CmdArgs.push_back("-fno-use-cxa-atexit");
+
+  if (Args.hasFlag(options::OPT_fregister_global_dtors_with_atexit,
+                   options::OPT_fno_register_global_dtors_with_atexit,
+                   RawTriple.isOSDarwin() && !KernelOrKext))
+    CmdArgs.push_back("-fregister-global-dtors-with-atexit");
 
   // -fms-extensions=0 is default.
   if (Args.hasFlag(options::OPT_fms_extensions, options::OPT_fno_ms_extensions,
@@ -4392,6 +4413,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
+  if (!Args.hasFlag(options::OPT_Qy, options::OPT_Qn, true))
+    CmdArgs.push_back("-Qn");
+
   // -fcommon is the default unless compiling kernel code or the target says so
   bool NoCommonDefault = KernelOrKext || isNoCommonDefault(RawTriple);
   if (!Args.hasFlag(options::OPT_fcommon, options::OPT_fno_common,
@@ -4573,31 +4597,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   // Setup statistics file output.
-  if (const Arg *A = Args.getLastArg(options::OPT_save_stats_EQ)) {
-    StringRef SaveStats = A->getValue();
-
-    SmallString<128> StatsFile;
-    bool DoSaveStats = false;
-    if (SaveStats == "obj") {
-      if (Output.isFilename()) {
-        StatsFile.assign(Output.getFilename());
-        llvm::sys::path::remove_filename(StatsFile);
-      }
-      DoSaveStats = true;
-    } else if (SaveStats == "cwd") {
-      DoSaveStats = true;
-    } else {
-      D.Diag(diag::err_drv_invalid_value) << A->getAsString(Args) << SaveStats;
-    }
-
-    if (DoSaveStats) {
-      StringRef BaseName = llvm::sys::path::filename(Input.getBaseInput());
-      llvm::sys::path::append(StatsFile, BaseName);
-      llvm::sys::path::replace_extension(StatsFile, "stats");
-      CmdArgs.push_back(Args.MakeArgString(Twine("-stats-file=") +
-                                           StatsFile));
-    }
-  }
+  SmallString<128> StatsFile = getStatsFileName(Args, Output, Input, D);
+  if (!StatsFile.empty())
+    CmdArgs.push_back(Args.MakeArgString(Twine("-stats-file=") + StatsFile));
 
   // Forward -Xclang arguments to -cc1, and -mllvm arguments to the LLVM option
   // parser.

@@ -988,6 +988,8 @@ StringRef Darwin::getOSLibraryNameSuffix() const {
 /// Check if the link command contains a symbol export directive.
 static bool hasExportSymbolDirective(const ArgList &Args) {
   for (Arg *A : Args) {
+    if (A->getOption().matches(options::OPT_exported__symbols__list))
+      return true;
     if (!A->getOption().matches(options::OPT_Wl_COMMA) &&
         !A->getOption().matches(options::OPT_Xlinker))
       continue;
@@ -1195,6 +1197,11 @@ struct DarwinPlatform {
 
   DarwinEnvironmentKind getEnvironment() const { return Environment; }
 
+  void setEnvironment(DarwinEnvironmentKind Kind) {
+    Environment = Kind;
+    InferSimulatorFromArch = false;
+  }
+
   StringRef getOSVersion() const {
     if (Kind == OSVersionArg)
       return Argument->getValue();
@@ -1212,7 +1219,7 @@ struct DarwinPlatform {
   bool isExplicitlySpecified() const { return Kind <= DeploymentTargetEnv; }
 
   /// Returns true if the simulator environment can be inferred from the arch.
-  bool canInferSimulatorFromArch() const { return Kind != InferredFromSDK; }
+  bool canInferSimulatorFromArch() const { return InferSimulatorFromArch; }
 
   /// Adds the -m<os>-version-min argument to the compiler invocation.
   void addOSVersionMinArgument(DerivedArgList &Args, const OptTable &Opts) {
@@ -1288,6 +1295,7 @@ struct DarwinPlatform {
     DarwinPlatform Result(InferredFromSDK, Platform, Value);
     if (IsSimulator)
       Result.Environment = DarwinEnvironmentKind::Simulator;
+    Result.InferSimulatorFromArch = false;
     return Result;
   }
   static DarwinPlatform createFromArch(llvm::Triple::OSType OS,
@@ -1322,7 +1330,7 @@ private:
   DarwinPlatformKind Platform;
   DarwinEnvironmentKind Environment = DarwinEnvironmentKind::NativeEnvironment;
   std::string OSVersion;
-  bool HasOSVersion = true;
+  bool HasOSVersion = true, InferSimulatorFromArch = true;
   Arg *Argument;
   StringRef EnvVarName;
 };
@@ -1591,9 +1599,16 @@ void Darwin::AddDeploymentTarget(DerivedArgList &Args) const {
     OSTarget = getDeploymentTargetFromOSVersionArg(Args, getDriver());
     // If no deployment target was specified on the command line, check for
     // environment defines.
-    if (!OSTarget)
+    if (!OSTarget) {
       OSTarget =
           getDeploymentTargetFromEnvironmentVariables(getDriver(), getTriple());
+      if (OSTarget) {
+        // Don't infer simulator from the arch when the SDK is also specified.
+        Optional<DarwinPlatform> SDKTarget = inferDeploymentTargetFromSDK(Args);
+        if (SDKTarget)
+          OSTarget->setEnvironment(SDKTarget->getEnvironment());
+      }
+    }
     // If there is no command-line argument to specify the Target version and
     // no environment variable defined, see if we can set the default based
     // on -isysroot.

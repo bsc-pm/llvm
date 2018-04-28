@@ -52,8 +52,15 @@ bool Symbol::isLive() const {
     return G->Global->Live;
   if (InputChunk *C = getChunk())
     return C->Live;
-  // Assume any other kind of symbol is live.
-  return true;
+  return Referenced;
+}
+
+void Symbol::markLive() {
+  if (auto *G = dyn_cast<DefinedGlobal>(this))
+    G->Global->Live = true;
+  if (InputChunk *C = getChunk())
+    C->Live = true;
+  Referenced = true;
 }
 
 uint32_t Symbol::getOutputSymbolIndex() const {
@@ -224,6 +231,8 @@ std::string lld::toString(WasmSymbolType Type) {
     return "Data";
   case llvm::wasm::WASM_SYMBOL_TYPE_GLOBAL:
     return "Global";
+  case llvm::wasm::WASM_SYMBOL_TYPE_SECTION:
+    return "Section";
   }
   llvm_unreachable("invalid symbol type");
 }

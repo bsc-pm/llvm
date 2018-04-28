@@ -777,9 +777,8 @@ void LinkerScript::assignOffsets(OutputSection *Sec) {
   if (PhdrEntry *L = Ctx->OutSec->PtLoad)
     L->LMAOffset = Ctx->LMAOffset;
 
-  // The Size previously denoted how many InputSections had been added to this
-  // section, and was used for sorting SHF_LINK_ORDER sections. Reset it to
-  // compute the actual size value.
+  // We can call this method multiple times during the creation of
+  // thunks and want to start over calculation each time.
   Sec->Size = 0;
 
   // We visited SectionsCommands from processSectionCommands to
@@ -799,12 +798,6 @@ void LinkerScript::assignOffsets(OutputSection *Sec) {
       Cmd->Offset = Dot - Ctx->OutSec->Addr;
       Dot += Cmd->Size;
       expandOutputSection(Cmd->Size);
-      continue;
-    }
-
-    // Handle ASSERT().
-    if (auto *Cmd = dyn_cast<AssertCommand>(Base)) {
-      Cmd->Expression();
       continue;
     }
 
@@ -1054,12 +1047,6 @@ void LinkerScript::assignAddresses() {
       Cmd->Size = Dot - Cmd->Addr;
       continue;
     }
-
-    if (auto *Cmd = dyn_cast<AssertCommand>(Base)) {
-      Cmd->Expression();
-      continue;
-    }
-
     assignOffsets(cast<OutputSection>(Base));
   }
   Ctx = nullptr;
@@ -1123,9 +1110,9 @@ ExprValue LinkerScript::getSymbolValue(StringRef Name, const Twine &Loc) {
   if (Symbol *Sym = Symtab->find(Name)) {
     if (auto *DS = dyn_cast<Defined>(Sym))
       return {DS->Section, false, DS->Value, Loc};
-    if (auto *SS = dyn_cast<SharedSymbol>(Sym))
-      if (!ErrorOnMissingSection || SS->CopyRelSec)
-        return {SS->CopyRelSec, false, 0, Loc};
+    if (isa<SharedSymbol>(Sym))
+      if (!ErrorOnMissingSection)
+        return {nullptr, false, 0, Loc};
   }
 
   error(Loc + ": symbol not found: " + Name);
