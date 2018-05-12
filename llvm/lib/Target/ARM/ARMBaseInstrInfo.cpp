@@ -331,7 +331,7 @@ bool ARMBaseInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
     bool CantAnalyze = false;
 
     // Skip over DEBUG values and predicated nonterminators.
-    while (I->isDebugValue() || !I->isTerminator()) {
+    while (I->isDebugInstr() || !I->isTerminator()) {
       if (I == MBB.begin())
         return false;
       --I;
@@ -1365,7 +1365,7 @@ unsigned ARMBaseInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
   return MI.mayLoad() && hasLoadFromStackSlot(MI, Dummy, FrameIndex);
 }
 
-/// \brief Expands MEMCPY to either LDMIA/STMIA or LDMIA_UPD/STMID_UPD
+/// Expands MEMCPY to either LDMIA/STMIA or LDMIA_UPD/STMID_UPD
 /// depending on whether the result is used.
 void ARMBaseInstrInfo::expandMEMCPY(MachineBasicBlock::iterator MI) const {
   bool isThumb1 = Subtarget.isThumb1Only();
@@ -1815,7 +1815,7 @@ bool ARMBaseInstrInfo::isSchedulingBoundary(const MachineInstr &MI,
   // considered a scheduling hazard, which is wrong. It should be the actual
   // instruction preceding the dbg_value instruction(s), just like it is
   // when debug info is not present.
-  if (MI.isDebugValue())
+  if (MI.isDebugInstr())
     return false;
 
   // Terminators and labels can't be scheduled around.
@@ -1829,8 +1829,8 @@ bool ARMBaseInstrInfo::isSchedulingBoundary(const MachineInstr &MI,
   // to the t2IT instruction. The added compile time and complexity does not
   // seem worth it.
   MachineBasicBlock::const_iterator I = MI;
-  // Make sure to skip any dbg_value instructions
-  while (++I != MBB->end() && I->isDebugValue())
+  // Make sure to skip any debug instructions
+  while (++I != MBB->end() && I->isDebugInstr())
     ;
   if (I != MBB->end() && I->getOpcode() == ARM::t2IT)
     return true;

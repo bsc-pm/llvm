@@ -95,7 +95,7 @@ static Value *simplifyValueKnownNonZero(Value *V, InstCombiner &IC,
   return MadeChange ? V : nullptr;
 }
 
-/// \brief A helper routine of InstCombiner::visitMul().
+/// A helper routine of InstCombiner::visitMul().
 ///
 /// If C is a scalar/vector of known powers of 2, then this function returns
 /// a new scalar/vector obtained from logBase2 of C.
@@ -123,47 +123,6 @@ static Constant *getLogBase2(Type *Ty, Constant *C) {
   }
 
   return ConstantVector::get(Elts);
-}
-
-/// \brief Return true if we can prove that:
-///    (mul LHS, RHS)  === (mul nsw LHS, RHS)
-bool InstCombiner::willNotOverflowSignedMul(const Value *LHS,
-                                            const Value *RHS,
-                                            const Instruction &CxtI) const {
-  // Multiplying n * m significant bits yields a result of n + m significant
-  // bits. If the total number of significant bits does not exceed the
-  // result bit width (minus 1), there is no overflow.
-  // This means if we have enough leading sign bits in the operands
-  // we can guarantee that the result does not overflow.
-  // Ref: "Hacker's Delight" by Henry Warren
-  unsigned BitWidth = LHS->getType()->getScalarSizeInBits();
-
-  // Note that underestimating the number of sign bits gives a more
-  // conservative answer.
-  unsigned SignBits =
-      ComputeNumSignBits(LHS, 0, &CxtI) + ComputeNumSignBits(RHS, 0, &CxtI);
-
-  // First handle the easy case: if we have enough sign bits there's
-  // definitely no overflow.
-  if (SignBits > BitWidth + 1)
-    return true;
-
-  // There are two ambiguous cases where there can be no overflow:
-  //   SignBits == BitWidth + 1    and
-  //   SignBits == BitWidth
-  // The second case is difficult to check, therefore we only handle the
-  // first case.
-  if (SignBits == BitWidth + 1) {
-    // It overflows only when both arguments are negative and the true
-    // product is exactly the minimum negative number.
-    // E.g. mul i16 with 17 sign bits: 0xff00 * 0xff80 = 0x8000
-    // For simplicity we just check if at least one side is not negative.
-    KnownBits LHSKnown = computeKnownBits(LHS, /*Depth=*/0, &CxtI);
-    KnownBits RHSKnown = computeKnownBits(RHS, /*Depth=*/0, &CxtI);
-    if (LHSKnown.isNonNegative() || RHSKnown.isNonNegative())
-      return true;
-  }
-  return false;
 }
 
 Instruction *InstCombiner::visitMul(BinaryOperator &I) {
@@ -689,7 +648,7 @@ static bool isMultiple(const APInt &C1, const APInt &C2, APInt &Quotient,
 /// This function implements the transforms common to both integer division
 /// instructions (udiv and sdiv). It is called by the visitors to those integer
 /// division instructions.
-/// @brief Common integer divide transforms
+/// Common integer divide transforms
 Instruction *InstCombiner::commonIDivTransforms(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
   bool IsSigned = I.getOpcode() == Instruction::SDiv;
@@ -830,7 +789,7 @@ using FoldUDivOperandCb = Instruction *(*)(Value *Op0, Value *Op1,
                                            const BinaryOperator &I,
                                            InstCombiner &IC);
 
-/// \brief Used to maintain state for visitUDivOperand().
+/// Used to maintain state for visitUDivOperand().
 struct UDivFoldAction {
   /// Informs visitUDiv() how to fold this operand.  This can be zero if this
   /// action joins two actions together.
@@ -899,7 +858,7 @@ static Instruction *foldUDivShl(Value *Op0, Value *Op1, const BinaryOperator &I,
   return LShr;
 }
 
-// \brief Recursively visits the possible right hand operands of a udiv
+// Recursively visits the possible right hand operands of a udiv
 // instruction, seeing through select instructions, to determine if we can
 // replace the udiv with something simpler.  If we find that an operand is not
 // able to simplify the udiv, we abort the entire transformation.
@@ -1280,7 +1239,7 @@ Instruction *InstCombiner::visitFDiv(BinaryOperator &I) {
 /// This function implements the transforms common to both integer remainder
 /// instructions (urem and srem). It is called by the visitors to those integer
 /// remainder instructions.
-/// @brief Common integer remainder transforms
+/// Common integer remainder transforms
 Instruction *InstCombiner::commonIRemTransforms(BinaryOperator &I) {
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
 

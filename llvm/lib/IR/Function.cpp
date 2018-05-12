@@ -508,7 +508,7 @@ static ArrayRef<const char *> findTargetSubtable(StringRef Name) {
   return makeArrayRef(&IntrinsicNameTable[1] + TI.Offset, TI.Count);
 }
 
-/// \brief This does the actual lookup of an intrinsic ID which
+/// This does the actual lookup of an intrinsic ID which
 /// matches the given function name.
 Intrinsic::ID Function::lookupIntrinsicID(StringRef Name) {
   ArrayRef<const char *> NameTable = findTargetSubtable(Name);
@@ -1393,11 +1393,11 @@ void Function::setSectionPrefix(StringRef Prefix) {
 
 Optional<StringRef> Function::getSectionPrefix() const {
   if (MDNode *MD = getMetadata(LLVMContext::MD_section_prefix)) {
-    assert(dyn_cast<MDString>(MD->getOperand(0))
+    assert(cast<MDString>(MD->getOperand(0))
                ->getString()
                .equals("function_section_prefix") &&
            "Metadata not match");
-    return dyn_cast<MDString>(MD->getOperand(1))->getString();
+    return cast<MDString>(MD->getOperand(1))->getString();
   }
   return None;
 }

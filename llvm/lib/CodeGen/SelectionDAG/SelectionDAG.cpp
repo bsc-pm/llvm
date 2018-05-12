@@ -773,7 +773,7 @@ static void VerifySDNode(SDNode *N) {
 }
 #endif // NDEBUG
 
-/// \brief Insert a newly allocated node into the DAG.
+/// Insert a newly allocated node into the DAG.
 ///
 /// Handles insertion into the all nodes list and CSE map, as well as
 /// verification and other common operations when a new node is allocated.
@@ -3962,11 +3962,13 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     else if (OpOpcode == ISD::UNDEF)
       return getUNDEF(VT);
 
-    // (ext (trunx x)) -> x
+    // (ext (trunc x)) -> x
     if (OpOpcode == ISD::TRUNCATE) {
       SDValue OpOp = Operand.getOperand(0);
-      if (OpOp.getValueType() == VT)
+      if (OpOp.getValueType() == VT) {
+        transferDbgValues(Operand, OpOp);
         return OpOp;
+      }
     }
     break;
   case ISD::TRUNCATE:
@@ -5446,7 +5448,7 @@ static SDValue getMemmoveLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
   return DAG.getNode(ISD::TokenFactor, dl, MVT::Other, OutChains);
 }
 
-/// \brief Lower the call to 'memset' intrinsic function into a series of store
+/// Lower the call to 'memset' intrinsic function into a series of store
 /// operations.
 ///
 /// \param DAG Selection DAG where lowered code is placed.
@@ -7418,6 +7420,14 @@ void SelectionDAG::salvageDebugInfo(SDNode &N) {
     AddDbgValue(Dbg, Dbg->getSDNode(), false);
 }
 
+/// Creates a SDDbgLabel node.
+SDDbgLabel *SelectionDAG::getDbgLabel(DILabel *Label,
+                                      const DebugLoc &DL, unsigned O) {
+  assert(cast<DILabel>(Label)->isValidLocationForIntrinsic(DL) &&
+         "Expected inlined-at fields to agree");
+  return new (DbgInfo->getAlloc()) SDDbgLabel(Label, DL, O);
+}
+
 namespace {
 
 /// RAUWUpdateListener - Helper for ReplaceAllUsesWith - When the node
@@ -7901,6 +7911,10 @@ void SelectionDAG::AddDbgValue(SDDbgValue *DB, SDNode *SD, bool isParameter) {
     SD->setHasDebugValue(true);
   }
   DbgInfo->add(DB, SD, isParameter);
+}
+
+void SelectionDAG::AddDbgLabel(SDDbgLabel *DB) {
+  DbgInfo->add(DB);
 }
 
 SDValue SelectionDAG::makeEquivalentMemoryOrdering(LoadSDNode *OldLoad,
@@ -8522,7 +8536,7 @@ bool ShuffleVectorSDNode::isSplatMask(const int *Mask, EVT VT) {
   return true;
 }
 
-// \brief Returns the SDNode if it is a constant integer BuildVector
+// Returns the SDNode if it is a constant integer BuildVector
 // or constant integer.
 SDNode *SelectionDAG::isConstantIntBuildVectorOrConstantInt(SDValue N) {
   if (isa<ConstantSDNode>(N))

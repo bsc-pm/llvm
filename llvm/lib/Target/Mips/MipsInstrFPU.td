@@ -358,14 +358,15 @@ def CEIL_W_S   : MMRel, StdMMR6Rel, ABSS_FT<"ceil.w.s", FGR32Opnd, FGR32Opnd, II
                  ABSS_FM<0xe, 16>, ISA_MIPS2;
 def FLOOR_W_S  : MMRel, StdMMR6Rel, ABSS_FT<"floor.w.s", FGR32Opnd, FGR32Opnd, II_FLOOR>,
                  ABSS_FM<0xf, 16>, ISA_MIPS2;
-def CVT_W_S    : MMRel, ABSS_FT<"cvt.w.s", FGR32Opnd, FGR32Opnd, II_CVT>,
-                 ABSS_FM<0x24, 16>;
+let AdditionalPredicates = [NotInMicroMips] in
+  def CVT_W_S    : MMRel, ABSS_FT<"cvt.w.s", FGR32Opnd, FGR32Opnd, II_CVT>,
+                   ABSS_FM<0x24, 16>, ISA_MIPS1;
 
 defm TRUNC_W : ROUND_M<"trunc.w.d", II_TRUNC>, ABSS_FM<0xd, 17>, ISA_MIPS2;
 defm CEIL_W  : ROUND_M<"ceil.w.d", II_CEIL>, ABSS_FM<0xe, 17>, ISA_MIPS2;
 defm FLOOR_W : ROUND_M<"floor.w.d", II_FLOOR>, ABSS_FM<0xf, 17>, ISA_MIPS2;
 let AdditionalPredicates = [NotInMicroMips] in {
-  defm CVT_W   : ROUND_M<"cvt.w.d", II_CVT>, ABSS_FM<0x24, 17>;
+  defm CVT_W   : ROUND_M<"cvt.w.d", II_CVT>, ABSS_FM<0x24, 17>, ISA_MIPS1;
 }
 
 let AdditionalPredicates = [NotInMicroMips] in {
@@ -411,9 +412,9 @@ let DecoderNamespace = "MipsFP64" in {
   }
 }
 
-def CVT_S_W : MMRel, ABSS_FT<"cvt.s.w", FGR32Opnd, FGR32Opnd, II_CVT>,
-              ABSS_FM<0x20, 20>;
 let AdditionalPredicates = [NotInMicroMips] in{
+  def CVT_S_W : MMRel, ABSS_FT<"cvt.s.w", FGR32Opnd, FGR32Opnd, II_CVT>,
+                ABSS_FM<0x20, 20>, ISA_MIPS1;
   def CVT_L_S : MMRel, ABSS_FT<"cvt.l.s", FGR64Opnd, FGR32Opnd, II_CVT>,
                 ABSS_FM<0x25, 16>, INSN_MIPS3_32R2;
   def CVT_L_D64: MMRel, ABSS_FT<"cvt.l.d", FGR64Opnd, FGR64Opnd, II_CVT>,
@@ -422,25 +423,25 @@ let AdditionalPredicates = [NotInMicroMips] in{
 
 let AdditionalPredicates = [NotInMicroMips] in {
   def CVT_S_D32 : MMRel, ABSS_FT<"cvt.s.d", FGR32Opnd, AFGR64Opnd, II_CVT>,
-                  ABSS_FM<0x20, 17>, FGR_32;
+                  ABSS_FM<0x20, 17>, ISA_MIPS1, FGR_32;
   def CVT_D32_S : MMRel, ABSS_FT<"cvt.d.s", AFGR64Opnd, FGR32Opnd, II_CVT>,
-                  ABSS_FM<0x21, 16>, FGR_32;
+                  ABSS_FM<0x21, 16>, ISA_MIPS1, FGR_32;
   def CVT_D32_W : MMRel, ABSS_FT<"cvt.d.w", AFGR64Opnd, FGR32Opnd, II_CVT>,
-                  ABSS_FM<0x21, 20>, FGR_32;
+                  ABSS_FM<0x21, 20>, ISA_MIPS1, FGR_32;
 }
 let DecoderNamespace = "MipsFP64" in {
   let AdditionalPredicates = [NotInMicroMips] in {
     def CVT_S_L   : ABSS_FT<"cvt.s.l", FGR32Opnd, FGR64Opnd, II_CVT>,
-                    ABSS_FM<0x20, 21>, FGR_64;
+                    ABSS_FM<0x20, 21>, INSN_MIPS3_32R2, FGR_64;
     def CVT_S_D64 : ABSS_FT<"cvt.s.d", FGR32Opnd, FGR64Opnd, II_CVT>,
-                    ABSS_FM<0x20, 17>, FGR_64;
+                    ABSS_FM<0x20, 17>, ISA_MIPS1, FGR_64;
     def CVT_D64_W : ABSS_FT<"cvt.d.w", FGR64Opnd, FGR32Opnd, II_CVT>,
-                    ABSS_FM<0x21, 20>, FGR_64;
+                    ABSS_FM<0x21, 20>, ISA_MIPS1, FGR_64;
     def CVT_D64_S : ABSS_FT<"cvt.d.s", FGR64Opnd, FGR32Opnd, II_CVT>,
-                    ABSS_FM<0x21, 16>, FGR_64;
+                    ABSS_FM<0x21, 16>, ISA_MIPS1, FGR_64;
+    def CVT_D64_L : ABSS_FT<"cvt.d.l", FGR64Opnd, FGR64Opnd, II_CVT>,
+                    ABSS_FM<0x21, 21>, INSN_MIPS3_32R2, FGR_64;
   }
-  def CVT_D64_L : ABSS_FT<"cvt.d.l", FGR64Opnd, FGR64Opnd, II_CVT>,
-                  ABSS_FM<0x21, 21>, FGR_64;
 }
 
 let isPseudo = 1, isCodeGenOnly = 1 in {
@@ -605,38 +606,39 @@ let AdditionalPredicates = [NotInMicroMips] in {
   defm FSUB :  ADDS_M<"sub.d", II_SUB_D, 0, fsub>, ADDS_FM<0x01, 17>;
 }
 
-def MADD_S : MMRel, MADDS_FT<"madd.s", FGR32Opnd, II_MADD_S, fadd>,
-             MADDS_FM<4, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6, MADD4;
-def MSUB_S : MMRel, MADDS_FT<"msub.s", FGR32Opnd, II_MSUB_S, fsub>,
-             MADDS_FM<5, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6, MADD4;
+let AdditionalPredicates = [NotInMicroMips, HasMadd4] in {
+  def MADD_S : MMRel, MADDS_FT<"madd.s", FGR32Opnd, II_MADD_S, fadd>,
+               MADDS_FM<4, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6;
+  def MSUB_S : MMRel, MADDS_FT<"msub.s", FGR32Opnd, II_MSUB_S, fsub>,
+               MADDS_FM<5, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6;
+}
 
-let AdditionalPredicates = [NoNaNsFPMath, HasMadd4] in {
+let AdditionalPredicates = [NoNaNsFPMath, HasMadd4, NotInMicroMips] in {
   def NMADD_S : MMRel, NMADDS_FT<"nmadd.s", FGR32Opnd, II_NMADD_S, fadd>,
                 MADDS_FM<6, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6;
   def NMSUB_S : MMRel, NMADDS_FT<"nmsub.s", FGR32Opnd, II_NMSUB_S, fsub>,
                 MADDS_FM<7, 0>, INSN_MIPS4_32R2_NOT_32R6_64R6;
 }
-
-def MADD_D32 : MMRel, MADDS_FT<"madd.d", AFGR64Opnd, II_MADD_D, fadd>,
-               MADDS_FM<4, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32, MADD4;
-def MSUB_D32 : MMRel, MADDS_FT<"msub.d", AFGR64Opnd, II_MSUB_D, fsub>,
-               MADDS_FM<5, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32, MADD4;
-
-let AdditionalPredicates = [NoNaNsFPMath, HasMadd4] in {
+let AdditionalPredicates = [NotInMicroMips, HasMadd4] in {
+  def MADD_D32 : MMRel, MADDS_FT<"madd.d", AFGR64Opnd, II_MADD_D, fadd>,
+                 MADDS_FM<4, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32;
+  def MSUB_D32 : MMRel, MADDS_FT<"msub.d", AFGR64Opnd, II_MSUB_D, fsub>,
+                 MADDS_FM<5, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32;
+}
+let AdditionalPredicates = [NoNaNsFPMath, HasMadd4, NotInMicroMips] in {
   def NMADD_D32 : MMRel, NMADDS_FT<"nmadd.d", AFGR64Opnd, II_NMADD_D, fadd>,
                   MADDS_FM<6, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32;
   def NMSUB_D32 : MMRel, NMADDS_FT<"nmsub.d", AFGR64Opnd, II_NMSUB_D, fsub>,
                   MADDS_FM<7, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_32;
 }
-
-let DecoderNamespace = "MipsFP64" in {
-  def MADD_D64 : MADDS_FT<"madd.d", FGR64Opnd, II_MADD_D, fadd>,
-                 MADDS_FM<4, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_64, MADD4;
-  def MSUB_D64 : MADDS_FT<"msub.d", FGR64Opnd, II_MSUB_D, fsub>,
-                 MADDS_FM<5, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_64, MADD4;
+let AdditionalPredicates = [NotInMicroMips, HasMadd4, NotInMicroMips],
+    DecoderNamespace = "MipsFP64" in {
+    def MADD_D64 : MADDS_FT<"madd.d", FGR64Opnd, II_MADD_D, fadd>,
+                   MADDS_FM<4, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_64;
+    def MSUB_D64 : MADDS_FT<"msub.d", FGR64Opnd, II_MSUB_D, fsub>,
+                   MADDS_FM<5, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_64;
 }
-
-let AdditionalPredicates = [NoNaNsFPMath, HasMadd4],
+let AdditionalPredicates = [NoNaNsFPMath, HasMadd4, NotInMicroMips],
     DecoderNamespace = "MipsFP64" in {
   def NMADD_D64 : NMADDS_FT<"nmadd.d", FGR64Opnd, II_NMADD_D, fadd>,
                   MADDS_FM<6, 1>, INSN_MIPS4_32R2_NOT_32R6_64R6, FGR_64;

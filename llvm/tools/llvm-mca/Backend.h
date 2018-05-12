@@ -26,7 +26,7 @@ class HWEventListener;
 class HWInstructionEvent;
 class HWStallEvent;
 
-/// \brief An out of order backend for a specific subtarget.
+/// An out of order backend for a specific subtarget.
 ///
 /// It emulates an out-of-order execution of instructions. Instructions are
 /// fetched from a MCInst sequence managed by an object of class SourceMgr.
@@ -80,13 +80,9 @@ public:
       runCycle(Cycles++);
   }
 
-  const Instruction &getInstruction(unsigned Index) const {
-    const auto It = Instructions.find(Index);
-    assert(It != Instructions.end() && "no running instructions with index");
-    assert(It->second);
-    return *It->second;
+  void eraseInstruction(const InstRef &IR) {
+    Instructions.erase(IR.getSourceIndex());
   }
-  void eraseInstruction(unsigned Index) { Instructions.erase(Index); }
 
   void addEventListener(HWEventListener *Listener);
   void notifyCycleBegin(unsigned Cycle);

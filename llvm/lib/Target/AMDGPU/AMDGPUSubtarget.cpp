@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Implements the AMDGPU specific subclass of TargetSubtarget.
+/// Implements the AMDGPU specific subclass of TargetSubtarget.
 //
 //===----------------------------------------------------------------------===//
 
@@ -162,6 +162,7 @@ AMDGPUSubtarget::AMDGPUSubtarget(const Triple &TT, StringRef GPU, StringRef FS,
     HasSDWAOutModsVOPC(false),
     HasDPP(false),
     HasDLInsts(false),
+    D16PreservesUnusedBits(false),
     FlatAddressSpace(false),
     FlatInstOffsets(false),
     FlatGlobalInsts(false),
@@ -380,7 +381,7 @@ SISubtarget::SISubtarget(const Triple &TT, StringRef GPU, StringRef FS,
 
   RegBankInfo.reset(new AMDGPURegisterBankInfo(*getRegisterInfo()));
   InstSelector.reset(new AMDGPUInstructionSelector(
-      *this, *static_cast<AMDGPURegisterBankInfo *>(RegBankInfo.get())));
+      *this, *static_cast<AMDGPURegisterBankInfo *>(RegBankInfo.get()), TM));
 }
 
 void SISubtarget::overrideSchedPolicy(MachineSchedPolicy &Policy,

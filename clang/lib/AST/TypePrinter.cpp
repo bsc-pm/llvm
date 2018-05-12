@@ -47,7 +47,7 @@ using namespace clang;
 
 namespace {
 
-  /// \brief RAII object that enables printing of the ARC __strong lifetime
+  /// RAII object that enables printing of the ARC __strong lifetime
   /// qualifier.
   class IncludeStrongLifetimeRAII {
     PrintingPolicy &Policy;
@@ -270,7 +270,7 @@ void TypePrinter::printBefore(QualType T, raw_ostream &OS) {
   printBefore(Split.Ty, Quals, OS);
 }
 
-/// \brief Prints the part of the type string before an identifier, e.g. for
+/// Prints the part of the type string before an identifier, e.g. for
 /// "int foo[10]" it prints "int ".
 void TypePrinter::printBefore(const Type *T,Qualifiers Quals, raw_ostream &OS) {
   if (Policy.SuppressSpecifiers && T->isSpecifierType())
@@ -323,7 +323,7 @@ void TypePrinter::printAfter(QualType t, raw_ostream &OS) {
   printAfter(split.Ty, split.Quals, OS);
 }
 
-/// \brief Prints the part of the type string after an identifier, e.g. for
+/// Prints the part of the type string after an identifier, e.g. for
 /// "int foo[10]" it prints "[10]".
 void TypePrinter::printAfter(const Type *T, Qualifiers Quals, raw_ostream &OS) {
   switch (T->getTypeClass()) {
@@ -672,7 +672,9 @@ FunctionProtoType::printExceptionSpecification(raw_ostream &OS,
     OS << ')';
   } else if (isNoexceptExceptionSpec(getExceptionSpecType())) {
     OS << " noexcept";
-    if (getExceptionSpecType() == EST_ComputedNoexcept) {
+    // FIXME:Is it useful to print out the expression for a non-dependent
+    // noexcept specification?
+    if (isComputedNoexcept(getExceptionSpecType())) {
       OS << '(';
       if (getNoexceptExpr())
         getNoexceptExpr()->printPretty(OS, nullptr, Policy);

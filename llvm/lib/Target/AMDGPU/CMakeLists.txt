@@ -15,6 +15,9 @@ tablegen(LLVM AMDGPUGenRegisterInfo.inc -gen-register-info)
 tablegen(LLVM AMDGPUGenSearchableTables.inc -gen-searchable-tables)
 tablegen(LLVM AMDGPUGenSubtargetInfo.inc -gen-subtarget)
 
+set(LLVM_TARGET_DEFINITIONS AMDGPUGISel.td)
+tablegen(LLVM AMDGPUGenGlobalISel.inc -gen-global-isel)
+
 add_public_tablegen_target(AMDGPUCommonTableGen)
 
 add_llvm_target(AMDGPUCodeGen
@@ -82,7 +85,6 @@ add_llvm_target(AMDGPUCodeGen
   SIFrameLowering.cpp
   SIInsertSkips.cpp
   SIInsertWaitcnts.cpp
-  SIInsertWaits.cpp
   SIInstrInfo.cpp
   SIISelLowering.cpp
   SILoadStoreOptimizer.cpp

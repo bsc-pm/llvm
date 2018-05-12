@@ -87,11 +87,11 @@ class SelectionDAGLegalize {
   const TargetLowering &TLI;
   SelectionDAG &DAG;
 
-  /// \brief The set of nodes which have already been legalized. We hold a
+  /// The set of nodes which have already been legalized. We hold a
   /// reference to it in order to update as necessary on node deletion.
   SmallPtrSetImpl<SDNode *> &LegalizedNodes;
 
-  /// \brief A set of all the nodes updated during legalization.
+  /// A set of all the nodes updated during legalization.
   SmallSetVector<SDNode *, 16> *UpdatedNodes;
 
   EVT getSetCCResultType(EVT VT) const {
@@ -107,7 +107,7 @@ public:
       : TM(DAG.getTarget()), TLI(DAG.getTargetLoweringInfo()), DAG(DAG),
         LegalizedNodes(LegalizedNodes), UpdatedNodes(UpdatedNodes) {}
 
-  /// \brief Legalizes the given operation.
+  /// Legalizes the given operation.
   void LegalizeOp(SDNode *Node);
 
 private:
@@ -3726,7 +3726,7 @@ bool SelectionDAGLegalize::ExpandNode(SDNode *Node) {
       if (Tmp2.isUndef() ||
           (Tmp2.getOpcode() == ISD::AND &&
            isa<ConstantSDNode>(Tmp2.getOperand(1)) &&
-           dyn_cast<ConstantSDNode>(Tmp2.getOperand(1))->getZExtValue() == 1))
+           cast<ConstantSDNode>(Tmp2.getOperand(1))->getZExtValue() == 1))
         Tmp3 = Tmp2;
       else
         Tmp3 = DAG.getNode(ISD::AND, dl, Tmp2.getValueType(), Tmp2,

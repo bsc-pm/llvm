@@ -1210,7 +1210,7 @@ static bool UpdateOperandRegClass(MachineInstr &Instr) {
   return true;
 }
 
-/// \brief Return the opcode that does not set flags when possible - otherwise
+/// Return the opcode that does not set flags when possible - otherwise
 /// return the original opcode. The caller is responsible to do the actual
 /// substitution and legality checking.
 static unsigned convertToNonFlagSettingOpc(const MachineInstr &MI) {
@@ -4643,7 +4643,7 @@ void AArch64InstrInfo::genAlternativeCodeSequence(
   DelInstrs.push_back(&Root);
 }
 
-/// \brief Replace csincr-branch sequence by simple conditional branch
+/// Replace csincr-branch sequence by simple conditional branch
 ///
 /// Examples:
 /// 1. \code
@@ -5044,7 +5044,7 @@ AArch64InstrInfo::getOutliningType(MachineBasicBlock::iterator &MIT,
     return MachineOutlinerInstrType::Illegal;
 
   // Don't allow debug values to impact outlining type.
-  if (MI.isDebugValue() || MI.isIndirectDebugValue()) 
+  if (MI.isDebugInstr() || MI.isIndirectDebugValue())
     return MachineOutlinerInstrType::Invisible;
 
   // At this point, KILL instructions don't really tell us much so we can go

@@ -2007,12 +2007,12 @@ define <8 x float> @test_insertf128(<8 x float> %a0, <4 x float> %a1, <4 x float
 define <32 x i8> @test_lddqu(i8* %a0) {
 ; GENERIC-LABEL: test_lddqu:
 ; GENERIC:       # %bb.0:
-; GENERIC-NEXT:    vlddqu (%rdi), %ymm0 # sched: [6:0.50]
+; GENERIC-NEXT:    vlddqu (%rdi), %ymm0 # sched: [7:0.50]
 ; GENERIC-NEXT:    retq # sched: [1:1.00]
 ;
 ; SANDY-LABEL: test_lddqu:
 ; SANDY:       # %bb.0:
-; SANDY-NEXT:    vlddqu (%rdi), %ymm0 # sched: [6:0.50]
+; SANDY-NEXT:    vlddqu (%rdi), %ymm0 # sched: [7:0.50]
 ; SANDY-NEXT:    retq # sched: [1:1.00]
 ;
 ; HASWELL-LABEL: test_lddqu:
@@ -2159,7 +2159,7 @@ define <4 x double> @test_maskmovpd_ymm(i8* %a0, <4 x i64> %a1, <4 x double> %a2
 ; BTVER2:       # %bb.0:
 ; BTVER2-NEXT:    vmaskmovpd (%rdi), %ymm0, %ymm2 # sched: [6:2.00]
 ; BTVER2-NEXT:    vmaskmovpd %ymm1, %ymm0, (%rdi) # sched: [6:2.00]
-; BTVER2-NEXT:    vmovapd %ymm2, %ymm0 # sched: [1:0.50]
+; BTVER2-NEXT:    vmovapd %ymm2, %ymm0 # sched: [1:1.00]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_maskmovpd_ymm:
@@ -2285,7 +2285,7 @@ define <8 x float> @test_maskmovps_ymm(i8* %a0, <8 x i32> %a1, <8 x float> %a2) 
 ; BTVER2:       # %bb.0:
 ; BTVER2-NEXT:    vmaskmovps (%rdi), %ymm0, %ymm2 # sched: [6:2.00]
 ; BTVER2-NEXT:    vmaskmovps %ymm1, %ymm0, (%rdi) # sched: [6:2.00]
-; BTVER2-NEXT:    vmovaps %ymm2, %ymm0 # sched: [1:0.50]
+; BTVER2-NEXT:    vmovaps %ymm2, %ymm0 # sched: [1:1.00]
 ; BTVER2-NEXT:    retq # sched: [4:1.00]
 ;
 ; ZNVER1-LABEL: test_maskmovps_ymm:
@@ -4450,7 +4450,7 @@ define <4 x double> @test_sqrtpd(<4 x double> %a0, <4 x double> *%a1) {
 ;
 ; ZNVER1-LABEL: test_sqrtpd:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    vsqrtpd (%rdi), %ymm1 # sched: [47:47.00]
+; ZNVER1-NEXT:    vsqrtpd (%rdi), %ymm1 # sched: [47:40.00]
 ; ZNVER1-NEXT:    vsqrtpd %ymm0, %ymm0 # sched: [40:40.00]
 ; ZNVER1-NEXT:    vaddpd %ymm1, %ymm0, %ymm0 # sched: [3:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]
@@ -4514,7 +4514,7 @@ define <8 x float> @test_sqrtps(<8 x float> %a0, <8 x float> *%a1) {
 ;
 ; ZNVER1-LABEL: test_sqrtps:
 ; ZNVER1:       # %bb.0:
-; ZNVER1-NEXT:    vsqrtps (%rdi), %ymm1 # sched: [35:35.00]
+; ZNVER1-NEXT:    vsqrtps (%rdi), %ymm1 # sched: [35:28.00]
 ; ZNVER1-NEXT:    vsqrtps %ymm0, %ymm0 # sched: [28:28.00]
 ; ZNVER1-NEXT:    vaddps %ymm1, %ymm0, %ymm0 # sched: [3:1.00]
 ; ZNVER1-NEXT:    retq # sched: [1:0.50]

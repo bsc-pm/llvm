@@ -66,16 +66,20 @@ set(files
   mmintrin.h
   mm_malloc.h
   module.modulemap
+  movdirintrin.h
   msa.h
   mwaitxintrin.h
   nmmintrin.h
   opencl-c.h
   pkuintrin.h
   pmmintrin.h
+  pconfigintrin.h
   popcntintrin.h
   prfchwintrin.h
+  ptwriteintrin.h
   rdseedintrin.h
   rtmintrin.h
+  sgxintrin.h
   s390intrin.h
   shaintrin.h
   smmintrin.h

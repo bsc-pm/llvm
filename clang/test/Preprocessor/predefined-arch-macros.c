@@ -1204,6 +1204,7 @@
 // CHECK_ICX_M32: #define __MMX__ 1
 // CHECK_ICX_M32: #define __MPX__ 1
 // CHECK_ICX_M32: #define __PCLMUL__ 1
+// CHECK_ICX_M32: #define __PCONFIG__ 1
 // CHECK_ICX_M32: #define __PKU__ 1
 // CHECK_ICX_M32: #define __POPCNT__ 1
 // CHECK_ICX_M32: #define __PRFCHW__ 1
@@ -1261,6 +1262,7 @@
 // CHECK_ICX_M64: #define __MMX__ 1
 // CHECK_ICX_M64: #define __MPX__ 1
 // CHECK_ICX_M64: #define __PCLMUL__ 1
+// CHECK_ICX_M64: #define __PCONFIG__ 1
 // CHECK_ICX_M64: #define __PKU__ 1
 // CHECK_ICX_M64: #define __POPCNT__ 1
 // CHECK_ICX_M64: #define __PRFCHW__ 1
@@ -1400,6 +1402,7 @@
 // CHECK_GLMP_M32: #define __PCLMUL__ 1
 // CHECK_GLMP_M32: #define __POPCNT__ 1
 // CHECK_GLMP_M32: #define __PRFCHW__ 1
+// CHECK_GLMP_M32: #define __PTWRITE__ 1
 // CHECK_GLMP_M32: #define __RDPID__ 1
 // CHECK_GLMP_M32: #define __RDRND__ 1
 // CHECK_GLMP_M32: #define __RDSEED__ 1
@@ -1435,6 +1438,7 @@
 // CHECK_GLMP_M64: #define __PCLMUL__ 1
 // CHECK_GLMP_M64: #define __POPCNT__ 1
 // CHECK_GLMP_M64: #define __PRFCHW__ 1
+// CHECK_GLMP_M64: #define __PTWRITE__ 1
 // CHECK_GLMP_M64: #define __RDPID__ 1
 // CHECK_GLMP_M64: #define __RDRND__ 1
 // CHECK_GLMP_M64: #define __RDSEED__ 1
@@ -1466,10 +1470,13 @@
 // CHECK_TRM_M32: #define __FXSR__ 1
 // CHECK_TRM_M32: #define __GFNI__ 1
 // CHECK_TRM_M32: #define __MMX__ 1
+// CHECK_TRM_M32: #define __MOVDIR64B__ 1
+// CHECK_TRM_M32: #define __MOVDIRI__ 1
 // CHECK_TRM_M32: #define __MPX__ 1
 // CHECK_TRM_M32: #define __PCLMUL__ 1
 // CHECK_TRM_M32: #define __POPCNT__ 1
 // CHECK_TRM_M32: #define __PRFCHW__ 1
+// CHECK_TRM_M32: #define __PTWRITE__ 1
 // CHECK_TRM_M32: #define __RDPID__ 1
 // CHECK_TRM_M32: #define __RDRND__ 1
 // CHECK_TRM_M32: #define __RDSEED__ 1
@@ -1504,10 +1511,13 @@
 // CHECK_TRM_M64: #define __FXSR__ 1
 // CHECK_TRM_M64: #define __GFNI__ 1
 // CHECK_TRM_M64: #define __MMX__ 1
+// CHECK_TRM_M64: #define __MOVDIR64B__ 1
+// CHECK_TRM_M64: #define __MOVDIRI__ 1
 // CHECK_TRM_M64: #define __MPX__ 1
 // CHECK_TRM_M64: #define __PCLMUL__ 1
 // CHECK_TRM_M64: #define __POPCNT__ 1
 // CHECK_TRM_M64: #define __PRFCHW__ 1
+// CHECK_TRM_M64: #define __PTWRITE__ 1
 // CHECK_TRM_M64: #define __RDPID__ 1
 // CHECK_TRM_M64: #define __RDRND__ 1
 // CHECK_TRM_M64: #define __RDSEED__ 1

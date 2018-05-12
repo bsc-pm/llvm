@@ -1596,11 +1596,6 @@ let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
         GCCBuiltin<"__builtin_ia32_maskstoreps256">,
         Intrinsic<[], [llvm_ptr_ty,
                   llvm_v8i32_ty, llvm_v8f32_ty], [IntrArgMemOnly]>;
-
-  def int_x86_avx512_mask_store_ss :
-        GCCBuiltin<"__builtin_ia32_storess_mask">,
-        Intrinsic<[], [llvm_ptr_ty, llvm_v4f32_ty, llvm_i8_ty],
-                  [IntrArgMemOnly]>;
 }
 
 // BITALG bits shuffle
@@ -2205,78 +2200,6 @@ let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
                         [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
                         [IntrNoMem]>;
 
-  def int_x86_fma_vfmsub_ss : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsub_sd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsub_ps : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsub_pd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsub_ps_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v8f32_ty],
-                        [llvm_v8f32_ty, llvm_v8f32_ty, llvm_v8f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsub_pd_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f64_ty],
-                        [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_ss : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_sd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_ps : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_pd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_ps_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v8f32_ty],
-                        [llvm_v8f32_ty, llvm_v8f32_ty, llvm_v8f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmadd_pd_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f64_ty],
-                        [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_ss : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_sd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_ps : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_pd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_ps_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v8f32_ty],
-                        [llvm_v8f32_ty, llvm_v8f32_ty, llvm_v8f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfnmsub_pd_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f64_ty],
-                        [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
-                        [IntrNoMem]>;
   def int_x86_fma_vfmaddsub_ps : GCCBuiltin<"__builtin_ia32_vfmaddsubps">,
               Intrinsic<[llvm_v4f32_ty],
                         [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
@@ -2292,22 +2215,6 @@ let TargetPrefix = "x86" in {  // All intrinsics start with "llvm.x86.".
                         [IntrNoMem]>;
   def int_x86_fma_vfmaddsub_pd_256 :
               GCCBuiltin<"__builtin_ia32_vfmaddsubpd256">,
-              Intrinsic<[llvm_v4f64_ty],
-                        [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsubadd_ps : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v4f32_ty],
-                        [llvm_v4f32_ty, llvm_v4f32_ty, llvm_v4f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsubadd_pd : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v2f64_ty],
-                        [llvm_v2f64_ty, llvm_v2f64_ty, llvm_v2f64_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsubadd_ps_256 : // TODO: remove this intrinsic
-              Intrinsic<[llvm_v8f32_ty],
-                        [llvm_v8f32_ty, llvm_v8f32_ty, llvm_v8f32_ty],
-                        [IntrNoMem]>;
-  def int_x86_fma_vfmsubadd_pd_256 : // TODO: remove this intrinsic
               Intrinsic<[llvm_v4f64_ty],
                         [llvm_v4f64_ty, llvm_v4f64_ty, llvm_v4f64_ty],
                         [IntrNoMem]>;
@@ -6412,4 +6319,26 @@ let TargetPrefix = "x86" in {
               Intrinsic<[llvm_i8_ty], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
   def int_x86_tpause : GCCBuiltin<"__builtin_ia32_tpause">,
               Intrinsic<[llvm_i8_ty], [llvm_i32_ty, llvm_i32_ty, llvm_i32_ty], []>;
+}
+
+//===----------------------------------------------------------------------===//
+// Direct Move Instructions
+
+let TargetPrefix = "x86" in {
+  def int_x86_directstore32 : GCCBuiltin<"__builtin_ia32_directstore_u32">,
+      Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty], []>;
+  def int_x86_directstore64 : GCCBuiltin<"__builtin_ia32_directstore_u64">,
+      Intrinsic<[], [llvm_ptr_ty, llvm_i64_ty], []>;
+  def int_x86_movdir64b : GCCBuiltin<"__builtin_ia32_movdir64b">,
+      Intrinsic<[], [llvm_ptr_ty, llvm_ptr_ty], []>;
+}
+
+//===----------------------------------------------------------------------===//
+// PTWrite - Write data to processor trace pocket
+
+let TargetPrefix = "x86" in {
+  def int_x86_ptwrite32 : GCCBuiltin<"__builtin_ia32_ptwrite32">,
+              Intrinsic<[], [llvm_i32_ty], []>;
+  def int_x86_ptwrite64 : GCCBuiltin<"__builtin_ia32_ptwrite64">,
+              Intrinsic<[], [llvm_i64_ty], []>;
 }

@@ -1,6 +1,6 @@
 ; RUN: llc -filetype=obj %p/Inputs/many-funcs.ll -o %t.many.o
 ; RUN: llc -filetype=obj %s -o %t.o
-; RUN: wasm-ld --check-signatures -r -o %t.wasm %t.many.o %t.o
+; RUN: wasm-ld -r -o %t.wasm %t.many.o %t.o
 ; RUN: obj2yaml %t.wasm | FileCheck %s
 
 ; Test that relocations within the CODE section correctly handle
@@ -8,7 +8,7 @@
 ; 128 function and so the final output requires a 2-byte LEB in
 ; the CODE section header to store the function count.
 
-target triple = "wasm32-unknown-unknown-wasm"
+target triple = "wasm32-unknown-unknown"
 
 define i32 @func() {
 entry:

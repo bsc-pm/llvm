@@ -19,16 +19,17 @@ namespace wasm {
 
 struct Configuration {
   bool AllowUndefined;
-  bool CheckSignatures;
   bool Demangle;
   bool ExportTable;
   bool GcSections;
   bool ImportMemory;
   bool ImportTable;
+  bool MergeDataSegments;
   bool PrintGcSections;
   bool Relocatable;
   bool StripAll;
   bool StripDebug;
+  bool StackFirst;
   uint32_t GlobalBase;
   uint32_t InitialMemory;
   uint32_t MaxMemory;

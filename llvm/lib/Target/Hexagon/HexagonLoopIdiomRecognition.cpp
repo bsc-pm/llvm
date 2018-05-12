@@ -244,8 +244,8 @@ namespace {
     const Value *V;
   };
 
-  raw_ostream &operator<< (raw_ostream &OS, const PE &P) LLVM_ATTRIBUTE_USED;
-  raw_ostream &operator<< (raw_ostream &OS, const PE &P) {
+  LLVM_ATTRIBUTE_USED
+  raw_ostream &operator<<(raw_ostream &OS, const PE &P) {
     P.C.print(OS, P.V ? P.V : P.C.Root);
     return OS;
   }
@@ -2295,7 +2295,7 @@ CleanupAndExit:
   return true;
 }
 
-// \brief Check if the instructions in Insts, together with their dependencies
+// Check if the instructions in Insts, together with their dependencies
 // cover the loop in the sense that the loop could be safely eliminated once
 // the instructions in Insts are removed.
 bool HexagonLoopIdiomRecognize::coverLoop(Loop *L,

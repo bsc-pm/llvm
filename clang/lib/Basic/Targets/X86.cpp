@@ -154,6 +154,7 @@ bool X86TargetInfo::initFeatureMap(
     break;
 
   case CK_IcelakeServer:
+    setFeatureEnabledImpl(Features, "pconfig", true);
     setFeatureEnabledImpl(Features, "wbnoinvd", true);
     LLVM_FALLTHROUGH;
   case CK_IcelakeClient:
@@ -246,10 +247,13 @@ bool X86TargetInfo::initFeatureMap(
 
   case CK_Tremont:
     setFeatureEnabledImpl(Features, "cldemote", true);
+    setFeatureEnabledImpl(Features, "movdiri", true);
+    setFeatureEnabledImpl(Features, "movdir64b", true);
     setFeatureEnabledImpl(Features, "gfni", true);
     setFeatureEnabledImpl(Features, "waitpkg", true);
     LLVM_FALLTHROUGH;
   case CK_GoldmontPlus:
+    setFeatureEnabledImpl(Features, "ptwrite", true);
     setFeatureEnabledImpl(Features, "rdpid", true);
     setFeatureEnabledImpl(Features, "sgx", true);
     LLVM_FALLTHROUGH;
@@ -821,6 +825,14 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasLAHFSAHF = true;
     } else if (Feature == "+waitpkg") {
       HasWAITPKG = true;
+    } else if (Feature == "+movdiri") {
+      HasMOVDIRI = true;
+    } else if (Feature == "+movdir64b") {
+      HasMOVDIR64B = true;
+    } else if (Feature == "+pconfig") {
+      HasPCONFIG = true;
+    } else if (Feature == "+ptwrite") {
+      HasPTWRITE = true;
     }
 
     X86SSEEnum Level = llvm::StringSwitch<X86SSEEnum>(Feature)
@@ -1177,6 +1189,14 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__CLDEMOTE__");
   if (HasWAITPKG)
     Builder.defineMacro("__WAITPKG__");
+  if (HasMOVDIRI)
+    Builder.defineMacro("__MOVDIRI__");
+  if (HasMOVDIR64B)
+    Builder.defineMacro("__MOVDIR64B__");
+  if (HasPCONFIG)
+    Builder.defineMacro("__PCONFIG__");
+  if (HasPTWRITE)
+    Builder.defineMacro("__PTWRITE__");
 
   // Each case falls through to the previous one here.
   switch (SSELevel) {
@@ -1301,13 +1321,17 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("lzcnt", true)
       .Case("mmx", true)
       .Case("movbe", true)
+      .Case("movdiri", true)
+      .Case("movdir64b", true)
       .Case("mpx", true)
       .Case("mwaitx", true)
       .Case("pclmul", true)
+      .Case("pconfig", true)
       .Case("pku", true)
       .Case("popcnt", true)
       .Case("prefetchwt1", true)
       .Case("prfchw", true)
+      .Case("ptwrite", true)
       .Case("rdpid", true)
       .Case("rdrnd", true)
       .Case("rdseed", true)
@@ -1377,13 +1401,17 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("mm3dnowa", MMX3DNowLevel >= AMD3DNowAthlon)
       .Case("mmx", MMX3DNowLevel >= MMX)
       .Case("movbe", HasMOVBE)
+      .Case("movdiri", HasMOVDIRI)
+      .Case("movdir64b", HasMOVDIR64B)
       .Case("mpx", HasMPX)
       .Case("mwaitx", HasMWAITX)
       .Case("pclmul", HasPCLMUL)
+      .Case("pconfig", HasPCONFIG)
       .Case("pku", HasPKU)
       .Case("popcnt", HasPOPCNT)
       .Case("prefetchwt1", HasPREFETCHWT1)
       .Case("prfchw", HasPRFCHW)
+      .Case("ptwrite", HasPTWRITE)
       .Case("rdpid", HasRDPID)
       .Case("rdrnd", HasRDRND)
       .Case("rdseed", HasRDSEED)

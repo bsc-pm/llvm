@@ -848,7 +848,7 @@ bool FastISel::selectStackmap(const CallInst *I) {
   return true;
 }
 
-/// \brief Lower an argument list according to the target calling convention.
+/// Lower an argument list according to the target calling convention.
 ///
 /// This is a helper for lowering intrinsics that follow a target calling
 /// convention or require stack pointer adjustment. Only a subset of the
@@ -1444,7 +1444,7 @@ bool FastISel::selectIntrinsicCall(const IntrinsicInst *II) {
     updateValueMap(II, ResultReg);
     return true;
   }
-  case Intrinsic::invariant_group_barrier:
+  case Intrinsic::launder_invariant_group:
   case Intrinsic::expect: {
     unsigned ResultReg = getRegForValue(II->getArgOperand(0));
     if (!ResultReg)

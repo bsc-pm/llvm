@@ -111,19 +111,18 @@ static void handleColorDiagnostics(opt::InputArgList &Args) {
                               OPT_no_color_diagnostics);
   if (!Arg)
     return;
-
-  if (Arg->getOption().getID() == OPT_color_diagnostics)
+  if (Arg->getOption().getID() == OPT_color_diagnostics) {
     errorHandler().ColorDiagnostics = true;
-  else if (Arg->getOption().getID() == OPT_no_color_diagnostics)
+  } else if (Arg->getOption().getID() == OPT_no_color_diagnostics) {
     errorHandler().ColorDiagnostics = false;
-  else {
+  } else {
     StringRef S = Arg->getValue();
     if (S == "always")
       errorHandler().ColorDiagnostics = true;
-    if (S == "never")
+    else if (S == "never")
       errorHandler().ColorDiagnostics = false;
-    if (S != "auto")
-      error("unknown option: -color-diagnostics=" + S);
+    else if (S != "auto")
+      error("unknown option: --color-diagnostics=" + S);
   }
 }
 
@@ -282,22 +281,26 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   errorHandler().ErrorLimit = args::getInteger(Args, OPT_error_limit, 20);
 
   Config->AllowUndefined = Args.hasArg(OPT_allow_undefined);
-  Config->CheckSignatures =
-      Args.hasFlag(OPT_check_signatures, OPT_no_check_signatures, false);
   Config->Demangle = Args.hasFlag(OPT_demangle, OPT_no_demangle, true);
   Config->Entry = getEntry(Args, Args.hasArg(OPT_relocatable) ? "" : "_start");
   Config->ExportTable = Args.hasArg(OPT_export_table);
+  errorHandler().FatalWarnings =
+      Args.hasFlag(OPT_fatal_warnings, OPT_no_fatal_warnings, false);
   Config->ImportMemory = Args.hasArg(OPT_import_memory);
   Config->ImportTable = Args.hasArg(OPT_import_table);
   Config->OutputFile = Args.getLastArgValue(OPT_o);
   Config->Relocatable = Args.hasArg(OPT_relocatable);
   Config->GcSections =
       Args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, !Config->Relocatable);
+  Config->MergeDataSegments =
+      Args.hasFlag(OPT_merge_data_segments, OPT_no_merge_data_segments,
+                   !Config->Relocatable);
   Config->PrintGcSections =
       Args.hasFlag(OPT_print_gc_sections, OPT_no_print_gc_sections, false);
   Config->SearchPaths = args::getStrings(Args, OPT_L);
   Config->StripAll = Args.hasArg(OPT_strip_all);
   Config->StripDebug = Args.hasArg(OPT_strip_debug);
+  Config->StackFirst = Args.hasArg(OPT_stack_first);
   errorHandler().Verbose = Args.hasArg(OPT_verbose);
   ThreadsEnabled = Args.hasFlag(OPT_threads, OPT_no_threads, true);
 

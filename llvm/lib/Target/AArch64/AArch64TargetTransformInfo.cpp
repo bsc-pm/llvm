@@ -38,7 +38,7 @@ bool AArch64TTIImpl::areInlineCompatible(const Function *Caller,
   return (CallerBits & CalleeBits) == CalleeBits;
 }
 
-/// \brief Calculate the cost of materializing a 64-bit value. This helper
+/// Calculate the cost of materializing a 64-bit value. This helper
 /// method might only calculate a fraction of a larger immediate. Therefore it
 /// is valid to return a cost of ZERO.
 int AArch64TTIImpl::getIntImmCost(int64_t Val) {
@@ -54,7 +54,7 @@ int AArch64TTIImpl::getIntImmCost(int64_t Val) {
   return (64 - LZ + 15) / 16;
 }
 
-/// \brief Calculate the cost of materializing the given constant.
+/// Calculate the cost of materializing the given constant.
 int AArch64TTIImpl::getIntImmCost(const APInt &Imm, Type *Ty) {
   assert(Ty->isIntegerTy());
 
@@ -520,6 +520,28 @@ int AArch64TTIImpl::getArithmeticInstrCost(
     }
     LLVM_FALLTHROUGH;
   case ISD::UDIV:
+    if (Opd2Info == TargetTransformInfo::OK_UniformConstantValue) {
+      auto VT = TLI->getValueType(DL, Ty);
+      if (TLI->isOperationLegalOrCustom(ISD::MULHU, VT)) {
+        // Vector signed division by constant are expanded to the
+        // sequence MULHS + ADD/SUB + SRA + SRL + ADD, and unsigned division
+        // to MULHS + SUB + SRL + ADD + SRL.
+        int MulCost = getArithmeticInstrCost(Instruction::Mul, Ty, Opd1Info,
+                                             Opd2Info,
+                                             TargetTransformInfo::OP_None,
+                                             TargetTransformInfo::OP_None);
+        int AddCost = getArithmeticInstrCost(Instruction::Add, Ty, Opd1Info,
+                                             Opd2Info,
+                                             TargetTransformInfo::OP_None,
+                                             TargetTransformInfo::OP_None);
+        int ShrCost = getArithmeticInstrCost(Instruction::AShr, Ty, Opd1Info,
+                                             Opd2Info,
+                                             TargetTransformInfo::OP_None,
+                                             TargetTransformInfo::OP_None);
+        return MulCost * 2 + AddCost * 2 + ShrCost * 2 + 1;
+      }
+    }
+
     Cost += BaseT::getArithmeticInstrCost(Opcode, Ty, Opd1Info, Opd2Info,
                                           Opd1PropInfo, Opd2PropInfo);
     if (Ty->isVectorTy()) {

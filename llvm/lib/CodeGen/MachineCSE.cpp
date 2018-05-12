@@ -314,7 +314,7 @@ bool MachineCSE::PhysRegDefsReach(MachineInstr *CSMI, MachineInstr *MI,
   unsigned LookAheadLeft = LookAheadLimit;
   while (LookAheadLeft) {
     // Skip over dbg_value's.
-    while (I != E && I != EE && I->isDebugValue())
+    while (I != E && I != EE && I->isDebugInstr())
       ++I;
 
     if (I == EE) {
@@ -353,7 +353,7 @@ bool MachineCSE::PhysRegDefsReach(MachineInstr *CSMI, MachineInstr *MI,
 
 bool MachineCSE::isCSECandidate(MachineInstr *MI) {
   if (MI->isPosition() || MI->isPHI() || MI->isImplicitDef() || MI->isKill() ||
-      MI->isInlineAsm() || MI->isDebugValue())
+      MI->isInlineAsm() || MI->isDebugInstr())
     return false;
 
   // Ignore copies.
@@ -445,15 +445,13 @@ bool MachineCSE::isProfitableToCSE(unsigned CSReg, unsigned Reg,
   // Heuristics #3: If the common subexpression is used by PHIs, do not reuse
   // it unless the defined value is already used in the BB of the new use.
   bool HasPHI = false;
-  SmallPtrSet<MachineBasicBlock*, 4> CSBBs;
-  for (MachineInstr &MI : MRI->use_nodbg_instructions(CSReg)) {
-    HasPHI |= MI.isPHI();
-    CSBBs.insert(MI.getParent());
+  for (MachineInstr &UseMI : MRI->use_nodbg_instructions(CSReg)) {
+    HasPHI |= UseMI.isPHI();
+    if (UseMI.getParent() == MI->getParent())
+      return true;
   }
 
-  if (!HasPHI)
-    return true;
-  return CSBBs.count(MI->getParent());
+  return !HasPHI;
 }
 
 void MachineCSE::EnterScope(MachineBasicBlock *MBB) {

@@ -46,7 +46,7 @@ enum ResourceStateEvent {
   RS_RESERVED
 };
 
-/// \brief A descriptor for processor resources.
+/// A descriptor for processor resources.
 ///
 /// Each object of class ResourceState is associated to a specific processor
 /// resource. There is an instance of this class for every processor resource
@@ -250,7 +250,7 @@ public:
 #endif
 };
 
-/// \brief A resource unit identifier.
+/// A resource unit identifier.
 ///
 /// This is used to identify a specific processor resource unit using a pair
 /// of indices where the 'first' index is a processor resource mask, and the
@@ -419,10 +419,10 @@ class Scheduler {
   std::map<unsigned, Instruction *> IssuedQueue;
 
   void
-  notifyInstructionIssued(unsigned Index,
+  notifyInstructionIssued(const InstRef &IR,
                           llvm::ArrayRef<std::pair<ResourceRef, double>> Used);
-  void notifyInstructionExecuted(unsigned Index);
-  void notifyInstructionReady(unsigned Index);
+  void notifyInstructionExecuted(const InstRef &IR);
+  void notifyInstructionReady(const InstRef &IR);
   void notifyResourceAvailable(const ResourceRef &RR);
 
   // Notify the Backend that buffered resources were consumed.
@@ -432,19 +432,19 @@ class Scheduler {
 
   /// Select the next instruction to issue from the ReadyQueue.
   /// This method gives priority to older instructions.
-  std::pair<unsigned, Instruction *> select();
+  InstRef select();
 
   /// Move instructions from the WaitQueue to the ReadyQueue if input operands
   /// are all available.
-  void promoteToReadyQueue(llvm::SmallVectorImpl<unsigned> &Ready);
+  void promoteToReadyQueue(llvm::SmallVectorImpl<InstRef> &Ready);
 
   /// Issue an instruction without updating the ready queue.
   void issueInstructionImpl(
-      unsigned Index, Instruction &IS,
+      InstRef &IR,
       llvm::SmallVectorImpl<std::pair<ResourceRef, double>> &Pipes);
 
-  void updatePendingQueue(llvm::SmallVectorImpl<unsigned> &Ready);
-  void updateIssuedQueue(llvm::SmallVectorImpl<unsigned> &Executed);
+  void updatePendingQueue(llvm::SmallVectorImpl<InstRef> &Ready);
+  void updateIssuedQueue(llvm::SmallVectorImpl<InstRef> &Executed);
 
 public:
   Scheduler(Backend *B, const llvm::MCSchedModel &Model, unsigned LoadQueueSize,
@@ -456,18 +456,18 @@ public:
 
   void setDispatchUnit(DispatchUnit *DispUnit) { DU = DispUnit; }
 
-  /// Check if instruction at index Idx can be dispatched.
+  /// Check if the instruction in 'IR' can be dispatched.
   ///
   /// The DispatchUnit is responsible for querying the Scheduler before
   /// dispatching new instructions. Queries are performed through method
   /// `Scheduler::CanBeDispatched`. If scheduling resources are available,
   /// and the instruction can be dispatched, then this method returns true.
   /// Otherwise, a generic HWStallEvent is notified to the listeners.
-  bool canBeDispatched(unsigned Idx, const InstrDesc &Desc) const;
-  void scheduleInstruction(unsigned Idx, Instruction &MCIS);
+  bool canBeDispatched(const InstRef &IR) const;
+  void scheduleInstruction(InstRef &IR);
 
   /// Issue an instruction.
-  void issueInstruction(unsigned Index, Instruction &IS);
+  void issueInstruction(InstRef &IR);
 
   /// Reserve one entry in each buffered resource.
   void reserveBuffers(llvm::ArrayRef<uint64_t> Buffers) {

@@ -17,6 +17,7 @@
 #define LLVM_TOOLS_LLVM_MCA_INSTRUCTION_H
 
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include <memory>
 #include <set>
 #include <vector>
@@ -30,7 +31,37 @@ class ReadState;
 
 constexpr int UNKNOWN_CYCLES = -512;
 
-/// \brief A register write descriptor.
+class Instruction;
+
+/// An InstRef contains both a SourceMgr index and Instruction pair.  The index
+/// is used as a unique identifier for the instruction.  MCA will make use of
+/// this index as a key throughout MCA.
+class InstRef : public std::pair<unsigned, Instruction *> {
+public:
+  InstRef() : std::pair<unsigned, Instruction *>(0, nullptr) {}
+  InstRef(unsigned Index, Instruction *I)
+      : std::pair<unsigned, Instruction *>(Index, I) {}
+
+  unsigned getSourceIndex() const { return first; }
+  Instruction *getInstruction() { return second; }
+  const Instruction *getInstruction() const { return second; }
+
+  /// Returns true if  this InstRef has been populated.
+  bool isValid() const { return second != nullptr; }
+
+#ifndef NDEBUG
+  void print(llvm::raw_ostream &OS) const { OS << getSourceIndex(); }
+#endif
+};
+
+#ifndef NDEBUG
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const InstRef &IR) {
+  IR.print(OS);
+  return OS;
+}
+#endif
+
+/// A register write descriptor.
 struct WriteDescriptor {
   // Operand index. -1 if this is an implicit write.
   int OpIndex;
@@ -59,7 +90,7 @@ struct WriteDescriptor {
   bool IsOptionalDef;
 };
 
-/// \brief A register read descriptor.
+/// A register read descriptor.
 struct ReadDescriptor {
   // A MCOperand index. This is used by the Dispatch logic to identify register
   // reads. This field defaults to -1 if this is an implicit read.
@@ -79,7 +110,7 @@ struct ReadDescriptor {
   bool HasReadAdvanceEntries;
 };
 
-/// \brief Tracks uses of a register definition (e.g. register write).
+/// Tracks uses of a register definition (e.g. register write).
 ///
 /// Each implicit/explicit register write is associated with an instance of
 /// this class. A WriteState object tracks the dependent users of a
@@ -128,7 +159,7 @@ public:
 #endif
 };
 
-/// \brief Tracks register operand latency in cycles.
+/// Tracks register operand latency in cycles.
 ///
 /// A read may be dependent on more than one write. This occurs when some
 /// writes only partially update the register associated to this read.
@@ -160,7 +191,7 @@ public:
   void setDependentWrites(unsigned Writes) { DependentWrites = Writes; }
 };
 
-/// \brief A sequence of cycles.
+/// A sequence of cycles.
 ///
 /// This class can be used as a building block to construct ranges of cycles.
 class CycleSegment {
@@ -205,7 +236,7 @@ public:
   void setReserved() { Reserved = true; }
 };
 
-/// \brief Helper used by class InstrDesc to describe how hardware resources
+/// Helper used by class InstrDesc to describe how hardware resources
 /// are used.
 ///
 /// This class describes how many resource units of a specific resource kind
@@ -220,7 +251,7 @@ struct ResourceUsage {
   void setReserved() { CS.setReserved(); }
 };
 
-/// \brief An instruction descriptor
+/// An instruction descriptor
 struct InstrDesc {
   std::vector<WriteDescriptor> Writes; // Implicit writes are at the end.
   std::vector<ReadDescriptor> Reads;   // Implicit reads are at the end.

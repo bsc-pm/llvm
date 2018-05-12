@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief SI Implementation of TargetInstrInfo.
+/// SI Implementation of TargetInstrInfo.
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,7 +89,7 @@ static SDValue findChainOperand(SDNode *Load) {
   return LastOp;
 }
 
-/// \brief Returns true if both nodes have the same value for the given
+/// Returns true if both nodes have the same value for the given
 ///        operand \p Op, or if both nodes do not have this operand.
 static bool nodesHaveSameOperandValue(SDNode *N0, SDNode* N1, unsigned OpName) {
   unsigned Opc0 = N0->getMachineOpcode();
@@ -2865,6 +2865,22 @@ bool SIInstrInfo::verifyInstruction(const MachineInstr &MI,
     const MachineOperand *Offset = getNamedOperand(MI, AMDGPU::OpName::offset);
     if (Offset->getImm() != 0) {
       ErrInfo = "subtarget does not support offsets in flat instructions";
+      return false;
+    }
+  }
+
+  const MachineOperand *DppCt = getNamedOperand(MI, AMDGPU::OpName::dpp_ctrl);
+  if (DppCt) {
+    using namespace AMDGPU::DPP;
+
+    unsigned DC = DppCt->getImm();
+    if (DC == DppCtrl::DPP_UNUSED1 || DC == DppCtrl::DPP_UNUSED2 ||
+        DC == DppCtrl::DPP_UNUSED3 || DC > DppCtrl::DPP_LAST ||
+        (DC >= DppCtrl::DPP_UNUSED4_FIRST && DC <= DppCtrl::DPP_UNUSED4_LAST) ||
+        (DC >= DppCtrl::DPP_UNUSED5_FIRST && DC <= DppCtrl::DPP_UNUSED5_LAST) ||
+        (DC >= DppCtrl::DPP_UNUSED6_FIRST && DC <= DppCtrl::DPP_UNUSED6_LAST) ||
+        (DC >= DppCtrl::DPP_UNUSED7_FIRST && DC <= DppCtrl::DPP_UNUSED7_LAST)) {
+      ErrInfo = "Invalid dpp_ctrl value";
       return false;
     }
   }

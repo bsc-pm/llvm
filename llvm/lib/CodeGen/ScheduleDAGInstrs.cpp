@@ -267,7 +267,7 @@ void ScheduleDAGInstrs::addPhysRegDataDeps(SUnit *SU, unsigned OperIdx) {
   }
 }
 
-/// \brief Adds register dependencies (data, anti, and output) from this SUnit
+/// Adds register dependencies (data, anti, and output) from this SUnit
 /// to following instructions in the same scheduling region that depend the
 /// physical register referenced at OperIdx.
 void ScheduleDAGInstrs::addPhysRegDeps(SUnit *SU, unsigned OperIdx) {
@@ -469,7 +469,7 @@ void ScheduleDAGInstrs::addVRegDefDeps(SUnit *SU, unsigned OperIdx) {
     CurrentVRegDefs.insert(VReg2SUnit(Reg, LaneMask, SU));
 }
 
-/// \brief Adds a register data dependency if the instruction that defines the
+/// Adds a register data dependency if the instruction that defines the
 /// virtual register used at OperIdx is mapped to an SUnit. Add a register
 /// antidependency from this SUnit to instructions that occur later in the same
 /// scheduling region if they write the virtual register.
@@ -515,7 +515,7 @@ void ScheduleDAGInstrs::addChainDependency (SUnit *SUa, SUnit *SUb,
   }
 }
 
-/// \brief Creates an SUnit for each real instruction, numbered in top-down
+/// Creates an SUnit for each real instruction, numbered in top-down
 /// topological order. The instruction order A < B, implies that no edge exists
 /// from B to A.
 ///
@@ -533,7 +533,7 @@ void ScheduleDAGInstrs::initSUnits() {
   SUnits.reserve(NumRegionInstrs);
 
   for (MachineInstr &MI : make_range(RegionBegin, RegionEnd)) {
-    if (MI.isDebugValue())
+    if (MI.isDebugInstr())
       continue;
 
     SUnit *SU = newSUnit(&MI);
@@ -764,6 +764,9 @@ void ScheduleDAGInstrs::buildSchedGraph(AliasAnalysis *AA,
       DbgMI = &MI;
       continue;
     }
+    if (MI.isDebugLabel())
+      continue;
+
     SUnit *SU = MISUnitMap[&MI];
     assert(SU && "No SUnit mapped to this MI");
 
@@ -1052,7 +1055,7 @@ void ScheduleDAGInstrs::fixupKills(MachineBasicBlock &MBB) {
 
   // Examine block from end to start...
   for (MachineInstr &MI : make_range(MBB.rbegin(), MBB.rend())) {
-    if (MI.isDebugValue())
+    if (MI.isDebugInstr())
       continue;
 
     // Update liveness.  Registers that are defed but not used in this
@@ -1088,7 +1091,7 @@ void ScheduleDAGInstrs::fixupKills(MachineBasicBlock &MBB) {
       while (I->isBundledWithSucc())
         ++I;
       do {
-        if (!I->isDebugValue())
+        if (!I->isDebugInstr())
           toggleKills(MRI, LiveRegs, *I, true);
         --I;
       } while(I != First);
@@ -1213,7 +1216,7 @@ public:
     RootSet[SU->NodeNum] = RData;
   }
 
-  /// \brief Called once for each tree edge after calling visitPostOrderNode on
+  /// Called once for each tree edge after calling visitPostOrderNode on
   /// the predecessor. Increment the parent node's instruction count and
   /// preemptively join this subtree to its parent's if it is small enough.
   void visitPostorderEdge(const SDep &PredDep, const SUnit *Succ) {

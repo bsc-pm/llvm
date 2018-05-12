@@ -197,7 +197,7 @@ defaultListDAGScheduler("default", "Best scheduler for the target",
 namespace llvm {
 
   //===--------------------------------------------------------------------===//
-  /// \brief This class is used by SelectionDAGISel to temporarily override
+  /// This class is used by SelectionDAGISel to temporarily override
   /// the optimization level on a per-function basis.
   class OptLevelChanger {
     SelectionDAGISel &IS;
@@ -1369,7 +1369,7 @@ static void propagateSwiftErrorVRegs(FunctionLoweringInfo *FuncInfo) {
       }
 
       auto DLoc = isa<Instruction>(SwiftErrorVal)
-                      ? dyn_cast<Instruction>(SwiftErrorVal)->getDebugLoc()
+                      ? cast<Instruction>(SwiftErrorVal)->getDebugLoc()
                       : DebugLoc();
       const auto *TII = FuncInfo->MF->getSubtarget().getInstrInfo();
 
@@ -2835,7 +2835,7 @@ struct MatchScope {
   bool HasChainNodesMatched;
 };
 
-/// \\brief A DAG update listener to keep the matching state
+/// \A DAG update listener to keep the matching state
 /// (i.e. RecordedNodes and MatchScope) uptodate if the target is allowed to
 /// change the DAG while matching.  X86 addressing mode matcher is an example
 /// for this.

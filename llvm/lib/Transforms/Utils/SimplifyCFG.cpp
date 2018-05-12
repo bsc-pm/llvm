@@ -688,9 +688,7 @@ Value *SimplifyCFGOpt::isValueEqualityComparison(TerminatorInst *TI) {
   if (SwitchInst *SI = dyn_cast<SwitchInst>(TI)) {
     // Do not permit merging of large switch instructions into their
     // predecessors unless there is only one predecessor.
-    if (SI->getNumSuccessors() * std::distance(pred_begin(SI->getParent()),
-                                               pred_end(SI->getParent())) <=
-        128)
+    if (SI->getNumSuccessors() * pred_size(SI->getParent()) <= 128)
       CV = SI->getCondition();
   } else if (BranchInst *BI = dyn_cast<BranchInst>(TI))
     if (BI->isConditional() && BI->getCondition()->hasOneUse())
@@ -1824,7 +1822,7 @@ static bool SinkCommonCodeFromPredecessors(BasicBlock *BB) {
   return Changed;
 }
 
-/// \brief Determine if we can hoist sink a sole store instruction out of a
+/// Determine if we can hoist sink a sole store instruction out of a
 /// conditional block.
 ///
 /// We are looking for code like the following:
@@ -1885,7 +1883,7 @@ static Value *isSafeToSpeculateStore(Instruction *I, BasicBlock *BrBB,
   return nullptr;
 }
 
-/// \brief Speculate a conditional basic block flattening the CFG.
+/// Speculate a conditional basic block flattening the CFG.
 ///
 /// Note that this is a very risky transform currently. Speculating
 /// instructions like this is most often not desirable. Instead, there is an MI
@@ -2871,7 +2869,7 @@ static Value *ensureValueAvailableInSuccessor(Value *V, BasicBlock *BB,
       if (!AlternativeV)
         break;
 
-      assert(std::distance(pred_begin(Succ), pred_end(Succ)) == 2);
+      assert(pred_size(Succ) == 2);
       auto PredI = pred_begin(Succ);
       BasicBlock *OtherPredBB = *PredI == BB ? *++PredI : *PredI;
       if (PHI->getIncomingValueForBlock(OtherPredBB) == AlternativeV)
@@ -3896,6 +3894,7 @@ static bool removeEmptyCleanup(CleanupReturnInst *RI) {
     switch (IntrinsicID) {
     case Intrinsic::dbg_declare:
     case Intrinsic::dbg_value:
+    case Intrinsic::dbg_label:
     case Intrinsic::lifetime_end:
       break;
     default:
@@ -5415,8 +5414,7 @@ static bool SwitchToLookupTable(SwitchInst *SI, IRBuilder<> &Builder,
   }
 
   bool ReturnedEarly = false;
-  for (size_t I = 0, E = PHIs.size(); I != E; ++I) {
-    PHINode *PHI = PHIs[I];
+  for (PHINode *PHI : PHIs) {
     const ResultListTy &ResultList = ResultLists[PHI];
 
     // If using a bitmask, use any value to fill the lookup table holes.
@@ -5752,7 +5750,7 @@ bool SimplifyCFGOpt::SimplifyUncondBranch(BranchInst *BI,
   // backedge, so we can eliminate BB.
   bool NeedCanonicalLoop =
       Options.NeedCanonicalLoop &&
-      (LoopHeaders && std::distance(pred_begin(BB), pred_end(BB)) > 1 &&
+      (LoopHeaders && pred_size(BB) > 1 &&
        (LoopHeaders->count(BB) || LoopHeaders->count(Succ)));
   BasicBlock::iterator I = BB->getFirstNonPHIOrDbg()->getIterator();
   if (I->isTerminator() && BB != &BB->getParent()->getEntryBlock() &&

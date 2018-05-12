@@ -155,11 +155,8 @@ bool LowerSwitch::runOnFunction(Function &F) {
 }
 
 /// Used for debugging purposes.
-static raw_ostream& operator<<(raw_ostream &O,
-                               const LowerSwitch::CaseVector &C)
-    LLVM_ATTRIBUTE_USED;
-
-static raw_ostream& operator<<(raw_ostream &O,
+LLVM_ATTRIBUTE_USED
+static raw_ostream &operator<<(raw_ostream &O,
                                const LowerSwitch::CaseVector &C) {
   O << "[";
 
@@ -172,7 +169,7 @@ static raw_ostream& operator<<(raw_ostream &O,
   return O << "]";
 }
 
-/// \brief Update the first occurrence of the "switch statement" BB in the PHI
+/// Update the first occurrence of the "switch statement" BB in the PHI
 /// node with the "new" BB. The other occurrences will:
 ///
 /// 1) Be updated by subsequent calls to this function.  Switch statements may

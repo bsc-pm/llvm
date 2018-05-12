@@ -286,11 +286,12 @@ phases::ID Driver::getFinalPhase(const DerivedArgList &DAL,
 }
 
 static Arg *MakeInputArg(DerivedArgList &Args, OptTable &Opts,
-                         StringRef Value) {
+                         StringRef Value, bool Claim = true) {
   Arg *A = new Arg(Opts.getOption(options::OPT_INPUT), Value,
                    Args.getBaseArgs().MakeIndex(Value), Value.data());
   Args.AddSynthesizedArg(A);
-  A->claim();
+  if (Claim)
+    A->claim();
   return A;
 }
 
@@ -358,7 +359,7 @@ DerivedArgList *Driver::TranslateInputArgs(const InputArgList &Args) const {
     if (A->getOption().matches(options::OPT__DASH_DASH)) {
       A->claim();
       for (StringRef Val : A->getValues())
-        DAL->append(MakeInputArg(*DAL, *Opts, Val));
+        DAL->append(MakeInputArg(*DAL, *Opts, Val, false));
       continue;
     }
 
@@ -383,7 +384,7 @@ DerivedArgList *Driver::TranslateInputArgs(const InputArgList &Args) const {
   return DAL;
 }
 
-/// \brief Compute target triple from args.
+/// Compute target triple from args.
 ///
 /// This routine provides the logic to compute a target triple from various
 /// args passed to the driver and the default triple string.
@@ -482,7 +483,7 @@ static llvm::Triple computeTargetTriple(const Driver &D,
   return Target;
 }
 
-// \brief Parse the LTO options and record the type of LTO compilation
+// Parse the LTO options and record the type of LTO compilation
 // based on which -f(no-)?lto(=.*)? option occurs last.
 void Driver::setLTOMode(const llvm::opt::ArgList &Args) {
   LTOMode = LTOK_None;
@@ -538,24 +539,46 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
                                               InputList &Inputs) {
 
   //
-  // CUDA
+  // CUDA/HIP
   //
-  // We need to generate a CUDA toolchain if any of the inputs has a CUDA type.
-  if (llvm::any_of(Inputs, [](std::pair<types::ID, const llvm::opt::Arg *> &I) {
+  // We need to generate a CUDA toolchain if any of the inputs has a CUDA
+  // or HIP type. However, mixed CUDA/HIP compilation is not supported.
+  bool IsCuda =
+      llvm::any_of(Inputs, [](std::pair<types::ID, const llvm::opt::Arg *> &I) {
         return types::isCuda(I.first);
-      })) {
+      });
+  bool IsHIP =
+      llvm::any_of(Inputs,
+                   [](std::pair<types::ID, const llvm::opt::Arg *> &I) {
+                     return types::isHIP(I.first);
+                   }) ||
+      C.getInputArgs().hasArg(options::OPT_hip_link);
+  if (IsCuda && IsHIP) {
+    Diag(clang::diag::err_drv_mix_cuda_hip);
+    return;
+  }
+  if (IsCuda || IsHIP) {
     const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
     const llvm::Triple &HostTriple = HostTC->getTriple();
-    llvm::Triple CudaTriple(HostTriple.isArch64Bit() ? "nvptx64-nvidia-cuda"
-                                                     : "nvptx-nvidia-cuda");
-    // Use the CUDA and host triples as the key into the ToolChains map, because
-    // the device toolchain we create depends on both.
+    StringRef DeviceTripleStr;
+    auto OFK = IsHIP ? Action::OFK_HIP : Action::OFK_Cuda;
+    if (IsHIP) {
+      // HIP is only supported on amdgcn.
+      DeviceTripleStr = "amdgcn-amd-amdhsa";
+    } else {
+      // CUDA is only supported on nvptx.
+      DeviceTripleStr = HostTriple.isArch64Bit() ? "nvptx64-nvidia-cuda"
+                                                 : "nvptx-nvidia-cuda";
+    }
+    llvm::Triple CudaTriple(DeviceTripleStr);
+    // Use the CUDA/HIP and host triples as the key into the ToolChains map,
+    // because the device toolchain we create depends on both.
     auto &CudaTC = ToolChains[CudaTriple.str() + "/" + HostTriple.str()];
     if (!CudaTC) {
       CudaTC = llvm::make_unique<toolchains::CudaToolChain>(
-          *this, CudaTriple, *HostTC, C.getInputArgs(), Action::OFK_Cuda);
+          *this, CudaTriple, *HostTC, C.getInputArgs(), OFK);
     }
-    C.addOffloadDeviceToolChain(CudaTC.get(), Action::OFK_Cuda);
+    C.addOffloadDeviceToolChain(CudaTC.get(), OFK);
   }
 
   //
@@ -1595,7 +1618,13 @@ bool Driver::HandleImmediateArgs(const Compilation &C) {
   }
 
   if (Arg *A = C.getArgs().getLastArg(options::OPT_print_prog_name_EQ)) {
-    llvm::outs() << GetProgramPath(A->getValue(), TC) << "\n";
+    StringRef ProgName = A->getValue();
+
+    // Null program name cannot have a path.
+    if (! ProgName.empty())
+      llvm::outs() << GetProgramPath(ProgName, TC);
+
+    llvm::outs() << "\n";
     return false;
   }
 
@@ -1727,7 +1756,7 @@ void Driver::PrintActions(const Compilation &C) const {
     PrintActions1(C, A, Ids);
 }
 
-/// \brief Check whether the given input tree contains any compilation or
+/// Check whether the given input tree contains any compilation or
 /// assembly actions.
 static bool ContainsCompileOrAssembleAction(const Action *A) {
   if (isa<CompileJobAction>(A) || isa<BackendJobAction>(A) ||
@@ -1828,7 +1857,7 @@ void Driver::BuildUniversalActions(Compilation &C, const ToolChain &TC,
   }
 }
 
-/// \brief Check that the file referenced by Value exists. If it doesn't,
+/// Check that the file referenced by Value exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool DiagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
                                    StringRef Value, types::ID Ty) {
@@ -2123,7 +2152,7 @@ class OffloadingActionBuilder final {
     }
   };
 
-  /// \brief CUDA action builder. It injects device code in the host backend
+  /// CUDA action builder. It injects device code in the host backend
   /// action.
   class CudaActionBuilder final : public DeviceActionBuilder {
     /// Flags to signal if the user requested host-only or device-only
@@ -2332,11 +2361,13 @@ class OffloadingActionBuilder final {
 
       const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
       assert(HostTC && "No toolchain for host compilation.");
-      if (HostTC->getTriple().isNVPTX()) {
-        // We do not support targeting NVPTX for host compilation. Throw
+      if (HostTC->getTriple().isNVPTX() ||
+          HostTC->getTriple().getArch() == llvm::Triple::amdgcn) {
+        // We do not support targeting NVPTX/AMDGCN for host compilation. Throw
         // an error and abort pipeline construction early so we don't trip
         // asserts that assume device-side compilation.
-        C.getDriver().Diag(diag::err_drv_cuda_nvptx_host);
+        C.getDriver().Diag(diag::err_drv_cuda_host_arch)
+            << HostTC->getTriple().getArchName();
         return true;
       }
 
@@ -2901,6 +2932,9 @@ void Driver::BuildActions(Compilation &C, DerivedArgList &Args,
     // this compilation, warn the user about it.
     phases::ID InitialPhase = PL[0];
     if (InitialPhase > FinalPhase) {
+      if (InputArg->isClaimed())
+        continue;
+
       // Claim here to avoid the more general unused warning.
       InputArg->claim();
 
@@ -3727,9 +3761,12 @@ InputInfo Driver::BuildJobsForActionNoCache(
           UI.DependentToolChain->getTriple().normalize(),
           /*CreatePrefixForHost=*/true);
       auto CurI = InputInfo(
-          UA, GetNamedOutputPath(C, *UA, BaseInput, UI.DependentBoundArch,
-                                 /*AtTopLevel=*/false, MultipleArchs,
-                                 OffloadingPrefix),
+          UA,
+          GetNamedOutputPath(C, *UA, BaseInput, UI.DependentBoundArch,
+                             /*AtTopLevel=*/false,
+                             MultipleArchs ||
+                                 UI.DependentOffloadKind == Action::OFK_HIP,
+                             OffloadingPrefix),
           BaseInput);
       // Save the unbundling result.
       UnbundlingResults.push_back(CurI);
@@ -3802,7 +3839,7 @@ const char *Driver::getDefaultImageName() const {
   return Target.isOSWindows() ? "a.exe" : "a.out";
 }
 
-/// \brief Create output filename based on ArgValue, which could either be a
+/// Create output filename based on ArgValue, which could either be a
 /// full filename, filename without extension, or a directory. If ArgValue
 /// does not provide a filename, then use BaseName, and use the extension
 /// suitable for FileType.

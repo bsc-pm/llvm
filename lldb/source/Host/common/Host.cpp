@@ -463,15 +463,17 @@ MonitorShellCommand(std::shared_ptr<ShellInfo> shell_info, lldb::pid_t pid,
 Status Host::RunShellCommand(const char *command, const FileSpec &working_dir,
                              int *status_ptr, int *signo_ptr,
                              std::string *command_output_ptr,
-                             uint32_t timeout_sec, bool run_in_default_shell) {
+                             const Timeout<std::micro> &timeout,
+                             bool run_in_default_shell) {
   return RunShellCommand(Args(command), working_dir, status_ptr, signo_ptr,
-                         command_output_ptr, timeout_sec, run_in_default_shell);
+                         command_output_ptr, timeout, run_in_default_shell);
 }
 
 Status Host::RunShellCommand(const Args &args, const FileSpec &working_dir,
                              int *status_ptr, int *signo_ptr,
                              std::string *command_output_ptr,
-                             uint32_t timeout_sec, bool run_in_default_shell) {
+                             const Timeout<std::micro> &timeout,
+                             bool run_in_default_shell) {
   Status error;
   ProcessLaunchInfo launch_info;
   launch_info.SetArchitecture(HostInfo::GetArchitecture());
@@ -536,18 +538,14 @@ Status Host::RunShellCommand(const Args &args, const FileSpec &working_dir,
     error.SetErrorString("failed to get process ID");
 
   if (error.Success()) {
-    bool timed_out = false;
-    shell_info_sp->process_reaped.WaitForValueEqualTo(
-        true, std::chrono::seconds(timeout_sec), &timed_out);
-    if (timed_out) {
+    if (!shell_info_sp->process_reaped.WaitForValueEqualTo(true, timeout)) {
       error.SetErrorString("timed out waiting for shell command to complete");
 
       // Kill the process since it didn't complete within the timeout specified
       Kill(pid, SIGKILL);
       // Wait for the monitor callback to get the message
-      timed_out = false;
       shell_info_sp->process_reaped.WaitForValueEqualTo(
-          true, std::chrono::seconds(1), &timed_out);
+          true, std::chrono::seconds(1));
     } else {
       if (status_ptr)
         *status_ptr = shell_info_sp->status;

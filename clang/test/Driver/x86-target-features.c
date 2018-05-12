@@ -149,3 +149,23 @@
 // RUN: %clang -target i386-linux-gnu -mno-waitpkg %s -### -o %t.o 2>&1 | FileCheck -check-prefix=NO-WAITPKG %s
 // WAITPKG: "-target-feature" "+waitpkg"
 // NO-WAITPKG: "-target-feature" "-waitpkg"
+
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mmovdiri %s -### -o %t.o 2>&1 | FileCheck -check-prefix=MOVDIRI %s
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mno-movdiri %s -### -o %t.o 2>&1 | FileCheck -check-prefix=NO-MOVDIRI %s
+// MOVDIRI: "-target-feature" "+movdiri"
+// NO-MOVDIRI: "-target-feature" "-movdiri"
+
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mmovdir64b %s -### -o %t.o 2>&1 | FileCheck -check-prefix=MOVDIR64B %s
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mno-movdir64b %s -### -o %t.o 2>&1 | FileCheck -check-prefix=NO-MOVDIR64B %s
+// MOVDIR64B: "-target-feature" "+movdir64b"
+// NO-MOVDIR64B: "-target-feature" "-movdir64b"
+
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mpconfig %s -### -o %t.o 2>&1 | FileCheck -check-prefix=PCONFIG %s
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mno-pconfig %s -### -o %t.o 2>&1 | FileCheck -check-prefix=NO-PCONFIG %s
+// PCONFIG: "-target-feature" "+pconfig"
+// NO-PCONFIG: "-target-feature" "-pconfig"
+
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mptwrite %s -### -o %t.o 2>&1 | FileCheck -check-prefix=PTWRITE %s
+// RUN: %clang -target i386-unknown-linux-gnu -march=i386 -mno-ptwrite %s -### -o %t.o 2>&1 | FileCheck -check-prefix=NO-PTWRITE %s
+// PTWRITE: "-target-feature" "+ptwrite"
+// NO-PTWRITE: "-target-feature" "-ptwrite"

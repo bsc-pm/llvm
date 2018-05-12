@@ -1205,7 +1205,7 @@ vzeroupper
 # CHECK-NEXT:  1      1     1.00                    	vinsertps	$1, %xmm0, %xmm1, %xmm2
 # CHECK-NEXT:  2      7     1.00    *               	vinsertps	$1, (%rax), %xmm1, %xmm2
 # CHECK-NEXT:  1      6     0.50    *               	vlddqu	(%rax), %xmm2
-# CHECK-NEXT:  1      6     0.50    *               	vlddqu	(%rax), %ymm2
+# CHECK-NEXT:  1      7     0.50    *               	vlddqu	(%rax), %ymm2
 # CHECK-NEXT:  4      5     1.00    *      *      * 	vldmxcsr	(%rax)
 # CHECK-NEXT:  1      1     1.00    *      *      * 	vmaskmovdqu	%xmm0, %xmm1
 # CHECK-NEXT:  3      8     1.00    *               	vmaskmovpd	(%rax), %xmm0, %xmm2
@@ -1289,7 +1289,7 @@ vzeroupper
 # CHECK-NEXT:  1      1     1.00           *        	vmovntdq	%xmm0, (%rax)
 # CHECK-NEXT:  1      1     1.00           *        	vmovntdq	%ymm0, (%rax)
 # CHECK-NEXT:  1      6     0.50    *               	vmovntdqa	(%rax), %xmm2
-# CHECK-NEXT:  1      6     0.50    *               	vmovntdqa	(%rax), %ymm2
+# CHECK-NEXT:  1      7     0.50    *               	vmovntdqa	(%rax), %ymm2
 # CHECK-NEXT:  1      1     1.00           *        	vmovntpd	%xmm0, (%rax)
 # CHECK-NEXT:  1      1     1.00           *        	vmovntpd	%ymm0, (%rax)
 # CHECK-NEXT:  1      1     1.00           *        	vmovntps	%xmm0, (%rax)
@@ -1430,7 +1430,7 @@ vzeroupper
 # CHECK-NEXT:  2      3     1.00                    	vpextrb	$1, %xmm0, %ecx
 # CHECK-NEXT:  3      5     1.00           *        	vpextrb	$1, %xmm0, (%rax)
 # CHECK-NEXT:  2      3     1.00                    	vpextrd	$1, %xmm0, %ecx
-# CHECK-NEXT:  3      5     1.00           *        	vpextrd	$1, %xmm0, (%rax)
+# CHECK-NEXT:  4      5     1.00           *        	vpextrd	$1, %xmm0, (%rax)
 # CHECK-NEXT:  2      3     1.00                    	vpextrq	$1, %xmm0, %rcx
 # CHECK-NEXT:  4      5     1.00           *        	vpextrq	$1, %xmm0, (%rax)
 # CHECK-NEXT:  2      3     1.00                    	vpextrw	$1, %xmm0, %ecx
@@ -1714,7 +1714,7 @@ vzeroupper
 
 # CHECK:      Resource pressure per iteration:
 # CHECK-NEXT: [0]    [1]    [2]    [3]    [4]    [5]    [6.0]  [6.1]
-# CHECK-NEXT:  -     572.00 224.50 307.00 39.00  354.50 177.50 177.50
+# CHECK-NEXT:  -     572.00 225.50 307.00 39.00  354.50 177.50 177.50
 
 # CHECK:      Resource pressure by instruction:
 # CHECK-NEXT: [0]    [1]    [2]    [3]    [4]    [5]    [6.0]  [6.1]  	Instructions:
@@ -2130,7 +2130,7 @@ vzeroupper
 # CHECK-NEXT:  -      -     1.00   0.50    -     0.50    -      -     	vpextrb	$1, %xmm0, %ecx
 # CHECK-NEXT:  -      -      -     0.50   1.00   0.50   0.50   0.50   	vpextrb	$1, %xmm0, (%rax)
 # CHECK-NEXT:  -      -     1.00   0.50    -     0.50    -      -     	vpextrd	$1, %xmm0, %ecx
-# CHECK-NEXT:  -      -      -     0.50   1.00   0.50   0.50   0.50   	vpextrd	$1, %xmm0, (%rax)
+# CHECK-NEXT:  -      -     1.00   0.50   1.00   0.50   0.50   0.50   	vpextrd	$1, %xmm0, (%rax)
 # CHECK-NEXT:  -      -     1.00   0.50    -     0.50    -      -     	vpextrq	$1, %xmm0, %rcx
 # CHECK-NEXT:  -      -     1.00   0.50   1.00   0.50   0.50   0.50   	vpextrq	$1, %xmm0, (%rax)
 # CHECK-NEXT:  -      -     1.00   0.50    -     0.50    -      -     	vpextrw	$1, %xmm0, %ecx

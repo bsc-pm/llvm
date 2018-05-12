@@ -847,7 +847,7 @@ private:
   void visitInvoke(const InvokeInst &I);
   void visitResume(const ResumeInst &I);
 
-  void visitBinary(const User &I, unsigned OpCode);
+  void visitBinary(const User &I, unsigned Opcode);
   void visitShift(const User &I, unsigned Opcode);
   void visitAdd(const User &I)  { visitBinary(I, ISD::ADD); }
   void visitFAdd(const User &I) { visitBinary(I, ISD::FADD); }
@@ -1048,6 +1048,14 @@ struct RegsForValue {
   void AddInlineAsmOperands(unsigned Kind, bool HasMatching,
                             unsigned MatchingIdx, const SDLoc &dl,
                             SelectionDAG &DAG, std::vector<SDValue> &Ops) const;
+
+  /// Check if the total RegCount is greater than one.
+  bool occupiesMultipleRegs() const {
+    return std::accumulate(RegCount.begin(), RegCount.end(), 0) > 1;
+  }
+
+  /// Return a list of registers and their sizes.
+  SmallVector<std::pair<unsigned, unsigned>, 4> getRegsAndSizes() const;
 };
 
 } // end namespace llvm
