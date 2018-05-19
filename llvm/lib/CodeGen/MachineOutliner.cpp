@@ -210,17 +210,22 @@ public:
     return getOccurrenceCount();
   }
 
-  /// Return the number of instructions it would take to outline this
+  /// Return the number of bytes it would take to outline this
   /// function.
   unsigned getOutliningCost() {
-    return (OccurrenceCount * MInfo.CallOverhead) + Sequence.size() +
+    return (OccurrenceCount * MInfo.CallOverhead) + MInfo.SequenceSize +
            MInfo.FrameOverhead;
+  }
+
+  /// Return the size in bytes of the unoutlined sequences.
+  unsigned getNotOutlinedCost() {
+    return OccurrenceCount * MInfo.SequenceSize;
   }
 
   /// Return the number of instructions that would be saved by outlining
   /// this function.
   unsigned getBenefit() {
-    unsigned NotOutlinedCost = OccurrenceCount * Sequence.size();
+    unsigned NotOutlinedCost = getNotOutlinedCost();
     unsigned OutlinedCost = getOutliningCost();
     return (NotOutlinedCost < OutlinedCost) ? 0
                                             : NotOutlinedCost - OutlinedCost;
@@ -1054,10 +1059,10 @@ unsigned MachineOutliner::findCandidates(
         R << "Did not outline " << NV("Length", StringLen) << " instructions"
           << " from " << NV("NumOccurrences", RepeatedSequenceLocs.size())
           << " locations."
-          << " Instructions from outlining all occurrences ("
+          << " Bytes from outlining all occurrences ("
           << NV("OutliningCost", OF.getOutliningCost()) << ")"
-          << " >= Unoutlined instruction count ("
-          << NV("NotOutliningCost", StringLen * OF.getOccurrenceCount()) << ")"
+          << " >= Unoutlined instruction bytes ("
+          << NV("NotOutliningCost", OF.getNotOutlinedCost()) << ")"
           << " (Also found at: ";
 
         // Tell the user the other places the candidate was found.
@@ -1112,11 +1117,11 @@ void MachineOutliner::prune(Candidate &C,
   // Remove C from the CandidateList.
   C.InCandidateList = false;
 
-  DEBUG(dbgs() << "- Removed a Candidate \n";
-        dbgs() << "--- Num fns left for candidate: " << F.getOccurrenceCount()
-               << "\n";
-        dbgs() << "--- Candidate's functions's benefit: " << F.getBenefit()
-               << "\n";);
+  LLVM_DEBUG(dbgs() << "- Removed a Candidate \n";
+             dbgs() << "--- Num fns left for candidate: "
+                    << F.getOccurrenceCount() << "\n";
+             dbgs() << "--- Candidate's functions's benefit: " << F.getBenefit()
+                    << "\n";);
 }
 
 void MachineOutliner::pruneOverlaps(
@@ -1253,6 +1258,14 @@ MachineOutliner::createOutlinedFunction(Module &M, const OutlinedFunction &OF,
   F->setLinkage(GlobalValue::InternalLinkage);
   F->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
 
+  // FIXME: Set nounwind, so we don't generate eh_frame? Haven't verified it's
+  // necessary.
+
+  // Set optsize/minsize, so we don't insert padding between outlined
+  // functions.
+  F->addFnAttr(Attribute::OptimizeForSize);
+  F->addFnAttr(Attribute::MinSize);
+
   // Save F so that we can add debug info later if we need to.
   CreatedIRFunctions.push_back(F);
 
@@ -1370,7 +1383,7 @@ bool MachineOutliner::outline(
       MachineOptimizationRemark R(DEBUG_TYPE, "OutlinedFunction",
                                   MBB->findDebugLoc(MBB->begin()), MBB);
       R << "Saved " << NV("OutliningBenefit", OF.getBenefit())
-        << " instructions by "
+        << " bytes by "
         << "outlining " << NV("Length", OF.Sequence.size()) << " instructions "
         << "from " << NV("NumOccurrences", OF.getOccurrenceCount())
         << " locations. "
@@ -1441,7 +1454,7 @@ bool MachineOutliner::outline(
     NumOutlined++;
   }
 
-  DEBUG(dbgs() << "OutlinedSomething = " << OutlinedSomething << "\n";);
+  LLVM_DEBUG(dbgs() << "OutlinedSomething = " << OutlinedSomething << "\n";);
 
   return OutlinedSomething;
 }
@@ -1461,8 +1474,9 @@ bool MachineOutliner::runOnModule(Module &M) {
   // Does the target implement the MachineOutliner? If it doesn't, quit here.
   if (!TII->useMachineOutliner()) {
     // No. So we're done.
-    DEBUG(dbgs()
-          << "Skipping pass: Target does not support the MachineOutliner.\n");
+    LLVM_DEBUG(
+        dbgs()
+        << "Skipping pass: Target does not support the MachineOutliner.\n");
     return false;
   }
 

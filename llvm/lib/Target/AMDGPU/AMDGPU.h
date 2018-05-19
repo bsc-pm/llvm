@@ -73,6 +73,10 @@ ModulePass *createAMDGPULowerIntrinsicsPass();
 void initializeAMDGPULowerIntrinsicsPass(PassRegistry &);
 extern char &AMDGPULowerIntrinsicsID;
 
+ModulePass *createAMDGPULowerKernelAttributesPass();
+void initializeAMDGPULowerKernelAttributesPass(PassRegistry &);
+extern char &AMDGPULowerKernelAttributesID;
+
 void initializeAMDGPURewriteOutArgumentsPass(PassRegistry &);
 extern char &AMDGPURewriteOutArgumentsID;
 
@@ -143,7 +147,7 @@ FunctionPass *createAMDGPUISelDag(
   TargetMachine *TM = nullptr,
   CodeGenOpt::Level OptLevel = CodeGenOpt::Default);
 ModulePass *createAMDGPUAlwaysInlinePass(bool GlobalOpt = true);
-ModulePass *createAMDGPUOpenCLImageTypeLoweringPass();
+ModulePass *createR600OpenCLImageTypeLoweringPass();
 FunctionPass *createAMDGPUAnnotateUniformValues();
 
 ModulePass* createAMDGPUUnifyMetadataPass();

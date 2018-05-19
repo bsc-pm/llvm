@@ -35,6 +35,23 @@
 using namespace llvm;
 using namespace object;
 
+void WasmSymbol::print(raw_ostream &Out) const {
+  Out << "Name=" << Info.Name
+  << ", Kind=" << toString(wasm::WasmSymbolType(Info.Kind))
+  << ", Flags=" << Info.Flags;
+  if (!isTypeData()) {
+    Out << ", ElemIndex=" << Info.ElementIndex;
+  } else if (isDefined()) {
+    Out << ", Segment=" << Info.DataRef.Segment;
+    Out << ", Offset=" << Info.DataRef.Offset;
+    Out << ", Size=" << Info.DataRef.Size;
+  }
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void WasmSymbol::dump() const { print(dbgs()); }
+#endif
+
 Expected<std::unique_ptr<WasmObjectFile>>
 ObjectFile::createWasmObjectFile(MemoryBufferRef Buffer) {
   Error Err = Error::success();
@@ -95,19 +112,22 @@ static int64_t readLEB128(const uint8_t *&Ptr) {
 
 static uint8_t readVaruint1(const uint8_t *&Ptr) {
   int64_t result = readLEB128(Ptr);
-  assert(result <= VARUINT1_MAX && result >= 0);
+  if (result > VARUINT1_MAX || result < 0)
+    report_fatal_error("LEB is outside Varuint1 range");
   return result;
 }
 
 static int32_t readVarint32(const uint8_t *&Ptr) {
   int64_t result = readLEB128(Ptr);
-  assert(result <= INT32_MAX && result >= INT32_MIN);
+  if (result > INT32_MAX || result < INT32_MIN)
+    report_fatal_error("LEB is outside Varint32 range");
   return result;
 }
 
 static uint32_t readVaruint32(const uint8_t *&Ptr) {
   uint64_t result = readULEB128(Ptr);
-  assert(result <= UINT32_MAX);
+  if (result > UINT32_MAX)
+    report_fatal_error("LEB is outside Varuint32 range");
   return result;
 }
 
@@ -492,7 +512,7 @@ Error WasmObjectFile::parseLinkingSectionSymtab(const uint8_t *&Ptr,
     LinkingData.SymbolTable.emplace_back(Info);
     Symbols.emplace_back(LinkingData.SymbolTable.back(), FunctionType,
                          GlobalType);
-    DEBUG(dbgs() << "Adding symbol: " << Symbols.back() << "\n");
+    LLVM_DEBUG(dbgs() << "Adding symbol: " << Symbols.back() << "\n");
   }
 
   return Error::success();
@@ -875,6 +895,7 @@ Error WasmObjectFile::parseCodeSection(const uint8_t *Ptr, const uint8_t *End) {
     uint32_t Size = readVaruint32(Ptr);
     const uint8_t *FunctionEnd = Ptr + Size;
 
+    Function.CodeOffset = Ptr - FunctionStart;
     Function.Index = NumImportedFunctions + Functions.size();
     Function.CodeSectionOffset = FunctionStart - CodeSectionStart;
     Function.Size = FunctionEnd - FunctionStart;
@@ -937,6 +958,9 @@ Error WasmObjectFile::parseDataSection(const uint8_t *Ptr, const uint8_t *End) {
     if (Error Err = readInitExpr(Segment.Data.Offset, Ptr))
       return Err;
     uint32_t Size = readVaruint32(Ptr);
+    if (Size > End - Ptr)
+      return make_error<GenericBinaryError>("Invalid segment size",
+                                            object_error::parse_failed);
     Segment.Data.Content = ArrayRef<uint8_t>(Ptr, Size);
     // The rest of these Data fields are set later, when reading in the linking
     // metadata section.
@@ -967,7 +991,7 @@ uint32_t WasmObjectFile::getSymbolFlags(DataRefImpl Symb) const {
   uint32_t Result = SymbolRef::SF_None;
   const WasmSymbol &Sym = getWasmSymbol(Symb);
 
-  DEBUG(dbgs() << "getSymbolFlags: ptr=" << &Sym << " " << Sym << "\n");
+  LLVM_DEBUG(dbgs() << "getSymbolFlags: ptr=" << &Sym << " " << Sym << "\n");
   if (Sym.isBindingWeak())
     Result |= SymbolRef::SF_Weak;
   if (!Sym.isBindingLocal())

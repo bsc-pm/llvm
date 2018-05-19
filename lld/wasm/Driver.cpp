@@ -98,11 +98,13 @@ static const opt::OptTable::Info OptInfo[] = {
 #undef OPTION
 };
 
+namespace {
 class WasmOptTable : public llvm::opt::OptTable {
 public:
   WasmOptTable() : OptTable(OptInfo) {}
   opt::InputArgList parse(ArrayRef<const char *> Argv);
 };
+} // namespace
 
 // Set color diagnostics according to -color-diagnostics={auto,always,never}
 // or -no-color-diagnostics flags.
@@ -288,6 +290,7 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
       Args.hasFlag(OPT_fatal_warnings, OPT_no_fatal_warnings, false);
   Config->ImportMemory = Args.hasArg(OPT_import_memory);
   Config->ImportTable = Args.hasArg(OPT_import_table);
+  Config->Optimize = args::getInteger(Args, OPT_O, 0);
   Config->OutputFile = Args.getLastArgValue(OPT_o);
   Config->Relocatable = Args.hasArg(OPT_relocatable);
   Config->GcSections =
@@ -309,6 +312,8 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   Config->MaxMemory = args::getInteger(Args, OPT_max_memory, 0);
   Config->ZStackSize =
       args::getZOptionValue(Args, OPT_z, "stack-size", WasmPageSize);
+
+  Config->CompressRelocTargets = Config->Optimize > 0 && !Config->Relocatable;
 
   if (auto *Arg = Args.getLastArg(OPT_allow_undefined_file))
     readImportFile(Arg->getValue());
@@ -360,9 +365,11 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
         "__dso_handle", WASM_SYMBOL_VISIBILITY_HIDDEN);
     WasmSym::DataEnd = Symtab->addSyntheticDataSymbol("__data_end", 0);
 
+    // For now, since we don't actually use the start function as the
+    // wasm start symbol, we don't need to care about it signature.
     if (!Config->Entry.empty())
-      EntrySym = Symtab->addUndefinedFunction(Config->Entry, 0, nullptr,
-                                              &NullSignature);
+      EntrySym =
+          Symtab->addUndefinedFunction(Config->Entry, 0, nullptr, nullptr);
 
     // Handle the `--undefined <sym>` options.
     for (auto *Arg : Args.filtered(OPT_undefined))
@@ -386,15 +393,19 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   if (!Config->Relocatable && !Config->AllowUndefined) {
     Symtab->reportRemainingUndefines();
   } else {
-    // When we allow undefined symbols we cannot include those defined in
-    // -u/--undefined since these undefined symbols have only names and no
-    // function signature, which means they cannot be written to the final
-    // output.
+    // Even when using --allow-undefined we still want to report the absence of
+    // our initial set of undefined symbols (i.e. the entry point and symbols
+    // specified via --undefined).
+    // Part of the reason for this is that these function don't have signatures
+    // so which means they cannot be written as wasm function imports.
     for (auto *Arg : Args.filtered(OPT_undefined)) {
       Symbol *Sym = Symtab->find(Arg->getValue());
       if (!Sym->isDefined())
-        error("function forced with --undefined not found: " + Sym->getName());
+        error("symbol forced with --undefined not found: " + Sym->getName());
     }
+    if (EntrySym && !EntrySym->isDefined())
+      error("entry symbol not defined (pass --no-entry to supress): " +
+            EntrySym->getName());
   }
   if (errorCount())
     return;

@@ -4936,11 +4936,15 @@ AArch64InstrInfo::getOutlininingCandidateInfo(
     std::vector<
         std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>>
         &RepeatedSequenceLocs) const {
-
+  unsigned SequenceSize = std::accumulate(
+      RepeatedSequenceLocs[0].first, std::next(RepeatedSequenceLocs[0].second),
+      0, [this](unsigned Sum, const MachineInstr &MI) {
+        return Sum + getInstSizeInBytes(MI);
+      });
   unsigned CallID = MachineOutlinerDefault;
   unsigned FrameID = MachineOutlinerDefault;
-  unsigned NumInstrsForCall = 3;
-  unsigned NumInstrsToCreateFrame = 1;
+  unsigned NumBytesForCall = 12;
+  unsigned NumBytesToCreateFrame = 4;
 
   auto DoesntNeedLRSave =
       [this](std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>
@@ -4951,23 +4955,23 @@ AArch64InstrInfo::getOutlininingCandidateInfo(
   if (RepeatedSequenceLocs[0].second->isTerminator()) {
     CallID = MachineOutlinerTailCall;
     FrameID = MachineOutlinerTailCall;
-    NumInstrsForCall = 1;
-    NumInstrsToCreateFrame = 0;
+    NumBytesForCall = 4;
+    NumBytesToCreateFrame = 0;
   }
 
   else if (std::all_of(RepeatedSequenceLocs.begin(), RepeatedSequenceLocs.end(),
                        DoesntNeedLRSave)) {
     CallID = MachineOutlinerNoLRSave;
     FrameID = MachineOutlinerNoLRSave;
-    NumInstrsForCall = 1;
-    NumInstrsToCreateFrame = 1;
+    NumBytesForCall = 4;
+    NumBytesToCreateFrame = 4;
   }
 
   // Check if the range contains a call. These require a save + restore of the
   // link register.
   if (std::any_of(RepeatedSequenceLocs[0].first, RepeatedSequenceLocs[0].second,
                   [](const MachineInstr &MI) { return MI.isCall(); }))
-    NumInstrsToCreateFrame += 2; // Save + restore the link register.
+    NumBytesToCreateFrame += 8; // Save + restore the link register.
 
   // Handle the last instruction separately. If this is a tail call, then the
   // last instruction is a call. We don't want to save + restore in this case.
@@ -4975,10 +4979,10 @@ AArch64InstrInfo::getOutlininingCandidateInfo(
   // it being valid to tail call this sequence. We should consider this as well.
   else if (RepeatedSequenceLocs[0].second->isCall() &&
            FrameID != MachineOutlinerTailCall)
-    NumInstrsToCreateFrame += 2;
+    NumBytesToCreateFrame += 8;
 
-  return MachineOutlinerInfo(NumInstrsForCall, NumInstrsToCreateFrame, CallID,
-                             FrameID);
+  return MachineOutlinerInfo(SequenceSize, NumBytesForCall,
+                             NumBytesToCreateFrame, CallID, FrameID);
 }
 
 bool AArch64InstrInfo::isFunctionSafeToOutlineFrom(
@@ -5188,6 +5192,12 @@ AArch64InstrInfo::getOutliningType(MachineBasicBlock::iterator &MIT,
     if (!MightNeedStackFixUp)
       return MachineOutlinerInstrType::Legal;
 
+    // Any modification of SP will break our code to save/restore LR.
+    // FIXME: We could handle some instructions which add a constant offset to
+    // SP, with a bit more work.
+    if (MI.modifiesRegister(AArch64::SP, &RI))
+      return MachineOutlinerInstrType::Illegal;
+
     // At this point, we have a stack instruction that we might need to fix
     // up. We'll handle it if it's a load or store.
     if (MI.mayLoadOrStore()) {
@@ -5216,6 +5226,8 @@ AArch64InstrInfo::getOutliningType(MachineBasicBlock::iterator &MIT,
       // It's in range, so we can outline it.
       return MachineOutlinerInstrType::Legal;
     }
+
+    // FIXME: Add handling for instructions like "add x0, sp, #8".
 
     // We can't fix it up, so don't outline it.
     return MachineOutlinerInstrType::Illegal;
@@ -5255,10 +5267,11 @@ void AArch64InstrInfo::fixupPostOutline(MachineBasicBlock &MBB) const {
 void AArch64InstrInfo::insertOutlinerEpilogue(
     MachineBasicBlock &MBB, MachineFunction &MF,
     const MachineOutlinerInfo &MInfo) const {
-
   // Is there a call in the outlined range?
-  if (std::any_of(MBB.instr_begin(), MBB.instr_end(),
-                  [](MachineInstr &MI) { return MI.isCall(); })) {
+  auto IsNonTailCall = [](MachineInstr &MI) {
+    return MI.isCall() && !MI.isReturn();
+  };
+  if (std::any_of(MBB.instr_begin(), MBB.instr_end(), IsNonTailCall)) {
     // Fix up the instructions in the range, since we're going to modify the
     // stack.
     fixupPostOutline(MBB);

@@ -155,27 +155,37 @@ namespace tooling {
 
 bool runToolOnCodeWithArgs(
     FrontendAction *ToolAction, const Twine &Code,
+    llvm::IntrusiveRefCntPtr<vfs::FileSystem> VFS,
     const std::vector<std::string> &Args, const Twine &FileName,
     const Twine &ToolName,
-    std::shared_ptr<PCHContainerOperations> PCHContainerOps,
-    const FileContentMappings &VirtualMappedFiles) {
+    std::shared_ptr<PCHContainerOperations> PCHContainerOps) {
   SmallString<16> FileNameStorage;
   StringRef FileNameRef = FileName.toNullTerminatedStringRef(FileNameStorage);
-  llvm::IntrusiveRefCntPtr<vfs::OverlayFileSystem> OverlayFileSystem(
-      new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
-  llvm::IntrusiveRefCntPtr<vfs::InMemoryFileSystem> InMemoryFileSystem(
-      new vfs::InMemoryFileSystem);
-  OverlayFileSystem->pushOverlay(InMemoryFileSystem);
+
   llvm::IntrusiveRefCntPtr<FileManager> Files(
-      new FileManager(FileSystemOptions(), OverlayFileSystem));
+      new FileManager(FileSystemOptions(), VFS));
   ArgumentsAdjuster Adjuster = getClangStripDependencyFileAdjuster();
   ToolInvocation Invocation(
       getSyntaxOnlyToolArgs(ToolName, Adjuster(Args, FileNameRef), FileNameRef),
       ToolAction, Files.get(),
       std::move(PCHContainerOps));
+  return Invocation.run();
+}
+
+bool runToolOnCodeWithArgs(
+    FrontendAction *ToolAction, const Twine &Code,
+    const std::vector<std::string> &Args, const Twine &FileName,
+    const Twine &ToolName,
+    std::shared_ptr<PCHContainerOperations> PCHContainerOps,
+    const FileContentMappings &VirtualMappedFiles) {
+  llvm::IntrusiveRefCntPtr<vfs::OverlayFileSystem> OverlayFileSystem(
+      new vfs::OverlayFileSystem(vfs::getRealFileSystem()));
+  llvm::IntrusiveRefCntPtr<vfs::InMemoryFileSystem> InMemoryFileSystem(
+      new vfs::InMemoryFileSystem);
+  OverlayFileSystem->pushOverlay(InMemoryFileSystem);
 
   SmallString<1024> CodeStorage;
-  InMemoryFileSystem->addFile(FileNameRef, 0,
+  InMemoryFileSystem->addFile(FileName, 0,
                               llvm::MemoryBuffer::getMemBuffer(
                                   Code.toNullTerminatedStringRef(CodeStorage)));
 
@@ -185,7 +195,8 @@ bool runToolOnCodeWithArgs(
         llvm::MemoryBuffer::getMemBuffer(FilenameWithContent.second));
   }
 
-  return Invocation.run();
+  return runToolOnCodeWithArgs(ToolAction, Code, OverlayFileSystem, Args,
+                               FileName, ToolName);
 }
 
 std::string getAbsolutePath(StringRef File) {
@@ -473,7 +484,7 @@ int ClangTool::run(ToolAction *Action) {
 
       // FIXME: We need a callback mechanism for the tool writer to output a
       // customized message for each file.
-      DEBUG({ llvm::dbgs() << "Processing: " << File << ".\n"; });
+      LLVM_DEBUG({ llvm::dbgs() << "Processing: " << File << ".\n"; });
       ToolInvocation Invocation(std::move(CommandLine), Action, Files.get(),
                                 PCHContainerOps);
       Invocation.setDiagnosticConsumer(DiagConsumer);

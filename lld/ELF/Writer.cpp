@@ -207,11 +207,12 @@ void elf::addReservedSymbols() {
           Symtab->addAbsolute("__gnu_local_gp", STV_HIDDEN, STB_GLOBAL);
   }
 
-  // The 64-bit PowerOpen ABI defines a TableOfContents (TOC) which combines the
-  // typical ELF GOT with the small data sections. It commonly includes .got
-  // .toc .sdata .sbss. The .TOC. symbol replaces both _GLOBAL_OFFSET_TABLE_ and
-  // _SDA_BASE_ from the 32-bit ABI. It is used to represent the TOC base which
-  // is offset by 0x8000 bytes from the start of the .got section.
+  // The Power Architecture 64-bit v2 ABI defines a TableOfContents (TOC) which
+  // combines the typical ELF GOT with the small data sections. It commonly
+  // includes .got .toc .sdata .sbss. The .TOC. symbol replaces both
+  // _GLOBAL_OFFSET_TABLE_ and _SDA_BASE_ from the 32-bit ABI. It is used to
+  // represent the TOC base which is offset by 0x8000 bytes from the start of
+  // the .got section.
   ElfSym::GlobalOffsetTable = addOptionalRegular(
       (Config->EMachine == EM_PPC64) ? ".TOC." : "_GLOBAL_OFFSET_TABLE_",
       Out::ElfHeader, Target->GotBaseSymOff);
@@ -697,11 +698,12 @@ enum RankFlags {
   RF_NOT_INTERP = 1 << 17,
   RF_NOT_ALLOC = 1 << 16,
   RF_WRITE = 1 << 15,
-  RF_EXEC_WRITE = 1 << 13,
-  RF_EXEC = 1 << 12,
-  RF_NON_TLS_BSS = 1 << 11,
-  RF_NON_TLS_BSS_RO = 1 << 10,
-  RF_NOT_TLS = 1 << 9,
+  RF_EXEC_WRITE = 1 << 14,
+  RF_EXEC = 1 << 13,
+  RF_NON_TLS_BSS = 1 << 12,
+  RF_NON_TLS_BSS_RO = 1 << 11,
+  RF_NOT_TLS = 1 << 10,
+  RF_ALLOC_FIRST = 1 << 9,
   RF_BSS = 1 << 8,
   RF_NOTE = 1 << 7,
   RF_PPC_NOT_TOCBSS = 1 << 6,
@@ -731,6 +733,16 @@ static unsigned getSectionRank(const OutputSection *Sec) {
   // so debug info doesn't change addresses in actual code.
   if (!(Sec->Flags & SHF_ALLOC))
     return Rank | RF_NOT_ALLOC;
+
+  // Place .dynsym and .dynstr at the beginning of SHF_ALLOC
+  // sections. We want to do this to mitigate the possibility that
+  // huge .dynsym and .dynstr sections placed between ro-data and text
+  // sections cause relocation overflow.  Note: .dynstr has SHT_STRTAB
+  // type and SHF_ALLOC attribute, whereas sections that only have
+  // SHT_STRTAB but without SHF_ALLOC is placed at the end. All "Sec"
+  // reaching here has SHF_ALLOC bit set.
+  if (Sec->Type == SHT_DYNSYM || Sec->Type == SHT_STRTAB)
+    return Rank | RF_ALLOC_FIRST;
 
   // Sort sections based on their access permission in the following
   // order: R, RX, RWX, RW.  This order is based on the following
@@ -1690,17 +1702,29 @@ template <class ELFT> void Writer<ELFT>::finalizeSections() {
 // The linker is expected to define SECNAME_start and SECNAME_end
 // symbols for a few sections. This function defines them.
 template <class ELFT> void Writer<ELFT>::addStartEndSymbols() {
-  auto Define = [&](StringRef Start, StringRef End, OutputSection *OS) {
-    // These symbols resolve to the image base if the section does not exist.
-    // A special value -1 indicates end of the section.
+  // If a section does not exist, there's ambiguity as to how we
+  // define _start and _end symbols for an init/fini section. Since
+  // the loader assume that the symbols are always defined, we need to
+  // always define them. But what value? The loader iterates over all
+  // pointers between _start and _end to run global ctors/dtors, so if
+  // the section is empty, their symbol values don't actually matter
+  // as long as _start and _end point to the same location.
+  //
+  // That said, we don't want to set the symbols to 0 (which is
+  // probably the simplest value) because that could cause some
+  // program to fail to link due to relocation overflow, if their
+  // program text is above 2 GiB. We use the address of the .text
+  // section instead to prevent that failure.
+  OutputSection *Default = findSection(".text");
+  if (!Default)
+    Default = Out::ElfHeader;
+  auto Define = [=](StringRef Start, StringRef End, OutputSection *OS) {
     if (OS) {
       addOptionalRegular(Start, OS, 0);
       addOptionalRegular(End, OS, -1);
     } else {
-      if (Config->Pic)
-        OS = Out::ElfHeader;
-      addOptionalRegular(Start, OS, 0);
-      addOptionalRegular(End, OS, 0);
+      addOptionalRegular(Start, Default, 0);
+      addOptionalRegular(End, Default, 0);
     }
   };
 

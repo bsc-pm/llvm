@@ -150,9 +150,6 @@ def warn_drv_unknown_argument_clang_cl : Warning<
 def warn_drv_unknown_argument_clang_cl_with_suggestion : Warning<
   "unknown argument ignored in clang-cl '%0' (did you mean '%1'?)">,
   InGroup<UnknownArgument>;
-def warn_drv_ignored_clang_abi_version : Warning<
-  "target requires clang ABI version %0, ignoring requested version">,
-  InGroup<UnusedCommandLineArgument>;
 
 def warn_drv_ycyu_no_arg_clang_cl : Warning<
   "support for '%0' without a filename not implemented yet; flag ignored">,
@@ -269,9 +266,6 @@ def warn_incompatible_sysroot : Warning<"using sysroot for '%0' but targeting '%
   InGroup<DiagGroup<"incompatible-sysroot">>;
 def warn_debug_compression_unavailable : Warning<"cannot compress debug sections (zlib not installed)">,
   InGroup<DiagGroup<"debug-compression-unavailable">>;
-def warn_drv_enabling_rtti_with_exceptions : Warning<
-  "implicitly enabling rtti for exception handling">,
-  InGroup<DiagGroup<"rtti-for-exceptions">>;
 def warn_drv_disabling_vptr_no_rtti_default : Warning<
   "implicitly disabling vptr sanitizer because rtti wasn't enabled">,
   InGroup<AutoDisableVptrSanitizer>;

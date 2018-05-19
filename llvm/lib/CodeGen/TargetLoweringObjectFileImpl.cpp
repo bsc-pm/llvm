@@ -187,7 +187,7 @@ const MCExpr *TargetLoweringObjectFileELF::getTTypeGlobalReference(
 }
 
 static SectionKind getELFKindForNamedSection(StringRef Name, SectionKind K) {
-  // N.B.: The defaults used in here are no the same ones used in MC.
+  // N.B.: The defaults used in here are not the same ones used in MC.
   // We follow gcc, MC follows gas. For example, given ".section .eh_frame",
   // both gas and MC will produce a section with no flags. Given
   // section(".eh_frame") gcc will produce:
@@ -200,7 +200,7 @@ static SectionKind getELFKindForNamedSection(StringRef Name, SectionKind K) {
 
   if (Name.empty() || Name[0] != '.') return K;
 
-  // Some lame default implementation based on some magic section names.
+  // Default implementation based on some magic section names.
   if (Name == ".bss" ||
       Name.startswith(".bss.") ||
       Name.startswith(".gnu.linkonce.b.") ||

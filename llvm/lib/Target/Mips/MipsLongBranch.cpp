@@ -77,8 +77,9 @@ namespace {
   public:
     static char ID;
 
-    MipsLongBranch()
-        : MachineFunctionPass(ID), ABI(MipsABIInfo::Unknown()) {}
+    MipsLongBranch() : MachineFunctionPass(ID), ABI(MipsABIInfo::Unknown()) {
+      initializeMipsLongBranchPass(*PassRegistry::getPassRegistry());
+    }
 
     StringRef getPassName() const override { return "Mips Long Branch"; }
 
@@ -107,6 +108,9 @@ namespace {
 } // end anonymous namespace
 
 char MipsLongBranch::ID = 0;
+
+INITIALIZE_PASS(MipsLongBranch, DEBUG_TYPE,
+                "Expand out of range branch instructions", false, false)
 
 /// Iterate over list of Br's operands and search for a MachineBasicBlock
 /// operand.
@@ -580,8 +584,7 @@ bool MipsLongBranch::runOnMachineFunction(MachineFunction &F) {
       if (!I->Br || I->HasLongBranch)
         continue;
 
-      int ShVal = STI.inMicroMipsMode() ? 2 : 4;
-      int64_t Offset = computeOffset(I->Br) / ShVal;
+      int64_t Offset = computeOffset(I->Br);
 
       if (STI.isTargetNaCl()) {
         // The offset calculation does not include sandboxing instructions
@@ -591,8 +594,9 @@ bool MipsLongBranch::runOnMachineFunction(MachineFunction &F) {
         Offset *= 2;
       }
 
-      // Check if offset fits into 16-bit immediate field of branches.
-      if (!ForceLongBranch && isInt<16>(Offset))
+      // Check if offset fits into the immediate field of the branch.
+      if (!ForceLongBranch &&
+          TII->isBranchOffsetInRange(I->Br->getOpcode(), Offset))
         continue;
 
       I->HasLongBranch = true;

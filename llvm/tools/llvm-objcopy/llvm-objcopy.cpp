@@ -87,10 +87,10 @@ enum StripID {
 static const opt::OptTable::Info StripInfoTable[] = {
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
                HELPTEXT, METAVAR, VALUES)                                      \
-  {PREFIX,          NAME,         HELPTEXT,                                    \
-   METAVAR,         STRIP_##ID, opt::Option::KIND##Class,                      \
-   PARAM,           FLAGS,        STRIP_##GROUP,                               \
-   STRIP_##ALIAS, ALIASARGS,    VALUES},
+  {PREFIX,        NAME,       HELPTEXT,                                        \
+   METAVAR,       STRIP_##ID, opt::Option::KIND##Class,                        \
+   PARAM,         FLAGS,      STRIP_##GROUP,                                   \
+   STRIP_##ALIAS, ALIASARGS,  VALUES},
 #include "StripOpts.inc"
 #undef OPTION
 };
@@ -148,6 +148,7 @@ struct CopyConfig {
   std::vector<StringRef> SymbolsToGlobalize;
   std::vector<StringRef> SymbolsToWeaken;
   std::vector<StringRef> SymbolsToRemove;
+  std::vector<StringRef> SymbolsToKeep;
   StringMap<StringRef> SymbolsToRename;
   bool StripAll = false;
   bool StripAllGNU = false;
@@ -159,6 +160,7 @@ struct CopyConfig {
   bool LocalizeHidden = false;
   bool Weaken = false;
   bool DiscardAll = false;
+  bool OnlyKeepDebug = false;
 };
 
 using SectionPred = std::function<bool(const SectionBase &Sec)>;
@@ -373,6 +375,10 @@ void HandleArgs(const CopyConfig &Config, Object &Obj, const Reader &Reader,
     });
 
     Obj.removeSymbols([&](const Symbol &Sym) {
+      if (!Config.SymbolsToKeep.empty() &&
+          is_contained(Config.SymbolsToKeep, Sym.Name))
+        return false;
+
       if (Config.DiscardAll && Sym.Binding == STB_LOCAL &&
           Sym.getShndx() != SHN_UNDEF && Sym.Type != STT_FILE &&
           Sym.Type != STT_SECTION)
@@ -416,12 +422,12 @@ CopyConfig ParseObjcopyOptions(ArrayRef<const char *> ArgsArr) {
   unsigned MissingArgumentIndex, MissingArgumentCount;
   llvm::opt::InputArgList InputArgs =
       T.ParseArgs(ArgsArr, MissingArgumentIndex, MissingArgumentCount);
-  
+
   if (InputArgs.size() == 0) {
     T.PrintHelp(errs(), "llvm-objcopy <input> [ <output> ]", "objcopy tool");
     exit(1);
   }
-  
+
   if (InputArgs.hasArg(OBJCOPY_help)) {
     T.PrintHelp(outs(), "llvm-objcopy <input> [ <output> ]", "objcopy tool");
     exit(0);
@@ -477,6 +483,7 @@ CopyConfig ParseObjcopyOptions(ArrayRef<const char *> ArgsArr) {
   Config.LocalizeHidden = InputArgs.hasArg(OBJCOPY_localize_hidden);
   Config.Weaken = InputArgs.hasArg(OBJCOPY_weaken);
   Config.DiscardAll = InputArgs.hasArg(OBJCOPY_discard_all);
+  Config.OnlyKeepDebug = InputArgs.hasArg(OBJCOPY_only_keep_debug);
   for (auto Arg : InputArgs.filtered(OBJCOPY_localize_symbol))
     Config.SymbolsToLocalize.push_back(Arg->getValue());
   for (auto Arg : InputArgs.filtered(OBJCOPY_globalize_symbol))
@@ -485,6 +492,8 @@ CopyConfig ParseObjcopyOptions(ArrayRef<const char *> ArgsArr) {
     Config.SymbolsToWeaken.push_back(Arg->getValue());
   for (auto Arg : InputArgs.filtered(OBJCOPY_strip_symbol))
     Config.SymbolsToRemove.push_back(Arg->getValue());
+  for (auto Arg : InputArgs.filtered(OBJCOPY_keep_symbol))
+    Config.SymbolsToKeep.push_back(Arg->getValue());
 
   return Config;
 }
@@ -502,7 +511,7 @@ CopyConfig ParseStripOptions(ArrayRef<const char *> ArgsArr) {
     T.PrintHelp(errs(), "llvm-strip <input> [ <output> ]", "strip tool");
     exit(1);
   }
-  
+
   if (InputArgs.hasArg(STRIP_help)) {
     T.PrintHelp(outs(), "llvm-strip <input> [ <output> ]", "strip tool");
     exit(0);
@@ -528,7 +537,7 @@ CopyConfig ParseStripOptions(ArrayRef<const char *> ArgsArr) {
   Config.StripDebug = InputArgs.hasArg(STRIP_strip_debug);
   if (!Config.StripDebug)
     Config.StripAll = true;
-  
+
   for (auto Arg : InputArgs.filtered(STRIP_remove_section))
     Config.ToRemove.push_back(Arg->getValue());
 
