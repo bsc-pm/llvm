@@ -1,4 +1,4 @@
-//===--------------------- Dispatch.cpp -------------------------*- C++ -*-===//
+//===--------------------- DispatchStage.cpp --------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -140,6 +140,12 @@ void DispatchStage::dispatch(InstRef IR) {
   // The scheduler is responsible for checking if this is a zero-latency
   // instruction that doesn't consume pipeline/scheduler resources.
   SC->scheduleInstruction(IR);
+}
+
+void DispatchStage::preExecute(const InstRef &IR) {
+  RCU->cycleEvent();
+  AvailableEntries = CarryOver >= DispatchWidth ? 0 : DispatchWidth - CarryOver;
+  CarryOver = CarryOver >= DispatchWidth ? CarryOver - DispatchWidth : 0U;
 }
 
 bool DispatchStage::execute(InstRef &IR) {

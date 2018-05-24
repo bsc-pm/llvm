@@ -12,10 +12,10 @@ declare i64 @llabs(i64)
 
 define i32 @test_abs(i32 %x) {
 ; CHECK-LABEL: @test_abs(
-; CHECK-NEXT:    [[ISPOS:%.*]] = icmp slt i32 [[X:%.*]], 0
-; CHECK-NEXT:    [[NEG:%.*]] = sub i32 0, [[X]]
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[ISPOS]], i32 [[NEG]], i32 [[X]]
-; CHECK-NEXT:    ret i32 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[X:%.*]], 0
+; CHECK-NEXT:    [[NEG:%.*]] = sub nsw i32 0, [[X]]
+; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], i32 [[NEG]], i32 [[X]]
+; CHECK-NEXT:    ret i32 [[TMP2]]
 ;
   %ret = call i32 @abs(i32 %x)
   ret i32 %ret
@@ -23,10 +23,10 @@ define i32 @test_abs(i32 %x) {
 
 define i64 @test_labs(i64 %x) {
 ; CHECK-LABEL: @test_labs(
-; CHECK-NEXT:    [[ISPOS:%.*]] = icmp slt i64 [[X:%.*]], 0
-; CHECK-NEXT:    [[NEG:%.*]] = sub i64 0, [[X]]
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[ISPOS]], i64 [[NEG]], i64 [[X]]
-; CHECK-NEXT:    ret i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i64 [[X:%.*]], 0
+; CHECK-NEXT:    [[NEG:%.*]] = sub nsw i64 0, [[X]]
+; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], i64 [[NEG]], i64 [[X]]
+; CHECK-NEXT:    ret i64 [[TMP2]]
 ;
   %ret = call i64 @labs(i64 %x)
   ret i64 %ret
@@ -34,10 +34,10 @@ define i64 @test_labs(i64 %x) {
 
 define i64 @test_llabs(i64 %x) {
 ; CHECK-LABEL: @test_llabs(
-; CHECK-NEXT:    [[ISPOS:%.*]] = icmp slt i64 [[X:%.*]], 0
-; CHECK-NEXT:    [[NEG:%.*]] = sub i64 0, [[X]]
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[ISPOS]], i64 [[NEG]], i64 [[X]]
-; CHECK-NEXT:    ret i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i64 [[X:%.*]], 0
+; CHECK-NEXT:    [[NEG:%.*]] = sub nsw i64 0, [[X]]
+; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], i64 [[NEG]], i64 [[X]]
+; CHECK-NEXT:    ret i64 [[TMP2]]
 ;
   %ret = call i64 @llabs(i64 %x)
   ret i64 %ret
@@ -266,3 +266,30 @@ define i8 @shifty_abs_too_many_uses(i8 %x) {
   ret i8 %abs
 }
 
+define i8 @negate_abs(i8 %x) {
+; CHECK-LABEL: @negate_abs(
+; CHECK-NEXT:    [[N:%.*]] = sub i8 0, [[X:%.*]]
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i8 [[X]], 0
+; CHECK-NEXT:    [[S:%.*]] = select i1 [[C]], i8 [[X]], i8 [[N]]
+; CHECK-NEXT:    ret i8 [[S]]
+;
+  %n = sub i8 0, %x
+  %c = icmp slt i8 %x, 0
+  %s = select i1 %c, i8 %n, i8 %x
+  %r = sub i8 0, %s
+  ret i8 %r
+}
+
+define <2 x i8> @negate_nabs(<2 x i8> %x) {
+; CHECK-LABEL: @negate_nabs(
+; CHECK-NEXT:    [[N:%.*]] = sub <2 x i8> zeroinitializer, [[X:%.*]]
+; CHECK-NEXT:    [[C:%.*]] = icmp slt <2 x i8> [[X]], zeroinitializer
+; CHECK-NEXT:    [[S:%.*]] = select <2 x i1> [[C]], <2 x i8> [[N]], <2 x i8> [[X]]
+; CHECK-NEXT:    ret <2 x i8> [[S]]
+;
+  %n = sub <2 x i8> zeroinitializer, %x
+  %c = icmp slt <2 x i8> %x, zeroinitializer
+  %s = select <2 x i1> %c, <2 x i8> %x, <2 x i8> %n
+  %r = sub <2 x i8> zeroinitializer, %s
+  ret <2 x i8> %r
+}
