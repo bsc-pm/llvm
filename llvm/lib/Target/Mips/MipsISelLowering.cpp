@@ -110,12 +110,6 @@ static bool isShiftedMask(uint64_t I, uint64_t &Pos, uint64_t &Size) {
 
 // The MIPS MSA ABI passes vector arguments in the integer register set.
 // The number of integer registers used is dependant on the ABI used.
-MVT MipsTargetLowering::getRegisterTypeForCallingConv(MVT VT) const {
-  if (VT.isVector() && Subtarget.hasMSA())
-    return Subtarget.isABI_O32() ? MVT::i32 : MVT::i64;
-  return MipsTargetLowering::getRegisterType(VT);
-}
-
 MVT MipsTargetLowering::getRegisterTypeForCallingConv(LLVMContext &Context,
                                                       EVT VT) const {
   if (VT.isVector()) {
@@ -200,6 +194,7 @@ const char *MipsTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case MipsISD::Ret:               return "MipsISD::Ret";
   case MipsISD::ERet:              return "MipsISD::ERet";
   case MipsISD::EH_RETURN:         return "MipsISD::EH_RETURN";
+  case MipsISD::FMS:               return "MipsISD::FMS";
   case MipsISD::FPBrcond:          return "MipsISD::FPBrcond";
   case MipsISD::FPCmp:             return "MipsISD::FPCmp";
   case MipsISD::FSELECT:           return "MipsISD::FSELECT";
@@ -1432,8 +1427,8 @@ MachineBasicBlock *MipsTargetLowering::emitAtomicBinary(MachineInstr &MI,
 
   if (Size == 4) {
     if (isMicroMips) {
-      LL = Mips::LL_MM;
-      SC = Mips::SC_MM;
+      LL = Subtarget.hasMips32r6() ? Mips::LL_MMR6 : Mips::LL_MM;
+      SC = Subtarget.hasMips32r6() ? Mips::SC_MMR6 : Mips::SC_MM;
     } else {
       LL = Subtarget.hasMips32r6()
                ? (ArePtrs64bit ? Mips::LL64_R6 : Mips::LL_R6)
@@ -1579,8 +1574,8 @@ MachineBasicBlock *MipsTargetLowering::emitAtomicBinaryPartword(
 
   unsigned LL, SC;
   if (isMicroMips) {
-    LL = Mips::LL_MM;
-    SC = Mips::SC_MM;
+    LL = Subtarget.hasMips32r6() ? Mips::LL_MMR6 : Mips::LL_MM;
+    SC = Subtarget.hasMips32r6() ? Mips::SC_MMR6 : Mips::SC_MM;
   } else {
     LL = Subtarget.hasMips32r6() ? (ArePtrs64bit ? Mips::LL64_R6 : Mips::LL_R6)
                                  : (ArePtrs64bit ? Mips::LL64 : Mips::LL);
@@ -1720,8 +1715,8 @@ MachineBasicBlock *MipsTargetLowering::emitAtomicCmpSwap(MachineInstr &MI,
 
   if (Size == 4) {
     if (isMicroMips) {
-      LL = Mips::LL_MM;
-      SC = Mips::SC_MM;
+      LL = Subtarget.hasMips32r6() ? Mips::LL_MMR6 : Mips::LL_MM;
+      SC = Subtarget.hasMips32r6() ? Mips::SC_MMR6 : Mips::SC_MM;
     } else {
       LL = Subtarget.hasMips32r6()
                ? (ArePtrs64bit ? Mips::LL64_R6 : Mips::LL_R6)
@@ -1834,8 +1829,8 @@ MachineBasicBlock *MipsTargetLowering::emitAtomicCmpSwapPartword(
   unsigned LL, SC;
 
   if (isMicroMips) {
-    LL = Mips::LL_MM;
-    SC = Mips::SC_MM;
+    LL = Subtarget.hasMips32r6() ? Mips::LL_MMR6 : Mips::LL_MM;
+    SC = Subtarget.hasMips32r6() ? Mips::SC_MMR6 : Mips::SC_MM;
   } else {
     LL = Subtarget.hasMips32r6() ? (ArePtrs64bit ? Mips::LL64_R6 : Mips::LL_R6)
                                  : (ArePtrs64bit ? Mips::LL64 : Mips::LL);

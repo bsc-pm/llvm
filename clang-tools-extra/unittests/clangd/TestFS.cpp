@@ -20,8 +20,8 @@ buildTestFS(StringMap<std::string> const &Files) {
       new vfs::InMemoryFileSystem);
   for (auto &FileAndContents : Files) {
     MemFS->addFile(FileAndContents.first(), time_t(),
-                   MemoryBuffer::getMemBuffer(FileAndContents.second,
-                                              FileAndContents.first()));
+                   MemoryBuffer::getMemBufferCopy(FileAndContents.second,
+                                                  FileAndContents.first()));
   }
   return MemFS;
 }
@@ -55,8 +55,10 @@ const char *testRoot() {
 std::string testPath(PathRef File) {
   assert(sys::path::is_relative(File) && "FileName should be relative");
 
+  SmallString<32> NativeFile = File;
+  sys::path::native(NativeFile);
   SmallString<32> Path;
-  sys::path::append(Path, testRoot(), File);
+  sys::path::append(Path, testRoot(), NativeFile);
   return Path.str();
 }
 

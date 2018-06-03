@@ -76,9 +76,6 @@ struct Config {
   /// The directory to store .dwo files.
   std::string DwoDir;
 
-  /// The objcopy binary used to extract dwo files.
-  std::string Objcopy;
-
   /// Optimization remarks file path.
   std::string RemarksFilename = "";
 
@@ -87,6 +84,9 @@ struct Config {
 
   /// Whether to emit the pass manager debuggging informations.
   bool DebugPassManager = false;
+
+  /// Statistics output file path.
+  std::string StatsFile;
 
   bool ShouldDiscardValueNames = true;
   DiagnosticHandlerFunction DiagHandler;

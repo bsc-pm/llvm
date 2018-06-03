@@ -102,7 +102,7 @@ void FileManager::clearStatCaches() {
   StatCache.reset();
 }
 
-/// \brief Retrieve the directory that the given file name resides in.
+/// Retrieve the directory that the given file name resides in.
 /// Filename can point to either a real file or a virtual file.
 static const DirectoryEntry *getDirectoryFromFile(FileManager &FileMgr,
                                                   StringRef Filename,
@@ -157,7 +157,7 @@ const DirectoryEntry *FileManager::getDirectory(StringRef DirName,
       DirName != llvm::sys::path::root_path(DirName) &&
       llvm::sys::path::is_separator(DirName.back()))
     DirName = DirName.substr(0, DirName.size()-1);
-#ifdef LLVM_ON_WIN32
+#ifdef _WIN32
   // Fixing a problem with "clang C:test.c" on Windows.
   // Stat("C:") does not recognize "C:" as a valid directory
   std::string DirNameStr;
@@ -534,8 +534,8 @@ StringRef FileManager::getCanonicalName(const DirectoryEntry *Dir) {
 
   StringRef CanonicalName(Dir->getName());
 
-  SmallString<256> CanonicalNameBuf;
-  if (!llvm::sys::fs::real_path(Dir->getName(), CanonicalNameBuf))
+  SmallString<4096> CanonicalNameBuf;
+  if (!FS->getRealPath(Dir->getName(), CanonicalNameBuf))
     CanonicalName = StringRef(CanonicalNameBuf).copy(CanonicalNameStorage);
 
   CanonicalDirNames.insert(std::make_pair(Dir, CanonicalName));

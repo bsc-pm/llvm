@@ -102,26 +102,6 @@ bool X86TargetInfo::setFPMath(StringRef Name) {
   return false;
 }
 
-bool X86TargetInfo::checkCFProtectionReturnSupported(
-    DiagnosticsEngine &Diags) const {
-  if (HasSHSTK)
-    return true;
-
-  Diags.Report(diag::err_opt_not_valid_without_opt) << "cf-protection=return"
-                                                    << "-mshstk";
-  return false;
-}
-
-bool X86TargetInfo::checkCFProtectionBranchSupported(
-    DiagnosticsEngine &Diags) const {
-  if (HasIBT)
-    return true;
-
-  Diags.Report(diag::err_opt_not_valid_without_opt) << "cf-protection=branch"
-                                                    << "-mibt";
-  return false;
-}
-
 bool X86TargetInfo::initFeatureMap(
     llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags, StringRef CPU,
     const std::vector<std::string> &FeaturesVec) const {
@@ -154,6 +134,7 @@ bool X86TargetInfo::initFeatureMap(
     break;
 
   case CK_IcelakeServer:
+    setFeatureEnabledImpl(Features, "pconfig", true);
     setFeatureEnabledImpl(Features, "wbnoinvd", true);
     LLVM_FALLTHROUGH;
   case CK_IcelakeClient:
@@ -201,6 +182,7 @@ bool X86TargetInfo::initFeatureMap(
     setFeatureEnabledImpl(Features, "bmi", true);
     setFeatureEnabledImpl(Features, "bmi2", true);
     setFeatureEnabledImpl(Features, "fma", true);
+    setFeatureEnabledImpl(Features, "invpcid", true);
     setFeatureEnabledImpl(Features, "movbe", true);
     LLVM_FALLTHROUGH;
   case CK_IvyBridge:
@@ -244,6 +226,18 @@ bool X86TargetInfo::initFeatureMap(
     setFeatureEnabledImpl(Features, "fxsr", true);
     break;
 
+  case CK_Tremont:
+    setFeatureEnabledImpl(Features, "cldemote", true);
+    setFeatureEnabledImpl(Features, "movdiri", true);
+    setFeatureEnabledImpl(Features, "movdir64b", true);
+    setFeatureEnabledImpl(Features, "gfni", true);
+    setFeatureEnabledImpl(Features, "waitpkg", true);
+    LLVM_FALLTHROUGH;
+  case CK_GoldmontPlus:
+    setFeatureEnabledImpl(Features, "ptwrite", true);
+    setFeatureEnabledImpl(Features, "rdpid", true);
+    setFeatureEnabledImpl(Features, "sgx", true);
+    LLVM_FALLTHROUGH;
   case CK_Goldmont:
     setFeatureEnabledImpl(Features, "sha", true);
     setFeatureEnabledImpl(Features, "rdseed", true);
@@ -768,8 +762,6 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasMPX = true;
     } else if (Feature == "+shstk") {
       HasSHSTK = true;
-    } else if (Feature == "+ibt") {
-      HasIBT = true;
     } else if (Feature == "+movbe") {
       HasMOVBE = true;
     } else if (Feature == "+sgx") {
@@ -810,6 +802,18 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasRetpolineExternalThunk = true;
     } else if (Feature == "+sahf") {
       HasLAHFSAHF = true;
+    } else if (Feature == "+waitpkg") {
+      HasWAITPKG = true;
+    } else if (Feature == "+movdiri") {
+      HasMOVDIRI = true;
+    } else if (Feature == "+movdir64b") {
+      HasMOVDIR64B = true;
+    } else if (Feature == "+pconfig") {
+      HasPCONFIG = true;
+    } else if (Feature == "+ptwrite") {
+      HasPTWRITE = true;
+    } else if (Feature == "+invpcid") {
+      HasINVPCID = true;
     }
 
     X86SSEEnum Level = llvm::StringSwitch<X86SSEEnum>(Feature)
@@ -929,6 +933,12 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     break;
   case CK_Goldmont:
     defineCPUMacros(Builder, "goldmont");
+    break;
+  case CK_GoldmontPlus:
+    defineCPUMacros(Builder, "goldmont_plus");
+    break;
+  case CK_Tremont:
+    defineCPUMacros(Builder, "tremont");
     break;
   case CK_Nehalem:
   case CK_Westmere:
@@ -1146,8 +1156,6 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__MPX__");
   if (HasSHSTK)
     Builder.defineMacro("__SHSTK__");
-  if (HasIBT)
-    Builder.defineMacro("__IBT__");
   if (HasSGX)
     Builder.defineMacro("__SGX__");
   if (HasPREFETCHWT1)
@@ -1158,6 +1166,18 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__RDPID__");
   if (HasCLDEMOTE)
     Builder.defineMacro("__CLDEMOTE__");
+  if (HasWAITPKG)
+    Builder.defineMacro("__WAITPKG__");
+  if (HasMOVDIRI)
+    Builder.defineMacro("__MOVDIRI__");
+  if (HasMOVDIR64B)
+    Builder.defineMacro("__MOVDIR64B__");
+  if (HasPCONFIG)
+    Builder.defineMacro("__PCONFIG__");
+  if (HasPTWRITE)
+    Builder.defineMacro("__PTWRITE__");
+  if (HasINVPCID)
+    Builder.defineMacro("__INVPCID__");
 
   // Each case falls through to the previous one here.
   switch (SSELevel) {
@@ -1278,17 +1298,22 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("fsgsbase", true)
       .Case("fxsr", true)
       .Case("gfni", true)
+      .Case("invpcid", true)
       .Case("lwp", true)
       .Case("lzcnt", true)
       .Case("mmx", true)
       .Case("movbe", true)
+      .Case("movdiri", true)
+      .Case("movdir64b", true)
       .Case("mpx", true)
       .Case("mwaitx", true)
       .Case("pclmul", true)
+      .Case("pconfig", true)
       .Case("pku", true)
       .Case("popcnt", true)
       .Case("prefetchwt1", true)
       .Case("prfchw", true)
+      .Case("ptwrite", true)
       .Case("rdpid", true)
       .Case("rdrnd", true)
       .Case("rdseed", true)
@@ -1309,6 +1334,7 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("vaes", true)
       .Case("vpclmulqdq", true)
       .Case("wbnoinvd", true)
+      .Case("waitpkg", true)
       .Case("x87", true)
       .Case("xop", true)
       .Case("xsave", true)
@@ -1350,20 +1376,24 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("fsgsbase", HasFSGSBASE)
       .Case("fxsr", HasFXSR)
       .Case("gfni", HasGFNI)
-      .Case("ibt", HasIBT)
+      .Case("invpcid", HasINVPCID)
       .Case("lwp", HasLWP)
       .Case("lzcnt", HasLZCNT)
       .Case("mm3dnow", MMX3DNowLevel >= AMD3DNow)
       .Case("mm3dnowa", MMX3DNowLevel >= AMD3DNowAthlon)
       .Case("mmx", MMX3DNowLevel >= MMX)
       .Case("movbe", HasMOVBE)
+      .Case("movdiri", HasMOVDIRI)
+      .Case("movdir64b", HasMOVDIR64B)
       .Case("mpx", HasMPX)
       .Case("mwaitx", HasMWAITX)
       .Case("pclmul", HasPCLMUL)
+      .Case("pconfig", HasPCONFIG)
       .Case("pku", HasPKU)
       .Case("popcnt", HasPOPCNT)
       .Case("prefetchwt1", HasPREFETCHWT1)
       .Case("prfchw", HasPRFCHW)
+      .Case("ptwrite", HasPTWRITE)
       .Case("rdpid", HasRDPID)
       .Case("rdrnd", HasRDRND)
       .Case("rdseed", HasRDSEED)
@@ -1385,6 +1415,7 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("vaes", HasVAES)
       .Case("vpclmulqdq", HasVPCLMULQDQ)
       .Case("wbnoinvd", HasWBNOINVD)
+      .Case("waitpkg", HasWAITPKG)
       .Case("x86", true)
       .Case("x86_32", getTriple().getArch() == llvm::Triple::x86)
       .Case("x86_64", getTriple().getArch() == llvm::Triple::x86_64)

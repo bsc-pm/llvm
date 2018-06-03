@@ -63,7 +63,7 @@ namespace llvm {
 namespace sys  {
 namespace path {
 
-// Convert a (likely) UTF-8 path to UTF-16.  Also, if the absolute equivalent of the
+// Convert a UTF-8 path to UTF-16.  Also, if the absolute equivalent of the
 // path is longer than CreateDirectory can tolerate, make it absolute and
 // prefixed by '\\?\'.
 std::error_code widenPath(const Twine &Path8,
@@ -72,7 +72,7 @@ std::error_code widenPath(const Twine &Path8,
 
   // Several operations would convert Path8 to SmallString; more efficient to
   // do it once up front.
-  SmallString<2*MAX_PATH> Path8Str;
+  SmallString<128> Path8Str;
   Path8.toVector(Path8Str);
 
   // If we made this path absolute, how much longer would it get?
@@ -112,17 +112,11 @@ std::error_code widenPath(const Twine &Path8,
       else
         llvm::sys::path::append(FullPath, *I);
     }
-    Path8Str = FullPath;
+    return UTF8ToUTF16(FullPath, Path16);
   }
 
-  // Path8Str now contains the full path or the original path
-  // If the conversion from UTF8 to UTF16 fails because of ERROR_NO_UNICODE_TRANSLATION,
-  // we also try using the current code page before giving up
-  auto ec = UTF8ToUTF16(Path8Str, Path16);
-  if (ec == mapWindowsError(ERROR_NO_UNICODE_TRANSLATION)) {
-    ec = CurCPToUTF16(Path8Str, Path16);
-  }
-  return ec;
+  // Just use the caller's original path.
+  return UTF8ToUTF16(Path8Str, Path16);
 }
 } // end namespace path
 
@@ -1058,6 +1052,7 @@ static std::error_code directoryRealPath(const Twine &Name,
 
 std::error_code openFileForRead(const Twine &Name, int &ResultFD,
                                 SmallVectorImpl<char> *RealPath) {
+  ResultFD = -1;
   SmallVector<wchar_t, 128> PathUTF16;
 
   if (std::error_code EC = widenPath(Name, PathUTF16))
@@ -1080,8 +1075,8 @@ std::error_code openFileForRead(const Twine &Name, int &ResultFD,
     return EC;
   }
 
-  int FD = ::_open_osfhandle(intptr_t(H), 0);
-  if (FD == -1) {
+  ResultFD = ::_open_osfhandle(intptr_t(H), 0);
+  if (ResultFD == -1) {
     ::CloseHandle(H);
     return mapWindowsError(ERROR_INVALID_HANDLE);
   }
@@ -1090,7 +1085,6 @@ std::error_code openFileForRead(const Twine &Name, int &ResultFD,
   if (RealPath)
     realPathFromHandle(H, *RealPath);
 
-  ResultFD = FD;
   return std::error_code();
 }
 
@@ -1100,6 +1094,7 @@ std::error_code openFileForWrite(const Twine &Name, int &ResultFD,
   assert((!(Flags & sys::fs::F_Excl) || !(Flags & sys::fs::F_Append)) &&
          "Cannot specify both 'excl' and 'append' file creation flags!");
 
+  ResultFD = -1;
   SmallVector<wchar_t, 128> PathUTF16;
 
   if (std::error_code EC = widenPath(Name, PathUTF16))
@@ -1147,13 +1142,12 @@ std::error_code openFileForWrite(const Twine &Name, int &ResultFD,
   if (Flags & F_Text)
     OpenFlags |= _O_TEXT;
 
-  int FD = ::_open_osfhandle(intptr_t(H), OpenFlags);
-  if (FD == -1) {
+  ResultFD = ::_open_osfhandle(intptr_t(H), OpenFlags);
+  if (ResultFD == -1) {
     ::CloseHandle(H);
     return mapWindowsError(ERROR_INVALID_HANDLE);
   }
 
-  ResultFD = FD;
   return std::error_code();
 }
 

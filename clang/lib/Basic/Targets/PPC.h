@@ -57,7 +57,7 @@ public:
     LongDoubleFormat = &llvm::APFloat::PPCDoubleDouble();
   }
 
-  /// \brief Flags for architecture specific defines.
+  /// Flags for architecture specific defines.
   typedef enum {
     ArchDefineNone = 0,
     ArchDefineName = 1 << 0, // <name> is substituted for arch name.
@@ -334,6 +334,15 @@ public:
       return true;
     }
     return false;
+  }
+
+  CallingConvCheckResult checkCallingConvention(CallingConv CC) const override {
+    switch (CC) {
+    case CC_Swift:
+      return CCCR_OK;
+    default:
+      return CCCR_Warning;
+    }
   }
 };
 

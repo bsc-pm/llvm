@@ -631,10 +631,10 @@ X86InstrInfo::X86InstrInfo(X86Subtarget &STI)
     { X86::PABSBrr,         X86::PABSBrm,             TB_ALIGN_16 },
     { X86::PABSDrr,         X86::PABSDrm,             TB_ALIGN_16 },
     { X86::PABSWrr,         X86::PABSWrm,             TB_ALIGN_16 },
-    { X86::PCMPESTRIrr,     X86::PCMPESTRIrm,         TB_ALIGN_16 },
-    { X86::PCMPESTRM128rr,  X86::PCMPESTRM128rm,      TB_ALIGN_16 },
-    { X86::PCMPISTRIrr,     X86::PCMPISTRIrm,         TB_ALIGN_16 },
-    { X86::PCMPISTRM128rr,  X86::PCMPISTRM128rm,      TB_ALIGN_16 },
+    { X86::PCMPESTRIrr,     X86::PCMPESTRIrm,         0 },
+    { X86::PCMPESTRMrr,     X86::PCMPESTRMrm,         0 },
+    { X86::PCMPISTRIrr,     X86::PCMPISTRIrm,         0 },
+    { X86::PCMPISTRMrr,     X86::PCMPISTRMrm,         0 },
     { X86::PHMINPOSUWrr,    X86::PHMINPOSUWrm,        TB_ALIGN_16 },
     { X86::PMOVSXBDrr,      X86::PMOVSXBDrm,          TB_NO_REVERSE },
     { X86::PMOVSXBQrr,      X86::PMOVSXBQrm,          TB_NO_REVERSE },
@@ -736,10 +736,10 @@ X86InstrInfo::X86InstrInfo(X86Subtarget &STI)
     { X86::VPABSDrr,        X86::VPABSDrm,            0 },
     { X86::VPABSWrr,        X86::VPABSWrm,            0 },
     { X86::VPCMPESTRIrr,    X86::VPCMPESTRIrm,        0 },
-    { X86::VPCMPESTRM128rr, X86::VPCMPESTRM128rm,     0 },
+    { X86::VPCMPESTRMrr,    X86::VPCMPESTRMrm,        0 },
     { X86::VPCMPISTRIrr,    X86::VPCMPISTRIrm,        0 },
-    { X86::VPCMPISTRM128rr, X86::VPCMPISTRM128rm,     0 },
-    { X86::VPHMINPOSUWrr,   X86::VPHMINPOSUWrm,      0 },
+    { X86::VPCMPISTRMrr,    X86::VPCMPISTRMrm,        0 },
+    { X86::VPHMINPOSUWrr,   X86::VPHMINPOSUWrm,       0 },
     { X86::VPERMILPDri,     X86::VPERMILPDmi,         0 },
     { X86::VPERMILPSri,     X86::VPERMILPSmi,         0 },
     { X86::VPMOVSXBDrr,     X86::VPMOVSXBDrm,         TB_NO_REVERSE },
@@ -3939,156 +3939,183 @@ bool X86InstrInfo::isFrameOperand(const MachineInstr &MI, unsigned int Op,
   return false;
 }
 
-static bool isFrameLoadOpcode(int Opcode) {
+static bool isFrameLoadOpcode(int Opcode, unsigned &MemBytes) {
   switch (Opcode) {
   default:
     return false;
   case X86::MOV8rm:
+  case X86::KMOVBkm:
+    MemBytes = 1;
+    return true;
   case X86::MOV16rm:
+  case X86::KMOVWkm:
+    MemBytes = 2;
+    return true;
   case X86::MOV32rm:
+  case X86::MOVSSrm:
+  case X86::VMOVSSZrm:
+  case X86::VMOVSSrm:
+  case X86::KMOVDkm:
+    MemBytes = 4;
+    return true;
   case X86::MOV64rm:
   case X86::LD_Fp64m:
-  case X86::MOVSSrm:
   case X86::MOVSDrm:
+  case X86::VMOVSDrm:
+  case X86::VMOVSDZrm:
+  case X86::MMX_MOVD64rm:
+  case X86::MMX_MOVQ64rm:
+  case X86::KMOVQkm:
+    MemBytes = 8;
+    return true;
   case X86::MOVAPSrm:
   case X86::MOVUPSrm:
   case X86::MOVAPDrm:
   case X86::MOVUPDrm:
   case X86::MOVDQArm:
   case X86::MOVDQUrm:
-  case X86::VMOVSSrm:
-  case X86::VMOVSDrm:
   case X86::VMOVAPSrm:
   case X86::VMOVUPSrm:
   case X86::VMOVAPDrm:
   case X86::VMOVUPDrm:
   case X86::VMOVDQArm:
   case X86::VMOVDQUrm:
-  case X86::VMOVUPSYrm:
-  case X86::VMOVAPSYrm:
-  case X86::VMOVUPDYrm:
-  case X86::VMOVAPDYrm:
-  case X86::VMOVDQUYrm:
-  case X86::VMOVDQAYrm:
-  case X86::MMX_MOVD64rm:
-  case X86::MMX_MOVQ64rm:
-  case X86::VMOVSSZrm:
-  case X86::VMOVSDZrm:
-  case X86::VMOVAPSZrm:
   case X86::VMOVAPSZ128rm:
-  case X86::VMOVAPSZ256rm:
-  case X86::VMOVAPSZ128rm_NOVLX:
-  case X86::VMOVAPSZ256rm_NOVLX:
-  case X86::VMOVUPSZrm:
   case X86::VMOVUPSZ128rm:
-  case X86::VMOVUPSZ256rm:
+  case X86::VMOVAPSZ128rm_NOVLX:
   case X86::VMOVUPSZ128rm_NOVLX:
-  case X86::VMOVUPSZ256rm_NOVLX:
-  case X86::VMOVAPDZrm:
   case X86::VMOVAPDZ128rm:
-  case X86::VMOVAPDZ256rm:
-  case X86::VMOVUPDZrm:
   case X86::VMOVUPDZ128rm:
-  case X86::VMOVUPDZ256rm:
-  case X86::VMOVDQA32Zrm:
-  case X86::VMOVDQA32Z128rm:
-  case X86::VMOVDQA32Z256rm:
-  case X86::VMOVDQU32Zrm:
-  case X86::VMOVDQU32Z128rm:
-  case X86::VMOVDQU32Z256rm:
-  case X86::VMOVDQA64Zrm:
-  case X86::VMOVDQA64Z128rm:
-  case X86::VMOVDQA64Z256rm:
-  case X86::VMOVDQU64Zrm:
-  case X86::VMOVDQU64Z128rm:
-  case X86::VMOVDQU64Z256rm:
-  case X86::VMOVDQU8Zrm:
   case X86::VMOVDQU8Z128rm:
-  case X86::VMOVDQU8Z256rm:
-  case X86::VMOVDQU16Zrm:
   case X86::VMOVDQU16Z128rm:
+  case X86::VMOVDQA32Z128rm:
+  case X86::VMOVDQU32Z128rm:
+  case X86::VMOVDQA64Z128rm:
+  case X86::VMOVDQU64Z128rm:
+    MemBytes = 16;
+    return true;
+  case X86::VMOVAPSYrm:
+  case X86::VMOVUPSYrm:
+  case X86::VMOVAPDYrm:
+  case X86::VMOVUPDYrm:
+  case X86::VMOVDQAYrm:
+  case X86::VMOVDQUYrm:
+  case X86::VMOVAPSZ256rm:
+  case X86::VMOVUPSZ256rm:
+  case X86::VMOVAPSZ256rm_NOVLX:
+  case X86::VMOVUPSZ256rm_NOVLX:
+  case X86::VMOVAPDZ256rm:
+  case X86::VMOVUPDZ256rm:
+  case X86::VMOVDQU8Z256rm:
   case X86::VMOVDQU16Z256rm:
-  case X86::KMOVBkm:
-  case X86::KMOVWkm:
-  case X86::KMOVDkm:
-  case X86::KMOVQkm:
+  case X86::VMOVDQA32Z256rm:
+  case X86::VMOVDQU32Z256rm:
+  case X86::VMOVDQA64Z256rm:
+  case X86::VMOVDQU64Z256rm:
+    MemBytes = 32;
+    return true;
+  case X86::VMOVAPSZrm:
+  case X86::VMOVUPSZrm:
+  case X86::VMOVAPDZrm:
+  case X86::VMOVUPDZrm:
+  case X86::VMOVDQU8Zrm:
+  case X86::VMOVDQU16Zrm:
+  case X86::VMOVDQA32Zrm:
+  case X86::VMOVDQU32Zrm:
+  case X86::VMOVDQA64Zrm:
+  case X86::VMOVDQU64Zrm:
+    MemBytes = 64;
     return true;
   }
 }
 
-static bool isFrameStoreOpcode(int Opcode) {
+static bool isFrameStoreOpcode(int Opcode, unsigned &MemBytes) {
   switch (Opcode) {
-  default: break;
+  default:
+    return false;
   case X86::MOV8mr:
+  case X86::KMOVBmk:
+    MemBytes = 1;
+    return true;
   case X86::MOV16mr:
+  case X86::KMOVWmk:
+    MemBytes = 2;
+    return true;
   case X86::MOV32mr:
+  case X86::MOVSSmr:
+  case X86::VMOVSSmr:
+  case X86::VMOVSSZmr:
+  case X86::KMOVDmk:
+    MemBytes = 4;
+    return true;
   case X86::MOV64mr:
   case X86::ST_FpP64m:
-  case X86::MOVSSmr:
   case X86::MOVSDmr:
+  case X86::VMOVSDmr:
+  case X86::VMOVSDZmr:
+  case X86::MMX_MOVD64mr:
+  case X86::MMX_MOVQ64mr:
+  case X86::MMX_MOVNTQmr:
+  case X86::KMOVQmk:
+    MemBytes = 8;
+    return true;
   case X86::MOVAPSmr:
   case X86::MOVUPSmr:
   case X86::MOVAPDmr:
   case X86::MOVUPDmr:
   case X86::MOVDQAmr:
   case X86::MOVDQUmr:
-  case X86::VMOVSSmr:
-  case X86::VMOVSDmr:
   case X86::VMOVAPSmr:
   case X86::VMOVUPSmr:
   case X86::VMOVAPDmr:
   case X86::VMOVUPDmr:
   case X86::VMOVDQAmr:
   case X86::VMOVDQUmr:
+  case X86::VMOVUPSZ128mr:
+  case X86::VMOVAPSZ128mr:
+  case X86::VMOVUPSZ128mr_NOVLX:
+  case X86::VMOVAPSZ128mr_NOVLX:
+  case X86::VMOVUPDZ128mr:
+  case X86::VMOVAPDZ128mr:
+  case X86::VMOVDQA32Z128mr:
+  case X86::VMOVDQU32Z128mr:
+  case X86::VMOVDQA64Z128mr:
+  case X86::VMOVDQU64Z128mr:
+  case X86::VMOVDQU8Z128mr:
+  case X86::VMOVDQU16Z128mr:
+    MemBytes = 16;
+    return true;
   case X86::VMOVUPSYmr:
   case X86::VMOVAPSYmr:
   case X86::VMOVUPDYmr:
   case X86::VMOVAPDYmr:
   case X86::VMOVDQUYmr:
   case X86::VMOVDQAYmr:
-  case X86::VMOVSSZmr:
-  case X86::VMOVSDZmr:
-  case X86::VMOVUPSZmr:
-  case X86::VMOVUPSZ128mr:
   case X86::VMOVUPSZ256mr:
-  case X86::VMOVUPSZ128mr_NOVLX:
-  case X86::VMOVUPSZ256mr_NOVLX:
-  case X86::VMOVAPSZmr:
-  case X86::VMOVAPSZ128mr:
   case X86::VMOVAPSZ256mr:
-  case X86::VMOVAPSZ128mr_NOVLX:
+  case X86::VMOVUPSZ256mr_NOVLX:
   case X86::VMOVAPSZ256mr_NOVLX:
-  case X86::VMOVUPDZmr:
-  case X86::VMOVUPDZ128mr:
   case X86::VMOVUPDZ256mr:
-  case X86::VMOVAPDZmr:
-  case X86::VMOVAPDZ128mr:
   case X86::VMOVAPDZ256mr:
-  case X86::VMOVDQA32Zmr:
-  case X86::VMOVDQA32Z128mr:
-  case X86::VMOVDQA32Z256mr:
-  case X86::VMOVDQU32Zmr:
-  case X86::VMOVDQU32Z128mr:
-  case X86::VMOVDQU32Z256mr:
-  case X86::VMOVDQA64Zmr:
-  case X86::VMOVDQA64Z128mr:
-  case X86::VMOVDQA64Z256mr:
-  case X86::VMOVDQU64Zmr:
-  case X86::VMOVDQU64Z128mr:
-  case X86::VMOVDQU64Z256mr:
-  case X86::VMOVDQU8Zmr:
-  case X86::VMOVDQU8Z128mr:
   case X86::VMOVDQU8Z256mr:
-  case X86::VMOVDQU16Zmr:
-  case X86::VMOVDQU16Z128mr:
   case X86::VMOVDQU16Z256mr:
-  case X86::MMX_MOVD64mr:
-  case X86::MMX_MOVQ64mr:
-  case X86::MMX_MOVNTQmr:
-  case X86::KMOVBmk:
-  case X86::KMOVWmk:
-  case X86::KMOVDmk:
-  case X86::KMOVQmk:
+  case X86::VMOVDQA32Z256mr:
+  case X86::VMOVDQU32Z256mr:
+  case X86::VMOVDQA64Z256mr:
+  case X86::VMOVDQU64Z256mr:
+    MemBytes = 32;
+    return true;
+  case X86::VMOVUPSZmr:
+  case X86::VMOVAPSZmr:
+  case X86::VMOVUPDZmr:
+  case X86::VMOVAPDZmr:
+  case X86::VMOVDQU8Zmr:
+  case X86::VMOVDQU16Zmr:
+  case X86::VMOVDQA32Zmr:
+  case X86::VMOVDQU32Zmr:
+  case X86::VMOVDQA64Zmr:
+  case X86::VMOVDQU64Zmr:
+    MemBytes = 64;
     return true;
   }
   return false;
@@ -4096,7 +4123,14 @@ static bool isFrameStoreOpcode(int Opcode) {
 
 unsigned X86InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                            int &FrameIndex) const {
-  if (isFrameLoadOpcode(MI.getOpcode()))
+  unsigned Dummy;
+  return X86InstrInfo::isLoadFromStackSlot(MI, FrameIndex, Dummy);
+}
+
+unsigned X86InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+                                           int &FrameIndex,
+                                           unsigned &MemBytes) const {
+  if (isFrameLoadOpcode(MI.getOpcode(), MemBytes))
     if (MI.getOperand(0).getSubReg() == 0 && isFrameOperand(MI, 1, FrameIndex))
       return MI.getOperand(0).getReg();
   return 0;
@@ -4104,7 +4138,8 @@ unsigned X86InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
 
 unsigned X86InstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
                                                  int &FrameIndex) const {
-  if (isFrameLoadOpcode(MI.getOpcode())) {
+  unsigned Dummy;
+  if (isFrameLoadOpcode(MI.getOpcode(), Dummy)) {
     unsigned Reg;
     if ((Reg = isLoadFromStackSlot(MI, FrameIndex)))
       return Reg;
@@ -4117,7 +4152,14 @@ unsigned X86InstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
 
 unsigned X86InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                           int &FrameIndex) const {
-  if (isFrameStoreOpcode(MI.getOpcode()))
+  unsigned Dummy;
+  return X86InstrInfo::isStoreToStackSlot(MI, FrameIndex, Dummy);
+}
+
+unsigned X86InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+                                          int &FrameIndex,
+                                          unsigned &MemBytes) const {
+  if (isFrameStoreOpcode(MI.getOpcode(), MemBytes))
     if (MI.getOperand(X86::AddrNumOperands).getSubReg() == 0 &&
         isFrameOperand(MI, 0, FrameIndex))
       return MI.getOperand(X86::AddrNumOperands).getReg();
@@ -4126,7 +4168,8 @@ unsigned X86InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
 
 unsigned X86InstrInfo::isStoreToStackSlotPostFE(const MachineInstr &MI,
                                                 int &FrameIndex) const {
-  if (isFrameStoreOpcode(MI.getOpcode())) {
+  unsigned Dummy;
+  if (isFrameStoreOpcode(MI.getOpcode(), Dummy)) {
     unsigned Reg;
     if ((Reg = isStoreToStackSlot(MI, FrameIndex)))
       return Reg;
@@ -4297,8 +4340,8 @@ bool X86InstrInfo::isSafeToClobberEFLAGS(MachineBasicBlock &MBB,
       // This instruction defines EFLAGS, no need to look any further.
       return true;
     ++Iter;
-    // Skip over DBG_VALUE.
-    while (Iter != E && Iter->isDebugValue())
+    // Skip over debug instructions.
+    while (Iter != E && Iter->isDebugInstr())
       ++Iter;
   }
 
@@ -4320,8 +4363,8 @@ bool X86InstrInfo::isSafeToClobberEFLAGS(MachineBasicBlock &MBB,
       return !MBB.isLiveIn(X86::EFLAGS);
 
     --Iter;
-    // Skip over DBG_VALUE.
-    while (Iter != B && Iter->isDebugValue())
+    // Skip over debug instructions.
+    while (Iter != B && Iter->isDebugInstr())
       --Iter;
 
     bool SawKill = false;
@@ -5139,7 +5182,7 @@ static bool commuteVPTERNLOG(MachineInstr &MI, unsigned SrcOpIdx1,
   return true;
 }
 
-// Returns true if this is a VPERMI2 or VPERMT2 instrution that can be
+// Returns true if this is a VPERMI2 or VPERMT2 instruction that can be
 // commuted.
 static bool isCommutableVPERMV3Instruction(unsigned Opcode) {
 #define VPERM_CASES(Suffix) \
@@ -5180,7 +5223,7 @@ static bool isCommutableVPERMV3Instruction(unsigned Opcode) {
 }
 
 // Returns commuted opcode for VPERMI2 and VPERMT2 instructions by switching
-// from the I opcod to the T opcode and vice versa.
+// from the I opcode to the T opcode and vice versa.
 static unsigned getCommutedVPERMV3Opcode(unsigned Opcode) {
 #define VPERM_CASES(Orig, New) \
   case X86::Orig##128rr:    return X86::New##128rr;   \
@@ -6111,7 +6154,7 @@ unsigned X86::getCMovFromCond(CondCode CC, unsigned RegBytes,
   }
 }
 
-/// \brief Get the VPCMP immediate if the opcodes are swapped.
+/// Get the VPCMP immediate if the opcodes are swapped.
 unsigned X86::getSwappedVPCMPImm(unsigned Imm) {
   switch (Imm) {
   default: llvm_unreachable("Unreachable!");
@@ -6129,7 +6172,7 @@ unsigned X86::getSwappedVPCMPImm(unsigned Imm) {
   return Imm;
 }
 
-/// \brief Get the VPCOM immediate if the opcodes are swapped.
+/// Get the VPCOM immediate if the opcodes are swapped.
 unsigned X86::getSwappedVPCOMImm(unsigned Imm) {
   switch (Imm) {
   default: llvm_unreachable("Unreachable!");
@@ -6211,7 +6254,7 @@ void X86InstrInfo::replaceBranchWithTailCall(
   MachineBasicBlock::iterator I = MBB.end();
   while (I != MBB.begin()) {
     --I;
-    if (I->isDebugValue())
+    if (I->isDebugInstr())
       continue;
     if (!I->isBranch())
       assert(0 && "Can't find the branch to replace!");
@@ -6279,7 +6322,7 @@ bool X86InstrInfo::AnalyzeBranchImpl(
   MachineBasicBlock::iterator UnCondBrIter = MBB.end();
   while (I != MBB.begin()) {
     --I;
-    if (I->isDebugValue())
+    if (I->isDebugInstr())
       continue;
 
     // Working from the bottom, when we see a non-terminator instruction, we're
@@ -6516,7 +6559,7 @@ unsigned X86InstrInfo::removeBranch(MachineBasicBlock &MBB,
 
   while (I != MBB.begin()) {
     --I;
-    if (I->isDebugValue())
+    if (I->isDebugInstr())
       continue;
     if (I->getOpcode() != X86::JMP_1 &&
         X86::getCondFromBranchOpc(I->getOpcode()) == X86::COND_INVALID)
@@ -6804,9 +6847,19 @@ void X86InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     report_fatal_error("Unable to copy EFLAGS physical register!");
   }
 
-  DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
-               << " to " << RI.getName(DestReg) << '\n');
+  LLVM_DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg) << " to "
+                    << RI.getName(DestReg) << '\n');
   llvm_unreachable("Cannot emit physreg copy instruction");
+}
+
+bool X86InstrInfo::isCopyInstr(const MachineInstr &MI, MachineOperand &Src,
+                               MachineOperand &Dest) const {
+  if (MI.isMoveReg()) {
+    Dest = MI.getOperand(0);
+    Src = MI.getOperand(1);
+    return true;
+  }
+  return false;
 }
 
 static unsigned getLoadStoreRegOpcode(unsigned Reg,
@@ -6893,9 +6946,9 @@ static unsigned getLoadStoreRegOpcode(unsigned Reg,
     }
     if (X86::BNDRRegClass.hasSubClassEq(RC)) {
       if (STI.is64Bit())
-        return load ? X86::BNDMOVRM64rm : X86::BNDMOVMR64mr;
+        return load ? X86::BNDMOV64rm : X86::BNDMOV64mr;
       else
-        return load ? X86::BNDMOVRM32rm : X86::BNDMOVMR32mr;
+        return load ? X86::BNDMOV32rm : X86::BNDMOV32mr;
     }
     llvm_unreachable("Unknown 16-byte regclass");
   }
@@ -11091,15 +11144,26 @@ X86InstrInfo::getOutlininingCandidateInfo(
   std::vector<
       std::pair<MachineBasicBlock::iterator, MachineBasicBlock::iterator>>
       &RepeatedSequenceLocs) const {
+  unsigned SequenceSize = std::accumulate(
+      RepeatedSequenceLocs[0].first, std::next(RepeatedSequenceLocs[0].second),
+      0, [](unsigned Sum, const MachineInstr &MI) {
+        // FIXME: x86 doesn't implement getInstSizeInBytes, so we can't
+        // tell the cost.  Just assume each instruction is one byte.
+        if (MI.isDebugInstr() || MI.isKill())
+          return Sum;
+        return Sum + 1;
+      });
 
+  // FIXME: Use real size in bytes for call and ret instructions.
   if (RepeatedSequenceLocs[0].second->isTerminator())
-    return MachineOutlinerInfo(1, // Number of instructions to emit call.
-                               0, // Number of instructions to emit frame.
+    return MachineOutlinerInfo(SequenceSize,
+                               1, // Number of bytes to emit call.
+                               0, // Number of bytes to emit frame.
                                MachineOutlinerTailCall, // Type of call.
                                MachineOutlinerTailCall // Type of frame.
                               );
 
-  return MachineOutlinerInfo(1, 1, MachineOutlinerDefault,
+  return MachineOutlinerInfo(SequenceSize, 1, 1, MachineOutlinerDefault,
                              MachineOutlinerDefault);
 }
 
@@ -11129,7 +11193,7 @@ X86GenInstrInfo::MachineOutlinerInstrType
 X86InstrInfo::getOutliningType(MachineBasicBlock::iterator &MIT,  unsigned Flags) const {
   MachineInstr &MI = *MIT;
   // Don't allow debug values to impact outlining type.
-  if (MI.isDebugValue() || MI.isIndirectDebugValue())
+  if (MI.isDebugInstr() || MI.isIndirectDebugValue())
     return MachineOutlinerInstrType::Invisible;
 
   // At this point, KILL instructions don't really tell us much so we can go

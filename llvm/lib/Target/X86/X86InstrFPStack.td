@@ -277,6 +277,8 @@ def SUB_FPrST0  : FPrST0PInst<MRM5r, "fsub{r}p\t$op">;
 def SUB_FST0r   : FPST0rInst <MRM4r, "fsub\t$op">;
 def SUBR_FrST0  : FPrST0Inst <MRM4r, "fsub{|r}\t{%st(0), $op|$op, st(0)}">;
 def SUBR_FPrST0 : FPrST0PInst<MRM4r, "fsub{|r}p\t$op">;
+} // SchedRW
+let SchedRW = [WriteFCom] in {
 def COM_FST0r   : FPST0rInst <MRM2r, "fcom\t$op">;
 def COMP_FST0r  : FPST0rInst <MRM3r, "fcomp\t$op">;
 } // SchedRW
@@ -307,12 +309,12 @@ def _F     : FPI<0xD9, fp, (outs), (ins), asmstring>;
 
 let Defs = [FPSW] in {
 
-let SchedRW = [WriteVecLogic] in {
+let SchedRW = [WriteFSign] in {
 defm CHS : FPUnary<fneg, MRM_E0, "fchs">;
 defm ABS : FPUnary<fabs, MRM_E1, "fabs">;
 }
 
-let SchedRW = [WriteFSqrt] in
+let SchedRW = [WriteFSqrt80] in
 defm SQRT: FPUnary<fsqrt,MRM_FA, "fsqrt">;
 
 let SchedRW = [WriteMicrocoded] in {
@@ -320,7 +322,7 @@ defm SIN : FPUnary<fsin, MRM_FE, "fsin">;
 defm COS : FPUnary<fcos, MRM_FF, "fcos">;
 }
 
-let SchedRW = [WriteFAdd] in {
+let SchedRW = [WriteFCom] in {
 let hasSideEffects = 0 in {
 def TST_Fp32  : FpIf32<(outs), (ins RFP32:$src), OneArgFP, []>;
 def TST_Fp64  : FpIf64<(outs), (ins RFP64:$src), OneArgFP, []>;
@@ -333,7 +335,7 @@ def TST_F  : FPI<0xD9, MRM_E4, (outs), (ins), "ftst">;
 
 // Versions of FP instructions that take a single memory operand.  Added for the
 //   disassembler; remove as they are included with patterns elsewhere.
-let SchedRW = [WriteFAddLd] in {
+let SchedRW = [WriteFComLd] in {
 def FCOM32m  : FPI<0xD8, MRM2m, (outs), (ins f32mem:$src), "fcom{s}\t$src">;
 def FCOMP32m : FPI<0xD8, MRM3m, (outs), (ins f32mem:$src), "fcomp{s}\t$src">;
 
@@ -382,7 +384,7 @@ multiclass FPCMov<PatLeaf cc> {
 }
 
 let Defs = [FPSW] in {
-let SchedRW = [WriteFAdd] in {
+let SchedRW = [WriteFCMOV] in {
 let Uses = [EFLAGS], Constraints = "$src1 = $dst" in {
 defm CMOVB  : FPCMov<X86_COND_B>;
 defm CMOVBE : FPCMov<X86_COND_BE>;
@@ -568,7 +570,7 @@ def LD_F1 : FPI<0xD9, MRM_E8, (outs), (ins), "fld1">;
 }
 
 // Floating point compares.
-let SchedRW = [WriteFAdd] in {
+let SchedRW = [WriteFCom] in {
 def UCOM_Fpr32 : FpIf32<(outs), (ins RFP32:$lhs, RFP32:$rhs), CompareFP,
                         [(set FPSW, (trunc (X86cmp RFP32:$lhs, RFP32:$rhs)))]>;
 def UCOM_Fpr64 : FpIf64<(outs), (ins RFP64:$lhs, RFP64:$rhs), CompareFP,
@@ -578,7 +580,7 @@ def UCOM_Fpr80 : FpI_  <(outs), (ins RFP80:$lhs, RFP80:$rhs), CompareFP,
 } // SchedRW
 } // Defs = [FPSW]
 
-let SchedRW = [WriteFAdd] in {
+let SchedRW = [WriteFCom] in {
 // CC = ST(0) cmp ST(i)
 let Defs = [EFLAGS, FPSW] in {
 def UCOM_FpIr32: FpIf32<(outs), (ins RFP32:$lhs, RFP32:$rhs), CompareFP,
@@ -667,16 +669,16 @@ def FSCALE : I<0xD9, MRM_FD, (outs), (ins), "fscale", []>;
 def FCOMPP : I<0xDE, MRM_D9, (outs), (ins), "fcompp", []>;
 } // Defs = [FPSW]
 
-def FXSAVE : I<0xAE, MRM0m, (outs), (ins opaque512mem:$dst),
+def FXSAVE : I<0xAE, MRM0m, (outs), (ins opaquemem:$dst),
              "fxsave\t$dst", [(int_x86_fxsave addr:$dst)]>, TB,
              Requires<[HasFXSR]>;
-def FXSAVE64 : RI<0xAE, MRM0m, (outs), (ins opaque512mem:$dst),
+def FXSAVE64 : RI<0xAE, MRM0m, (outs), (ins opaquemem:$dst),
                "fxsave64\t$dst", [(int_x86_fxsave64 addr:$dst)]>,
                TB, Requires<[HasFXSR, In64BitMode]>;
-def FXRSTOR : I<0xAE, MRM1m, (outs), (ins opaque512mem:$src),
+def FXRSTOR : I<0xAE, MRM1m, (outs), (ins opaquemem:$src),
               "fxrstor\t$src", [(int_x86_fxrstor addr:$src)]>,
               TB, Requires<[HasFXSR]>;
-def FXRSTOR64 : RI<0xAE, MRM1m, (outs), (ins opaque512mem:$src),
+def FXRSTOR64 : RI<0xAE, MRM1m, (outs), (ins opaquemem:$src),
                 "fxrstor64\t$src", [(int_x86_fxrstor64 addr:$src)]>,
                 TB, Requires<[HasFXSR, In64BitMode]>;
 } // SchedRW

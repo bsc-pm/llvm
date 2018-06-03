@@ -11,6 +11,7 @@
 #include "AMDGPUArgumentUsageInfo.h"
 #include "AMDGPUSubtarget.h"
 #include "SIRegisterInfo.h"
+#include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "Utils/AMDGPUBaseInfo.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -70,8 +71,11 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
     if (F.hasFnAttribute("amdgpu-implicitarg-ptr"))
       ImplicitArgPtr = true;
   } else {
-    if (F.hasFnAttribute("amdgpu-implicitarg-ptr"))
+    if (F.hasFnAttribute("amdgpu-implicitarg-ptr")) {
       KernargSegmentPtr = true;
+      assert(MaxKernArgAlign == 0);
+      MaxKernArgAlign =  ST.getAlignmentForImplicitArgPtr();
+    }
   }
 
   CallingConv::ID CC = F.getCallingConv();
@@ -133,7 +137,7 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
     }
   }
 
-  bool IsCOV2 = ST.isAmdCodeObjectV2(MF);
+  bool IsCOV2 = ST.isAmdCodeObjectV2(F);
   if (IsCOV2) {
     if (HasStackObjects || MaySpill)
       PrivateSegmentBuffer = true;
@@ -146,7 +150,7 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
 
     if (F.hasFnAttribute("amdgpu-dispatch-id"))
       DispatchID = true;
-  } else if (ST.isMesaGfxShader(MF)) {
+  } else if (ST.isMesaGfxShader(F)) {
     if (HasStackObjects || MaySpill)
       ImplicitBufferPtr = true;
   }
@@ -297,4 +301,30 @@ bool SIMachineFunctionInfo::allocateSGPRSpillToVGPR(MachineFunction &MF,
 void SIMachineFunctionInfo::removeSGPRToVGPRFrameIndices(MachineFrameInfo &MFI) {
   for (auto &R : SGPRToVGPRSpills)
     MFI.RemoveStackObject(R.first);
+}
+
+
+/// \returns VGPR used for \p Dim' work item ID.
+unsigned SIMachineFunctionInfo::getWorkItemIDVGPR(unsigned Dim) const {
+  switch (Dim) {
+  case 0:
+    assert(hasWorkItemIDX());
+    return AMDGPU::VGPR0;
+  case 1:
+    assert(hasWorkItemIDY());
+    return AMDGPU::VGPR1;
+  case 2:
+    assert(hasWorkItemIDZ());
+    return AMDGPU::VGPR2;
+  }
+  llvm_unreachable("unexpected dimension");
+}
+
+MCPhysReg SIMachineFunctionInfo::getNextUserSGPR() const {
+  assert(NumSystemSGPRs == 0 && "System SGPRs must be added after user SGPRs");
+  return AMDGPU::SGPR0 + NumUserSGPRs;
+}
+
+MCPhysReg SIMachineFunctionInfo::getNextSystemSGPR() const {
+  return AMDGPU::SGPR0 + NumUserSGPRs + NumSystemSGPRs;
 }

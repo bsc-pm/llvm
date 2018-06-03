@@ -765,6 +765,23 @@ static inline bool isSVEMaskOfIdenticalElements(int64_t Imm) {
   return all_of(Vec.Parts, [Vec](T Elem) { return Elem == Vec.Parts[0]; });
 }
 
+/// Returns true if Imm is valid for CPY/DUP.
+template <typename T>
+static inline bool isSVECpyImm(int64_t Imm) {
+  if (std::is_same<int8_t, typename std::make_signed<T>::type>::value)
+    return uint8_t(Imm) == Imm || int8_t(Imm) == Imm;
+  else
+    return int8_t(Imm) == Imm || int16_t(Imm & ~0xff) == Imm;
+}
+
+/// Returns true if Imm is valid for ADD/SUB.
+template <typename T>
+static inline bool isSVEAddSubImm(int64_t Imm) {
+  bool IsInt8t =
+      std::is_same<int8_t, typename std::make_signed<T>::type>::value;
+  return uint8_t(Imm) == Imm || (!IsInt8t && uint16_t(Imm & ~0xff) == Imm);
+}
+
 inline static bool isAnyMOVZMovAlias(uint64_t Value, int RegWidth) {
   for (int Shift = 0; Shift <= RegWidth - 16; Shift += 16)
     if ((Value & ~(0xffffULL << Shift)) == 0)

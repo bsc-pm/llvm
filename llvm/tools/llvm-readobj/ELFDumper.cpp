@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This file implements the ELF-specific dumper for llvm-readobj.
+/// This file implements the ELF-specific dumper for llvm-readobj.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -115,11 +115,11 @@ struct DynRegionInfo {
   DynRegionInfo(const void *A, uint64_t S, uint64_t ES)
       : Addr(A), Size(S), EntSize(ES) {}
 
-  /// \brief Address in current address space.
+  /// Address in current address space.
   const void *Addr = nullptr;
-  /// \brief Size in bytes of the region.
+  /// Size in bytes of the region.
   uint64_t Size = 0;
-  /// \brief Size of each entity in the region.
+  /// Size of each entity in the region.
   uint64_t EntSize = 0;
 
   template <typename Type> ArrayRef<Type> getAsArrayRef() const {
@@ -1292,6 +1292,8 @@ static const EnumEntry<unsigned> ElfHeaderAMDGPUFlags[] = {
   LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_MACH_AMDGCN_GFX810),
   LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_MACH_AMDGCN_GFX900),
   LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_MACH_AMDGCN_GFX902),
+  LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_MACH_AMDGCN_GFX904),
+  LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_MACH_AMDGCN_GFX906),
   LLVM_READOBJ_ENUM_ENT(ELF, EF_AMDGPU_XNACK)
 };
 
@@ -2231,6 +2233,7 @@ static const EnumEntry<unsigned> ElfMipsASEFlags[] = {
   {"microMIPS",          Mips::AFL_ASE_MICROMIPS},
   {"XPA",                Mips::AFL_ASE_XPA},
   {"CRC",                Mips::AFL_ASE_CRC},
+  {"GINV",               Mips::AFL_ASE_GINV},
 };
 
 static const EnumEntry<unsigned> ElfMipsFpABIType[] = {
@@ -3454,7 +3457,7 @@ static void printGNUProperty(raw_ostream &OS, uint32_t Type, uint32_t DataSize,
   case GNU_PROPERTY_STACK_SIZE: {
     OS << "    stack size: ";
     if (DataSize == sizeof(typename ELFT::uint))
-      OS << format("0x%x\n",
+      OS << format("0x%lx\n",
                    (uint64_t)(*(const typename ELFT::Addr *)Data.data()));
     else
       OS << format("<corrupt length: 0x%x>\n", DataSize);
@@ -3464,6 +3467,36 @@ static void printGNUProperty(raw_ostream &OS, uint32_t Type, uint32_t DataSize,
     OS << "    no copy on protected";
     if (DataSize)
       OS << format(" <corrupt length: 0x%x>", DataSize);
+    OS << "\n";
+    break;
+  case GNU_PROPERTY_X86_FEATURE_1_AND:
+    OS << "    X86 features: ";
+    if (DataSize != 4 && DataSize != 8) {
+      OS << format("<corrupt length: 0x%x>\n", DataSize);
+      break;
+    }
+    uint64_t CFProtection =
+        (DataSize == 4)
+            ? support::endian::read32<ELFT::TargetEndianness>(Data.data())
+            : support::endian::read64<ELFT::TargetEndianness>(Data.data());
+    if (CFProtection == 0) {
+      OS << "none\n";
+      break;
+    }
+    if (CFProtection & GNU_PROPERTY_X86_FEATURE_1_IBT) {
+      OS << "IBT";
+      CFProtection &= ~GNU_PROPERTY_X86_FEATURE_1_IBT;
+      if (CFProtection)
+        OS << ", ";
+    }
+    if (CFProtection & GNU_PROPERTY_X86_FEATURE_1_SHSTK) {
+      OS << "SHSTK";
+      CFProtection &= ~GNU_PROPERTY_X86_FEATURE_1_SHSTK;
+      if (CFProtection)
+        OS << ", ";
+    }
+    if (CFProtection)
+      OS << format("<unknown flags: 0x%lx>", CFProtection);
     OS << "\n";
     break;
   }

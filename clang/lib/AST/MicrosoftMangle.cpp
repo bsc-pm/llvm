@@ -76,7 +76,7 @@ getLambdaDefaultArgumentDeclContext(const Decl *D) {
   return nullptr;
 }
 
-/// \brief Retrieve the declaration context that should be used when mangling
+/// Retrieve the declaration context that should be used when mangling
 /// the given declaration.
 static const DeclContext *getEffectiveDeclContext(const Decl *D) {
   // The ABI assumes that lambda closure types that occur within
@@ -1919,8 +1919,15 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
     break;
 
   case BuiltinType::Float16:
-  case BuiltinType::Float128:
-  case BuiltinType::Half: {
+    mangleArtificalTagType(TTK_Struct, "_Float16", {"__clang"});
+    break;
+
+  case BuiltinType::Half:
+    mangleArtificalTagType(TTK_Struct, "_Half", {"__clang"});
+    break;
+
+  case BuiltinType::Char8:
+  case BuiltinType::Float128: {
     DiagnosticsEngine &Diags = Context.getDiags();
     unsigned DiagID = Diags.getCustomDiagID(
         DiagnosticsEngine::Error, "cannot mangle this built-in %0 type yet");

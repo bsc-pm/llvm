@@ -969,12 +969,9 @@ void AArch64InstPrinter::printArithExtend(const MCInst *MI, unsigned OpNum,
     O << " #" << ShiftVal;
 }
 
-void AArch64InstPrinter::printMemExtend(const MCInst *MI, unsigned OpNum,
-                                        raw_ostream &O, char SrcRegKind,
-                                        unsigned Width) {
-  unsigned SignExtend = MI->getOperand(OpNum).getImm();
-  unsigned DoShift = MI->getOperand(OpNum + 1).getImm();
-
+static void printMemExtendImpl(bool SignExtend, bool DoShift,
+                               unsigned Width, char SrcRegKind,
+                               raw_ostream &O) {
   // sxtw, sxtx, uxtw or lsl (== uxtx)
   bool IsLSL = !SignExtend && SrcRegKind == 'x';
   if (IsLSL)
@@ -984,6 +981,32 @@ void AArch64InstPrinter::printMemExtend(const MCInst *MI, unsigned OpNum,
 
   if (DoShift || IsLSL)
     O << " #" << Log2_32(Width / 8);
+}
+
+void AArch64InstPrinter::printMemExtend(const MCInst *MI, unsigned OpNum,
+                                        raw_ostream &O, char SrcRegKind,
+                                        unsigned Width) {
+  bool SignExtend = MI->getOperand(OpNum).getImm();
+  bool DoShift = MI->getOperand(OpNum + 1).getImm();
+  printMemExtendImpl(SignExtend, DoShift, Width, SrcRegKind, O);
+}
+
+template <bool SignExtend, int ExtWidth, char SrcRegKind, char Suffix>
+void AArch64InstPrinter::printRegWithShiftExtend(const MCInst *MI,
+                                                 unsigned OpNum,
+                                                 const MCSubtargetInfo &STI,
+                                                 raw_ostream &O) {
+  printOperand(MI, OpNum, STI, O);
+  if (Suffix == 's' || Suffix == 'd')
+    O << '.' << Suffix;
+  else
+    assert(Suffix == 0 && "Unsupported suffix size");
+
+  bool DoShift = ExtWidth != 8;
+  if (SignExtend || DoShift || SrcRegKind == 'w') {
+    O << ", ";
+    printMemExtendImpl(SignExtend, DoShift, ExtWidth, SrcRegKind, O);
+  }
 }
 
 void AArch64InstPrinter::printCondCode(const MCInst *MI, unsigned OpNum,
@@ -1038,15 +1061,22 @@ void AArch64InstPrinter::printAMIndexedWB(const MCInst *MI, unsigned OpNum,
   O << ']';
 }
 
+template <bool IsSVEPrefetch>
 void AArch64InstPrinter::printPrefetchOp(const MCInst *MI, unsigned OpNum,
                                          const MCSubtargetInfo &STI,
                                          raw_ostream &O) {
   unsigned prfop = MI->getOperand(OpNum).getImm();
-  auto PRFM = AArch64PRFM::lookupPRFMByEncoding(prfop);
-  if (PRFM)
+  if (IsSVEPrefetch) {
+    if (auto PRFM = AArch64SVEPRFM::lookupSVEPRFMByEncoding(prfop)) {
+      O << PRFM->Name;
+      return;
+    }
+  } else if (auto PRFM = AArch64PRFM::lookupPRFMByEncoding(prfop)) {
     O << PRFM->Name;
-  else
-    O << '#' << formatImm(prfop);
+    return;
+  }
+
+  O << '#' << formatImm(prfop);
 }
 
 void AArch64InstPrinter::printPSBHintOp(const MCInst *MI, unsigned OpNum,
@@ -1180,12 +1210,15 @@ void AArch64InstPrinter::printVectorList(const MCInst *MI, unsigned OpNum,
   // list).
   unsigned NumRegs = 1;
   if (MRI.getRegClass(AArch64::DDRegClassID).contains(Reg) ||
+      MRI.getRegClass(AArch64::ZPR2RegClassID).contains(Reg) ||
       MRI.getRegClass(AArch64::QQRegClassID).contains(Reg))
     NumRegs = 2;
   else if (MRI.getRegClass(AArch64::DDDRegClassID).contains(Reg) ||
+           MRI.getRegClass(AArch64::ZPR3RegClassID).contains(Reg) ||
            MRI.getRegClass(AArch64::QQQRegClassID).contains(Reg))
     NumRegs = 3;
   else if (MRI.getRegClass(AArch64::DDDDRegClassID).contains(Reg) ||
+           MRI.getRegClass(AArch64::ZPR4RegClassID).contains(Reg) ||
            MRI.getRegClass(AArch64::QQQQRegClassID).contains(Reg))
     NumRegs = 4;
 
@@ -1403,4 +1436,47 @@ void AArch64InstPrinter::printSVERegOp(const MCInst *MI, unsigned OpNum,
   O << getRegisterName(Reg);
   if (suffix != 0)
     O << '.' << suffix;
+}
+
+template <typename T>
+void AArch64InstPrinter::printImmSVE(T Value, raw_ostream &O) {
+  typename std::make_unsigned<T>::type HexValue = Value;
+
+  if (getPrintImmHex())
+    O << '#' << formatHex((uint64_t)HexValue);
+  else
+    O << '#' << formatDec(Value);
+
+  if (CommentStream) {
+    // Do the opposite to that used for instruction operands.
+    if (getPrintImmHex())
+      *CommentStream << '=' << formatDec(HexValue) << '\n';
+    else
+      *CommentStream << '=' << formatHex((uint64_t)Value) << '\n';
+  }
+}
+
+template <typename T>
+void AArch64InstPrinter::printImm8OptLsl(const MCInst *MI, unsigned OpNum,
+                                         const MCSubtargetInfo &STI,
+                                         raw_ostream &O) {
+  unsigned UnscaledVal = MI->getOperand(OpNum).getImm();
+  unsigned Shift = MI->getOperand(OpNum + 1).getImm();
+  assert(AArch64_AM::getShiftType(Shift) == AArch64_AM::LSL &&
+         "Unexepected shift type!");
+
+  // #0 lsl #8 is never pretty printed
+  if ((UnscaledVal == 0) && (AArch64_AM::getShiftValue(Shift) != 0)) {
+    O << '#' << formatImm(UnscaledVal);
+    printShifter(MI, OpNum + 1, STI, O);
+    return;
+  }
+
+  T Val;
+  if (std::is_signed<T>())
+    Val = (int8_t)UnscaledVal * (1 << AArch64_AM::getShiftValue(Shift));
+  else
+    Val = (uint8_t)UnscaledVal * (1 << AArch64_AM::getShiftValue(Shift));
+
+  printImmSVE(Val, O);
 }

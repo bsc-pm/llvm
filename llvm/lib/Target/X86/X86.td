@@ -218,8 +218,6 @@ def FeatureSHA     : SubtargetFeature<"sha", "HasSHA", "true",
                                       [FeatureSSE2]>;
 def FeatureSHSTK   : SubtargetFeature<"shstk", "HasSHSTK", "true",
                        "Support CET Shadow-Stack instructions">;
-def FeatureIBT     : SubtargetFeature<"ibt", "HasIBT", "true",
-                       "Support CET Indirect-Branch-Tracking instructions">;
 def FeaturePRFCHW  : SubtargetFeature<"prfchw", "HasPRFCHW", "true",
                                       "Support PRFCHW instructions">;
 def FeatureRDSEED  : SubtargetFeature<"rdseed", "HasRDSEED", "true",
@@ -232,6 +230,8 @@ def FeatureCLZERO  : SubtargetFeature<"clzero", "HasCLZERO", "true",
                                       "Enable Cache Line Zero">;
 def FeatureCLDEMOTE  : SubtargetFeature<"cldemote", "HasCLDEMOTE", "true",
                                       "Enable Cache Demote">;
+def FeaturePTWRITE  : SubtargetFeature<"ptwrite", "HasPTWRITE", "true",
+                                      "Support ptwrite instruction">;
 def FeatureMPX     : SubtargetFeature<"mpx", "HasMPX", "true",
                                       "Support MPX instructions">;
 def FeatureLEAForSP : SubtargetFeature<"lea-sp", "UseLeaForSP", "true",
@@ -245,6 +245,8 @@ def FeatureSlowDivide64 : SubtargetFeature<"idivq-to-divl",
 def FeaturePadShortFunctions : SubtargetFeature<"pad-short-functions",
                                      "PadShortFunctions", "true",
                                      "Pad short functions">;
+def FeatureINVPCID : SubtargetFeature<"invpcid", "HasINVPCID", "true",
+                                      "Invalidate Process-Context Identifier">;
 def FeatureSGX     : SubtargetFeature<"sgx", "HasSGX", "true",
                                       "Enable Software Guard Extensions">;
 def FeatureCLFLUSHOPT : SubtargetFeature<"clflushopt", "HasCLFLUSHOPT", "true",
@@ -255,6 +257,8 @@ def FeatureWBNOINVD    : SubtargetFeature<"wbnoinvd", "HasWBNOINVD", "true",
                                       "Write Back No Invalidate">;
 def FeatureRDPID : SubtargetFeature<"rdpid", "HasRDPID", "true",
                                     "Support RDPID instructions">;
+def FeatureWAITPKG  : SubtargetFeature<"waitpkg", "HasWAITPKG", "true",
+                                      "Wait and pause enhancements">;
 // On some processors, instructions that implicitly take two memory operands are
 // slow. In practice, this means that CALL, PUSH, and POP with memory operands
 // should be avoided in favor of a MOV + register CALL/PUSH/POP.
@@ -278,6 +282,8 @@ def FeaturePOPCNTFalseDeps : SubtargetFeature<"false-deps-popcnt",
 def FeatureLZCNTFalseDeps : SubtargetFeature<"false-deps-lzcnt-tzcnt",
                                      "HasLZCNTFalseDeps", "true",
                                      "LZCNT/TZCNT have a false dependency on dest register">;
+def FeaturePCONFIG : SubtargetFeature<"pconfig", "HasPCONFIG", "true",
+                                      "platform configuration instruction">;
 // On recent X86 (port bound) processors, its preferable to combine to a single shuffle
 // using a variable mask over multiple fixed shuffles.
 def FeatureFastVariableShuffle
@@ -377,6 +383,12 @@ def FeatureRetpolineExternalThunk
           "Enable retpoline, but with an externally provided thunk.",
           [FeatureRetpoline]>;
 
+// Direct Move instructions.
+def FeatureMOVDIRI  : SubtargetFeature<"movdiri", "HasMOVDIRI", "true",
+                                       "Support movdiri instruction">;
+def FeatureMOVDIR64B : SubtargetFeature<"movdir64b", "HasMOVDIR64B", "true",
+                                        "Support movdir64b instruction">;
+
 //===----------------------------------------------------------------------===//
 // Register File Description
 //===----------------------------------------------------------------------===//
@@ -413,6 +425,10 @@ def ProcIntelSLM  : SubtargetFeature<"slm", "X86ProcFamily", "IntelSLM",
                     "Intel Silvermont processors">;
 def ProcIntelGLM  : SubtargetFeature<"glm", "X86ProcFamily", "IntelGLM",
                     "Intel Goldmont processors">;
+def ProcIntelGLP  : SubtargetFeature<"glp", "X86ProcFamily", "IntelGLP",
+                    "Intel Goldmont Plus processors">;
+def ProcIntelTRM  : SubtargetFeature<"tremont", "X86ProcFamily", "IntelTRM",
+                    "Intel Tremont processors">;
 def ProcIntelHSW  : SubtargetFeature<"haswell", "X86ProcFamily",
                     "IntelHaswell", "Intel Haswell processors">;
 def ProcIntelBDW  : SubtargetFeature<"broadwell", "X86ProcFamily",
@@ -559,13 +575,23 @@ class SilvermontProc<string Name> : ProcessorModel<Name, SLMModel, [
   FeatureSlowIncDec,
   FeatureSlowPMULLD,
   FeatureRDRAND,
-  FeatureLAHFSAHF
+  FeatureLAHFSAHF,
+  FeaturePOPCNTFalseDeps
 ]>;
 def : SilvermontProc<"silvermont">;
 def : SilvermontProc<"slm">; // Legacy alias.
 
-class GoldmontProc<string Name> : ProcessorModel<Name, SLMModel, [
-  ProcIntelGLM,
+class ProcessorFeatures<list<SubtargetFeature> Inherited,
+                        list<SubtargetFeature> NewFeatures> {
+  list<SubtargetFeature> Value = !listconcat(Inherited, NewFeatures);
+}
+
+class ProcModel<string Name, SchedMachineModel Model,
+                list<SubtargetFeature> ProcFeatures,
+                list<SubtargetFeature> OtherFeatures> :
+  ProcessorModel<Name, Model, !listconcat(ProcFeatures, OtherFeatures)>;
+
+def GLMFeatures : ProcessorFeatures<[], [
   FeatureX87,
   FeatureMMX,
   FeatureSSE42,
@@ -592,7 +618,36 @@ class GoldmontProc<string Name> : ProcessorModel<Name, SLMModel, [
   FeatureCLFLUSHOPT,
   FeatureFSGSBase
 ]>;
+
+class GoldmontProc<string Name> : ProcModel<Name, SLMModel,
+      GLMFeatures.Value, [
+  ProcIntelGLM,
+  FeaturePOPCNTFalseDeps
+]>;
 def : GoldmontProc<"goldmont">;
+
+def GLPFeatures : ProcessorFeatures<GLMFeatures.Value, [
+  FeaturePTWRITE,
+  FeatureRDPID,
+  FeatureSGX
+]>;
+
+class GoldmontPlusProc<string Name> : ProcModel<Name, SLMModel,
+      GLPFeatures.Value, [
+  ProcIntelGLP
+]>;
+def : GoldmontPlusProc<"goldmont-plus">;
+
+class TremontProc<string Name> : ProcModel<Name, SLMModel,
+      GLPFeatures.Value, [
+  ProcIntelTRM,
+  FeatureCLDEMOTE,
+  FeatureGFNI,
+  FeatureMOVDIRI,
+  FeatureMOVDIR64B,
+  FeatureWAITPKG
+]>;
+def : TremontProc<"tremont">;
 
 // "Arrandale" along with corei3 and corei5
 class NehalemProc<string Name> : ProcessorModel<Name, SandyBridgeModel, [
@@ -625,16 +680,6 @@ class WestmereProc<string Name> : ProcessorModel<Name, SandyBridgeModel, [
   FeatureMacroFusion
 ]>;
 def : WestmereProc<"westmere">;
-
-class ProcessorFeatures<list<SubtargetFeature> Inherited,
-                        list<SubtargetFeature> NewFeatures> {
-  list<SubtargetFeature> Value = !listconcat(Inherited, NewFeatures);
-}
-
-class ProcModel<string Name, SchedMachineModel Model,
-                list<SubtargetFeature> ProcFeatures,
-                list<SubtargetFeature> OtherFeatures> :
-  ProcessorModel<Name, Model, !listconcat(ProcFeatures, OtherFeatures)>;
 
 // SSE is not listed here since llvm treats AVX as a reimplementation of SSE,
 // rather than a superset.
@@ -687,6 +732,7 @@ def HSWFeatures : ProcessorFeatures<IVBFeatures.Value, [
   FeatureBMI2,
   FeatureERMSB,
   FeatureFMA,
+  FeatureINVPCID,
   FeatureLZCNT,
   FeatureMOVBE,
   FeatureFastVariableShuffle
@@ -829,6 +875,7 @@ def : IcelakeClientProc<"icelake-client">;
 class IcelakeServerProc<string Name> : ProcModel<Name, SkylakeServerModel,
                                                  ICLFeatures.Value, [
   ProcIntelICX,
+  FeaturePCONFIG,
   FeatureWBNOINVD,
   FeatureHasFastGather
 ]>;

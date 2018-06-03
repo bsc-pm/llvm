@@ -213,7 +213,7 @@ static bool isFunctionMacroExpansion(SourceLocation Loc,
   if (!Loc.isMacroID())
     return false;
   while (SM.isMacroArgExpansion(Loc))
-    Loc = SM.getImmediateExpansionRange(Loc).first;
+    Loc = SM.getImmediateExpansionRange(Loc).getBegin();
   std::pair<FileID, unsigned> TLInfo = SM.getDecomposedLoc(Loc);
   SrcMgr::SLocEntry SE = SM.getSLocEntry(TLInfo.first);
   const SrcMgr::ExpansionInfo &EInfo = SE.getExpansion();
@@ -483,7 +483,7 @@ private:
       if (!(isa<FieldRegion>(R) || isa<CXXBaseObjectRegion>(R)))
         return false; // Pattern-matching failed.
       Subregions.push_back(R);
-      R = dyn_cast<SubRegion>(R)->getSuperRegion();
+      R = cast<SubRegion>(R)->getSuperRegion();
     }
     bool IndirectReference = !Subregions.empty();
 
@@ -2332,4 +2332,25 @@ CXXSelfAssignmentBRVisitor::VisitNode(const ExplodedNode *Succ,
   Piece->addRange(Met->getSourceRange());
 
   return std::move(Piece);
+}
+
+std::shared_ptr<PathDiagnosticPiece>
+TaintBugVisitor::VisitNode(const ExplodedNode *N, const ExplodedNode *PrevN,
+                           BugReporterContext &BRC, BugReport &BR) {
+
+  // Find the ExplodedNode where the taint was first introduced
+  if (!N->getState()->isTainted(V) || PrevN->getState()->isTainted(V))
+    return nullptr;
+
+  const Stmt *S = PathDiagnosticLocation::getStmt(N);
+  if (!S)
+    return nullptr;
+
+  const LocationContext *NCtx = N->getLocationContext();
+  PathDiagnosticLocation L =
+      PathDiagnosticLocation::createBegin(S, BRC.getSourceManager(), NCtx);
+  if (!L.isValid() || !L.asLocation().isValid())
+    return nullptr;
+
+  return std::make_shared<PathDiagnosticEventPiece>(L, "Taint originated here");
 }

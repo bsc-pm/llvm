@@ -117,8 +117,10 @@ define amdgpu_kernel void @s_test_imin_sle_v4i8(<4 x i8> addrspace(1)* %out, <4 
 ; SI: v_min_i32
 ; SI: v_min_i32
 
-; VI: v_min_i32
-; VI: v_min_i32
+; VI: s_sext_i32_i16
+; VI: s_sext_i32_i16
+; VI: s_min_i32
+; VI: s_min_i32
 
 ; GFX9: v_pk_min_i16
 
@@ -131,17 +133,16 @@ define amdgpu_kernel void @s_test_imin_sle_v2i16(<2 x i16> addrspace(1)* %out, <
   ret void
 }
 
-; FIXME: VI use s_min_i32
 ; FUNC-LABEL: {{^}}s_test_imin_sle_v4i16:
 ; SI: v_min_i32
 ; SI: v_min_i32
 ; SI: v_min_i32
 ; SI: v_min_i32
 
-; VI: v_min_i32
-; VI: v_min_i32
-; VI: v_min_i32
-; VI: v_min_i32
+; VI: s_min_i32
+; VI: s_min_i32
+; VI: s_min_i32
+; VI: s_min_i32
 
 ; GFX9: v_pk_min_i16
 ; GFX9: v_pk_min_i16
@@ -289,9 +290,9 @@ define amdgpu_kernel void @v_test_umin_ule_v3i32(<3 x i32> addrspace(1)* %out, <
 ; SI-NOT: v_min_u32_e32
 
 ; VI: v_min_u16_e32
-; VI: v_min_u16_sdwa
+; VI: v_min_u16_sdwa v{{[0-9]+}}, v{{[0-9]+}}, v{{[0-9]+}} dst_sel:WORD_1 dst_unused:UNUSED_PAD src0_sel:WORD_1 src1_sel:WORD_1
 ; VI: v_min_u16_e32
-; VI-NOT: v_min_u16_e32
+; VI-NOT: v_min_u16
 
 ; GFX9: v_pk_min_u16
 ; GFX9: v_pk_min_u16
@@ -461,14 +462,14 @@ define amdgpu_kernel void @s_test_umin_ult_v8i32(<8 x i32> addrspace(1)* %out, <
 ; SI: v_min_u32
 ; SI: v_min_u32
 
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
-; VI: v_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
+; VI: s_min_u32
 
 ; EG: MIN_UINT
 ; EG: MIN_UINT

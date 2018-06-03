@@ -98,11 +98,13 @@ static const opt::OptTable::Info OptInfo[] = {
 #undef OPTION
 };
 
+namespace {
 class WasmOptTable : public llvm::opt::OptTable {
 public:
   WasmOptTable() : OptTable(OptInfo) {}
   opt::InputArgList parse(ArrayRef<const char *> Argv);
 };
+} // namespace
 
 // Set color diagnostics according to -color-diagnostics={auto,always,never}
 // or -no-color-diagnostics flags.
@@ -111,19 +113,18 @@ static void handleColorDiagnostics(opt::InputArgList &Args) {
                               OPT_no_color_diagnostics);
   if (!Arg)
     return;
-
-  if (Arg->getOption().getID() == OPT_color_diagnostics)
+  if (Arg->getOption().getID() == OPT_color_diagnostics) {
     errorHandler().ColorDiagnostics = true;
-  else if (Arg->getOption().getID() == OPT_no_color_diagnostics)
+  } else if (Arg->getOption().getID() == OPT_no_color_diagnostics) {
     errorHandler().ColorDiagnostics = false;
-  else {
+  } else {
     StringRef S = Arg->getValue();
     if (S == "always")
       errorHandler().ColorDiagnostics = true;
-    if (S == "never")
+    else if (S == "never")
       errorHandler().ColorDiagnostics = false;
-    if (S != "auto")
-      error("unknown option: -color-diagnostics=" + S);
+    else if (S != "auto")
+      error("unknown option: --color-diagnostics=" + S);
   }
 }
 
@@ -141,6 +142,10 @@ opt::InputArgList WasmOptTable::parse(ArrayRef<const char *> Argv) {
 
   unsigned MissingIndex;
   unsigned MissingCount;
+
+  // Expand response files (arguments in the form of @<filename>)
+  cl::ExpandResponseFiles(Saver, cl::TokenizeGNUCommandLine, Vec);
+
   opt::InputArgList Args = this->ParseArgs(Vec, MissingIndex, MissingCount);
 
   handleColorDiagnostics(Args);
@@ -240,10 +245,11 @@ static void handleWeakUndefines() {
     // Add a synthetic dummy for weak undefined functions.  These dummies will
     // be GC'd if not used as the target of any "call" instructions.
     Optional<std::string> SymName = demangleItanium(Sym->getName());
-    StringRef StubName =
+    StringRef DebugName =
         Saver.save("undefined function " +
                    (SymName ? StringRef(*SymName) : Sym->getName()));
-    SyntheticFunction *Func = make<SyntheticFunction>(Sig, StubName);
+    SyntheticFunction *Func =
+        make<SyntheticFunction>(Sig, Sym->getName(), DebugName);
     Func->setBody(UnreachableFn);
     // Ensure it compares equal to the null pointer, and so that table relocs
     // don't pull in the stub body (only call-operand relocs should do that).
@@ -281,22 +287,27 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   errorHandler().ErrorLimit = args::getInteger(Args, OPT_error_limit, 20);
 
   Config->AllowUndefined = Args.hasArg(OPT_allow_undefined);
-  Config->CheckSignatures =
-      Args.hasFlag(OPT_check_signatures, OPT_no_check_signatures, false);
   Config->Demangle = Args.hasFlag(OPT_demangle, OPT_no_demangle, true);
   Config->Entry = getEntry(Args, Args.hasArg(OPT_relocatable) ? "" : "_start");
   Config->ExportTable = Args.hasArg(OPT_export_table);
+  errorHandler().FatalWarnings =
+      Args.hasFlag(OPT_fatal_warnings, OPT_no_fatal_warnings, false);
   Config->ImportMemory = Args.hasArg(OPT_import_memory);
   Config->ImportTable = Args.hasArg(OPT_import_table);
+  Config->Optimize = args::getInteger(Args, OPT_O, 0);
   Config->OutputFile = Args.getLastArgValue(OPT_o);
   Config->Relocatable = Args.hasArg(OPT_relocatable);
   Config->GcSections =
       Args.hasFlag(OPT_gc_sections, OPT_no_gc_sections, !Config->Relocatable);
+  Config->MergeDataSegments =
+      Args.hasFlag(OPT_merge_data_segments, OPT_no_merge_data_segments,
+                   !Config->Relocatable);
   Config->PrintGcSections =
       Args.hasFlag(OPT_print_gc_sections, OPT_no_print_gc_sections, false);
   Config->SearchPaths = args::getStrings(Args, OPT_L);
   Config->StripAll = Args.hasArg(OPT_strip_all);
   Config->StripDebug = Args.hasArg(OPT_strip_debug);
+  Config->StackFirst = Args.hasArg(OPT_stack_first);
   errorHandler().Verbose = Args.hasArg(OPT_verbose);
   ThreadsEnabled = Args.hasFlag(OPT_threads, OPT_no_threads, true);
 
@@ -305,6 +316,8 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   Config->MaxMemory = args::getInteger(Args, OPT_max_memory, 0);
   Config->ZStackSize =
       args::getZOptionValue(Args, OPT_z, "stack-size", WasmPageSize);
+
+  Config->CompressRelocTargets = Config->Optimize > 0 && !Config->Relocatable;
 
   if (auto *Arg = Args.getLastArg(OPT_allow_undefined_file))
     readImportFile(Arg->getValue());
@@ -339,7 +352,8 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
     Global.Type = {WASM_TYPE_I32, true};
     Global.InitExpr.Value.Int32 = 0;
     Global.InitExpr.Opcode = WASM_OPCODE_I32_CONST;
-    InputGlobal *StackPointer = make<InputGlobal>(Global);
+    Global.SymbolName = "__stack_pointer";
+    InputGlobal *StackPointer = make<InputGlobal>(Global, nullptr);
     StackPointer->Live = true;
 
     static WasmSignature NullSignature = {{}, WASM_TYPE_NORESULT};
@@ -355,9 +369,11 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
         "__dso_handle", WASM_SYMBOL_VISIBILITY_HIDDEN);
     WasmSym::DataEnd = Symtab->addSyntheticDataSymbol("__data_end", 0);
 
+    // For now, since we don't actually use the start function as the
+    // wasm start symbol, we don't need to care about it signature.
     if (!Config->Entry.empty())
-      EntrySym = Symtab->addUndefinedFunction(Config->Entry, 0, nullptr,
-                                              &NullSignature);
+      EntrySym =
+          Symtab->addUndefinedFunction(Config->Entry, 0, nullptr, nullptr);
 
     // Handle the `--undefined <sym>` options.
     for (auto *Arg : Args.filtered(OPT_undefined))
@@ -381,15 +397,19 @@ void LinkerDriver::link(ArrayRef<const char *> ArgsArr) {
   if (!Config->Relocatable && !Config->AllowUndefined) {
     Symtab->reportRemainingUndefines();
   } else {
-    // When we allow undefined symbols we cannot include those defined in
-    // -u/--undefined since these undefined symbols have only names and no
-    // function signature, which means they cannot be written to the final
-    // output.
+    // Even when using --allow-undefined we still want to report the absence of
+    // our initial set of undefined symbols (i.e. the entry point and symbols
+    // specified via --undefined).
+    // Part of the reason for this is that these function don't have signatures
+    // so which means they cannot be written as wasm function imports.
     for (auto *Arg : Args.filtered(OPT_undefined)) {
       Symbol *Sym = Symtab->find(Arg->getValue());
       if (!Sym->isDefined())
-        error("function forced with --undefined not found: " + Sym->getName());
+        error("symbol forced with --undefined not found: " + Sym->getName());
     }
+    if (EntrySym && !EntrySym->isDefined())
+      error("entry symbol not defined (pass --no-entry to supress): " +
+            EntrySym->getName());
   }
   if (errorCount())
     return;

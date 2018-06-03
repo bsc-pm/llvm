@@ -8,7 +8,6 @@
  * 91893 Orsay, France 
  */
 
-#define ISL_DIM_H
 #include <isl_map_private.h>
 #include <isl_union_map_private.h>
 #include <isl_polynomial_private.h>
@@ -685,6 +684,7 @@ __isl_give isl_qpolynomial_fold *isl_qpolynomial_fold_gist_params(
 #define NO_PULLBACK
 
 #include <isl_pw_templ.c>
+#include <isl_pw_eval.c>
 
 #undef UNION
 #define UNION isl_union_pw_qpolynomial_fold
@@ -1657,6 +1657,7 @@ __isl_give isl_qpolynomial_fold *isl_qpolynomial_fold_realign_domain(
 	__isl_take isl_qpolynomial_fold *fold, __isl_take isl_reordering *r)
 {
 	int i;
+	isl_space *space;
 
 	fold = isl_qpolynomial_fold_cow(fold);
 	if (!fold || !r)
@@ -1669,8 +1670,8 @@ __isl_give isl_qpolynomial_fold *isl_qpolynomial_fold_realign_domain(
 			goto error;
 	}
 
-	fold = isl_qpolynomial_fold_reset_domain_space(fold,
-						    isl_space_copy(r->dim));
+	space = isl_reordering_get_space(r);
+	fold = isl_qpolynomial_fold_reset_domain_space(fold, space);
 
 	isl_reordering_free(r);
 

@@ -1,4 +1,4 @@
-; RUN: llc -march=amdgcn -mcpu=gfx900 -mattr=-flat-for-global -verify-machineinstrs -enable-packed-inlinable-literals < %s | FileCheck -check-prefix=GCN -check-prefix=GFX9 %s
+; RUN: llc -march=amdgcn -mcpu=gfx900 -mattr=-flat-for-global -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GFX9 %s
 ; RUN: llc -march=amdgcn -mcpu=tonga -mattr=-flat-for-global -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=VI -check-prefix=CIVI %s
 ; RUN: llc -march=amdgcn -mcpu=bonaire -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=CI -check-prefix=CIVI %s
 
@@ -8,8 +8,17 @@
 ; GFX9: v_mov_b32_e32 [[VLHS:v[0-9]+]], [[LHS]]
 ; GFX9: v_pk_ashrrev_i16 [[RESULT:v[0-9]+]], [[RHS]], [[VLHS]]
 
-; VI: v_ashrrev_i32_sdwa v{{[0-9]+}}, v{{[0-9]+}}, v{{[0-9]+}} dst_sel:WORD_1 dst_unused:UNUSED_PAD src0_sel:DWORD src1_sel:DWORD
-; VI: v_or_b32_sdwa v{{[0-9]+}}, v{{[0-9]+}}, v{{[0-9]+}} dst_sel:DWORD dst_unused:UNUSED_PAD src0_sel:WORD_0 src1_sel:DWORD
+; VI: s_load_dword [[LHS:s[0-9]+]]
+; VI: s_load_dword [[RHS:s[0-9]+]]
+; VI: s_ashr_i32
+; VI: s_ashr_i32
+; VI: s_sext_i32_i16
+; VI: s_sext_i32_i16
+; VI: s_ashr_i32
+; VI: s_ashr_i32
+; VI: s_lshl_b32
+; VI: s_and_b32
+; VI: s_or_b32
 
 ; CI-DAG: v_ashrrev_i32_e32
 ; CI-DAG: v_and_b32_e32 v{{[0-9]+}}, 0xffff, v{{[0-9]+}}

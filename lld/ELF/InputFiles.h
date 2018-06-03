@@ -113,11 +113,12 @@ public:
   bool JustSymbols = false;
 
   // GroupId is used for --warn-backrefs which is an optional error
-  // checking feature. All files within the same --{start,end}-group
-  // get the same group ID. Otherwise, each file gets a new group
-  // ID. For more info, see checkDependency() in SymbolTable.cpp.
+  // checking feature. All files within the same --{start,end}-group or
+  // --{start,end}-lib get the same group ID. Otherwise, each file gets a new
+  // group ID. For more info, see checkDependency() in SymbolTable.cpp.
   uint32_t GroupId;
   static bool IsInGroup;
+  static uint32_t NextGroupId;
 
 protected:
   InputFile(Kind K, MemoryBufferRef M);
@@ -126,8 +127,6 @@ protected:
 
 private:
   const Kind FileKind;
-
-  static uint32_t NextGroupId;
 };
 
 template <typename ELFT> class ELFFileBase : public InputFile {
@@ -260,11 +259,11 @@ public:
   template <class ELFT> void parse();
   MemoryBufferRef getBuffer();
   InputFile *fetch();
+  bool AddedToLink = false;
 
 private:
   template <class ELFT> void addElfSymbols();
 
-  bool Seen = false;
   uint64_t OffsetInArchive;
 };
 
@@ -352,8 +351,15 @@ InputFile *createObjectFile(MemoryBufferRef MB, StringRef ArchiveName = "",
                             uint64_t OffsetInArchive = 0);
 InputFile *createSharedFile(MemoryBufferRef MB, StringRef DefaultSoName);
 
+inline bool isBitcode(MemoryBufferRef MB) {
+  return identify_magic(MB.getBuffer()) == llvm::file_magic::bitcode;
+}
+
+std::string replaceThinLTOSuffix(StringRef Path);
+
 extern std::vector<BinaryFile *> BinaryFiles;
 extern std::vector<BitcodeFile *> BitcodeFiles;
+extern std::vector<LazyObjFile *> LazyObjFiles;
 extern std::vector<InputFile *> ObjectFiles;
 extern std::vector<InputFile *> SharedFiles;
 

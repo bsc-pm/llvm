@@ -33,7 +33,7 @@ enum class PCHStorageFlag { Disk, Memory };
 // Build an in-memory static index for global symbols from a YAML-format file.
 // The size of global symbols should be relatively small, so that all symbols
 // can be managed in memory.
-std::unique_ptr<SymbolIndex> BuildStaticIndex(llvm::StringRef YamlSymbolFile) {
+std::unique_ptr<SymbolIndex> buildStaticIndex(llvm::StringRef YamlSymbolFile) {
   auto Buffer = llvm::MemoryBuffer::getFile(YamlSymbolFile);
   if (!Buffer) {
     llvm::errs() << "Can't open " << YamlSymbolFile << "\n";
@@ -96,9 +96,9 @@ static llvm::cl::opt<PCHStorageFlag> PCHStorage(
         clEnumValN(PCHStorageFlag::Memory, "memory", "store PCHs in memory")),
     llvm::cl::init(PCHStorageFlag::Disk));
 
-static llvm::cl::opt<int> LimitCompletionResult(
-    "completion-limit",
-    llvm::cl::desc("Limit the number of completion results returned by clangd. "
+static llvm::cl::opt<int> LimitResults(
+    "limit-results",
+    llvm::cl::desc("Limit the number of results returned by clangd. "
                    "0 means no limit."),
     llvm::cl::init(100));
 
@@ -118,11 +118,11 @@ static llvm::cl::opt<Path> InputMirrorFile(
         "Mirror all LSP input to the specified file. Useful for debugging."),
     llvm::cl::init(""), llvm::cl::Hidden);
 
-static llvm::cl::opt<bool> EnableIndexBasedCompletion(
-    "enable-index-based-completion",
-    llvm::cl::desc(
-        "Enable index-based global code completion. "
-        "Clang uses an index built from symbols in opened files"),
+static llvm::cl::opt<bool> EnableIndex(
+    "index",
+    llvm::cl::desc("Enable index-based features such as global code completion "
+                   "and searching for symbols."
+                   "Clang uses an index built from symbols in opened files"),
     llvm::cl::init(true));
 
 static llvm::cl::opt<Path> YamlSymbolFile(
@@ -220,17 +220,17 @@ int main(int argc, char *argv[]) {
   }
   if (!ResourceDir.empty())
     Opts.ResourceDir = ResourceDir;
-  Opts.BuildDynamicSymbolIndex = EnableIndexBasedCompletion;
+  Opts.BuildDynamicSymbolIndex = EnableIndex;
   std::unique_ptr<SymbolIndex> StaticIdx;
-  if (EnableIndexBasedCompletion && !YamlSymbolFile.empty()) {
-    StaticIdx = BuildStaticIndex(YamlSymbolFile);
+  if (EnableIndex && !YamlSymbolFile.empty()) {
+    StaticIdx = buildStaticIndex(YamlSymbolFile);
     Opts.StaticIndex = StaticIdx.get();
   }
   Opts.AsyncThreadsCount = WorkerThreadsCount;
 
   clangd::CodeCompleteOptions CCOpts;
   CCOpts.IncludeIneligibleResults = IncludeIneligibleResults;
-  CCOpts.Limit = LimitCompletionResult;
+  CCOpts.Limit = LimitResults;
 
   // Initialize and run ClangdLSPServer.
   ClangdLSPServer LSPServer(Out, CCOpts, CompileCommandsDirPath, Opts);

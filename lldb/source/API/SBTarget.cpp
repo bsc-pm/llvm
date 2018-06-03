@@ -23,6 +23,7 @@
 #include "lldb/API/SBSourceManager.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/API/SBStringList.h"
+#include "lldb/API/SBStructuredData.h"
 #include "lldb/API/SBSymbolContextList.h"
 #include "lldb/Breakpoint/BreakpointID.h"
 #include "lldb/Breakpoint/BreakpointIDList.h"
@@ -38,11 +39,11 @@
 #include "lldb/Core/STLUtils.h"
 #include "lldb/Core/SearchFilter.h"
 #include "lldb/Core/Section.h"
+#include "lldb/Core/StructuredDataImpl.h"
 #include "lldb/Core/ValueObjectConstResult.h"
 #include "lldb/Core/ValueObjectList.h"
 #include "lldb/Core/ValueObjectVariable.h"
 #include "lldb/Host/Host.h"
-#include "lldb/Interpreter/Args.h"
 #include "lldb/Symbol/ClangASTContext.h"
 #include "lldb/Symbol/DeclVendor.h"
 #include "lldb/Symbol/ObjectFile.h"
@@ -58,11 +59,12 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/TargetList.h"
 #include "lldb/Utility/ArchSpec.h"
+#include "lldb/Utility/Args.h"
 #include "lldb/Utility/FileSpec.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/RegularExpression.h"
 
-#include "../source/Commands/CommandObjectBreakpoint.h"
+#include "Commands/CommandObjectBreakpoint.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Regex.h"
@@ -82,8 +84,8 @@ Status AttachToProcess(ProcessAttachInfo &attach_info, Target &target) {
     const auto state = process_sp->GetState();
     if (process_sp->IsAlive() && state == eStateConnected) {
       // If we are already connected, then we have already specified the
-      // listener, so if a valid listener is supplied, we need to error out
-      // to let the client know.
+      // listener, so if a valid listener is supplied, we need to error out to
+      // let the client know.
       if (attach_info.GetListener())
         return Status("process is connected and already has a listener, pass "
                       "empty listener");
@@ -181,6 +183,25 @@ SBDebugger SBTarget::GetDebugger() const {
   return debugger;
 }
 
+SBStructuredData SBTarget::GetStatistics() {
+  SBStructuredData data;
+  TargetSP target_sp(GetSP());
+  if (!target_sp)
+    return data;
+
+  auto stats_up = llvm::make_unique<StructuredData::Dictionary>();
+  int i = 0;
+  for (auto &Entry : target_sp->GetStatistics()) {
+    std::string Desc = lldb_private::GetStatDescription(
+        static_cast<lldb_private::StatisticKind>(i));
+    stats_up->AddIntegerItem(Desc, Entry);
+    i += 1;
+  }
+
+  data.m_impl_up->SetObjectSP(std::move(stats_up));
+  return data;
+}
+
 SBProcess SBTarget::LoadCore(const char *core_file) {
   SBProcess sb_process;
   TargetSP target_sp(GetSP());
@@ -267,8 +288,8 @@ SBProcess SBTarget::Launch(SBListener &listener, char const **argv,
 
     if (state == eStateConnected) {
       // If we are already connected, then we have already specified the
-      // listener, so if a valid listener is supplied, we need to error out
-      // to let the client know.
+      // listener, so if a valid listener is supplied, we need to error out to
+      // let the client know.
       if (listener.IsValid()) {
         error.SetErrorString("process is connected and already has a listener, "
                              "pass empty listener");
@@ -1522,9 +1543,9 @@ const char *SBTarget::GetTriple() {
   TargetSP target_sp(GetSP());
   if (target_sp) {
     std::string triple(target_sp->GetArchitecture().GetTriple().str());
-    // Unique the string so we don't run into ownership issues since
-    // the const strings put the string into the string pool once and
-    // the strings never comes out
+    // Unique the string so we don't run into ownership issues since the const
+    // strings put the string into the string pool once and the strings never
+    // comes out
     ConstString const_triple(triple.c_str());
     return const_triple.GetCString();
   }
@@ -1674,8 +1695,8 @@ lldb::SBType SBTarget::FindFirstType(const char *typename_cstr) {
       }
     }
 
-    // Didn't find the type in the symbols; try the Objective-C runtime
-    // if one is installed
+    // Didn't find the type in the symbols; try the Objective-C runtime if one
+    // is installed
 
     ProcessSP process_sp(target_sp->GetProcessSP());
 

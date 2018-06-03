@@ -723,7 +723,7 @@ static Value *rewriteGEPAsOffset(Value *Start, Value *Base,
       }
 
       auto *Op = NewInsts[GEP->getOperand(0)];
-      if (isa<ConstantInt>(Op) && dyn_cast<ConstantInt>(Op)->isZero())
+      if (isa<ConstantInt>(Op) && cast<ConstantInt>(Op)->isZero())
         NewInsts[GEP] = Index;
       else
         NewInsts[GEP] = Builder.CreateNSWAdd(
@@ -3668,7 +3668,7 @@ bool InstCombiner::OptimizeOverflowCheck(OverflowCheckFlavor OCF, Value *LHS,
   return false;
 }
 
-/// \brief Recognize and process idiom involving test for multiplication
+/// Recognize and process idiom involving test for multiplication
 /// overflow.
 ///
 /// The caller has matched a pattern of the form:
@@ -3966,7 +3966,7 @@ static bool swapMayExposeCSEOpportunities(const Value *Op0, const Value *Op1) {
   return GoodToSwap > 0;
 }
 
-/// \brief Check that one use is in the same block as the definition and all
+/// Check that one use is in the same block as the definition and all
 /// other uses are in blocks dominated by a given block.
 ///
 /// \param DI Definition
@@ -4011,7 +4011,7 @@ static bool isChainSelectCmpBranch(const SelectInst *SI) {
   return true;
 }
 
-/// \brief True when a select result is replaced by one of its operands
+/// True when a select result is replaced by one of its operands
 /// in select-icmp sequence. This will eventually result in the elimination
 /// of the select.
 ///

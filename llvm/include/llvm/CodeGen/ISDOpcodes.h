@@ -424,7 +424,8 @@ namespace ISD {
     /// Like SetCC, ops #0 and #1 are the LHS and RHS operands to compare, but
     /// op #2 is a boolean indicating if there is an incoming carry. This
     /// operator checks the result of "LHS - RHS - Carry", and can be used to
-    /// compare two wide integers: (setcce lhshi rhshi (subc lhslo rhslo) cc).
+    /// compare two wide integers:
+    /// (setcccarry lhshi rhshi (subcarry lhslo rhslo) cc).
     /// Only valid for integers.
     SETCCCARRY,
 
@@ -495,7 +496,8 @@ namespace ISD {
     ZERO_EXTEND_VECTOR_INREG,
 
     /// FP_TO_[US]INT - Convert a floating point value to a signed or unsigned
-    /// integer.
+    /// integer. These have the same semantics as fptosi and fptoui in IR. If
+    /// the FP value cannot fit in the integer type, the results are undefined.
     FP_TO_SINT,
     FP_TO_UINT,
 

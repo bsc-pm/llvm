@@ -112,11 +112,6 @@ An overview of all the command-line options:
 
   clang-tidy options:
 
-    -analyze-temporary-dtors     -
-                                   Enable temporary destructor-aware analysis in
-                                   clang-analyzer- checks.
-                                   This option overrides the value read from a
-                                   .clang-tidy file.
     -checks=<string>             -
                                    Comma-separated list of globs with optional '-'
                                    prefix. Globs are processed in order of
@@ -245,7 +240,6 @@ An overview of all the command-line options:
       Checks:          '-*,some-check'
       WarningsAsErrors: ''
       HeaderFilterRegex: ''
-      AnalyzeTemporaryDtors: false
       FormatStyle:     none
       User:            user
       CheckOptions:
@@ -672,6 +666,27 @@ source code is at `test/clang-tidy/google-readability-casting.cpp`_):
     // CHECK-MESSAGES: :[[@LINE-1]]:11: warning: redundant cast to the same type [google-readability-casting]
     // CHECK-FIXES: int b = a;
   }
+
+To check more than one scenario in the same test file use 
+``-check-suffix=SUFFIX-NAME`` on ``check_clang_tidy.py`` command line.
+With ``-check-suffix=SUFFIX-NAME`` you need to replace your ``CHECK-*`` 
+directives with ``CHECK-MESSAGES-SUFFIX-NAME`` and ``CHECK-FIXES-SUFFIX-NAME``.
+
+Here's an example:
+
+.. code-block:: c++
+
+   // RUN: %check_clang_tidy -check-suffix=USING-A %s misc-unused-using-decls %t -- -- -DUSING_A
+   // RUN: %check_clang_tidy -check-suffix=USING-B %s misc-unused-using-decls %t -- -- -DUSING_B
+   // RUN: %check_clang_tidy %s misc-unused-using-decls %t
+   ...
+   // CHECK-MESSAGES-USING-A: :[[@LINE-8]]:10: warning: using decl 'A' {{.*}}
+   // CHECK-MESSAGES-USING-B: :[[@LINE-7]]:10: warning: using decl 'B' {{.*}}
+   // CHECK-MESSAGES: :[[@LINE-6]]:10: warning: using decl 'C' {{.*}}
+   // CHECK-FIXES-USING-A-NOT: using a::A;$
+   // CHECK-FIXES-USING-B-NOT: using a::B;$
+   // CHECK-FIXES-NOT: using a::C;$
+
 
 There are many dark corners in the C++ language, and it may be difficult to make
 your check work perfectly in all cases, especially if it issues fix-it hints. The

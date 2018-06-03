@@ -32,6 +32,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/WithColor.h"
 #include <system_error>
 using namespace llvm;
 
@@ -127,10 +128,10 @@ struct LLVMDisDiagnosticHandler : public DiagnosticHandler {
     raw_ostream &OS = errs();
     OS << Prefix << ": ";
     switch (DI.getSeverity()) {
-      case DS_Error: OS << "error: "; break;
-      case DS_Warning: OS << "warning: "; break;
+      case DS_Error: WithColor::error(OS); break;
+      case DS_Warning: WithColor::warning(OS); break;
       case DS_Remark: OS << "remark: "; break;
-      case DS_Note: OS << "note: "; break;
+      case DS_Note: WithColor::note(OS); break;
     }
 
     DiagnosticPrinterRawOStream DP(OS);
@@ -146,19 +147,6 @@ struct LLVMDisDiagnosticHandler : public DiagnosticHandler {
 
 static ExitOnError ExitOnErr;
 
-static std::unique_ptr<Module> openInputFile(LLVMContext &Context) {
-  std::unique_ptr<MemoryBuffer> MB =
-      ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
-  std::unique_ptr<Module> M = ExitOnErr(getOwningLazyBitcodeModule(
-      std::move(MB), Context,
-      /*ShouldLazyLoadMetadata=*/true, SetImporting));
-  if (MaterializeMetadata)
-    ExitOnErr(M->materializeMetadata());
-  else
-    ExitOnErr(M->materializeAll());
-  return M;
-}
-
 int main(int argc, char **argv) {
   InitLLVM X(argc, argv);
 
@@ -169,7 +157,19 @@ int main(int argc, char **argv) {
       llvm::make_unique<LLVMDisDiagnosticHandler>(argv[0]));
   cl::ParseCommandLineOptions(argc, argv, "llvm .bc -> .ll disassembler\n");
 
-  std::unique_ptr<Module> M = openInputFile(Context);
+  std::unique_ptr<MemoryBuffer> MB =
+      ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(InputFilename)));
+  std::unique_ptr<Module> M = ExitOnErr(getLazyBitcodeModule(
+      *MB, Context, /*ShouldLazyLoadMetadata=*/true, SetImporting));
+  if (MaterializeMetadata)
+    ExitOnErr(M->materializeMetadata());
+  else
+    ExitOnErr(M->materializeAll());
+
+  BitcodeLTOInfo LTOInfo = ExitOnErr(getBitcodeLTOInfo(*MB));
+  std::unique_ptr<ModuleSummaryIndex> Index;
+  if (LTOInfo.HasSummary)
+    Index = ExitOnErr(getModuleSummaryIndex(*MB));
 
   // Just use stdout.  We won't actually print anything on it.
   if (DontPrint)
@@ -198,8 +198,11 @@ int main(int argc, char **argv) {
     Annotator.reset(new CommentWriter());
 
   // All that llvm-dis does is write the assembly to a file.
-  if (!DontPrint)
+  if (!DontPrint) {
     M->print(Out->os(), Annotator.get(), PreserveAssemblyUseListOrder);
+    if (Index)
+      Index->print(Out->os());
+  }
 
   // Declare success.
   Out->keep();

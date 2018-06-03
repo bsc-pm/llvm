@@ -24,6 +24,7 @@
 #include "polly/ScopDetection.h"
 #include "polly/Support/GICHelper.h"
 #include "polly/Support/ISLOStream.h"
+#include "polly/Support/ISLTools.h"
 #include "polly/Support/SCEVAffinator.h"
 #include "polly/Support/SCEVValidator.h"
 #include "polly/Support/ScopHelper.h"
@@ -126,6 +127,7 @@ STATISTIC(NumLoopsInScop, "Number of loops in scops");
 STATISTIC(NumBoxedLoops, "Number of boxed loops in SCoPs after ScopInfo");
 STATISTIC(NumAffineLoops, "Number of affine loops in SCoPs after ScopInfo");
 
+STATISTIC(NumScopsDepthZero, "Number of scops with maximal loop depth 0");
 STATISTIC(NumScopsDepthOne, "Number of scops with maximal loop depth 1");
 STATISTIC(NumScopsDepthTwo, "Number of scops with maximal loop depth 2");
 STATISTIC(NumScopsDepthThree, "Number of scops with maximal loop depth 3");
@@ -274,7 +276,7 @@ static isl::set addRangeBoundsToSet(isl::set S, const ConstantRange &Range,
   if (Range.isFullSet())
     return S;
 
-  if (isl_set_n_basic_set(S.get()) > MaxDisjunctsInContext)
+  if (S.n_basic_set() > MaxDisjunctsInContext)
     return S;
 
   // In case of signed wrapping, we can refine the set of valid values by
@@ -878,8 +880,7 @@ void MemoryAccess::foldAccessRelation() {
     isl::pw_aff DimSize = getPwAff(Sizes[i + 1]);
 
     isl::space SpaceSize = DimSize.get_space();
-    isl::id ParamId =
-        give(isl_space_get_dim_id(SpaceSize.get(), isl_dim_param, 0));
+    isl::id ParamId = SpaceSize.get_dim_id(isl::dim::param, 0);
 
     Space = AccessRelation.get_space();
     Space = Space.range().map_from_set();
@@ -1239,7 +1240,7 @@ bool MemoryAccess::isLatestPartialAccess() const {
   isl::set StmtDom = getStatement()->getDomain();
   isl::set AccDom = getLatestAccessRelation().domain();
 
-  return isl_set_is_subset(StmtDom.keep(), AccDom.keep()) == isl_bool_false;
+  return !StmtDom.is_subset(AccDom);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1419,7 +1420,7 @@ getPwAff(Scop &S, BasicBlock *BB,
          bool NonNegative = false) {
   PWACtx PWAC = S.getPwAff(E, BB, NonNegative);
   InvalidDomainMap[BB] = InvalidDomainMap[BB].unite(PWAC.second);
-  return PWAC.first.take();
+  return PWAC.first.release();
 }
 
 /// Build the conditions sets for the switch @p SI in the @p Domain.
@@ -2111,29 +2112,23 @@ void Scop::addUserContext() {
   if (UserContextStr.empty())
     return;
 
-  isl_set *UserContext =
-      isl_set_read_from_str(getIslCtx().get(), UserContextStr.c_str());
-  isl_space *Space = getParamSpace().release();
-  if (isl_space_dim(Space, isl_dim_param) !=
-      isl_set_dim(UserContext, isl_dim_param)) {
-    auto SpaceStr = isl_space_to_str(Space);
+  isl::set UserContext = isl::set(getIslCtx(), UserContextStr.c_str());
+  isl::space Space = getParamSpace();
+  if (Space.dim(isl::dim::param) != UserContext.dim(isl::dim::param)) {
+    std::string SpaceStr = Space.to_str();
     errs() << "Error: the context provided in -polly-context has not the same "
            << "number of dimensions than the computed context. Due to this "
            << "mismatch, the -polly-context option is ignored. Please provide "
            << "the context in the parameter space: " << SpaceStr << ".\n";
-    free(SpaceStr);
-    isl_set_free(UserContext);
-    isl_space_free(Space);
     return;
   }
 
-  for (unsigned i = 0; i < isl_space_dim(Space, isl_dim_param); i++) {
+  for (unsigned i = 0; i < Space.dim(isl::dim::param); i++) {
     std::string NameContext = Context.get_dim_name(isl::dim::param, i);
-    std::string NameUserContext =
-        isl_set_get_dim_name(UserContext, isl_dim_param, i);
+    std::string NameUserContext = UserContext.get_dim_name(isl::dim::param, i);
 
     if (NameContext != NameUserContext) {
-      auto SpaceStr = isl_space_to_str(Space);
+      std::string SpaceStr = Space.to_str();
       errs() << "Error: the name of dimension " << i
              << " provided in -polly-context "
              << "is '" << NameUserContext << "', but the name in the computed "
@@ -2141,19 +2136,14 @@ void Scop::addUserContext() {
              << "'. Due to this name mismatch, "
              << "the -polly-context option is ignored. Please provide "
              << "the context in the parameter space: " << SpaceStr << ".\n";
-      free(SpaceStr);
-      isl_set_free(UserContext);
-      isl_space_free(Space);
       return;
     }
 
-    UserContext =
-        isl_set_set_dim_id(UserContext, isl_dim_param, i,
-                           isl_space_get_dim_id(Space, isl_dim_param, i));
+    UserContext = UserContext.set_dim_id(isl::dim::param, i,
+                                         Space.get_dim_id(isl::dim::param, i));
   }
 
-  Context = Context.intersect(isl::manage(UserContext));
-  isl_space_free(Space);
+  Context = Context.intersect(UserContext);
 }
 
 void Scop::buildInvariantEquivalenceClasses() {
@@ -2307,12 +2297,12 @@ buildMinMaxAccess(isl::set Set, Scop::MinMaxVectorTy &MinMaxAccesses, Scop &S) {
   isl::pw_aff LastDimAff;
   isl::aff OneAff;
   unsigned Pos;
-  isl::ctx Ctx = Set.get_ctx();
 
   Set = Set.remove_divs();
+  polly::simplify(Set);
 
-  if (isl_set_n_basic_set(Set.get()) >= MaxDisjunctsInDomain)
-    return isl::stat::error;
+  if (Set.n_basic_set() > RunTimeChecksMaxAccessDisjuncts)
+    Set = Set.simple_hull();
 
   // Restrict the number of parameters involved in the access as the lexmin/
   // lexmax computation will take too long if this number is high.
@@ -2338,14 +2328,8 @@ buildMinMaxAccess(isl::set Set, Scop::MinMaxVectorTy &MinMaxAccesses, Scop &S) {
       return isl::stat::error;
   }
 
-  if (isl_set_n_basic_set(Set.get()) > RunTimeChecksMaxAccessDisjuncts)
-    return isl::stat::error;
-
   MinPMA = Set.lexmin_pw_multi_aff();
   MaxPMA = Set.lexmax_pw_multi_aff();
-
-  if (isl_ctx_last_error(Ctx.get()) == isl_error_quota)
-    return isl::stat::error;
 
   MinPMA = MinPMA.coalesce();
   MaxPMA = MaxPMA.coalesce();
@@ -2354,13 +2338,18 @@ buildMinMaxAccess(isl::set Set, Scop::MinMaxVectorTy &MinMaxAccesses, Scop &S) {
   // enclose the accessed memory region by MinPMA and MaxPMA. The pointer
   // we test during code generation might now point after the end of the
   // allocated array but we will never dereference it anyway.
-  assert(MaxPMA.dim(isl::dim::out) && "Assumed at least one output dimension");
+  assert((!MaxPMA || MaxPMA.dim(isl::dim::out)) &&
+         "Assumed at least one output dimension");
+
   Pos = MaxPMA.dim(isl::dim::out) - 1;
   LastDimAff = MaxPMA.get_pw_aff(Pos);
   OneAff = isl::aff(isl::local_space(LastDimAff.get_domain_space()));
   OneAff = OneAff.add_constant_si(1);
   LastDimAff = LastDimAff.add(OneAff);
   MaxPMA = MaxPMA.set_pw_aff(Pos, LastDimAff);
+
+  if (!MinPMA || !MaxPMA)
+    return isl::stat::error;
 
   MinMaxAccesses.push_back(std::make_pair(MinPMA, MaxPMA));
 
@@ -2382,12 +2371,10 @@ static bool calculateMinMaxAccess(Scop::AliasGroupTy AliasGroup, Scop &S,
   isl::union_map Accesses = isl::union_map::empty(S.getParamSpace());
 
   for (MemoryAccess *MA : AliasGroup)
-    Accesses = Accesses.add_map(give(MA->getAccessRelation().release()));
+    Accesses = Accesses.add_map(MA->getAccessRelation());
 
   Accesses = Accesses.intersect_domain(Domains);
   isl::union_set Locations = Accesses.range();
-  Locations = Locations.coalesce();
-  Locations = Locations.detect_equalities();
 
   auto Lambda = [&MinMaxAccesses, &S](isl::set Set) -> isl::stat {
     return buildMinMaxAccess(Set, MinMaxAccesses, S);
@@ -2654,16 +2641,15 @@ bool Scop::propagateInvalidStmtDomains(
 
       Loop *SuccBBLoop = getFirstNonBoxedLoopFor(SuccBB, LI, getBoxedLoops());
 
-      auto *AdjustedInvalidDomain = adjustDomainDimensions(
-          *this, InvalidDomain.copy(), BBLoop, SuccBBLoop);
+      auto AdjustedInvalidDomain = isl::manage(adjustDomainDimensions(
+          *this, InvalidDomain.copy(), BBLoop, SuccBBLoop));
 
-      auto *SuccInvalidDomain = InvalidDomainMap[SuccBB].copy();
-      SuccInvalidDomain =
-          isl_set_union(SuccInvalidDomain, AdjustedInvalidDomain);
-      SuccInvalidDomain = isl_set_coalesce(SuccInvalidDomain);
-      unsigned NumConjucts = isl_set_n_basic_set(SuccInvalidDomain);
+      isl::set SuccInvalidDomain = InvalidDomainMap[SuccBB];
+      SuccInvalidDomain = SuccInvalidDomain.unite(AdjustedInvalidDomain);
+      SuccInvalidDomain = SuccInvalidDomain.coalesce();
+      unsigned NumConjucts = SuccInvalidDomain.n_basic_set();
 
-      InvalidDomainMap[SuccBB] = isl::manage(SuccInvalidDomain);
+      InvalidDomainMap[SuccBB] = SuccInvalidDomain;
 
       // Check if the maximal number of domain disjunctions was reached.
       // In case this happens we will bail.
@@ -2841,7 +2827,7 @@ bool Scop::buildDomainsWithBranchConstraints(
 
       // Check if the maximal number of domain disjunctions was reached.
       // In case this happens we will clean up and bail.
-      if (isl_set_n_basic_set(SuccDomain.get()) < MaxDisjunctsInDomain)
+      if (SuccDomain.n_basic_set() < MaxDisjunctsInDomain)
         continue;
 
       invalidate(COMPLEXITY, DebugLoc());
@@ -2960,19 +2946,19 @@ bool Scop::propagateDomainConstraints(
 ///             [i0, i1, i2, i3] -> [i0, i1, i2 + 1, i3]
 ///
 /// if @p Dim is 2 and @p SetSpace has 4 dimensions.
-static __isl_give isl_map *
-createNextIterationMap(__isl_take isl_space *SetSpace, unsigned Dim) {
-  auto *MapSpace = isl_space_map_from_set(SetSpace);
-  auto *NextIterationMap = isl_map_universe(isl_space_copy(MapSpace));
-  for (unsigned u = 0; u < isl_map_dim(NextIterationMap, isl_dim_in); u++)
+static isl::map createNextIterationMap(isl::space SetSpace, unsigned Dim) {
+  isl::space MapSpace = SetSpace.map_from_set();
+  isl::map NextIterationMap = isl::map::universe(MapSpace);
+  for (unsigned u = 0; u < NextIterationMap.dim(isl::dim::in); u++)
     if (u != Dim)
       NextIterationMap =
-          isl_map_equate(NextIterationMap, isl_dim_in, u, isl_dim_out, u);
-  auto *C = isl_constraint_alloc_equality(isl_local_space_from_space(MapSpace));
-  C = isl_constraint_set_constant_si(C, 1);
-  C = isl_constraint_set_coefficient_si(C, isl_dim_in, Dim, 1);
-  C = isl_constraint_set_coefficient_si(C, isl_dim_out, Dim, -1);
-  NextIterationMap = isl_map_add_constraint(NextIterationMap, C);
+          NextIterationMap.equate(isl::dim::in, u, isl::dim::out, u);
+  isl::constraint C =
+      isl::constraint::alloc_equality(isl::local_space(MapSpace));
+  C = C.set_constant_si(1);
+  C = C.set_coefficient_si(isl::dim::in, Dim, 1);
+  C = C.set_coefficient_si(isl::dim::out, Dim, -1);
+  NextIterationMap = NextIterationMap.add_constraint(C);
   return NextIterationMap;
 }
 
@@ -2985,8 +2971,8 @@ bool Scop::addLoopBoundsToHeaderDomain(
   assert(DomainMap.count(HeaderBB));
   isl::set &HeaderBBDom = DomainMap[HeaderBB];
 
-  isl::map NextIterationMap = isl::manage(
-      createNextIterationMap(HeaderBBDom.get_space().release(), LoopDepth));
+  isl::map NextIterationMap =
+      createNextIterationMap(HeaderBBDom.get_space(), LoopDepth);
 
   isl::set UnionBackedgeCondition = HeaderBBDom.empty(HeaderBBDom.get_space());
 
@@ -3103,12 +3089,13 @@ bool Scop::buildAliasChecks(AliasAnalysis &AA) {
   // we make the assumed context infeasible.
   invalidate(ALIASING, DebugLoc());
 
-  DEBUG(dbgs() << "\n\nNOTE: Run time checks for " << getNameStr()
-               << " could not be created as the number of parameters involved "
-                  "is too high. The SCoP will be "
-                  "dismissed.\nUse:\n\t--polly-rtc-max-parameters=X\nto adjust "
-                  "the maximal number of parameters but be advised that the "
-                  "compile time might increase exponentially.\n\n");
+  LLVM_DEBUG(
+      dbgs() << "\n\nNOTE: Run time checks for " << getNameStr()
+             << " could not be created as the number of parameters involved "
+                "is too high. The SCoP will be "
+                "dismissed.\nUse:\n\t--polly-rtc-max-parameters=X\nto adjust "
+                "the maximal number of parameters but be advised that the "
+                "compile time might increase exponentially.\n\n");
   return false;
 }
 
@@ -3329,8 +3316,8 @@ Scop::Scop(Region &R, ScalarEvolution &ScalarEvolution, LoopInfo &LI,
            DominatorTree &DT, ScopDetection::DetectionContext &DC,
            OptimizationRemarkEmitter &ORE)
     : IslCtx(isl_ctx_alloc(), isl_ctx_free), SE(&ScalarEvolution), DT(&DT),
-      R(R), HasSingleExitEdge(R.getExitingBlock()), DC(DC), ORE(ORE),
-      Affinator(this, LI),
+      R(R), name(None), HasSingleExitEdge(R.getExitingBlock()), DC(DC),
+      ORE(ORE), Affinator(this, LI),
       ID(getNextID((*R.getEntry()->getParent()).getName().str())) {
   if (IslOnErrorAbort)
     isl_options_set_on_error(getIslCtx().get(), ISL_ON_ERROR_ABORT);
@@ -3584,6 +3571,10 @@ void Scop::removeStmtNotInDomainMap() {
 
 void Scop::simplifySCoP(bool AfterHoisting) {
   auto ShouldDelete = [AfterHoisting](ScopStmt &Stmt) -> bool {
+    // Never delete statements that contain calls to debug functions.
+    if (hasDebugCall(&Stmt))
+      return false;
+
     bool RemoveStmt = Stmt.isEmpty();
 
     // Remove read only statements only after invariant load hoisting.
@@ -3683,7 +3674,7 @@ void Scop::addInvariantLoads(ScopStmt &Stmt, InvariantAccessesTy &InvMAs) {
   isl::set DomainCtx = Stmt.getDomain().params();
   DomainCtx = DomainCtx.subtract(StmtInvalidCtx);
 
-  if (isl_set_n_basic_set(DomainCtx.get()) >= MaxDisjunctsInDomain) {
+  if (DomainCtx.n_basic_set() >= MaxDisjunctsInDomain) {
     auto *AccInst = InvMAs.front().MA->getAccessInstruction();
     invalidate(COMPLEXITY, AccInst->getDebugLoc(), AccInst->getParent());
     return;
@@ -3843,7 +3834,7 @@ isl::set Scop::getNonHoistableCtx(MemoryAccess *Access, isl::union_map Writes) {
   if (hasNonHoistableBasePtrInScop(Access, Writes))
     return nullptr;
 
-  isl::map AccessRelation = give(Access->getAccessRelation().release());
+  isl::map AccessRelation = Access->getAccessRelation();
   assert(!AccessRelation.is_empty());
 
   if (AccessRelation.involves_dims(isl::dim::in, 0, Stmt.getNumIterators()))
@@ -3875,8 +3866,7 @@ isl::set Scop::getNonHoistableCtx(MemoryAccess *Access, isl::union_map Writes) {
     return WrittenCtx;
 
   WrittenCtx = WrittenCtx.remove_divs();
-  bool TooComplex =
-      isl_set_n_basic_set(WrittenCtx.get()) >= MaxDisjunctsInDomain;
+  bool TooComplex = WrittenCtx.n_basic_set() >= MaxDisjunctsInDomain;
   if (TooComplex || !isRequiredInvariantLoad(LI))
     return nullptr;
 
@@ -4311,7 +4301,7 @@ void Scop::addRecordedAssumptions() {
 }
 
 void Scop::invalidate(AssumptionKind Kind, DebugLoc Loc, BasicBlock *BB) {
-  DEBUG(dbgs() << "Invalidate SCoP because of reason " << Kind << "\n");
+  LLVM_DEBUG(dbgs() << "Invalidate SCoP because of reason " << Kind << "\n");
   addAssumption(Kind, isl::set::empty(getParamSpace()), Loc, AS_ASSUMPTION, BB);
 }
 
@@ -4521,7 +4511,7 @@ isl_bool isNotExtNode(__isl_keep isl_schedule_node *Node, void *User) {
 
 bool Scop::containsExtensionNode(isl::schedule Schedule) {
   return isl_schedule_foreach_schedule_node_top_down(
-             Schedule.keep(), isNotExtNode, nullptr) == isl_stat_error;
+             Schedule.get(), isNotExtNode, nullptr) == isl_stat_error;
 }
 
 isl::union_map Scop::getSchedule() const {
@@ -5001,7 +4991,9 @@ void updateLoopCountStatistic(ScopDetection::LoopStats Stats,
   MaxNumLoopsInScop =
       std::max(MaxNumLoopsInScop.getValue(), (unsigned)Stats.NumLoops);
 
-  if (Stats.MaxDepth == 1)
+  if (Stats.MaxDepth == 0)
+    NumScopsDepthZero++;
+  else if (Stats.MaxDepth == 1)
     NumScopsDepthOne++;
   else if (Stats.MaxDepth == 2)
     NumScopsDepthTwo++;

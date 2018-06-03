@@ -577,7 +577,8 @@ void CGDebugInfo::CreateCompileUnit() {
                           remapDIPath(getCurrentDirname()),
                           CSInfo,
                           getSource(SM, SM.getMainFileID())),
-      Producer, LO.Optimize || CGOpts.PrepareForLTO || CGOpts.EmitSummaryIndex,
+      CGOpts.EmitVersionIdentMetadata ? Producer : "",
+      LO.Optimize || CGOpts.PrepareForLTO || CGOpts.EmitSummaryIndex,
       CGOpts.DwarfDebugFlags, RuntimeVers,
       CGOpts.EnableSplitDwarf ? "" : CGOpts.SplitDwarfFile, EmissionKind,
       0 /* DWOid */, CGOpts.SplitDwarfInlining, CGOpts.DebugInfoForProfiling,
@@ -664,6 +665,7 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
   case BuiltinType::SChar:
     Encoding = llvm::dwarf::DW_ATE_signed_char;
     break;
+  case BuiltinType::Char8:
   case BuiltinType::Char16:
   case BuiltinType::Char32:
     Encoding = llvm::dwarf::DW_ATE_UTF;
@@ -799,22 +801,46 @@ static bool hasCXXMangling(const TagDecl *TD, llvm::DICompileUnit *TheCU) {
   }
 }
 
-/// In C++ mode, types have linkage, so we can rely on the ODR and
-/// on their mangled names, if they're external.
-static SmallString<256> getUniqueTagTypeName(const TagType *Ty,
-                                             CodeGenModule &CGM,
-                                             llvm::DICompileUnit *TheCU) {
-  SmallString<256> FullName;
+// Determines if the tag declaration will require a type identifier.
+static bool needsTypeIdentifier(const TagDecl *TD,
+                                CodeGenModule& CGM,
+                                llvm::DICompileUnit *TheCU) {
+  // We only add a type identifier for types with C++ name mangling.
+  if (!hasCXXMangling(TD, TheCU))
+    return false;
+
+  // CodeView types with C++ mangling need a type identifier.
+  if (CGM.getCodeGenOpts().EmitCodeView)
+    return true;
+
+  // Externally visible types with C++ mangling need a type identifier.
+  if (TD->isExternallyVisible())
+    return true;
+
+  return false;
+}
+
+// When emitting CodeView debug information we need to produce a type
+// identifier for all types which have a C++ mangling.  Until a GUID is added
+// to the identifier (not currently implemented) the result will not be unique
+// across compilation units.
+// When emitting DWARF debug information, we need to produce a type identifier
+// for all externally visible types with C++ name mangling. This identifier
+// should be unique across ODR-compliant compilation units.
+static SmallString<256> getTypeIdentifier(const TagType *Ty,
+                                          CodeGenModule &CGM,
+                                          llvm::DICompileUnit *TheCU) {
+  SmallString<256> Identifier;
   const TagDecl *TD = Ty->getDecl();
 
-  if (!hasCXXMangling(TD, TheCU) || !TD->isExternallyVisible())
-    return FullName;
+  if (!needsTypeIdentifier(TD, CGM, TheCU))
+    return Identifier;
 
   // TODO: This is using the RTTI name. Is there a better way to get
   // a unique string for a type?
-  llvm::raw_svector_ostream Out(FullName);
+  llvm::raw_svector_ostream Out(Identifier);
   CGM.getCXXABI().getMangleContext().mangleCXXRTTIName(QualType(Ty, 0), Out);
-  return FullName;
+  return Identifier;
 }
 
 /// \return the appropriate DWARF tag for a composite type.
@@ -847,10 +873,10 @@ CGDebugInfo::getOrCreateRecordFwdDecl(const RecordType *Ty,
   uint32_t Align = 0;
 
   // Create the type.
-  SmallString<256> FullName = getUniqueTagTypeName(Ty, CGM, TheCU);
+  SmallString<256> Identifier = getTypeIdentifier(Ty, CGM, TheCU);
   llvm::DICompositeType *RetTy = DBuilder.createReplaceableCompositeType(
       getTagForRecord(RD), RDName, Ctx, DefUnit, Line, 0, Size, Align,
-      llvm::DINode::FlagFwdDecl, FullName);
+      llvm::DINode::FlagFwdDecl, Identifier);
   if (CGM.getCodeGenOpts().DebugFwdTemplateParams)
     if (auto *TSpecial = dyn_cast<ClassTemplateSpecializationDecl>(RD))
       DBuilder.replaceArrays(RetTy, llvm::DINodeArray(),
@@ -1534,6 +1560,7 @@ void CGDebugInfo::CollectCXXBasesAux(
     auto *BaseTy = getOrCreateType(BI.getType(), Unit);
     llvm::DINode::DIFlags BFlags = StartingFlags;
     uint64_t BaseOffset;
+    uint32_t VBPtrOffset = 0;
 
     if (BI.isVirtual()) {
       if (CGM.getTarget().getCXXABI().isItaniumFamily()) {
@@ -1547,6 +1574,8 @@ void CGDebugInfo::CollectCXXBasesAux(
         // vbase offset offset in Itanium.
         BaseOffset =
             4 * CGM.getMicrosoftVTableContext().getVBTableIndex(RD, Base);
+        VBPtrOffset = CGM.getContext().getASTRecordLayout(RD).getVBPtrOffset()
+                         .getQuantity();
       }
       BFlags |= llvm::DINode::FlagVirtual;
     } else
@@ -1556,7 +1585,8 @@ void CGDebugInfo::CollectCXXBasesAux(
 
     BFlags |= getAccessFlag(BI.getAccessSpecifier(), RD);
     llvm::DIType *DTy =
-        DBuilder.createInheritance(RecordTy, BaseTy, BaseOffset, BFlags);
+        DBuilder.createInheritance(RecordTy, BaseTy, BaseOffset, VBPtrOffset,
+                                   BFlags);
     EltTys.push_back(DTy);
   }
 }
@@ -2190,7 +2220,7 @@ llvm::DIType *CGDebugInfo::CreateTypeDefinition(const ObjCInterfaceType *Ty,
     if (!SClassTy)
       return nullptr;
 
-    llvm::DIType *InhTag = DBuilder.createInheritance(RealDecl, SClassTy, 0,
+    llvm::DIType *InhTag = DBuilder.createInheritance(RealDecl, SClassTy, 0, 0,
                                                       llvm::DINode::FlagZero);
     EltTys.push_back(InhTag);
   }
@@ -2471,7 +2501,7 @@ llvm::DIType *CGDebugInfo::CreateEnumType(const EnumType *Ty) {
     Align = getDeclAlignIfRequired(ED, CGM.getContext());
   }
 
-  SmallString<256> FullName = getUniqueTagTypeName(Ty, CGM, TheCU);
+  SmallString<256> Identifier = getTypeIdentifier(Ty, CGM, TheCU);
 
   bool isImportedFromModule =
       DebugTypeExtRefs && ED->isFromASTFile() && ED->getDefinition();
@@ -2494,7 +2524,7 @@ llvm::DIType *CGDebugInfo::CreateEnumType(const EnumType *Ty) {
     StringRef EDName = ED->getName();
     llvm::DIType *RetTy = DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_enumeration_type, EDName, EDContext, DefUnit, Line,
-        0, Size, Align, llvm::DINode::FlagFwdDecl, FullName);
+        0, Size, Align, llvm::DINode::FlagFwdDecl, Identifier);
 
     ReplaceMap.emplace_back(
         std::piecewise_construct, std::make_tuple(Ty),
@@ -2514,7 +2544,7 @@ llvm::DIType *CGDebugInfo::CreateTypeDefinition(const EnumType *Ty) {
     Align = getDeclAlignIfRequired(ED, CGM.getContext());
   }
 
-  SmallString<256> FullName = getUniqueTagTypeName(Ty, CGM, TheCU);
+  SmallString<256> Identifier = getTypeIdentifier(Ty, CGM, TheCU);
 
   // Create elements for each enumerator.
   SmallVector<llvm::Metadata *, 16> Enumerators;
@@ -2536,7 +2566,7 @@ llvm::DIType *CGDebugInfo::CreateTypeDefinition(const EnumType *Ty) {
   llvm::DIType *ClassTy = getOrCreateType(ED->getIntegerType(), DefUnit);
   return DBuilder.createEnumerationType(EnumContext, ED->getName(), DefUnit,
                                         Line, Size, Align, EltArray, ClassTy,
-                                        FullName, ED->isFixed());
+                                        Identifier, ED->isFixed());
 }
 
 llvm::DIMacro *CGDebugInfo::CreateMacro(llvm::DIMacroFile *Parent,
@@ -2837,7 +2867,7 @@ llvm::DICompositeType *CGDebugInfo::CreateLimitedType(const RecordType *Ty) {
   uint64_t Size = CGM.getContext().getTypeSize(Ty);
   auto Align = getDeclAlignIfRequired(D, CGM.getContext());
 
-  SmallString<256> FullName = getUniqueTagTypeName(Ty, CGM, TheCU);
+  SmallString<256> Identifier = getTypeIdentifier(Ty, CGM, TheCU);
 
   // Explicitly record the calling convention for C++ records.
   auto Flags = llvm::DINode::FlagZero;
@@ -2850,7 +2880,7 @@ llvm::DICompositeType *CGDebugInfo::CreateLimitedType(const RecordType *Ty) {
 
   llvm::DICompositeType *RealDecl = DBuilder.createReplaceableCompositeType(
       getTagForRecord(RD), RDName, RDContext, DefUnit, Line, 0, Size, Align,
-      Flags, FullName);
+      Flags, Identifier);
 
   // Elements of composite types usually have back to the type, creating
   // uniquing cycles.  Distinct nodes are more efficient.
@@ -2864,7 +2894,7 @@ llvm::DICompositeType *CGDebugInfo::CreateLimitedType(const RecordType *Ty) {
     // so they don't tend to be involved in uniquing cycles and there is some
     // chance of merging them when linking together two modules.  Only make
     // them distinct if they are ODR-uniqued.
-    if (FullName.empty())
+    if (Identifier.empty())
       break;
     LLVM_FALLTHROUGH;
 
@@ -3217,7 +3247,8 @@ llvm::DISubroutineType *CGDebugInfo::getOrCreateFunctionType(const Decl *D,
 
 void CGDebugInfo::EmitFunctionStart(GlobalDecl GD, SourceLocation Loc,
                                     SourceLocation ScopeLoc, QualType FnType,
-                                    llvm::Function *Fn, CGBuilderTy &Builder) {
+                                    llvm::Function *Fn, bool CurFuncIsThunk,
+                                    CGBuilderTy &Builder) {
 
   StringRef Name;
   StringRef LinkageName;
@@ -3263,6 +3294,10 @@ void CGDebugInfo::EmitFunctionStart(GlobalDecl GD, SourceLocation Loc,
     // Artificial functions should not silently reuse CurLoc.
     CurLoc = SourceLocation();
   }
+
+  if (CurFuncIsThunk)
+    Flags |= llvm::DINode::FlagThunk;
+
   unsigned LineNo = getLineNumber(Loc);
   unsigned ScopeLine = getLineNumber(ScopeLoc);
 

@@ -51,7 +51,8 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
             << (std::string(XRayInstrumentOption) + " on " + Triple.str());
       }
     } else if (Triple.getOS() == llvm::Triple::FreeBSD ||
-               Triple.getOS() == llvm::Triple::OpenBSD) {
+               Triple.getOS() == llvm::Triple::OpenBSD ||
+               Triple.getOS() == llvm::Triple::NetBSD) {
       if (Triple.getArch() != llvm::Triple::x86_64) {
         D.Diag(diag::err_drv_clang_unsupported)
             << (std::string(XRayInstrumentOption) + " on " + Triple.str());
@@ -76,6 +77,10 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
     if (Args.hasFlag(options::OPT_fxray_always_emit_customevents,
                      options::OPT_fnoxray_always_emit_customevents, false))
       XRayAlwaysEmitCustomEvents = true;
+
+    if (Args.hasFlag(options::OPT_fxray_always_emit_typedevents,
+                     options::OPT_fnoxray_always_emit_typedevents, false))
+      XRayAlwaysEmitTypedEvents = true;
 
     if (!Args.hasFlag(options::OPT_fxray_link_deps,
                       options::OPT_fnoxray_link_deps, true))
@@ -159,7 +164,7 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
       }
 
     // Then we want to sort and unique the modes we've collected.
-    std::sort(Modes.begin(), Modes.end());
+    llvm::sort(Modes.begin(), Modes.end());
     Modes.erase(std::unique(Modes.begin(), Modes.end()), Modes.end());
   }
 }
@@ -173,6 +178,9 @@ void XRayArgs::addArgs(const ToolChain &TC, const ArgList &Args,
 
   if (XRayAlwaysEmitCustomEvents)
     CmdArgs.push_back("-fxray-always-emit-customevents");
+
+  if (XRayAlwaysEmitTypedEvents)
+    CmdArgs.push_back("-fxray-always-emit-typedevents");
 
   CmdArgs.push_back(Args.MakeArgString(Twine(XRayInstructionThresholdOption) +
                                        Twine(InstructionThreshold)));

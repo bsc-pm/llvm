@@ -25,6 +25,7 @@
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -206,6 +207,11 @@ static cl::opt<bool> EnableDebugify(
     cl::desc(
         "Start the pipeline with debugify and end it with check-debugify"));
 
+static cl::opt<bool> DebugifyEach(
+    "debugify-each",
+    cl::desc(
+        "Start each pass with debugify and end it with check-debugify"));
+
 static cl::opt<bool>
 PrintBreakpoints("print-breakpoints-for-testing",
                  cl::desc("Print select breakpoints location for testing"));
@@ -254,6 +260,37 @@ static cl::opt<std::string>
     RemarksFilename("pass-remarks-output",
                     cl::desc("YAML output filename for pass remarks"),
                     cl::value_desc("filename"));
+
+class OptCustomPassManager : public legacy::PassManager {
+public:
+  using super = legacy::PassManager;
+
+  void add(Pass *P) override {
+    bool WrapWithDebugify =
+        DebugifyEach && !P->getAsImmutablePass() && !isIRPrintingPass(P);
+    if (!WrapWithDebugify) {
+      super::add(P);
+      return;
+    }
+    PassKind Kind = P->getPassKind();
+    // TODO: Implement Debugify for BasicBlockPass, LoopPass.
+    switch (Kind) {
+      case PT_Function:
+        super::add(createDebugifyFunctionPass());
+        super::add(P);
+        super::add(createCheckDebugifyFunctionPass(true, P->getPassName()));
+        break;
+      case PT_Module:
+        super::add(createDebugifyModulePass());
+        super::add(P);
+        super::add(createCheckDebugifyModulePass(true, P->getPassName()));
+        break;
+      default:
+        super::add(P);
+        break;
+    }
+  }
+};
 
 static inline void addPass(legacy::PassManagerBase &PM, Pass *P) {
   // Add the pass to the pass manager...
@@ -388,7 +425,7 @@ int main(int argc, char **argv) {
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);
   initializeInstCombine(Registry);
-  initializeAggressiveInstCombinerLegacyPassPass(Registry);
+  initializeAggressiveInstCombine(Registry);
   initializeInstrumentation(Registry);
   initializeTarget(Registry);
   // For codegen passes, only passes that do IR to IR transformation are
@@ -555,8 +592,8 @@ int main(int argc, char **argv) {
 
   // Create a PassManager to hold and optimize the collection of passes we are
   // about to build.
-  //
-  legacy::PassManager Passes;
+  OptCustomPassManager Passes;
+  bool AddOneTimeDebugifyPasses = EnableDebugify && !DebugifyEach;
 
   // Add an appropriate TargetLibraryInfo pass for the module's triple.
   TargetLibraryInfoImpl TLII(ModuleTriple);
@@ -570,8 +607,8 @@ int main(int argc, char **argv) {
   Passes.add(createTargetTransformInfoWrapperPass(TM ? TM->getTargetIRAnalysis()
                                                      : TargetIRAnalysis()));
 
-  if (EnableDebugify)
-    Passes.add(createDebugifyPass());
+  if (AddOneTimeDebugifyPasses)
+    Passes.add(createDebugifyModulePass());
 
   std::unique_ptr<legacy::FunctionPassManager> FPasses;
   if (OptLevelO0 || OptLevelO1 || OptLevelO2 || OptLevelOs || OptLevelOz ||
@@ -718,8 +755,8 @@ int main(int argc, char **argv) {
   if (!NoVerify && !VerifyEach)
     Passes.add(createVerifierPass());
 
-  if (EnableDebugify)
-    Passes.add(createCheckDebugifyPass());
+  if (AddOneTimeDebugifyPasses)
+    Passes.add(createCheckDebugifyModulePass(false));
 
   // In run twice mode, we want to make sure the output is bit-by-bit
   // equivalent if we run the pass manager again, so setup two buffers and

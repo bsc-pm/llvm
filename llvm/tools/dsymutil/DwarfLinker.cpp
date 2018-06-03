@@ -9,7 +9,6 @@
 
 #include "BinaryHolder.h"
 #include "DebugMap.h"
-#include "ErrorReporting.h"
 #include "MachOUtils.h"
 #include "NonRelocatableStringpool.h"
 #include "dsymutil.h"
@@ -53,6 +52,7 @@
 #include "llvm/MC/MCDwarf.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
+#include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCStreamer.h"
@@ -79,6 +79,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
@@ -587,15 +588,15 @@ static bool inFunctionScope(CompileUnit &U, unsigned Idx) {
 } // namespace
 
 void warn(Twine Warning, Twine Context) {
-  warn_ostream() << Warning + "\n";
+  WithColor::warning() << Warning + "\n";
   if (!Context.isTriviallyEmpty())
-    note_ostream() << Twine("while processing ") + Context + "\n";
+    WithColor::note() << Twine("while processing ") + Context + "\n";
 }
 
 bool error(Twine Error, Twine Context) {
-  error_ostream() << Error + "\n";
+  WithColor::error() << Error + "\n";
   if (!Context.isTriviallyEmpty())
-    note_ostream() << Twine("while processing ") + Context + "\n";
+    WithColor::note() << Twine("while processing ") + Context + "\n";
   return false;
 }
 
@@ -882,9 +883,9 @@ bool DwarfStreamer::init(Triple TheTriple) {
 
   MCTargetOptions MCOptions = InitMCTargetOptionsFromFlags();
   MS = TheTarget->createMCObjectStreamer(
-      TheTriple, *MC, std::unique_ptr<MCAsmBackend>(MAB), OutFile,
-      std::unique_ptr<MCCodeEmitter>(MCE), *MSTI, MCOptions.MCRelaxAll,
-      MCOptions.MCIncrementalLinkerCompatible,
+      TheTriple, *MC, std::unique_ptr<MCAsmBackend>(MAB),
+      MAB->createObjectWriter(OutFile), std::unique_ptr<MCCodeEmitter>(MCE),
+      *MSTI, MCOptions.MCRelaxAll, MCOptions.MCIncrementalLinkerCompatible,
       /*DWARFMustBeAtTheEnd*/ false);
   if (!MS)
     return error("no object streamer for target " + TripleName, Context);
@@ -2178,7 +2179,7 @@ void DwarfLinker::reportWarning(const Twine &Warning, const DebugMapObject &DMO,
   DumpOpts.RecurseDepth = 0;
   DumpOpts.Verbose = Options.Verbose;
 
-  note_ostream() << "    in DIE:\n";
+  WithColor::note() << "    in DIE:\n";
   DIE->dump(errs(), 6 /* Indent */, DumpOpts);
 }
 
@@ -3603,7 +3604,10 @@ void DwarfLinker::patchLineTableForUnit(CompileUnit &Unit,
   DWARFDataExtractor LineExtractor(
       OrigDwarf.getDWARFObj(), OrigDwarf.getDWARFObj().getLineSection(),
       OrigDwarf.isLittleEndian(), Unit.getOrigUnit().getAddressByteSize());
-  LineTable.parse(LineExtractor, &StmtOffset, OrigDwarf, &Unit.getOrigUnit());
+
+  Error Err = LineTable.parse(LineExtractor, &StmtOffset, OrigDwarf,
+                              &Unit.getOrigUnit());
+  DWARFDebugLine::warn(std::move(Err));
 
   // This vector is the output line table.
   std::vector<DWARFDebugLine::Row> NewRows;
@@ -3999,9 +4003,9 @@ Error DwarfLinker::loadClangModule(StringRef Filename, StringRef ModulePath,
         // cache has expired and was pruned by clang.  A more adventurous
         // dsymutil would invoke clang to rebuild the module now.
         if (!ModuleCacheHintDisplayed) {
-          note_ostream() << "The clang module cache may have expired since "
-                            "this object file was built. Rebuilding the "
-                            "object file will rebuild the module cache.\n";
+          WithColor::note() << "The clang module cache may have expired since "
+                               "this object file was built. Rebuilding the "
+                               "object file will rebuild the module cache.\n";
           ModuleCacheHintDisplayed = true;
         }
       } else if (isArchive) {
@@ -4010,12 +4014,13 @@ Error DwarfLinker::loadClangModule(StringRef Filename, StringRef ModulePath,
         // was built on a different machine. We don't want to discourage module
         // debugging for convenience libraries within a project though.
         if (!ArchiveHintDisplayed) {
-          note_ostream() << "Linking a static library that was built with "
-                            "-gmodules, but the module cache was not found.  "
-                            "Redistributable static libraries should never be "
-                            "built with module debugging enabled.  The debug "
-                            "experience will be degraded due to incomplete "
-                            "debug information.\n";
+          WithColor::note()
+              << "Linking a static library that was built with "
+                 "-gmodules, but the module cache was not found.  "
+                 "Redistributable static libraries should never be "
+                 "built with module debugging enabled.  The debug "
+                 "experience will be degraded due to incomplete "
+                 "debug information.\n";
           ArchiveHintDisplayed = true;
         }
       }
@@ -4248,10 +4253,10 @@ bool DwarfLinker::link(const DebugMap &Map) {
           Stat.getLastModificationTime() !=
               sys::TimePoint<>(LinkContext.DMO.getTimestamp())) {
         // Not using the helper here as we can easily stream TimePoint<>.
-        warn_ostream() << "Timestamp mismatch for " << File << ": "
-                       << Stat.getLastModificationTime() << " and "
-                       << sys::TimePoint<>(LinkContext.DMO.getTimestamp())
-                       << "\n";
+        WithColor::warning()
+            << "Timestamp mismatch for " << File << ": "
+            << Stat.getLastModificationTime() << " and "
+            << sys::TimePoint<>(LinkContext.DMO.getTimestamp()) << "\n";
         continue;
       }
 

@@ -919,13 +919,16 @@ static bool isPermutation(ArrayRef<int> Mask) {
 }
 
 bool HvxSelector::selectVectorConstants(SDNode *N) {
-  // Constant vectors are generated as loads from constant pools or
-  // as VSPLATs of a constant value.
-  // Since they are generated during the selection process, the main
-  // selection algorithm is not aware of them. Select them directly
-  // here.
+  // Constant vectors are generated as loads from constant pools or as
+  // splats of a constant value. Since they are generated during the
+  // selection process, the main selection algorithm is not aware of them.
+  // Select them directly here.
   SmallVector<SDNode*,4> Nodes;
   SetVector<SDNode*> WorkQ;
+
+  // The one-use test for VSPLATW's operand may fail due to dead nodes
+  // left over in the DAG.
+  DAG.RemoveDeadNodes();
 
   // The DAG can change (due to CSE) during selection, so cache all the
   // unselected nodes first to avoid traversing a mutating DAG.
@@ -933,22 +936,23 @@ bool HvxSelector::selectVectorConstants(SDNode *N) {
   auto IsNodeToSelect = [] (SDNode *N) {
     if (N->isMachineOpcode())
       return false;
-    unsigned Opc = N->getOpcode();
-    if (Opc == HexagonISD::VSPLAT || Opc == HexagonISD::VZERO)
-      return true;
-    if (Opc == ISD::BITCAST) {
-      // Only select bitcasts of VSPLATs.
-      if (N->getOperand(0).getOpcode() == HexagonISD::VSPLAT)
+    switch (N->getOpcode()) {
+      case HexagonISD::VZERO:
+      case HexagonISD::VSPLATW:
         return true;
+      case ISD::LOAD: {
+        SDValue Addr = cast<LoadSDNode>(N)->getBasePtr();
+        unsigned AddrOpc = Addr.getOpcode();
+        if (AddrOpc == HexagonISD::AT_PCREL || AddrOpc == HexagonISD::CP)
+          if (Addr.getOperand(0).getOpcode() == ISD::TargetConstantPool)
+            return true;
+      }
+      break;
     }
-    if (Opc == ISD::LOAD) {
-      SDValue Addr = cast<LoadSDNode>(N)->getBasePtr();
-      unsigned AddrOpc = Addr.getOpcode();
-      if (AddrOpc == HexagonISD::AT_PCREL || AddrOpc == HexagonISD::CP)
-        if (Addr.getOperand(0).getOpcode() == ISD::TargetConstantPool)
-          return true;
-    }
-    return false;
+    // Make sure to select the operand of VSPLATW.
+    bool IsSplatOp = N->hasOneUse() &&
+                     N->use_begin()->getOpcode() == HexagonISD::VSPLATW;
+    return IsSplatOp;
   };
 
   WorkQ.insert(N);
@@ -1050,7 +1054,7 @@ OpRef HvxSelector::packs(ShuffleMask SM, OpRef Va, OpRef Vb,
   int VecLen = SM.Mask.size();
   MVT Ty = getSingleVT(MVT::i8);
 
-  auto IsSubvector = [] (ShuffleMask M) {
+  auto IsExtSubvector = [] (ShuffleMask M) {
     assert(M.MinSrc >= 0 && M.MaxSrc >= 0);
     for (int I = 0, E = M.Mask.size(); I != E; ++I) {
       if (M.Mask[I] >= 0 && M.Mask[I]-I != M.MinSrc)
@@ -1060,7 +1064,12 @@ OpRef HvxSelector::packs(ShuffleMask SM, OpRef Va, OpRef Vb,
   };
 
   if (SM.MaxSrc - SM.MinSrc < int(HwLen)) {
-    if (SM.MinSrc == 0 || SM.MinSrc == int(HwLen) || !IsSubvector(SM)) {
+    if (SM.MinSrc == 0 || SM.MinSrc == int(HwLen) || !IsExtSubvector(SM)) {
+      // If the mask picks elements from only one of the operands, return
+      // that operand, and update the mask to use index 0 to refer to the
+      // first element of that operand.
+      // If the mask extracts a subvector, it will be handled below, so
+      // skip it here.
       if (SM.MaxSrc < int(HwLen)) {
         memcpy(NewMask.data(), SM.Mask.data(), sizeof(int)*VecLen);
         return Va;
@@ -1075,17 +1084,23 @@ OpRef HvxSelector::packs(ShuffleMask SM, OpRef Va, OpRef Vb,
         return Vb;
       }
     }
+    int MinSrc = SM.MinSrc;
     if (SM.MaxSrc < int(HwLen)) {
       Vb = Va;
     } else if (SM.MinSrc > int(HwLen)) {
       Va = Vb;
-      SM.MinSrc -= HwLen;
+      MinSrc = SM.MinSrc - HwLen;
     }
     const SDLoc &dl(Results.InpNode);
-    SDValue S = DAG.getTargetConstant(SM.MinSrc, dl, MVT::i32);
-    if (isUInt<3>(SM.MinSrc)) {
-      Results.push(Hexagon::V6_valignbi, Ty, {Vb, Va, S});
+    if (isUInt<3>(MinSrc) || isUInt<3>(HwLen-MinSrc)) {
+      bool IsRight = isUInt<3>(MinSrc); // Right align.
+      SDValue S = DAG.getTargetConstant(IsRight ? MinSrc : HwLen-MinSrc,
+                                        dl, MVT::i32);
+      unsigned Opc = IsRight ? Hexagon::V6_valignbi
+                             : Hexagon::V6_vlalignbi;
+      Results.push(Opc, Ty, {Vb, Va, S});
     } else {
+      SDValue S = DAG.getTargetConstant(MinSrc, dl, MVT::i32);
       Results.push(Hexagon::A2_tfrsi, MVT::i32, {S});
       unsigned Top = Results.top();
       Results.push(Hexagon::V6_valignb, Ty, {Vb, Va, OpRef::res(Top)});

@@ -39,16 +39,24 @@ enum NamingStyle {
 ///
 /// Keep this list sorted.
 constexpr llvm::StringLiteral DefaultSpecialAcronyms[] = {
+    "[2-9]G",
     "ACL",
     "API",
+    "AR",
     "ARGB",
     "ASCII",
     "BGRA",
+    "CA",
+    "CF",
+    "CG",
+    "CI",
+    "CV",
     "CMYK",
     "DNS",
     "FPS",
     "FTP",
     "GIF",
+    "GL",
     "GPS",
     "GUID",
     "HD",
@@ -64,6 +72,7 @@ constexpr llvm::StringLiteral DefaultSpecialAcronyms[] = {
     "LZW",
     "MDNS",
     "MIDI",
+    "NS",
     "OS",
     "PDF",
     "PIN",
@@ -80,6 +89,7 @@ constexpr llvm::StringLiteral DefaultSpecialAcronyms[] = {
     "RPC",
     "RTF",
     "RTL",
+    "SC",
     "SDK",
     "SSO",
     "TCP",
@@ -93,8 +103,12 @@ constexpr llvm::StringLiteral DefaultSpecialAcronyms[] = {
     "VOIP",
     "VPN",
     "VR",
+    "W",
     "WAN",
+    "X",
     "XML",
+    "Y",
+    "Z",
 };
 
 /// For now we will only fix 'CamelCase' or 'abc_CamelCase' property to
@@ -204,6 +218,12 @@ void PropertyDeclarationCheck::check(const MatchFinder::MatchResult &Result) {
   assert(MatchedDecl->getName().size() > 0);
   auto *DeclContext = MatchedDecl->getDeclContext();
   auto *CategoryDecl = llvm::dyn_cast<ObjCCategoryDecl>(DeclContext);
+
+  auto AcronymsRegex =
+      llvm::Regex("^" + AcronymsGroupRegex(EscapedAcronyms) + "$");
+  if (AcronymsRegex.match(MatchedDecl->getName())) {
+    return;
+  }
   if (CategoryDecl != nullptr &&
       hasCategoryPropertyPrefix(MatchedDecl->getName())) {
     if (!prefixedPropertyNameValid(MatchedDecl->getName(), EscapedAcronyms) ||

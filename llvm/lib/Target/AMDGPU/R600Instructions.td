@@ -663,13 +663,6 @@ let isCodeGenOnly = 1, isPseudo = 1 in {
 
 let usesCustomInserter = 1  in {
 
-class CLAMP <RegisterClass rc> : AMDGPUShaderInst <
-  (outs rc:$dst),
-  (ins rc:$src0),
-  "CLAMP $dst, $src0",
-  [(set f32:$dst, (AMDGPUclamp f32:$src0))]
->;
-
 class FABS <RegisterClass rc> : AMDGPUShaderInst <
   (outs rc:$dst),
   (ins rc:$src0),
@@ -1194,7 +1187,6 @@ class COS_Common <bits<11> inst> : R600_1OP <
   let Itinerary = TransALU;
 }
 
-def CLAMP_R600 :  CLAMP <R600_Reg32>;
 def FABS_R600 : FABS<R600_Reg32>;
 def FNEG_R600 : FNEG<R600_Reg32>;
 
@@ -1739,11 +1731,6 @@ def : R600Pat <
 >;
 
 // KIL Patterns
-def KILP : R600Pat <
-  (int_AMDGPU_kilp),
-  (MASK_WRITE (KILLGT (f32 ONE), (f32 ZERO)))
->;
-
 def KIL : R600Pat <
   (int_AMDGPU_kill f32:$src0),
   (MASK_WRITE (KILLGT (f32 ZERO), $src0))

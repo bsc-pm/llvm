@@ -184,8 +184,6 @@ MipsOptionsSection<ELFT> *MipsOptionsSection<ELFT>::create() {
 
       auto *Opt = reinterpret_cast<const Elf_Mips_Options *>(D.data());
       if (Opt->kind == ODK_REGINFO) {
-        if (Config->Relocatable && Opt->getRegInfo().ri_gp_value)
-          error(Filename + ": unsupported non-zero ri_gp_value");
         Reginfo.ri_gprmask |= Opt->getRegInfo().ri_gprmask;
         Sec->getFile<ELFT>()->MipsGp0 = Opt->getRegInfo().ri_gp_value;
         break;
@@ -236,10 +234,8 @@ MipsReginfoSection<ELFT> *MipsReginfoSection<ELFT>::create() {
       error(toString(Sec->File) + ": invalid size of .reginfo section");
       return nullptr;
     }
-    auto *R = reinterpret_cast<const Elf_Mips_RegInfo *>(Sec->Data.data());
-    if (Config->Relocatable && R->ri_gp_value)
-      error(toString(Sec->File) + ": unsupported non-zero ri_gp_value");
 
+    auto *R = reinterpret_cast<const Elf_Mips_RegInfo *>(Sec->Data.data());
     Reginfo.ri_gprmask |= R->ri_gprmask;
     Sec->getFile<ELFT>()->MipsGp0 = R->ri_gp_value;
   };
@@ -425,7 +421,7 @@ bool EhFrameSection::isFdeLive(EhSectionPiece &Fde, ArrayRef<RelTy> Rels) {
 // one and associates FDEs to the CIE.
 template <class ELFT, class RelTy>
 void EhFrameSection::addSectionAux(EhInputSection *Sec, ArrayRef<RelTy> Rels) {
-  DenseMap<size_t, CieRecord *> OffsetToCie;
+  OffsetToCie.clear();
   for (EhSectionPiece &Piece : Sec->Pieces) {
     // The empty record is the end marker.
     if (Piece.Size == 4)
@@ -460,10 +456,6 @@ template <class ELFT> void EhFrameSection::addSection(InputSectionBase *C) {
   for (auto *DS : Sec->DependentSections)
     DependentSections.push_back(DS);
 
-  // .eh_frame is a sequence of CIE or FDE records. This function
-  // splits it into pieces so that we can call
-  // SplitInputSection::getSectionPiece on the section.
-  Sec->split<ELFT>();
   if (Sec->Pieces.empty())
     return;
 
@@ -501,10 +493,10 @@ void EhFrameSection::finalizeContents() {
   }
 
   // The LSB standard does not allow a .eh_frame section with zero
-  // Call Frame Information records. Therefore add a CIE record length
-  // 0 as a terminator if this .eh_frame section is empty.
-  if (Off == 0)
-    Off = 4;
+  // Call Frame Information records. glibc unwind-dw2-fde.c
+  // classify_object_over_fdes expects there is a CIE record length 0 as a
+  // terminator. Thus we add one unconditionally.
+  Off += 4;
 
   this->Size = Off;
 }
@@ -882,12 +874,18 @@ void MipsGotSection::writeTo(uint8_t *Buf) {
   }
 }
 
+// On PowerPC the .plt section is used to hold the table of function addresses
+// instead of the .got.plt, and the type is SHT_NOBITS similar to a .bss
+// section. I don't know why we have a BSS style type for the section but it is
+// consitent across both 64-bit PowerPC ABIs as well as the 32-bit PowerPC ABI.
 GotPltSection::GotPltSection()
-    : SyntheticSection(SHF_ALLOC | SHF_WRITE, SHT_PROGBITS,
-                       Target->GotPltEntrySize, ".got.plt") {}
+    : SyntheticSection(SHF_ALLOC | SHF_WRITE,
+                       Config->EMachine == EM_PPC64 ? SHT_NOBITS : SHT_PROGBITS,
+                       Target->GotPltEntrySize,
+                       Config->EMachine == EM_PPC64 ? ".plt" : ".got.plt") {}
 
 void GotPltSection::addEntry(Symbol &Sym) {
-  Sym.GotPltIndex = Target->GotPltHeaderEntriesNum + Entries.size();
+  assert(Sym.PltIndex == Entries.size());
   Entries.push_back(&Sym);
 }
 
@@ -913,16 +911,29 @@ bool GotPltSection::empty() const {
          !(ElfSym::GlobalOffsetTable && Target->GotBaseSymInGotPlt);
 }
 
-// On ARM the IgotPltSection is part of the GotSection, on other Targets it is
-// part of the .got.plt
+static StringRef getIgotPltName() {
+  // On ARM the IgotPltSection is part of the GotSection.
+  if (Config->EMachine == EM_ARM)
+    return ".got";
+
+  // On PowerPC64 the GotPltSection is renamed to '.plt' so the IgotPltSection
+  // needs to be named the same.
+  if (Config->EMachine == EM_PPC64)
+    return ".plt";
+
+  return ".got.plt";
+}
+
+// On PowerPC64 the GotPltSection type is SHT_NOBITS so we have to follow suit
+// with the IgotPltSection.
 IgotPltSection::IgotPltSection()
-    : SyntheticSection(SHF_ALLOC | SHF_WRITE, SHT_PROGBITS,
-                       Target->GotPltEntrySize,
-                       Config->EMachine == EM_ARM ? ".got" : ".got.plt") {}
+    : SyntheticSection(SHF_ALLOC | SHF_WRITE,
+                       Config->EMachine == EM_PPC64 ? SHT_NOBITS : SHT_PROGBITS,
+                       Target->GotPltEntrySize, getIgotPltName()) {}
 
 void IgotPltSection::addEntry(Symbol &Sym) {
   Sym.IsInIgot = true;
-  Sym.GotPltIndex = Entries.size();
+  assert(Sym.PltIndex == Entries.size());
   Entries.push_back(&Sym);
 }
 
@@ -1190,6 +1201,16 @@ template <class ELFT> void DynamicSection<ELFT>::finalizeContents() {
     }
   }
 
+  // Glink dynamic tag is required by the V2 abi if the plt section isn't empty.
+  if (Config->EMachine == EM_PPC64 && !InX::Plt->empty()) {
+    // The Glink tag points to 32 bytes before the first lazy symbol resolution
+    // stub, which starts directly after the header.
+    Entries.push_back({DT_PPC64_GLINK, [=] {
+                         unsigned Offset = Target->PltHeaderSize - 32;
+                         return InX::Plt->getVA(0) + Offset;
+                       }});
+  }
+
   addInt(DT_NULL, 0);
 
   getParent()->Link = this->Link;
@@ -1393,10 +1414,10 @@ bool AndroidPackedRelocationSection<ELFT>::updateAllocSize() {
       NonRelatives.push_back(R);
   }
 
-  std::sort(Relatives.begin(), Relatives.end(),
-            [](const Elf_Rel &A, const Elf_Rel &B) {
-              return A.r_offset < B.r_offset;
-            });
+  llvm::sort(Relatives.begin(), Relatives.end(),
+             [](const Elf_Rel &A, const Elf_Rel &B) {
+               return A.r_offset < B.r_offset;
+             });
 
   // Try to find groups of relative relocations which are spaced one word
   // apart from one another. These generally correspond to vtable entries. The
@@ -1474,10 +1495,10 @@ bool AndroidPackedRelocationSection<ELFT>::updateAllocSize() {
   }
 
   // Finally the non-relative relocations.
-  std::sort(NonRelatives.begin(), NonRelatives.end(),
-            [](const Elf_Rela &A, const Elf_Rela &B) {
-              return A.r_offset < B.r_offset;
-            });
+  llvm::sort(NonRelatives.begin(), NonRelatives.end(),
+             [](const Elf_Rela &A, const Elf_Rela &B) {
+               return A.r_offset < B.r_offset;
+             });
   if (!NonRelatives.empty()) {
     Add(NonRelatives.size());
     Add(HasAddendIfRela);
@@ -1646,6 +1667,8 @@ template <class ELFT> void SymbolTableSection<ELFT>::writeTo(uint8_t *Buf) {
         CommonSec = dyn_cast_or_null<BssSection>(D->Section);
     if (CommonSec)
       ESym->st_shndx = SHN_COMMON;
+    else if (Sym->NeedsPltAddr)
+      ESym->st_shndx = SHN_UNDEF;
     else if (const OutputSection *OutSec = Sym->getOutputSection())
       ESym->st_shndx = OutSec->SectionIndex;
     else if (isa<Defined>(Sym))
@@ -1687,9 +1710,11 @@ template <class ELFT> void SymbolTableSection<ELFT>::writeTo(uint8_t *Buf) {
         ESym->st_other |= STO_MIPS_PLT;
       if (isMicroMips()) {
         // Set STO_MIPS_MICROMIPS flag and less-significant bit for
-        // defined microMIPS symbols and shared symbols with PLT record.
-        if ((Sym->isDefined() && (Sym->StOther & STO_MIPS_MICROMIPS)) ||
-            (Sym->isShared() && Sym->NeedsPltAddr)) {
+        // a defined microMIPS symbol and symbol should point to its
+        // PLT entry (in case of microMIPS, PLT entries always contain
+        // microMIPS code).
+        if (Sym->isDefined() &&
+            ((Sym->StOther & STO_MIPS_MICROMIPS) || Sym->NeedsPltAddr)) {
           if (StrTabSec.isDynamic())
             ESym->st_value |= 1;
           ESym->st_other |= STO_MIPS_MICROMIPS;
@@ -1831,10 +1856,6 @@ void GnuHashTableSection::addSymbols(std::vector<SymbolTableEntry> &V) {
   // its type correctly.
   std::vector<SymbolTableEntry>::iterator Mid =
       std::stable_partition(V.begin(), V.end(), [](const SymbolTableEntry &S) {
-        // Shared symbols that this executable preempts are special. The dynamic
-        // linker has to look them up, so they have to be in the hash table.
-        if (auto *SS = dyn_cast<SharedSymbol>(S.Sym))
-          return SS->CopyRelSec == nullptr && !SS->NeedsPltAddr;
         return !S.Sym->isDefined();
       });
 
@@ -1907,8 +1928,11 @@ void HashTableSection::writeTo(uint8_t *Buf) {
   }
 }
 
+// On PowerPC64 the lazy symbol resolvers go into the `global linkage table`
+// in the .glink section, rather then the typical .plt section.
 PltSection::PltSection(bool IsIplt)
-    : SyntheticSection(SHF_ALLOC | SHF_EXECINSTR, SHT_PROGBITS, 16, ".plt"),
+    : SyntheticSection(SHF_ALLOC | SHF_EXECINSTR, SHT_PROGBITS, 16,
+                       Config->EMachine == EM_PPC64 ? ".glink" : ".plt"),
       HeaderSize(IsIplt ? 0 : Target->PltHeaderSize), IsIplt(IsIplt) {
   // The PLT needs to be writable on SPARC as the dynamic linker will
   // modify the instructions in the PLT entries.
@@ -2359,9 +2383,8 @@ VersionNeedSection<ELFT>::VersionNeedSection()
   NextIndex = getVerDefNum() + 1;
 }
 
-template <class ELFT>
-void VersionNeedSection<ELFT>::addSymbol(SharedSymbol *SS) {
-  SharedFile<ELFT> &File = SS->getFile<ELFT>();
+template <class ELFT> void VersionNeedSection<ELFT>::addSymbol(Symbol *SS) {
+  auto &File = cast<SharedFile<ELFT>>(*SS->File);
   if (SS->VerdefIndex == VER_NDX_GLOBAL) {
     SS->VersionId = VER_NDX_GLOBAL;
     return;
@@ -2540,9 +2563,18 @@ static MergeSyntheticSection *createMergeSynthetic(StringRef Name,
 
 // Debug sections may be compressed by zlib. Decompress if exists.
 void elf::decompressSections() {
+  parallelForEach(InputSections,
+                  [](InputSectionBase *Sec) { Sec->maybeDecompress(); });
+}
+
+template <class ELFT> void elf::splitSections() {
+  // splitIntoPieces needs to be called on each MergeInputSection
+  // before calling finalizeContents().
   parallelForEach(InputSections, [](InputSectionBase *Sec) {
-    if (Sec->Live)
-      Sec->maybeDecompress();
+    if (auto *S = dyn_cast<MergeInputSection>(Sec))
+      S->splitIntoPieces();
+    else if (auto *Eh = dyn_cast<EhInputSection>(Sec))
+      Eh->split<ELFT>();
   });
 }
 
@@ -2554,13 +2586,6 @@ void elf::decompressSections() {
 // that it replaces. It then finalizes each synthetic section in order
 // to compute an output offset for each piece of each input section.
 void elf::mergeSections() {
-  // splitIntoPieces needs to be called on each MergeInputSection
-  // before calling finalizeContents(). Do that first.
-  parallelForEach(InputSections, [](InputSectionBase *Sec) {
-    if (auto *S = dyn_cast<MergeInputSection>(Sec))
-      S->splitIntoPieces();
-  });
-
   std::vector<MergeSyntheticSection *> MergeSections;
   for (InputSectionBase *&S : InputSections) {
     MergeInputSection *MS = dyn_cast<MergeInputSection>(S);
@@ -2705,6 +2730,11 @@ template GdbIndexSection *elf::createGdbIndex<ELF32LE>();
 template GdbIndexSection *elf::createGdbIndex<ELF32BE>();
 template GdbIndexSection *elf::createGdbIndex<ELF64LE>();
 template GdbIndexSection *elf::createGdbIndex<ELF64BE>();
+
+template void elf::splitSections<ELF32LE>();
+template void elf::splitSections<ELF32BE>();
+template void elf::splitSections<ELF64LE>();
+template void elf::splitSections<ELF64BE>();
 
 template void EhFrameSection::addSection<ELF32LE>(InputSectionBase *);
 template void EhFrameSection::addSection<ELF32BE>(InputSectionBase *);

@@ -466,12 +466,19 @@ bool CodeGenFunction::ShouldXRayInstrumentFunction() const {
 }
 
 /// AlwaysEmitXRayCustomEvents - Return true if we should emit IR for calls to
-/// the __xray_customevent(...) builin calls, when doing XRay instrumentation.
+/// the __xray_customevent(...) builtin calls, when doing XRay instrumentation.
 bool CodeGenFunction::AlwaysEmitXRayCustomEvents() const {
   return CGM.getCodeGenOpts().XRayInstrumentFunctions &&
          (CGM.getCodeGenOpts().XRayAlwaysEmitCustomEvents ||
           CGM.getCodeGenOpts().XRayInstrumentationBundle.Mask ==
               XRayInstrKind::Custom);
+}
+
+bool CodeGenFunction::AlwaysEmitXRayTypedEvents() const {
+  return CGM.getCodeGenOpts().XRayInstrumentFunctions &&
+         (CGM.getCodeGenOpts().XRayAlwaysEmitTypedEvents ||
+          CGM.getCodeGenOpts().XRayInstrumentationBundle.Mask ==
+              XRayInstrKind::Typed);
 }
 
 llvm::Constant *
@@ -1018,7 +1025,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
       ArgTypes.push_back(VD->getType());
     QualType FnType = getContext().getFunctionType(
         RetTy, ArgTypes, FunctionProtoType::ExtProtoInfo(CC));
-    DI->EmitFunctionStart(GD, Loc, StartLoc, FnType, CurFn, Builder);
+    DI->EmitFunctionStart(GD, Loc, StartLoc, FnType, CurFn, CurFuncIsThunk,
+                          Builder);
   }
 
   if (ShouldInstrumentFunction()) {
@@ -2276,7 +2284,7 @@ static bool hasRequiredFeatures(const SmallVectorImpl<StringRef> &ReqFeatures,
   return std::all_of(
       ReqFeatures.begin(), ReqFeatures.end(), [&](StringRef Feature) {
         SmallVector<StringRef, 1> OrFeatures;
-        Feature.split(OrFeatures, "|");
+        Feature.split(OrFeatures, '|');
         return std::any_of(OrFeatures.begin(), OrFeatures.end(),
                            [&](StringRef Feature) {
                              if (!CallerFeatureMap.lookup(Feature)) {
@@ -2314,7 +2322,7 @@ void CodeGenFunction::checkTargetFeatures(const CallExpr *E,
     // Return if the builtin doesn't have any required features.
     if (!FeatureList || StringRef(FeatureList) == "")
       return;
-    StringRef(FeatureList).split(ReqFeatures, ",");
+    StringRef(FeatureList).split(ReqFeatures, ',');
     if (!hasRequiredFeatures(ReqFeatures, CGM, FD, MissingFeature))
       CGM.getDiags().Report(E->getLocStart(), diag::err_builtin_needs_feature)
           << TargetDecl->getDeclName()

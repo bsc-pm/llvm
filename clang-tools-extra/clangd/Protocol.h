@@ -27,6 +27,7 @@
 #include "JSONExpr.h"
 #include "URI.h"
 #include "llvm/ADT/Optional.h"
+#include <bitset>
 #include <string>
 #include <vector>
 
@@ -90,11 +91,16 @@ struct Position {
   int line = 0;
 
   /// Character offset on a line in a document (zero-based).
+  /// WARNING: this is in UTF-16 codepoints, not bytes or characters!
+  /// Use the functions in SourceCode.h to construct/interpret Positions.
   int character = 0;
 
   friend bool operator==(const Position &LHS, const Position &RHS) {
     return std::tie(LHS.line, LHS.character) ==
            std::tie(RHS.line, RHS.character);
+  }
+  friend bool operator!=(const Position &LHS, const Position &RHS) {
+    return !(LHS == RHS);
   }
   friend bool operator<(const Position &LHS, const Position &RHS) {
     return std::tie(LHS.line, LHS.character) <
@@ -237,6 +243,67 @@ struct CompletionClientCapabilities {
 };
 bool fromJSON(const json::Expr &, CompletionClientCapabilities &);
 
+/// A symbol kind.
+enum class SymbolKind {
+  File = 1,
+  Module = 2,
+  Namespace = 3,
+  Package = 4,
+  Class = 5,
+  Method = 6,
+  Property = 7,
+  Field = 8,
+  Constructor = 9,
+  Enum = 10,
+  Interface = 11,
+  Function = 12,
+  Variable = 13,
+  Constant = 14,
+  String = 15,
+  Number = 16,
+  Boolean = 17,
+  Array = 18,
+  Object = 19,
+  Key = 20,
+  Null = 21,
+  EnumMember = 22,
+  Struct = 23,
+  Event = 24,
+  Operator = 25,
+  TypeParameter = 26
+};
+
+constexpr auto SymbolKindMin = static_cast<size_t>(SymbolKind::File);
+constexpr auto SymbolKindMax = static_cast<size_t>(SymbolKind::TypeParameter);
+using SymbolKindBitset = std::bitset<SymbolKindMax + 1>;
+
+bool fromJSON(const json::Expr &, SymbolKind &);
+
+struct SymbolKindCapabilities {
+  /// The SymbolKinds that the client supports. If not set, the client only
+  /// supports <= SymbolKind::Array and will not fall back to a valid default
+  /// value.
+  llvm::Optional<std::vector<SymbolKind>> valueSet;
+};
+bool fromJSON(const json::Expr &, std::vector<SymbolKind> &);
+bool fromJSON(const json::Expr &, SymbolKindCapabilities &);
+SymbolKind adjustKindToCapability(SymbolKind Kind,
+                                  SymbolKindBitset &supportedSymbolKinds);
+
+struct WorkspaceSymbolCapabilities {
+  /// Capabilities SymbolKind.
+  llvm::Optional<SymbolKindCapabilities> symbolKind;
+};
+bool fromJSON(const json::Expr &, WorkspaceSymbolCapabilities &);
+
+// FIXME: most of the capabilities are missing from this struct. Only the ones
+// used by clangd are currently there.
+struct WorkspaceClientCapabilities {
+  /// Capabilities specific to `workspace/symbol`.
+  llvm::Optional<WorkspaceSymbolCapabilities> symbol;
+};
+bool fromJSON(const json::Expr &, WorkspaceClientCapabilities &);
+
 // FIXME: most of the capabilities are missing from this struct. Only the ones
 // used by clangd are currently there.
 struct TextDocumentClientCapabilities {
@@ -247,8 +314,7 @@ bool fromJSON(const json::Expr &, TextDocumentClientCapabilities &);
 
 struct ClientCapabilities {
   // Workspace specific client capabilities.
-  // NOTE: not used by clangd at the moment.
-  // WorkspaceClientCapabilities workspace;
+  llvm::Optional<WorkspaceClientCapabilities> workspace;
 
   // Text document specific client capabilities.
   TextDocumentClientCapabilities textDocument;
@@ -475,26 +541,6 @@ struct WorkspaceEdit {
 bool fromJSON(const json::Expr &, WorkspaceEdit &);
 json::Expr toJSON(const WorkspaceEdit &WE);
 
-struct IncludeInsertion {
-  /// The document in which the command was invoked.
-  /// If either originalHeader or preferredHeader has been (directly) included
-  /// in the current file, no new include will be inserted.
-  TextDocumentIdentifier textDocument;
-
-  /// The declaring header corresponding to this insertion e.g. the header that
-  /// declares a symbol. This could be either a URI or a literal string quoted
-  /// with <> or "" that can be #included directly.
-  std::string declaringHeader;
-  /// The preferred header to be inserted. This may be different from
-  /// originalHeader as a header file can have a different canonical include.
-  /// This could be either a URI or a literal string quoted with <> or "" that
-  /// can be #included directly. If empty, declaringHeader is used to calculate
-  /// the #include path.
-  std::string preferredHeader;
-};
-bool fromJSON(const json::Expr &, IncludeInsertion &);
-json::Expr toJSON(const IncludeInsertion &II);
-
 /// Exact commands are not specified in the protocol so we define the
 /// ones supported by Clangd here. The protocol specifies the command arguments
 /// to be "any[]" but to make this safer and more manageable, each command we
@@ -506,16 +552,12 @@ json::Expr toJSON(const IncludeInsertion &II);
 struct ExecuteCommandParams {
   // Command to apply fix-its. Uses WorkspaceEdit as argument.
   const static llvm::StringLiteral CLANGD_APPLY_FIX_COMMAND;
-  // Command to insert an #include into code.
-  const static llvm::StringLiteral CLANGD_INSERT_HEADER_INCLUDE;
 
   /// The command identifier, e.g. CLANGD_APPLY_FIX_COMMAND
   std::string command;
 
   // Arguments
   llvm::Optional<WorkspaceEdit> workspaceEdit;
-
-  llvm::Optional<IncludeInsertion> includeInsertion;
 };
 bool fromJSON(const json::Expr &, ExecuteCommandParams &);
 
@@ -524,6 +566,31 @@ struct Command : public ExecuteCommandParams {
 };
 
 json::Expr toJSON(const Command &C);
+
+/// Represents information about programming constructs like variables, classes,
+/// interfaces etc.
+struct SymbolInformation {
+  /// The name of this symbol.
+  std::string name;
+
+  /// The kind of this symbol.
+  SymbolKind kind;
+
+  /// The location of this symbol.
+  Location location;
+
+  /// The name of the symbol containing this symbol.
+  std::string containerName;
+};
+json::Expr toJSON(const SymbolInformation &);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, const SymbolInformation &);
+
+/// The parameters of a Workspace Symbol Request.
+struct WorkspaceSymbolParams {
+  /// A non-empty query string
+  std::string query;
+};
+bool fromJSON(const json::Expr &, WorkspaceSymbolParams &);
 
 struct ApplyWorkspaceEditParams {
   WorkspaceEdit edit;
@@ -662,7 +729,6 @@ struct CompletionItem {
   /// themselves.
   std::vector<TextEdit> additionalTextEdits;
 
-  llvm::Optional<Command> command;
   // TODO(krasimir): The following optional fields defined by the language
   // server protocol are unsupported:
   //

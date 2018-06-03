@@ -87,11 +87,6 @@ struct ClangTidyStats {
   }
 };
 
-/// \brief Container for clang-tidy profiling data.
-struct ProfileData {
-  llvm::StringMap<llvm::TimeRecord> Records;
-};
-
 /// \brief Every \c ClangTidyCheck reports errors through a \c DiagnosticsEngine
 /// provided by this context.
 ///
@@ -104,7 +99,8 @@ struct ProfileData {
 class ClangTidyContext {
 public:
   /// \brief Initializes \c ClangTidyContext instance.
-  ClangTidyContext(std::unique_ptr<ClangTidyOptionsProvider> OptionsProvider);
+  ClangTidyContext(std::unique_ptr<ClangTidyOptionsProvider> OptionsProvider,
+                   bool AllowEnablingAnalyzerAlphaCheckers = false);
 
   ~ClangTidyContext();
 
@@ -169,12 +165,9 @@ public:
   /// \brief Clears collected errors.
   void clearErrors() { Errors.clear(); }
 
-  /// \brief Set the output struct for profile data.
-  ///
-  /// Setting a non-null pointer here will enable profile collection in
-  /// clang-tidy.
-  void setCheckProfileData(ProfileData *Profile);
-  ProfileData *getCheckProfileData() const { return Profile; }
+  /// \brief Control profile collection in clang-tidy.
+  void setEnableProfiling(bool Profile);
+  bool getEnableProfiling() const { return Profile; }
 
   /// \brief Should be called when starting to process new translation unit.
   void setCurrentBuildDirectory(StringRef BuildDirectory) {
@@ -184,6 +177,12 @@ public:
   /// \brief Returns build directory of the current translation unit.
   const std::string &getCurrentBuildDirectory() {
     return CurrentBuildDirectory;
+  }
+
+  /// \brief If the experimental alpha checkers from the static analyzer can be
+  /// enabled.
+  bool canEnableAnalyzerAlphaCheckers() const {
+    return AllowEnablingAnalyzerAlphaCheckers;
   }
 
 private:
@@ -216,7 +215,9 @@ private:
 
   llvm::DenseMap<unsigned, std::string> CheckNamesByDiagnosticID;
 
-  ProfileData *Profile;
+  bool Profile;
+
+  bool AllowEnablingAnalyzerAlphaCheckers;
 };
 
 /// \brief A diagnostic consumer that turns each \c Diagnostic into a

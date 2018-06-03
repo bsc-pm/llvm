@@ -66,6 +66,9 @@ defm as_needed: B<"as-needed",
     "Only set DT_NEEDED for shared libraries if used",
     "Always set DT_NEEDED for shared libraries">;
 
+defm call_graph_ordering_file: Eq<"call-graph-ordering-file">,
+  HelpText<"Layout sections to optimize the given callgraph">;
+
 // -chroot doesn't have a help text because it is an internal option.
 defm chroot: Eq<"chroot">;
 
@@ -73,7 +76,7 @@ def color_diagnostics: F<"color-diagnostics">,
   HelpText<"Use colors in diagnostics">;
 
 def color_diagnostics_eq: J<"color-diagnostics=">,
-  HelpText<"Use colors in diagnostics">;
+  HelpText<"Use colors in diagnostics; one of 'always', 'never', 'auto'">;
 
 defm cref: B<"cref",
     "Output cross reference table",
@@ -189,11 +192,10 @@ defm init: Eq<"init">, HelpText<"Specify an initializer function">,
 
 defm just_symbols: Eq<"just-symbols">, HelpText<"Just link symbols">;
 
+defm keep_unique: Eq<"keep-unique">, HelpText<"Do not fold this symbol during ICF">;
+
 defm library: Eq<"library">, HelpText<"Root name of library to use">,
   MetaVarName<"<libName>">;
-
-def lto_O: J<"lto-O">, MetaVarName<"<opt-level>">,
-  HelpText<"Optimization level for LTO">;
 
 def m: JoinedOrSeparate<["-"], "m">, HelpText<"Set target emulation">;
 
@@ -288,7 +290,7 @@ def strip_all: F<"strip-all">, HelpText<"Strip all symbols">;
 def strip_debug: F<"strip-debug">, HelpText<"Strip debugging information">;
 
 defm symbol_ordering_file: Eq<"symbol-ordering-file">,
-  HelpText<"Layout sections in the order specified by symbol file">;
+  HelpText<"Layout sections to place symbols in the order specified by symbol ordering file">;
 
 defm sysroot: Eq<"sysroot">, HelpText<"Set the system root">;
 
@@ -404,6 +406,8 @@ def lto_new_pass_manager: F<"lto-new-pass-manager">,
   HelpText<"Use new pass manager">;
 def lto_newpm_passes: J<"lto-newpm-passes=">,
   HelpText<"Passes to run during LTO">;
+def lto_O: J<"lto-O">, MetaVarName<"<opt-level>">,
+  HelpText<"Optimization level for LTO">;
 def lto_partitions: J<"lto-partitions=">,
   HelpText<"Number of LTO codegen partitions">;
 def lto_sample_profile: J<"lto-sample-profile=">,
@@ -423,6 +427,22 @@ defm thinlto_cache_policy: Eq<"thinlto-cache-policy">,
   HelpText<"Pruning policy for the ThinLTO cache">;
 def thinlto_jobs: J<"thinlto-jobs=">, HelpText<"Number of ThinLTO jobs">;
 
+def plugin_opt_O: J<"plugin-opt=O">, Alias<lto_O>;
+def plugin_opt_debug_pass_manager: F<"plugin-opt=debug-pass-manager">, Alias<lto_debug_pass_manager>;
+def plugin_opt_disable_verify: F<"plugin-opt=disable-verify">, Alias<disable_verify>;
+def plugin_opt_jobs_eq: J<"plugin-opt=jobs=">, Alias<thinlto_jobs>;
+def plugin_opt_lto_partitions_eq: J<"plugin-opt=lto-partitions=">, Alias<lto_partitions>;
+def plugin_opt_mcpu_eq: J<"plugin-opt=mcpu=">;
+def plugin_opt_new_pass_manager: F<"plugin-opt=new-pass-manager">, Alias<lto_new_pass_manager>;
+def plugin_opt_obj_path_eq: J<"plugin-opt=obj-path=">;
+def plugin_opt_sample_profile_eq: J<"plugin-opt=sample-profile=">, Alias<lto_sample_profile>;
+def plugin_opt_save_temps: F<"plugin-opt=save-temps">, Alias<save_temps>;
+def plugin_opt_thinlto_emit_imports_files: F<"plugin-opt=thinlto-emit-imports-files">;
+def plugin_opt_thinlto_index_only: F<"plugin-opt=thinlto-index-only">;
+def plugin_opt_thinlto_index_only_eq: J<"plugin-opt=thinlto-index-only=">;
+def plugin_opt_thinlto_object_suffix_replace_eq: J<"plugin-opt=thinlto-object-suffix-replace=">;
+def plugin_opt_thinlto_prefix_replace_eq: J<"plugin-opt=thinlto-prefix-replace=">;
+
 // Ignore LTO plugin-related options.
 // clang -flto passes -plugin and -plugin-opt to the linker. This is required
 // for ld.gold and ld.bfd to get LTO working. But it's not for lld which doesn't
@@ -431,6 +451,11 @@ def thinlto_jobs: J<"thinlto-jobs=">, HelpText<"Number of ThinLTO jobs">;
 // be called 'ld' and understanding which linker is used would require parsing of
 // --version output.
 defm plugin: Eq<"plugin">;
+
+def plugin_opt_fresolution_eq: J<"plugin-opt=-fresolution=">;
+def plugin_opt_pass_through_eq: J<"plugin-opt=-pass-through=">;
+def plugin_opt_thinlto: J<"plugin-opt=thinlto">;
+def plugin_opt_slash: J<"plugin-opt=/">;
 
 // Options listed below are silently ignored for now for compatibility.
 def allow_shlib_undefined: F<"allow-shlib-undefined">;

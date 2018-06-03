@@ -12,10 +12,12 @@
 
 #include "Diagnostics.h"
 #include "Function.h"
+#include "Headers.h"
 #include "Path.h"
 #include "Protocol.h"
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Frontend/PrecompiledPreamble.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Core/Replacement.h"
@@ -40,18 +42,16 @@ struct CompileCommand;
 
 namespace clangd {
 
-using InclusionLocations = std::vector<std::pair<Range, Path>>;
-
 // Stores Preamble and associated data.
 struct PreambleData {
-  PreambleData(PrecompiledPreamble Preamble,
-               std::vector<serialization::DeclID> TopLevelDeclIDs,
-               std::vector<Diag> Diags, InclusionLocations IncLocations);
+  PreambleData(PrecompiledPreamble Preamble, std::vector<Diag> Diags,
+               std::vector<Inclusion> Inclusions);
 
   PrecompiledPreamble Preamble;
-  std::vector<serialization::DeclID> TopLevelDeclIDs;
   std::vector<Diag> Diags;
-  InclusionLocations IncLocations;
+  // Processes like code completions and go-to-definitions will need #include
+  // information, and their compile action skips preamble range.
+  std::vector<Inclusion> Inclusions;
 };
 
 /// Information required to run clang, e.g. to parse AST or do code completion.
@@ -78,6 +78,9 @@ public:
 
   ~ParsedAST();
 
+  /// Note that the returned ast will not contain decls from the preamble that
+  /// were not deserialized during parsing. Clients should expect only decls
+  /// from the main file to be in the AST.
   ASTContext &getASTContext();
   const ASTContext &getASTContext() const;
 
@@ -85,27 +88,23 @@ public:
   std::shared_ptr<Preprocessor> getPreprocessorPtr();
   const Preprocessor &getPreprocessor() const;
 
-  /// This function returns all top-level decls, including those that come
-  /// from Preamble. Decls, coming from Preamble, have to be deserialized, so
-  /// this call might be expensive.
-  ArrayRef<const Decl *> getTopLevelDecls();
+  /// This function returns top-level decls present in the main file of the AST.
+  /// The result does not include the decls that come from the preamble.
+  ArrayRef<const Decl *> getLocalTopLevelDecls();
 
   const std::vector<Diag> &getDiagnostics() const;
 
   /// Returns the esitmated size of the AST and the accessory structures, in
   /// bytes. Does not include the size of the preamble.
   std::size_t getUsedBytes() const;
-  const InclusionLocations &getInclusionLocations() const;
+  const std::vector<Inclusion> &getInclusions() const;
 
 private:
   ParsedAST(std::shared_ptr<const PreambleData> Preamble,
             std::unique_ptr<CompilerInstance> Clang,
             std::unique_ptr<FrontendAction> Action,
-            std::vector<const Decl *> TopLevelDecls, std::vector<Diag> Diags,
-            InclusionLocations IncLocations);
-
-private:
-  void ensurePreambleDeclsDeserialized();
+            std::vector<const Decl *> LocalTopLevelDecls,
+            std::vector<Diag> Diags, std::vector<Inclusion> Inclusions);
 
   // In-memory preambles must outlive the AST, it is important that this member
   // goes before Clang and Action.
@@ -120,12 +119,14 @@ private:
 
   // Data, stored after parsing.
   std::vector<Diag> Diags;
-  std::vector<const Decl *> TopLevelDecls;
-  bool PreambleDeclsDeserialized;
-  InclusionLocations IncLocations;
+  // Top-level decls inside the current file. Not that this does not include
+  // top-level decls from the preamble.
+  std::vector<const Decl *> LocalTopLevelDecls;
+  std::vector<Inclusion> Inclusions;
 };
 
-using ASTParsedCallback = std::function<void(PathRef Path, ParsedAST *)>;
+using PreambleParsedCallback = std::function<void(
+    PathRef Path, ASTContext &, std::shared_ptr<clang::Preprocessor>)>;
 
 /// Manages resources, required by clangd. Allows to rebuild file with new
 /// contents, and provides AST and Preamble for it.
@@ -133,7 +134,7 @@ class CppFile {
 public:
   CppFile(PathRef FileName, bool StorePreamblesInMemory,
           std::shared_ptr<PCHContainerOperations> PCHs,
-          ASTParsedCallback ASTCallback);
+          PreambleParsedCallback PreambleCallback);
 
   /// Rebuild the AST and the preamble.
   /// Returns a list of diagnostics or llvm::None, if an error occured.
@@ -169,12 +170,13 @@ private:
   std::shared_ptr<PCHContainerOperations> PCHs;
   /// This is called after the file is parsed. This can be nullptr if there is
   /// no callback.
-  ASTParsedCallback ASTCallback;
+  PreambleParsedCallback PreambleCallback;
 };
 
 /// Get the beginning SourceLocation at a specified \p Pos.
+/// May be invalid if Pos is, or if there's no identifier.
 SourceLocation getBeginningOfIdentifier(ParsedAST &Unit, const Position &Pos,
-                                        const FileEntry *FE);
+                                        const FileID FID);
 
 /// For testing/debugging purposes. Note that this method deserializes all
 /// unserialized Decls, so use with care.

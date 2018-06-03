@@ -176,6 +176,63 @@ bool fromJSON(const json::Expr &Params, CompletionClientCapabilities &R) {
   return true;
 }
 
+bool fromJSON(const json::Expr &E, SymbolKind &Out) {
+  if (auto T = E.asInteger()) {
+    if (*T < static_cast<int>(SymbolKind::File) ||
+        *T > static_cast<int>(SymbolKind::TypeParameter))
+      return false;
+    Out = static_cast<SymbolKind>(*T);
+    return true;
+  }
+  return false;
+}
+
+bool fromJSON(const json::Expr &E, std::vector<SymbolKind> &Out) {
+  if (auto *A = E.asArray()) {
+    Out.clear();
+    for (size_t I = 0; I < A->size(); ++I) {
+      SymbolKind KindOut;
+      if (fromJSON((*A)[I], KindOut))
+        Out.push_back(KindOut);
+    }
+    return true;
+  }
+  return false;
+}
+
+bool fromJSON(const json::Expr &Params, SymbolKindCapabilities &R) {
+  json::ObjectMapper O(Params);
+  return O && O.map("valueSet", R.valueSet);
+}
+
+SymbolKind adjustKindToCapability(SymbolKind Kind,
+                                  SymbolKindBitset &supportedSymbolKinds) {
+  auto KindVal = static_cast<size_t>(Kind);
+  if (KindVal >= SymbolKindMin && KindVal <= supportedSymbolKinds.size() &&
+      supportedSymbolKinds[KindVal])
+    return Kind;
+
+  switch (Kind) {
+  // Provide some fall backs for common kinds that are close enough.
+  case SymbolKind::Struct:
+    return SymbolKind::Class;
+  case SymbolKind::EnumMember:
+    return SymbolKind::Enum;
+  default:
+    return SymbolKind::String;
+  }
+}
+
+bool fromJSON(const json::Expr &Params, WorkspaceSymbolCapabilities &R) {
+  json::ObjectMapper O(Params);
+  return O && O.map("symbolKind", R.symbolKind);
+}
+
+bool fromJSON(const json::Expr &Params, WorkspaceClientCapabilities &R) {
+  json::ObjectMapper O(Params);
+  return O && O.map("symbol", R.symbol);
+}
+
 bool fromJSON(const json::Expr &Params, TextDocumentClientCapabilities &R) {
   json::ObjectMapper O(Params);
   if (!O)
@@ -189,6 +246,7 @@ bool fromJSON(const json::Expr &Params, ClientCapabilities &R) {
   if (!O)
     return false;
   O.map("textDocument", R.textDocument);
+  O.map("workspace", R.workspace);
   return true;
 }
 
@@ -332,9 +390,6 @@ bool fromJSON(const json::Expr &Params, WorkspaceEdit &R) {
 
 const llvm::StringLiteral ExecuteCommandParams::CLANGD_APPLY_FIX_COMMAND =
     "clangd.applyFix";
-const llvm::StringLiteral ExecuteCommandParams::CLANGD_INSERT_HEADER_INCLUDE =
-    "clangd.insertInclude";
-
 bool fromJSON(const json::Expr &Params, ExecuteCommandParams &R) {
   json::ObjectMapper O(Params);
   if (!O || !O.map("command", R.command))
@@ -344,19 +399,34 @@ bool fromJSON(const json::Expr &Params, ExecuteCommandParams &R) {
   if (R.command == ExecuteCommandParams::CLANGD_APPLY_FIX_COMMAND) {
     return Args && Args->size() == 1 &&
            fromJSON(Args->front(), R.workspaceEdit);
-  } else if (R.command == ExecuteCommandParams::CLANGD_INSERT_HEADER_INCLUDE) {
-    return Args && Args->size() == 1 &&
-           fromJSON(Args->front(), R.includeInsertion);
   }
   return false; // Unrecognized command.
+}
+
+json::Expr toJSON(const SymbolInformation &P) {
+  return json::obj{
+      {"name", P.name},
+      {"kind", static_cast<int>(P.kind)},
+      {"location", P.location},
+      {"containerName", P.containerName},
+  };
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &O,
+                              const SymbolInformation &SI) {
+  O << SI.containerName << "::" << SI.name << " - " << toJSON(SI);
+  return O;
+}
+
+bool fromJSON(const json::Expr &Params, WorkspaceSymbolParams &R) {
+  json::ObjectMapper O(Params);
+  return O && O.map("query", R.query);
 }
 
 json::Expr toJSON(const Command &C) {
   auto Cmd = json::obj{{"title", C.title}, {"command", C.command}};
   if (C.workspaceEdit)
     Cmd["arguments"] = {*C.workspaceEdit};
-  else if (C.includeInsertion)
-    Cmd["arguments"] = {*C.includeInsertion};
   return std::move(Cmd);
 }
 
@@ -367,18 +437,6 @@ json::Expr toJSON(const WorkspaceEdit &WE) {
   for (auto &Change : *WE.changes)
     FileChanges[Change.first] = json::ary(Change.second);
   return json::obj{{"changes", std::move(FileChanges)}};
-}
-
-bool fromJSON(const json::Expr &II, IncludeInsertion &R) {
-  json::ObjectMapper O(II);
-  return O && O.map("textDocument", R.textDocument) &&
-         O.map("declaringHeader", R.declaringHeader) &&
-         O.map("preferredHeader", R.preferredHeader);
-}
-json::Expr toJSON(const IncludeInsertion &II) {
-  return json::obj{{"textDocument", II.textDocument},
-                   {"declaringHeader", II.declaringHeader},
-                   {"preferredHeader", II.preferredHeader}};
 }
 
 json::Expr toJSON(const ApplyWorkspaceEditParams &Params) {
@@ -441,8 +499,6 @@ json::Expr toJSON(const CompletionItem &CI) {
     Result["textEdit"] = *CI.textEdit;
   if (!CI.additionalTextEdits.empty())
     Result["additionalTextEdits"] = json::ary(CI.additionalTextEdits);
-  if (CI.command)
-    Result["command"] = *CI.command;
   return std::move(Result);
 }
 

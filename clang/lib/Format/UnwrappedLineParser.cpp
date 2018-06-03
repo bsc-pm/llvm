@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This file contains the implementation of the UnwrappedLineParser,
+/// This file contains the implementation of the UnwrappedLineParser,
 /// which turns a stream of tokens into UnwrappedLines.
 ///
 //===----------------------------------------------------------------------===//
@@ -260,7 +260,7 @@ void UnwrappedLineParser::parse() {
   IndexedTokenSource TokenSource(AllTokens);
   Line->FirstStartColumn = FirstStartColumn;
   do {
-    DEBUG(llvm::dbgs() << "----\n");
+    LLVM_DEBUG(llvm::dbgs() << "----\n");
     reset();
     Tokens = &TokenSource;
     TokenSource.reset();
@@ -570,7 +570,7 @@ void UnwrappedLineParser::parseBlock(bool MustBeDeclaration, bool AddLevel,
     Line->MatchingOpeningBlockLineIndex = OpeningLineIndex;
     if (OpeningLineIndex != UnwrappedLine::kInvalidIndex) {
       // Update the opening line to add the forward reference as well
-      (*CurrentLines)[OpeningLineIndex].MatchingOpeningBlockLineIndex =
+      (*CurrentLines)[OpeningLineIndex].MatchingClosingBlockLineIndex =
           CurrentLines->size() - 1;
     }
   }
@@ -2130,6 +2130,24 @@ void UnwrappedLineParser::parseRecord(bool ParseAsExpr) {
   // "} n, m;" will end up in one unwrapped line.
 }
 
+void UnwrappedLineParser::parseObjCMethod() {
+  assert(FormatTok->Tok.isOneOf(tok::l_paren, tok::identifier) &&
+         "'(' or identifier expected.");
+  do {
+    if (FormatTok->Tok.is(tok::semi)) {
+      nextToken();
+      addUnwrappedLine();
+      return;
+    } else if (FormatTok->Tok.is(tok::l_brace)) {
+      parseBlock(/*MustBeDeclaration=*/false);
+      addUnwrappedLine();
+      return;
+    } else {
+      nextToken();
+    }
+  } while (!eof());
+}
+
 void UnwrappedLineParser::parseObjCProtocolList() {
   assert(FormatTok->Tok.is(tok::less) && "'<' expected.");
   do {
@@ -2157,6 +2175,9 @@ void UnwrappedLineParser::parseObjCUntilAtEnd() {
       // Ignore stray "}". parseStructuralElement doesn't consume them.
       nextToken();
       addUnwrappedLine();
+    } else if (FormatTok->isOneOf(tok::minus, tok::plus)) {
+      nextToken();
+      parseObjCMethod();
     } else {
       parseStructuralElement();
     }
@@ -2324,7 +2345,7 @@ LLVM_ATTRIBUTE_UNUSED static void printDebugInfo(const UnwrappedLine &Line,
 void UnwrappedLineParser::addUnwrappedLine() {
   if (Line->Tokens.empty())
     return;
-  DEBUG({
+  LLVM_DEBUG({
     if (CurrentLines == &Lines)
       printDebugInfo(*Line);
   });

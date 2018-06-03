@@ -194,9 +194,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 option(LLVM_INSTALL_BINUTILS_SYMLINKS
   "Install symlinks from the binutils tool names to the corresponding LLVM tools." OFF)
 
-option(LLVM_INSTALL_CCTOOLS_SYMLINKS
-  "Install symlinks from the cctools tool names to the corresponding LLVM tools." OFF)
-
 option(LLVM_INSTALL_UTILS "Include utility binaries in the 'install' target." OFF)
 
 option(LLVM_INSTALL_TOOLCHAIN_ONLY "Only include toolchain files in the 'install' target." OFF)
@@ -441,6 +438,7 @@ endif( LLVM_USE_OPROFILE )
 
 set(LLVM_USE_SANITIZER "" CACHE STRING
   "Define the sanitizer used to build binaries and tests.")
+option(LLVM_OPTIMIZE_SANITIZED_BUILDS "Pass -O1 on debug sanitizer builds" ON)
 set(LLVM_LIB_FUZZING_ENGINE "" CACHE PATH
   "Path to fuzzing library for linking with fuzz targets")
 
@@ -522,6 +520,7 @@ option (LLVM_INCLUDE_DOCS "Generate build targets for llvm documentation." ON)
 option (LLVM_ENABLE_DOXYGEN "Use doxygen to generate llvm API documentation." OFF)
 option (LLVM_ENABLE_SPHINX "Use Sphinx to generate llvm documentation." OFF)
 option (LLVM_ENABLE_OCAMLDOC "Build OCaml bindings documentation." ON)
+option (LLVM_ENABLE_BINDINGS "Build bindings." ON)
 
 set(LLVM_INSTALL_DOXYGEN_HTML_DIR "share/doc/llvm/doxygen-html"
     CACHE STRING "Doxygen-generated HTML documentation install directory")
@@ -1000,7 +999,7 @@ if(LLVM_DISTRIBUTION_COMPONENTS)
   add_custom_target(distribution)
   add_custom_target(install-distribution)
   add_custom_target(install-distribution-stripped)
-  foreach(target ${LLVM_DISTRIBUTION_COMPONENTS})
+  foreach(target ${LLVM_DISTRIBUTION_COMPONENTS} ${LLVM_RUNTIME_DISTRIBUTION_COMPONENTS})
     if(TARGET ${target})
       add_dependencies(distribution ${target})
     else()

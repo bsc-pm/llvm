@@ -97,8 +97,12 @@ static void setConstantInArgument(CallSite CS, Value *Op,
                                   Constant *ConstValue) {
   unsigned ArgNo = 0;
   for (auto &I : CS.args()) {
-    if (&*I == Op)
+    if (&*I == Op) {
+      // It is possible we have already added the non-null attribute to the
+      // parameter by using an earlier constraining condition.
+      CS.removeParamAttr(ArgNo, Attribute::NonNull);
       CS.setArgument(ArgNo, ConstValue);
+    }
     ++ArgNo;
   }
 }
@@ -312,7 +316,7 @@ static void splitCallSite(
   if (!IsMustTailCall && !Instr->use_empty())
     CallPN = PHINode::Create(Instr->getType(), Preds.size(), "phi.call");
 
-  DEBUG(dbgs() << "split call-site : " << *Instr << " into \n");
+  LLVM_DEBUG(dbgs() << "split call-site : " << *Instr << " into \n");
 
   assert(Preds.size() == 2 && "The ValueToValueMaps array has size 2.");
   // ValueToValueMapTy is neither copy nor moveable, so we use a simple array
@@ -340,8 +344,8 @@ static void splitCallSite(
         ++ArgNo;
       }
     }
-    DEBUG(dbgs() << "    " << *NewCI << " in " << SplitBlock->getName()
-                 << "\n");
+    LLVM_DEBUG(dbgs() << "    " << *NewCI << " in " << SplitBlock->getName()
+                      << "\n");
     if (CallPN)
       CallPN->addIncoming(NewCI, SplitBlock);
 

@@ -350,7 +350,7 @@ void printIndexStats() {
   }
 }
 
-/// \brief List symbols in each IR file.
+/// List symbols in each IR file.
 ///
 /// The main point here is to provide lit-testable coverage for the LTOModule
 /// functionality that's exposed by the C API to list symbols.  Moreover, this
@@ -380,7 +380,7 @@ static void createCombinedModuleSummaryIndex() {
     ExitOnError ExitOnErr("llvm-lto: error loading file '" + Filename + "': ");
     std::unique_ptr<MemoryBuffer> MB =
         ExitOnErr(errorOrToExpected(MemoryBuffer::getFileOrSTDIN(Filename)));
-    ExitOnErr(readModuleSummaryIndex(*MB, CombinedIndex, ++NextModuleId));
+    ExitOnErr(readModuleSummaryIndex(*MB, CombinedIndex, NextModuleId++));
   }
   std::error_code EC;
   assert(!OutputFilename.empty());

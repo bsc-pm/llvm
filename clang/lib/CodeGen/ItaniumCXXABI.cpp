@@ -34,6 +34,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/ScopedPrinter.h"
 
 using namespace clang;
 using namespace CodeGen;
@@ -824,7 +825,6 @@ ItaniumCXXABI::EmitMemberFunctionPointer(const CXXMethodDecl *MD) {
 llvm::Constant *ItaniumCXXABI::BuildMemberPointer(const CXXMethodDecl *MD,
                                                   CharUnits ThisAdjustment) {
   assert(MD->isInstance() && "Member function must not be static!");
-  MD = MD->getCanonicalDecl();
 
   CodeGenTypes &Types = CGM.getTypes();
 
@@ -1170,7 +1170,7 @@ static llvm::Constant *getBadCastFn(CodeGenFunction &CGF) {
   return CGF.CGM.CreateRuntimeFunction(FTy, "__cxa_bad_cast");
 }
 
-/// \brief Compute the src2dst_offset hint as described in the
+/// Compute the src2dst_offset hint as described in the
 /// Itanium C++ ABI [2.9.7]
 static CharUnits computeOffsetHint(ASTContext &Context,
                                    const CXXRecordDecl *Src,
@@ -1639,7 +1639,6 @@ CGCallee ItaniumCXXABI::getVirtualFunctionPointer(CodeGenFunction &CGF,
                                                   Address This,
                                                   llvm::Type *Ty,
                                                   SourceLocation Loc) {
-  GD = GD.getCanonicalDecl();
   Ty = Ty->getPointerTo()->getPointerTo();
   auto *MethodDecl = cast<CXXMethodDecl>(GD.getDecl());
   llvm::Value *VTable = CGF.GetVTablePtr(This, Ty, MethodDecl->getParent());
@@ -1673,7 +1672,7 @@ CGCallee ItaniumCXXABI::getVirtualFunctionPointer(CodeGenFunction &CGF,
     VFunc = VFuncLoad;
   }
 
-  CGCallee Callee(MethodDecl, VFunc);
+  CGCallee Callee(MethodDecl->getCanonicalDecl(), VFunc);
   return Callee;
 }
 
@@ -2195,12 +2194,61 @@ static void emitGlobalDtorWithCXAAtExit(CodeGenFunction &CGF,
   auto *GV = cast<llvm::GlobalValue>(handle->stripPointerCasts());
   GV->setVisibility(llvm::GlobalValue::HiddenVisibility);
 
+  if (!addr)
+    // addr is null when we are trying to register a dtor annotated with
+    // __attribute__((destructor)) in a constructor function. Using null here is
+    // okay because this argument is just passed back to the destructor
+    // function.
+    addr = llvm::Constant::getNullValue(CGF.Int8PtrTy);
+
   llvm::Value *args[] = {
     llvm::ConstantExpr::getBitCast(dtor, dtorTy),
     llvm::ConstantExpr::getBitCast(addr, CGF.Int8PtrTy),
     handle
   };
   CGF.EmitNounwindRuntimeCall(atexit, args);
+}
+
+void CodeGenModule::registerGlobalDtorsWithAtExit() {
+  for (const auto I : DtorsUsingAtExit) {
+    int Priority = I.first;
+    const llvm::TinyPtrVector<llvm::Function *> &Dtors = I.second;
+
+    // Create a function that registers destructors that have the same priority.
+    //
+    // Since constructor functions are run in non-descending order of their
+    // priorities, destructors are registered in non-descending order of their
+    // priorities, and since destructor functions are run in the reverse order
+    // of their registration, destructor functions are run in non-ascending
+    // order of their priorities.
+    CodeGenFunction CGF(*this);
+    std::string GlobalInitFnName =
+        std::string("__GLOBAL_init_") + llvm::to_string(Priority);
+    llvm::FunctionType *FTy = llvm::FunctionType::get(VoidTy, false);
+    llvm::Function *GlobalInitFn = CreateGlobalInitOrDestructFunction(
+        FTy, GlobalInitFnName, getTypes().arrangeNullaryFunction(),
+        SourceLocation());
+    ASTContext &Ctx = getContext();
+    FunctionDecl *FD = FunctionDecl::Create(
+        Ctx, Ctx.getTranslationUnitDecl(), SourceLocation(), SourceLocation(),
+        &Ctx.Idents.get(GlobalInitFnName), Ctx.VoidTy, nullptr, SC_Static,
+        false, false);
+    CGF.StartFunction(GlobalDecl(FD), getContext().VoidTy, GlobalInitFn,
+                      getTypes().arrangeNullaryFunction(), FunctionArgList(),
+                      SourceLocation(), SourceLocation());
+
+    for (auto *Dtor : Dtors) {
+      // Register the destructor function calling __cxa_atexit if it is
+      // available. Otherwise fall back on calling atexit.
+      if (getCodeGenOpts().CXAAtExit)
+        emitGlobalDtorWithCXAAtExit(CGF, Dtor, nullptr, false);
+      else
+        CGF.registerGlobalDtorWithAtExit(Dtor);
+    }
+
+    CGF.FinishFunction();
+    AddGlobalCtor(GlobalInitFn, Priority, nullptr);
+  }
 }
 
 /// Register a global destructor as best as we know how.
@@ -2402,8 +2450,12 @@ void ItaniumCXXABI::EmitThreadLocalInitFuncs(
     if (InitIsInitFunc) {
       if (Init) {
         llvm::CallInst *CallVal = Builder.CreateCall(Init);
-        if (isThreadWrapperReplaceable(VD, CGM))
+        if (isThreadWrapperReplaceable(VD, CGM)) {
           CallVal->setCallingConv(llvm::CallingConv::CXX_FAST_TLS);
+          llvm::Function *Fn =
+              cast<llvm::Function>(cast<llvm::GlobalAlias>(Init)->getAliasee());
+          Fn->setCallingConv(llvm::CallingConv::CXX_FAST_TLS);
+        }
       }
     } else {
       // Don't know whether we have an init function. Call it if it exists.
@@ -2656,6 +2708,7 @@ static bool TypeInfoIsInStandardLibrary(const BuiltinType *Ty) {
     case BuiltinType::LongDouble:
     case BuiltinType::Float16:
     case BuiltinType::Float128:
+    case BuiltinType::Char8:
     case BuiltinType::Char16:
     case BuiltinType::Char32:
     case BuiltinType::Int128:
@@ -2955,7 +3008,7 @@ void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty) {
   Fields.push_back(VTable);
 }
 
-/// \brief Return the linkage that the type info and type info name constants
+/// Return the linkage that the type info and type info name constants
 /// should have for the given type.
 static llvm::GlobalVariable::LinkageTypes getTypeInfoLinkage(CodeGenModule &CGM,
                                                              QualType Ty) {
@@ -3425,7 +3478,7 @@ static unsigned extractPBaseFlags(ASTContext &Ctx, QualType &Type) {
     Flags |= ItaniumRTTIBuilder::PTI_Incomplete;
 
   if (auto *Proto = Type->getAs<FunctionProtoType>()) {
-    if (Proto->isNothrow(Ctx)) {
+    if (Proto->isNothrow()) {
       Flags |= ItaniumRTTIBuilder::PTI_Noexcept;
       Type = Ctx.getFunctionTypeWithExceptionSpec(Type, EST_None);
     }
@@ -3517,7 +3570,8 @@ void ItaniumCXXABI::EmitFundamentalRTTIDescriptors(bool DLLExport) {
       getContext().UnsignedInt128Ty,   getContext().HalfTy,
       getContext().FloatTy,            getContext().DoubleTy,
       getContext().LongDoubleTy,       getContext().Float128Ty,
-      getContext().Char16Ty,           getContext().Char32Ty
+      getContext().Char8Ty,            getContext().Char16Ty,
+      getContext().Char32Ty
   };
   for (const QualType &FundamentalType : FundamentalTypes)
     EmitFundamentalRTTIDescriptor(FundamentalType, DLLExport);

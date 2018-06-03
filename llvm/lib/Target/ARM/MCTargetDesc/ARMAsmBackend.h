@@ -21,12 +21,11 @@ namespace llvm {
 class ARMAsmBackend : public MCAsmBackend {
   const MCSubtargetInfo &STI;
   bool isThumbMode;    // Currently emitting Thumb code.
-  bool IsLittleEndian; // Big or little endian.
 public:
-  ARMAsmBackend(const Target &T, const MCSubtargetInfo &STI, bool IsLittle)
-      : MCAsmBackend(), STI(STI),
-        isThumbMode(STI.getTargetTriple().isThumb()),
-        IsLittleEndian(IsLittle) {}
+  ARMAsmBackend(const Target &T, const MCSubtargetInfo &STI,
+                support::endianness Endian)
+      : MCAsmBackend(Endian), STI(STI),
+        isThumbMode(STI.getTargetTriple().isThumb()) {}
 
   unsigned getNumFixupKinds() const override {
     return ARM::NumTargetFixupKinds;
@@ -41,8 +40,7 @@ public:
 
   unsigned adjustFixupValue(const MCAssembler &Asm, const MCFixup &Fixup,
                             const MCValue &Target, uint64_t Value,
-                            bool IsResolved, MCContext &Ctx,
-                            bool IsLittleEndian) const;
+                            bool IsResolved, MCContext &Ctx) const;
 
   void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                   const MCValue &Target, MutableArrayRef<char> Data,
@@ -62,14 +60,13 @@ public:
   void relaxInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
                         MCInst &Res) const override;
 
-  bool writeNopData(uint64_t Count, MCObjectWriter *OW) const override;
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
 
   void handleAssemblerFlag(MCAssemblerFlag Flag) override;
 
   unsigned getPointerSize() const { return 4; }
   bool isThumb() const { return isThumbMode; }
   void setIsThumb(bool it) { isThumbMode = it; }
-  bool isLittle() const { return IsLittleEndian; }
 };
 } // end namespace llvm
 

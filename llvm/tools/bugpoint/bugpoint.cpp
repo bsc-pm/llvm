@@ -15,6 +15,7 @@
 
 #include "BugDriver.h"
 #include "ToolRunner.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/LegacyPassNameParser.h"
@@ -130,6 +131,7 @@ int main(int argc, char **argv) {
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);
   initializeInstCombine(Registry);
+  initializeAggressiveInstCombine(Registry);
   initializeInstrumentation(Registry);
   initializeTarget(Registry);
 

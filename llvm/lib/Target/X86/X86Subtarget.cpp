@@ -231,9 +231,9 @@ void X86Subtarget::initSubtargetFeatures(StringRef CPU, StringRef FS) {
   else
     llvm_unreachable("Not 16-bit, 32-bit or 64-bit mode!");
 
-  DEBUG(dbgs() << "Subtarget features: SSELevel " << X86SSELevel
-               << ", 3DNowLevel " << X863DNowLevel
-               << ", 64bit " << HasX86_64 << "\n");
+  LLVM_DEBUG(dbgs() << "Subtarget features: SSELevel " << X86SSELevel
+                    << ", 3DNowLevel " << X863DNowLevel << ", 64bit "
+                    << HasX86_64 << "\n");
   assert((!In64BitMode || HasX86_64) &&
          "64-bit code requested on a subtarget that doesn't support it!");
 
@@ -317,14 +317,19 @@ void X86Subtarget::initializeEnvironment() {
   HasMWAITX = false;
   HasCLZERO = false;
   HasCLDEMOTE = false;
+  HasMOVDIRI = false;
+  HasMOVDIR64B = false;
+  HasPTWRITE = false;
   HasMPX = false;
   HasSHSTK = false;
-  HasIBT = false;
+  HasINVPCID = false;
   HasSGX = false;
+  HasPCONFIG = false;
   HasCLFLUSHOPT = false;
   HasCLWB = false;
   HasWBNOINVD = false;
   HasRDPID = false;
+  HasWAITPKG = false;
   UseRetpoline = false;
   UseRetpolineExternalThunk = false;
   IsPMULLDSlow = false;

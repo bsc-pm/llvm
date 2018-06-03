@@ -399,11 +399,8 @@ define i1 @bools_multi_uses1(i1 %a, i1 %b, i1 %c) {
 
 define i1 @bools_multi_uses2(i1 %a, i1 %b, i1 %c) {
 ; CHECK-LABEL: @bools_multi_uses2(
-; CHECK-NEXT:    [[NOT:%.*]] = xor i1 [[C:%.*]], true
-; CHECK-NEXT:    [[AND1:%.*]] = and i1 [[NOT]], [[A:%.*]]
-; CHECK-NEXT:    [[AND2:%.*]] = and i1 [[C]], [[B:%.*]]
-; CHECK-NEXT:    [[ADD:%.*]] = xor i1 [[AND1]], [[AND2]]
-; CHECK-NEXT:    ret i1 [[ADD]]
+; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[C:%.*]], i1 [[B:%.*]], i1 [[A:%.*]]
+; CHECK-NEXT:    ret i1 [[TMP1]]
 ;
   %not = xor i1 %c, -1
   %and1 = and i1 %not, %a
@@ -478,6 +475,19 @@ define <4 x i32> @vec_not_sel_consts(<4 x i32> %a, <4 x i32> %b) {
 ;
   %and1 = and <4 x i32> %a, <i32 -1, i32 0, i32 0, i32 0>
   %and2 = and <4 x i32> %b, <i32 0, i32 -1, i32 0, i32 -1>
+  %or = or <4 x i32> %and1, %and2
+  ret <4 x i32> %or
+}
+
+define <4 x i32> @vec_not_sel_consts_undef_elts(<4 x i32> %a, <4 x i32> %b) {
+; CHECK-LABEL: @vec_not_sel_consts_undef_elts(
+; CHECK-NEXT:    [[AND1:%.*]] = and <4 x i32> [[A:%.*]], <i32 -1, i32 undef, i32 0, i32 0>
+; CHECK-NEXT:    [[AND2:%.*]] = and <4 x i32> [[B:%.*]], <i32 0, i32 -1, i32 0, i32 undef>
+; CHECK-NEXT:    [[OR:%.*]] = or <4 x i32> [[AND1]], [[AND2]]
+; CHECK-NEXT:    ret <4 x i32> [[OR]]
+;
+  %and1 = and <4 x i32> %a, <i32 -1, i32 undef, i32 0, i32 0>
+  %and2 = and <4 x i32> %b, <i32 0, i32 -1, i32 0, i32 undef>
   %or = or <4 x i32> %and1, %and2
   ret <4 x i32> %or
 }

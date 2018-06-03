@@ -91,9 +91,8 @@ PlatformSP PlatformMacOSX::CreateInstance(bool force, const ArchSpec *arch) {
       break;
 
 #if defined(__APPLE__)
-    // Only accept "unknown" for vendor if the host is Apple and
-    // it "unknown" wasn't specified (it was just returned because it
-    // was NOT specified)
+    // Only accept "unknown" for vendor if the host is Apple and it "unknown"
+    // wasn't specified (it was just returned because it was NOT specified)
     case llvm::Triple::UnknownArch:
       create = !arch->TripleVendorWasSpecified();
       break;
@@ -109,9 +108,8 @@ PlatformSP PlatformMacOSX::CreateInstance(bool force, const ArchSpec *arch) {
       case llvm::Triple::MacOSX:
         break;
 #if defined(__APPLE__)
-      // Only accept "vendor" for vendor if the host is Apple and
-      // it "unknown" wasn't specified (it was just returned because it
-      // was NOT specified)
+      // Only accept "vendor" for vendor if the host is Apple and it "unknown"
+      // wasn't specified (it was just returned because it was NOT specified)
       case llvm::Triple::UnknownOS:
         create = !arch->TripleOSWasSpecified();
         break;
@@ -198,7 +196,7 @@ ConstString PlatformMacOSX::GetSDKDirectory(lldb_private::Target &target) {
                          // here
                 &output, // Get the output from the command and place it in this
                          // string
-                3); // Timeout in seconds to wait for shell program to finish
+                std::chrono::seconds(3));
             if (status == 0 && !output.empty()) {
               size_t first_non_newline = output.find_last_not_of("\r\n");
               if (first_non_newline != std::string::npos)

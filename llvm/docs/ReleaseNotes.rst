@@ -61,6 +61,33 @@ Non-comprehensive list of changes in this release
 * The optimization flag to merge constants (-fmerge-all-constants) is no longer
   applied by default.
 
+* Optimization of floating-point casts is improved. This may cause surprising
+  results for code that is relying on the undefined behavior of overflowing 
+  casts. The optimization can be disabled by specifying a function attribute:
+  "strict-float-cast-overflow"="false". This attribute may be created by the
+  clang option :option:`-fno-strict-float-cast-overflow`.
+  Code sanitizers can be used to detect affected patterns. The option for
+  detecting this problem alone is "-fsanitize=float-cast-overflow":
+
+.. code-block:: c
+
+    int main() {
+      float x = 4294967296.0f;
+      x = (float)((int)x);
+      printf("junk in the ftrunc: %f\n", x);
+      return 0;
+    }
+
+.. code-block:: bash
+
+    clang -O1 ftrunc.c -fsanitize=float-cast-overflow ; ./a.out 
+    ftrunc.c:5:15: runtime error: 4.29497e+09 is outside the range of representable values of type 'int'
+    junk in the ftrunc: 0.000000
+
+* ``LLVM_ON_WIN32`` is no longer set by ``llvm/Config/config.h`` and
+  ``llvm/Config/llvm-config.h``.  If you used this macro, use the compiler-set
+  ``_WIN32`` instead which is set exactly when ``LLVM_ON_WIN32`` used to be set.
+
 * Note..
 
 .. NOTE
@@ -79,6 +106,10 @@ Changes to the LLVM IR
 * The signatures for the builtins @llvm.memcpy, @llvm.memmove, and @llvm.memset
   have changed. Alignment is no longer an argument, and are instead conveyed as
   parameter attributes.
+
+* invariant.group.barrier has been renamed to launder.invariant.group.
+
+* invariant.group metadata can now refer only empty metadata nodes.
 
 Changes to the ARM Backend
 --------------------------
@@ -115,13 +146,15 @@ Changes to the AVR Target
 Changes to the OCaml bindings
 -----------------------------
 
- During this release ...
+* Remove ``add_bb_vectorize``.
 
 
 Changes to the C API
 --------------------
 
- During this release ...
+* Remove ``LLVMAddBBVectorizePass``. The implementation was removed and the C
+  interface was made a deprecated no-op in LLVM 5. Use
+  ``LLVMAddSLPVectorizePass`` instead to get the supported SLP vectorizer.
 
 
 External Open Source Projects Using LLVM 7

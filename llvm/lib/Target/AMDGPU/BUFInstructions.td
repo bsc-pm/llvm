@@ -1060,14 +1060,14 @@ defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, v2f32, "BUFFER_LOAD_FORMAT_X
 defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, v4f32, "BUFFER_LOAD_FORMAT_XYZW">;
 
 let SubtargetPredicate = HasUnpackedD16VMem in {
-  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, f16, "BUFFER_LOAD_FORMAT_D16_X_gfx80">;
+  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, f16, "BUFFER_LOAD_FORMAT_D16_X_gfx80">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2i32, "BUFFER_LOAD_FORMAT_D16_XY_gfx80">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v4i32, "BUFFER_LOAD_FORMAT_D16_XYZW_gfx80">;
 } // End HasUnpackedD16VMem.
 
 let SubtargetPredicate = HasPackedD16VMem in {
-  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, f16, "BUFFER_LOAD_FORMAT_D16_X">;
-  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, v2f16, "BUFFER_LOAD_FORMAT_D16_XY">;
+  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, f16, "BUFFER_LOAD_FORMAT_D16_X">;
+  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2f16, "BUFFER_LOAD_FORMAT_D16_XY">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, i32, "BUFFER_LOAD_FORMAT_D16_XY">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2i32, "BUFFER_LOAD_FORMAT_D16_XYZW">;
 } // End HasPackedD16VMem.
@@ -1374,7 +1374,7 @@ defm : MUBUFScratchLoadPat <BUFFER_LOAD_DWORD_OFFEN, BUFFER_LOAD_DWORD_OFFSET, i
 defm : MUBUFScratchLoadPat <BUFFER_LOAD_DWORDX2_OFFEN, BUFFER_LOAD_DWORDX2_OFFSET, v2i32, load_private>;
 defm : MUBUFScratchLoadPat <BUFFER_LOAD_DWORDX4_OFFEN, BUFFER_LOAD_DWORDX4_OFFSET, v4i32, load_private>;
 
-let OtherPredicates = [HasD16LoadStore] in {
+let OtherPredicates = [D16PreservesUnusedBits] in {
 defm : MUBUFScratchLoadPat_Hi16<BUFFER_LOAD_SHORT_D16_HI_OFFEN, BUFFER_LOAD_SHORT_D16_HI_OFFSET, i16, load_private>;
 defm : MUBUFScratchLoadPat_Hi16<BUFFER_LOAD_UBYTE_D16_HI_OFFEN, BUFFER_LOAD_UBYTE_D16_HI_OFFSET, i16, az_extloadi8_private>;
 defm : MUBUFScratchLoadPat_Hi16<BUFFER_LOAD_SBYTE_D16_HI_OFFEN, BUFFER_LOAD_SBYTE_D16_HI_OFFSET, i16, sextloadi8_private>;
@@ -1489,7 +1489,7 @@ defm : MUBUFScratchStorePat <BUFFER_STORE_DWORDX2_OFFEN, BUFFER_STORE_DWORDX2_OF
 defm : MUBUFScratchStorePat <BUFFER_STORE_DWORDX4_OFFEN, BUFFER_STORE_DWORDX4_OFFSET, v4i32, store_private>;
 
 
-let OtherPredicates = [HasD16LoadStore] in {
+let OtherPredicates = [D16PreservesUnusedBits] in {
  // Hiding the extract high pattern in the PatFrag seems to not
  // automatically increase the complexity.
 let AddedComplexity = 1 in {
@@ -1547,14 +1547,14 @@ defm : MTBUF_LoadIntrinsicPat<SItbuffer_load, v2f32, "TBUFFER_LOAD_FORMAT_XY">;
 defm : MTBUF_LoadIntrinsicPat<SItbuffer_load, v4f32, "TBUFFER_LOAD_FORMAT_XYZW">;
 
 let SubtargetPredicate = HasUnpackedD16VMem in {
-  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load, f16,   "TBUFFER_LOAD_FORMAT_D16_X_gfx80">;
+  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, f16,   "TBUFFER_LOAD_FORMAT_D16_X_gfx80">;
   defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, v2i32, "TBUFFER_LOAD_FORMAT_D16_XY_gfx80">;
   defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, v4i32, "TBUFFER_LOAD_FORMAT_D16_XYZW_gfx80">;
 } // End HasUnpackedD16VMem.
 
 let SubtargetPredicate = HasPackedD16VMem in {
-  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load, f16,   "TBUFFER_LOAD_FORMAT_D16_X">;
-  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load, v2f16, "TBUFFER_LOAD_FORMAT_D16_XY">;
+  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, f16,   "TBUFFER_LOAD_FORMAT_D16_X">;
+  defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, v2f16, "TBUFFER_LOAD_FORMAT_D16_XY">;
   defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, i32, "TBUFFER_LOAD_FORMAT_D16_XY">;
   defm : MTBUF_LoadIntrinsicPat<SItbuffer_load_d16, v2i32, "TBUFFER_LOAD_FORMAT_D16_XYZW">;
 } // End HasPackedD16VMem.

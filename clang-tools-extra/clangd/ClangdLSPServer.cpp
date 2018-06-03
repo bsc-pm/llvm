@@ -60,30 +60,12 @@ public:
 static URISchemeRegistry::Add<TestScheme>
     X("test", "Test scheme for clangd lit tests.");
 
-TextEdit replacementToEdit(StringRef Code, const tooling::Replacement &R) {
-  Range ReplacementRange = {
-      offsetToPosition(Code, R.getOffset()),
-      offsetToPosition(Code, R.getOffset() + R.getLength())};
-  return {ReplacementRange, R.getReplacementText()};
-}
-
-std::vector<TextEdit>
-replacementsToEdits(StringRef Code,
-                    const std::vector<tooling::Replacement> &Replacements) {
-  // Turn the replacements into the format specified by the Language Server
-  // Protocol. Fuse them into one big JSON array.
-  std::vector<TextEdit> Edits;
-  for (const auto &R : Replacements)
-    Edits.push_back(replacementToEdit(Code, R));
-  return Edits;
-}
-
-std::vector<TextEdit> replacementsToEdits(StringRef Code,
-                                          const tooling::Replacements &Repls) {
-  std::vector<TextEdit> Edits;
-  for (const auto &R : Repls)
-    Edits.push_back(replacementToEdit(Code, R));
-  return Edits;
+SymbolKindBitset defaultSymbolKinds() {
+  SymbolKindBitset Defaults;
+  for (size_t I = SymbolKindMin; I <= static_cast<size_t>(SymbolKind::Array);
+       ++I)
+    Defaults.set(I);
+  return Defaults;
 }
 
 } // namespace
@@ -96,6 +78,14 @@ void ClangdLSPServer::onInitialize(InitializeParams &Params) {
 
   CCOpts.EnableSnippets =
       Params.capabilities.textDocument.completion.completionItem.snippetSupport;
+
+  if (Params.capabilities.workspace && Params.capabilities.workspace->symbol &&
+      Params.capabilities.workspace->symbol->symbolKind) {
+    for (SymbolKind Kind :
+         *Params.capabilities.workspace->symbol->symbolKind->valueSet) {
+      SupportedSymbolKinds.set(static_cast<size_t>(Kind));
+    }
+  }
 
   reply(json::obj{
       {{"capabilities",
@@ -122,11 +112,10 @@ void ClangdLSPServer::onInitialize(InitializeParams &Params) {
             {"documentHighlightProvider", true},
             {"hoverProvider", true},
             {"renameProvider", true},
+            {"workspaceSymbolProvider", true},
             {"executeCommandProvider",
              json::obj{
-                 {"commands",
-                  {ExecuteCommandParams::CLANGD_APPLY_FIX_COMMAND,
-                   ExecuteCommandParams::CLANGD_INSERT_HEADER_INCLUDE}},
+                 {"commands", {ExecuteCommandParams::CLANGD_APPLY_FIX_COMMAND}},
              }},
         }}}});
 }
@@ -199,42 +188,6 @@ void ClangdLSPServer::onCommand(ExecuteCommandParams &Params) {
 
     reply("Fix applied.");
     ApplyEdit(*Params.workspaceEdit);
-  } else if (Params.command ==
-             ExecuteCommandParams::CLANGD_INSERT_HEADER_INCLUDE) {
-    auto &FileURI = Params.includeInsertion->textDocument.uri;
-    auto Code = DraftMgr.getDraft(FileURI.file());
-    if (!Code)
-      return replyError(ErrorCode::InvalidParams,
-                        ("command " +
-                         ExecuteCommandParams::CLANGD_INSERT_HEADER_INCLUDE +
-                         " called on non-added file " + FileURI.file())
-                            .str());
-    llvm::StringRef DeclaringHeader = Params.includeInsertion->declaringHeader;
-    if (DeclaringHeader.empty())
-      return replyError(
-          ErrorCode::InvalidParams,
-          "declaringHeader must be provided for include insertion.");
-    llvm::StringRef PreferredHeader = Params.includeInsertion->preferredHeader;
-    auto Replaces = Server.insertInclude(
-        FileURI.file(), *Code, DeclaringHeader,
-        PreferredHeader.empty() ? DeclaringHeader : PreferredHeader);
-    if (!Replaces) {
-      std::string ErrMsg =
-          ("Failed to generate include insertion edits for adding " +
-           DeclaringHeader + " (" + PreferredHeader + ") into " +
-           FileURI.file())
-              .str();
-      log(ErrMsg + ":" + llvm::toString(Replaces.takeError()));
-      replyError(ErrorCode::InternalError, ErrMsg);
-      return;
-    }
-    auto Edits = replacementsToEdits(*Code, *Replaces);
-    WorkspaceEdit WE;
-    WE.changes = {{FileURI.uri(), Edits}};
-
-    reply(("Inserted header " + DeclaringHeader + " (" + PreferredHeader + ")")
-              .str());
-    ApplyEdit(std::move(WE));
   } else {
     // We should not get here because ExecuteCommandParams would not have
     // parsed in the first place and this handler should not be called. But if
@@ -243,6 +196,20 @@ void ClangdLSPServer::onCommand(ExecuteCommandParams &Params) {
         ErrorCode::InvalidParams,
         llvm::formatv("Unsupported command \"{0}\".", Params.command).str());
   }
+}
+
+void ClangdLSPServer::onWorkspaceSymbol(WorkspaceSymbolParams &Params) {
+  Server.workspaceSymbols(
+      Params.query, CCOpts.Limit,
+      [this](llvm::Expected<std::vector<SymbolInformation>> Items) {
+        if (!Items)
+          return replyError(ErrorCode::InternalError,
+                            llvm::toString(Items.takeError()));
+        for (auto &Sym : *Items)
+          Sym.kind = adjustKindToCapability(Sym.kind, SupportedSymbolKinds);
+
+        reply(json::ary(*Items));
+      });
 }
 
 void ClangdLSPServer::onRename(RenameParams &Params) {
@@ -260,7 +227,11 @@ void ClangdLSPServer::onRename(RenameParams &Params) {
           return replyError(ErrorCode::InternalError,
                             llvm::toString(Replacements.takeError()));
 
-        std::vector<TextEdit> Edits = replacementsToEdits(*Code, *Replacements);
+        // Turn the replacements into the format specified by the Language
+        // Server Protocol. Fuse them into one big JSON array.
+        std::vector<TextEdit> Edits;
+        for (const auto &R : *Replacements)
+          Edits.push_back(replacementToEdit(*Code, R));
         WorkspaceEdit WE;
         WE.changes = {{Params.textDocument.uri.uri(), Edits}};
         reply(WE);
@@ -422,6 +393,7 @@ ClangdLSPServer::ClangdLSPServer(JSONOutput &Out,
                                  llvm::Optional<Path> CompileCommandsDir,
                                  const ClangdServer::Options &Opts)
     : Out(Out), CDB(std::move(CompileCommandsDir)), CCOpts(CCOpts),
+      SupportedSymbolKinds(defaultSymbolKinds()),
       Server(CDB, FSProvider, /*DiagConsumer=*/*this, Opts) {}
 
 bool ClangdLSPServer::run(std::istream &In, JSONStreamStyle InputStyle) {

@@ -23,7 +23,7 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/ExecutionEngine/ObjectMemoryBuffer.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -39,6 +39,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SHA1.h"
+#include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/Threading.h"
@@ -267,14 +268,14 @@ std::unique_ptr<MemoryBuffer> codegenModule(Module &TheModule,
     PM.add(createObjCARCContractPass());
 
     // Setup the codegen now.
-    if (TM.addPassesToEmitFile(PM, OS, TargetMachine::CGFT_ObjectFile,
+    if (TM.addPassesToEmitFile(PM, OS, nullptr, TargetMachine::CGFT_ObjectFile,
                                /* DisableVerify */ true))
       report_fatal_error("Failed to setup codegen");
 
     // Run codegen now. resulting binary is in OutputBuffer.
     PM.run(TheModule);
   }
-  return make_unique<ObjectMemoryBuffer>(std::move(OutputBuffer));
+  return make_unique<SmallVectorMemoryBuffer>(std::move(OutputBuffer));
 }
 
 /// Manage caching for a single Module.
@@ -475,7 +476,7 @@ ProcessThinLTOModule(Module &TheModule, ModuleSummaryIndex &Index,
       auto Index = buildModuleSummaryIndex(TheModule, nullptr, &PSI);
       WriteBitcodeToFile(TheModule, OS, true, &Index);
     }
-    return make_unique<ObjectMemoryBuffer>(std::move(OutputBuffer));
+    return make_unique<SmallVectorMemoryBuffer>(std::move(OutputBuffer));
   }
 
   return codegenModule(TheModule, TM);
@@ -975,9 +976,9 @@ void ThinLTOCodeGenerator::run() {
 
         {
           auto ErrOrBuffer = CacheEntry.tryLoadingBuffer();
-          DEBUG(dbgs() << "Cache " << (ErrOrBuffer ? "hit" : "miss") << " '"
-                       << CacheEntryPath << "' for buffer " << count << " "
-                       << ModuleIdentifier << "\n");
+          LLVM_DEBUG(dbgs() << "Cache " << (ErrOrBuffer ? "hit" : "miss")
+                            << " '" << CacheEntryPath << "' for buffer "
+                            << count << " " << ModuleIdentifier << "\n");
 
           if (ErrOrBuffer) {
             // Cache Hit!

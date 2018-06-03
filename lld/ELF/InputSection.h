@@ -61,6 +61,9 @@ public:
 
   unsigned Bss : 1;
 
+  // Set for sections that should not be folded by ICF.
+  unsigned KeepUnique : 1;
+
   // These corresponds to the fields in Elf_Shdr.
   uint32_t Alignment;
   uint64_t Flags;
@@ -85,8 +88,8 @@ protected:
               uint64_t Entsize, uint64_t Alignment, uint32_t Type,
               uint32_t Info, uint32_t Link)
       : Name(Name), Repl(this), SectionKind(SectionKind), Live(false),
-        Bss(false), Alignment(Alignment), Flags(Flags), Entsize(Entsize),
-        Type(Type), Link(Link), Info(Info) {}
+        Bss(false), KeepUnique(false), Alignment(Alignment), Flags(Flags),
+        Entsize(Entsize), Type(Type), Link(Link), Info(Info) {}
 };
 
 // This corresponds to a section of an input file.
@@ -223,15 +226,9 @@ public:
   static bool classof(const SectionBase *S) { return S->kind() == Merge; }
   void splitIntoPieces();
 
-  // Mark the piece at a given offset live. Used by GC.
-  void markLiveAt(uint64_t Offset) {
-    if (this->Flags & llvm::ELF::SHF_ALLOC)
-      LiveOffsets.insert(Offset);
-  }
-
-  // Translate an offset in the input section to an offset
-  // in the output section.
-  uint64_t getOffset(uint64_t Offset) const;
+  // Translate an offset in the input section to an offset in the parent
+  // MergeSyntheticSection.
+  uint64_t getParentOffset(uint64_t Offset) const;
 
   // Splittable sections are handled as a sequence of data
   // rather than a single large blob of data.
@@ -259,8 +256,6 @@ public:
 private:
   void splitStrings(ArrayRef<uint8_t> A, size_t Size);
   void splitNonStrings(ArrayRef<uint8_t> A, size_t Size);
-
-  llvm::DenseSet<uint32_t> LiveOffsets;
 };
 
 struct EhSectionPiece {
@@ -310,6 +305,8 @@ public:
   // beginning of the output section.
   template <class ELFT> void writeTo(uint8_t *Buf);
 
+  uint64_t getOffset(uint64_t Offset) const { return OutSecOff + Offset; }
+
   OutputSection *getParent() const;
 
   // This variable has two usages. Initially, it represents an index in the
@@ -320,7 +317,7 @@ public:
 
   static bool classof(const SectionBase *S);
 
-  InputSectionBase *getRelocatedSection();
+  InputSectionBase *getRelocatedSection() const;
 
   template <class ELFT, class RelTy>
   void relocateNonAlloc(uint8_t *Buf, llvm::ArrayRef<RelTy> Rels);

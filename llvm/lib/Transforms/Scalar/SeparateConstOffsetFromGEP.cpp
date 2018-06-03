@@ -212,7 +212,7 @@ static cl::opt<bool>
 
 namespace {
 
-/// \brief A helper class for separating a constant offset from a GEP index.
+/// A helper class for separating a constant offset from a GEP index.
 ///
 /// In real programs, a GEP index may be more complicated than a simple addition
 /// of something and a constant integer which can be trivially splitted. For
@@ -339,7 +339,7 @@ private:
   const DominatorTree *DT;
 };
 
-/// \brief A pass that tries to split every GEP in the function into a variadic
+/// A pass that tries to split every GEP in the function into a variadic
 /// base and a constant offset. It is a FunctionPass because searching for the
 /// constant offset may inspect other basic blocks.
 class SeparateConstOffsetFromGEP : public FunctionPass {
@@ -497,6 +497,8 @@ bool ConstantOffsetExtractor::CanTraceInto(bool SignExtended,
   Value *LHS = BO->getOperand(0), *RHS = BO->getOperand(1);
   // Do not trace into "or" unless it is equivalent to "add". If LHS and RHS
   // don't have common bits, (LHS | RHS) is equivalent to (LHS + RHS).
+  // FIXME: this does not appear to be covered by any tests
+  //        (with x86/aarch64 backends at least)
   if (BO->getOpcode() == Instruction::Or &&
       !haveNoCommonBitsSet(LHS, RHS, DL, nullptr, BO, DT))
     return false;
@@ -585,6 +587,10 @@ APInt ConstantOffsetExtractor::find(Value *V, bool SignExtended,
     // Trace into subexpressions for more hoisting opportunities.
     if (CanTraceInto(SignExtended, ZeroExtended, BO, NonNegative))
       ConstantOffset = findInEitherOperand(BO, SignExtended, ZeroExtended);
+  } else if (isa<TruncInst>(V)) {
+    ConstantOffset =
+        find(U->getOperand(0), SignExtended, ZeroExtended, NonNegative)
+            .trunc(BitWidth);
   } else if (isa<SExtInst>(V)) {
     ConstantOffset = find(U->getOperand(0), /* SignExtended */ true,
                           ZeroExtended, NonNegative).sext(BitWidth);
@@ -649,8 +655,9 @@ ConstantOffsetExtractor::distributeExtsAndCloneChain(unsigned ChainIndex) {
   }
 
   if (CastInst *Cast = dyn_cast<CastInst>(U)) {
-    assert((isa<SExtInst>(Cast) || isa<ZExtInst>(Cast)) &&
-           "We only traced into two types of CastInst: sext and zext");
+    assert(
+        (isa<SExtInst>(Cast) || isa<ZExtInst>(Cast) || isa<TruncInst>(Cast)) &&
+        "Only following instructions can be traced: sext, zext & trunc");
     ExtInsts.push_back(Cast);
     UserChain[ChainIndex] = nullptr;
     return distributeExtsAndCloneChain(ChainIndex - 1);

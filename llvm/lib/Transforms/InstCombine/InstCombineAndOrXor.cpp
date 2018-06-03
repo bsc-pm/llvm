@@ -75,7 +75,7 @@ static Value *getFCmpValue(unsigned Code, Value *LHS, Value *RHS,
   return Builder.CreateFCmp(Pred, LHS, RHS);
 }
 
-/// \brief Transform BITWISE_OP(BSWAP(A),BSWAP(B)) or
+/// Transform BITWISE_OP(BSWAP(A),BSWAP(B)) or
 /// BITWISE_OP(BSWAP(A), Constant) to BSWAP(BITWISE_OP(A, B))
 /// \param I Binary operator to transform.
 /// \return Pointer to node that must replace the original binary operator, or
@@ -748,6 +748,9 @@ static Value *foldLogOpOfMaskedICmps(ICmpInst *LHS, ICmpInst *RHS, bool IsAnd,
   return nullptr;
 }
 
+static Instruction *foldMaskedMerge(BinaryOperator &I,
+                                    InstCombiner::BuilderTy &Builder);
+
 /// Try to fold a signed range checked with lower bound 0 to an unsigned icmp.
 /// Example: (icmp sge x, 0) & (icmp slt x, n) --> icmp ult x, n
 /// If \p Inverted is true then the check is for the inverted range, e.g.
@@ -1288,8 +1291,8 @@ static Instruction *foldAndToXor(BinaryOperator &I,
   // Operand complexity canonicalization guarantees that the 'or' is Op0.
   // (A | B) & ~(A & B) --> A ^ B
   // (A | B) & ~(B & A) --> A ^ B
-  if (match(Op0, m_Or(m_Value(A), m_Value(B))) &&
-      match(Op1, m_Not(m_c_And(m_Specific(A), m_Specific(B)))))
+  if (match(&I, m_BinOp(m_Or(m_Value(A), m_Value(B)),
+                        m_Not(m_c_And(m_Deferred(A), m_Deferred(B))))))
     return BinaryOperator::CreateXor(A, B);
 
   // (A | ~B) & (~A | B) --> ~(A ^ B)
@@ -1297,8 +1300,8 @@ static Instruction *foldAndToXor(BinaryOperator &I,
   // (~B | A) & (~A | B) --> ~(A ^ B)
   // (~B | A) & (B | ~A) --> ~(A ^ B)
   if (Op0->hasOneUse() || Op1->hasOneUse())
-    if (match(Op0, m_c_Or(m_Value(A), m_Not(m_Value(B)))) &&
-        match(Op1, m_c_Or(m_Not(m_Specific(A)), m_Specific(B))))
+    if (match(&I, m_BinOp(m_c_Or(m_Value(A), m_Not(m_Value(B))),
+                          m_c_Or(m_Not(m_Deferred(A)), m_Deferred(B)))))
       return BinaryOperator::CreateNot(Builder.CreateXor(A, B));
 
   return nullptr;
@@ -1648,6 +1651,9 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
       A->getType()->isIntOrIntVectorTy(1))
     return SelectInst::Create(A, Op0, Constant::getNullValue(I.getType()));
 
+  if (Instruction *MM = foldMaskedMerge(I, Builder))
+    return MM;
+
   return Changed ? &I : nullptr;
 }
 
@@ -1675,7 +1681,18 @@ Instruction *InstCombiner::MatchBSwap(BinaryOperator &I) {
   bool OrOfAnds = match(Op0, m_And(m_Value(), m_Value())) &&
                   match(Op1, m_And(m_Value(), m_Value()));
 
-  if (!OrOfOrs && !OrOfShifts && !OrOfAnds)
+  // (A << B) | (C & D)                              -> bswap if possible.
+  // The bigger pattern here is ((A & C1) << C2) | ((B >> C2) & C1), which is a
+  // part of the bswap idiom for specific values of C1, C2 (e.g. C1 = 16711935,
+  // C2 = 8 for i32).
+  // This pattern can occur when the operands of the 'or' are not canonicalized
+  // for some reason (not having only one use, for example).
+  bool OrOfAndAndSh = (match(Op0, m_LogicalShift(m_Value(), m_Value())) &&
+                       match(Op1, m_And(m_Value(), m_Value()))) ||
+                      (match(Op0, m_And(m_Value(), m_Value())) &&
+                       match(Op1, m_LogicalShift(m_Value(), m_Value())));
+
+  if (!OrOfOrs && !OrOfShifts && !OrOfAnds && !OrOfAndAndSh)
     return nullptr;
 
   SmallVector<Instruction*, 4> Insts;
@@ -1699,7 +1716,6 @@ static bool areInverseVectorBitmasks(Constant *C1, Constant *C2) {
       return false;
 
     // One element must be all ones, and the other must be all zeros.
-    // FIXME: Allow undef elements.
     if (!((match(EltC1, m_Zero()) && match(EltC2, m_AllOnes())) ||
           (match(EltC2, m_Zero()) && match(EltC1, m_AllOnes()))))
       return false;
@@ -2277,6 +2293,9 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     }
   }
 
+  if (Instruction *MM = foldMaskedMerge(I, Builder))
+    return MM;
+
   return Changed ? &I : nullptr;
 }
 
@@ -2295,10 +2314,8 @@ static Instruction *foldXorToXor(BinaryOperator &I,
   // (A & B) ^ (B | A) -> A ^ B
   // (A | B) ^ (A & B) -> A ^ B
   // (A | B) ^ (B & A) -> A ^ B
-  if ((match(Op0, m_And(m_Value(A), m_Value(B))) &&
-       match(Op1, m_c_Or(m_Specific(A), m_Specific(B)))) ||
-      (match(Op0, m_Or(m_Value(A), m_Value(B))) &&
-       match(Op1, m_c_And(m_Specific(A), m_Specific(B))))) {
+  if (match(&I, m_c_Xor(m_And(m_Value(A), m_Value(B)),
+                        m_c_Or(m_Deferred(A), m_Deferred(B))))) {
     I.setOperand(0, A);
     I.setOperand(1, B);
     return &I;
@@ -2308,10 +2325,8 @@ static Instruction *foldXorToXor(BinaryOperator &I,
   // (~B | A) ^ (~A | B) -> A ^ B
   // (~A | B) ^ (A | ~B) -> A ^ B
   // (B | ~A) ^ (A | ~B) -> A ^ B
-  if ((match(Op0, m_Or(m_Value(A), m_Not(m_Value(B)))) &&
-       match(Op1, m_c_Or(m_Not(m_Specific(A)), m_Specific(B)))) ||
-      (match(Op0, m_Or(m_Not(m_Value(A)), m_Value(B))) &&
-       match(Op1, m_c_Or(m_Specific(A), m_Not(m_Specific(B)))))) {
+  if (match(&I, m_Xor(m_c_Or(m_Value(A), m_Not(m_Value(B))),
+                      m_c_Or(m_Not(m_Deferred(A)), m_Deferred(B))))) {
     I.setOperand(0, A);
     I.setOperand(1, B);
     return &I;
@@ -2321,10 +2336,8 @@ static Instruction *foldXorToXor(BinaryOperator &I,
   // (~B & A) ^ (~A & B) -> A ^ B
   // (~A & B) ^ (A & ~B) -> A ^ B
   // (B & ~A) ^ (A & ~B) -> A ^ B
-  if ((match(Op0, m_And(m_Value(A), m_Not(m_Value(B)))) &&
-       match(Op1, m_c_And(m_Not(m_Specific(A)), m_Specific(B)))) ||
-      (match(Op0, m_And(m_Not(m_Value(A)), m_Value(B))) &&
-       match(Op1, m_c_And(m_Specific(A), m_Not(m_Specific(B)))))) {
+  if (match(&I, m_Xor(m_c_And(m_Value(A), m_Not(m_Value(B))),
+                      m_c_And(m_Not(m_Deferred(A)), m_Deferred(B))))) {
     I.setOperand(0, A);
     I.setOperand(1, B);
     return &I;
@@ -2418,6 +2431,77 @@ Value *InstCombiner::foldXorOfICmps(ICmpInst *LHS, ICmpInst *RHS) {
   return nullptr;
 }
 
+/// Bitwise masked merge (bitwise select) is typically coded as:
+/// (x & m) | (y & ~m)
+/// Another variant is:
+/// (x | ~m) & (y | m)
+/// Canonicalize those to a form with one less IR instruction:
+/// ((x ^ y) & m) ^ y
+static Instruction *foldMaskedMerge(BinaryOperator &I,
+                                    InstCombiner::BuilderTy &Builder) {
+  Value *X, *Y;
+
+  Value *M;
+  if (match(&I, m_c_Or(m_OneUse(m_c_And(m_Value(Y), m_Not(m_Value(M)))),
+                       m_OneUse(m_c_And(m_Value(X), m_Deferred(M))))) ||
+      match(&I, m_c_And(m_OneUse(m_c_Or(m_Value(X), m_Not(m_Value(M)))),
+                        m_OneUse(m_c_Or(m_Value(Y), m_Deferred(M)))))) {
+    assert(!isa<Constant>(M) && "Shouldn't have matched a constant.");
+
+    Value *D = Builder.CreateXor(X, Y);
+    Value *A = Builder.CreateAnd(D, M);
+    return BinaryOperator::CreateXor(A, Y);
+  }
+
+  // FIXME: we still want to canonicalize the patterns with constants somewhat.
+
+  return nullptr;
+}
+
+/// If we have a masked merge, in the canonical form of:
+/// (assuming that A only has one use.)
+///   |        A  |  |B|
+///   ((x ^ y) & M) ^ y
+///    |  D  |
+/// * If M is inverted:
+///      |  D  |
+///     ((x ^ y) & ~M) ^ y
+///   We can canonicalize by swapping the final xor operand
+///   to eliminate the 'not' of the mask.
+///     ((x ^ y) & M) ^ x
+/// * If M is a constant, and D has one use, we transform to 'and' / 'or' ops
+///   because that shortens the dependency chain and improves analysis:
+///     (x & M) | (y & ~M)
+static Instruction *visitMaskedMerge(BinaryOperator &I,
+                                     InstCombiner::BuilderTy &Builder) {
+  Value *B, *X, *D;
+  Value *M;
+  if (!match(&I, m_c_Xor(m_Value(B),
+                         m_OneUse(m_c_And(
+                             m_CombineAnd(m_c_Xor(m_Deferred(B), m_Value(X)),
+                                          m_Value(D)),
+                             m_Value(M))))))
+    return nullptr;
+
+  Value *NotM;
+  if (match(M, m_Not(m_Value(NotM)))) {
+    // De-invert the mask and swap the value in B part.
+    Value *NewA = Builder.CreateAnd(D, NotM);
+    return BinaryOperator::CreateXor(NewA, X);
+  }
+
+  Constant *C;
+  if (D->hasOneUse() && match(M, m_Constant(C))) {
+    // Unfold.
+    Value *LHS = Builder.CreateAnd(X, C);
+    Value *NotC = Builder.CreateNot(C);
+    Value *RHS = Builder.CreateAnd(B, NotC);
+    return BinaryOperator::CreateOr(LHS, RHS);
+  }
+
+  return nullptr;
+}
+
 // FIXME: We use commutative matchers (m_c_*) for some, but not all, matches
 // here. We should standardize that construct where it is needed or choose some
 // other way to ensure that commutated variants of patterns are not missed.
@@ -2446,6 +2530,10 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
   if (Value *V = SimplifyBSwap(I, Builder))
     return replaceInstUsesWith(I, V);
 
+  // A^B --> A|B iff A and B have no bits set in common.
+  if (haveNoCommonBitsSet(Op0, Op1, DL, &AC, &I, &DT))
+    return BinaryOperator::CreateOr(Op0, Op1);
+
   // Apply DeMorgan's Law for 'nand' / 'nor' logic with an inverted operand.
   Value *X, *Y;
 
@@ -2463,6 +2551,9 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
     Value *NotY = Builder.CreateNot(Y, Y->getName() + ".not");
     return BinaryOperator::CreateAnd(X, NotY);
   }
+
+  if (Instruction *Xor = visitMaskedMerge(I, Builder))
+    return Xor;
 
   // Is this a 'not' (~) fed by a binary operator?
   BinaryOperator *NotVal;
@@ -2693,7 +2784,11 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
     // xor (add A, B), B  ; add -1 and flip bits if negative
     // --> (A < 0) ? -A : A
     Value *Cmp = Builder.CreateICmpSLT(A, ConstantInt::getNullValue(Ty));
-    return SelectInst::Create(Cmp, Builder.CreateNeg(A), A);
+    // Copy the nuw/nsw flags from the add to the negate.
+    auto *Add = cast<BinaryOperator>(Op0);
+    Value *Neg = Builder.CreateNeg(A, "", Add->hasNoUnsignedWrap(),
+                                   Add->hasNoSignedWrap());
+    return SelectInst::Create(Cmp, Neg, A);
   }
 
   // Eliminate a bitwise 'not' op of 'not' min/max by inverting the min/max:

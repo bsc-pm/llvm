@@ -19,6 +19,7 @@ add_clang_library(clangDaemon
   Context.cpp
   Diagnostics.cpp
   DraftStore.cpp
+  FindSymbols.cpp
   FuzzyMatch.cpp
   GlobalCompilationDatabase.cpp
   Headers.cpp
@@ -27,6 +28,7 @@ add_clang_library(clangDaemon
   Logger.cpp
   Protocol.cpp
   ProtocolHandlers.cpp
+  Quality.cpp
   SourceCode.cpp
   Threading.cpp
   Trace.cpp
@@ -45,6 +47,7 @@ add_clang_library(clangDaemon
   clangAST
   clangASTMatchers
   clangBasic
+  clangDriver
   clangFormat
   clangFrontend
   clangIndex

@@ -32,6 +32,7 @@
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include <algorithm>
@@ -75,8 +76,8 @@ public:
                       [this](std::unique_ptr<Module> M) {
                         return optimizeModule(std::move(M));
                       }),
-        CompileCallbackManager(
-            orc::createLocalCompileCallbackManager(TM->getTargetTriple(), 0)),
+        CompileCallbackManager(orc::createLocalCompileCallbackManager(
+            TM->getTargetTriple(), ES, 0)),
         CODLayer(ES, OptimizeLayer,
                  [&](orc::VModuleKey K) { return Resolvers[K]; },
                  [&](orc::VModuleKey K, std::shared_ptr<SymbolResolver> R) {
@@ -97,6 +98,7 @@ public:
 
     // Build a resolver and associate it with the new key.
     Resolvers[K] = createLegacyLookupResolver(
+        ES,
         [this](const std::string &Name) -> JITSymbol {
           if (auto Sym = CompileLayer.findSymbol(Name, false))
             return Sym;

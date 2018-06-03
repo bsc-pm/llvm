@@ -31,14 +31,13 @@ add_llvm_target(MipsCodeGen
   MipsConstantIslandPass.cpp
   MipsDelaySlotFiller.cpp
   MipsFastISel.cpp
-  MipsHazardSchedule.cpp
   MipsInstrInfo.cpp
   MipsInstructionSelector.cpp
   MipsISelDAGToDAG.cpp
   MipsISelLowering.cpp
   MipsFrameLowering.cpp
   MipsLegalizerInfo.cpp
-  MipsLongBranch.cpp
+  MipsBranchExpansion.cpp
   MipsMCInstLower.cpp
   MipsMachineFunction.cpp
   MipsModuleISelDAGToDAG.cpp
@@ -57,9 +56,8 @@ add_llvm_target(MipsCodeGen
   MicroMipsSizeReduction.cpp
   )
 
-add_subdirectory(InstPrinter)
-add_subdirectory(Disassembler)
-add_subdirectory(TargetInfo)
-add_subdirectory(MCTargetDesc)
 add_subdirectory(AsmParser)
-
+add_subdirectory(Disassembler)
+add_subdirectory(InstPrinter)
+add_subdirectory(MCTargetDesc)
+add_subdirectory(TargetInfo)

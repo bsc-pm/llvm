@@ -152,7 +152,8 @@ if(NOT WIN32 AND NOT APPLE)
   if( LLVM_USE_LINKER )
     set(command ${CMAKE_C_COMPILER} -fuse-ld=${LLVM_USE_LINKER} -Wl,--version)
   else()
-    set(command ${CMAKE_C_COMPILER} -Wl,--version)
+    separate_arguments(flags UNIX_COMMAND "${CMAKE_EXE_LINKER_FLAGS}")
+    set(command ${CMAKE_C_COMPILER} ${flags} -Wl,--version)
   endif()
   execute_process(
     COMMAND ${command}
@@ -1545,7 +1546,7 @@ function(llvm_externalize_debuginfo name)
     if(APPLE)
       set(strip_command COMMAND xcrun strip -Sxl $<TARGET_FILE:${name}>)
     else()
-      set(strip_command COMMAND strip -gx $<TARGET_FILE:${name}>)
+      set(strip_command COMMAND ${CMAKE_STRIP} -gx $<TARGET_FILE:${name}>)
     endif()
   endif()
 
@@ -1563,9 +1564,9 @@ function(llvm_externalize_debuginfo name)
       )
   else()
     add_custom_command(TARGET ${name} POST_BUILD
-      COMMAND objcopy --only-keep-debug $<TARGET_FILE:${name}> $<TARGET_FILE:${name}>.debug
+      COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:${name}> $<TARGET_FILE:${name}>.debug
       ${strip_command} -R .gnu_debuglink
-      COMMAND objcopy --add-gnu-debuglink=$<TARGET_FILE:${name}>.debug $<TARGET_FILE:${name}>
+      COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE:${name}>.debug $<TARGET_FILE:${name}>
       )
   endif()
 endfunction()
@@ -1614,10 +1615,10 @@ function(setup_dependency_debugging name)
     return()
   endif()
 
-  set(deny_attributes_gen "(deny file* (literal \"${LLVM_BINARY_DIR}/include/llvm/IR/Attributes.gen\"))")
-  set(deny_intrinsics_gen "(deny file* (literal \"${LLVM_BINARY_DIR}/include/llvm/IR/Intrinsics.gen\"))")
+  set(deny_attributes_inc "(deny file* (literal \"${LLVM_BINARY_DIR}/include/llvm/IR/Attributes.inc\"))")
+  set(deny_intrinsics_inc "(deny file* (literal \"${LLVM_BINARY_DIR}/include/llvm/IR/Intrinsics.inc\"))")
 
-  set(sandbox_command "sandbox-exec -p '(version 1) (allow default) ${deny_attributes_gen} ${deny_intrinsics_gen}'")
+  set(sandbox_command "sandbox-exec -p '(version 1) (allow default) ${deny_attributes_inc} ${deny_intrinsics_inc}'")
   set_target_properties(${name} PROPERTIES RULE_LAUNCH_COMPILE ${sandbox_command})
 endfunction()
 

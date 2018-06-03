@@ -47,7 +47,7 @@ template <typename T> struct MappingTraits;
 
 } // end namespace yaml
 
-/// \brief Class to accumulate and hold information about a callee.
+/// Class to accumulate and hold information about a callee.
 struct CalleeInfo {
   enum class HotnessType : uint8_t {
     Unknown = 0,
@@ -218,16 +218,16 @@ template <> struct DenseMapInfo<ValueInfo> {
   static unsigned getHashValue(ValueInfo I) { return (uintptr_t)I.getRef(); }
 };
 
-/// \brief Function and variable summary information to aid decisions and
+/// Function and variable summary information to aid decisions and
 /// implementation of importing.
 class GlobalValueSummary {
 public:
-  /// \brief Sububclass discriminator (for dyn_cast<> et al.)
+  /// Sububclass discriminator (for dyn_cast<> et al.)
   enum SummaryKind : unsigned { AliasKind, FunctionKind, GlobalVarKind };
 
   /// Group flags (Linkage, NotEligibleToImport, etc.) as a bitfield.
   struct GVFlags {
-    /// \brief The linkage type of the associated global value.
+    /// The linkage type of the associated global value.
     ///
     /// One use is to flag values that have local linkage types and need to
     /// have module identifier appended before placing into the combined
@@ -269,7 +269,7 @@ private:
   /// GUID includes the module level id in the hash.
   GlobalValue::GUID OriginalName = 0;
 
-  /// \brief Path of module IR containing value's definition, used to locate
+  /// Path of module IR containing value's definition, used to locate
   /// module during importing.
   ///
   /// This is only used during parsing of the combined index, or when
@@ -312,7 +312,7 @@ public:
   StringRef modulePath() const { return ModulePath; }
 
   /// Get the flags for this GlobalValue (see \p struct GVFlags).
-  GVFlags flags() { return Flags; }
+  GVFlags flags() const { return Flags; }
 
   /// Return linkage type recorded for this global value.
   GlobalValue::LinkageTypes linkage() const {
@@ -350,7 +350,7 @@ public:
   friend class ModuleSummaryIndex;
 };
 
-/// \brief Alias summary information.
+/// Alias summary information.
 class AliasSummary : public GlobalValueSummary {
   GlobalValueSummary *AliaseeSummary;
   // AliaseeGUID is only set and accessed when we are building a combined index
@@ -397,7 +397,7 @@ inline GlobalValueSummary *GlobalValueSummary::getBaseObject() {
   return this;
 }
 
-/// \brief Function summary information to aid decisions and implementation of
+/// Function summary information to aid decisions and implementation of
 /// importing.
 class FunctionSummary : public GlobalValueSummary {
 public:
@@ -426,6 +426,26 @@ public:
   struct ConstVCall {
     VFuncId VFunc;
     std::vector<uint64_t> Args;
+  };
+
+  /// All type identifier related information. Because these fields are
+  /// relatively uncommon we only allocate space for them if necessary.
+  struct TypeIdInfo {
+    /// List of type identifiers used by this function in llvm.type.test
+    /// intrinsics referenced by something other than an llvm.assume intrinsic,
+    /// represented as GUIDs.
+    std::vector<GlobalValue::GUID> TypeTests;
+
+    /// List of virtual calls made by this function using (respectively)
+    /// llvm.assume(llvm.type.test) or llvm.type.checked.load intrinsics that do
+    /// not have all constant integer arguments.
+    std::vector<VFuncId> TypeTestAssumeVCalls, TypeCheckedLoadVCalls;
+
+    /// List of virtual calls made by this function using (respectively)
+    /// llvm.assume(llvm.type.test) or llvm.type.checked.load intrinsics with
+    /// all constant integer arguments.
+    std::vector<ConstVCall> TypeTestAssumeConstVCalls,
+        TypeCheckedLoadConstVCalls;
   };
 
   /// Function attribute flags. Used to track if a function accesses memory,
@@ -468,25 +488,6 @@ private:
   /// List of <CalleeValueInfo, CalleeInfo> call edge pairs from this function.
   std::vector<EdgeTy> CallGraphEdgeList;
 
-  /// All type identifier related information. Because these fields are
-  /// relatively uncommon we only allocate space for them if necessary.
-  struct TypeIdInfo {
-    /// List of type identifiers used by this function in llvm.type.test
-    /// intrinsics other than by an llvm.assume intrinsic, represented as GUIDs.
-    std::vector<GlobalValue::GUID> TypeTests;
-
-    /// List of virtual calls made by this function using (respectively)
-    /// llvm.assume(llvm.type.test) or llvm.type.checked.load intrinsics that do
-    /// not have all constant integer arguments.
-    std::vector<VFuncId> TypeTestAssumeVCalls, TypeCheckedLoadVCalls;
-
-    /// List of virtual calls made by this function using (respectively)
-    /// llvm.assume(llvm.type.test) or llvm.type.checked.load intrinsics with
-    /// all constant integer arguments.
-    std::vector<ConstVCall> TypeTestAssumeConstVCalls,
-        TypeCheckedLoadConstVCalls;
-  };
-
   std::unique_ptr<TypeIdInfo> TIdInfo;
 
 public:
@@ -516,7 +517,7 @@ public:
   }
 
   /// Get function attribute flags.
-  FFlags &fflags() { return FunFlags; }
+  FFlags fflags() const { return FunFlags; }
 
   /// Get the instruction count recorded for this function.
   unsigned instCount() const { return InstCount; }
@@ -576,6 +577,8 @@ public:
     TIdInfo->TypeTests.push_back(Guid);
   }
 
+  const TypeIdInfo *getTypeIdInfo() const { return TIdInfo.get(); };
+
   friend struct GraphTraits<ValueInfo>;
 };
 
@@ -613,7 +616,7 @@ template <> struct DenseMapInfo<FunctionSummary::ConstVCall> {
   }
 };
 
-/// \brief Global variable summary information to aid decisions and
+/// Global variable summary information to aid decisions and
 /// implementation of importing.
 ///
 /// Currently this doesn't add anything to the base \p GlobalValueSummary,
@@ -864,6 +867,12 @@ public:
   }
   bool isGUIDLive(GlobalValue::GUID GUID) const;
 
+  /// Return a ValueInfo for the index value_type (convenient when iterating
+  /// index).
+  ValueInfo getValueInfo(const GlobalValueSummaryMapTy::value_type &R) const {
+    return ValueInfo(IsAnalysis, &R);
+  }
+
   /// Return a ValueInfo for GUID if it exists, otherwise return ValueInfo().
   ValueInfo getValueInfo(GlobalValue::GUID GUID) const {
     auto I = GlobalValueMap.find(GUID);
@@ -1047,6 +1056,12 @@ public:
   /// Summary).
   void collectDefinedGVSummariesPerModule(
       StringMap<GVSummaryMapTy> &ModuleToDefinedGVSummaries) const;
+
+  /// Print to an output stream.
+  void print(raw_ostream &OS, bool IsForDebug = false) const;
+
+  /// Dump to stderr (for debugging).
+  void dump() const;
 
   /// Export summary to dot file for GraphViz.
   void exportToDot(raw_ostream& OS) const;

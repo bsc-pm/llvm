@@ -54,6 +54,12 @@ void AddOpenMPLinkerScript(const ToolChain &TC, Compilation &C,
                            llvm::opt::ArgStringList &CmdArgs,
                            const JobAction &JA);
 
+void AddHIPLinkerScript(const ToolChain &TC, Compilation &C,
+                        const InputInfo &Output, const InputInfoList &Inputs,
+                        const llvm::opt::ArgList &Args,
+                        llvm::opt::ArgStringList &CmdArgs, const JobAction &JA,
+                        const Tool &T);
+
 const char *SplitDebugName(const llvm::opt::ArgList &Args,
                            const InputInfo &Input);
 
@@ -62,11 +68,14 @@ void SplitDebugInfo(const ToolChain &TC, Compilation &C, const Tool &T,
                     const InputInfo &Output, const char *OutFile);
 
 void AddGoldPlugin(const ToolChain &ToolChain, const llvm::opt::ArgList &Args,
-                   llvm::opt::ArgStringList &CmdArgs, bool IsThinLTO,
-                   const Driver &D);
+                   llvm::opt::ArgStringList &CmdArgs, const InputInfo &Output,
+                   const InputInfo &Input, bool IsThinLTO);
 
 std::tuple<llvm::Reloc::Model, unsigned, bool>
 ParsePICArgs(const ToolChain &ToolChain, const llvm::opt::ArgList &Args);
+
+unsigned ParseFunctionAlignment(const ToolChain &TC,
+                                const llvm::opt::ArgList &Args);
 
 void AddAssemblerKPIC(const ToolChain &ToolChain,
                       const llvm::opt::ArgList &Args,
@@ -106,6 +115,11 @@ void handleTargetFeaturesGroup(const llvm::opt::ArgList &Args,
                                std::vector<StringRef> &Features,
                                llvm::opt::OptSpecifier Group);
 
+/// Handles the -save-stats option and returns the filename to save statistics
+/// to.
+SmallString<128> getStatsFileName(const llvm::opt::ArgList &Args,
+                                  const InputInfo &Output,
+                                  const InputInfo &Input, const Driver &D);
 } // end namespace tools
 } // end namespace driver
 } // end namespace clang
