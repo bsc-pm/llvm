@@ -154,6 +154,8 @@ btcq $7, (%rax)
 btrq $7, (%rax)
 btsq $7, (%rax)
 
+clc
+
 decb %dil
 decb (%rax)
 decw %di
@@ -745,6 +747,7 @@ xorq (%rax), %rdi
 # CHECK-NEXT:  4      7     1.00    *      *            btcq	$7, (%rax)
 # CHECK-NEXT:  4      7     1.00    *      *            btrq	$7, (%rax)
 # CHECK-NEXT:  4      7     1.00    *      *            btsq	$7, (%rax)
+# CHECK-NEXT:  1      1      -                    *     clc
 # CHECK-NEXT:  1      1     0.33                        decb	%dil
 # CHECK-NEXT:  3      7     1.00    *      *            decb	(%rax)
 # CHECK-NEXT:  1      1     0.33                        decw	%di
@@ -1301,6 +1304,7 @@ xorq (%rax), %rdi
 # CHECK-NEXT:  -      -     0.50    -     1.00   0.50   1.00   1.00   btcq	$7, (%rax)
 # CHECK-NEXT:  -      -     0.50    -     1.00   0.50   1.00   1.00   btrq	$7, (%rax)
 # CHECK-NEXT:  -      -     0.50    -     1.00   0.50   1.00   1.00   btsq	$7, (%rax)
+# CHECK-NEXT:  -      -      -      -      -      -      -      -     clc
 # CHECK-NEXT:  -      -     0.33   0.33    -     0.33    -      -     decb	%dil
 # CHECK-NEXT:  -      -     0.33   0.33   1.00   0.33   1.00   1.00   decb	(%rax)
 # CHECK-NEXT:  -      -     0.33   0.33    -     0.33    -      -     decw	%di
@@ -1702,4 +1706,3 @@ xorq (%rax), %rdi
 # CHECK-NEXT:  -      -     0.33   0.33    -     0.33    -      -     xorq	%rdi, %rdi
 # CHECK-NEXT:  -      -     0.33   0.33   1.00   0.33   1.00   1.00   xorq	%rdi, (%rax)
 # CHECK-NEXT:  -      -     0.33   0.33    -     0.33   0.50   0.50   xorq	(%rax), %rdi
-

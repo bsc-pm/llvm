@@ -27,7 +27,7 @@ class SITargetLowering final : public AMDGPUTargetLowering {
   SDValue getImplicitArgPtr(SelectionDAG &DAG, const SDLoc &SL) const;
   SDValue lowerKernargMemParameter(SelectionDAG &DAG, EVT VT, EVT MemVT,
                                    const SDLoc &SL, SDValue Chain,
-                                   uint64_t Offset, bool Signed,
+                                   uint64_t Offset, unsigned Align, bool Signed,
                                    const ISD::InputArg *Arg = nullptr) const;
 
   SDValue lowerStackParameter(SelectionDAG &DAG, CCValAssign &VA,
@@ -131,6 +131,7 @@ class SITargetLowering final : public AMDGPUTargetLowering {
   SDValue performFSubCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performSetCCCombine(SDNode *N, DAGCombinerInfo &DCI) const;
   SDValue performCvtF32UByteNCombine(SDNode *N, DAGCombinerInfo &DCI) const;
+  SDValue performClampCombine(SDNode *N, DAGCombinerInfo &DCI) const;
 
   bool isLegalFlatAddressingMode(const AddrMode &AM) const;
   bool isLegalGlobalAddressingMode(const AddrMode &AM) const;

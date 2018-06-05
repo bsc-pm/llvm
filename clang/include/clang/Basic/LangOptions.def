@@ -247,6 +247,10 @@ ENUM_LANGOPT(AddressSpaceMapMangling , AddrSpaceMapMangling, 2, ASMM_Target, "Op
 LANGOPT(IncludeDefaultHeader, 1, 0, "Include default header file for OpenCL")
 BENIGN_LANGOPT(DelayedTemplateParsing , 1, 0, "delayed template parsing")
 LANGOPT(BlocksRuntimeOptional , 1, 0, "optional blocks runtime")
+LANGOPT(
+    CompleteMemberPointers, 1, 0,
+    "Require member pointer base types to be complete at the point where the "
+    "type's inheritance model would be determined under the Microsoft ABI")
 
 ENUM_LANGOPT(GC, GCMode, 2, NonGC, "Objective-C Garbage Collection mode")
 ENUM_LANGOPT(ValueVisibilityMode, Visibility, 3, DefaultVisibility,
@@ -297,6 +301,8 @@ ENUM_LANGOPT(ClangABICompat, ClangABI, 4, ClangABI::Latest,
              "with")
 
 COMPATIBLE_VALUE_LANGOPT(FunctionAlignment, 5, 0, "Default alignment for functions")
+
+LANGOPT(FixedPoint, 1, 0, "fixed point types")
 
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT

@@ -18,6 +18,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/YAMLTraits.h"
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -26,8 +27,8 @@ namespace exegesis {
 struct InstructionBenchmarkKey {
   // The LLVM opcode name.
   std::string OpcodeName;
-  // The benchmark mode.
-  std::string Mode;
+  enum ModeE { Unknown, Latency, Uops };
+  ModeE Mode;
   // An opaque configuration, that can be used to separate several benchmarks of
   // the same instruction under different configurations.
   std::string Config;
@@ -59,6 +60,31 @@ struct InstructionBenchmark {
   // Write functions, non-const because of YAML traits.
   void writeYamlTo(llvm::raw_ostream &S);
   void writeYamlOrDie(const llvm::StringRef Filename);
+};
+
+//------------------------------------------------------------------------------
+// Utilities to work with Benchmark measures.
+
+// A class that measures stats over benchmark measures.
+class BenchmarkMeasureStats {
+public:
+  void push(const BenchmarkMeasure &BM);
+
+  double avg() const {
+    assert(NumValues);
+    return SumValues / NumValues;
+  }
+  double min() const { return MinValue; }
+  double max() const { return MaxValue; }
+
+  const std::string &key() const { return Key; }
+
+private:
+  std::string Key;
+  double SumValues = 0.0;
+  int NumValues = 0;
+  double MaxValue = std::numeric_limits<double>::min();
+  double MinValue = std::numeric_limits<double>::max();
 };
 
 } // namespace exegesis

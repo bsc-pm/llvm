@@ -19,6 +19,7 @@
 #include "clang/Tooling/Tooling.h"
 
 #include "DeclMatcher.h"
+#include "Language.h"
 #include "gtest/gtest.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -28,50 +29,6 @@ namespace ast_matchers {
 using internal::Matcher;
 using internal::BindableMatcher;
 using llvm::StringMap;
-
-typedef std::vector<std::string> ArgVector;
-typedef std::vector<ArgVector> RunOptions;
-
-static bool isCXX(Language Lang) {
-  return Lang == Lang_CXX || Lang == Lang_CXX11;
-}
-
-static ArgVector getBasicRunOptionsForLanguage(Language Lang) {
-  ArgVector BasicArgs;
-  // Test with basic arguments.
-  switch (Lang) {
-  case Lang_C:
-    BasicArgs = {"-x", "c", "-std=c99"};
-    break;
-  case Lang_C89:
-    BasicArgs = {"-x", "c", "-std=c89"};
-    break;
-  case Lang_CXX:
-    BasicArgs = {"-std=c++98", "-frtti"};
-    break;
-  case Lang_CXX11:
-    BasicArgs = {"-std=c++11", "-frtti"};
-    break;
-  case Lang_OpenCL:
-  case Lang_OBJCXX:
-    llvm_unreachable("Not implemented yet!");
-  }
-  return BasicArgs;
-}
-
-static RunOptions getRunOptionsForLanguage(Language Lang) {
-  ArgVector BasicArgs = getBasicRunOptionsForLanguage(Lang);
-
-  // For C++, test with "-fdelayed-template-parsing" enabled to handle MSVC
-  // default behaviour.
-  if (isCXX(Lang)) {
-    ArgVector ArgsForDelayedTemplateParse = BasicArgs;
-    ArgsForDelayedTemplateParse.emplace_back("-fdelayed-template-parsing");
-    return {BasicArgs, ArgsForDelayedTemplateParse};
-  }
-
-  return {BasicArgs};
-}
 
 // Creates a virtual file and assigns that to the context of given AST. If the
 // file already exists then the file will not be created again as a duplicate.
@@ -1150,6 +1107,50 @@ TEST(ImportExpr, DependentSizedArrayType) {
                  has(fieldDecl(hasType(dependentSizedArrayType())))))));
 }
 
+TEST_P(ASTImporterTestBase, ImportOfTemplatedDeclOfClassTemplateDecl) {
+  Decl *FromTU = getTuDecl("template<class X> struct S{};", Lang_CXX);
+  auto From =
+      FirstDeclMatcher<ClassTemplateDecl>().match(FromTU, classTemplateDecl());
+  ASSERT_TRUE(From);
+  auto To = cast<ClassTemplateDecl>(Import(From, Lang_CXX));
+  ASSERT_TRUE(To);
+  Decl *ToTemplated = To->getTemplatedDecl();
+  Decl *ToTemplated1 = Import(From->getTemplatedDecl(), Lang_CXX);
+  EXPECT_TRUE(ToTemplated1);
+  EXPECT_EQ(ToTemplated1, ToTemplated);
+}
+
+TEST_P(ASTImporterTestBase, ImportCorrectTemplatedDecl) {
+  auto Code =
+        R"(
+        namespace x {
+          template<class X> struct S1{};
+          template<class X> struct S2{};
+          template<class X> struct S3{};
+        }
+        )";
+  Decl *FromTU = getTuDecl(Code, Lang_CXX);
+  auto FromNs =
+      FirstDeclMatcher<NamespaceDecl>().match(FromTU, namespaceDecl());
+  auto ToNs = cast<NamespaceDecl>(Import(FromNs, Lang_CXX));
+  ASSERT_TRUE(ToNs);
+  auto From =
+      FirstDeclMatcher<ClassTemplateDecl>().match(FromTU,
+                                                  classTemplateDecl(
+                                                      hasName("S2")));
+  auto To =
+      FirstDeclMatcher<ClassTemplateDecl>().match(ToNs,
+                                                  classTemplateDecl(
+                                                      hasName("S2")));
+  ASSERT_TRUE(From);
+  ASSERT_TRUE(To);
+  auto ToTemplated = To->getTemplatedDecl();
+  auto ToTemplated1 =
+      cast<CXXRecordDecl>(Import(From->getTemplatedDecl(), Lang_CXX));
+  EXPECT_TRUE(ToTemplated1);
+  ASSERT_EQ(ToTemplated1, ToTemplated);
+}
+
 TEST_P(ASTImporterTestBase, DISABLED_ImportFunctionWithBackReferringParameter) {
   Decl *From, *To;
   std::tie(From, To) = getImportedDecl(
@@ -1257,7 +1258,7 @@ TEST_P(ASTImporterTestBase, TUshouldNotContainTemplatedDeclOfTypeAlias) {
 
 TEST_P(
     ASTImporterTestBase,
-    DISABLED_TUshouldNotContainClassTemplateSpecializationOfImplicitInstantiation) {
+    TUshouldNotContainClassTemplateSpecializationOfImplicitInstantiation) {
 
   Decl *From, *To;
   std::tie(From, To) = getImportedDecl(
@@ -1543,7 +1544,7 @@ TEST_P(ASTImporterTestBase,
       )",
       Lang_CXX);
   ASSERT_EQ(2u, DeclCounter<CXXRecordDecl>().match(
-                    ToTU, cxxRecordDecl(hasParent(translationUnitDecl()))));
+                    ToTU, cxxRecordDecl(unless(isImplicit()))));
 
   Decl *FromTU = getTuDecl(
       R"(
@@ -1558,7 +1559,7 @@ TEST_P(ASTImporterTestBase,
   Import(FromD, Lang_CXX);
 
   EXPECT_EQ(2u, DeclCounter<CXXRecordDecl>().match(
-                    ToTU, cxxRecordDecl(hasParent(translationUnitDecl()))));
+                    ToTU, cxxRecordDecl(unless(isImplicit()))));
 }
 
 TEST_P(

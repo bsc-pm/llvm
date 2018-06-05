@@ -64,6 +64,9 @@ struct SymbolRelevanceSignals {
   // 0-1 fuzzy-match score for unqualified name. Must be explicitly assigned.
   float NameMatch = 1;
   bool Forbidden = false; // Unavailable (e.g const) or inaccessible (private).
+  /// Proximity between the best declaration and the query location. [0-1] score
+  /// where 1 is closest
+  float ProximityScore = 0;
 
   void merge(const CodeCompletionResult &SemaResult);
 
@@ -116,8 +119,8 @@ private:
   Compare Greater;
 };
 
-/// Returns a string that sorts in the same order as (-Score, Tiebreak), for LSP.
-/// (The highest score compares smallest so it sorts at the top).
+/// Returns a string that sorts in the same order as (-Score, Tiebreak), for
+/// LSP. (The highest score compares smallest so it sorts at the top).
 std::string sortText(float Score, llvm::StringRef Tiebreak = "");
 
 } // namespace clangd

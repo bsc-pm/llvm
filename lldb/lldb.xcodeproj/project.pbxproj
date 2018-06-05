@@ -756,6 +756,9 @@
 		4CD44CFB20B37C440003557C /* DWARFIndex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44CF820B37C440003557C /* DWARFIndex.cpp */; };
 		4CD44CFC20B37C440003557C /* ManualDWARFIndex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44CF920B37C440003557C /* ManualDWARFIndex.cpp */; };
 		4CD44CFD20B37C440003557C /* AppleDWARFIndex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44CFA20B37C440003557C /* AppleDWARFIndex.cpp */; };
+		4CD44D2220B725DA0003557C /* SystemInitializerLLGS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44D2020B725DA0003557C /* SystemInitializerLLGS.cpp */; };
+		4CD44D4220B777850003557C /* DWARFBaseDIE.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44D4020B777850003557C /* DWARFBaseDIE.cpp */; };
+		4CD44D5820C603CB0003557C /* ClangHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CD44D5620C603A80003557C /* ClangHost.cpp */; };
 		4CDB8D6D1DBA91B6006C5B13 /* LibStdcppUniquePointer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CDB8D671DBA91A6006C5B13 /* LibStdcppUniquePointer.cpp */; };
 		4CDB8D6E1DBA91B6006C5B13 /* LibStdcppTuple.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CDB8D681DBA91A6006C5B13 /* LibStdcppTuple.cpp */; };
 		4CE4EFAA1E8999B900A80C06 /* PlatformOpenBSD.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4CE4EFA61E8999B000A80C06 /* PlatformOpenBSD.cpp */; };
@@ -2407,7 +2410,6 @@
 		3F8169181ABA2419001DA9DF /* NameMatches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = NameMatches.cpp; path = source/Utility/NameMatches.cpp; sourceTree = "<group>"; };
 		3F81691C1ABA242B001DA9DF /* NameMatches.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = NameMatches.h; path = include/lldb/Utility/NameMatches.h; sourceTree = "<group>"; };
 		3F81692A1ABB7A16001DA9DF /* SystemInitializerFull.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemInitializerFull.cpp; path = source/API/SystemInitializerFull.cpp; sourceTree = "<group>"; };
-		3F81692D1ABB7A40001DA9DF /* SystemInitializerFull.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SystemInitializerFull.h; path = include/lldb/API/SystemInitializerFull.h; sourceTree = "<group>"; };
 		3F81692E1ABB7A6D001DA9DF /* SystemInitializer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemInitializer.cpp; path = source/Initialization/SystemInitializer.cpp; sourceTree = "<group>"; };
 		3F81692F1ABB7A6D001DA9DF /* SystemInitializerCommon.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemInitializerCommon.cpp; path = source/Initialization/SystemInitializerCommon.cpp; sourceTree = "<group>"; };
 		3F8169301ABB7A6D001DA9DF /* SystemLifetimeManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemLifetimeManager.cpp; path = source/Initialization/SystemLifetimeManager.cpp; sourceTree = "<group>"; };
@@ -2589,7 +2591,7 @@
 		4C4EB7821E6A4DE7002035C0 /* DumpDataExtractor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DumpDataExtractor.h; path = include/lldb/Core/DumpDataExtractor.h; sourceTree = "<group>"; };
 		4C54B2781F61CE1200D469CA /* SBBreakpointName.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SBBreakpointName.h; path = include/lldb/API/SBBreakpointName.h; sourceTree = "<group>"; };
 		4C54B27C1F61CE5300D469CA /* SBBreakpointName.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SBBreakpointName.cpp; path = source/API/SBBreakpointName.cpp; sourceTree = "<group>"; };
-		4C54B2811F62081300D469CA /* SBBreakpointOptionCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SBBreakpointOptionCommon.h; path = include/lldb/API/SBBreakpointOptionCommon.h; sourceTree = "<group>"; };
+		4C54B2811F62081300D469CA /* SBBreakpointOptionCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SBBreakpointOptionCommon.h; path = source/API/SBBreakpointOptionCommon.h; sourceTree = "<group>"; };
 		4C562CC21CC07DDD00C52EAC /* PDBASTParser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PDBASTParser.cpp; path = PDB/PDBASTParser.cpp; sourceTree = "<group>"; };
 		4C562CC31CC07DDD00C52EAC /* PDBASTParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PDBASTParser.h; path = PDB/PDBASTParser.h; sourceTree = "<group>"; };
 		4C56543019D1EFAA002E9C44 /* ThreadPlanPython.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ThreadPlanPython.cpp; path = source/Target/ThreadPlanPython.cpp; sourceTree = "<group>"; };
@@ -2662,6 +2664,12 @@
 		4CD44CFE20B37C570003557C /* DWARFIndex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DWARFIndex.h; sourceTree = "<group>"; };
 		4CD44CFF20B37C580003557C /* AppleDWARFIndex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppleDWARFIndex.h; sourceTree = "<group>"; };
 		4CD44D0020B37C580003557C /* ManualDWARFIndex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ManualDWARFIndex.h; sourceTree = "<group>"; };
+		4CD44D2020B725DA0003557C /* SystemInitializerLLGS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemInitializerLLGS.cpp; path = "tools/lldb-server/SystemInitializerLLGS.cpp"; sourceTree = "<group>"; };
+		4CD44D2320B725F60003557C /* SystemInitializerLLGS.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SystemInitializerLLGS.h; path = "tools/lldb-server/SystemInitializerLLGS.h"; sourceTree = "<group>"; };
+		4CD44D4020B777850003557C /* DWARFBaseDIE.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DWARFBaseDIE.cpp; sourceTree = "<group>"; };
+		4CD44D4120B777850003557C /* DWARFBaseDIE.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DWARFBaseDIE.h; sourceTree = "<group>"; };
+		4CD44D5620C603A80003557C /* ClangHost.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ClangHost.cpp; path = ExpressionParser/Clang/ClangHost.cpp; sourceTree = "<group>"; };
+		4CD44D5720C603A90003557C /* ClangHost.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ClangHost.h; path = ExpressionParser/Clang/ClangHost.h; sourceTree = "<group>"; };
 		4CDB8D671DBA91A6006C5B13 /* LibStdcppUniquePointer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = LibStdcppUniquePointer.cpp; path = Language/CPlusPlus/LibStdcppUniquePointer.cpp; sourceTree = "<group>"; };
 		4CDB8D681DBA91A6006C5B13 /* LibStdcppTuple.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = LibStdcppTuple.cpp; path = Language/CPlusPlus/LibStdcppTuple.cpp; sourceTree = "<group>"; };
 		4CE4EFA61E8999B000A80C06 /* PlatformOpenBSD.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PlatformOpenBSD.cpp; sourceTree = "<group>"; };
@@ -3224,6 +3232,7 @@
 		B2B7CCED15D1BFB700EEFB57 /* WatchpointOptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = WatchpointOptions.h; path = include/lldb/Breakpoint/WatchpointOptions.h; sourceTree = "<group>"; };
 		B2B7CCEF15D1C20F00EEFB57 /* WatchpointOptions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = WatchpointOptions.cpp; path = source/Breakpoint/WatchpointOptions.cpp; sourceTree = "<group>"; };
 		B2D3033612EFA5C500F84EB3 /* InstructionUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InstructionUtils.h; path = Utility/InstructionUtils.h; sourceTree = "<group>"; };
+		CDC75CF920B8D1DF002209BC /* SystemInitializerFull.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SystemInitializerFull.h; path = source/API/SystemInitializerFull.h; sourceTree = "<group>"; };
 		D67521351EA17C3900439694 /* MainLoop.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MainLoop.cpp; sourceTree = "<group>"; };
 		E73A15A41B548EC500786197 /* GDBRemoteSignals.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = GDBRemoteSignals.cpp; path = Utility/GDBRemoteSignals.cpp; sourceTree = "<group>"; };
 		E73A15A51B548EC500786197 /* GDBRemoteSignals.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GDBRemoteSignals.h; path = Utility/GDBRemoteSignals.h; sourceTree = "<group>"; };
@@ -3943,6 +3952,8 @@
 				4CC7C6521D5299140076FF94 /* DWARFASTParserOCaml.cpp */,
 				260C89B610F57C5600BB2B04 /* DWARFAttribute.h */,
 				266E829C1B8E542C008FCA06 /* DWARFAttribute.cpp */,
+				4CD44D4020B777850003557C /* DWARFBaseDIE.cpp */,
+				4CD44D4120B777850003557C /* DWARFBaseDIE.h */,
 				260C89B710F57C5600BB2B04 /* DWARFCompileUnit.cpp */,
 				260C89B810F57C5600BB2B04 /* DWARFCompileUnit.h */,
 				26AB92101819D74600E63F3E /* DWARFDataExtractor.cpp */,
@@ -4253,8 +4264,8 @@
 				94235B9B1A8D5FF300EB2EED /* SBVariablesOptions.cpp */,
 				B2A58721143119810092BFBA /* SBWatchpoint.h */,
 				B2A58723143119D50092BFBA /* SBWatchpoint.cpp */,
-				3F81692D1ABB7A40001DA9DF /* SystemInitializerFull.h */,
 				3F81692A1ABB7A16001DA9DF /* SystemInitializerFull.cpp */,
+				CDC75CF920B8D1DF002209BC /* SystemInitializerFull.h */,
 			);
 			name = API;
 			sourceTree = "<group>";
@@ -5995,6 +6006,8 @@
 				4C98D3E0118FB98F00E575D0 /* ClangFunctionCaller.h */,
 				4C98D3DA118FB96F00E575D0 /* ClangFunctionCaller.cpp */,
 				26BC7DC010F1B79500F91463 /* ClangExpressionHelper.h */,
+				4CD44D5720C603A90003557C /* ClangHost.h */,
+				4CD44D5620C603A80003557C /* ClangHost.cpp */,
 				49445E341225AB6A00C11A81 /* ClangUserExpression.h */,
 				26BC7ED510F1B86700F91463 /* ClangUserExpression.cpp */,
 				497C86C1122823F300B54702 /* ClangUtilityFunction.h */,
@@ -6769,6 +6782,8 @@
 				E769331D1A94D18100C73337 /* lldb-server.cpp */,
 				26DC6A1C1337FECA00FF7998 /* lldb-platform.cpp */,
 				26D6F3F4183E7F9300194858 /* lldb-gdbserver.cpp */,
+				4CD44D2020B725DA0003557C /* SystemInitializerLLGS.cpp */,
+				4CD44D2320B725F60003557C /* SystemInitializerLLGS.h */,
 			);
 			name = "lldb-server";
 			sourceTree = "<group>";
@@ -7874,6 +7889,7 @@
 				4C56543119D1EFAA002E9C44 /* ThreadPlanPython.cpp in Sources */,
 				26AB92121819D74600E63F3E /* DWARFDataExtractor.cpp in Sources */,
 				268900E913353E6F00698AC0 /* CPPLanguageRuntime.cpp in Sources */,
+				4CD44D4220B777850003557C /* DWARFBaseDIE.cpp in Sources */,
 				9485545A1DCBAE3B00345FF5 /* RenderScriptScriptGroup.cpp in Sources */,
 				268900EA13353E6F00698AC0 /* DynamicLoader.cpp in Sources */,
 				945261BF1B9A11FC00BF138D /* CxxStringTypes.cpp in Sources */,
@@ -8115,6 +8131,7 @@
 				490A36C0180F0E6F00BA31F8 /* PlatformWindows.cpp in Sources */,
 				260CC65015D0440D002BF2E0 /* OptionValueFormat.cpp in Sources */,
 				260CC65115D0440D002BF2E0 /* OptionValueSInt64.cpp in Sources */,
+				4CD44D5820C603CB0003557C /* ClangHost.cpp in Sources */,
 				260CC65215D0440D002BF2E0 /* OptionValueString.cpp in Sources */,
 				6D55B2911A8A806200A70529 /* GDBRemoteCommunicationServerLLGS.cpp in Sources */,
 				260CC65315D0440D002BF2E0 /* OptionValueUInt64.cpp in Sources */,
@@ -8243,6 +8260,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E769331C1A94D15400C73337 /* lldb-gdbserver.cpp in Sources */,
+				4CD44D2220B725DA0003557C /* SystemInitializerLLGS.cpp in Sources */,
 				26DC6A1D1337FECA00FF7998 /* lldb-platform.cpp in Sources */,
 				E769331E1A94D18100C73337 /* lldb-server.cpp in Sources */,
 			);

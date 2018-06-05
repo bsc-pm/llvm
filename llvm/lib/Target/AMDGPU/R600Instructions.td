@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-include "R600Intrinsics.td"
 include "R600InstrFormats.td"
 
 // FIXME: Should not be arbitrarily split from other R600 inst classes.
@@ -663,13 +662,6 @@ let isCodeGenOnly = 1, isPseudo = 1 in {
 
 let usesCustomInserter = 1  in {
 
-class CLAMP <RegisterClass rc> : AMDGPUShaderInst <
-  (outs rc:$dst),
-  (ins rc:$src0),
-  "CLAMP $dst, $src0",
-  [(set f32:$dst, (AMDGPUclamp f32:$src0))]
->;
-
 class FABS <RegisterClass rc> : AMDGPUShaderInst <
   (outs rc:$dst),
   (ins rc:$src0),
@@ -1194,7 +1186,6 @@ class COS_Common <bits<11> inst> : R600_1OP <
   let Itinerary = TransALU;
 }
 
-def CLAMP_R600 :  CLAMP <R600_Reg32>;
 def FABS_R600 : FABS<R600_Reg32>;
 def FNEG_R600 : FNEG<R600_Reg32>;
 

@@ -168,7 +168,7 @@ IdentifiedSymbol getSymbolAtPosition(ParsedAST &AST, SourceLocation Pos) {
   IndexOpts.SystemSymbolFilter =
       index::IndexingOptions::SystemSymbolFilterKind::All;
   IndexOpts.IndexFunctionLocals = true;
-  indexTopLevelDecls(AST.getASTContext(), AST.getTopLevelDecls(),
+  indexTopLevelDecls(AST.getASTContext(), AST.getLocalTopLevelDecls(),
                      DeclMacrosFinder, IndexOpts);
 
   return {DeclMacrosFinder.takeDecls(), DeclMacrosFinder.takeMacroInfos()};
@@ -418,7 +418,7 @@ std::vector<DocumentHighlight> findDocumentHighlights(ParsedAST &AST,
   IndexOpts.SystemSymbolFilter =
       index::IndexingOptions::SystemSymbolFilterKind::All;
   IndexOpts.IndexFunctionLocals = true;
-  indexTopLevelDecls(AST.getASTContext(), AST.getTopLevelDecls(),
+  indexTopLevelDecls(AST.getASTContext(), AST.getLocalTopLevelDecls(),
                      DocHighlightsFinder, IndexOpts);
 
   return DocHighlightsFinder.takeHighlights();
@@ -526,7 +526,7 @@ static Hover getHoverContents(StringRef MacroName) {
   return H;
 }
 
-Hover getHover(ParsedAST &AST, Position Pos) {
+Optional<Hover> getHover(ParsedAST &AST, Position Pos) {
   const SourceManager &SourceMgr = AST.getASTContext().getSourceManager();
   SourceLocation SourceLocationBeg =
       getBeginningOfIdentifier(AST, Pos, SourceMgr.getMainFileID());
@@ -539,7 +539,7 @@ Hover getHover(ParsedAST &AST, Position Pos) {
   if (!Symbols.Decls.empty())
     return getHoverContents(Symbols.Decls[0]);
 
-  return Hover();
+  return None;
 }
 
 } // namespace clangd

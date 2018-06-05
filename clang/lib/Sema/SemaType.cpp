@@ -1391,6 +1391,39 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     }
     break;
   }
+  case DeclSpec::TST_accum: {
+    if (DS.getTypeSpecSign() != DeclSpec::TSS_unsigned) {
+      switch (DS.getTypeSpecWidth()) {
+        case DeclSpec::TSW_short:
+          Result = Context.ShortAccumTy;
+          break;
+        case DeclSpec::TSW_unspecified:
+          Result = Context.AccumTy;
+          break;
+        case DeclSpec::TSW_long:
+          Result = Context.LongAccumTy;
+          break;
+        case DeclSpec::TSW_longlong:
+          // Unreachable b/c this is caught in final analysis of the DeclSpec.
+          llvm_unreachable("Unable to specify long long as _Accum width");
+      }
+    } else {
+      switch (DS.getTypeSpecWidth()) {
+        case DeclSpec::TSW_short:
+          Result = Context.UnsignedShortAccumTy;
+          break;
+        case DeclSpec::TSW_unspecified:
+          Result = Context.UnsignedAccumTy;
+          break;
+        case DeclSpec::TSW_long:
+          Result = Context.UnsignedLongAccumTy;
+          break;
+        case DeclSpec::TSW_longlong:
+          llvm_unreachable("Unable to specify long long as _Accum width");
+      }
+    }
+    break;
+  }
   case DeclSpec::TST_int128:
     if (!S.Context.getTargetInfo().hasInt128Type())
       S.Diag(DS.getTypeSpecTypeLoc(), diag::err_type_unsupported)
@@ -7544,7 +7577,7 @@ bool Sema::hasVisibleDefinition(NamedDecl *D, NamedDecl **Suggested,
 
 /// Locks in the inheritance model for the given class and all of its bases.
 static void assignInheritanceModel(Sema &S, CXXRecordDecl *RD) {
-  RD = RD->getMostRecentDecl();
+  RD = RD->getMostRecentNonInjectedDecl();
   if (!RD->hasAttr<MSInheritanceAttr>()) {
     MSInheritanceAttr::Spelling IM;
 
@@ -7585,11 +7618,17 @@ bool Sema::RequireCompleteTypeImpl(SourceLocation Loc, QualType T,
   //  assert(!T->isDependentType() &&
   //         "Can't ask whether a dependent type is complete");
 
-  // We lock in the inheritance model once somebody has asked us to ensure
-  // that a pointer-to-member type is complete.
-  if (Context.getTargetInfo().getCXXABI().isMicrosoft()) {
-    if (const MemberPointerType *MPTy = T->getAs<MemberPointerType>()) {
-      if (!MPTy->getClass()->isDependentType()) {
+  if (const MemberPointerType *MPTy = T->getAs<MemberPointerType>()) {
+    if (!MPTy->getClass()->isDependentType()) {
+      if (getLangOpts().CompleteMemberPointers &&
+          !MPTy->getClass()->getAsCXXRecordDecl()->isBeingDefined() &&
+          RequireCompleteType(Loc, QualType(MPTy->getClass(), 0),
+                              diag::err_memptr_incomplete))
+        return true;
+
+      // We lock in the inheritance model once somebody has asked us to ensure
+      // that a pointer-to-member type is complete.
+      if (Context.getTargetInfo().getCXXABI().isMicrosoft()) {
         (void)isCompleteType(Loc, QualType(MPTy->getClass(), 0));
         assignInheritanceModel(*this, MPTy->getMostRecentCXXRecordDecl());
       }

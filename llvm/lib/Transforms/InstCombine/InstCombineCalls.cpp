@@ -24,7 +24,7 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
-#include "llvm/Analysis/Utils/Local.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/BasicBlock.h"
@@ -1385,6 +1385,68 @@ static APFloat fmed3AMDGCN(const APFloat &Src0, const APFloat &Src1,
     return maxnum(Src0, Src2);
 
   return maxnum(Src0, Src1);
+}
+
+/// Convert a table lookup to shufflevector if the mask is constant.
+/// This could benefit tbl1 if the mask is { 7,6,5,4,3,2,1,0 }, in
+/// which case we could lower the shufflevector with rev64 instructions
+/// as it's actually a byte reverse.
+static Value *simplifyNeonTbl1(const IntrinsicInst &II,
+                               InstCombiner::BuilderTy &Builder) {
+  // Bail out if the mask is not a constant.
+  auto *C = dyn_cast<Constant>(II.getArgOperand(1));
+  if (!C)
+    return nullptr;
+
+  auto *VecTy = cast<VectorType>(II.getType());
+  unsigned NumElts = VecTy->getNumElements();
+
+  // Only perform this transformation for <8 x i8> vector types.
+  if (!VecTy->getElementType()->isIntegerTy(8) || NumElts != 8)
+    return nullptr;
+
+  uint32_t Indexes[8];
+
+  for (unsigned I = 0; I < NumElts; ++I) {
+    Constant *COp = C->getAggregateElement(I);
+
+    if (!COp || !isa<ConstantInt>(COp))
+      return nullptr;
+
+    Indexes[I] = cast<ConstantInt>(COp)->getLimitedValue();
+
+    // Make sure the mask indices are in range.
+    if (Indexes[I] >= NumElts)
+      return nullptr;
+  }
+
+  auto *ShuffleMask = ConstantDataVector::get(II.getContext(),
+                                              makeArrayRef(Indexes));
+  auto *V1 = II.getArgOperand(0);
+  auto *V2 = Constant::getNullValue(V1->getType());
+  return Builder.CreateShuffleVector(V1, V2, ShuffleMask);
+}
+
+/// Convert a vector load intrinsic into a simple llvm load instruction.
+/// This is beneficial when the underlying object being addressed comes
+/// from a constant, since we get constant-folding for free.
+static Value *simplifyNeonVld1(const IntrinsicInst &II,
+                               unsigned MemAlign,
+                               InstCombiner::BuilderTy &Builder) {
+  auto *IntrAlign = dyn_cast<ConstantInt>(II.getArgOperand(1));
+
+  if (!IntrAlign)
+    return nullptr;
+
+  unsigned Alignment = IntrAlign->getLimitedValue() < MemAlign ?
+                       MemAlign : IntrAlign->getLimitedValue();
+
+  if (!isPowerOf2_32(Alignment))
+    return nullptr;
+
+  auto *BCastInst = Builder.CreateBitCast(II.getArgOperand(0),
+                                          PointerType::get(II.getType(), 0));
+  return Builder.CreateAlignedLoad(BCastInst, Alignment);
 }
 
 // Returns true iff the 2 intrinsics have the same operands, limiting the
@@ -2901,7 +2963,14 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     }
     break;
 
-  case Intrinsic::arm_neon_vld1:
+  case Intrinsic::arm_neon_vld1: {
+    unsigned MemAlign = getKnownAlignment(II->getArgOperand(0),
+                                          DL, II, &AC, &DT);
+    if (Value *V = simplifyNeonVld1(*II, MemAlign, Builder))
+      return replaceInstUsesWith(*II, V);
+    break;
+  }
+
   case Intrinsic::arm_neon_vld2:
   case Intrinsic::arm_neon_vld3:
   case Intrinsic::arm_neon_vld4:
@@ -2927,6 +2996,12 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     }
     break;
   }
+
+  case Intrinsic::arm_neon_vtbl1:
+  case Intrinsic::aarch64_neon_tbl1:
+    if (Value *V = simplifyNeonTbl1(*II, Builder))
+      return replaceInstUsesWith(*II, V);
+    break;
 
   case Intrinsic::arm_neon_vmulls:
   case Intrinsic::arm_neon_vmullu:
@@ -2964,6 +3039,23 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
           return CastInst::CreateIntegerCast(Arg0, II->getType(),
                                              /*isSigned=*/!Zext);
 
+    break;
+  }
+  case Intrinsic::arm_neon_aesd:
+  case Intrinsic::arm_neon_aese:
+  case Intrinsic::aarch64_crypto_aesd:
+  case Intrinsic::aarch64_crypto_aese: {
+    Value *DataArg = II->getArgOperand(0);
+    Value *KeyArg  = II->getArgOperand(1);
+
+    // Try to use the builtin XOR in AESE and AESD to eliminate a prior XOR
+    Value *Data, *Key;
+    if (match(KeyArg, m_ZeroInt()) &&
+        match(DataArg, m_Xor(m_Value(Data), m_Value(Key)))) {
+      II->setArgOperand(0, Data);
+      II->setArgOperand(1, Key);
+      return II;
+    }
     break;
   }
   case Intrinsic::amdgcn_rcp: {

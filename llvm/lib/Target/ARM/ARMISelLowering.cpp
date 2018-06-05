@@ -842,11 +842,6 @@ ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SRL_PARTS, MVT::i32, Expand);
   }
 
-  setOperationAction(ISD::ADDC,      MVT::i32, Custom);
-  setOperationAction(ISD::ADDE,      MVT::i32, Custom);
-  setOperationAction(ISD::SUBC,      MVT::i32, Custom);
-  setOperationAction(ISD::SUBE,      MVT::i32, Custom);
-
   if (!Subtarget->isThumb1Only() && Subtarget->hasV6T2Ops())
     setOperationAction(ISD::BITREVERSE, MVT::i32, Legal);
 
@@ -1064,9 +1059,7 @@ ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SELECT_CC, MVT::f16, Custom);
   }
 
-  // Thumb-1 cannot currently select ARMISD::SUBE.
-  if (!Subtarget->isThumb1Only())
-    setOperationAction(ISD::SETCCCARRY, MVT::i32, Custom);
+  setOperationAction(ISD::SETCCCARRY, MVT::i32, Custom);
 
   setOperationAction(ISD::BRCOND,    MVT::Other, Custom);
   setOperationAction(ISD::BR_CC,     MVT::i32,   Custom);
@@ -7732,27 +7725,6 @@ static SDValue LowerUDIV(SDValue Op, SelectionDAG &DAG) {
   return N0;
 }
 
-static SDValue LowerADDC_ADDE_SUBC_SUBE(SDValue Op, SelectionDAG &DAG) {
-  EVT VT = Op.getNode()->getValueType(0);
-  SDVTList VTs = DAG.getVTList(VT, MVT::i32);
-
-  unsigned Opc;
-  bool ExtraOp = false;
-  switch (Op.getOpcode()) {
-  default: llvm_unreachable("Invalid code");
-  case ISD::ADDC: Opc = ARMISD::ADDC; break;
-  case ISD::ADDE: Opc = ARMISD::ADDE; ExtraOp = true; break;
-  case ISD::SUBC: Opc = ARMISD::SUBC; break;
-  case ISD::SUBE: Opc = ARMISD::SUBE; ExtraOp = true; break;
-  }
-
-  if (!ExtraOp)
-    return DAG.getNode(Opc, SDLoc(Op), VTs, Op.getOperand(0),
-                       Op.getOperand(1));
-  return DAG.getNode(Opc, SDLoc(Op), VTs, Op.getOperand(0),
-                     Op.getOperand(1), Op.getOperand(2));
-}
-
 static SDValue LowerADDSUBCARRY(SDValue Op, SelectionDAG &DAG) {
   SDNode *N = Op.getNode();
   EVT VT = N->getValueType(0);
@@ -8148,10 +8120,6 @@ SDValue ARMTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
     if (Subtarget->isTargetWindows() && !Op.getValueType().isVector())
       return LowerDIV_Windows(Op, DAG, /* Signed */ false);
     return LowerUDIV(Op, DAG);
-  case ISD::ADDC:
-  case ISD::ADDE:
-  case ISD::SUBC:
-  case ISD::SUBE:          return LowerADDC_ADDE_SUBC_SUBE(Op, DAG);
   case ISD::ADDCARRY:
   case ISD::SUBCARRY:      return LowerADDSUBCARRY(Op, DAG);
   case ISD::SADDO:
@@ -12795,6 +12763,9 @@ SDValue ARMTargetLowering::PerformDAGCombine(SDNode *N,
   case ISD::INTRINSIC_W_CHAIN:
     switch (cast<ConstantSDNode>(N->getOperand(1))->getZExtValue()) {
     case Intrinsic::arm_neon_vld1:
+    case Intrinsic::arm_neon_vld1x2:
+    case Intrinsic::arm_neon_vld1x3:
+    case Intrinsic::arm_neon_vld1x4:
     case Intrinsic::arm_neon_vld2:
     case Intrinsic::arm_neon_vld3:
     case Intrinsic::arm_neon_vld4:
@@ -14102,6 +14073,21 @@ bool ARMTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     Info.offset = 0;
     Value *AlignArg = I.getArgOperand(I.getNumArgOperands() - 1);
     Info.align = cast<ConstantInt>(AlignArg)->getZExtValue();
+    // volatile loads with NEON intrinsics not supported
+    Info.flags = MachineMemOperand::MOLoad;
+    return true;
+  }
+  case Intrinsic::arm_neon_vld1x2:
+  case Intrinsic::arm_neon_vld1x3:
+  case Intrinsic::arm_neon_vld1x4: {
+    Info.opc = ISD::INTRINSIC_W_CHAIN;
+    // Conservatively set memVT to the entire set of vectors loaded.
+    auto &DL = I.getCalledFunction()->getParent()->getDataLayout();
+    uint64_t NumElts = DL.getTypeSizeInBits(I.getType()) / 64;
+    Info.memVT = EVT::getVectorVT(I.getType()->getContext(), MVT::i64, NumElts);
+    Info.ptrVal = I.getArgOperand(I.getNumArgOperands() - 1);
+    Info.offset = 0;
+    Info.align = 0;
     // volatile loads with NEON intrinsics not supported
     Info.flags = MachineMemOperand::MOLoad;
     return true;

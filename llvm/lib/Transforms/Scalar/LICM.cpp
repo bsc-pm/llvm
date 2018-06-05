@@ -47,7 +47,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/Analysis/Utils/Local.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
@@ -170,7 +170,8 @@ struct LegacyLICMPass : public LoopPass {
   /// loop preheaders be inserted into the CFG...
   ///
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesCFG();
+    AU.addPreserved<DominatorTreeWrapperPass>();
+    AU.addPreserved<LoopInfoWrapperPass>();
     AU.addRequired<TargetLibraryInfoWrapperPass>();
     if (EnableMSSALoopDependency)
       AU.addRequired<MemorySSAWrapperPass>();
@@ -220,7 +221,10 @@ PreservedAnalyses LICMPass::run(Loop &L, LoopAnalysisManager &AM,
     return PreservedAnalyses::all();
 
   auto PA = getLoopPassPreservedAnalyses();
-  PA.preserveSet<CFGAnalyses>();
+
+  PA.preserve<DominatorTreeAnalysis>();
+  PA.preserve<LoopAnalysis>();
+
   return PA;
 }
 

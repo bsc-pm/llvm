@@ -1078,6 +1078,12 @@ static void computeKnownBitsFromOperator(const Operator *I, KnownBits &Known,
       // leading zero bits.
       MaxHighZeros =
           std::max(Known.countMinLeadingZeros(), Known2.countMinLeadingZeros());
+    } else if (SPF == SPF_ABS) {
+      // RHS from matchSelectPattern returns the negation part of abs pattern.
+      // If the negate has an NSW flag we can assume the sign bit of the result
+      // will be 0 because that makes abs(INT_MIN) undefined.
+      if (cast<Instruction>(RHS)->hasNoSignedWrap())
+        MaxHighZeros = 1;
     }
 
     // Only known if known in both the LHS and RHS.
@@ -1937,6 +1943,10 @@ bool isKnownNonZero(const Value *V, unsigned Depth, const Query &Q) {
     }
   }
 
+  // Some of the tests below are recursive, so bail out if we hit the limit.
+  if (Depth++ >= MaxDepth)
+    return false;
+
   // Check for pointer simplifications.
   if (V->getType()->isPointerTy()) {
     // Alloca never returns null, malloc might.
@@ -1957,13 +1967,10 @@ bool isKnownNonZero(const Value *V, unsigned Depth, const Query &Q) {
       if (CS.isReturnNonNull())
         return true;
       if (const auto *RP = getArgumentAliasingToReturnedPointer(CS))
-        return isKnownNonZero(RP, Depth + 1, Q);
+        return isKnownNonZero(RP, Depth, Q);
     }
   }
 
-  // The remaining tests are all recursive, so bail out if we hit the limit.
-  if (Depth++ >= MaxDepth)
-    return false;
 
   // Check for recursive pointer simplifications.
   if (V->getType()->isPointerTy()) {
@@ -4597,23 +4604,35 @@ static SelectPatternResult matchSelectPattern(CmpInst::Predicate Pred,
 
   const APInt *C1;
   if (match(CmpRHS, m_APInt(C1))) {
-    if ((CmpLHS == TrueVal && match(FalseVal, m_Neg(m_Specific(CmpLHS)))) ||
-        (CmpLHS == FalseVal && match(TrueVal, m_Neg(m_Specific(CmpLHS))))) {
-      // Set RHS to the negate operand. LHS was assigned to CmpLHS earlier.
-      RHS = (CmpLHS == TrueVal) ? FalseVal : TrueVal;
+    // Sign-extending LHS does not change its sign, so TrueVal/FalseVal can
+    // match against either LHS or sext(LHS).
+    auto MaybeSExtLHS = m_CombineOr(m_Specific(CmpLHS),
+                                    m_SExt(m_Specific(CmpLHS)));
+    if ((match(TrueVal, MaybeSExtLHS) &&
+         match(FalseVal, m_Neg(m_Specific(TrueVal)))) ||
+        (match(FalseVal, MaybeSExtLHS) &&
+         match(TrueVal, m_Neg(m_Specific(FalseVal))))) {
+      // Set LHS and RHS so that RHS is the negated operand of the select
+      if (match(TrueVal, MaybeSExtLHS)) {
+        LHS = TrueVal;
+        RHS = FalseVal;
+      } else {
+        LHS = FalseVal;
+        RHS = TrueVal;
+      }
 
       // ABS(X) ==> (X >s 0) ? X : -X and (X >s -1) ? X : -X
       // NABS(X) ==> (X >s 0) ? -X : X and (X >s -1) ? -X : X
       if (Pred == ICmpInst::ICMP_SGT &&
           (C1->isNullValue() || C1->isAllOnesValue())) {
-        return {(CmpLHS == TrueVal) ? SPF_ABS : SPF_NABS, SPNB_NA, false};
+        return {(LHS == TrueVal) ? SPF_ABS : SPF_NABS, SPNB_NA, false};
       }
 
       // ABS(X) ==> (X <s 0) ? -X : X and (X <s 1) ? -X : X
       // NABS(X) ==> (X <s 0) ? X : -X and (X <s 1) ? X : -X
       if (Pred == ICmpInst::ICMP_SLT &&
           (C1->isNullValue() || C1->isOneValue())) {
-        return {(CmpLHS == FalseVal) ? SPF_ABS : SPF_NABS, SPNB_NA, false};
+        return {(LHS == FalseVal) ? SPF_ABS : SPF_NABS, SPNB_NA, false};
       }
     }
   }

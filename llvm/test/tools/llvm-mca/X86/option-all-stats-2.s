@@ -7,22 +7,23 @@
 
 add %eax, %eax
 
-# ALL:      Iterations:     100
-# ALL-NEXT: Instructions:   100
-# ALL-NEXT: Total Cycles:   103
-# ALL-NEXT: Dispatch Width: 2
-# ALL-NEXT: IPC:            0.97
+# ALL:       Iterations:        100
+# ALL-NEXT:  Instructions:      100
+# ALL-NEXT:  Total Cycles:      103
+# ALL-NEXT:  Dispatch Width:    2
+# ALL-NEXT:  IPC:               0.97
+# ALL-NEXT:  Block RThroughput: 0.5
 
-# ALL:      Instruction Info:
-# ALL-NEXT: [1]: #uOps
-# ALL-NEXT: [2]: Latency
-# ALL-NEXT: [3]: RThroughput
-# ALL-NEXT: [4]: MayLoad
-# ALL-NEXT: [5]: MayStore
-# ALL-NEXT: [6]: HasSideEffects
+# ALL:       Instruction Info:
+# ALL-NEXT:  [1]: #uOps
+# ALL-NEXT:  [2]: Latency
+# ALL-NEXT:  [3]: RThroughput
+# ALL-NEXT:  [4]: MayLoad
+# ALL-NEXT:  [5]: MayStore
+# ALL-NEXT:  [6]: HasSideEffects
 
-# ALL:      [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
-# ALL-NEXT:  1      1     0.50                        addl	%eax, %eax
+# ALL:       [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
+# ALL-NEXT:   1      1     0.50                        addl	%eax, %eax
 
 # FULL:      Dynamic Dispatch Stall Cycles:
 # FULL-NEXT: RAT     - Register unavailable:                      0
@@ -90,4 +91,3 @@ add %eax, %eax
 # FULL:      Resource pressure by instruction:
 # FULL-NEXT: [0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12]   [13]   Instructions:
 # FULL-NEXT: 0.50   0.50    -      -      -      -      -      -      -      -      -      -      -      -     addl	%eax, %eax
-

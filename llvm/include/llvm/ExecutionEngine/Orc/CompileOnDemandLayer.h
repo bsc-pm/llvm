@@ -349,22 +349,21 @@ private:
         // Create a callback, associate it with the stub for the function,
         // and set the compile action to compile the partition containing the
         // function.
-        if (auto CCInfoOrErr = CompileCallbackMgr.getCompileCallback()) {
-          auto &CCInfo = *CCInfoOrErr;
+        auto CompileAction = [this, &LD, LMId, &F]() -> JITTargetAddress {
+          if (auto FnImplAddrOrErr = this->extractAndCompile(LD, LMId, F))
+            return *FnImplAddrOrErr;
+          else {
+            // FIXME: Report error, return to 'abort' or something similar.
+            consumeError(FnImplAddrOrErr.takeError());
+            return 0;
+          }
+        };
+        if (auto CCAddr =
+                CompileCallbackMgr.getCompileCallback(std::move(CompileAction)))
           StubInits[MangledName] =
-            std::make_pair(CCInfo.getAddress(),
-                           JITSymbolFlags::fromGlobalValue(F));
-          CCInfo.setCompileAction([this, &LD, LMId, &F]() -> JITTargetAddress {
-              if (auto FnImplAddrOrErr = this->extractAndCompile(LD, LMId, F))
-                return *FnImplAddrOrErr;
-              else {
-                // FIXME: Report error, return to 'abort' or something similar.
-                consumeError(FnImplAddrOrErr.takeError());
-                return 0;
-              }
-            });
-        } else
-          return CCInfoOrErr.takeError();
+              std::make_pair(*CCAddr, JITSymbolFlags::fromGlobalValue(F));
+        else
+          return CCAddr.takeError();
       }
 
       if (auto Err = LD.StubsMgr->createStubs(StubInits))
@@ -402,9 +401,8 @@ private:
 
     // Initializers may refer to functions declared (but not defined) in this
     // module. Build a materializer to clone decls on demand.
-    Error MaterializerErrors = Error::success();
     auto Materializer = createLambdaMaterializer(
-      [&LD, &GVsM, &MaterializerErrors](Value *V) -> Value* {
+      [&LD, &GVsM](Value *V) -> Value* {
         if (auto *F = dyn_cast<Function>(V)) {
           // Decls in the original module just get cloned.
           if (F->isDeclaration())
@@ -416,18 +414,8 @@ private:
           const DataLayout &DL = GVsM->getDataLayout();
           std::string FName = mangle(F->getName(), DL);
           unsigned PtrBitWidth = DL.getPointerTypeSizeInBits(F->getType());
-          JITTargetAddress StubAddr = 0;
-
-          // Get the address for the stub. If we encounter an error while
-          // doing so, stash it in the MaterializerErrors variable and use a
-          // null address as a placeholder.
-          if (auto StubSym = LD.StubsMgr->findStub(FName, false)) {
-            if (auto StubAddrOrErr = StubSym.getAddress())
-              StubAddr = *StubAddrOrErr;
-            else
-              MaterializerErrors = joinErrors(std::move(MaterializerErrors),
-                                              StubAddrOrErr.takeError());
-          }
+          JITTargetAddress StubAddr =
+            LD.StubsMgr->findStub(FName, false).getAddress();
 
           ConstantInt *StubAddrCI =
             ConstantInt::get(GVsM->getContext(), APInt(PtrBitWidth, StubAddr));
@@ -456,15 +444,10 @@ private:
       NewA->setAliasee(cast<Constant>(Init));
     }
 
-    if (MaterializerErrors)
-      return MaterializerErrors;
-
     // Build a resolver for the globals module and add it to the base layer.
     auto LegacyLookup = [this, &LD](const std::string &Name) -> JITSymbol {
       if (auto Sym = LD.StubsMgr->findStub(Name, false))
         return Sym;
-      else if (auto Err = Sym.takeError())
-        return std::move(Err);
 
       if (auto Sym = LD.findSymbol(BaseLayer, Name, false))
         return Sym;

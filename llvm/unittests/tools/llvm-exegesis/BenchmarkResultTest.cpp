@@ -28,7 +28,7 @@ TEST(BenchmarkResultTest, WriteToAndReadFromDisk) {
   InstructionBenchmark ToDisk;
 
   ToDisk.Key.OpcodeName = "name";
-  ToDisk.Key.Mode = "mode";
+  ToDisk.Key.Mode = InstructionBenchmarkKey::Latency;
   ToDisk.Key.Config = "config";
   ToDisk.CpuName = "cpu_name";
   ToDisk.LLVMTriple = "llvm_triple";
@@ -77,5 +77,15 @@ TEST(BenchmarkResultTest, WriteToAndReadFromDisk) {
   }
 }
 
+TEST(BenchmarkResultTest, BenchmarkMeasureStats) {
+  BenchmarkMeasureStats Stats;
+  Stats.push(BenchmarkMeasure{"a", 0.5, "debug a"});
+  Stats.push(BenchmarkMeasure{"a", 1.5, "debug a"});
+  Stats.push(BenchmarkMeasure{"a", -1.0, "debug a"});
+  Stats.push(BenchmarkMeasure{"a", 0.0, "debug a"});
+  EXPECT_EQ(Stats.min(), -1.0);
+  EXPECT_EQ(Stats.max(), 1.5);
+  EXPECT_EQ(Stats.avg(), 0.25); // (0.5+1.5-1.0+0.0) / 4
+}
 } // namespace
 } // namespace exegesis

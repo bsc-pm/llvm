@@ -17,6 +17,8 @@
 #include "SyncAPI.h"
 #include "TestFS.h"
 #include "index/MemIndex.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -157,7 +159,7 @@ Symbol func(StringRef Name) { // Assumes the function has no args.
   return sym(Name, index::SymbolKind::Function, "@F@\\0#"); // no args
 }
 Symbol cls(StringRef Name) {
-  return sym(Name, index::SymbolKind::Class, "@S@\\0@S@\\0");
+  return sym(Name, index::SymbolKind::Class, "@S@\\0");
 }
 Symbol var(StringRef Name) {
   return sym(Name, index::SymbolKind::Variable, "@\\0");
@@ -423,10 +425,9 @@ TEST(CompletionTest, NoDuplicates) {
   auto Results = completions(
       R"cpp(
           class Adapter {
-            void method();
           };
 
-          void Adapter::method() {
+          void f() {
             Adapter^
           }
       )cpp",
@@ -555,6 +556,37 @@ TEST(CompletionTest, IncludeInsertionPreprocessorIntegrationTests) {
                         {Sym});
   EXPECT_THAT(Results.items,
               ElementsAre(AllOf(Named("X"), Not(HasAdditionalEdits()))));
+}
+
+TEST(CompletionTest, NoIncludeInsertionWhenDeclFoundInFile) {
+  MockFSProvider FS;
+  MockCompilationDatabase CDB;
+
+  IgnoreDiagnostics DiagConsumer;
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
+  Symbol::Details Scratch;
+  Symbol SymX = cls("ns::X");
+  Symbol SymY = cls("ns::Y");
+  std::string BarHeader = testPath("bar.h");
+  auto BarURI = URI::createFile(BarHeader).toString();
+  SymX.CanonicalDeclaration.FileURI = BarURI;
+  SymY.CanonicalDeclaration.FileURI = BarURI;
+  Scratch.IncludeHeader = "<bar>";
+  SymX.Detail = &Scratch;
+  SymY.Detail = &Scratch;
+  // Shoten include path based on search dirctory and insert.
+  auto Results = completions(Server,
+                             R"cpp(
+          namespace ns {
+            class X;
+            class Y {}
+          }
+          int main() { ns::^ }
+      )cpp",
+                             {SymX, SymY});
+  EXPECT_THAT(Results.items,
+              ElementsAre(AllOf(Named("X"), Not(HasAdditionalEdits())),
+                          AllOf(Named("Y"), Not(HasAdditionalEdits()))));
 }
 
 TEST(CompletionTest, IndexSuppressesPreambleCompletions) {
@@ -691,6 +723,42 @@ TEST(CompletionTest, BacktrackCrashes) {
       if (FooBarBaz * x^) {}
     }
 )cpp");
+}
+
+TEST(CompletionTest, CompleteInMacroWithStringification) {
+  auto Results = completions(R"cpp(
+void f(const char *, int x);
+#define F(x) f(#x, x)
+
+namespace ns {
+int X;
+int Y;
+}  // namespace ns
+
+int f(int input_num) {
+  F(ns::^)
+}
+)cpp");
+
+  EXPECT_THAT(Results.items,
+              UnorderedElementsAre(Named("X"), Named("Y")));
+}
+
+TEST(CompletionTest, CompleteInMacroAndNamespaceWithStringification) {
+  auto Results = completions(R"cpp(
+void f(const char *, int x);
+#define F(x) f(#x, x)
+
+namespace ns {
+int X;
+
+int f(int input_num) {
+  F(^)
+}
+}  // namespace ns
+)cpp");
+
+  EXPECT_THAT(Results.items, Contains(Named("X")));
 }
 
 TEST(CompletionTest, CompleteInExcludedPPBranch) {
@@ -961,6 +1029,65 @@ TEST(CompletionTest, NoIndexCompletionsInsideDependentCode) {
                 Not(Contains(Labeled("SomeNameInTheIndex"))));
   }
 }
+
+TEST(CompletionTest, DocumentationFromChangedFileCrash) {
+  MockFSProvider FS;
+  auto FooH = testPath("foo.h");
+  auto FooCpp = testPath("foo.cpp");
+  FS.Files[FooH] = R"cpp(
+    // this is my documentation comment.
+    int func();
+  )cpp";
+  FS.Files[FooCpp] = "";
+
+  MockCompilationDatabase CDB;
+  IgnoreDiagnostics DiagConsumer;
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
+
+  Annotations Source(R"cpp(
+    #include "foo.h"
+    int func() {
+      // This makes sure we have func from header in the AST.
+    }
+    int a = fun^
+  )cpp");
+  Server.addDocument(FooCpp, Source.code(), WantDiagnostics::Yes);
+  // We need to wait for preamble to build.
+  ASSERT_TRUE(Server.blockUntilIdleForTest());
+
+  // Change the header file. Completion will reuse the old preamble!
+  FS.Files[FooH] = R"cpp(
+    int func();
+  )cpp";
+
+  clangd::CodeCompleteOptions Opts;
+  Opts.IncludeComments = true;
+  CompletionList Completions =
+      cantFail(runCodeComplete(Server, FooCpp, Source.point(), Opts));
+  // We shouldn't crash. Unfortunately, current workaround is to not produce
+  // comments for symbols from headers.
+  EXPECT_THAT(Completions.items,
+              Contains(AllOf(Not(IsDocumented()), Named("func"))));
+}
+
+TEST(CompletionTest, CompleteOnInvalidLine) {
+  auto FooCpp = testPath("foo.cpp");
+
+  MockCompilationDatabase CDB;
+  IgnoreDiagnostics DiagConsumer;
+  MockFSProvider FS;
+  FS.Files[FooCpp] = "// empty file";
+
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
+  // Run completion outside the file range.
+  Position Pos;
+  Pos.line = 100;
+  Pos.character = 0;
+  EXPECT_THAT_EXPECTED(
+      runCodeComplete(Server, FooCpp, Pos, clangd::CodeCompleteOptions()),
+      Failed());
+}
+
 
 } // namespace
 } // namespace clangd

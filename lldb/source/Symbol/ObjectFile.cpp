@@ -8,7 +8,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/Symbol/ObjectFile.h"
-#include "Plugins/ObjectContainer/BSD-Archive/ObjectContainerBSDArchive.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ModuleSpec.h"
 #include "lldb/Core/PluginManager.h"
@@ -354,6 +353,7 @@ AddressClass ObjectFile::GetAddressClass(addr_t file_addr) {
           case eSectionTypeDWARFDebugLoc:
           case eSectionTypeDWARFDebugMacInfo:
           case eSectionTypeDWARFDebugMacro:
+          case eSectionTypeDWARFDebugNames:
           case eSectionTypeDWARFDebugPubNames:
           case eSectionTypeDWARFDebugPubTypes:
           case eSectionTypeDWARFDebugRanges:

@@ -141,6 +141,9 @@ def WriteZero : SchedWrite;
 defm WriteJump : X86SchedWritePair;
 
 // Floating point. This covers both scalar and vector operations.
+def  WriteFLD0          : SchedWrite;
+def  WriteFLD1          : SchedWrite;
+def  WriteFLDC          : SchedWrite;
 def  WriteFLoad         : SchedWrite;
 def  WriteFLoadX        : SchedWrite;
 def  WriteFLoadY        : SchedWrite;
@@ -554,6 +557,11 @@ def SchedWriteFLogicSizes
  : X86SchedWriteSizes<SchedWriteFLogic, SchedWriteFLogic>;
 def SchedWriteFShuffleSizes
  : X86SchedWriteSizes<SchedWriteFShuffle, SchedWriteFShuffle>;
+
+//===----------------------------------------------------------------------===//
+//  Common MCInstPredicate definitions used by variant scheduling classes.
+
+def ZeroIdiomPredicate : CheckSameRegOperand<1, 2>;
 
 //===----------------------------------------------------------------------===//
 // Generic Processor Scheduler Models.

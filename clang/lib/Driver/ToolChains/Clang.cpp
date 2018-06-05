@@ -3756,6 +3756,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_pedantic_errors);
   Args.AddLastArg(CmdArgs, options::OPT_w);
 
+  // Fixed point flags
+  if (Args.hasFlag(options::OPT_ffixed_point, options::OPT_fno_fixed_point,
+                   /*Default=*/false))
+    Args.AddLastArg(CmdArgs, options::OPT_ffixed_point);
+
   // Handle -{std, ansi, trigraphs} -- take the last of -{std, ansi}
   // (-ansi is equivalent to -std=c89 or -std=c++98).
   //
@@ -4783,6 +4788,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (A->getOption().matches(options::OPT_fforce_enable_int128))
       CmdArgs.push_back("-fforce-enable-int128");
   }
+
+  if (Args.hasFlag(options::OPT_fcomplete_member_pointers,
+                   options::OPT_fno_complete_member_pointers, false))
+    CmdArgs.push_back("-fcomplete-member-pointers");
 
   // Finally add the compile command to the compilation.
   if (Args.hasArg(options::OPT__SLASH_fallback) &&

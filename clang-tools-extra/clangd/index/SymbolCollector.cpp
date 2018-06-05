@@ -200,23 +200,31 @@ bool shouldCollectIncludePath(index::SymbolKind Kind) {
 /// Gets a canonical include (URI of the header or <header>  or "header") for
 /// header of \p Loc.
 /// Returns None if fails to get include header for \p Loc.
-/// FIXME: we should handle .inc files whose symbols are expected be exported by
-/// their containing headers.
 llvm::Optional<std::string>
 getIncludeHeader(llvm::StringRef QName, const SourceManager &SM,
                  SourceLocation Loc, const SymbolCollector::Options &Opts) {
-  llvm::StringRef FilePath = SM.getFilename(Loc);
-  if (FilePath.empty())
-    return llvm::None;
-  if (Opts.Includes) {
-    llvm::StringRef Mapped = Opts.Includes->mapHeader(FilePath, QName);
-    if (Mapped != FilePath)
-      return (Mapped.startswith("<") || Mapped.startswith("\""))
-                 ? Mapped.str()
-                 : ("\"" + Mapped + "\"").str();
+  std::vector<std::string> Headers;
+  // Collect the #include stack.
+  while (true) {
+    if (!Loc.isValid())
+      break;
+    auto FilePath = SM.getFilename(Loc);
+    if (FilePath.empty())
+      break;
+    Headers.push_back(FilePath);
+    if (SM.isInMainFile(Loc))
+      break;
+    Loc = SM.getIncludeLoc(SM.getFileID(Loc));
   }
-
-  return toURI(SM, SM.getFilename(Loc), Opts);
+  if (Headers.empty())
+    return llvm::None;
+  llvm::StringRef Header = Headers[0];
+  if (Opts.Includes) {
+    Header = Opts.Includes->mapHeader(Headers, QName);
+    if (Header.startswith("<") || Header.startswith("\""))
+      return Header.str();
+  }
+  return toURI(SM, Header, Opts);
 }
 
 // Return the symbol location of the given declaration `D`.
@@ -282,6 +290,19 @@ bool SymbolCollector::handleDeclOccurence(
     index::IndexDataConsumer::ASTNodeInfo ASTNode) {
   assert(ASTCtx && PP.get() && "ASTContext and Preprocessor must be set.");
   assert(CompletionAllocator && CompletionTUInfo);
+  assert(ASTNode.OrigD);
+  // If OrigD is an declaration associated with a friend declaration and it's
+  // not a definition, skip it. Note that OrigD is the occurrence that the
+  // collector is currently visiting.
+  if ((ASTNode.OrigD->getFriendObjectKind() !=
+       Decl::FriendObjectKind::FOK_None) &&
+      !(Roles & static_cast<unsigned>(index::SymbolRole::Definition)))
+    return true;
+  // A declaration created for a friend declaration should not be used as the
+  // canonical declaration in the index. Use OrigD instead, unless we've already
+  // picked a replacement for D
+  if (D->getFriendObjectKind() != Decl::FriendObjectKind::FOK_None)
+    D = CanonicalDecls.try_emplace(D, ASTNode.OrigD).first->second;
   const NamedDecl *ND = llvm::dyn_cast<NamedDecl>(D);
   if (!ND)
     return true;
@@ -381,7 +402,8 @@ const Symbol *SymbolCollector::addDeclaration(const NamedDecl &ND,
                         /*EnableSnippets=*/false);
   std::string FilterText = getFilterText(*CCS);
   std::string Documentation =
-      formatDocumentation(*CCS, getDocComment(Ctx, SymbolCompletion));
+      formatDocumentation(*CCS, getDocComment(Ctx, SymbolCompletion,
+                                              /*CommentsFromHeaders=*/true));
   std::string CompletionDetail = getDetail(*CCS);
 
   std::string Include;

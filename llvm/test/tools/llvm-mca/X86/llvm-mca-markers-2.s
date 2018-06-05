@@ -7,11 +7,12 @@
 
 # CHECK:      [0] Code Region - Default
 
-# CHECK:      Iterations:     1
-# CHECK-NEXT: Instructions:   1
-# CHECK-NEXT: Total Cycles:   4
-# CHECK-NEXT: Dispatch Width: 2
-# CHECK-NEXT: IPC:            0.25
+# CHECK:      Iterations:        1
+# CHECK-NEXT: Instructions:      1
+# CHECK-NEXT: Total Cycles:      4
+# CHECK-NEXT: Dispatch Width:    2
+# CHECK-NEXT: IPC:               0.25
+# CHECK-NEXT: Block RThroughput: 0.5
 
 # CHECK:      Instruction Info:
 # CHECK-NEXT: [1]: #uOps
@@ -23,4 +24,3 @@
 
 # CHECK:      [1]    [2]    [3]    [4]    [5]    [6]    Instructions:
 # CHECK-NEXT:  1      1     0.50                        addl	%edi, %esi
-

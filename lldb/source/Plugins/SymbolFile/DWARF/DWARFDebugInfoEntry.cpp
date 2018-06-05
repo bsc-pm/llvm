@@ -638,7 +638,7 @@ void DWARFDebugInfoEntry::Dump(SymbolFileDWARF *dwarf2Data,
 
 void DWARFDebugInfoEntry::DumpLocation(SymbolFileDWARF *dwarf2Data,
                                        DWARFUnit *cu, Stream &s) const {
-  const DWARFDIE cu_die = cu->GetUnitDIEOnly();
+  const DWARFBaseDIE cu_die = cu->GetUnitDIEOnly();
   const char *cu_name = NULL;
   if (cu_die)
     cu_name = cu_die.GetName();
@@ -912,7 +912,7 @@ dw_offset_t DWARFDebugInfoEntry::GetAttributeValue(
   if (!dwo_cu)
     return 0;
 
-  DWARFDIE dwo_cu_die = dwo_cu->GetUnitDIEOnly();
+  DWARFBaseDIE dwo_cu_die = dwo_cu->GetUnitDIEOnly();
   if (!dwo_cu_die.IsValid())
     return 0;
 
@@ -1824,4 +1824,16 @@ void DWARFDebugInfoEntry::DumpDIECollection(
                 DW_TAG_value_to_name(die_ref.Tag()),
                 die_ref.HasChildren() ? " *" : "");
   }
+}
+
+bool DWARFDebugInfoEntry::operator==(const DWARFDebugInfoEntry &rhs) const {
+  return m_offset == rhs.m_offset && m_parent_idx == rhs.m_parent_idx &&
+         m_sibling_idx == rhs.m_sibling_idx &&
+         m_empty_children == rhs.m_empty_children &&
+         m_abbr_idx == rhs.m_abbr_idx && m_has_children == rhs.m_has_children &&
+         m_tag == rhs.m_tag;
+}
+
+bool DWARFDebugInfoEntry::operator!=(const DWARFDebugInfoEntry &rhs) const {
+  return !(*this == rhs);
 }
