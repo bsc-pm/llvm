@@ -176,6 +176,7 @@ def ixlenimm : Operand<XLenVT>;
 // Standalone (codegen-only) immleaf patterns.
 def simm32     : ImmLeaf<XLenVT, [{return isInt<32>(Imm);}]>;
 def simm32hi20 : ImmLeaf<XLenVT, [{return isShiftedInt<20, 12>(Imm);}]>;
+def simm64     : ImmLeaf<XLenVT, [{return isInt<64>(Imm);}]>;
 
 // Addressing modes.
 // Necessary because a frameindex can't be matched directly in a pattern.
@@ -193,6 +194,23 @@ def LO12Sext : SDNodeXForm<imm, [{
 // or ld/st being negative.
 def HI20 : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant(((N->getZExtValue()+0x800) >> 12) & 0xfffff,
+                                   SDLoc(N), N->getValueType(0));
+}]>;
+
+// Extract least significant 12 bits from the upper half of an immediate value
+// and sign extend them.
+def HLO12Sext : SDNodeXForm<imm, [{
+  uint64_t Val = N->getZExtValue() >> 32;
+  return CurDAG->getTargetConstant(SignExtend64<12>(Val),
+                                   SDLoc(N), N->getValueType(0));
+}]>;
+
+// Extract the most significant 20 bits from the upper half of an immediate
+// value. Add 1 if bit 32+11 is 1, to compensate for the low 12 bits in the
+// matching immediate addi or ld/st being negative.
+def HHI20 : SDNodeXForm<imm, [{
+  uint64_t Val = N->getZExtValue() >> 32;
+  return CurDAG->getTargetConstant(((Val+0x800) >> 12) & 0xfffff,
                                    SDLoc(N), N->getValueType(0));
 }]>;
 
@@ -526,7 +544,7 @@ def : InstAlias<"sfence.vma $rs", (SFENCE_VMA GPR:$rs, X0)>;
 
 /// Generic pattern classes
 
-class PatGprGpr<SDPatternOperator OpNode, RVInstR Inst>
+class PatGprGpr<SDPatternOperator OpNode, RVInst Inst>
     : Pat<(OpNode GPR:$rs1, GPR:$rs2), (Inst GPR:$rs1, GPR:$rs2)>;
 class PatGprSimm12<SDPatternOperator OpNode, RVInstI Inst>
     : Pat<(OpNode GPR:$rs1, simm12:$imm12), (Inst GPR:$rs1, simm12:$imm12)>;
@@ -543,8 +561,10 @@ def IsOrAdd: PatFrag<(ops node:$A, node:$B), (or node:$A, node:$B), [{
 /// Immediates
 
 def : Pat<(simm12:$imm), (ADDI X0, simm12:$imm)>;
-def : Pat<(simm32hi20:$imm), (LUI (HI20 imm:$imm))>;
-def : Pat<(simm32:$imm), (ADDI (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;
+def : Pat<(simm32hi20:$imm), (LUI (HI20 imm:$imm))>,
+      Requires<[IsRV32]>;
+def : Pat<(simm32:$imm), (ADDI (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>,
+      Requires<[IsRV32]>;
 
 /// Simple arithmetic operations
 
@@ -699,7 +719,7 @@ defm : LdPat<sextloadi8, LB>;
 defm : LdPat<extloadi8, LB>;
 defm : LdPat<sextloadi16, LH>;
 defm : LdPat<extloadi16, LH>;
-defm : LdPat<load, LW>;
+defm : LdPat<load, LW>, Requires<[IsRV32]>;
 defm : LdPat<zextloadi8, LBU>;
 defm : LdPat<zextloadi16, LHU>;
 
@@ -718,7 +738,27 @@ multiclass StPat<PatFrag StoreOp, RVInst Inst, RegisterClass StTy> {
 
 defm : StPat<truncstorei8, SB, GPR>;
 defm : StPat<truncstorei16, SH, GPR>;
-defm : StPat<store, SW, GPR>;
+defm : StPat<store, SW, GPR>, Requires<[IsRV32]>;
+
+/// Atomics
+
+// fence acquire -> fence r, rw
+def : Pat<(atomic_fence (i32 4), (imm)), (FENCE 2, 3)>;
+// fence release -> fence rw, r
+def : Pat<(atomic_fence (i32 5), (imm)), (FENCE 3, 1)>;
+// fence acq_rel -> fence rw, rw (but ideally would be fence.tso)
+// TODO: convert to fence.tso (when defined) for fence r, rw + fence rw, r
+def : Pat<(atomic_fence (i32 6), (imm)), (FENCE 3, 3)>;
+// fence seq_cst -> fence rw, rw
+def : Pat<(atomic_fence (i32 7), (imm)), (FENCE 3, 3)>;
+
+defm : LdPat<atomic_load_8, LB>;
+defm : LdPat<atomic_load_16, LH>;
+defm : LdPat<atomic_load_32, LW>;
+
+defm : StPat<atomic_store_8, SB, GPR>;
+defm : StPat<atomic_store_16, SH, GPR>;
+defm : StPat<atomic_store_32, SW, GPR>;
 
 /// Other pseudo-instructions
 
@@ -729,6 +769,47 @@ def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
 def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               [(CallSeqEnd timm:$amt1, timm:$amt2)]>;
 } // Defs = [X2], Uses = [X2]
+
+/// RV64 patterns
+
+let Predicates = [IsRV64] in {
+def : Pat<(simm32:$imm), (ADDIW (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;
+// TODO: add better patterns for loading 64-bit immediates
+def : Pat<(simm64:$imm), (OR (SLLI (ADDIW (LUI (HHI20 imm:$imm)),
+                                           (HLO12Sext imm:$imm)),
+                                   (i64 32)),
+                             (SRLI (SLLI (ADDIW (LUI (HI20 imm:$imm)),
+                                          (LO12Sext imm:$imm)),
+                                    32),
+                              32))>;
+
+def : Pat<(sext_inreg (add GPR:$rs1, simm12:$imm12), i32),
+          (ADDIW GPR:$rs1, simm12:$imm12)>;
+// sext.w
+def : Pat<(sext_inreg GPR:$rs1, i32), (ADDIW GPR:$rs1, 0)>;
+
+def : Pat<(sext_inreg (shl GPR:$rs1, uimm5:$shamt), i32),
+          (SLLIW GPR:$rs1, uimm5:$shamt)>;
+// TODO: Patterns for SRLIW, SRAIW
+def : Pat<(sext_inreg (add GPR:$rs1, GPR:$rs2), i32),
+          (ADDW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (sub GPR:$rs1, GPR:$rs2), i32),
+          (SUBW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (shl GPR:$rs1, GPR:$rs2), i32),
+          (SLLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(srl (and GPR:$rs1, 0xffffffff), GPR:$rs2),
+          (SRLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sra (sext_inreg GPR:$rs1, i32), GPR:$rs2),
+          (SRAW GPR:$rs1, GPR:$rs2)>;
+
+defm : LdPat<sextloadi32, LW>;
+defm : LdPat<extloadi32, LW>;
+defm : LdPat<zextloadi32, LWU>;
+defm : LdPat<load, LD>;
+
+defm : StPat<truncstorei32, SW, GPR>;
+defm : StPat<store, SD, GPR>;
+} // Predicates = [IsRV64]
 
 //===----------------------------------------------------------------------===//
 // Standard extensions
