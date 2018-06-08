@@ -19,6 +19,7 @@ set(XRAY_BASIC_MODE_SOURCES
     xray_basic_logging.cc)
 
 set(XRAY_PROFILER_MODE_SOURCES
+    xray_profile_collector.cc
     xray_profiler_flags.cc)
 
 # Implementation files for all XRay architectures.
@@ -64,6 +65,10 @@ include_directories(../../include)
 
 set(XRAY_CFLAGS ${SANITIZER_COMMON_CFLAGS})
 set(XRAY_COMMON_DEFINITIONS XRAY_HAS_EXCEPTIONS=1)
+
+# We don't need RTTI in XRay, so turn that off.
+append_rtti_flag(OFF XRAY_CFLAGS)
+
 append_list_if(
   COMPILER_RT_HAS_XRAY_COMPILER_FLAG XRAY_SUPPORTED=1 XRAY_COMMON_DEFINITIONS)
 append_list_if(

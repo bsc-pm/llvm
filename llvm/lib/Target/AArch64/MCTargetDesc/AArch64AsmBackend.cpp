@@ -73,9 +73,11 @@ public:
 
   void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                   const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved) const override;
+                  uint64_t Value, bool IsResolved,
+                  const MCSubtargetInfo *STI) const override;
 
-  bool mayNeedRelaxation(const MCInst &Inst) const override;
+  bool mayNeedRelaxation(const MCInst &Inst,
+                         const MCSubtargetInfo &STI) const override;
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
                             const MCRelaxableFragment *DF,
                             const MCAsmLayout &Layout) const override;
@@ -285,7 +287,8 @@ unsigned AArch64AsmBackend::getFixupKindContainereSizeInBytes(unsigned Kind) con
 void AArch64AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
                                    const MCValue &Target,
                                    MutableArrayRef<char> Data, uint64_t Value,
-                                   bool IsResolved) const {
+                                   bool IsResolved,
+                                   const MCSubtargetInfo *STI) const {
   unsigned NumBytes = getFixupKindNumBytes(Fixup.getKind());
   if (!Value)
     return; // Doesn't change encoding.
@@ -321,7 +324,8 @@ void AArch64AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
   }
 }
 
-bool AArch64AsmBackend::mayNeedRelaxation(const MCInst &Inst) const {
+bool AArch64AsmBackend::mayNeedRelaxation(const MCInst &Inst,
+                                          const MCSubtargetInfo &STI) const {
   return false;
 }
 
@@ -455,9 +459,17 @@ public:
         return CU::UNWIND_ARM64_MODE_DWARF;
       case MCCFIInstruction::OpDefCfa: {
         // Defines a frame pointer.
-        assert(getXRegFromWReg(MRI.getLLVMRegNum(Inst.getRegister(), true)) ==
-                   AArch64::FP &&
-               "Invalid frame pointer!");
+        unsigned XReg =
+            getXRegFromWReg(MRI.getLLVMRegNum(Inst.getRegister(), true));
+
+        // Other CFA registers than FP are not supported by compact unwind.
+        // Fallback on DWARF.
+        // FIXME: When opt-remarks are supported in MC, add a remark to notify
+        // the user.
+        if (XReg != AArch64::FP)
+          return CU::UNWIND_ARM64_MODE_DWARF;
+
+        assert(XReg == AArch64::FP && "Invalid frame pointer!");
         assert(i + 2 < e && "Insufficient CFI instructions to define a frame!");
 
         const MCCFIInstruction &LRPush = Instrs[++i];

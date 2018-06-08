@@ -411,13 +411,15 @@ Module *SymbolFileDWARFDebugMap::GetModuleByOSOIndex(uint32_t oso_idx) {
 Module *SymbolFileDWARFDebugMap::GetModuleByCompUnitInfo(
     CompileUnitInfo *comp_unit_info) {
   if (!comp_unit_info->oso_sp) {
-    auto pos = m_oso_map.find(comp_unit_info->oso_path);
+    auto pos = m_oso_map.find(
+        {comp_unit_info->oso_path, comp_unit_info->oso_mod_time});
     if (pos != m_oso_map.end()) {
       comp_unit_info->oso_sp = pos->second;
     } else {
       ObjectFile *obj_file = GetObjectFile();
       comp_unit_info->oso_sp.reset(new OSOInfo());
-      m_oso_map[comp_unit_info->oso_path] = comp_unit_info->oso_sp;
+      m_oso_map[{comp_unit_info->oso_path, comp_unit_info->oso_mod_time}] =
+          comp_unit_info->oso_sp;
       const char *oso_path = comp_unit_info->oso_path.GetCString();
       FileSpec oso_file(oso_path, false);
       ConstString oso_object;
@@ -801,8 +803,8 @@ uint32_t SymbolFileDWARFDebugMap::PrivateFindGlobalVariables(
     if (comp_unit_info) {
       SymbolFileDWARF *oso_dwarf = GetSymbolFileByOSOIndex(oso_idx);
       if (oso_dwarf) {
-        if (oso_dwarf->FindGlobalVariables(name, parent_decl_ctx, true,
-                                           max_matches, variables))
+        if (oso_dwarf->FindGlobalVariables(name, parent_decl_ctx, max_matches,
+                                           variables))
           if (variables.GetSize() > max_matches)
             break;
       }
@@ -813,21 +815,16 @@ uint32_t SymbolFileDWARFDebugMap::PrivateFindGlobalVariables(
 
 uint32_t SymbolFileDWARFDebugMap::FindGlobalVariables(
     const ConstString &name, const CompilerDeclContext *parent_decl_ctx,
-    bool append, uint32_t max_matches, VariableList &variables) {
+    uint32_t max_matches, VariableList &variables) {
 
-  // If we aren't appending the results to this list, then clear the list
-  if (!append)
-    variables.Clear();
-
-  // Remember how many variables are in the list before we search in case we
-  // are appending the results to a variable list.
+  // Remember how many variables are in the list before we search.
   const uint32_t original_size = variables.GetSize();
 
   uint32_t total_matches = 0;
 
   ForEachSymbolFile([&](SymbolFileDWARF *oso_dwarf) -> bool {
     const uint32_t oso_matches = oso_dwarf->FindGlobalVariables(
-        name, parent_decl_ctx, true, max_matches, variables);
+        name, parent_decl_ctx, max_matches, variables);
     if (oso_matches > 0) {
       total_matches += oso_matches;
 
@@ -853,20 +850,15 @@ uint32_t SymbolFileDWARFDebugMap::FindGlobalVariables(
 
 uint32_t
 SymbolFileDWARFDebugMap::FindGlobalVariables(const RegularExpression &regex,
-                                             bool append, uint32_t max_matches,
+                                             uint32_t max_matches,
                                              VariableList &variables) {
-  // If we aren't appending the results to this list, then clear the list
-  if (!append)
-    variables.Clear();
-
-  // Remember how many variables are in the list before we search in case we
-  // are appending the results to a variable list.
+  // Remember how many variables are in the list before we search.
   const uint32_t original_size = variables.GetSize();
 
   uint32_t total_matches = 0;
   ForEachSymbolFile([&](SymbolFileDWARF *oso_dwarf) -> bool {
     const uint32_t oso_matches =
-        oso_dwarf->FindGlobalVariables(regex, true, max_matches, variables);
+        oso_dwarf->FindGlobalVariables(regex, max_matches, variables);
     if (oso_matches > 0) {
       total_matches += oso_matches;
 

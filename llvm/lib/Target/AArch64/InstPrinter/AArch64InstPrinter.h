@@ -172,11 +172,17 @@ protected:
   template <typename T>
   void printImm8OptLsl(const MCInst *MI, unsigned OpNum,
                        const MCSubtargetInfo &STI, raw_ostream &O);
+  template <typename T>
+  void printSVELogicalImm(const MCInst *MI, unsigned OpNum,
+                          const MCSubtargetInfo &STI, raw_ostream &O);
   void printSVEPattern(const MCInst *MI, unsigned OpNum,
                        const MCSubtargetInfo &STI, raw_ostream &O);
   template <char = 0>
   void printSVERegOp(const MCInst *MI, unsigned OpNum,
                     const MCSubtargetInfo &STI, raw_ostream &O);
+  template <int Width>
+  void printZPRasFPR(const MCInst *MI, unsigned OpNum,
+                     const MCSubtargetInfo &STI, raw_ostream &O);
 };
 
 class AArch64AppleInstPrinter : public AArch64InstPrinter {

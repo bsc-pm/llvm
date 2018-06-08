@@ -2040,7 +2040,7 @@ bool Type::isIncompleteType(NamedDecl **Def) const {
       return false;
     // The inheritance attribute might only be present on the most recent
     // CXXRecordDecl, use that one.
-    RD = RD->getMostRecentDecl();
+    RD = RD->getMostRecentNonInjectedDecl();
     // Nothing interesting to do if the inheritance attribute is already set.
     if (RD->hasAttr<MSInheritanceAttr>())
       return false;
@@ -2656,6 +2656,18 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "double";
   case LongDouble:
     return "long double";
+  case ShortAccum:
+    return "short _Accum";
+  case Accum:
+    return "_Accum";
+  case LongAccum:
+    return "long _Accum";
+  case UShortAccum:
+    return "unsigned short _Accum";
+  case UAccum:
+    return "unsigned _Accum";
+  case ULongAccum:
+    return "unsigned long _Accum";
   case Float16:
     return "_Float16";
   case Float128:
@@ -3936,5 +3948,5 @@ QualType::DestructionKind QualType::isDestructedTypeImpl(QualType type) {
 }
 
 CXXRecordDecl *MemberPointerType::getMostRecentCXXRecordDecl() const {
-  return getClass()->getAsCXXRecordDecl()->getMostRecentDecl();
+  return getClass()->getAsCXXRecordDecl()->getMostRecentNonInjectedDecl();
 }
