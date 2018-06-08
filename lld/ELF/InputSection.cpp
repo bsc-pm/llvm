@@ -618,8 +618,23 @@ static uint64_t getRelocTargetVA(RelType Type, int64_t A, uint64_t P,
     // statically to zero.
     if (Sym.isTls() && Sym.isUndefWeak())
       return 0;
-    if (Target->TcbSize)
+
+    // For TLS variant 1 the TCB is a fixed size, whereas for TLS variant 2 the
+    // TCB is on unspecified size and content. Targets that implement variant 1
+    // should set TcbSize.
+    if (Target->TcbSize) {
+      // PPC64 V2 ABI has the thread pointer offset into the middle of the TLS
+      // storage area by TlsTpOffset for efficient addressing TCB and up to
+      // 4KB – 8 B of other thread library information (placed before the TCB).
+      // Subtracting this offset will get the address of the first TLS block.
+      if (Target->TlsTpOffset)
+        return Sym.getVA(A) - Target->TlsTpOffset;
+
+      // If thread pointer is not offset into the middle, the first thing in the
+      // TLS storage area is the TCB. Add the TcbSize to get the address of the
+      // first TLS block.
       return Sym.getVA(A) + alignTo(Target->TcbSize, Out::TlsPhdr->p_align);
+    }
     return Sym.getVA(A) - Out::TlsPhdr->p_memsz;
   case R_RELAX_TLS_GD_TO_LE_NEG:
   case R_NEG_TLS:
@@ -631,14 +646,16 @@ static uint64_t getRelocTargetVA(RelType Type, int64_t A, uint64_t P,
   case R_TLSDESC_PAGE:
     return getAArch64Page(InX::Got->getGlobalDynAddr(Sym) + A) -
            getAArch64Page(P);
-  case R_TLSGD:
-    return InX::Got->getGlobalDynOffset(Sym) + A - InX::Got->getSize();
   case R_TLSGD_GOT:
     return InX::Got->getGlobalDynOffset(Sym) + A;
+  case R_TLSGD_GOT_FROM_END:
+    return InX::Got->getGlobalDynOffset(Sym) + A - InX::Got->getSize();
   case R_TLSGD_PC:
     return InX::Got->getGlobalDynAddr(Sym) + A - P;
-  case R_TLSLD:
+  case R_TLSLD_GOT_FROM_END:
     return InX::Got->getTlsIndexOff() + A - InX::Got->getSize();
+  case R_TLSLD_GOT:
+      return InX::Got->getTlsIndexOff() + A;
   case R_TLSLD_PC:
     return InX::Got->getTlsIndexVA() + A - P;
   }

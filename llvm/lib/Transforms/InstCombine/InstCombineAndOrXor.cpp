@@ -14,7 +14,7 @@
 #include "InstCombineInternal.h"
 #include "llvm/Analysis/CmpInstAnalysis.h"
 #include "llvm/Analysis/InstructionSimplify.h"
-#include "llvm/Analysis/Utils/Local.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
@@ -748,9 +748,6 @@ static Value *foldLogOpOfMaskedICmps(ICmpInst *LHS, ICmpInst *RHS, bool IsAnd,
   return nullptr;
 }
 
-static Instruction *foldMaskedMerge(BinaryOperator &I,
-                                    InstCombiner::BuilderTy &Builder);
-
 /// Try to fold a signed range checked with lower bound 0 to an unsigned icmp.
 /// Example: (icmp sge x, 0) & (icmp slt x, n) --> icmp ult x, n
 /// If \p Inverted is true then the check is for the inverted range, e.g.
@@ -1406,12 +1403,11 @@ Instruction *InstCombiner::narrowMaskedBinOp(BinaryOperator &And) {
 Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   bool Changed = SimplifyAssociativeOrCommutative(I);
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
-
-  if (Value *V = SimplifyVectorOp(I))
-    return replaceInstUsesWith(I, V);
-
   if (Value *V = SimplifyAndInst(Op0, Op1, SQ.getWithInstruction(&I)))
     return replaceInstUsesWith(I, V);
+
+  if (Instruction *X = foldShuffledBinop(I))
+    return X;
 
   // See if we can simplify any instructions used by the instruction whose sole
   // purpose is to compute bits we don't care about.
@@ -1650,9 +1646,6 @@ Instruction *InstCombiner::visitAnd(BinaryOperator &I) {
   if (match(Op1, m_OneUse(m_SExt(m_Value(A)))) &&
       A->getType()->isIntOrIntVectorTy(1))
     return SelectInst::Create(A, Op0, Constant::getNullValue(I.getType()));
-
-  if (Instruction *MM = foldMaskedMerge(I, Builder))
-    return MM;
 
   return Changed ? &I : nullptr;
 }
@@ -2024,12 +2017,11 @@ Value *InstCombiner::foldOrOfICmps(ICmpInst *LHS, ICmpInst *RHS,
 Instruction *InstCombiner::visitOr(BinaryOperator &I) {
   bool Changed = SimplifyAssociativeOrCommutative(I);
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
-
-  if (Value *V = SimplifyVectorOp(I))
-    return replaceInstUsesWith(I, V);
-
   if (Value *V = SimplifyOrInst(Op0, Op1, SQ.getWithInstruction(&I)))
     return replaceInstUsesWith(I, V);
+
+  if (Instruction *X = foldShuffledBinop(I))
+    return X;
 
   // See if we can simplify any instructions used by the instruction whose sole
   // purpose is to compute bits we don't care about.
@@ -2293,9 +2285,6 @@ Instruction *InstCombiner::visitOr(BinaryOperator &I) {
     }
   }
 
-  if (Instruction *MM = foldMaskedMerge(I, Builder))
-    return MM;
-
   return Changed ? &I : nullptr;
 }
 
@@ -2431,33 +2420,6 @@ Value *InstCombiner::foldXorOfICmps(ICmpInst *LHS, ICmpInst *RHS) {
   return nullptr;
 }
 
-/// Bitwise masked merge (bitwise select) is typically coded as:
-/// (x & m) | (y & ~m)
-/// Another variant is:
-/// (x | ~m) & (y | m)
-/// Canonicalize those to a form with one less IR instruction:
-/// ((x ^ y) & m) ^ y
-static Instruction *foldMaskedMerge(BinaryOperator &I,
-                                    InstCombiner::BuilderTy &Builder) {
-  Value *X, *Y;
-
-  Value *M;
-  if (match(&I, m_c_Or(m_OneUse(m_c_And(m_Value(Y), m_Not(m_Value(M)))),
-                       m_OneUse(m_c_And(m_Value(X), m_Deferred(M))))) ||
-      match(&I, m_c_And(m_OneUse(m_c_Or(m_Value(X), m_Not(m_Value(M)))),
-                        m_OneUse(m_c_Or(m_Value(Y), m_Deferred(M)))))) {
-    assert(!isa<Constant>(M) && "Shouldn't have matched a constant.");
-
-    Value *D = Builder.CreateXor(X, Y);
-    Value *A = Builder.CreateAnd(D, M);
-    return BinaryOperator::CreateXor(A, Y);
-  }
-
-  // FIXME: we still want to canonicalize the patterns with constants somewhat.
-
-  return nullptr;
-}
-
 /// If we have a masked merge, in the canonical form of:
 /// (assuming that A only has one use.)
 ///   |        A  |  |B|
@@ -2508,12 +2470,11 @@ static Instruction *visitMaskedMerge(BinaryOperator &I,
 Instruction *InstCombiner::visitXor(BinaryOperator &I) {
   bool Changed = SimplifyAssociativeOrCommutative(I);
   Value *Op0 = I.getOperand(0), *Op1 = I.getOperand(1);
-
-  if (Value *V = SimplifyVectorOp(I))
-    return replaceInstUsesWith(I, V);
-
   if (Value *V = SimplifyXorInst(Op0, Op1, SQ.getWithInstruction(&I)))
     return replaceInstUsesWith(I, V);
+
+  if (Instruction *X = foldShuffledBinop(I))
+    return X;
 
   if (Instruction *NewXor = foldXorToXor(I, Builder))
     return NewXor;
@@ -2767,7 +2728,7 @@ Instruction *InstCombiner::visitXor(BinaryOperator &I) {
   if (Instruction *CastedXor = foldCastedBitwiseLogic(I))
     return CastedXor;
 
-  // Canonicalize the shifty way to code absolute value to the common pattern.
+  // Canonicalize a shifty way to code absolute value to the common pattern.
   // There are 4 potential commuted variants. Move the 'ashr' candidate to Op1.
   // We're relying on the fact that we only do this transform when the shift has
   // exactly 2 uses and the add has exactly 1 use (otherwise, we might increase

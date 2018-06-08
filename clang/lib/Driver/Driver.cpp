@@ -1258,9 +1258,6 @@ void Driver::generateCompilationDiagnostics(
 
   // If any of the preprocessing commands failed, clean up and exit.
   if (!FailingCommands.empty()) {
-    if (!isSaveTempsEnabled())
-      C.CleanupFileList(C.getTempFiles(), true);
-
     Diag(clang::diag::note_drv_command_failed_diag_msg)
         << "Error generating preprocessed source(s).";
     return;
@@ -1301,7 +1298,7 @@ void Driver::generateCompilationDiagnostics(
 
   std::string Script = CrashInfo.Filename.rsplit('.').first.str() + ".sh";
   std::error_code EC;
-  llvm::raw_fd_ostream ScriptOS(Script, EC, llvm::sys::fs::F_Excl);
+  llvm::raw_fd_ostream ScriptOS(Script, EC, llvm::sys::fs::CD_CreateNew);
   if (EC) {
     Diag(clang::diag::note_drv_command_failed_diag_msg)
         << "Error generating run script: " + Script + " " + EC.message();
@@ -1376,9 +1373,6 @@ int Driver::ExecuteCompilation(
     setUpResponseFiles(C, Job);
 
   C.ExecuteJobs(C.getJobs(), FailingCommands);
-
-  // Remove temp files.
-  C.CleanupFileList(C.getTempFiles());
 
   // If the command succeeded, we are done.
   if (FailingCommands.empty())
@@ -2819,7 +2813,7 @@ public:
           C.MakeAction<OffloadUnbundlingJobAction>(HostAction);
       UnbundlingHostAction->registerDependentActionInfo(
           C.getSingleOffloadToolChain<Action::OFK_Host>(),
-          /*BoundArch=*/StringRef(), Action::OFK_Host);
+          /*BoundArch=*/"all", Action::OFK_Host);
       HostAction = UnbundlingHostAction;
     }
 
@@ -3898,9 +3892,18 @@ InputInfo Driver::BuildJobsForActionNoCache(
 
       // Get the unique string identifier for this dependence and cache the
       // result.
-      CachedResults[{A, GetTriplePlusArchString(
-                            UI.DependentToolChain, BoundArch,
-                            UI.DependentOffloadKind)}] = CurI;
+      StringRef Arch;
+      if (TargetDeviceOffloadKind == Action::OFK_HIP) {
+        if (UI.DependentOffloadKind == Action::OFK_Host)
+          Arch = "all";
+        else
+          Arch = UI.DependentBoundArch;
+      } else
+        Arch = BoundArch;
+
+      CachedResults[{A, GetTriplePlusArchString(UI.DependentToolChain, Arch,
+                                                UI.DependentOffloadKind)}] =
+          CurI;
     }
 
     // Now that we have all the results generated, select the one that should be

@@ -152,7 +152,7 @@ defm : BWWriteResPair<WriteBZHI, [BWPort15], 1>;
 defm : X86WriteRes<WriteLoad,    [BWPort23], 5, [1], 1>;
 defm : X86WriteRes<WriteStore,   [BWPort237, BWPort4], 1, [1,1], 1>;
 defm : X86WriteRes<WriteStoreNT, [BWPort237, BWPort4], 1, [1,1], 2>;
-defm : X86WriteRes<WriteMove,    [BWPort0156], 1, [1,1], 1>;
+defm : X86WriteRes<WriteMove,    [BWPort0156], 1, [1], 1>;
 
 // Idioms that clear a register, like xorps %xmm0, %xmm0.
 // These can often bypass execution ports completely.
@@ -166,6 +166,9 @@ def : InstRW<[WriteMove], (instrs COPY)>;
 defm : BWWriteResPair<WriteJump,  [BWPort06],   1>;
 
 // Floating point. This covers both scalar and vector operations.
+defm : X86WriteRes<WriteFLD0,          [BWPort01], 1, [1], 1>;
+defm : X86WriteRes<WriteFLD1,          [BWPort01], 1, [2], 2>;
+defm : X86WriteRes<WriteFLDC,          [BWPort01], 1, [2], 2>;
 defm : X86WriteRes<WriteFLoad,         [BWPort23], 5, [1], 1>;
 defm : X86WriteRes<WriteFLoadX,        [BWPort23], 5, [1], 1>;
 defm : X86WriteRes<WriteFLoadY,        [BWPort23], 6, [1], 1>;
