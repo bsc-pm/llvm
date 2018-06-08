@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; RUN: not llc < %s 2>&1 | FileCheck %s
 ; REQUIRES: default_triple
 

@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: default_triple, object-emission
 
 ; RUN: llvm-link %s %p/type-unique-simple-b.ll -S -o %t

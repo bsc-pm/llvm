@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s | llvm-dwarfdump -v - | FileCheck %s
 
 

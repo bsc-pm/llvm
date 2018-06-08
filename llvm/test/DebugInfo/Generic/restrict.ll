@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: object-emission
 
 ; RUN: %llc_dwarf -dwarf-version=2 -O0 -filetype=obj < %s | llvm-dwarfdump -v -debug-info - | FileCheck --check-prefix=CHECK --check-prefix=V2 %s

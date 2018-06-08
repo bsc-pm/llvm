@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; Make sure that absolute source dir is detected correctly regardless of the platform.
 ; REQUIRES: object-emission
 ; On powerpc llvm-nm describes win_func as a global variable, not a function. It breaks the test.

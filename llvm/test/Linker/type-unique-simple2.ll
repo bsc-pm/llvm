@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: object-emission
 ; REQUIRES: default_triple
 

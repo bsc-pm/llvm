@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: object-emission
 
 ; RUN: %llc_dwarf -filetype=obj -O0 < %s > %t

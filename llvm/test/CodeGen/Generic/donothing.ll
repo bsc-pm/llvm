@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; RUN: llc < %s | FileCheck %s
 
 declare i32 @__gxx_personality_v0(...)

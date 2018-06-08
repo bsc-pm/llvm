@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; RUN: llc -I %p/Inputs -filetype asm -o - %s | FileCheck %s
 ; REQUIRES: default_triple
 

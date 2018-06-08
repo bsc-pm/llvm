@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; RUN: llc -no-integrated-as < %s
 
 ; XFAIL: avr

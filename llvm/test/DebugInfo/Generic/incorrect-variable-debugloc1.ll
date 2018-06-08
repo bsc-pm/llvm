@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: object-emission
 ; This test is failing for powerpc64, because a location list for the
 ; variable 'c' is not generated at all. Temporary marking this test as XFAIL 
