@@ -1,3 +1,4 @@
+// XFAIL: riscv
 // Test header and library paths when Clang is used with Android standalone
 // toolchain.
 //

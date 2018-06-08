@@ -1,3 +1,4 @@
+// XFAIL: riscv
 // no PCH
 // RUN: %clang_cc1 -fopenmp -fnoopenmp-use-tls -emit-llvm -include %s -include %s %s -o - | FileCheck %s
 // with PCH

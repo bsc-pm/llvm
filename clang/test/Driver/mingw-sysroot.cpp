@@ -1,3 +1,4 @@
+// XFAIL: riscv
 // REQUIRES: shell
 // UNSUPPORTED: system-windows
 

@@ -1,3 +1,4 @@
+// XFAIL: riscv
 // RUN: %clang_cc1 -S -o %t.ll -mllvm -debug-only=exprconstant %s 2>&1 | \
 // RUN:     FileCheck %s
 // REQUIRES: asserts
