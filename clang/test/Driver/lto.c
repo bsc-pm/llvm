@@ -1,3 +1,4 @@
+// XFAIL: riscv
 // -flto causes a switch to llvm-bc object files.
 // RUN: %clang -ccc-print-phases -c %s -flto 2> %t
 // RUN: FileCheck -check-prefix=CHECK-COMPILE-ACTIONS < %t %s
