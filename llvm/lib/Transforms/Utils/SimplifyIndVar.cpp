@@ -26,6 +26,7 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 using namespace llvm;
 
@@ -772,6 +773,15 @@ void SimplifyIndvar::simplifyUsers(PHINode *CurrIV, IVVisitor *V) {
       SimpleIVUsers.pop_back_val();
     Instruction *UseInst = UseOper.first;
 
+    // If a user of the IndVar is trivially dead, we prefer just to mark it dead
+    // rather than try to do some complex analysis or transformation (such as
+    // widening) basing on it.
+    // TODO: Propagate TLI and pass it here to handle more cases.
+    if (isInstructionTriviallyDead(UseInst, /* TLI */ nullptr)) {
+      DeadInsts.emplace_back(UseInst);
+      continue;
+    }
+
     // Bypass back edges to avoid extra work.
     if (UseInst == CurrIV) continue;
 
@@ -784,7 +794,7 @@ void SimplifyIndvar::simplifyUsers(PHINode *CurrIV, IVVisitor *V) {
     for (unsigned N = 0; IVOperand; ++N) {
       assert(N <= Simplified.size() && "runaway iteration");
 
-      Value *NewOper = foldIVUser(UseOper.first, IVOperand);
+      Value *NewOper = foldIVUser(UseInst, IVOperand);
       if (!NewOper)
         break; // done folding
       IVOperand = dyn_cast<Instruction>(NewOper);
@@ -792,12 +802,12 @@ void SimplifyIndvar::simplifyUsers(PHINode *CurrIV, IVVisitor *V) {
     if (!IVOperand)
       continue;
 
-    if (eliminateIVUser(UseOper.first, IVOperand)) {
+    if (eliminateIVUser(UseInst, IVOperand)) {
       pushIVUsers(IVOperand, L, Simplified, SimpleIVUsers);
       continue;
     }
 
-    if (BinaryOperator *BO = dyn_cast<BinaryOperator>(UseOper.first)) {
+    if (BinaryOperator *BO = dyn_cast<BinaryOperator>(UseInst)) {
       if ((isa<OverflowingBinaryOperator>(BO) &&
            strengthenOverflowingOperation(BO, IVOperand)) ||
           (isa<ShlOperator>(BO) && strengthenRightShift(BO, IVOperand))) {
@@ -807,13 +817,13 @@ void SimplifyIndvar::simplifyUsers(PHINode *CurrIV, IVVisitor *V) {
       }
     }
 
-    CastInst *Cast = dyn_cast<CastInst>(UseOper.first);
+    CastInst *Cast = dyn_cast<CastInst>(UseInst);
     if (V && Cast) {
       V->visitCast(Cast);
       continue;
     }
-    if (isSimpleIVUser(UseOper.first, L, SE)) {
-      pushIVUsers(UseOper.first, L, Simplified, SimpleIVUsers);
+    if (isSimpleIVUser(UseInst, L, SE)) {
+      pushIVUsers(UseInst, L, Simplified, SimpleIVUsers);
     }
   }
 }

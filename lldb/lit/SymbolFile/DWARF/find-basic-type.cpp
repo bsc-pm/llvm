@@ -1,6 +1,6 @@
 // REQUIRES: lld
 
-// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux
+// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux -mllvm -accel-tables=Disable
 // RUN: ld.lld %t.o -o %t
 // RUN: lldb-test symbols --name=foo --find=type %t | \
 // RUN:   FileCheck --check-prefix=NAME %s
@@ -10,6 +10,15 @@
 // RUN:   FileCheck --check-prefix=EMPTY %s
 //
 // RUN: clang %s -g -c -o %t --target=x86_64-apple-macosx
+// RUN: lldb-test symbols --name=foo --find=type %t | \
+// RUN:   FileCheck --check-prefix=NAME %s
+// RUN: lldb-test symbols --name=foo --context=context --find=type %t | \
+// RUN:   FileCheck --check-prefix=CONTEXT %s
+// RUN: lldb-test symbols --name=not_there --find=type %t | \
+// RUN:   FileCheck --check-prefix=EMPTY %s
+
+// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux -mllvm -accel-tables=Dwarf
+// RUN: ld.lld %t.o -o %t
 // RUN: lldb-test symbols --name=foo --find=type %t | \
 // RUN:   FileCheck --check-prefix=NAME %s
 // RUN: lldb-test symbols --name=foo --context=context --find=type %t | \

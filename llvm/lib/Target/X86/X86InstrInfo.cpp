@@ -439,7 +439,7 @@ X86InstrInfo::X86InstrInfo(X86Subtarget &STI)
 
     // AVX 128-bit versions of foldable instructions
     { X86::VEXTRACTPSrr,X86::VEXTRACTPSmr,  TB_FOLDED_STORE  },
-    { X86::VEXTRACTF128rr, X86::VEXTRACTF128mr, TB_FOLDED_STORE | TB_ALIGN_16 },
+    { X86::VEXTRACTF128rr, X86::VEXTRACTF128mr, TB_FOLDED_STORE },
     { X86::VMOVAPDrr,   X86::VMOVAPDmr,     TB_FOLDED_STORE | TB_ALIGN_16 },
     { X86::VMOVAPSrr,   X86::VMOVAPSmr,     TB_FOLDED_STORE | TB_ALIGN_16 },
     { X86::VMOVDQArr,   X86::VMOVDQAmr,     TB_FOLDED_STORE | TB_ALIGN_16 },
@@ -454,7 +454,7 @@ X86InstrInfo::X86InstrInfo(X86Subtarget &STI)
     { X86::VPEXTRQrr,   X86::VPEXTRQmr,     TB_FOLDED_STORE },
 
     // AVX 256-bit foldable instructions
-    { X86::VEXTRACTI128rr, X86::VEXTRACTI128mr, TB_FOLDED_STORE | TB_ALIGN_16 },
+    { X86::VEXTRACTI128rr, X86::VEXTRACTI128mr, TB_FOLDED_STORE },
     { X86::VMOVAPDYrr,  X86::VMOVAPDYmr,    TB_FOLDED_STORE | TB_ALIGN_32 },
     { X86::VMOVAPSYrr,  X86::VMOVAPSYmr,    TB_FOLDED_STORE | TB_ALIGN_32 },
     { X86::VMOVDQAYrr,  X86::VMOVDQAYmr,    TB_FOLDED_STORE | TB_ALIGN_32 },
@@ -6852,11 +6852,12 @@ void X86InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   llvm_unreachable("Cannot emit physreg copy instruction");
 }
 
-bool X86InstrInfo::isCopyInstr(const MachineInstr &MI, MachineOperand &Src,
-                               MachineOperand &Dest) const {
+bool X86InstrInfo::isCopyInstr(const MachineInstr &MI,
+                               const MachineOperand *&Src,
+                               const MachineOperand *&Dest) const {
   if (MI.isMoveReg()) {
-    Dest = MI.getOperand(0);
-    Src = MI.getOperand(1);
+    Dest = &MI.getOperand(0);
+    Src = &MI.getOperand(1);
     return true;
   }
   return false;
@@ -8478,6 +8479,19 @@ MachineInstr *X86InstrInfo::foldMemoryOperandCustom(
   return nullptr;
 }
 
+static bool shouldPreventUndefRegUpdateMemFold(MachineFunction &MF, MachineInstr &MI) {
+  if (MF.getFunction().optForSize() || !hasUndefRegUpdate(MI.getOpcode()) ||
+      !MI.getOperand(1).isReg())
+    return false;
+ 
+  MachineRegisterInfo &RegInfo = MF.getRegInfo();
+  MachineInstr *VRegDef = RegInfo.getUniqueVRegDef(MI.getOperand(1).getReg());
+  if (VRegDef == nullptr)
+    return false;
+  return VRegDef->isImplicitDef();
+}
+
+
 MachineInstr *X86InstrInfo::foldMemoryOperandImpl(
     MachineFunction &MF, MachineInstr &MI, unsigned OpNum,
     ArrayRef<MachineOperand> MOs, MachineBasicBlock::iterator InsertPt,
@@ -8496,10 +8510,10 @@ MachineInstr *X86InstrInfo::foldMemoryOperandImpl(
        MI.getOpcode() == X86::PUSH64r))
     return nullptr;
 
-  // Avoid partial register update stalls unless optimizing for size.
-  // TODO: we should block undef reg update as well.
+  // Avoid partial and undef register update stalls unless optimizing for size.
   if (!MF.getFunction().optForSize() &&
-      hasPartialRegUpdate(MI.getOpcode(), Subtarget))
+      (hasPartialRegUpdate(MI.getOpcode(), Subtarget) ||
+       shouldPreventUndefRegUpdateMemFold(MF, MI)))
     return nullptr;
 
   unsigned NumOps = MI.getDesc().getNumOperands();
@@ -8673,11 +8687,10 @@ X86InstrInfo::foldMemoryOperandImpl(MachineFunction &MF, MachineInstr &MI,
   if (NoFusing)
     return nullptr;
 
-  // Unless optimizing for size, don't fold to avoid partial
-  // register update stalls
-  // TODO: we should block undef reg update as well.
+  // Avoid partial and undef register update stalls unless optimizing for size.
   if (!MF.getFunction().optForSize() &&
-      hasPartialRegUpdate(MI.getOpcode(), Subtarget))
+      (hasPartialRegUpdate(MI.getOpcode(), Subtarget) ||
+       shouldPreventUndefRegUpdateMemFold(MF, MI)))
     return nullptr;
 
   // Don't fold subreg spills, or reloads that use a high subreg.
@@ -8874,10 +8887,10 @@ MachineInstr *X86InstrInfo::foldMemoryOperandImpl(
   // Check switch flag
   if (NoFusing) return nullptr;
 
-  // Avoid partial register update stalls unless optimizing for size.
-  // TODO: we should block undef reg update as well.
+  // Avoid partial and undef register update stalls unless optimizing for size.
   if (!MF.getFunction().optForSize() &&
-      hasPartialRegUpdate(MI.getOpcode(), Subtarget))
+      (hasPartialRegUpdate(MI.getOpcode(), Subtarget) ||
+       shouldPreventUndefRegUpdateMemFold(MF, MI)))
     return nullptr;
 
   // Determine the alignment of the load.

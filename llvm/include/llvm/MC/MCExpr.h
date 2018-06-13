@@ -286,6 +286,7 @@ public:
     VK_AMDGPU_GOTPCREL32_HI, // symbol@gotpcrel32@hi
     VK_AMDGPU_REL32_LO,      // symbol@rel32@lo
     VK_AMDGPU_REL32_HI,      // symbol@rel32@hi
+    VK_AMDGPU_REL64,         // symbol@rel64
 
     VK_TPREL,
     VK_DTPREL
@@ -581,6 +582,9 @@ public:
   virtual bool evaluateAsRelocatableImpl(MCValue &Res,
                                          const MCAsmLayout *Layout,
                                          const MCFixup *Fixup) const = 0;
+  // This should be set when assigned expressions are not valid ".set"
+  // expressions, e.g. registers, and must be inlined.
+  virtual bool inlineAssignedExpr() const { return false; }
   virtual void visitUsedExpr(MCStreamer& Streamer) const = 0;
   virtual MCFragment *findAssociatedFragment() const = 0;
 

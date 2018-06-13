@@ -21,6 +21,8 @@
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Symbol/ClangASTContext.h"
 #include "lldb/Symbol/ClangASTImporter.h"
+#include "lldb/Symbol/CompileUnit.h"
+#include "lldb/Symbol/LineTable.h"
 #include "lldb/Symbol/SymbolVendor.h"
 #include "lldb/Symbol/TypeList.h"
 #include "lldb/Symbol/VariableList.h"
@@ -143,6 +145,13 @@ static FunctionNameType getFunctionNameFlags() {
   return Result;
 }
 
+static cl::opt<bool> Verify("verify", cl::desc("Verify symbol information."),
+                            cl::sub(SymbolsSubcommand));
+
+static cl::opt<std::string> File("file",
+                                 cl::desc("File (compile unit) to search."),
+                                 cl::sub(SymbolsSubcommand));
+
 static Expected<CompilerDeclContext> getDeclContext(SymbolVendor &Vendor);
 
 static Error findFunctions(lldb_private::Module &Module);
@@ -150,7 +159,9 @@ static Error findNamespaces(lldb_private::Module &Module);
 static Error findTypes(lldb_private::Module &Module);
 static Error findVariables(lldb_private::Module &Module);
 static Error dumpModule(lldb_private::Module &Module);
+static Error verify(lldb_private::Module &Module);
 
+static Expected<Error (*)(lldb_private::Module &)> getAction();
 static int dumpSymbols(Debugger &Dbg);
 }
 
@@ -190,6 +201,13 @@ int evaluateMemoryMapCommands(Debugger &Dbg);
 } // namespace irmemorymap
 
 } // namespace opts
+
+template <typename... Args>
+static Error make_string_error(const char *Format, Args &&... args) {
+  return llvm::make_error<llvm::StringError>(
+      llvm::formatv(Format, std::forward<Args>(args)...).str(),
+      llvm::inconvertibleErrorCode());
+}
 
 TargetSP opts::createTarget(Debugger &Dbg, const std::string &Filename) {
   TargetSP Target;
@@ -306,14 +324,10 @@ opts::symbols::getDeclContext(SymbolVendor &Vendor) {
     return CompilerDeclContext();
   VariableList List;
   Vendor.FindGlobalVariables(ConstString(Context), nullptr, UINT32_MAX, List);
-  if (List.Empty()) {
-    return make_error<StringError>("Context search didn't find a match.",
-                                   inconvertibleErrorCode());
-  }
-  if (List.GetSize() > 1) {
-    return make_error<StringError>("Context search found multiple matches.",
-                                   inconvertibleErrorCode());
-  }
+  if (List.Empty())
+    return make_string_error("Context search didn't find a match.");
+  if (List.GetSize() > 1)
+    return make_string_error("Context search found multiple matches.");
   return List.GetVariableAtIndex(0)->GetDeclContext();
 }
 
@@ -388,6 +402,22 @@ Error opts::symbols::findVariables(lldb_private::Module &Module) {
     RegularExpression RE(Name);
     assert(RE.IsValid());
     Vendor.FindGlobalVariables(RE, UINT32_MAX, List);
+  } else if (!File.empty()) {
+    CompUnitSP CU;
+    for (size_t Ind = 0; !CU && Ind < Module.GetNumCompileUnits(); ++Ind) {
+      CompUnitSP Candidate = Module.GetCompileUnitAtIndex(Ind);
+      if (!Candidate || Candidate->GetFilename().GetStringRef() != File)
+        continue;
+      if (CU)
+        return make_string_error("Multiple compile units for file `{0}` found.",
+                                 File);
+      CU = std::move(Candidate);
+    }
+
+    if (!CU)
+      return make_string_error("Compile unit `{0}` not found.", File);
+
+    List.AddVariables(CU->GetVariableList(true).get());
   } else {
     Expected<CompilerDeclContext> ContextOr = getDeclContext(Vendor);
     if (!ContextOr)
@@ -412,46 +442,121 @@ Error opts::symbols::dumpModule(lldb_private::Module &Module) {
   return Error::success();
 }
 
-int opts::symbols::dumpSymbols(Debugger &Dbg) {
-  if (Find != FindType::None && Regex && !Context.empty()) {
-    WithColor::error()
-        << "Cannot search using both regular expressions and context.\n";
-    return 1;
-  }
-  if ((Find == FindType::Type || Find == FindType::Namespace) && Regex) {
-    WithColor::error() << "Cannot search for types and namespaces using "
-                          "regular expressions.\n";
-    return 1;
-  }
-  if (Find == FindType::Function && Regex && getFunctionNameFlags() != 0) {
-    WithColor::error() << "Cannot search for types using both regular "
-                          "expressions and function-flags.\n";
-    return 1;
-  }
-  if (Regex && !RegularExpression(Name).IsValid()) {
-    WithColor::error() << "`" << Name
-                       << "` is not a valid regular expression.\n";
-    return 1;
+Error opts::symbols::verify(lldb_private::Module &Module) {
+  SymbolVendor &plugin = *Module.GetSymbolVendor();
+
+  SymbolFile *symfile = plugin.GetSymbolFile();
+  if (!symfile)
+    return make_string_error("Module has no symbol file.");
+
+  uint32_t comp_units_count = symfile->GetNumCompileUnits();
+
+  outs() << "Found " << comp_units_count << " compile units.\n";
+
+  for (uint32_t i = 0; i < comp_units_count; i++) {
+    lldb::CompUnitSP comp_unit = symfile->ParseCompileUnitAtIndex(i);
+    if (!comp_unit)
+      return make_string_error("Connot parse compile unit {0}.", i);
+
+    outs() << "Processing '" << comp_unit->GetFilename().AsCString() <<
+      "' compile unit.\n";
+
+    LineTable *lt = comp_unit->GetLineTable();
+    if (!lt)
+      return make_string_error("Can't get a line table of a compile unit.");
+
+    uint32_t count = lt->GetSize();
+
+    outs() << "The line table contains " << count << " entries.\n";
+
+    if (count == 0)
+      continue;
+
+    LineEntry le;
+    if (!lt->GetLineEntryAtIndex(0, le))
+      return make_string_error("Can't get a line entry of a compile unit.");
+
+    for (uint32_t i = 1; i < count; i++) {
+      lldb::addr_t curr_end =
+        le.range.GetBaseAddress().GetFileAddress() + le.range.GetByteSize();
+
+      if (!lt->GetLineEntryAtIndex(i, le))
+        return make_string_error("Can't get a line entry of a compile unit");
+
+      if (curr_end > le.range.GetBaseAddress().GetFileAddress())
+        return make_string_error(
+            "Line table of a compile unit is inconsistent.");
+    }
   }
 
-  Error (*Action)(lldb_private::Module &);
-  switch (Find) {
-  case FindType::Function:
-    Action = findFunctions;
-    break;
-  case FindType::Namespace:
-    Action = findNamespaces;
-    break;
-  case FindType::Type:
-    Action = findTypes;
-    break;
-  case FindType::Variable:
-    Action = findVariables;
-    break;
-  case FindType::None:
-    Action = dumpModule;
-    break;
+  outs() << "The symbol information is verified.\n";
+
+  return Error::success();
+}
+
+Expected<Error (*)(lldb_private::Module &)> opts::symbols::getAction() {
+  if (Verify) {
+    if (Find != FindType::None)
+      return make_string_error(
+          "Cannot both search and verify symbol information.");
+    if (Regex || !Context.empty() || !Name.empty() || !File.empty())
+      return make_string_error("-regex, -context, -name and -file options are not "
+                               "applicable for symbol verification.");
+    return verify;
   }
+
+  if (Regex && !Context.empty())
+    return make_string_error(
+        "Cannot search using both regular expressions and context.");
+
+  if (Regex && !RegularExpression(Name).IsValid())
+    return make_string_error("`{0}` is not a valid regular expression.", Name);
+
+  if (Regex + !Context.empty() + !File.empty() >= 2)
+    return make_string_error(
+        "Only one of -regex, -context and -file may be used simultaneously.");
+  if (Regex && Name.empty())
+    return make_string_error("-regex used without a -name");
+
+  switch (Find) {
+  case FindType::None:
+    if (!Context.empty() || !Name.empty() || !File.empty())
+      return make_string_error(
+          "Specify search type (-find) to use search options.");
+    return dumpModule;
+
+  case FindType::Function:
+    if (!File.empty())
+      return make_string_error("Cannot search for functions by file name.");
+    if (Regex && getFunctionNameFlags() != 0)
+      return make_string_error("Cannot search for functions using both regular "
+                               "expressions and function-flags.");
+    return findFunctions;
+
+  case FindType::Namespace:
+    if (Regex || !File.empty())
+      return make_string_error("Cannot search for namespaces using regular "
+                               "expressions or file names.");
+    return findNamespaces;
+
+  case FindType::Type:
+    if (Regex || !File.empty())
+      return make_string_error("Cannot search for types using regular "
+                               "expressions or file names.");
+    return findTypes;
+
+  case FindType::Variable:
+    return findVariables;
+  }
+}
+
+int opts::symbols::dumpSymbols(Debugger &Dbg) {
+  auto ActionOr = getAction();
+  if (!ActionOr) {
+    logAllUnhandledErrors(ActionOr.takeError(), WithColor::error(), "");
+    return 1;
+  }
+  auto Action = *ActionOr;
 
   int HadErrors = 0;
   for (const auto &File : InputFilenames) {
@@ -466,7 +571,7 @@ int opts::symbols::dumpSymbols(Debugger &Dbg) {
       HadErrors = 1;
       continue;
     }
-    
+
     if (Error E = Action(*ModulePtr)) {
       WithColor::error() << toString(std::move(E)) << "\n";
       HadErrors = 1;
