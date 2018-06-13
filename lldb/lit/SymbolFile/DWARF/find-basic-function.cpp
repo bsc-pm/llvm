@@ -1,6 +1,6 @@
 // REQUIRES: lld
 
-// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux
+// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux -mllvm -accel-tables=Disable
 // RUN: ld.lld %t.o -o %t
 // RUN: lldb-test symbols --name=foo --find=function --function-flags=base %t | \
 // RUN:   FileCheck --check-prefix=BASE %s
@@ -16,6 +16,21 @@
 // RUN:   FileCheck --check-prefix=EMPTY %s
 //
 // RUN: clang %s -g -c -o %t --target=x86_64-apple-macosx
+// RUN: lldb-test symbols --name=foo --find=function --function-flags=base %t | \
+// RUN:   FileCheck --check-prefix=BASE %s
+// RUN: lldb-test symbols --name=foo --find=function --function-flags=method %t | \
+// RUN:   FileCheck --check-prefix=METHOD %s
+// RUN: lldb-test symbols --name=foo --find=function --function-flags=full %t | \
+// RUN:   FileCheck --check-prefix=FULL %s
+// RUN: lldb-test symbols --name=_Z3fooi --find=function --function-flags=full %t | \
+// RUN:   FileCheck --check-prefix=FULL-MANGLED %s
+// RUN: lldb-test symbols --name=foo --context=context --find=function --function-flags=base %t | \
+// RUN:   FileCheck --check-prefix=CONTEXT %s
+// RUN: lldb-test symbols --name=not_there --find=function %t | \
+// RUN:   FileCheck --check-prefix=EMPTY %s
+
+// RUN: clang %s -g -c -o %t.o --target=x86_64-pc-linux -mllvm -accel-tables=Dwarf
+// RUN: ld.lld %t.o -o %t
 // RUN: lldb-test symbols --name=foo --find=function --function-flags=base %t | \
 // RUN:   FileCheck --check-prefix=BASE %s
 // RUN: lldb-test symbols --name=foo --find=function --function-flags=method %t | \

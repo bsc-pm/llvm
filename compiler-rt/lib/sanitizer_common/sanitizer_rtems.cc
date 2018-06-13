@@ -96,6 +96,7 @@ void GetThreadStackAndTls(bool main, uptr *stk_addr, uptr *stk_size,
 }
 
 void MaybeReexec() {}
+void CheckASLR() {}
 void DisableCoreDumperIfNecessary() {}
 void InstallDeadlySignalHandlers(SignalHandlerType handler) {}
 void SetAlternateSignalStack() {}
@@ -238,8 +239,11 @@ bool IsAccessibleMemoryRange(uptr beg, uptr size) {
   return true;
 }
 
-char **GetArgv() { return NULL; }
-const char *GetEnv(const char *name) { return NULL; }
+char **GetArgv() { return nullptr; }
+
+const char *GetEnv(const char *name) {
+  return getenv(name);
+}
 
 uptr ReadBinaryName(/*out*/char *buf, uptr buf_len) {
   internal_strncpy(buf, "StubBinaryName", buf_len);

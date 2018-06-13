@@ -23,7 +23,6 @@
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Basic/Version.h"
-#include "clang/Basic/VersionTuple.h"
 #include "clang/Basic/VirtualFileSystem.h"
 #include "clang/Basic/Visibility.h"
 #include "clang/Basic/XRayInstr.h"
@@ -76,6 +75,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Regex.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
 #include <algorithm>
@@ -2344,6 +2344,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
                            options::OPT_fdwarf_exceptions);
   if (A) {
     const Option &Opt = A->getOption();
+    llvm::Triple T(TargetOpts.Triple);
+    if (T.isWindowsMSVCEnvironment())
+      Diags.Report(diag::err_fe_invalid_exception_model)
+          << Opt.getName() << T.str();
+
     Opts.SjLjExceptions = Opt.matches(options::OPT_fsjlj_exceptions);
     Opts.SEHExceptions = Opt.matches(options::OPT_fseh_exceptions);
     Opts.DWARFExceptions = Opt.matches(options::OPT_fdwarf_exceptions);

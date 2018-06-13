@@ -1327,6 +1327,9 @@ HexagonTargetLowering::HexagonTargetLowering(const TargetMachine &TM,
     setMinimumJumpTableEntries(std::numeric_limits<int>::max());
   setOperationAction(ISD::BR_JT, MVT::Other, Expand);
 
+  setOperationAction(ISD::ABS, MVT::i32, Legal);
+  setOperationAction(ISD::ABS, MVT::i64, Legal);
+
   // Hexagon has A4_addp_c and A4_subp_c that take and generate a carry bit,
   // but they only operate on i64.
   for (MVT VT : MVT::integer_valuetypes()) {
@@ -1356,22 +1359,21 @@ HexagonTargetLowering::HexagonTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BITREVERSE, MVT::i64, Legal);
   setOperationAction(ISD::BSWAP, MVT::i32, Legal);
   setOperationAction(ISD::BSWAP, MVT::i64, Legal);
-  setOperationAction(ISD::MUL,   MVT::i64, Legal);
 
   for (unsigned IntExpOp :
-       { ISD::SDIV,      ISD::UDIV,      ISD::SREM,      ISD::UREM,
-         ISD::SDIVREM,   ISD::UDIVREM,   ISD::ROTL,      ISD::ROTR,
-         ISD::SHL_PARTS, ISD::SRA_PARTS, ISD::SRL_PARTS,
-         ISD::SMUL_LOHI, ISD::UMUL_LOHI }) {
-    setOperationAction(IntExpOp, MVT::i32, Expand);
-    setOperationAction(IntExpOp, MVT::i64, Expand);
+       {ISD::SDIV,      ISD::UDIV,      ISD::SREM,      ISD::UREM,
+        ISD::SDIVREM,   ISD::UDIVREM,   ISD::ROTL,      ISD::ROTR,
+        ISD::SHL_PARTS, ISD::SRA_PARTS, ISD::SRL_PARTS,
+        ISD::SMUL_LOHI, ISD::UMUL_LOHI}) {
+    for (MVT VT : MVT::integer_valuetypes())
+      setOperationAction(IntExpOp, VT, Expand);
   }
 
   for (unsigned FPExpOp :
        {ISD::FDIV, ISD::FREM, ISD::FSQRT, ISD::FSIN, ISD::FCOS, ISD::FSINCOS,
         ISD::FPOW, ISD::FCOPYSIGN}) {
-    setOperationAction(FPExpOp, MVT::f32, Expand);
-    setOperationAction(FPExpOp, MVT::f64, Expand);
+    for (MVT VT : MVT::fp_valuetypes())
+      setOperationAction(FPExpOp, VT, Expand);
   }
 
   // No extending loads from i32.
@@ -1508,6 +1510,10 @@ HexagonTargetLowering::HexagonTargetLowering(const TargetMachine &TM,
 
   // Subtarget-specific operation actions.
   //
+  if (Subtarget.hasV60TOps()) {
+    setOperationAction(ISD::ROTL, MVT::i32, Custom);
+    setOperationAction(ISD::ROTL, MVT::i64, Custom);
+  }
   if (Subtarget.hasV5TOps()) {
     setOperationAction(ISD::FMA,  MVT::f64, Expand);
     setOperationAction(ISD::FADD, MVT::f64, Expand);
@@ -2090,6 +2096,13 @@ HexagonTargetLowering::getVectorShiftByInt(SDValue Op, SelectionDAG &DAG)
 SDValue
 HexagonTargetLowering::LowerVECTOR_SHIFT(SDValue Op, SelectionDAG &DAG) const {
   return getVectorShiftByInt(Op, DAG);
+}
+
+SDValue
+HexagonTargetLowering::LowerROTL(SDValue Op, SelectionDAG &DAG) const {
+  if (isa<ConstantSDNode>(Op.getOperand(1).getNode()))
+    return Op;
+  return SDValue();
 }
 
 SDValue
@@ -2793,6 +2806,7 @@ HexagonTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
     case ISD::SRA:
     case ISD::SHL:
     case ISD::SRL:                  return LowerVECTOR_SHIFT(Op, DAG);
+    case ISD::ROTL:                 return LowerROTL(Op, DAG);
     case ISD::ConstantPool:         return LowerConstantPool(Op, DAG);
     case ISD::JumpTable:            return LowerJumpTable(Op, DAG);
     case ISD::EH_RETURN:            return LowerEH_RETURN(Op, DAG);

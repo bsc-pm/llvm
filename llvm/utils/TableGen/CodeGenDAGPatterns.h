@@ -907,21 +907,21 @@ struct DAGDefaultOperand {
 };
 
 class DAGInstruction {
-  TreePattern *Pattern;
+  std::unique_ptr<TreePattern> Pattern;
   std::vector<Record*> Results;
   std::vector<Record*> Operands;
   std::vector<Record*> ImpResults;
   TreePatternNodePtr ResultPattern;
 
 public:
-  DAGInstruction(TreePattern *TP,
+  DAGInstruction(std::unique_ptr<TreePattern> &&TP,
                  const std::vector<Record*> &results,
                  const std::vector<Record*> &operands,
                  const std::vector<Record*> &impresults)
-    : Pattern(TP), Results(results), Operands(operands),
+    : Pattern(std::move(TP)), Results(results), Operands(operands),
       ImpResults(impresults), ResultPattern(nullptr) {}
 
-  TreePattern *getPattern() const { return Pattern; }
+  TreePattern *getPattern() const { return Pattern.get(); }
   unsigned getNumResults() const { return Results.size(); }
   unsigned getNumOperands() const { return Operands.size(); }
   unsigned getNumImpResults() const { return ImpResults.size(); }
@@ -998,20 +998,12 @@ public:
 /// processed to produce isel.
 class PatternToMatch {
 public:
-  PatternToMatch(Record *srcrecord, const std::vector<Predicate> &preds,
+  PatternToMatch(Record *srcrecord, std::vector<Predicate> preds,
                  TreePatternNodePtr src, TreePatternNodePtr dst,
-                 const std::vector<Record *> &dstregs, int complexity,
+                 std::vector<Record *> dstregs, int complexity,
                  unsigned uid, unsigned setmode = 0)
       : SrcRecord(srcrecord), SrcPattern(src), DstPattern(dst),
-        Predicates(preds), Dstregs(std::move(dstregs)),
-        AddedComplexity(complexity), ID(uid), ForceMode(setmode) {}
-
-  PatternToMatch(Record *srcrecord, std::vector<Predicate> &&preds,
-                 TreePatternNodePtr src, TreePatternNodePtr dst,
-                 std::vector<Record *> &&dstregs, int complexity, unsigned uid,
-                 unsigned setmode = 0)
-      : SrcRecord(srcrecord), SrcPattern(src), DstPattern(dst),
-        Predicates(preds), Dstregs(std::move(dstregs)),
+        Predicates(std::move(preds)), Dstregs(std::move(dstregs)),
         AddedComplexity(complexity), ID(uid), ForceMode(setmode) {}
 
   Record          *SrcRecord;   // Originating Record for the pattern.
@@ -1201,7 +1193,7 @@ private:
 
   void AddPatternToMatch(TreePattern *Pattern, PatternToMatch &&PTM);
   void FindPatternInputsAndOutputs(
-      TreePattern *I, TreePatternNodePtr Pat,
+      TreePattern &I, TreePatternNodePtr Pat,
       std::map<std::string, TreePatternNodePtr> &InstInputs,
       std::map<std::string, TreePatternNodePtr> &InstResults,
       std::vector<Record *> &InstImpResults);
