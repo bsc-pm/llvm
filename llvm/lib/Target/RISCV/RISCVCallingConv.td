@@ -16,5 +16,11 @@
 
 def CSR : CalleeSavedRegs<(add X1, X3, X4, X8, X9, (sequence "X%u", 18, 27))>;
 
+def CSR_HardFloatSingle : CalleeSavedRegs<(add X1, X3, X4, X8, X9, (sequence "X%u", 18, 27),
+                                           F8_32, F9_32, (sequence "F%u_32", 18, 27))>;
+
+def CSR_HardFloatDouble : CalleeSavedRegs<(add X1, X3, X4, X8, X9, (sequence "X%u", 18, 27),
+                                           F8_64, F9_64, (sequence "F%u_64", 18, 27))>;
+
 // Needed for implementation of RISCVRegisterInfo::getNoPreservedMask()
 def CSR_NoRegs : CalleeSavedRegs<(add)>;

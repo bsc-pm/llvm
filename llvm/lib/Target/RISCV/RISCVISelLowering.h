@@ -29,6 +29,8 @@ enum NodeType : unsigned {
   SELECT_CC,
   BuildPairF64,
   SplitF64,
+  F32ToI64,
+  I64ToF32,
   TAIL
 };
 }

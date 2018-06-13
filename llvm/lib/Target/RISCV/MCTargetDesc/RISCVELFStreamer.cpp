@@ -31,6 +31,11 @@ RISCVTargetELFStreamer::RISCVTargetELFStreamer(MCStreamer &S,
   if (Features[RISCV::FeatureStdExtC])
     EFlags |= ELF::EF_RISCV_RVC;
 
+  if (Features[RISCV::HardFloatSingle])
+    EFlags |= ELF::EF_RISCV_FLOAT_ABI_SINGLE;
+  else if (Features[RISCV::HardFloatDouble])
+    EFlags |= ELF::EF_RISCV_FLOAT_ABI_DOUBLE;
+
   MCA.setELFHeaderEFlags(EFlags);
 }
 

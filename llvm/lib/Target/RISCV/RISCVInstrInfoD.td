@@ -201,6 +201,10 @@ let Predicates = [HasStdExtD] in {
 
 /// Float conversion operations
 
+// Moves (no conversion)
+def : Pat<(bitconvert GPR:$rs1), (FMV_D_X GPR:$rs1)>;
+def : Pat<(bitconvert FPR64:$rs1), (FMV_X_D FPR64:$rs1)>;
+
 // f64 -> f32, f32 -> f64
 def : Pat<(fpround FPR64:$rs1), (FCVT_S_D FPR64:$rs1, 0b111)>;
 def : Pat<(fpextend FPR32:$rs1), (FCVT_D_S FPR32:$rs1)>;
