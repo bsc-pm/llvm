@@ -200,7 +200,8 @@ static void getExtensionFeatures(const Driver &D,
   }
 }
 
-void riscv::getRISCVTargetFeatures(const Driver &D, const ArgList &Args,
+void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
+                                   const ArgList &Args,
                                    std::vector<StringRef> &Features) {
   if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
     StringRef MArch = A->getValue();
@@ -365,14 +366,31 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const ArgList &Args,
     getExtensionFeatures(D, Args, Features, MArch, OtherExts);
   }
 
+  // Forward the ABI correctly for code generation.
+  StringRef ABI = getRISCVABI(Args, Triple);
+  if (ABI == "ilp32f" || ABI == "lp64f")
+    Features.push_back("+hard-float-single");
+  else if (ABI == "ilp32d" || ABI == "lp64d")
+    Features.push_back("+hard-float-double");
+
   // Now add any that the user explicitly requested on the command line,
   // which may override the defaults.
   handleTargetFeaturesGroup(Args, Features, options::OPT_m_riscv_Features_Group);
 }
 
 StringRef riscv::getRISCVABI(const ArgList &Args, const llvm::Triple &Triple) {
-  if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
+  assert((Triple.getArch() == llvm::Triple::riscv32 ||
+          Triple.getArch() == llvm::Triple::riscv64) &&
+         "Unexpected triple");
+
+  if (const Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
     return A->getValue();
+
+  if (Triple.getArch() == llvm::Triple::riscv64 &&
+      Triple.getOS() == llvm::Triple::Linux &&
+      Triple.getEnvironment() == llvm::Triple::GNU)
+    // GNU/Linux is always hard float double
+    return "lp64d";
 
   return Triple.getArch() == llvm::Triple::riscv32 ? "ilp32" : "lp64";
 }

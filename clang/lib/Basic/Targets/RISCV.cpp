@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCV.h"
+#include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/MacroBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -46,9 +47,17 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
   Builder.defineMacro("__riscv");
   bool Is64Bit = getTriple().getArch() == llvm::Triple::riscv64;
   Builder.defineMacro("__riscv_xlen", Is64Bit ? "64" : "32");
-  // TODO: modify when more code models and ABIs are supported.
+  // TODO: modify when more code models are supported.
   Builder.defineMacro("__riscv_cmodel_medlow");
-  Builder.defineMacro("__riscv_float_abi_soft");
+
+  // We enforce the consistency between ABI and the corresponding target
+  // feature in handleTargetFeatures.
+  if (ABI == "ilp32f" || ABI == "lp64f")
+      Builder.defineMacro("__riscv_float_abi_single");
+  else if (ABI == "ilp32d" || ABI == "lp64d")
+      Builder.defineMacro("__riscv_float_abi_double");
+  else
+      Builder.defineMacro("__riscv_float_abi_soft");
 
   if (HasM) {
     Builder.defineMacro("__riscv_mul");
@@ -81,6 +90,9 @@ bool RISCVTargetInfo::hasFeature(StringRef Feature) const {
       .Case("f", HasF)
       .Case("d", HasD)
       .Case("c", HasC)
+      .Case("soft-float", !HardFloatSingle && !HardFloatDouble)
+      .Case("hard-float-single", HardFloatSingle)
+      .Case("hard-float-double", HardFloatDouble)
       .Default(false);
 }
 
@@ -98,6 +110,60 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasD = true;
     else if (Feature == "+c")
       HasC = true;
+    else if (Feature == "+soft-float")
+      HardFloatSingle = HardFloatDouble = false;
+    else if (Feature == "+hard-float-single")
+      HardFloatSingle = true;
+    else if (Feature == "+hard-float-double")
+      HardFloatDouble = true;
+  }
+
+  // FIXME: This won't scale when we have hard-float-quad.
+  if (HardFloatSingle && HardFloatDouble) {
+    Diags.Report(diag::err_opt_not_valid_with_opt) << "-target-feature +hard-float-single"
+                                                   << "-target-feature +hard-float-double";
+    return false;
+  }
+
+  // Make sure -target-abi and hard float are consistent.
+  // FIXME: when hard-float-quad is ever supported the way we emit the
+  // diagnostic will have to change.
+  bool Is64Bit = getTriple().getArch() == llvm::Triple::riscv64;
+  StringRef HardFloatSingleName, HardFloatDoubleName;
+  if (Is64Bit) {
+    HardFloatSingleName = "lp64f";
+    HardFloatDoubleName = "lp64d";
+  } else {
+    HardFloatSingleName = "ilp32f";
+    HardFloatDoubleName = "ilp32d";
+  }
+
+  std::string TargetAbiHardFloatSingle = "-target-abi ";
+  TargetAbiHardFloatSingle += HardFloatSingleName;
+
+  std::string TargetAbiHardFloatDouble = "-target-abi ";
+  TargetAbiHardFloatDouble += HardFloatDoubleName;
+
+  if (HardFloatSingle && ABI != HardFloatSingleName) {
+    Diags.Report(diag::err_opt_not_valid_without_opt)
+        << "-target-feature +hard-float-single"
+        << TargetAbiHardFloatSingle;
+    return false;
+  } else if (HardFloatDouble && ABI != HardFloatDoubleName) {
+    Diags.Report(diag::err_opt_not_valid_without_opt)
+        << "-target-feature +hard-float-double"
+        << TargetAbiHardFloatDouble;
+    return false;
+  } else if (ABI == HardFloatSingleName && !HardFloatSingle) {
+    Diags.Report(diag::err_opt_not_valid_without_opt)
+        << TargetAbiHardFloatSingle
+        << "-target-feature +hard-float-single";
+    return false;
+  } else if (ABI == HardFloatDoubleName && !HardFloatDouble) {
+    Diags.Report(diag::err_opt_not_valid_without_opt)
+        << TargetAbiHardFloatDouble
+        << "-target-feature +hard-float-double";
+    return false;
   }
 
   return true;

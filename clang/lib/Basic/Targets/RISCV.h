@@ -31,11 +31,13 @@ protected:
   bool HasF;
   bool HasD;
   bool HasC;
+  bool HardFloatSingle;
+  bool HardFloatDouble;
 
 public:
   RISCVTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
-      : TargetInfo(Triple), HasM(false), HasA(false), HasF(false),
-        HasD(false), HasC(false) {
+      : TargetInfo(Triple), HasM(false), HasA(false), HasF(false), HasD(false),
+        HasC(false), HardFloatSingle(false), HardFloatDouble(false) {
     TLSSupported = false;
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
@@ -83,7 +85,7 @@ public:
 
   bool setABI(const std::string &Name) override {
     // TODO: support ilp32f and ilp32d ABIs.
-    if (Name == "ilp32") {
+    if (Name == "ilp32" || Name == "ilp32f" || Name == "ilp32d") {
       ABI = Name;
       return true;
     }
@@ -100,8 +102,7 @@ public:
   }
 
   bool setABI(const std::string &Name) override {
-    // TODO: support lp64f and lp64d ABIs.
-    if (Name == "lp64") {
+    if (Name == "lp64" || Name == "lp64f" || Name == "lp64d") {
       ABI = Name;
       return true;
     }
