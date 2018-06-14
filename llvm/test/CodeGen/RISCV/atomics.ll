@@ -23,7 +23,7 @@ define void @fence_release() nounwind {
 define void @fence_acq_rel() nounwind {
 ; RV32I-LABEL: fence_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
+; RV32I-NEXT:    fence.tso
 ; RV32I-NEXT:    ret
   fence acq_rel
   ret void
@@ -186,7 +186,7 @@ define void @atomic_store_i8_release(i8 *%a, i8 %b) nounwind {
 define void @atomic_store_i8_seq_cst(i8 *%a, i8 %b) nounwind {
 ; RV32I-LABEL: atomic_store_i8_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
+; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    sb a0, 0(a1)
 ; RV32I-NEXT:    ret
   store atomic i8 %b, i8* %a seq_cst, align 1
@@ -224,7 +224,7 @@ define void @atomic_store_i16_release(i16 *%a, i16 %b) nounwind {
 define void @atomic_store_i16_seq_cst(i16 *%a, i16 %b) nounwind {
 ; RV32I-LABEL: atomic_store_i16_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
+; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    sh a0, 0(a1)
 ; RV32I-NEXT:    ret
   store atomic i16 %b, i16* %a seq_cst, align 2
@@ -262,7 +262,7 @@ define void @atomic_store_i32_release(i32 *%a, i32 %b) nounwind {
 define void @atomic_store_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomic_store_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
+; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    sw a0, 0(a1)
 ; RV32I-NEXT:    ret
   store atomic i32 %b, i32* %a seq_cst, align 4
@@ -282,7 +282,6 @@ define i32 @atomicrmw_xchg_i32_acquire(i32* %a, i32 %b) {
 ; RV32I-LABEL: atomicrmw_xchg_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amoswap.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xchg i32* %a, i32 %b acquire
   ret i32 %1
@@ -291,7 +290,6 @@ define i32 @atomicrmw_xchg_i32_acquire(i32* %a, i32 %b) {
 define i32 @atomicrmw_xchg_i32_release(i32* %a, i32 %b) {
 ; RV32I-LABEL: atomicrmw_xchg_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amoswap.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xchg i32* %a, i32 %b release
@@ -301,9 +299,7 @@ define i32 @atomicrmw_xchg_i32_release(i32* %a, i32 %b) {
 define i32 @atomicrmw_xchg_i32_acq_rel(i32* %a, i32 %b) {
 ; RV32I-LABEL: atomicrmw_xchg_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoswap.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xchg i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -312,9 +308,7 @@ define i32 @atomicrmw_xchg_i32_acq_rel(i32* %a, i32 %b) {
 define i32 @atomicrmw_xchg_i32_seq_cst(i32* %a, i32 %b) {
 ; RV32I-LABEL: atomicrmw_xchg_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoswap.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xchg i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -333,7 +327,6 @@ define i32 @atomicrmw_add_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_add_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amoadd.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw add i32* %a, i32 %b acquire
   ret i32 %1
@@ -342,7 +335,6 @@ define i32 @atomicrmw_add_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_add_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_add_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amoadd.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw add i32* %a, i32 %b release
@@ -352,9 +344,7 @@ define i32 @atomicrmw_add_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_add_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_add_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoadd.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw add i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -363,9 +353,7 @@ define i32 @atomicrmw_add_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_add_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_add_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoadd.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw add i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -384,7 +372,6 @@ define i32 @atomicrmw_and_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_and_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amoand.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw and i32* %a, i32 %b acquire
   ret i32 %1
@@ -393,7 +380,6 @@ define i32 @atomicrmw_and_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_and_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_and_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amoand.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw and i32* %a, i32 %b release
@@ -403,9 +389,7 @@ define i32 @atomicrmw_and_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_and_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_and_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoand.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw and i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -414,9 +398,7 @@ define i32 @atomicrmw_and_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_and_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_and_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoand.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw and i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -435,7 +417,6 @@ define i32 @atomicrmw_or_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_or_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amoor.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw or i32* %a, i32 %b acquire
   ret i32 %1
@@ -444,7 +425,6 @@ define i32 @atomicrmw_or_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_or_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_or_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amoor.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw or i32* %a, i32 %b release
@@ -454,9 +434,7 @@ define i32 @atomicrmw_or_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_or_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_or_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoor.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw or i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -465,9 +443,7 @@ define i32 @atomicrmw_or_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_or_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_or_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoor.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw or i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -486,7 +462,6 @@ define i32 @atomicrmw_xor_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_xor_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amoxor.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xor i32* %a, i32 %b acquire
   ret i32 %1
@@ -495,7 +470,6 @@ define i32 @atomicrmw_xor_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_xor_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_xor_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amoxor.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xor i32* %a, i32 %b release
@@ -505,9 +479,7 @@ define i32 @atomicrmw_xor_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_xor_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_xor_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoxor.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xor i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -516,9 +488,7 @@ define i32 @atomicrmw_xor_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_xor_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_xor_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amoxor.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw xor i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -537,7 +507,6 @@ define i32 @atomicrmw_max_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_max_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amomax.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw max i32* %a, i32 %b acquire
   ret i32 %1
@@ -546,7 +515,6 @@ define i32 @atomicrmw_max_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_max_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_max_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amomax.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw max i32* %a, i32 %b release
@@ -556,9 +524,7 @@ define i32 @atomicrmw_max_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_max_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_max_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomax.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw max i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -567,9 +533,7 @@ define i32 @atomicrmw_max_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_max_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_max_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomax.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw max i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -588,7 +552,6 @@ define i32 @atomicrmw_min_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_min_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amomin.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw min i32* %a, i32 %b acquire
   ret i32 %1
@@ -597,7 +560,6 @@ define i32 @atomicrmw_min_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_min_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_min_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amomin.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw min i32* %a, i32 %b release
@@ -607,9 +569,7 @@ define i32 @atomicrmw_min_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_min_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_min_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomin.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw min i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -618,9 +578,7 @@ define i32 @atomicrmw_min_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_min_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_min_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomin.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw min i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -639,7 +597,6 @@ define i32 @atomicrmw_umax_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umax_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amomaxu.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umax i32* %a, i32 %b acquire
   ret i32 %1
@@ -648,7 +605,6 @@ define i32 @atomicrmw_umax_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umax_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umax_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amomaxu.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umax i32* %a, i32 %b release
@@ -658,9 +614,7 @@ define i32 @atomicrmw_umax_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umax_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umax_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomaxu.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umax i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -669,9 +623,7 @@ define i32 @atomicrmw_umax_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umax_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umax_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amomaxu.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umax i32* %a, i32 %b seq_cst
   ret i32 %1
@@ -690,7 +642,6 @@ define i32 @atomicrmw_umin_i32_acquire(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umin_i32_acquire:
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    amominu.w a0, a1, (a0)
-; RV32I-NEXT:    fence r, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umin i32* %a, i32 %b acquire
   ret i32 %1
@@ -699,7 +650,6 @@ define i32 @atomicrmw_umin_i32_acquire(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umin_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umin_i32_release:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, w
 ; RV32I-NEXT:    amominu.w a0, a1, (a0)
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umin i32* %a, i32 %b release
@@ -709,9 +659,7 @@ define i32 @atomicrmw_umin_i32_release(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umin_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umin_i32_acq_rel:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amominu.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umin i32* %a, i32 %b acq_rel
   ret i32 %1
@@ -720,9 +668,7 @@ define i32 @atomicrmw_umin_i32_acq_rel(i32 *%a, i32 %b) nounwind {
 define i32 @atomicrmw_umin_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32I-LABEL: atomicrmw_umin_i32_seq_cst:
 ; RV32I:       # %bb.0:
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    amominu.w a0, a1, (a0)
-; RV32I-NEXT:    fence rw, rw
 ; RV32I-NEXT:    ret
   %1 = atomicrmw umin i32* %a, i32 %b seq_cst
   ret i32 %1

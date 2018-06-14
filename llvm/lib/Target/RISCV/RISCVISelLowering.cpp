@@ -137,6 +137,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BlockAddress, XLenVT, Custom);
   setOperationAction(ISD::ConstantPool, XLenVT, Custom);
 
+  if (Subtarget.hasStdExtA())
+    setMaxAtomicSizeInBitsSupported(Subtarget.getXLen());
+  else
+    setMaxAtomicSizeInBitsSupported(0);
+
   setBooleanContents(ZeroOrOneBooleanContent);
 
   // Function alignments (log2).
@@ -1554,19 +1559,17 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
 Instruction *RISCVTargetLowering::emitLeadingFence(IRBuilder<> &Builder,
                                                    Instruction *Inst,
                                                    AtomicOrdering Ord) const {
-  if (isReleaseOrStronger(Ord))
+  if (isa<LoadInst>(Inst) && Ord == AtomicOrdering::SequentiallyConsistent)
     return Builder.CreateFence(Ord);
+  if (isa<StoreInst>(Inst) && isReleaseOrStronger(Ord))
+    return Builder.CreateFence(AtomicOrdering::Release);
   return nullptr;
 }
 
 Instruction *RISCVTargetLowering::emitTrailingFence(IRBuilder<> &Builder,
                                                     Instruction *Inst,
                                                     AtomicOrdering Ord) const {
-  if (Inst->hasAtomicLoad() && Inst->hasAtomicStore() &&
-      (Ord == AtomicOrdering::SequentiallyConsistent ||
-       Ord == AtomicOrdering::AcquireRelease))
-    return Builder.CreateFence(AtomicOrdering::SequentiallyConsistent);
-  if (Inst->hasAtomicLoad() && isAcquireOrStronger(Ord))
+  if (isa<LoadInst>(Inst) && isAcquireOrStronger(Ord))
     return Builder.CreateFence(AtomicOrdering::Acquire);
   return nullptr;
 }

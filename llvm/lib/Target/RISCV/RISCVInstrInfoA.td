@@ -74,13 +74,29 @@ defm AMOMIN_D   : AMO_rr_aq_rl<0b10000, 0b011, "amomin.d">;
 defm AMOMAX_D   : AMO_rr_aq_rl<0b10100, 0b011, "amomax.d">;
 defm AMOMINU_D  : AMO_rr_aq_rl<0b11000, 0b011, "amominu.d">;
 defm AMOMAXU_D  : AMO_rr_aq_rl<0b11100, 0b011, "amomaxu.d">;
-} // Predicates = [HasStdExtA, IsRV64]
+} // Predicates = [HasStedExtA, IsRV64]
 
 //===----------------------------------------------------------------------===//
 // Pseudo-instructions and codegen patterns
 //===----------------------------------------------------------------------===//
 
 let Predicates = [HasStdExtA] in {
+
+/// Atomic loads and stores
+
+// Fences will be inserted for atomic load/stores according to the logic in
+// RISCVTargetLowering::{emitLeadingFence,emitTrailingFence}.
+
+defm : LdPat<atomic_load_8,  LB>;
+defm : LdPat<atomic_load_16, LH>;
+defm : LdPat<atomic_load_32, LW>;
+
+defm : StPat<atomic_store_8,  SB, GPR>;
+defm : StPat<atomic_store_16,  SH, GPR>;
+defm : StPat<atomic_store_32, SW, GPR>;
+
+/// Atomic operations
+
 // TODO: Should set .aqrl bits as appropriate rather than doing the
 // fence-based lowering.
 def : PatGprGpr<atomic_swap_32, AMOSWAP_W>;
@@ -92,4 +108,5 @@ def : PatGprGpr<atomic_load_max_32, AMOMAX_W>;
 def : PatGprGpr<atomic_load_min_32, AMOMIN_W>;
 def : PatGprGpr<atomic_load_umax_32, AMOMAXU_W>;
 def : PatGprGpr<atomic_load_umin_32, AMOMINU_W>;
+
 } // Predicates = [HasStdExtA]

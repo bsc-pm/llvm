@@ -63,16 +63,16 @@ public:
   EmitInstrWithCustomInserter(MachineInstr &MI,
                               MachineBasicBlock *BB) const override;
 
+  EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
+                         EVT VT) const override;
+
   bool shouldInsertFencesForAtomic(const Instruction *I) const override {
-    return true;
+    return isa<LoadInst>(I) || isa<StoreInst>(I);
   }
   Instruction *emitLeadingFence(IRBuilder<> &Builder, Instruction *Inst,
                                 AtomicOrdering Ord) const override;
   Instruction *emitTrailingFence(IRBuilder<> &Builder, Instruction *Inst,
                                  AtomicOrdering Ord) const override;
-
-  EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
-                         EVT VT) const override;
 
 private:
   void analyzeInputArgs(MachineFunction &MF, CCState &CCInfo,
