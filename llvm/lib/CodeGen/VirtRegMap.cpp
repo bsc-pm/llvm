@@ -433,7 +433,7 @@ void VirtRegRewriter::expandCopyBundle(MachineInstr &MI) const {
     // If any of the destination registers in the bundle of copies alias any of
     // the source registers, try to schedule the instructions to avoid any
     // clobbering.
-    for (int E = MIs.size(), PrevE; E > 1; PrevE = E) {
+    for (int E = MIs.size(), PrevE = E; E > 1; PrevE = E) {
       for (int I = E; I--; )
         if (!anyRegsAlias(MIs[I], makeArrayRef(MIs).take_front(E), TRI)) {
           if (I + 1 != E)
