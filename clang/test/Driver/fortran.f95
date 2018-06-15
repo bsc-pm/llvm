@@ -1,3 +1,5 @@
+// XFAILing because we have integrated flang
+// XFAIL: *
 // Check that the clang driver can invoke gcc to compile Fortran.
 
 // RUN: %clang -target x86_64-unknown-linux-gnu -integrated-as -c %s -### 2>&1 \
