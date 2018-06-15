@@ -35,6 +35,10 @@ let Predicates = [HasSVE] in {
   defm EOR_ZI : sve_int_log_imm<0b01, "eor", "eon">;
   defm AND_ZI : sve_int_log_imm<0b10, "and", "bic">;
 
+  defm FADD_ZPmI    : sve_fp_2op_i_p_zds<0b000, "fadd", sve_fpimm_half_one>;
+  defm FMUL_ZPmI    : sve_fp_2op_i_p_zds<0b010, "fmul", sve_fpimm_half_two>;
+  defm FMAX_ZPmI    : sve_fp_2op_i_p_zds<0b110, "fmax", sve_fpimm_zero_one>;
+
   // Splat immediate (unpredicated)
   defm DUP_ZI   : sve_int_dup_imm<"dup">;
   defm FDUP_ZI  : sve_int_dup_fpimm<"fdup">;
@@ -472,6 +476,15 @@ let Predicates = [HasSVE] in {
   def RDVLI_XI  : sve_int_read_vl_a<0b0, 0b11111, "rdvl">;
   def ADDVL_XXI : sve_int_arith_vl<0b0, "addvl">;
   def ADDPL_XXI : sve_int_arith_vl<0b1, "addpl">;
+
+  defm INCB_XPiI : sve_int_pred_pattern_a<0b000, "incb">;
+  defm DECB_XPiI : sve_int_pred_pattern_a<0b001, "decb">;
+  defm INCH_XPiI : sve_int_pred_pattern_a<0b010, "inch">;
+  defm DECH_XPiI : sve_int_pred_pattern_a<0b011, "dech">;
+  defm INCW_XPiI : sve_int_pred_pattern_a<0b100, "incw">;
+  defm DECW_XPiI : sve_int_pred_pattern_a<0b101, "decw">;
+  defm INCD_XPiI : sve_int_pred_pattern_a<0b110, "incd">;
+  defm DECD_XPiI : sve_int_pred_pattern_a<0b111, "decd">;
 
   defm INDEX_RR : sve_int_index_rr<"index">;
   defm INDEX_IR : sve_int_index_ir<"index">;
