@@ -193,27 +193,22 @@ int main() { ClassWithMembers().^ }
 
 TEST(CompletionTest, Filter) {
   std::string Body = R"cpp(
-    #define FooBarMacro
-    int Abracadabra;
-    int Alakazam;
+    #define MotorCar
+    int Car;
     struct S {
       int FooBar;
       int FooBaz;
       int Qux;
     };
   )cpp";
+
+  // Only items matching the fuzzy query are returned.
   EXPECT_THAT(completions(Body + "int main() { S().Foba^ }").items,
-              AllOf(Has("FooBar"), Has("FooBaz"), Not(Has("FooBarMacro")),
-                    Not(Has("Qux"))));
+              AllOf(Has("FooBar"), Has("FooBaz"), Not(Has("Qux"))));
 
-  EXPECT_THAT(completions(Body + "int main() { S().FR^ }").items,
-              AllOf(Has("FooBar"), Not(Has("FooBaz")), Not(Has("Qux"))));
-
-  EXPECT_THAT(completions(Body + "int main() { aaa^ }").items,
-              AllOf(Has("Abracadabra"), Has("Alakazam")));
-
-  EXPECT_THAT(completions(Body + "int main() { _a^ }").items,
-              AllOf(Has("static_cast"), Not(Has("Abracadabra"))));
+  // Macros require  prefix match.
+  EXPECT_THAT(completions(Body + "int main() { C^ }").items,
+              AllOf(Has("Car"), Not(Has("MotorCar"))));
 }
 
 void TestAfterDotCompletion(clangd::CodeCompleteOptions Opts) {
@@ -461,21 +456,21 @@ TEST(CompletionTest, NoDuplicates) {
 TEST(CompletionTest, ScopedNoIndex) {
   auto Results = completions(
       R"cpp(
-          namespace fake { int BigBang, Babble, Ball; };
-          int main() { fake::bb^ }
+          namespace fake { int BigBang, Babble, Box; };
+          int main() { fake::ba^ }
       ")cpp");
-  // BigBang is a better match than Babble. Ball doesn't match at all.
-  EXPECT_THAT(Results.items, ElementsAre(Named("BigBang"), Named("Babble")));
+  // Babble is a better match than BigBang. Box doesn't match at all.
+  EXPECT_THAT(Results.items, ElementsAre(Named("Babble"), Named("BigBang")));
 }
 
 TEST(CompletionTest, Scoped) {
   auto Results = completions(
       R"cpp(
-          namespace fake { int Babble, Ball; };
-          int main() { fake::bb^ }
+          namespace fake { int Babble, Box; };
+          int main() { fake::ba^ }
       ")cpp",
       {var("fake::BigBang")});
-  EXPECT_THAT(Results.items, ElementsAre(Named("BigBang"), Named("Babble")));
+  EXPECT_THAT(Results.items, ElementsAre(Named("Babble"), Named("BigBang")));
 }
 
 TEST(CompletionTest, ScopedWithFilter) {
@@ -1103,6 +1098,65 @@ TEST(CompletionTest, DocumentationFromChangedFileCrash) {
   // comments for symbols from headers.
   EXPECT_THAT(Completions.items,
               Contains(AllOf(Not(IsDocumented()), Named("func"))));
+}
+
+TEST(CompletionTest, NonDocComments) {
+  MockFSProvider FS;
+  auto FooCpp = testPath("foo.cpp");
+  FS.Files[FooCpp] = "";
+
+  MockCompilationDatabase CDB;
+  IgnoreDiagnostics DiagConsumer;
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
+
+  Annotations Source(R"cpp(
+    // ------------------
+    int comments_foo();
+
+    // A comment and a decl are separated by newlines.
+    // Therefore, the comment shouldn't show up as doc comment.
+
+    int comments_bar();
+
+    // this comment should be in the results.
+    int comments_baz();
+
+
+    template <class T>
+    struct Struct {
+      int comments_qux();
+      int comments_quux();
+    };
+
+
+    // This comment should not be there.
+
+    template <class T>
+    int Struct<T>::comments_qux() {
+    }
+
+    // This comment **should** be in results.
+    template <class T>
+    int Struct<T>::comments_quux() {
+      int a = comments^;
+    }
+  )cpp");
+  Server.addDocument(FooCpp, Source.code(), WantDiagnostics::Yes);
+  CompletionList Completions = cantFail(runCodeComplete(
+      Server, FooCpp, Source.point(), clangd::CodeCompleteOptions()));
+
+  // We should not get any of those comments in completion.
+  EXPECT_THAT(
+      Completions.items,
+      UnorderedElementsAre(AllOf(Not(IsDocumented()), Named("comments_foo")),
+                           AllOf(IsDocumented(), Named("comments_baz")),
+                           AllOf(IsDocumented(), Named("comments_quux")),
+                           // FIXME(ibiryukov): the following items should have
+                           // empty documentation, since they are separated from
+                           // a comment with an empty line. Unfortunately, I
+                           // couldn't make Sema tests pass if we ignore those.
+                           AllOf(IsDocumented(), Named("comments_bar")),
+                           AllOf(IsDocumented(), Named("comments_qux"))));
 }
 
 TEST(CompletionTest, CompleteOnInvalidLine) {

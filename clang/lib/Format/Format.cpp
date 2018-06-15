@@ -449,6 +449,8 @@ template <> struct MappingTraits<FormatStyle> {
                    Style.SpaceAfterTemplateKeyword);
     IO.mapOptional("SpaceBeforeAssignmentOperators",
                    Style.SpaceBeforeAssignmentOperators);
+    IO.mapOptional("SpaceBeforeCpp11BracedList",
+                   Style.SpaceBeforeCpp11BracedList);
     IO.mapOptional("SpaceBeforeCtorInitializerColon",
                    Style.SpaceBeforeCtorInitializerColon);
     IO.mapOptional("SpaceBeforeInheritanceColon",
@@ -697,6 +699,7 @@ FormatStyle getLLVMStyle() {
   LLVMStyle.SpaceBeforeParens = FormatStyle::SBPO_ControlStatements;
   LLVMStyle.SpaceBeforeRangeBasedForLoopColon = true;
   LLVMStyle.SpaceBeforeAssignmentOperators = true;
+  LLVMStyle.SpaceBeforeCpp11BracedList = false;
   LLVMStyle.SpacesInAngles = false;
 
   LLVMStyle.PenaltyBreakAssignment = prec::Assignment;
@@ -820,6 +823,7 @@ FormatStyle getGoogleStyle(FormatStyle::LanguageKind Language) {
     // has been implemented.
     GoogleStyle.BreakStringLiterals = false;
   } else if (Language == FormatStyle::LK_ObjC) {
+    GoogleStyle.AlwaysBreakBeforeMultilineStrings = false;
     GoogleStyle.ColumnLimit = 100;
   }
 
@@ -892,6 +896,7 @@ FormatStyle getWebKitStyle() {
   Style.ObjCBlockIndentWidth = 4;
   Style.ObjCSpaceAfterProperty = true;
   Style.PointerAlignment = FormatStyle::PAS_Left;
+  Style.SpaceBeforeCpp11BracedList = true;
   return Style;
 }
 

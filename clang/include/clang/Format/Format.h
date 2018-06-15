@@ -840,24 +840,24 @@ struct FormatStyle {
   enum BreakConstructorInitializersStyle {
     /// Break constructor initializers before the colon and after the commas.
     /// \code
-    /// Constructor()
-    ///     : initializer1(),
-    ///       initializer2()
+    ///    Constructor()
+    ///        : initializer1(),
+    ///          initializer2()
     /// \endcode
     BCIS_BeforeColon,
     /// Break constructor initializers before the colon and commas, and align
     /// the commas with the colon.
     /// \code
-    /// Constructor()
-    ///     : initializer1()
-    ///     , initializer2()
+    ///    Constructor()
+    ///        : initializer1()
+    ///        , initializer2()
     /// \endcode
     BCIS_BeforeComma,
     /// Break constructor initializers after the colon and commas.
     /// \code
-    /// Constructor() :
-    ///     initializer1(),
-    ///     initializer2()
+    ///    Constructor() :
+    ///        initializer1(),
+    ///        initializer2()
     /// \endcode
     BCIS_AfterColon
   };
@@ -897,25 +897,27 @@ struct FormatStyle {
   enum BreakInheritanceListStyle {
     /// Break inheritance list before the colon and after the commas.
     /// \code
-    /// class Foo
-    ///     : Base1,
-    ///       Base2
-    /// {};
+    ///    class Foo
+    ///        : Base1,
+    ///          Base2
+    ///    {};
     /// \endcode
     BILS_BeforeColon,
     /// Break inheritance list before the colon and commas, and align
     /// the commas with the colon.
     /// \code
-    /// Constructor()
-    ///     : initializer1()
-    ///     , initializer2()
+    ///    class Foo
+    ///        : Base1
+    ///        , Base2
+    ///    {};
     /// \endcode
     BILS_BeforeComma,
     /// Break inheritance list after the colon and commas.
     /// \code
-    /// Constructor() :
-    ///     initializer1(),
-    ///     initializer2()
+    ///    class Foo :
+    ///        Base1,
+    ///        Base2
+    ///    {};
     /// \endcode
     BILS_AfterColon
   };
@@ -1495,6 +1497,17 @@ struct FormatStyle {
   /// \endcode
   bool SpaceBeforeAssignmentOperators;
 
+  /// If ``true``, a space will be inserted before a C++11 braced list
+  /// used to initialize an object (after the preceding identifier or type).
+  /// \code
+  ///    true:                                  false:
+  ///    Foo foo { bar };               vs.     Foo foo{ bar };
+  ///    Foo {};                                Foo{};
+  ///    vector<int> { 1, 2, 3 };               vector<int>{ 1, 2, 3 };
+  ///    new int[3] { 1, 2, 3 };                new int[3]{ 1, 2, 3 };
+  /// \endcode
+  bool SpaceBeforeCpp11BracedList;
+
   /// If ``false``, spaces will be removed before constructor initializer
   /// colon.
   /// \code
@@ -1738,6 +1751,7 @@ struct FormatStyle {
            SpaceAfterCStyleCast == R.SpaceAfterCStyleCast &&
            SpaceAfterTemplateKeyword == R.SpaceAfterTemplateKeyword &&
            SpaceBeforeAssignmentOperators == R.SpaceBeforeAssignmentOperators &&
+           SpaceBeforeCpp11BracedList == R.SpaceBeforeCpp11BracedList &&
            SpaceBeforeCtorInitializerColon ==
                R.SpaceBeforeCtorInitializerColon &&
            SpaceBeforeInheritanceColon == R.SpaceBeforeInheritanceColon &&
