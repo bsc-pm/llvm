@@ -3,6 +3,36 @@
 // RUN: %clang %s -### -no-canonical-prefixes -target riscv64 2>&1 | FileCheck -check-prefix=CC1 %s
 // CC1: clang{{.*}} "-cc1" "-triple" "riscv64"
 
+// RUN: %clang %s -### -no-canonical-prefixes -fuse-ld=ld \
+// RUN:   -target riscv64-linux-unknown-elf \
+// RUN:   --gcc-toolchain=%S/Inputs/multilib_riscv_linux_sdk \
+// RUN:   --sysroot=%S/Inputs/multilib_riscv_linux_sdk/sysroot 2>&1 \
+// RUN:   | FileCheck -check-prefix=C-RV64-LINUX-MULTI-LP64 %s
+
+// C-RV64-LINUX-MULTI-LP64: "{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/../../../../riscv64-unknown-linux-gnu/bin{{/|\\\\}}ld"
+// C-RV64-LINUX-MULTI-LP64: "--sysroot={{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot"
+// C-RV64-LINUX-MULTI-LP64: "-m" "elf64lriscv"
+// C-RV64-LINUX-MULTI-LP64: "-dynamic-linker" "/lib/ld-linux-riscv64-lp64.so.1"
+// C-RV64-LINUX-MULTI-LP64: "{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib64/lp64{{/|\\\\}}crtbegin.o"
+// C-RV64-LINUX-MULTI-LP64: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib64/lp64"
+// C-RV64-LINUX-MULTI-LP64: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib64/lp64"
+// C-RV64-LINUX-MULTI-LP64: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib64/lp64"
+
+// RUN: %clang %s -### -no-canonical-prefixes -fuse-ld=ld \
+// RUN:   -target riscv64-linux-unknown-elf -march=rv64imafd -mabi=lp64d \
+// RUN:   --gcc-toolchain=%S/Inputs/multilib_riscv_linux_sdk \
+// RUN:   --sysroot=%S/Inputs/multilib_riscv_linux_sdk/sysroot 2>&1 \
+// RUN:   | FileCheck -check-prefix=C-RV64-LINUX-MULTI-LP64D %s
+
+// C-RV64-LINUX-MULTI-LP64D: "{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/../../../../riscv64-unknown-linux-gnu/bin{{/|\\\\}}ld"
+// C-RV64-LINUX-MULTI-LP64D: "--sysroot={{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot"
+// C-RV64-LINUX-MULTI-LP64D: "-m" "elf64lriscv"
+// C-RV64-LINUX-MULTI-LP64D: "-dynamic-linker" "/lib/ld-linux-riscv64-lp64d.so.1"
+// C-RV64-LINUX-MULTI-LP64D: "{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib64/lp64d{{/|\\\\}}crtbegin.o"
+// C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib64/lp64d"
+// C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib64/lp64d"
+// C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib64/lp64d"
+
 // RUN: %clang -target riscv64 %s -emit-llvm -S -o - | FileCheck %s
 
 typedef __builtin_va_list va_list;
