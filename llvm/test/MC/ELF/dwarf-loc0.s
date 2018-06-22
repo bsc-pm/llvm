@@ -3,6 +3,7 @@
 # REQUIRES: default_triple
 # Darwin line table is stuck on DWARF v2.
 # XFAIL: darwin
+# XFAIL: riscv
 # Show that ".loc 0" works in DWARF v5, gets an error for earlier versions.
         .file 0 "root.cpp"
         .file 1 "header.h"
