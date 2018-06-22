@@ -7,9 +7,9 @@
         .file 0 "root.cpp"
         .file 1 "header.h"
 	.loc  0 10 0
-        nop
+        .byte 0
         .loc  1 20 0
-        nop
+        .byte 0
 
 # CHECK:      file_names[ 0]:
 # CHECK-NEXT: name: "root.cpp"
@@ -17,9 +17,9 @@
 # CHECK-NEXT: name: "header.h"
 # CHECK:      Address Line Column File
 # CHECK-NEXT: -------
-# CHECK-NEXT: 0x{{0+}}0 10 0 0
-# CHECK-NEXT: 0x{{0+}}1 20 0 1
-# CHECK-NEXT: 0x{{0+}}2 20 0 1 {{.*}} end_sequence
+# CHECK-NEXT: 0x{{[0-9a-f]+}} 10 0 0
+# CHECK-NEXT: 0x{{[0-9a-f]+}} 20 0 1
+# CHECK-NEXT: 0x{{[0-9a-f]+}} 20 0 1 {{.*}} end_sequence
 
 # ERR:      file number less than one in '.loc' directive
 # ERR-NEXT: .loc 0 10 0
