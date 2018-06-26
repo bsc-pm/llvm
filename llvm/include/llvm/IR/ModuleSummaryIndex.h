@@ -914,6 +914,12 @@ public:
   std::set<std::string> &cfiFunctionDecls() { return CfiFunctionDecls; }
   const std::set<std::string> &cfiFunctionDecls() const { return CfiFunctionDecls; }
 
+  /// Add a global value summary for a value.
+  void addGlobalValueSummary(const GlobalValue &GV,
+                             std::unique_ptr<GlobalValueSummary> Summary) {
+    addGlobalValueSummary(getOrInsertValueInfo(&GV), std::move(Summary));
+  }
+
   /// Add a global value summary for a value of the given name.
   void addGlobalValueSummary(StringRef ValueName,
                              std::unique_ptr<GlobalValueSummary> Summary) {
@@ -965,8 +971,7 @@ public:
   GlobalValueSummary *getGlobalValueSummary(const GlobalValue &GV,
                                             bool PerModuleIndex = true) const {
     assert(GV.hasName() && "Can't get GlobalValueSummary for GV with no name");
-    return getGlobalValueSummary(GlobalValue::getGUID(GV.getName()),
-                                 PerModuleIndex);
+    return getGlobalValueSummary(GV.getGUID(), PerModuleIndex);
   }
 
   /// Returns the first GlobalValueSummary for \p ValueGUID, asserting that
@@ -1021,6 +1026,13 @@ public:
   ModuleInfo *addModule(StringRef ModPath, uint64_t ModId,
                         ModuleHash Hash = ModuleHash{{0}}) {
     return &*ModulePathStringTable.insert({ModPath, {ModId, Hash}}).first;
+  }
+
+  /// Return module entry for module with the given \p ModPath.
+  ModuleInfo *getModule(StringRef ModPath) {
+    auto It = ModulePathStringTable.find(ModPath);
+    assert(It != ModulePathStringTable.end() && "Module not registered");
+    return &*It;
   }
 
   /// Check if the given Module has any functions available for exporting
