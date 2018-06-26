@@ -22,8 +22,10 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/Type.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "llvm/Support/type_traits.h"
 #include <cassert>
 
 namespace clang {
@@ -76,16 +78,20 @@ public:
     KindLast = InAlloca
   };
 
+  enum class ExtendKind : unsigned { None = 1, SignExt = 2, ZeroExt = 3 };
+
 private:
+
   llvm::Type *TypeData; // canHaveCoerceToType()
   union {
     llvm::Type *PaddingType; // canHavePaddingType()
     llvm::Type *UnpaddedCoerceAndExpandType; // isCoerceAndExpand()
   };
   union {
-    unsigned DirectOffset;     // isDirect() || isExtend()
-    unsigned IndirectAlign;    // isIndirect()
-    unsigned AllocaFieldIndex; // isInAlloca()
+    llvm::ConstantDataArray *ExtendSeq; // isCoerceAndExpand()
+    unsigned DirectOffset;              // isDirect() || isExtend()
+    unsigned IndirectAlign;             // isIndirect()
+    unsigned AllocaFieldIndex;          // isInAlloca()
   };
   Kind TheKind;
   bool PaddingInReg : 1;
@@ -110,13 +116,16 @@ private:
     UnpaddedCoerceAndExpandType = T;
   }
 
-  ABIArgInfo(Kind K)
-      : TheKind(K), PaddingInReg(false), InReg(false) {
+  void setExtendSet(llvm::ConstantDataArray *ES) {
+    assert(isCoerceAndExpand());
+    ExtendSeq = ES;
   }
+
+  ABIArgInfo(Kind K) : TheKind(K), PaddingInReg(false), InReg(false) {}
 
 public:
   ABIArgInfo()
-      : TypeData(nullptr), PaddingType(nullptr), DirectOffset(0),
+      : TypeData(nullptr), PaddingType(nullptr), ExtendSeq(nullptr),
         TheKind(Direct), PaddingInReg(false), InReg(false) {}
 
   static ABIArgInfo getDirect(llvm::Type *T = nullptr, unsigned Offset = 0,
@@ -210,8 +219,15 @@ public:
   /// \param unpaddedCoerceToType The coerce-to type with padding elements
   ///   removed, canonicalized to a single element if it would otherwise
   ///   have exactly one element.
-  static ABIArgInfo getCoerceAndExpand(llvm::StructType *coerceToType,
-                                       llvm::Type *unpaddedCoerceToType) {
+  /// \param extendSet The extension to be applied to the expanded type. It is
+  //    represented by a constant data array of integers where each integer
+  //    is a value of ExtendKind. If null no extension is applied. If not null
+  //    it has as many elements as unpaddedCoerceToType. Only integral-types can
+  //    have an extension other than None.
+  static ABIArgInfo
+  getCoerceAndExpand(llvm::StructType *coerceToType,
+                     llvm::Type *unpaddedCoerceToType,
+                     llvm::ConstantDataArray *extendSet = nullptr) {
 #ifndef NDEBUG
     // Sanity checks on unpaddedCoerceToType.
 
@@ -238,11 +254,38 @@ public:
     } else {
       assert(unpaddedIndex == 1);
     }
+
+    if (extendSet) {
+      // Assert that the size of the extend struct agrees with the unpadded
+      // struct and it only attempts to extend integral types.
+      if (unpaddedStruct) {
+        assert(extendSet->getNumElements() == unpaddedStruct->getNumElements());
+        unsigned Idx = 0;
+        for (auto EltType : unpaddedStruct->elements()) {
+          uint64_t ExtendType = extendSet->getElementAsInteger(Idx);
+          assert((ExtendType == static_cast<uint64_t>(ExtendKind::None) ||
+                  ((ExtendType == static_cast<uint64_t>(ExtendKind::ZeroExt) ||
+                    ExtendType == static_cast<uint64_t>(ExtendKind::SignExt)) &&
+                   EltType->isIntegerTy())) &&
+                 "Invalid extend applied to non-integral type");
+          Idx++;
+        }
+      } else {
+        assert(extendSet->getNumElements() == 1);
+        uint64_t ExtendType = extendSet->getElementAsInteger(0);
+        assert((ExtendType == static_cast<uint64_t>(ExtendKind::None) ||
+                ((ExtendType == static_cast<uint64_t>(ExtendKind::ZeroExt) ||
+                  ExtendType == static_cast<uint64_t>(ExtendKind::SignExt)) &&
+                 unpaddedCoerceToType->isIntegerTy())) &&
+               "Invalid extend applied to non-integral type");
+      }
+    }
 #endif
 
     auto AI = ABIArgInfo(CoerceAndExpand);
     AI.setCoerceToType(coerceToType);
     AI.setUnpaddedCoerceToType(unpaddedCoerceToType);
+    AI.setExtendSet(extendSet);
     return AI;
   }
 
@@ -253,6 +296,15 @@ public:
     } else {
       return false;
     }
+  }
+
+  static ExtendKind getExtendKind(uint64_t I) {
+    ExtendKind EK = static_cast<ExtendKind>(I);
+    if (EK == ExtendKind::None || EK == ExtendKind::SignExt ||
+        EK == ExtendKind::ZeroExt) {
+      return EK;
+    }
+    llvm_unreachable("Unexpected integer kind");
   }
 
   Kind getKind() const { return TheKind; }
@@ -316,6 +368,11 @@ public:
   llvm::Type *getUnpaddedCoerceAndExpandType() const {
     assert(isCoerceAndExpand());
     return UnpaddedCoerceAndExpandType;
+  }
+
+  llvm::ConstantDataArray *getExtendSeq() const {
+    assert(isCoerceAndExpand());
+    return ExtendSeq;
   }
 
   ArrayRef<llvm::Type *>getCoerceAndExpandTypeSequence() const {
@@ -408,6 +465,13 @@ public:
 
   void dump() const;
 };
+
+#if defined(LLVM_IS_TRIVIALLY_COPYABLE)
+static_assert(
+    LLVM_IS_TRIVIALLY_COPYABLE(ABIArgInfo),
+    "ABIArgInfo must be trivially copyable as it is embedded as trailing "
+    "data of CGFunctionInfo");
+#endif
 
 /// A class for recording the number of arguments that a function
 /// signature requires.
