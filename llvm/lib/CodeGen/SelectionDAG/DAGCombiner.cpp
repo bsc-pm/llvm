@@ -3051,6 +3051,8 @@ SDValue DAGCombiner::visitSDIV(SDNode *N) {
     // == 1)
     if (C->getAPIntValue().isOneValue())
       return false;
+    if (C->getAPIntValue().isAllOnesValue())
+      return false;
 
     if (C->getAPIntValue().isPowerOf2())
       return true;
@@ -6930,15 +6932,10 @@ SDValue DAGCombiner::visitSELECT(SDNode *N) {
     }
   }
 
-  // select (xor Cond, 1), X, Y -> select Cond, Y, X
   if (VT0 == MVT::i1) {
-    if (N0->getOpcode() == ISD::XOR) {
-      if (auto *C = dyn_cast<ConstantSDNode>(N0->getOperand(1))) {
-        SDValue Cond0 = N0->getOperand(0);
-        if (C->isOne())
-          return DAG.getNode(ISD::SELECT, DL, N1.getValueType(), Cond0, N2, N1);
-      }
-    }
+    // select (not Cond), N1, N2 -> select Cond, N2, N1
+    if (isBitwiseNot(N0))
+      return DAG.getNode(ISD::SELECT, DL, VT, N0->getOperand(0), N2, N1);
   }
 
   // fold selects based on a setcc into other things, such as min/max/abs
