@@ -85,6 +85,7 @@ public:
   void addIRPasses() override;
   bool addInstSelector() override;
   void addPreEmitPass() override;
+  void addPreRegAlloc() override;
 };
 }
 
@@ -118,3 +119,7 @@ bool RISCVPassConfig::addInstSelector() {
 }
 
 void RISCVPassConfig::addPreEmitPass() { addPass(&BranchRelaxationPassID); }
+
+void RISCVPassConfig::addPreRegAlloc() {
+  addPass(createRISCVMergeBaseOffsetOptPass());
+}
