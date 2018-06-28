@@ -37,9 +37,9 @@ define double @foo_double(double %a, double %b) nounwind {
 ; RISCV64F-LABEL: foo_double:
 ; RISCV64F:       # %bb.0:
 ; RISCV64F-NEXT:    addi sp, sp, -16
-; RISCV64F-NEXT:    sw ra, 8(sp)
+; RISCV64F-NEXT:    sd ra, 8(sp)
 ; RISCV64F-NEXT:    call __adddf3
-; RISCV64F-NEXT:    lw ra, 8(sp)
+; RISCV64F-NEXT:    ld ra, 8(sp)
 ; RISCV64F-NEXT:    addi sp, sp, 16
 ; RISCV64F-NEXT:    ret
 ;

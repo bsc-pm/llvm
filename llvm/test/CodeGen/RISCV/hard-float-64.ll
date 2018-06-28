@@ -798,7 +798,7 @@ define void @test_nine_doubles() nounwind {
 ; LP64F-LABEL: test_nine_doubles:
 ; LP64F:       # %bb.0:
 ; LP64F-NEXT:    addi sp, sp, -16
-; LP64F-NEXT:    sw ra, 8(sp)
+; LP64F-NEXT:    sd ra, 8(sp)
 ; LP64F-NEXT:    lui a0, 263936
 ; LP64F-NEXT:    sext.w a0, a0
 ; LP64F-NEXT:    slli a0, a0, 32
@@ -841,7 +841,7 @@ define void @test_nine_doubles() nounwind {
 ; LP64F-NEXT:    slli t0, t0, 32
 ; LP64F-NEXT:    or a7, t0, a7
 ; LP64F-NEXT:    call nine_doubles
-; LP64F-NEXT:    lw ra, 8(sp)
+; LP64F-NEXT:    ld ra, 8(sp)
 ; LP64F-NEXT:    addi sp, sp, 16
 ; LP64F-NEXT:    ret
 ;
@@ -1175,7 +1175,7 @@ define void @test_variadic_function_float() nounwind {
 ; LP64F-LABEL: test_variadic_function_float:
 ; LP64F:       # %bb.0:
 ; LP64F-NEXT:    addi sp, sp, -16
-; LP64F-NEXT:    sw ra, 8(sp)
+; LP64F-NEXT:    sd ra, 8(sp)
 ; LP64F-NEXT:    lui a0, %hi(.LCPI26_0)
 ; LP64F-NEXT:    addi a0, a0, %lo(.LCPI26_0)
 ; LP64F-NEXT:    lui a1, %hi(.LCPI26_1)
@@ -1194,14 +1194,14 @@ define void @test_variadic_function_float() nounwind {
 ; LP64F-NEXT:    fmv.x.w a3, ft2
 ; LP64F-NEXT:    fmv.x.w a4, ft3
 ; LP64F-NEXT:    call variadic_function
-; LP64F-NEXT:    lw ra, 8(sp)
+; LP64F-NEXT:    ld ra, 8(sp)
 ; LP64F-NEXT:    addi sp, sp, 16
 ; LP64F-NEXT:    ret
 ;
 ; LP64D-LABEL: test_variadic_function_float:
 ; LP64D:       # %bb.0:
 ; LP64D-NEXT:    addi sp, sp, -16
-; LP64D-NEXT:    sw ra, 8(sp)
+; LP64D-NEXT:    sd ra, 8(sp)
 ; LP64D-NEXT:    lui a0, %hi(.LCPI26_0)
 ; LP64D-NEXT:    addi a0, a0, %lo(.LCPI26_0)
 ; LP64D-NEXT:    lui a1, %hi(.LCPI26_1)
@@ -1220,7 +1220,7 @@ define void @test_variadic_function_float() nounwind {
 ; LP64D-NEXT:    fmv.x.w a3, ft2
 ; LP64D-NEXT:    fmv.x.w a4, ft3
 ; LP64D-NEXT:    call variadic_function
-; LP64D-NEXT:    lw ra, 8(sp)
+; LP64D-NEXT:    ld ra, 8(sp)
 ; LP64D-NEXT:    addi sp, sp, 16
 ; LP64D-NEXT:    ret
     tail call void (i64, ...) @variadic_function(i64 4, float 1.0, float 2.0, float 4.0, float 8.0)
@@ -1231,7 +1231,7 @@ define void @test_variadic_function_double() nounwind {
 ; LP64F-LABEL: test_variadic_function_double:
 ; LP64F:       # %bb.0:
 ; LP64F-NEXT:    addi sp, sp, -16
-; LP64F-NEXT:    sw ra, 8(sp)
+; LP64F-NEXT:    sd ra, 8(sp)
 ; LP64F-NEXT:    lui a0, 262144
 ; LP64F-NEXT:    sext.w a0, a0
 ; LP64F-NEXT:    lui a1, 262400
@@ -1254,14 +1254,14 @@ define void @test_variadic_function_double() nounwind {
 ; LP64F-NEXT:    or a4, a0, a4
 ; LP64F-NEXT:    addi a0, zero, 4
 ; LP64F-NEXT:    call variadic_function
-; LP64F-NEXT:    lw ra, 8(sp)
+; LP64F-NEXT:    ld ra, 8(sp)
 ; LP64F-NEXT:    addi sp, sp, 16
 ; LP64F-NEXT:    ret
 ;
 ; LP64D-LABEL: test_variadic_function_double:
 ; LP64D:       # %bb.0:
 ; LP64D-NEXT:    addi sp, sp, -16
-; LP64D-NEXT:    sw ra, 8(sp)
+; LP64D-NEXT:    sd ra, 8(sp)
 ; LP64D-NEXT:    lui a0, %hi(.LCPI27_0)
 ; LP64D-NEXT:    addi a0, a0, %lo(.LCPI27_0)
 ; LP64D-NEXT:    lui a1, %hi(.LCPI27_1)
@@ -1280,7 +1280,7 @@ define void @test_variadic_function_double() nounwind {
 ; LP64D-NEXT:    fmv.x.d a3, ft2
 ; LP64D-NEXT:    fmv.x.d a4, ft3
 ; LP64D-NEXT:    call variadic_function
-; LP64D-NEXT:    lw ra, 8(sp)
+; LP64D-NEXT:    ld ra, 8(sp)
 ; LP64D-NEXT:    addi sp, sp, 16
 ; LP64D-NEXT:    ret
     tail call void (i64, ...) @variadic_function(i64 4, double 1.0, double 2.0, double 4.0, double 8.0)
