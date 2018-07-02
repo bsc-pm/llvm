@@ -527,21 +527,48 @@ let Predicates = [HasSVE] in {
   defm CMPLO_WIDE_PPzZZ : sve_int_cmp_1_wide<0b110, "cmplo">;
   defm CMPLS_WIDE_PPzZZ : sve_int_cmp_1_wide<0b111, "cmpls">;
 
+  defm CMPGE_PPzZI : sve_int_scmp_vi<0b000, "cmpge">;
+  defm CMPGT_PPzZI : sve_int_scmp_vi<0b001, "cmpgt">;
+  defm CMPLT_PPzZI : sve_int_scmp_vi<0b010, "cmplt">;
+  defm CMPLE_PPzZI : sve_int_scmp_vi<0b011, "cmple">;
+  defm CMPEQ_PPzZI : sve_int_scmp_vi<0b100, "cmpeq">;
+  defm CMPNE_PPzZI : sve_int_scmp_vi<0b101, "cmpne">;
+  defm CMPHS_PPzZI : sve_int_ucmp_vi<0b00, "cmphs">;
+  defm CMPHI_PPzZI : sve_int_ucmp_vi<0b01, "cmphi">;
+  defm CMPLO_PPzZI : sve_int_ucmp_vi<0b10, "cmplo">;
+  defm CMPLS_PPzZI : sve_int_ucmp_vi<0b11, "cmpls">;
+
+  defm SQINCB_XPiWdI : sve_int_pred_pattern_b_s32<0b00000, "sqincb">;
+  defm UQINCB_WPiI   : sve_int_pred_pattern_b_u32<0b00001, "uqincb">;
+  defm SQDECB_XPiWdI : sve_int_pred_pattern_b_s32<0b00010, "sqdecb">;
+  defm UQDECB_WPiI   : sve_int_pred_pattern_b_u32<0b00011, "uqdecb">;
   defm SQINCB_XPiI   : sve_int_pred_pattern_b_x64<0b00100, "sqincb">;
   defm UQINCB_XPiI   : sve_int_pred_pattern_b_x64<0b00101, "uqincb">;
   defm SQDECB_XPiI   : sve_int_pred_pattern_b_x64<0b00110, "sqdecb">;
   defm UQDECB_XPiI   : sve_int_pred_pattern_b_x64<0b00111, "uqdecb">;
 
+  defm SQINCH_XPiWdI : sve_int_pred_pattern_b_s32<0b01000, "sqinch">;
+  defm UQINCH_WPiI   : sve_int_pred_pattern_b_u32<0b01001, "uqinch">;
+  defm SQDECH_XPiWdI : sve_int_pred_pattern_b_s32<0b01010, "sqdech">;
+  defm UQDECH_WPiI   : sve_int_pred_pattern_b_u32<0b01011, "uqdech">;
   defm SQINCH_XPiI   : sve_int_pred_pattern_b_x64<0b01100, "sqinch">;
   defm UQINCH_XPiI   : sve_int_pred_pattern_b_x64<0b01101, "uqinch">;
   defm SQDECH_XPiI   : sve_int_pred_pattern_b_x64<0b01110, "sqdech">;
   defm UQDECH_XPiI   : sve_int_pred_pattern_b_x64<0b01111, "uqdech">;
 
+  defm SQINCW_XPiWdI : sve_int_pred_pattern_b_s32<0b10000, "sqincw">;
+  defm UQINCW_WPiI   : sve_int_pred_pattern_b_u32<0b10001, "uqincw">;
+  defm SQDECW_XPiWdI : sve_int_pred_pattern_b_s32<0b10010, "sqdecw">;
+  defm UQDECW_WPiI   : sve_int_pred_pattern_b_u32<0b10011, "uqdecw">;
   defm SQINCW_XPiI   : sve_int_pred_pattern_b_x64<0b10100, "sqincw">;
   defm UQINCW_XPiI   : sve_int_pred_pattern_b_x64<0b10101, "uqincw">;
   defm SQDECW_XPiI   : sve_int_pred_pattern_b_x64<0b10110, "sqdecw">;
   defm UQDECW_XPiI   : sve_int_pred_pattern_b_x64<0b10111, "uqdecw">;
 
+  defm SQINCD_XPiWdI : sve_int_pred_pattern_b_s32<0b11000, "sqincd">;
+  defm UQINCD_WPiI   : sve_int_pred_pattern_b_u32<0b11001, "uqincd">;
+  defm SQDECD_XPiWdI : sve_int_pred_pattern_b_s32<0b11010, "sqdecd">;
+  defm UQDECD_WPiI   : sve_int_pred_pattern_b_u32<0b11011, "uqdecd">;
   defm SQINCD_XPiI   : sve_int_pred_pattern_b_x64<0b11100, "sqincd">;
   defm UQINCD_XPiI   : sve_int_pred_pattern_b_x64<0b11101, "uqincd">;
   defm SQDECD_XPiI   : sve_int_pred_pattern_b_x64<0b11110, "sqdecd">;
