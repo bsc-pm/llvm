@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // REQUIRES: clang-driver
 // REQUIRES: x86-registered-target
 // REQUIRES: nvptx-registered-target
