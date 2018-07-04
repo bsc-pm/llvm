@@ -12,6 +12,13 @@
 //===----------------------------------------------------------------------===//
 
 let Predicates = [HasSVE] in {
+
+  def RDFFR_PPz  : sve_int_rdffr_pred<0b0, "rdffr">;
+  def RDFFRS_PPz : sve_int_rdffr_pred<0b1, "rdffrs">;
+  def RDFFR_P    : sve_int_rdffr_unpred<"rdffr">;
+  def SETFFR     : sve_int_setffr<"setffr">;
+  def WRFFR      : sve_int_wrffr<"wrffr">;
+
   defm ADD_ZZZ   : sve_int_bin_cons_arit_0<0b000, "add">;
   defm SUB_ZZZ   : sve_int_bin_cons_arit_0<0b001, "sub">;
   defm SQADD_ZZZ : sve_int_bin_cons_arit_0<0b100, "sqadd">;
@@ -24,8 +31,9 @@ let Predicates = [HasSVE] in {
   def EOR_ZZZ : sve_int_bin_cons_log<0b10, "eor">;
   def BIC_ZZZ : sve_int_bin_cons_log<0b11, "bic">;
 
-  defm ADD_ZPmZ  : sve_int_bin_pred_arit_0<0b000, "add">;
-  defm SUB_ZPmZ  : sve_int_bin_pred_arit_0<0b001, "sub">;
+  defm ADD_ZPmZ   : sve_int_bin_pred_arit_0<0b000, "add">;
+  defm SUB_ZPmZ   : sve_int_bin_pred_arit_0<0b001, "sub">;
+  defm SUBR_ZPmZ  : sve_int_bin_pred_arit_0<0b011, "subr">;
 
   defm ORR_ZPmZ : sve_int_bin_pred_log<0b000, "orr">;
   defm EOR_ZPmZ : sve_int_bin_pred_log<0b001, "eor">;
@@ -34,6 +42,7 @@ let Predicates = [HasSVE] in {
 
   defm ADD_ZI   : sve_int_arith_imm0<0b000, "add">;
   defm SUB_ZI   : sve_int_arith_imm0<0b001, "sub">;
+  defm SUBR_ZI  : sve_int_arith_imm0<0b011, "subr">;
   defm SQADD_ZI : sve_int_arith_imm0<0b100, "sqadd">;
   defm UQADD_ZI : sve_int_arith_imm0<0b101, "uqadd">;
   defm SQSUB_ZI : sve_int_arith_imm0<0b110, "sqsub">;
