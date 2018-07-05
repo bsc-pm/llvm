@@ -13,6 +13,16 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// RISC-V specific DAG Nodes.
+//===----------------------------------------------------------------------===//
+
+def SDT_RISCVF32ToI64 : SDTypeProfile<1, 1, [SDTCisVT<0, i64>, SDTCisVT<1, f32>]>;
+def SDT_RISCVI64ToF32 : SDTypeProfile<1, 1, [SDTCisVT<0, f32>, SDTCisVT<1, i64>]>;
+
+def RISCVF32ToI64 : SDNode<"RISCVISD::F32ToI64", SDT_RISCVF32ToI64>;
+def RISCVI64ToF32 : SDNode<"RISCVISD::I64ToF32", SDT_RISCVI64ToF32>;
+
+//===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
 //===----------------------------------------------------------------------===//
 
@@ -323,3 +333,13 @@ defm : LdPat<load, FLW>;
 defm : StPat<store, FSW, FPR32>;
 
 } // Predicates = [HasStdExtF]
+
+let Predicates = [HasStdExtF, IsRV64] in {
+
+def : Pat<(RISCVF32ToI64 FPR32:$src),
+          (FMV_X_W FPR32:$src)>;
+
+def : Pat<(RISCVI64ToF32 GPR:$src),
+          (FMV_W_X GPR:$src)>;
+
+} // Predicates = [HasStdExtF, IsRV64]

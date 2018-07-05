@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; RUN: llc < %s
 ; REQUIRES: default_triple
 

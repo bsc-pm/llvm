@@ -29,6 +29,8 @@ enum NodeType : unsigned {
   SELECT_CC,
   BuildPairF64,
   SplitF64,
+  F32ToI64,
+  I64ToF32,
   TAIL
 };
 }
@@ -113,6 +115,16 @@ private:
   bool IsEligibleForTailCallOptimization(CCState &CCInfo,
     CallLoweringInfo &CLI, MachineFunction &MF,
     const SmallVector<CCValAssign, 16> &ArgLocs) const;
+
+  unsigned
+  getExceptionPointerRegister(const Constant *PersonalityFn) const override {
+    return RISCV::X10;
+  }
+
+  unsigned
+  getExceptionSelectorRegister(const Constant *PersonalityFn) const override {
+    return RISCV::X11;
+  }
 };
 }
 

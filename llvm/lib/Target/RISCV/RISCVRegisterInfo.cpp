@@ -108,7 +108,16 @@ unsigned RISCVRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
 }
 
 const uint32_t *
-RISCVRegisterInfo::getCallPreservedMask(const MachineFunction & /*MF*/,
+RISCVRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                         CallingConv::ID /*CC*/) const {
-  return CSR_RegMask;
+  const RISCVSubtarget &SubTarget = MF.getSubtarget<RISCVSubtarget>();
+
+  if (SubTarget.isSoftFloat())
+    return CSR_RegMask;
+  else if (SubTarget.isHardFloatSingle())
+    return CSR_HardFloatSingle_RegMask;
+  else if (SubTarget.isHardFloatDouble())
+    return CSR_HardFloatDouble_RegMask;
+  else
+    llvm_unreachable("Unhandled ABI");
 }

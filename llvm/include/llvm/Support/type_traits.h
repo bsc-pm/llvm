@@ -25,22 +25,28 @@
 
 namespace llvm {
 
+/// If the compiler is able to implement is_trivially_copyable
+/// define LLVM_IS_TRIVIALLY_COPYABLE, otherwise leave it undefined.
+#if (__has_feature(is_trivially_copyable) && defined(_LIBCPP_VERSION)) ||      \
+    (defined(__GNUC__) && __GNUC__ >= 5)
+// std::is_trivially_copyable is available in libc++ with clang, libstdc++
+// that comes with GCC 5.
+#define LLVM_IS_TRIVIALLY_COPYABLE(Ty) std::is_trivially_copyable<Ty>::value
+#elif __has_feature(is_trivially_copyable)
+// Use the internal name if the compiler supports is_trivially_copyable but we
+// don't know if the standard library does. This is the case for clang in
+// conjunction with libstdc++ from GCC 4.x.
+#define LLVM_IS_TRIVIALLY_COPYABLE(Ty) __is_trivially_copyable(Ty)
+#endif
+
 /// isPodLike - This is a type trait that is used to determine whether a given
 /// type can be copied around with memcpy instead of running ctors etc.
 template <typename T>
 struct isPodLike {
-  // std::is_trivially_copyable is available in libc++ with clang, libstdc++
-  // that comes with GCC 5.
-#if (__has_feature(is_trivially_copyable) && defined(_LIBCPP_VERSION)) ||      \
-    (defined(__GNUC__) && __GNUC__ >= 5)
-  // If the compiler supports the is_trivially_copyable trait use it, as it
-  // matches the definition of isPodLike closely.
-  static const bool value = std::is_trivially_copyable<T>::value;
-#elif __has_feature(is_trivially_copyable)
-  // Use the internal name if the compiler supports is_trivially_copyable but we
-  // don't know if the standard library does. This is the case for clang in
-  // conjunction with libstdc++ from GCC 4.x.
-  static const bool value = __is_trivially_copyable(T);
+// If the compiler can implement the is_trivially_copyable trait use it, as it
+// matches the definition of isPodLike closely.
+#if defined(LLVM_IS_TRIVIALLY_COPYABLE)
+  static const bool value = LLVM_IS_TRIVIALLY_COPYABLE(T);
 #else
   // If we don't know anything else, we can (at least) assume that all non-class
   // types are PODs.

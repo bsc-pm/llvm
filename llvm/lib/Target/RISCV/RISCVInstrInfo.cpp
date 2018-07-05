@@ -29,8 +29,9 @@
 
 using namespace llvm;
 
-RISCVInstrInfo::RISCVInstrInfo()
-    : RISCVGenInstrInfo(RISCV::ADJCALLSTACKDOWN, RISCV::ADJCALLSTACKUP) {}
+RISCVInstrInfo::RISCVInstrInfo(const RISCVSubtarget &Subtarget)
+    : RISCVGenInstrInfo(RISCV::ADJCALLSTACKDOWN, RISCV::ADJCALLSTACKUP),
+      Subtarget(Subtarget) {}
 
 unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
@@ -92,18 +93,50 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
-  // FPR->FPR copies
+  // FPR->FPR
   unsigned Opc;
-  if (RISCV::FPR32RegClass.contains(DstReg, SrcReg))
-    Opc = RISCV::FSGNJ_S;
-  else if (RISCV::FPR64RegClass.contains(DstReg, SrcReg))
-    Opc = RISCV::FSGNJ_D;
-  else
-    llvm_unreachable("Impossible reg-to-reg copy");
+  if (RISCV::FPR32RegClass.contains(DstReg, SrcReg) ||
+      RISCV::FPR64RegClass.contains(DstReg, SrcReg)) {
+    if (RISCV::FPR64RegClass.contains(DstReg, SrcReg))
+      Opc = RISCV::FSGNJ_D;
+    else
+      Opc = RISCV::FSGNJ_S;
 
-  BuildMI(MBB, MBBI, DL, get(Opc), DstReg)
-      .addReg(SrcReg, getKillRegState(KillSrc))
-      .addReg(SrcReg, getKillRegState(KillSrc));
+    BuildMI(MBB, MBBI, DL, get(Opc), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc))
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+
+  // GPR->FPR
+  if (RISCV::FPR32RegClass.contains(DstReg) &&
+      RISCV::GPRRegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FMV_W_X), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+  if (RISCV::FPR64RegClass.contains(DstReg) &&
+      RISCV::GPRRegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FMV_D_X), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+
+  // FPR->GPR
+  if (RISCV::GPRRegClass.contains(DstReg) &&
+      RISCV::FPR32RegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FMV_X_W), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+  if (RISCV::GPRRegClass.contains(DstReg) &&
+      RISCV::FPR64RegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FMV_X_D), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+
+  llvm_unreachable("Impossible reg-to-reg copy");
 }
 
 void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
@@ -118,7 +151,7 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCV::GPRRegClass.hasSubClassEq(RC))
-    Opcode = RISCV::SW;
+    Opcode = Subtarget.is64Bit() ? RISCV::SD : RISCV::SW;
   else if (RISCV::FPR32RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
@@ -144,7 +177,7 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCV::GPRRegClass.hasSubClassEq(RC))
-    Opcode = RISCV::LW;
+    Opcode = Subtarget.is64Bit() ? RISCV::LD : RISCV::LW;
   else if (RISCV::FPR32RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))

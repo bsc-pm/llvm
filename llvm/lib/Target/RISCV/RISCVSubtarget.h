@@ -37,6 +37,12 @@ class RISCVSubtarget : public RISCVGenSubtargetInfo {
   bool HasStdExtC = false;
   bool HasRV64 = false;
   bool EnableLinkerRelax = false;
+  enum class FloatABI {
+    Soft,
+    HardSingle,
+    HardDouble,
+    // TODO: HardQuad,
+  } ABI = FloatABI::Soft;
   unsigned XLen = 32;
   MVT XLenVT = MVT::i32;
   RISCVFrameLowering FrameLowering;
@@ -81,6 +87,12 @@ public:
   bool enableLinkerRelax() const { return EnableLinkerRelax; }
   MVT getXLenVT() const { return XLenVT; }
   unsigned getXLen() const { return XLen; }
+  bool isSoftFloat() const { return ABI == FloatABI::Soft; }
+  bool isHardFloat() const {
+    return ABI == FloatABI::HardSingle || ABI == FloatABI::HardDouble;
+  }
+  bool isHardFloatSingle() const { return ABI == FloatABI::HardSingle; }
+  bool isHardFloatDouble() const { return ABI == FloatABI::HardDouble; }
 };
 } // End llvm namespace
 
