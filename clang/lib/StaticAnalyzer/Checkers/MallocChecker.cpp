@@ -1993,6 +1993,11 @@ void MallocChecker::ReportUseAfterFree(CheckerContext &C, SourceRange Range,
     R->markInteresting(Sym);
     R->addRange(Range);
     R->addVisitor(llvm::make_unique<MallocBugVisitor>(Sym));
+
+    const RefState *RS = C.getState()->get<RegionState>(Sym);
+    if (RS->getAllocationFamily() == AF_InternalBuffer)
+      R->addVisitor(allocation_state::getDanglingBufferBRVisitor(Sym));
+
     C.emitReport(std::move(R));
   }
 }
@@ -2915,7 +2920,6 @@ std::shared_ptr<PathDiagnosticPiece> MallocChecker::MallocBugVisitor::VisitNode(
           Msg = "Internal buffer is released because the object was destroyed";
           break;
         case AF_None:
-        default:
           llvm_unreachable("Unhandled allocation family!");
       }
       StackHint = new StackHintGeneratorForSymbol(Sym,
