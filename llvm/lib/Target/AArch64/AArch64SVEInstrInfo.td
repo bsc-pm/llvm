@@ -539,6 +539,8 @@ let Predicates = [HasSVE] in {
   defm ADR_LSL_ZZZ_S  : sve_int_bin_cons_misc_0_a_32_lsl<0b10, "adr">;
   defm ADR_LSL_ZZZ_D  : sve_int_bin_cons_misc_0_a_64_lsl<0b11, "adr">;
 
+  defm TBL_ZZZ  : sve_int_perm_tbl<"tbl">;
+
   defm ZIP1_ZZZ : sve_int_perm_bin_perm_zz<0b000, "zip1">;
   defm ZIP2_ZZZ : sve_int_perm_bin_perm_zz<0b001, "zip2">;
   defm UZP1_ZZZ : sve_int_perm_bin_perm_zz<0b010, "uzp1">;
@@ -688,11 +690,31 @@ let Predicates = [HasSVE] in {
   defm INDEX_RI : sve_int_index_ri<"index">;
   defm INDEX_II : sve_int_index_ii<"index">;
 
-  defm LSR_ZZI : sve_int_bin_cons_shift_b_right<0b01, "lsr">;
-  defm LSL_ZZI : sve_int_bin_cons_shift_b_left< 0b11, "lsl">;
+  // Unpredicated shifts
+  defm ASR_ZZI : sve_int_bin_cons_shift_imm_right<0b00, "asr">;
+  defm LSR_ZZI : sve_int_bin_cons_shift_imm_right<0b01, "lsr">;
+  defm LSL_ZZI : sve_int_bin_cons_shift_imm_left< 0b11, "lsl">;
 
-  defm LSR_ZPmZ  : sve_int_bin_pred_shift_1<0b001, "lsr">;
-  defm LSL_ZPmZ  : sve_int_bin_pred_shift_1<0b011, "lsl">;
+  defm ASR_WIDE_ZZZ : sve_int_bin_cons_shift_wide<0b00, "asr">;
+  defm LSR_WIDE_ZZZ : sve_int_bin_cons_shift_wide<0b01, "lsr">;
+  defm LSL_WIDE_ZZZ : sve_int_bin_cons_shift_wide<0b11, "lsl">;
+
+  // Predicated shifts
+  defm ASR_ZPmI  : sve_int_bin_pred_shift_imm_right<0b000, "asr">;
+  defm LSR_ZPmI  : sve_int_bin_pred_shift_imm_right<0b001, "lsr">;
+  defm LSL_ZPmI  : sve_int_bin_pred_shift_imm_left< 0b011, "lsl">;
+  defm ASRD_ZPmI : sve_int_bin_pred_shift_imm_right<0b100, "asrd">;
+
+  defm ASR_ZPmZ  : sve_int_bin_pred_shift<0b000, "asr">;
+  defm LSR_ZPmZ  : sve_int_bin_pred_shift<0b001, "lsr">;
+  defm LSL_ZPmZ  : sve_int_bin_pred_shift<0b011, "lsl">;
+  defm ASRR_ZPmZ : sve_int_bin_pred_shift<0b100, "asrr">;
+  defm LSRR_ZPmZ : sve_int_bin_pred_shift<0b101, "lsrr">;
+  defm LSLR_ZPmZ : sve_int_bin_pred_shift<0b111, "lslr">;
+
+  defm ASR_WIDE_ZPmZ : sve_int_bin_pred_shift_wide<0b000, "asr">;
+  defm LSR_WIDE_ZPmZ : sve_int_bin_pred_shift_wide<0b001, "lsr">;
+  defm LSL_WIDE_ZPmZ : sve_int_bin_pred_shift_wide<0b011, "lsl">;
 
   def FCVT_ZPmZ_StoH   : sve_fp_2op_p_zd<0b1001000, "fcvt",   ZPR32, ZPR16>;
   def FCVT_ZPmZ_HtoS   : sve_fp_2op_p_zd<0b1001001, "fcvt",   ZPR16, ZPR32>;
