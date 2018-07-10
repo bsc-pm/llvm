@@ -1197,17 +1197,12 @@ static Instruction *foldSelectShuffleWith1Binop(ShuffleVectorInst &Shuf) {
   else
     return nullptr;
 
-  auto *BO = cast<BinaryOperator>(Op0IsBinop ? Op0 : Op1);
-  Value *X = Op0IsBinop ? Op1 : Op0;
-  // TODO: Allow div/rem by accounting for potential UB due to undef elements.
-  if (BO->isIntDivRem())
-    return nullptr;
-
   // The identity constant for a binop leaves a variable operand unchanged. For
   // a vector, this is a splat of something like 0, -1, or 1.
   // If there's no identity constant for this binop, we're done.
+  auto *BO = cast<BinaryOperator>(Op0IsBinop ? Op0 : Op1);
   BinaryOperator::BinaryOps BOpcode = BO->getOpcode();
-  Constant *IdC = ConstantExpr::getBinOpIdentity(BOpcode, Shuf.getType());
+  Constant *IdC = ConstantExpr::getBinOpIdentity(BOpcode, Shuf.getType(), true);
   if (!IdC)
     return nullptr;
 
@@ -1219,14 +1214,22 @@ static Instruction *foldSelectShuffleWith1Binop(ShuffleVectorInst &Shuf) {
   Constant *NewC = Op0IsBinop ? ConstantExpr::getShuffleVector(C, IdC, Mask) :
                                 ConstantExpr::getShuffleVector(IdC, C, Mask);
 
+  bool MightCreatePoisonOrUB =
+      Mask->containsUndefElement() &&
+      (Instruction::isIntDivRem(BOpcode) || Instruction::isShift(BOpcode));
+  if (MightCreatePoisonOrUB)
+    NewC = getSafeVectorConstantForBinop(BOpcode, NewC, true);
+
   // shuf (bop X, C), X, M --> bop X, C'
   // shuf X, (bop X, C), M --> bop X, C'
+  Value *X = Op0IsBinop ? Op1 : Op0;
   Instruction *NewBO = BinaryOperator::Create(BOpcode, X, NewC);
   NewBO->copyIRFlags(BO);
 
   // An undef shuffle mask element may propagate as an undef constant element in
   // the new binop. That would produce poison where the original code might not.
-  if (Mask->containsUndefElement())
+  // If we already made a safe constant, then there's no danger.
+  if (Mask->containsUndefElement() && !MightCreatePoisonOrUB)
     NewBO->dropPoisonGeneratingFlags();
   return NewBO;
 }
@@ -1336,12 +1339,13 @@ static Instruction *foldSelectShuffle(ShuffleVectorInst &Shuf,
   // Flags are intersected from the 2 source binops. But there are 2 exceptions:
   // 1. If we changed an opcode, poison conditions might have changed.
   // 2. If the shuffle had undef mask elements, the new binop might have undefs
-  //    where the original code did not. Drop all poison potential to be safe.
+  //    where the original code did not. But if we already made a safe constant,
+  //    then there's no danger.
   NewBO->copyIRFlags(B0);
   NewBO->andIRFlags(B1);
   if (DropNSW)
     NewBO->setHasNoSignedWrap(false);
-  if (Mask->containsUndefElement())
+  if (Mask->containsUndefElement() && !MightCreatePoisonOrUB)
     NewBO->dropPoisonGeneratingFlags();
   return NewBO;
 }
