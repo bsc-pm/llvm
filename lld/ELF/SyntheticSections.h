@@ -677,13 +677,6 @@ struct GdbIndexChunk {
   std::vector<NameTypeEntry> NamesAndTypes;
 };
 
-// The symbol type for the .gdb_index section.
-struct GdbSymbol {
-  llvm::CachedHashStringRef Name;
-  uint32_t OutputOff;
-  uint32_t CuVectorIdx;
-};
-
 class GdbIndexSection final : public SyntheticSection {
 public:
   GdbIndexSection(std::vector<GdbIndexChunk> &&Chunks);
@@ -692,6 +685,12 @@ public:
   bool empty() const override;
 
 private:
+  struct GdbSymbol {
+    llvm::CachedHashStringRef Name;
+    uint32_t OutputOff;
+    uint32_t CuVectorIdx;
+  };
+
   // A symbol table for this .gdb_index section.
   std::vector<GdbSymbol> Symbols;
 
@@ -708,7 +707,7 @@ private:
   uint64_t SymtabSize = 0;
   uint64_t ConstantPoolOffset;
   uint64_t CuVectorsPoolSize = 0;
-  uint64_t StringPoolSize;
+  uint64_t StringPoolSize = 0;
   uint64_t TotalSize;
 
   std::vector<uint32_t> CuVectorOffsets;
