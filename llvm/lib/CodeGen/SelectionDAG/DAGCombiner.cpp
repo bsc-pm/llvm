@@ -3244,6 +3244,8 @@ SDValue DAGCombiner::visitREM(SDNode *N) {
   SDValue N0 = N->getOperand(0);
   SDValue N1 = N->getOperand(1);
   EVT VT = N->getValueType(0);
+  EVT CCVT = getSetCCResultType(VT);
+
   bool isSigned = (Opcode == ISD::SREM);
   SDLoc DL(N);
 
@@ -3253,6 +3255,10 @@ SDValue DAGCombiner::visitREM(SDNode *N) {
   if (N0C && N1C)
     if (SDValue Folded = DAG.FoldConstantArithmetic(Opcode, DL, VT, N0C, N1C))
       return Folded;
+  // fold (urem X, -1) -> select(X == -1, 0, x)
+  if (!isSigned && N1C && N1C->getAPIntValue().isAllOnesValue())
+    return DAG.getSelect(DL, VT, DAG.getSetCC(DL, CCVT, N0, N1, ISD::SETEQ),
+                         DAG.getConstant(0, DL, VT), N0);
 
   if (SDValue V = simplifyDivRem(N, DAG))
     return V;
@@ -3291,7 +3297,10 @@ SDValue DAGCombiner::visitREM(SDNode *N) {
   // by skipping the simplification if isIntDivCheap().  When div is not cheap,
   // combine will not return a DIVREM.  Regardless, checking cheapness here
   // makes sense since the simplification results in fatter code.
-  if (N1C && !N1C->isNullValue() && !TLI.isIntDivCheap(VT, Attr)) {
+  // TODO: replace matchUnaryPredicate with SelectionDAG::isKnownNeverZero(N1).
+  if (ISD::matchUnaryPredicate(
+          N1, [](ConstantSDNode *C) { return !C->isNullValue(); }) &&
+      !TLI.isIntDivCheap(VT, Attr)) {
     SDValue OptimizedDiv =
         isSigned ? visitSDIVLike(N0, N1, N) : visitUDIVLike(N0, N1, N);
     if (OptimizedDiv.getNode() && OptimizedDiv.getOpcode() != ISD::UDIVREM &&
