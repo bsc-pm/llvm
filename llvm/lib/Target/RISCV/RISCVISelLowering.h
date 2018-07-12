@@ -34,7 +34,8 @@ enum NodeType : unsigned {
   SplitF64,
   F32ToI64,
   I64ToF32,
-  TAIL
+  TAIL,
+  WRAPPER_PIC,
 };
 }
 

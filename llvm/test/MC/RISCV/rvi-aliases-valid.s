@@ -24,7 +24,6 @@
 # CHECK-ALIAS....Match the alias (tests instr. to alias mapping)
 # CHECK-EXPAND...Match canonical instr. unconditionally (tests alias expansion)
 
-# TODO la
 # TODO lb lh lw
 # TODO sb sh sw
 

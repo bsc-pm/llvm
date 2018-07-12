@@ -32,11 +32,32 @@ const RISCVMCExpr *RISCVMCExpr::create(const MCExpr *Expr, VariantKind Kind,
 }
 
 void RISCVMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
-  bool HasVariant =
-      ((getKind() != VK_RISCV_None) && (getKind() != VK_RISCV_CALL));
+
+  bool HasVariant = true;
+  bool HasSuffix = false;
+  StringRef Suffix;
+
+  // Classify syntax
+  switch (getKind())
+  {
+    default: break;
+    case VK_RISCV_None:
+    case VK_RISCV_CALL:
+    case VK_RISCV_GOT_HI_Pseudo:
+      HasVariant = false;
+      break;
+    case VK_RISCV_PLT:
+      HasVariant = false;
+      HasSuffix = true;
+      Suffix = "@plt";
+      break;
+  }
+
   if (HasVariant)
     OS << '%' << getVariantKindName(getKind()) << '(';
   Expr->print(OS, MAI);
+  if (HasSuffix)
+    OS << Suffix;
   if (HasVariant)
     OS << ')';
 }

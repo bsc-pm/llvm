@@ -93,6 +93,9 @@ public:
   }
   bool isHardFloatSingle() const { return ABI == FloatABI::HardSingle; }
   bool isHardFloatDouble() const { return ABI == FloatABI::HardDouble; }
+
+  unsigned char ClassifyPICGlobalReference(const GlobalValue *GV,
+                                           const TargetMachine &TM) const;
 };
 } // End llvm namespace
 
