@@ -6421,29 +6421,52 @@ let Predicates = [HasAVX, OptForSpeed] in {
 
   def : Pat<(v4f32 (X86Movss VR128:$src1, VR128:$src2)),
             (VBLENDPSrri VR128:$src1, VR128:$src2, (i8 1))>;
+  def : Pat<(v4f32 (X86Movss VR128:$src1, (loadv4f32 addr:$src2))),
+            (VBLENDPSrmi VR128:$src1, addr:$src2, (i8 1))>;
+  def : Pat<(v4f32 (X86Movss (loadv4f32 addr:$src2), VR128:$src1)),
+            (VBLENDPSrmi VR128:$src1, addr:$src2, (i8 0xe))>;
   def : Pat<(v4i32 (X86Movss VR128:$src1, VR128:$src2)),
             (VPBLENDWrri VR128:$src1, VR128:$src2, (i8 3))>;
+  def : Pat<(v4i32 (X86Movss VR128:$src1, (bc_v4i32 (loadv2i64 addr:$src2)))),
+            (VPBLENDWrmi VR128:$src1, addr:$src2, (i8 3))>;
+  def : Pat<(v4i32 (X86Movss (bc_v4i32 (loadv2i64 addr:$src2)), VR128:$src1)),
+            (VPBLENDWrmi VR128:$src1, addr:$src2, (i8 0xfc))>;
 
   def : Pat<(v2f64 (X86Movsd VR128:$src1, VR128:$src2)),
             (VBLENDPDrri VR128:$src1, VR128:$src2, (i8 1))>;
+  def : Pat<(v2f64 (X86Movsd VR128:$src1, (loadv2f64 addr:$src2))),
+            (VBLENDPDrmi VR128:$src1, addr:$src2, (i8 1))>;
+  def : Pat<(v2f64 (X86Movsd (loadv2f64 addr:$src2), VR128:$src1)),
+            (VBLENDPDrmi VR128:$src1, addr:$src2, (i8 2))>;
   def : Pat<(v2i64 (X86Movsd VR128:$src1, VR128:$src2)),
             (VPBLENDWrri VR128:$src1, VR128:$src2, (i8 0xf))>;
+  def : Pat<(v2i64 (X86Movsd VR128:$src1, (loadv2i64 addr:$src2))),
+            (VPBLENDWrmi VR128:$src1, addr:$src2, (i8 0xf))>;
+  def : Pat<(v2i64 (X86Movsd (loadv2i64 addr:$src2), VR128:$src1)),
+            (VPBLENDWrmi VR128:$src1, addr:$src2, (i8 0xf0))>;
 
   // Move low f32 and clear high bits.
   def : Pat<(v8f32 (X86vzmovl (v8f32 VR256:$src))),
-            (VBLENDPSYrri (v8f32 (AVX_SET0)), VR256:$src, (i8 1))>;
-
-  // Move low f64 and clear high bits.
-  def : Pat<(v4f64 (X86vzmovl (v4f64 VR256:$src))),
-            (VBLENDPDYrri (v4f64 (AVX_SET0)), VR256:$src, (i8 1))>;
-
-  // These will incur an FP/int domain crossing penalty, but it may be the only
-  // way without AVX2. Do not add any complexity because we may be able to match
-  // more optimal patterns defined earlier in this file.
+            (SUBREG_TO_REG (i32 0),
+             (VBLENDPSrri (v4f32 (V_SET0)),
+                          (EXTRACT_SUBREG (v8f32 VR256:$src), sub_xmm),
+                          (i8 1)), sub_xmm)>;
   def : Pat<(v8i32 (X86vzmovl (v8i32 VR256:$src))),
-            (VBLENDPSYrri (v8i32 (AVX_SET0)), VR256:$src, (i8 1))>;
+            (SUBREG_TO_REG (i32 0),
+             (VPBLENDWrri (v4i32 (V_SET0)),
+                          (EXTRACT_SUBREG (v8i32 VR256:$src), sub_xmm),
+                          (i8 3)), sub_xmm)>;
+
+  def : Pat<(v4f64 (X86vzmovl (v4f64 VR256:$src))),
+            (SUBREG_TO_REG (i32 0),
+             (VBLENDPDrri (v2f64 (V_SET0)),
+                          (EXTRACT_SUBREG (v4f64 VR256:$src), sub_xmm),
+                          (i8 1)), sub_xmm)>;
   def : Pat<(v4i64 (X86vzmovl (v4i64 VR256:$src))),
-            (VBLENDPDYrri (v4i64 (AVX_SET0)), VR256:$src, (i8 1))>;
+            (SUBREG_TO_REG (i32 0),
+             (VPBLENDWrri (v2i64 (V_SET0)),
+                          (EXTRACT_SUBREG (v4i64 VR256:$src), sub_xmm),
+                          (i8 0xf)), sub_xmm)>;
 }
 
 // Prefer a movss or movsd over a blendps when optimizing for size. these were
@@ -6458,13 +6481,29 @@ let Predicates = [UseSSE41, OptForSpeed] in {
 
   def : Pat<(v4f32 (X86Movss VR128:$src1, VR128:$src2)),
             (BLENDPSrri VR128:$src1, VR128:$src2, (i8 1))>;
+  def : Pat<(v4f32 (X86Movss VR128:$src1, (memopv4f32 addr:$src2))),
+            (BLENDPSrmi VR128:$src1, addr:$src2, (i8 1))>;
+  def : Pat<(v4f32 (X86Movss (memopv4f32 addr:$src2), VR128:$src1)),
+            (BLENDPSrmi VR128:$src1, addr:$src2, (i8 0xe))>;
   def : Pat<(v4i32 (X86Movss VR128:$src1, VR128:$src2)),
             (PBLENDWrri VR128:$src1, VR128:$src2, (i8 3))>;
+  def : Pat<(v4i32 (X86Movss VR128:$src1, (bc_v4i32 (memopv2i64 addr:$src2)))),
+            (PBLENDWrmi VR128:$src1, addr:$src2, (i8 3))>;
+  def : Pat<(v4i32 (X86Movss (bc_v4i32 (memopv2i64 addr:$src2)), VR128:$src1)),
+            (PBLENDWrmi VR128:$src1, addr:$src2, (i8 0xfc))>;
 
   def : Pat<(v2f64 (X86Movsd VR128:$src1, VR128:$src2)),
             (BLENDPDrri VR128:$src1, VR128:$src2, (i8 1))>;
+  def : Pat<(v2f64 (X86Movsd VR128:$src1, (memopv2f64 addr:$src2))),
+            (BLENDPDrmi VR128:$src1, addr:$src2, (i8 1))>;
+  def : Pat<(v2f64 (X86Movsd (memopv2f64 addr:$src2), VR128:$src1)),
+            (BLENDPDrmi VR128:$src1, addr:$src2, (i8 2))>;
   def : Pat<(v2i64 (X86Movsd VR128:$src1, VR128:$src2)),
             (PBLENDWrri VR128:$src1, VR128:$src2, (i8 0xf))>;
+  def : Pat<(v2i64 (X86Movsd VR128:$src1, (memopv2i64 addr:$src2))),
+            (PBLENDWrmi VR128:$src1, addr:$src2, (i8 0xf))>;
+  def : Pat<(v2i64 (X86Movsd (memopv2i64 addr:$src2), VR128:$src1)),
+            (PBLENDWrmi VR128:$src1, addr:$src2, (i8 0xf0))>;
 }
 
 
