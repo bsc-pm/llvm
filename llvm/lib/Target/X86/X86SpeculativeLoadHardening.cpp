@@ -173,6 +173,7 @@ private:
   MachineInstr *
   sinkPostLoadHardenedInst(MachineInstr &MI,
                            SmallPtrSetImpl<MachineInstr *> &HardenedLoads);
+  bool canHardenPostLoad(MachineInstr &MI);
   void hardenPostLoad(MachineInstr &MI, MachineSSAUpdater &PredStateSSA);
   void checkReturnInstr(MachineInstr &MI, MachineSSAUpdater &PredStateSSA);
   void checkCallInstr(MachineInstr &MI, MachineSSAUpdater &PredStateSSA);
@@ -330,6 +331,37 @@ static void canonicalizePHIOperands(MachineFunction &MF) {
     }
 }
 
+/// Helper to scan a function for loads vulnerable to misspeculation that we
+/// want to harden.
+///
+/// We use this to avoid making changes to functions where there is nothing we
+/// need to do to harden against misspeculation.
+static bool hasVulnerableLoad(MachineFunction &MF) {
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : MBB) {
+      // Loads within this basic block after an LFENCE are not at risk of
+      // speculatively executing with invalid predicates from prior control
+      // flow. So break out of this block but continue scanning the function.
+      if (MI.getOpcode() == X86::LFENCE)
+        break;
+
+      // Looking for loads only.
+      if (!MI.mayLoad())
+        continue;
+
+      // An MFENCE is modeled as a load but isn't vulnerable to misspeculation.
+      if (MI.getOpcode() == X86::MFENCE)
+        continue;
+
+      // We found a load.
+      return true;
+    }
+  }
+
+  // No loads found.
+  return false;
+}
+
 bool X86SpeculativeLoadHardeningPass::runOnMachineFunction(
     MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "********** " << getPassName() << " : " << MF.getName()
@@ -359,34 +391,14 @@ bool X86SpeculativeLoadHardeningPass::runOnMachineFunction(
   auto EntryInsertPt = Entry.SkipPHIsLabelsAndDebug(Entry.begin());
 
   // Do a quick scan to see if we have any checkable loads.
-  bool HasCheckableLoad = false;
-  for (MachineBasicBlock &MBB : MF) {
-    for (MachineInstr &MI : MBB) {
-      // Stop searching blocks at an LFENCE.
-      if (MI.getOpcode() == X86::LFENCE)
-        break;
-
-      // Looking for loads only.
-      if (!MI.mayLoad())
-        continue;
-
-      // An MFENCE is modeled as a load but doesn't require hardening.
-      if (MI.getOpcode() == X86::MFENCE)
-        continue;
-
-      HasCheckableLoad = true;
-      break;
-    }
-    if (HasCheckableLoad)
-      break;
-  }
+  bool HasVulnerableLoad = hasVulnerableLoad(MF);
 
   // See if we have any conditional branching blocks that we will need to trace
   // predicate state through.
   SmallVector<BlockCondInfo, 16> Infos = collectBlockCondInfo(MF);
 
   // If we have no interesting conditions or loads, nothing to do here.
-  if (!HasCheckableLoad && Infos.empty())
+  if (!HasVulnerableLoad && Infos.empty())
     return true;
 
   unsigned PredStateReg;
@@ -402,7 +414,7 @@ bool X86SpeculativeLoadHardeningPass::runOnMachineFunction(
 
   // If we have loads being hardened and we've asked for call and ret edges to
   // get a full fence-based mitigation, inject that fence.
-  if (HasCheckableLoad && FenceCallAndRet) {
+  if (HasVulnerableLoad && FenceCallAndRet) {
     // We need to insert an LFENCE at the start of the function to suspend any
     // incoming misspeculation from the caller. This helps two-fold: the caller
     // may not have been protected as this code has been, and this code gets to
@@ -1104,12 +1116,12 @@ void X86SpeculativeLoadHardeningPass::checkAllLoads(
           (IndexReg && LoadDepRegs.test(IndexReg)))
         continue;
 
-      // If post-load hardening is enabled, this load is known to be
-      // data-invariant, and we aren't already going to harden one of the
+      // If post-load hardening is enabled, this load is compatible with
+      // post-load hardening, and we aren't already going to harden one of the
       // address registers, queue it up to be hardened post-load. Notably, even
       // once hardened this won't introduce a useful dependency that could prune
       // out subsequent loads.
-      if (EnablePostLoadHardening && isDataInvariantLoad(MI) &&
+      if (EnablePostLoadHardening && canHardenPostLoad(MI) &&
           !HardenedAddrRegs.count(BaseReg) &&
           !HardenedAddrRegs.count(IndexReg)) {
         HardenPostLoad.insert(&MI);
@@ -1591,6 +1603,25 @@ MachineInstr *X86SpeculativeLoadHardeningPass::sinkPostLoadHardenedInst(
   return MI;
 }
 
+bool X86SpeculativeLoadHardeningPass::canHardenPostLoad(MachineInstr &MI) {
+  if (!isDataInvariantLoad(MI))
+    return false;
+
+  auto &DefOp = MI.getOperand(0);
+  unsigned OldDefReg = DefOp.getReg();
+
+  auto *DefRC = MRI->getRegClass(OldDefReg);
+  int DefRegBytes = TRI->getRegSizeInBits(*DefRC) / 8;
+  if (DefRegBytes > 8)
+    // We don't support post-load hardening of vectors.
+    return false;
+
+  const TargetRegisterClass *GPRRegClasses[] = {
+      &X86::GR8RegClass, &X86::GR16RegClass, &X86::GR32RegClass,
+      &X86::GR64RegClass};
+  return DefRC->hasSuperClassEq(GPRRegClasses[Log2_32(DefRegBytes)]);
+}
+
 // We can harden non-leaking loads into register without touching the address
 // by just hiding all of the loaded bits. We use an `or` instruction to do
 // this because having the poison value be all ones allows us to use the same
@@ -1598,8 +1629,8 @@ MachineInstr *X86SpeculativeLoadHardeningPass::sinkPostLoadHardenedInst(
 // execution and coercing them to one is sufficient.
 void X86SpeculativeLoadHardeningPass::hardenPostLoad(
     MachineInstr &MI, MachineSSAUpdater &PredStateSSA) {
-  assert(isDataInvariantLoad(MI) &&
-         "Cannot get here with a non-invariant load!");
+  assert(canHardenPostLoad(MI) &&
+         "Invalid instruction for post-load hardening!");
 
   MachineBasicBlock &MBB = *MI.getParent();
   DebugLoc Loc = MI.getDebugLoc();
@@ -1613,14 +1644,6 @@ void X86SpeculativeLoadHardeningPass::hardenPostLoad(
 
   unsigned OrOpCodes[] = {X86::OR8rr, X86::OR16rr, X86::OR32rr, X86::OR64rr};
   unsigned OrOpCode = OrOpCodes[Log2_32(DefRegBytes)];
-
-#ifndef NDEBUG
-  const TargetRegisterClass *OrRegClasses[] = {
-      &X86::GR8RegClass, &X86::GR16RegClass, &X86::GR32RegClass,
-      &X86::GR64RegClass};
-  assert(DefRC->hasSuperClassEq(OrRegClasses[Log2_32(DefRegBytes)]) &&
-         "Cannot define this register with OR instruction!");
-#endif
 
   unsigned SubRegImms[] = {X86::sub_8bit, X86::sub_16bit, X86::sub_32bit};
 
