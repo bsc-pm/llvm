@@ -1387,6 +1387,12 @@ multiclass sve_int_bin_pred_arit_2<bits<3> opc, string asm> {
   def _D : sve_int_bin_pred_arit_log<0b11, 0b10, opc, asm, ZPR64>;
 }
 
+// Special case for divides which are not defined for 8b/16b elements.
+multiclass sve_int_bin_pred_arit_2_div<bits<3> opc, string asm> {
+  def _S : sve_int_bin_pred_arit_log<0b10, 0b10, opc, asm, ZPR32>;
+  def _D : sve_int_bin_pred_arit_log<0b11, 0b10, opc, asm, ZPR64>;
+}
+
 //===----------------------------------------------------------------------===//
 // SVE Integer Multiply-Add Group
 //===----------------------------------------------------------------------===//
@@ -1449,6 +1455,72 @@ multiclass sve_int_mlas_vvv_pred<bits<1> opc, string asm> {
   def _H : sve_int_mlas_vvv_pred<0b01, opc, asm, ZPR16>;
   def _S : sve_int_mlas_vvv_pred<0b10, opc, asm, ZPR32>;
   def _D : sve_int_mlas_vvv_pred<0b11, opc, asm, ZPR64>;
+}
+
+//===----------------------------------------------------------------------===//
+// SVE Integer Dot Product Group
+//===----------------------------------------------------------------------===//
+
+class sve_intx_dot<bit sz, bit U, string asm, ZPRRegOp zprty1,
+                   ZPRRegOp zprty2>
+: I<(outs zprty1:$Zda), (ins zprty1:$_Zda, zprty2:$Zn, zprty2:$Zm), asm,
+  "\t$Zda, $Zn, $Zm", "", []>, Sched<[]> {
+  bits<5> Zda;
+  bits<5> Zn;
+  bits<5> Zm;
+  let Inst{31-23} = 0b010001001;
+  let Inst{22}    = sz;
+  let Inst{21}    = 0;
+  let Inst{20-16} = Zm;
+  let Inst{15-11} = 0;
+  let Inst{10}    = U;
+  let Inst{9-5}   = Zn;
+  let Inst{4-0}   = Zda;
+
+  let Constraints = "$Zda = $_Zda";
+}
+
+multiclass sve_intx_dot<bit opc, string asm> {
+  def _S : sve_intx_dot<0b0, opc, asm, ZPR32, ZPR8>;
+  def _D : sve_intx_dot<0b1, opc, asm, ZPR64, ZPR16>;
+}
+
+//===----------------------------------------------------------------------===//
+// SVE Integer Dot Product Group - Indexed Group
+//===----------------------------------------------------------------------===//
+
+class sve_intx_dot_by_indexed_elem<bit sz, bit U, string asm,
+                                   ZPRRegOp zprty1, ZPRRegOp zprty2,
+                                   ZPRRegOp zprty3, Operand itype>
+: I<(outs zprty1:$Zda), (ins zprty1:$_Zda, zprty2:$Zn, zprty3:$Zm, itype:$iop),
+  asm, "\t$Zda, $Zn, $Zm$iop",
+  "", []>, Sched<[]> {
+  bits<5> Zda;
+  bits<5> Zn;
+  let Inst{31-23} = 0b010001001;
+  let Inst{22}    = sz;
+  let Inst{21}    = 0b1;
+  let Inst{15-11} = 0;
+  let Inst{10}    = U;
+  let Inst{9-5}   = Zn;
+  let Inst{4-0}   = Zda;
+
+  let Constraints = "$Zda = $_Zda";
+}
+
+multiclass sve_intx_dot_by_indexed_elem<bit opc, string asm> {
+  def _S : sve_intx_dot_by_indexed_elem<0b0, opc, asm, ZPR32, ZPR8, ZPR3b8, VectorIndexS> {
+    bits<2> iop;
+    bits<3> Zm;
+    let Inst{20-19} = iop;
+    let Inst{18-16} = Zm;
+  }
+  def _D : sve_intx_dot_by_indexed_elem<0b1, opc, asm, ZPR64, ZPR16, ZPR4b16, VectorIndexD> {
+    bits<1> iop;
+    bits<4> Zm;
+    let Inst{20} = iop;
+    let Inst{19-16} = Zm;
+  }
 }
 
 //===----------------------------------------------------------------------===//
