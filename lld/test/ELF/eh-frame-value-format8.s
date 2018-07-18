@@ -4,7 +4,7 @@
 # RUN: ld.lld --eh-frame-hdr --section-start .text=0x1000 %t.o -o %t
 # RUN: llvm-readobj -s -section-data %t | FileCheck %s
 
-## Check we are able to handle DW_EH_PE_udata2 encoding.
+## Check we are able to handle DW_EH_PE_absptr encoding.
 
 # CHECK:      Section {
 # CHECK:        Index:
@@ -43,17 +43,16 @@
 # CHECK-NEXT:   AddressAlignment:
 # CHECK-NEXT:   EntrySize:
 # CHECK-NEXT:   SectionData (
-# CHECK-NEXT:     0000: 0C000000 00000000 01520001 010102FF
+# CHECK-NEXT:     0000: 0C000000 00000000 01520001 010100FF
 # CHECK-NEXT:     0010: 0C000000 14000000 34120000 00000000
 #                                           ^
 #                                           ---> ADDR(foo) + 0x234 = 0x1234
-
 .text
 .global foo
 foo:
  nop
 
-.section .eh_frame
+.section .eh_frame, "ax"
   .long 12   # Size
   .long 0x00 # ID
   .byte 0x01 # Version.
@@ -66,10 +65,10 @@ foo:
   .byte 0x01 # LEB128
   .byte 0x01 # LEB128
 
-  .byte 0x02 # DW_EH_PE_udata2
+  .byte 0x00 # DW_EH_PE_absptr
 
   .byte 0xFF
  
-  .long 0x6  # Size
+  .long 12  # Size
   .long 0x14 # ID
-  .short foo + 0x234
+  .quad foo + 0x234
