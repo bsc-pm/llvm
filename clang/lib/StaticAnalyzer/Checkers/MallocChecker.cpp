@@ -2899,8 +2899,11 @@ std::shared_ptr<PathDiagnosticPiece> MallocChecker::MallocBugVisitor::VisitNode(
   // (__attribute__((cleanup))).
 
   // Find out if this is an interesting point and what is the kind.
-  const char *Msg = nullptr;
+  StringRef Msg;
   StackHintGeneratorForSymbol *StackHint = nullptr;
+  SmallString<256> Buf;
+  llvm::raw_svector_ostream OS(Buf);
+  
   if (Mode == Normal) {
     if (isAllocated(RS, RSPrev, S)) {
       Msg = "Memory is allocated";
@@ -2917,8 +2920,6 @@ std::shared_ptr<PathDiagnosticPiece> MallocChecker::MallocBugVisitor::VisitNode(
           Msg = "Memory is released";
           break;
         case AF_InternalBuffer: {
-          SmallString<256> Buf;
-          llvm::raw_svector_ostream OS(Buf);
           OS << "Inner pointer invalidated by call to ";
           if (N->getLocation().getKind() == ProgramPoint::PostImplicitCallKind) {
             OS << "destructor";
@@ -2932,7 +2933,7 @@ std::shared_ptr<PathDiagnosticPiece> MallocChecker::MallocBugVisitor::VisitNode(
             }
             OS << "'";
           }
-          Msg = OS.str().data();
+          Msg = OS.str();
           break;
         }
         case AF_None:
@@ -3003,7 +3004,7 @@ std::shared_ptr<PathDiagnosticPiece> MallocChecker::MallocBugVisitor::VisitNode(
     }
   }
 
-  if (!Msg)
+  if (Msg.empty())
     return nullptr;
   assert(StackHint);
 
