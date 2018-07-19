@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // RUN: %clang_cc1 -S -emit-llvm -fno-builtin -o - %s | FileCheck %s
 // RUN: %clang_cc1 -S -emit-llvm -fno-builtin-ceil -fno-builtin-copysign -fno-builtin-cos \
 // RUN:  -fno-builtin-fabs -fno-builtin-floor -fno-builtin-strcat -fno-builtin-strncat \
