@@ -232,6 +232,7 @@
 
 #include <experimental/__config>
 #include <cstddef>
+#include <cstdlib>
 #include <chrono>
 #include <iterator>
 #include <iosfwd>
@@ -249,6 +250,9 @@
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #pragma GCC system_header
 #endif
+
+_LIBCPP_PUSH_MACROS
+#include <__undef_macros>
 
 #define __cpp_lib_experimental_filesystem 201406
 
@@ -2250,6 +2254,7 @@ private:
           __ec->clear();
         return __data_.__type_;
       }
+      _LIBCPP_UNREACHABLE();
     }
 
     _LIBCPP_INLINE_VISIBILITY
@@ -2270,6 +2275,7 @@ private:
         return __data_.__type_;
       }
       }
+      _LIBCPP_UNREACHABLE();
     }
 
     _LIBCPP_INLINE_VISIBILITY
@@ -2284,6 +2290,7 @@ private:
       case _RefreshSymlink:
         return file_status(__get_ft(__ec), __data_.__non_sym_perms_);
       }
+      _LIBCPP_UNREACHABLE();
     }
 
     _LIBCPP_INLINE_VISIBILITY
@@ -2299,6 +2306,7 @@ private:
       case _RefreshSymlinkUnresolved:
         return file_status(__get_sym_ft(__ec), __data_.__sym_perms_);
       }
+      _LIBCPP_UNREACHABLE();
     }
 
 
@@ -2324,6 +2332,7 @@ private:
         return __data_.__size_;
       }
       }
+      _LIBCPP_UNREACHABLE();
     }
 
     _LIBCPP_INLINE_VISIBILITY
@@ -2342,6 +2351,7 @@ private:
         return __data_.__nlink_;
       }
       }
+      _LIBCPP_UNREACHABLE();
     }
 
     _LIBCPP_INLINE_VISIBILITY
@@ -2364,6 +2374,7 @@ private:
         return __data_.__write_time_;
       }
       }
+      _LIBCPP_UNREACHABLE();
     }
 private:
     _Path __p_;
@@ -2638,5 +2649,7 @@ recursive_directory_iterator end(const recursive_directory_iterator&) _NOEXCEPT 
 }
 
 _LIBCPP_END_NAMESPACE_EXPERIMENTAL_FILESYSTEM
+
+_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP_EXPERIMENTAL_FILESYSTEM
