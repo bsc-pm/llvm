@@ -1,3 +1,4 @@
+; UNSUPPORTED: riscv
 ; RUN: llc -fast-isel=false -O0 -filetype=obj -o - %s | llvm-dwarfdump -v - | FileCheck %s
 ;
 ; CHECK: .debug_info contents:
