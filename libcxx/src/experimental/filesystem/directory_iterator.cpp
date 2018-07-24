@@ -42,14 +42,18 @@ static file_type get_file_type(DirEntT *ent, int) {
     return file_type::regular;
   case DT_SOCK:
     return file_type::socket;
+  // Unlike in lstat, hitting "unknown" here simply means that the underlying
+  // filesystem doesn't support d_type. Report is as 'none' so we correctly
+  // set the cache to empty.
   case DT_UNKNOWN:
-    return file_type::unknown;
+    break;
   }
   return file_type::none;
 }
+
 template <class DirEntT>
 static file_type get_file_type(DirEntT *ent, long) {
-  return file_type::unknown;
+  return file_type::none;
 }
 
 static pair<string_view, file_type>
@@ -359,13 +363,13 @@ bool recursive_directory_iterator::__try_recursion(error_code *ec) {
   bool skip_rec = false;
   error_code m_ec;
   if (!rec_sym) {
-    file_status st = curr_it.__entry_.symlink_status(m_ec);
+    file_status st(curr_it.__entry_.__get_sym_ft(&m_ec));
     if (m_ec && status_known(st))
       m_ec.clear();
     if (m_ec || is_symlink(st) || !is_directory(st))
       skip_rec = true;
   } else {
-    file_status st = curr_it.__entry_.status(m_ec);
+    file_status st(curr_it.__entry_.__get_ft(&m_ec));
     if (m_ec && status_known(st))
       m_ec.clear();
     if (m_ec || !is_directory(st))
