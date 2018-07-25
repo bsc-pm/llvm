@@ -33749,6 +33749,24 @@ static SDValue combineMulSpecial(uint64_t MulAmt, SDNode *N, SelectionDAG &DAG,
     return DAG.getNode(ISD::ADD, DL, VT, N->getOperand(0),
                        combineMulMulAddOrSub(9, 3, /*isAdd*/ true));
   }
+
+  // Another trick. If this is a power 2 + 2/4/8, we can use a shift followed
+  // by a single LEA.
+  // First check if this a sum of two power of 2s because that's easy. Then
+  // count how many zeros are up to the first bit.
+  // TODO: We can do this even without LEA at a cost of two shifts and an add.
+  if (isPowerOf2_64(MulAmt & (MulAmt - 1))) {
+    unsigned ScaleShift = countTrailingZeros(MulAmt);
+    if (ScaleShift >= 1 && ScaleShift < 4) {
+      unsigned ShiftAmt = Log2_64((MulAmt & (MulAmt - 1)));
+      SDValue Shift1 = DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
+                                   DAG.getConstant(ShiftAmt, DL, MVT::i8));
+      SDValue Shift2 = DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
+                                   DAG.getConstant(ScaleShift, DL, MVT::i8));
+      return DAG.getNode(ISD::ADD, DL, VT, Shift1, Shift2);
+    }
+  }
+
   return SDValue();
 }
 
@@ -33920,35 +33938,39 @@ static SDValue combineMul(SDNode *N, SelectionDAG &DAG,
     int64_t SignMulAmt = C->getSExtValue();
     if ((SignMulAmt != INT64_MIN) && (SignMulAmt != INT64_MAX) &&
         (SignMulAmt != -INT64_MAX)) {
-      int NumSign = SignMulAmt > 0 ? 1 : -1;
-      bool IsPowerOf2_64PlusOne = isPowerOf2_64(NumSign * SignMulAmt - 1);
-      bool IsPowerOf2_64MinusOne = isPowerOf2_64(NumSign * SignMulAmt + 1);
-      bool IsPowerOf2_64MinusTwo = isPowerOf2_64(NumSign * SignMulAmt + 2);
-      if (IsPowerOf2_64PlusOne) {
+      int64_t AbsMulAmt = SignMulAmt < 0 ? -SignMulAmt : SignMulAmt;
+      if (isPowerOf2_64(AbsMulAmt - 1)) {
         // (mul x, 2^N + 1) => (add (shl x, N), x)
         NewMul = DAG.getNode(
             ISD::ADD, DL, VT, N->getOperand(0),
             DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
-                        DAG.getConstant(Log2_64(NumSign * SignMulAmt - 1), DL,
+                        DAG.getConstant(Log2_64(AbsMulAmt - 1), DL,
                                         MVT::i8)));
         // To negate, subtract the number from zero
         if (SignMulAmt < 0)
           NewMul = DAG.getNode(ISD::SUB, DL, VT,
                                DAG.getConstant(0, DL, VT), NewMul);
-      } else if (IsPowerOf2_64MinusOne) {
+      } else if (isPowerOf2_64(AbsMulAmt + 1)) {
         // (mul x, 2^N - 1) => (sub (shl x, N), x)
         NewMul = DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
-                             DAG.getConstant(Log2_64(NumSign * SignMulAmt + 1),
+                             DAG.getConstant(Log2_64(AbsMulAmt + 1),
                                              DL, MVT::i8));
         // To negate, reverse the operands of the subtract.
         if (SignMulAmt < 0)
           NewMul = DAG.getNode(ISD::SUB, DL, VT, N->getOperand(0), NewMul);
         else
           NewMul = DAG.getNode(ISD::SUB, DL, VT, NewMul, N->getOperand(0));
-      } else if (IsPowerOf2_64MinusTwo && NumSign == 1) {
-        // (mul x, 2^N - 1) => (sub (shl x, N), x)
+      } else if (SignMulAmt >= 0 && isPowerOf2_64(AbsMulAmt - 2)) {
+        // (mul x, 2^N + 2) => (add (add (shl x, N), x), x)
         NewMul = DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
-                             DAG.getConstant(Log2_64(NumSign * SignMulAmt + 2),
+                             DAG.getConstant(Log2_64(AbsMulAmt - 2),
+                                             DL, MVT::i8));
+        NewMul = DAG.getNode(ISD::ADD, DL, VT, NewMul, N->getOperand(0));
+        NewMul = DAG.getNode(ISD::ADD, DL, VT, NewMul, N->getOperand(0));
+      } else if (SignMulAmt >= 0 && isPowerOf2_64(AbsMulAmt + 2)) {
+        // (mul x, 2^N - 2) => (sub (sub (shl x, N), x), x)
+        NewMul = DAG.getNode(ISD::SHL, DL, VT, N->getOperand(0),
+                             DAG.getConstant(Log2_64(AbsMulAmt + 2),
                                              DL, MVT::i8));
         NewMul = DAG.getNode(ISD::SUB, DL, VT, NewMul, N->getOperand(0));
         NewMul = DAG.getNode(ISD::SUB, DL, VT, NewMul, N->getOperand(0));
