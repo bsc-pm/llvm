@@ -229,7 +229,7 @@ struct time_util_base {
           .count();
 
 private:
-#if _LIBCPP_STD_VER > 11
+#if _LIBCPP_STD_VER > 11 && !defined(_LIBCPP_HAS_NO_CXX14_CONSTEXPR)
   static constexpr fs_duration get_min_nsecs() {
     return duration_cast<fs_duration>(
         fs_nanoseconds(min_nsec_timespec) -
@@ -393,8 +393,10 @@ bool set_file_times(const path& p, std::array<TimeSpec, 2> const& TS,
                     error_code& ec) {
 #if !defined(_LIBCPP_USE_UTIMENSAT)
   using namespace chrono;
-  auto Convert = [](long nsec) -> decltype(std::declval<::timeval>().tv_usec) {
-    return duration_cast<microseconds>(nanoseconds(nsec)).count();
+  auto Convert = [](long nsec) {
+    using int_type = decltype(std::declval<::timeval>().tv_usec);
+    auto dur = duration_cast<microseconds>(nanoseconds(nsec)).count();
+    return static_cast<int_type>(dur);
   };
   struct ::timeval ConvertedTS[2] = {{TS[0].tv_sec, Convert(TS[0].tv_nsec)},
                                      {TS[1].tv_sec, Convert(TS[1].tv_nsec)}};
