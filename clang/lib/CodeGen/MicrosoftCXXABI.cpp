@@ -827,6 +827,7 @@ MicrosoftCXXABI::getRecordArgABI(const CXXRecordDecl *RD) const {
     return RAA_Default;
 
   case llvm::Triple::x86_64:
+  case llvm::Triple::aarch64:
     return !canCopyArgument(RD) ? RAA_Indirect : RAA_Default;
   }
 
@@ -1060,10 +1061,22 @@ bool MicrosoftCXXABI::classifyReturnType(CGFunctionInfo &FI) const {
     // the second parameter.
     FI.getReturnInfo() = ABIArgInfo::getIndirect(Align, /*ByVal=*/false);
     FI.getReturnInfo().setSRetAfterThis(FI.isInstanceMethod());
+
+    // aarch64-windows requires that instance methods use X1 for the return
+    // address. So for aarch64-windows we do not mark the
+    // return as SRet.
+    FI.getReturnInfo().setSuppressSRet(CGM.getTarget().getTriple().getArch() ==
+                                       llvm::Triple::aarch64);
     return true;
   } else if (!RD->isPOD()) {
     // If it's a free function, non-POD types are returned indirectly.
     FI.getReturnInfo() = ABIArgInfo::getIndirect(Align, /*ByVal=*/false);
+
+    // aarch64-windows requires that non-POD, non-instance returns use X0 for
+    // the return address. So for aarch64-windows we do not mark the return as
+    // SRet.
+    FI.getReturnInfo().setSuppressSRet(CGM.getTarget().getTriple().getArch() ==
+                                       llvm::Triple::aarch64);
     return true;
   }
 
