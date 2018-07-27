@@ -37,3 +37,16 @@ call ra
 # INSTR: auipc ra, 0
 # INSTR: jalr  ra
 # FIXUP: fixup A - offset: 0, value: ra, kind: fixup_riscv_call
+
+# Calls via PLT
+
+call foo@plt
+# RELOC: R_RISCV_CALL_PLT foo 0x0
+# INSTR: auipc ra, 0
+# INSTR: jalr  ra
+# FIXUP: fixup A - offset: 0, value: foo@plt, kind: fixup_riscv_call_plt
+call bar@plt
+# RELOC: R_RISCV_CALL_PLT bar 0x0
+# INSTR: auipc ra, 0
+# INSTR: jalr  ra
+# FIXUP:  fixup A - offset: 0, value: bar@plt, kind: fixup_riscv_call_plt

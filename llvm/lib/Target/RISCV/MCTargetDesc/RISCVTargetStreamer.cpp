@@ -30,3 +30,11 @@ void RISCVTargetAsmStreamer::emitDirectiveOptionRVC() {
 void RISCVTargetAsmStreamer::emitDirectiveOptionNoRVC() {
   OS << "\t.option\tnorvc\n";
 }
+
+void RISCVTargetAsmStreamer::emitDirectiveOptionPIC() {
+  OS << "\t.option\tpic\n";
+}
+
+void RISCVTargetAsmStreamer::emitDirectiveOptionNoPIC() {
+  OS << "\t.option\tnopic\n";
+}

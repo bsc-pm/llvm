@@ -298,17 +298,24 @@ SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
   int64_t Offset = N->getOffset();
   MVT XLenVT = Subtarget.getXLenVT();
 
-  if (isPositionIndependent())
-    report_fatal_error("Unable to lowerGlobalAddress");
-  // In order to maximise the opportunity for common subexpression elimination,
-  // emit a separate ADD node for the global address offset instead of folding
-  // it in the global address node. Later peephole optimisations may choose to
-  // fold it back in when profitable.
+  // TODO: implement -fPIE without -fPIC
+  if (isPositionIndependent()) {
+    return DAG.getNode(
+        RISCVISD::WRAPPER_PIC, DL, Ty,
+        DAG.getTargetGlobalAddress(
+            GV, DL, Ty, Offset,
+            Subtarget.ClassifyPICGlobalReference(GV, getTargetMachine())));
+  }
+
+  // In order to maximise the opportunity for common subexpression
+  // elimination, emit a separate ADD node for the global address offset
+  // instead of folding it in the global address node. Later peephole
+  // optimisations may choose to fold it back in when profitable.
   SDValue GAHi = DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_HI);
   SDValue GALo = DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_LO);
   SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, GAHi), 0);
   SDValue MNLo =
-    SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, GALo), 0);
+      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, GALo), 0);
   if (Offset != 0)
     return DAG.getNode(ISD::ADD, DL, Ty, MNLo,
                        DAG.getConstant(Offset, DL, XLenVT));
@@ -323,14 +330,17 @@ SDValue RISCVTargetLowering::lowerBlockAddress(SDValue Op,
   const BlockAddress *BA = N->getBlockAddress();
   int64_t Offset = N->getOffset();
 
-  if (isPositionIndependent())
-    report_fatal_error("Unable to lowerBlockAddress");
+  if (isPositionIndependent()) {
+    return DAG.getNode(
+        RISCVISD::WRAPPER_PIC, DL, Ty,
+        DAG.getTargetBlockAddress(BA, Ty, Offset, RISCVII::MO_PCREL));
+  }
 
   SDValue BAHi = DAG.getTargetBlockAddress(BA, Ty, Offset, RISCVII::MO_HI);
   SDValue BALo = DAG.getTargetBlockAddress(BA, Ty, Offset, RISCVII::MO_LO);
   SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, BAHi), 0);
   SDValue MNLo =
-    SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, BALo), 0);
+      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, BALo), 0);
   return MNLo;
 }
 
@@ -343,18 +353,20 @@ SDValue RISCVTargetLowering::lowerConstantPool(SDValue Op,
   int64_t Offset = N->getOffset();
   unsigned Alignment = N->getAlignment();
 
-  if (!isPositionIndependent()) {
-    SDValue CPAHi =
-        DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_HI);
-    SDValue CPALo =
-        DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_LO);
-    SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, CPAHi), 0);
-    SDValue MNLo =
-        SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, CPALo), 0);
-    return MNLo;
-  } else {
-    report_fatal_error("Unable to lowerConstantPool");
+  if (isPositionIndependent()) {
+    return DAG.getNode(RISCVISD::WRAPPER_PIC, DL, Ty,
+                       DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset,
+                                                 RISCVII::MO_PCREL));
   }
+
+  SDValue CPAHi =
+      DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_HI);
+  SDValue CPALo =
+      DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_LO);
+  SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, CPAHi), 0);
+  SDValue MNLo =
+      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, CPALo), 0);
+  return MNLo;
 }
 
 SDValue RISCVTargetLowering::lowerExternalSymbol(SDValue Op,
@@ -365,15 +377,17 @@ SDValue RISCVTargetLowering::lowerExternalSymbol(SDValue Op,
   const char *Sym = N->getSymbol();
 
   // TODO: should also handle gp-relative loads.
-
-  if (isPositionIndependent())
-    report_fatal_error("Unable to lowerExternalSymbol");
+  if (isPositionIndependent()) {
+    return DAG.getNode(
+        RISCVISD::WRAPPER_PIC, DL, Ty,
+        DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_GOT));
+  }
 
   SDValue GAHi = DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_HI);
   SDValue GALo = DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_LO);
   SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, GAHi), 0);
   SDValue MNLo =
-    SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, GALo), 0);
+      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, GALo), 0);
   return MNLo;
 }
 
@@ -1441,9 +1455,19 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   // TargetGlobalAddress/TargetExternalSymbol node so that legalize won't
   // split it and then direct call can be matched by PseudoCALL.
   if (GlobalAddressSDNode *S = dyn_cast<GlobalAddressSDNode>(Callee)) {
-    Callee = DAG.getTargetGlobalAddress(S->getGlobal(), DL, PtrVT, 0, 0);
+    const GlobalValue *GV = S->getGlobal();
+    const TargetMachine &TM = getTargetMachine();
+    unsigned char TargetFlags =
+        !isPositionIndependent() ||
+                TM.shouldAssumeDSOLocal(*GV->getParent(), GV)
+            ? RISCVII::MO_None
+            : RISCVII::MO_PLT;
+    Callee =
+        DAG.getTargetGlobalAddress(S->getGlobal(), DL, PtrVT, 0, TargetFlags);
   } else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
-    Callee = DAG.getTargetExternalSymbol(S->getSymbol(), PtrVT, 0);
+    unsigned char TargetFlags =
+        !isPositionIndependent() ? RISCVII::MO_None : RISCVII::MO_PLT;
+    Callee = DAG.getTargetExternalSymbol(S->getSymbol(), PtrVT, TargetFlags);
   }
 
   // The first call operand is the chain and the second is the target address.
@@ -1676,6 +1700,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::I64ToF32";
   case RISCVISD::TAIL:
     return "RISCVISD::TAIL";
+  case RISCVISD::WRAPPER_PIC:
+    return "RISCVISD::WRAPPER_PIC";
   }
   return nullptr;
 }

@@ -47,6 +47,7 @@ def SelectCC     : SDNode<"RISCVISD::SELECT_CC", SDT_RISCVSelectCC,
 def Tail         : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                            SDNPVariadic]>;
+def WrapperPIC   : SDNode<"RISCVISD::WRAPPER_PIC", SDTIntUnaryOp>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -174,9 +175,24 @@ def BareSymbol : AsmOperandClass {
   let DiagnosticType = "InvalidBareSymbol";
 }
 
+
 // A bare symbol.
 def bare_symbol : Operand<XLenVT> {
   let ParserMatchClass = BareSymbol;
+  let MCOperandPredicate = [{
+     return MCOp.isBareSymbolRef();
+  }];
+}
+
+def BareSymbolOrPlt : AsmOperandClass {
+  let Name = "BareSymbolOrPlt";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidBareSymbolOrPlt";
+}
+
+// A bare symbol optionally decorated with @plt.
+def bare_symbol_or_plt : Operand<XLenVT> {
+  let ParserMatchClass = BareSymbolOrPlt;
   let MCOperandPredicate = [{
      return MCOp.isBareSymbolRef();
   }];
@@ -471,7 +487,6 @@ def SFENCE_VMA : RVInstR<0b0001001, 0b000, OPC_SYSTEM, (outs),
 // Assembler Pseudo Instructions (User-Level ISA, Version 2.2, Chapter 20)
 //===----------------------------------------------------------------------===//
 
-// TODO la
 // TODO lb lh lw
 // TODO RV64I: ld
 // TODO sb sh sw
@@ -703,7 +718,7 @@ def : Pat<(brind (add GPR:$rs1, simm12:$imm12)),
 // Define AsmString to print "call" when compile with -S flag.
 // Define isCodeGenOnly = 0 to support parsing assembly "call" instruction.
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0 in
-def PseudoCALL : Pseudo<(outs), (ins bare_symbol:$func),
+def PseudoCALL : Pseudo<(outs), (ins bare_symbol_or_plt:$func),
                         [(Call tglobaladdr:$func)]> {
   let AsmString = "call\t$func";
 }
@@ -727,7 +742,7 @@ def PseudoRET : Pseudo<(outs), (ins), [(RetFlag)]>,
 // Define AsmString to print "tail" when compile with -S flag.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2],
     isCodeGenOnly = 0 in
-def PseudoTAIL : Pseudo<(outs), (ins bare_symbol:$dst), []> {
+def PseudoTAIL : Pseudo<(outs), (ins bare_symbol_or_plt:$dst), []> {
   let AsmString = "tail\t$dst";
 }
 
@@ -739,6 +754,28 @@ def : Pat<(Tail (iPTR tglobaladdr:$dst)),
           (PseudoTAIL texternalsym:$dst)>;
 def : Pat<(Tail (iPTR texternalsym:$dst)),
           (PseudoTAIL texternalsym:$dst)>;
+
+// We will cheat a bit here and the assembler parser will convert "la" into an
+// "lla" if we are not compiling for PIC.
+// This effectively means "la" we will use "la" for GOT and "lla" for PC-rel.
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
+  let AsmString = "la\t$dst, $src";
+}
+
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
+  let AsmString = "lla\t$dst, $src";
+}
+
+def PseudoAddrPIC : Pseudo<(outs GPR:$dst), (ins ixlenimm:$addr),
+                           [(set GPR:$dst, (WrapperPIC tglobaladdr:$addr))]>;
+
+def : Pat<(WrapperPIC tblockaddress:$addr),
+          (PseudoAddrPIC tblockaddress:$addr)>;
+
+def : Pat<(WrapperPIC tconstpool:$addr),
+          (PseudoAddrPIC tconstpool:$addr)>;
 
 /// Loads
 

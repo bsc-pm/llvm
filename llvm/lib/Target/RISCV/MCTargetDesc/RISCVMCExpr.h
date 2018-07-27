@@ -29,7 +29,9 @@ public:
     VK_RISCV_HI,
     VK_RISCV_PCREL_LO,
     VK_RISCV_PCREL_HI,
+    VK_RISCV_GOT_HI_Pseudo, // Variant without syntax yet
     VK_RISCV_CALL,
+    VK_RISCV_PLT,
     VK_RISCV_Invalid
   };
 

@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; Test fastcc works. Test from bug 2770.
 ; RUN: llc < %s -relocation-model=pic
 

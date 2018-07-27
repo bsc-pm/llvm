@@ -55,7 +55,20 @@ public:
   // during relaxation.
   bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
                              const MCValue &Target) override {
-    return STI.getFeatureBits()[RISCV::FeatureRelax];
+    if (STI.getFeatureBits()[RISCV::FeatureRelax])
+      return true;
+
+    RISCV::Fixups Kind = static_cast<RISCV::Fixups>(Fixup.getKind());
+    // FIXME: Is there a case where pcrel accesses could be resolved?
+    // If so, it looks like we will want to finely-grain distinguish those
+    // that don't.
+    switch (Kind) {
+    default:
+      return false;
+    case RISCV::fixup_riscv_pcrel_lo12_i:
+    case RISCV::fixup_riscv_pcrel_lo12_s:
+      return true;
+    }
   }
 
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
@@ -86,11 +99,13 @@ public:
       { "fixup_riscv_pcrel_hi20",   12,     20,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_pcrel_lo12_i", 20,     12,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_pcrel_lo12_s",  0,     32,  MCFixupKindInfo::FKF_IsPCRel },
+      { "fixup_riscv_got_hi20",     12,     20,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_jal",          12,     20,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_branch",        0,     32,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_rvc_jump",      2,     11,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_rvc_branch",    0,     16,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_call",          0,     64,  MCFixupKindInfo::FKF_IsPCRel },
+      { "fixup_riscv_call_plt",      0,     64,  MCFixupKindInfo::FKF_IsPCRel },
       { "fixup_riscv_relax",         0,      0,  0 }
     };
     static_assert((array_lengthof(Infos)) == RISCV::NumTargetFixupKinds,

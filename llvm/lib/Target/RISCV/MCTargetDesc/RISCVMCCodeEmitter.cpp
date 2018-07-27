@@ -212,6 +212,8 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_None:
     case RISCVMCExpr::VK_RISCV_Invalid:
       llvm_unreachable("Unhandled fixup kind!");
+    case RISCVMCExpr::VK_RISCV_PLT:
+      llvm_unreachable("This variant kind cannot appear at this level");
     case RISCVMCExpr::VK_RISCV_LO:
       if (MIFrm == RISCVII::InstFormatI)
         FixupKind = RISCV::fixup_riscv_lo12_i;
@@ -235,9 +237,24 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_PCREL_HI:
       FixupKind = RISCV::fixup_riscv_pcrel_hi20;
       break;
-    case RISCVMCExpr::VK_RISCV_CALL:
-      FixupKind = RISCV::fixup_riscv_call;
+    case RISCVMCExpr::VK_RISCV_GOT_HI_Pseudo:
+      assert(MIFrm == RISCVII::InstFormatU &&
+             "VK_RISCV_GOT_HI is only valid in U-format");
+      FixupKind = RISCV::fixup_riscv_got_hi20;
       break;
+    case RISCVMCExpr::VK_RISCV_CALL: {
+      FixupKind = RISCV::fixup_riscv_call;
+      if (RVExpr->getSubExpr()->getKind() == MCExpr::Target) {
+        const RISCVMCExpr *SubExpr = cast<RISCVMCExpr>(RVExpr->getSubExpr());
+        assert(SubExpr->getKind() == RISCVMCExpr::VK_RISCV_PLT &&
+               "Only PLT is allowed");
+        FixupKind = RISCV::fixup_riscv_call_plt;
+      } else if (RVExpr->getSubExpr()->getKind() == MCExpr::SymbolRef)
+        FixupKind = RISCV::fixup_riscv_call;
+      else
+        llvm_unreachable("Invalid subexpression in target node");
+      break;
+    }
     }
   } else if (Kind == MCExpr::SymbolRef &&
              cast<MCSymbolRefExpr>(Expr)->getKind() == MCSymbolRefExpr::VK_None) {
@@ -259,10 +276,12 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
   ++MCNumFixups;
 
   if (EnableRelax) {
-    if (FixupKind == RISCV::fixup_riscv_call) {
-      Fixups.push_back(
-      MCFixup::create(0, Expr, MCFixupKind(RISCV::fixup_riscv_relax),
-                      MI.getLoc()));
+    if (FixupKind == RISCV::fixup_riscv_call ||
+        FixupKind == RISCV::fixup_riscv_call_plt ||
+        FixupKind == RISCV::fixup_riscv_pcrel_lo12_i ||
+        FixupKind == RISCV::fixup_riscv_pcrel_lo12_s) {
+      Fixups.push_back(MCFixup::create(
+          0, Expr, MCFixupKind(RISCV::fixup_riscv_relax), MI.getLoc()));
       ++MCNumFixups;
     }
   }

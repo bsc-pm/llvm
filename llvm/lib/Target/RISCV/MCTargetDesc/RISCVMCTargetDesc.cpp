@@ -17,8 +17,11 @@
 #include "RISCVMCAsmInfo.h"
 #include "RISCVTargetStreamer.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCInstrInfo.h"
+#include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -69,6 +72,14 @@ static MCInstPrinter *createRISCVMCInstPrinter(const Triple &T,
   return new RISCVInstPrinter(MAI, MII, MRI);
 }
 
+static MCStreamer *createRISCVELFStreamer(
+    const Triple &T, MCContext &Ctx, std::unique_ptr<MCAsmBackend> &&MAB,
+    std::unique_ptr<MCObjectWriter> &&OW,
+    std::unique_ptr<MCCodeEmitter> &&Emitter, bool RelaxAll) {
+  return new RISCVELFStreamer(Ctx, std::move(MAB), std::move(OW),
+                              std::move(Emitter));
+}
+
 static MCTargetStreamer *
 createRISCVObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
   const Triple &TT = STI.getTargetTriple();
@@ -93,6 +104,7 @@ extern "C" void LLVMInitializeRISCVTargetMC() {
     TargetRegistry::RegisterMCCodeEmitter(*T, createRISCVMCCodeEmitter);
     TargetRegistry::RegisterMCInstPrinter(*T, createRISCVMCInstPrinter);
     TargetRegistry::RegisterMCSubtargetInfo(*T, createRISCVMCSubtargetInfo);
+    TargetRegistry::RegisterELFStreamer(*T, createRISCVELFStreamer);
     TargetRegistry::RegisterObjectTargetStreamer(
         *T, createRISCVObjectTargetStreamer);
 

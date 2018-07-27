@@ -46,3 +46,11 @@ RISCVSubtarget::RISCVSubtarget(const Triple &TT, const std::string &CPU,
     : RISCVGenSubtargetInfo(TT, CPU, FS),
       FrameLowering(initializeSubtargetDependencies(CPU, FS, TT.isArch64Bit())),
       InstrInfo(), RegInfo(getHwMode()), TLInfo(TM, *this) {}
+
+unsigned char
+RISCVSubtarget::ClassifyPICGlobalReference(const GlobalValue *GV,
+                                           const TargetMachine &TM) const {
+  return TM.shouldAssumeDSOLocal(*GV->getParent(), GV)
+             ? RISCVII::MO_PCREL
+             : RISCVII::MO_GOT;
+}

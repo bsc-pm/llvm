@@ -15,8 +15,9 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstBuilder.h"
+#include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCParser/MCAsmLexer.h"
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCParser/MCTargetAsmParser.h"
@@ -83,13 +84,15 @@ class RISCVAsmParser : public MCTargetAsmParser {
 #define GET_ASSEMBLER_HEADER
 #include "RISCVGenAsmMatcher.inc"
 
-  OperandMatchResultTy parseImmediate(OperandVector &Operands);
+  OperandMatchResultTy parseImmediate(OperandVector &Operands,
+                                      bool AllowPLT = false);
   OperandMatchResultTy parseRegister(OperandVector &Operands,
                                      bool AllowParens = false);
   OperandMatchResultTy parseMemOpBaseReg(OperandVector &Operands);
   OperandMatchResultTy parseOperandWithModifier(OperandVector &Operands);
 
-  bool parseOperand(OperandVector &Operands, bool ForceImmediate);
+  bool parseOperand(OperandVector &Operands, bool ForceImmediate,
+                    bool AllowPLT);
 
   bool parseDirectiveOption();
 
@@ -108,6 +111,8 @@ class RISCVAsmParser : public MCTargetAsmParser {
           ComputeAvailableFeatures(STI.ToggleFeature(FeatureString)));
     }
   }
+
+  bool IsPicEnabled;
 public:
   enum RISCVMatchResultTy {
     Match_Dummy = FIRST_TARGET_MATCH_RESULT_TY,
@@ -123,11 +128,15 @@ public:
   RISCVAsmParser(const MCSubtargetInfo &STI, MCAsmParser &Parser,
                  const MCInstrInfo &MII, const MCTargetOptions &Options)
       : MCTargetAsmParser(Options, STI, MII) {
+    MCAsmParserExtension::Initialize(Parser);
+
     Parser.addAliasForDirective(".half", ".2byte");
     Parser.addAliasForDirective(".hword", ".2byte");
     Parser.addAliasForDirective(".word", ".4byte");
     Parser.addAliasForDirective(".dword", ".8byte");
     setAvailableFeatures(ComputeAvailableFeatures(STI.getFeatureBits()));
+
+    IsPicEnabled = getContext().getObjectFileInfo()->isPositionIndependent();
   }
 };
 
@@ -224,6 +233,17 @@ public:
       return false;
     return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
+  }
+
+  bool isBareSymbolOrPlt() const {
+    int64_t Imm;
+    RISCVMCExpr::VariantKind VK;
+    // Must be of 'immediate' type but not a constant.
+    if (!isImm() || evaluateConstantImm(Imm, VK))
+      return false;
+    return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
+           (VK == RISCVMCExpr::VK_RISCV_None ||
+            VK == RISCVMCExpr::VK_RISCV_PLT);
   }
 
   /// Return true if the operand is a valid for the fence instruction e.g.
@@ -776,6 +796,12 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
     return Error(ErrorLoc, "operand must be a bare symbol name");
   }
+  case Match_InvalidBareSymbolOrPlt: {
+    SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
+    return Error(
+        ErrorLoc,
+        "operand must be a bare symbol name optionally followed by @plt");
+  }
   }
 
   llvm_unreachable("Unknown match type detected!");
@@ -842,7 +868,8 @@ OperandMatchResultTy RISCVAsmParser::parseRegister(OperandVector &Operands,
   return MatchOperand_Success;
 }
 
-OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands) {
+OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands,
+                                                    bool AllowPLT) {
   SMLoc S = getLoc();
   SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
   const MCExpr *Res;
@@ -862,8 +889,23 @@ OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands) {
     StringRef Identifier;
     if (getParser().parseIdentifier(Identifier))
       return MatchOperand_ParseFail;
+    bool IsPLT = false;
+    if (Identifier.endswith("@plt")) {
+      if (AllowPLT) {
+        Identifier = Identifier.drop_back(4);
+        IsPLT = true;
+      } else {
+        Error(S, "symbol cannot include @plt in this context");
+        return MatchOperand_ParseFail;
+      }
+    }
     MCSymbol *Sym = getContext().getOrCreateSymbol(Identifier);
     Res = MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_None, getContext());
+    // We'd like to use a plain MCSymbolRefExpr::VK_PLT but LLVM emits @PLT and
+    // this is at the moment not valid for GNU (only @plt) so let's stick to
+    // the syntax and use a kind of ours.
+    if (IsPLT)
+      Res = RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_PLT, getContext());
     break;
   }
   case AsmToken::Percent:
@@ -946,13 +988,14 @@ RISCVAsmParser::parseMemOpBaseReg(OperandVector &Operands) {
 /// operand as a register, which is needed for pseudoinstructions such as
 /// call.
 bool RISCVAsmParser::parseOperand(OperandVector &Operands,
-                                  bool ForceImmediate) {
+                                  bool ForceImmediate,
+                                  bool AllowPLT) {
   // Attempt to parse token as register, unless ForceImmediate.
   if (!ForceImmediate && parseRegister(Operands, true) == MatchOperand_Success)
     return false;
 
   // Attempt to parse token as an immediate
-  if (parseImmediate(Operands) == MatchOperand_Success) {
+  if (parseImmediate(Operands, AllowPLT) == MatchOperand_Success) {
     // Parse memory base register if present
     if (getLexer().is(AsmToken::LParen))
       return parseMemOpBaseReg(Operands) != MatchOperand_Success;
@@ -962,6 +1005,23 @@ bool RISCVAsmParser::parseOperand(OperandVector &Operands,
   // Finally we have exhausted all options and must declare defeat.
   Error(getLoc(), "unknown operand");
   return true;
+}
+
+static bool ForceImmediateOperand(StringRef Name, unsigned OperandIdx) {
+  // FIXME: This may not scale so perhaps we want to use a data-driven approach
+  // instead.
+  switch (OperandIdx) {
+  case 0:
+    // call imm
+    // tail imm
+    return Name == "tail" || Name == "call";
+  case 1:
+    // lla rdest, imm
+    // la rdest, imm
+    return Name == "lla" || Name == "la";
+  default:
+    return false;
+  }
 }
 
 bool RISCVAsmParser::ParseInstruction(ParseInstructionInfo &Info,
@@ -975,18 +1035,22 @@ bool RISCVAsmParser::ParseInstruction(ParseInstructionInfo &Info,
     return false;
 
   // Parse first operand
-  bool ForceImmediate = (Name == "call" || Name == "tail");
-  if (parseOperand(Operands, ForceImmediate))
+  bool AllowPLT = (Name == "call" || Name == "tail");
+  if (parseOperand(Operands, ForceImmediateOperand(Name, 0), AllowPLT))
     return true;
 
   // Parse until end of statement, consuming commas between operands
+  unsigned OperandIdx = 1;
   while (getLexer().is(AsmToken::Comma)) {
     // Consume comma token
     getLexer().Lex();
 
     // Parse next operand
-    if (parseOperand(Operands, false))
+    if (parseOperand(Operands, ForceImmediateOperand(Name, OperandIdx),
+                     /* AllowPLT */ false))
       return true;
+
+    ++OperandIdx;
   }
 
   if (getLexer().isNot(AsmToken::EndOfStatement)) {
@@ -1089,6 +1153,30 @@ bool RISCVAsmParser::parseDirectiveOption() {
                    "unexpected token, expected end of statement");
 
     clearFeatureBits(RISCV::FeatureStdExtC, "c");
+    return false;
+  }
+
+  if (Option == "pic") {
+    getTargetStreamer().emitDirectiveOptionPIC();
+
+    Parser.Lex();
+    if (Parser.getTok().isNot(AsmToken::EndOfStatement))
+      return Error(Parser.getTok().getLoc(),
+                   "unexpected token, expected end of statement");
+
+    IsPicEnabled = true;
+    return false;
+  }
+
+  if (Option == "nopic") {
+    getTargetStreamer().emitDirectiveOptionNoPIC();
+
+    Parser.Lex();
+    if (Parser.getTok().isNot(AsmToken::EndOfStatement))
+      return Error(Parser.getTok().getLoc(),
+                   "unexpected token, expected end of statement");
+
+    IsPicEnabled = false;
     return false;
   }
 
@@ -1198,6 +1286,12 @@ bool RISCVAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
       Imm = SignExtend64<32>(Imm);
     emitLoadImm(Reg, Imm, Out);
     return false;
+  } else if (Inst.getOpcode() == RISCV::PseudoLA) {
+    // Convert PseudoLA into PseudoLLA when PIC is not enabled
+    // so the ELF streamer will do the right thing already.
+    if (!IsPicEnabled)
+      Inst.setOpcode(RISCV::PseudoLLA);
+    // Fall-through to the emitToStreamer below.
   }
 
   emitToStreamer(Out, Inst);
