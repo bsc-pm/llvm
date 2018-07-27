@@ -16,21 +16,21 @@
 ;
 ; Checking for special return instructions (uret, sret, mret).
 ;
-define void @foo_user() #0 {
+define void @foo_user() nounwind #0 {
 ; CHECK-LABEL: foo_user:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    uret
   ret void
 }
 
-define void @foo_supervisor() #1 {
+define void @foo_supervisor() nounwind #1 {
 ; CHECK-LABEL: foo_supervisor:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    sret
   ret void
 }
 
-define void @foo_machine() #2 {
+define void @foo_machine() nounwind #2 {
 ; CHECK-LABEL: foo_machine:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    mret
@@ -49,7 +49,7 @@ define void @foo_machine() #2 {
 ;
 
 declare i32 @otherfoo(...)
-define void @foo_with_call() #2 {
+define void @foo_with_call() nounwind #2 {
 ;
 ; CHECK-RV32-LABEL: foo_with_call:
 ; CHECK-RV32:       # %bb.0:
@@ -547,7 +547,7 @@ define void @foo_with_call() #2 {
 ;
 ; Additionally check frame pointer and return address are properly saved.
 ;
-define void @foo_fp_with_call() #3 {
+define void @foo_fp_with_call() nounwind #3 {
 ;
 ; CHECK-RV32-LABEL: foo_fp_with_call:
 ; CHECK-RV32:       # %bb.0:
