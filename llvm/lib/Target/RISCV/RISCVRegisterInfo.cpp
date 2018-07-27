@@ -33,6 +33,13 @@ RISCVRegisterInfo::RISCVRegisterInfo(unsigned HwMode)
 
 const MCPhysReg *
 RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  if (MF->getFunction().hasFnAttribute("interrupt")) {
+    if (MF->getSubtarget<RISCVSubtarget>().hasStdExtD())
+      return CSR_XLEN_F64_Interrupt_SaveList;
+    if (MF->getSubtarget<RISCVSubtarget>().hasStdExtF())
+      return CSR_XLEN_F32_Interrupt_SaveList;
+    return CSR_Interrupt_SaveList;
+  }
   return CSR_SaveList;
 }
 
@@ -111,6 +118,13 @@ const uint32_t *
 RISCVRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                         CallingConv::ID /*CC*/) const {
   const RISCVSubtarget &SubTarget = MF.getSubtarget<RISCVSubtarget>();
+  if (MF.getFunction().hasFnAttribute("interrupt")) {
+    if (SubTarget.hasStdExtD())
+      return CSR_XLEN_F64_Interrupt_RegMask;
+    if (SubTarget.hasStdExtF())
+      return CSR_XLEN_F32_Interrupt_RegMask;
+    return CSR_Interrupt_RegMask;
+  }
 
   if (SubTarget.isSoftFloat())
     return CSR_RegMask;
@@ -120,4 +134,6 @@ RISCVRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
     return CSR_HardFloatDouble_RegMask;
   else
     llvm_unreachable("Unhandled ABI");
+
+  return CSR_RegMask;
 }

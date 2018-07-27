@@ -29,9 +29,8 @@
 
 using namespace llvm;
 
-RISCVInstrInfo::RISCVInstrInfo(const RISCVSubtarget &Subtarget)
-    : RISCVGenInstrInfo(RISCV::ADJCALLSTACKDOWN, RISCV::ADJCALLSTACKUP),
-      Subtarget(Subtarget) {}
+RISCVInstrInfo::RISCVInstrInfo()
+    : RISCVGenInstrInfo(RISCV::ADJCALLSTACKDOWN, RISCV::ADJCALLSTACKUP) {}
 
 unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
@@ -151,7 +150,8 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCV::GPRRegClass.hasSubClassEq(RC))
-    Opcode = Subtarget.is64Bit() ? RISCV::SD : RISCV::SW;
+    Opcode = TRI->getRegSizeInBits(RISCV::GPRRegClass) == 32 ?
+             RISCV::SW : RISCV::SD;
   else if (RISCV::FPR32RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
@@ -177,7 +177,8 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCV::GPRRegClass.hasSubClassEq(RC))
-    Opcode = Subtarget.is64Bit() ? RISCV::LD : RISCV::LW;
+    Opcode = TRI->getRegSizeInBits(RISCV::GPRRegClass) == 32 ?
+             RISCV::LW : RISCV::LD;
   else if (RISCV::FPR32RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
