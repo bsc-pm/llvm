@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // RUN: %clang_cc1 -std=c++1z %s -verify -fcxx-exceptions
 
 struct S { int a, b, c; };
