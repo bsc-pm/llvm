@@ -2743,6 +2743,17 @@ SDValue DAGCombiner::visitSUB(SDNode *N) {
     }
   }
 
+  // Prefer an add for more folding potential and possibly better codegen:
+  // sub N0, (lshr N10, width-1) --> add N0, (ashr N10, width-1)
+  if (!LegalOperations && N1.getOpcode() == ISD::SRL && N1.hasOneUse()) {
+    SDValue ShAmt = N1.getOperand(1);
+    ConstantSDNode *ShAmtC = isConstOrConstSplat(ShAmt);
+    if (ShAmtC && ShAmtC->getZExtValue() == N1.getScalarValueSizeInBits() - 1) {
+      SDValue SRA = DAG.getNode(ISD::SRA, DL, VT, N1.getOperand(0), ShAmt);
+      return DAG.getNode(ISD::ADD, DL, VT, N0, SRA);
+    }
+  }
+
   return SDValue();
 }
 
@@ -18079,7 +18090,7 @@ SDValue DAGCombiner::BuildSDIVPow2(SDNode *N) {
     return SDValue();
 
   std::vector<SDNode *> Built;
-  SDValue S = TLI.BuildSDIVPow2(N, C->getAPIntValue(), DAG, &Built);
+  SDValue S = TLI.BuildSDIVPow2(N, C->getAPIntValue(), DAG, Built);
 
   for (SDNode *N : Built)
     AddToWorklist(N);
