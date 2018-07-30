@@ -65,6 +65,8 @@ public:
     switch (Kind) {
     default:
       return false;
+    case RISCV::fixup_riscv_got_hi20:
+    case RISCV::fixup_riscv_pcrel_hi20:
     case RISCV::fixup_riscv_pcrel_lo12_i:
     case RISCV::fixup_riscv_pcrel_lo12_s:
       return true;
