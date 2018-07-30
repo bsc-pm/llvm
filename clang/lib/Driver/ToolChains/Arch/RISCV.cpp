@@ -280,7 +280,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     if (!getExtensionVersion(D, MArch, std::string(1, Baseline),
                              Exts, Major, Minor))
       return;
-    
+
     // TODO: Use version number when setting target features
     // and consume the underscore '_' that might follow.
 
