@@ -69,6 +69,7 @@ public:
     case RISCV::fixup_riscv_pcrel_hi20:
     case RISCV::fixup_riscv_pcrel_lo12_i:
     case RISCV::fixup_riscv_pcrel_lo12_s:
+    case RISCV::fixup_riscv_call_plt:
       return true;
     }
   }
