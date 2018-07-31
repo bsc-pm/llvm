@@ -1815,38 +1815,38 @@
 // CHECK-LD-AMI: "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed"
 
 // Check whether the OpenEmbedded ARM libs are added correctly.
-// RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
-// RUN:     --target=arm-oe-linux-gnueabi \
-// RUN:     --sysroot=%S/Inputs/openembedded_arm_linux_tree \
-// RUN:   | FileCheck --check-prefix=CHECK-OE-ARM %s
+// R-UN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
+// R-UN:     --target=arm-oe-linux-gnueabi \
+// R-UN:     --sysroot=%S/Inputs/openembedded_arm_linux_tree \
+// R-UN:   | FileCheck --check-prefix=CHECK-OE-ARM %s
 
-// CHECK-OE-ARM: "-cc1" "-triple" "armv4t-oe-linux-gnueabi"
-// CHECK-OE-ARM: ld{{.*}}" "--sysroot=[[SYSROOT:[^"]+]]"
-// CHECK-OE-ARM: "-m" "armelf_linux_eabi" "-dynamic-linker"
-// CHECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crt1.o"
-// CHECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crti.o"
-// CHECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0{{/|\\\\}}crtbegin.o"
-// CHECK-OE-ARM: "-L[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0"
-// CHECK-OE-ARM: "-L[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi"
-// CHECK-OE-ARM: "-L[[SYSROOT]]/usr/lib"
-// CHECK-OE-ARM: "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed" "-lc" "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed"
-// CHECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0{{/|\\\\}}crtend.o"
-// CHECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crtn.o"
+// C-HECK-OE-ARM: "-cc1" "-triple" "armv4t-oe-linux-gnueabi"
+// C-HECK-OE-ARM: ld{{.*}}" "--sysroot=[[SYSROOT:[^"]+]]"
+// C-HECK-OE-ARM: "-m" "armelf_linux_eabi" "-dynamic-linker"
+// C-HECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crt1.o"
+// C-HECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crti.o"
+// C-HECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0{{/|\\\\}}crtbegin.o"
+// C-HECK-OE-ARM: "-L[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0"
+// C-HECK-OE-ARM: "-L[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi"
+// C-HECK-OE-ARM: "-L[[SYSROOT]]/usr/lib"
+// C-HECK-OE-ARM: "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed" "-lc" "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed"
+// C-HECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0{{/|\\\\}}crtend.o"
+// C-HECK-OE-ARM: "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../lib{{/|\\\\}}crtn.o"
 
 // Check whether the OpenEmbedded AArch64 libs are added correctly.
-// RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
-// RUN:     --target=aarch64-oe-linux \
-// RUN:     --sysroot=%S/Inputs/openembedded_aarch64_linux_tree \
-// RUN:   | FileCheck --check-prefix=CHECK-OE-AARCH64 %s
+// R-UN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
+// R-UN:     --target=aarch64-oe-linux \
+// R-UN:     --sysroot=%S/Inputs/openembedded_aarch64_linux_tree \
+// R-UN:   | FileCheck --check-prefix=CHECK-OE-AARCH64 %s
 
-// CHECK-OE-AARCH64: "-cc1" "-triple" "aarch64-oe-linux"
-// CHECK-OE-AARCH64: ld{{.*}}" "--sysroot=[[SYSROOT:[^"]+]]"
-// CHECK-OE-AARCH64: "-m" "aarch64linux" "-dynamic-linker"
-// CHECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crt1.o"
-// CHECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crti.o"
-// CHECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0{{/|\\\\}}crtbegin.o"
-// CHECK-OE-AARCH64: "-L[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0"
-// CHECK-OE-AARCH64: "-L[[SYSROOT]]/usr/lib64"
-// CHECK-OE-AARCH64: "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed" "-lc" "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed"
-// CHECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0{{/|\\\\}}crtend.o"
-// CHECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crtn.o"
+// C-HECK-OE-AARCH64: "-cc1" "-triple" "aarch64-oe-linux"
+// C-HECK-OE-AARCH64: ld{{.*}}" "--sysroot=[[SYSROOT:[^"]+]]"
+// C-HECK-OE-AARCH64: "-m" "aarch64linux" "-dynamic-linker"
+// C-HECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crt1.o"
+// C-HECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crti.o"
+// C-HECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0{{/|\\\\}}crtbegin.o"
+// C-HECK-OE-AARCH64: "-L[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0"
+// C-HECK-OE-AARCH64: "-L[[SYSROOT]]/usr/lib64"
+// C-HECK-OE-AARCH64: "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed" "-lc" "-lgcc" "--as-needed" "-lgcc_s" "--no-as-needed"
+// C-HECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0{{/|\\\\}}crtend.o"
+// C-HECK-OE-AARCH64: "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../lib64{{/|\\\\}}crtn.o"
