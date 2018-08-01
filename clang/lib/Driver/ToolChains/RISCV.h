@@ -26,6 +26,9 @@ public:
   void
   AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
                             llvm::opt::ArgStringList &CC1Args) const override;
+  void
+  addLibStdCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
+                           llvm::opt::ArgStringList &CC1Args) const override;
 
 protected:
   Tool *buildLinker() const override;
@@ -42,6 +45,7 @@ public:
                 TC.getTriple().isArch64Bit() ? "riscv64-unknown-elf-ld"
                                              : "riscv32-unknown-elf-ld",
                 TC) {}
+
   bool hasIntegratedCPP() const override { return false; }
   bool isLinkJob() const override { return true; }
   void ConstructJob(Compilation &C, const JobAction &JA,
