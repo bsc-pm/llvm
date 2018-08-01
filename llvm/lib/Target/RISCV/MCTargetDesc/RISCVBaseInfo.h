@@ -52,6 +52,9 @@ enum {
   MO_PCREL,
   MO_GOT,
   MO_PLT,
+  MO_TPREL_HI,
+  MO_TPREL_ADD,
+  MO_TPREL_LO,
 };
 } // namespace RISCVII
 

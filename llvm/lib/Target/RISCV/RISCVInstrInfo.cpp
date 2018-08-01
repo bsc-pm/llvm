@@ -482,3 +482,27 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
   }
   }
 }
+
+std::pair<unsigned, unsigned>
+RISCVInstrInfo::decomposeMachineOperandsTargetFlags(unsigned TF) const {
+  // No bitmap values yet
+  return {TF, 0};
+}
+
+ArrayRef<std::pair<unsigned, const char *>>
+RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
+  using namespace RISCVII;
+
+  static const std::pair<unsigned, const char *> TargetFlags[] = {
+      {MO_LO, "riscv-abs-lo"},
+      {MO_HI, "riscv-abs-hi"},
+      {MO_PCREL, "riscv-pcrel"},
+      {MO_GOT, "riscv-got"},
+      {MO_PLT, "riscv-plt"},
+      {MO_TPREL_HI, "riscv-tprel-hi"},
+      {MO_TPREL_ADD, "riscv-tprel-add"},
+      {MO_TPREL_LO, "riscv-tprel-lo"},
+  };
+
+  return makeArrayRef(TargetFlags);
+}

@@ -57,6 +57,10 @@ public:
                           SmallVectorImpl<MCFixup> &Fixups,
                           const MCSubtargetInfo &STI) const;
 
+  void expandAddTp(const MCInst &MI, raw_ostream &OS,
+                   SmallVectorImpl<MCFixup> &Fixups,
+                   const MCSubtargetInfo &STI) const;
+
   /// TableGen'erated function for getting the binary encoding for an
   /// instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
@@ -83,6 +87,31 @@ MCCodeEmitter *llvm::createRISCVMCCodeEmitter(const MCInstrInfo &MCII,
                                               const MCRegisterInfo &MRI,
                                               MCContext &Ctx) {
   return new RISCVMCCodeEmitter(Ctx, MCII);
+}
+
+void RISCVMCCodeEmitter::expandAddTp(const MCInst &MI, raw_ostream &OS,
+                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     const MCSubtargetInfo &STI) const {
+  // This expands into
+  //   add rdest, rs, tp
+  // but includes a relocation %tp_rel(symbol)
+  MCOperand Rdest = MI.getOperand(0);
+  MCOperand Rsrc1 = MI.getOperand(1);
+  MCOperand Rsrc2 = MI.getOperand(2);
+  const MCExpr *Symbol = MI.getOperand(3).getExpr();
+
+  MCInst AddInst = MCInstBuilder(RISCV::ADD)
+                       .addOperand(Rdest)
+                       .addOperand(Rsrc1)
+                       .addOperand(Rsrc2);
+
+  // Remember the relocation manually because it does not apply to any operand
+  // so encoding the MCInst wouldn't emit it.
+  Fixups.push_back(MCFixup::create(
+      0, Symbol, MCFixupKind(RISCV::fixup_riscv_tprel_add), MI.getLoc()));
+
+  uint32_t Binary = getBinaryCodeForInstr(AddInst, Fixups, STI);
+  support::endian::write(OS, Binary, support::little);
 }
 
 // Expand PseudoCALL and PseudoTAIL to AUIPC and JALR with relocation types.
@@ -136,6 +165,10 @@ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
       MI.getOpcode() == RISCV::PseudoTAIL) {
     expandFunctionCall(MI, OS, Fixups, STI);
     MCNumEmitted += 2;
+    return;
+  } if (MI.getOpcode() == RISCV::PseudoAddTp) {
+    expandAddTp(MI, OS, Fixups, STI);
+    ++MCNumEmitted;
     return;
   }
 
@@ -253,6 +286,24 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
         FixupKind = RISCV::fixup_riscv_call;
       else
         llvm_unreachable("Invalid subexpression in target node");
+      break;
+    }
+    case RISCVMCExpr::VK_RISCV_TPREL_HI: {
+      FixupKind = RISCV::fixup_riscv_tprel_hi20;
+      break;
+    }
+    case RISCVMCExpr::VK_RISCV_TPREL_ADD: {
+      FixupKind = RISCV::fixup_riscv_tprel_add;
+      break;
+    }
+    case RISCVMCExpr::VK_RISCV_TPREL_LO: {
+      if (MIFrm == RISCVII::InstFormatI)
+        FixupKind = RISCV::fixup_riscv_tprel_lo12_i;
+      else if (MIFrm == RISCVII::InstFormatS)
+        FixupKind = RISCV::fixup_riscv_tprel_lo12_s;
+      else
+        llvm_unreachable(
+            "VK_RISCV_TPREL_LO used with unexpected instruction format");
       break;
     }
     }

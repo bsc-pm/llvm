@@ -134,6 +134,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   }
 
   setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
+  setOperationAction(ISD::GlobalTLSAddress, XLenVT, Custom);
   setOperationAction(ISD::BlockAddress, XLenVT, Custom);
   setOperationAction(ISD::ConstantPool, XLenVT, Custom);
 
@@ -274,6 +275,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     report_fatal_error("unimplemented operand");
   case ISD::GlobalAddress:
     return lowerGlobalAddress(Op, DAG);
+  case ISD::GlobalTLSAddress:
+    return lowerGlobalTLSAddress(Op, DAG);
   case ISD::BlockAddress:
     return lowerBlockAddress(Op, DAG);
   case ISD::ConstantPool:
@@ -320,6 +323,46 @@ SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
     return DAG.getNode(ISD::ADD, DL, Ty, MNLo,
                        DAG.getConstant(Offset, DL, XLenVT));
   return MNLo;
+}
+
+SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
+                                                SelectionDAG &DAG) const {
+  const GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(Op);
+  if (DAG.getTarget().useEmulatedTLS())
+    return LowerToTLSEmulatedModel(GA, DAG);
+
+  const GlobalAddressSDNode *N = cast<GlobalAddressSDNode>(Op);
+  const GlobalValue *GV = N->getGlobal();
+  int64_t Offset = N->getOffset();
+  MVT XLenVT = Subtarget.getXLenVT();
+
+  SDLoc DL(Op);
+  EVT Ty = Op.getValueType();
+
+  TLSModel::Model Model = getTargetMachine().getTLSModel(GV);
+
+  switch (Model) {
+  default:
+    llvm_unreachable("Not implemented");
+  case TLSModel::LocalExec: {
+    SDValue TPRelHI =
+        DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_HI);
+    SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, TPRelHI), 0);
+    SDValue TPRelAdd =
+        DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_ADD);
+    SDValue TP = DAG.getRegister(RISCV::X4, XLenVT);
+    SDValue MNAdd = SDValue(
+        DAG.getMachineNode(RISCV::PseudoAddTp, DL, Ty, MNHi, TP, TPRelAdd), 0);
+    SDValue TPRelLo =
+        DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_LO);
+    SDValue MNLo =
+        SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNAdd, TPRelLo), 0);
+    if (Offset != 0)
+      return DAG.getNode(ISD::ADD, DL, Ty, MNLo,
+                         DAG.getConstant(Offset, DL, XLenVT));
+    return MNLo;
+  }
+  }
 }
 
 SDValue RISCVTargetLowering::lowerBlockAddress(SDValue Op,

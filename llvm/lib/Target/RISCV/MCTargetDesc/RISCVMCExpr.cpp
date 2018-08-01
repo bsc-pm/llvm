@@ -94,6 +94,9 @@ RISCVMCExpr::VariantKind RISCVMCExpr::getVariantKindForName(StringRef name) {
       .Case("hi", VK_RISCV_HI)
       .Case("pcrel_lo", VK_RISCV_PCREL_LO)
       .Case("pcrel_hi", VK_RISCV_PCREL_HI)
+      .Case("tprel_lo", VK_RISCV_TPREL_LO)
+      .Case("tprel_hi", VK_RISCV_TPREL_HI)
+      .Case("tprel_add", VK_RISCV_TPREL_ADD)
       .Default(VK_RISCV_Invalid);
 }
 
@@ -109,15 +112,28 @@ StringRef RISCVMCExpr::getVariantKindName(VariantKind Kind) {
     return "pcrel_lo";
   case VK_RISCV_PCREL_HI:
     return "pcrel_hi";
+  case VK_RISCV_TPREL_LO:
+    return "tprel_lo";
+  case VK_RISCV_TPREL_ADD:
+    return "tprel_add";
+  case VK_RISCV_TPREL_HI:
+    return "tprel_hi";
   }
 }
 
 bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
   MCValue Value;
 
-  if (Kind == VK_RISCV_PCREL_HI || Kind == VK_RISCV_PCREL_LO ||
-      Kind == VK_RISCV_CALL)
+  switch (Kind) {
+  default:
+    break;
+  case VK_RISCV_PCREL_HI:
+  case VK_RISCV_PCREL_LO:
+  case VK_RISCV_TPREL_HI:
+  case VK_RISCV_TPREL_LO:
+  case VK_RISCV_CALL:
     return false;
+  }
 
   if (!getSubExpr()->evaluateAsRelocatable(Value, nullptr, nullptr))
     return false;

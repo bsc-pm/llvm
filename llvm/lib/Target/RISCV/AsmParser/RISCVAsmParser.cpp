@@ -246,6 +246,16 @@ public:
             VK == RISCVMCExpr::VK_RISCV_PLT);
   }
 
+  bool isBareSymbolTpRelAdd() const {
+    int64_t Imm;
+    RISCVMCExpr::VariantKind VK;
+    // Must be of 'immediate' type but not a constant.
+    if (!isImm() || evaluateConstantImm(Imm, VK))
+      return false;
+    return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
+           VK == RISCVMCExpr::VK_RISCV_TPREL_ADD;
+  }
+
   /// Return true if the operand is a valid for the fence instruction e.g.
   /// ('iorw').
   bool isFenceArg() const {
@@ -428,7 +438,8 @@ public:
       IsValid = isInt<12>(Imm);
     return IsValid && (VK == RISCVMCExpr::VK_RISCV_None ||
                        VK == RISCVMCExpr::VK_RISCV_LO ||
-                       VK == RISCVMCExpr::VK_RISCV_PCREL_LO);
+                       VK == RISCVMCExpr::VK_RISCV_PCREL_LO ||
+                       VK == RISCVMCExpr::VK_RISCV_TPREL_LO);
   }
 
   bool isSImm12Lsb0() const { return isBareSimmNLsb0<12>(); }
@@ -465,7 +476,8 @@ public:
       IsValid = isUInt<20>(Imm);
     return IsValid && (VK == RISCVMCExpr::VK_RISCV_None ||
                        VK == RISCVMCExpr::VK_RISCV_HI ||
-                       VK == RISCVMCExpr::VK_RISCV_PCREL_HI);
+                       VK == RISCVMCExpr::VK_RISCV_PCREL_HI ||
+                       VK == RISCVMCExpr::VK_RISCV_TPREL_HI);
   }
 
   bool isSImm21Lsb0() const { return isBareSimmNLsb0<21>(); }

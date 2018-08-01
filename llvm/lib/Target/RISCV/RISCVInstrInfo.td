@@ -198,6 +198,21 @@ def bare_symbol_or_plt : Operand<XLenVT> {
   }];
 }
 
+def BareSymbolTpRelAdd : AsmOperandClass {
+  let Name = "BareSymbolTpRelAdd";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidBareSymbolTpRelAdd";
+}
+
+// A bare symbol that must be decorated with %tprel_add
+def bare_symbol_tprel_add : Operand<XLenVT> {
+  let ParserMatchClass = BareSymbolTpRelAdd;
+  let MCOperandPredicate = [{
+     return MCOp.isBareSymbolRef();
+  }];
+}
+
+
 // A parameterized register class alternative to i32imm/i64imm from Target.td.
 def ixlenimm : Operand<XLenVT> {
   let ParserMatchClass = ImmXLenAsmOperand<"">;
@@ -776,6 +791,14 @@ def : Pat<(WrapperPIC tblockaddress:$addr),
 
 def : Pat<(WrapperPIC tconstpool:$addr),
           (PseudoAddrPIC tconstpool:$addr)>;
+
+// Will expand into:
+//   add $dst, $rs1, tp, %tprel_add(symbol)
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoAddTp : Pseudo<(outs GPR:$dst),
+                         (ins GPR:$rs1, GPR:$rs2,
+                              bare_symbol_tprel_add:$sym), [],
+                         "add", "$dst, $rs1, $rs2, $sym">;
 
 /// Loads
 
