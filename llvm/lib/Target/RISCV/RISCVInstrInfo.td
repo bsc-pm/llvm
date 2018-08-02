@@ -48,6 +48,7 @@ def Tail         : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                            SDNPVariadic]>;
 def WrapperPIC   : SDNode<"RISCVISD::WRAPPER_PIC", SDTIntUnaryOp>;
+def WrapperTLSIE : SDNode<"RISCVISD::WRAPPER_TLS_IE", SDTIntUnaryOp>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -792,6 +793,7 @@ def : Pat<(WrapperPIC tblockaddress:$addr),
 def : Pat<(WrapperPIC tconstpool:$addr),
           (PseudoAddrPIC tconstpool:$addr)>;
 
+// Thread local storage: Local Exec
 // Will expand into:
 //   add $dst, $rs1, tp, %tprel_add(symbol)
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
@@ -799,6 +801,13 @@ def PseudoAddTp : Pseudo<(outs GPR:$dst),
                          (ins GPR:$rs1, GPR:$rs2,
                               bare_symbol_tprel_add:$sym), [],
                          "add", "$dst, $rs1, $rs2, $sym">;
+
+// Thread local storage: Initial Exec
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoLATLSIE :
+    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+           [(set GPR:$dst, (WrapperTLSIE tglobaltlsaddr:$src))],
+          "la.tls.ie", "$dst, $src">;
 
 /// Loads
 

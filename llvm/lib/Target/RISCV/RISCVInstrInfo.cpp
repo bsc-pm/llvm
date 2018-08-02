@@ -502,6 +502,7 @@ RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
       {MO_TPREL_HI, "riscv-tprel-hi"},
       {MO_TPREL_ADD, "riscv-tprel-add"},
       {MO_TPREL_LO, "riscv-tprel-lo"},
+      {MO_TLS_GOT, "riscv-tls-got"},
   };
 
   return makeArrayRef(TargetFlags);

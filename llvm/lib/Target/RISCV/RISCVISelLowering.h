@@ -36,6 +36,7 @@ enum NodeType : unsigned {
   I64ToF32,
   TAIL,
   WRAPPER_PIC,
+  WRAPPER_TLS_IE,
 };
 }
 

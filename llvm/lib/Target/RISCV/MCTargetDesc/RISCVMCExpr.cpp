@@ -44,6 +44,7 @@ void RISCVMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
     case VK_RISCV_None:
     case VK_RISCV_CALL:
     case VK_RISCV_GOT_HI_Pseudo:
+    case VK_RISCV_TLS_GOT_HI_Pseudo:
       HasVariant = false;
       break;
     case VK_RISCV_PLT:

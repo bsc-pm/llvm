@@ -306,6 +306,12 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
             "VK_RISCV_TPREL_LO used with unexpected instruction format");
       break;
     }
+    case RISCVMCExpr::VK_RISCV_TLS_GOT_HI_Pseudo: {
+      assert(MIFrm == RISCVII::InstFormatU &&
+             "VK_RISCV_GOT_HI is only valid in U-format");
+      FixupKind = RISCV::fixup_riscv_tls_got_hi20;
+      break;
+    }
     }
   } else if (Kind == MCExpr::SymbolRef &&
              cast<MCSymbolRefExpr>(Expr)->getKind() == MCSymbolRefExpr::VK_None) {

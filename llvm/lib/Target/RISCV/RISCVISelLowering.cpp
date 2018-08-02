@@ -362,6 +362,14 @@ SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
                          DAG.getConstant(Offset, DL, XLenVT));
     return MNLo;
   }
+  case TLSModel::InitialExec: {
+    SDValue LoadAddressTLSIE = DAG.getNode(
+        RISCVISD::WRAPPER_TLS_IE, DL, Ty,
+        DAG.getTargetGlobalAddress(GV, DL, Ty, Offset, RISCVII::MO_TLS_GOT));
+    SDValue AddTP = DAG.getNode(ISD::ADD, DL, Ty, LoadAddressTLSIE,
+                                DAG.getRegister(RISCV::X4, XLenVT));
+    return AddTP;
+  }
   }
 }
 
@@ -1745,6 +1753,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::TAIL";
   case RISCVISD::WRAPPER_PIC:
     return "RISCVISD::WRAPPER_PIC";
+  case RISCVISD::WRAPPER_TLS_IE:
+    return "RISCVISD::WRAPPER_TLS_IE";
   }
   return nullptr;
 }
