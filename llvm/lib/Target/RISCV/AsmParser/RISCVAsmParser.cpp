@@ -814,6 +814,12 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
         ErrorLoc,
         "operand must be a bare symbol name optionally followed by @plt");
   }
+  case Match_InvalidBareSymbolTpRelAdd: {
+    SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
+    return Error(
+        ErrorLoc,
+        "operand must be of the form '%tprel_add(symbol)'");
+  }
   }
 
   llvm_unreachable("Unknown match type detected!");
