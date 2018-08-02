@@ -342,8 +342,6 @@ SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
   TLSModel::Model Model = getTargetMachine().getTLSModel(GV);
 
   switch (Model) {
-  default:
-    llvm_unreachable("Not implemented");
   case TLSModel::LocalExec: {
     SDValue TPRelHI =
         DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_HI);
@@ -369,6 +367,36 @@ SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
     SDValue AddTP = DAG.getNode(ISD::ADD, DL, Ty, LoadAddressTLSIE,
                                 DAG.getRegister(RISCV::X4, XLenVT));
     return AddTP;
+  }
+  case TLSModel::GeneralDynamic:
+  case TLSModel::LocalDynamic: {
+    // These two models are the same in RISC-V
+    SDValue LoadAddressTLSIE = DAG.getNode(
+        RISCVISD::WRAPPER_TLS_GD, DL, Ty,
+        DAG.getTargetGlobalAddress(GV, DL, Ty, Offset, RISCVII::MO_TLS_GD));
+
+    // Call to __tls_get_addr@plt
+    TargetLowering::ArgListTy Args;
+    TargetLowering::ArgListEntry Entry;
+
+    Type* ArgType = Ty.getTypeForEVT(*DAG.getContext());
+
+    Entry.Node = LoadAddressTLSIE;
+    Entry.Ty = ArgType;
+    Entry.IsSExt = false;
+    Entry.IsZExt = false;
+    Args.push_back(Entry);
+
+    SDValue TLSGetLib = DAG.getExternalSymbol(
+        "__tls_get_addr", getPointerTy(DAG.getDataLayout()));
+
+    TargetLowering::CallLoweringInfo CLI(DAG);
+    CLI.setDebugLoc(DL)
+        .setChain(DAG.getEntryNode())
+        .setLibCallee(CallingConv::C, ArgType, TLSGetLib, std::move(Args));
+
+    std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
+    return CallResult.first;
   }
   }
 }
@@ -1755,6 +1783,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::WRAPPER_PIC";
   case RISCVISD::WRAPPER_TLS_IE:
     return "RISCVISD::WRAPPER_TLS_IE";
+  case RISCVISD::WRAPPER_TLS_GD:
+    return "RISCVISD::WRAPPER_TLS_GD";
   }
   return nullptr;
 }

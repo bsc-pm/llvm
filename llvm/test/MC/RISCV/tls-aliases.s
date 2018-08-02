@@ -12,3 +12,10 @@
 # RV64: ld  a0, 0(a0)
 # CHECK:  R_RISCV_PCREL_LO12_I .Ltls_got_hi0
 la.tls.ie	a0, y
+
+# CHECK: .Ltls_gd_hi0:
+# CHECK: auipc	a0, 0
+# CHECK: R_RISCV_TLS_GD_HI20	y
+# CHECK: mv	a0, a0
+# CHECK: R_RISCV_PCREL_LO12_I	.Ltls_gd_hi0
+la.tls.gd a0, y

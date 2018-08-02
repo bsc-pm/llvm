@@ -52,6 +52,9 @@ enum Fixups {
   // fixup_riscv_tls_got_hi20 - 20-bit fixup corresponding to the offset in the
   // TCB under TLS mode Initial Exec
   fixup_riscv_tls_got_hi20,
+  // fixup_riscv_tls_gd_hi20 - 20-bit fixup corresponding to the offset in the
+  // TCB under TLS mode General Dynamic / Local Dynamic
+  fixup_riscv_tls_gd_hi20,
   // fixup_riscv_jal - 20-bit fixup for symbol references in the jal
   // instruction
   fixup_riscv_jal,

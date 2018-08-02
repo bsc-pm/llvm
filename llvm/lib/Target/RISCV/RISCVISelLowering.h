@@ -37,6 +37,7 @@ enum NodeType : unsigned {
   TAIL,
   WRAPPER_PIC,
   WRAPPER_TLS_IE,
+  WRAPPER_TLS_GD,
 };
 }
 

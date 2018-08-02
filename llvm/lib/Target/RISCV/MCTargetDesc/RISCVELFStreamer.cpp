@@ -160,6 +160,37 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addExpr(RefToLinkTmpLabel);
     EmitInstruction(Load, STI, PrintSchedInfo);
   }
+  case RISCV::PseudoLATLSGD: {
+    // PC-rel addressing for TLS General / Local Dynamic
+    MCContext &Ctx = getContext();
+
+    // TmpLabel: AUIPC rdest, %tls_gd_hi(symbol)
+    //           ADDI rdest, %pcrel_lo(TmpLabel)
+    // Note: there is not such thing as %tls_gd_hi, yet
+    MCSymbol *TmpLabel = Ctx.createTempSymbol(
+        "tls_gd_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
+    EmitLabel(TmpLabel);
+
+    MCOperand DestReg = Inst.getOperand(0);
+    const RISCVMCExpr *Symbol =
+        RISCVMCExpr::create(Inst.getOperand(1).getExpr(),
+                            RISCVMCExpr::VK_RISCV_TLS_GD_HI_Pseudo, Ctx);
+
+    MCInst AUIPC =
+        MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
+    EmitInstruction(AUIPC, STI, PrintSchedInfo);
+
+    const MCExpr *RefToLinkTmpLabel =
+        RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
+                            RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
+
+    MCInst Addi = MCInstBuilder(RISCV::ADDI)
+                      .addOperand(DestReg)
+                      .addOperand(DestReg)
+                      .addExpr(RefToLinkTmpLabel);
+    EmitInstruction(Addi, STI, PrintSchedInfo);
+    break;
+  }
   }
 
   return true;

@@ -49,6 +49,7 @@ def Tail         : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                            SDNPVariadic]>;
 def WrapperPIC   : SDNode<"RISCVISD::WRAPPER_PIC", SDTIntUnaryOp>;
 def WrapperTLSIE : SDNode<"RISCVISD::WRAPPER_TLS_IE", SDTIntUnaryOp>;
+def WrapperTLSGD : SDNode<"RISCVISD::WRAPPER_TLS_GD", SDTIntUnaryOp>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -794,8 +795,7 @@ def : Pat<(WrapperPIC tconstpool:$addr),
           (PseudoAddrPIC tconstpool:$addr)>;
 
 // Thread local storage: Local Exec
-// Will expand into:
-//   add $dst, $rs1, tp, %tprel_add(symbol)
+//   add $dst, $rs1, $rs2, %tprel_add($sym)
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
 def PseudoAddTp : Pseudo<(outs GPR:$dst),
                          (ins GPR:$rs1, GPR:$rs2,
@@ -808,6 +808,15 @@ def PseudoLATLSIE :
     Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
            [(set GPR:$dst, (WrapperTLSIE tglobaltlsaddr:$src))],
           "la.tls.ie", "$dst, $src">;
+
+// Thread local storage: General Dynamic
+// In contrast to la.tls.ie, this pseudo instruction does not expand to
+// anything that loads memory.
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoLATLSGD :
+    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+           [(set GPR:$dst, (WrapperTLSGD tglobaltlsaddr:$src))],
+          "la.tls.gd", "$dst, $src">;
 
 /// Loads
 
