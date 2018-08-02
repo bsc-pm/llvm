@@ -2246,6 +2246,21 @@ SourceRange CXXCtorInitializer::getSourceRange() const {
   return SourceRange(getSourceLocation(), getRParenLoc());
 }
 
+CXXConstructorDecl::CXXConstructorDecl(
+    ASTContext &C, CXXRecordDecl *RD, SourceLocation StartLoc,
+    const DeclarationNameInfo &NameInfo, QualType T, TypeSourceInfo *TInfo,
+    bool isExplicitSpecified, bool isInline, bool isImplicitlyDeclared,
+    bool isConstexpr, InheritedConstructor Inherited)
+    : CXXMethodDecl(CXXConstructor, C, RD, StartLoc, NameInfo, T, TInfo,
+                    SC_None, isInline, isConstexpr, SourceLocation()) {
+  setNumCtorInitializers(0);
+  setInheritingConstructor(static_cast<bool>(Inherited));
+  setImplicit(isImplicitlyDeclared);
+  if (Inherited)
+    *getTrailingObjects<InheritedConstructor>() = Inherited;
+  setExplicitSpecified(isExplicitSpecified);
+}
+
 void CXXConstructorDecl::anchor() {}
 
 CXXConstructorDecl *CXXConstructorDecl::CreateDeserialized(ASTContext &C,
@@ -2255,7 +2270,7 @@ CXXConstructorDecl *CXXConstructorDecl::CreateDeserialized(ASTContext &C,
   auto *Result = new (C, ID, Extra) CXXConstructorDecl(
       C, nullptr, SourceLocation(), DeclarationNameInfo(), QualType(), nullptr,
       false, false, false, false, InheritedConstructor());
-  Result->IsInheritingConstructor = Inherited;
+  Result->setInheritingConstructor(Inherited);
   return Result;
 }
 
@@ -2449,6 +2464,15 @@ CXXConversionDecl::Create(ASTContext &C, CXXRecordDecl *RD,
 bool CXXConversionDecl::isLambdaToBlockPointerConversion() const {
   return isImplicit() && getParent()->isLambda() &&
          getConversionType()->isBlockPointerType();
+}
+
+LinkageSpecDecl::LinkageSpecDecl(DeclContext *DC, SourceLocation ExternLoc,
+                                 SourceLocation LangLoc, LanguageIDs lang,
+                                 bool HasBraces)
+    : Decl(LinkageSpec, DC, LangLoc), DeclContext(LinkageSpec),
+      ExternLoc(ExternLoc), RBraceLoc(SourceLocation()) {
+  setLanguage(lang);
+  LinkageSpecDeclBits.HasBraces = HasBraces;
 }
 
 void LinkageSpecDecl::anchor() {}
