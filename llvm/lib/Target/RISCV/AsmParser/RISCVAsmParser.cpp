@@ -1036,7 +1036,10 @@ static bool ForceImmediateOperand(StringRef Name, unsigned OperandIdx) {
   case 1:
     // lla rdest, imm
     // la rdest, imm
-    return Name == "lla" || Name == "la";
+    // la.tls.ie rdest, imm
+    // la.tls.gd rdest, imm
+    return Name == "lla" || Name == "la" || Name == "la.tls.ie" ||
+           Name == "la.tls.gd";
   default:
     return false;
   }
