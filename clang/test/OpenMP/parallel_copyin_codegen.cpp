@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // RUN: %clang_cc1 -verify -fopenmp -fnoopenmp-use-tls -x c++ -triple %itanium_abi_triple -emit-llvm %s -o - | FileCheck %s
 // RUN: %clang_cc1 -fopenmp -fnoopenmp-use-tls -x c++ -std=c++11 -triple %itanium_abi_triple -emit-pch -o %t %s
 // RUN: %clang_cc1 -fopenmp -fnoopenmp-use-tls -x c++ -triple %itanium_abi_triple -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s

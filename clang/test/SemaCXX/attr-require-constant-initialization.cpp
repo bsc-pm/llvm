@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // RUN: %clang_cc1 -fsyntax-only -verify -DTEST_ONE -std=c++03 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -DTEST_ONE -std=c++11 %s
 // RUN: %clang_cc1 -fsyntax-only -verify -DTEST_ONE -std=c++14 %s

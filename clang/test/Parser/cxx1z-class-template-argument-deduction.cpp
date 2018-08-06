@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // RUN: %clang_cc1 -std=c++1z -fcxx-exceptions -verify %s
 
 template <typename T> struct A { // expected-note 38{{declared here}}
