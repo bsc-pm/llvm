@@ -303,11 +303,16 @@ SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
 
   // TODO: implement -fPIE without -fPIC
   if (isPositionIndependent()) {
-    return DAG.getNode(
+    SDValue Addr = DAG.getNode(
         RISCVISD::WRAPPER_PIC, DL, Ty,
         DAG.getTargetGlobalAddress(
-            GV, DL, Ty, Offset,
+            GV, DL, Ty, 0,
             Subtarget.ClassifyPICGlobalReference(GV, getTargetMachine())));
+
+    if (Offset != 0)
+      return DAG.getNode(ISD::ADD, DL, Ty, Addr,
+                         DAG.getConstant(Offset, DL, XLenVT));
+    return Addr;
   }
 
   // In order to maximise the opportunity for common subexpression
