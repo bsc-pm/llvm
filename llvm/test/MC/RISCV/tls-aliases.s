@@ -21,16 +21,16 @@ la.tls.ie	a0, y
 # CHECK:  R_RISCV_PCREL_LO12_I .Ltls_got_hi1
 la.tls.ie	a0, zero
 
-# CHECK: .Ltls_gd_hi2:
+# CHECK: .Ltls_gd_hi0:
 # CHECK: auipc	a0, 0
 # CHECK: R_RISCV_TLS_GD_HI20	y
 # CHECK: mv	a0, a0
-# CHECK: R_RISCV_PCREL_LO12_I	.Ltls_gd_hi2
+# CHECK: R_RISCV_PCREL_LO12_I	.Ltls_gd_hi0
 la.tls.gd a0, y
 
-# CHECK: .Ltls_gd_hi3:
+# CHECK: .Ltls_gd_hi1:
 # CHECK: auipc	a0, 0
 # CHECK: R_RISCV_TLS_GD_HI20	zero
 # CHECK: mv	a0, a0
-# CHECK: R_RISCV_PCREL_LO12_I	.Ltls_gd_hi3
+# CHECK: R_RISCV_PCREL_LO12_I	.Ltls_gd_hi1
 la.tls.gd a0, zero

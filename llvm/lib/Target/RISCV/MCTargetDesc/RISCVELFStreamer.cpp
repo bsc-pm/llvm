@@ -127,6 +127,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
     EmitInstruction(Load, STI, PrintSchedInfo);
+    break;
   }
   case RISCV::PseudoLATLSIE: {
     // GOT addressing
@@ -159,6 +160,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
     EmitInstruction(Load, STI, PrintSchedInfo);
+    break;
   }
   case RISCV::PseudoLATLSGD: {
     // PC-rel addressing for TLS General / Local Dynamic
