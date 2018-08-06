@@ -470,10 +470,6 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
   case TargetOpcode::KILL:
   case TargetOpcode::DBG_VALUE:
     return 0;
-  case RISCV::PseudoCALL:
-  case RISCV::PseudoTAIL:
-  case RISCV::PseudoAddrPIC:
-    return 8;
   case TargetOpcode::INLINEASM: {
     const MachineFunction &MF = *MI.getParent()->getParent();
     const auto &TM = static_cast<const RISCVTargetMachine &>(MF.getTarget());
@@ -481,4 +477,30 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
                               *TM.getMCAsmInfo());
   }
   }
+}
+
+std::pair<unsigned, unsigned>
+RISCVInstrInfo::decomposeMachineOperandsTargetFlags(unsigned TF) const {
+  // No bitmap values yet
+  return {TF, 0};
+}
+
+ArrayRef<std::pair<unsigned, const char *>>
+RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
+  using namespace RISCVII;
+
+  static const std::pair<unsigned, const char *> TargetFlags[] = {
+      {MO_LO, "riscv-abs-lo"},
+      {MO_HI, "riscv-abs-hi"},
+      {MO_PCREL, "riscv-pcrel"},
+      {MO_GOT, "riscv-got"},
+      {MO_PLT, "riscv-plt"},
+      {MO_TPREL_HI, "riscv-tprel-hi"},
+      {MO_TPREL_ADD, "riscv-tprel-add"},
+      {MO_TPREL_LO, "riscv-tprel-lo"},
+      {MO_TLS_GOT, "riscv-tls-got"},
+      {MO_TLS_GD, "riscv-tls-gd"},
+  };
+
+  return makeArrayRef(TargetFlags);
 }

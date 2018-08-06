@@ -48,6 +48,8 @@ def Tail         : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                            SDNPVariadic]>;
 def WrapperPIC   : SDNode<"RISCVISD::WRAPPER_PIC", SDTIntUnaryOp>;
+def WrapperTLSIE : SDNode<"RISCVISD::WRAPPER_TLS_IE", SDTIntUnaryOp>;
+def WrapperTLSGD : SDNode<"RISCVISD::WRAPPER_TLS_GD", SDTIntUnaryOp>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -197,6 +199,21 @@ def bare_symbol_or_plt : Operand<XLenVT> {
      return MCOp.isBareSymbolRef();
   }];
 }
+
+def BareSymbolTpRelAdd : AsmOperandClass {
+  let Name = "BareSymbolTpRelAdd";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidBareSymbolTpRelAdd";
+}
+
+// A bare symbol that must be decorated with %tprel_add
+def bare_symbol_tprel_add : Operand<XLenVT> {
+  let ParserMatchClass = BareSymbolTpRelAdd;
+  let MCOperandPredicate = [{
+     return MCOp.isBareSymbolRef();
+  }];
+}
+
 
 // A parameterized register class alternative to i32imm/i64imm from Target.td.
 def ixlenimm : Operand<XLenVT> {
@@ -717,7 +734,7 @@ def : Pat<(brind (add GPR:$rs1, simm12:$imm12)),
 // if the offset fits in a signed 21-bit immediate.
 // Define AsmString to print "call" when compile with -S flag.
 // Define isCodeGenOnly = 0 to support parsing assembly "call" instruction.
-let isCall = 1, Defs = [X1], isCodeGenOnly = 0 in
+let isCall = 1, Defs = [X1], isCodeGenOnly = 0, Size = 8 in
 def PseudoCALL : Pseudo<(outs), (ins bare_symbol_or_plt:$func),
                         [(Call tglobaladdr:$func)]> {
   let AsmString = "call\t$func";
@@ -741,7 +758,7 @@ def PseudoRET : Pseudo<(outs), (ins), [(RetFlag)]>,
 // expand to auipc and jalr while encoding.
 // Define AsmString to print "tail" when compile with -S flag.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2],
-    isCodeGenOnly = 0 in
+    isCodeGenOnly = 0, Size = 8 in
 def PseudoTAIL : Pseudo<(outs), (ins bare_symbol_or_plt:$dst), []> {
   let AsmString = "tail\t$dst";
 }
@@ -768,6 +785,7 @@ def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
   let AsmString = "lla\t$dst, $src";
 }
 
+let Size = 8 in
 def PseudoAddrPIC : Pseudo<(outs GPR:$dst), (ins ixlenimm:$addr),
                            [(set GPR:$dst, (WrapperPIC tglobaladdr:$addr))]>;
 
@@ -776,6 +794,32 @@ def : Pat<(WrapperPIC tblockaddress:$addr),
 
 def : Pat<(WrapperPIC tconstpool:$addr),
           (PseudoAddrPIC tconstpool:$addr)>;
+
+// Thread local storage: Local Exec
+//   add $dst, $rs1, $rs2, %tprel_add($sym)
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoAddTp : Pseudo<(outs GPR:$dst),
+                         (ins GPR:$rs1, GPR:$rs2,
+                              bare_symbol_tprel_add:$sym), [],
+                         "add", "$dst, $rs1, $rs2, $sym">;
+
+// Thread local storage: Initial Exec
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
+    Size = 8 in
+def PseudoLATLSIE :
+    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+           [(set GPR:$dst, (WrapperTLSIE tglobaltlsaddr:$src))],
+          "la.tls.ie", "$dst, $src">;
+
+// Thread local storage: General Dynamic
+// In contrast to la.tls.ie, this pseudo instruction does not expand to
+// anything that loads memory.
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
+    Size = 8 in
+def PseudoLATLSGD :
+    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+           [(set GPR:$dst, (WrapperTLSGD tglobaltlsaddr:$src))],
+          "la.tls.gd", "$dst, $src">;
 
 /// Loads
 

@@ -129,7 +129,7 @@ sub t0, t2, 1 # CHECK: :[[@LINE]]:13: error: invalid operand for instruction
 add a1, a2, (a3) # CHECK: :[[@LINE]]:13: error: invalid operand for instruction
 
 # Too many operands
-add ra, zero, zero, zero # CHECK: :[[@LINE]]:21: error: invalid operand for instruction
+add ra, zero, zero, zero # CHECK: :[[@LINE]]:21: error: operand must be of the form '%tprel_add(symbol)'
 sltiu s2, s3, 0x50, 0x60 # CHECK: :[[@LINE]]:21: error: invalid operand for instruction
 
 # Memory operand not formatted correctly

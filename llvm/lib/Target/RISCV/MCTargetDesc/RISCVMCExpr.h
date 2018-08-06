@@ -32,6 +32,11 @@ public:
     VK_RISCV_GOT_HI_Pseudo, // Variant without syntax yet
     VK_RISCV_CALL,
     VK_RISCV_PLT,
+    VK_RISCV_TPREL_HI,
+    VK_RISCV_TPREL_ADD,
+    VK_RISCV_TPREL_LO,
+    VK_RISCV_TLS_GOT_HI_Pseudo, // Variant without syntax yet
+    VK_RISCV_TLS_GD_HI_Pseudo,  // Variant without syntax yet
     VK_RISCV_Invalid
   };
 
