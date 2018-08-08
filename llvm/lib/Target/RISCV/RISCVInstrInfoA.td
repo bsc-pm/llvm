@@ -97,16 +97,52 @@ defm : StPat<atomic_store_32, SW, GPR>;
 
 /// Atomic operations
 
-// TODO: Should set .aqrl bits as appropriate rather than doing the
-// fence-based lowering.
-def : PatGprGpr<atomic_swap_32, AMOSWAP_W>;
-def : PatGprGpr<atomic_load_add_32, AMOADD_W>;
-def : PatGprGpr<atomic_load_and_32, AMOAND_W>;
-def : PatGprGpr<atomic_load_or_32, AMOOR_W>;
-def : PatGprGpr<atomic_load_xor_32, AMOXOR_W>;
-def : PatGprGpr<atomic_load_max_32, AMOMAX_W>;
-def : PatGprGpr<atomic_load_min_32, AMOMIN_W>;
-def : PatGprGpr<atomic_load_umax_32, AMOMAXU_W>;
-def : PatGprGpr<atomic_load_umin_32, AMOMINU_W>;
+multiclass AtomicOp<string inst, string op> {
+
+   // See RISC-V 2.3 draft, Table A.6 in Appendix A for these mappings.
+   // Note that these are the mappings that do support the native instruction.
+   // Subword atomic is not implemented yet
+   def : PatGprGpr<!cast<SDPatternOperator>(inst#"_monotonic"),
+                   !cast<RVInst>(op)>;
+   // acquire
+   def : PatGprGpr<!cast<SDPatternOperator>(inst#"_acquire"),
+                   !cast<RVInst>(op # "_AQ")>;
+   // release
+   def : PatGprGpr<!cast<SDPatternOperator>(inst#"_release"),
+                   !cast<RVInst>(op # "_RL")>;
+   // acquire + release
+   def : PatGprGpr<!cast<SDPatternOperator>(inst#"_acq_rel"),
+                   !cast<RVInst>(op # "_AQ_RL")>;
+   // sequentially consistent
+   def : PatGprGpr<!cast<SDPatternOperator>(inst#"_seq_cst"),
+                   !cast<RVInst>(op # "_AQ_RL")>;
+}
+
+defm : AtomicOp<"atomic_swap_32", "AMOSWAP_W">;
+defm : AtomicOp<"atomic_load_add_32", "AMOADD_W">;
+defm : AtomicOp<"atomic_load_and_32", "AMOAND_W">;
+defm : AtomicOp<"atomic_load_or_32", "AMOOR_W">;
+defm : AtomicOp<"atomic_load_xor_32", "AMOXOR_W">;
+defm : AtomicOp<"atomic_load_max_32", "AMOMAX_W">;
+defm : AtomicOp<"atomic_load_min_32", "AMOMIN_W">;
+defm : AtomicOp<"atomic_load_umax_32", "AMOMAXU_W">;
+defm : AtomicOp<"atomic_load_umin_32", "AMOMINU_W">;
 
 } // Predicates = [HasStdExtA]
+
+let Predicates = [HasStdExtA, IsRV64] in {
+
+defm : LdPat<atomic_load_64, LD>;
+defm : StPat<atomic_store_64, SD, GPR>;
+
+defm : AtomicOp<"atomic_swap_64", "AMOSWAP_D">;
+defm : AtomicOp<"atomic_load_add_64", "AMOADD_D">;
+defm : AtomicOp<"atomic_load_and_64", "AMOAND_D">;
+defm : AtomicOp<"atomic_load_or_64", "AMOOR_D">;
+defm : AtomicOp<"atomic_load_xor_64", "AMOXOR_D">;
+defm : AtomicOp<"atomic_load_max_64", "AMOMAX_D">;
+defm : AtomicOp<"atomic_load_min_64", "AMOMIN_D">;
+defm : AtomicOp<"atomic_load_umax_64", "AMOMAXU_D">;
+defm : AtomicOp<"atomic_load_umin_64", "AMOMINU_D">;
+
+}
