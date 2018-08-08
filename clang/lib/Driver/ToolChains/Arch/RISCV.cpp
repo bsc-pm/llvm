@@ -365,7 +365,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     // Handle all other types of extensions.
     getExtensionFeatures(D, Args, Features, MArch, OtherExts);
   } else {
-    // GNU/Linux uses G
+    // GNU/Linux uses RV64GC
     if (Triple.getArch() == llvm::Triple::riscv64 &&
         Triple.getOS() == llvm::Triple::Linux &&
         Triple.getEnvironment() == llvm::Triple::GNU) {
@@ -373,6 +373,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       Features.push_back("+a");
       Features.push_back("+f");
       Features.push_back("+d");
+      Features.push_back("+c");
     }
   }
 
