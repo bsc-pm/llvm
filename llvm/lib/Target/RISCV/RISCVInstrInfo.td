@@ -785,7 +785,8 @@ def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
   let AsmString = "lla\t$dst, $src";
 }
 
-let Size = 8 in
+// Here mayLoad = 1 because GOT addressing reads memory
+let Size = 8, mayLoad = 1 in
 def PseudoAddrPIC : Pseudo<(outs GPR:$dst), (ins ixlenimm:$addr),
                            [(set GPR:$dst, (WrapperPIC tglobaladdr:$addr))]>;
 
