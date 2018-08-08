@@ -495,23 +495,25 @@
 // CHECK-DEBIAN-SPARC64: "-internal-externc-isystem" "[[SYSROOT]]/usr/include"
 
 // Check header search on OpenEmbedded ARM.
-// R-UN: %clang -no-canonical-prefixes %s -### -fsyntax-only 2>&1 \
-// R-UN:     -target arm-oe-linux-gnueabi \
-// R-UN:     --sysroot=%S/Inputs/openembedded_arm_linux_tree \
-// R-UN:   | FileCheck --check-prefix=CHECK-OE-ARM %s
+// RUN: %clang -no-canonical-prefixes %s -### -fsyntax-only 2>&1 \
+// RUN:     -target arm-oe-linux-gnueabi -stdlib=libstdc++ \
+// RUN:     --sysroot=%S/Inputs/openembedded_arm_linux_tree \
+// RUN:     --gcc-toolchain="" \
+// RUN:   | FileCheck --check-prefix=CHECK-OE-ARM %s
 
-// C-HECK-OE-ARM: "{{[^"]*}}clang{{[^"]*}}" "-cc1"
-// C-HECK-OE-ARM: "-isysroot" "[[SYSROOT:[^"]+]]"
-// C-HECK-OE-ARM: "-internal-isystem" "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../include/c++/6.3.0"
-// C-HECK-OE-ARM: "-internal-isystem" "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../include/c++/6.3.0/backward"
+// CHECK-OE-ARM: "{{[^"]*}}clang{{[^"]*}}" "-cc1"
+// CHECK-OE-ARM: "-isysroot" "[[SYSROOT:[^"]+]]"
+// CHECK-OE-ARM: "-internal-isystem" "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../include/c++/6.3.0"
+// CHECK-OE-ARM: "-internal-isystem" "[[SYSROOT]]/usr/lib/arm-oe-linux-gnueabi/6.3.0/../../../include/c++/6.3.0/backward"
 
 // Check header search on OpenEmbedded AArch64.
-// R-UN: %clang -no-canonical-prefixes %s -### -fsyntax-only 2>&1 \
-// R-UN:     -target aarch64-oe-linux \
-// R-UN:     --sysroot=%S/Inputs/openembedded_aarch64_linux_tree \
-// R-UN:   | FileCheck --check-prefix=CHECK-OE-AARCH64 %s
+// RUN: %clang -no-canonical-prefixes %s -### -fsyntax-only 2>&1 \
+// RUN:     -target aarch64-oe-linux -stdlib=libstdc++ \
+// RUN:     --sysroot=%S/Inputs/openembedded_aarch64_linux_tree \
+// RUN:     --gcc-toolchain="" \
+// RUN:   | FileCheck --check-prefix=CHECK-OE-AARCH64 %s
 
-// C-HECK-OE-AARCH64: "{{[^"]*}}clang{{[^"]*}}" "-cc1"
-// C-HECK-OE-AARCH64: "-isysroot" "[[SYSROOT:[^"]+]]"
-// C-HECK-OE-AARCH64: "-internal-isystem" "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../include/c++/6.3.0"
-// C-HECK-OE-AARCH64: "-internal-isystem" "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../include/c++/6.3.0/backward"
+// CHECK-OE-AARCH64: "{{[^"]*}}clang{{[^"]*}}" "-cc1"
+// CHECK-OE-AARCH64: "-isysroot" "[[SYSROOT:[^"]+]]"
+// CHECK-OE-AARCH64: "-internal-isystem" "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../include/c++/6.3.0"
+// CHECK-OE-AARCH64: "-internal-isystem" "[[SYSROOT]]/usr/lib64/aarch64-oe-linux/6.3.0/../../../include/c++/6.3.0/backward"
