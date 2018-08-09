@@ -6,7 +6,7 @@ function nice_message()
   local prefix="$1"
   local message="$2"
 
-  if [ "$(which fmt)" = "" ];
+  if [ -z "$(which fmt)" ];
   then
     # Best effort if no fmt available in the PATH
     echo "$prefix: $message"
@@ -38,17 +38,30 @@ function run()
   "$@"
 }
 
+################################################################################
+# Basic directory settings
+################################################################################
+
 BUILDDIR=$(readlink -f $(pwd))
 SRCDIR=$(dirname $(readlink -f $0))
+
+info "Using the current directory '${BUILDDIR}' as the build-dir"
+info "Using '${SRCDIR}' as the source-dir"
+
+if [ -z "${INSTALLDIR}" ];
+then
+  INSTALLDIR=$(readlink -f ${BUILDDIR}/../llvm-install)
+  info "Using '${INSTALLDIR}' as the install-dir (you can override it setting INSTALLDIR)"
+else
+  info "Using '${INSTALLDIR}' as the install-dir"
+fi
+CMAKE_INVOCATION_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=${INSTALLDIR}"
 
 ################################################################################
 # Detection of toolchain and sysroot
 ################################################################################
 
-info "Using the current directory '${BUILDDIR}' as the build-dir"
-info "Using '${SRCDIR}' as the source-dir"
-
-if [ "$GCC_TOOLCHAIN" = "" ];
+if [ -z "$GCC_TOOLCHAIN" ];
 then
   die "Please, set the GCC_TOOLCHAIN environment variable to the location of the riscv64-unknown-linux-gnu toolchain. If you do not have a GCC toolchain yet, follow the instructions at https://pm.bsc.es/gitlab/EPI/project/wikis/install-toolchain"
 fi
@@ -82,9 +95,7 @@ BUILD_SYSTEM="Unix Makefiles"
 COMMAND_TO_BUILD="make -j$(nproc)"
 NINJA_BIN=${NINJA_BIN:-$(which ninja)}
 
-CMAKE_INVOCATION_EXTRA_FLAGS=""
-
-if [ "${NINJA_BIN}" = "" ];
+if [ -z "${NINJA_BIN}" ];
 then
   info "Using Makefiles as build system because 'ninja' wasn't found in your PATH. You can override the location setting the NINJA_BIN environment variable"
 elif [ ! -x "${NINJA_BIN}" ];
@@ -95,7 +106,7 @@ else
   BUILD_SYSTEM="Ninja"
   COMMAND_TO_BUILD="ninja"
   # Do not presume we can use 'ninja' as if it were in the path
-  if [ "$(which ninja)" = "" ];
+  if [ -z "$(which ninja)" ];
   then
     COMMAND_TO_BUILD="${NINJA_BIN}"
   fi
@@ -111,15 +122,15 @@ fi
 if [ -z "${COMPILER}" ];
 then
   info "Automatic detection of compiler. Override the detection setting the COMPILER enviromment variable to either 'gcc' or 'clang', in which case CC and CXX will be used by cmake instead"
-  if [ "$(which clang)" = "" ];
+  if [ -z "$(which clang)" ];
   then
     # Clang not found
-    if [ "$(which gcc)" != "" ];
+    if [ -n "$(which gcc)" ];
     then
       COMPILER="gcc"
       info "Using GCC $(gcc -dumpversion)"
       info "gcc: $(which gcc)"
-      if [ "$(which g++)" != "" ];
+      if [ -n "$(which g++)" ];
       then
         info "g++: $(which g++)"
         # Sanity check
@@ -129,7 +140,6 @@ then
         fi
         CC="$(which gcc)"
         CXX="$(which g++)"
-        CMAKE_INVOCATION_EXTRA_FLAGS="-DCMAKE_C_COMPILER=$(which gcc) -DCMAKE_CXX_COMPILER=$(which g++)"
       else
         error "g++ not found in the PATH but gcc was found. This usually means that your system is missing development packages"
       fi
@@ -139,7 +149,7 @@ then
     COMPILER="clang"
     info "Using clang ${CLANG_VERSION}"
     info "clang: $(which clang)"
-    if [ "$(which clang++)" != "" ];
+    if [ -n "$(which clang++)" ];
     then
       info "clang++: $(which clang++)"
       # Sanity check
@@ -150,7 +160,6 @@ then
       fi
       CC="$(which clang)"
       CXX="$(which clang++)"
-      CMAKE_INVOCATION_EXTRA_FLAGS="-DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++)"
     else
       error "clang++ not found in the PATH but clang was found. You may have to review your installation"
     fi
@@ -164,6 +173,7 @@ then
   CC=${CC:-"$(which clang)"}
   CXX=${CXX:-"$(which clang++)"}
 fi
+CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}"
 
 ################################################################################
 # Detection of the linker
@@ -196,6 +206,20 @@ then
   CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DLLVM_PARALLEL_LINK_JOBS=1"
 else
   warning "Makefiles do not allow limiting the concurrent linking jobs"
+fi
+
+################################################################################
+# Detection of ccache
+################################################################################
+
+if [ -n "$(which ccache)" ];
+then
+  info "Using ccache: $(which ccache)"
+  CMAKE_INVOCATION_EXTRA_FLAGS="$CMAKE_INVOCATION_EXTRA_FLAGS -DLLVM_CCACHE_BUILD=ON"
+  info "Setting LLVM_APPEND_VC_REV=OFF to improve ccache hit ratio"
+  CMAKE_INVOCATION_EXTRA_FLAGS="$CMAKE_INVOCATION_EXTRA_FLAGS -DLLVM_APPEND_VC_REV=OFF"
+else
+  info "Not using ccache as it was not found"
 fi
 
 ################################################################################
