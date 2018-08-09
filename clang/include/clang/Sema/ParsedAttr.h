@@ -118,9 +118,7 @@ class ParsedAttr final
     : private llvm::TrailingObjects<
           ParsedAttr, ArgsUnion, detail::AvailabilityData,
           detail::TypeTagForDatatypeData, ParsedType, detail::PropertyData> {
-  friend class llvm::TrailingObjects<
-      ParsedAttr, ArgsUnion, detail::AvailabilityData,
-      detail::TypeTagForDatatypeData, ParsedType, detail::PropertyData>;
+  friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<ArgsUnion>) const { return NumArgs; }
   size_t numTrailingObjects(OverloadToken<detail::AvailabilityData>) const {
@@ -362,7 +360,9 @@ private:
 
 public:
   ParsedAttr(const ParsedAttr &) = delete;
+  ParsedAttr(ParsedAttr &&) = delete;
   ParsedAttr &operator=(const ParsedAttr &) = delete;
+  ParsedAttr &operator=(ParsedAttr &&) = delete;
   ~ParsedAttr() = delete;
 
   void operator delete(void *) = delete;
