@@ -815,14 +815,13 @@ def : Pat<(Tail (iPTR texternalsym:$dst)),
 // "lla" if we are not compiling for PIC.
 // This effectively means "la" we will use "la" for GOT and "lla" for PC-rel.
 let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
-def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
-  let AsmString = "la\t$dst, $src";
-}
+def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
+                      "la", "$dst, $src">;
 
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
-def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), []> {
-  let AsmString = "lla\t$dst, $src";
-}
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
+    isAsmParserOnly = 1 in
+def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
+                       "lla", "$dst, $src">;
 
 // Here mayLoad = 1 because GOT addressing reads memory
 let Size = 8, mayLoad = 1 in

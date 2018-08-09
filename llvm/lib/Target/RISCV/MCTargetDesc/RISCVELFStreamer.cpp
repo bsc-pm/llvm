@@ -68,6 +68,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
   switch (Inst.getOpcode()) {
   default:
     return false;
+  // FIXME this should go away
   case RISCV::PseudoLLA: {
     // PC-rel addressing
     MCContext &Ctx = getContext();

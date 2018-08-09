@@ -74,6 +74,9 @@ class RISCVAsmParser : public MCTargetAsmParser {
   // synthesize the desired immedate value into the destination register.
   void emitLoadImm(unsigned DestReg, int64_t Value, MCStreamer &Out);
 
+  // Helper to emit pseudo instruction "lla" used in PC-rel addressing.
+  void emitLoadLocalAddress(MCInst &Inst, SMLoc IDLoc, MCStreamer &Out);
+
   /// Helper for processing MC instructions that have been successfully matched
   /// by MatchAndEmitInstruction. Modifications to the emitted instructions,
   /// like the expansion of pseudo instructions (e.g., "li"), can be performed
@@ -1293,6 +1296,39 @@ void RISCVAsmParser::emitLoadImm(unsigned DestReg, int64_t Value,
                             .addImm(Lo12));
 }
 
+void RISCVAsmParser::emitLoadLocalAddress(MCInst &Inst, SMLoc IDLoc,
+                                          MCStreamer &Out) {
+  // The local load address pseudo-instruction "lla" is used in PC-relative
+  // addressing of symbols:
+  //   lla rdest, symbol
+  // expands to
+  //   TmpLabel: AUIPC rdest, %pcrel_hi(symbol)
+  //             ADDI rdest, %pcrel_lo(TmpLabel)
+  MCContext &Ctx = getContext();
+
+  MCSymbol *TmpLabel = Ctx.createTempSymbol(
+      "pcrel_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
+  Out.EmitLabel(TmpLabel);
+
+  MCOperand DestReg = Inst.getOperand(0);
+  const RISCVMCExpr *Symbol = RISCVMCExpr::create(
+      Inst.getOperand(1).getExpr(), RISCVMCExpr::VK_RISCV_PCREL_HI, Ctx);
+
+  MCInst &AUIPC =
+      MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
+  emitToStreamer(Out, AUIPC);
+
+  const MCExpr *RefToLinkTmpLabel =
+      RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
+                          RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
+
+  MCInst &ADDI = MCInstBuilder(RISCV::ADDI)
+                     .addOperand(DestReg)
+                     .addOperand(DestReg)
+                     .addExpr(RefToLinkTmpLabel);
+  emitToStreamer(Out, ADDI);
+}
+
 bool RISCVAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
                                         MCStreamer &Out) {
   Inst.setLoc(IDLoc);
@@ -1307,12 +1343,11 @@ bool RISCVAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
       Imm = SignExtend64<32>(Imm);
     emitLoadImm(Reg, Imm, Out);
     return false;
-  } else if (Inst.getOpcode() == RISCV::PseudoLA) {
-    // Convert PseudoLA into PseudoLLA when PIC is not enabled
-    // so the ELF streamer will do the right thing already.
-    if (!IsPicEnabled)
-      Inst.setOpcode(RISCV::PseudoLLA);
-    // Fall-through to the emitToStreamer below.
+  } else if (Inst.getOpcode() == RISCV::PseudoLLA ||
+             (!IsPicEnabled && Inst.getOpcode() == RISCV::PseudoLA)) {
+    // We emit PseudoLA as a PseudoLLA when PIC is not enabled
+    emitLoadLocalAddress(Inst, IDLoc, Out);
+    return false;
   }
 
   emitToStreamer(Out, Inst);
