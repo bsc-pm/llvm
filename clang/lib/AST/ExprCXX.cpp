@@ -452,13 +452,13 @@ DependentScopeDeclRefExpr::CreateEmpty(const ASTContext &C,
 
 SourceLocation CXXConstructExpr::getBeginLoc() const {
   if (isa<CXXTemporaryObjectExpr>(this))
-    return cast<CXXTemporaryObjectExpr>(this)->getLocStart();
+    return cast<CXXTemporaryObjectExpr>(this)->getBeginLoc();
   return Loc;
 }
 
 SourceLocation CXXConstructExpr::getEndLoc() const {
   if (isa<CXXTemporaryObjectExpr>(this))
-    return cast<CXXTemporaryObjectExpr>(this)->getLocEnd();
+    return cast<CXXTemporaryObjectExpr>(this)->getEndLoc();
 
   if (ParenOrBraceRange.isValid())
     return ParenOrBraceRange.getEnd();
@@ -467,7 +467,7 @@ SourceLocation CXXConstructExpr::getEndLoc() const {
   for (unsigned I = getNumArgs(); I > 0; --I) {
     const Expr *Arg = getArg(I-1);
     if (!Arg->isDefaultArgument()) {
-      SourceLocation NewEnd = Arg->getLocEnd();
+      SourceLocation NewEnd = Arg->getEndLoc();
       if (NewEnd.isValid()) {
         End = NewEnd;
         break;
@@ -483,20 +483,20 @@ SourceRange CXXOperatorCallExpr::getSourceRangeImpl() const {
   if (Kind == OO_PlusPlus || Kind == OO_MinusMinus) {
     if (getNumArgs() == 1)
       // Prefix operator
-      return SourceRange(getOperatorLoc(), getArg(0)->getLocEnd());
+      return SourceRange(getOperatorLoc(), getArg(0)->getEndLoc());
     else
       // Postfix operator
-      return SourceRange(getArg(0)->getLocStart(), getOperatorLoc());
+      return SourceRange(getArg(0)->getBeginLoc(), getOperatorLoc());
   } else if (Kind == OO_Arrow) {
     return getArg(0)->getSourceRange();
   } else if (Kind == OO_Call) {
-    return SourceRange(getArg(0)->getLocStart(), getRParenLoc());
+    return SourceRange(getArg(0)->getBeginLoc(), getRParenLoc());
   } else if (Kind == OO_Subscript) {
-    return SourceRange(getArg(0)->getLocStart(), getRParenLoc());
+    return SourceRange(getArg(0)->getBeginLoc(), getRParenLoc());
   } else if (getNumArgs() == 1) {
-    return SourceRange(getOperatorLoc(), getArg(0)->getLocEnd());
+    return SourceRange(getOperatorLoc(), getArg(0)->getEndLoc());
   } else if (getNumArgs() == 2) {
-    return SourceRange(getArg(0)->getLocStart(), getArg(1)->getLocEnd());
+    return SourceRange(getArg(0)->getBeginLoc(), getArg(1)->getEndLoc());
   } else {
     return getOperatorLoc();
   }
@@ -708,11 +708,11 @@ CXXFunctionalCastExpr::CreateEmpty(const ASTContext &C, unsigned PathSize) {
 }
 
 SourceLocation CXXFunctionalCastExpr::getBeginLoc() const {
-  return getTypeInfoAsWritten()->getTypeLoc().getLocStart();
+  return getTypeInfoAsWritten()->getTypeLoc().getBeginLoc();
 }
 
 SourceLocation CXXFunctionalCastExpr::getEndLoc() const {
-  return RParenLoc.isValid() ? RParenLoc : getSubExpr()->getLocEnd();
+  return RParenLoc.isValid() ? RParenLoc : getSubExpr()->getEndLoc();
 }
 
 UserDefinedLiteral::LiteralOperatorKind
@@ -799,7 +799,7 @@ SourceLocation CXXTemporaryObjectExpr::getBeginLoc() const {
 SourceLocation CXXTemporaryObjectExpr::getEndLoc() const {
   SourceLocation Loc = getParenOrBraceRange().getEnd();
   if (Loc.isInvalid() && getNumArgs())
-    Loc = getArg(getNumArgs()-1)->getLocEnd();
+    Loc = getArg(getNumArgs() - 1)->getEndLoc();
   return Loc;
 }
 
