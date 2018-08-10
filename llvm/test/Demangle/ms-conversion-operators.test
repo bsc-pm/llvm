@@ -33,7 +33,7 @@
 ; CHECK: double const volatile __thiscall ConstVolatileOps::operator double const volatile(void)
 
 ??BCompoundTypeOps@@QAEPAHXZ
-i; CHECK: nt * __thiscall CompoundTypeOps::operator int *(void)
+; CHECK: nt * __thiscall CompoundTypeOps::operator int *(void)
 
 ??BCompoundTypeOps@@QAEPBHXZ
 ; CHECK: int const * __thiscall CompoundTypeOps::operator int const *(void)
