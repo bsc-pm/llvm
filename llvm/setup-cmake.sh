@@ -121,7 +121,7 @@ fi
 
 if [ -z "${COMPILER}" ];
 then
-  info "Automatic detection of compiler. Override the detection setting the COMPILER enviromment variable to either 'gcc' or 'clang', in which case CC and CXX will be used by cmake instead"
+  info "Automatic detection of compiler. Override the detection setting the COMPILER environment variable to either 'gcc' or 'clang', in which case CC and CXX will be used by cmake instead"
   if [ -z "$(which clang)" ];
   then
     # Clang not found
