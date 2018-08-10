@@ -898,26 +898,6 @@ defm : StPat<truncstorei8, SB, GPR>;
 defm : StPat<truncstorei16, SH, GPR>;
 defm : StPat<store, SW, GPR>, Requires<[IsRV32]>;
 
-/// Atomics
-
-// fence acquire -> fence r, rw
-def : Pat<(atomic_fence (i32 4), (imm)), (FENCE 2, 3)>;
-// fence release -> fence rw, r
-def : Pat<(atomic_fence (i32 5), (imm)), (FENCE 3, 1)>;
-// fence acq_rel -> fence rw, rw (but ideally would be fence.tso)
-// TODO: convert to fence.tso (when defined) for fence r, rw + fence rw, r
-def : Pat<(atomic_fence (i32 6), (imm)), (FENCE 3, 3)>;
-// fence seq_cst -> fence rw, rw
-def : Pat<(atomic_fence (i32 7), (imm)), (FENCE 3, 3)>;
-
-defm : LdPat<atomic_load_8, LB>;
-defm : LdPat<atomic_load_16, LH>;
-defm : LdPat<atomic_load_32, LW>;
-
-defm : StPat<atomic_store_8, SB, GPR>;
-defm : StPat<atomic_store_16, SH, GPR>;
-defm : StPat<atomic_store_32, SW, GPR>;
-
 /// Fences
 
 // Refer to Table A.6 in the version 2.3 draft of the RISC-V Instruction Set
@@ -931,6 +911,19 @@ def : Pat<(atomic_fence (i32 5), (imm)), (FENCE 0b11, 0b1)>;
 def : Pat<(atomic_fence (i32 6), (imm)), (FENCE_TSO)>;
 // fence seq_cst -> fence rw, rw
 def : Pat<(atomic_fence (i32 7), (imm)), (FENCE 0b11, 0b11)>;
+
+let Predicates = [IsRV64] in {
+
+// fence acquire -> fence r, rw
+def : Pat<(atomic_fence (i64 4), (imm)), (FENCE 0b10, 0b11)>;
+// fence release -> fence rw, w
+def : Pat<(atomic_fence (i64 5), (imm)), (FENCE 0b11, 0b1)>;
+// fence acq_rel -> fence.tso
+def : Pat<(atomic_fence (i64 6), (imm)), (FENCE_TSO)>;
+// fence seq_cst -> fence rw, rw
+def : Pat<(atomic_fence (i64 7), (imm)), (FENCE 0b11, 0b11)>;
+
+}
 
 // Lowering for atomic load and store is defined in RISCVInstrInfoA.td.
 // Although these are lowered to fence+load/store instructions defined in the
