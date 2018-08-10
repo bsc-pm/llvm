@@ -188,7 +188,9 @@ template <typename Inst>
 static bool atomicSizeSupported(const TargetLowering *TLI, Inst *I) {
   unsigned Size = getAtomicOpSize(I);
   unsigned Align = getAtomicOpAlign(I);
-  return Align >= Size && Size <= TLI->getMaxAtomicSizeInBitsSupported() / 8;
+  return Align >= Size &&
+    Size >= TLI->getMinAtomicSizeInBitsSupported() / 8 &&
+    Size <= TLI->getMaxAtomicSizeInBitsSupported() / 8;
 }
 
 bool AtomicExpand::runOnFunction(Function &F) {

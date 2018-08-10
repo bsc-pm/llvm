@@ -1506,6 +1506,14 @@ public:
   /// \name Helpers for atomic expansion.
   /// @{
 
+  /// Returns the minimum atomic operation size (in bits) supported by
+  /// the backend. Atomic operations lower than this size (as well
+  /// as ones that are not naturally aligned), will be expanded by
+  /// AtomicExpandPass into an __atomic_* library call.
+  unsigned getMinAtomicSizeInBitsSupported() const {
+    return MinAtomicSizeInBitsSupported;
+  }
+
   /// Returns the maximum atomic operation size (in bits) supported by
   /// the backend. Atomic operations greater than this size (as well
   /// as ones that are not naturally aligned), will be expanded by
@@ -1921,6 +1929,14 @@ protected:
   /// Set the minimum stack alignment of an argument (in log2(bytes)).
   void setMinStackArgumentAlignment(unsigned Align) {
     MinStackArgumentAlignment = Align;
+  }
+
+  /// Set the minimum atomic operation size supported by the
+  /// backend. Atomic operations smaller than this size (as well as
+  /// ones that are not naturally aligned), will be expanded by
+  /// AtomicExpandPass into an __atomic_* library call.
+  void setMinAtomicSizeInBitsSupported(unsigned SizeInBits) {
+    MinAtomicSizeInBitsSupported = SizeInBits;
   }
 
   /// Set the maximum atomic operation size supported by the
@@ -2421,6 +2437,10 @@ private:
 
   /// The preferred loop alignment.
   unsigned PrefLoopAlignment;
+
+  /// Size in bits of the minimum atomics size the backend supports.
+  /// Accesses smaller than this will be expanded by AtomicExpandPass.
+  unsigned MinAtomicSizeInBitsSupported;
 
   /// Size in bits of the maximum atomics size the backend supports.
   /// Accesses larger than this will be expanded by AtomicExpandPass.
