@@ -931,8 +931,7 @@ Value *InstCombiner::foldAndOrOfICmpsOfAndWithPow2(ICmpInst *LHS, ICmpInst *RHS,
 static Value *foldSignedTruncationCheck(ICmpInst *ICmp0, ICmpInst *ICmp1,
                                         Instruction &CxtI,
                                         InstCombiner::BuilderTy &Builder) {
-  assert(ICmp0 == CxtI.getOperand(0) && ICmp1 == CxtI.getOperand(1) &&
-         CxtI.getOpcode() == Instruction::And);
+  assert(CxtI.getOpcode() == Instruction::And);
 
   // Match  icmp ult (add %arg, C01), C1   (C1 == C01 << 1; powers of two)
   auto tryToMatchSignedTruncationCheck = [](ICmpInst *ICmp, Value *&X,

@@ -88,6 +88,22 @@ define i1 @positive_with_aggressive_icmp(i32 %arg) {
 
 ; I'm sure there is a bunch more patterns possible :/
 
+; This used to trigger an assert, because the icmp's are not direct
+; operands of the and.
+define i1 @positive_with_extra_and(i32 %arg, i1 %z) {
+; CHECK-LABEL: @positive_with_extra_and(
+; CHECK-NEXT:    [[T5_SIMPLIFIED:%.*]] = icmp ult i32 [[ARG:%.*]], 128
+; CHECK-NEXT:    [[TMP1:%.*]] = and i1 [[T5_SIMPLIFIED]], [[Z:%.*]]
+; CHECK-NEXT:    ret i1 [[TMP1]]
+;
+  %t1 = icmp sgt i32 %arg, -1
+  %t2 = add i32 %arg, 128
+  %t3 = icmp ult i32 %t2, 256
+  %t4 = and i1 %t1, %z
+  %t5 = and i1 %t3, %t4
+  ret i1 %t5
+}
+
 ; ============================================================================ ;
 ; Vector tests
 ; ============================================================================ ;
