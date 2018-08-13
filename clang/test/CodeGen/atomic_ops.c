@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // XFAIL: hexagon,sparc
 //        (due to not having native load atomic support)
 // RUN: %clang_cc1 -emit-llvm %s -o - | FileCheck %s
