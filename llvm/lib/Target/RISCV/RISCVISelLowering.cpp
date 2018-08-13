@@ -139,7 +139,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::ConstantPool, XLenVT, Custom);
 
   if (Subtarget.hasStdExtA())
+  {
+    setMinAtomicSizeInBitsSupported(32);
     setMaxAtomicSizeInBitsSupported(Subtarget.getXLen());
+  }
   else
     setMaxAtomicSizeInBitsSupported(0);
 
