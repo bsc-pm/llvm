@@ -38,9 +38,16 @@
 //     references it, and we wouldn't generate multiple report on the same
 //     pointee.
 //
+// To read about how the checker works, refer to the comments in
+// UninitializedObject.h.
+//
+// Some of the logic is implemented in UninitializedPointee.cpp, to reduce the
+// complexity of this file.
+//
 //===----------------------------------------------------------------------===//
 
 #include "ClangSACheckers.h"
+#include "UninitializedObject.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
@@ -65,161 +72,7 @@ public:
   void checkEndFunction(const ReturnStmt *RS, CheckerContext &C) const;
 };
 
-/// Represents a field chain. A field chain is a vector of fields where the
-/// first element of the chain is the object under checking (not stored), and
-/// every other element is a field, and the element that precedes it is the
-/// object that contains it.
-///
-/// Note that this class is immutable, and new fields may only be added through
-/// constructor calls.
-class FieldChainInfo {
-  using FieldChain = llvm::ImmutableList<const FieldRegion *>;
-
-  FieldChain Chain;
-
-  const bool IsDereferenced = false;
-
-public:
-  FieldChainInfo() = default;
-
-  FieldChainInfo(const FieldChainInfo &Other, const bool IsDereferenced)
-      : Chain(Other.Chain), IsDereferenced(IsDereferenced) {}
-
-  FieldChainInfo(const FieldChainInfo &Other, const FieldRegion *FR,
-                 const bool IsDereferenced = false);
-
-  bool contains(const FieldRegion *FR) const { return Chain.contains(FR); }
-  bool isPointer() const;
-
-  /// If this is a fieldchain whose last element is an uninitialized region of a
-  /// pointer type, `IsDereferenced` will store whether the pointer itself or
-  /// the pointee is uninitialized.
-  bool isDereferenced() const;
-  const FieldDecl *getEndOfChain() const;
-  void print(llvm::raw_ostream &Out) const;
-
-private:
-  /// Prints every element except the last to `Out`. Since ImmutableLists store
-  /// elements in reverse order, and have no reverse iterators, we use a
-  /// recursive function to print the fieldchain correctly. The last element in
-  /// the chain is to be printed by `print`.
-  static void printTail(llvm::raw_ostream &Out,
-                        const llvm::ImmutableListImpl<const FieldRegion *> *L);
-  friend struct FieldChainInfoComparator;
-};
-
-struct FieldChainInfoComparator {
-  bool operator()(const FieldChainInfo &lhs, const FieldChainInfo &rhs) const {
-    assert(!lhs.Chain.isEmpty() && !rhs.Chain.isEmpty() &&
-           "Attempted to store an empty fieldchain!");
-    return *lhs.Chain.begin() < *rhs.Chain.begin();
-  }
-};
-
-using UninitFieldSet = std::set<FieldChainInfo, FieldChainInfoComparator>;
-
-/// Searches for and stores uninitialized fields in a non-union object.
-class FindUninitializedFields {
-  ProgramStateRef State;
-  const TypedValueRegion *const ObjectR;
-
-  const bool IsPedantic;
-  const bool CheckPointeeInitialization;
-
-  bool IsAnyFieldInitialized = false;
-
-  UninitFieldSet UninitFields;
-
-public:
-  FindUninitializedFields(ProgramStateRef State,
-                          const TypedValueRegion *const R, bool IsPedantic,
-                          bool CheckPointeeInitialization);
-  const UninitFieldSet &getUninitFields();
-
-private:
-  /// Adds a FieldChainInfo object to UninitFields. Return true if an insertion
-  /// took place.
-  bool addFieldToUninits(FieldChainInfo LocalChain);
-
-  // For the purposes of this checker, we'll regard the object under checking as
-  // a directed tree, where
-  //   * the root is the object under checking
-  //   * every node is an object that is
-  //     - a union
-  //     - a non-union record
-  //     - a pointer/reference
-  //     - an array
-  //     - of a primitive type, which we'll define later in a helper function.
-  //   * the parent of each node is the object that contains it
-  //   * every leaf is an array, a primitive object, a nullptr or an undefined
-  //   pointer.
-  //
-  // Example:
-  //
-  //   struct A {
-  //      struct B {
-  //        int x, y = 0;
-  //      };
-  //      B b;
-  //      int *iptr = new int;
-  //      B* bptr;
-  //
-  //      A() {}
-  //   };
-  //
-  // The directed tree:
-  //
-  //           ->x
-  //          /
-  //      ->b--->y
-  //     /
-  //    A-->iptr->(int value)
-  //     \
-  //      ->bptr
-  //
-  // From this we'll construct a vector of fieldchains, where each fieldchain
-  // represents an uninitialized field. An uninitialized field may be a
-  // primitive object, a pointer, a pointee or a union without a single
-  // initialized field.
-  // In the above example, for the default constructor call we'll end up with
-  // these fieldchains:
-  //
-  //   this->b.x
-  //   this->iptr (pointee uninit)
-  //   this->bptr (pointer uninit)
-  //
-  // We'll traverse each node of the above graph with the appropiate one of
-  // these methods:
-
-  /// This method checks a region of a union object, and returns true if no
-  /// field is initialized within the region.
-  bool isUnionUninit(const TypedValueRegion *R);
-
-  /// This method checks a region of a non-union object, and returns true if
-  /// an uninitialized field is found within the region.
-  bool isNonUnionUninit(const TypedValueRegion *R, FieldChainInfo LocalChain);
-
-  /// This method checks a region of a pointer or reference object, and returns
-  /// true if the ptr/ref object itself or any field within the pointee's region
-  /// is uninitialized.
-  bool isPointerOrReferenceUninit(const FieldRegion *FR,
-                                  FieldChainInfo LocalChain);
-
-  /// This method returns true if the value of a primitive object is
-  /// uninitialized.
-  bool isPrimitiveUninit(const SVal &V);
-
-  // Note that we don't have a method for arrays -- the elements of an array are
-  // often left uninitialized intentionally even when it is of a C++ record
-  // type, so we'll assume that an array is always initialized.
-  // TODO: Add a support for nonloc::LocAsInteger.
-};
-
 } // end of anonymous namespace
-
-// Static variable instantionations.
-
-static llvm::ImmutableListFactory<const FieldRegion *> Factory;
 
 // Utility function declarations.
 
@@ -234,21 +87,7 @@ getObjectVal(const CXXConstructorDecl *CtorDecl, CheckerContext &Context);
 /// (e.g. if the object is a field of another object, in which case we'd check
 /// it multiple times).
 static bool willObjectBeAnalyzedLater(const CXXConstructorDecl *Ctor,
-                               CheckerContext &Context);
-
-/// Returns whether T can be (transitively) dereferenced to a void pointer type
-/// (void*, void**, ...). The type of the region behind a void pointer isn't
-/// known, and thus FD can not be analyzed.
-static bool isVoidPointer(QualType T);
-
-/// Returns true if T is a primitive type. We defined this type so that for
-/// objects that we'd only like analyze as much as checking whether their
-/// value is undefined or not, such as ints and doubles, can be analyzed with
-/// ease. This also helps ensuring that every special field type is handled
-/// correctly.
-static bool isPrimitiveType(const QualType &T) {
-  return T->isBuiltinType() || T->isEnumeralType() || T->isMemberPointerType();
-}
+                                      CheckerContext &Context);
 
 /// Constructs a note message for a given FieldChainInfo object.
 static void printNoteMessage(llvm::raw_ostream &Out,
@@ -355,7 +194,7 @@ FindUninitializedFields::FindUninitializedFields(
       CheckPointeeInitialization(CheckPointeeInitialization) {}
 
 const UninitFieldSet &FindUninitializedFields::getUninitFields() {
-  isNonUnionUninit(ObjectR, FieldChainInfo());
+  isNonUnionUninit(ObjectR, FieldChainInfo(Factory));
 
   if (!IsPedantic && !IsAnyFieldInitialized)
     UninitFields.clear();
@@ -472,124 +311,6 @@ bool FindUninitializedFields::isUnionUninit(const TypedValueRegion *R) {
   return false;
 }
 
-// Note that pointers/references don't contain fields themselves, so in this
-// function we won't add anything to LocalChain.
-bool FindUninitializedFields::isPointerOrReferenceUninit(
-    const FieldRegion *FR, FieldChainInfo LocalChain) {
-
-  assert((FR->getDecl()->getType()->isPointerType() ||
-          FR->getDecl()->getType()->isReferenceType() ||
-          FR->getDecl()->getType()->isBlockPointerType()) &&
-         "This method only checks pointer/reference objects!");
-
-  SVal V = State->getSVal(FR);
-
-  if (V.isUnknown() || V.getAs<loc::ConcreteInt>()) {
-    IsAnyFieldInitialized = true;
-    return false;
-  }
-
-  if (V.isUndef()) {
-    return addFieldToUninits({LocalChain, FR});
-  }
-
-  if (!CheckPointeeInitialization) {
-    IsAnyFieldInitialized = true;
-    return false;
-  }
-
-  assert(V.getAs<loc::MemRegionVal>() &&
-         "At this point V must be loc::MemRegionVal!");
-  auto L = V.castAs<loc::MemRegionVal>();
-
-  // We can't reason about symbolic regions, assume its initialized.
-  // Note that this also avoids a potential infinite recursion, because
-  // constructors for list-like classes are checked without being called, and
-  // the Static Analyzer will construct a symbolic region for Node *next; or
-  // similar code snippets.
-  if (L.getRegion()->getSymbolicBase()) {
-    IsAnyFieldInitialized = true;
-    return false;
-  }
-
-  DynamicTypeInfo DynTInfo = getDynamicTypeInfo(State, L.getRegion());
-  if (!DynTInfo.isValid()) {
-    IsAnyFieldInitialized = true;
-    return false;
-  }
-
-  QualType DynT = DynTInfo.getType();
-
-  if (isVoidPointer(DynT)) {
-    IsAnyFieldInitialized = true;
-    return false;
-  }
-
-  // At this point the pointer itself is initialized and points to a valid
-  // location, we'll now check the pointee.
-  SVal DerefdV = State->getSVal(V.castAs<Loc>(), DynT);
-
-  // If DerefdV is still a pointer value, we'll dereference it again (e.g.:
-  // int** -> int*).
-  while (auto Tmp = DerefdV.getAs<loc::MemRegionVal>()) {
-    if (Tmp->getRegion()->getSymbolicBase()) {
-      IsAnyFieldInitialized = true;
-      return false;
-    }
-
-    DynTInfo = getDynamicTypeInfo(State, Tmp->getRegion());
-    if (!DynTInfo.isValid()) {
-      IsAnyFieldInitialized = true;
-      return false;
-    }
-
-    DynT = DynTInfo.getType();
-    if (isVoidPointer(DynT)) {
-      IsAnyFieldInitialized = true;
-      return false;
-    }
-
-    DerefdV = State->getSVal(*Tmp, DynT);
-  }
-
-  // If FR is a pointer pointing to a non-primitive type.
-  if (Optional<nonloc::LazyCompoundVal> RecordV =
-          DerefdV.getAs<nonloc::LazyCompoundVal>()) {
-
-    const TypedValueRegion *R = RecordV->getRegion();
-
-    if (DynT->getPointeeType()->isStructureOrClassType())
-      return isNonUnionUninit(R, {LocalChain, FR});
-
-    if (DynT->getPointeeType()->isUnionType()) {
-      if (isUnionUninit(R)) {
-        return addFieldToUninits({LocalChain, FR, /*IsDereferenced*/ true});
-      } else {
-        IsAnyFieldInitialized = true;
-        return false;
-      }
-    }
-
-    if (DynT->getPointeeType()->isArrayType()) {
-      IsAnyFieldInitialized = true;
-      return false;
-    }
-
-    llvm_unreachable("All cases are handled!");
-  }
-
-  assert((isPrimitiveType(DynT->getPointeeType()) || DynT->isPointerType() ||
-          DynT->isReferenceType()) &&
-         "At this point FR must either have a primitive dynamic type, or it "
-         "must be a null, undefined, unknown or concrete pointer!");
-
-  if (isPrimitiveUninit(DerefdV))
-    return addFieldToUninits({LocalChain, FR, /*IsDereferenced*/ true});
-
-  IsAnyFieldInitialized = true;
-  return false;
-}
-
 bool FindUninitializedFields::isPrimitiveUninit(const SVal &V) {
   if (V.isUndef())
     return true;
@@ -624,6 +345,13 @@ const FieldDecl *FieldChainInfo::getEndOfChain() const {
   assert(!Chain.isEmpty() && "Empty fieldchain!");
   return (*Chain.begin())->getDecl();
 }
+
+/// Prints every element except the last to `Out`. Since ImmutableLists store
+/// elements in reverse order, and have no reverse iterators, we use a
+/// recursive function to print the fieldchain correctly. The last element in
+/// the chain is to be printed by `print`.
+static void printTail(llvm::raw_ostream &Out,
+                      const FieldChainInfo::FieldChainImpl *L);
 
 // TODO: This function constructs an incorrect string if a void pointer is a
 // part of the chain:
@@ -662,15 +390,13 @@ void FieldChainInfo::print(llvm::raw_ostream &Out) const {
   if (Chain.isEmpty())
     return;
 
-  const llvm::ImmutableListImpl<const FieldRegion *> *L =
-      Chain.getInternalPointer();
+  const FieldChainImpl *L = Chain.getInternalPointer();
   printTail(Out, L->getTail());
   Out << getVariableName(L->getHead()->getDecl());
 }
 
-void FieldChainInfo::printTail(
-    llvm::raw_ostream &Out,
-    const llvm::ImmutableListImpl<const FieldRegion *> *L) {
+static void printTail(llvm::raw_ostream &Out,
+                      const FieldChainInfo::FieldChainImpl *L) {
   if (!L)
     return;
 
@@ -683,15 +409,6 @@ void FieldChainInfo::printTail(
 //===----------------------------------------------------------------------===//
 //                           Utility functions.
 //===----------------------------------------------------------------------===//
-
-static bool isVoidPointer(QualType T) {
-  while (!T.isNull()) {
-    if (T->isVoidPointerType())
-      return true;
-    T = T->getPointeeType();
-  }
-  return false;
-}
 
 static Optional<nonloc::LazyCompoundVal>
 getObjectVal(const CXXConstructorDecl *CtorDecl, CheckerContext &Context) {
@@ -708,7 +425,7 @@ getObjectVal(const CXXConstructorDecl *CtorDecl, CheckerContext &Context) {
 }
 
 static bool willObjectBeAnalyzedLater(const CXXConstructorDecl *Ctor,
-                               CheckerContext &Context) {
+                                      CheckerContext &Context) {
 
   Optional<nonloc::LazyCompoundVal> CurrentObject = getObjectVal(Ctor, Context);
   if (!CurrentObject)
