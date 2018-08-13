@@ -5,148 +5,77 @@
 define i64 @atomic_load_i64_unordered(i64 *%a) nounwind {
 ; RV64A-LABEL: atomic_load_i64_unordered:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a1, a0
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    call __atomic_load
-; RV64A-NEXT:    ld a0, 0(sp)
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    ld a0, 0(a0)
 ; RV64A-NEXT:    ret
-  %1 = load atomic i64, i64* %a unordered, align 4
+  %1 = load atomic i64, i64* %a unordered, align 8
   ret i64 %1
 }
 
 define i64 @atomic_load_i64_monotonic(i64 *%a) nounwind {
 ; RV64A-LABEL: atomic_load_i64_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a1, a0
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    call __atomic_load
-; RV64A-NEXT:    ld a0, 0(sp)
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    ld a0, 0(a0)
 ; RV64A-NEXT:    ret
-  %1 = load atomic i64, i64* %a monotonic, align 4
+  %1 = load atomic i64, i64* %a monotonic, align 8
   ret i64 %1
 }
 
 define i64 @atomic_load_i64_acquire(i64 *%a) nounwind {
 ; RV64A-LABEL: atomic_load_i64_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a1, a0
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    addi a3, zero, 2
-; RV64A-NEXT:    call __atomic_load
-; RV64A-NEXT:    ld a0, 0(sp)
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    ld a0, 0(a0)
+; RV64A-NEXT:    fence r, rw
 ; RV64A-NEXT:    ret
-  %1 = load atomic i64, i64* %a acquire, align 4
+  %1 = load atomic i64, i64* %a acquire, align 8
   ret i64 %1
 }
 
 define i64 @atomic_load_i64_seq_cst(i64 *%a) nounwind {
 ; RV64A-LABEL: atomic_load_i64_seq_cst:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a1, a0
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    call __atomic_load
-; RV64A-NEXT:    ld a0, 0(sp)
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    fence rw, rw
+; RV64A-NEXT:    ld a0, 0(a0)
+; RV64A-NEXT:    fence r, rw
 ; RV64A-NEXT:    ret
-  %1 = load atomic i64, i64* %a seq_cst, align 4
+  %1 = load atomic i64, i64* %a seq_cst, align 8
   ret i64 %1
 }
 
 define void @atomic_store_i64_unordered(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_unordered:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a3, a0
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    mv a1, a3
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    call __atomic_store
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    sd a0, 0(a1)
 ; RV64A-NEXT:    ret
-  store atomic i64 %b, i64* %a unordered, align 4
+  store atomic i64 %b, i64* %a unordered, align 8
   ret void
 }
 
 define void @atomic_store_i64_monotonic(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a3, a0
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    mv a1, a3
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    call __atomic_store
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    sd a0, 0(a1)
 ; RV64A-NEXT:    ret
-  store atomic i64 %b, i64* %a monotonic, align 4
+  store atomic i64 %b, i64* %a monotonic, align 8
   ret void
 }
 
 define void @atomic_store_i64_release(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_release:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a4, a0
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    addi a3, zero, 3
-; RV64A-NEXT:    mv a1, a4
-; RV64A-NEXT:    call __atomic_store
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    fence rw, w
+; RV64A-NEXT:    sd a0, 0(a1)
 ; RV64A-NEXT:    ret
-  store atomic i64 %b, i64* %a release, align 4
+  store atomic i64 %b, i64* %a release, align 8
   ret void
 }
 
 define void @atomic_store_i64_seq_cst(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_seq_cst:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    mv a4, a0
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    addi a0, zero, 8
-; RV64A-NEXT:    mv a2, sp
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    mv a1, a4
-; RV64A-NEXT:    call __atomic_store
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:    fence rw, w
+; RV64A-NEXT:    sd a0, 0(a1)
 ; RV64A-NEXT:    ret
-  store atomic i64 %b, i64* %a seq_cst, align 4
+  store atomic i64 %b, i64* %a seq_cst, align 8
   ret void
 }
 
