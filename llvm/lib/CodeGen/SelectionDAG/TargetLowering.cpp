@@ -3438,32 +3438,44 @@ static SDValue BuildExactSDIV(const TargetLowering &TLI, SDNode *N,
   SDValue Op0 = N->getOperand(0);
   SDValue Op1 = N->getOperand(1);
   EVT VT = N->getValueType(0);
+  EVT SVT = VT.getScalarType();
   EVT ShVT = TLI.getShiftAmountTy(VT, DAG.getDataLayout());
+  EVT ShSVT = ShVT.getScalarType();
 
-  auto BuildSDIVPattern = [](APInt Divisor, unsigned &Shift, APInt &Factor) {
-    bool UseSRA = false;
-    Shift = Divisor.countTrailingZeros();
+  bool UseSRA = false;
+  SmallVector<SDValue, 16> Shifts, Factors;
+
+  auto BuildSDIVPattern = [&](ConstantSDNode *C) {
+    if (C->isNullValue())
+      return false;
+    APInt Divisor = C->getAPIntValue();
+    unsigned Shift = Divisor.countTrailingZeros();
     if (Shift) {
       Divisor.ashrInPlace(Shift);
       UseSRA = true;
     }
     // Calculate the multiplicative inverse, using Newton's method.
     APInt t;
-    Factor = Divisor;
+    APInt Factor = Divisor;
     while ((t = Divisor * Factor) != 1)
       Factor *= APInt(Divisor.getBitWidth(), 2) - t;
-    return UseSRA;
+    Shifts.push_back(DAG.getConstant(Shift, dl, ShSVT));
+    Factors.push_back(DAG.getConstant(Factor, dl, SVT));
+    return true;
   };
 
-  ConstantSDNode *C = isConstOrConstSplat(Op1);
-  if (!C || C->isNullValue())
+  // Collect all magic values from the build vector.
+  if (!ISD::matchUnaryPredicate(Op1, BuildSDIVPattern))
     return SDValue();
 
-  APInt FactorVal;
-  unsigned ShiftVal;
-  bool UseSRA = BuildSDIVPattern(C->getAPIntValue(), ShiftVal, FactorVal);
-  SDValue Shift = DAG.getConstant(ShiftVal, dl, ShVT);
-  SDValue Factor = DAG.getConstant(FactorVal, dl, VT);
+  SDValue Shift, Factor;
+  if (VT.isVector()) {
+    Shift = DAG.getBuildVector(ShVT, dl, Shifts);
+    Factor = DAG.getBuildVector(VT, dl, Factors);
+  } else {
+    Shift = Shifts[0];
+    Factor = Factors[0];
+  }
 
   SDValue Res = Op0;
 
@@ -3569,19 +3581,27 @@ SDValue TargetLowering::BuildUDIV(SDNode *N, SelectionDAG &DAG,
                                   SmallVectorImpl<SDNode *> &Created) const {
   SDLoc dl(N);
   EVT VT = N->getValueType(0);
+  EVT SVT = VT.getScalarType();
   EVT ShVT = getShiftAmountTy(VT, DAG.getDataLayout());
+  EVT ShSVT = ShVT.getScalarType();
+  unsigned EltBits = VT.getScalarSizeInBits();
 
   // Check to see if we can do this.
   // FIXME: We should be more aggressive here.
   if (!isTypeLegal(VT))
     return SDValue();
 
-  auto BuildUDIVPattern = [](const APInt &Divisor, unsigned &PreShift,
-                             APInt &Magic, unsigned &PostShift) {
+  bool UseNPQ = false;
+  SmallVector<SDValue, 16> PreShifts, PostShifts, MagicFactors, NPQFactors;
+
+  auto BuildUDIVPattern = [&](ConstantSDNode *C) {
+    if (C->isNullValue())
+      return false;
     // FIXME: We should use a narrower constant when the upper
     // bits are known to be zero.
+    APInt Divisor = C->getAPIntValue();
     APInt::mu magics = Divisor.magicu();
-    PreShift = PostShift = 0;
+    unsigned PreShift = 0, PostShift = 0;
 
     // If the divisor is even, we can avoid using the expensive fixup by
     // shifting the divided value upfront.
@@ -3592,65 +3612,47 @@ SDValue TargetLowering::BuildUDIV(SDNode *N, SelectionDAG &DAG,
       assert(magics.a == 0 && "Should use cheap fixup now");
     }
 
-    Magic = magics.m;
+    APInt Magic = magics.m;
 
+    unsigned SelNPQ;
     if (magics.a == 0 || Divisor.isOneValue()) {
       assert(magics.s < Divisor.getBitWidth() &&
              "We shouldn't generate an undefined shift!");
       PostShift = magics.s;
-      return false;
+      SelNPQ = false;
     } else {
       PostShift = magics.s - 1;
-      return true;
+      SelNPQ = true;
     }
+
+    PreShifts.push_back(DAG.getConstant(PreShift, dl, ShSVT));
+    MagicFactors.push_back(DAG.getConstant(Magic, dl, SVT));
+    NPQFactors.push_back(
+        DAG.getConstant(SelNPQ ? APInt::getOneBitSet(EltBits, EltBits - 1)
+                               : APInt::getNullValue(EltBits),
+                        dl, SVT));
+    PostShifts.push_back(DAG.getConstant(PostShift, dl, ShSVT));
+    UseNPQ |= SelNPQ;
+    return true;
   };
 
   SDValue N0 = N->getOperand(0);
   SDValue N1 = N->getOperand(1);
 
   // Collect the shifts/magic values from each element.
-  bool UseNPQ = false;
+  if (!ISD::matchUnaryPredicate(N1, BuildUDIVPattern))
+    return SDValue();
+
   SDValue PreShift, PostShift, MagicFactor, NPQFactor;
   if (VT.isVector()) {
-    EVT SVT = VT.getScalarType();
-    EVT ShSVT = ShVT.getScalarType();
-    unsigned EltBits = VT.getScalarSizeInBits();
-    unsigned NumElts = VT.getVectorNumElements();
-    SmallVector<SDValue, 16> PreShifts, PostShifts, MagicFactors, NPQFactors;
-    if (ISD::BUILD_VECTOR != N1.getOpcode())
-      return SDValue();
-    for (unsigned i = 0; i != NumElts; ++i) {
-      auto *C = dyn_cast<ConstantSDNode>(N1.getOperand(i));
-      if (!C || C->isNullValue() || C->getAPIntValue().getBitWidth() != EltBits)
-        return SDValue();
-      APInt MagicVal;
-      unsigned PreShiftVal, PostShiftVal;
-      bool SelNPQ = BuildUDIVPattern(C->getAPIntValue(), PreShiftVal, MagicVal,
-                                     PostShiftVal);
-      PreShifts.push_back(DAG.getConstant(PreShiftVal, dl, ShSVT));
-      MagicFactors.push_back(DAG.getConstant(MagicVal, dl, SVT));
-      NPQFactors.push_back(
-          DAG.getConstant(SelNPQ ? APInt::getOneBitSet(EltBits, EltBits - 1)
-                                 : APInt::getNullValue(EltBits),
-                          dl, SVT));
-      PostShifts.push_back(DAG.getConstant(PostShiftVal, dl, ShSVT));
-      UseNPQ |= SelNPQ;
-    }
     PreShift = DAG.getBuildVector(ShVT, dl, PreShifts);
     MagicFactor = DAG.getBuildVector(VT, dl, MagicFactors);
     NPQFactor = DAG.getBuildVector(VT, dl, NPQFactors);
     PostShift = DAG.getBuildVector(ShVT, dl, PostShifts);
   } else {
-    auto *C = dyn_cast<ConstantSDNode>(N1);
-    if (!C || C->isNullValue())
-      return SDValue();
-    APInt MagicVal;
-    unsigned PreShiftVal, PostShiftVal;
-    UseNPQ = BuildUDIVPattern(C->getAPIntValue(), PreShiftVal, MagicVal,
-                              PostShiftVal);
-    PreShift = DAG.getConstant(PreShiftVal, dl, ShVT);
-    MagicFactor = DAG.getConstant(MagicVal, dl, VT);
-    PostShift = DAG.getConstant(PostShiftVal, dl, ShVT);
+    PreShift = PreShifts[0];
+    MagicFactor = MagicFactors[0];
+    PostShift = PostShifts[0];
   }
 
   SDValue Q = N0;
