@@ -65,8 +65,7 @@ public:
     return getSubExpr()->findAssociatedFragment();
   }
 
-  // There are no TLS RISCVMCExprs at the moment.
-  void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override {}
+  void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override;
 
   bool evaluateAsConstant(int64_t &Res) const;
 
@@ -78,6 +77,7 @@ public:
 
   static VariantKind getVariantKindForName(StringRef name);
   static StringRef getVariantKindName(VariantKind Kind);
+
 };
 
 } // end namespace llvm.
