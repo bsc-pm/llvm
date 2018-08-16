@@ -1571,6 +1571,8 @@ protected:
     unsigned Keyword : 8;
   };
 
+  enum { NumTypeWithKeywordBits = 8 };
+
   class VectorTypeBitfields {
     friend class VectorType;
     friend class DependentVectorType;
@@ -1606,6 +1608,21 @@ protected:
     unsigned Keyword : 2;
   };
 
+  class SubstTemplateTypeParmPackTypeBitfields {
+    friend class SubstTemplateTypeParmPackType;
+
+    unsigned : NumTypeBits;
+
+    /// The number of template arguments in \c Arguments, which is
+    /// expected to be able to hold at least 1024 according to [implimits].
+    /// However as this limit is somewhat easy to hit with template
+    /// metaprogramming we'd prefer to keep it as large as possible.
+    /// At the moment it has been left as a non-bitfield since this type
+    /// safely fits in 64 bits as an unsigned, so there is no reason to
+    /// introduce the performance impact of a bitfield.
+    unsigned NumArgs;
+  };
+
   class TemplateSpecializationTypeBitfields {
     friend class TemplateSpecializationType;
 
@@ -1613,6 +1630,22 @@ protected:
 
     /// Whether this template specialization type is a substituted type alias.
     unsigned TypeAlias : 1;
+
+    /// The number of template arguments named in this class template
+    /// specialization, which is expected to be able to hold at least 1024
+    /// according to [implimits]. However, as this limit is somewhat easy to
+    /// hit with template metaprogramming we'd prefer to keep it as large
+    /// as possible. At the moment it has been left as a non-bitfield since
+    /// this type safely fits in 64 bits as an unsigned, so there is no reason
+    /// to introduce the performance impact of a bitfield.
+    unsigned NumArgs;
+  };
+
+  class DependentTemplateSpecializationTypeBitfields {
+    friend class DependentTemplateSpecializationType;
+
+    unsigned : NumTypeBits;
+    unsigned : NumTypeWithKeywordBits;
 
     /// The number of template arguments named in this class template
     /// specialization, which is expected to be able to hold at least 1024
@@ -1654,7 +1687,10 @@ protected:
     ReferenceTypeBitfields ReferenceTypeBits;
     TypeWithKeywordBitfields TypeWithKeywordBits;
     VectorTypeBitfields VectorTypeBits;
+    SubstTemplateTypeParmPackTypeBitfields SubstTemplateTypeParmPackTypeBits;
     TemplateSpecializationTypeBitfields TemplateSpecializationTypeBits;
+    DependentTemplateSpecializationTypeBitfields
+      DependentTemplateSpecializationTypeBits;
     PackExpansionTypeBitfields PackExpansionTypeBits;
 
     static_assert(sizeof(TypeBitfields) <= 8,
@@ -1677,8 +1713,14 @@ protected:
                   "TypeWithKeywordBitfields is larger than 8 bytes!");
     static_assert(sizeof(VectorTypeBitfields) <= 8,
                   "VectorTypeBitfields is larger than 8 bytes!");
+    static_assert(sizeof(SubstTemplateTypeParmPackTypeBitfields) <= 8,
+                  "SubstTemplateTypeParmPackTypeBitfields is larger"
+                  " than 8 bytes!");
     static_assert(sizeof(TemplateSpecializationTypeBitfields) <= 8,
                   "TemplateSpecializationTypeBitfields is larger"
+                  " than 8 bytes!");
+    static_assert(sizeof(DependentTemplateSpecializationTypeBitfields) <= 8,
+                  "DependentTemplateSpecializationTypeBitfields is larger"
                   " than 8 bytes!");
     static_assert(sizeof(PackExpansionTypeBitfields) <= 8,
                   "PackExpansionTypeBitfields is larger than 8 bytes");
@@ -4528,9 +4570,6 @@ class SubstTemplateTypeParmPackType : public Type, public llvm::FoldingSetNode {
   /// parameter pack is instantiated with.
   const TemplateArgument *Arguments;
 
-  /// The number of template arguments in \c Arguments.
-  unsigned NumArguments;
-
   SubstTemplateTypeParmPackType(const TemplateTypeParmType *Param,
                                 QualType Canon,
                                 const TemplateArgument &ArgPack);
@@ -4541,6 +4580,10 @@ public:
   /// Gets the template parameter that was substituted for.
   const TemplateTypeParmType *getReplacedParameter() const {
     return Replaced;
+  }
+
+  unsigned getNumArgs() const {
+    return SubstTemplateTypeParmPackTypeBits.NumArgs;
   }
 
   bool isSugared() const { return false; }
@@ -5123,10 +5166,6 @@ class alignas(8) DependentTemplateSpecializationType
   /// The identifier of the template.
   const IdentifierInfo *Name;
 
-  /// The number of template arguments named in this class template
-  /// specialization.
-  unsigned NumArgs;
-
   DependentTemplateSpecializationType(ElaboratedTypeKeyword Keyword,
                                       NestedNameSpecifier *NNS,
                                       const IdentifierInfo *Name,
@@ -5151,12 +5190,14 @@ public:
   }
 
   /// Retrieve the number of template arguments.
-  unsigned getNumArgs() const { return NumArgs; }
+  unsigned getNumArgs() const {
+    return DependentTemplateSpecializationTypeBits.NumArgs;
+  }
 
   const TemplateArgument &getArg(unsigned Idx) const; // in TemplateBase.h
 
   ArrayRef<TemplateArgument> template_arguments() const {
-    return {getArgs(), NumArgs};
+    return {getArgs(), getNumArgs()};
   }
 
   using iterator = const TemplateArgument *;
@@ -5168,7 +5209,7 @@ public:
   QualType desugar() const { return QualType(this, 0); }
 
   void Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context) {
-    Profile(ID, Context, getKeyword(), NNS, Name, {getArgs(), NumArgs});
+    Profile(ID, Context, getKeyword(), NNS, Name, {getArgs(), getNumArgs()});
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID,
