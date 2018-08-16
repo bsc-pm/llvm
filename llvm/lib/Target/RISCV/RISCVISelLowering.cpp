@@ -138,12 +138,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::BlockAddress, XLenVT, Custom);
   setOperationAction(ISD::ConstantPool, XLenVT, Custom);
 
-  if (Subtarget.hasStdExtA())
-  {
+  if (Subtarget.hasStdExtA()) {
     setMinAtomicSizeInBitsSupported(32);
     setMaxAtomicSizeInBitsSupported(Subtarget.getXLen());
-  }
-  else
+  } else
     setMaxAtomicSizeInBitsSupported(0);
 
   setBooleanContents(ZeroOrOneBooleanContent);
