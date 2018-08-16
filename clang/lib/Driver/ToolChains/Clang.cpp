@@ -3376,6 +3376,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-pic-is-pie");
   }
 
+  if (!PICLevel && Triple.getArch() == llvm::Triple::riscv64 &&
+      Triple.getOS() == llvm::Triple::Linux &&
+      Triple.getEnvironment() == llvm::Triple::GNU) {
+    // This is odd and seems to be a disagreement between GCC and LLVM
+    // when it comes to the TLS model use when -fno-PIC. For now fix it here.
+    // See EPI/llvm#12
+    CmdArgs.push_back("-ftls-model=local-exec");
+  }
+
   if (Arg *A = Args.getLastArg(options::OPT_meabi)) {
     CmdArgs.push_back("-meabi");
     CmdArgs.push_back(A->getValue());
