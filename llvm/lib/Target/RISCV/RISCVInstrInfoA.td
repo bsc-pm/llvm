@@ -128,6 +128,27 @@ defm : AtomicOp<"atomic_load_min_32", "AMOMIN_W">;
 defm : AtomicOp<"atomic_load_umax_32", "AMOMAXU_W">;
 defm : AtomicOp<"atomic_load_umin_32", "AMOMINU_W">;
 
+// We do not have an atomic_load_sub so use a pattern for it
+multiclass AtomicLoadSub<string inst, string op> {
+    // FIXME: The Pat itself can be factored out again.
+    def : Pat<(!cast<SDPatternOperator>(inst#"_monotonic") GPR:$rs1, GPR:$rs2),
+              (!cast<RVInst>(op) GPR:$rs1, (SUB X0, GPR:$rs2))>;
+
+    def : Pat<(!cast<SDPatternOperator>(inst#"_acquire") GPR:$rs1, GPR:$rs2),
+              (!cast<RVInst>(op # "_AQ") GPR:$rs1, (SUB X0, GPR:$rs2))>;
+
+    def : Pat<(!cast<SDPatternOperator>(inst#"_release") GPR:$rs1, GPR:$rs2),
+              (!cast<RVInst>(op # "_RL") GPR:$rs1, (SUB X0, GPR:$rs2))>;
+
+    def : Pat<(!cast<SDPatternOperator>(inst#"_acq_rel") GPR:$rs1, GPR:$rs2),
+              (!cast<RVInst>(op # "_AQ_RL") GPR:$rs1, (SUB X0, GPR:$rs2))>;
+
+    def : Pat<(!cast<SDPatternOperator>(inst#"_seq_cst") GPR:$rs1, GPR:$rs2),
+              (!cast<RVInst>(op # "_AQ_RL") GPR:$rs1, (SUB X0, GPR:$rs2))>;
+}
+
+defm : AtomicLoadSub<"atomic_load_sub_32", "AMOADD_W">;
+
 } // Predicates = [HasStdExtA]
 
 let Predicates = [HasStdExtA, IsRV64] in {
@@ -144,5 +165,7 @@ defm : AtomicOp<"atomic_load_max_64", "AMOMAX_D">;
 defm : AtomicOp<"atomic_load_min_64", "AMOMIN_D">;
 defm : AtomicOp<"atomic_load_umax_64", "AMOMAXU_D">;
 defm : AtomicOp<"atomic_load_umin_64", "AMOMINU_D">;
+
+defm : AtomicLoadSub<"atomic_load_sub_64", "AMOADD_D">;
 
 }

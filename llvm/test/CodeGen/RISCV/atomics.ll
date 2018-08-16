@@ -706,6 +706,86 @@ define i32 @atomicrmw_add_i32_seq_cst(i32 *%a, i32 %b) nounwind {
   ret i32 %1
 }
 
+define i32 @atomicrmw_sub_i32_monotonic(i32 *%a, i32 %b) nounwind {
+; RV32A-LABEL: atomicrmw_sub_i32_monotonic:
+; RV32A:       # %bb.0:
+; RV32A-NEXT:    neg a1, a1
+; RV32A-NEXT:    amoadd.w a0, a1, (a0)
+; RV32A-NEXT:    ret
+;
+; RV64A-LABEL: atomicrmw_sub_i32_monotonic:
+; RV64A:       # %bb.0:
+; RV64A-NEXT:    neg a1, a1
+; RV64A-NEXT:    amoadd.w a0, a1, (a0)
+; RV64A-NEXT:    ret
+  %1 = atomicrmw sub i32* %a, i32 %b monotonic
+  ret i32 %1
+}
+
+define i32 @atomicrmw_sub_i32_acquire(i32 *%a, i32 %b) nounwind {
+; RV32A-LABEL: atomicrmw_sub_i32_acquire:
+; RV32A:       # %bb.0:
+; RV32A-NEXT:    neg a1, a1
+; RV32A-NEXT:    amoadd.w.aq a0, a1, (a0)
+; RV32A-NEXT:    ret
+;
+; RV64A-LABEL: atomicrmw_sub_i32_acquire:
+; RV64A:       # %bb.0:
+; RV64A-NEXT:    neg a1, a1
+; RV64A-NEXT:    amoadd.w.aq a0, a1, (a0)
+; RV64A-NEXT:    ret
+  %1 = atomicrmw sub i32* %a, i32 %b acquire
+  ret i32 %1
+}
+
+define i32 @atomicrmw_sub_i32_release(i32 *%a, i32 %b) nounwind {
+; RV32A-LABEL: atomicrmw_sub_i32_release:
+; RV32A:       # %bb.0:
+; RV32A-NEXT:    neg a1, a1
+; RV32A-NEXT:    amoadd.w.rl a0, a1, (a0)
+; RV32A-NEXT:    ret
+;
+; RV64A-LABEL: atomicrmw_sub_i32_release:
+; RV64A:       # %bb.0:
+; RV64A-NEXT:    neg a1, a1
+; RV64A-NEXT:    amoadd.w.rl a0, a1, (a0)
+; RV64A-NEXT:    ret
+  %1 = atomicrmw sub i32* %a, i32 %b release
+  ret i32 %1
+}
+
+define i32 @atomicrmw_sub_i32_acq_rel(i32 *%a, i32 %b) nounwind {
+; RV32A-LABEL: atomicrmw_sub_i32_acq_rel:
+; RV32A:       # %bb.0:
+; RV32A-NEXT:    neg a1, a1
+; RV32A-NEXT:    amoadd.w.aqrl a0, a1, (a0)
+; RV32A-NEXT:    ret
+;
+; RV64A-LABEL: atomicrmw_sub_i32_acq_rel:
+; RV64A:       # %bb.0:
+; RV64A-NEXT:    neg a1, a1
+; RV64A-NEXT:    amoadd.w.aqrl a0, a1, (a0)
+; RV64A-NEXT:    ret
+  %1 = atomicrmw sub i32* %a, i32 %b acq_rel
+  ret i32 %1
+}
+
+define i32 @atomicrmw_sub_i32_seq_cst(i32 *%a, i32 %b) nounwind {
+; RV32A-LABEL: atomicrmw_sub_i32_seq_cst:
+; RV32A:       # %bb.0:
+; RV32A-NEXT:    neg a1, a1
+; RV32A-NEXT:    amoadd.w.aqrl a0, a1, (a0)
+; RV32A-NEXT:    ret
+;
+; RV64A-LABEL: atomicrmw_sub_i32_seq_cst:
+; RV64A:       # %bb.0:
+; RV64A-NEXT:    neg a1, a1
+; RV64A-NEXT:    amoadd.w.aqrl a0, a1, (a0)
+; RV64A-NEXT:    ret
+  %1 = atomicrmw sub i32* %a, i32 %b seq_cst
+  ret i32 %1
+}
+
 define i32 @atomicrmw_and_i32_monotonic(i32 *%a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_and_i32_monotonic:
 ; RV32A:       # %bb.0:
