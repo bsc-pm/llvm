@@ -456,28 +456,6 @@ SDValue RISCVTargetLowering::lowerConstantPool(SDValue Op,
   return MNLo;
 }
 
-SDValue RISCVTargetLowering::lowerExternalSymbol(SDValue Op,
-                                                 SelectionDAG &DAG) const {
-  SDLoc DL(Op);
-  EVT Ty = Op.getValueType();
-  ExternalSymbolSDNode *N = cast<ExternalSymbolSDNode>(Op);
-  const char *Sym = N->getSymbol();
-
-  // TODO: should also handle gp-relative loads.
-  if (isPositionIndependent()) {
-    return DAG.getNode(
-        RISCVISD::WRAPPER_PIC, DL, Ty,
-        DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_GOT));
-  }
-
-  SDValue GAHi = DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_HI);
-  SDValue GALo = DAG.getTargetExternalSymbol(Sym, Ty, RISCVII::MO_LO);
-  SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, GAHi), 0);
-  SDValue MNLo =
-      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, GALo), 0);
-  return MNLo;
-}
-
 SDValue RISCVTargetLowering::lowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   SDValue CondV = Op.getOperand(0);
   SDValue TrueV = Op.getOperand(1);
