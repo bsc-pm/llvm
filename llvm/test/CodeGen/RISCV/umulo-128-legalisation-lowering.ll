@@ -2,7 +2,7 @@
 ; RUN: llc < %s -mtriple=riscv32 -mattr=+m | FileCheck %s --check-prefixes=RISCV32
 ; RUN: llc < %s -mtriple=riscv64 -mattr=+m | FileCheck %s --check-prefixes=RISCV64
 
-define { i128, i8 } @muloti_test(i128 %l, i128 %r) unnamed_addr #0 {
+define { i128, i8 } @muloti_test(i128 %l, i128 %r) nounwind {
 ; RISCV32-LABEL: muloti_test:
 ; RISCV32:       # %bb.0: # %start
 ; RISCV32-NEXT:    addi sp, sp, -80
@@ -136,10 +136,10 @@ define { i128, i8 } @muloti_test(i128 %l, i128 %r) unnamed_addr #0 {
 ; RISCV64-NEXT:    mul a5, a2, a3
 ; RISCV64-NEXT:    add a6, a5, a6
 ; RISCV64-NEXT:    mul a5, a1, a3
-; RISCV64-NEXT:    sw a5, 0(a0)
+; RISCV64-NEXT:    sd a5, 0(a0)
 ; RISCV64-NEXT:    mulhu a7, a1, a3
 ; RISCV64-NEXT:    add a5, a7, a6
-; RISCV64-NEXT:    sw a5, 8(a0)
+; RISCV64-NEXT:    sd a5, 8(a0)
 ; RISCV64-NEXT:    sltu a6, a5, a7
 ; RISCV64-NEXT:    xor a5, a4, zero
 ; RISCV64-NEXT:    snez a7, a5
@@ -167,9 +167,4 @@ start:
   ret { i128, i8 } %5
 }
 
-; Function Attrs: nounwind readnone speculatable
-declare { i128, i1 } @llvm.umul.with.overflow.i128(i128, i128) #1
-
-attributes #0 = { nounwind readnone uwtable }
-attributes #1 = { nounwind readnone speculatable }
-attributes #2 = { nounwind }
+declare { i128, i1 } @llvm.umul.with.overflow.i128(i128, i128) nounwind
