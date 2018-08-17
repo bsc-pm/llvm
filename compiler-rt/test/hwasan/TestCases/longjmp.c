@@ -1,5 +1,5 @@
-// RUN: %clangxx_hwasan -O0 -DNEGATIVE %s -o %t && %run %t 2>&1
-// RUN: %clangxx_hwasan -O0 %s -o %t && not %run %t 2>&1 | FileCheck %s
+// RUN: %clang_hwasan -O0 -DNEGATIVE %s -o %t && %run %t 2>&1
+// RUN: %clang_hwasan -O0 %s -o %t && not %run %t 2>&1 | FileCheck %s
 
 // REQUIRES: stable-runtime
 
