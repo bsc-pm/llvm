@@ -443,6 +443,15 @@ SDValue RISCVTargetLowering::lowerConstantPool(SDValue Op,
                        DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset,
                                                  RISCVII::MO_PCREL));
   }
+
+  SDValue CPAHi =
+      DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_HI);
+  SDValue CPALo =
+      DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset, RISCVII::MO_LO);
+  SDValue MNHi = SDValue(DAG.getMachineNode(RISCV::LUI, DL, Ty, CPAHi), 0);
+  SDValue MNLo =
+      SDValue(DAG.getMachineNode(RISCV::ADDI, DL, Ty, MNHi, CPALo), 0);
+  return MNLo;
 }
 
 SDValue RISCVTargetLowering::lowerSELECT(SDValue Op, SelectionDAG &DAG) const {
