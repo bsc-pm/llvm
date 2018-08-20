@@ -1,4 +1,5 @@
 ; RUN: llc -O2 -filetype=obj -o - %s | llvm-dwarfdump -v - | FileCheck %s
+; XFAIL: riscv
 ;
 ; CHECK: .debug_info contents:
 ; CHECK: [[LABEL_ORIGIN:0x[0-9a-zA-Z]+]]:{{ *}}DW_TAG_label
