@@ -53,7 +53,13 @@ static MCRegisterInfo *createRISCVMCRegisterInfo(const Triple &TT) {
 
 static MCAsmInfo *createRISCVMCAsmInfo(const MCRegisterInfo &MRI,
                                        const Triple &TT) {
-  return new RISCVMCAsmInfo(TT);
+  MCAsmInfo *MAI = new RISCVMCAsmInfo(TT);
+
+  // Standard calling conventions leave the CFA at SP on entry.
+  unsigned Reg = MRI.getDwarfRegNum(RISCV::X2, true);
+  MCCFIInstruction Inst = MCCFIInstruction::createDefCfaRegister(nullptr, Reg);
+  MAI->addInitialFrameState(Inst);
+  return MAI;
 }
 
 static MCSubtargetInfo *createRISCVMCSubtargetInfo(const Triple &TT,

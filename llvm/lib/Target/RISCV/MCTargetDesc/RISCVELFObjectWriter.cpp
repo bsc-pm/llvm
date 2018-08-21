@@ -53,7 +53,7 @@ unsigned RISCVELFObjectWriter::getRelocType(MCContext &Ctx,
   default:
     llvm_unreachable("invalid fixup kind!");
   case FK_Data_4:
-    return ELF::R_RISCV_32;
+    return IsPCRel ? ELF::R_RISCV_32_PCREL : ELF::R_RISCV_32;
   case FK_Data_8:
     return ELF::R_RISCV_64;
   case FK_Data_Add_1:
