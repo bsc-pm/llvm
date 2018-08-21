@@ -23581,6 +23581,7 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
   SDValue R = Op.getOperand(0);
   SDValue Amt = Op.getOperand(1);
   unsigned Opc = Op.getOpcode();
+  unsigned EltSizeInBits = VT.getScalarSizeInBits();
   bool ConstantAmt = ISD::isBuildVectorOfConstantSDNodes(Amt.getNode());
 
   assert(VT.isVector() && "Custom lowering only for vector shifts!");
@@ -23669,18 +23670,21 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
 
     // Only perform this blend if we can perform it without loading a mask.
     if (ShuffleMask.size() == NumElts && Amt1 && Amt2 &&
-        isa<ConstantSDNode>(Amt1) && isa<ConstantSDNode>(Amt2) &&
         (VT != MVT::v16i16 ||
          is128BitLaneRepeatedShuffleMask(VT, ShuffleMask)) &&
         (VT == MVT::v4i32 || Subtarget.hasSSE41() || Opc != ISD::SHL ||
          canWidenShuffleElements(ShuffleMask))) {
-      SDValue Splat1 =
-          DAG.getConstant(cast<ConstantSDNode>(Amt1)->getAPIntValue(), dl, VT);
-      SDValue Shift1 = DAG.getNode(Op->getOpcode(), dl, VT, R, Splat1);
-      SDValue Splat2 =
-          DAG.getConstant(cast<ConstantSDNode>(Amt2)->getAPIntValue(), dl, VT);
-      SDValue Shift2 = DAG.getNode(Op->getOpcode(), dl, VT, R, Splat2);
-      return DAG.getVectorShuffle(VT, dl, Shift1, Shift2, ShuffleMask);
+      auto *Cst1 = dyn_cast<ConstantSDNode>(Amt1);
+      auto *Cst2 = dyn_cast<ConstantSDNode>(Amt2);
+      if (Cst1 && Cst2 && Cst1->getAPIntValue().ult(EltSizeInBits) &&
+          Cst2->getAPIntValue().ult(EltSizeInBits)) {
+        unsigned X86Opc = getTargetVShiftUniformOpcode(Opc, false);
+        SDValue Shift1 = getTargetVShiftByConstNode(X86Opc, dl, VT, R,
+                                                    Cst1->getZExtValue(), DAG);
+        SDValue Shift2 = getTargetVShiftByConstNode(X86Opc, dl, VT, R,
+                                                    Cst2->getZExtValue(), DAG);
+        return DAG.getVectorShuffle(VT, dl, Shift1, Shift2, ShuffleMask);
+      }
     }
   }
 
@@ -23697,7 +23701,7 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       ((Subtarget.hasSSE41() && VT == MVT::v8i16) ||
        DAG.isKnownNeverZero(Amt)) &&
       (VT == MVT::v8i16 || (VT == MVT::v16i16 && Subtarget.hasInt256()))) {
-    SDValue EltBits = DAG.getConstant(VT.getScalarSizeInBits(), dl, VT);
+    SDValue EltBits = DAG.getConstant(EltSizeInBits, dl, VT);
     SDValue RAmt = DAG.getNode(ISD::SUB, dl, VT, EltBits, Amt);
     if (SDValue Scale = convertShiftLeftToScale(RAmt, dl, Subtarget, DAG)) {
       SDValue Zero = DAG.getConstant(0, dl, VT);
@@ -23840,7 +23844,6 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       (VT == MVT::v32i8 && Subtarget.hasInt256() && !Subtarget.hasXOP()) ||
       (VT == MVT::v64i8 && Subtarget.hasBWI())) {
     MVT ExtVT = MVT::getVectorVT(MVT::i16, VT.getVectorNumElements() / 2);
-    unsigned ShiftOpcode = Opc;
 
     auto SignBitSelect = [&](MVT SelVT, SDValue Sel, SDValue V0, SDValue V1) {
       if (VT.is512BitVector()) {
@@ -23874,32 +23877,33 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
     // We can safely do this using i16 shifts as we're only interested in
     // the 3 lower bits of each byte.
     Amt = DAG.getBitcast(ExtVT, Amt);
-    Amt = DAG.getNode(ISD::SHL, dl, ExtVT, Amt, DAG.getConstant(5, dl, ExtVT));
+    Amt = getTargetVShiftByConstNode(X86ISD::VSHLI, dl, ExtVT, Amt, 5, DAG);
     Amt = DAG.getBitcast(VT, Amt);
 
     if (Opc == ISD::SHL || Opc == ISD::SRL) {
       // r = VSELECT(r, shift(r, 4), a);
-      SDValue M =
-          DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(4, dl, VT));
+      SDValue M = DAG.getNode(Opc, dl, VT, R, DAG.getConstant(4, dl, VT));
       R = SignBitSelect(VT, Amt, M, R);
 
       // a += a
       Amt = DAG.getNode(ISD::ADD, dl, VT, Amt, Amt);
 
       // r = VSELECT(r, shift(r, 2), a);
-      M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(2, dl, VT));
+      M = DAG.getNode(Opc, dl, VT, R, DAG.getConstant(2, dl, VT));
       R = SignBitSelect(VT, Amt, M, R);
 
       // a += a
       Amt = DAG.getNode(ISD::ADD, dl, VT, Amt, Amt);
 
       // return VSELECT(r, shift(r, 1), a);
-      M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(1, dl, VT));
+      M = DAG.getNode(Opc, dl, VT, R, DAG.getConstant(1, dl, VT));
       R = SignBitSelect(VT, Amt, M, R);
       return R;
     }
 
     if (Opc == ISD::SRA) {
+      unsigned X86Opc = getTargetVShiftUniformOpcode(Opc, false);
+
       // For SRA we need to unpack each byte to the higher byte of a i16 vector
       // so we can correctly sign extend. We don't care what happens to the
       // lower byte.
@@ -23913,10 +23917,8 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       RHi = DAG.getBitcast(ExtVT, RHi);
 
       // r = VSELECT(r, shift(r, 4), a);
-      SDValue MLo = DAG.getNode(ShiftOpcode, dl, ExtVT, RLo,
-                                DAG.getConstant(4, dl, ExtVT));
-      SDValue MHi = DAG.getNode(ShiftOpcode, dl, ExtVT, RHi,
-                                DAG.getConstant(4, dl, ExtVT));
+      SDValue MLo = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RLo, 4, DAG);
+      SDValue MHi = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RHi, 4, DAG);
       RLo = SignBitSelect(ExtVT, ALo, MLo, RLo);
       RHi = SignBitSelect(ExtVT, AHi, MHi, RHi);
 
@@ -23925,10 +23927,8 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       AHi = DAG.getNode(ISD::ADD, dl, ExtVT, AHi, AHi);
 
       // r = VSELECT(r, shift(r, 2), a);
-      MLo = DAG.getNode(ShiftOpcode, dl, ExtVT, RLo,
-                        DAG.getConstant(2, dl, ExtVT));
-      MHi = DAG.getNode(ShiftOpcode, dl, ExtVT, RHi,
-                        DAG.getConstant(2, dl, ExtVT));
+      MLo = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RLo, 2, DAG);
+      MHi = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RHi, 2, DAG);
       RLo = SignBitSelect(ExtVT, ALo, MLo, RLo);
       RHi = SignBitSelect(ExtVT, AHi, MHi, RHi);
 
@@ -23937,20 +23937,15 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       AHi = DAG.getNode(ISD::ADD, dl, ExtVT, AHi, AHi);
 
       // r = VSELECT(r, shift(r, 1), a);
-      MLo = DAG.getNode(ShiftOpcode, dl, ExtVT, RLo,
-                        DAG.getConstant(1, dl, ExtVT));
-      MHi = DAG.getNode(ShiftOpcode, dl, ExtVT, RHi,
-                        DAG.getConstant(1, dl, ExtVT));
+      MLo = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RLo, 1, DAG);
+      MHi = getTargetVShiftByConstNode(X86Opc, dl, ExtVT, RHi, 1, DAG);
       RLo = SignBitSelect(ExtVT, ALo, MLo, RLo);
       RHi = SignBitSelect(ExtVT, AHi, MHi, RHi);
 
       // Logical shift the result back to the lower byte, leaving a zero upper
-      // byte
-      // meaning that we can safely pack with PACKUSWB.
-      RLo =
-          DAG.getNode(ISD::SRL, dl, ExtVT, RLo, DAG.getConstant(8, dl, ExtVT));
-      RHi =
-          DAG.getNode(ISD::SRL, dl, ExtVT, RHi, DAG.getConstant(8, dl, ExtVT));
+      // byte meaning that we can safely pack with PACKUSWB.
+      RLo = getTargetVShiftByConstNode(X86ISD::VSRLI, dl, ExtVT, RLo, 8, DAG);
+      RHi = getTargetVShiftByConstNode(X86ISD::VSRLI, dl, ExtVT, RHi, 8, DAG);
       return DAG.getNode(X86ISD::PACKUS, dl, VT, RLo, RHi);
     }
   }
@@ -23968,13 +23963,13 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
     RHi = DAG.getBitcast(ExtVT, RHi);
     SDValue Lo = DAG.getNode(Opc, dl, ExtVT, RLo, ALo);
     SDValue Hi = DAG.getNode(Opc, dl, ExtVT, RHi, AHi);
-    Lo = DAG.getNode(ISD::SRL, dl, ExtVT, Lo, DAG.getConstant(16, dl, ExtVT));
-    Hi = DAG.getNode(ISD::SRL, dl, ExtVT, Hi, DAG.getConstant(16, dl, ExtVT));
+    Lo = getTargetVShiftByConstNode(X86ISD::VSRLI, dl, ExtVT, Lo, 16, DAG);
+    Hi = getTargetVShiftByConstNode(X86ISD::VSRLI, dl, ExtVT, Hi, 16, DAG);
     return DAG.getNode(X86ISD::PACKUS, dl, VT, Lo, Hi);
   }
 
   if (VT == MVT::v8i16) {
-    unsigned ShiftOpcode = Opc;
+    unsigned X86Opc = getTargetVShiftUniformOpcode(Opc, false);
 
     // If we have a constant shift amount, the non-SSE41 path is best as
     // avoiding bitcasts make it easier to constant fold and reduce to PBLENDW.
@@ -23995,7 +23990,7 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       // set all bits of the lanes to true and VSELECT uses that in
       // its OR(AND(V0,C),AND(V1,~C)) lowering.
       SDValue C =
-          DAG.getNode(ISD::SRA, dl, VT, Sel, DAG.getConstant(15, dl, VT));
+          getTargetVShiftByConstNode(X86ISD::VSRAI, dl, VT, Sel, 15, DAG);
       return DAG.getSelect(dl, VT, C, V0, V1);
     };
 
@@ -24005,35 +24000,35 @@ static SDValue LowerShift(SDValue Op, const X86Subtarget &Subtarget,
       // bytes for PBLENDVB.
       Amt = DAG.getNode(
           ISD::OR, dl, VT,
-          DAG.getNode(ISD::SHL, dl, VT, Amt, DAG.getConstant(4, dl, VT)),
-          DAG.getNode(ISD::SHL, dl, VT, Amt, DAG.getConstant(12, dl, VT)));
+          getTargetVShiftByConstNode(X86ISD::VSHLI, dl, VT, Amt, 4, DAG),
+          getTargetVShiftByConstNode(X86ISD::VSHLI, dl, VT, Amt, 12, DAG));
     } else {
-      Amt = DAG.getNode(ISD::SHL, dl, VT, Amt, DAG.getConstant(12, dl, VT));
+      Amt = getTargetVShiftByConstNode(X86ISD::VSHLI, dl, VT, Amt, 12, DAG);
     }
 
     // r = VSELECT(r, shift(r, 8), a);
-    SDValue M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(8, dl, VT));
+    SDValue M = getTargetVShiftByConstNode(X86Opc, dl, VT, R, 8, DAG);
     R = SignBitSelect(Amt, M, R);
 
     // a += a
     Amt = DAG.getNode(ISD::ADD, dl, VT, Amt, Amt);
 
     // r = VSELECT(r, shift(r, 4), a);
-    M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(4, dl, VT));
+    M = getTargetVShiftByConstNode(X86Opc, dl, VT, R, 4, DAG);
     R = SignBitSelect(Amt, M, R);
 
     // a += a
     Amt = DAG.getNode(ISD::ADD, dl, VT, Amt, Amt);
 
     // r = VSELECT(r, shift(r, 2), a);
-    M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(2, dl, VT));
+    M = getTargetVShiftByConstNode(X86Opc, dl, VT, R, 2, DAG);
     R = SignBitSelect(Amt, M, R);
 
     // a += a
     Amt = DAG.getNode(ISD::ADD, dl, VT, Amt, Amt);
 
     // return VSELECT(r, shift(r, 1), a);
-    M = DAG.getNode(ShiftOpcode, dl, VT, R, DAG.getConstant(1, dl, VT));
+    M = getTargetVShiftByConstNode(X86Opc, dl, VT, R, 1, DAG);
     R = SignBitSelect(Amt, M, R);
     return R;
   }
