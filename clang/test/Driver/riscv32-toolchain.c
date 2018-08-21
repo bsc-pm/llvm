@@ -48,6 +48,7 @@
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib32/ilp32"
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib32/ilp32"
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib32/ilp32"
+// C-RV32-LINUX-MULTI-ILP32: "-latomic"
 
 // RUN: %clang %s -### -no-canonical-prefixes -fuse-ld=ld \
 // RUN:   -target riscv32-linux-unknown-elf -march=rv32imafd -mabi=ilp32d \
@@ -63,6 +64,7 @@
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib32/ilp32d"
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib32/ilp32d"
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib32/ilp32d"
+// C-RV32-LINUX-MULTI-ILP32D: "-latomic"
 
 // RUN: %clang -target riscv32 %s -emit-llvm -S -o - | FileCheck %s
 
