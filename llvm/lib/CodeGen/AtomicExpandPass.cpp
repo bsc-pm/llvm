@@ -242,7 +242,14 @@ bool AtomicExpand::runOnFunction(Function &F) {
         continue;
       }
     } else if (CASI) {
-      if (!atomicSizeSupported(TLI, CASI)) {
+      // Support of CAS is ongoing upstream so this a stop-gap for now.
+      auto isRISCV = [&]() {
+        auto Triple = TM.getTargetTriple();
+        auto Arch = Triple.getArch();
+
+        return Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64;
+      };
+      if (!atomicSizeSupported(TLI, CASI) || isRISCV()) {
         expandAtomicCASToLibcall(CASI);
         MadeChange = true;
         continue;
