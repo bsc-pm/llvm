@@ -445,7 +445,11 @@ std::string Linux::computeSysRoot() const {
   if (!getDriver().SysRoot.empty())
     return getDriver().SysRoot;
 
-  if (getTriple().isAndroid()) {
+  auto Arch = getTriple().getArch();
+  bool IsRISCV = Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64;
+
+  // We will use the same strategy as Android for RISC-V
+  if (getTriple().isAndroid() || IsRISCV) {
     // Android toolchains typically include a sysroot at ../sysroot relative to
     // the clang binary.
     const StringRef ClangDir = getDriver().getInstalledDir();
