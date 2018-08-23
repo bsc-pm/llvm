@@ -4856,7 +4856,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   if (Args.hasFlag(options::OPT_faddrsig, options::OPT_fno_addrsig,
-                   getToolChain().getTriple().isOSBinFormatELF() &&
+                   (getToolChain().getTriple().isOSBinFormatELF() ||
+                    getToolChain().getTriple().isOSBinFormatCOFF()) &&
                        getToolChain().useIntegratedAs()))
     CmdArgs.push_back("-faddrsig");
 
