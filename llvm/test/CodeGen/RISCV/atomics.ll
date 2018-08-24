@@ -509,12 +509,12 @@ define void @atomic_store_i16_seq_cst(i16 *%a, i16 %b) nounwind {
 define void @atomic_store_i32_unordered(i32 *%a, i32 %b) nounwind {
 ; RV32A-LABEL: atomic_store_i32_unordered:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    sw a0, 0(a1)
+; RV32A-NEXT:    sw a1, 0(a0)
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: atomic_store_i32_unordered:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    sw a0, 0(a1)
+; RV64A-NEXT:    sw a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i32 %b, i32* %a unordered, align 4
   ret void
@@ -523,12 +523,12 @@ define void @atomic_store_i32_unordered(i32 *%a, i32 %b) nounwind {
 define void @atomic_store_i32_monotonic(i32 *%a, i32 %b) nounwind {
 ; RV32A-LABEL: atomic_store_i32_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    sw a0, 0(a1)
+; RV32A-NEXT:    sw a1, 0(a0)
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: atomic_store_i32_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    sw a0, 0(a1)
+; RV64A-NEXT:    sw a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i32 %b, i32* %a monotonic, align 4
   ret void
@@ -538,13 +538,13 @@ define void @atomic_store_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32A-LABEL: atomic_store_i32_release:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    fence rw, w
-; RV32A-NEXT:    sw a0, 0(a1)
+; RV32A-NEXT:    sw a1, 0(a0)
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: atomic_store_i32_release:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    fence rw, w
-; RV64A-NEXT:    sw a0, 0(a1)
+; RV64A-NEXT:    sw a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i32 %b, i32* %a release, align 4
   ret void
@@ -554,13 +554,13 @@ define void @atomic_store_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32A-LABEL: atomic_store_i32_seq_cst:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    fence rw, w
-; RV32A-NEXT:    sw a0, 0(a1)
+; RV32A-NEXT:    sw a1, 0(a0)
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: atomic_store_i32_seq_cst:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    fence rw, w
-; RV64A-NEXT:    sw a0, 0(a1)
+; RV64A-NEXT:    sw a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i32 %b, i32* %a seq_cst, align 4
   ret void

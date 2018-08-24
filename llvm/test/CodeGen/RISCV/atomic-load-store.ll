@@ -576,7 +576,7 @@ define void @atomic_store_i32_unordered(i32 *%a, i32 %b) nounwind {
 ;
 ; RV32IA-LABEL: atomic_store_i32_unordered:
 ; RV32IA:       # %bb.0:
-; RV32IA-NEXT:    sw a0, 0(a1)
+; RV32IA-NEXT:    sw a1, 0(a0)
 ; RV32IA-NEXT:    ret
   store atomic i32 %b, i32* %a unordered, align 4
   ret void
@@ -595,7 +595,7 @@ define void @atomic_store_i32_monotonic(i32 *%a, i32 %b) nounwind {
 ;
 ; RV32IA-LABEL: atomic_store_i32_monotonic:
 ; RV32IA:       # %bb.0:
-; RV32IA-NEXT:    sw a0, 0(a1)
+; RV32IA-NEXT:    sw a1, 0(a0)
 ; RV32IA-NEXT:    ret
   store atomic i32 %b, i32* %a monotonic, align 4
   ret void
@@ -615,7 +615,7 @@ define void @atomic_store_i32_release(i32 *%a, i32 %b) nounwind {
 ; RV32IA-LABEL: atomic_store_i32_release:
 ; RV32IA:       # %bb.0:
 ; RV32IA-NEXT:    fence rw, w
-; RV32IA-NEXT:    sw a0, 0(a1)
+; RV32IA-NEXT:    sw a1, 0(a0)
 ; RV32IA-NEXT:    ret
   store atomic i32 %b, i32* %a release, align 4
   ret void
@@ -635,7 +635,7 @@ define void @atomic_store_i32_seq_cst(i32 *%a, i32 %b) nounwind {
 ; RV32IA-LABEL: atomic_store_i32_seq_cst:
 ; RV32IA:       # %bb.0:
 ; RV32IA-NEXT:    fence rw, w
-; RV32IA-NEXT:    sw a0, 0(a1)
+; RV32IA-NEXT:    sw a1, 0(a0)
 ; RV32IA-NEXT:    ret
   store atomic i32 %b, i32* %a seq_cst, align 4
   ret void

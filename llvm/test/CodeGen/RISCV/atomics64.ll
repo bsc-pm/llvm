@@ -44,7 +44,7 @@ define i64 @atomic_load_i64_seq_cst(i64 *%a) nounwind {
 define void @atomic_store_i64_unordered(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_unordered:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    sd a0, 0(a1)
+; RV64A-NEXT:    sd a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i64 %b, i64* %a unordered, align 8
   ret void
@@ -53,7 +53,7 @@ define void @atomic_store_i64_unordered(i64 *%a, i64 %b) nounwind {
 define void @atomic_store_i64_monotonic(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    sd a0, 0(a1)
+; RV64A-NEXT:    sd a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i64 %b, i64* %a monotonic, align 8
   ret void
@@ -63,7 +63,7 @@ define void @atomic_store_i64_release(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_release:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    fence rw, w
-; RV64A-NEXT:    sd a0, 0(a1)
+; RV64A-NEXT:    sd a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i64 %b, i64* %a release, align 8
   ret void
@@ -73,7 +73,7 @@ define void @atomic_store_i64_seq_cst(i64 *%a, i64 %b) nounwind {
 ; RV64A-LABEL: atomic_store_i64_seq_cst:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    fence rw, w
-; RV64A-NEXT:    sd a0, 0(a1)
+; RV64A-NEXT:    sd a1, 0(a0)
 ; RV64A-NEXT:    ret
   store atomic i64 %b, i64* %a seq_cst, align 8
   ret void
