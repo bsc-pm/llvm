@@ -1,4 +1,5 @@
 // RUN: %libomp-compile-and-run
+// XFAIL: *
 #include <stdio.h>
 
 int main()
