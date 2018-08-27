@@ -15,7 +15,7 @@
 #ifndef LLVM_TOOLS_LLVM_MCA_RETIRE_CONTROL_UNIT_H
 #define LLVM_TOOLS_LLVM_MCA_RETIRE_CONTROL_UNIT_H
 
-#include "HardwareUnit.h"
+#include "HardwareUnits/HardwareUnit.h"
 #include "Instruction.h"
 #include "llvm/MC/MCSchedule.h"
 #include <vector>
@@ -64,7 +64,6 @@ private:
 public:
   RetireControlUnit(const llvm::MCSchedModel &SM);
 
-  bool isFull() const { return !AvailableSlots; }
   bool isEmpty() const { return AvailableSlots == Queue.size(); }
   bool isAvailable(unsigned Quantity = 1) const {
     // Some instructions may declare a number of uOps which exceeds the size
