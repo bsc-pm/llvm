@@ -40,6 +40,13 @@ RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
       return CSR_XLEN_F32_Interrupt_SaveList;
     return CSR_Interrupt_SaveList;
   }
+
+  const RISCVSubtarget &SubTarget = MF->getSubtarget<RISCVSubtarget>();
+  if (SubTarget.isHardFloatSingle())
+    return CSR_HardFloatSingle_SaveList;
+  else if (SubTarget.isHardFloatDouble())
+    return CSR_HardFloatDouble_SaveList;
+
   return CSR_SaveList;
 }
 
