@@ -13,7 +13,9 @@
 #include "DurationDivisionCheck.h"
 #include "FasterStrsplitDelimiterCheck.h"
 #include "NoNamespaceCheck.h"
+#include "RedundantStrcatCallsCheck.h"
 #include "StringFindStartswithCheck.h"
+#include "StrCatAppendCheck.h"
 
 namespace clang {
 namespace tidy {
@@ -27,8 +29,12 @@ public:
     CheckFactories.registerCheck<FasterStrsplitDelimiterCheck>(
         "abseil-faster-strsplit-delimiter");
     CheckFactories.registerCheck<NoNamespaceCheck>("abseil-no-namespace");
+    CheckFactories.registerCheck<RedundantStrcatCallsCheck>(
+        "abseil-redundant-strcat-calls");
     CheckFactories.registerCheck<StringFindStartswithCheck>(
         "abseil-string-find-startswith");
+    CheckFactories.registerCheck<StrCatAppendCheck>(
+        "abseil-str-cat-append");
   }
 };
 
