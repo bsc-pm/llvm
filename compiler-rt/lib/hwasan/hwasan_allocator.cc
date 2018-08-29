@@ -36,7 +36,7 @@ enum {
 
 struct Metadata {
   u64 state : 2;
-  u64 requested_size : 62;
+  u32 requested_size;  // Current use cases of hwasan do not expect sizes > 4G.
   u32 alloc_context_id;
   u32 free_context_id;
 };
@@ -155,7 +155,7 @@ static void *HwasanAllocate(StackTrace *stack, uptr size, uptr alignment,
   Metadata *meta =
       reinterpret_cast<Metadata *>(allocator.GetMetaData(allocated));
   meta->state = CHUNK_ALLOCATED;
-  meta->requested_size = size;
+  meta->requested_size = static_cast<u32>(size);
   meta->alloc_context_id = StackDepotPut(*stack);
   if (zeroise) {
     internal_memset(allocated, 0, size);
@@ -194,7 +194,8 @@ void HwasanDeallocate(StackTrace *stack, void *user_ptr) {
   uptr size = meta->requested_size;
   meta->state = CHUNK_FREE;
   meta->requested_size = 0;
-  meta->free_context_id = StackDepotPut(*stack);
+  u32 free_context_id = StackDepotPut(*stack);
+  meta->free_context_id = free_context_id;
   // This memory will not be reused by anyone else, so we are free to keep it
   // poisoned.
   HwasanThread *t = GetCurrentThread();
@@ -209,6 +210,9 @@ void HwasanDeallocate(StackTrace *stack, void *user_ptr) {
   if (t) {
     AllocatorCache *cache = GetAllocatorCache(&t->malloc_storage());
     allocator.Deallocate(cache, p);
+    if (auto *ha = t->heap_allocations())
+      ha->push({reinterpret_cast<uptr>(user_ptr), free_context_id,
+                static_cast<u32>(size)});
   } else {
     SpinMutexLock l(&fallback_mutex);
     AllocatorCache *cache = &fallback_allocator_cache;
@@ -224,33 +228,14 @@ void *HwasanReallocate(StackTrace *stack, void *user_old_p, uptr new_size,
   if (!PointerAndMemoryTagsMatch(user_old_p))
     ReportInvalidFree(stack, reinterpret_cast<uptr>(user_old_p));
 
-  void *old_p = GetAddressFromPointer(user_old_p);
-  Metadata *meta = reinterpret_cast<Metadata*>(allocator.GetMetaData(old_p));
-  uptr old_size = meta->requested_size;
-  uptr actually_allocated_size = allocator.GetActuallyAllocatedSize(old_p);
-  if (new_size <= actually_allocated_size) {
-    // We are not reallocating here.
-    // FIXME: update stack trace for the allocation?
-    meta->requested_size = new_size;
-    if (!atomic_load_relaxed(&hwasan_allocator_tagging_enabled))
-      return user_old_p;
-    if (flags()->retag_in_realloc) {
-      HwasanThread *t = GetCurrentThread();
-      return (void *)TagMemoryAligned(
-          (uptr)old_p, new_size,
-          t ? t->GenerateRandomTag() : kFallbackAllocTag);
-    }
-    if (new_size > old_size) {
-      tag_t tag = GetTagFromPointer(reinterpret_cast<uptr>(user_old_p));
-      TagMemoryAligned((uptr)old_p + old_size, new_size - old_size, tag);
-    }
-    return user_old_p;
-  }
-  uptr memcpy_size = Min(new_size, old_size);
   void *new_p = HwasanAllocate(stack, new_size, alignment, false /*zeroise*/);
-  if (new_p) {
-    internal_memcpy(new_p, old_p, memcpy_size);
-    HwasanDeallocate(stack, old_p);
+  if (user_old_p && new_p) {
+    void *untagged_ptr_old =  GetAddressFromPointer(user_old_p);
+    Metadata *meta =
+        reinterpret_cast<Metadata *>(allocator.GetMetaData(untagged_ptr_old));
+    internal_memcpy(GetAddressFromPointer(new_p), untagged_ptr_old,
+                    Min(new_size, static_cast<uptr>(meta->requested_size)));
+    HwasanDeallocate(stack, user_old_p);
   }
   return new_p;
 }
