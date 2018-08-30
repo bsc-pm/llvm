@@ -120,7 +120,8 @@ static void InitializeFlags() {
 #if HWASAN_CONTAINS_UBSAN
   ubsan_parser.ParseString(GetEnv("UBSAN_OPTIONS"));
 #endif
-  VPrintf(1, "HWASAN_OPTIONS: %s\n", hwasan_options ? hwasan_options : "<empty>");
+  VPrintf(1, "HWASAN_OPTIONS: %s\n",
+          hwasan_options ? hwasan_options : "<empty>");
 
   InitializeCommonFlags();
 
@@ -166,12 +167,6 @@ void __hwasan_shadow_init() {
   if (hwasan_shadow_inited) return;
   if (!InitShadow()) {
     Printf("FATAL: HWAddressSanitizer cannot mmap the shadow memory.\n");
-    if (HWASAN_FIXED_MAPPING) {
-      Printf("FATAL: Make sure to compile with -fPIE and to link with -pie.\n");
-      Printf("FATAL: Disabling ASLR is known to cause this error.\n");
-      Printf("FATAL: If running under GDB, try "
-             "'set disable-randomization off'.\n");
-    }
     DumpProcessMap();
     Die();
   }
@@ -228,13 +223,13 @@ void __hwasan_init() {
 }
 
 void __hwasan_print_shadow(const void *p, uptr sz) {
-  uptr ptr_raw = GetAddressFromPointer((uptr)p);
-  uptr shadow_first = MEM_TO_SHADOW(ptr_raw);
-  uptr shadow_last = MEM_TO_SHADOW(ptr_raw + sz - 1);
+  uptr ptr_raw = UntagAddr(reinterpret_cast<uptr>(p));
+  uptr shadow_first = MemToShadow(ptr_raw);
+  uptr shadow_last = MemToShadow(ptr_raw + sz - 1);
   Printf("HWASan shadow map for %zx .. %zx (pointer tag %x)\n", ptr_raw,
          ptr_raw + sz, GetTagFromPointer((uptr)p));
   for (uptr s = shadow_first; s <= shadow_last; ++s)
-    Printf("  %zx: %x\n", SHADOW_TO_MEM(s), *(tag_t *)s);
+    Printf("  %zx: %x\n", ShadowToMem(s), *(tag_t *)s);
 }
 
 sptr __hwasan_test_shadow(const void *p, uptr sz) {
@@ -243,12 +238,12 @@ sptr __hwasan_test_shadow(const void *p, uptr sz) {
   tag_t ptr_tag = GetTagFromPointer((uptr)p);
   if (ptr_tag == 0)
     return -1;
-  uptr ptr_raw = GetAddressFromPointer((uptr)p);
-  uptr shadow_first = MEM_TO_SHADOW(ptr_raw);
-  uptr shadow_last = MEM_TO_SHADOW(ptr_raw + sz - 1);
+  uptr ptr_raw = UntagAddr(reinterpret_cast<uptr>(p));
+  uptr shadow_first = MemToShadow(ptr_raw);
+  uptr shadow_last = MemToShadow(ptr_raw + sz - 1);
   for (uptr s = shadow_first; s <= shadow_last; ++s)
     if (*(tag_t*)s != ptr_tag)
-      return SHADOW_TO_MEM(s) - ptr_raw;
+      return ShadowToMem(s) - ptr_raw;
   return -1;
 }
 
@@ -304,7 +299,7 @@ template <ErrorAction EA, AccessType AT, unsigned LogSize>
 __attribute__((always_inline, nodebug)) static void CheckAddress(uptr p) {
   tag_t ptr_tag = GetTagFromPointer(p);
   uptr ptr_raw = p & ~kAddressTagMask;
-  tag_t mem_tag = *(tag_t *)MEM_TO_SHADOW(ptr_raw);
+  tag_t mem_tag = *(tag_t *)MemToShadow(ptr_raw);
   if (UNLIKELY(ptr_tag != mem_tag)) {
     SigTrap<0x20 * (EA == ErrorAction::Recover) +
            0x10 * (AT == AccessType::Store) + LogSize>(p);
@@ -318,8 +313,8 @@ __attribute__((always_inline, nodebug)) static void CheckAddressSized(uptr p,
   CHECK_NE(0, sz);
   tag_t ptr_tag = GetTagFromPointer(p);
   uptr ptr_raw = p & ~kAddressTagMask;
-  tag_t *shadow_first = (tag_t *)MEM_TO_SHADOW(ptr_raw);
-  tag_t *shadow_last = (tag_t *)MEM_TO_SHADOW(ptr_raw + sz - 1);
+  tag_t *shadow_first = (tag_t *)MemToShadow(ptr_raw);
+  tag_t *shadow_last = (tag_t *)MemToShadow(ptr_raw + sz - 1);
   for (tag_t *t = shadow_first; t <= shadow_last; ++t)
     if (UNLIKELY(ptr_tag != *t)) {
       SigTrap<0x20 * (EA == ErrorAction::Recover) +
