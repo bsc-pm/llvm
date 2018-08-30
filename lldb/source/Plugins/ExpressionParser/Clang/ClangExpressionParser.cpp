@@ -9,6 +9,7 @@
 
 // C Includes
 // C++ Includes
+#include <cctype> // for alnum
 // Other libraries and framework includes
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
@@ -558,11 +559,11 @@ namespace {
 /// of an incomplete `expr` invocation.
 //----------------------------------------------------------------------
 class CodeComplete : public CodeCompleteConsumer {
-  CodeCompletionTUInfo CCTUInfo;
+  CodeCompletionTUInfo m_info;
 
-  std::string expr;
-  unsigned position = 0;
-  StringList &matches;
+  std::string m_expr;
+  unsigned m_position = 0;
+  StringList &m_matches;
 
   /// Returns true if the given character can be used in an identifier.
   /// This also returns true for numbers because for completion we usually
@@ -639,8 +640,8 @@ public:
   ///
   CodeComplete(StringList &matches, std::string expr, unsigned position)
       : CodeCompleteConsumer(CodeCompleteOptions(), false),
-        CCTUInfo(std::make_shared<GlobalCodeCompletionAllocator>()), expr(expr),
-        position(position), matches(matches) {}
+        m_info(std::make_shared<GlobalCodeCompletionAllocator>()), m_expr(expr),
+        m_position(position), m_matches(matches) {}
 
   /// Deregisters and destroys this code-completion consumer.
   virtual ~CodeComplete() {}
@@ -705,7 +706,7 @@ public:
           else
             ToInsert += "(";
         }
-        // If we try to complete a namespace, then we directly can append
+        // If we try to complete a namespace, then we can directly append
         // the '::'.
         if (const NamespaceDecl *N = dyn_cast<NamespaceDecl>(D)) {
           if (!N->isAnonymousNamespace())
@@ -717,7 +718,6 @@ public:
         ToInsert = R.Keyword;
         break;
       case CodeCompletionResult::RK_Macro:
-        // It's not clear if we want to complete any macros in the
         ToInsert = R.Macro->getName().str();
         break;
       case CodeCompletionResult::RK_Pattern:
@@ -734,8 +734,8 @@ public:
         // Merge the suggested Token into the existing command line to comply
         // with the kind of result the lldb API expects.
         std::string CompletionSuggestion =
-            mergeCompletion(expr, position, ToInsert);
-        matches.AppendString(CompletionSuggestion);
+            mergeCompletion(m_expr, m_position, ToInsert);
+        m_matches.AppendString(CompletionSuggestion);
       }
     }
   }
@@ -756,10 +756,10 @@ public:
   }
 
   CodeCompletionAllocator &getAllocator() override {
-    return CCTUInfo.getAllocator();
+    return m_info.getAllocator();
   }
 
-  CodeCompletionTUInfo &getCodeCompletionTUInfo() override { return CCTUInfo; }
+  CodeCompletionTUInfo &getCodeCompletionTUInfo() override { return m_info; }
 };
 } // namespace
 
