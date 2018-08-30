@@ -50,18 +50,18 @@ DECLARE_REAL(void *, memcpy, void *dest, const void *src, uptr n)
 DECLARE_REAL(void *, memset, void *dest, int c, uptr n)
 
 bool IsInInterceptorScope() {
-  HwasanThread *t = GetCurrentThread();
+  Thread *t = GetCurrentThread();
   return t && t->InInterceptorScope();
 }
 
 struct InterceptorScope {
   InterceptorScope() {
-    HwasanThread *t = GetCurrentThread();
+    Thread *t = GetCurrentThread();
     if (t)
       t->EnterInterceptorScope();
   }
   ~InterceptorScope() {
-    HwasanThread *t = GetCurrentThread();
+    Thread *t = GetCurrentThread();
     if (t)
       t->LeaveInterceptorScope();
   }
@@ -294,13 +294,14 @@ extern "C" int pthread_attr_destroy(void *attr);
 
 static void *HwasanThreadStartFunc(void *arg) {
   __hwasan_thread_enter();
-  return ((HwasanThread *)arg)->ThreadStart();
+  return ((Thread *)arg)->ThreadStart();
 }
 
 INTERCEPTOR(int, pthread_create, void *th, void *attr, void *(*callback)(void*),
             void * param) {
   ENSURE_HWASAN_INITED(); // for GetTlsSize()
   __sanitizer_pthread_attr_t myattr;
+  ScopedTaggingDisabler disabler;
   if (!attr) {
     pthread_attr_init(&myattr);
     attr = &myattr;
@@ -308,9 +309,9 @@ INTERCEPTOR(int, pthread_create, void *th, void *attr, void *(*callback)(void*),
 
   AdjustStackSize(attr);
 
-  HwasanThread *t = HwasanThread::Create(callback, param);
-
-  int res = REAL(pthread_create)(th, attr, HwasanThreadStartFunc, t);
+  Thread *t = Thread::Create(callback, param);
+  int res = REAL(pthread_create)(UntagPtr(th), UntagPtr(attr),
+                                 HwasanThreadStartFunc, UntagPtr(t));
 
   if (attr == &myattr)
     pthread_attr_destroy(&myattr);
