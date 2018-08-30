@@ -455,6 +455,10 @@ ClangExpressionParser::ClangExpressionParser(ExecutionContextScope *exe_scope,
       false; // Debuggers get universal access
   m_compiler->getLangOpts().DollarIdents =
       true; // $ indicates a persistent variable name
+  // We enable all builtin functions beside the builtins from libc/libm (e.g.
+  // 'fopen'). Those libc functions are already correctly handled by LLDB, and
+  // additionally enabling them as expandable builtins is breaking Clang.
+  m_compiler->getLangOpts().NoBuiltin = true;
 
   // Set CodeGen options
   m_compiler->getCodeGenOpts().EmitDeclMetadata = true;
@@ -510,10 +514,6 @@ ClangExpressionParser::ClangExpressionParser(ExecutionContextScope *exe_scope,
 
   // 8. Most of this we get from the CompilerInstance, but we also want to give
   // the context an ExternalASTSource.
-  // We enable all builtin functions beside the builtins from libc/libm (e.g.
-  // 'fopen'). Those libc functions are already correctly handled by LLDB, and
-  // additionally enabling them as expandable builtins is breaking Clang.
-  m_compiler->getLangOpts().NoBuiltin = true;
 
   auto &PP = m_compiler->getPreprocessor();
   auto &builtin_context = PP.getBuiltinInfo();
@@ -563,7 +563,7 @@ class CodeComplete : public CodeCompleteConsumer {
 
   std::string m_expr;
   unsigned m_position = 0;
-  StringList &m_matches;
+  CompletionRequest &m_request;
 
   /// Returns true if the given character can be used in an identifier.
   /// This also returns true for numbers because for completion we usually
@@ -638,10 +638,10 @@ public:
   /// @param[out] position
   ///    The character position of the user cursor in the `expr` parameter.
   ///
-  CodeComplete(StringList &matches, std::string expr, unsigned position)
+  CodeComplete(CompletionRequest &request, std::string expr, unsigned position)
       : CodeCompleteConsumer(CodeCompleteOptions(), false),
         m_info(std::make_shared<GlobalCodeCompletionAllocator>()), m_expr(expr),
-        m_position(position), m_matches(matches) {}
+        m_position(position), m_request(request) {}
 
   /// Deregisters and destroys this code-completion consumer.
   virtual ~CodeComplete() {}
@@ -735,7 +735,7 @@ public:
         // with the kind of result the lldb API expects.
         std::string CompletionSuggestion =
             mergeCompletion(m_expr, m_position, ToInsert);
-        m_matches.AppendString(CompletionSuggestion);
+        m_request.AddCompletion(CompletionSuggestion);
       }
     }
   }
@@ -763,7 +763,7 @@ public:
 };
 } // namespace
 
-bool ClangExpressionParser::Complete(StringList &matches, unsigned line,
+bool ClangExpressionParser::Complete(CompletionRequest &request, unsigned line,
                                      unsigned pos, unsigned typed_pos) {
   DiagnosticManager mgr;
   // We need the raw user expression here because that's what the CodeComplete
@@ -773,7 +773,7 @@ bool ClangExpressionParser::Complete(StringList &matches, unsigned line,
   // the LLVMUserExpression which exposes the right API. This should never fail
   // as we always have a ClangUserExpression whenever we call this.
   LLVMUserExpression &llvm_expr = *static_cast<LLVMUserExpression *>(&m_expr);
-  CodeComplete CC(matches, llvm_expr.GetUserText(), typed_pos);
+  CodeComplete CC(request, llvm_expr.GetUserText(), typed_pos);
   // We don't need a code generator for parsing.
   m_code_generator.reset();
   // Start parsing the expression with our custom code completion consumer.
