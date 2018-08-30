@@ -39,7 +39,7 @@ static void UnmapFromTo(uptr from, uptr to) {
 // shadow_size_bytes bytes on the right of it are mapped r/o.
 static uptr MapDynamicShadow(uptr shadow_size_bytes) {
   const uptr granularity = GetMmapGranularity();
-  const uptr alignment = granularity * SHADOW_GRANULARITY;
+  const uptr alignment = granularity << kShadowScale;
   const uptr left_padding = granularity;
   const uptr shadow_size =
       RoundUpTo(shadow_size_bytes, granularity);
@@ -57,8 +57,6 @@ static uptr MapDynamicShadow(uptr shadow_size_bytes) {
 }
 
 }  // namespace __hwasan
-
-#if HWASAN_PREMAP_SHADOW
 
 extern "C" {
 
@@ -117,15 +115,11 @@ void __hwasan_shadow();
 
 }  // extern "C"
 
-#endif  // HWASAN_PREMAP_SHADOW
-
 namespace __hwasan {
 
 uptr FindDynamicShadowStart(uptr shadow_size_bytes) {
-#if HWASAN_PREMAP_SHADOW
   if (IsPremapShadowAvailable())
     return FindPremappedShadowStart(shadow_size_bytes);
-#endif
   return MapDynamicShadow(shadow_size_bytes);
 }
 
