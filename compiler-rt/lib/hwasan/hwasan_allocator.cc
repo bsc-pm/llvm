@@ -28,24 +28,15 @@
 
 namespace __hwasan {
 
-enum {
-  CHUNK_INVALID = 0,
-  CHUNK_FREE = 1,
-  CHUNK_ALLOCATED = 2
-};
-
 struct Metadata {
-  u64 state : 2;
-  u64 requested_size : 31;  // sizes are < 4G.
-  u32 alloc_context_id : 31;
+  u32 requested_size;  // sizes are < 4G.
+  u32 alloc_context_id;
 };
 
-bool HwasanChunkView::IsValid() const {
-  return metadata_ && metadata_->state != CHUNK_INVALID;
-}
 bool HwasanChunkView::IsAllocated() const {
-  return metadata_ && metadata_->state == CHUNK_ALLOCATED;
+  return metadata_ && metadata_->alloc_context_id && metadata_->requested_size;
 }
+
 uptr HwasanChunkView::Beg() const {
   return block_;
 }
@@ -119,10 +110,11 @@ void HwasanThreadLocalMallocStorage::CommitBack() {
   allocator.SwallowCache(GetAllocatorCache(this));
 }
 
-static void *HwasanAllocate(StackTrace *stack, uptr size, uptr alignment,
-                          bool zeroise) {
+static void *HwasanAllocate(StackTrace *stack, uptr orig_size, uptr alignment,
+                            bool zeroise) {
+  if (!orig_size) return nullptr;
   alignment = Max(alignment, kShadowAlignment);
-  size = RoundUpTo(size, kShadowAlignment);
+  uptr size = RoundUpTo(orig_size, kShadowAlignment);
 
   if (size > kMaxAllowedMallocSize) {
     if (AllocatorMayReturnNull()) {
@@ -150,8 +142,7 @@ static void *HwasanAllocate(StackTrace *stack, uptr size, uptr alignment,
   }
   Metadata *meta =
       reinterpret_cast<Metadata *>(allocator.GetMetaData(allocated));
-  meta->state = CHUNK_ALLOCATED;
-  meta->requested_size = static_cast<u32>(size);
+  meta->requested_size = static_cast<u32>(orig_size);
   meta->alloc_context_id = StackDepotPut(*stack);
   if (zeroise) {
     internal_memset(allocated, 0, size);
@@ -190,10 +181,10 @@ void HwasanDeallocate(StackTrace *stack, void *tagged_ptr) {
   Metadata *meta =
       reinterpret_cast<Metadata *>(allocator.GetMetaData(untagged_ptr));
   uptr size = meta->requested_size;
-  meta->state = CHUNK_FREE;
-  meta->requested_size = 0;
   u32 free_context_id = StackDepotPut(*stack);
   u32 alloc_context_id = meta->alloc_context_id;
+  meta->requested_size = 0;
+  meta->alloc_context_id = 0;
   // This memory will not be reused by anyone else, so we are free to keep it
   // poisoned.
   Thread *t = GetCurrentThread();
@@ -203,7 +194,7 @@ void HwasanDeallocate(StackTrace *stack, void *tagged_ptr) {
   }
   if (flags()->tag_in_free &&
       atomic_load_relaxed(&hwasan_allocator_tagging_enabled))
-    TagMemoryAligned((uptr)untagged_ptr, size,
+    TagMemoryAligned((uptr)untagged_ptr, RoundUpTo(size, kShadowAlignment),
                      t ? t->GenerateRandomTag() : kFallbackFreeTag);
   if (t) {
     AllocatorCache *cache = GetAllocatorCache(&t->malloc_storage());
