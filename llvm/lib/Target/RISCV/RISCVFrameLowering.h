@@ -54,6 +54,9 @@ private:
   void adjustReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                  const DebugLoc &DL, unsigned DestReg, unsigned SrcReg,
                  int64_t Val, MachineInstr::MIFlag Flag) const;
+  void alignSP(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
+               const DebugLoc &DL, int64_t Alignment) const;
+
 };
 }
 #endif

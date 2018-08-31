@@ -53,6 +53,8 @@ struct RISCVRegisterInfo : public RISCVGenRegisterInfo {
   bool trackLivenessAfterRegAlloc(const MachineFunction &) const override {
     return true;
   }
+
+  bool hasBasePointer(const MachineFunction &MF) const;
 };
 }
 

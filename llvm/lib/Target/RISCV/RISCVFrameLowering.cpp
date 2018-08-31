@@ -26,6 +26,11 @@ using namespace llvm;
 bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
+  // We use a FP when any of the following is true:
+  // - we are told to have one
+  // - the stack needs realignment (due to overaligned local objects)
+  // - the stack has VLAs
+  // - the function uses @llvm.frameaddress
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   return MF.getTarget().Options.DisableFramePointerElim(MF) ||
          RegInfo->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
@@ -108,8 +113,43 @@ void RISCVFrameLowering::adjustReg(MachineBasicBlock &MBB,
 // Returns the register used to hold the frame pointer.
 static unsigned getFPReg(const RISCVSubtarget &STI) { return RISCV::X8; }
 
+// Returns the register used to hold the base pointer.
+static unsigned getBPReg(const RISCVSubtarget &STI) { return RISCV::X9; }
+
 // Returns the register used to hold the stack pointer.
 static unsigned getSPReg(const RISCVSubtarget &STI) { return RISCV::X2; }
+
+void RISCVFrameLowering::alignSP(MachineBasicBlock &MBB,
+                                 MachineBasicBlock::iterator MBBI,
+                                 const DebugLoc &DL, int64_t Alignment) const {
+  assert(isPowerOf2_64(Alignment) && "Alignment must be a power of 2");
+
+  const RISCVInstrInfo *TII = STI.getInstrInfo();
+
+  if (isInt<12>(Alignment)) {
+    //  ANDI SP, SP, -Alignment
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::ANDI), getSPReg(STI))
+        .addReg(getSPReg(STI))
+        .addImm(-Alignment)
+        .setMIFlag(MachineInstr::FrameSetup);
+  } else if (isInt<32>(Alignment)) {
+    // Use shifts to avoid using a virtual register
+    // SRLI SP, SP, Log2(Alignment)
+    // SLLI SP, SP, Log2(Alignment)
+    uint64_t Log2Alignment = Log2_64(Alignment);
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::SRLI), getSPReg(STI))
+        .addReg(getSPReg(STI))
+        .addImm(Log2Alignment)
+        .setMIFlag(MachineInstr::FrameSetup);
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::SLLI), getSPReg(STI))
+        .addReg(getSPReg(STI))
+        .addImm(Log2Alignment)
+        .setMIFlag(MachineInstr::FrameSetup);
+  } else {
+    report_fatal_error(
+        "adjustReg cannot yet handle stack realignment >32 bits");
+  }
+}
 
 void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
                                       MachineBasicBlock &MBB) const {
@@ -119,9 +159,13 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   const RISCVInstrInfo *TII = STI.getInstrInfo();
+  const RISCVRegisterInfo *RegInfo =
+      MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
+  bool NeedsStackRealignment = RegInfo->needsStackRealignment(MF);
 
   unsigned FPReg = getFPReg(STI);
   unsigned SPReg = getSPReg(STI);
+  unsigned BPReg = getBPReg(STI);
 
   // Debug location must be unknown since the first debug location is used
   // to determine the end of the prologue.
@@ -151,23 +195,47 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   std::advance(MBBI, CSI.size());
 
   // Generate new FP.
+  // This does
+  //   ADDI FP, SP, bytes_of_CSRs
   if (hasFP(MF))
     adjustReg(MBB, MBBI, DL, FPReg, SPReg,
-              StackSize - RVFI->getVarArgsSaveSize(), MachineInstr::FrameSetup);
+        StackSize - RVFI->getVarArgsSaveSize(),
+        MachineInstr::FrameSetup);
 
   // Emit CFI records:
   const MCRegisterInfo *MRI = MF.getMMI().getContext().getRegisterInfo();
-  // .cfi_def_cfa_offset -StackSize
-  unsigned CFIIndex = MF.addFrameInst(
-      MCCFIInstruction::createDefCfaOffset(nullptr, -StackSize));
-  BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-      .addCFIIndex(CFIIndex)
-      .setMIFlags(MachineInstr::FrameSetup);
-  // .cfi_def_cfa_register DwarfRegNum
+
+  if (NeedsStackRealignment) {
+    // Realign the stack now.
+    alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
+
+    assert(hasFP(MF) && "we need an FP to properly realign the stack");
+
+    // .cfi_def_cfa FP, 0
+    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
+        nullptr, MRI->getDwarfRegNum(FPReg, true), 0));
+    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+        .addCFIIndex(CFIIndex)
+        .setMIFlags(MachineInstr::FrameSetup);
+
+    if (RegInfo->hasBasePointer(MF)) {
+      // Set BP to be the current SP
+      adjustReg(MBB, MBBI, DL, BPReg, SPReg, 0, MachineInstr::FrameSetup);
+    }
+  } else {
+    // .cfi_def_cfa_offset -StackSize
+    unsigned CFIIndex = MF.addFrameInst(
+        MCCFIInstruction::createDefCfaOffset(nullptr, -StackSize));
+    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+        .addCFIIndex(CFIIndex)
+        .setMIFlags(MachineInstr::FrameSetup);
+  }
+
+  // .cfi_offset DwarfRegNum, offset_of_CSI
   for (const auto &Entry : CSI) {
     unsigned Reg = Entry.getReg();
     int FI = Entry.getFrameIdx();
-    CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
+    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
         nullptr, MRI->getDwarfRegNum(Reg, true), MFI.getObjectOffset(FI)));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
         .addCFIIndex(CFIIndex)
@@ -210,12 +278,14 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
                                                int FI,
                                                unsigned &FrameReg) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
-  const TargetRegisterInfo *RI = MF.getSubtarget().getRegisterInfo();
+  const RISCVRegisterInfo *RI =
+      MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
   const auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
 
-  // Callee-saved registers should be referenced relative to the stack
-  // pointer (positive offset), otherwise use the frame pointer (negative
-  // offset).
+  // Callee-saved registers should be referenced relative to the stack pointer
+  // (positive offset), otherwise use the frame pointer (negative offset)
+  // unless the offset from FP is not known at constant time, as it happens
+  // when we have to align the stack or we have variably sized data.
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   int MinCSFI = 0;
   int MaxCSFI = -1;
@@ -227,16 +297,21 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
     MinCSFI = CSI[0].getFrameIdx();
     MaxCSFI = CSI[CSI.size() - 1].getFrameIdx();
   }
+  bool IsCSR = FI >= MinCSFI && FI <= MaxCSFI;
+  bool isFixed = !IsCSR && MFI.isFixedObjectIndex(FI);
 
-  if (FI >= MinCSFI && FI <= MaxCSFI) {
-    FrameReg = RISCV::X2;
+  if (IsCSR) {
+    FrameReg = getSPReg(STI);
     Offset += MF.getFrameInfo().getStackSize();
   } else {
-    FrameReg = RI->getFrameRegister(MF);
-    if (hasFP(MF))
+    if (hasFP(MF) && (isFixed || (!RI->needsStackRealignment(MF) &&
+                                  !MFI.isVariableSizedObjectIndex(FI)))) {
+      FrameReg = getFPReg(STI);
       Offset += RVFI->getVarArgsSaveSize();
-    else
+    } else {
+      FrameReg = RI->hasBasePointer(MF) ? getBPReg(STI) : getSPReg(STI);
       Offset += MF.getFrameInfo().getStackSize();
+    }
   }
   return Offset;
 }
@@ -245,11 +320,16 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
                                               BitVector &SavedRegs,
                                               RegScavenger *RS) const {
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
+  const RISCVRegisterInfo *RI =
+      MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
   // Unconditionally spill RA and FP only if the function uses a frame
   // pointer.
   if (hasFP(MF)) {
     SavedRegs.set(RISCV::X1);
-    SavedRegs.set(RISCV::X8);
+    SavedRegs.set(getFPReg(STI));
+  }
+  if (RI->hasBasePointer(MF)) {
+    SavedRegs.set(getBPReg(STI));
   }
 
   // If interrupt is enabled and there are calls in the handler,

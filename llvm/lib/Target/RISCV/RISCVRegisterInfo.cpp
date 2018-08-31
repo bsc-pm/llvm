@@ -60,6 +60,8 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   markSuperRegs(Reserved, RISCV::X3); // gp
   markSuperRegs(Reserved, RISCV::X4); // tp
   markSuperRegs(Reserved, RISCV::X8); // fp
+  if (hasBasePointer(MF))
+    markSuperRegs(Reserved, RISCV::X9); // bp
   assert(checkAllSuperRegsMarked(Reserved));
   return Reserved;
 }
@@ -143,4 +145,13 @@ RISCVRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
     llvm_unreachable("Unhandled ABI");
 
   return CSR_RegMask;
+}
+
+bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
+  // We use a BP when all of the following are true:
+  // - the stack needs realignment (due to overaligned local objects)
+  // - the stack has VLAs
+  // Note that when we need a BP the conditions also imply a FP.
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
+  return needsStackRealignment(MF) && MFI.hasVarSizedObjects();
 }
