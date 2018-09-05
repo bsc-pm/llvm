@@ -1046,6 +1046,9 @@ def err_objc_property_attr_mutually_exclusive : Error<
   "property attributes '%0' and '%1' are mutually exclusive">;
 def err_objc_property_requires_object : Error<
   "property with '%0' attribute must be of object type">;
+def warn_objc_property_assign_on_object : Warning<
+  "'assign' property of object type may become a dangling reference; consider using 'unsafe_unretained'">,
+  InGroup<ObjCPropertyAssignOnObjectType>, DefaultIgnore;
 def warn_objc_property_no_assignment_attribute : Warning<
   "no 'assign', 'retain', or 'copy' attribute is specified - "
   "'assign' is assumed">,
@@ -2609,6 +2612,8 @@ def err_arg_with_address_space : Error<
   "parameter may not be qualified with an address space">;
 def err_field_with_address_space : Error<
   "field may not be qualified with an address space">;
+def err_compound_literal_with_address_space : Error<
+  "compound literal in function scope may not be qualified with an address space">;
 def err_attr_objc_ownership_redundant : Error<
   "the type %0 is already explicitly ownership-qualified">;
 def err_invalid_nsnumber_type : Error<
