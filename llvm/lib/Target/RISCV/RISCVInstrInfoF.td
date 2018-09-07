@@ -37,7 +37,7 @@ def FRMArg : AsmOperandClass {
 def frmarg : Operand<XLenVT> {
   let ParserMatchClass = FRMArg;
   let PrintMethod = "printFRMArg";
-  let DecoderMethod = "decodeUImmOperand<3>";
+  let DecoderMethod = "decodeFRMArg";
 }
 
 //===----------------------------------------------------------------------===//
