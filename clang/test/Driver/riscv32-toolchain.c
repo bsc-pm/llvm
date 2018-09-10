@@ -21,7 +21,8 @@
 
 // RUN: %clang %s -### -no-canonical-prefixes \
 // RUN:   -target riscv32-unknown-elf \
-// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree 2>&1 \
+// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree \
+// RUN:   --sysroot= 2>&1 \
 // RUN:   | FileCheck -check-prefix=C-RV32-BAREMETAL-NOSYSROOT-ILP32 %s
 
 // C-RV32-BAREMETAL-NOSYSROOT-ILP32: "-fuse-init-array"
@@ -52,7 +53,8 @@
 
 // RUN: %clangxx %s -### -no-canonical-prefixes \
 // RUN:   -target riscv32-unknown-elf -stdlib=libstdc++ \
-// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree 2>&1 \
+// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree \
+// RUN:   --sysroot= 2>&1 \
 // RUN:   | FileCheck -check-prefix=CXX-RV32-BAREMETAL-NOSYSROOT-ILP32 %s
 
 // CXX-RV32-BAREMETAL-NOSYSROOT-ILP32: "-fuse-init-array"
