@@ -14,6 +14,7 @@
 
 #include "RISCV.h"
 #include "RISCVMCExpr.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCStreamer.h"
