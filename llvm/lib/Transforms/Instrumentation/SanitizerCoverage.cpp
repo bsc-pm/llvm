@@ -219,11 +219,6 @@ private:
                    MDNode::get(*C, None));
   }
 
-  std::string UniqueSuffix() {
-    static size_t Count = 0;
-    return "_sancov" + std::to_string(Count++);
-  }
-
   std::string getSectionName(const std::string &Section) const;
   std::string getSectionStart(const std::string &Section) const;
   std::string getSectionEnd(const std::string &Section) const;
@@ -578,13 +573,13 @@ GlobalVariable *SanitizerCoverageModule::CreateFunctionLocalArrayInSection(
       Constant::getNullValue(ArrayTy), "__sancov_gen_");
   if (auto Comdat = F.getComdat()) {
     Array->setComdat(Comdat);
-  } else {
+  } else if (TargetTriple.isOSBinFormatELF()) {
     // TODO: Refactor into a helper function and use it in ASan.
     assert(F.hasName());
     std::string Name = F.getName();
     if (F.hasLocalLinkage()) {
       std::string ModuleId = getUniqueModuleId(CurModule);
-      Name += ModuleId.empty() ? UniqueSuffix() : ModuleId;
+      Name += ModuleId.empty() ? CurModule->getModuleIdentifier() : ModuleId;
     }
     Comdat = CurModule->getOrInsertComdat(Name);
     // Make this IMAGE_COMDAT_SELECT_NODUPLICATES on COFF. Also upgrade private
