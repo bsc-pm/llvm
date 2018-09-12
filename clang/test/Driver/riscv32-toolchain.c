@@ -21,8 +21,8 @@
 
 // RUN: %clang %s -### -no-canonical-prefixes \
 // RUN:   -target riscv32-unknown-elf \
-// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree \
-// RUN:   --sysroot= 2>&1 \
+// RUN:   --sysroot= \
+// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree 2>&1 \
 // RUN:   | FileCheck -check-prefix=C-RV32-BAREMETAL-NOSYSROOT-ILP32 %s
 
 // C-RV32-BAREMETAL-NOSYSROOT-ILP32: "-fuse-init-array"
@@ -53,8 +53,8 @@
 
 // RUN: %clangxx %s -### -no-canonical-prefixes \
 // RUN:   -target riscv32-unknown-elf -stdlib=libstdc++ \
-// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree \
-// RUN:   --sysroot= 2>&1 \
+// RUN:   --sysroot= \
+// RUN:   --gcc-toolchain=%S/Inputs/basic_riscv32_tree 2>&1 \
 // RUN:   | FileCheck -check-prefix=CXX-RV32-BAREMETAL-NOSYSROOT-ILP32 %s
 
 // CXX-RV32-BAREMETAL-NOSYSROOT-ILP32: "-fuse-init-array"
@@ -82,7 +82,6 @@
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib32/ilp32"
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib32/ilp32"
 // C-RV32-LINUX-MULTI-ILP32: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib32/ilp32"
-// C-RV32-LINUX-MULTI-ILP32: "-latomic"
 
 // RUN: %clang %s -### -no-canonical-prefixes -fuse-ld=ld \
 // RUN:   -target riscv32-linux-unknown-elf -march=rv32imafd -mabi=ilp32d \
@@ -99,7 +98,6 @@
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib32/ilp32d"
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib32/ilp32d"
 // C-RV32-LINUX-MULTI-ILP32D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib32/ilp32d"
-// C-RV32-LINUX-MULTI-ILP32D: "-latomic"
 
 // RUN: %clang -target riscv32 %s -emit-llvm -S -o - | FileCheck %s
 
@@ -143,7 +141,7 @@ int align_vl = __alignof(va_list);
 
 // Check types
 
-// CHECK: define dso_local zeroext i8 @check_char()
+// CHECK: zeroext i8 @check_char()
 char check_char() { return 0; }
 
 // CHECK: define dso_local signext i16 @check_short()
