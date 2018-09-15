@@ -133,6 +133,54 @@
     # CHECK: i32x4.mul # encoding: [0xfd,0x22]
     i32x4.mul
 
+    # CHECK: i8x16.neg # encoding: [0xfd,0x23]
+    i8x16.neg
+
+    # CHECK: i16x8.neg # encoding: [0xfd,0x24]
+    i16x8.neg
+
+    # CHECK: i32x4.neg # encoding: [0xfd,0x25]
+    i32x4.neg
+
+    # CHECK: i64x2.neg # encoding: [0xfd,0x26]
+    i64x2.neg
+
+    # CHECK: i8x16.shl # encoding: [0xfd,0x2f]
+    i8x16.shl
+
+    # CHECK: i16x8.shl # encoding: [0xfd,0x30]
+    i16x8.shl
+
+    # CHECK: i32x4.shl # encoding: [0xfd,0x31]
+    i32x4.shl
+
+    # CHECK: i64x2.shl # encoding: [0xfd,0x32]
+    i64x2.shl
+
+    # CHECK: i8x16.shr_s # encoding: [0xfd,0x33]
+    i8x16.shr_s
+
+    # CHECK: i8x16.shr_u # encoding: [0xfd,0x34]
+    i8x16.shr_u
+
+    # CHECK: i16x8.shr_s # encoding: [0xfd,0x35]
+    i16x8.shr_s
+
+    # CHECK: i16x8.shr_u # encoding: [0xfd,0x36]
+    i16x8.shr_u
+
+    # CHECK: i32x4.shr_s # encoding: [0xfd,0x37]
+    i32x4.shr_s
+
+    # CHECK: i32x4.shr_u # encoding: [0xfd,0x38]
+    i32x4.shr_u
+
+    # CHECK: i64x2.shr_s # encoding: [0xfd,0x39]
+    i64x2.shr_s
+
+    # CHECK: i64x2.shr_u # encoding: [0xfd,0x3a]
+    i64x2.shr_u
+
     # CHECK: v128.and # encoding: [0xfd,0x3b]
     v128.and
 
@@ -270,6 +318,12 @@
 
     # CHECK: f64x2.ge # encoding: [0xfd,0x71]
     f64x2.ge
+
+    # CHECK: f32x4.neg # encoding: [0xfd,0x72]
+    f32x4.neg
+
+    # CHECK: f64x2.neg # encoding: [0xfd,0x73]
+    f64x2.neg
 
     # CHECK: f32x4.add # encoding: [0xfd,0x7a]
     f32x4.add
