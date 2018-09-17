@@ -202,8 +202,22 @@ fi
 
 if [ "$BUILD_SYSTEM" = "Ninja" ];
 then
-  info "Limiting concurrent linking jobs to 1"
-  CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DLLVM_PARALLEL_LINK_JOBS=1"
+  NUM_LINK_JOBS=0
+  if [ -n "$(which nproc)" ];
+  then
+    # Note these are heuristics based on experimentation
+    if [ "$LINKER" = "lld" ];
+    then
+      NUM_LINK_JOBS=$(($(nproc)/4))
+    else
+      # GNU linker uses a lot of memory
+      NUM_LINK_JOBS=$(($(nproc)/8))
+    fi
+  fi
+  # At least 1
+  NUM_LINK_JOBS=$((${NUM_LINK_JOBS} + 1))
+  info "Limiting concurrent linking jobs to ${NUM_LINK_JOBS}"
+  CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DLLVM_PARALLEL_LINK_JOBS=${NUM_LINK_JOBS}"
 else
   warning "Makefiles do not allow limiting the concurrent linking jobs"
 fi
