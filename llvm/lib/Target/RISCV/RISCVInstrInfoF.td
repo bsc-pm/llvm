@@ -317,6 +317,21 @@ def : PatFpr32Fpr32<setolt, FLT_S>;
 def : PatFpr32Fpr32<setle, FLE_S>;
 def : PatFpr32Fpr32<setole, FLE_S>;
 
+// Three operands
+def : Pat<(fma FPR32:$rs1, FPR32:$rs2, FPR32:$rs3),
+          (FMADD_S $rs1, $rs2, $rs3, 0b111)>;
+
+def : Pat<(fma FPR32:$rs1, FPR32:$rs2, (fneg FPR32:$rs3)),
+          (FMSUB_S $rs1, $rs2, $rs3, 0b111)>;
+
+def : Pat<(fneg (fma FPR32:$rs1, FPR32:$rs2, FPR32:$rs3)),
+          (FNMADD_S $rs1, $rs2, $rs3, 0b111)>;
+
+def : Pat<(fma (fneg FPR32:$rs1), FPR32:$rs2, FPR32:$rs3),
+          (FNMSUB_S $rs1, $rs2, $rs3, 0b111)>;
+def : Pat<(fma FPR32:$rs1, (fneg FPR32:$rs2), FPR32:$rs3),
+          (FNMSUB_S $rs1, $rs2, $rs3, 0b111)>;
+
 // Define pattern expansions for setcc operations which aren't directly
 // handled by a RISC-V instruction and aren't expanded in the SelectionDAG
 // Legalizer.
