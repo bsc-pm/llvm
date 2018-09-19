@@ -87,13 +87,13 @@ class RISCVAsmParser : public MCTargetAsmParser {
 #define GET_ASSEMBLER_HEADER
 #include "RISCVGenAsmMatcher.inc"
 
-  OperandMatchResultTy parseImmediate(OperandVector &Operands,
-                                      bool AllowPLT = false);
+  OperandMatchResultTy parseImmediate(OperandVector &Operands);
   OperandMatchResultTy parseRegister(OperandVector &Operands,
                                      bool AllowParens = false);
   OperandMatchResultTy parseMemOpBaseReg(OperandVector &Operands);
   OperandMatchResultTy parseOperandWithModifier(OperandVector &Operands);
   OperandMatchResultTy parseBareSymbol(OperandVector &Operands);
+  OperandMatchResultTy parseBareSymbolOrPlt(OperandVector &Operands);
 
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
 
@@ -941,8 +941,7 @@ OperandMatchResultTy RISCVAsmParser::parseRegister(OperandVector &Operands,
   return MatchOperand_Success;
 }
 
-OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands,
-                                                    bool AllowPLT) {
+OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands) {
   SMLoc S = getLoc();
   SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
   const MCExpr *Res;
@@ -962,23 +961,8 @@ OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands,
     StringRef Identifier;
     if (getParser().parseIdentifier(Identifier))
       return MatchOperand_ParseFail;
-    bool IsPLT = false;
-    if (Identifier.endswith("@plt")) {
-      if (AllowPLT) {
-        Identifier = Identifier.drop_back(4);
-        IsPLT = true;
-      } else {
-        Error(S, "symbol cannot include @plt in this context");
-        return MatchOperand_ParseFail;
-      }
-    }
     MCSymbol *Sym = getContext().getOrCreateSymbol(Identifier);
     Res = MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_None, getContext());
-    // We'd like to use a plain MCSymbolRefExpr::VK_PLT but LLVM emits @PLT and
-    // this is at the moment not valid for GNU (only @plt) so let's stick to
-    // the syntax and use a kind of ours.
-    if (IsPLT)
-      Res = RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_PLT, getContext());
     break;
   }
   case AsmToken::Percent:
@@ -1048,6 +1032,37 @@ OperandMatchResultTy RISCVAsmParser::parseBareSymbol(OperandVector &Operands) {
 }
 
 OperandMatchResultTy
+RISCVAsmParser::parseBareSymbolOrPlt(OperandVector &Operands) {
+  SMLoc S = getLoc();
+  SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
+  const MCExpr *Res;
+
+  if (getLexer().getKind() != AsmToken::Identifier)
+    return MatchOperand_NoMatch;
+
+  StringRef Identifier;
+  if (getParser().parseIdentifier(Identifier))
+    return MatchOperand_ParseFail;
+
+  bool IsPLT = false;
+  if (Identifier.endswith("@plt")) {
+    Identifier = Identifier.drop_back(4);
+    IsPLT = true;
+  }
+
+  MCSymbol *Sym = getContext().getOrCreateSymbol(Identifier);
+  Res = MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_None, getContext());
+  // We'd like to use a plain MCSymbolRefExpr::VK_PLT but LLVM emits @PLT and
+  // this is at the moment not valid for GNU (only @plt) so let's stick to
+  // the syntax and use a kind of ours.
+  if (IsPLT)
+    Res = RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_PLT, getContext());
+
+  Operands.push_back(RISCVOperand::createImm(Res, S, E, isRV64()));
+  return MatchOperand_Success;
+}
+
+OperandMatchResultTy
 RISCVAsmParser::parseMemOpBaseReg(OperandVector &Operands) {
   if (getLexer().isNot(AsmToken::LParen)) {
     Error(getLoc(), "expected '('");
@@ -1090,10 +1105,8 @@ bool RISCVAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
   if (parseRegister(Operands, true) == MatchOperand_Success)
     return false;
 
-  bool AllowPLT = Mnemonic == "tail" || Mnemonic == "call";
-
   // Attempt to parse token as an immediate
-  if (parseImmediate(Operands, AllowPLT) == MatchOperand_Success) {
+  if (parseImmediate(Operands) == MatchOperand_Success) {
     // Parse memory base register if present
     if (getLexer().is(AsmToken::LParen))
       return parseMemOpBaseReg(Operands) != MatchOperand_Success;

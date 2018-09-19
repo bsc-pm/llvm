@@ -194,6 +194,7 @@ def BareSymbolOrPlt : AsmOperandClass {
   let Name = "BareSymbolOrPlt";
   let RenderMethod = "addImmOperands";
   let DiagnosticType = "InvalidBareSymbolOrPlt";
+  let ParserMethod = "parseBareSymbolOrPlt";
 }
 
 // A bare symbol optionally decorated with @plt.
