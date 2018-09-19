@@ -484,12 +484,10 @@ public:
     if (!IsConstantImm) {
       IsValid = RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm);
       return IsValid && (VK == RISCVMCExpr::VK_RISCV_HI ||
-                         VK == RISCVMCExpr::VK_RISCV_PCREL_HI ||
                          VK == RISCVMCExpr::VK_RISCV_TPREL_HI);
     } else {
       return isUInt<20>(Imm) && (VK == RISCVMCExpr::VK_RISCV_None ||
                                  VK == RISCVMCExpr::VK_RISCV_HI ||
-                                 VK == RISCVMCExpr::VK_RISCV_PCREL_HI ||
                                  VK == RISCVMCExpr::VK_RISCV_TPREL_HI);
     }
   }
