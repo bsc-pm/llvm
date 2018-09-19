@@ -561,7 +561,6 @@ TargetLoweringBase::TargetLoweringBase(const TargetMachine &tm) : TM(tm) {
   MinStackArgumentAlignment = 1;
   // TODO: the default will be switched to 0 in the next commit, along
   // with the Target-specific changes necessary.
-  MinAtomicSizeInBitsSupported = 1;
   MaxAtomicSizeInBitsSupported = 1024;
 
   MinCmpXchgSizeInBits = 0;

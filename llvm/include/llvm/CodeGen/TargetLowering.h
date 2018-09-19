@@ -163,6 +163,7 @@ public:
     LLOnly,  // Expand the (load) instruction into just a load-linked, which has
              // greater atomic guarantees than a normal load.
     CmpXChg, // Expand the instruction into cmpxchg; used by at least X86.
+    MaskedIntrinsic, // Use a target-specific intrinsic for the LL/SC loop.
   };
 
   /// Enum that specifies when a multiplication should be expanded.
@@ -1519,14 +1520,6 @@ public:
   /// \name Helpers for atomic expansion.
   /// @{
 
-  /// Returns the minimum atomic operation size (in bits) supported by
-  /// the backend. Atomic operations lower than this size (as well
-  /// as ones that are not naturally aligned), will be expanded by
-  /// AtomicExpandPass into an __atomic_* library call.
-  unsigned getMinAtomicSizeInBitsSupported() const {
-    return MinAtomicSizeInBitsSupported;
-  }
-
   /// Returns the maximum atomic operation size (in bits) supported by
   /// the backend. Atomic operations greater than this size (as well
   /// as ones that are not naturally aligned), will be expanded by
@@ -1568,6 +1561,17 @@ public:
   virtual Value *emitStoreConditional(IRBuilder<> &Builder, Value *Val,
                                       Value *Addr, AtomicOrdering Ord) const {
     llvm_unreachable("Store conditional unimplemented on this target");
+  }
+
+  /// Perform a masked atomicrmw using a target-specific intrinsic. This
+  /// represents the core LL/SC loop which will be lowered at a late stage by
+  /// the backend.
+  virtual Value *emitMaskedAtomicRMWIntrinsic(IRBuilder<> &Builder,
+                                              AtomicRMWInst *AI,
+                                              Value *AlignedAddr, Value *Incr,
+                                              Value *Mask, Value *ShiftAmt,
+                                              AtomicOrdering Ord) const {
+    llvm_unreachable("Masked atomicrmw expansion unimplemented on this target");
   }
 
   /// Inserts in the IR a target-specific intrinsic specifying a fence.
@@ -1942,14 +1946,6 @@ protected:
   /// Set the minimum stack alignment of an argument (in log2(bytes)).
   void setMinStackArgumentAlignment(unsigned Align) {
     MinStackArgumentAlignment = Align;
-  }
-
-  /// Set the minimum atomic operation size supported by the
-  /// backend. Atomic operations smaller than this size (as well as
-  /// ones that are not naturally aligned), will be expanded by
-  /// AtomicExpandPass into an __atomic_* library call.
-  void setMinAtomicSizeInBitsSupported(unsigned SizeInBits) {
-    MinAtomicSizeInBitsSupported = SizeInBits;
   }
 
   /// Set the maximum atomic operation size supported by the
@@ -2450,10 +2446,6 @@ private:
 
   /// The preferred loop alignment.
   unsigned PrefLoopAlignment;
-
-  /// Size in bits of the minimum atomics size the backend supports.
-  /// Accesses smaller than this will be expanded by AtomicExpandPass.
-  unsigned MinAtomicSizeInBitsSupported;
 
   /// Size in bits of the maximum atomics size the backend supports.
   /// Accesses larger than this will be expanded by AtomicExpandPass.

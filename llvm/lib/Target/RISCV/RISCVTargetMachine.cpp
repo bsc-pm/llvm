@@ -34,6 +34,8 @@ EnableGEPOpt("riscv-gep-opt", cl::Hidden,
 extern "C" void LLVMInitializeRISCVTarget() {
   RegisterTargetMachine<RISCVTargetMachine> X(getTheRISCV32Target());
   RegisterTargetMachine<RISCVTargetMachine> Y(getTheRISCV64Target());
+  auto PR = PassRegistry::getPassRegistry();
+  initializeRISCVExpandPseudoPass(*PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -85,6 +87,7 @@ public:
   void addIRPasses() override;
   bool addInstSelector() override;
   void addPreEmitPass() override;
+  void addPreEmitPass2() override;
   void addPreRegAlloc() override;
 };
 }
@@ -119,6 +122,13 @@ bool RISCVPassConfig::addInstSelector() {
 }
 
 void RISCVPassConfig::addPreEmitPass() { addPass(&BranchRelaxationPassID); }
+
+void RISCVPassConfig::addPreEmitPass2() {
+  // Schedule the expansion of AMOs at the last possible moment, avoiding the
+  // possibility for other passes to break the requirements for forward
+  // progress in the LR/SC block.
+  addPass(createRISCVExpandPseudoPass());
+}
 
 void RISCVPassConfig::addPreRegAlloc() {
   addPass(createRISCVMergeBaseOffsetOptPass());

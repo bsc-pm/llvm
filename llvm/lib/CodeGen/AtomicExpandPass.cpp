@@ -90,6 +90,7 @@ namespace {
         TargetLoweringBase::AtomicExpansionKind ExpansionKind);
     AtomicRMWInst *widenPartwordAtomicRMW(AtomicRMWInst *AI);
     void expandPartwordCmpXchg(AtomicCmpXchgInst *I);
+    void expandAtomicRMWToMaskedIntrinsic(AtomicRMWInst *AI);
 
     AtomicCmpXchgInst *convertCmpXchgToIntegerType(AtomicCmpXchgInst *CI);
     static Value *insertRMWCmpXchgLoop(
@@ -189,9 +190,7 @@ template <typename Inst>
 static bool atomicSizeSupported(const TargetLowering *TLI, Inst *I) {
   unsigned Size = getAtomicOpSize(I);
   unsigned Align = getAtomicOpAlign(I);
-  return Align >= Size &&
-    Size >= TLI->getMinAtomicSizeInBitsSupported() / 8 &&
-    Size <= TLI->getMaxAtomicSizeInBitsSupported() / 8;
+  return Align >= Size && Size <= TLI->getMaxAtomicSizeInBitsSupported() / 8;
 }
 
 bool AtomicExpand::runOnFunction(Function &F) {
@@ -420,8 +419,9 @@ bool AtomicExpand::tryExpandAtomicLoad(LoadInst *LI) {
     return expandAtomicLoadToLL(LI);
   case TargetLoweringBase::AtomicExpansionKind::CmpXChg:
     return expandAtomicLoadToCmpXchg(LI);
+  default:
+    llvm_unreachable("Unhandled case in tryExpandAtomicLoad");
   }
-  llvm_unreachable("Unhandled case in tryExpandAtomicLoad");
 }
 
 bool AtomicExpand::expandAtomicLoadToLL(LoadInst *LI) {
@@ -583,6 +583,10 @@ bool AtomicExpand::tryExpandAtomicRMW(AtomicRMWInst *AI) {
     }
     return true;
   }
+  case TargetLoweringBase::AtomicExpansionKind::MaskedIntrinsic: {
+    expandAtomicRMWToMaskedIntrinsic(AI);
+    return true;
+  }
   default:
     llvm_unreachable("Unhandled case in tryExpandAtomicRMW");
   }
@@ -671,6 +675,9 @@ static Value *performMaskedAtomicOp(AtomicRMWInst::BinOp Op,
                                     IRBuilder<> &Builder, Value *Loaded,
                                     Value *Shifted_Inc, Value *Inc,
                                     const PartwordMaskValues &PMV) {
+  // TODO: update to use
+  // https://graphics.stanford.edu/~seander/bithacks.html#MaskedMerge in order
+  // to merge bits from two values without requiring PMV.Inv_Mask.
   switch (Op) {
   case AtomicRMWInst::Xchg: {
     Value *Loaded_MaskOut = Builder.CreateAnd(Loaded, PMV.Inv_Mask);
@@ -921,6 +928,33 @@ void AtomicExpand::expandAtomicOpToLLSC(
 
   I->replaceAllUsesWith(Loaded);
   I->eraseFromParent();
+}
+
+void AtomicExpand::expandAtomicRMWToMaskedIntrinsic(AtomicRMWInst *AI) {
+  IRBuilder<> Builder(AI);
+
+  PartwordMaskValues PMV =
+      createMaskInstrs(Builder, AI, AI->getType(), AI->getPointerOperand(),
+                       TLI->getMinCmpXchgSizeInBits() / 8);
+
+  // The value operand must be sign-extended for signed min/max so that the
+  // target's signed comparison instructions can be used. Otherwise, just
+  // zero-ext.
+  Instruction::CastOps CastOp = Instruction::ZExt;
+  AtomicRMWInst::BinOp RMWOp = AI->getOperation();
+  if (RMWOp == AtomicRMWInst::Max || RMWOp == AtomicRMWInst::Min)
+    CastOp = Instruction::SExt;
+
+  Value *ValOperand_Shifted = Builder.CreateShl(
+      Builder.CreateCast(CastOp, AI->getValOperand(), PMV.WordType),
+      PMV.ShiftAmt, "ValOperand_Shifted");
+  Value *OldResult = TLI->emitMaskedAtomicRMWIntrinsic(
+      Builder, AI, PMV.AlignedAddr, ValOperand_Shifted, PMV.Mask, PMV.ShiftAmt,
+      AI->getOrdering());
+  Value *FinalOldResult = Builder.CreateTrunc(
+      Builder.CreateLShr(OldResult, PMV.ShiftAmt), PMV.ValueType);
+  AI->replaceAllUsesWith(FinalOldResult);
+  AI->eraseFromParent();
 }
 
 Value *AtomicExpand::insertRMWLLSCLoop(
