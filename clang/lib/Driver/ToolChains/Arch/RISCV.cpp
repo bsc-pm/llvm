@@ -375,6 +375,16 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       Features.push_back("+d");
       Features.push_back("+c");
     }
+    // We should be using RV64GC here too but C may not be available in most
+    // baremetal environments for 64 bit.
+    else if (Triple.getArch() == llvm::Triple::riscv64 &&
+        Triple.getOS() == llvm::Triple::UnknownOS &&
+        Triple.getEnvironment() == llvm::Triple::UnknownEnvironment) {
+      Features.push_back("+m");
+      Features.push_back("+a");
+      Features.push_back("+f");
+      Features.push_back("+d");
+    }
   }
 
   // Forward the ABI correctly for code generation.
