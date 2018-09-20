@@ -197,18 +197,20 @@ public:
   bool isImm() const override { return Kind == Immediate; }
   bool isMem() const override { return false; }
 
-  bool evaluateConstantImm(int64_t &Imm, RISCVMCExpr::VariantKind &VK) const {
-    const MCExpr *Val = getImm();
-    bool Ret = false;
-    if (auto *RE = dyn_cast<RISCVMCExpr>(Val)) {
-      Ret = RE->evaluateAsConstant(Imm);
+  static bool evaluateConstantImm(const MCExpr *Expr, int64_t &Imm,
+                                  RISCVMCExpr::VariantKind &VK) {
+    if (auto *RE = dyn_cast<RISCVMCExpr>(Expr)) {
       VK = RE->getKind();
-    } else if (auto CE = dyn_cast<MCConstantExpr>(Val)) {
-      Ret = true;
+      return RE->evaluateAsConstant(Imm);
+    }
+
+    if (auto CE = dyn_cast<MCConstantExpr>(Expr)) {
       VK = RISCVMCExpr::VK_RISCV_None;
       Imm = CE->getValue();
+      return true;
     }
-    return Ret;
+
+    return false;
   }
 
   // True if operand is a symbol with no modifiers, or a constant with no
@@ -218,7 +220,7 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     bool IsValid;
     if (!IsConstantImm)
       IsValid = RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm);
@@ -233,7 +235,7 @@ public:
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
     // Must be of 'immediate' type but not a constant.
-    if (!isImm() || evaluateConstantImm(Imm, VK))
+    if (!isImm() || evaluateConstantImm(getImm(), Imm, VK))
       return false;
     return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
@@ -304,7 +306,7 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     // Given only Imm, ensuring that the actually specified constant is either
     // a signed or unsigned 64-bit number is unfortunately impossible.
     bool IsInRange = isRV64() ? true : isInt<32>(Imm) || isUInt<32>(Imm);
@@ -316,7 +318,8 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    if (!evaluateConstantImm(Imm, VK) || VK != RISCVMCExpr::VK_RISCV_None)
+    if (!evaluateConstantImm(getImm(), Imm, VK) ||
+        VK != RISCVMCExpr::VK_RISCV_None)
       return false;
     return (isRV64() && isUInt<6>(Imm)) || isUInt<5>(Imm);
   }
@@ -326,7 +329,8 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    if (!evaluateConstantImm(Imm, VK) || VK != RISCVMCExpr::VK_RISCV_None)
+    if (!evaluateConstantImm(getImm(), Imm, VK) ||
+        VK != RISCVMCExpr::VK_RISCV_None)
       return false;
     if (Imm == 0)
       return false;
@@ -338,7 +342,7 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isUInt<5>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
   }
 
@@ -347,7 +351,7 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isUInt<5>(Imm) && (Imm != 0) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -357,7 +361,7 @@ public:
       return false;
     RISCVMCExpr::VariantKind VK;
     int64_t Imm;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isInt<6>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -367,7 +371,7 @@ public:
       return false;
     RISCVMCExpr::VariantKind VK;
     int64_t Imm;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isInt<6>(Imm) && (Imm != 0) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -377,7 +381,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && (Imm != 0) &&
            (isUInt<5>(Imm) || (Imm >= 0xfffe0 && Imm <= 0xfffff)) &&
             VK == RISCVMCExpr::VK_RISCV_None;
@@ -388,7 +392,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isShiftedUInt<5, 2>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -398,7 +402,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isShiftedUInt<6, 2>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -408,7 +412,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isShiftedUInt<5, 3>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -420,7 +424,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isShiftedUInt<6, 3>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -430,7 +434,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isShiftedUInt<8, 2>(Imm) && (Imm != 0) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -441,7 +445,7 @@ public:
     bool IsValid;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     if (!IsConstantImm)
       IsValid = RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm);
     else
@@ -459,7 +463,7 @@ public:
     RISCVMCExpr::VariantKind VK;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isUInt<12>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
   }
 
@@ -470,7 +474,7 @@ public:
       return false;
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && (Imm != 0) && isShiftedInt<6, 4>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
@@ -481,7 +485,7 @@ public:
     bool IsValid;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     if (!IsConstantImm) {
       IsValid = RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm);
       return IsValid && (VK == RISCVMCExpr::VK_RISCV_HI ||
@@ -499,7 +503,7 @@ public:
     bool IsValid;
     if (!isImm())
       return false;
-    bool IsConstantImm = evaluateConstantImm(Imm, VK);
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     if (!IsConstantImm) {
       IsValid = RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm);
       return IsValid && VK == RISCVMCExpr::VK_RISCV_PCREL_HI;
@@ -581,13 +585,8 @@ public:
   void addExpr(MCInst &Inst, const MCExpr *Expr) const {
     assert(Expr && "Expr shouldn't be null!");
     int64_t Imm = 0;
-    bool IsConstant = false;
-    if (auto *RE = dyn_cast<RISCVMCExpr>(Expr)) {
-      IsConstant = RE->evaluateAsConstant(Imm);
-    } else if (auto *CE = dyn_cast<MCConstantExpr>(Expr)) {
-      IsConstant = true;
-      Imm = CE->getValue();
-    }
+    RISCVMCExpr::VariantKind VK;
+    bool IsConstant = evaluateConstantImm(Expr, Imm, VK);
 
     if (IsConstant)
       Inst.addOperand(MCOperand::createImm(Imm));
