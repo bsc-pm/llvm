@@ -245,7 +245,7 @@ public:
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
     // Must be of 'immediate' type but not a constant.
-    if (!isImm() || evaluateConstantImm(Imm, VK))
+    if (!isImm() || evaluateConstantImm(getImm(), Imm, VK))
       return false;
     return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
            (VK == RISCVMCExpr::VK_RISCV_None ||
@@ -256,7 +256,7 @@ public:
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
     // Must be of 'immediate' type but not a constant.
-    if (!isImm() || evaluateConstantImm(Imm, VK))
+    if (!isImm() || evaluateConstantImm(getImm(), Imm, VK))
       return false;
     return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
            VK == RISCVMCExpr::VK_RISCV_TPREL_ADD;
