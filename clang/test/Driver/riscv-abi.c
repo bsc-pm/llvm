@@ -25,7 +25,7 @@
 // CHECK-RV32-LP64: error: unknown target ABI 'lp64'
 
 // RUN: %clang -target riscv64-unknown-elf %s -### -o %t.o 2>&1 \
-// RUN:   | FileCheck -check-prefix=CHECK-LP64 %s
+// RUN:   | FileCheck -check-prefix=CHECK-LP64D %s
 // RUN: %clang -target riscv64-unknown-elf %s -### -o %t.o -mabi=lp64 2>&1 \
 // RUN:   | FileCheck -check-prefix=CHECK-LP64 %s
 
