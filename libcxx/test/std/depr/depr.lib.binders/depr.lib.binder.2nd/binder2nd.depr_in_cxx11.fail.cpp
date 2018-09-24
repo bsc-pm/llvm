@@ -11,6 +11,8 @@
 //
 // binder2nd
 
+// UNSUPPORTED: clang-4.0
+// UNSUPPORTED: c++98, c++03
 // REQUIRES: verify-support
 
 // MODULES_DEFINES: _LIBCPP_ENABLE_DEPRECATION_WARNINGS
@@ -25,10 +27,5 @@
 
 int main()
 {
-#if TEST_STD_VER < 11
-    // expected-no-diagnostics
-#else
-    // expected-error@* 1 {{'binder2nd<test_func>' is deprecated}}
-#endif
-    typedef std::binder2nd<test_func> B2ND;
+    typedef std::binder2nd<test_func> B2ND; // expected-error{{'binder2nd<test_func>' is deprecated}}
 }
