@@ -18,18 +18,19 @@
 //     random_shuffle(RandomAccessIterator first, RandomAccessIterator last,
 //                    RandomNumberGenerator& rand);
 
-//
-//  In C++17, random_shuffle has been removed.
-//  However, for backwards compatibility, if _LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE
-//  is defined before including <algorithm>, then random_shuffle will be restored.
-
+// UNSUPPORTED: clang-4.0
+// UNSUPPORTED: c++98, c++03, c++11
 // REQUIRES: verify-support
 
+// MODULES_DEFINES: _LIBCPP_ENABLE_DEPRECATION_WARNINGS
 // MODULES_DEFINES: _LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE
+#define _LIBCPP_ENABLE_DEPRECATION_WARNINGS
 #define _LIBCPP_ENABLE_CXX17_REMOVED_RANDOM_SHUFFLE
 
 #include <algorithm>
-#include <vector>
+#include <cstddef>
+
+#include "test_macros.h"
 
 struct gen
 {
@@ -42,8 +43,8 @@ struct gen
 
 int main()
 {
-    std::vector<int> v;
-    std::random_shuffle(v.begin(), v.end());
+    int v[1] = {1};
+    std::random_shuffle(&v[0], &v[1]); // expected-error{{'random_shuffle<int *>' is deprecated}}
     gen r;
-    std::random_shuffle(v.begin(), v.end(), r);
+    std::random_shuffle(&v[0], &v[1], r); // expected-error{{'random_shuffle<int *, gen &>' is deprecated}}
 }
