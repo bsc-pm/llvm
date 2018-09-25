@@ -733,7 +733,7 @@ Value *HWAddressSanitizer::emitPrologue(IRBuilder<> &IRB,
   Value *ShadowBase = IRB.CreateAdd(
       IRB.CreateOr(
           ThreadLongMaybeUntagged,
-          ConstantInt::get(IntptrTy, (1UL << kShadowBaseAlignment) - 1)),
+          ConstantInt::get(IntptrTy, (1ULL << kShadowBaseAlignment) - 1)),
       ConstantInt::get(IntptrTy, 1), "hwasan.shadow");
   return ShadowBase;
 }
