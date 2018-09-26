@@ -175,7 +175,6 @@ private:
 
   bool parseDirectiveReq(StringRef Name, SMLoc L);
   bool parseDirectiveUnreq(SMLoc L);
-  bool parseDirectiveCFINegateRAState();
 
   bool validateInstruction(MCInst &Inst, SMLoc &IDLoc,
                            SmallVectorImpl<SMLoc> &Loc);
@@ -4893,8 +4892,6 @@ bool AArch64AsmParser::ParseDirective(AsmToken DirectiveID) {
     parseDirectiveUnreq(Loc);
   else if (IDVal == ".inst")
     parseDirectiveInst(Loc);
-  else if (IDVal == ".cfi_negate_ra_state")
-    parseDirectiveCFINegateRAState();
   else if (IsMachO) {
     if (IDVal == MCLOHDirectiveName())
       parseDirectiveLOH(IDVal, Loc);
@@ -4948,6 +4945,7 @@ static void ExpandCryptoAEK(AArch64::ArchKind ArchKind,
       RequestedExtensions.push_back("aes");
       break;
     case AArch64::ArchKind::ARMV8_4A:
+    case AArch64::ArchKind::ARMV8_5A:
       RequestedExtensions.push_back("sm4");
       RequestedExtensions.push_back("sha3");
       RequestedExtensions.push_back("sha2");
@@ -4966,6 +4964,7 @@ static void ExpandCryptoAEK(AArch64::ArchKind ArchKind,
       RequestedExtensions.push_back("noaes");
       break;
     case AArch64::ArchKind::ARMV8_4A:
+    case AArch64::ArchKind::ARMV8_5A:
       RequestedExtensions.push_back("nosm4");
       RequestedExtensions.push_back("nosha3");
       RequestedExtensions.push_back("nosha2");
@@ -5285,13 +5284,6 @@ bool AArch64AsmParser::parseDirectiveUnreq(SMLoc L) {
   Parser.Lex(); // Eat the identifier.
   if (parseToken(AsmToken::EndOfStatement))
     return addErrorSuffix("in '.unreq' directive");
-  return false;
-}
-
-bool AArch64AsmParser::parseDirectiveCFINegateRAState() {
-  if (parseToken(AsmToken::EndOfStatement, "unexpected token in directive"))
-    return true;
-  getStreamer().EmitCFINegateRAState();
   return false;
 }
 
