@@ -77,6 +77,21 @@ FunctionPass *llvm::createScalarizeMaskedMemIntrinPass() {
   return new ScalarizeMaskedMemIntrin();
 }
 
+static bool isConstantIntVector(Value *Mask) {
+  Constant *C = dyn_cast<Constant>(Mask);
+  if (!C)
+    return false;
+
+  unsigned NumElts = Mask->getType()->getVectorNumElements();
+  for (unsigned i = 0; i != NumElts; ++i) {
+    Constant *CElt = C->getAggregateElement(i);
+    if (!CElt || !isa<ConstantInt>(CElt))
+      return false;
+  }
+
+  return true;
+}
+
 // Translate a masked load intrinsic like
 // <16 x i32 > @llvm.masked.load( <16 x i32>* %addr, i32 align,
 //                               <16 x i1> %mask, <16 x i32> %passthru)
@@ -116,10 +131,9 @@ static void scalarizeMaskedLoad(CallInst *CI) {
   Value *Src0 = CI->getArgOperand(3);
 
   unsigned AlignVal = cast<ConstantInt>(Alignment)->getZExtValue();
-  VectorType *VecType = dyn_cast<VectorType>(CI->getType());
-  assert(VecType && "Unexpected return type of masked load intrinsic");
+  VectorType *VecType = cast<VectorType>(CI->getType());
 
-  Type *EltTy = CI->getType()->getVectorElementType();
+  Type *EltTy = VecType->getElementType();
 
   IRBuilder<> Builder(CI->getContext());
   Instruction *InsertPt = CI;
@@ -139,7 +153,7 @@ static void scalarizeMaskedLoad(CallInst *CI) {
   }
 
   // Adjust alignment for the scalar instruction.
-  AlignVal = std::min(AlignVal, VecType->getScalarSizeInBits() / 8);
+  AlignVal = std::min(AlignVal, EltTy->getPrimitiveSizeInBits() / 8);
   // Bitcast %addr fron i8* to EltTy*
   Type *NewPtrType =
       EltTy->getPointerTo(cast<PointerType>(Ptr->getType())->getAddressSpace());
@@ -149,7 +163,7 @@ static void scalarizeMaskedLoad(CallInst *CI) {
   // The result vector
   Value *VResult = Src0;
 
-  if (isa<Constant>(Mask)) {
+  if (isConstantIntVector(Mask)) {
     for (unsigned Idx = 0; Idx < VectorWidth; ++Idx) {
       if (cast<Constant>(Mask)->getAggregateElement(Idx)->isNullValue())
         continue;
@@ -244,8 +258,7 @@ static void scalarizeMaskedStore(CallInst *CI) {
   Value *Mask = CI->getArgOperand(3);
 
   unsigned AlignVal = cast<ConstantInt>(Alignment)->getZExtValue();
-  VectorType *VecType = dyn_cast<VectorType>(Src->getType());
-  assert(VecType && "Unexpected data type in masked store intrinsic");
+  VectorType *VecType = cast<VectorType>(Src->getType());
 
   Type *EltTy = VecType->getElementType();
 
@@ -263,14 +276,14 @@ static void scalarizeMaskedStore(CallInst *CI) {
   }
 
   // Adjust alignment for the scalar instruction.
-  AlignVal = std::max(AlignVal, VecType->getScalarSizeInBits() / 8);
+  AlignVal = std::max(AlignVal, EltTy->getPrimitiveSizeInBits() / 8);
   // Bitcast %addr fron i8* to EltTy*
   Type *NewPtrType =
       EltTy->getPointerTo(cast<PointerType>(Ptr->getType())->getAddressSpace());
   Value *FirstEltPtr = Builder.CreateBitCast(Ptr, NewPtrType);
   unsigned VectorWidth = VecType->getNumElements();
 
-  if (isa<Constant>(Mask)) {
+  if (isConstantIntVector(Mask)) {
     for (unsigned Idx = 0; Idx < VectorWidth; ++Idx) {
       if (cast<Constant>(Mask)->getAggregateElement(Idx)->isNullValue())
         continue;
@@ -354,9 +367,7 @@ static void scalarizeMaskedGather(CallInst *CI) {
   Value *Mask = CI->getArgOperand(2);
   Value *Src0 = CI->getArgOperand(3);
 
-  VectorType *VecType = dyn_cast<VectorType>(CI->getType());
-
-  assert(VecType && "Unexpected return type of masked load intrinsic");
+  VectorType *VecType = cast<VectorType>(CI->getType());
 
   IRBuilder<> Builder(CI->getContext());
   Instruction *InsertPt = CI;
@@ -373,7 +384,7 @@ static void scalarizeMaskedGather(CallInst *CI) {
   unsigned VectorWidth = VecType->getNumElements();
 
   // Shorten the way if the mask is a vector of constants.
-  if (isa<Constant>(Mask)) {
+  if (isConstantIntVector(Mask)) {
     for (unsigned Idx = 0; Idx < VectorWidth; ++Idx) {
       if (cast<Constant>(Mask)->getAggregateElement(Idx)->isNullValue())
         continue;
@@ -483,7 +494,7 @@ static void scalarizeMaskedScatter(CallInst *CI) {
   unsigned VectorWidth = Src->getType()->getVectorNumElements();
 
   // Shorten the way if the mask is a vector of constants.
-  if (isa<Constant>(Mask)) {
+  if (isConstantIntVector(Mask)) {
     for (unsigned Idx = 0; Idx < VectorWidth; ++Idx) {
       if (cast<ConstantVector>(Mask)->getAggregateElement(Idx)->isNullValue())
         continue;
