@@ -37,15 +37,26 @@ define void @cmpxchg_i8_monotonic_monotonic(i8* %ptr, i8 %cmp, i8 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i8_monotonic_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    mv a3, zero
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB0_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB0_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB0_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB0_1
+; RV32A-NEXT:  .LBB0_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_monotonic_monotonic:
@@ -93,15 +104,26 @@ define void @cmpxchg_i8_acquire_monotonic(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_acquire_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB1_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB1_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB1_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB1_1
+; RV32A-NEXT:  .LBB1_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_acquire_monotonic:
@@ -149,15 +171,26 @@ define void @cmpxchg_i8_acquire_acquire(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_acquire_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB2_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB2_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB2_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB2_1
+; RV32A-NEXT:  .LBB2_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_acquire_acquire:
@@ -205,15 +238,26 @@ define void @cmpxchg_i8_release_monotonic(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_release_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB3_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB3_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB3_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB3_1
+; RV32A-NEXT:  .LBB3_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_release_monotonic:
@@ -261,15 +305,26 @@ define void @cmpxchg_i8_release_acquire(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_release_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB4_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB4_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB4_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB4_1
+; RV32A-NEXT:  .LBB4_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_release_acquire:
@@ -317,15 +372,26 @@ define void @cmpxchg_i8_acq_rel_monotonic(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_acq_rel_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB5_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB5_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB5_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB5_1
+; RV32A-NEXT:  .LBB5_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_acq_rel_monotonic:
@@ -373,15 +439,26 @@ define void @cmpxchg_i8_acq_rel_acquire(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_acq_rel_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB6_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB6_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB6_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB6_1
+; RV32A-NEXT:  .LBB6_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_acq_rel_acquire:
@@ -429,15 +506,26 @@ define void @cmpxchg_i8_seq_cst_monotonic(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_seq_cst_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB7_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB7_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB7_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB7_1
+; RV32A-NEXT:  .LBB7_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_seq_cst_monotonic:
@@ -485,15 +573,26 @@ define void @cmpxchg_i8_seq_cst_acquire(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_seq_cst_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB8_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB8_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB8_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB8_1
+; RV32A-NEXT:  .LBB8_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_seq_cst_acquire:
@@ -541,15 +640,26 @@ define void @cmpxchg_i8_seq_cst_seq_cst(i8* %ptr, i8 %cmp, i8 %val) nounwind {
 ;
 ; RV32A-LABEL: cmpxchg_i8_seq_cst_seq_cst:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sb a1, 11(sp)
-; RV32A-NEXT:    addi a1, sp, 11
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_1
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    slli a3, a0, 3
+; RV32A-NEXT:    andi a3, a3, 24
+; RV32A-NEXT:    addi a4, zero, 255
+; RV32A-NEXT:    sll a4, a4, a3
+; RV32A-NEXT:    andi a2, a2, 255
+; RV32A-NEXT:    sll a2, a2, a3
+; RV32A-NEXT:    andi a1, a1, 255
+; RV32A-NEXT:    sll a1, a1, a3
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB9_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    and a5, a3, a4
+; RV32A-NEXT:    bne a5, a1, .LBB9_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB9_1 Depth=1
+; RV32A-NEXT:    xor a5, a3, a2
+; RV32A-NEXT:    and a5, a5, a4
+; RV32A-NEXT:    xor a5, a3, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB9_1
+; RV32A-NEXT:  .LBB9_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i8_seq_cst_seq_cst:
@@ -597,15 +707,27 @@ define void @cmpxchg_i16_monotonic_monotonic(i16* %ptr, i16 %cmp, i16 %val) noun
 ;
 ; RV32A-LABEL: cmpxchg_i16_monotonic_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    mv a3, zero
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB10_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB10_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB10_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB10_1
+; RV32A-NEXT:  .LBB10_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_monotonic_monotonic:
@@ -653,15 +775,27 @@ define void @cmpxchg_i16_acquire_monotonic(i16* %ptr, i16 %cmp, i16 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i16_acquire_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB11_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB11_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB11_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB11_1
+; RV32A-NEXT:  .LBB11_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_acquire_monotonic:
@@ -709,15 +843,27 @@ define void @cmpxchg_i16_acquire_acquire(i16* %ptr, i16 %cmp, i16 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i16_acquire_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB12_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB12_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB12_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB12_1
+; RV32A-NEXT:  .LBB12_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_acquire_acquire:
@@ -765,15 +911,27 @@ define void @cmpxchg_i16_release_monotonic(i16* %ptr, i16 %cmp, i16 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i16_release_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB13_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB13_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB13_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB13_1
+; RV32A-NEXT:  .LBB13_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_release_monotonic:
@@ -821,15 +979,27 @@ define void @cmpxchg_i16_release_acquire(i16* %ptr, i16 %cmp, i16 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i16_release_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB14_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB14_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB14_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB14_1
+; RV32A-NEXT:  .LBB14_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_release_acquire:
@@ -877,15 +1047,27 @@ define void @cmpxchg_i16_acq_rel_monotonic(i16* %ptr, i16 %cmp, i16 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i16_acq_rel_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB15_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB15_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB15_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB15_1
+; RV32A-NEXT:  .LBB15_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_acq_rel_monotonic:
@@ -933,15 +1115,27 @@ define void @cmpxchg_i16_acq_rel_acquire(i16* %ptr, i16 %cmp, i16 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i16_acq_rel_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB16_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB16_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB16_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.rl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB16_1
+; RV32A-NEXT:  .LBB16_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_acq_rel_acquire:
@@ -989,15 +1183,27 @@ define void @cmpxchg_i16_seq_cst_monotonic(i16* %ptr, i16 %cmp, i16 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i16_seq_cst_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB17_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB17_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB17_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB17_1
+; RV32A-NEXT:  .LBB17_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_seq_cst_monotonic:
@@ -1045,15 +1251,27 @@ define void @cmpxchg_i16_seq_cst_acquire(i16* %ptr, i16 %cmp, i16 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i16_seq_cst_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB18_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB18_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB18_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB18_1
+; RV32A-NEXT:  .LBB18_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_seq_cst_acquire:
@@ -1101,15 +1319,27 @@ define void @cmpxchg_i16_seq_cst_seq_cst(i16* %ptr, i16 %cmp, i16 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i16_seq_cst_seq_cst:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sh a1, 10(sp)
-; RV32A-NEXT:    addi a1, sp, 10
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_2
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:    lui a3, 16
+; RV32A-NEXT:    addi a3, a3, -1
+; RV32A-NEXT:    and a1, a1, a3
+; RV32A-NEXT:    and a2, a2, a3
+; RV32A-NEXT:    slli a4, a0, 3
+; RV32A-NEXT:    andi a4, a4, 24
+; RV32A-NEXT:    sll a3, a3, a4
+; RV32A-NEXT:    sll a2, a2, a4
+; RV32A-NEXT:    sll a1, a1, a4
+; RV32A-NEXT:    andi a0, a0, -4
+; RV32A-NEXT:  .LBB19_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a4, (a0)
+; RV32A-NEXT:    and a5, a4, a3
+; RV32A-NEXT:    bne a5, a1, .LBB19_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB19_1 Depth=1
+; RV32A-NEXT:    xor a5, a4, a2
+; RV32A-NEXT:    and a5, a5, a3
+; RV32A-NEXT:    xor a5, a4, a5
+; RV32A-NEXT:    sc.w.aqrl a5, a5, (a0)
+; RV32A-NEXT:    bnez a5, .LBB19_1
+; RV32A-NEXT:  .LBB19_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i16_seq_cst_seq_cst:
@@ -1157,28 +1387,24 @@ define void @cmpxchg_i32_monotonic_monotonic(i32* %ptr, i32 %cmp, i32 %val) noun
 ;
 ; RV32A-LABEL: cmpxchg_i32_monotonic_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    mv a3, zero
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB20_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB20_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB20_1 Depth=1
+; RV32A-NEXT:    sc.w a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB20_1
+; RV32A-NEXT:  .LBB20_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_monotonic_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB20_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB20_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB20_1 Depth=1
+; RV64A-NEXT:    sc.w a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB20_1
+; RV64A-NEXT:  .LBB20_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val monotonic monotonic
   ret void
@@ -1213,28 +1439,24 @@ define void @cmpxchg_i32_acquire_monotonic(i32* %ptr, i32 %cmp, i32 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i32_acquire_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB21_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB21_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB21_1 Depth=1
+; RV32A-NEXT:    sc.w a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB21_1
+; RV32A-NEXT:  .LBB21_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_acquire_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 2
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB21_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB21_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB21_1 Depth=1
+; RV64A-NEXT:    sc.w a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB21_1
+; RV64A-NEXT:  .LBB21_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val acquire monotonic
   ret void
@@ -1269,28 +1491,24 @@ define void @cmpxchg_i32_acquire_acquire(i32* %ptr, i32 %cmp, i32 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i32_acquire_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 2
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB22_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB22_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB22_1 Depth=1
+; RV32A-NEXT:    sc.w a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB22_1
+; RV32A-NEXT:  .LBB22_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_acquire_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 2
-; RV64A-NEXT:    mv a4, a3
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB22_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB22_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB22_1 Depth=1
+; RV64A-NEXT:    sc.w a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB22_1
+; RV64A-NEXT:  .LBB22_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val acquire acquire
   ret void
@@ -1325,28 +1543,24 @@ define void @cmpxchg_i32_release_monotonic(i32* %ptr, i32 %cmp, i32 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i32_release_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB23_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB23_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB23_1 Depth=1
+; RV32A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB23_1
+; RV32A-NEXT:  .LBB23_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_release_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 3
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB23_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB23_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB23_1 Depth=1
+; RV64A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB23_1
+; RV64A-NEXT:  .LBB23_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val release monotonic
   ret void
@@ -1381,28 +1595,24 @@ define void @cmpxchg_i32_release_acquire(i32* %ptr, i32 %cmp, i32 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i32_release_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 3
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB24_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB24_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB24_1 Depth=1
+; RV32A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB24_1
+; RV32A-NEXT:  .LBB24_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_release_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 3
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB24_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB24_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB24_1 Depth=1
+; RV64A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB24_1
+; RV64A-NEXT:  .LBB24_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val release acquire
   ret void
@@ -1437,28 +1647,24 @@ define void @cmpxchg_i32_acq_rel_monotonic(i32* %ptr, i32 %cmp, i32 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i32_acq_rel_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB25_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB25_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB25_1 Depth=1
+; RV32A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB25_1
+; RV32A-NEXT:  .LBB25_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_acq_rel_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 4
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB25_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB25_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB25_1 Depth=1
+; RV64A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB25_1
+; RV64A-NEXT:  .LBB25_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val acq_rel monotonic
   ret void
@@ -1493,28 +1699,24 @@ define void @cmpxchg_i32_acq_rel_acquire(i32* %ptr, i32 %cmp, i32 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i32_acq_rel_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 4
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB26_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aq a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB26_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB26_1 Depth=1
+; RV32A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB26_1
+; RV32A-NEXT:  .LBB26_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_acq_rel_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 4
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB26_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB26_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB26_1 Depth=1
+; RV64A-NEXT:    sc.w.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB26_1
+; RV64A-NEXT:  .LBB26_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val acq_rel acquire
   ret void
@@ -1549,28 +1751,24 @@ define void @cmpxchg_i32_seq_cst_monotonic(i32* %ptr, i32 %cmp, i32 %val) nounwi
 ;
 ; RV32A-LABEL: cmpxchg_i32_seq_cst_monotonic:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, zero
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB27_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB27_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB27_1 Depth=1
+; RV32A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB27_1
+; RV32A-NEXT:  .LBB27_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_seq_cst_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB27_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB27_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB27_1 Depth=1
+; RV64A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB27_1
+; RV64A-NEXT:  .LBB27_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val seq_cst monotonic
   ret void
@@ -1605,28 +1803,24 @@ define void @cmpxchg_i32_seq_cst_acquire(i32* %ptr, i32 %cmp, i32 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i32_seq_cst_acquire:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    addi a4, zero, 2
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB28_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB28_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB28_1 Depth=1
+; RV32A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB28_1
+; RV32A-NEXT:  .LBB28_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_seq_cst_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB28_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB28_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB28_1 Depth=1
+; RV64A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB28_1
+; RV64A-NEXT:  .LBB28_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val seq_cst acquire
   ret void
@@ -1661,28 +1855,24 @@ define void @cmpxchg_i32_seq_cst_seq_cst(i32* %ptr, i32 %cmp, i32 %val) nounwind
 ;
 ; RV32A-LABEL: cmpxchg_i32_seq_cst_seq_cst:
 ; RV32A:       # %bb.0:
-; RV32A-NEXT:    addi sp, sp, -16
-; RV32A-NEXT:    sw ra, 12(sp)
-; RV32A-NEXT:    sw a1, 8(sp)
-; RV32A-NEXT:    addi a1, sp, 8
-; RV32A-NEXT:    addi a3, zero, 5
-; RV32A-NEXT:    mv a4, a3
-; RV32A-NEXT:    call __atomic_compare_exchange_4
-; RV32A-NEXT:    lw ra, 12(sp)
-; RV32A-NEXT:    addi sp, sp, 16
+; RV32A-NEXT:  .LBB29_1: # =>This Inner Loop Header: Depth=1
+; RV32A-NEXT:    lr.w.aqrl a3, (a0)
+; RV32A-NEXT:    bne a3, a1, .LBB29_3
+; RV32A-NEXT:  # %bb.2: # in Loop: Header=BB29_1 Depth=1
+; RV32A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV32A-NEXT:    bnez a4, .LBB29_1
+; RV32A-NEXT:  .LBB29_3:
 ; RV32A-NEXT:    ret
 ;
 ; RV64A-LABEL: cmpxchg_i32_seq_cst_seq_cst:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sw a1, 4(sp)
-; RV64A-NEXT:    addi a1, sp, 4
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    mv a4, a3
-; RV64A-NEXT:    call __atomic_compare_exchange_4
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB29_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.w.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB29_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB29_1 Depth=1
+; RV64A-NEXT:    sc.w.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB29_1
+; RV64A-NEXT:  .LBB29_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i32* %ptr, i32 %cmp, i32 %val seq_cst seq_cst
   ret void
@@ -1736,15 +1926,13 @@ define void @cmpxchg_i64_monotonic_monotonic(i64* %ptr, i64 %cmp, i64 %val) noun
 ;
 ; RV64A-LABEL: cmpxchg_i64_monotonic_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    mv a3, zero
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB30_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB30_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB30_1 Depth=1
+; RV64A-NEXT:    sc.d a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB30_1
+; RV64A-NEXT:  .LBB30_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val monotonic monotonic
   ret void
@@ -1800,15 +1988,13 @@ define void @cmpxchg_i64_acquire_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ;
 ; RV64A-LABEL: cmpxchg_i64_acquire_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 2
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB31_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB31_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB31_1 Depth=1
+; RV64A-NEXT:    sc.d a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB31_1
+; RV64A-NEXT:  .LBB31_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val acquire monotonic
   ret void
@@ -1862,15 +2048,13 @@ define void @cmpxchg_i64_acquire_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ;
 ; RV64A-LABEL: cmpxchg_i64_acquire_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 2
-; RV64A-NEXT:    mv a4, a3
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB32_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB32_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB32_1 Depth=1
+; RV64A-NEXT:    sc.d a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB32_1
+; RV64A-NEXT:  .LBB32_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val acquire acquire
   ret void
@@ -1926,15 +2110,13 @@ define void @cmpxchg_i64_release_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ;
 ; RV64A-LABEL: cmpxchg_i64_release_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 3
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB33_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB33_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB33_1 Depth=1
+; RV64A-NEXT:    sc.d.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB33_1
+; RV64A-NEXT:  .LBB33_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val release monotonic
   ret void
@@ -1990,15 +2172,13 @@ define void @cmpxchg_i64_release_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ;
 ; RV64A-LABEL: cmpxchg_i64_release_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 3
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB34_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB34_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB34_1 Depth=1
+; RV64A-NEXT:    sc.d.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB34_1
+; RV64A-NEXT:  .LBB34_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val release acquire
   ret void
@@ -2054,15 +2234,13 @@ define void @cmpxchg_i64_acq_rel_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ;
 ; RV64A-LABEL: cmpxchg_i64_acq_rel_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 4
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB35_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB35_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB35_1 Depth=1
+; RV64A-NEXT:    sc.d.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB35_1
+; RV64A-NEXT:  .LBB35_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val acq_rel monotonic
   ret void
@@ -2118,15 +2296,13 @@ define void @cmpxchg_i64_acq_rel_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ;
 ; RV64A-LABEL: cmpxchg_i64_acq_rel_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 4
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB36_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aq a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB36_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB36_1 Depth=1
+; RV64A-NEXT:    sc.d.rl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB36_1
+; RV64A-NEXT:  .LBB36_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val acq_rel acquire
   ret void
@@ -2182,15 +2358,13 @@ define void @cmpxchg_i64_seq_cst_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ;
 ; RV64A-LABEL: cmpxchg_i64_seq_cst_monotonic:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    mv a4, zero
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB37_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB37_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB37_1 Depth=1
+; RV64A-NEXT:    sc.d.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB37_1
+; RV64A-NEXT:  .LBB37_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val seq_cst monotonic
   ret void
@@ -2246,15 +2420,13 @@ define void @cmpxchg_i64_seq_cst_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ;
 ; RV64A-LABEL: cmpxchg_i64_seq_cst_acquire:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    addi a4, zero, 2
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB38_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB38_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB38_1 Depth=1
+; RV64A-NEXT:    sc.d.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB38_1
+; RV64A-NEXT:  .LBB38_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val seq_cst acquire
   ret void
@@ -2308,15 +2480,13 @@ define void @cmpxchg_i64_seq_cst_seq_cst(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ;
 ; RV64A-LABEL: cmpxchg_i64_seq_cst_seq_cst:
 ; RV64A:       # %bb.0:
-; RV64A-NEXT:    addi sp, sp, -16
-; RV64A-NEXT:    sd ra, 8(sp)
-; RV64A-NEXT:    sd a1, 0(sp)
-; RV64A-NEXT:    mv a1, sp
-; RV64A-NEXT:    addi a3, zero, 5
-; RV64A-NEXT:    mv a4, a3
-; RV64A-NEXT:    call __atomic_compare_exchange_8
-; RV64A-NEXT:    ld ra, 8(sp)
-; RV64A-NEXT:    addi sp, sp, 16
+; RV64A-NEXT:  .LBB39_1: # =>This Inner Loop Header: Depth=1
+; RV64A-NEXT:    lr.d.aqrl a3, (a0)
+; RV64A-NEXT:    bne a3, a1, .LBB39_3
+; RV64A-NEXT:  # %bb.2: # in Loop: Header=BB39_1 Depth=1
+; RV64A-NEXT:    sc.d.aqrl a4, a2, (a0)
+; RV64A-NEXT:    bnez a4, .LBB39_1
+; RV64A-NEXT:  .LBB39_3:
 ; RV64A-NEXT:    ret
   %res = cmpxchg i64* %ptr, i64 %cmp, i64 %val seq_cst seq_cst
   ret void

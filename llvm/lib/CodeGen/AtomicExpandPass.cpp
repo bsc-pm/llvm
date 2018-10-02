@@ -91,6 +91,7 @@ namespace {
     AtomicRMWInst *widenPartwordAtomicRMW(AtomicRMWInst *AI);
     void expandPartwordCmpXchg(AtomicCmpXchgInst *I);
     void expandAtomicRMWToMaskedIntrinsic(AtomicRMWInst *AI);
+    void expandAtomicCmpXchgToMaskedIntrinsic(AtomicCmpXchgInst *CI);
 
     AtomicCmpXchgInst *convertCmpXchgToIntegerType(AtomicCmpXchgInst *CI);
     static Value *insertRMWCmpXchgLoop(
@@ -242,14 +243,16 @@ bool AtomicExpand::runOnFunction(Function &F) {
         continue;
       }
     } else if (CASI) {
-      // Support of CAS is ongoing upstream so this a stop-gap for now.
-      auto isRISCV = [&]() {
+      // For rv64a cmpxcgh involving i8 or i16 don't work yet.
+      // This is a stop-gap until we fully devise a solution.
+      auto isNotSupportedRISCV64 = [&]() {
         auto Triple = TM.getTargetTriple();
         auto Arch = Triple.getArch();
+        unsigned Size = getAtomicOpSize(CASI);
 
-        return Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64;
+        return (Arch == llvm::Triple::riscv64) && (Size < 4);
       };
-      if (!atomicSizeSupported(TLI, CASI) || isRISCV()) {
+      if (!atomicSizeSupported(TLI, CASI) || isNotSupportedRISCV64()) {
         expandAtomicCASToLibcall(CASI);
         MadeChange = true;
         continue;
@@ -951,6 +954,35 @@ void AtomicExpand::expandAtomicRMWToMaskedIntrinsic(AtomicRMWInst *AI) {
   AI->eraseFromParent();
 }
 
+void AtomicExpand::expandAtomicCmpXchgToMaskedIntrinsic(AtomicCmpXchgInst *CI) {
+  IRBuilder<> Builder(CI);
+
+  PartwordMaskValues PMV = createMaskInstrs(
+      Builder, CI, CI->getCompareOperand()->getType(), CI->getPointerOperand(),
+      TLI->getMinCmpXchgSizeInBits() / 8);
+
+  Value *CmpVal_Shifted = Builder.CreateShl(
+      Builder.CreateZExt(CI->getCompareOperand(), PMV.WordType), PMV.ShiftAmt,
+      "CmpVal_Shifted");
+  Value *NewVal_Shifted = Builder.CreateShl(
+      Builder.CreateZExt(CI->getNewValOperand(), PMV.WordType), PMV.ShiftAmt,
+      "NewVal_Shifted");
+  Value *OldVal = TLI->emitMaskedAtomicCmpXchgIntrinsic(
+      Builder, CI, PMV.AlignedAddr, CmpVal_Shifted, NewVal_Shifted, PMV.Mask,
+      CI->getSuccessOrdering());
+  Value *FinalOldVal = Builder.CreateTrunc(
+      Builder.CreateLShr(OldVal, PMV.ShiftAmt), PMV.ValueType);
+
+  Value *Res = UndefValue::get(CI->getType());
+  Res = Builder.CreateInsertValue(Res, FinalOldVal, 0);
+  Value *Success = Builder.CreateICmpEQ(
+      CmpVal_Shifted, Builder.CreateAnd(OldVal, PMV.Mask), "Success");
+  Res = Builder.CreateInsertValue(Res, Success, 1);
+
+  CI->replaceAllUsesWith(Res);
+  CI->eraseFromParent();
+}
+
 Value *AtomicExpand::insertRMWLLSCLoop(
     IRBuilder<> &Builder, Type *ResultTy, Value *Addr,
     AtomicOrdering MemOpOrder,
@@ -1373,8 +1405,8 @@ bool AtomicExpand::tryExpandAtomicCmpXchg(AtomicCmpXchgInst *CI) {
     return expandAtomicCmpXchg(CI);
   }
   case TargetLoweringBase::AtomicExpansionKind::MaskedIntrinsic:
-    llvm_unreachable(
-        "MaskedIntrinsic expansion of cmpxhg not yet implemented");
+    expandAtomicCmpXchgToMaskedIntrinsic(CI);
+    return true;
   }
 }
 
