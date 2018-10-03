@@ -590,21 +590,51 @@ let usesCustomInserter = 1, hasNoSchedulingInfo = 1, Uses = [EFLAGS] in {
 
   defm _FR32   : CMOVrr_PSEUDO<FR32, f32>;
   defm _FR64   : CMOVrr_PSEUDO<FR64, f64>;
-  defm _F128   : CMOVrr_PSEUDO<VR128, f128>;
-  defm _V4F32  : CMOVrr_PSEUDO<VR128, v4f32>;
-  defm _V2F64  : CMOVrr_PSEUDO<VR128, v2f64>;
-  defm _V2I64  : CMOVrr_PSEUDO<VR128, v2i64>;
-  defm _V8F32  : CMOVrr_PSEUDO<VR256, v8f32>;
-  defm _V4F64  : CMOVrr_PSEUDO<VR256, v4f64>;
-  defm _V4I64  : CMOVrr_PSEUDO<VR256, v4i64>;
-  defm _V8I64  : CMOVrr_PSEUDO<VR512, v8i64>;
-  defm _V8F64  : CMOVrr_PSEUDO<VR512, v8f64>;
-  defm _V16F32 : CMOVrr_PSEUDO<VR512, v16f32>;
-  defm _V8I1   : CMOVrr_PSEUDO<VK8,  v8i1>;
-  defm _V16I1  : CMOVrr_PSEUDO<VK16, v16i1>;
-  defm _V32I1  : CMOVrr_PSEUDO<VK32, v32i1>;
-  defm _V64I1  : CMOVrr_PSEUDO<VK64, v64i1>;
+  let Predicates = [NoVLX] in {
+    defm _VR128  : CMOVrr_PSEUDO<VR128, v2i64>;
+    defm _VR256  : CMOVrr_PSEUDO<VR256, v4i64>;
+  }
+  let Predicates = [HasVLX] in {
+    defm _VR128X : CMOVrr_PSEUDO<VR128X, v2i64>;
+    defm _VR256X : CMOVrr_PSEUDO<VR256X, v4i64>;
+  }
+  defm _VR512  : CMOVrr_PSEUDO<VR512, v8i64>;
+  defm _VK2    : CMOVrr_PSEUDO<VK2,  v2i1>;
+  defm _VK4    : CMOVrr_PSEUDO<VK4,  v4i1>;
+  defm _VK8    : CMOVrr_PSEUDO<VK8,  v8i1>;
+  defm _VK16   : CMOVrr_PSEUDO<VK16, v16i1>;
+  defm _VK32   : CMOVrr_PSEUDO<VK32, v32i1>;
+  defm _VK64   : CMOVrr_PSEUDO<VK64, v64i1>;
 } // usesCustomInserter = 1, hasNoSchedulingInfo = 1, Uses = [EFLAGS]
+
+def : Pat<(f128 (X86cmov VR128:$t, VR128:$f, imm:$cond, EFLAGS)),
+          (CMOV_VR128 VR128:$t, VR128:$f, imm:$cond)>;
+
+let Predicates = [NoVLX] in {
+  def : Pat<(v4f32 (X86cmov VR128:$t, VR128:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR128 VR128:$t, VR128:$f, imm:$cond)>;
+  def : Pat<(v2f64 (X86cmov VR128:$t, VR128:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR128 VR128:$t, VR128:$f, imm:$cond)>;
+  def : Pat<(v8f32 (X86cmov VR256:$t, VR256:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR256 VR256:$t, VR256:$f, imm:$cond)>;
+  def : Pat<(v4f64 (X86cmov VR256:$t, VR256:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR256 VR256:$t, VR256:$f, imm:$cond)>;
+}
+let Predicates = [HasVLX] in {
+  def : Pat<(v4f32 (X86cmov VR128X:$t, VR128X:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR128X VR128X:$t, VR128X:$f, imm:$cond)>;
+  def : Pat<(v2f64 (X86cmov VR128X:$t, VR128X:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR128X VR128X:$t, VR128X:$f, imm:$cond)>;
+  def : Pat<(v8f32 (X86cmov VR256X:$t, VR256X:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR256X VR256X:$t, VR256X:$f, imm:$cond)>;
+  def : Pat<(v4f64 (X86cmov VR256X:$t, VR256X:$f, imm:$cond, EFLAGS)),
+            (CMOV_VR256X VR256X:$t, VR256X:$f, imm:$cond)>;
+}
+
+def : Pat<(v16f32 (X86cmov VR512:$t, VR512:$f, imm:$cond, EFLAGS)),
+          (CMOV_VR512 VR512:$t, VR512:$f, imm:$cond)>;
+def : Pat<(v8f64 (X86cmov VR512:$t, VR512:$f, imm:$cond, EFLAGS)),
+          (CMOV_VR512 VR512:$t, VR512:$f, imm:$cond)>;
 
 //===----------------------------------------------------------------------===//
 // Normal-Instructions-With-Lock-Prefix Pseudo Instructions
@@ -619,7 +649,7 @@ let isCodeGenOnly = 1, Defs = [EFLAGS] in
 def OR32mrLocked  : I<0x09, MRMDestMem, (outs), (ins i32mem:$dst, GR32:$zero),
                       "or{l}\t{$zero, $dst|$dst, $zero}", []>,
                       Requires<[Not64BitMode]>, OpSize32, LOCK,
-                      Sched<[WriteALULd, WriteRMW]>;
+                      Sched<[WriteALURMW]>;
 
 let hasSideEffects = 1 in
 def Int_MemBarrier : I<0, Pseudo, (outs), (ins),
@@ -633,7 +663,7 @@ def Int_MemBarrier : I<0, Pseudo, (outs), (ins),
 multiclass LOCK_ArithBinOp<bits<8> RegOpc, bits<8> ImmOpc, bits<8> ImmOpc8,
                            Format ImmMod, SDNode Op, string mnemonic> {
 let Defs = [EFLAGS], mayLoad = 1, mayStore = 1, isCodeGenOnly = 1,
-    SchedRW = [WriteALULd, WriteRMW] in {
+    SchedRW = [WriteALURMW] in {
 
 def NAME#8mr : I<{RegOpc{7}, RegOpc{6}, RegOpc{5}, RegOpc{4},
                   RegOpc{3}, RegOpc{2}, RegOpc{1}, 0 },
@@ -732,7 +762,7 @@ defm LOCK_XOR : LOCK_ArithBinOp<0x30, 0x80, 0x83, MRM6m, X86lock_xor, "xor">;
 multiclass LOCK_ArithUnOp<bits<8> Opc8, bits<8> Opc, Format Form,
                           string frag, string mnemonic> {
 let Defs = [EFLAGS], mayLoad = 1, mayStore = 1, isCodeGenOnly = 1,
-    SchedRW = [WriteALULd, WriteRMW] in {
+    SchedRW = [WriteALURMW] in {
 def NAME#8m  : I<Opc8, Form, (outs), (ins i8mem :$dst),
                  !strconcat(mnemonic, "{b}\t$dst"),
                  [(set EFLAGS, (!cast<PatFrag>(frag # "_8") addr:$dst))]>,
@@ -870,7 +900,7 @@ defm LCMPXCHG : LCMPXCHG_BinOp<0xB0, 0xB1, MRMDestMem, "cmpxchg", X86cas>;
 multiclass ATOMIC_LOAD_BINOP<bits<8> opc8, bits<8> opc, string mnemonic,
                              string frag> {
   let Constraints = "$val = $dst", Defs = [EFLAGS], isCodeGenOnly = 1,
-      SchedRW = [WriteALULd, WriteRMW] in {
+      SchedRW = [WriteALURMW] in {
     def NAME#8  : I<opc8, MRMSrcMem, (outs GR8:$dst),
                     (ins GR8:$val, i8mem:$ptr),
                     !strconcat(mnemonic, "{b}\t{$val, $ptr|$ptr, $val}"),
