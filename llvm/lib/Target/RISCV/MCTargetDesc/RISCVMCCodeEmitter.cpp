@@ -278,8 +278,8 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_CALL: {
       FixupKind = RISCV::fixup_riscv_call;
       if (RVExpr->getSubExpr()->getKind() == MCExpr::Target) {
-        const RISCVMCExpr *SubExpr = cast<RISCVMCExpr>(RVExpr->getSubExpr());
-        assert(SubExpr->getKind() == RISCVMCExpr::VK_RISCV_PLT &&
+        assert(cast<RISCVMCExpr>(RVExpr->getSubExpr())->getKind() ==
+                   RISCVMCExpr::VK_RISCV_PLT &&
                "Only PLT is allowed");
         FixupKind = RISCV::fixup_riscv_call_plt;
       } else if (RVExpr->getSubExpr()->getKind() == MCExpr::SymbolRef)
