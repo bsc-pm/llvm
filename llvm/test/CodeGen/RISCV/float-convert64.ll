@@ -97,3 +97,21 @@ entry:
   %conv = sitofp i32 %x to double
   ret double %conv
 }
+
+define dso_local i64 @fcvt_w_s(double %a) nounwind {
+; CHECK-LABEL: fcvt_w_s:
+; CHECK:       # %bb.0:
+; CHECK-NEXT:    fcvt.l.d a0, fa0, rtz
+; CHECK-NEXT:    ret
+  %1 = fptosi double %a to i64
+  ret i64 %1
+}
+
+define dso_local i64 @fcvt_wu_s(double %a) nounwind {
+; CHECK-LABEL: fcvt_wu_s:
+; CHECK:       # %bb.0:
+; CHECK-NEXT:    fcvt.lu.d a0, fa0, rtz
+; CHECK-NEXT:    ret
+  %1 = fptoui double %a to i64
+  ret i64 %1
+}

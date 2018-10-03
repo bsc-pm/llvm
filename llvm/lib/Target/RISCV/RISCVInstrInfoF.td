@@ -364,6 +364,10 @@ def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_WU $rs1, 0b111)>;
 } // Predicates = [HasStdExtF, IsRV32]
 
 let Predicates = [HasStdExtF, IsRV64] in {
+// double->[u]int64. Round-to-zero must be used.
+def : Pat<(fp_to_sint FPR32:$rs1), (FCVT_L_S $rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_LU_S $rs1, 0b001)>;
+
 // [u]int64->float. Match GCC and default to using dynamic rounding mode.
 // FIXME: isn't this redundant with what we have in RISCVInstrInfoD
 def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_L $rs1, 0b111)>;
