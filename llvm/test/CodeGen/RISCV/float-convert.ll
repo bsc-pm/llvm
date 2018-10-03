@@ -4,14 +4,14 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+f -verify-machineinstrs < %s \
 ; RUN:   | FileCheck -check-prefix=RV64IF %s
 
-define i32 @fcvt_w_s(float %a) nounwind {
-; RV32IF-LABEL: fcvt_w_s:
+define i32 @float_to_int32(float %a) nounwind {
+; RV32IF-LABEL: float_to_int32:
 ; RV32IF:       # %bb.0:
 ; RV32IF-NEXT:    fmv.w.x ft0, a0
 ; RV32IF-NEXT:    fcvt.w.s a0, ft0, rtz
 ; RV32IF-NEXT:    ret
 ;
-; RV64IF-LABEL: fcvt_w_s:
+; RV64IF-LABEL: float_to_int32:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    fmv.w.x ft0, a0
 ; RV64IF-NEXT:    fcvt.l.s a0, ft0, rtz
@@ -20,14 +20,14 @@ define i32 @fcvt_w_s(float %a) nounwind {
   ret i32 %1
 }
 
-define i32 @fcvt_wu_s(float %a) nounwind {
-; RV32IF-LABEL: fcvt_wu_s:
+define i32 @float_to_uint32(float %a) nounwind {
+; RV32IF-LABEL: float_to_uint32:
 ; RV32IF:       # %bb.0:
 ; RV32IF-NEXT:    fmv.w.x ft0, a0
 ; RV32IF-NEXT:    fcvt.wu.s a0, ft0, rtz
 ; RV32IF-NEXT:    ret
 ;
-; RV64IF-LABEL: fcvt_wu_s:
+; RV64IF-LABEL: float_to_uint32:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    fmv.w.x ft0, a0
 ; RV64IF-NEXT:    fcvt.lu.s a0, ft0, rtz
@@ -61,14 +61,14 @@ define i32 @fmv_x_w(float %a, float %b) nounwind {
   ret i32 %2
 }
 
-define float @fcvt_s_w(i32 %a) nounwind {
-; RV32IF-LABEL: fcvt_s_w:
+define float @int32_to_float(i32 %a) nounwind {
+; RV32IF-LABEL: int32_to_float:
 ; RV32IF:       # %bb.0:
 ; RV32IF-NEXT:    fcvt.s.w ft0, a0
 ; RV32IF-NEXT:    fmv.x.w a0, ft0
 ; RV32IF-NEXT:    ret
 ;
-; RV64IF-LABEL: fcvt_s_w:
+; RV64IF-LABEL: int32_to_float:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    sext.w a0, a0
 ; RV64IF-NEXT:    fcvt.s.l ft0, a0
@@ -78,14 +78,14 @@ define float @fcvt_s_w(i32 %a) nounwind {
   ret float %1
 }
 
-define float @fcvt_s_wu(i32 %a) nounwind {
-; RV32IF-LABEL: fcvt_s_wu:
+define float @uint32_to_float(i32 %a) nounwind {
+; RV32IF-LABEL: uint32_to_float:
 ; RV32IF:       # %bb.0:
 ; RV32IF-NEXT:    fcvt.s.wu ft0, a0
 ; RV32IF-NEXT:    fmv.x.w a0, ft0
 ; RV32IF-NEXT:    ret
 ;
-; RV64IF-LABEL: fcvt_s_wu:
+; RV64IF-LABEL: uint32_to_float:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    lui a1, 0
 ; RV64IF-NEXT:    sext.w a2, a1

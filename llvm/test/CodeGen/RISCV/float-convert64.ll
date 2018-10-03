@@ -98,8 +98,8 @@ entry:
   ret double %conv
 }
 
-define dso_local i64 @fcvt_w_s(double %a) nounwind {
-; CHECK-LABEL: fcvt_w_s:
+define dso_local i64 @f64tos32(double %a) nounwind {
+; CHECK-LABEL: f64tos32:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    fcvt.l.d a0, fa0, rtz
 ; CHECK-NEXT:    ret
@@ -107,8 +107,8 @@ define dso_local i64 @fcvt_w_s(double %a) nounwind {
   ret i64 %1
 }
 
-define dso_local i64 @fcvt_wu_s(double %a) nounwind {
-; CHECK-LABEL: fcvt_wu_s:
+define dso_local i64 @f64tou32(double %a) nounwind {
+; CHECK-LABEL: f64tou32:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    fcvt.lu.d a0, fa0, rtz
 ; CHECK-NEXT:    ret
