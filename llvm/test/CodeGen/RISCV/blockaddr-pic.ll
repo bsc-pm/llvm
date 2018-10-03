@@ -18,8 +18,8 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV64-NOPIC:    lui a1, %hi(.Ltmp0)
 ; RV64-NOPIC:    addi a1, a1, %lo(.Ltmp0)
 ; RV64-NOPIC:    sd a1, 0(sp)
-; RV64-NOPIC:    slti a0, a0, 101
-; RV64-NOPIC:    bnez a0,
+; RV64-NOPIC:    addi  a1, zero, 101
+; RV64-NOPIC:    blt a0, a1,
 ; RV64-NOPIC:    ld a0, 0(sp)
 ; RV64-NOPIC:    jr a0
 ; RV64-NOPIC:  .Ltmp0:
@@ -40,8 +40,10 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV64-PIC:    sd ra, 8(sp)
 ; RV64-PIC:    lla a1, .Ltmp0
 ; RV64-PIC:    sd a1, 0(sp)
-; RV64-PIC:    slti a0, a0, 101
-; RV64-PIC:    bnez a0
+; RV64-PIC:    addi a1, zero, 101
+; RV64-PIC:    blt  a0, a1
+; RV64-PIC:    ld a0, 0(sp)
+; RV64-PIC:    jr a0
 ; RV64-PIC:  .Ltmp0:
 
 entry:

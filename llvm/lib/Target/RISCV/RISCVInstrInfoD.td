@@ -216,6 +216,8 @@ def : Pat<(bitconvert FPR64:$rs1), (FMV_X_D FPR64:$rs1)>;
 def : Pat<(fpround FPR64:$rs1), (FCVT_S_D FPR64:$rs1, 0b111)>;
 def : Pat<(fpextend FPR32:$rs1), (FCVT_D_S FPR32:$rs1)>;
 
+// [u]int<->double conversion patterns must be gated on IsRV32 or IsRV64, so
+// are defined later.
 
 /// Float arithmetic operations
 
@@ -301,25 +303,21 @@ def SplitF64Pseudo
 } // Predicates = [HasStdExtD]
 
 let Predicates = [HasStdExtD, IsRV32] in {
+// double->[u]int. Round-to-zero must be used.
+def : Pat<(fp_to_sint FPR64:$rs1), (FCVT_W_D FPR64:$rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR64:$rs1), (FCVT_WU_D FPR64:$rs1, 0b001)>;
 
-// [u]int->fp
+// [u]int->double.
 def : Pat<(sint_to_fp GPR:$rs1), (FCVT_D_W GPR:$rs1)>;
 def : Pat<(uint_to_fp GPR:$rs1), (FCVT_D_WU GPR:$rs1)>;
-
-// FP->[u]int. Round-to-zero must be used
-def : Pat<(fp_to_sint FPR64:$rs1), (FCVT_W_D $rs1, 0b001)>;
-def : Pat<(fp_to_uint FPR64:$rs1), (FCVT_WU_D $rs1, 0b001)>;
-
 } // Predicates = [HasStdExtD, IsRV32]
 
 let Predicates = [HasStdExtD, IsRV64] in {
-
-// [u]int->fp
-def : Pat<(sint_to_fp GPR:$rs1), (FCVT_D_L GPR:$rs1, 0b111)>;
-def : Pat<(uint_to_fp GPR:$rs1), (FCVT_D_LU GPR:$rs1, 0b111)>;
-
-// FP->[u]int. Round-to-zero must be used
+// double->[u]int64. Round-to-zero must be used
 def : Pat<(fp_to_sint FPR64:$rs1), (FCVT_L_D $rs1, 0b001)>;
 def : Pat<(fp_to_uint FPR64:$rs1), (FCVT_LU_D $rs1, 0b001)>;
 
+// [u]int64->double
+def : Pat<(sint_to_fp GPR:$rs1), (FCVT_D_L GPR:$rs1, 0b111)>;
+def : Pat<(uint_to_fp GPR:$rs1), (FCVT_D_LU GPR:$rs1, 0b111)>;
 } // Predicates = [HasStdExtD, IsRV64]

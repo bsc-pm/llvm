@@ -270,9 +270,8 @@ let Predicates = [HasStdExtF] in {
 def : Pat<(bitconvert GPR:$rs1), (FMV_W_X GPR:$rs1)>;
 def : Pat<(bitconvert FPR32:$rs1), (FMV_X_W FPR32:$rs1)>;
 
-// FP->[u]int. Round-to-zero must be used
-def : Pat<(fp_to_sint FPR32:$rs1), (FCVT_W_S $rs1, 0b001)>;
-def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_WU_S $rs1, 0b001)>;
+// [u]int32<->float conversion patterns must be gated on IsRV32 or IsRV64, so
+// are defined later.
 
 /// Float arithmetic operations
 
@@ -353,16 +352,27 @@ defm : StPat<store, FSW, FPR32>;
 
 } // Predicates = [HasStdExtF]
 
+
+let Predicates = [HasStdExtF, IsRV32] in {
+// float->[u]int. Round-to-zero must be used.
+def : Pat<(fp_to_sint FPR32:$rs1), (FCVT_W_S $rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_WU_S $rs1, 0b001)>;
+
+// [u]int->float. Match GCC and default to using dynamic rounding mode.
+def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_W $rs1, 0b111)>;
+def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_WU $rs1, 0b111)>;
+} // Predicates = [HasStdExtF, IsRV32]
+
 let Predicates = [HasStdExtF, IsRV64] in {
-
-def : Pat<(RISCVF32ToI64 FPR32:$src),
-          (FMV_X_W FPR32:$src)>;
-
-def : Pat<(RISCVI64ToF32 GPR:$src),
-          (FMV_W_X GPR:$src)>;
-
-// [u]int->fp. Match GCC and default to using dynamic rounding mode.
+// [u]int64->float. Match GCC and default to using dynamic rounding mode.
+// FIXME: isn't this redundant with what we have in RISCVInstrInfoD
 def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_L $rs1, 0b111)>;
 def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_LU $rs1, 0b111)>;
 
+// bitmove f32 to i64. Used for soft-float ABI in RV64F
+def : Pat<(RISCVF32ToI64 FPR32:$src),
+          (FMV_X_W FPR32:$src)>;
+// bitmove i64 to f32. Used for soft-float ABI in RV64F
+def : Pat<(RISCVI64ToF32 GPR:$src),
+          (FMV_W_X GPR:$src)>;
 } // Predicates = [HasStdExtF, IsRV64]
