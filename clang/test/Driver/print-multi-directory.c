@@ -1,5 +1,6 @@
 // RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>/dev/null \
 // RUN:     -target i386-none-linux \
+// RUN:     --gcc-toolchain= \
 // RUN:     --sysroot=%S/Inputs/multilib_64bit_linux_tree/usr \
 // RUN:     -print-multi-directory \
 // RUN:   | FileCheck --match-full-lines --check-prefix=CHECK-X86-MULTILIBS %s
