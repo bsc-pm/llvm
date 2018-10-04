@@ -33,8 +33,12 @@ function warning()
 
 function run()
 {
-  P="$@"
-  echo "$P"
+  for i in "$@";
+  do
+    echo -n "'$i' "
+  done
+  echo
+
   "$@"
 }
 
@@ -55,7 +59,7 @@ then
 else
   info "Using '${INSTALLDIR}' as the install-dir"
 fi
-CMAKE_INVOCATION_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=${INSTALLDIR}"
+CMAKE_INVOCATION_EXTRA_FLAGS=("-DCMAKE_INSTALL_PREFIX=${INSTALLDIR}")
 
 ################################################################################
 # Detection of toolchain and sysroot
@@ -173,7 +177,8 @@ then
   CC=${CC:-"$(which clang)"}
   CXX=${CXX:-"$(which clang++)"}
 fi
-CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}"
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${CC}")
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${CXX}")
 
 ################################################################################
 # Detection of the linker
@@ -197,7 +202,7 @@ fi
 
 if [ "$LINKER" = "lld" ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DLLVM_ENABLE_LLD=ON"
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_ENABLE_LLD=ON")
 fi
 
 if [ "$BUILD_SYSTEM" = "Ninja" ];
@@ -217,7 +222,7 @@ then
   # At least 1
   NUM_LINK_JOBS=$((${NUM_LINK_JOBS} + 1))
   info "Limiting concurrent linking jobs to ${NUM_LINK_JOBS}"
-  CMAKE_INVOCATION_EXTRA_FLAGS="${CMAKE_INVOCATION_EXTRA_FLAGS} -DLLVM_PARALLEL_LINK_JOBS=${NUM_LINK_JOBS}"
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_LINK_JOBS=${NUM_LINK_JOBS}")
 else
   warning "Makefiles do not allow limiting the concurrent linking jobs"
 fi
@@ -229,9 +234,9 @@ fi
 if [ -n "$(which ccache)" ];
 then
   info "Using ccache: $(which ccache)"
-  CMAKE_INVOCATION_EXTRA_FLAGS="$CMAKE_INVOCATION_EXTRA_FLAGS -DLLVM_CCACHE_BUILD=ON"
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_CCACHE_BUILD=ON")
   info "Setting LLVM_APPEND_VC_REV=OFF to improve ccache hit ratio"
-  CMAKE_INVOCATION_EXTRA_FLAGS="$CMAKE_INVOCATION_EXTRA_FLAGS -DLLVM_APPEND_VC_REV=OFF"
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_APPEND_VC_REV=OFF")
 else
   info "Not using ccache as it was not found"
 fi
@@ -247,7 +252,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR} \
    -DLLVM_DEFAULT_TARGET_TRIPLE=riscv64-unknown-linux-gnu \
    -DDEFAULT_SYSROOT=${RISCV_SYSROOT} \
    -DGCC_INSTALL_PREFIX=${GCC_TOOLCHAIN} \
-   ${CMAKE_INVOCATION_EXTRA_FLAGS}
+   "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
 if [ $? = 0 ];
 then
