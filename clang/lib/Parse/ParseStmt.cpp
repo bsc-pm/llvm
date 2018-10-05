@@ -362,6 +362,10 @@ Retry:
     ProhibitAttributes(Attrs);
     return HandlePragmaCaptured();
 
+  case tok::annot_pragma_ompss:
+    ProhibitAttributes(Attrs);
+    return ParseOmpSsDeclarativeOrExecutableDirective(Allowed);
+
   case tok::annot_pragma_openmp:
     ProhibitAttributes(Attrs);
     return ParseOpenMPDeclarativeOrExecutableDirective(Allowed);

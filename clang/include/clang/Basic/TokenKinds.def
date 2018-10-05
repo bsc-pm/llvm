@@ -811,6 +811,12 @@ ANNOTATION(pragma_opencl_extension)
 ANNOTATION(pragma_openmp)
 ANNOTATION(pragma_openmp_end)
 
+// Annotations for OmpSs pragma directives - #pragma oss ...
+// The lexer produces these so that they only take effect when the parser
+// handles #pragma oss ... directives.
+ANNOTATION(pragma_ompss)
+ANNOTATION(pragma_ompss_end)
+
 // Annotations for loop pragma directives #pragma clang loop ...
 // The lexer produces these so that they only take effect when the parser
 // handles #pragma loop ... directives.

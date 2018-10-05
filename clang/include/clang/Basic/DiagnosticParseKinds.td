@@ -1089,6 +1089,14 @@ def err_openclcxx_virtual_function : Error<
 def err_openclcxx_reserved : Error<
   "'%0' is a reserved keyword in OpenCL C++">;
 
+// OmpSs support.
+def warn_pragma_oss_ignored : Warning<
+  "unexpected '#pragma oss ...' in program">, InGroup<SourceUsesOmpSs>, DefaultIgnore;
+def err_oss_unexpected_directive : Error<
+  "unexpected OmpSs directive %select{|'#pragma oss %1'}0">;
+def err_oss_unknown_directive : Error<
+  "expected an OmpSs directive">;
+
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<
   "unexpected '#pragma omp ...' in program">, InGroup<SourceUsesOpenMP>, DefaultIgnore;

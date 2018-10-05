@@ -162,6 +162,18 @@ struct PragmaOpenMPHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaNoOmpSsHandler : public PragmaHandler {
+  PragmaNoOmpSsHandler() : PragmaHandler("oss") { }
+  void HandlePragma(Preprocessor &PP, PragmaIntroducerKind Introducer,
+                    Token &FirstToken) override;
+};
+
+struct PragmaOmpSsHandler : public PragmaHandler {
+  PragmaOmpSsHandler() : PragmaHandler("oss") { }
+  void HandlePragma(Preprocessor &PP, PragmaIntroducerKind Introducer,
+                    Token &FirstToken) override;
+};
+
 /// PragmaCommentHandler - "\#pragma comment ...".
 struct PragmaCommentHandler : public PragmaHandler {
   PragmaCommentHandler(Sema &Actions)
@@ -312,6 +324,13 @@ void Parser::initializePragmaHandlers() {
     OpenMPHandler.reset(new PragmaNoOpenMPHandler());
   PP.AddPragmaHandler(OpenMPHandler.get());
 
+  // OmpSs
+  if (getLangOpts().OmpSs)
+    OmpSsHandler.reset(new PragmaOmpSsHandler());
+  else
+    OmpSsHandler.reset(new PragmaNoOmpSsHandler());
+  PP.AddPragmaHandler(OmpSsHandler.get());
+
   if (getLangOpts().MicrosoftExt ||
       getTargetInfo().getTriple().isOSBinFormatELF()) {
     MSCommentHandler.reset(new PragmaCommentHandler(Actions));
@@ -403,6 +422,9 @@ void Parser::resetPragmaHandlers() {
   }
   PP.RemovePragmaHandler(OpenMPHandler.get());
   OpenMPHandler.reset();
+
+  PP.RemovePragmaHandler(OmpSsHandler.get());
+  OmpSsHandler.reset();
 
   if (getLangOpts().MicrosoftExt ||
       getTargetInfo().getTriple().isOSBinFormatELF()) {
@@ -2154,6 +2176,61 @@ PragmaOpenCLExtensionHandler::HandlePragma(Preprocessor &PP,
   if (PP.getPPCallbacks())
     PP.getPPCallbacks()->PragmaOpenCLExtension(NameLoc, Ext,
                                                StateLoc, State);
+}
+
+/// Handle '#pragma oss ...' when OmpSs is disabled.
+///
+void
+PragmaNoOmpSsHandler::HandlePragma(Preprocessor &PP,
+                                    PragmaIntroducerKind Introducer,
+                                    Token &FirstTok) {
+  if (!PP.getDiagnostics().isIgnored(diag::warn_pragma_oss_ignored,
+                                     FirstTok.getLocation())) {
+    PP.Diag(FirstTok, diag::warn_pragma_oss_ignored);
+    PP.getDiagnostics().setSeverity(diag::warn_pragma_oss_ignored,
+                                    diag::Severity::Ignored, SourceLocation());
+  }
+  PP.DiscardUntilEndOfDirective();
+}
+
+/// Handle '#pragma oss ...' when OmpSs is enabled.
+///
+void
+PragmaOmpSsHandler::HandlePragma(Preprocessor &PP,
+                                  PragmaIntroducerKind Introducer,
+                                  Token &FirstTok) {
+  SmallVector<Token, 16> Pragma;
+  Token Tok;
+  Tok.startToken();
+  Tok.setKind(tok::annot_pragma_ompss);
+  Tok.setLocation(FirstTok.getLocation());
+
+  while (Tok.isNot(tok::eod) && Tok.isNot(tok::eof)) {
+    Pragma.push_back(Tok);
+    PP.Lex(Tok);
+    if (Tok.is(tok::annot_pragma_ompss)) {
+      PP.Diag(Tok, diag::err_oss_unexpected_directive) << 0;
+      unsigned InnerPragmaCnt = 1;
+      while (InnerPragmaCnt != 0) {
+        PP.Lex(Tok);
+        if (Tok.is(tok::annot_pragma_ompss))
+          ++InnerPragmaCnt;
+        else if (Tok.is(tok::annot_pragma_ompss_end))
+          --InnerPragmaCnt;
+      }
+      PP.Lex(Tok);
+    }
+  }
+  SourceLocation EodLoc = Tok.getLocation();
+  Tok.startToken();
+  Tok.setKind(tok::annot_pragma_ompss_end);
+  Tok.setLocation(EodLoc);
+  Pragma.push_back(Tok);
+
+  auto Toks = llvm::make_unique<Token[]>(Pragma.size());
+  std::copy(Pragma.begin(), Pragma.end(), Toks.get());
+  PP.EnterTokenStream(std::move(Toks), Pragma.size(),
+                      /*DisableMacroExpansion=*/false);
 }
 
 /// Handle '#pragma omp ...' when OpenMP is disabled.
