@@ -50,3 +50,9 @@ call bar@plt
 # INSTR: auipc ra, 0
 # INSTR: jalr  ra
 # FIXUP:  fixup A - offset: 0, value: bar@plt, kind: fixup_riscv_call_plt
+
+call mstatus
+# RELOC: R_RISCV_CALL mstatus 0x0
+# INSTR: auipc ra, 0
+# INSTR: jalr  ra
+# FIXUP: fixup A - offset: 0, value: mstatus, kind: fixup_riscv_call
