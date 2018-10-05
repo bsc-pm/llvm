@@ -1943,13 +1943,13 @@ define void @cmpxchg_i64_acquire_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a5, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a5, zero, 2
+; RV32I-NEXT:    addi a4, zero, 2
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a5
+; RV32I-NEXT:    mv a3, a5
 ; RV32I-NEXT:    mv a5, zero
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
@@ -2065,13 +2065,13 @@ define void @cmpxchg_i64_release_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a5, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a5, zero, 3
+; RV32I-NEXT:    addi a4, zero, 3
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a5
+; RV32I-NEXT:    mv a3, a5
 ; RV32I-NEXT:    mv a5, zero
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
@@ -2127,14 +2127,14 @@ define void @cmpxchg_i64_release_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a6, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a6, zero, 3
+; RV32I-NEXT:    addi a4, zero, 3
 ; RV32I-NEXT:    addi a5, zero, 2
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a6
+; RV32I-NEXT:    mv a3, a6
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
 ; RV32I-NEXT:    addi sp, sp, 16
@@ -2189,13 +2189,13 @@ define void @cmpxchg_i64_acq_rel_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a5, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a5, zero, 4
+; RV32I-NEXT:    addi a4, zero, 4
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a5
+; RV32I-NEXT:    mv a3, a5
 ; RV32I-NEXT:    mv a5, zero
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
@@ -2251,14 +2251,14 @@ define void @cmpxchg_i64_acq_rel_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a6, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a6, zero, 4
+; RV32I-NEXT:    addi a4, zero, 4
 ; RV32I-NEXT:    addi a5, zero, 2
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a6
+; RV32I-NEXT:    mv a3, a6
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
 ; RV32I-NEXT:    addi sp, sp, 16
@@ -2313,13 +2313,13 @@ define void @cmpxchg_i64_seq_cst_monotonic(i64* %ptr, i64 %cmp, i64 %val) nounwi
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a5, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a5, zero, 5
+; RV32I-NEXT:    addi a4, zero, 5
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a5
+; RV32I-NEXT:    mv a3, a5
 ; RV32I-NEXT:    mv a5, zero
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
@@ -2375,14 +2375,14 @@ define void @cmpxchg_i64_seq_cst_acquire(i64* %ptr, i64 %cmp, i64 %val) nounwind
 ; RV32I:       # %bb.0:
 ; RV32I-NEXT:    addi sp, sp, -16
 ; RV32I-NEXT:    sw ra, 12(sp)
+; RV32I-NEXT:    mv a6, a4
 ; RV32I-NEXT:    sw a2, 4(sp)
 ; RV32I-NEXT:    sw a1, 0(sp)
 ; RV32I-NEXT:    mv a1, sp
-; RV32I-NEXT:    addi a6, zero, 5
+; RV32I-NEXT:    addi a4, zero, 5
 ; RV32I-NEXT:    addi a5, zero, 2
 ; RV32I-NEXT:    mv a2, a3
-; RV32I-NEXT:    mv a3, a4
-; RV32I-NEXT:    mv a4, a6
+; RV32I-NEXT:    mv a3, a6
 ; RV32I-NEXT:    call __atomic_compare_exchange_8
 ; RV32I-NEXT:    lw ra, 12(sp)
 ; RV32I-NEXT:    addi sp, sp, 16
