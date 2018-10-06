@@ -31755,6 +31755,15 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
       return true;
     break;
   }
+  case X86ISD::PSHUFB: {
+    // TODO - simplify other variable shuffle masks.
+    SDValue Mask = Op.getOperand(1);
+    APInt MaskUndef, MaskZero;
+    if (SimplifyDemandedVectorElts(Mask, DemandedElts, MaskUndef, MaskZero, TLO,
+                                   Depth + 1))
+      return true;
+    break;
+  }
   }
 
   // Simplify target shuffles.
@@ -37721,8 +37730,6 @@ static SDValue combineBEXTR(SDNode *N, SelectionDAG &DAG,
   unsigned NumBits = VT.getSizeInBits();
 
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-  TargetLowering::TargetLoweringOpt TLO(DAG, !DCI.isBeforeLegalize(),
-                                        !DCI.isBeforeLegalizeOps());
 
   // TODO - Constant Folding.
   if (auto *Cst1 = dyn_cast<ConstantSDNode>(Op1)) {
@@ -37736,12 +37743,9 @@ static SDValue combineBEXTR(SDNode *N, SelectionDAG &DAG,
   }
 
   // Only bottom 16-bits of the control bits are required.
-  KnownBits Known;
   APInt DemandedMask(APInt::getLowBitsSet(NumBits, 16));
-  if (TLI.SimplifyDemandedBits(Op1, DemandedMask, Known, TLO)) {
-    DCI.CommitTargetLoweringOpt(TLO);
+  if (TLI.SimplifyDemandedBits(Op1, DemandedMask, DCI))
     return SDValue(N, 0);
-  }
 
   return SDValue();
 }
@@ -38839,16 +38843,11 @@ static SDValue combineMOVMSK(SDNode *N, SelectionDAG &DAG,
     Src = Src.getOperand(0);
 
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-  TargetLowering::TargetLoweringOpt TLO(DAG, !DCI.isBeforeLegalize(),
-                                        !DCI.isBeforeLegalizeOps());
 
   // MOVMSK only uses the MSB from each vector element.
-  KnownBits Known;
   APInt DemandedMask(APInt::getSignMask(SrcVT.getScalarSizeInBits()));
-  if (TLI.SimplifyDemandedBits(Src, DemandedMask, Known, TLO)) {
-    DCI.CommitTargetLoweringOpt(TLO);
+  if (TLI.SimplifyDemandedBits(Src, DemandedMask, DCI))
     return SDValue(N, 0);
-  }
 
   // Combine (movmsk (setne (and X, (1 << C)), 0)) -> (movmsk (X << C)).
   // Only do this when the setcc input and output types are the same and the
@@ -40315,22 +40314,13 @@ static SDValue combinePMULDQ(SDNode *N, SelectionDAG &DAG,
     return RHS;
 
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-  TargetLowering::TargetLoweringOpt TLO(DAG, !DCI.isBeforeLegalize(),
-                                        !DCI.isBeforeLegalizeOps());
   APInt DemandedMask(APInt::getLowBitsSet(64, 32));
 
   // PMULQDQ/PMULUDQ only uses lower 32 bits from each vector element.
-  KnownBits LHSKnown;
-  if (TLI.SimplifyDemandedBits(LHS, DemandedMask, LHSKnown, TLO)) {
-    DCI.CommitTargetLoweringOpt(TLO);
+  if (TLI.SimplifyDemandedBits(LHS, DemandedMask, DCI))
     return SDValue(N, 0);
-  }
-
-  KnownBits RHSKnown;
-  if (TLI.SimplifyDemandedBits(RHS, DemandedMask, RHSKnown, TLO)) {
-    DCI.CommitTargetLoweringOpt(TLO);
+  if (TLI.SimplifyDemandedBits(RHS, DemandedMask, DCI))
     return SDValue(N, 0);
-  }
 
   return SDValue();
 }
