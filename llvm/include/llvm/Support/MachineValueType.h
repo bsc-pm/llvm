@@ -372,9 +372,9 @@ namespace llvm {
 
     /// Return true if this is an overloaded type for TableGen.
     bool isOverloaded() const {
-      return (SimpleTy==MVT::Any  ||
-              SimpleTy==MVT::iAny || SimpleTy==MVT::fAny ||
-              SimpleTy==MVT::vAny || SimpleTy==MVT::iPTRAny);
+      return (SimpleTy == MVT::Any || SimpleTy == MVT::iAny ||
+              SimpleTy == MVT::fAny || SimpleTy == MVT::vAny ||
+              SimpleTy == MVT::iPTRAny);
     }
 
     /// Return a VT for a vector type with the same element type but

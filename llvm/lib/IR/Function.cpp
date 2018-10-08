@@ -700,7 +700,8 @@ enum IIT_Info {
   IIT_STRUCT7 = 39,
   IIT_STRUCT8 = 40,
   IIT_F128 = 41,
-  IIT_VEC_ELEMENT = 42
+  IIT_VEC_ELEMENT = 42,
+  IIT_NXV1 = 43
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -758,6 +759,10 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
     return;
   case IIT_V1:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Vector, 1));
+    DecodeIITType(NextElt, Infos, OutputTable);
+    return;
+  case IIT_NXV1:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::ScalableVector, 1));
     DecodeIITType(NextElt, Infos, OutputTable);
     return;
   case IIT_V2:
@@ -934,6 +939,9 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
     return IntegerType::get(Context, D.Integer_Width);
   case IITDescriptor::Vector:
     return VectorType::get(DecodeFixedType(Infos, Tys, Context),D.Vector_Width);
+  case IITDescriptor::ScalableVector:
+    return VectorType::get(DecodeFixedType(Infos, Tys, Context), D.Vector_Width,
+                           /* Scalable */ true);
   case IITDescriptor::Pointer:
     return PointerType::get(DecodeFixedType(Infos, Tys, Context),
                             D.Pointer_AddressSpace);
@@ -1096,6 +1104,13 @@ static bool matchIntrinsicType(
     case IITDescriptor::Vector: {
       VectorType *VT = dyn_cast<VectorType>(Ty);
       return !VT || VT->getNumElements() != D.Vector_Width ||
+             matchIntrinsicType(VT->getElementType(), Infos, ArgTys,
+                                DeferredChecks, IsDeferredCheck);
+    }
+    case IITDescriptor::ScalableVector: {
+      VectorType *VT = dyn_cast<VectorType>(Ty);
+      return !VT || VT->getNumElements() != D.Vector_Width ||
+             !VT->isScalable() ||
              matchIntrinsicType(VT->getElementType(), Infos, ArgTys,
                                 DeferredChecks, IsDeferredCheck);
     }

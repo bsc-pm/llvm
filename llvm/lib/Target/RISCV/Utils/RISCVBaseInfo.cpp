@@ -1,12 +1,15 @@
 #include "RISCVBaseInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
 namespace RISCVSysReg {
+
 #define GET_SysRegsList_IMPL
-#include "RISCVGenSystemOperands.inc"
+#include "RISCVGenSearchableTables.inc"
+
 } // namespace RISCVSysReg
 
 namespace RISCVABI {
@@ -76,5 +79,12 @@ void validate(const Triple &TT, const FeatureBitset &FeatureBits) {
 }
 
 } // namespace RISCVFeatures
+
+namespace RISCVEPIIntrinsicsTable {
+
+#define GET_EPIIntrinsicsTable_IMPL
+#include "RISCVGenSearchableTables.inc"
+
+} // namespace RISCVEPIIntrinsicsTable
 
 } // namespace llvm

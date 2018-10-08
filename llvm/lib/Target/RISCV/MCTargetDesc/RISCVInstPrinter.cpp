@@ -124,3 +124,33 @@ void RISCVInstPrinter::printAtomicMemOp(const MCInst *MI, unsigned OpNo,
   O << ")";
   return;
 }
+
+void RISCVInstPrinter::printVectorMask(const MCInst *MI, unsigned OpNo,
+                                       const MCSubtargetInfo &STI,
+                                       raw_ostream &O) {
+  auto VectorMask =
+      static_cast<RISCVEPIVectorMask::VectorMask>(MI->getOperand(OpNo).getImm());
+  O << RISCVEPIVectorMask::vectorMaskToString(VectorMask);
+}
+
+void RISCVInstPrinter::printVectorElementWidth(const MCInst *MI, unsigned OpNo,
+                                       const MCSubtargetInfo &STI,
+                                       raw_ostream &O) {
+  auto VectorElementWidth =
+      static_cast<RISCVEPIVectorElementWidth::VectorElementWidth>(MI->getOperand(OpNo).getImm());
+  O << RISCVEPIVectorElementWidth::VectorElementWidthToString(VectorElementWidth);
+}
+
+void RISCVInstPrinter::printVectorMultiplier(const MCInst *MI, unsigned OpNo,
+                                       const MCSubtargetInfo &STI,
+                                       raw_ostream &O) {
+  auto VectorMultiplier =
+      static_cast<RISCVEPIVectorMultiplier::VectorMultiplier>(MI->getOperand(OpNo).getImm());
+  O << RISCVEPIVectorMultiplier::VectorMultiplierToString(VectorMultiplier);
+}
+
+void RISCVInstPrinter::printEPIVRScalar(const MCInst *MI, unsigned OpNo,
+                                        const MCSubtargetInfo &STI,
+                                        raw_ostream &O) {
+  O << getRegisterName(MI->getOperand(OpNo).getReg()) << ".s";
+}

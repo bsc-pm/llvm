@@ -149,6 +149,12 @@ static DecodeStatus DecodeFPR64RegisterClass(MCInst &Inst, uint64_t RegNo,
   return MCDisassembler::Success;
 }
 
+static DecodeStatus DecodeEPIFPRRegisterClass(MCInst &Inst, uint64_t RegNo,
+                                             uint64_t Address,
+                                             const void *Decoder) {
+  return DecodeFPR64RegisterClass(Inst, RegNo, Address, Decoder);
+}
+
 static DecodeStatus DecodeFPR64CRegisterClass(MCInst &Inst, uint64_t RegNo,
                                               uint64_t Address,
                                               const void *Decoder) {
@@ -187,6 +193,31 @@ static DecodeStatus DecodeGPRCRegisterClass(MCInst &Inst, uint64_t RegNo,
     return MCDisassembler::Fail;
 
   Register Reg = GPRDecoderTable[RegNo + 8];
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
+static const unsigned EPIVRDecoderTable[] = {
+  RISCV::V0,  RISCV::V1,  RISCV::V2,  RISCV::V3,
+  RISCV::V4,  RISCV::V5,  RISCV::V6,  RISCV::V7,
+  RISCV::V8,  RISCV::V9,  RISCV::V10, RISCV::V11,
+  RISCV::V12, RISCV::V13, RISCV::V14, RISCV::V15,
+  RISCV::V16, RISCV::V17, RISCV::V18, RISCV::V19,
+  RISCV::V20, RISCV::V21, RISCV::V22, RISCV::V23,
+  RISCV::V24, RISCV::V25, RISCV::V26, RISCV::V27,
+  RISCV::V28, RISCV::V29, RISCV::V30, RISCV::V31
+};
+
+static DecodeStatus DecodeEPIVRRegisterClass(MCInst &Inst, uint64_t RegNo,
+                                             uint64_t Address,
+                                             const void *Decoder) {
+  if (RegNo > sizeof(EPIVRDecoderTable))
+    return MCDisassembler::Fail;
+
+  // We must define our own mapping from RegNo to register identifier.
+  // Accessing index RegNo in the register class will work in the case that
+  // registers were added in ascending order, but not in general.
+  unsigned Reg = EPIVRDecoderTable[RegNo];
   Inst.addOperand(MCOperand::createReg(Reg));
   return MCDisassembler::Success;
 }
@@ -296,6 +327,36 @@ static DecodeStatus decodeRVCInstrRdRs2(MCInst &Inst, unsigned Insn,
 static DecodeStatus decodeRVCInstrRdRs1Rs2(MCInst &Inst, unsigned Insn,
                                            uint64_t Address,
                                            const void *Decoder);
+
+static DecodeStatus decodeVectorMask(MCInst &Inst, uint64_t Imm,
+                                     int64_t Address, const void *Decoder) {
+  assert(isUInt<1>(Imm) && "Invalid immediate");
+  if (!llvm::RISCVEPIVectorMask::isValidVectorMask(Imm))
+    return MCDisassembler::Fail;
+
+  Inst.addOperand(MCOperand::createImm(Imm));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus decodeVectorElementWidth(MCInst &Inst, uint64_t Imm,
+                                     int64_t Address, const void *Decoder) {
+  assert(isUInt<3>(Imm) && "Invalid immediate");
+  if (!llvm::RISCVEPIVectorElementWidth::isValidVectorElementWidth(Imm))
+    return MCDisassembler::Fail;
+
+  Inst.addOperand(MCOperand::createImm(Imm));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus decodeVectorMultiplier(MCInst &Inst, uint64_t Imm,
+                                     int64_t Address, const void *Decoder) {
+  assert(isUInt<2>(Imm) && "Invalid immediate");
+  if (!llvm::RISCVEPIVectorMultiplier::isValidVectorMultiplier(Imm))
+    return MCDisassembler::Fail;
+
+  Inst.addOperand(MCOperand::createImm(Imm));
+  return MCDisassembler::Success;
+}
 
 #include "RISCVGenDisassemblerTables.inc"
 

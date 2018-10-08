@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCVELFStreamer.h"
+#include "MCTargetDesc/RISCVAsmBackend.h"
 #include "RISCVMCExpr.h"
 #include "RISCVMCTargetDesc.h"
-#include "MCTargetDesc/RISCVAsmBackend.h"
 #include "Utils/RISCVBaseInfo.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCContext.h"

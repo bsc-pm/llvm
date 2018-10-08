@@ -1280,7 +1280,7 @@ RegisterInfoEmitter::runTargetDesc(raw_ostream &OS, CodeGenTarget &Target,
         (void)EV;
         const RegSizeInfo &RI = RC.RSI.get(M);
         OS << "  { " << RI.RegSize << ", " << RI.SpillSize << ", "
-           << RI.SpillAlignment;
+           << RI.SpillAlignment << ", " << RI.isDynamicSpillSize;
         std::vector<MVT::SimpleValueType> VTs;
         for (const ValueTypeByHwMode &VVT : RC.VTs)
           VTs.push_back(VVT.get(M).SimpleTy);

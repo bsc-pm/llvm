@@ -1013,6 +1013,8 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
     if (MFI.getStackID(i) !=
         TargetStackID::Default) // Only allocate objects on the default stack.
       continue;
+    if (MFI.isObjectDynamicSpill(i))
+      continue;
 
     // Add the objects that we need to allocate to our working set.
     ObjectsToAllocate.push_back(i);

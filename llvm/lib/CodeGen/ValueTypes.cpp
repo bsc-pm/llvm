@@ -114,6 +114,9 @@ unsigned EVT::getExtendedSizeInBits() const {
 std::string EVT::getEVTString() const {
   switch (V.SimpleTy) {
   default:
+    if (isScalableVector())
+      return "nxv" + utostr(getVectorNumElements()) +
+             getVectorElementType().getEVTString();
     if (isVector())
       return (isScalableVector() ? "nxv" : "v") + utostr(getVectorNumElements())
              + getVectorElementType().getEVTString();

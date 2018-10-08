@@ -54,6 +54,9 @@ struct RISCVRegisterInfo : public RISCVGenRegisterInfo {
   }
 
   bool hasBasePointer(const MachineFunction &MF) const;
+
+  const TargetRegisterClass *getPointerRegClass(const MachineFunction &MF,
+                                                unsigned Kind) const override;
 };
 }
 

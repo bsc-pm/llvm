@@ -57,10 +57,11 @@ class ValueTypeByHwMode<list<HwMode> Ms, list<ValueType> Ts>
 
 // A class representing the register size, spill size and spill alignment
 // in bits of a register.
-class RegInfo<int RS, int SS, int SA> {
+class RegInfo<int RS, int SS, int SA, int DS = 0> {
   int RegSize = RS;         // Register size in bits.
   int SpillSize = SS;       // Spill slot size in bits.
   int SpillAlignment = SA;  // Spill slot alignment in bits.
+  int isDynamicSpillSize = DS; // Some registers have dynamic spill sizes.
 }
 
 // The register size/alignment information, parameterized by a HW mode.
@@ -225,6 +226,10 @@ class RegisterClass<string namespace, list<ValueType> regTypes, int alignment,
   // Size - Specify the spill size in bits of the registers.  A default value of
   // zero lets tablgen pick an appropriate size.
   int Size = 0;
+
+  // Some registers have a dynamic spill size which is constant within a
+  // function but not among functions.
+  int isDynamicSpillSize = 0;
 
   // Alignment - Specify the alignment required of the registers when they are
   // stored or loaded to memory.

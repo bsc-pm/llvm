@@ -80,6 +80,10 @@ bool RISCVTargetInfo::validateAsmConstraint(
     // An address that is held in a general-purpose register.
     Info.setAllowsMemory();
     return true;
+  case 'v':
+    // EPI vector
+    Info.setAllowsRegister();
+    return true;
   }
 }
 

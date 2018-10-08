@@ -56,6 +56,12 @@ private:
   void alignSP(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                const DebugLoc &DL, int64_t Alignment) const;
 
+  void expandVectorSpillReload(MachineFunction& MF) const;
+
+  void setupHandleObjects(MachineBasicBlock &MBB,
+                          MachineBasicBlock::iterator MBBI,
+                          const MachineFrameInfo &MFI, MachineRegisterInfo &MRI,
+                          const TargetInstrInfo &TII, const DebugLoc &DL) const;
 };
 }
 #endif

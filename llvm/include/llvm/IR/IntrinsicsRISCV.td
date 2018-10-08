@@ -65,4 +65,7 @@ def int_riscv_masked_cmpxchg_i64
                                 llvm_i64_ty, llvm_i64_ty],
                 [IntrArgMemOnly, NoCapture<0>, ImmArg<4>]>;
 
+
 } // TargetPrefix = "riscv"
+
+include "llvm/IR/IntrinsicsEPI.td"
