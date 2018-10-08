@@ -49,7 +49,7 @@ def InstFormatCB     : InstFormat<15>;
 def InstFormatCJ     : InstFormat<16>;
 def InstFormatOther  : InstFormat<17>;
 
-// The following opcode names match those given in Table 19.1 in the
+// The following opcode names and match those given in Table 19.1 in the
 // RISC-V User-level ISA specification ("RISC-V base opcode map").
 class RISCVOpcode<bits<7> val> {
   bits<7> Value = val;
@@ -75,6 +75,18 @@ def OPC_BRANCH    : RISCVOpcode<0b1100011>;
 def OPC_JALR      : RISCVOpcode<0b1100111>;
 def OPC_JAL       : RISCVOpcode<0b1101111>;
 def OPC_SYSTEM    : RISCVOpcode<0b1110011>;
+
+// Row 00
+def OPC_CUSTOM_0   : RISCVOpcode<0b0001011>;
+// Row 01
+def OPC_CUSTOM_1   : RISCVOpcode<0b0101011>;
+// Row 10
+def OPC_V          : RISCVOpcode<0b1010111>;
+def OPC_CUSTOM_2   : RISCVOpcode<0b1011011>;
+// Row 11
+def OPC_RESERVED_1 : RISCVOpcode<0b1101011>;
+def OPC_RESERVED_2 : RISCVOpcode<0b1110111>;
+def OPC_CUSTOM_3   : RISCVOpcode<0b1111011>;
 
 class RVInst<dag outs, dag ins, string opcodestr, string argstr,
              list<dag> pattern, InstFormat format>

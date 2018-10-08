@@ -541,23 +541,26 @@ MachineInstr *TargetInstrInfo::foldMemoryOperand(MachineInstr &MI,
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
 
-  if (Flags & MachineMemOperand::MOStore) {
-    MemSize = MFI.getObjectSize(FI);
-  } else {
-    for (unsigned OpIdx : Ops) {
-      int64_t OpSize = MFI.getObjectSize(FI);
+  if (!MFI.isObjectDynamicSpill(FI)) {
+    if (Flags & MachineMemOperand::MOStore) {
+      MemSize = MFI.getObjectSize(FI);
+    } else {
+      for (unsigned OpIdx : Ops) {
+        int64_t OpSize = MFI.getObjectSize(FI);
 
-      if (auto SubReg = MI.getOperand(OpIdx).getSubReg()) {
-        unsigned SubRegSize = TRI->getSubRegIdxSize(SubReg);
-        if (SubRegSize > 0 && !(SubRegSize % 8))
-          OpSize = SubRegSize / 8;
+        if (auto SubReg = MI.getOperand(OpIdx).getSubReg()) {
+          unsigned SubRegSize = TRI->getSubRegIdxSize(SubReg);
+          if (SubRegSize > 0 && !(SubRegSize % 8))
+            OpSize = SubRegSize / 8;
+        }
+
+        MemSize = std::max(MemSize, OpSize);
       }
-
-      MemSize = std::max(MemSize, OpSize);
     }
   }
 
-  assert(MemSize && "Did not expect a zero-sized stack slot");
+  assert((MemSize || MFI.isObjectDynamicSpill(FI)) &&
+         "Did not expect a zero-sized stack slot");
 
   MachineInstr *NewMI = nullptr;
 

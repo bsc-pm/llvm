@@ -71,6 +71,17 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   if (Subtarget.hasStdExtD())
     addRegisterClass(MVT::f64, &RISCV::FPR64RegClass);
 
+  if (Subtarget.hasExtEPI()) {
+    addRegisterClass(MVT::nxv1i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1i8, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1i16, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1i32, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1i64, &RISCV::EPIVRRegClass);
+
+    addRegisterClass(MVT::nxv1f32, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1f64, &RISCV::EPIVRRegClass);
+  }
+
   // Compute derived properties from the register classes.
   computeRegisterProperties(STI.getRegisterInfo());
 
@@ -194,6 +205,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
   // Effectively disable jump table generation.
   setMinimumJumpTableEntries(INT_MAX);
+
+  // EPI intrinsics may have illegal operands/results
+  for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32}) {
+    setOperationAction(ISD::INTRINSIC_WO_CHAIN, VT, Custom);
+  }
 }
 
 EVT RISCVTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -362,6 +378,37 @@ static unsigned getBranchOpcodeForIntCondCode(ISD::CondCode CC) {
   }
 }
 
+SDValue RISCVTargetLowering::lowerINTRINSIC_WO_CHAIN(SDValue Op,
+                                                     SelectionDAG &DAG) const {
+  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  SDLoc DL(Op);
+  switch (IntNo) {
+    // By default we do not lower any intrinsic.
+  default:
+    break;
+  }
+
+  // Some EPI intrinsics may claim that they want an integer operand to be
+  // extended.
+  if (const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
+          RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(IntNo)) {
+    if (EII->ExtendedOperand) {
+      assert(EII->ExtendedOperand < Op.getNumOperands());
+      std::vector<SDValue> Operands(Op->op_begin(), Op->op_end());
+      SDValue &ScalarOp = Operands[EII->ExtendedOperand];
+      if (ScalarOp.getValueType() == MVT::i32 ||
+          ScalarOp.getValueType() == MVT::i16 ||
+          ScalarOp.getValueType() == MVT::i8) {
+        ScalarOp = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, ScalarOp);
+        return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+                           Operands);
+      }
+    }
+  }
+
+  return SDValue();
+}
+
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
@@ -400,6 +447,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     SDValue FPConv = DAG.getNode(RISCVISD::FMV_W_X_RV64, DL, MVT::f32, NewOp0);
     return FPConv;
   }
+  case ISD::INTRINSIC_WO_CHAIN:
+    return lowerINTRINSIC_WO_CHAIN(Op, DAG);
   }
 }
 
@@ -1139,10 +1188,7 @@ static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
   // Insert appropriate branch.
   unsigned Opcode = getBranchOpcodeForIntCondCode(CC);
 
-  BuildMI(HeadMBB, DL, TII.get(Opcode))
-    .addReg(LHS)
-    .addReg(RHS)
-    .addMBB(TailMBB);
+  BuildMI(HeadMBB, DL, TII.get(Opcode)).addReg(LHS).addReg(RHS).addMBB(TailMBB);
 
   // IfFalseMBB just falls through to TailMBB.
   IfFalseMBB->addSuccessor(TailMBB);
@@ -2261,12 +2307,27 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
     switch (Constraint[0]) {
     case 'r':
       return std::make_pair(0U, &RISCV::GPRRegClass);
+    case 'v':
+      return std::make_pair(0U, &RISCV::EPIVRRegClass);
     default:
       break;
     }
   }
 
   return TargetLowering::getRegForInlineAsmConstraint(TRI, Constraint, VT);
+}
+
+RISCVTargetLowering::ConstraintType
+RISCVTargetLowering::getConstraintType(StringRef Constraint) const {
+  if (Constraint.size() == 1) {
+    switch (Constraint[0]) {
+    case 'v':
+      return C_RegisterClass;
+    default:
+      break;
+    }
+  }
+  return TargetLowering::getConstraintType(Constraint);
 }
 
 Instruction *RISCVTargetLowering::emitLeadingFence(IRBuilder<> &Builder,

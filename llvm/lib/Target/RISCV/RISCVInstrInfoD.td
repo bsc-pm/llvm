@@ -271,15 +271,19 @@ def : PatFpr64Fpr64<setle, FLE_D>;
 def : PatFpr64Fpr64<setole, FLE_D>;
 
 // Three operands
+// fmadd: rs1 * rs2 + rs3
 def : Pat<(fma FPR64:$rs1, FPR64:$rs2, FPR64:$rs3),
           (FMADD_D $rs1, $rs2, $rs3, 0b111)>;
 
+// fmsub: rs1 * rs2 - rs3
 def : Pat<(fma FPR64:$rs1, FPR64:$rs2, (fneg FPR64:$rs3)),
           (FMSUB_D $rs1, $rs2, $rs3, 0b111)>;
 
+// fnmadd: -rs1 * rs2 - rs3
 def : Pat<(fneg (fma FPR64:$rs1, FPR64:$rs2, FPR64:$rs3)),
           (FNMADD_D $rs1, $rs2, $rs3, 0b111)>;
 
+// fnmsub: -rs1 * rs2 + rs3
 def : Pat<(fma (fneg FPR64:$rs1), FPR64:$rs2, FPR64:$rs3),
           (FNMSUB_D $rs1, $rs2, $rs3, 0b111)>;
 def : Pat<(fma FPR64:$rs1, (fneg FPR64:$rs2), FPR64:$rs3),

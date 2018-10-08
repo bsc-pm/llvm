@@ -114,6 +114,9 @@ unsigned EVT::getExtendedSizeInBits() const {
 std::string EVT::getEVTString() const {
   switch (V.SimpleTy) {
   default:
+    if (isScalableVector())
+      return "nxv" + utostr(getVectorNumElements()) +
+             getVectorElementType().getEVTString();
     if (isVector())
       return "v" + utostr(getVectorNumElements()) +
              getVectorElementType().getEVTString();
@@ -279,6 +282,21 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::v4f64:   return VectorType::get(Type::getDoubleTy(Context), 4);
   case MVT::v8f64:   return VectorType::get(Type::getDoubleTy(Context), 8);
   case MVT::Metadata: return Type::getMetadataTy(Context);
+  // Scalable types
+  case MVT::nxv1i1:
+    return VectorType::get(Type::getInt1Ty(Context), 1, /* Scalable */ true);
+  case MVT::nxv1i8:
+    return VectorType::get(Type::getInt8Ty(Context), 1, /* Scalable */ true);
+  case MVT::nxv1i16:
+    return VectorType::get(Type::getInt16Ty(Context), 1, /* Scalable */ true);
+  case MVT::nxv1i32:
+    return VectorType::get(Type::getInt32Ty(Context), 1, /* Scalable */ true);
+  case MVT::nxv1i64:
+    return VectorType::get(Type::getInt64Ty(Context), 1, /* Scalable */ true);
+  case MVT::nxv1f32:
+    return VectorType::get(Type::getFloatTy(Context), 1, /* Scalable */ true);
+  case MVT::nxv1f64:
+    return VectorType::get(Type::getDoubleTy(Context), 1, /* Scalable */ true);
  }
 }
 

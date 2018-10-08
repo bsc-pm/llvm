@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 include "llvm/Target/Target.td"
+include "llvm/TableGen/SearchableTable.td"                                       
 
 //===----------------------------------------------------------------------===//
 // RISC-V subtarget features and instruction predicates.
@@ -43,6 +44,11 @@ def FeatureStdExtC
 def HasStdExtC : Predicate<"Subtarget->hasStdExtC()">,
                            AssemblerPredicate<"FeatureStdExtC">;
 
+def FeatureExtEPI
+    : SubtargetFeature<"epi", "HasExtEPI", "true",
+                       "'EPI' (Research Vector ISA)">;
+def HasExtEPI : Predicate<"Subtarget->hasExtEPI()">,
+                           AssemblerPredicate<"FeatureExtEPI">;
 
 def Feature64Bit
     : SubtargetFeature<"64bit", "HasRV64", "true", "Implements RV64">;

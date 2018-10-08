@@ -67,6 +67,7 @@ namespace {
     RegAllocFast() : MachineFunctionPass(ID), StackSlotForVirtReg(-1) {}
 
   private:
+    MachineFunction *MF;
     MachineFrameInfo *MFI;
     MachineRegisterInfo *MRI;
     const TargetRegisterInfo *TRI;
@@ -219,7 +220,7 @@ namespace {
     unsigned traceCopies(unsigned VirtReg) const;
     unsigned traceCopyChain(unsigned Reg) const;
 
-    int getStackSpaceFor(unsigned VirtReg);
+    int getStackSpaceFor(unsigned VirtReg, const MachineFunction &MF);
     void spill(MachineBasicBlock::iterator Before, unsigned VirtReg,
                MCPhysReg AssignedReg, bool Kill);
     void reload(MachineBasicBlock::iterator Before, unsigned VirtReg,
@@ -244,7 +245,7 @@ void RegAllocFast::setPhysRegState(MCPhysReg PhysReg, unsigned NewState) {
 
 /// This allocates space for the specified virtual register to be held on the
 /// stack.
-int RegAllocFast::getStackSpaceFor(unsigned VirtReg) {
+int RegAllocFast::getStackSpaceFor(unsigned VirtReg, const MachineFunction &MF) {
   // Find the location Reg would belong...
   int SS = StackSlotForVirtReg[VirtReg];
   // Already has space allocated?
@@ -253,9 +254,22 @@ int RegAllocFast::getStackSpaceFor(unsigned VirtReg) {
 
   // Allocate a new stack object for this spill location...
   const TargetRegisterClass &RC = *MRI->getRegClass(VirtReg);
-  unsigned Size = TRI->getSpillSize(RC);
+  int FrameIdx;
   unsigned Align = TRI->getSpillAlignment(RC);
-  int FrameIdx = MFI->CreateSpillStackObject(Size, Align);
+  if (!TRI->isDynamicSpillSize(RC)) {
+    unsigned Size = TRI->getSpillSize(RC);
+    FrameIdx = MFI->CreateSpillStackObject(Size, Align);
+  } else {
+    // FIXME: We should be able to pass a Kind != 0 here
+    const TargetRegisterClass &PtrClass = *TRI->getPointerRegClass(MF);
+    unsigned FixedHandleSize = TRI->getSpillSize(PtrClass);
+    unsigned FixedHandleAlignment = TRI->getSpillAlignment(PtrClass);
+    FrameIdx =
+        MFI->CreateSpillStackObject(FixedHandleSize, FixedHandleAlignment);
+    int DynamicSpillIdx = MFI->CreateDynamicSpillStackObject(Align, &RC);
+
+    MFI->setObjectHandle(FrameIdx, DynamicSpillIdx);
+  }
 
   // Assign the slot.
   StackSlotForVirtReg[VirtReg] = FrameIdx;
@@ -315,7 +329,7 @@ void RegAllocFast::spill(MachineBasicBlock::iterator Before, unsigned VirtReg,
                          MCPhysReg AssignedReg, bool Kill) {
   LLVM_DEBUG(dbgs() << "Spilling " << printReg(VirtReg, TRI)
                     << " in " << printReg(AssignedReg, TRI));
-  int FI = getStackSpaceFor(VirtReg);
+  int FI = getStackSpaceFor(VirtReg, *MF);
   LLVM_DEBUG(dbgs() << " to stack slot #" << FI << '\n');
 
   const TargetRegisterClass &RC = *MRI->getRegClass(VirtReg);
@@ -343,7 +357,7 @@ void RegAllocFast::reload(MachineBasicBlock::iterator Before, unsigned VirtReg,
                           MCPhysReg PhysReg) {
   LLVM_DEBUG(dbgs() << "Reloading " << printReg(VirtReg, TRI) << " into "
                     << printReg(PhysReg, TRI) << '\n');
-  int FI = getStackSpaceFor(VirtReg);
+  int FI = getStackSpaceFor(VirtReg, *MF);
   const TargetRegisterClass &RC = *MRI->getRegClass(VirtReg);
   TII->loadRegFromStackSlot(*MBB, Before, PhysReg, FI, &RC, TRI);
   ++NumLoads;
@@ -1293,6 +1307,7 @@ void RegAllocFast::allocateBasicBlock(MachineBasicBlock &MBB) {
 bool RegAllocFast::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "********** FAST REGISTER ALLOCATION **********\n"
                     << "********** Function: " << MF.getName() << '\n');
+  this->MF = &MF;
   MRI = &MF.getRegInfo();
   const TargetSubtargetInfo &STI = MF.getSubtarget();
   TRI = STI.getRegisterInfo();

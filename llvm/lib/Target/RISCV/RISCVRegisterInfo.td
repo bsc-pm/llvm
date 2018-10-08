@@ -227,3 +227,5 @@ def FPR64C : RegisterClass<"RISCV", [f64], 64, (add
   (sequence "F%u_64", 10, 15),
   (sequence "F%u_64", 8, 9)
 )>;
+
+include "RISCVRegisterInfoEPI.td"

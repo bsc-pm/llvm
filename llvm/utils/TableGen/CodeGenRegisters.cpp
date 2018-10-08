@@ -790,6 +790,7 @@ CodeGenRegisterClass::CodeGenRegisterClass(CodeGenRegBank &RegBank, Record *R)
     RI.RegSize = RI.SpillSize = Size ? Size
                                      : VTs[0].getSimple().getSizeInBits();
     RI.SpillAlignment = R->getValueAsInt("Alignment");
+    RI.isDynamicSpillSize = R->getValueAsInt("isDynamicSpillSize");
     RSI.Map.insert({DefaultMode, RI});
   }
 

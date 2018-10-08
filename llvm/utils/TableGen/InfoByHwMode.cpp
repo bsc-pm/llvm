@@ -123,22 +123,23 @@ RegSizeInfo::RegSizeInfo(Record *R, const CodeGenHwModes &CGH) {
   RegSize = R->getValueAsInt("RegSize");
   SpillSize = R->getValueAsInt("SpillSize");
   SpillAlignment = R->getValueAsInt("SpillAlignment");
+  isDynamicSpillSize = R->getValueAsInt("isDynamicSpillSize");
 }
 
-bool RegSizeInfo::operator< (const RegSizeInfo &I) const {
-  return std::tie(RegSize, SpillSize, SpillAlignment) <
-         std::tie(I.RegSize, I.SpillSize, I.SpillAlignment);
+bool RegSizeInfo::operator<(const RegSizeInfo &I) const {
+  return std::tie(RegSize, SpillSize, SpillAlignment, isDynamicSpillSize) <
+         std::tie(I.RegSize, I.SpillSize, I.SpillAlignment, I.isDynamicSpillSize);
 }
 
 bool RegSizeInfo::isSubClassOf(const RegSizeInfo &I) const {
-  return RegSize <= I.RegSize &&
-         SpillAlignment && I.SpillAlignment % SpillAlignment == 0 &&
-         SpillSize <= I.SpillSize;
+  return RegSize <= I.RegSize && SpillAlignment &&
+         I.SpillAlignment % SpillAlignment == 0 && SpillSize <= I.SpillSize &&
+         isDynamicSpillSize == I.isDynamicSpillSize;
 }
 
 void RegSizeInfo::writeToStream(raw_ostream &OS) const {
   OS << "[R=" << RegSize << ",S=" << SpillSize
-     << ",A=" << SpillAlignment << ']';
+     << ",A=" << SpillAlignment << ",DS=" << isDynamicSpillSize << ']';
 }
 
 RegSizeInfoByHwMode::RegSizeInfoByHwMode(Record *R,
@@ -172,7 +173,8 @@ bool RegSizeInfoByHwMode::hasStricterSpillThan(const RegSizeInfoByHwMode &I)
   const RegSizeInfo &A0 = get(M0);
   const RegSizeInfo &B0 = I.get(M0);
   return std::tie(A0.SpillSize, A0.SpillAlignment) >
-         std::tie(B0.SpillSize, B0.SpillAlignment);
+             std::tie(B0.SpillSize, B0.SpillAlignment) &&
+         A0.isDynamicSpillSize == B0.isDynamicSpillSize;
 }
 
 void RegSizeInfoByHwMode::writeToStream(raw_ostream &OS) const {

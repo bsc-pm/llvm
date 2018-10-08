@@ -180,10 +180,10 @@ class LLVMHalfElementsVectorType<int num> : LLVMMatchType<num>;
 
 def llvm_void_ty       : LLVMType<isVoid>;
 let isAny = 1 in {
-  def llvm_any_ty        : LLVMType<Any>;
-  def llvm_anyint_ty     : LLVMType<iAny>;
-  def llvm_anyfloat_ty   : LLVMType<fAny>;
-  def llvm_anyvector_ty  : LLVMType<vAny>;
+  def llvm_any_ty                : LLVMType<Any>;
+  def llvm_anyint_ty             : LLVMType<iAny>;
+  def llvm_anyfloat_ty           : LLVMType<fAny>;
+  def llvm_anyvector_ty          : LLVMType<vAny>;
 }
 def llvm_i1_ty         : LLVMType<i1>;
 def llvm_i8_ty         : LLVMType<i8>;
@@ -1186,6 +1186,13 @@ def int_experimental_vector_reduce_fmin : Intrinsic<[llvm_anyfloat_ty],
 
 def int_ssa_copy : Intrinsic<[llvm_any_ty], [LLVMMatchType<0>],
                              [IntrNoMem, Returned<0>]>;
+
+//===--------- Intrinsics that are used with scalable vector types --------===//
+
+def int_experimental_vector_vscale : Intrinsic<[llvm_anyint_ty],
+                                               [],
+                                               [IntrNoMem]>;
+
 //===----------------------------------------------------------------------===//
 // Target-specific intrinsics
 //===----------------------------------------------------------------------===//

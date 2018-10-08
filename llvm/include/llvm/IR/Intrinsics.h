@@ -74,9 +74,9 @@ namespace Intrinsic {
   /// it.
   ///
   /// The Tys parameter is for intrinsics with overloaded types (e.g., those
-  /// using iAny, fAny, vAny, or iPTRAny).  For a declaration of an overloaded
-  /// intrinsic, Tys must provide exactly one type for each overloaded type in
-  /// the intrinsic.
+  /// using iAny, fAny, vAny, or iPTRAny).  For a declaration of an
+  /// overloaded intrinsic, Tys must provide exactly one type for each
+  /// overloaded type in the intrinsic.
   Function *getDeclaration(Module *M, ID id, ArrayRef<Type*> Tys = None);
 
   /// Looks up Name in NameTable via binary search. NameTable must be sorted
@@ -97,7 +97,7 @@ namespace Intrinsic {
   struct IITDescriptor {
     enum IITDescriptorKind {
       Void, VarArg, MMX, Token, Metadata, Half, Float, Double, Quad,
-      Integer, Vector, Pointer, Struct,
+      Integer, Vector, ScalableVector, Pointer, Struct,
       Argument, ExtendArgument, TruncArgument, HalfVecArgument,
       SameVecWidthArgument, PtrToArgument, PtrToElt, VecOfAnyPtrsToElt
     } Kind;

@@ -43,6 +43,16 @@ enum {
   InstFormatCJ = 16,
   InstFormatOther = 17,
 
+  // EPI formats
+  InstEPIVAluInt = 17,
+  InstEPIVAluIntImm = 18,
+  InstEPIVAluFloat = 19,
+  InstEPIVAluFM = 20,
+  InstEPIVLoadInt = 21,
+  InstEPIVLoadFloat = 22,
+  InstEPIVAtomic = 23,
+  // End of EPI formats
+
   InstFormatMask = 31
 };
 
@@ -61,7 +71,20 @@ enum {
   MO_TLS_GOT,
   MO_TLS_GD
 };
+
 } // namespace RISCVII
+
+namespace EPICSR {
+
+enum {
+  VSTART = 0x008,
+  VXSAT = 0x009,
+  VXRM = 0x00A,
+  VTYPE = 0x00B,
+  VL = 0xC20,
+};
+
+}
 
 // Describes the predecessor/successor bits used in the FENCE instruction.
 namespace RISCVFenceField {
@@ -130,6 +153,139 @@ inline static bool isValidRoundingMode(unsigned Mode) {
 }
 } // namespace RISCVFPRndMode
 
+// EPI Vector mask
+namespace RISCVEPIVectorMask {
+enum VectorMask {
+  VectorTrueMask = 0,
+  VectorUnmasked = 1,
+  Invalid
+};
+
+inline static VectorMask stringToVectorMask(StringRef Str) {
+  return StringSwitch<VectorMask>(Str)
+      .Case("v0.t", RISCVEPIVectorMask::VectorTrueMask)
+      .Default(RISCVEPIVectorMask::Invalid);
+}
+
+inline static StringRef vectorMaskToString(VectorMask VM) {
+  switch (VM) {
+  default:
+    llvm_unreachable("Invalid vector mask");
+  case RISCVEPIVectorMask::VectorTrueMask:
+    return "v0.t";
+  }
+}
+
+inline static bool isValidVectorMask(unsigned Mode) {
+  switch (Mode) {
+  default:
+    return false;
+  case RISCVEPIVectorMask::VectorTrueMask:
+    return true;
+  }
+}
+} // namespace RISCVEPIVectorMask
+
+namespace RISCVEPIVectorElementWidth {
+
+#define VECTOR_ELEMENT_WIDTH_LIST                                              \
+  VECTOR_ELEMENT_WIDTH(ElementWidth8, 0, "e8")                                     \
+  VECTOR_ELEMENT_WIDTH(ElementWidth16, 1, "e16")                                   \
+  VECTOR_ELEMENT_WIDTH(ElementWidth32, 2, "e32")                                   \
+  VECTOR_ELEMENT_WIDTH(ElementWidth64, 3, "e64")                                   \
+  VECTOR_ELEMENT_WIDTH(ElementWidth128, 4, "e128")
+
+enum VectorElementWidth {
+#define VECTOR_ELEMENT_WIDTH(ID, ENC, __) ID = ENC,
+  VECTOR_ELEMENT_WIDTH_LIST
+#undef VECTOR_ELEMENT_WIDTH
+      Invalid
+};
+
+inline static VectorElementWidth stringToVectorElementWidth(StringRef Str) {
+  return StringSwitch<VectorElementWidth>(Str)
+#define VECTOR_ELEMENT_WIDTH(ID, _, STR)                                       \
+  .Case(STR, RISCVEPIVectorElementWidth::ID)
+      VECTOR_ELEMENT_WIDTH_LIST
+#undef VECTOR_ELEMENT_WIDTH
+          .Default(RISCVEPIVectorElementWidth::Invalid);
+}
+
+inline static StringRef VectorElementWidthToString(VectorElementWidth VM) {
+  switch (VM) {
+  default:
+    llvm_unreachable("Invalid vector element width");
+#define VECTOR_ELEMENT_WIDTH(ID, _, STR)                                       \
+  case RISCVEPIVectorElementWidth::ID:                                         \
+    return STR;
+    VECTOR_ELEMENT_WIDTH_LIST
+#undef VECTOR_ELEMENT_WIDTH
+  }
+}
+
+inline static bool isValidVectorElementWidth(unsigned Mode) {
+  switch (Mode) {
+  default:
+    return false;
+#define VECTOR_ELEMENT_WIDTH(ID, _, STR) case RISCVEPIVectorElementWidth::ID:
+    VECTOR_ELEMENT_WIDTH_LIST
+#undef VECTOR_ELEMENT_WIDTH
+    return true;
+  }
+}
+
+#undef VECTOR_ELEMENT_WIDTH_LIST
+
+} // namespace RISCVEPIVectorElementWidth
+
+namespace RISCVEPIVectorMultiplier {
+
+#define VECTOR_MULTIPLIER_LIST                                                 \
+  VECTOR_MULTIPLIER(VTypeInt8, 0, "m1")                                        \
+  VECTOR_MULTIPLIER(VTypeInt16, 1, "m2")                                       \
+  VECTOR_MULTIPLIER(VTypeInt32, 2, "m4")                                       \
+  VECTOR_MULTIPLIER(VTypeInt64, 3, "m8")
+
+enum VectorMultiplier {
+#define VECTOR_MULTIPLIER(ID, ENC, __) ID = ENC,
+  VECTOR_MULTIPLIER_LIST
+#undef VECTOR_MULTIPLIER
+  Invalid
+};
+
+inline static VectorMultiplier stringToVectorMultiplier(StringRef Str) {
+  return StringSwitch<VectorMultiplier>(Str)
+#define VECTOR_MULTIPLIER(ID, _, STR) .Case(STR, RISCVEPIVectorMultiplier::ID)
+      VECTOR_MULTIPLIER_LIST
+#undef VECTOR_MULTIPLIER
+      .Default(RISCVEPIVectorMultiplier::Invalid);
+}
+
+inline static StringRef VectorMultiplierToString(VectorMultiplier VM) {
+  switch (VM) {
+  default:
+    llvm_unreachable("Invalid vector type");
+#define VECTOR_MULTIPLIER(ID, _, STR) case RISCVEPIVectorMultiplier::ID: return STR;
+  VECTOR_MULTIPLIER_LIST
+#undef VECTOR_MULTIPLIER
+  }
+}
+
+inline static bool isValidVectorMultiplier(unsigned Mode) {
+  switch (Mode) {
+  default:
+    return false;
+#define VECTOR_MULTIPLIER(ID, _, STR) case RISCVEPIVectorMultiplier::ID:
+  VECTOR_MULTIPLIER_LIST
+#undef VECTOR_MULTIPLIER
+    return true;
+  }
+}
+
+#undef VECTOR_MULTIPLIER_LIST
+
+} // namespace RISCVEPIVectorMultiplier
+
 namespace RISCVSysReg {
 struct SysReg {
   const char *Name;
@@ -158,7 +314,9 @@ struct SysReg {
 };
 
 #define GET_SysRegsList_DECL
-#include "RISCVGenSystemOperands.inc"
+#include "RISCVGenSearchableTables.inc"
+
+
 } // end namespace RISCVSysReg
 
 namespace RISCVABI {
@@ -188,6 +346,19 @@ namespace RISCVFeatures {
 void validate(const Triple &TT, const FeatureBitset &FeatureBits);
 
 } // namespace RISCVFeatures
+
+namespace RISCVEPIIntrinsicsTable {
+
+struct EPIIntrinsicInfo {
+  unsigned int IntrinsicID;
+  unsigned int ExtendedOperand;
+};
+
+#define GET_EPIIntrinsicsTable_DECL
+using namespace RISCV;
+#include "RISCVGenSearchableTables.inc"
+
+} // end namespace RISCVEPIIntrinsicsTable
 
 } // namespace llvm
 

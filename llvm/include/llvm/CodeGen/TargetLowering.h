@@ -1208,7 +1208,7 @@ public:
         Elm = PointerTy.getTypeForEVT(Ty->getContext());
       }
       return EVT::getVectorVT(Ty->getContext(), EVT::getEVT(Elm, false),
-                       VTy->getNumElements());
+                       VTy->getNumElements(), VTy->isScalable());
     }
 
     return getValueType(DL, Ty, AllowUnknown);

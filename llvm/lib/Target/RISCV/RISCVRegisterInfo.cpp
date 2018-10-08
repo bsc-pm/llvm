@@ -60,6 +60,7 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = getFrameLowering(MF);
   BitVector Reserved(getNumRegs());
 
+
   // Use markSuperRegs to ensure any register aliases are also reserved
   markSuperRegs(Reserved, RISCV::X0); // zero
   markSuperRegs(Reserved, RISCV::X1); // ra
@@ -70,6 +71,11 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
     markSuperRegs(Reserved, RISCV::X8); // fp
   if (hasBasePointer(MF))
     markSuperRegs(Reserved, RISCV::X9); // bp
+
+  // EPI registers
+  markSuperRegs(Reserved, RISCV::VL);
+  markSuperRegs(Reserved, RISCV::VTYPE);
+
   assert(checkAllSuperRegsMarked(Reserved));
   return Reserved;
 }
@@ -96,8 +102,21 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   unsigned FrameReg;
   int Offset =
-      getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg) +
-      MI.getOperand(FIOperandNum + 1).getImm();
+      getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg);
+
+  bool OffsetFits = false;
+  int OffsetIndex = -1;
+  // FIXME: Improve this to make it more robust.
+  switch (MI.getOpcode()) {
+  case RISCV::VLE_V:
+  case RISCV::VSE_V:
+    break;
+  default:
+    OffsetIndex = FIOperandNum + 1;
+    Offset += MI.getOperand(OffsetIndex).getImm();
+    OffsetFits = isInt<12>(Offset);
+    break;
+  }
 
   if (!isInt<32>(Offset)) {
     report_fatal_error(
@@ -107,7 +126,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineBasicBlock &MBB = *MI.getParent();
   bool FrameRegIsKill = false;
 
-  if (!isInt<12>(Offset)) {
+  if (!OffsetFits) {
     assert(isInt<32>(Offset) && "Int32 expected");
     // The offset won't fit in an immediate, so use a scratch register instead
     // Modify Offset and FrameReg appropriately
@@ -123,7 +142,9 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MI.getOperand(FIOperandNum)
       .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
-  MI.getOperand(FIOperandNum + 1).ChangeToImmediate(Offset);
+  if (OffsetIndex >= 0) {
+    MI.getOperand(OffsetIndex).ChangeToImmediate(Offset);
+  }
 }
 
 unsigned RISCVRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
@@ -165,4 +186,10 @@ bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   // Note that when we need a BP the conditions also imply a FP.
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   return needsStackRealignment(MF) && MFI.hasVarSizedObjects();
+}
+
+const TargetRegisterClass *
+RISCVRegisterInfo::getPointerRegClass(const MachineFunction &MF,
+                                        unsigned Kind) const {
+  return &RISCV::GPRRegClass;
 }

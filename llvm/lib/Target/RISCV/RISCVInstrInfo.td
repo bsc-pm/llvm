@@ -1103,3 +1103,5 @@ include "RISCVInstrInfoA.td"
 include "RISCVInstrInfoF.td"
 include "RISCVInstrInfoD.td"
 include "RISCVInstrInfoC.td"
+
+include "RISCVInstrInfoEPI.td"

@@ -134,6 +134,14 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
+  // EPIVR->EPIVR
+  if (RISCV::EPIVRRegClass.contains(DstReg, SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::VADD_VI), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc))
+        .addImm(0);
+    return;
+  }
+
   llvm_unreachable("Impossible reg-to-reg copy");
 }
 
@@ -155,7 +163,12 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FSW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSD;
-  else
+  else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL))
+        .addReg(SrcReg, getKillRegState(IsKill))
+        .addFrameIndex(FI);
+    return;
+  } else
     llvm_unreachable("Can't store this register to stack slot");
 
   BuildMI(MBB, I, DL, get(Opcode))
@@ -182,7 +195,11 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FLW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLD;
-  else
+  else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD), DstReg)
+        .addFrameIndex(FI);
+    return;
+  } else
     llvm_unreachable("Can't load this register from stack slot");
 
   BuildMI(MBB, I, DL, get(Opcode), DstReg).addFrameIndex(FI).addImm(0);

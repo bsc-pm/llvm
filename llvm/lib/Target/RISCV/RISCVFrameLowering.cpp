@@ -190,6 +190,9 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   // to the stack, not before.
   // FIXME: assumes exactly one instruction is used to save each callee-saved
   // register.
+  // XXX: This will break horribly when among the callee-saved registers
+  // there are EPI vectors because storing them DOES need more than one
+  // instruction.
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   std::advance(MBBI, CSI.size());
 
@@ -242,6 +245,80 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
         .addCFIIndex(CFIIndex)
         .setMIFlags(MachineInstr::FrameSetup);
+  }
+
+  setupHandleObjects(MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
+}
+
+void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
+                                            MachineBasicBlock::iterator MBBI,
+                                            const MachineFrameInfo &MFI,
+                                            MachineRegisterInfo &MRI,
+                                            const TargetInstrInfo &TII,
+                                            const DebugLoc &DL) const {
+  assert(MFI.hasDynamicSpillObjects() == MFI.hasHandleObjects() &&
+         "Dynamic spills and handles are out of sync");
+
+  if (!MFI.hasHandleObjects())
+    return;
+
+  // FIXME: We're presuming in advance that this is all about EPIVR
+  // FIXME: We are assuming the width of the element is 64 bit, we will want
+  // something like a Subtarget feature or a way to query this from the CPU (via
+  // a CSR) Compute the SizeOfVector in bytes
+  unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVLI), SizeOfVector)
+    .addReg(RISCV::X0)
+    // FIXME - We need to change this
+    .addImm(3) // SEW=64b
+    .addImm(0); // VLMUL=1
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::SLLI), SizeOfVector)
+      .addReg(SizeOfVector)
+      .addImm(3); // 2^3 = 8 bytes
+
+  unsigned SPReg = getSPReg(STI);
+
+  // Link each dynamic spill with its handle
+  // FIXME: This is a bit naive.
+  DenseMap<int, int> DynamicToHandle;
+  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
+       FI < EFI; FI++) {
+    if (!MFI.isObjectDynamicSpill(FI))
+      continue;
+    int FIHandle = MFI.getObjectIndexBegin();
+    for (; FIHandle < EFI; FIHandle++) {
+      if (FIHandle == FI || !MFI.isObjectHandle(FIHandle))
+        continue;
+      if (MFI.getObjectHandle(FIHandle) == FI) {
+        DynamicToHandle[FI] = FIHandle;
+        break;
+      }
+    }
+    assert(FIHandle < EFI && "We didn't find the handle for this dynamic");
+  }
+
+  for (const auto &P : DynamicToHandle)
+  {
+    int FI = P.first;
+    int FIHandle = P.second;
+    const TargetRegisterClass *RC = MFI.getRegisterClass(FI);
+    if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
+      // Grow the stack
+      BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
+        .addReg(SPReg)
+        .addReg(SizeOfVector);
+      // Align the stack
+      alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
+      // Now SP is the value we want to put in the handle spill slot, so
+      // store it.
+      unsigned StoreOpcode =
+          MFI.getObjectSize(FIHandle) == 4 ? RISCV::SW : RISCV::SD;
+      BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))
+        .addReg(SPReg)
+        .addFrameIndex(FIHandle)
+        .addImm(0);
+    } else
+      llvm_unreachable("We only handle EPIVR as dynamic spills");
   }
 }
 
@@ -324,6 +401,11 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
   const RISCVRegisterInfo *RI =
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
+
+  // This is what Hexagon does but makes me wonder if this is the best place
+  // to do this. At least will happen once.
+  expandVectorSpillReload(MF);
+
   // Unconditionally spill RA and FP only if the function uses a frame
   // pointer.
   if (hasFP(MF)) {
@@ -361,6 +443,71 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
         if (RISCV::FPR32RegClass.contains(Regs[i]) ||
             RISCV::FPR64RegClass.contains(Regs[i]))
           SavedRegs.set(Regs[i]);
+    }
+  }
+}
+
+static void expandVectorSpillReloadPseudo(MachineBasicBlock &MBB,
+                                          MachineBasicBlock::iterator I,
+                                          MachineRegisterInfo &MRI,
+                                          const RISCVInstrInfo &TII,
+                                          const TargetRegisterInfo &TRI) {
+  MachineInstr &MI = *I;
+  DebugLoc DL = MI.getDebugLoc();
+
+  // FIXME - This is ignoring VL!
+
+  // Compute address to the handle
+  MachineOperand &OpFI = MI.getOperand(1);
+  unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  unsigned LoadHandleOpcode =
+      TRI.getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
+  BuildMI(MBB, I, DL, TII.get(LoadHandleOpcode), HandleReg)
+      .addFrameIndex(OpFI.getIndex())
+      .addImm(0);
+
+  // Do the memory operation
+  MachineOperand &OpReg = MI.getOperand(0);
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instruction");
+  case RISCV::PseudoVSPILL: {
+    // FIXME: hardcoded to SEW for now
+    BuildMI(MBB, I, DL, TII.get(RISCV::VSE_V))
+        .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
+        .addReg(HandleReg);
+    break;
+  }
+  case RISCV::PseudoVRELOAD: {
+    // FIXME: hardcodeo to SEW for now
+    BuildMI(MBB, I, DL, TII.get(RISCV::VLE_V), OpReg.getReg())
+        .addReg(HandleReg);
+    break;
+  }
+  }
+
+  // Remove the pseudo instruction.
+  MBB.erase(I);
+}
+
+
+void RISCVFrameLowering::expandVectorSpillReload(MachineFunction &MF) const {
+  const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+  const RISCVInstrInfo &TII = *STI.getInstrInfo();
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  for (auto &MBB : MF) {
+    MachineBasicBlock::iterator NextI;
+    for (auto I = MBB.begin(), E = MBB.end(); I != E; I = NextI) {
+      MachineInstr &MI = *I;
+      NextI = std::next(I);
+
+      unsigned Opc = MI.getOpcode();
+      switch (Opc) {
+      case RISCV::PseudoVSPILL:
+      case RISCV::PseudoVRELOAD:
+        expandVectorSpillReloadPseudo(MBB, I, MRI, TII, *TRI);
+        break;
+      }
     }
   }
 }

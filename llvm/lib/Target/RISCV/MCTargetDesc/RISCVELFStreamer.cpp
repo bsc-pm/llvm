@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCVELFStreamer.h"
+#include "MCTargetDesc/RISCVAsmBackend.h"
 #include "RISCVMCExpr.h"
 #include "RISCVMCTargetDesc.h"
-#include "MCTargetDesc/RISCVAsmBackend.h"
 #include "Utils/RISCVBaseInfo.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCContext.h"
@@ -212,6 +212,23 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
     EmitInstruction(Addi, STI);
     break;
   }
+    // EPI Pseudo Instructions
+  case RISCV::PseudoReadVL: {
+    EmitInstruction(MCInstBuilder(RISCV::CSRRS)
+                        .addOperand(Inst.getOperand(0))
+                        .addImm(EPICSR::VL)
+                        .addReg(RISCV::X0),
+                    STI);
+    break;
+  }
+  // case RISCV::PseudoReadVType: {
+  //   EmitInstruction(MCInstBuilder(RISCV::CSRRS)
+  //                       .addOperand(Inst.getOperand(0))
+  //                       .addImm(EPICSR::VTYPE)
+  //                       .addReg(RISCV::X0),
+  //                   STI);
+  //   break;
+  // }
   }
 
   return true;

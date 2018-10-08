@@ -149,13 +149,14 @@ struct RegSizeInfo {
   unsigned RegSize;
   unsigned SpillSize;
   unsigned SpillAlignment;
+  bool isDynamicSpillSize = false;
 
   RegSizeInfo(Record *R, const CodeGenHwModes &CGH);
   RegSizeInfo() = default;
   bool operator< (const RegSizeInfo &I) const;
-  bool operator== (const RegSizeInfo &I) const {
-    return std::tie(RegSize, SpillSize, SpillAlignment) ==
-           std::tie(I.RegSize, I.SpillSize, I.SpillAlignment);
+  bool operator==(const RegSizeInfo &I) const {
+    return std::tie(RegSize, SpillSize, SpillAlignment, isDynamicSpillSize) ==
+           std::tie(I.RegSize, I.SpillSize, I.SpillAlignment, isDynamicSpillSize);
   }
   bool operator!= (const RegSizeInfo &I) const {
     return !(*this == I);

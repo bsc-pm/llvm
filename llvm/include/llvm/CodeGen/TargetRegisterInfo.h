@@ -222,6 +222,7 @@ public:
   using vt_iterator = const MVT::SimpleValueType *;
   struct RegClassInfo {
     unsigned RegSize, SpillSize, SpillAlignment;
+    bool isDynamicSpillSize;
     vt_iterator VTList;
   };
 private:
@@ -314,9 +315,17 @@ public:
     return getRegClassInfo(RC).RegSize;
   }
 
+  /// Returns if this register class must be dynamically spilled.
+  bool isDynamicSpillSize(const TargetRegisterClass &RC) const {
+    return getRegClassInfo(RC).isDynamicSpillSize;
+  }
+
   /// Return the size in bytes of the stack slot allocated to hold a spilled
   /// copy of a register from class RC.
   unsigned getSpillSize(const TargetRegisterClass &RC) const {
+    // FIXME: This may return bogus values
+    // assert(!getRegClassInfo(RC).isDynamicSpillSize &&
+    //        "Cannot get the spill size of a dynamically spilled register");
     return getRegClassInfo(RC).SpillSize / 8;
   }
 
