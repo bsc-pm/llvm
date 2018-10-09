@@ -53,7 +53,13 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   StmtResult Directive = StmtError();
   switch (DKind) {
   case OSSD_task:
+    Diag(Tok, diag::err_oss_task_no_implemented);
+    SkipUntil(tok::annot_pragma_ompss_end);
+    break;
   case OSSD_taskwait:
+    Diag(Tok, diag::err_oss_taskwait_no_implemented);
+    SkipUntil(tok::annot_pragma_ompss_end);
+    break;
   case OSSD_unknown:
     Diag(Tok, diag::err_oss_unknown_directive);
     SkipUntil(tok::annot_pragma_ompss_end);
