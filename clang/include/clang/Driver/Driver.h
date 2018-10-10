@@ -28,13 +28,12 @@
 
 namespace llvm {
 class Triple;
-}
-
-namespace clang {
-
 namespace vfs {
 class FileSystem;
 }
+} // namespace llvm
+
+namespace clang {
 
 namespace driver {
 
@@ -61,7 +60,7 @@ class Driver {
 
   DiagnosticsEngine &Diags;
 
-  IntrusiveRefCntPtr<vfs::FileSystem> VFS;
+  IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
 
   enum DriverMode {
     GCCMode,
@@ -288,7 +287,7 @@ private:
 public:
   Driver(StringRef ClangExecutable, StringRef TargetTriple,
          DiagnosticsEngine &Diags,
-         IntrusiveRefCntPtr<vfs::FileSystem> VFS = nullptr);
+         IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS = nullptr);
 
   /// @name Accessors
   /// @{
@@ -302,7 +301,7 @@ public:
 
   const DiagnosticsEngine &getDiags() const { return Diags; }
 
-  vfs::FileSystem &getVFS() const { return *VFS; }
+  llvm::vfs::FileSystem &getVFS() const { return *VFS; }
 
   bool getCheckInputsExist() const { return CheckInputsExist; }
 
