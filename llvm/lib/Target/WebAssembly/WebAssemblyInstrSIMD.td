@@ -55,7 +55,6 @@ multiclass ConstVec<ValueType vec_t, dag ops, dag pat, string args> {
                                   "v128.const\t"#args, 0>;
 }
 
-let Defs = [ARGUMENTS] in {
 defm "" : ConstVec<v16i8,
                    (ins vec_i8imm_op:$i0, vec_i8imm_op:$i1,
                         vec_i8imm_op:$i2, vec_i8imm_op:$i3,
@@ -100,7 +99,6 @@ defm "" : ConstVec<v2f64,
                   (ins f64imm_op:$i0, f64imm_op:$i1),
                   (build_vector (f64 fpimm:$i0), (f64 fpimm:$i1)),
                   "$i0, $i1">;
-} // Defs = [ARGUMENTS]
 
 // Create vector with identical lanes: splat
 def splat2 : PatFrag<(ops node:$x), (build_vector node:$x, node:$x)>;
@@ -508,23 +506,16 @@ defm XOR : SIMDBitwise<xor, "xor", 62>;
 } // isCommutable = 1
 
 // Bitwise logic: v128.not
-multiclass SIMDNot<ValueType vec_t, PatFrag splat_pat, ValueType lane_t> {
-  defm NOT_#vec_t : SIMD_I<(outs V128:$dst), (ins V128:$vec),
-                           (outs), (ins),
-                           [(set
-                             (vec_t V128:$dst),
-                             (vec_t (xor
-                               (vec_t V128:$vec),
-                               (vec_t (splat_pat (lane_t -1)))
-                             ))
-                           )],
+multiclass SIMDNot<ValueType vec_t> {
+  defm NOT_#vec_t : SIMD_I<(outs V128:$dst), (ins V128:$vec), (outs), (ins),
+                           [(set (vec_t V128:$dst), (vec_t (vnot V128:$vec)))],
                            "v128.not\t$dst, $vec", "v128.not", 63>;
 }
 
-defm "" : SIMDNot<v16i8, splat16, i32>;
-defm "" : SIMDNot<v8i16, splat8, i32>;
-defm "" : SIMDNot<v4i32, splat4, i32>;
-defm "" : SIMDNot<v2i64, splat2, i64>;
+defm "" : SIMDNot<v16i8>;
+defm "" : SIMDNot<v8i16>;
+defm "" : SIMDNot<v4i32>;
+defm "" : SIMDNot<v2i64>;
 
 // Bitwise select: v128.bitselect
 def wasm_bitselect_t : SDTypeProfile<1, 3,
