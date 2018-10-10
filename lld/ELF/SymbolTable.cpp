@@ -196,23 +196,22 @@ std::pair<Symbol *, bool> SymbolTable::insert(StringRef Name) {
 
   if (SymIndex == -1) {
     SymIndex = SymVector.size();
-    IsNew = Traced = true;
+    IsNew = true;
+    Traced = true;
   }
 
-  Symbol *Sym;
-  if (IsNew) {
-    Sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
-    Sym->Visibility = STV_DEFAULT;
-    Sym->IsUsedInRegularObj = false;
-    Sym->ExportDynamic = false;
-    Sym->CanInline = true;
-    Sym->Traced = Traced;
-    Sym->VersionId = Config->DefaultSymbolVersion;
-    SymVector.push_back(Sym);
-  } else {
-    Sym = SymVector[SymIndex];
-  }
-  return {Sym, IsNew};
+  if (!IsNew)
+    return {SymVector[SymIndex], false};
+
+  auto *Sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
+  Sym->Visibility = STV_DEFAULT;
+  Sym->IsUsedInRegularObj = false;
+  Sym->ExportDynamic = false;
+  Sym->CanInline = true;
+  Sym->Traced = Traced;
+  Sym->VersionId = Config->DefaultSymbolVersion;
+  SymVector.push_back(Sym);
+  return {Sym, true};
 }
 
 // Find an existing symbol or create and insert a new one, then apply the given
@@ -443,12 +442,6 @@ Symbol *SymbolTable::addCommon(StringRef N, uint64_t Size, uint32_t Alignment,
   return S;
 }
 
-static void reportDuplicate(Symbol *Sym, InputFile *NewFile) {
-  if (!Config->AllowMultipleDefinition)
-    error("duplicate symbol: " + toString(*Sym) + "\n>>> defined in " +
-          toString(Sym->File) + "\n>>> defined in " + toString(NewFile));
-}
-
 static void reportDuplicate(Symbol *Sym, InputFile *NewFile,
                             InputSectionBase *ErrSec, uint64_t ErrOffset) {
   if (Config->AllowMultipleDefinition)
@@ -456,7 +449,8 @@ static void reportDuplicate(Symbol *Sym, InputFile *NewFile,
 
   Defined *D = cast<Defined>(Sym);
   if (!D->Section || !ErrSec) {
-    reportDuplicate(Sym, NewFile);
+    error("duplicate symbol: " + toString(*Sym) + "\n>>> defined in " +
+          toString(Sym->File) + "\n>>> defined in " + toString(NewFile));
     return;
   }
 
@@ -545,7 +539,7 @@ Symbol *SymbolTable::addBitcode(StringRef Name, uint8_t Binding,
   if (Cmp > 0)
     replaceSymbol<Defined>(S, &F, Name, Binding, StOther, Type, 0, 0, nullptr);
   else if (Cmp == 0)
-    reportDuplicate(S, &F);
+    reportDuplicate(S, &F, nullptr, 0);
   return S;
 }
 
