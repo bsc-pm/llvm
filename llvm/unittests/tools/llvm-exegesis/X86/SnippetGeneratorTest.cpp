@@ -175,7 +175,7 @@ TEST_F(UopsSnippetGeneratorTest, SerialInstruction) {
 }
 
 TEST_F(UopsSnippetGeneratorTest, StaticRenaming) {
-  // CMOVA32rr has tied variables, we enumarate the possible values to execute
+  // CMOVA32rr has tied variables, we enumerate the possible values to execute
   // as many in parallel as possible.
 
   // explicit def 0       : reg RegClass=GR32
@@ -248,7 +248,7 @@ public:
   FakeSnippetGenerator(const LLVMState &State) : SnippetGenerator(State) {}
 
   Instruction createInstruction(unsigned Opcode) {
-    return Instruction(State.getInstrInfo().get(Opcode), RATC);
+    return Instruction(State, Opcode);
   }
 
 private:
