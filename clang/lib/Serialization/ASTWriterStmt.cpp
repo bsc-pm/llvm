@@ -2197,18 +2197,12 @@ void ASTStmtWriter::VisitOMPTargetTeamsDistributeSimdDirective(
 void ASTStmtWriter::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
   Record.AddSourceLocation(E->getBeginLoc());
   Record.AddSourceLocation(E->getEndLoc());
-  // OSSClauseWriter ClauseWriter(Record);
-  // for (unsigned i = 0; i < E->getNumClauses(); ++i) {
-  //   ClauseWriter.writeClause(E->getClause(i));
-  // }
-  // if (E->hasAssociatedStmt())
-  //   Record.AddStmt(E->getAssociatedStmt());
 }
 
 void ASTStmtWriter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   VisitStmt(D);
   VisitOSSExecutableDirective(D);
-  // Code = serialization::STMT_OSS_TASKWAIT_DIRECTIVE;
+  Code = serialization::STMT_OSS_TASKWAIT_DIRECTIVE;
 }
 
 //===----------------------------------------------------------------------===//

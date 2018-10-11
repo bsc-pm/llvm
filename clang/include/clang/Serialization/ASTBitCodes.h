@@ -1953,6 +1953,9 @@ namespace serialization {
       STMT_OMP_TARGET_TEAMS_DISTRIBUTE_SIMD_DIRECTIVE,
       EXPR_OMP_ARRAY_SECTION,
 
+      // OpenMP directives
+      STMT_OSS_TASKWAIT_DIRECTIVE,
+
       // ARC
       EXPR_OBJC_BRIDGED_CAST,     // ObjCBridgedCastExpr
 

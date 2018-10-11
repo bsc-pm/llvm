@@ -109,6 +109,8 @@ namespace {
     void PrintRawSEHFinallyStmt(SEHFinallyStmt *S);
     void PrintOMPExecutableDirective(OMPExecutableDirective *S,
                                      bool ForceNoStmt = false);
+    // OmpSs
+    void PrintOSSExecutableDirective(OSSExecutableDirective *S);
 
     void PrintExpr(Expr *E) {
       if (E)
@@ -1340,9 +1342,15 @@ void StmtPrinter::VisitOMPTargetTeamsDistributeSimdDirective(
 //===----------------------------------------------------------------------===//
 //  OmpSs printing methods.
 //===----------------------------------------------------------------------===//
+
+void StmtPrinter::PrintOSSExecutableDirective(OSSExecutableDirective *S) {
+  OS << NL;
+  return;
+}
+
 void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
-  // Indent() << "#pragma omp taskwait";
-  // PrintOSSExecutableDirective(Node);
+  Indent() << "#pragma omp taskwait";
+  PrintOSSExecutableDirective(Node);
 }
 
 //===----------------------------------------------------------------------===//

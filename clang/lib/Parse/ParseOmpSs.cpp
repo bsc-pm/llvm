@@ -74,9 +74,6 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     }
 
-    // Diag(Tok, diag::err_oss_taskwait_no_implemented);
-    // SkipUntil(tok::annot_pragma_ompss_end);
-    // break;
   case OSSD_unknown:
     Diag(Tok, diag::err_oss_unknown_directive);
     SkipUntil(tok::annot_pragma_ompss_end);
@@ -85,12 +82,3 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   return Directive;
 }
 
-      /*
-    ConsumeToken();
-    ParseScope OMPDirectiveScope(this, ScopeFlags);
-
-    // End location of the directive.
-    EndLoc = Tok.getLocation();
-    // Consume final annot_pragma_openmp_end.
-    ConsumeAnnotationToken();
-      */

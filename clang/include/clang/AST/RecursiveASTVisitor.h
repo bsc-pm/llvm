@@ -537,6 +537,7 @@ private:
   bool VisitOMPClauseWithPreInit(OMPClauseWithPreInit *Node);
   bool VisitOMPClauseWithPostUpdate(OMPClauseWithPostUpdate *Node);
 
+  // OmpSs
   bool TraverseOSSExecutableDirective(OSSExecutableDirective *S);
 
   bool dataTraverseNode(Stmt *S, DataRecursionQueue *Queue);
@@ -3241,9 +3242,6 @@ bool RecursiveASTVisitor<Derived>::VisitOMPIsDevicePtrClause(
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
-  // for (auto *C : S->clauses()) {
-  //   TRY_TO(TraverseOSSClause(C));
-  // }
   return true;
 }
 

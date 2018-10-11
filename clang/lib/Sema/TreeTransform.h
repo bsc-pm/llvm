@@ -1479,6 +1479,17 @@ public:
     return getSema().BuildObjCAtThrowStmt(AtLoc, Operand);
   }
 
+  /// Build a new OmpSs executable directive.
+  ///
+  /// By default, performs semantic analysis to build the new statement.
+  /// Subclasses may override this routine to provide different behavior.
+  StmtResult RebuildOSSExecutableDirective(OmpSsDirectiveKind Kind,
+                                           SourceLocation StartLoc,
+                                           SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsExecutableDirective(
+        Kind, StartLoc, EndLoc);
+  }
+
   /// Build a new OpenMP executable directive.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -8877,15 +8888,19 @@ TreeTransform<Derived>::TransformOMPIsDevicePtrClause(OMPIsDevicePtrClause *C) {
 //===----------------------------------------------------------------------===//
 
 template <typename Derived>
+StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
+    OSSExecutableDirective *D) {
+
+  // Transform the clauses
+  return getDerived().RebuildOSSExecutableDirective(
+      D->getDirectiveKind(), D->getBeginLoc(), D->getEndLoc());
+}
+
+template <typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
-  // DeclarationNameInfo DirName;
-  // getDerived().getSema().StartOpenMPDSABlock(OSSD_taskwait, DirName, nullptr,
-  //                                            D->getBeginLoc());
-  // StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
-  // getDerived().getSema().EndOpenMPDSABlock(Res.get());
   StmtResult Res = StmtError();
-
+  Res = getDerived().TransformOSSExecutableDirective(D);
   return Res;
 }
 

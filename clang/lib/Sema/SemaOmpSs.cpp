@@ -35,11 +35,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(
 
   StmtResult Res = StmtError();
   switch (Kind) {
-  case OSSD_task:
-    llvm_unreachable("oss task not supported yet");
   case OSSD_taskwait:
     Res = ActOnOmpSsTaskwaitDirective(StartLoc, EndLoc);
     break;
+  case OSSD_task:
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
   }

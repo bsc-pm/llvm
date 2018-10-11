@@ -2939,11 +2939,7 @@ void EnqueueVisitor::VisitOMPTargetTeamsDistributeSimdDirective(
 
 void EnqueueVisitor::VisitOSSExecutableDirective(
   const OSSExecutableDirective *D) {
-  // EnqueueChildren(D);
-  // for (ArrayRef<OSSClause *>::iterator I = D->clauses().begin(),
-  //                                      E = D->clauses().end();
-  //      I != E; ++I)
-  //   EnqueueChildren(*I);
+  EnqueueChildren(D);
 }
 
 void EnqueueVisitor::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *D) {
