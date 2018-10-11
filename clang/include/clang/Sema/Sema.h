@@ -34,6 +34,7 @@
 #include "clang/Basic/ExpressionTraits.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/PragmaKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TemplateKinds.h"
@@ -9289,6 +9290,13 @@ public:
   OMPClause *ActOnOpenMPIsDevicePtrClause(ArrayRef<Expr *> VarList,
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,
+                                          SourceLocation EndLoc);
+  // OmpSs
+  StmtResult ActOnOmpSsExecutableDirective(
+      OmpSsDirectiveKind Kind, SourceLocation StartLoc, SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss taskwait'.
+  StmtResult ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
                                           SourceLocation EndLoc);
 
   /// The kind of conversion being performed.

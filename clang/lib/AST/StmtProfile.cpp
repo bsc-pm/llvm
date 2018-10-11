@@ -980,6 +980,23 @@ void StmtProfiler::VisitOMPTargetTeamsDistributeSimdDirective(
   VisitOMPLoopDirective(S);
 }
 
+// OmpSs
+
+void
+StmtProfiler::VisitOSSExecutableDirective(const OSSExecutableDirective *S) {
+  VisitStmt(S);
+  // OSSClauseProfiler P(this);
+  // ArrayRef<OSSClause *> Clauses = S->clauses();
+  // for (ArrayRef<OSSClause *>::iterator I = Clauses.begin(), E = Clauses.end();
+  //      I != E; ++I)
+  //   if (*I)
+  //     P.Visit(*I);
+}
+
+void StmtProfiler::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitExpr(const Expr *S) {
   VisitStmt(S);
 }

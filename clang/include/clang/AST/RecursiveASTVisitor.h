@@ -34,12 +34,14 @@
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
@@ -534,6 +536,8 @@ private:
   /// Process clauses with pre-initis.
   bool VisitOMPClauseWithPreInit(OMPClauseWithPreInit *Node);
   bool VisitOMPClauseWithPostUpdate(OMPClauseWithPostUpdate *Node);
+
+  bool TraverseOSSExecutableDirective(OSSExecutableDirective *S);
 
   bool dataTraverseNode(Stmt *S, DataRecursionQueue *Queue);
   bool PostVisitStmt(Stmt *S);
@@ -3232,6 +3236,19 @@ bool RecursiveASTVisitor<Derived>::VisitOMPIsDevicePtrClause(
 //    http://clang.llvm.org/doxygen/classclang_1_1UnaryExprOrTypeTraitExpr.html
 //    http://clang.llvm.org/doxygen/classclang_1_1TypesCompatibleExpr.html
 //    Every class that has getQualifier.
+
+// OmpSs directives.
+template <typename Derived>
+bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
+    OSSExecutableDirective *S) {
+  // for (auto *C : S->clauses()) {
+  //   TRY_TO(TraverseOSSClause(C));
+  // }
+  return true;
+}
+
+DEF_TRAVERSE_STMT(OSSTaskwaitDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT

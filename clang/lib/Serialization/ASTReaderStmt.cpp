@@ -2167,6 +2167,27 @@ void ASTStmtReader::VisitOMPTargetTeamsDistributeSimdDirective(
 }
 
 //===----------------------------------------------------------------------===//
+// OmpSs Directives.
+//===----------------------------------------------------------------------===//
+
+void ASTStmtReader::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
+  E->setLocStart(ReadSourceLocation());
+  E->setLocEnd(ReadSourceLocation());
+  // OSSClauseReader ClauseReader(Record);
+  // SmallVector<OSSClause *, 5> Clauses;
+  // for (unsigned i = 0; i < E->getNumClauses(); ++i)
+  //   Clauses.push_back(ClauseReader.readClause());
+  // E->setClauses(Clauses);
+  // if (E->hasAssociatedStmt())
+  //   E->setAssociatedStmt(Record.readSubStmt());
+}
+
+void ASTStmtReader::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
+  VisitStmt(D);
+  VisitOSSExecutableDirective(D);
+}
+
+//===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//
 

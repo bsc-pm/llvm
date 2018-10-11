@@ -60,6 +60,7 @@ add_clang_library(clangAST
   StmtIterator.cpp
   StmtObjC.cpp
   StmtOpenMP.cpp
+  StmtOmpSs.cpp
   StmtPrinter.cpp
   StmtProfile.cpp
   StmtViz.cpp

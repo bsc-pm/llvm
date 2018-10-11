@@ -1338,6 +1338,14 @@ void StmtPrinter::VisitOMPTargetTeamsDistributeSimdDirective(
 }
 
 //===----------------------------------------------------------------------===//
+//  OmpSs printing methods.
+//===----------------------------------------------------------------------===//
+void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
+  // Indent() << "#pragma omp taskwait";
+  // PrintOSSExecutableDirective(Node);
+}
+
+//===----------------------------------------------------------------------===//
 //  Expr printing methods.
 //===----------------------------------------------------------------------===//
 

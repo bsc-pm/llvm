@@ -27,6 +27,7 @@
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/Sema/Designator.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Ownership.h"
@@ -665,6 +666,9 @@ public:
   ExprResult TransformParenDependentScopeDeclRefExpr(
       ParenExpr *PE, DependentScopeDeclRefExpr *DRE, bool IsAddressOfOperand,
       TypeSourceInfo **RecoveryTSI);
+
+  // OmpSs
+  StmtResult TransformOSSExecutableDirective(OSSExecutableDirective *S);
 
   StmtResult TransformOMPExecutableDirective(OMPExecutableDirective *S);
 
@@ -8866,6 +8870,23 @@ TreeTransform<Derived>::TransformOMPIsDevicePtrClause(OMPIsDevicePtrClause *C) {
   }
   return getDerived().RebuildOMPIsDevicePtrClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+//===----------------------------------------------------------------------===//
+// OmpSs directive transformation
+//===----------------------------------------------------------------------===//
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
+  // DeclarationNameInfo DirName;
+  // getDerived().getSema().StartOpenMPDSABlock(OSSD_taskwait, DirName, nullptr,
+  //                                            D->getBeginLoc());
+  // StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  // getDerived().getSema().EndOpenMPDSABlock(Res.get());
+  StmtResult Res = StmtError();
+
+  return Res;
 }
 
 //===----------------------------------------------------------------------===//
