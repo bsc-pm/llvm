@@ -26296,30 +26296,26 @@ void X86TargetLowering::ReplaceNodeResults(SDNode *N,
       return;
     }
 
-    if (SrcVT != MVT::f64 ||
-        (DstVT != MVT::v2i32 && DstVT != MVT::v4i16 && DstVT != MVT::v8i8))
+    if ((SrcVT != MVT::f64 && SrcVT != MVT::v2f32) ||
+        (DstVT != MVT::v2i32 && DstVT != MVT::v4i16 && DstVT != MVT::v8i8) ||
+        getTypeAction(*DAG.getContext(), DstVT) == TypeWidenVector)
       return;
 
     unsigned NumElts = DstVT.getVectorNumElements();
     EVT SVT = DstVT.getVectorElementType();
     EVT WiderVT = EVT::getVectorVT(*DAG.getContext(), SVT, NumElts * 2);
-    SDValue Expanded = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl,
-                                   MVT::v2f64, N->getOperand(0));
-    SDValue ToVecInt = DAG.getBitcast(WiderVT, Expanded);
+    SDValue Res;
+    if (SrcVT == MVT::f64)
+      Res = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl,
+                             MVT::v2f64, N->getOperand(0));
+    else
+      Res = DAG.getNode(ISD::CONCAT_VECTORS, dl, MVT::v4f32, N->getOperand(0),
+                        DAG.getUNDEF(MVT::v2f32));
 
-    if (getTypeAction(*DAG.getContext(), DstVT) == TypeWidenVector) {
-      // If we are legalizing vectors by widening, we already have the desired
-      // legal vector type, just return it.
-      Results.push_back(ToVecInt);
-      return;
-    }
-
-    SmallVector<SDValue, 8> Elts;
-    for (unsigned i = 0, e = NumElts; i != e; ++i)
-      Elts.push_back(DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, SVT,
-                                   ToVecInt, DAG.getIntPtrConstant(i, dl)));
-
-    Results.push_back(DAG.getBuildVector(DstVT, dl, Elts));
+    Res = DAG.getBitcast(WiderVT, Res);
+    Res = DAG.getNode(ISD::EXTRACT_SUBVECTOR, dl, DstVT, Res,
+                      DAG.getIntPtrConstant(0, dl));
+    Results.push_back(Res);
     return;
   }
   case ISD::MGATHER: {
