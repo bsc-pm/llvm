@@ -3022,22 +3022,20 @@ SDValue DAGTypeLegalizer::WidenVecRes_BITCAST(SDNode *N) {
     }
 
     if (TLI.isTypeLegal(NewInVT)) {
-      // Because the result and the input are different vector types, widening
-      // the result could create a legal type but widening the input might make
-      // it an illegal type that might lead to repeatedly splitting the input
-      // and then widening it. To avoid this, we widen the input only if
-      // it results in a legal type.
-      SmallVector<SDValue, 16> Ops(NewNumElts);
-      SDValue UndefVal = DAG.getUNDEF(InVT);
-      Ops[0] = InOp;
-      for (unsigned i = 1; i < NewNumElts; ++i)
-        Ops[i] = UndefVal;
-
       SDValue NewVec;
-      if (InVT.isVector())
+      if (InVT.isVector()) {
+        // Because the result and the input are different vector types, widening
+        // the result could create a legal type but widening the input might make
+        // it an illegal type that might lead to repeatedly splitting the input
+        // and then widening it. To avoid this, we widen the input only if
+        // it results in a legal type.
+        SmallVector<SDValue, 16> Ops(NewNumElts, DAG.getUNDEF(InVT));
+        Ops[0] = InOp;
+
         NewVec = DAG.getNode(ISD::CONCAT_VECTORS, dl, NewInVT, Ops);
-      else
-        NewVec = DAG.getBuildVector(NewInVT, dl, Ops);
+      } else {
+        NewVec = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl, NewInVT, InOp);
+      }
       return DAG.getNode(ISD::BITCAST, dl, WidenVT, NewVec);
     }
   }
@@ -3751,8 +3749,9 @@ SDValue DAGTypeLegalizer::WidenVecOp_Convert(SDNode *N) {
                                 InVT.getVectorNumElements());
   if (TLI.isTypeLegal(WideVT)) {
     SDValue Res = DAG.getNode(Opcode, dl, WideVT, InOp);
-    return DAG.getNode(ISD::EXTRACT_SUBVECTOR, dl, VT, Res,
-                       DAG.getIntPtrConstant(0, dl));
+    return DAG.getNode(
+        ISD::EXTRACT_SUBVECTOR, dl, VT, Res,
+        DAG.getConstant(0, dl, TLI.getVectorIdxTy(DAG.getDataLayout())));
   }
 
   EVT InEltVT = InVT.getVectorElementType();
