@@ -25,8 +25,8 @@ namespace llvm {
 class MCAsmBackend;
 class MCCodeEmitter;
 class MCContext;
-class MCDwarfFrameInfo;
 class MCSubtargetInfo;
+struct MCDwarfFrameInfo;
 
 class MipsELFStreamer : public MCELFStreamer {
   SmallVector<std::unique_ptr<MipsOptionRecord>, 8> MipsOptionRecords;
