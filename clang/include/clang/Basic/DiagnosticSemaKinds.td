@@ -9482,4 +9482,9 @@ def err_std_compare_type_not_supported : Error<
    "member '%2' is missing|"
    "the type is not trivially copyable|"
    "the type does not have the expected form}1">;
+
+// OmpSs errors
+def err_oss_taskwait_codegen_not_implemented : Error<
+ "oss taskwait codegen not supported yet">;
+
 } // end of sema component.

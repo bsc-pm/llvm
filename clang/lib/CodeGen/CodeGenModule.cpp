@@ -20,6 +20,7 @@
 #include "CGObjCRuntime.h"
 #include "CGOpenCLRuntime.h"
 #include "CGOpenMPRuntime.h"
+#include "CGOmpSsRuntime.h"
 #include "CGOpenMPRuntimeNVPTX.h"
 #include "CodeGenFunction.h"
 #include "CodeGenPGO.h"
@@ -132,6 +133,8 @@ CodeGenModule::CodeGenModule(ASTContext &C, const HeaderSearchOptions &HSO,
     createOpenCLRuntime();
   if (LangOpts.OpenMP)
     createOpenMPRuntime();
+  if (LangOpts.OmpSs)
+    createOmpSsRuntime();
   if (LangOpts.CUDA)
     createCUDARuntime();
 
@@ -215,6 +218,10 @@ void CodeGenModule::createOpenMPRuntime() {
       OpenMPRuntime.reset(new CGOpenMPRuntime(*this));
     break;
   }
+}
+
+void CodeGenModule::createOmpSsRuntime() {
+  OmpSsRuntime.reset(new CGOmpSsRuntime(*this));
 }
 
 void CodeGenModule::createCUDARuntime() {
@@ -371,6 +378,8 @@ void CodeGenModule::clear() {
   DeferredDeclsToEmit.clear();
   if (OpenMPRuntime)
     OpenMPRuntime->clear();
+  if (OmpSsRuntime)
+    OmpSsRuntime->clear();
 }
 
 void InstrProfStats::reportDiagnostics(DiagnosticsEngine &Diags,

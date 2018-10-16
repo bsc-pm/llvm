@@ -343,6 +343,10 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
     EmitOMPTargetTeamsDistributeSimdDirective(
         cast<OMPTargetTeamsDistributeSimdDirective>(*S));
     break;
+  // OmpSs directives
+  case Stmt::OSSTaskwaitDirectiveClass:
+    EmitOSSTaskwaitDirective(cast<OSSTaskwaitDirective>(*S));
+    break;
   }
 }
 
