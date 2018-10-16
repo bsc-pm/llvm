@@ -22,15 +22,31 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-bool LoopSafetyInfo::headerMayThrow() const {
+const DenseMap<BasicBlock *, ColorVector> &
+LoopSafetyInfo::getBlockColors() const {
+  return BlockColors;
+}
+
+void LoopSafetyInfo::copyColors(BasicBlock *New, BasicBlock *Old) {
+  ColorVector &ColorsForNewBlock = BlockColors[New];
+  ColorVector &ColorsForOldBlock = BlockColors[Old];
+  ColorsForNewBlock = ColorsForOldBlock;
+}
+
+bool SimpleLoopSafetyInfo::headerMayThrow() const {
   return HeaderMayThrow;
 }
 
-bool LoopSafetyInfo::anyBlockMayThrow() const {
+bool SimpleLoopSafetyInfo::blockMayThrow(const BasicBlock *BB) const {
+  (void)BB;
+  return anyBlockMayThrow();
+}
+
+bool SimpleLoopSafetyInfo::anyBlockMayThrow() const {
   return MayThrow;
 }
 
-void LoopSafetyInfo::computeLoopSafetyInfo(Loop *CurLoop) {
+void SimpleLoopSafetyInfo::computeLoopSafetyInfo(const Loop *CurLoop) {
   assert(CurLoop != nullptr && "CurLoop can't be null");
   BasicBlock *Header = CurLoop->getHeader();
   // Iterate over header and compute safety info.
@@ -46,6 +62,10 @@ void LoopSafetyInfo::computeLoopSafetyInfo(Loop *CurLoop) {
        (BB != BBE) && !MayThrow; ++BB)
     MayThrow |= !isGuaranteedToTransferExecutionToSuccessor(*BB);
 
+  computeBlockColors(CurLoop);
+}
+
+void LoopSafetyInfo::computeBlockColors(const Loop *CurLoop) {
   // Compute funclet colors if we might sink/hoist in a function with a funclet
   // personality routine.
   Function *Fn = CurLoop->getHeader()->getParent();
@@ -148,7 +168,10 @@ bool LoopSafetyInfo::allLoopPathsLeadToBlock(const Loop *CurLoop,
   // 3) Exit blocks which are not taken on 1st iteration.
   // Memoize blocks we've already checked.
   SmallPtrSet<const BasicBlock *, 4> CheckedSuccessors;
-  for (auto *Pred : Predecessors)
+  for (auto *Pred : Predecessors) {
+    // Predecessor block may throw, so it has a side exit.
+    if (blockMayThrow(Pred))
+      return false;
     for (auto *Succ : successors(Pred))
       if (CheckedSuccessors.insert(Succ).second &&
           Succ != BB && !Predecessors.count(Succ))
@@ -169,6 +192,7 @@ bool LoopSafetyInfo::allLoopPathsLeadToBlock(const Loop *CurLoop,
         if (CurLoop->contains(Succ) ||
             !CanProveNotTakenFirstIteration(Succ, DT, CurLoop))
           return false;
+  }
 
   // All predecessors can only lead us to BB.
   return true;
@@ -176,9 +200,9 @@ bool LoopSafetyInfo::allLoopPathsLeadToBlock(const Loop *CurLoop,
 
 /// Returns true if the instruction in a loop is guaranteed to execute at least
 /// once.
-bool llvm::isGuaranteedToExecute(const Instruction &Inst,
-                                 const DominatorTree *DT, const Loop *CurLoop,
-                                 const LoopSafetyInfo *SafetyInfo) {
+bool SimpleLoopSafetyInfo::isGuaranteedToExecute(const Instruction &Inst,
+                                                 const DominatorTree *DT,
+                                                 const Loop *CurLoop) const {
   // We have to check to make sure that the instruction dominates all
   // of the exit blocks.  If it doesn't, then there is a path out of the loop
   // which does not execute this instruction, so we can't hoist it.
@@ -191,17 +215,12 @@ bool llvm::isGuaranteedToExecute(const Instruction &Inst,
     // Inst unless we can prove that Inst comes before the potential implicit
     // exit.  At the moment, we use a (cheap) hack for the common case where
     // the instruction of interest is the first one in the block.
-    return !SafetyInfo->headerMayThrow() ||
-      Inst.getParent()->getFirstNonPHIOrDbg() == &Inst;
-
-  // Somewhere in this loop there is an instruction which may throw and make us
-  // exit the loop.
-  if (SafetyInfo->anyBlockMayThrow())
-    return false;
+    return !headerMayThrow() ||
+           Inst.getParent()->getFirstNonPHIOrDbg() == &Inst;
 
   // If there is a path from header to exit or latch that doesn't lead to our
   // instruction's block, return false.
-  if (!SafetyInfo->allLoopPathsLeadToBlock(CurLoop, Inst.getParent(), DT))
+  if (!allLoopPathsLeadToBlock(CurLoop, Inst.getParent(), DT))
     return false;
 
   return true;
@@ -240,9 +259,9 @@ static bool isMustExecuteIn(const Instruction &I, Loop *L, DominatorTree *DT) {
   // TODO: merge these two routines.  For the moment, we display the best
   // result obtained by *either* implementation.  This is a bit unfair since no
   // caller actually gets the full power at the moment.
-  LoopSafetyInfo LSI;
+  SimpleLoopSafetyInfo LSI;
   LSI.computeLoopSafetyInfo(L);
-  return isGuaranteedToExecute(I, DT, L, &LSI) ||
+  return LSI.isGuaranteedToExecute(I, DT, L) ||
     isGuaranteedToExecuteForEveryIteration(&I, L);
 }
 
