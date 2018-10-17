@@ -97,29 +97,14 @@ void ClangdLSPServer::onInitialize(InitializeParams &Params) {
   else if (Params.rootPath && !Params.rootPath->empty())
     Server->setRootPath(*Params.rootPath);
 
-  CCOpts.EnableSnippets =
-      Params.capabilities.textDocument.completion.completionItem.snippetSupport;
-  DiagOpts.EmbedFixesInDiagnostics =
-      Params.capabilities.textDocument.publishDiagnostics.clangdFixSupport;
-  DiagOpts.SendDiagnosticCategory =
-      Params.capabilities.textDocument.publishDiagnostics.categorySupport;
-  SupportsCodeAction =
-      Params.capabilities.textDocument.codeActionLiteralSupport;
-
-  if (Params.capabilities.workspace && Params.capabilities.workspace->symbol &&
-      Params.capabilities.workspace->symbol->symbolKind &&
-      Params.capabilities.workspace->symbol->symbolKind->valueSet) {
-    for (SymbolKind Kind :
-         *Params.capabilities.workspace->symbol->symbolKind->valueSet) {
-      SupportedSymbolKinds.set(static_cast<size_t>(Kind));
-    }
-  }
-
-  if (Params.capabilities.textDocument.completion.completionItemKind &&
-      Params.capabilities.textDocument.completion.completionItemKind->valueSet)
-    for (CompletionItemKind Kind : *Params.capabilities.textDocument.completion
-                                        .completionItemKind->valueSet)
-      SupportedCompletionItemKinds.set(static_cast<size_t>(Kind));
+  CCOpts.EnableSnippets = Params.capabilities.CompletionSnippets;
+  DiagOpts.EmbedFixesInDiagnostics = Params.capabilities.DiagnosticFixes;
+  DiagOpts.SendDiagnosticCategory = Params.capabilities.DiagnosticCategory;
+  if (Params.capabilities.WorkspaceSymbolKinds)
+    SupportedSymbolKinds |= *Params.capabilities.WorkspaceSymbolKinds;
+  if (Params.capabilities.CompletionItemKinds)
+    SupportedCompletionItemKinds |= *Params.capabilities.CompletionItemKinds;
+  SupportsCodeAction = Params.capabilities.CodeActionStructure;
 
   reply(json::Object{
       {{"capabilities",
@@ -162,7 +147,10 @@ void ClangdLSPServer::onShutdown(ShutdownParams &Params) {
   reply(nullptr);
 }
 
-void ClangdLSPServer::onExit(ExitParams &Params) { IsDone = true; }
+void ClangdLSPServer::onExit(ExitParams &Params) {
+  // No work to do.
+  // JSONRPCDispatcher shuts down the transport after this notification.
+}
 
 void ClangdLSPServer::onDocumentDidOpen(DidOpenTextDocumentParams &Params) {
   PathRef File = Params.textDocument.uri.file();
@@ -497,39 +485,41 @@ void ClangdLSPServer::onReference(ReferenceParams &Params) {
                          });
 }
 
-ClangdLSPServer::ClangdLSPServer(JSONOutput &Out,
+ClangdLSPServer::ClangdLSPServer(class Transport &Transp,
                                  const clangd::CodeCompleteOptions &CCOpts,
                                  llvm::Optional<Path> CompileCommandsDir,
                                  bool ShouldUseInMemoryCDB,
                                  const ClangdServer::Options &Opts)
-    : Out(Out), CDB(ShouldUseInMemoryCDB ? CompilationDB::makeInMemory()
-                                         : CompilationDB::makeDirectoryBased(
-                                               std::move(CompileCommandsDir))),
+    : Transp(Transp),
+      CDB(ShouldUseInMemoryCDB ? CompilationDB::makeInMemory()
+                               : CompilationDB::makeDirectoryBased(
+                                     std::move(CompileCommandsDir))),
       CCOpts(CCOpts), SupportedSymbolKinds(defaultSymbolKinds()),
       SupportedCompletionItemKinds(defaultCompletionItemKinds()),
       Server(new ClangdServer(CDB.getCDB(), FSProvider, /*DiagConsumer=*/*this,
                               Opts)) {}
 
-bool ClangdLSPServer::run(std::FILE *In, JSONStreamStyle InputStyle) {
-  assert(!IsDone && "Run was called before");
+bool ClangdLSPServer::run() {
   assert(Server);
 
   // Set up JSONRPCDispatcher.
   JSONRPCDispatcher Dispatcher([](const json::Value &Params) {
     replyError(ErrorCode::MethodNotFound, "method not found");
+    return true;
   });
   registerCallbackHandlers(Dispatcher, /*Callbacks=*/*this);
 
   // Run the Language Server loop.
-  runLanguageServerLoop(In, Out, InputStyle, Dispatcher, IsDone);
+  bool CleanExit = true;
+  if (auto Err = Dispatcher.runLanguageServerLoop(Transp)) {
+    elog("Transport error: {0}", std::move(Err));
+    CleanExit = false;
+  }
 
-  // Make sure IsDone is set to true after this method exits to ensure assertion
-  // at the start of the method fires if it's ever executed again.
-  IsDone = true;
   // Destroy ClangdServer to ensure all worker threads finish.
   Server.reset();
 
-  return ShutdownRequestReceived;
+  return CleanExit && ShutdownRequestReceived;
 }
 
 std::vector<Fix> ClangdLSPServer::getFixes(StringRef File,
@@ -589,15 +579,11 @@ void ClangdLSPServer::onDiagnosticsReady(PathRef File,
   }
 
   // Publish diagnostics.
-  Out.writeMessage(json::Object{
-      {"jsonrpc", "2.0"},
-      {"method", "textDocument/publishDiagnostics"},
-      {"params",
-       json::Object{
-           {"uri", URIForFile{File}},
-           {"diagnostics", std::move(DiagnosticsJSON)},
-       }},
-  });
+  Transp.notify("textDocument/publishDiagnostics",
+                json::Object{
+                    {"uri", URIForFile{File}},
+                    {"diagnostics", std::move(DiagnosticsJSON)},
+                });
 }
 
 void ClangdLSPServer::reparseOpenedFiles() {
