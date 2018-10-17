@@ -46,12 +46,6 @@ const char *clang::getOmpSsDirectiveName(OmpSsDirectiveKind Kind) {
 }
 
 OmpSsClauseKind clang::getOmpSsClauseKind(StringRef Str) {
-  // 'flush' clause cannot be specified explicitly, because this is an implicit
-  // clause for 'flush' directive. If the 'flush' clause is explicitly specified
-  // the Parser should generate a warning about extra tokens at the end of the
-  // directive.
-  if (Str == "flush")
-    return OSSC_unknown;
   return llvm::StringSwitch<OmpSsClauseKind>(Str)
 #define OMPSS_CLAUSE(Name, Class) .Case(#Name, OSSC_##Name)
 #include "clang/Basic/OmpSsKinds.def"

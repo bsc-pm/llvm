@@ -9297,7 +9297,12 @@ public:
 
   /// Called on well-formed '\#pragma oss taskwait'.
   StmtResult ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
-                                          SourceLocation EndLoc);
+                                         SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma omp task' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOmpSsTaskDirective(SourceLocation StartLoc,
+                                     SourceLocation EndLoc);
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {

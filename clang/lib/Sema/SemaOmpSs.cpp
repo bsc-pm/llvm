@@ -39,6 +39,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(
     Res = ActOnOmpSsTaskwaitDirective(StartLoc, EndLoc);
     break;
   case OSSD_task:
+    Res = ActOnOmpSsTaskDirective(StartLoc, EndLoc);
+    break;
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
   }
@@ -48,5 +50,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(
 StmtResult Sema::ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
                                               SourceLocation EndLoc) {
   return OSSTaskwaitDirective::Create(Context, StartLoc, EndLoc);
+}
+
+StmtResult Sema::ActOnOmpSsTaskDirective(SourceLocation StartLoc,
+                                         SourceLocation EndLoc) {
+  return OSSTaskDirective::Create(Context, StartLoc, EndLoc);
 }
 

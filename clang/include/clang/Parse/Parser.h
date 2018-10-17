@@ -17,6 +17,7 @@
 #include "clang/AST/Availability.h"
 #include "clang/Basic/BitmaskEnum.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/OperatorPrecedence.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Lex/CodeCompletionHandler.h"
@@ -47,6 +48,7 @@ namespace clang {
   class InMessageExpressionRAIIObject;
   class PoisonSEHIdentifiersRAIIObject;
   class OMPClause;
+  class OSSClause;
   class ObjCTypeParamList;
   class ObjCTypeParameter;
 
@@ -2756,6 +2758,16 @@ private:
   // OpenSs: Directives and clauses.
   StmtResult
   ParseOmpSsDeclarativeOrExecutableDirective(AllowedConstructsKind Allowed);
+
+  /// Parses clause of kind \a CKind for directive of a kind \a Kind.
+  ///
+  /// \param DKind Kind of current directive.
+  /// \param CKind Kind of current clause.
+  /// \param FirstClause true, if this is the first clause of a kind \a CKind
+  /// in current directive.
+  ///
+  OSSClause *ParseOmpSsClause(OmpSsDirectiveKind DKind,
+                              OmpSsClauseKind CKind, bool FirstClause);
 
   //===--------------------------------------------------------------------===//
   // OpenMP: Directives and clauses.

@@ -1096,10 +1096,8 @@ def err_oss_unexpected_directive : Error<
   "unexpected OmpSs directive %select{|'#pragma oss %1'}0">;
 def err_oss_unknown_directive : Error<
   "unknown OmpSs-2 directive">;
-def err_oss_task_no_implemented : Error<
-  "oss task not implemented yet">;
-def err_oss_taskwait_no_implemented : Error<
-  "oss taskwait not implemented yet">;
+def err_oss_unexpected_clause : Error<
+  "unexpected OmpSs clause '%0' in directive '#pragma oss %1'">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

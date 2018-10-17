@@ -2064,6 +2064,7 @@ public:
 
   void VisitOSSExecutableDirective(const OSSExecutableDirective *D);
   void VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *D);
+  void VisitOSSTaskDirective(const OSSTaskDirective *D);
 
 private:
   void AddDeclarationNameInfo(const Stmt *S);
@@ -2943,6 +2944,10 @@ void EnqueueVisitor::VisitOSSExecutableDirective(
 }
 
 void EnqueueVisitor::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *D) {
+  VisitOSSExecutableDirective(D);
+}
+
+void EnqueueVisitor::VisitOSSTaskDirective(const OSSTaskDirective *D) {
   VisitOSSExecutableDirective(D);
 }
 

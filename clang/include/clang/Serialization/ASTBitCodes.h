@@ -1955,6 +1955,7 @@ namespace serialization {
 
       // OpenMP directives
       STMT_OSS_TASKWAIT_DIRECTIVE,
+      STMT_OSS_TASK_DIRECTIVE,
 
       // ARC
       EXPR_OBJC_BRIDGED_CAST,     // ObjCBridgedCastExpr

@@ -2205,6 +2205,12 @@ void ASTStmtWriter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   Code = serialization::STMT_OSS_TASKWAIT_DIRECTIVE;
 }
 
+void ASTStmtWriter::VisitOSSTaskDirective(OSSTaskDirective *D) {
+  VisitStmt(D);
+  VisitOSSExecutableDirective(D);
+  Code = serialization::STMT_OSS_TASK_DIRECTIVE;
+}
+
 //===----------------------------------------------------------------------===//
 // ASTWriter Implementation
 //===----------------------------------------------------------------------===//

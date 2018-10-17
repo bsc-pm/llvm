@@ -9486,5 +9486,7 @@ def err_std_compare_type_not_supported : Error<
 // OmpSs errors
 def err_oss_taskwait_codegen_not_implemented : Error<
  "oss taskwait codegen not supported yet">;
+def err_oss_task_codegen_not_implemented : Error<
+ "oss task codegen not supported yet">;
 
 } // end of sema component.

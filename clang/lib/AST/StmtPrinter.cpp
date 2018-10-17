@@ -1353,6 +1353,11 @@ void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
   PrintOSSExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
+  Indent() << "#pragma omp task";
+  PrintOSSExecutableDirective(Node);
+}
+
 //===----------------------------------------------------------------------===//
 //  Expr printing methods.
 //===----------------------------------------------------------------------===//

@@ -43,6 +43,7 @@ public:
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);
+  virtual void emitTaskCall(CodeGenFunction &CGF, SourceLocation Loc);
 
 };
 

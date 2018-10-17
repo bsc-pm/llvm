@@ -30,3 +30,17 @@ OSSTaskwaitDirective *OSSTaskwaitDirective::CreateEmpty(const ASTContext &C,
   void *Mem = C.Allocate(sizeof(OSSTaskwaitDirective));
   return new (Mem) OSSTaskwaitDirective();
 }
+
+OSSTaskDirective *OSSTaskDirective::Create(const ASTContext &C,
+                                                   SourceLocation StartLoc,
+                                                   SourceLocation EndLoc) {
+  void *Mem = C.Allocate(sizeof(OSSTaskDirective));
+  OSSTaskDirective *Dir = new (Mem) OSSTaskDirective(StartLoc, EndLoc);
+  return Dir;
+}
+
+OSSTaskDirective *OSSTaskDirective::CreateEmpty(const ASTContext &C,
+                                                        EmptyShell) {
+  void *Mem = C.Allocate(sizeof(OSSTaskDirective));
+  return new (Mem) OSSTaskDirective();
+}

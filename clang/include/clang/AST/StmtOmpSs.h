@@ -16,6 +16,7 @@
 #define LLVM_CLANG_AST_STMTOMPSS_H
 
 #include "clang/AST/Expr.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/Stmt.h"
 #include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/SourceLocation.h"
@@ -122,6 +123,44 @@ public:
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskwaitDirectiveClass;
+  }
+};
+
+class OSSTaskDirective : public OSSExecutableDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  ///
+  OSSTaskDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_taskwait,
+                               StartLoc, EndLoc) {}
+
+  /// Build an empty directive.
+  ///
+  explicit OSSTaskDirective()
+      : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_taskwait,
+                               SourceLocation(), SourceLocation()) {}
+
+public:
+  /// Creates directive.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  ///
+  static OSSTaskDirective *
+  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc);
+
+  /// Creates an empty directive.
+  ///
+  /// \param C AST context.
+  ///
+  static OSSTaskDirective *CreateEmpty(const ASTContext &C, EmptyShell);
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSTaskDirectiveClass;
   }
 };
 

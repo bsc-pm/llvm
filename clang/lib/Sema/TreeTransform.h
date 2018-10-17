@@ -8904,6 +8904,14 @@ TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   return Res;
 }
 
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
+  StmtResult Res = StmtError();
+  Res = getDerived().TransformOSSExecutableDirective(D);
+  return Res;
+}
+
 //===----------------------------------------------------------------------===//
 // Expression transformation
 //===----------------------------------------------------------------------===//

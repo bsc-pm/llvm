@@ -991,6 +991,10 @@ void StmtProfiler::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *S) {
   VisitOSSExecutableDirective(S);
 }
 
+void StmtProfiler::VisitOSSTaskDirective(const OSSTaskDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitExpr(const Expr *S) {
   VisitStmt(S);
 }

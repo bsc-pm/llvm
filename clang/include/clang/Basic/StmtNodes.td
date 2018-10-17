@@ -251,4 +251,5 @@ def OMPTargetTeamsDistributeSimdDirective : DStmt<OMPLoopDirective>;
 // OmpSs Directives
 def OSSExecutableDirective : Stmt<1>;
 def OSSTaskwaitDirective : DStmt<OSSExecutableDirective>;
+def OSSTaskDirective : DStmt<OSSExecutableDirective>;
 

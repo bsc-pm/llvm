@@ -26,3 +26,7 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc());
 }
 
+void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
+  CGM.getOmpSsRuntime().emitTaskCall(*this, S.getBeginLoc());
+}
+

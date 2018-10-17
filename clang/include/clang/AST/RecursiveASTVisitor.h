@@ -3248,6 +3248,9 @@ bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
 DEF_TRAVERSE_STMT(OSSTaskwaitDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSTaskDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT
 #undef TRAVERSE_STMT_BASE

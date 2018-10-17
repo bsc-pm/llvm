@@ -2180,6 +2180,11 @@ void ASTStmtReader::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   VisitOSSExecutableDirective(D);
 }
 
+void ASTStmtReader::VisitOSSTaskDirective(OSSTaskDirective *D) {
+  VisitStmt(D);
+  VisitOSSExecutableDirective(D);
+}
+
 //===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//

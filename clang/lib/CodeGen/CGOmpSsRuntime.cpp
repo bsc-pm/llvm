@@ -40,3 +40,9 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
   Diags.Report(Loc, diag::err_oss_taskwait_codegen_not_implemented);
 }
 
+void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
+                                  SourceLocation Loc) {
+  DiagnosticsEngine &Diags = CGM.getDiags();
+  Diags.Report(Loc, diag::err_oss_task_codegen_not_implemented);
+}
+
