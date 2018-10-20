@@ -515,6 +515,19 @@ foreach shifts = [[shl, SHL_v2i64], [sra, SHR_S_v2i64], [srl, SHR_U_v2i64]] in
 def : Pat<(v2i64 (shifts[0] (v2i64 V128:$vec), (v2i64 (splat2 I64:$x)))),
           (v2i64 (shifts[1] (v2i64 V128:$vec), (I32_WRAP_I64 I64:$x)))>;
 
+// 2xi64 shifts with constant shift amounts are custom lowered to avoid wrapping
+def wasm_shift_t : SDTypeProfile<1, 2,
+  [SDTCisVec<0>, SDTCisSameAs<0, 1>, SDTCisVT<2, i32>]
+>;
+def wasm_shl : SDNode<"WebAssemblyISD::VEC_SHL", wasm_shift_t>;
+def wasm_shr_s : SDNode<"WebAssemblyISD::VEC_SHR_S", wasm_shift_t>;
+def wasm_shr_u : SDNode<"WebAssemblyISD::VEC_SHR_U", wasm_shift_t>;
+foreach shifts = [[wasm_shl, SHL_v2i64],
+                  [wasm_shr_s, SHR_S_v2i64],
+                  [wasm_shr_u, SHR_U_v2i64]] in
+def : Pat<(v2i64 (shifts[0] (v2i64 V128:$vec), I32:$x)),
+          (v2i64 (shifts[1] (v2i64 V128:$vec), I32:$x))>;
+
 //===----------------------------------------------------------------------===//
 // Bitwise operations
 //===----------------------------------------------------------------------===//
@@ -600,7 +613,8 @@ multiclass SIMDCondition<ValueType vec_t, ValueType out_t, string vec,
   defm _#vec_t :
     SIMD_I<(outs V128:$dst), (ins V128:$lhs, V128:$rhs), (outs), (ins),
            [(set (out_t V128:$dst),
-             (setcc (vec_t V128:$lhs), (vec_t V128:$rhs), cond))],
+             (setcc (vec_t V128:$lhs), (vec_t V128:$rhs), cond)
+           )],
            vec#"."#name#"\t$dst, $lhs, $rhs", vec#"."#name, simdop>;
 }
 
@@ -608,15 +622,15 @@ multiclass SIMDConditionInt<string name, CondCode cond, bits<32> baseInst,
                             int step = 1> {
   defm "" : SIMDCondition<v16i8, v16i8, "i8x16", name, cond, baseInst>;
   defm "" : SIMDCondition<v8i16, v8i16, "i16x8", name, cond,
-                              !add(baseInst, step)>;
+                          !add(baseInst, step)>;
   defm "" : SIMDCondition<v4i32, v4i32, "i32x4", name, cond,
-                              !add(!add(baseInst, step), step)>;
+                          !add(!add(baseInst, step), step)>;
 }
 
 multiclass SIMDConditionFP<string name, CondCode cond, bits<32> baseInst> {
   defm "" : SIMDCondition<v4f32, v4i32, "f32x4", name, cond, baseInst>;
   defm "" : SIMDCondition<v2f64, v2i64, "f64x2", name, cond,
-                              !add(baseInst, 1)>;
+                          !add(baseInst, 1)>;
 }
 
 // Equality: eq
