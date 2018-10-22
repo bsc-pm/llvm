@@ -1125,6 +1125,9 @@ void TextNodeDumper::VisitVectorType(const VectorType *T) {
   case VectorType::NeonPolyVector:
     OS << " neon poly";
     break;
+  case VectorType::EPIVector:
+    OS << "epi";
+    break;
   }
   OS << " " << T->getNumElements();
 }

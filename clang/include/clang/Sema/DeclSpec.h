@@ -307,6 +307,9 @@ public:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) \
   static const TST TST_##ImgType##_t = clang::TST_##ImgType##_t;
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) \
+  static const TST TST_EPI_##TypeName = clang::TST_EPI_##TypeName;
+#include "clang/Basic/EPITypes.def"
   static const TST TST_error = clang::TST_error;
 
   // type-qualifiers

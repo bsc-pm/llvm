@@ -12,7 +12,9 @@
 
 #include "RISCV.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/LangOptions.h"
 #include "clang/Basic/MacroBuilder.h"
+#include "clang/Basic/TargetBuiltins.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace clang;
@@ -87,6 +89,15 @@ bool RISCVTargetInfo::validateAsmConstraint(
   }
 }
 
+const Builtin::Info RISCVTargetInfo::BuiltinInfo[] = {
+#define BUILTIN(ID, TYPE, ATTRS)                                               \
+  {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
+#include "clang/Basic/BuiltinsRISCV.def"
+#define BUILTIN(ID, TYPE, ATTRS)                                               \
+  {"__builtin_epi_" #ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
+#include "clang/Basic/BuiltinsEPI.def"
+};
+
 void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
                                        MacroBuilder &Builder) const {
   Builder.defineMacro("__ELF__");
@@ -123,6 +134,14 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
 
   if (HasC)
     Builder.defineMacro("__riscv_compressed");
+
+  if (HasEPI)
+    Builder.defineMacro("__epi");
+}
+
+ArrayRef<Builtin::Info> RISCVTargetInfo::getTargetBuiltins() const {
+  return llvm::makeArrayRef(BuiltinInfo, clang::RISCV::LastTSBuiltin -
+                                             Builtin::FirstTSBuiltin);
 }
 
 /// Return true if has this feature, need to sync with handleTargetFeatures.
@@ -137,6 +156,7 @@ bool RISCVTargetInfo::hasFeature(StringRef Feature) const {
       .Case("f", HasF)
       .Case("d", HasD)
       .Case("c", HasC)
+      .Case("epi", HasEPI)
       .Default(false);
 }
 
@@ -154,7 +174,15 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasD = true;
     else if (Feature == "+c")
       HasC = true;
+    else if (Feature == "+epi")
+      HasEPI = true;
   }
 
   return true;
+}
+
+void RISCVTargetInfo::adjust(LangOptions &Opts) {
+  if (HasEPI)
+    Opts.EPI = 1;
+  TargetInfo::adjust(Opts);
 }

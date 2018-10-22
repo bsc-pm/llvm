@@ -1,0 +1,461 @@
+//==--- BuiltinsEPI.def - EPI RISCV-V Builtin function database --*- C++ -*-==//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the EPI RISC-V-specific builtin function database.  Users
+// of this file must define the BUILTIN macro to make use of this information.
+//
+//===----------------------------------------------------------------------===//
+
+
+#if defined(BUILTIN) && !defined(EPI_BUILTIN)
+#define EPI_BUILTIN(ID, TYPE, ATTRS) BUILTIN(ID, TYPE, ATTRS)
+#endif
+
+//===----------------------------------------------------------------------===//
+// Vector Register File
+//===----------------------------------------------------------------------===//
+
+EPI_BUILTIN(vl, "UWi", "")
+EPI_BUILTIN(setvl, "UWiUWiUWIiUWIi", "")
+
+//===----------------------------------------------------------------------===//
+// Load / store
+//===----------------------------------------------------------------------===//
+
+// TODO: strided load/store
+// TODO: indexed load/store
+// TODO: masked loads/stores
+EPI_BUILTIN(vstore_i8, "vSc*QV0Sc", "n")
+EPI_BUILTIN(vstore_i16, "vSs*QV0Ss", "n")
+EPI_BUILTIN(vstore_i32, "vSi*QV0Si", "n")
+EPI_BUILTIN(vstore_i64, "vSWi*QV0SWi", "n")
+
+EPI_BUILTIN(vstore_unsigned_i8, "vUc*QV0Sc", "n")
+EPI_BUILTIN(vstore_unsigned_i16, "vUs*QV0Ss", "n")
+EPI_BUILTIN(vstore_unsigned_i32, "vUi*QV0Si", "n")
+EPI_BUILTIN(vstore_unsigned_i64, "vUWi*QV0SWi", "n")
+
+EPI_BUILTIN(vload_i8, "QV0ScSc*", "n")
+EPI_BUILTIN(vload_i16, "QV0SsSs*", "n")
+EPI_BUILTIN(vload_i32, "QV0SiSi*", "n")
+EPI_BUILTIN(vload_i64, "QV0SWiSWi*", "n")
+
+EPI_BUILTIN(vload_unsigned_i8, "QV0ScUc*", "n")
+EPI_BUILTIN(vload_unsigned_i16, "QV0SsUs*", "n")
+EPI_BUILTIN(vload_unsigned_i32, "QV0SiUi*", "n")
+EPI_BUILTIN(vload_unsigned_i64, "QV0SiUWi*", "n")
+
+EPI_BUILTIN(vstore_f32, "vf*QV0f", "n")
+EPI_BUILTIN(vstore_f64, "vd*QV0d", "n")
+
+EPI_BUILTIN(vload_f32, "QV0ff*", "n")
+EPI_BUILTIN(vload_f64, "QV0dd*", "n")
+
+#define EPI_INT_BINARY(name)                                                   \
+  EPI_BUILTIN(name##_i1, "QV0bQV0bQV0b", "Un")                                 \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0ScQV0Sc", "Un")                              \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0SsQV0Ss", "Un")                             \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0SiQV0Si", "Un")                             \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0SWiQV0SWi", "Un")                          \
+                                                                               \
+  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0bQV0b", "Un")                        \
+  EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScQV0ScQV0b", "Un")                     \
+  EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsQV0SsQV0b", "Un")                    \
+  EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiQV0SiQV0b", "Un")                    \
+  EPI_BUILTIN(name##_i64_mask, "QV0SWiQV0SWiQV0SWiQV0b", "Un")
+
+#define EPI_INT_SCALAR_INT_BINARY(name)                                        \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0ScSc", "Un")                                 \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0SsSs", "Un")                                \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0SiSi", "Un")                                \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0SWiSWi", "Un")                             \
+                                                                               \
+  EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScScQV0b", "Un")                        \
+  EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsSsQV0b", "Un")                       \
+  EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiSiQV0b", "Un")                       \
+  EPI_BUILTIN(name##_i64_mask, "QV0SWiQV0SWiSWiQV0b", "Un")
+
+#define EPI_MASK_BINARY(name) EPI_BUILTIN(name##_i1, "QV0bQV0bQV0b", "Un")
+
+#define EPI_FP_BINARY(name)                                                    \
+  EPI_BUILTIN(name##_f32, "QV0fQV0fQV0f", "Un")                                \
+  EPI_BUILTIN(name##_f64, "QV0dQV0dQV0d", "Un")                                \
+                                                                               \
+  EPI_BUILTIN(name##_f32_mask, "QV0fQV0fQV0fQV0b", "Un")                       \
+  EPI_BUILTIN(name##_f64_mask, "QV0dQV0dQV0dQV0b", "Un")
+
+#define EPI_INT_RELATIONAL(name)                                               \
+  EPI_BUILTIN(name##_i1, "QV0bQV0bQV0b", "Un")                                 \
+  EPI_BUILTIN(name##_i8, "QV0bQV0ScQV0Sc", "Un")                               \
+  EPI_BUILTIN(name##_i16, "QV0bQV0SsQV0Ss", "Un")                              \
+  EPI_BUILTIN(name##_i32, "QV0bQV0SiQV0Si", "Un")                              \
+  EPI_BUILTIN(name##_i64, "QV0bQV0SWiQV0SWi", "Un")                            \
+                                                                               \
+  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0bQV0b", "Un")                        \
+  EPI_BUILTIN(name##_i8_mask, "QV0bQV0ScQV0ScQV0b", "Un")                      \
+  EPI_BUILTIN(name##_i16_mask, "QV0bQV0SsQV0SsQV0b", "Un")                     \
+  EPI_BUILTIN(name##_i32_mask, "QV0bQV0SiQV0SiQV0b", "Un")                     \
+  EPI_BUILTIN(name##_i64_mask, "QV0bQV0SWiQV0SWiQV0b", "Un")
+
+#define EPI_FP_RELATIONAL(name)                                                \
+  EPI_BUILTIN(name##_f32, "QV0bQV0fQV0f", "Un")                                \
+  EPI_BUILTIN(name##_f64, "QV0bQV0dQV0d", "Un")                                \
+                                                                               \
+  EPI_BUILTIN(name##_f32_mask, "QV0bQV0fQV0fQV0b", "Un")                       \
+  EPI_BUILTIN(name##_f64_mask, "QV0bQV0dQV0dQV0b", "Un")
+
+#define EPI_INT_UNARY(name)                                                    \
+  EPI_BUILTIN(name##_i1, "QV0bQV0b", "Un")                                     \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0Sc", "Un")                                   \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0Ss", "Un")                                  \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0Si", "Un")                                  \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0SWi", "Un")                                \
+                                                                               \
+  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0b", "Un")                            \
+  EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScQV0b", "Un")                          \
+  EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsQV0b", "Un")                         \
+  EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiQV0b", "Un")                         \
+  EPI_BUILTIN(name##_i64_mask, "QV0SWiQV0SWiQV0b", "Un")
+
+#define EPI_FP_UNARY(name)                                                     \
+  EPI_BUILTIN(name##_f32, "QV0fQV0f", "Un")                                    \
+  EPI_BUILTIN(name##_f64, "QV0dQV0d", "Un")                                    \
+                                                                               \
+  EPI_BUILTIN(name##_f32_mask, "QV0fQV0fQV0b", "Un")                           \
+  EPI_BUILTIN(name##_f64_mask, "QV0dQV0dQV0b", "Un")
+
+#define EPI_FP_TERNARY(name)                                                   \
+  EPI_BUILTIN(name##_f32, "QV0fQV0fQV0fQV0f", "Un")                            \
+  EPI_BUILTIN(name##_f64, "QV0dQV0dQV0dQV0d", "Un")                            \
+                                                                               \
+  EPI_BUILTIN(name##_f32_mask, "QV0fQV0fQV0fQV0fQV0b", "Un")                   \
+  EPI_BUILTIN(name##_f64_mask, "QV0dQV0dQV0dQV0dQV0b", "Un")
+
+#define EPI_MASK_UNARY(name) EPI_BUILTIN(name##_i1, "QV0bQV0b", "Un")
+
+#define EPI_MASK_TO_INT_UNARY(name)                                            \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0b", "Un")                                    \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0b", "Un")                                   \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0b", "Un")                                   \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0b", "Un")                                  \
+                                                                               \
+  EPI_BUILTIN(name##_i8_mask, "QV0ScQV0bQV0b", "Un")                           \
+  EPI_BUILTIN(name##_i16_mask, "QV0SsQV0bQV0b", "Un")                          \
+  EPI_BUILTIN(name##_i32_mask, "QV0SiQV0bQV0b", "Un")                          \
+  EPI_BUILTIN(name##_i64_mask, "QV0SWiQV0bQV0b", "Un")
+
+#define EPI_MASK_TO_SCALAR_INT_UNARY(name)                                     \
+  EPI_BUILTIN(name##_i1, "SWiQV0b", "Un")                                      \
+                                                                               \
+  EPI_BUILTIN(name##_i1_mask, "SWiQV0bQV0b", "Un")
+
+#define EPI_ANY_AND_SCALAR_INT_BINARY(name)                                    \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0ScSWi", "Un")                                \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0SsSWi", "Un")                               \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0SiSWi", "Un")                               \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0SWiSWi", "Un")                             \
+                                                                               \
+  EPI_BUILTIN(name##_f32, "QV0fQV0fSWi", "Un")                                 \
+  EPI_BUILTIN(name##_f64, "QV0dQV0dSWi", "Un")                                 \
+                                                                               \
+  EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScSWiQV0b", "Un")                       \
+  EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsSWiQV0b", "Un")                      \
+  EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiSWiQV0b", "Un")                      \
+  EPI_BUILTIN(name##_i64_mask, "QV0SWiQV0SWiSWiQV0b", "Un")                    \
+                                                                               \
+  EPI_BUILTIN(name##_f32_mask, "QV0fQV0fSWiQV0b", "Un")                        \
+  EPI_BUILTIN(name##_f64_mask, "QV0dQV0dSWiQV0b", "Un")
+
+#define EPI_ANY_AND_MASK_BINARY(name)                                          \
+  EPI_BUILTIN(name##_i8, "QV0ScQV0ScQV0b", "Un")                                \
+  EPI_BUILTIN(name##_i16, "QV0SsQV0SsQV0b", "Un")                             \
+  EPI_BUILTIN(name##_i32, "QV0SiQV0SiQV0b", "Un")                              \
+  EPI_BUILTIN(name##_i64, "QV0SWiQV0SWiQV0b", "Un")                            \
+                                                                               \
+  EPI_BUILTIN(name##_f32, "QV0fQV0fQV0b", "Un")                                \
+  EPI_BUILTIN(name##_f64, "QV0dQV0dQV0b", "Un")
+
+#define EPI_FP_TO_INT_CONVERSION(name)                                         \
+  EPI_BUILTIN(name##_i32_f32, "QV0SiQV0f", "Un")                               \
+  EPI_BUILTIN(name##_i64_f64, "QV0SWiQV0d", "Un")                              \
+  EPI_BUILTIN(name##_i32_f32_mask, "QV0SiQV0fQV0b", "Un")                      \
+  EPI_BUILTIN(name##_i64_f64_mask, "QV0SWiQV0dQV0b", "Un")
+
+#define EPI_INT_TO_FP_CONVERSION(name)                                         \
+  EPI_BUILTIN(name##_f32_i32, "QV0fQV0Si", "Un")                               \
+  EPI_BUILTIN(name##_f64_i64, "QV0dQV0SWi", "Un")                              \
+  EPI_BUILTIN(name##_f32_i32_mask, "QV0fQV0SiQV0b", "Un")                      \
+  EPI_BUILTIN(name##_f64_i64_mask, "QV0dQV0SWiQV0b", "Un")
+
+#define EPI_FP_TO_FP_NARROW_CONVERSION(name)                                   \
+  EPI_BUILTIN(name##_f32_f64, "QV0fQV0d", "Un")                                \
+  EPI_BUILTIN(name##_f32_f64_mask, "QV0fQV0dQV0b", "Un")
+
+#define EPI_FP_TO_FP_WIDEN_CONVERSION(name)                                    \
+  EPI_BUILTIN(name##_f64_f32, "QV0dQV0f", "Un")                                \
+  EPI_BUILTIN(name##_f64_f32_mask, "QV0dQV0fQV0b", "Un")
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+EPI_INT_BINARY(vadd)
+EPI_INT_BINARY(vsub)
+EPI_INT_SCALAR_INT_BINARY(vrsub)
+
+// FIXME
+// EPI_INT_WIDE(vwaddu)
+// EPI_INT_WIDE(vwsubu)
+
+// EPI_INT_WIDE(vwadd)
+// EPI_INT_WIDE(vwsub)
+
+// EPI_INT_WIDE_RESULT(vwaddu_w)
+// EPI_INT_WIDE_RESULT(vwsubu_w)
+
+// EPI_INT_WIDE_RESULT(vwadd_w)
+// EPI_INT_WIDE_RESULT(vwsub_w)
+
+// FIXME: These use V0, so it returns more stuff
+// EPI_INT_BINARY(vadc)
+// EPI_INT_BINARY(vsbc)
+
+EPI_INT_BINARY(vand)
+EPI_INT_BINARY(vor)
+EPI_INT_BINARY(vxor)
+
+EPI_INT_BINARY(vsll)
+EPI_INT_BINARY(vsrl)
+EPI_INT_BINARY(vsra)
+
+// FIXME
+// EPI_INT_NARROW(vnsrl)
+// EPI_INT_NARROW(vnsra)
+
+EPI_INT_RELATIONAL(vseq)
+EPI_INT_RELATIONAL(vsne)
+EPI_INT_RELATIONAL(vsltu)
+EPI_INT_RELATIONAL(vslt)
+EPI_INT_RELATIONAL(vsleu)
+EPI_INT_RELATIONAL(vsle)
+EPI_INT_RELATIONAL(vsgtu)
+EPI_INT_RELATIONAL(vsgt)
+// Provide them as lowered versions
+// EPI_RELATIONAL(vsgteu)
+// EPI_RELATIONAL(vsgte)
+
+EPI_INT_BINARY(vminu)
+EPI_INT_BINARY(vmin)
+
+EPI_INT_BINARY(vmaxu)
+EPI_INT_BINARY(vmax)
+
+EPI_INT_BINARY(vmul)
+EPI_INT_BINARY(vmulh)
+EPI_INT_BINARY(vmulhu)
+EPI_INT_BINARY(vmulhsu)
+
+// FIXME
+// EPI_INT_WIDE(vwmul)
+// EPI_INT_WIDE(vwmulu)
+// EPI_INT_WIDE(vwmulsu)
+
+// FIXME
+// EPI_INT_TERNARY(vmacc)
+// EPI_INT_TERNARY(vmsac)
+// EPI_INT_TERNARY(vmadd)
+// EPI_INT_TERNARY(vmsub)
+
+// FIXME
+// EPI_INT_TERNARY_WIDE(vwmaccu)
+// EPI_INT_TERNARY_WIDE(vwmacc)
+// EPI_INT_TERNARY_WIDE(vwmsacu)
+// EPI_INT_TERNARY_WIDE(vwmsac)
+
+EPI_INT_BINARY(vdivu)
+EPI_INT_BINARY(vdiv)
+EPI_INT_BINARY(vremu)
+EPI_INT_BINARY(vrem)
+
+EPI_INT_BINARY(vmerge)
+
+EPI_INT_BINARY(vsaddu)
+EPI_INT_BINARY(vsadd)
+EPI_INT_BINARY(vssub)
+EPI_INT_BINARY(vssubu)
+
+EPI_INT_BINARY(vaadd)
+EPI_INT_BINARY(vasub)
+
+EPI_INT_BINARY(vsmul)
+
+// FIXME:
+// EPI_INT_WIDE(vwsmaccu)
+// EPI_INT_WIDE(vwsmacc)
+// EPI_INT_WIDE(vwsmsacu)
+// EPI_INT_WIDE(vwsmsac)
+
+EPI_INT_BINARY(vssrl)
+EPI_INT_BINARY(vssra)
+
+// FIXME
+// EPI_INT_NARROW(vnclipu)
+// EPI_INT_NARROW(vnclip)
+
+EPI_FP_BINARY(vfadd)
+EPI_FP_BINARY(vfsub)
+
+// FIXME
+// EPI_FP_WIDE(vfwadd)
+// EPI_FP_WIDE(vfwsub)
+// EPI_FP_WIDE_RESULT(vfwadd_w)
+// EPI_FP_WIDE_RESULT(vfwsub_w)
+
+EPI_FP_BINARY(vfmul)
+EPI_FP_BINARY(vfdiv)
+
+// FIXME
+// EPI_FP_WIDEN(vfwmul)
+
+// FIXME
+EPI_FP_TERNARY(vfmadd)
+EPI_FP_TERNARY(vfnmadd)
+EPI_FP_TERNARY(vfmsub)
+EPI_FP_TERNARY(vfnmsub)
+EPI_FP_TERNARY(vfmacc)
+EPI_FP_TERNARY(vfnmacc)
+EPI_FP_TERNARY(vfmsac)
+EPI_FP_TERNARY(vfnmsac)
+
+// FIXME
+// EPI_FP_TERNARY_WIDE(vfwmacc)
+// EPI_FP_TERNARY_WIDE(vfwnmacc)
+// EPI_FP_TERNARY_WIDE(vfwmsac)
+// EPI_FP_TERNARY_WIDE(vfwnmsac)
+
+// FIXME
+EPI_FP_UNARY(vfsqrt)
+
+EPI_FP_BINARY(vfmin)
+EPI_FP_BINARY(vfmax)
+
+EPI_FP_BINARY(vfsgnj)
+EPI_FP_BINARY(vfsgnjn)
+EPI_FP_BINARY(vfsgnjx)
+
+EPI_FP_RELATIONAL(vfeq)
+EPI_FP_RELATIONAL(vfne)
+EPI_FP_RELATIONAL(vflt)
+EPI_FP_RELATIONAL(vflte)
+EPI_FP_RELATIONAL(vfgt)
+EPI_FP_RELATIONAL(vfgte)
+EPI_FP_RELATIONAL(vford)
+
+EPI_FP_BINARY(vfmerge)
+
+EPI_FP_TO_INT_CONVERSION(vfcvt_xu_f)
+EPI_FP_TO_INT_CONVERSION(vfcvt_x_f)
+EPI_INT_TO_FP_CONVERSION(vfcvt_f_xu)
+EPI_INT_TO_FP_CONVERSION(vfcvt_f_x)
+
+EPI_FP_TO_FP_WIDEN_CONVERSION(vfwcvt_f_f)
+EPI_FP_TO_FP_NARROW_CONVERSION(vfncvt_f_f)
+
+// FIXME
+// vfwcvt.xu.f
+// vfwcvt.x.f
+//
+// vfwcvt.f.xu
+// vfwcvt.f.x
+//
+// vfncvt.xu.f
+// vfncvt.x.f
+//
+// vfncvt.f.xu
+// vfncvt.f.x
+
+EPI_INT_BINARY(vredsum)
+EPI_INT_BINARY(vredmaxu)
+EPI_INT_BINARY(vredmax)
+EPI_INT_BINARY(vredmin)
+EPI_INT_BINARY(vredminu)
+EPI_INT_BINARY(vredand)
+EPI_INT_BINARY(vredor)
+EPI_INT_BINARY(vredxor)
+
+EPI_FP_BINARY(vfredosum)
+EPI_FP_BINARY(vfredsum)
+EPI_FP_BINARY(vfredmax)
+EPI_FP_BINARY(vfredmin)
+
+// FIXME
+// EPI_FP_BINARY(vfwredosum)
+// EPI_FP_BINARY(vfwredsum)
+
+EPI_MASK_BINARY(vmand)
+EPI_MASK_BINARY(vmnand)
+EPI_MASK_BINARY(vmandnot)
+EPI_MASK_BINARY(vmxor)
+EPI_MASK_BINARY(vmor)
+EPI_MASK_BINARY(vmnor)
+EPI_MASK_BINARY(vmornot)
+EPI_MASK_BINARY(vmxnor)
+
+EPI_MASK_TO_SCALAR_INT_UNARY(vmpopc)
+EPI_MASK_TO_SCALAR_INT_UNARY(vmfirst)
+
+EPI_MASK_UNARY(vmsbf)
+EPI_MASK_UNARY(vmsif)
+EPI_MASK_UNARY(vmsof)
+
+EPI_MASK_TO_INT_UNARY(vmiota)
+
+// FIXME
+// EPI_UNARY(vmid)
+
+// FIXME
+// vext.x.v
+// vmv.s.x
+//
+// vfmv.f.s
+// vfmv.s.f
+
+EPI_ANY_AND_SCALAR_INT_BINARY(vslideup)
+EPI_ANY_AND_SCALAR_INT_BINARY(vslidedown)
+EPI_ANY_AND_SCALAR_INT_BINARY(vslide1up)
+EPI_ANY_AND_SCALAR_INT_BINARY(vslide1down)
+EPI_ANY_AND_SCALAR_INT_BINARY(vrgather)
+EPI_ANY_AND_MASK_BINARY(vcompress)
+
+EPI_INT_BINARY(vdot)
+EPI_INT_BINARY(vdotu)
+EPI_FP_BINARY(vfdot)
+
+// Cleanup
+#undef BUILTIN
+#undef EPI_INT_BINARY
+#undef EPI_MASK_BINARY
+#undef EPI_FP_BINARY
+#undef EPI_INT_RELATIONAL
+#undef EPI_FP_RELATIONAL
+#undef EPI_INT_UNARY
+#undef EPI_FP_UNARY
+#undef EPI_FP_TERNARY
+#undef EPI_MASK_TO_INT_UNARY
+#undef EPI_MASK_UNARY
+#undef EPI_ANY_AND_SCALAR_INT_BINARY
+#undef EPI_ANY_AND_MASK_BINARY
+#undef EPI_MASK_TO_SCALAR_INT_UNARY
+#undef EPI_INT_TO_FP_CONVERSION
+#undef EPI_FP_TO_INT_CONVERSION
+#undef EPI_FP_TO_FP_NARROW_CONVERSION
+#undef EPI_FP_TO_FP_WIDEN_CONVERSION
+#undef EPI_INT_SCALAR_INT_BINARY
+
+// vim: ft=cpp

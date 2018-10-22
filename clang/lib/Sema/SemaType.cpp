@@ -1637,6 +1637,32 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
     break;
 #include "clang/Basic/OpenCLImageTypes.def"
 
+  // EPI types
+  case DeclSpec::TST_EPI_f16:
+    Result = Context.getVectorType(Context.HalfTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_f32:
+    Result = Context.getVectorType(Context.FloatTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_f64:
+    Result = Context.getVectorType(Context.DoubleTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_i8:
+    Result = Context.getVectorType(Context.SignedCharTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_i16:
+    Result = Context.getVectorType(Context.ShortTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_i32:
+    Result = Context.getVectorType(Context.IntTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_i64:
+    Result = Context.getVectorType(Context.LongTy, 0, VectorType::EPIVector);
+    break;
+  case DeclSpec::TST_EPI_i1:
+    Result = Context.getVectorType(Context.BoolTy, 0, VectorType::EPIVector);
+    break;
+
   case DeclSpec::TST_error:
     Result = Context.IntTy;
     declarator.setInvalidType(true);
@@ -2175,6 +2201,14 @@ QualType Sema::BuildArrayType(QualType T, ArrayType::ArraySizeModifier ASM,
   if (T->isFunctionType()) {
     Diag(Loc, diag::err_illegal_decl_array_of_functions)
       << getPrintableNameForEntity(Entity) << T;
+    return QualType();
+  }
+
+  // We do not allow building arrays to EPI vectors.
+  if (T->isVectorType() &&
+      cast<VectorType>(T.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector) {
+    Diag(Loc, diag::err_epi_array_to_type) << T;
     return QualType();
   }
 
@@ -4415,6 +4449,14 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         }
       }
 
+      // We do not allow building pointers to EPI vectors.
+      if (T->isVectorType() &&
+          cast<VectorType>(T.getCanonicalType())->getVectorKind() ==
+              VectorType::EPIVector) {
+        S.Diag(D.getIdentifierLoc(), diag::err_epi_pointer_to_type) << T;
+        D.setInvalidType(true);
+      }
+
       T = S.BuildPointerType(T, DeclType.Loc, Name);
       if (DeclType.Ptr.TypeQuals)
         T = S.BuildQualifiedType(T, DeclType.Loc, DeclType.Ptr.TypeQuals);
@@ -4427,10 +4469,20 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         D.setInvalidType(true);
         // Build the type anyway.
       }
+
+      // We do not allow building references to EPI vectors.
+      if (T->isVectorType() &&
+          cast<VectorType>(T.getCanonicalType())->getVectorKind() ==
+              VectorType::EPIVector) {
+        S.Diag(D.getIdentifierLoc(), diag::err_epi_reference_to_type) << T;
+        D.setInvalidType(true);
+      }
+
       T = S.BuildReferenceType(T, DeclType.Ref.LValueRef, DeclType.Loc, Name);
 
       if (DeclType.Ref.HasRestrict)
         T = S.BuildQualifiedType(T, DeclType.Loc, Qualifiers::Restrict);
+
       break;
     }
     case DeclaratorChunk::Array: {

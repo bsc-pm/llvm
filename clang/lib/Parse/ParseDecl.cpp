@@ -3821,6 +3821,12 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
                                    DiagID, Policy); \
     break;
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) \
+  case tok::kw___epi_##TypeName: \
+    isInvalid = DS.SetTypeSpecType(DeclSpec::TST_EPI_##TypeName, Loc, PrevSpec, \
+                                   DiagID, Policy); \
+    break;
+#include "clang/Basic/EPITypes.def"
     case tok::kw___unknown_anytype:
       isInvalid = DS.SetTypeSpecType(TST_unknown_anytype, Loc,
                                      PrevSpec, DiagID, Policy);
@@ -4790,6 +4796,8 @@ bool Parser::isKnownToBeTypeSpecifier(const Token &Tok) const {
   case tok::kw___vector:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) case tok::kw___epi_##TypeName:
+#include "clang/Basic/EPITypes.def"
 
     // struct-or-union-specifier (C99) or class-specifier (C++)
   case tok::kw_class:
@@ -4869,6 +4877,8 @@ bool Parser::isTypeSpecifierQualifier() {
   case tok::kw___vector:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) case tok::kw___epi_##TypeName:
+#include "clang/Basic/EPITypes.def"
 
     // struct-or-union-specifier (C99) or class-specifier (C++)
   case tok::kw_class:
@@ -5119,6 +5129,8 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
   case tok::kw___write_only:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) case tok::kw___epi_##TypeName:
+#include "clang/Basic/EPITypes.def"
 
     return true;
 

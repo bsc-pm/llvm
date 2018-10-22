@@ -130,6 +130,9 @@ namespace {
   private:
     void printBefore(const Type *ty, Qualifiers qs, raw_ostream &OS);
     void printAfter(const Type *ty, Qualifiers qs, raw_ostream &OS);
+
+    template <typename VectorType>
+    void printEPIType(const VectorType *T, raw_ostream &OS);
   };
 
 } // namespace
@@ -617,6 +620,48 @@ void TypePrinter::printDependentSizedExtVectorAfter(
   printAfter(T->getElementType(), OS);
 }
 
+template <typename VectorType>
+void TypePrinter::printEPIType(const VectorType *T, raw_ostream &OS) {
+  OS << "__epi_";
+  QualType ET = T->getElementType();
+  if (ET->isHalfType()) {
+    OS << "f16";
+  } else if (ET->isBooleanType()) {
+    OS << "i1";
+  } else if (ET->isCharType()) {
+    OS << "i8";
+  } else if (ET->isIntegerType() || ET->isFloatingType()) {
+    const BuiltinType *BT = cast<BuiltinType>(ET);
+    // FIXME: This is gross and we should be using another approach for these
+    // types.
+    switch (BT->getKind()) {
+    default:
+      llvm_unreachable("Unexpected builtin type");
+    case BuiltinType::Short:
+      OS << "i16";
+      break;
+    case BuiltinType::Int:
+      OS << "i32";
+      break;
+    case BuiltinType::Long:
+      OS << "i64";
+      break;
+    case BuiltinType::Float16:
+      OS << "f16";
+      break;
+    case BuiltinType::Float:
+      OS << "f32";
+      break;
+    case BuiltinType::Double:
+      OS << "f64";
+      break;
+    }
+  } else
+    llvm_unreachable("Unexpected EPI base type");
+
+  spaceBeforePlaceHolder(OS);
+}
+
 void TypePrinter::printVectorBefore(const VectorType *T, raw_ostream &OS) {
   switch (T->getVectorKind()) {
   case VectorType::AltiVecPixel:
@@ -639,6 +684,9 @@ void TypePrinter::printVectorBefore(const VectorType *T, raw_ostream &OS) {
     OS << "__attribute__((neon_polyvector_type(" <<
           T->getNumElements() << "))) ";
     printBefore(T->getElementType(), OS);
+    break;
+  case VectorType::EPIVector:
+    printEPIType(T, OS);
     break;
   case VectorType::GenericVector: {
     // FIXME: We prefer to print the size directly here, but have no way
@@ -685,6 +733,9 @@ void TypePrinter::printDependentVectorBefore(
       T->getSizeExpr()->printPretty(OS, nullptr, Policy);
     OS << "))) ";
     printBefore(T->getElementType(), OS);
+    break;
+  case VectorType::EPIVector:
+    printEPIType(T, OS);
     break;
   case VectorType::GenericVector: {
     // FIXME: We prefer to print the size directly here, but have no way
