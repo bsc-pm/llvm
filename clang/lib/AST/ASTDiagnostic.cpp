@@ -304,10 +304,16 @@ ConvertTypeToDiagnosticString(ASTContext &Context, QualType Ty,
       const VectorType *VTy = Ty->getAs<VectorType>();
       std::string DecoratedString;
       llvm::raw_string_ostream OS(DecoratedString);
-      const char *Values = VTy->getNumElements() > 1 ? "values" : "value";
-      OS << "'" << S << "' (vector of " << VTy->getNumElements() << " '"
-         << VTy->getElementType().getAsString(Context.getPrintingPolicy())
-         << "' " << Values << ")";
+      if (VTy->getVectorKind() == VectorType::EPIVector) {
+        OS << "'" << S << "' (vector of '"
+           << VTy->getElementType().getAsString(Context.getPrintingPolicy())
+           << "')";
+      } else {
+        const char *Values = VTy->getNumElements() > 1 ? "values" : "value";
+        OS << "'" << S << "' (vector of " << VTy->getNumElements() << " '"
+           << VTy->getElementType().getAsString(Context.getPrintingPolicy())
+           << "' " << Values << ")";
+      }
       return OS.str();
     }
   }

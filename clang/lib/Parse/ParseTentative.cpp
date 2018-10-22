@@ -1156,6 +1156,8 @@ Parser::isExpressionOrTypeSpecifierSimple(tok::TokenKind Kind) {
   case tok::kw__Atomic:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) case tok::kw___epi_##TypeName:
+#include "clang/Basic/EPITypes.def"
   case tok::kw___unknown_anytype:
     return TPResult::False;
 
@@ -1716,6 +1718,12 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   // C11 _Atomic
   case tok::kw__Atomic:
     return TPResult::True;
+
+  // EPI types
+#define EPI_VECTOR_TYPE(TypeName)                                              \
+  case tok::kw___epi_##TypeName:                                               \
+    return TPResult::True;
+#include "clang/Basic/EPITypes.def"
 
   default:
     return TPResult::False;

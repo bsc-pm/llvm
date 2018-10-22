@@ -253,6 +253,8 @@ VectorType::VectorType(TypeClass tc, QualType vecType, unsigned nElements,
       ElementType(vecType) {
   VectorTypeBits.VecKind = vecKind;
   VectorTypeBits.NumElements = nElements;
+  assert((vecKind != VectorType::EPIVector || nElements == 0) &&
+         "EPI vectors must have 0 elements");
 }
 
 /// getArrayElementTypeNoTypeQual - If this is an array type, return the

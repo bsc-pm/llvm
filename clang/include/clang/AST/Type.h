@@ -3201,7 +3201,10 @@ public:
     NeonVector,
 
     /// is ARM Neon polynomial vector
-    NeonPolyVector
+    NeonPolyVector,
+
+    /// is EPI unsized vector
+    EPIVector,
   };
 
 protected:

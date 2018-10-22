@@ -1544,6 +1544,11 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
         if (CheckPPCBuiltinFunctionCall(BuiltinID, TheCall))
           return ExprError();
         break;
+      case llvm::Triple::riscv32:
+      case llvm::Triple::riscv64:
+        if (CheckRISCVBuiltinFunctionCall(BuiltinID, TheCall))
+          return ExprError();
+        break;
       default:
         break;
     }
@@ -3221,6 +3226,31 @@ bool Sema::CheckPPCBuiltinFunctionCall(unsigned BuiltinID, CallExpr *TheCall) {
     return SemaVSXCheck(TheCall);
   }
   return SemaBuiltinConstantArgRange(TheCall, i, l, u);
+}
+
+bool Sema::CheckRISCVBuiltinFunctionCall(unsigned BuiltinID,
+                                         CallExpr *TheCall) {
+  // stand-in
+  switch (BuiltinID) {
+  default:
+    return false;
+    // Reject EPI builtins if there is no EPI support.
+#define BUILTIN(ID_, TYPE, ATTRS) case RISCV::BI__builtin_epi_##ID_:
+#include "clang/Basic/BuiltinsEPI.def"
+    {
+      if (!getLangOpts().EPI)
+        return Diag(TheCall->getBeginLoc(), diag::err_epi_builtin_not_useable)
+               << TheCall->getSourceRange();
+      return false;
+      break;
+    }
+  }
+
+  // Specific typecheck
+  switch (BuiltinID) {
+  default:
+    return false;
+  }
 }
 
 bool Sema::CheckSystemZBuiltinFunctionCall(unsigned BuiltinID,

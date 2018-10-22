@@ -3183,6 +3183,14 @@ Sema::ActOnCXXMemberDeclarator(Scope *S, AccessSpecifier AS, Declarator &D,
       Member->setInvalidDecl();
     }
 
+    // Do not allow non-static data members of EPI type
+    if (VarDecl *VD = dyn_cast<VarDecl>(Member)) {
+      if (VD->getType()->isVectorType() &&
+          cast<VectorType>(VD->getType().getCanonicalType())
+                  ->getVectorKind() == VectorType::EPIVector)
+        Diag(Loc, diag::err_epi_static_field) << VD->getType();
+    }
+
     NamedDecl *NonTemplateMember = Member;
     if (FunctionTemplateDecl *FunTmpl = dyn_cast<FunctionTemplateDecl>(Member))
       NonTemplateMember = FunTmpl->getTemplatedDecl();

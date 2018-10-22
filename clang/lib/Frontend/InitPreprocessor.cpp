@@ -587,6 +587,19 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   Builder.defineMacro("__ATOMIC_ACQ_REL", "4");
   Builder.defineMacro("__ATOMIC_SEQ_CST", "5");
 
+  if (LangOpts.EPI) {
+    Builder.defineMacro("__epi_e8", "0");
+    Builder.defineMacro("__epi_e16", "1");
+    Builder.defineMacro("__epi_e32", "2");
+    Builder.defineMacro("__epi_e64", "3");
+    Builder.defineMacro("__epi_e128", "4");
+
+    Builder.defineMacro("__epi_m1", "0");
+    Builder.defineMacro("__epi_m2", "1");
+    Builder.defineMacro("__epi_m4", "2");
+    Builder.defineMacro("__epi_m8", "3");
+  }
+
   // Define macros for the OpenCL memory scope.
   // The values should match AtomicScopeOpenCLModel::ID enum.
   static_assert(

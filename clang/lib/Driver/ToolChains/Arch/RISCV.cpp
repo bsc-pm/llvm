@@ -192,6 +192,10 @@ static void getExtensionFeatures(const Driver &D,
 void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
                                    const ArgList &Args,
                                    std::vector<StringRef> &Features) {
+
+  bool HasM = false, HasA = false, HasF = false, HasD = false;
+  bool HasRV64 = false;
+
   if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
     StringRef MArch = A->getValue();
 
@@ -210,12 +214,11 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       return;
     }
 
-    bool HasRV64 = MArch.startswith("rv64");
+    HasRV64 = MArch.startswith("rv64");
 
     // The canonical order specified in ISA manual.
     // Ref: Table 22.1 in RISC-V User-Level ISA V2.2
     StringRef StdExts = "mafdqlcbjtpvn";
-    bool HasF = false, HasD = false;
     char Baseline = MArch[4];
 
     // First letter should be 'e', 'i' or 'g'.
@@ -245,6 +248,8 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       Features.push_back("+a");
       Features.push_back("+f");
       Features.push_back("+d");
+      HasM = true;
+      HasA = true;
       HasF = true;
       HasD = true;
       break;
@@ -319,9 +324,11 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
         return;
       case 'm':
         Features.push_back("+m");
+        HasM = true;
         break;
       case 'a':
         Features.push_back("+a");
+        HasA = true;
         break;
       case 'f':
         Features.push_back("+f");
@@ -342,8 +349,8 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     // extension without also specifying the 'f' (single precision
     // floating-point) extension.
     if (HasD && !HasF)
-      D.Diag(diag::err_drv_invalid_riscv_arch_name) << MArch
-        << "d requires f extension to also be specified";
+      D.Diag(diag::err_drv_invalid_riscv_arch_name)
+          << MArch << "d requires f extension to also be specified";
 
     // Additional dependency checks.
     // TODO: The 'q' extension requires rv64.
@@ -360,6 +367,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       Features.push_back("+f");
       Features.push_back("+d");
       Features.push_back("+c");
+      HasRV64 = HasM = HasA = HasF = HasD = true;
     }
     // We should be using RV64GC here too but C may not be available in most
     // baremetal environments for 64 bit.
@@ -370,6 +378,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
       Features.push_back("+a");
       Features.push_back("+f");
       Features.push_back("+d");
+      HasRV64 = HasM = HasA = HasF = HasD = true;
     }
   }
 
@@ -378,6 +387,11 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     Features.push_back("+relax");
   else
     Features.push_back("-relax");
+
+  if (Args.getLastArg(options::OPT_mepi) &&
+      (!HasRV64 || !HasM || !HasA || !HasF || !HasD)) {
+    D.Diag(diag::err_drv_invalid_riscv_epi_ext);
+  }
 
   // Now add any that the user explicitly requested on the command line,
   // which may override the defaults.

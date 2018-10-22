@@ -595,6 +595,10 @@ KEYWORD(__covariant                  , KEYOBJC)
 KEYWORD(__contravariant              , KEYOBJC)
 KEYWORD(__kindof                     , KEYOBJC)
 
+// EPI extensions
+#define EPI_VECTOR_TYPE(TypeName) KEYWORD(__epi_##TypeName, KEYEPI)
+#include "clang/Basic/EPITypes.def"
+
 // Alternate spelling for various tokens.  There are GCC extensions in all
 // languages, but should not be disabled in strict conformance mode.
 ALIAS("__alignof__"  , __alignof  , KEYALL)

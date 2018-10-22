@@ -87,6 +87,8 @@ namespace clang {
     TST_atomic,           // C11 _Atomic
 #define GENERIC_IMAGE_TYPE(ImgType, Id) TST_##ImgType##_t, // OpenCL image types
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EPI_VECTOR_TYPE(TypeName) TST_EPI_##TypeName, // EPI Vector Types
+#include "clang/Basic/EPITypes.def"
     TST_error // erroneous type
   };
 

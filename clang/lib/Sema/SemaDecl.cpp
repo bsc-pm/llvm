@@ -7495,6 +7495,19 @@ void Sema::CheckVariableDeclarationType(VarDecl *NewVD) {
     }
   }
 
+  // EPI vector variables can't be global
+  if (T->isVectorType() &&
+      cast<VectorType>(T.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector &&
+      NewVD->hasGlobalStorage() && !NewVD->isStaticDataMember()) {
+    if (NewVD->isFileVarDecl())
+      Diag(NewVD->getLocation(), diag::err_epi_decl_in_file_scope);
+    else if (NewVD->isStaticLocal())
+      Diag(NewVD->getLocation(), diag::err_epi_decl_has_static_storage);
+    else
+      Diag(NewVD->getLocation(), diag::err_epi_decl_has_extern_linkage);
+  }
+
   bool isVM = T->isVariablyModifiedType();
   if (isVM || NewVD->hasAttr<CleanupAttr>() ||
       NewVD->hasAttr<BlocksAttr>())
@@ -15356,6 +15369,14 @@ FieldDecl *Sema::HandleField(Scope *S, RecordDecl *Record,
       T = Context.IntTy;
       TInfo = Context.getTrivialTypeSourceInfo(T, Loc);
     }
+  }
+
+  // Do not allow EPI vectors as fields.
+  if (T->isVectorType() &&
+      cast<VectorType>(T.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector) {
+    Diag(Loc, diag::err_epi_type_struct_or_union_field) << T;
+    D.setInvalidType();
   }
 
   DiagnoseFunctionSpecifiers(D.getDeclSpec());

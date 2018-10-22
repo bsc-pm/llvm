@@ -1468,8 +1468,28 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
       // Create the alloca.  Note that we set the name separately from
       // building the instruction so that it's there even in no-asserts
       // builds.
-      address = CreateTempAlloca(allocaTy, allocaAlignment, D.getName(),
-                                 /*ArraySize=*/nullptr, &AllocaAddr);
+      if (isa<llvm::VectorType>(allocaTy) &&
+          cast<llvm::VectorType>(allocaTy)->isScalable()) {
+        // Scalable vector types are "morally" statically sized but
+        // require dynamic size.
+        llvm::VectorType *VT = cast<llvm::VectorType>(allocaTy);
+
+        llvm::PointerType *ptrTy = VT->getElementType()->getPointerTo();
+
+        auto *IntPtrTy = CGM.getDataLayout().getIntPtrType(CGM.getLLVMContext());
+        llvm::Value *vscale = Builder.CreateCall(CGM.getIntrinsic(
+            llvm::Intrinsic::experimental_vector_vscale, {IntPtrTy}));
+
+        address = CreateTempAlloca(ptrTy, allocaAlignment, D.getName(), vscale,
+                                   &AllocaAddr);
+
+        address = Address(Builder.CreateBitCast(address.getPointer(),
+                                                allocaTy->getPointerTo()),
+                          address.getAlignment());
+      } else {
+        address = CreateTempAlloca(allocaTy, allocaAlignment, D.getName(),
+                                   /*ArraySize=*/nullptr, &AllocaAddr);
+      }
 
       // Don't emit lifetime markers for MSVC catch parameters. The lifetime of
       // the catch parameter starts in the catchpad instruction, and we can't

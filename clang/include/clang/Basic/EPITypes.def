@@ -1,0 +1,24 @@
+//===-- OpenCLImageTypes.def - Metadata about BuiltinTypes ------*- C++ -*-===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//  This file extends builtin types database with EPI types.
+//  Custom code should define the following macro
+//    EPI_VECTOR_TYPE(Type)
+
+EPI_VECTOR_TYPE(f16)
+EPI_VECTOR_TYPE(f32)
+EPI_VECTOR_TYPE(f64)
+
+EPI_VECTOR_TYPE(i8)
+EPI_VECTOR_TYPE(i16)
+EPI_VECTOR_TYPE(i32)
+EPI_VECTOR_TYPE(i64)
+
+EPI_VECTOR_TYPE(i1)
+
+#undef EPI_VECTOR_TYPE

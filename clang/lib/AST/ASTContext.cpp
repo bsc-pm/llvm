@@ -1775,8 +1775,15 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
   case Type::Vector: {
     const auto *VT = cast<VectorType>(T);
     TypeInfo EltInfo = getTypeInfo(VT->getElementType());
-    Width = EltInfo.Width * VT->getNumElements();
-    Align = Width;
+    if (VT->getVectorKind() == VectorType::EPIVector) {
+      // EPI vectors don't have a number of elements. Handle them like
+      // incomplete/VL arrays above.
+      Width = 0;
+      Align = EltInfo.Align;
+    } else {
+      Width = EltInfo.Width * VT->getNumElements();
+      Align = Width;
+    }
     // If the alignment is not a power of 2, round up to the next power of 2.
     // This happens for non-power-of-2 length vectors.
     if (Align & (Align-1)) {
@@ -9258,6 +9265,7 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
   // Modifiers.
   int HowLong = 0;
   bool Signed = false, Unsigned = false;
+  bool EPIVector = false;
   RequiresICE = false;
 
   // Read the prefixed modifiers first.
@@ -9270,6 +9278,9 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
     default: Done = true; --Str; break;
     case 'I':
       RequiresICE = true;
+      break;
+    case 'Q':
+      EPIVector = true;
       break;
     case 'S':
       assert(!Unsigned && "Can't use both 'S' and 'U' modifiers!");
@@ -9461,7 +9472,9 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
 
     // TODO: No way to make AltiVec vectors in builtins yet.
     Type = Context.getVectorType(ElementType, NumElements,
-                                 VectorType::GenericVector);
+                                 EPIVector ? VectorType::EPIVector
+                                           : VectorType::GenericVector);
+
     break;
   }
   case 'E': {

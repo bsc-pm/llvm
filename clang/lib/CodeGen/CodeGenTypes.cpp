@@ -589,8 +589,14 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
   case Type::ExtVector:
   case Type::Vector: {
     const VectorType *VT = cast<VectorType>(Ty);
-    ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),
-                                       VT->getNumElements());
+    if (VT->getVectorKind() == VectorType::EPIVector) {
+      // Use a scalable vector here 1 x <type>
+      ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()), 1,
+                                         /* Scalable */ 1);
+    } else {
+      ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),
+                                         VT->getNumElements());
+    }
     break;
   }
   case Type::FunctionNoProto:

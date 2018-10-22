@@ -100,8 +100,9 @@ namespace {
     KEYCXX2A      = 0x200000,
     KEYOPENCLCXX  = 0x400000,
     KEYMSCOMPAT   = 0x800000,
+    KEYEPI        = 0x1000000,
     KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX2A,
-    KEYALL = (0xffffff & ~KEYNOMS18 &
+    KEYALL = (0xfffffff & ~KEYNOMS18 &
               ~KEYNOOPENCL) // KEYNOMS18 and KEYNOOPENCL are used to exclude.
   };
 
@@ -137,6 +138,7 @@ static KeywordStatus getKeywordStatus(const LangOptions &LangOpts,
   if (LangOpts.OpenCL && !LangOpts.OpenCLCPlusPlus && (Flags & KEYOPENCLC))
     return KS_Enabled;
   if (LangOpts.OpenCLCPlusPlus && (Flags & KEYOPENCLCXX)) return KS_Enabled;
+  if (LangOpts.EPI && (Flags & KEYEPI)) return KS_Enabled;
   if (!LangOpts.CPlusPlus && (Flags & KEYNOCXX)) return KS_Enabled;
   if (LangOpts.C11 && (Flags & KEYC11)) return KS_Enabled;
   // We treat bridge casts as objective-C keywords so we can warn on them

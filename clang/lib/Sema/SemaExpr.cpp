@@ -3817,6 +3817,14 @@ bool Sema::CheckUnaryExprOrTypeTraitOperand(Expr *E,
     return true;
   }
 
+  if (ExprTy->isVectorType() &&
+      cast<VectorType>(ExprTy.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector) {
+    Diag(E->getExprLoc(), diag::err_epi_sizeof_alignof_vector_type)
+        << ExprKind << E->getSourceRange();
+    return true;
+  }
+
   // The operand for sizeof and alignof is in an unevaluated expression context,
   // so side effects could result in unintended consequences.
   if ((ExprKind == UETT_SizeOf || ExprKind == UETT_AlignOf ||
@@ -3909,6 +3917,14 @@ bool Sema::CheckUnaryExprOrTypeTraitOperand(QualType ExprType,
   if (ExprType->isFunctionType()) {
     Diag(OpLoc, diag::err_sizeof_alignof_function_type)
       << ExprKind << ExprRange;
+    return true;
+  }
+
+  if (ExprType->isVectorType() &&
+      cast<VectorType>(ExprType.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector) {
+    Diag(OpLoc, diag::err_epi_sizeof_alignof_vector_type)
+        << ExprKind << ExprRange;
     return true;
   }
 
@@ -6351,6 +6367,16 @@ bool Sema::areLaxCompatibleVectorTypes(QualType srcTy, QualType destTy) {
 /// known to be a vector type?
 bool Sema::isLaxVectorConversion(QualType srcTy, QualType destTy) {
   assert(destTy->isVectorType() || srcTy->isVectorType());
+
+  // EPI vectors cannot be forced to lax conversions.
+  if (destTy->isVectorType() &&
+      cast<VectorType>(destTy.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector)
+    return false;
+  if (srcTy->isVectorType() &&
+      cast<VectorType>(srcTy.getCanonicalType())->getVectorKind() ==
+          VectorType::EPIVector)
+    return false;
 
   if (!Context.getLangOpts().LaxVectorConversions)
     return false;
@@ -8807,6 +8833,11 @@ QualType Sema::CheckVectorOperands(ExprResult &LHS, ExprResult &RHS,
   const VectorType *LHSVecType = LHSType->getAs<VectorType>();
   const VectorType *RHSVecType = RHSType->getAs<VectorType>();
   assert(LHSVecType || RHSVecType);
+
+  // Disable EPI vector type conversions.
+  if ((LHSVecType && LHSVecType->getVectorKind() == VectorType::EPIVector) ||
+      (RHSVecType && RHSVecType->getVectorKind() == VectorType::EPIVector))
+    return InvalidOperands(Loc, LHS, RHS);
 
   // AltiVec-style "vector bool op vector bool" combinations are allowed
   // for some operators but not others.
@@ -11843,7 +11874,8 @@ namespace {
     AO_Vector_Element = 1,
     AO_Property_Expansion = 2,
     AO_Register_Variable = 3,
-    AO_No_Error = 4
+    AO_EPI_Vector = 4,
+    AO_No_Error = 5
   };
 }
 /// Diagnose invalid operand for address of operations.
@@ -12020,6 +12052,12 @@ QualType Sema::CheckAddressOfOperand(ExprResult &OrigOp, SourceLocation OpLoc) {
       if (vd->getStorageClass() == SC_Register &&
           !getLangOpts().CPlusPlus) {
         AddressOfError = AO_Register_Variable;
+      } else if (vd->getType()->isVectorType() &&
+                 cast<VectorType>(vd->getType().getCanonicalType())
+                         ->getVectorKind() == VectorType::EPIVector) {
+        // EPI vectors will never be stored in memory as such so don't allow
+        // getting their addresses.
+        AddressOfError = AO_EPI_Vector;
       }
     } else if (isa<MSPropertyDecl>(dcl)) {
       AddressOfError = AO_Property_Expansion;

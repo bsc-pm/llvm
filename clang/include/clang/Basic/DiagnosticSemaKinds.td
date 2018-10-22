@@ -5889,7 +5889,7 @@ def err_typecheck_sclass_func : Error<"illegal storage class on function">;
 def err_static_block_func : Error<
   "function declared in block scope cannot have 'static' storage class">;
 def err_typecheck_address_of : Error<"address of %select{bit-field"
-  "|vector element|property expression|register variable}0 requested">;
+  "|vector element|property expression|register variable|EPI vector}0 requested">;
 def ext_typecheck_addrof_void : Extension<
   "ISO C forbids taking the address of an expression of type 'void'">;
 def err_unqualified_pointer_member_function : Error<
@@ -9714,5 +9714,31 @@ def warn_noderef_to_dereferenceable_pointer : Warning<
 def err_builtin_launder_invalid_arg : Error<
   "%select{non-pointer|function pointer|void pointer}0 argument to "
   "'__builtin_launder' is not allowed">;
+
+
+// EPI
+def err_epi_pointer_to_type : Error<
+  "pointer to EPI vector type %0 is invalid">;
+def err_epi_reference_to_type : Error<
+  "reference to EPI vector type %0 is invalid">;
+def err_epi_array_to_type : Error<
+  "array of EPI vector type %0 is invalid">;
+
+def err_epi_type_struct_or_union_field : Error<
+  "the EPI vector type %0 cannot be used to declare a structure or union field">;
+def err_epi_static_field : Error<
+  "the EPI vector type %0 cannot be used to declare a non-static data member">;
+
+def err_epi_decl_in_file_scope : Error<
+  "declaration of a variable with an EPI vector type not allowed at file scope">;
+def err_epi_decl_has_static_storage : Error<
+  "declaration of a variable with an EPI vector type cannot have 'static' storage duration">;
+def err_epi_decl_has_extern_linkage : Error<
+  "declaration of a variable with an EPI vector type cannot have 'extern' linkage">;
+def err_epi_builtin_not_useable : Error<
+  "this builtin is only valid when using -mepi flag">;
+def err_epi_sizeof_alignof_vector_type : Error<
+  "invalid application of '%select{sizeof|alignof|vec_step|__builtin_omp_required_simd_align}0' to an "
+  "EPI vector type">;
 
 } // end of sema component.

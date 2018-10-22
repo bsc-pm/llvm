@@ -57,6 +57,7 @@
 //  S   -> signed
 //  U   -> unsigned
 //  I   -> Required to constant fold to an integer constant expression.
+//  Q   -> EPI vector kind. Type defined should be a vector.
 //
 // Types may be postfixed with the following modifiers:
 // * -> pointer (optionally followed by an address space number, if no address
