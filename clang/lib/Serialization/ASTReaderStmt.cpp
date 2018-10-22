@@ -2171,18 +2171,15 @@ void ASTStmtReader::VisitOMPTargetTeamsDistributeSimdDirective(
 //===----------------------------------------------------------------------===//
 
 void ASTStmtReader::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
-  E->setLocStart(ReadSourceLocation());
-  E->setLocEnd(ReadSourceLocation());
+  llvm_unreachable("Not supported yet");
 }
 
 void ASTStmtReader::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
-  VisitStmt(D);
-  VisitOSSExecutableDirective(D);
+  llvm_unreachable("Not supported yet");
 }
 
 void ASTStmtReader::VisitOSSTaskDirective(OSSTaskDirective *D) {
-  VisitStmt(D);
-  VisitOSSExecutableDirective(D);
+  llvm_unreachable("Not supported yet");
 }
 
 //===----------------------------------------------------------------------===//

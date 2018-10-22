@@ -3242,6 +3242,7 @@ bool RecursiveASTVisitor<Derived>::VisitOMPIsDevicePtrClause(
 template <typename Derived>
 bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
     OSSExecutableDirective *S) {
+  llvm_unreachable("");
   return true;
 }
 

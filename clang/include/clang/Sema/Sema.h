@@ -157,6 +157,7 @@ namespace clang {
   class OMPDeclareReductionDecl;
   class OMPDeclareSimdDecl;
   class OMPClause;
+  class OSSClause;
   struct OverloadCandidate;
   class OverloadCandidateSet;
   class OverloadExpr;
@@ -9292,7 +9293,7 @@ public:
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc);
   // OmpSs
-  StmtResult ActOnOmpSsExecutableDirective(
+  StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
       OmpSsDirectiveKind Kind, SourceLocation StartLoc, SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss taskwait'.
@@ -9301,8 +9302,23 @@ public:
 
   /// Called on well-formed '\#pragma omp task' after parsing of the
   /// associated statement.
-  StmtResult ActOnOmpSsTaskDirective(SourceLocation StartLoc,
+  StmtResult ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
+                                     SourceLocation StartLoc,
                                      SourceLocation EndLoc);
+
+  OSSClause *ActOnOmpSsVarListClause(
+      OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+      SourceLocation StartLoc, SourceLocation LParenLoc,
+      SourceLocation ColonLoc, SourceLocation EndLoc,
+      OmpSsDependClauseKind DepKind,
+      SourceLocation DepLinMapLoc);
+
+  /// Called on well-formed 'depend' clause.
+  OSSClause *
+  ActOnOmpSsDependClause(OmpSsDependClauseKind DepKind, SourceLocation DepLoc,
+                          SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                          SourceLocation StartLoc, SourceLocation LParenLoc,
+                          SourceLocation EndLoc);
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {

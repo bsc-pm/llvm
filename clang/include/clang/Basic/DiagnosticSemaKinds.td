@@ -9489,4 +9489,7 @@ def err_oss_taskwait_codegen_not_implemented : Error<
 def err_oss_task_codegen_not_implemented : Error<
  "oss task codegen not supported yet">;
 
+def err_oss_expected_addressable_lvalue_or_array_item : Error<
+  "expected addressable lvalue expression, array element or array section">;
+
 } // end of sema component.

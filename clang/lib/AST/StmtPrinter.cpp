@@ -26,6 +26,7 @@
 #include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OpenMPClause.h"
+#include "clang/AST/OmpSsClause.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
@@ -624,6 +625,436 @@ void StmtPrinter::VisitSEHLeaveStmt(SEHLeaveStmt *Node) {
   Indent() << "__leave;";
   if (Policy.IncludeNewlines) OS << NL;
 }
+//===----------------------------------------------------------------------===//
+//  OmpSs clauses printing methods
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class OSSClausePrinter : public OSSClauseVisitor<OSSClausePrinter> {
+  raw_ostream &OS;
+  const PrintingPolicy &Policy;
+
+  /// Process clauses with list of variables.
+  template <typename T>
+  void VisitOSSClauseList(T *Node, char StartSym);
+
+public:
+  OSSClausePrinter(raw_ostream &OS, const PrintingPolicy &Policy)
+      : OS(OS), Policy(Policy) {}
+
+#define OMPSS_CLAUSE(Name, Class)                              \
+  void Visit##Class(Class *S);
+#include "clang/Basic/OmpSsKinds.def"
+};
+
+} // namespace
+
+template<typename T>
+void OSSClausePrinter::VisitOSSClauseList(T *Node, char StartSym) {
+  for (typename T::varlist_iterator I = Node->varlist_begin(),
+                                    E = Node->varlist_end();
+       I != E; ++I) {
+    assert(*I && "Expected non-null Stmt");
+    OS << (I == Node->varlist_begin() ? StartSym : ',');
+    if (auto *DRE = dyn_cast<DeclRefExpr>(*I)) {
+        DRE->getDecl()->printQualifiedName(OS);
+    } else
+      (*I)->printPretty(OS, nullptr, Policy, 0);
+  }
+}
+
+void OSSClausePrinter::VisitOSSIfClause(OSSIfClause *Node) {
+  OS << "if(";
+  if (Node->getNameModifier() != OSSD_unknown)
+    OS << getOmpSsDirectiveName(Node->getNameModifier()) << ": ";
+  Node->getCondition()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSFinalClause(OSSFinalClause *Node) {
+  OS << "final(";
+  Node->getCondition()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSNumThreadsClause(OSSNumThreadsClause *Node) {
+  OS << "num_threads(";
+  Node->getNumThreads()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSSafelenClause(OSSSafelenClause *Node) {
+  OS << "safelen(";
+  Node->getSafelen()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSSimdlenClause(OSSSimdlenClause *Node) {
+  OS << "simdlen(";
+  Node->getSimdlen()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSCollapseClause(OSSCollapseClause *Node) {
+  OS << "collapse(";
+  Node->getNumForLoops()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSDefaultClause(OSSDefaultClause *Node) {
+  OS << "default("
+     << getOmpSsSimpleClauseTypeName(OSSC_default, Node->getDefaultKind())
+     << ")";
+}
+
+void OSSClausePrinter::VisitOSSProcBindClause(OSSProcBindClause *Node) {
+  OS << "proc_bind("
+     << getOmpSsSimpleClauseTypeName(OSSC_proc_bind, Node->getProcBindKind())
+     << ")";
+}
+
+void OSSClausePrinter::VisitOSSScheduleClause(OSSScheduleClause *Node) {
+  OS << "schedule(";
+  if (Node->getFirstScheduleModifier() != OSSC_SCHEDULE_MODIFIER_unknown) {
+    OS << getOmpSsSimpleClauseTypeName(OSSC_schedule,
+                                        Node->getFirstScheduleModifier());
+    if (Node->getSecondScheduleModifier() != OSSC_SCHEDULE_MODIFIER_unknown) {
+      OS << ", ";
+      OS << getOmpSsSimpleClauseTypeName(OSSC_schedule,
+                                          Node->getSecondScheduleModifier());
+    }
+    OS << ": ";
+  }
+  OS << getOmpSsSimpleClauseTypeName(OSSC_schedule, Node->getScheduleKind());
+  if (auto *E = Node->getChunkSize()) {
+    OS << ", ";
+    E->printPretty(OS, nullptr, Policy);
+  }
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSOrderedClause(OSSOrderedClause *Node) {
+  OS << "ordered";
+  if (auto *Num = Node->getNumForLoops()) {
+    OS << "(";
+    Num->printPretty(OS, nullptr, Policy, 0);
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSNowaitClause(OSSNowaitClause *) {
+  OS << "nowait";
+}
+
+void OSSClausePrinter::VisitOSSUntiedClause(OSSUntiedClause *) {
+  OS << "untied";
+}
+
+void OSSClausePrinter::VisitOSSNogroupClause(OSSNogroupClause *) {
+  OS << "nogroup";
+}
+
+void OSSClausePrinter::VisitOSSMergeableClause(OSSMergeableClause *) {
+  OS << "mergeable";
+}
+
+void OSSClausePrinter::VisitOSSReadClause(OSSReadClause *) { OS << "read"; }
+
+void OSSClausePrinter::VisitOSSWriteClause(OSSWriteClause *) { OS << "write"; }
+
+void OSSClausePrinter::VisitOSSUpdateClause(OSSUpdateClause *) {
+  OS << "update";
+}
+
+void OSSClausePrinter::VisitOSSCaptureClause(OSSCaptureClause *) {
+  OS << "capture";
+}
+
+void OSSClausePrinter::VisitOSSSeqCstClause(OSSSeqCstClause *) {
+  OS << "seq_cst";
+}
+
+void OSSClausePrinter::VisitOSSThreadsClause(OSSThreadsClause *) {
+  OS << "threads";
+}
+
+void OSSClausePrinter::VisitOSSSIMDClause(OSSSIMDClause *) { OS << "simd"; }
+
+void OSSClausePrinter::VisitOSSDeviceClause(OSSDeviceClause *Node) {
+  OS << "device(";
+  Node->getDevice()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSNumTeamsClause(OSSNumTeamsClause *Node) {
+  OS << "num_teams(";
+  Node->getNumTeams()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSThreadLimitClause(OSSThreadLimitClause *Node) {
+  OS << "thread_limit(";
+  Node->getThreadLimit()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSPriorityClause(OSSPriorityClause *Node) {
+  OS << "priority(";
+  Node->getPriority()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSGrainsizeClause(OSSGrainsizeClause *Node) {
+  OS << "grainsize(";
+  Node->getGrainsize()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSNumTasksClause(OSSNumTasksClause *Node) {
+  OS << "num_tasks(";
+  Node->getNumTasks()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSHintClause(OSSHintClause *Node) {
+  OS << "hint(";
+  Node->getHint()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSPrivateClause(OSSPrivateClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "private";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSFirstprivateClause(OSSFirstprivateClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "firstprivate";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSLastprivateClause(OSSLastprivateClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "lastprivate";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSSharedClause(OSSSharedClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "shared";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSReductionClause(OSSReductionClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "reduction(";
+    NestedNameSpecifier *QualifierLoc =
+        Node->getQualifierLoc().getNestedNameSpecifier();
+    OverloadedOperatorKind OOK =
+        Node->getNameInfo().getName().getCXXOverloadedOperator();
+    if (QualifierLoc == nullptr && OOK != OO_None) {
+      // Print reduction identifier in C format
+      OS << getOperatorSpelling(OOK);
+    } else {
+      // Use C++ format
+      if (QualifierLoc != nullptr)
+        QualifierLoc->print(OS, Policy);
+      OS << Node->getNameInfo();
+    }
+    OS << ":";
+    VisitOSSClauseList(Node, ' ');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSTaskReductionClause(
+    OSSTaskReductionClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "task_reduction(";
+    NestedNameSpecifier *QualifierLoc =
+        Node->getQualifierLoc().getNestedNameSpecifier();
+    OverloadedOperatorKind OOK =
+        Node->getNameInfo().getName().getCXXOverloadedOperator();
+    if (QualifierLoc == nullptr && OOK != OO_None) {
+      // Print reduction identifier in C format
+      OS << getOperatorSpelling(OOK);
+    } else {
+      // Use C++ format
+      if (QualifierLoc != nullptr)
+        QualifierLoc->print(OS, Policy);
+      OS << Node->getNameInfo();
+    }
+    OS << ":";
+    VisitOSSClauseList(Node, ' ');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSInReductionClause(OSSInReductionClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "in_reduction(";
+    NestedNameSpecifier *QualifierLoc =
+        Node->getQualifierLoc().getNestedNameSpecifier();
+    OverloadedOperatorKind OOK =
+        Node->getNameInfo().getName().getCXXOverloadedOperator();
+    if (QualifierLoc == nullptr && OOK != OO_None) {
+      // Print reduction identifier in C format
+      OS << getOperatorSpelling(OOK);
+    } else {
+      // Use C++ format
+      if (QualifierLoc != nullptr)
+        QualifierLoc->print(OS, Policy);
+      OS << Node->getNameInfo();
+    }
+    OS << ":";
+    VisitOSSClauseList(Node, ' ');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSLinearClause(OSSLinearClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "linear";
+    if (Node->getModifierLoc().isValid()) {
+      OS << '('
+         << getOmpSsSimpleClauseTypeName(OSSC_linear, Node->getModifier());
+    }
+    VisitOSSClauseList(Node, '(');
+    if (Node->getModifierLoc().isValid())
+      OS << ')';
+    if (Node->getStep() != nullptr) {
+      OS << ": ";
+      Node->getStep()->printPretty(OS, nullptr, Policy, 0);
+    }
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSAlignedClause(OSSAlignedClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "aligned";
+    VisitOSSClauseList(Node, '(');
+    if (Node->getAlignment() != nullptr) {
+      OS << ": ";
+      Node->getAlignment()->printPretty(OS, nullptr, Policy, 0);
+    }
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSCopyinClause(OSSCopyinClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "copyin";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSCopyprivateClause(OSSCopyprivateClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "copyprivate";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSFlushClause(OSSFlushClause *Node) {
+  if (!Node->varlist_empty()) {
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSDependClause(OSSDependClause *Node) {
+  OS << "depend(";
+  OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
+                                      Node->getDependencyKind());
+  if (!Node->varlist_empty()) {
+    OS << " :";
+    VisitOSSClauseList(Node, ' ');
+  }
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSMapClause(OSSMapClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "map(";
+    if (Node->getMapType() != OSSC_MAP_unknown) {
+      if (Node->getMapTypeModifier() != OSSC_MAP_unknown) {
+        OS << getOmpSsSimpleClauseTypeName(OSSC_map,
+                                            Node->getMapTypeModifier());
+        OS << ',';
+      }
+      OS << getOmpSsSimpleClauseTypeName(OSSC_map, Node->getMapType());
+      OS << ':';
+    }
+    VisitOSSClauseList(Node, ' ');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSToClause(OSSToClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "to";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSFromClause(OSSFromClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "from";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSDistScheduleClause(OSSDistScheduleClause *Node) {
+  OS << "dist_schedule(" << getOmpSsSimpleClauseTypeName(
+                           OSSC_dist_schedule, Node->getDistScheduleKind());
+  if (auto *E = Node->getChunkSize()) {
+    OS << ", ";
+    E->printPretty(OS, nullptr, Policy);
+  }
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSDefaultmapClause(OSSDefaultmapClause *Node) {
+  OS << "defaultmap(";
+  OS << getOmpSsSimpleClauseTypeName(OSSC_defaultmap,
+                                      Node->getDefaultmapModifier());
+  OS << ": ";
+  OS << getOmpSsSimpleClauseTypeName(OSSC_defaultmap,
+    Node->getDefaultmapKind());
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSUseDevicePtrClause(OSSUseDevicePtrClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "use_device_ptr";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
+void OSSClausePrinter::VisitOSSIsDevicePtrClause(OSSIsDevicePtrClause *Node) {
+  if (!Node->varlist_empty()) {
+    OS << "is_device_ptr";
+    VisitOSSClauseList(Node, '(');
+    OS << ")";
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 //  OpenMP clauses printing methods
@@ -1344,17 +1775,26 @@ void StmtPrinter::VisitOMPTargetTeamsDistributeSimdDirective(
 //===----------------------------------------------------------------------===//
 
 void StmtPrinter::PrintOSSExecutableDirective(OSSExecutableDirective *S) {
+  OSSClausePrinter Printer(OS, Policy);
+  ArrayRef<OSSClause *> Clauses = S->clauses();
+  for (auto *Clause : Clauses)
+    if (Clause && !Clause->isImplicit()) {
+      OS << ' ';
+      Printer.Visit(Clause);
+    }
   OS << NL;
+  // if (S->hasAssociatedStmt())
+  //   PrintStmt(S->getInnermostCapturedStmt()->getCapturedStmt());
   return;
 }
 
 void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
-  Indent() << "#pragma omp taskwait";
+  Indent() << "#pragma oss taskwait";
   PrintOSSExecutableDirective(Node);
 }
 
 void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
-  Indent() << "#pragma omp task";
+  Indent() << "#pragma oss task";
   PrintOSSExecutableDirective(Node);
 }
 

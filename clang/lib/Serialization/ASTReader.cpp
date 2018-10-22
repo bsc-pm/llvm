@@ -12521,3 +12521,4 @@ void OMPClauseReader::VisitOMPIsDevicePtrClause(OMPIsDevicePtrClause *C) {
   }
   C->setComponents(Components, ListSizes);
 }
+

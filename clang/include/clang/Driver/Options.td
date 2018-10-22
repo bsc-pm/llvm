@@ -1507,7 +1507,7 @@ def fno_objc_nonfragile_abi : Flag<["-"], "fno-objc-nonfragile-abi">, Group<f_Gr
 
 def fobjc_sender_dependent_dispatch : Flag<["-"], "fobjc-sender-dependent-dispatch">, Group<f_Group>;
 def fomit_frame_pointer : Flag<["-"], "fomit-frame-pointer">, Group<f_Group>;
-def fompss : Flag<["-"], "fompss">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
+def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Parse OmpSs pragmas and generate parallel code.">;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Parse OpenMP pragmas and generate parallel code.">;

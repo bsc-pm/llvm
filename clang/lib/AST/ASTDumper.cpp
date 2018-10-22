@@ -518,6 +518,9 @@ namespace  {
     // OpenMP
     void VisitOMPExecutableDirective(const OMPExecutableDirective *Node);
 
+    // OmpSs
+    void VisitOSSExecutableDirective(const OSSExecutableDirective *Node);
+
     // Exprs
     void VisitExpr(const Expr *Node);
     void VisitCastExpr(const CastExpr *Node);
@@ -2038,6 +2041,36 @@ void ASTDumper::VisitOMPExecutableDirective(
         ColorScope Color(*this, AttrColor);
         StringRef ClauseName(getOpenMPClauseName(C->getClauseKind()));
         OS << "OMP" << ClauseName.substr(/*Start=*/0, /*N=*/1).upper()
+           << ClauseName.drop_front() << "Clause";
+      }
+      dumpPointer(C);
+      dumpSourceRange(SourceRange(C->getBeginLoc(), C->getEndLoc()));
+      if (C->isImplicit())
+        OS << " <implicit>";
+      for (auto *S : C->children())
+        dumpStmt(S);
+    });
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//  OmpSs dumping methods.
+//===----------------------------------------------------------------------===//
+
+void ASTDumper::VisitOSSExecutableDirective(
+    const OSSExecutableDirective *Node) {
+  VisitStmt(Node);
+  for (auto *C : Node->clauses()) {
+    dumpChild([=] {
+      if (!C) {
+        ColorScope Color(*this, NullColor);
+        OS << "<<<NULL>>> OSSClause";
+        return;
+      }
+      {
+        ColorScope Color(*this, AttrColor);
+        StringRef ClauseName(getOmpSsClauseName(C->getClauseKind()));
+        OS << "OSS" << ClauseName.substr(/*Start=*/0, /*N=*/1).upper()
            << ClauseName.drop_front() << "Clause";
       }
       dumpPointer(C);

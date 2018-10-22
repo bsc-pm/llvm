@@ -4072,7 +4072,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Forward flags for OmpSs
   if (Arg *A = Args.getLastArg(options::OPT_fompss)) {
-    CmdArgs.push_back("-fompss");
+    CmdArgs.push_back("-fompss-2");
   }
 
   // Forward flags for OpenMP. We don't do this if the current action is an

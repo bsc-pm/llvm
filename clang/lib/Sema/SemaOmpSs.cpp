@@ -30,7 +30,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 using namespace clang;
 
-StmtResult Sema::ActOnOmpSsExecutableDirective(
+StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     OmpSsDirectiveKind Kind, SourceLocation StartLoc, SourceLocation EndLoc) {
 
   StmtResult Res = StmtError();
@@ -39,7 +39,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(
     Res = ActOnOmpSsTaskwaitDirective(StartLoc, EndLoc);
     break;
   case OSSD_task:
-    Res = ActOnOmpSsTaskDirective(StartLoc, EndLoc);
+    Res = ActOnOmpSsTaskDirective(Clauses, StartLoc, EndLoc);
     break;
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
@@ -48,12 +48,58 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(
 }
 
 StmtResult Sema::ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
-                                              SourceLocation EndLoc) {
+                                             SourceLocation EndLoc) {
   return OSSTaskwaitDirective::Create(Context, StartLoc, EndLoc);
 }
 
-StmtResult Sema::ActOnOmpSsTaskDirective(SourceLocation StartLoc,
+StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
+                                         SourceLocation StartLoc,
                                          SourceLocation EndLoc) {
-  return OSSTaskDirective::Create(Context, StartLoc, EndLoc);
+  return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses);
+}
+
+OSSClause *
+Sema::ActOnOmpSsDependClause(OmpSsDependClauseKind DepKind,
+                              SourceLocation DepLoc, SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                              SourceLocation StartLoc,
+                              SourceLocation LParenLoc, SourceLocation EndLoc) {
+
+  for (Expr *RefExpr : VarList) {
+    SourceLocation ELoc = RefExpr->getExprLoc();
+    Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
+
+    auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
+    if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
+        (ASE &&
+         !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
+         !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
+      Diag(ELoc, diag::err_oss_expected_addressable_lvalue_or_array_item)
+          << RefExpr->getSourceRange();
+      continue;
+    }
+  }
+  return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                 DepKind, DepLoc, ColonLoc, VarList,
+                                 0); // used in ordered clause. useless for now
+}
+
+OSSClause *
+Sema::ActOnOmpSsVarListClause(
+  OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+  SourceLocation StartLoc, SourceLocation LParenLoc,
+  SourceLocation ColonLoc, SourceLocation EndLoc,
+  OmpSsDependClauseKind DepKind, SourceLocation DepLinMapLoc) {
+
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_depend:
+    Res = ActOnOmpSsDependClause(DepKind, DepLinMapLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+
+  return Res;
 }
 

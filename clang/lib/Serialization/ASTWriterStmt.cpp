@@ -2195,20 +2195,15 @@ void ASTStmtWriter::VisitOMPTargetTeamsDistributeSimdDirective(
 // OmpSs Directives.
 //===----------------------------------------------------------------------===//
 void ASTStmtWriter::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
-  Record.AddSourceLocation(E->getBeginLoc());
-  Record.AddSourceLocation(E->getEndLoc());
+  llvm_unreachable("Not supported yet");
 }
 
 void ASTStmtWriter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
-  VisitStmt(D);
-  VisitOSSExecutableDirective(D);
-  Code = serialization::STMT_OSS_TASKWAIT_DIRECTIVE;
+  llvm_unreachable("Not supported yet");
 }
 
 void ASTStmtWriter::VisitOSSTaskDirective(OSSTaskDirective *D) {
-  VisitStmt(D);
-  VisitOSSExecutableDirective(D);
-  Code = serialization::STMT_OSS_TASK_DIRECTIVE;
+  llvm_unreachable("Not supported yet");
 }
 
 //===----------------------------------------------------------------------===//

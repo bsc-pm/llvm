@@ -49,6 +49,7 @@ add_clang_library(clangAST
   NSAPI.cpp
   ODRHash.cpp
   OpenMPClause.cpp
+  OmpSsClause.cpp
   ParentMap.cpp
   QualTypeNames.cpp
   RawCommentList.cpp

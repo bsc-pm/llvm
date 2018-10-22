@@ -2769,6 +2769,29 @@ private:
   OSSClause *ParseOmpSsClause(OmpSsDirectiveKind DKind,
                               OmpSsClauseKind CKind, bool FirstClause);
 
+  /// Parses clause with the list of variables of a kind \a Kind.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
+                                     OmpSsClauseKind Kind, bool ParseOnly);
+public:
+
+  /// Data used for parsing list of variables in OmpSs clauses.
+  struct OmpSsVarListDataTy {
+    SourceLocation ColonLoc;
+    SourceLocation RLoc;
+    SourceLocation DepLinMapLoc; // depend linear map clause loc
+    OmpSsDependClauseKind DepKind = OSSC_DEPEND_unknown;
+  };
+
+  /// Parses clauses with list.
+  bool ParseOmpSsVarList(OmpSsDirectiveKind DKind, OmpSsClauseKind Kind,
+                          SmallVectorImpl<Expr *> &Vars,
+                          OmpSsVarListDataTy &Data);
+private:
   //===--------------------------------------------------------------------===//
   // OpenMP: Directives and clauses.
   /// Parse clauses for '#pragma omp declare simd'.

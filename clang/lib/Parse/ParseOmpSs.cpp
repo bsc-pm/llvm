@@ -98,8 +98,10 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
       // TODO: parse task body
     }
 
-    Directive = Actions.ActOnOmpSsExecutableDirective(
-        DKind, Loc, EndLoc);
+    Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
+                                                      DKind,
+                                                      Loc,
+                                                      EndLoc);
 
     // Exit scope.
     OSSDirectiveScope.Exit();
@@ -143,7 +145,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     }
     break;
   case OSSC_depend:
-    // Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
+    Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
   case OSSC_unknown:
     Diag(Tok, diag::warn_omp_extra_tokens_at_eol)
@@ -153,3 +155,90 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   }
   return ErrorFound ? nullptr : Clause;
 }
+
+/// Parses clauses with list.
+bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
+                                OmpSsClauseKind Kind,
+                                SmallVectorImpl<Expr *> &Vars,
+                                OmpSsVarListDataTy &Data) {
+  // Parse '('.
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
+  if (T.expectAndConsume(diag::err_expected_lparen_after,
+                         getOmpSsClauseName(Kind)))
+    return true;
+
+  if (Kind == OSSC_depend) {
+    // Handle dependency type for depend clause.
+    ColonProtectionRAIIObject ColonRAII(*this);
+    Data.DepKind =
+        static_cast<OmpSsDependClauseKind>(getOmpSsSimpleClauseType(
+            Kind, Tok.is(tok::identifier) ? PP.getSpelling(Tok) : ""));
+    Data.DepLinMapLoc = Tok.getLocation();
+
+    if (Data.DepKind == OSSC_DEPEND_unknown) {
+      SkipUntil(tok::colon, tok::r_paren, tok::annot_pragma_ompss_end,
+                StopBeforeMatch);
+    } else {
+      ConsumeToken();
+    }
+    if (Tok.is(tok::colon)) {
+      Data.ColonLoc = ConsumeToken();
+    } else {
+      Diag(Tok, diag::warn_pragma_expected_colon) << "dependency type";
+    }
+  }
+
+  bool IsComma =
+      (Kind == OSSC_depend && Data.DepKind != OSSC_DEPEND_unknown);
+  while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
+                     Tok.isNot(tok::annot_pragma_ompss_end))) {
+    // Parse variable
+    ExprResult VarExpr =
+        Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+    if (VarExpr.isUsable()) {
+      Vars.push_back(VarExpr.get());
+    } else {
+      SkipUntil(tok::comma, tok::r_paren, tok::annot_pragma_ompss_end,
+                StopBeforeMatch);
+    }
+    // Skip ',' if any
+    IsComma = Tok.is(tok::comma);
+    if (IsComma)
+      ConsumeToken();
+    else if (Tok.isNot(tok::r_paren) &&
+             Tok.isNot(tok::annot_pragma_ompss_end))
+      Diag(Tok, diag::err_omp_expected_punc)
+          << getOmpSsClauseName(Kind);
+  }
+
+  // Parse ')'.
+  Data.RLoc = Tok.getLocation();
+  if (!T.consumeClose())
+    Data.RLoc = T.getCloseLocation();
+  return (Kind == OSSC_depend
+          && Data.DepKind != OSSC_DEPEND_unknown
+          && Vars.empty());
+}
+
+/// Parsing of OmpSs
+///
+///    depend-clause:
+///       'depend' '(' in | out | inout : ')'
+OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
+                                            OmpSsClauseKind Kind,
+                                            bool ParseOnly) {
+  SourceLocation Loc = Tok.getLocation();
+  SourceLocation LOpen = ConsumeToken();
+  SmallVector<Expr *, 4> Vars;
+  OmpSsVarListDataTy Data;
+
+  if (ParseOmpSsVarList(DKind, Kind, Vars, Data))
+    return nullptr;
+
+  if (ParseOnly)
+    return nullptr;
+  return Actions.ActOnOmpSsVarListClause(
+      Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
+      Data.DepKind, Data.DepLinMapLoc);
+}
+

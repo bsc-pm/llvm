@@ -1485,8 +1485,9 @@ public:
   /// Subclasses may override this routine to provide different behavior.
   StmtResult RebuildOSSExecutableDirective(OmpSsDirectiveKind Kind,
                                            SourceLocation StartLoc,
-                                           SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsExecutableDirective(
+                                           SourceLocation EndLoc,
+                                           ArrayRef<OSSClause *> Clauses) {
+    return getSema().ActOnOmpSsExecutableDirective(Clauses,
         Kind, StartLoc, EndLoc);
   }
 
@@ -8893,7 +8894,7 @@ StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
 
   // Transform the clauses
   return getDerived().RebuildOSSExecutableDirective(
-      D->getDirectiveKind(), D->getBeginLoc(), D->getEndLoc());
+      D->getDirectiveKind(), D->getBeginLoc(), D->getEndLoc(), nullptr);
 }
 
 template <typename Derived>
