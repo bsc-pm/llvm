@@ -869,6 +869,11 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
       setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
     }
 
+    // Promote v16i8, v8i16, v4i32 load, select, and, or, xor to v2i64.
+    for (auto VT : { MVT::v16i8, MVT::v8i16, MVT::v4i32 }) {
+      setOperationPromotedToType(ISD::LOAD,   VT, MVT::v2i64);
+    }
+
     // Custom lower v2i64 and v2f64 selects.
     setOperationAction(ISD::SELECT,             MVT::v2f64, Custom);
     setOperationAction(ISD::SELECT,             MVT::v2i64, Custom);
@@ -1173,6 +1178,11 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     if (HasInt256)
       setOperationAction(ISD::VSELECT,         MVT::v32i8, Legal);
 
+    // Promote v32i8, v16i16, v8i32 select, and, or, xor to v4i64.
+    for (auto VT : { MVT::v32i8, MVT::v16i16, MVT::v8i32 }) {
+      setOperationPromotedToType(ISD::LOAD,   VT, MVT::v4i64);
+    }
+
     if (HasInt256) {
       // Custom legalize 2x32 to get a little better code.
       setOperationAction(ISD::MGATHER, MVT::v2f32, Custom);
@@ -1409,6 +1419,10 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
       setOperationAction(ISD::MGATHER,             VT, Custom);
       setOperationAction(ISD::MSCATTER,            VT, Custom);
     }
+    for (auto VT : { MVT::v64i8, MVT::v32i16, MVT::v16i32 }) {
+      setOperationPromotedToType(ISD::LOAD,   VT, MVT::v8i64);
+    }
+
     // Need to custom split v32i16/v64i8 bitcasts.
     if (!Subtarget.hasBWI()) {
       setOperationAction(ISD::BITCAST, MVT::v32i16, Custom);
@@ -5525,7 +5539,7 @@ static const Constant *getTargetConstantFromNode(SDValue Op) {
   if (!CNode || CNode->isMachineConstantPoolEntry() || CNode->getOffset() != 0)
     return nullptr;
 
-  return CNode->getConstVal();
+  return dyn_cast<Constant>(CNode->getConstVal());
 }
 
 // Extract raw constant bits from constant pools.
@@ -5680,11 +5694,12 @@ static bool getTargetConstantBitsFromNode(SDValue Op, unsigned EltSizeInBits,
   // Extract constant bits from constant pool vector.
   if (auto *Cst = getTargetConstantFromNode(Op)) {
     Type *CstTy = Cst->getType();
-    if (!CstTy->isVectorTy() || (SizeInBits != CstTy->getPrimitiveSizeInBits()))
+    unsigned CstSizeInBits = CstTy->getPrimitiveSizeInBits();
+    if (!CstTy->isVectorTy() || (CstSizeInBits % SizeInBits) != 0)
       return false;
 
     unsigned SrcEltSizeInBits = CstTy->getScalarSizeInBits();
-    unsigned NumSrcElts = CstTy->getVectorNumElements();
+    unsigned NumSrcElts = SizeInBits / SrcEltSizeInBits;
 
     APInt UndefSrcElts(NumSrcElts, 0);
     SmallVector<APInt, 64> SrcEltBits(NumSrcElts, APInt(SrcEltSizeInBits, 0));
@@ -6030,7 +6045,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
       break;
     }
     if (auto *C = getTargetConstantFromNode(MaskNode)) {
-      DecodeVPERMILPMask(C, MaskEltSize, VT.getSizeInBits(), Mask);
+      DecodeVPERMILPMask(C, MaskEltSize, Mask);
       break;
     }
     return false;
@@ -6047,7 +6062,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
       break;
     }
     if (auto *C = getTargetConstantFromNode(MaskNode)) {
-      DecodePSHUFBMask(C, VT.getSizeInBits(), Mask);
+      DecodePSHUFBMask(C, Mask);
       break;
     }
     return false;
@@ -6109,7 +6124,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
         break;
       }
       if (auto *C = getTargetConstantFromNode(MaskNode)) {
-        DecodeVPERMIL2PMask(C, CtrlImm, MaskEltSize, VT.getSizeInBits(), Mask);
+        DecodeVPERMIL2PMask(C, CtrlImm, MaskEltSize, Mask);
         break;
       }
     }
@@ -6126,7 +6141,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
       break;
     }
     if (auto *C = getTargetConstantFromNode(MaskNode)) {
-      DecodeVPPERMMask(C, VT.getSizeInBits(), Mask);
+      DecodeVPPERMMask(C, Mask);
       break;
     }
     return false;
@@ -6143,7 +6158,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
       break;
     }
     if (auto *C = getTargetConstantFromNode(MaskNode)) {
-      DecodeVPERMVMask(C, MaskEltSize, VT.getSizeInBits(), Mask);
+      DecodeVPERMVMask(C, MaskEltSize, Mask);
       break;
     }
     return false;
@@ -6157,7 +6172,7 @@ static bool getTargetShuffleMask(SDNode *N, MVT VT, bool AllowSentinelZero,
     Ops.push_back(N->getOperand(2));
     SDValue MaskNode = N->getOperand(1);
     if (auto *C = getTargetConstantFromNode(MaskNode)) {
-      DecodeVPERMV3Mask(C, MaskEltSize, VT.getSizeInBits(), Mask);
+      DecodeVPERMV3Mask(C, MaskEltSize, Mask);
       break;
     }
     return false;
