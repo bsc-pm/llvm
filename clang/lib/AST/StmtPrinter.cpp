@@ -1783,8 +1783,8 @@ void StmtPrinter::PrintOSSExecutableDirective(OSSExecutableDirective *S) {
       Printer.Visit(Clause);
     }
   OS << NL;
-  // if (S->hasAssociatedStmt())
-  //   PrintStmt(S->getInnermostCapturedStmt()->getCapturedStmt());
+  if (S->hasAssociatedStmt())
+    PrintStmt(S->getAssociatedStmt());
   return;
 }
 

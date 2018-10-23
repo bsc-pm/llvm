@@ -1098,6 +1098,9 @@ def err_oss_unknown_directive : Error<
   "unknown OmpSs-2 directive">;
 def err_oss_unexpected_clause : Error<
   "unexpected OmpSs clause '%0' in directive '#pragma oss %1'">;
+def warn_oss_extra_tokens_at_eol : Warning<
+  "extra tokens at the end of '#pragma oss %0' are ignored">,
+  InGroup<ExtraTokens>;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

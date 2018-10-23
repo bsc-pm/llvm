@@ -39,13 +39,14 @@ OSSTaskwaitDirective *OSSTaskwaitDirective::CreateEmpty(const ASTContext &C,
 
 OSSTaskDirective *
 OSSTaskDirective::Create(const ASTContext &C, SourceLocation StartLoc,
-                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses) {
+                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt) {
   unsigned Size = llvm::alignTo(sizeof(OSSTaskDirective), alignof(OSSClause *));
   void *Mem =
       C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
   OSSTaskDirective *Dir =
       new (Mem) OSSTaskDirective(StartLoc, EndLoc, Clauses.size());
   Dir->setClauses(Clauses);
+  Dir->setAssociatedStmt(AStmt);
   return Dir;
 }
 

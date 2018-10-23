@@ -95,11 +95,12 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
-      // TODO: parse task body
+      AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
     }
 
     Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
                                                       DKind,
+                                                      AssociatedStmt.get(),
                                                       Loc,
                                                       EndLoc);
 
@@ -148,7 +149,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
   case OSSC_unknown:
-    Diag(Tok, diag::warn_omp_extra_tokens_at_eol)
+    Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
         << getOmpSsDirectiveName(DKind);
     SkipUntil(tok::annot_pragma_openmp_end, StopBeforeMatch);
     break;

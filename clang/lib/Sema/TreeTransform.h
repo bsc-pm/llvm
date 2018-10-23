@@ -8892,9 +8892,8 @@ template <typename Derived>
 StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
     OSSExecutableDirective *D) {
 
-  // Transform the clauses
-  return getDerived().RebuildOSSExecutableDirective(
-      D->getDirectiveKind(), D->getBeginLoc(), D->getEndLoc(), nullptr);
+  llvm_unreachable("Not implemented yet");
+  return StmtError();
 }
 
 template <typename Derived>

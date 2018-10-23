@@ -31,7 +31,7 @@
 using namespace clang;
 
 StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
-    OmpSsDirectiveKind Kind, SourceLocation StartLoc, SourceLocation EndLoc) {
+    OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
 
   StmtResult Res = StmtError();
   switch (Kind) {
@@ -39,7 +39,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     Res = ActOnOmpSsTaskwaitDirective(StartLoc, EndLoc);
     break;
   case OSSD_task:
-    Res = ActOnOmpSsTaskDirective(Clauses, StartLoc, EndLoc);
+    Res = ActOnOmpSsTaskDirective(Clauses, AStmt, StartLoc, EndLoc);
     break;
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
@@ -53,9 +53,10 @@ StmtResult Sema::ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
 }
 
 StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
+                                         Stmt *AStmt,
                                          SourceLocation StartLoc,
                                          SourceLocation EndLoc) {
-  return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses);
+  return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt);
 }
 
 OSSClause *

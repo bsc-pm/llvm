@@ -203,7 +203,7 @@ class OSSTaskDirective : public OSSExecutableDirective {
   ///
   OSSTaskDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
       : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_task,
-                               StartLoc, EndLoc, NumClauses, 0) {}
+                               StartLoc, EndLoc, NumClauses, 1) {}
 
   /// Build an empty directive.
   ///
@@ -211,7 +211,7 @@ class OSSTaskDirective : public OSSExecutableDirective {
   ///
   explicit OSSTaskDirective(unsigned NumClauses)
       : OSSExecutableDirective(this, OSSTaskDirectiveClass, OSSD_task,
-                               SourceLocation(), SourceLocation(), NumClauses, 0) {}
+                               SourceLocation(), SourceLocation(), NumClauses, 1) {}
 
 public:
   /// Creates directive with a list of \a Clauses.
@@ -223,7 +223,8 @@ public:
   ///
   static OSSTaskDirective *Create(const ASTContext &C, SourceLocation StartLoc,
                                   SourceLocation EndLoc,
-                                  ArrayRef<OSSClause *> Clauses);
+                                  ArrayRef<OSSClause *> Clauses,
+                                  Stmt *AStmt);
 
   /// Creates an empty directive with the place for \a NumClauses
   /// clauses.

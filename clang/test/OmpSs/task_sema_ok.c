@@ -3,5 +3,6 @@
 
 int main(void) {
   #pragma oss task
+  {}
 }
 

@@ -9294,7 +9294,7 @@ public:
                                           SourceLocation EndLoc);
   // OmpSs
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
-      OmpSsDirectiveKind Kind, SourceLocation StartLoc, SourceLocation EndLoc);
+      OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss taskwait'.
   StmtResult ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
@@ -9303,6 +9303,7 @@ public:
   /// Called on well-formed '\#pragma omp task' after parsing of the
   /// associated statement.
   StmtResult ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
+                                     Stmt *AStmt,
                                      SourceLocation StartLoc,
                                      SourceLocation EndLoc);
 
