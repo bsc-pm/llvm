@@ -3113,7 +3113,7 @@ class OSSDependClause final
   friend TrailingObjects;
 
   /// Dependency type (one of in, out, inout).
-  OmpSsDependClauseKind DepKind = OSSC_DEPEND_unknown;
+  SmallVector<OmpSsDependClauseKind, 2> DepKinds;
 
   /// Dependency type location.
   SourceLocation DepLoc;
@@ -3121,35 +3121,28 @@ class OSSDependClause final
   /// Colon location.
   SourceLocation ColonLoc;
 
-  /// Number of loops, associated with the depend clause.
-  unsigned NumLoops = 0;
-
   /// Build clause with number of variables \a N.
   ///
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
   /// \param N Number of the variables in the clause.
-  /// \param NumLoops Number of loops that is associated with this depend
-  /// clause.
   OSSDependClause(SourceLocation StartLoc, SourceLocation LParenLoc,
-                  SourceLocation EndLoc, unsigned N, unsigned NumLoops)
+                  SourceLocation EndLoc, unsigned N)
       : OSSVarListClause<OSSDependClause>(OSSC_depend, StartLoc, LParenLoc,
-                                          EndLoc, N), NumLoops(NumLoops) {}
+                                          EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
-  /// \param NumLoops Number of loops that is associated with this depend
-  /// clause.
-  explicit OSSDependClause(unsigned N, unsigned NumLoops)
+  explicit OSSDependClause(unsigned N)
       : OSSVarListClause<OSSDependClause>(OSSC_depend, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
-                                          N),
-        NumLoops(NumLoops) {}
+                                          N), DepKinds(1, OSSC_DEPEND_unknown)
+                                          {}
 
   /// Set dependency kind.
-  void setDependencyKind(OmpSsDependClauseKind K) { DepKind = K; }
+  void setDependencyKinds(const SmallVector<OmpSsDependClauseKind, 2>& K) { DepKinds = K; }
 
   /// Set dependency kind and its location.
   void setDependencyLoc(SourceLocation Loc) { DepLoc = Loc; }
@@ -3168,43 +3161,28 @@ public:
   /// \param DepLoc Location of the dependency type.
   /// \param ColonLoc Colon location.
   /// \param VL List of references to the variables.
-  /// \param NumLoops Number of loops that is associated with this depend
   /// clause.
   static OSSDependClause *Create(const ASTContext &C, SourceLocation StartLoc,
                                  SourceLocation LParenLoc,
                                  SourceLocation EndLoc,
-                                 OmpSsDependClauseKind DepKind,
+                                 const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
                                  SourceLocation DepLoc, SourceLocation ColonLoc,
-                                 ArrayRef<Expr *> VL, unsigned NumLoops);
+                                 ArrayRef<Expr *> VL);
 
   /// Creates an empty clause with \a N variables.
   ///
   /// \param C AST context.
   /// \param N The number of variables.
-  /// \param NumLoops Number of loops that is associated with this depend
-  /// clause.
-  static OSSDependClause *CreateEmpty(const ASTContext &C, unsigned N,
-                                      unsigned NumLoops);
+  static OSSDependClause *CreateEmpty(const ASTContext &C, unsigned N);
 
-  /// Get dependency type.
-  OmpSsDependClauseKind getDependencyKind() const { return DepKind; }
+  /// Get dependency types.
+  SmallVector<OmpSsDependClauseKind, 2> getDependencyKind() const { return DepKinds; }
 
   /// Get dependency type location.
   SourceLocation getDependencyLoc() const { return DepLoc; }
 
   /// Get colon location.
   SourceLocation getColonLoc() const { return ColonLoc; }
-
-  /// Get number of loops associated with the clause.
-  unsigned getNumLoops() const { return NumLoops; }
-
-  /// Set the loop data for the depend clauses with 'sink|source' kind of
-  /// dependency.
-  void setLoopData(unsigned NumLoop, Expr *Cnt);
-
-  /// Get the loop data.
-  Expr *getLoopData(unsigned NumLoop);
-  const Expr *getLoopData(unsigned NumLoop) const;
 
   child_range children() {
     return child_range(reinterpret_cast<Stmt **>(varlist_begin()),

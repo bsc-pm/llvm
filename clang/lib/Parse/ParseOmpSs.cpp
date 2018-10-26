@@ -69,8 +69,6 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     while (Tok.isNot(tok::annot_pragma_ompss_end)) {
       OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
 
-      // Actions.StartOpenMPClause(CKind);
-
       // Track which clauses have appeared so we can throw an error in case
       // a clause cannot appear again
       OSSClause *Clause =
@@ -85,7 +83,6 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
       if (Tok.is(tok::comma))
         ConsumeToken();
 
-      // Actions.EndOpenMPClause();
     }
 
     // End location of the directive.
@@ -168,19 +165,38 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                          getOmpSsClauseName(Kind)))
     return true;
 
+  OmpSsDependClauseKind DepKind;
+
   if (Kind == OSSC_depend) {
     // Handle dependency type for depend clause.
     ColonProtectionRAIIObject ColonRAII(*this);
-    Data.DepKind =
+    DepKind =
         static_cast<OmpSsDependClauseKind>(getOmpSsSimpleClauseType(
             Kind, Tok.is(tok::identifier) ? PP.getSpelling(Tok) : ""));
     Data.DepLinMapLoc = Tok.getLocation();
 
-    if (Data.DepKind == OSSC_DEPEND_unknown) {
-      SkipUntil(tok::colon, tok::r_paren, tok::annot_pragma_ompss_end,
-                StopBeforeMatch);
+    Data.DepKinds.push_back(DepKind);
+
+    if (DepKind == OSSC_DEPEND_unknown) {
+      tok::TokenKind TokArray[] = {tok::comma, tok::colon, tok::r_paren, tok::annot_pragma_ompss_end};
+      SkipUntil(TokArray, StopBeforeMatch);
     } else {
       ConsumeToken();
+    }
+    if (Tok.is(tok::comma)) {
+      ConsumeToken();
+      DepKind =
+          static_cast<OmpSsDependClauseKind>(getOmpSsSimpleClauseType(
+              Kind, Tok.is(tok::identifier) ? PP.getSpelling(Tok) : ""));
+
+      Data.DepKinds.push_back(DepKind);
+
+      if (DepKind == OSSC_DEPEND_unknown) {
+        SkipUntil(tok::colon, tok::r_paren, tok::annot_pragma_ompss_end,
+                  StopBeforeMatch);
+      } else {
+        ConsumeToken();
+      }
     }
     if (Tok.is(tok::colon)) {
       Data.ColonLoc = ConsumeToken();
@@ -189,8 +205,12 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
     }
   }
 
+  auto DepKindIt = std::find(Data.DepKinds.begin(),
+                             Data.DepKinds.end(),
+                             OSSC_DEPEND_unknown);
   bool IsComma =
-      (Kind == OSSC_depend && Data.DepKind != OSSC_DEPEND_unknown);
+      (Kind == OSSC_depend && *DepKindIt != OSSC_DEPEND_unknown);
+
   while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
     // Parse variable
@@ -217,14 +237,15 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   if (!T.consumeClose())
     Data.RLoc = T.getCloseLocation();
   return (Kind == OSSC_depend
-          && Data.DepKind != OSSC_DEPEND_unknown
+          && *DepKindIt != OSSC_DEPEND_unknown
           && Vars.empty());
 }
 
 /// Parsing of OmpSs
 ///
 ///    depend-clause:
-///       'depend' '(' in | out | inout : ')'
+///       'depend' '(' in | out | inout [ ,weak ] : ')'
+///       'depend' '(' [ weak, ] in | out | inout : ')'
 OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
                                             OmpSsClauseKind Kind,
                                             bool ParseOnly) {
@@ -240,6 +261,6 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
     return nullptr;
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
-      Data.DepKind, Data.DepLinMapLoc);
+      Data.DepKinds, Data.DepLinMapLoc);
 }
 

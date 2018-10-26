@@ -978,7 +978,13 @@ void OSSClausePrinter::VisitOSSFlushClause(OSSFlushClause *Node) {
 void OSSClausePrinter::VisitOSSDependClause(OSSDependClause *Node) {
   OS << "depend(";
   OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                      Node->getDependencyKind());
+                                     Node->getDependencyKind()[0]);
+  if (Node->getDependencyKind().size() == 2) {
+    OS << " ,";
+    OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
+                                       Node->getDependencyKind()[1]);
+  }
+
   if (!Node->varlist_empty()) {
     OS << " :";
     VisitOSSClauseList(Node, ' ');

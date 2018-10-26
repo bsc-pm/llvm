@@ -2784,7 +2784,7 @@ public:
     SourceLocation ColonLoc;
     SourceLocation RLoc;
     SourceLocation DepLinMapLoc; // depend linear map clause loc
-    OmpSsDependClauseKind DepKind = OSSC_DEPEND_unknown;
+    SmallVector<OmpSsDependClauseKind, 2> DepKinds;
   };
 
   /// Parses clauses with list.

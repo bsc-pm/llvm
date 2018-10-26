@@ -707,55 +707,21 @@ OSSFlushClause *OSSFlushClause::CreateEmpty(const ASTContext &C, unsigned N) {
 OSSDependClause *
 OSSDependClause::Create(const ASTContext &C, SourceLocation StartLoc,
                         SourceLocation LParenLoc, SourceLocation EndLoc,
-                        OmpSsDependClauseKind DepKind, SourceLocation DepLoc,
-                        SourceLocation ColonLoc, ArrayRef<Expr *> VL,
-                        unsigned NumLoops) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size() + NumLoops));
+                        const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLoc,
+                        SourceLocation ColonLoc, ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
   OSSDependClause *Clause = new (Mem)
-      OSSDependClause(StartLoc, LParenLoc, EndLoc, VL.size(), NumLoops);
+      OSSDependClause(StartLoc, LParenLoc, EndLoc, VL.size());
   Clause->setVarRefs(VL);
-  Clause->setDependencyKind(DepKind);
+  Clause->setDependencyKinds(DepKinds);
   Clause->setDependencyLoc(DepLoc);
   Clause->setColonLoc(ColonLoc);
-  for (unsigned I = 0 ; I < NumLoops; ++I)
-    Clause->setLoopData(I, nullptr);
   return Clause;
 }
 
-OSSDependClause *OSSDependClause::CreateEmpty(const ASTContext &C, unsigned N,
-                                              unsigned NumLoops) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N + NumLoops));
-  return new (Mem) OSSDependClause(N, NumLoops);
-}
-
-void OSSDependClause::setLoopData(unsigned NumLoop, Expr *Cnt) {
-  assert((getDependencyKind() == OSSC_DEPEND_sink ||
-          getDependencyKind() == OSSC_DEPEND_source) &&
-         NumLoop < NumLoops &&
-         "Expected sink or source depend + loop index must be less number of "
-         "loops.");
-  auto It = std::next(getVarRefs().end(), NumLoop);
-  *It = Cnt;
-}
-
-Expr *OSSDependClause::getLoopData(unsigned NumLoop) {
-  assert((getDependencyKind() == OSSC_DEPEND_sink ||
-          getDependencyKind() == OSSC_DEPEND_source) &&
-         NumLoop < NumLoops &&
-         "Expected sink or source depend + loop index must be less number of "
-         "loops.");
-  auto It = std::next(getVarRefs().end(), NumLoop);
-  return *It;
-}
-
-const Expr *OSSDependClause::getLoopData(unsigned NumLoop) const {
-  assert((getDependencyKind() == OSSC_DEPEND_sink ||
-          getDependencyKind() == OSSC_DEPEND_source) &&
-         NumLoop < NumLoops &&
-         "Expected sink or source depend + loop index must be less number of "
-         "loops.");
-  auto It = std::next(getVarRefs().end(), NumLoop);
-  return *It;
+OSSDependClause *OSSDependClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
+  return new (Mem) OSSDependClause(N);
 }
 
 unsigned OSSClauseMappableExprCommon::getComponentsTotalNumber(
