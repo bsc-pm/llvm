@@ -154,7 +154,7 @@ void ASTStmtReader::VisitStmt(Stmt *S) {
 void ASTStmtReader::VisitNullStmt(NullStmt *S) {
   VisitStmt(S);
   S->setSemiLoc(ReadSourceLocation());
-  S->HasLeadingEmptyMacro = Record.readInt();
+  S->NullStmtBits.HasLeadingEmptyMacro = Record.readInt();
 }
 
 void ASTStmtReader::VisitCompoundStmt(CompoundStmt *S) {
@@ -164,7 +164,7 @@ void ASTStmtReader::VisitCompoundStmt(CompoundStmt *S) {
   while (NumStmts--)
     Stmts.push_back(Record.readSubStmt());
   S->setStmts(Stmts);
-  S->LBraceLoc = ReadSourceLocation();
+  S->CompoundStmtBits.LBraceLoc = ReadSourceLocation();
   S->RBraceLoc = ReadSourceLocation();
 }
 
@@ -199,15 +199,18 @@ void ASTStmtReader::VisitLabelStmt(LabelStmt *S) {
 
 void ASTStmtReader::VisitAttributedStmt(AttributedStmt *S) {
   VisitStmt(S);
+  // NumAttrs in AttributedStmt is set when creating an empty
+  // AttributedStmt in AttributedStmt::CreateEmpty, since it is needed
+  // to allocate the right amount of space for the trailing Attr *.
   uint64_t NumAttrs = Record.readInt();
   AttrVec Attrs;
   Record.readAttributes(Attrs);
   (void)NumAttrs;
-  assert(NumAttrs == S->NumAttrs);
+  assert(NumAttrs == S->AttributedStmtBits.NumAttrs);
   assert(NumAttrs == Attrs.size());
   std::copy(Attrs.begin(), Attrs.end(), S->getAttrArrayPtr());
   S->SubStmt = Record.readSubStmt();
-  S->AttrLoc = ReadSourceLocation();
+  S->AttributedStmtBits.AttrLoc = ReadSourceLocation();
 }
 
 void ASTStmtReader::VisitIfStmt(IfStmt *S) {
@@ -493,9 +496,12 @@ void ASTStmtReader::VisitExpr(Expr *E) {
 
 void ASTStmtReader::VisitPredefinedExpr(PredefinedExpr *E) {
   VisitExpr(E);
+  bool HasFunctionName = Record.readInt();
+  E->PredefinedExprBits.HasFunctionName = HasFunctionName;
+  E->PredefinedExprBits.Kind = Record.readInt();
   E->setLocation(ReadSourceLocation());
-  E->Type = (PredefinedExpr::IdentType)Record.readInt();
-  E->FnName = cast_or_null<StringLiteral>(Record.readSubExpr());
+  if (HasFunctionName)
+    E->setFunctionName(cast<StringLiteral>(Record.readSubExpr()));
 }
 
 void ASTStmtReader::VisitDeclRefExpr(DeclRefExpr *E) {
@@ -2331,12 +2337,14 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
       break;
 
     case STMT_CAPTURED:
-      S = CapturedStmt::CreateDeserialized(Context,
-                                           Record[ASTStmtReader::NumStmtFields]);
+      S = CapturedStmt::CreateDeserialized(
+          Context, Record[ASTStmtReader::NumStmtFields]);
       break;
 
     case EXPR_PREDEFINED:
-      S = new (Context) PredefinedExpr(Empty);
+      S = PredefinedExpr::CreateEmpty(
+          Context,
+          /*HasFunctionName*/ Record[ASTStmtReader::NumExprFields]);
       break;
 
     case EXPR_DECL_REF:
