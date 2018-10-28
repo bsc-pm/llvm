@@ -56,7 +56,6 @@ def _run_benchmark(env, out_dir, include_debug_info):
     # Just build all the things. The more data we have, the better.
     _build_things_in(env, target_dir, what=['all'])
 
-
 ### Script
 
 
@@ -252,13 +251,7 @@ def _build_stage1_clang(env):
     target_dir = env.output_subdir('stage1')
     cmake = _get_default_cmake_invocation(env)
     _run_fresh_cmake(env, cmake, target_dir)
-
-    # FIXME: The full build here is somewhat unfortunate. It's primarily
-    # because I don't know what to call libclang_rt.profile for arches that
-    # aren't x86_64 (and even then, it's in a subdir that contains clang's
-    # current version). It would be nice to figure out what target I can
-    # request to magically have libclang_rt.profile built for ${host}
-    _build_things_in(env, target_dir, what=['all'])
+    _build_things_in(env, target_dir, what=['clang', 'llvm-profdata', 'profile'])
     return target_dir
 
 
