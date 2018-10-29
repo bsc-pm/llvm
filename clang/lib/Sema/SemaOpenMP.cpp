@@ -2321,6 +2321,8 @@ public:
         }
       }
     }
+    // Check implicitly captured variables.
+    VisitSubCaptures(S);
   }
   void VisitStmt(Stmt *S) {
     for (Stmt *C : S->children()) {
@@ -5299,7 +5301,8 @@ checkOpenMPLoop(OpenMPDirectiveKind DKind, Expr *CollapseLoopCountExpr,
   ExprResult CombDistCond;
   if (isOpenMPLoopBoundSharingDirective(DKind)) {
     CombDistCond =
-        SemaRef.BuildBinOp(CurScope, CondLoc, BO_LE, IV.get(), NumIterations.get());
+        SemaRef.BuildBinOp(
+            CurScope, CondLoc, BO_LT, IV.get(), NumIterations.get());
   }
 
   ExprResult CombCond;
