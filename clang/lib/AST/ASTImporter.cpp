@@ -5864,9 +5864,8 @@ ExpectedStmt ASTNodeImporter::VisitWhileStmt(WhileStmt *S) {
   SourceLocation ToWhileLoc;
   std::tie(ToConditionVariable, ToCond, ToBody, ToWhileLoc) = *Imp;
 
-  return new (Importer.getToContext()) WhileStmt(
-      Importer.getToContext(),
-      ToConditionVariable, ToCond, ToBody, ToWhileLoc);
+  return WhileStmt::Create(Importer.getToContext(), ToConditionVariable, ToCond,
+                           ToBody, ToWhileLoc);
 }
 
 ExpectedStmt ASTNodeImporter::VisitDoStmt(DoStmt *S) {
@@ -5958,8 +5957,8 @@ ExpectedStmt ASTNodeImporter::VisitReturnStmt(ReturnStmt *S) {
   const VarDecl *ToNRVOCandidate;
   std::tie(ToReturnLoc, ToRetValue, ToNRVOCandidate) = *Imp;
 
-  return new (Importer.getToContext()) ReturnStmt(
-      ToReturnLoc, ToRetValue, ToNRVOCandidate);
+  return ReturnStmt::Create(Importer.getToContext(), ToReturnLoc, ToRetValue,
+                            ToNRVOCandidate);
 }
 
 ExpectedStmt ASTNodeImporter::VisitCXXCatchStmt(CXXCatchStmt *S) {
