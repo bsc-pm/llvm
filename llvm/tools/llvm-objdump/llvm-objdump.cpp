@@ -106,7 +106,11 @@ DisassembleFunctions("df",
 static StringSet<> DisasmFuncsSet;
 
 cl::opt<bool>
-llvm::Relocations("r", cl::desc("Display the relocation entries in the file"));
+llvm::Relocations("reloc",
+                  cl::desc("Display the relocation entries in the file"));
+static cl::alias RelocationsShort("r", cl::desc("Alias for --reloc"),
+                                  cl::NotHidden,
+                                  cl::aliasopt(llvm::Relocations));
 
 cl::opt<bool>
 llvm::DynamicRelocations("dynamic-reloc",
@@ -124,6 +128,7 @@ static cl::alias SectionContentsShort("s",
 
 cl::opt<bool> llvm::SymbolTable("syms", cl::desc("Display the symbol table"));
 static cl::alias SymbolTableShort("t", cl::desc("Alias for --syms"),
+                                  cl::NotHidden,
                                   cl::aliasopt(llvm::SymbolTable));
 
 cl::opt<bool>
