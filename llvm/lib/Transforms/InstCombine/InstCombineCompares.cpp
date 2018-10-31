@@ -5431,9 +5431,12 @@ Instruction *InstCombiner::visitFCmpInst(FCmpInst &I) {
       switch (Pred) {
       default:
         break;
-      // fabs(x) < 0 --> false
+      case FCmpInst::FCMP_UGE:
       case FCmpInst::FCMP_OLT:
-        llvm_unreachable("handled by SimplifyFCmpInst");
+        // fabs(x) >= 0.0 --> true
+        // fabs(x) <  0.0 --> false
+        llvm_unreachable("fcmp should have simplified");
+
       // fabs(x) > 0 --> x != 0
       case FCmpInst::FCMP_OGT:
         return new FCmpInst(FCmpInst::FCMP_ONE, CI->getArgOperand(0), RHSC);
@@ -5442,6 +5445,7 @@ Instruction *InstCombiner::visitFCmpInst(FCmpInst &I) {
         return new FCmpInst(FCmpInst::FCMP_OEQ, CI->getArgOperand(0), RHSC);
       // fabs(x) >= 0 --> !isnan(x)
       case FCmpInst::FCMP_OGE:
+        assert(!I.hasNoNaNs() && "fcmp should have simplified");
         return new FCmpInst(FCmpInst::FCMP_ORD, CI->getArgOperand(0), RHSC);
       // fabs(x) == 0 --> x == 0
       // fabs(x) != 0 --> x != 0
