@@ -35,6 +35,22 @@ defm split_dwo
                       "<dwo-file>, then strip-dwo on the input file">,
       MetaVarName<"dwo-file">;
 
+def enable_deterministic_archives
+    : Flag<["-", "--"], "enable-deterministic-archives">,
+      HelpText<"Enable deterministic mode when copying archives (use zero for "
+               "UIDs, GIDs, and timestamps).">;
+def D : Flag<["-"], "D">,
+        Alias<enable_deterministic_archives>,
+        HelpText<"Alias for --enable-deterministic-archives">;
+
+def disable_deterministic_archives
+    : Flag<["-", "--"], "disable-deterministic-archives">,
+      HelpText<"Disable deterministic mode when copying archives (use real "
+               "values for UIDs, GIDs, and timestamps).">;
+def U : Flag<["-"], "U">,
+        Alias<disable_deterministic_archives>,
+        HelpText<"Alias for --disable-deterministic-archives">;
+
 def preserve_dates : Flag<[ "-", "--" ], "preserve-dates">,
                      HelpText<"Preserve access and modification timestamps">;
 
@@ -69,7 +85,7 @@ def strip_all : Flag<["-", "--"], "strip-all">,
 def S : Flag<["-"], "S">,
         Alias<strip_all>;
 def strip_all_gnu : Flag<["-", "--"], "strip-all-gnu">,
-                    HelpText<"Compaitable with GNU objcopy's --strip-all">;
+                    HelpText<"Compatible with GNU objcopy's --strip-all">;
 def strip_debug : Flag<["-", "--"], "strip-debug">,
                   HelpText<"Remove all debug information">;
 def strip_dwo : Flag<["-", "--"], "strip-dwo">,
@@ -126,7 +142,7 @@ defm keep_symbol : Eq<"keep-symbol", "Do not remove symbol <symbol>">,
 def K : JoinedOrSeparate<["-"], "K">,
         Alias<keep_symbol>;
 def only_keep_debug : Flag<["-", "--"], "only-keep-debug">,
-                          HelpText<"Currently ignored. Only for compaitability with GNU objcopy.">;
+                          HelpText<"Currently ignored. Only for compatibility with GNU objcopy.">;
 def strip_unneeded : Flag<["-", "--"], "strip-unneeded">,
                       HelpText<"Remove all symbols not needed by relocations">;
 def keep_file_symbols : Flag<["-", "--"], "keep-file-symbols">,

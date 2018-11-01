@@ -8,6 +8,22 @@ multiclass Eq<string name, string help> {
 
 def help : Flag<["-", "--"], "help">;
 
+def enable_deterministic_archives
+    : Flag<["-", "--"], "enable-deterministic-archives">,
+      HelpText<"Enable deterministic mode when stripping archives (use zero "
+               "for UIDs, GIDs, and timestamps).">;
+def D : Flag<["-"], "D">,
+        Alias<enable_deterministic_archives>,
+        HelpText<"Alias for --enable-deterministic-archives">;
+
+def disable_deterministic_archives
+    : Flag<["-", "--"], "disable-deterministic-archives">,
+      HelpText<"Disable deterministic mode when stripping archives (use real "
+               "values for UIDs, GIDs, and timestamps).">;
+def U : Flag<["-"], "U">,
+        Alias<disable_deterministic_archives>,
+        HelpText<"Alias for --disable-deterministic-archives">;
+
 defm output : Eq<"o", "Write output to <file>">,
               MetaVarName<"output">;
 
@@ -21,6 +37,9 @@ def strip_all : Flag<["-", "--"], "strip-all">,
 
 def s : Flag<["-"], "s">,
         Alias<strip_all>;
+
+def strip_all_gnu : Flag<["-", "--"], "strip-all-gnu">,
+                    HelpText<"Compatible with GNU strip's --strip-all">;
 
 def strip_debug : Flag<["-", "--"], "strip-debug">,
                   HelpText<"Remove debugging symbols only">;
@@ -39,6 +58,8 @@ defm remove_section : Eq<"remove-section", "Remove <section>">,
 
 def R : JoinedOrSeparate<["-"], "R">,
         Alias<remove_section>;
+
+defm keep : Eq<"keep", "Keep <section>">, MetaVarName<"section">;
 
 defm keep_symbol : Eq<"keep-symbol", "Do not remove symbol <symbol>">,
                    MetaVarName<"symbol">;

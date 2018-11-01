@@ -2863,8 +2863,6 @@ SDValue AArch64TargetLowering::LowerOperation(SDValue Op,
     return LowerFP_EXTEND(Op, DAG);
   case ISD::FRAMEADDR:
     return LowerFRAMEADDR(Op, DAG);
-  case ISD::SPONENTRY:
-    return LowerSPONENTRY(Op, DAG);
   case ISD::RETURNADDR:
     return LowerRETURNADDR(Op, DAG);
   case ISD::INSERT_VECTOR_ELT:
@@ -5171,16 +5169,6 @@ SDValue AArch64TargetLowering::LowerFRAMEADDR(SDValue Op,
     FrameAddr = DAG.getLoad(VT, DL, DAG.getEntryNode(), FrameAddr,
                             MachinePointerInfo());
   return FrameAddr;
-}
-
-SDValue AArch64TargetLowering::LowerSPONENTRY(SDValue Op,
-                                              SelectionDAG &DAG) const {
-  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
-
-  EVT VT = getPointerTy(DAG.getDataLayout());
-  SDLoc DL(Op);
-  int FI = MFI.CreateFixedObject(4, 0, false);
-  return DAG.getFrameIndex(FI, VT);
 }
 
 // FIXME? Maybe this could be a TableGen attribute on some registers and
@@ -11048,9 +11036,9 @@ static SDValue performNVCASTCombine(SDNode *N) {
 static SDValue performGlobalAddressCombine(SDNode *N, SelectionDAG &DAG,
                                            const AArch64Subtarget *Subtarget,
                                            const TargetMachine &TM) {
-  auto *GN = dyn_cast<GlobalAddressSDNode>(N);
-  if (!GN || Subtarget->ClassifyGlobalReference(GN->getGlobal(), TM) !=
-                 AArch64II::MO_NO_FLAG)
+  auto *GN = cast<GlobalAddressSDNode>(N);
+  if (Subtarget->ClassifyGlobalReference(GN->getGlobal(), TM) !=
+      AArch64II::MO_NO_FLAG)
     return SDValue();
 
   uint64_t MinOffset = -1ull;
@@ -11182,6 +11170,7 @@ SDValue AArch64TargetLowering::PerformDAGCombine(SDNode *N,
     default:
       break;
     }
+    break;
   case ISD::GlobalAddress:
     return performGlobalAddressCombine(N, DAG, Subtarget, getTargetMachine());
   }
