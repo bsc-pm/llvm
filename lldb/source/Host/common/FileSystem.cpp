@@ -78,10 +78,23 @@ uint32_t FileSystem::GetPermissions(const FileSpec &file_spec) const {
   return GetPermissions(file_spec.GetPath());
 }
 
+uint32_t FileSystem::GetPermissions(const FileSpec &file_spec,
+                                    std::error_code &ec) const {
+  return GetPermissions(file_spec.GetPath(), ec);
+}
+
 uint32_t FileSystem::GetPermissions(const Twine &path) const {
+  std::error_code ec;
+  return GetPermissions(path, ec);
+}
+
+uint32_t FileSystem::GetPermissions(const Twine &path,
+                                    std::error_code &ec) const {
   ErrorOr<vfs::Status> status = m_fs->status(path);
-  if (!status)
+  if (!status) {
+    ec = status.getError();
     return sys::fs::perms::perms_not_known;
+  }
   return status->getPermissions();
 }
 
@@ -141,7 +154,7 @@ std::error_code FileSystem::MakeAbsolute(FileSpec &file_spec) const {
   if (EC)
     return EC;
 
-  FileSpec new_file_spec(path, false, file_spec.GetPathStyle());
+  FileSpec new_file_spec(path, file_spec.GetPathStyle());
   file_spec = new_file_spec;
   return {};
 }
@@ -179,6 +192,7 @@ void FileSystem::Resolve(FileSpec &file_spec) {
 
   // Update the FileSpec with the resolved path.
   file_spec.SetPath(path);
+  file_spec.SetIsResolved(true);
 }
 
 bool FileSystem::ResolveExecutableLocation(FileSpec &file_spec) {
@@ -206,7 +220,7 @@ bool FileSystem::ResolveExecutableLocation(FileSpec &file_spec) {
     return false;
 
   // Make sure that the result exists.
-  FileSpec result(*error_or_path, false);
+  FileSpec result(*error_or_path);
   if (!Exists(result))
     return false;
 
