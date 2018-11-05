@@ -8965,6 +8965,11 @@ ClangASTContext::ConvertStringToFloatValue(lldb::opaque_compiler_type_t type,
 //----------------------------------------------------------------------
 #define DEPTH_INCREMENT 2
 
+void ClangASTContext::Dump(Stream &s) {
+  Decl *tu = Decl::castFromDeclContext(GetTranslationUnitDecl());
+  tu->dump(s.AsRawOstream());
+}
+
 void ClangASTContext::DumpValue(
     lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx, Stream *s,
     lldb::Format format, const DataExtractor &data,
