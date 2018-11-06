@@ -756,6 +756,8 @@ public:
       return "Objective-C @finally statement";
     case CR_OpenMP:
       return "OpenMP region";
+    case CR_OmpSs:
+      return "OmpSs region";
     }
     llvm_unreachable("Invalid captured region kind!");
   }

@@ -19,3 +19,6 @@ int main() {
 // CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:{{[0-9]+}}, col:{{[0-9]+}}> 'int' lvalue prefix '*' cannot overflow
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[0-9]+}}> 'int *' lvalue Var {{[a-z0-9]+}} 'c' 'int *
+// CHECK-NEXT: CapturedStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
+// CHECK-NEXT: CapturedDecl {{[a-z0-9]+}} <<invalid sloc>> <invalid sloc>
+// CHECK-NEXT: CompoundStmt {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>

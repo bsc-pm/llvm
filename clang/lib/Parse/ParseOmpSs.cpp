@@ -66,6 +66,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     ConsumeToken();
     ParseScope OSSDirectiveScope(this, ScopeFlags);
 
+    Actions.StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
     while (Tok.isNot(tok::annot_pragma_ompss_end)) {
       OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
 
@@ -92,7 +93,13 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
+      Actions.ActOnCapturedRegionStart(Loc, getCurScope(), CR_OmpSs, 1);
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
+      if (AssociatedStmt.isUsable()) {
+        AssociatedStmt = Actions.ActOnCapturedRegionEnd(AssociatedStmt.get());
+      } else {
+        Actions.ActOnCapturedRegionError();
+      }
     }
 
     Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
@@ -102,6 +109,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
                                                       EndLoc);
 
     // Exit scope.
+    Actions.EndOmpSsDSABlock(Directive.get());
     OSSDirectiveScope.Exit();
     break;
 
@@ -142,6 +150,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
       ErrorFound = true;
     }
     break;
+  case OSSC_shared:
   case OSSC_depend:
     Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
@@ -208,8 +217,9 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   auto DepKindIt = std::find(Data.DepKinds.begin(),
                              Data.DepKinds.end(),
                              OSSC_DEPEND_unknown);
-  bool IsComma =
-      (Kind == OSSC_depend && *DepKindIt != OSSC_DEPEND_unknown);
+
+  bool IsComma = (Kind != OSSC_depend)
+                 || (Kind == OSSC_depend && *DepKindIt != OSSC_DEPEND_unknown);
 
   while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
@@ -246,9 +256,15 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 ///    depend-clause:
 ///       'depend' '(' in | out | inout [ ,weak ] : ')'
 ///       'depend' '(' [ weak, ] in | out | inout : ')'
+///    private-clause:
+///       'private' '(' list ')'
+///    firstprivate-clause:
+///       'firstprivate' '(' list ')'
+///    shared-clause:
+///       'shared' '(' list ')'
 OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
-                                            OmpSsClauseKind Kind,
-                                            bool ParseOnly) {
+                                           OmpSsClauseKind Kind,
+                                           bool ParseOnly) {
   SourceLocation Loc = Tok.getLocation();
   SourceLocation LOpen = ConsumeToken();
   SmallVector<Expr *, 4> Vars;

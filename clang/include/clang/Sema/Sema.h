@@ -9292,7 +9292,20 @@ public:
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc);
-  // OmpSs
+  //===--------------------------------------------------------------------===//
+  // OmpSs directives and clauses.
+  //
+  void *VarDataSharingAttributesStackOmpSs;
+  /// Initialization of data-sharing attributes stack.
+  void InitDataSharingAttributesStackOmpSs();
+  void DestroyDataSharingAttributesStackOmpSs();
+  /// Called on start of new data sharing attribute block.
+  void StartOmpSsDSABlock(OmpSsDirectiveKind K,
+                          Scope *CurScope,
+                          SourceLocation Loc);
+  /// Called on end of data sharing attribute block.
+  void EndOmpSsDSABlock(Stmt *CurDirective);
+
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
       OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
 
@@ -9313,6 +9326,12 @@ public:
       SourceLocation ColonLoc, SourceLocation EndLoc,
       const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
       SourceLocation DepLinMapLoc);
+
+  /// Called on well-formed 'shared' clause.
+  OSSClause *ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
 
   /// Called on well-formed 'depend' clause.
   OSSClause *
