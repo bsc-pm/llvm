@@ -128,9 +128,6 @@ struct SuffixTreeNode {
   /// mapping by tacking that character on the end of the current string.
   DenseMap<unsigned, SuffixTreeNode *> Children;
 
-  /// A flag set to false if the node has been pruned from the tree.
-  bool IsInTree = true;
-
   /// The start index of this node's substring in the main string.
   unsigned StartIdx = EmptyIdx;
 
@@ -169,12 +166,6 @@ struct SuffixTreeNode {
 
   /// The parent of this node. Every node except for the root has a parent.
   SuffixTreeNode *Parent = nullptr;
-
-  /// The number of times this node's string appears in the tree.
-  ///
-  /// This is equal to the number of leaf children of the string. It represents
-  /// the number of suffixes that the node's string is a prefix of.
-  unsigned OccurrenceCount = 0;
 
   /// The length of the string formed by concatenating the edge labels from the
   /// root to this node.
@@ -355,7 +346,6 @@ private:
       // If yes, give it a suffix index and bump its parent's occurrence count.
       CurrNode.SuffixIdx = Str.size() - CurrIdx;
       assert(CurrNode.Parent && "CurrNode had no parent!");
-      CurrNode.Parent->OccurrenceCount++;
     }
   }
 
@@ -533,7 +523,6 @@ public:
   /// \param Str The string to construct the suffix tree for.
   SuffixTree(const std::vector<unsigned> &Str) : Str(Str) {
     Root = insertInternalNode(nullptr, EmptyIdx, EmptyIdx, 0);
-    Root->IsInTree = true;
     Active.Node = Root;
 
     // Keep track of the number of suffixes we have to add of the current
