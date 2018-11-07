@@ -5302,21 +5302,39 @@ static Instruction *foldFabsWithFcmpZero(FCmpInst &I) {
     // fabs(X) > 0.0 --> X != 0.0
     return new FCmpInst(FCmpInst::FCMP_ONE, X, I.getOperand(1));
 
+  case FCmpInst::FCMP_UGT:
+    // fabs(X) u> 0.0 --> X u!= 0.0
+    return new FCmpInst(FCmpInst::FCMP_UNE, X, I.getOperand(1));
+
   case FCmpInst::FCMP_OLE:
     // fabs(X) <= 0.0 --> X == 0.0
     return new FCmpInst(FCmpInst::FCMP_OEQ, X, I.getOperand(1));
+
+  case FCmpInst::FCMP_ULE:
+    // fabs(X) u<= 0.0 --> X u== 0.0
+    return new FCmpInst(FCmpInst::FCMP_UEQ, X, I.getOperand(1));
 
   case FCmpInst::FCMP_OGE:
     // fabs(X) >= 0.0 --> !isnan(X)
     assert(!I.hasNoNaNs() && "fcmp should have simplified");
     return new FCmpInst(FCmpInst::FCMP_ORD, X, I.getOperand(1));
 
+  case FCmpInst::FCMP_ULT:
+    // fabs(X) u< 0.0 --> isnan(X)
+    assert(!I.hasNoNaNs() && "fcmp should have simplified");
+    return new FCmpInst(FCmpInst::FCMP_UNO, X, I.getOperand(1));
+
   case FCmpInst::FCMP_OEQ:
   case FCmpInst::FCMP_UEQ:
   case FCmpInst::FCMP_ONE:
   case FCmpInst::FCMP_UNE:
-    // fabs(X) == 0.0 --> X == 0.0
+  case FCmpInst::FCMP_ORD:
+  case FCmpInst::FCMP_UNO:
+    // Look through the fabs() because it doesn't change anything but the sign.
+    // fabs(X) == 0.0 --> X == 0.0,
     // fabs(X) != 0.0 --> X != 0.0
+    // isnan(fabs(X)) --> isnan(X)
+    // !isnan(fabs(X) --> !isnan(X)
     return new FCmpInst(I.getPredicate(), X, I.getOperand(1));
 
   default:
