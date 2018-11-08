@@ -9333,6 +9333,18 @@ public:
                                     SourceLocation LParenLoc,
                                     SourceLocation EndLoc);
 
+  /// Called on well-formed 'private' clause.
+  OSSClause *ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc);
+
+  /// Called on well-formed 'firstprivate' clause.
+  OSSClause *ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc);
+
   /// Called on well-formed 'depend' clause.
   OSSClause *
   ActOnOmpSsDependClause(const SmallVector<OmpSsDependClauseKind, 2>& DepKind, SourceLocation DepLoc,

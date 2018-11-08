@@ -46,8 +46,6 @@ const OSSClauseWithPreInit *OSSClauseWithPreInit::get(const OSSClause *C) {
     return static_cast<const OSSScheduleClause *>(C);
   case OSSC_dist_schedule:
     return static_cast<const OSSDistScheduleClause *>(C);
-  case OSSC_firstprivate:
-    return static_cast<const OSSFirstprivateClause *>(C);
   case OSSC_lastprivate:
     return static_cast<const OSSLastprivateClause *>(C);
   case OSSC_reduction:
@@ -232,61 +230,37 @@ const Expr *OSSOrderedClause::getLoopCounter(unsigned NumLoop) const {
   return getTrailingObjects<Expr *>()[NumberOfLoops + NumLoop];
 }
 
-void OSSPrivateClause::setPrivateCopies(ArrayRef<Expr *> VL) {
-  assert(VL.size() == varlist_size() &&
-         "Number of private copies is not the same as the preallocated buffer");
-  std::copy(VL.begin(), VL.end(), varlist_end());
-}
-
-OSSPrivateClause *
-OSSPrivateClause::Create(const ASTContext &C, SourceLocation StartLoc,
-                         SourceLocation LParenLoc, SourceLocation EndLoc,
-                         ArrayRef<Expr *> VL, ArrayRef<Expr *> PrivateVL) {
-  // Allocate space for private variables and initializer expressions.
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(2 * VL.size()));
+OSSPrivateClause *OSSPrivateClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
   OSSPrivateClause *Clause =
       new (Mem) OSSPrivateClause(StartLoc, LParenLoc, EndLoc, VL.size());
   Clause->setVarRefs(VL);
-  Clause->setPrivateCopies(PrivateVL);
   return Clause;
 }
 
-OSSPrivateClause *OSSPrivateClause::CreateEmpty(const ASTContext &C,
-                                                unsigned N) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(2 * N));
+OSSPrivateClause *OSSPrivateClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
   return new (Mem) OSSPrivateClause(N);
 }
 
-void OSSFirstprivateClause::setPrivateCopies(ArrayRef<Expr *> VL) {
-  assert(VL.size() == varlist_size() &&
-         "Number of private copies is not the same as the preallocated buffer");
-  std::copy(VL.begin(), VL.end(), varlist_end());
-}
-
-void OSSFirstprivateClause::setInits(ArrayRef<Expr *> VL) {
-  assert(VL.size() == varlist_size() &&
-         "Number of inits is not the same as the preallocated buffer");
-  std::copy(VL.begin(), VL.end(), getPrivateCopies().end());
-}
-
-OSSFirstprivateClause *
-OSSFirstprivateClause::Create(const ASTContext &C, SourceLocation StartLoc,
-                              SourceLocation LParenLoc, SourceLocation EndLoc,
-                              ArrayRef<Expr *> VL, ArrayRef<Expr *> PrivateVL,
-                              ArrayRef<Expr *> InitVL, Stmt *PreInit) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(3 * VL.size()));
+OSSFirstprivateClause *OSSFirstprivateClause::Create(const ASTContext &C,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc,
+                                         ArrayRef<Expr *> VL) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
   OSSFirstprivateClause *Clause =
       new (Mem) OSSFirstprivateClause(StartLoc, LParenLoc, EndLoc, VL.size());
   Clause->setVarRefs(VL);
-  Clause->setPrivateCopies(PrivateVL);
-  Clause->setInits(InitVL);
-  Clause->setPreInitStmt(PreInit);
   return Clause;
 }
 
-OSSFirstprivateClause *OSSFirstprivateClause::CreateEmpty(const ASTContext &C,
-                                                          unsigned N) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(3 * N));
+OSSFirstprivateClause *OSSFirstprivateClause::CreateEmpty(const ASTContext &C, unsigned N) {
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(N));
   return new (Mem) OSSFirstprivateClause(N);
 }
 

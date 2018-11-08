@@ -1237,7 +1237,6 @@ public:
 class OSSPrivateClause final
     : public OSSVarListClause<OSSPrivateClause>,
       private llvm::TrailingObjects<OSSPrivateClause, Expr *> {
-  friend class OSSClauseReader;
   friend OSSVarListClause;
   friend TrailingObjects;
 
@@ -1248,31 +1247,17 @@ class OSSPrivateClause final
   /// \param EndLoc Ending location of the clause.
   /// \param N Number of the variables in the clause.
   OSSPrivateClause(SourceLocation StartLoc, SourceLocation LParenLoc,
-                   SourceLocation EndLoc, unsigned N)
+                  SourceLocation EndLoc, unsigned N)
       : OSSVarListClause<OSSPrivateClause>(OSSC_private, StartLoc, LParenLoc,
-                                           EndLoc, N) {}
+                                          EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSPrivateClause(unsigned N)
       : OSSVarListClause<OSSPrivateClause>(OSSC_private, SourceLocation(),
-                                           SourceLocation(), SourceLocation(),
-                                           N) {}
-
-  /// Sets the list of references to private copies with initializers for
-  /// new private variables.
-  /// \param VL List of references.
-  void setPrivateCopies(ArrayRef<Expr *> VL);
-
-  /// Gets the list of references to private copies with initializers for
-  /// new private variables.
-  MutableArrayRef<Expr *> getPrivateCopies() {
-    return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
-  }
-  ArrayRef<const Expr *> getPrivateCopies() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
-  }
+                                          SourceLocation(), SourceLocation(),
+                                          N) {}
 
 public:
   /// Creates clause with a list of variables \a VL.
@@ -1282,33 +1267,15 @@ public:
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
   /// \param VL List of references to the variables.
-  /// \param PrivateVL List of references to private copies with initializers.
   static OSSPrivateClause *Create(const ASTContext &C, SourceLocation StartLoc,
-                                  SourceLocation LParenLoc,
-                                  SourceLocation EndLoc, ArrayRef<Expr *> VL,
-                                  ArrayRef<Expr *> PrivateVL);
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
 
-  /// Creates an empty clause with the place for \a N variables.
+  /// Creates an empty clause with \a N variables.
   ///
   /// \param C AST context.
   /// \param N The number of variables.
   static OSSPrivateClause *CreateEmpty(const ASTContext &C, unsigned N);
-
-  using private_copies_iterator = MutableArrayRef<Expr *>::iterator;
-  using private_copies_const_iterator = ArrayRef<const Expr *>::iterator;
-  using private_copies_range = llvm::iterator_range<private_copies_iterator>;
-  using private_copies_const_range =
-      llvm::iterator_range<private_copies_const_iterator>;
-
-  private_copies_range private_copies() {
-    return private_copies_range(getPrivateCopies().begin(),
-                                getPrivateCopies().end());
-  }
-
-  private_copies_const_range private_copies() const {
-    return private_copies_const_range(getPrivateCopies().begin(),
-                                      getPrivateCopies().end());
-  }
 
   child_range children() {
     return child_range(reinterpret_cast<Stmt **>(varlist_begin()),
@@ -1330,9 +1297,7 @@ public:
 /// with the variables 'a' and 'b'.
 class OSSFirstprivateClause final
     : public OSSVarListClause<OSSFirstprivateClause>,
-      public OSSClauseWithPreInit,
       private llvm::TrailingObjects<OSSFirstprivateClause, Expr *> {
-  friend class OSSClauseReader;
   friend OSSVarListClause;
   friend TrailingObjects;
 
@@ -1343,47 +1308,17 @@ class OSSFirstprivateClause final
   /// \param EndLoc Ending location of the clause.
   /// \param N Number of the variables in the clause.
   OSSFirstprivateClause(SourceLocation StartLoc, SourceLocation LParenLoc,
-                        SourceLocation EndLoc, unsigned N)
-      : OSSVarListClause<OSSFirstprivateClause>(OSSC_firstprivate, StartLoc,
-                                                LParenLoc, EndLoc, N),
-        OSSClauseWithPreInit(this) {}
+                  SourceLocation EndLoc, unsigned N)
+      : OSSVarListClause<OSSFirstprivateClause>(OSSC_firstprivate, StartLoc, LParenLoc,
+                                          EndLoc, N) {}
 
   /// Build an empty clause.
   ///
   /// \param N Number of variables.
   explicit OSSFirstprivateClause(unsigned N)
-      : OSSVarListClause<OSSFirstprivateClause>(
-            OSSC_firstprivate, SourceLocation(), SourceLocation(),
-            SourceLocation(), N),
-        OSSClauseWithPreInit(this) {}
-
-  /// Sets the list of references to private copies with initializers for
-  /// new private variables.
-  /// \param VL List of references.
-  void setPrivateCopies(ArrayRef<Expr *> VL);
-
-  /// Gets the list of references to private copies with initializers for
-  /// new private variables.
-  MutableArrayRef<Expr *> getPrivateCopies() {
-    return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
-  }
-  ArrayRef<const Expr *> getPrivateCopies() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
-  }
-
-  /// Sets the list of references to initializer variables for new
-  /// private variables.
-  /// \param VL List of references.
-  void setInits(ArrayRef<Expr *> VL);
-
-  /// Gets the list of references to initializer variables for new
-  /// private variables.
-  MutableArrayRef<Expr *> getInits() {
-    return MutableArrayRef<Expr *>(getPrivateCopies().end(), varlist_size());
-  }
-  ArrayRef<const Expr *> getInits() const {
-    return llvm::makeArrayRef(getPrivateCopies().end(), varlist_size());
-  }
+      : OSSVarListClause<OSSFirstprivateClause>(OSSC_firstprivate, SourceLocation(),
+                                          SourceLocation(), SourceLocation(),
+                                          N) {}
 
 public:
   /// Creates clause with a list of variables \a VL.
@@ -1392,50 +1327,16 @@ public:
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
-  /// \param VL List of references to the original variables.
-  /// \param PrivateVL List of references to private copies with initializers.
-  /// \param InitVL List of references to auto generated variables used for
-  /// initialization of a single array element. Used if firstprivate variable is
-  /// of array type.
-  /// \param PreInit Statement that must be executed before entering the OmpSs
-  /// region with this clause.
-  static OSSFirstprivateClause *
-  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
-         SourceLocation EndLoc, ArrayRef<Expr *> VL, ArrayRef<Expr *> PrivateVL,
-         ArrayRef<Expr *> InitVL, Stmt *PreInit);
+  /// \param VL List of references to the variables.
+  static OSSFirstprivateClause *Create(const ASTContext &C, SourceLocation StartLoc,
+                                 SourceLocation LParenLoc,
+                                 SourceLocation EndLoc, ArrayRef<Expr *> VL);
 
-  /// Creates an empty clause with the place for \a N variables.
+  /// Creates an empty clause with \a N variables.
   ///
   /// \param C AST context.
   /// \param N The number of variables.
   static OSSFirstprivateClause *CreateEmpty(const ASTContext &C, unsigned N);
-
-  using private_copies_iterator = MutableArrayRef<Expr *>::iterator;
-  using private_copies_const_iterator = ArrayRef<const Expr *>::iterator;
-  using private_copies_range = llvm::iterator_range<private_copies_iterator>;
-  using private_copies_const_range =
-      llvm::iterator_range<private_copies_const_iterator>;
-
-  private_copies_range private_copies() {
-    return private_copies_range(getPrivateCopies().begin(),
-                                getPrivateCopies().end());
-  }
-  private_copies_const_range private_copies() const {
-    return private_copies_const_range(getPrivateCopies().begin(),
-                                      getPrivateCopies().end());
-  }
-
-  using inits_iterator = MutableArrayRef<Expr *>::iterator;
-  using inits_const_iterator = ArrayRef<const Expr *>::iterator;
-  using inits_range = llvm::iterator_range<inits_iterator>;
-  using inits_const_range = llvm::iterator_range<inits_const_iterator>;
-
-  inits_range inits() {
-    return inits_range(getInits().begin(), getInits().end());
-  }
-  inits_const_range inits() const {
-    return inits_const_range(getInits().begin(), getInits().end());
-  }
 
   child_range children() {
     return child_range(reinterpret_cast<Stmt **>(varlist_begin()),

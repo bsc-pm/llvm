@@ -116,6 +116,9 @@ public:
   /// Returns data sharing attributes from top of the stack for the
   /// specified declaration.
   const DSAVarData getTopDSA(ValueDecl *D, bool FromParent);
+  /// Returns data sharing attributes from the current directive for the
+  /// specified declaration.
+  const DSAVarData getCurrentDSA(ValueDecl *D);
   /// Returns data-sharing attributes for the specified declaration.
   /// Checks if the specified variables has data-sharing attributes which
   /// match specified \a CPred predicate in any directive which matches \a DPred
@@ -185,13 +188,35 @@ const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
   auto *VD = dyn_cast<VarDecl>(D);
 
   auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return Dir == OSSD_task; };
-  auto &&AnyClause = [](OmpSsClauseKind) { return true; };
+  auto &&AnyClause = [](OmpSsClauseKind Clause) { return Clause != OSSC_shared; };
   if (VD) {
     DSAVarData DVarTemp = hasDSA(D, AnyClause, IsTaskDir, FromParent);
     if (DVarTemp.CKind != OSSC_unknown && DVarTemp.RefExpr)
       return DVarTemp;
   }
 
+  return DVar;
+}
+
+const DSAStackTy::DSAVarData DSAStackTy::getCurrentDSA(ValueDecl *D) {
+  D = getCanonicalDecl(D);
+  DSAVarData DVar;
+
+  auto *VD = dyn_cast<VarDecl>(D);
+
+  auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return Dir == OSSD_task; };
+  auto &&AnyClause = [](OmpSsClauseKind Clause) { return true; };
+  iterator I = Stack.back().first.rbegin();
+  iterator EndI = Stack.back().first.rend();
+  if (VD){
+    if (I != EndI) {
+      if (IsTaskDir(I->Directive)) {
+        DSAVarData DVar = getDSA(I, D);
+          if (AnyClause(DVar.CKind))
+            return DVar;
+      }
+    }
+  }
   return DVar;
 }
 
@@ -220,8 +245,9 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   DSAStackTy *Stack;
   Sema &SemaRef;
   bool ErrorFound = false;
-  CapturedStmt *CS = nullptr;
+  Stmt *CS = nullptr;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
+  llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
 
 public:
   void VisitDeclRefExpr(DeclRefExpr *E) {
@@ -231,35 +257,72 @@ public:
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
 
-      DSAStackTy::DSAVarData DVar = Stack->getTopDSA(VD, /*FromParent=*/false);
-      // Check if the variable has explicit DSA set and stop analysis if it so.
-      if (DVar.RefExpr && !DVar.IsImplicit)
+      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
+      DSAStackTy::DSAVarData DVarFromParent = Stack->getTopDSA(VD, /*FromParent=*/true);
+
+      bool IsParentExplicit = DVarFromParent.RefExpr && !DVarFromParent.IsImplicit;
+      bool IsCurrentExplicit = DVarCurrent.RefExpr && !DVarCurrent.IsImplicit;
+
+      // Check if the variable has explicit DSA only set on the current
+      // directive and stop analysis if it so.
+      if (IsCurrentExplicit)
         return;
+      // If explicit DSA comes from parent inherit it
+      if (IsParentExplicit) {
+          switch (DVarFromParent.CKind) {
+          case OSSC_shared:
+            ImplicitShared.push_back(E);
+            break;
+          case OSSC_private:
+          case OSSC_firstprivate:
+            ImplicitFirstprivate.push_back(E);
+            break;
+          default:
+            llvm_unreachable("unexpected DSA from parent");
+          }
+      } else {
 
-      // Add implicit DSA
-      Stack->addDSA(VD, E, OSSC_shared, true);
+        OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
+        if (VD->hasLocalStorage()) {
+          // If no default clause is present and the variable was private/local
+          // in the context encountering the construct, the variable will
+          // be firstprivate
+          Stack->addDSA(VD, E, OSSC_firstprivate, true);
 
-      OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
+          // Define implicit data-sharing attributes for task.
+          if (isOmpSsTaskingDirective(DKind))
+            ImplicitFirstprivate.push_back(E);
+        } else {
+          // If no default clause is present and the variable was shared/global
+          // in the context encountering the construct, the variable will be shared.
+          Stack->addDSA(VD, E, OSSC_shared, true);
 
-      // Define implicit data-sharing attributes for task.
-      if (isOmpSsTaskingDirective(DKind))
-        ImplicitShared.push_back(E);
+          // Define implicit data-sharing attributes for task.
+          if (isOmpSsTaskingDirective(DKind))
+            ImplicitShared.push_back(E);
+        }
+      }
     }
   }
 
   void VisitStmt(Stmt *S) {
     for (Stmt *C : S->children()) {
-      if (C && !isa<OSSExecutableDirective>(C))
+      if (C)
         Visit(C);
     }
   }
 
   bool isErrorFound() const { return ErrorFound; }
+
   ArrayRef<Expr *> getImplicitShared() const {
     return ImplicitShared;
   }
 
-  DSAAttrChecker(DSAStackTy *S, Sema &SemaRef, CapturedStmt *CS)
+  ArrayRef<Expr *> getImplicitFirstprivate() const {
+    return ImplicitFirstprivate;
+  }
+
+  DSAAttrChecker(DSAStackTy *S, Sema &SemaRef, Stmt *CS)
       : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
 };
 } // namespace
@@ -312,10 +375,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
   if (AStmt) {
-    assert(isa<CapturedStmt>(AStmt) && "Captured statement expected");
-
     // Check default data sharing attributes for referenced variables.
-    DSAAttrChecker DSAChecker(DSAStack, *this, cast<CapturedStmt>(AStmt));
+    DSAAttrChecker DSAChecker(DSAStack, *this, AStmt);
     Stmt *S = AStmt;
     DSAChecker.Visit(S);
     if (DSAChecker.isErrorFound())
@@ -325,6 +386,10 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
         DSAChecker.getImplicitShared().begin(),
         DSAChecker.getImplicitShared().end());
 
+    SmallVector<Expr *, 4> ImplicitFirstprivate(
+        DSAChecker.getImplicitFirstprivate().begin(),
+        DSAChecker.getImplicitFirstprivate().end());
+
     if (!ImplicitShared.empty()) {
       if (OSSClause *Implicit = ActOnOmpSsSharedClause(
               ImplicitShared, SourceLocation(), SourceLocation(),
@@ -332,6 +397,18 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
         ClausesWithImplicit.push_back(Implicit);
         ErrorFound = cast<OSSSharedClause>(Implicit)->varlist_size() !=
                      ImplicitShared.size();
+      } else {
+        ErrorFound = true;
+      }
+    }
+
+    if (!ImplicitFirstprivate.empty()) {
+      if (OSSClause *Implicit = ActOnOmpSsFirstprivateClause(
+              ImplicitFirstprivate, SourceLocation(), SourceLocation(),
+              SourceLocation())) {
+        ClausesWithImplicit.push_back(Implicit);
+        ErrorFound = cast<OSSFirstprivateClause>(Implicit)->varlist_size() !=
+                     ImplicitFirstprivate.size();
       } else {
         ErrorFound = true;
       }
@@ -448,6 +525,12 @@ Sema::ActOnOmpSsVarListClause(
   case OSSC_shared:
     Res = ActOnOmpSsSharedClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
+  case OSSC_private:
+    Res = ActOnOmpSsPrivateClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_firstprivate:
+    Res = ActOnOmpSsFirstprivateClause(Vars, StartLoc, LParenLoc, EndLoc);
+    break;
   case OSSC_depend:
     Res = ActOnOmpSsDependClause(DepKinds, DepLinMapLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc);
@@ -464,27 +547,75 @@ Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
-    for (Expr *RefExpr : Vars) {
-      auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
-      auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-      if (DE && isa<VarDecl>(DE->getDecl())) {
-        DSAStack->addDSA(DE->getDecl(), RefExpr, OSSC_shared, false);
-        // OK
-      }
-      else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
-        // KO
-        llvm_unreachable("Not supported FieldDecl");
-      }
-      else {
-        // KO
-        llvm_unreachable("??");
-      }
-
-      // if ((!DE || !isa<VarDecl>(DE->getDecl())) &&
-      //     (!ME || !isa<FieldDecl>(ME->getMemberDecl()))) {
-      //       llvm_unreachable("No VarDecl || FieldDecl");
-      // }
+  for (Expr *RefExpr : Vars) {
+    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
+    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
+    if (DE && isa<VarDecl>(DE->getDecl())) {
+      DSAStack->addDSA(DE->getDecl(), RefExpr, OSSC_shared, false);
+      // OK
+    }
+    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
+      // KO
+      llvm_unreachable("Not supported FieldDecl");
+    }
+    else {
+      // KO
+      llvm_unreachable("??");
     }
 
-    return OSSSharedClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+  }
+
+  return OSSSharedClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+}
+
+OSSClause *
+Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
+                       SourceLocation StartLoc,
+                       SourceLocation LParenLoc,
+                       SourceLocation EndLoc) {
+  for (Expr *RefExpr : Vars) {
+    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
+    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
+    if (DE && isa<VarDecl>(DE->getDecl())) {
+      DSAStack->addDSA(DE->getDecl(), RefExpr, OSSC_private, false);
+      // OK
+    }
+    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
+      // KO
+      llvm_unreachable("Not supported FieldDecl");
+    }
+    else {
+      // KO
+      llvm_unreachable("??");
+    }
+
+  }
+
+  return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+}
+
+OSSClause *
+Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
+                       SourceLocation StartLoc,
+                       SourceLocation LParenLoc,
+                       SourceLocation EndLoc) {
+  for (Expr *RefExpr : Vars) {
+    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
+    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
+    if (DE && isa<VarDecl>(DE->getDecl())) {
+      DSAStack->addDSA(getCanonicalDecl(DE->getDecl()), RefExpr, OSSC_firstprivate, false);
+      // OK
+    }
+    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
+      // KO
+      llvm_unreachable("Not supported FieldDecl");
+    }
+    else {
+      // KO
+      llvm_unreachable("??");
+    }
+
+  }
+
+  return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
 }

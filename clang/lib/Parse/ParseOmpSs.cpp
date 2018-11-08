@@ -93,13 +93,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
-      Actions.ActOnCapturedRegionStart(Loc, getCurScope(), CR_OmpSs, 1);
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
-      if (AssociatedStmt.isUsable()) {
-        AssociatedStmt = Actions.ActOnCapturedRegionEnd(AssociatedStmt.get());
-      } else {
-        Actions.ActOnCapturedRegionError();
-      }
     }
 
     Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
@@ -151,6 +145,8 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
     }
     break;
   case OSSC_shared:
+  case OSSC_private:
+  case OSSC_firstprivate:
   case OSSC_depend:
     Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
