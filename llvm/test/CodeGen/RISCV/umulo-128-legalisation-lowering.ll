@@ -133,17 +133,13 @@ define { i128, i8 } @muloti_test(i128 %l, i128 %r) nounwind {
 ; RISCV64-NEXT:    add a5, a7, a6
 ; RISCV64-NEXT:    sd a5, 8(a0)
 ; RISCV64-NEXT:    sltu a6, a5, a7
-; RISCV64-NEXT:    xor a5, a4, zero
-; RISCV64-NEXT:    snez a7, a5
-; RISCV64-NEXT:    xor a5, a2, zero
-; RISCV64-NEXT:    snez a5, a5
+; RISCV64-NEXT:    snez a7, a4
+; RISCV64-NEXT:    snez a5, a2
 ; RISCV64-NEXT:    and a5, a5, a7
 ; RISCV64-NEXT:    mulhu a2, a2, a3
-; RISCV64-NEXT:    xor a2, a2, zero
 ; RISCV64-NEXT:    snez a2, a2
 ; RISCV64-NEXT:    or a2, a5, a2
 ; RISCV64-NEXT:    mulhu a1, a4, a1
-; RISCV64-NEXT:    xor a1, a1, zero
 ; RISCV64-NEXT:    snez a1, a1
 ; RISCV64-NEXT:    or a1, a2, a1
 ; RISCV64-NEXT:    or a1, a1, a6
