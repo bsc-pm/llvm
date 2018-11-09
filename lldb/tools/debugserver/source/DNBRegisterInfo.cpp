@@ -13,6 +13,7 @@
 
 #include "DNBRegisterInfo.h"
 #include "DNBLog.h"
+#include <llvm/Support/Compiler.h>
 #include <string.h>
 
 DNBRegisterValueClass::DNBRegisterValueClass(const DNBRegisterInfo *regInfo) {
@@ -156,6 +157,7 @@ void DNBRegisterValueClass::Dump(const char *pre, const char *post) const {
             DNBLogError(
                 "unsupported vector format %d, defaulting to hex bytes.",
                 info.format);
+            LLVM_FALLTHROUGH;
           case VectorOfUInt8:
             snprintf(str, sizeof(str), "%s", "uint8   { ");
             pos = str + strlen(str);
