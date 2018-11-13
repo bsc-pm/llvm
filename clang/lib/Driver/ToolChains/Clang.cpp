@@ -802,29 +802,6 @@ static void addPGOAndCoverageFlags(Compilation &C, const Driver &D,
     CmdArgs.push_back("-fcoverage-mapping");
   }
 
-  if (Args.hasArg(options::OPT_fprofile_exclude_files_EQ)) {
-    auto *Arg = Args.getLastArg(options::OPT_fprofile_exclude_files_EQ);
-    if (!Args.hasArg(options::OPT_coverage))
-      D.Diag(clang::diag::err_drv_argument_only_allowed_with)
-          << "-fprofile-exclude-files="
-          << "--coverage";
-
-    StringRef v = Arg->getValue();
-    CmdArgs.push_back(
-        Args.MakeArgString(Twine("-fprofile-exclude-files=" + v)));
-  }
-
-  if (Args.hasArg(options::OPT_fprofile_filter_files_EQ)) {
-    auto *Arg = Args.getLastArg(options::OPT_fprofile_exclude_files_EQ);
-    if (!Args.hasArg(options::OPT_coverage))
-      D.Diag(clang::diag::err_drv_argument_only_allowed_with)
-          << "-fprofile-filter-files="
-          << "--coverage";
-
-    StringRef v = Arg->getValue();
-    CmdArgs.push_back(Args.MakeArgString(Twine("-fprofile-filter-files=" + v)));
-  }
-
   if (C.getArgs().hasArg(options::OPT_c) ||
       C.getArgs().hasArg(options::OPT_S)) {
     if (Output.isFilename()) {
@@ -5524,8 +5501,13 @@ void Clang::AddClangCLArgs(const ArgList &Args, types::ID InputType,
 
  if (Args.hasFlag(options::OPT__SLASH_Zc_dllexportInlines_,
                   options::OPT__SLASH_Zc_dllexportInlines,
-                  false))
+                  false)) {
+   if (Args.hasArg(options::OPT__SLASH_fallback)) {
+     D.Diag(clang::diag::err_drv_dllexport_inlines_and_fallback);
+   } else {
     CmdArgs.push_back("-fno-dllexport-inlines");
+   }
+ }
 
   Arg *MostGeneralArg = Args.getLastArg(options::OPT__SLASH_vmg);
   Arg *BestCaseArg = Args.getLastArg(options::OPT__SLASH_vmb);
