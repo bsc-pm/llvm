@@ -25,6 +25,8 @@ public:
   virtual void emitDirectiveOptionNoRVC();
   virtual void emitDirectiveOptionPIC();
   virtual void emitDirectiveOptionNoPIC();
+  virtual void emitDirectiveOptionRelax();
+  virtual void emitDirectiveOptionNoRelax();
 };
 
 class RISCVELFStreamer : public MCELFStreamer {

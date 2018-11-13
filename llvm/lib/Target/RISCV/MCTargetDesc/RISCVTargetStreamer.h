@@ -22,6 +22,8 @@ public:
   virtual void emitDirectiveOptionNoRVC() = 0;
   virtual void emitDirectiveOptionPIC() = 0;
   virtual void emitDirectiveOptionNoPIC() = 0;
+  virtual void emitDirectiveOptionRelax() = 0;
+  virtual void emitDirectiveOptionNoRelax() = 0;
 };
 
 // This part is for ascii assembly output
@@ -35,6 +37,8 @@ public:
   void emitDirectiveOptionNoRVC() override;
   void emitDirectiveOptionPIC() override;
   void emitDirectiveOptionNoPIC() override;
+  void emitDirectiveOptionRelax() override;
+  void emitDirectiveOptionNoRelax() override;
 };
 
 }

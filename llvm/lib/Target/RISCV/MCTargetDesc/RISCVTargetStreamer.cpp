@@ -38,3 +38,11 @@ void RISCVTargetAsmStreamer::emitDirectiveOptionPIC() {
 void RISCVTargetAsmStreamer::emitDirectiveOptionNoPIC() {
   OS << "\t.option\tnopic\n";
 }
+
+void RISCVTargetAsmStreamer::emitDirectiveOptionRelax() {
+  OS << "\t.option\trelax\n";
+}
+
+void RISCVTargetAsmStreamer::emitDirectiveOptionNoRelax() {
+  OS << "\t.option\tnorelax\n";
+}
