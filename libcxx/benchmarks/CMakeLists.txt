@@ -193,7 +193,7 @@ if (LIBCXX_INCLUDE_TESTS)
 
   set(BENCHMARK_LIT_ARGS "--show-all --show-xfail --show-unsupported ${LIT_ARGS_DEFAULT}")
 
-  add_lit_testsuite(check-cxx-benchmarks
+  add_lit_target(check-cxx-benchmarks
           "Running libcxx benchmarks tests"
           ${CMAKE_CURRENT_BINARY_DIR}
           DEPENDS cxx-benchmarks ${LIBCXX_TEST_DEPS}
