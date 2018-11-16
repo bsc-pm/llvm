@@ -366,6 +366,28 @@ protected:
     unsigned IsExact : 1;
   };
 
+  class StringLiteralBitfields {
+    friend class ASTStmtReader;
+    friend class StringLiteral;
+
+    unsigned : NumExprBits;
+
+    /// The kind of this string literal.
+    /// One of the enumeration values of StringLiteral::StringKind.
+    unsigned Kind : 3;
+
+    /// The width of a single character in bytes. Only values of 1, 2,
+    /// and 4 bytes are supported. StringLiteral::mapCharByteWidth maps
+    /// the target + string kind to the appropriate CharByteWidth.
+    unsigned CharByteWidth : 3;
+
+    unsigned IsPascal : 1;
+
+    /// The number of concatenated token this string is made of.
+    /// This is the number of trailing SourceLocation.
+    unsigned NumConcatenated;
+  };
+
   class CharacterLiteralBitfields {
     friend class CharacterLiteral;
 
@@ -440,6 +462,20 @@ protected:
     unsigned Kind : 6;
     unsigned PartOfExplicitCast : 1; // Only set for ImplicitCastExpr.
     unsigned BasePathIsEmpty : 1;
+  };
+
+  class BinaryOperatorBitfields {
+    friend class BinaryOperator;
+
+    unsigned : NumExprBits;
+
+    unsigned Opc : 6;
+
+    /// This is only meaningful for operations on floating point
+    /// types and 0 otherwise.
+    unsigned FPFeatures : 3;
+
+    SourceLocation OpLoc;
   };
 
   class InitListExprBitfields {
@@ -552,12 +588,14 @@ protected:
     PredefinedExprBitfields PredefinedExprBits;
     DeclRefExprBitfields DeclRefExprBits;
     FloatingLiteralBitfields FloatingLiteralBits;
+    StringLiteralBitfields StringLiteralBits;
     CharacterLiteralBitfields CharacterLiteralBits;
     UnaryOperatorBitfields UnaryOperatorBits;
     UnaryExprOrTypeTraitExprBitfields UnaryExprOrTypeTraitExprBits;
     CallExprBitfields CallExprBits;
     MemberExprBitfields MemberExprBits;
     CastExprBitfields CastExprBits;
+    BinaryOperatorBitfields BinaryOperatorBits;
     InitListExprBitfields InitListExprBits;
     PseudoObjectExprBitfields PseudoObjectExprBits;
 
