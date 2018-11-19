@@ -866,14 +866,11 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
       setLoadExtAction(ISD::EXTLOAD, VT, MVT::v8i8, Custom);
     }
 
-    if (ExperimentalVectorWideningLegalization) {
-      // Explicitly code the list so we don't use narrow result types.
-      setLoadExtAction(ISD::SEXTLOAD, MVT::v4i32, MVT::v4i8,  Custom);
-      setLoadExtAction(ISD::SEXTLOAD, MVT::v4i32, MVT::v4i16, Custom);
+    if (ExperimentalVectorWideningLegalization &&
+        !Subtarget.hasSSE41() && Subtarget.is64Bit()) {
+      // This lets DAG combine create sextloads that get split and scalarized.
+      // TODO: Does this make sense? What about v2i8->v2i64?
       setLoadExtAction(ISD::SEXTLOAD, MVT::v4i64, MVT::v4i8,  Custom);
-      setLoadExtAction(ISD::SEXTLOAD, MVT::v4i64, MVT::v4i16, Custom);
-      setLoadExtAction(ISD::SEXTLOAD, MVT::v8i16, MVT::v8i8,  Custom);
-      setLoadExtAction(ISD::SEXTLOAD, MVT::v8i32, MVT::v8i8,  Custom);
       setLoadExtAction(ISD::SEXTLOAD, MVT::v8i64, MVT::v8i8,  Custom);
     }
 
@@ -20086,8 +20083,8 @@ static SDValue LowerEXTEND_VECTOR_INREG(SDValue Op,
     return SignExt;
 
   if (VT == MVT::v2i64 && CurrVT == MVT::v4i32) {
-    SDValue Sign = DAG.getNode(X86ISD::VSRAI, dl, CurrVT, Curr,
-                               DAG.getConstant(31, dl, MVT::i8));
+    SDValue Zero = DAG.getConstant(0, dl, CurrVT);
+    SDValue Sign = DAG.getSetCC(dl, CurrVT, Zero, Curr, ISD::SETGT);
     SDValue Ext = DAG.getVectorShuffle(CurrVT, dl, SignExt, Sign, {0, 4, 1, 5});
     return DAG.getBitcast(VT, Ext);
   }
@@ -23594,11 +23591,11 @@ static SDValue LowerMULH(SDValue Op, const X86Subtarget &Subtarget,
     // If we have a signed multiply but no PMULDQ fix up the result of an
     // unsigned multiply.
     if (IsSigned && !Subtarget.hasSSE41()) {
-      SDValue ShAmt = DAG.getConstant(31, dl, VT);
+      SDValue Zero = DAG.getConstant(0, dl, VT);
       SDValue T1 = DAG.getNode(ISD::AND, dl, VT,
-                               DAG.getNode(ISD::SRA, dl, VT, A, ShAmt), B);
+                               DAG.getSetCC(dl, VT, Zero, A, ISD::SETGT), B);
       SDValue T2 = DAG.getNode(ISD::AND, dl, VT,
-                               DAG.getNode(ISD::SRA, dl, VT, B, ShAmt), A);
+                               DAG.getSetCC(dl, VT, Zero, B, ISD::SETGT), A);
 
       SDValue Fixup = DAG.getNode(ISD::ADD, dl, VT, T1, T2);
       Res = DAG.getNode(ISD::SUB, dl, VT, Res, Fixup);
@@ -26361,8 +26358,8 @@ void X86TargetLowering::ReplaceNodeResults(SDNode *N,
       In = DAG.getNode(ISD::SIGN_EXTEND, dl, MVT::v4i32, In);
 
       // Fill a vector with sign bits for each element.
-      SDValue SignBits = DAG.getNode(ISD::SRA, dl, MVT::v4i32, In,
-                                     DAG.getConstant(31, dl, MVT::v4i32));
+      SDValue Zero = DAG.getConstant(0, dl, MVT::v4i32);
+      SDValue SignBits = DAG.getSetCC(dl, MVT::v4i32, Zero, In, ISD::SETGT);
 
       // Create an unpackl and unpackh to interleave the sign bits then bitcast
       // to v2i64.
