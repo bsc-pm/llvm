@@ -40,7 +40,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include <algorithm>
 #include <cassert>
@@ -1120,8 +1119,6 @@ InterleavedLoadCombineImpl::findFirstLoad(const std::set<LoadInst *> &LIs) {
 bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
                                          OptimizationRemarkEmitter &ORE) {
   LLVM_DEBUG(dbgs() << "Checking interleaved load\n");
-  for (auto &VI : InterleavedLoad)
-    LLVM_DEBUG(dbgs() << VI << "\n");
 
   // The insertion point is the LoadInst which loads the first values. The
   // following tests are used to proof that the combined load can be inserted
