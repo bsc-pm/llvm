@@ -40,7 +40,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include <algorithm>
 #include <cassert>
@@ -620,10 +619,12 @@ private:
   }
 };
 
-static raw_ostream &operator<<(raw_ostream &OS, const Polynomial &P) {
-  P.print(OS);
+#ifndef NDEBUG
+static raw_ostream &operator<<(raw_ostream &OS, const Polynomial &S) {
+  S.print(OS);
   return OS;
 }
+#endif
 
 /// VectorInfo stores abstract the following information for each vector
 /// element:
@@ -811,7 +812,7 @@ public:
       Result.PV = LHS.PV;
     }
     // Both operands produced sensible results?
-    else if ((LHS.BB == RHS.BB) && (LHS.PV == LHS.PV)) {
+    else if ((LHS.BB == RHS.BB) && (LHS.PV == RHS.PV)) {
       Result.BB = LHS.BB;
       Result.PV = LHS.PV;
     }
@@ -1046,12 +1047,6 @@ public:
 #endif
 };
 
-#ifndef NDEBUG
-static raw_ostream &operator<<(raw_ostream &OS, const VectorInfo &S) {
-  S.print(OS);
-  return OS;
-}
-#endif
 } // anonymous namespace
 
 bool InterleavedLoadCombineImpl::findPattern(
@@ -1120,8 +1115,6 @@ InterleavedLoadCombineImpl::findFirstLoad(const std::set<LoadInst *> &LIs) {
 bool InterleavedLoadCombineImpl::combine(std::list<VectorInfo> &InterleavedLoad,
                                          OptimizationRemarkEmitter &ORE) {
   LLVM_DEBUG(dbgs() << "Checking interleaved load\n");
-  for (auto &VI : InterleavedLoad)
-    LLVM_DEBUG(dbgs() << VI << "\n");
 
   // The insertion point is the LoadInst which loads the first values. The
   // following tests are used to proof that the combined load can be inserted

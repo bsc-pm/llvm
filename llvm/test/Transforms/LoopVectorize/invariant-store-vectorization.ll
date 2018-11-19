@@ -266,26 +266,19 @@ for.end:                                          ; preds = %for.body
 ; variant/invariant values being stored to invariant address.
 ; test checks that the last element of the phi is extracted and scalar stored
 ; into the uniform address within the loop.
-; Since the condition and the phi is loop invariant, they are LICM'ed before
+; Since the condition and the phi is loop invariant, they are LICM'ed after
 ; vectorization.
 ; CHECK-LABEL: inv_val_store_to_inv_address_conditional_inv
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[B1:%.*]] = bitcast i32* [[B:%.*]] to i8*
-; CHECK-NEXT:    [[A4:%.*]] = bitcast i32* [[A:%.*]] to i8*
 ; CHECK-NEXT:    [[NTRUNC:%.*]] = trunc i64 [[N:%.*]] to i32
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[NTRUNC]], [[K:%.*]]
-; CHECK-NEXT:    br i1 [[CMP]], label %[[COND_STORE_LICM:.*]], label %[[COND_STORE_K_LICM:.*]]
-; CHECK:       [[COND_STORE_LICM]]:
-; CHECK-NEXT:    br label %[[LATCH_LICM:.*]]
-; CHECK:       [[COND_STORE_K_LICM]]:
-; CHECK-NEXT:    br label %[[LATCH_LICM]]
-; CHECK:       [[LATCH_LICM]]:
-; CHECK-NEXT:    [[STOREVAL:%.*]] = phi i32 [ [[NTRUNC]], %[[COND_STORE_LICM]] ], [ [[K]], %[[COND_STORE_K_LICM]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp sgt i64 [[N]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = select i1 [[TMP0]], i64 [[N]], i64 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
+; CHECK-NEXT:    [[A4:%.*]] = bitcast i32* [[A:%.*]] to i8*
+; CHECK-NEXT:    [[B1:%.*]] = bitcast i32* [[B:%.*]] to i8*
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt i64 [[N]], 1
 ; CHECK-NEXT:    [[SMAX2:%.*]] = select i1 [[TMP1]], i64 [[N]], i64 1
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i32, i32* [[B]], i64 [[SMAX2]]
@@ -298,13 +291,17 @@ for.end:                                          ; preds = %for.body
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[SMAX]], 9223372036854775804
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <4 x i32> undef, i32 [[NTRUNC]], i32 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT5]], <4 x i32> undef, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <4 x i1> undef, i1 [[CMP]], i32 3
+; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <4 x i32> undef, i32 [[K]], i32 3
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP2]], <4 x i32> [[BROADCAST_SPLAT6]], <4 x i32> [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PREDPHI]], i32 3
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, i32* [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = bitcast i32* [[TMP6]] to <4 x i32>*
 ; CHECK-NEXT:    store <4 x i32> [[BROADCAST_SPLAT6]], <4 x i32>* [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[STOREVAL]], i32* [[A]], align 4
+; CHECK-NEXT:    store i32 [[TMP5]], i32* [[A]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]]
@@ -324,6 +321,7 @@ for.end:                                          ; preds = %for.body
 ; CHECK:       cond_store_k:
 ; CHECK-NEXT:    br label [[LATCH]]
 ; CHECK:       latch:
+; CHECK-NEXT:    [[STOREVAL:%.*]] = phi i32 [ [[NTRUNC]], [[COND_STORE]] ], [ [[K]], [[COND_STORE_K]] ]
 ; CHECK-NEXT:    store i32 [[STOREVAL]], i32* [[A]], align 4
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i64 [[I_NEXT]], [[N]]
@@ -550,4 +548,46 @@ for.inc8:                                         ; preds = %for.body3, %for.con
 
 for.end10:                                        ; preds = %for.inc8, %entry
   ret i32 undef
+}
+
+; cannot vectorize loop with unsafe dependency between uniform load (%tmp10) and store
+; (%tmp12) to the same address
+; PR39653
+; Note: %tmp10 could be replaced by phi(%arg4, %tmp12), a potentially vectorizable
+; 1st-order-recurrence
+define void @unsafe_dep_uniform_load_store(i32 %arg, i32 %arg1, i64 %arg2, i16* %arg3, i32 %arg4, i64 %arg5) {
+; CHECK-LABEL: unsafe_dep_uniform_load_store
+; CHECK-NOT: <4 x i32>
+bb:
+  %tmp = alloca i32
+  store i32 %arg4, i32* %tmp
+  %tmp6 = getelementptr inbounds i16, i16* %arg3, i64 %arg5
+  br label %bb7
+
+bb7:
+  %tmp8 = phi i64 [ 0, %bb ], [ %tmp24, %bb7 ]
+  %tmp9 = phi i32 [ %arg1, %bb ], [ %tmp23, %bb7 ]
+  %tmp10 = load i32, i32* %tmp
+  %tmp11 = mul nsw i32 %tmp9, %tmp10
+  %tmp12 = srem i32 %tmp11, 65536
+  %tmp13 = add nsw i32 %tmp12, %tmp9
+  %tmp14 = trunc i32 %tmp13 to i16
+  %tmp15 = trunc i64 %tmp8 to i32
+  %tmp16 = add i32 %arg, %tmp15
+  %tmp17 = zext i32 %tmp16 to i64
+  %tmp18 = getelementptr inbounds i16, i16* %tmp6, i64 %tmp17
+  store i16 %tmp14, i16* %tmp18, align 2
+  %tmp19 = add i32 %tmp13, %tmp9
+  %tmp20 = trunc i32 %tmp19 to i16
+  %tmp21 = and i16 %tmp20, 255
+  %tmp22 = getelementptr inbounds i16, i16* %arg3, i64 %tmp17
+  store i16 %tmp21, i16* %tmp22, align 2
+  %tmp23 = add nsw i32 %tmp9, 1
+  %tmp24 = add nuw nsw i64 %tmp8, 1
+  %tmp25 = icmp eq i64 %tmp24, %arg2
+  store i32 %tmp12, i32* %tmp
+  br i1 %tmp25, label %bb26, label %bb7
+
+bb26:
+  ret void
 }
