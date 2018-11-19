@@ -170,14 +170,8 @@ define double @fmsub_d_fma_intrinsic(double %a, double %b, double %c) nounwind {
 ;
 ; RV64IFD-LABEL: fmsub_d_fma_intrinsic:
 ; RV64IFD:       # %bb.0:
-; RV64IFD-NEXT:    lui a3, 524288
-; RV64IFD-NEXT:    sext.w a3, a3
-; RV64IFD-NEXT:    slli a3, a3, 32
-; RV64IFD-NEXT:    lui a4, 0
-; RV64IFD-NEXT:    sext.w a4, a4
-; RV64IFD-NEXT:    slli a4, a4, 32
-; RV64IFD-NEXT:    srli a4, a4, 32
-; RV64IFD-NEXT:    or a3, a3, a4
+; RV64IFD-NEXT:    addi a3, zero, -1
+; RV64IFD-NEXT:    slli a3, a3, 63
 ; RV64IFD-NEXT:    xor a2, a2, a3
 ; RV64IFD-NEXT:    fmv.d.x ft0, a2
 ; RV64IFD-NEXT:    fmv.d.x ft1, a1

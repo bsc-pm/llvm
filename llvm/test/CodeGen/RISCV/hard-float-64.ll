@@ -417,14 +417,8 @@ declare void @nine_doubles(double %a1, double %a2, double %a3, double %a4, doubl
 define void @test_one_double() nounwind {
 ; LP64F-LABEL: test_one_double:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a1, a1, 32
-; LP64F-NEXT:    or a0, a0, a1
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
 ; LP64F-NEXT:    tail one_double
 ;
 ; LP64D-LABEL: test_one_double:
@@ -440,18 +434,10 @@ define void @test_one_double() nounwind {
 define void @test_two_doubles() nounwind {
 ; LP64F-LABEL: test_two_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a1, a1, 32
-; LP64F-NEXT:    or a0, a0, a1
-; LP64F-NEXT:    lui a2, 262144
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    slli a2, a2, 32
-; LP64F-NEXT:    or a1, a2, a1
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
 ; LP64F-NEXT:    tail two_doubles
 ;
 ; LP64D-LABEL: test_two_doubles:
@@ -470,22 +456,12 @@ define void @test_two_doubles() nounwind {
 define void @test_three_doubles() nounwind {
 ; LP64F-LABEL: test_three_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a2, a1, 32
-; LP64F-NEXT:    or a0, a0, a2
-; LP64F-NEXT:    lui a1, 262144
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    or a1, a1, a2
-; LP64F-NEXT:    lui a3, 262400
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    slli a3, a3, 32
-; LP64F-NEXT:    or a2, a3, a2
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
 ; LP64F-NEXT:    tail three_doubles
 ;
 ; LP64D-LABEL: test_three_doubles:
@@ -507,26 +483,14 @@ define void @test_three_doubles() nounwind {
 define void @test_four_doubles() nounwind {
 ; LP64F-LABEL: test_four_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a2, 0
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    slli a2, a2, 32
-; LP64F-NEXT:    srli a3, a2, 32
-; LP64F-NEXT:    or a0, a0, a3
-; LP64F-NEXT:    or a1, a1, a3
-; LP64F-NEXT:    lui a2, 262400
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    slli a2, a2, 32
-; LP64F-NEXT:    or a2, a2, a3
-; LP64F-NEXT:    lui a4, 262656
-; LP64F-NEXT:    sext.w a4, a4
-; LP64F-NEXT:    slli a4, a4, 32
-; LP64F-NEXT:    or a3, a4, a3
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
 ; LP64F-NEXT:    tail four_doubles
 ;
 ; LP64D-LABEL: test_four_doubles:
@@ -551,30 +515,16 @@ define void @test_four_doubles() nounwind {
 define void @test_five_doubles() nounwind {
 ; LP64F-LABEL: test_five_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262400
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a2, a1, 32
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a3, 0
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    slli a3, a3, 32
-; LP64F-NEXT:    srli a4, a3, 32
-; LP64F-NEXT:    or a0, a0, a4
-; LP64F-NEXT:    or a1, a1, a4
-; LP64F-NEXT:    or a2, a2, a4
-; LP64F-NEXT:    lui a3, 262656
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    slli a3, a3, 32
-; LP64F-NEXT:    or a3, a3, a4
-; LP64F-NEXT:    lui a5, 262912
-; LP64F-NEXT:    sext.w a5, a5
-; LP64F-NEXT:    slli a5, a5, 32
-; LP64F-NEXT:    or a4, a5, a4
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
+; LP64F-NEXT:    addi a4, zero, 1027
+; LP64F-NEXT:    slli a4, a4, 52
 ; LP64F-NEXT:    tail five_doubles
 ;
 ; LP64D-LABEL: test_five_doubles:
@@ -602,34 +552,18 @@ define void @test_five_doubles() nounwind {
 define void @test_six_doubles() nounwind {
 ; LP64F-LABEL: test_six_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262400
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    lui a2, 262656
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    slli a3, a2, 32
-; LP64F-NEXT:    slli a2, a1, 32
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a4, 0
-; LP64F-NEXT:    sext.w a4, a4
-; LP64F-NEXT:    slli a4, a4, 32
-; LP64F-NEXT:    srli a6, a4, 32
-; LP64F-NEXT:    or a0, a0, a6
-; LP64F-NEXT:    or a1, a1, a6
-; LP64F-NEXT:    or a2, a2, a6
-; LP64F-NEXT:    or a3, a3, a6
-; LP64F-NEXT:    lui a4, 262912
-; LP64F-NEXT:    sext.w a4, a4
-; LP64F-NEXT:    slli a4, a4, 32
-; LP64F-NEXT:    or a4, a4, a6
-; LP64F-NEXT:    lui a5, 263168
-; LP64F-NEXT:    sext.w a5, a5
-; LP64F-NEXT:    slli a5, a5, 32
-; LP64F-NEXT:    or a5, a5, a6
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
+; LP64F-NEXT:    addi a4, zero, 1027
+; LP64F-NEXT:    slli a4, a4, 52
+; LP64F-NEXT:    addi a5, zero, 257
+; LP64F-NEXT:    slli a5, a5, 54
 ; LP64F-NEXT:    tail six_doubles
 ;
 ; LP64D-LABEL: test_six_doubles:
@@ -660,38 +594,20 @@ define void @test_six_doubles() nounwind {
 define void @test_seven_doubles() nounwind {
 ; LP64F-LABEL: test_seven_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262400
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    lui a2, 262656
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    lui a3, 262912
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    slli a4, a3, 32
-; LP64F-NEXT:    slli a3, a2, 32
-; LP64F-NEXT:    slli a2, a1, 32
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a5, 0
-; LP64F-NEXT:    sext.w a5, a5
-; LP64F-NEXT:    slli a5, a5, 32
-; LP64F-NEXT:    srli a6, a5, 32
-; LP64F-NEXT:    or a0, a0, a6
-; LP64F-NEXT:    or a1, a1, a6
-; LP64F-NEXT:    or a2, a2, a6
-; LP64F-NEXT:    or a3, a3, a6
-; LP64F-NEXT:    or a4, a4, a6
-; LP64F-NEXT:    lui a5, 263168
-; LP64F-NEXT:    sext.w a5, a5
-; LP64F-NEXT:    slli a5, a5, 32
-; LP64F-NEXT:    or a5, a5, a6
-; LP64F-NEXT:    lui a7, 263424
-; LP64F-NEXT:    sext.w a7, a7
-; LP64F-NEXT:    slli a7, a7, 32
-; LP64F-NEXT:    or a6, a7, a6
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
+; LP64F-NEXT:    addi a4, zero, 1027
+; LP64F-NEXT:    slli a4, a4, 52
+; LP64F-NEXT:    addi a5, zero, 257
+; LP64F-NEXT:    slli a5, a5, 54
+; LP64F-NEXT:    addi a6, zero, 1029
+; LP64F-NEXT:    slli a6, a6, 52
 ; LP64F-NEXT:    tail seven_doubles
 ;
 ; LP64D-LABEL: test_seven_doubles:
@@ -725,42 +641,22 @@ define void @test_seven_doubles() nounwind {
 define void @test_eight_doubles() nounwind {
 ; LP64F-LABEL: test_eight_doubles:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262400
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    lui a2, 262656
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    lui a3, 262912
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    lui a4, 263168
-; LP64F-NEXT:    sext.w a4, a4
-; LP64F-NEXT:    slli a6, a4, 32
-; LP64F-NEXT:    slli a4, a3, 32
-; LP64F-NEXT:    slli a3, a2, 32
-; LP64F-NEXT:    slli a2, a1, 32
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a5, 0
-; LP64F-NEXT:    sext.w a5, a5
-; LP64F-NEXT:    slli a5, a5, 32
-; LP64F-NEXT:    srli a7, a5, 32
-; LP64F-NEXT:    or a0, a0, a7
-; LP64F-NEXT:    or a1, a1, a7
-; LP64F-NEXT:    or a2, a2, a7
-; LP64F-NEXT:    or a3, a3, a7
-; LP64F-NEXT:    or a4, a4, a7
-; LP64F-NEXT:    or a5, a6, a7
-; LP64F-NEXT:    lui a6, 263424
-; LP64F-NEXT:    sext.w a6, a6
-; LP64F-NEXT:    slli a6, a6, 32
-; LP64F-NEXT:    or a6, a6, a7
-; LP64F-NEXT:    lui t0, 263680
-; LP64F-NEXT:    sext.w t0, t0
-; LP64F-NEXT:    slli t0, t0, 32
-; LP64F-NEXT:    or a7, t0, a7
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
+; LP64F-NEXT:    addi a4, zero, 1027
+; LP64F-NEXT:    slli a4, a4, 52
+; LP64F-NEXT:    addi a5, zero, 257
+; LP64F-NEXT:    slli a5, a5, 54
+; LP64F-NEXT:    addi a6, zero, 1029
+; LP64F-NEXT:    slli a6, a6, 52
+; LP64F-NEXT:    addi a7, zero, 515
+; LP64F-NEXT:    slli a7, a7, 53
 ; LP64F-NEXT:    tail eight_doubles
 ;
 ; LP64D-LABEL: test_eight_doubles:
@@ -799,47 +695,25 @@ define void @test_nine_doubles() nounwind {
 ; LP64F:       # %bb.0:
 ; LP64F-NEXT:    addi sp, sp, -16
 ; LP64F-NEXT:    sd ra, 8(sp)
-; LP64F-NEXT:    lui a0, 263936
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a7, a1, 32
-; LP64F-NEXT:    or a0, a0, a7
+; LP64F-NEXT:    addi a0, zero, 1031
+; LP64F-NEXT:    slli a0, a0, 52
 ; LP64F-NEXT:    sd a0, 0(sp)
-; LP64F-NEXT:    lui a0, 262400
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262656
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    lui a2, 262912
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    lui a3, 263168
-; LP64F-NEXT:    sext.w a3, a3
-; LP64F-NEXT:    slli a5, a3, 32
-; LP64F-NEXT:    slli a4, a2, 32
-; LP64F-NEXT:    slli a3, a1, 32
-; LP64F-NEXT:    slli a2, a0, 32
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a1, a0, 32
-; LP64F-NEXT:    lui a0, 261888
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    or a0, a0, a7
-; LP64F-NEXT:    or a1, a1, a7
-; LP64F-NEXT:    or a2, a2, a7
-; LP64F-NEXT:    or a3, a3, a7
-; LP64F-NEXT:    or a4, a4, a7
-; LP64F-NEXT:    or a5, a5, a7
-; LP64F-NEXT:    lui a6, 263424
-; LP64F-NEXT:    sext.w a6, a6
-; LP64F-NEXT:    slli a6, a6, 32
-; LP64F-NEXT:    or a6, a6, a7
-; LP64F-NEXT:    lui t0, 263680
-; LP64F-NEXT:    sext.w t0, t0
-; LP64F-NEXT:    slli t0, t0, 32
-; LP64F-NEXT:    or a7, t0, a7
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a0, a0, 52
+; LP64F-NEXT:    addi a1, zero, 1
+; LP64F-NEXT:    slli a1, a1, 62
+; LP64F-NEXT:    addi a2, zero, 1025
+; LP64F-NEXT:    slli a2, a2, 52
+; LP64F-NEXT:    addi a3, zero, 513
+; LP64F-NEXT:    slli a3, a3, 53
+; LP64F-NEXT:    addi a4, zero, 1027
+; LP64F-NEXT:    slli a4, a4, 52
+; LP64F-NEXT:    addi a5, zero, 257
+; LP64F-NEXT:    slli a5, a5, 54
+; LP64F-NEXT:    addi a6, zero, 1029
+; LP64F-NEXT:    slli a6, a6, 52
+; LP64F-NEXT:    addi a7, zero, 515
+; LP64F-NEXT:    slli a7, a7, 53
 ; LP64F-NEXT:    call nine_doubles
 ; LP64F-NEXT:    ld ra, 8(sp)
 ; LP64F-NEXT:    addi sp, sp, 16
@@ -1092,14 +966,8 @@ declare void @double_and_i64(double, i64);
 define void @test_double_and_i64() nounwind
 ; LP64F-LABEL: test_double_and_i64:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a1, a1, 32
-; LP64F-NEXT:    or a0, a0, a1
+; LP64F-NEXT:    addi a0, zero, 1
+; LP64F-NEXT:    slli a0, a0, 62
 ; LP64F-NEXT:    addi a1, zero, 42
 ; LP64F-NEXT:    tail double_and_i64
 ;
@@ -1143,14 +1011,8 @@ declare void @i64_and_double(i64, double);
 define void @test_i64_and_double() nounwind
 ; LP64F-LABEL: test_i64_and_double:
 ; LP64F:       # %bb.0:
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 0
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    srli a1, a1, 32
-; LP64F-NEXT:    or a1, a0, a1
+; LP64F-NEXT:    addi a0, zero, 1
+; LP64F-NEXT:    slli a1, a0, 62
 ; LP64F-NEXT:    addi a0, zero, 42
 ; LP64F-NEXT:    tail i64_and_double
 ;
@@ -1232,26 +1094,14 @@ define void @test_variadic_function_double() nounwind {
 ; LP64F:       # %bb.0:
 ; LP64F-NEXT:    addi sp, sp, -16
 ; LP64F-NEXT:    sd ra, 8(sp)
-; LP64F-NEXT:    lui a0, 262144
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    lui a1, 262400
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a3, a1, 32
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    lui a1, 261888
-; LP64F-NEXT:    sext.w a1, a1
-; LP64F-NEXT:    slli a1, a1, 32
-; LP64F-NEXT:    lui a2, 0
-; LP64F-NEXT:    sext.w a2, a2
-; LP64F-NEXT:    slli a2, a2, 32
-; LP64F-NEXT:    srli a4, a2, 32
-; LP64F-NEXT:    or a1, a1, a4
-; LP64F-NEXT:    or a2, a0, a4
-; LP64F-NEXT:    or a3, a3, a4
-; LP64F-NEXT:    lui a0, 262656
-; LP64F-NEXT:    sext.w a0, a0
-; LP64F-NEXT:    slli a0, a0, 32
-; LP64F-NEXT:    or a4, a0, a4
+; LP64F-NEXT:    addi a0, zero, 1023
+; LP64F-NEXT:    slli a1, a0, 52
+; LP64F-NEXT:    addi a0, zero, 1
+; LP64F-NEXT:    slli a2, a0, 62
+; LP64F-NEXT:    addi a0, zero, 1025
+; LP64F-NEXT:    slli a3, a0, 52
+; LP64F-NEXT:    addi a0, zero, 513
+; LP64F-NEXT:    slli a4, a0, 53
 ; LP64F-NEXT:    addi a0, zero, 4
 ; LP64F-NEXT:    call variadic_function
 ; LP64F-NEXT:    ld ra, 8(sp)
