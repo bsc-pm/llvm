@@ -137,12 +137,15 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
 
   switch (CKind) {
   case OSSC_grainsize:
+      break;
+  case OSSC_default:
     // These clauses cannot appear more than once
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
       ErrorFound = true;
     }
+    Clause = ParseOmpSsSimpleClause(CKind, WrongDirective);
     break;
   case OSSC_shared:
   case OSSC_private:
@@ -274,5 +277,37 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
       Data.DepKinds, Data.DepLinMapLoc);
+}
+
+/// Parsing of simple OmpSs clauses like 'default' or 'proc_bind'.
+///
+///    default-clause:
+///         'default' '(' 'none' | 'shared' ')
+///
+OSSClause *Parser::ParseOmpSsSimpleClause(OmpSsClauseKind Kind,
+                                          bool ParseOnly) {
+  SourceLocation Loc = Tok.getLocation();
+  SourceLocation LOpen = ConsumeToken();
+  // Parse '('.
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
+  if (T.expectAndConsume(diag::err_expected_lparen_after,
+                         getOmpSsClauseName(Kind)))
+    return nullptr;
+
+  unsigned Type = getOmpSsSimpleClauseType(
+      Kind, Tok.isAnnotation() ? "" : PP.getSpelling(Tok));
+  SourceLocation TypeLoc = Tok.getLocation();
+  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::comma) &&
+      Tok.isNot(tok::annot_pragma_ompss_end))
+    ConsumeAnyToken();
+
+  // Parse ')'.
+  SourceLocation RLoc = Tok.getLocation();
+  if (!T.consumeClose())
+    RLoc = T.getCloseLocation();
+
+  if (ParseOnly)
+    return nullptr;
+  return Actions.ActOnOmpSsSimpleClause(Kind, Type, TypeLoc, LOpen, Loc, RLoc);
 }
 

@@ -9327,6 +9327,20 @@ public:
       const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
       SourceLocation DepLinMapLoc);
 
+  OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
+                                    unsigned Argument,
+                                    SourceLocation ArgumentLoc,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
+
+  /// Called on well-formed 'default' clause.
+  OSSClause *ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
+                                      SourceLocation KindLoc,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
+
   /// Called on well-formed 'shared' clause.
   OSSClause *ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                                     SourceLocation StartLoc,

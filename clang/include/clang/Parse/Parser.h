@@ -2777,6 +2777,13 @@ private:
   ///
   OSSClause *ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
                                      OmpSsClauseKind Kind, bool ParseOnly);
+  /// Parses simple clause of a kind \a Kind.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsSimpleClause(OmpSsClauseKind Kind, bool ParseOnly);
 public:
 
   /// Data used for parsing list of variables in OmpSs clauses.

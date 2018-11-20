@@ -66,6 +66,7 @@ private:
   struct SharingMapTy {
     DeclSAMapTy SharingMap;
     DefaultDataSharingAttributes DefaultAttr = DSA_unspecified;
+    SourceLocation DefaultAttrLoc;
     OmpSsDirectiveKind Directive = OSSD_unknown;
     Scope *CurScope = nullptr;
     SourceLocation ConstructLoc;
@@ -127,9 +128,24 @@ public:
   hasDSA(ValueDecl *D, const llvm::function_ref<bool(OmpSsClauseKind)> CPred,
          const llvm::function_ref<bool(OmpSsDirectiveKind)> DPred,
          bool FromParent) const;
+  /// Set default data sharing attribute to none.
+  void setDefaultDSANone(SourceLocation Loc) {
+    assert(!isStackEmpty());
+    Stack.back().first.back().DefaultAttr = DSA_none;
+    Stack.back().first.back().DefaultAttrLoc = Loc;
+  }
+  /// Set default data sharing attribute to shared.
+  void setDefaultDSAShared(SourceLocation Loc) {
+    assert(!isStackEmpty());
+    Stack.back().first.back().DefaultAttr = DSA_shared;
+    Stack.back().first.back().DefaultAttrLoc = Loc;
+  }
   /// Returns currently analyzed directive.
   OmpSsDirectiveKind getCurrentDirective() const {
     return isStackEmpty() ? OSSD_unknown : Stack.back().first.back().Directive;
+  }
+  DefaultDataSharingAttributes getCurrentDefaultDataSharingAttributtes() const {
+    return isStackEmpty() ? DSA_unspecified : Stack.back().first.back().DefaultAttr;
   }
 };
 
@@ -269,6 +285,7 @@ public:
         return;
       // If explicit DSA comes from parent inherit it
       if (IsParentExplicit) {
+          Stack->addDSA(VD, E, DVarFromParent.CKind, true);
           switch (DVarFromParent.CKind) {
           case OSSC_shared:
             ImplicitShared.push_back(E);
@@ -281,25 +298,36 @@ public:
             llvm_unreachable("unexpected DSA from parent");
           }
       } else {
-
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
-        if (VD->hasLocalStorage()) {
-          // If no default clause is present and the variable was private/local
-          // in the context encountering the construct, the variable will
-          // be firstprivate
-          Stack->addDSA(VD, E, OSSC_firstprivate, true);
-
-          // Define implicit data-sharing attributes for task.
-          if (isOmpSsTaskingDirective(DKind))
-            ImplicitFirstprivate.push_back(E);
-        } else {
-          // If no default clause is present and the variable was shared/global
-          // in the context encountering the construct, the variable will be shared.
+        switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
+        case DSA_shared:
           Stack->addDSA(VD, E, OSSC_shared, true);
 
           // Define implicit data-sharing attributes for task.
           if (isOmpSsTaskingDirective(DKind))
             ImplicitShared.push_back(E);
+          break;
+        case DSA_none:
+          break;
+        case DSA_unspecified:
+          if (VD->hasLocalStorage()) {
+            // If no default clause is present and the variable was private/local
+            // in the context encountering the construct, the variable will
+            // be firstprivate
+            Stack->addDSA(VD, E, OSSC_firstprivate, true);
+
+            // Define implicit data-sharing attributes for task.
+            if (isOmpSsTaskingDirective(DKind))
+              ImplicitFirstprivate.push_back(E);
+          } else {
+            // If no default clause is present and the variable was shared/global
+            // in the context encountering the construct, the variable will be shared.
+            Stack->addDSA(VD, E, OSSC_shared, true);
+
+            // Define implicit data-sharing attributes for task.
+            if (isOmpSsTaskingDirective(DKind))
+              ImplicitShared.push_back(E);
+          }
         }
       }
     }
@@ -540,6 +568,49 @@ Sema::ActOnOmpSsVarListClause(
   }
 
   return Res;
+}
+
+OSSClause *
+Sema::ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
+                             unsigned Argument,
+                             SourceLocation ArgumentLoc,
+                             SourceLocation StartLoc,
+                             SourceLocation LParenLoc,
+                             SourceLocation EndLoc) {
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_default:
+    Res =
+    ActOnOmpSsDefaultClause(static_cast<OmpSsDefaultClauseKind>(Argument),
+                                 ArgumentLoc, StartLoc, LParenLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+  return Res;
+}
+
+OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
+                                          SourceLocation KindKwLoc,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+  switch (Kind) {
+  case OSSC_DEFAULT_none:
+    DSAStack->setDefaultDSANone(KindKwLoc);
+    break;
+  case OSSC_DEFAULT_shared:
+    DSAStack->setDefaultDSAShared(KindKwLoc);
+    break;
+  case OSSC_DEFAULT_unknown:
+    Diag(KindKwLoc, diag::err_omp_unexpected_clause_value)
+        << getListOfPossibleValues(OSSC_default, /*First=*/0,
+                                   /*Last=*/OSSC_DEFAULT_unknown)
+        << getOmpSsClauseName(OSSC_default);
+    return nullptr;
+  }
+  return new (Context)
+      OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *
