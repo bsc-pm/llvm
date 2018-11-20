@@ -946,6 +946,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::SIGN_EXTEND_VECTOR_INREG, MVT::v8i16, Custom);
 
     if (ExperimentalVectorWideningLegalization) {
+      setOperationAction(ISD::SIGN_EXTEND, MVT::v8i32, Custom);
       setOperationAction(ISD::SIGN_EXTEND, MVT::v4i64, Custom);
 
       setOperationAction(ISD::TRUNCATE,    MVT::v2i8,  Custom);
@@ -5928,6 +5929,31 @@ static void createPackShuffleMask(MVT VT, SmallVectorImpl<int> &Mask,
       Mask.push_back(Elt + (Lane * NumEltsPerLane));
     for (unsigned Elt = 0; Elt != NumEltsPerLane; Elt += 2)
       Mask.push_back(Elt + (Lane * NumEltsPerLane) + Offset);
+  }
+}
+
+// Split the demanded elts of a PACKSS/PACKUS node between its operands.
+static void getPackDemandedElts(EVT VT, const APInt &DemandedElts,
+                                APInt &DemandedLHS, APInt &DemandedRHS) {
+  int NumLanes = VT.getSizeInBits() / 128;
+  int NumElts = DemandedElts.getBitWidth();
+  int NumInnerElts = NumElts / 2;
+  int NumEltsPerLane = NumElts / NumLanes;
+  int NumInnerEltsPerLane = NumInnerElts / NumLanes;
+
+  DemandedLHS = APInt::getNullValue(NumInnerElts);
+  DemandedRHS = APInt::getNullValue(NumInnerElts);
+
+  // Map DemandedElts to the packed operands.
+  for (int Lane = 0; Lane != NumLanes; ++Lane) {
+    for (int Elt = 0; Elt != NumInnerEltsPerLane; ++Elt) {
+      int OuterIdx = (Lane * NumEltsPerLane) + Elt;
+      int InnerIdx = (Lane * NumInnerEltsPerLane) + Elt;
+      if (DemandedElts[OuterIdx])
+        DemandedLHS.setBit(InnerIdx);
+      if (DemandedElts[OuterIdx + NumInnerEltsPerLane])
+        DemandedRHS.setBit(InnerIdx);
+    }
   }
 }
 
@@ -13123,6 +13149,10 @@ static SDValue lowerV16I8VectorShuffle(const SDLoc &DL, ArrayRef<int> Mask,
     if (SDValue Broadcast = lowerVectorShuffleAsBroadcast(
             DL, MVT::v16i8, V1, V2, Mask, Subtarget, DAG))
       return Broadcast;
+
+    if (SDValue V =
+            lowerVectorShuffleWithUNPCK(DL, MVT::v16i8, Mask, V1, V2, DAG))
+      return V;
 
     // Check whether we can widen this to an i16 shuffle by duplicating bytes.
     // Notably, this handles splat and partial-splat shuffles more efficiently.
@@ -23408,7 +23438,7 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
 
     MVT ExVT = MVT::getVectorVT(MVT::i16, NumElts / 2);
 
-    // Extract the lo parts to any extend to i16
+    // Extract the lo parts to any extend to i16.
     // We're going to mask off the low byte of each result element of the
     // pmullw, so it doesn't matter what's in the high byte of each 16-bit
     // element.
@@ -23418,7 +23448,7 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
     ALo = DAG.getBitcast(ExVT, ALo);
     BLo = DAG.getBitcast(ExVT, BLo);
 
-    // Extract the hi parts to any extend to i16
+    // Extract the hi parts to any extend to i16.
     // We're going to mask off the low byte of each result element of the
     // pmullw, so it doesn't matter what's in the high byte of each 16-bit
     // element.
@@ -23427,20 +23457,12 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
     AHi = DAG.getBitcast(ExVT, AHi);
     BHi = DAG.getBitcast(ExVT, BHi);
 
-    // Multiply, mask the lower 8bits of the lo/hi results and pack
+    // Multiply, mask the lower 8bits of the lo/hi results and pack.
     SDValue RLo = DAG.getNode(ISD::MUL, dl, ExVT, ALo, BLo);
     SDValue RHi = DAG.getNode(ISD::MUL, dl, ExVT, AHi, BHi);
     RLo = DAG.getNode(ISD::AND, dl, ExVT, RLo, DAG.getConstant(255, dl, ExVT));
     RHi = DAG.getNode(ISD::AND, dl, ExVT, RHi, DAG.getConstant(255, dl, ExVT));
-    RLo = DAG.getBitcast(VT, RLo);
-    RHi = DAG.getBitcast(VT, RHi);
-
-    // For each 128-bit lane, we need to take the 8 even elements from RLo then
-    // the 8 even elements from RHi.
-    SmallVector<int, 64> PackMask;
-    createPackShuffleMask(VT, PackMask, /*Unary*/false);
-
-    return DAG.getVectorShuffle(VT, dl, RLo, RHi, PackMask);
+    return DAG.getNode(X86ISD::PACKUS, dl, VT, RLo, RHi);
   }
 
   // Lower v4i32 mul as 2x shuffle, 2x pmuludq, 2x shuffle.
@@ -26363,6 +26385,38 @@ void X86TargetLowering::ReplaceNodeResults(SDNode *N,
       SDValue Hi = DAG.getVectorShuffle(MVT::v4i32, dl, In, SignBits,
                                         {2, 6, 3, 7});
       Hi = DAG.getNode(ISD::BITCAST, dl, MVT::v2i64, Hi);
+
+      SDValue Res = DAG.getNode(ISD::CONCAT_VECTORS, dl, VT, Lo, Hi);
+      Results.push_back(Res);
+      return;
+    }
+
+    if (!Subtarget.hasSSE41() && VT == MVT::v8i32 && InVT == MVT::v8i8) {
+      // Widen the input to 128 bits.
+      In = DAG.getNode(ISD::CONCAT_VECTORS, dl, MVT::v16i8, In,
+                       DAG.getUNDEF(InVT));
+      // Emit a shuffle that will become punpcklbw putting the input elements
+      // in the high half of the expansion.
+      In = DAG.getVectorShuffle(MVT::v16i8, dl, In, In,
+                                {-1, 0, -1, 1, -1, 2, -1, 3,
+                                 -1, 4, -1, 5, -1, 6, -1, 7});
+      In = DAG.getNode(ISD::BITCAST, dl, MVT::v8i16, In);
+
+      // Emit a shuffle that will become punpcklwd. Shift right to fill with
+      // sign bits.
+      SDValue Lo = DAG.getVectorShuffle(MVT::v8i16, dl, In, In,
+                                        {-1, 0, -1, 1, -1, 2, -1, 3});
+      Lo = DAG.getNode(ISD::BITCAST, dl, MVT::v4i32, Lo);
+      Lo = DAG.getNode(ISD::SRA, dl, MVT::v4i32, Lo,
+                       DAG.getConstant(24, dl, MVT::v4i32));
+
+      // Emit a shuffle that will become punpckhwd. Shift right to fill with
+      // sign bits.
+      SDValue Hi = DAG.getVectorShuffle(MVT::v8i16, dl, In, In,
+                                        {-1, 4, -1, 5, -1, 6, -1, 7});
+      Hi = DAG.getNode(ISD::BITCAST, dl, MVT::v4i32, Hi);
+      Hi = DAG.getNode(ISD::SRA, dl, MVT::v4i32, Hi,
+                       DAG.getConstant(24, dl, MVT::v4i32));
 
       SDValue Res = DAG.getNode(ISD::CONCAT_VECTORS, dl, VT, Lo, Hi);
       Results.push_back(Res);
@@ -29909,12 +29963,24 @@ void X86TargetLowering::computeKnownBitsForTargetNode(const SDValue Op,
   }
   case X86ISD::PACKUS: {
     // PACKUS is just a truncation if the upper half is zero.
-    // TODO: Add DemandedElts support.
+    APInt DemandedLHS, DemandedRHS;
+    getPackDemandedElts(VT, DemandedElts, DemandedLHS, DemandedRHS);
+
+    Known.One = APInt::getAllOnesValue(BitWidth * 2);
+    Known.Zero = APInt::getAllOnesValue(BitWidth * 2);
+
     KnownBits Known2;
-    DAG.computeKnownBits(Op.getOperand(0), Known, Depth + 1);
-    DAG.computeKnownBits(Op.getOperand(1), Known2, Depth + 1);
-    Known.One &= Known2.One;
-    Known.Zero &= Known2.Zero;
+    if (!!DemandedLHS) {
+      DAG.computeKnownBits(Op.getOperand(0), Known2, DemandedLHS, Depth + 1);
+      Known.One &= Known2.One;
+      Known.Zero &= Known2.Zero;
+    }
+    if (!!DemandedRHS) {
+      DAG.computeKnownBits(Op.getOperand(1), Known2, DemandedRHS, Depth + 1);
+      Known.One &= Known2.One;
+      Known.Zero &= Known2.Zero;
+    }
+
     if (Known.countMinLeadingZeros() < BitWidth)
       Known.resetAll();
     Known = Known.trunc(BitWidth);
@@ -30010,10 +30076,16 @@ unsigned X86TargetLowering::ComputeNumSignBitsForTargetNode(
 
   case X86ISD::PACKSS: {
     // PACKSS is just a truncation if the sign bits extend to the packed size.
-    // TODO: Add DemandedElts support.
+    APInt DemandedLHS, DemandedRHS;
+    getPackDemandedElts(Op.getValueType(), DemandedElts, DemandedLHS,
+                        DemandedRHS);
+
     unsigned SrcBits = Op.getOperand(0).getScalarValueSizeInBits();
-    unsigned Tmp0 = DAG.ComputeNumSignBits(Op.getOperand(0), Depth + 1);
-    unsigned Tmp1 = DAG.ComputeNumSignBits(Op.getOperand(1), Depth + 1);
+    unsigned Tmp0 = SrcBits, Tmp1 = SrcBits;
+    if (!!DemandedLHS)
+      Tmp0 = DAG.ComputeNumSignBits(Op.getOperand(0), DemandedLHS, Depth + 1);
+    if (!!DemandedRHS)
+      Tmp1 = DAG.ComputeNumSignBits(Op.getOperand(1), DemandedRHS, Depth + 1);
     unsigned Tmp = std::min(Tmp0, Tmp1);
     if (Tmp > (SrcBits - VTBits))
       return Tmp - (SrcBits - VTBits);
@@ -32195,6 +32267,20 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
       return true;
     break;
   }
+  case X86ISD::PACKSS:
+  case X86ISD::PACKUS: {
+    APInt DemandedLHS, DemandedRHS;
+    getPackDemandedElts(VT, DemandedElts, DemandedLHS, DemandedRHS);
+
+    APInt SrcUndef, SrcZero;
+    if (SimplifyDemandedVectorElts(Op.getOperand(0), DemandedLHS, SrcUndef,
+                                   SrcZero, TLO, Depth + 1))
+      return true;
+    if (SimplifyDemandedVectorElts(Op.getOperand(1), DemandedRHS, SrcUndef,
+                                   SrcZero, TLO, Depth + 1))
+      return true;
+    break;
+  }
   case X86ISD::VBROADCAST: {
     SDValue Src = Op.getOperand(0);
     MVT SrcVT = Src.getSimpleValueType();
@@ -32400,9 +32486,13 @@ static SDValue XFormVExtractWithShuffleIntoLoad(SDNode *N, SelectionDAG &DAG,
   if (Idx == SM_SentinelUndef)
     return DAG.getUNDEF(EltVT);
 
+  // Bail if any mask element is SM_SentinelZero - getVectorShuffle below
+  // won't handle it.
+  if (llvm::any_of(ShuffleMask, [](int M) { return M == SM_SentinelZero; }))
+    return SDValue();
+
   assert(0 <= Idx && Idx < (int)(2 * NumElems) && "Shuffle index out of range");
-  SDValue LdNode = (Idx < (int)NumElems) ? ShuffleOps[0]
-                                         : ShuffleOps[1];
+  SDValue LdNode = (Idx < (int)NumElems) ? ShuffleOps[0] : ShuffleOps[1];
 
   // If inputs to shuffle are the same for both ops, then allow 2 uses
   unsigned AllowedUses =
