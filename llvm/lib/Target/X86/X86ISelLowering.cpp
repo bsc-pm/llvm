@@ -23413,7 +23413,7 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
 
     MVT ExVT = MVT::getVectorVT(MVT::i16, NumElts / 2);
 
-    // Extract the lo parts to any extend to i16
+    // Extract the lo parts to any extend to i16.
     // We're going to mask off the low byte of each result element of the
     // pmullw, so it doesn't matter what's in the high byte of each 16-bit
     // element.
@@ -23423,7 +23423,7 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
     ALo = DAG.getBitcast(ExVT, ALo);
     BLo = DAG.getBitcast(ExVT, BLo);
 
-    // Extract the hi parts to any extend to i16
+    // Extract the hi parts to any extend to i16.
     // We're going to mask off the low byte of each result element of the
     // pmullw, so it doesn't matter what's in the high byte of each 16-bit
     // element.
@@ -23432,20 +23432,12 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget,
     AHi = DAG.getBitcast(ExVT, AHi);
     BHi = DAG.getBitcast(ExVT, BHi);
 
-    // Multiply, mask the lower 8bits of the lo/hi results and pack
+    // Multiply, mask the lower 8bits of the lo/hi results and pack.
     SDValue RLo = DAG.getNode(ISD::MUL, dl, ExVT, ALo, BLo);
     SDValue RHi = DAG.getNode(ISD::MUL, dl, ExVT, AHi, BHi);
     RLo = DAG.getNode(ISD::AND, dl, ExVT, RLo, DAG.getConstant(255, dl, ExVT));
     RHi = DAG.getNode(ISD::AND, dl, ExVT, RHi, DAG.getConstant(255, dl, ExVT));
-    RLo = DAG.getBitcast(VT, RLo);
-    RHi = DAG.getBitcast(VT, RHi);
-
-    // For each 128-bit lane, we need to take the 8 even elements from RLo then
-    // the 8 even elements from RHi.
-    SmallVector<int, 64> PackMask;
-    createPackShuffleMask(VT, PackMask, /*Unary*/false);
-
-    return DAG.getVectorShuffle(VT, dl, RLo, RHi, PackMask);
+    return DAG.getNode(X86ISD::PACKUS, dl, VT, RLo, RHi);
   }
 
   // Lower v4i32 mul as 2x shuffle, 2x pmuludq, 2x shuffle.
@@ -32229,6 +32221,36 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
     APInt SrcElts = DemandedElts.zextOrTrunc(SrcVT.getVectorNumElements());
     if (SimplifyDemandedVectorElts(Src, SrcElts, SrcUndef, SrcZero, TLO,
                                    Depth + 1))
+      return true;
+    break;
+  }
+  case X86ISD::PACKSS:
+  case X86ISD::PACKUS: {
+    int NumLanes = VT.getSizeInBits() / 128;
+    int NumInnerElts = NumElts / 2;
+    int NumEltsPerLane = NumElts / NumLanes;
+    int NumInnerEltsPerLane = NumInnerElts / NumLanes;
+
+    // Map DemandedElts to the packed operands.
+    APInt DemandedLHS = APInt::getNullValue(NumInnerElts);
+    APInt DemandedRHS = APInt::getNullValue(NumInnerElts);
+    for (int Lane = 0; Lane != NumLanes; ++Lane) {
+      for (int Elt = 0; Elt != NumInnerEltsPerLane; ++Elt) {
+        int OuterIdx = (Lane * NumEltsPerLane) + Elt;
+        int InnerIdx = (Lane * NumInnerEltsPerLane) + Elt;
+        if (DemandedElts[OuterIdx])
+          DemandedLHS.setBit(InnerIdx);
+        if (DemandedElts[OuterIdx + NumInnerEltsPerLane])
+          DemandedRHS.setBit(InnerIdx);
+      }
+    }
+
+    APInt SrcUndef, SrcZero;
+    if (SimplifyDemandedVectorElts(Op.getOperand(0), DemandedLHS, SrcUndef,
+                                   SrcZero, TLO, Depth + 1))
+      return true;
+    if (SimplifyDemandedVectorElts(Op.getOperand(1), DemandedRHS, SrcUndef,
+                                   SrcZero, TLO, Depth + 1))
       return true;
     break;
   }
