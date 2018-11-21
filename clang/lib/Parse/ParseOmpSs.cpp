@@ -181,7 +181,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
     DepKind =
         static_cast<OmpSsDependClauseKind>(getOmpSsSimpleClauseType(
             Kind, Tok.is(tok::identifier) ? PP.getSpelling(Tok) : ""));
-    Data.DepLinMapLoc = Tok.getLocation();
+    Data.DepLoc = Tok.getLocation();
 
     Data.DepKinds.push_back(DepKind);
 
@@ -276,7 +276,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
     return nullptr;
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
-      Data.DepKinds, Data.DepLinMapLoc);
+      Data.DepKinds, Data.DepLoc);
 }
 
 /// Parsing of simple OmpSs clauses like 'default' or 'proc_bind'.

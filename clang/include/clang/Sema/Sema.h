@@ -9325,7 +9325,7 @@ public:
       SourceLocation StartLoc, SourceLocation LParenLoc,
       SourceLocation ColonLoc, SourceLocation EndLoc,
       const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
-      SourceLocation DepLinMapLoc);
+      SourceLocation DepLoc);
 
   OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
                                     unsigned Argument,

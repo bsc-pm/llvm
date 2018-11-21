@@ -546,7 +546,7 @@ Sema::ActOnOmpSsVarListClause(
   OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
   SourceLocation StartLoc, SourceLocation LParenLoc,
   SourceLocation ColonLoc, SourceLocation EndLoc,
-  const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLinMapLoc) {
+  const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLoc) {
 
   OSSClause *Res = nullptr;
   switch (Kind) {
@@ -560,7 +560,7 @@ Sema::ActOnOmpSsVarListClause(
     Res = ActOnOmpSsFirstprivateClause(Vars, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_depend:
-    Res = ActOnOmpSsDependClause(DepKinds, DepLinMapLoc, ColonLoc, Vars,
+    Res = ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc);
     break;
   default:

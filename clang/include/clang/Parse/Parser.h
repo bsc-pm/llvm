@@ -2790,7 +2790,7 @@ public:
   struct OmpSsVarListDataTy {
     SourceLocation ColonLoc;
     SourceLocation RLoc;
-    SourceLocation DepLinMapLoc; // depend linear map clause loc
+    SourceLocation DepLoc;
     SmallVector<OmpSsDependClauseKind, 2> DepKinds;
   };
 
