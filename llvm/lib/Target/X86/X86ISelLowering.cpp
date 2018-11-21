@@ -21238,7 +21238,9 @@ static SDValue getScalarMaskingNode(SDValue Op, SDValue Mask,
   SDLoc dl(Op);
 
   assert(Mask.getValueType() == MVT::i8 && "Unexpect type");
-  SDValue IMask = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl, MVT::v1i1, Mask);
+  SDValue IMask = DAG.getNode(ISD::EXTRACT_SUBVECTOR, dl, MVT::v1i1,
+                              DAG.getBitcast(MVT::v8i1, Mask),
+                              DAG.getIntPtrConstant(0, dl));
   if (Op.getOpcode() == X86ISD::FSETCCM ||
       Op.getOpcode() == X86ISD::FSETCCM_RND ||
       Op.getOpcode() == X86ISD::VFPCLASSS)
@@ -32255,6 +32257,13 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
     MVT SrcVT = Src.getSimpleValueType();
     if (!SrcVT.isVector())
       return false;
+    // Don't bother broadcasting if we just need the 0'th element.
+    if (DemandedElts == 1) {
+      if(Src.getValueType() != VT)
+        Src = widenSubVector(VT.getSimpleVT(), Src, false, Subtarget, TLO.DAG,
+                             SDLoc(Op));
+      return TLO.CombineTo(Op, Src);
+    }
     APInt SrcUndef, SrcZero;
     APInt SrcElts = APInt::getOneBitSet(SrcVT.getVectorNumElements(), 0);
     if (SimplifyDemandedVectorElts(Src, SrcElts, SrcUndef, SrcZero, TLO,
