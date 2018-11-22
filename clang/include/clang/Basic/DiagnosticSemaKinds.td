@@ -9492,8 +9492,12 @@ def err_oss_unexpected_clause_value : Error<
   "expected %0 in OmpSs-2 clause '%1'">;
 def err_oss_depend_weak_required : Error<
  "expected 'weak' clause">;
+def err_oss_wrong_dsa : Error<
+  "%0 variable cannot be %1">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element or array section">;
+def err_oss_expected_var_name: Error<
+  "expected variable name">;
 
 } // end of sema component.

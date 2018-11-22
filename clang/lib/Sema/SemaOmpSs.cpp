@@ -285,7 +285,11 @@ public:
         return;
       // If explicit DSA comes from parent inherit it
       if (IsParentExplicit) {
-          Stack->addDSA(VD, E, DVarFromParent.CKind, true);
+          Stack->addDSA(VD,
+                        E,
+                        DVarFromParent.CKind == OSSC_private ?
+                          OSSC_firstprivate : DVarFromParent.CKind,
+                        true);
           switch (DVarFromParent.CKind) {
           case OSSC_shared:
             ImplicitShared.push_back(E);
@@ -613,30 +617,56 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
 }
 
+static ValueDecl *
+getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
+               SourceRange &ERange) {
+  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
+      RefExpr->containsUnexpandedParameterPack())
+    return nullptr;
+
+  RefExpr = RefExpr->IgnoreParens();
+  ELoc = RefExpr->getExprLoc();
+  ERange = RefExpr->getSourceRange();
+  RefExpr = RefExpr->IgnoreParenImpCasts();
+  auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
+  auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
+  if (!DE || !isa<VarDecl>(DE->getDecl())) {
+
+      S.Diag(ELoc, diag::err_oss_expected_var_name) << ERange;
+      return nullptr;
+  }
+  return getCanonicalDecl(DE->getDecl());
+}
+
 OSSClause *
 Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
   for (Expr *RefExpr : Vars) {
-    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
-    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-    if (DE && isa<VarDecl>(DE->getDecl())) {
-      DSAStack->addDSA(DE->getDecl(), RefExpr, OSSC_shared, false);
-      // OK
-    }
-    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
-      // KO
-      llvm_unreachable("Not supported FieldDecl");
-    }
-    else {
-      // KO
-      llvm_unreachable("??");
-    }
 
+    SourceLocation ELoc;
+    SourceRange ERange;
+    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (!D) {
+      continue;
+    }
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_shared &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
+                                          << getOmpSsClauseName(OSSC_shared);
+      continue;
+    }
+    DSAStack->addDSA(D, RefExpr, OSSC_shared, false);
+    ClauseVars.push_back(RefExpr);
   }
 
-  return OSSSharedClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSSharedClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 OSSClause *
@@ -644,25 +674,30 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
   for (Expr *RefExpr : Vars) {
-    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
-    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-    if (DE && isa<VarDecl>(DE->getDecl())) {
-      DSAStack->addDSA(DE->getDecl(), RefExpr, OSSC_private, false);
-      // OK
-    }
-    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
-      // KO
-      llvm_unreachable("Not supported FieldDecl");
-    }
-    else {
-      // KO
-      llvm_unreachable("??");
-    }
 
+    SourceLocation ELoc;
+    SourceRange ERange;
+    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (!D) {
+      continue;
+    }
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_private &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
+                                          << getOmpSsClauseName(OSSC_private);
+      continue;
+    }
+    DSAStack->addDSA(D, RefExpr, OSSC_private, false);
+    ClauseVars.push_back(RefExpr);
   }
 
-  return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
 
 OSSClause *
@@ -670,23 +705,28 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
+  SmallVector<Expr *, 8> ClauseVars;
   for (Expr *RefExpr : Vars) {
-    auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
-    auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-    if (DE && isa<VarDecl>(DE->getDecl())) {
-      DSAStack->addDSA(getCanonicalDecl(DE->getDecl()), RefExpr, OSSC_firstprivate, false);
-      // OK
-    }
-    else if (ME && isa<FieldDecl>(ME->getMemberDecl())) {
-      // KO
-      llvm_unreachable("Not supported FieldDecl");
-    }
-    else {
-      // KO
-      llvm_unreachable("??");
-    }
 
+    SourceLocation ELoc;
+    SourceRange ERange;
+    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (!D) {
+      continue;
+    }
+    DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+    if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_firstprivate &&
+        DVar.RefExpr) {
+      Diag(ELoc, diag::err_oss_wrong_dsa) << getOmpSsClauseName(DVar.CKind)
+                                          << getOmpSsClauseName(OSSC_firstprivate);
+      continue;
+    }
+    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, false);
+    ClauseVars.push_back(RefExpr);
   }
 
-  return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, Vars);
+  if (Vars.empty())
+    return nullptr;
+
+  return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
