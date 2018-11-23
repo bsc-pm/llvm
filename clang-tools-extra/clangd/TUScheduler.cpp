@@ -176,8 +176,7 @@ public:
                                 ParsingCallbacks &Callbacks);
   ~ASTWorker();
 
-  void update(ParseInputs Inputs, WantDiagnostics,
-              llvm::unique_function<void(std::vector<Diag>)> OnUpdated);
+  void update(ParseInputs Inputs, WantDiagnostics);
   void runWithAST(StringRef Name,
                   unique_function<void(Expected<InputsAndAST>)> Action);
   bool blockUntilIdle(Deadline Timeout) const;
@@ -231,7 +230,7 @@ private:
   const Path FileName;
   /// Whether to keep the built preambles in memory or on disk.
   const bool StorePreambleInMemory;
-  /// Callback, invoked when preamble or main file AST is built.
+  /// Callback invoked when preamble or main file AST is built.
   ParsingCallbacks &Callbacks;
   /// Helper class required to build the ASTs.
   const std::shared_ptr<PCHContainerOperations> PCHs;
@@ -252,6 +251,13 @@ private:
   bool Done;                    /* GUARDED_BY(Mutex) */
   std::deque<Request> Requests; /* GUARDED_BY(Mutex) */
   mutable std::condition_variable RequestsCV;
+  /// Guards a critical section for running the diagnostics callbacks. 
+  std::mutex DiagsMu;
+  // Used to prevent remove document + leading to out-of-order diagnostics:
+  // The lifetime of the old/new ASTWorkers will overlap, but their handles
+  // don't. When the old handle is destroyed, the old worker will stop reporting
+  // diagnostics.
+  bool ReportDiagnostics = true; /* GUARDED_BY(DiagMu) */
 };
 
 /// A smart-pointer-like class that points to an active ASTWorker.
@@ -333,9 +339,8 @@ ASTWorker::~ASTWorker() {
 #endif
 }
 
-void ASTWorker::update(ParseInputs Inputs, WantDiagnostics WantDiags,
-                       unique_function<void(std::vector<Diag>)> OnUpdated) {
-  auto Task = [=](decltype(OnUpdated) OnUpdated) mutable {
+void ASTWorker::update(ParseInputs Inputs, WantDiagnostics WantDiags) {
+  auto Task = [=]() mutable {
     // Will be used to check if we can avoid rebuilding the AST.
     bool InputsAreTheSame =
         std::tie(FileInputs.CompileCommand, FileInputs.Contents) ==
@@ -406,6 +411,14 @@ void ASTWorker::update(ParseInputs Inputs, WantDiagnostics WantDiags,
     if (WantDiags == WantDiagnostics::No)
       return;
 
+    {
+      std::lock_guard<std::mutex> Lock(DiagsMu);
+      // No need to rebuild the AST if we won't send the diagnotics. However,
+      // note that we don't prevent preamble rebuilds.
+      if (!ReportDiagnostics)
+        return;
+    }
+
     // Get the AST for diagnostics.
     Optional<std::unique_ptr<ParsedAST>> AST = IdleASTs.take(this);
     if (!AST) {
@@ -418,7 +431,11 @@ void ASTWorker::update(ParseInputs Inputs, WantDiagnostics WantDiags,
     // spam us with updates.
     // Note *AST can still be null if buildAST fails.
     if (*AST) {
-      OnUpdated((*AST)->getDiagnostics());
+      {
+        std::lock_guard<std::mutex> Lock(DiagsMu);
+        if (ReportDiagnostics)
+          Callbacks.onDiagnostics(FileName, (*AST)->getDiagnostics());
+      }
       trace::Span Span("Running main AST callback");
       Callbacks.onMainAST(FileName, **AST);
       DiagsWereReported = true;
@@ -427,7 +444,7 @@ void ASTWorker::update(ParseInputs Inputs, WantDiagnostics WantDiags,
     IdleASTs.put(this, std::move(*AST));
   };
 
-  startTask("Update", Bind(Task, std::move(OnUpdated)), WantDiags);
+  startTask("Update", std::move(Task), WantDiags);
 }
 
 void ASTWorker::runWithAST(
@@ -512,6 +529,10 @@ std::size_t ASTWorker::getUsedBytes() const {
 bool ASTWorker::isASTCached() const { return IdleASTs.getUsedBytes(this) != 0; }
 
 void ASTWorker::stop() {
+  {
+    std::lock_guard<std::mutex> Lock(DiagsMu);
+    ReportDiagnostics = false;
+  }
   {
     std::lock_guard<std::mutex> Lock(Mutex);
     assert(!Done && "stop() called twice");
@@ -719,8 +740,7 @@ bool TUScheduler::blockUntilIdle(Deadline D) const {
 }
 
 void TUScheduler::update(PathRef File, ParseInputs Inputs,
-                         WantDiagnostics WantDiags,
-                         unique_function<void(std::vector<Diag>)> OnUpdated) {
+                         WantDiagnostics WantDiags) {
   std::unique_ptr<FileData> &FD = Files[File];
   if (!FD) {
     // Create a new worker to process the AST-related tasks.
@@ -733,7 +753,7 @@ void TUScheduler::update(PathRef File, ParseInputs Inputs,
     FD->Contents = Inputs.Contents;
     FD->Command = Inputs.CompileCommand;
   }
-  FD->Worker->update(std::move(Inputs), WantDiags, std::move(OnUpdated));
+  FD->Worker->update(std::move(Inputs), WantDiags);
 }
 
 void TUScheduler::remove(PathRef File) {
