@@ -358,13 +358,15 @@ SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
   int64_t Offset = N->getOffset();
   MVT XLenVT = Subtarget.getXLenVT();
 
-  // TODO: implement -fPIE without -fPIC
-  if (isPositionIndependent()) {
+  if (isPositionIndependent() ||
+      getTargetMachine().getCodeModel() == CodeModel::Medium) {
     SDValue Addr = DAG.getNode(
         RISCVISD::WRAPPER_PIC, DL, Ty,
         DAG.getTargetGlobalAddress(
             GV, DL, Ty, 0,
-            Subtarget.ClassifyPICGlobalReference(GV, getTargetMachine())));
+            isPositionIndependent()
+                ? Subtarget.ClassifyPICGlobalReference(GV, getTargetMachine())
+                : RISCVII::MO_PCREL));
 
     if (Offset != 0)
       return DAG.getNode(ISD::ADD, DL, Ty, Addr,
@@ -471,7 +473,8 @@ SDValue RISCVTargetLowering::lowerBlockAddress(SDValue Op,
   const BlockAddress *BA = N->getBlockAddress();
   int64_t Offset = N->getOffset();
 
-  if (isPositionIndependent()) {
+  if (isPositionIndependent() ||
+      getTargetMachine().getCodeModel() == CodeModel::Medium) {
     return DAG.getNode(
         RISCVISD::WRAPPER_PIC, DL, Ty,
         DAG.getTargetBlockAddress(BA, Ty, Offset, RISCVII::MO_PCREL));
@@ -494,7 +497,8 @@ SDValue RISCVTargetLowering::lowerConstantPool(SDValue Op,
   int64_t Offset = N->getOffset();
   unsigned Alignment = N->getAlignment();
 
-  if (isPositionIndependent()) {
+  if (isPositionIndependent() ||
+      getTargetMachine().getCodeModel() == CodeModel::Medium) {
     return DAG.getNode(RISCVISD::WRAPPER_PIC, DL, Ty,
                        DAG.getTargetConstantPool(CPA, Ty, Alignment, Offset,
                                                  RISCVII::MO_PCREL));
