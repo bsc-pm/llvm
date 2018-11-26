@@ -357,6 +357,79 @@ public:
   DSAAttrChecker(DSAStackTy *S, Sema &SemaRef, Stmt *CS)
       : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
 };
+
+class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> {
+  DSAStackTy *Stack;
+  Sema &SemaRef;
+  bool ErrorFound = false;
+public:
+  void VisitDeclRefExpr(DeclRefExpr *E) {
+    if (E->isTypeDependent() || E->isValueDependent() ||
+        E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
+      return;
+
+    if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
+      VD = VD->getCanonicalDecl();
+      // inout(x)              | shared(x)        | int x;
+      // inout(p[i])           | firstprivate(p)  | int *p;
+      // inout(a[i])           | shared(a)        | int a[N];
+      // inout(*p)/inout(p[0]) | firstprivate(p)  | int *p;
+      // inout(s.x)            | shared(s)        | struct S s;
+      // inout(ps->x)          | firstprivate(ps) | struct S *ps;
+      OmpSsClauseKind VKind = OSSC_shared;
+      if (VD->getType()->isPointerType())
+        VKind = OSSC_firstprivate;
+
+      SourceLocation ELoc = E->getExprLoc();
+      SourceRange ERange = E->getSourceRange();
+
+      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
+      switch (DVarCurrent.CKind) {
+      case OSSC_shared:
+        if (VKind == OSSC_private || VKind == OSSC_firstprivate) {
+          ErrorFound = true;
+          SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
+            << getOmpSsClauseName(DVarCurrent.CKind)
+            << getOmpSsClauseName(VKind) << ERange;
+        }
+        break;
+      case OSSC_private:
+      case OSSC_firstprivate:
+        if (VKind == OSSC_shared) {
+          ErrorFound = true;
+          SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
+            << getOmpSsClauseName(DVarCurrent.CKind)
+            << getOmpSsClauseName(VKind) << ERange;
+        }
+        break;
+      default:
+        // OK: no DSA explicit, record DSA as explicit, but do not
+        // make a node for it
+        Stack->addDSA(VD, E, VKind, false);
+        break;
+      }
+    }
+  }
+
+  void VisitOSSDepend(OSSDependClause *Clause) {
+    for (Stmt *Child : Clause->children()) {
+      if (Child)
+        Visit(Child);
+    }
+  }
+
+  void VisitStmt(Stmt *S) {
+    for (Stmt *C : S->children()) {
+      if (C)
+        Visit(C);
+    }
+  }
+
+  bool isErrorFound() const { return ErrorFound; }
+
+  OSSClauseDSAChecker(DSAStackTy *S, Sema &SemaRef)
+      : Stack(S), SemaRef(SemaRef), ErrorFound(false) {}
+};
 } // namespace
 
 void Sema::InitDataSharingAttributesStackOmpSs() {
@@ -400,10 +473,19 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
   return Out.str();
 }
 
+void Sema::ActOnOmpSsAfterClauseGathering(ArrayRef<OSSClause *> Clauses) {
+  OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
+  for (auto *Clause : Clauses) {
+    if (Clause->getClauseKind() == OSSC_depend)
+      OSSDependChecker.VisitOSSDepend(cast<OSSDependClause> (Clause));
+  }
+}
+
 StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
 
   bool ErrorFound = false;
+
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
   if (AStmt) {
@@ -412,7 +494,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     Stmt *S = AStmt;
     DSAChecker.Visit(S);
     if (DSAChecker.isErrorFound())
-      return StmtError();
+      ErrorFound = true;
 
     SmallVector<Expr *, 4> ImplicitShared(
         DSAChecker.getImplicitShared().begin(),

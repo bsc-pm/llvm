@@ -9306,6 +9306,11 @@ public:
   /// Called on end of data sharing attribute block.
   void EndOmpSsDSABlock(Stmt *CurDirective);
 
+  // Check if there are conflicts between depend() and other DSA clauses
+  // This must happen before parsing the statement (if any) so child tasks
+  // can see DSA derived from 'depend' clauses
+  void ActOnOmpSsAfterClauseGathering(ArrayRef<OSSClause *> Clauses);
+
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
       OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
 

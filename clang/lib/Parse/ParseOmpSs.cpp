@@ -91,6 +91,8 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     // Consume final annot_pragma_openmp_end.
     ConsumeAnnotationToken();
 
+    Actions.ActOnOmpSsAfterClauseGathering(Clauses);
+
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
