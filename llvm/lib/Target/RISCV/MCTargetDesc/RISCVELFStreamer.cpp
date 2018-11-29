@@ -46,6 +46,8 @@ RISCVELFStreamer &RISCVTargetELFStreamer::getStreamer() {
   return static_cast<RISCVELFStreamer &>(Streamer);
 }
 
+void RISCVTargetELFStreamer::emitDirectiveOptionPush() {}
+void RISCVTargetELFStreamer::emitDirectiveOptionPop() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionRVC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoRVC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionPIC() {}
