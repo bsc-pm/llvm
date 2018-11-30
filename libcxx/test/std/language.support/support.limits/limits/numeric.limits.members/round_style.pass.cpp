@@ -32,7 +32,7 @@ int main()
     test<signed char, std::round_toward_zero>();
     test<unsigned char, std::round_toward_zero>();
     test<wchar_t, std::round_toward_zero>();
-#if TEST_STD_VER > 17
+#if TEST_STD_VER > 17 && defined(__cpp_char8_t)
     test<char8_t, std::round_toward_zero>();
 #endif
 #ifndef _LIBCPP_HAS_NO_UNICODE_CHARS

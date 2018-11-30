@@ -85,7 +85,7 @@ int main()
     test_is_integral<signed char>();
     test_is_integral<unsigned char>();
     test_is_integral<wchar_t>();
-#if TEST_STD_VER > 14
+#if TEST_STD_VER > 17 && defined(__cpp_char8_t)
     test_is_integral<char8_t>();
 #endif
 
