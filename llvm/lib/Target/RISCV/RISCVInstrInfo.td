@@ -403,6 +403,15 @@ def EBREAK : RVInstI<0b000, OPC_SYSTEM, (outs), (ins), "ebreak", ""> {
   let rd = 0;
   let imm12 = 1;
 }
+
+// This is a de facto standard (as set by GNU binutils) 32-bit unimplemented
+// instruction (i.e., it should always trap, if your implementation has invalid
+// instruction traps).
+def UNIMP : RVInstI<0b001, OPC_SYSTEM, (outs), (ins), "unimp", ""> {
+  let rs1 = 0;
+  let rd = 0;
+  let imm12 = 0b110000000000;
+}
 } // hasSideEffects = 1, mayLoad = 0, mayStore = 0
 
 def CSRRW : CSR_ir<0b001, "csrrw">;
@@ -570,6 +579,16 @@ def : InstAlias<"csrc $csr, $rs", (CSRRC      X0, csr_sysreg:$csr, GPR:$rs)>;
 def : InstAlias<"csrwi $csr, $imm", (CSRRWI X0, csr_sysreg:$csr, uimm5:$imm)>;
 def : InstAlias<"csrsi $csr, $imm", (CSRRSI X0, csr_sysreg:$csr, uimm5:$imm)>;
 def : InstAlias<"csrci $csr, $imm", (CSRRCI X0, csr_sysreg:$csr, uimm5:$imm)>;
+
+let EmitPriority = 0 in {
+def : InstAlias<"csrw $csr, $imm", (CSRRWI X0, csr_sysreg:$csr, uimm5:$imm)>;
+def : InstAlias<"csrs $csr, $imm", (CSRRSI X0, csr_sysreg:$csr, uimm5:$imm)>;
+def : InstAlias<"csrc $csr, $imm", (CSRRCI X0, csr_sysreg:$csr, uimm5:$imm)>;
+
+def : InstAlias<"csrrw $rd, $csr, $imm", (CSRRWI GPR:$rd, csr_sysreg:$csr, uimm5:$imm)>;
+def : InstAlias<"csrrs $rd, $csr, $imm", (CSRRSI GPR:$rd, csr_sysreg:$csr, uimm5:$imm)>;
+def : InstAlias<"csrrc $rd, $csr, $imm", (CSRRCI GPR:$rd, csr_sysreg:$csr, uimm5:$imm)>;
+}
 
 def : InstAlias<"sfence.vma",     (SFENCE_VMA      X0, X0)>;
 def : InstAlias<"sfence.vma $rs", (SFENCE_VMA GPR:$rs, X0)>;
