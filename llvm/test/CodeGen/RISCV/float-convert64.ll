@@ -15,10 +15,8 @@ entry:
 define dso_local float @u32tof32(i32 signext %x) nounwind {
 ; CHECK-LABEL: u32tof32:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    addi a1, zero, 1
-; CHECK-NEXT:    slli a1, a1, 32
-; CHECK-NEXT:    addi a1, a1, -1
-; CHECK-NEXT:    and a0, a0, a1
+; CHECK-NEXT:    slli a0, a0, 32
+; CHECK-NEXT:    srli a0, a0, 32
 ; CHECK-NEXT:    fcvt.s.lu fa0, a0
 ; CHECK-NEXT:    ret
 entry:
@@ -39,10 +37,8 @@ entry:
 define dso_local double @u32tof64(i32 signext %x) nounwind {
 ; CHECK-LABEL: u32tof64:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    addi a1, zero, 1
-; CHECK-NEXT:    slli a1, a1, 32
-; CHECK-NEXT:    addi a1, a1, -1
-; CHECK-NEXT:    and a0, a0, a1
+; CHECK-NEXT:    slli a0, a0, 32
+; CHECK-NEXT:    srli a0, a0, 32
 ; CHECK-NEXT:    fcvt.d.lu fa0, a0
 ; CHECK-NEXT:    ret
 entry:

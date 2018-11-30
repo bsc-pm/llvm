@@ -246,6 +246,9 @@ def immbottomxlenset : ImmLeaf<XLenVT, [{
     return countTrailingOnes<uint64_t>(Imm) >= 6;
   return countTrailingOnes<uint64_t>(Imm) >= 5;
 }]>;
+def immshifti32 : ImmLeaf<XLenVT, [{
+  return countTrailingOnes<uint64_t>(Imm) >= 5;
+}]>;
 
 // Addressing modes.
 // Necessary because a frameindex can't be matched directly in a pattern.
@@ -976,8 +979,15 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
 
 /// RV64 patterns
 
+def assertzexti32 : PatFrag<(ops node:$src), (assertzext node:$src), [{
+  return cast<VTSDNode>(N->getOperand(1))->getVT() == MVT::i32;
+}]>;
+def zexti32 : PatFrags<(ops node:$src),
+                       [(and node:$src, 0xffffffff),
+                        (assertzexti32 node:$src)]>;
+
 let Predicates = [IsRV64] in {
-def : Pat<(simm32:$imm), (ADDIW (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;
+
 // TODO: add better patterns for loading 64-bit immediates
 def : Pat<(simm64:$imm), (OR (SLLI (ADDIW (LUI (HHI20 imm:$imm)),
                                            (HLO12Sext imm:$imm)),
@@ -987,29 +997,51 @@ def : Pat<(simm64:$imm), (OR (SLLI (ADDIW (LUI (HHI20 imm:$imm)),
                                     32),
                               32))>;
 
-def : Pat<(sext_inreg (add GPR:$rs1, simm12:$imm12), i32),
-          (ADDIW GPR:$rs1, simm12:$imm12)>;
-// sext.w
-def : Pat<(sext_inreg GPR:$rs1, i32), (ADDIW GPR:$rs1, 0)>;
+/// sext and zext
 
-def : Pat<(sext_inreg (shl GPR:$rs1, uimm5:$shamt), i32),
-          (SLLIW GPR:$rs1, uimm5:$shamt)>;
-// TODO: Patterns for SRLIW, SRAIW
+def : Pat<(sext_inreg GPR:$rs1, i32), (ADDIW GPR:$rs1, 0)>;
+def : Pat<(and GPR:$rs1, 0xffffffff), (SRLI (SLLI GPR:$rs1, 32), 32)>;
+
+/// ALU operations
+
 def : Pat<(sext_inreg (add GPR:$rs1, GPR:$rs2), i32),
           (ADDW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (add GPR:$rs1, simm12:$imm12), i32),
+          (ADDIW GPR:$rs1, simm12:$imm12)>;
 def : Pat<(sext_inreg (sub GPR:$rs1, GPR:$rs2), i32),
           (SUBW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (shl GPR:$rs1, uimm5:$shamt), i32),
+          (SLLIW GPR:$rs1, uimm5:$shamt)>;
+// (srl (zexti32 ...), uimm5:$shamt) is matched with custom code due to the
+// need to undo manipulation of the mask value performed by DAGCombine.
+def : Pat<(sra (sext_inreg GPR:$rs1, i32), uimm5:$shamt),
+          (SRAIW GPR:$rs1, uimm5:$shamt)>;
+
 def : Pat<(sext_inreg (shl GPR:$rs1, GPR:$rs2), i32),
           (SLLW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(srl (and GPR:$rs1, 0xffffffff), GPR:$rs2),
+def : Pat<(sext_inreg (shl GPR:$rs1, (and GPR:$rs2, immshifti32)), i32),
+          (SLLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(srl (zexti32 GPR:$rs1), GPR:$rs2),
+          (SRLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(srl (zexti32 GPR:$rs1), (and GPR:$rs2, immshifti32)),
+          (SRLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (srl (zexti32 GPR:$rs1), GPR:$rs2), i32),
+          (SRLW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sext_inreg (srl (zexti32 GPR:$rs1), (and GPR:$rs2, immshifti32)), i32),
           (SRLW GPR:$rs1, GPR:$rs2)>;
 def : Pat<(sra (sext_inreg GPR:$rs1, i32), GPR:$rs2),
           (SRAW GPR:$rs1, GPR:$rs2)>;
+def : Pat<(sra (sext_inreg GPR:$rs1, i32), (and GPR:$rs2, immshifti32)),
+          (SRAW GPR:$rs1, GPR:$rs2)>;
+
+/// Loads
 
 defm : LdPat<sextloadi32, LW>;
 defm : LdPat<extloadi32, LW>;
 defm : LdPat<zextloadi32, LWU>;
 defm : LdPat<load, LD>;
+
+/// Stores
 
 defm : StPat<truncstorei32, SW, GPR>;
 defm : StPat<store, SD, GPR>;

@@ -160,7 +160,6 @@ define void @sd(i64 *%a, i64 %b) nounwind {
 
 ; Check load and store to an i1 location
 define i64 @load_sext_zext_anyext_i1(i1 *%a) nounwind {
-  ; sextload i1
 ; RV64I-LABEL: load_sext_zext_anyext_i1:
 ; RV64I:       # %bb.0:
 ; RV64I-NEXT:    lb a1, 0(a0)
@@ -168,6 +167,7 @@ define i64 @load_sext_zext_anyext_i1(i1 *%a) nounwind {
 ; RV64I-NEXT:    lbu a0, 2(a0)
 ; RV64I-NEXT:    sub a0, a0, a1
 ; RV64I-NEXT:    ret
+  ; sextload i1
   %1 = getelementptr i1, i1* %a, i32 1
   %2 = load i1, i1* %1
   %3 = sext i1 %2 to i64
@@ -182,7 +182,6 @@ define i64 @load_sext_zext_anyext_i1(i1 *%a) nounwind {
 }
 
 define i16 @load_sext_zext_anyext_i1_i16(i1 *%a) nounwind {
-  ; sextload i1
 ; RV64I-LABEL: load_sext_zext_anyext_i1_i16:
 ; RV64I:       # %bb.0:
 ; RV64I-NEXT:    lb a1, 0(a0)
@@ -190,6 +189,7 @@ define i16 @load_sext_zext_anyext_i1_i16(i1 *%a) nounwind {
 ; RV64I-NEXT:    lbu a0, 2(a0)
 ; RV64I-NEXT:    sub a0, a0, a1
 ; RV64I-NEXT:    ret
+  ; sextload i1
   %1 = getelementptr i1, i1* %a, i32 1
   %2 = load i1, i1* %1
   %3 = sext i1 %2 to i16
@@ -207,7 +207,6 @@ define i16 @load_sext_zext_anyext_i1_i16(i1 *%a) nounwind {
 @G = global i64 0
 
 define i64 @ld_sd_global(i64 %a) nounwind {
-; TODO: the addi should be folded in to the ld/sd operations
 ; RV64I-LABEL: ld_sd_global:
 ; RV64I:       # %bb.0:
 ; RV64I-NEXT:    lui a2, %hi(G)

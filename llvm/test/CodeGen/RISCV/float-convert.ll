@@ -87,10 +87,8 @@ define float @uint32_to_float(i32 %a) nounwind {
 ;
 ; RV64IF-LABEL: uint32_to_float:
 ; RV64IF:       # %bb.0:
-; RV64IF-NEXT:    addi a1, zero, 1
-; RV64IF-NEXT:    slli a1, a1, 32
-; RV64IF-NEXT:    addi a1, a1, -1
-; RV64IF-NEXT:    and a0, a0, a1
+; RV64IF-NEXT:    slli a0, a0, 32
+; RV64IF-NEXT:    srli a0, a0, 32
 ; RV64IF-NEXT:    fcvt.s.lu ft0, a0
 ; RV64IF-NEXT:    fmv.x.w a0, ft0
 ; RV64IF-NEXT:    ret

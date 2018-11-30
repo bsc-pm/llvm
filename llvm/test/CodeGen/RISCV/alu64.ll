@@ -4,6 +4,11 @@
 ; RUN: llc -mtriple=riscv32 -verify-machineinstrs < %s \
 ; RUN:   | FileCheck %s -check-prefix=RV32I
 
+; These tests are each targeted at a particular RISC-V ALU instruction. Other
+; files in this folder exercise LLVM IR instructions that don't directly match a
+; RISC-V instruction. This file contains tests for the instructions common
+; between RV32I and RV64I as well as the *W instructions introduced in RV64I.
+
 ; Register-immediate instructions
 
 define i64 @addi(i64 %a) nounwind {
@@ -341,6 +346,8 @@ define i64 @and(i64 %a, i64 %b) nounwind {
   ret i64 %1
 }
 
+; RV64I-only instructions
+
 define signext i32 @addiw(i32 signext %a) {
 ; RV64I-LABEL: addiw:
 ; RV64I:       # %bb.0:
@@ -369,28 +376,32 @@ define signext i32 @slliw(i32 signext %a) {
   ret i32 %1
 }
 
-define signext i32 @srliw(i32 signext %a) {
+define signext i32 @srliw(i32 %a) {
 ; RV64I-LABEL: srliw:
 ; RV64I:       # %bb.0:
+; RV64I-NEXT:    srliw a0, a0, 8
 ; RV64I-NEXT:    ret
 ;
 ; RV32I-LABEL: srliw:
 ; RV32I:       # %bb.0:
+; RV32I-NEXT:    srli a0, a0, 8
 ; RV32I-NEXT:    ret
-; TODO
-  ret i32 %a
+  %1 = lshr i32 %a, 8
+  ret i32 %1
 }
 
-define signext i32 @sraiw(i32 signext %a) {
+define signext i32 @sraiw(i32 %a) {
 ; RV64I-LABEL: sraiw:
 ; RV64I:       # %bb.0:
+; RV64I-NEXT:    sraiw a0, a0, 9
 ; RV64I-NEXT:    ret
 ;
 ; RV32I-LABEL: sraiw:
 ; RV32I:       # %bb.0:
+; RV32I-NEXT:    srai a0, a0, 9
 ; RV32I-NEXT:    ret
-; TODO
-  ret i32 %a
+  %1 = ashr i32 %a, 9
+  ret i32 %1
 }
 
 define signext i32 @sextw(i32 zeroext %a) {
@@ -451,7 +462,6 @@ define signext i32 @srlw(i32 signext %a, i32 zeroext %b) {
 ; RV64I-LABEL: srlw:
 ; RV64I:       # %bb.0:
 ; RV64I-NEXT:    srlw a0, a0, a1
-; RV64I-NEXT:    sext.w a0, a0
 ; RV64I-NEXT:    ret
 ;
 ; RV32I-LABEL: srlw:
