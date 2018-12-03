@@ -23706,14 +23706,17 @@ static SDValue LowerMULH(SDValue Op, const X86Subtarget &Subtarget,
   // shift the results and pack the half lane results back together.
 
   MVT ExVT = MVT::getVectorVT(MVT::i16, NumElts / 2);
-  unsigned ExSSE41 = IsSigned ? ISD::SIGN_EXTEND_VECTOR_INREG
-                              : ISD::ZERO_EXTEND_VECTOR_INREG;
 
   // Extract the lo parts and zero/sign extend to i16.
+  // Only use SSE4.1 instructions for signed v16i8 where using unpack requires
+  // shifts to sign extend. Using unpack for unsigned only requires an xor to
+  // create zeros and a copy due to tied registers contraints pre-avx. But using
+  // zero_extend_vector_inreg would require an additional pshufd for the high
+  // part.
   SDValue ALo, BLo;
-  if (VT == MVT::v16i8 && Subtarget.hasSSE41()) {
-    ALo = DAG.getNode(ExSSE41, dl, ExVT, A);
-    BLo = DAG.getNode(ExSSE41, dl, ExVT, B);
+  if (IsSigned && VT == MVT::v16i8 && Subtarget.hasSSE41()) {
+    ALo = DAG.getNode(ISD::SIGN_EXTEND_VECTOR_INREG, dl, ExVT, A);
+    BLo = DAG.getNode(ISD::SIGN_EXTEND_VECTOR_INREG, dl, ExVT, B);
   } else if (IsSigned) {
     ALo = getUnpackl(DAG, dl, VT, DAG.getUNDEF(VT), A);
     BLo = getUnpackl(DAG, dl, VT, DAG.getUNDEF(VT), B);
@@ -23730,13 +23733,13 @@ static SDValue LowerMULH(SDValue Op, const X86Subtarget &Subtarget,
 
   // Extract the hi parts and zero/sign extend to i16.
   SDValue AHi, BHi;
-  if (VT == MVT::v16i8 && Subtarget.hasSSE41()) {
+  if (IsSigned && VT == MVT::v16i8 && Subtarget.hasSSE41()) {
     const int ShufMask[] = { 8,  9, 10, 11, 12, 13, 14, 15,
                             -1, -1, -1, -1, -1, -1, -1, -1};
     AHi = DAG.getVectorShuffle(VT, dl, A, A, ShufMask);
     BHi = DAG.getVectorShuffle(VT, dl, B, B, ShufMask);
-    AHi = DAG.getNode(ExSSE41, dl, ExVT, AHi);
-    BHi = DAG.getNode(ExSSE41, dl, ExVT, BHi);
+    AHi = DAG.getNode(ISD::SIGN_EXTEND_VECTOR_INREG, dl, ExVT, AHi);
+    BHi = DAG.getNode(ISD::SIGN_EXTEND_VECTOR_INREG, dl, ExVT, BHi);
   } else if (IsSigned) {
     AHi = getUnpackh(DAG, dl, VT, DAG.getUNDEF(VT), A);
     BHi = getUnpackh(DAG, dl, VT, DAG.getUNDEF(VT), B);
@@ -25218,40 +25221,32 @@ static SDValue LowerBITCAST(SDValue Op, const X86Subtarget &Subtarget,
   if (SrcVT == MVT::v2i32 || SrcVT == MVT::v4i16 || SrcVT == MVT::v8i8 ||
       SrcVT == MVT::i64) {
     assert(Subtarget.hasSSE2() && "Requires at least SSE2!");
-    if (DstVT != MVT::f64)
+    if (DstVT != MVT::f64 && DstVT != MVT::i64 &&
+        !(DstVT == MVT::x86mmx && SrcVT.isVector()))
       // This conversion needs to be expanded.
       return SDValue();
 
-    SmallVector<SDValue, 16> Elts;
     SDLoc dl(Op);
-    unsigned NumElts;
-    MVT SVT;
     if (SrcVT.isVector()) {
-      NumElts = SrcVT.getVectorNumElements();
-      SVT = SrcVT.getVectorElementType();
-
       // Widen the vector in input in the case of MVT::v2i32.
       // Example: from MVT::v2i32 to MVT::v4i32.
-      for (unsigned i = 0, e = NumElts; i != e; ++i)
-        Elts.push_back(DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, SVT, Src,
-                                   DAG.getIntPtrConstant(i, dl)));
+      MVT NewVT = MVT::getVectorVT(SrcVT.getVectorElementType(),
+                                   SrcVT.getVectorNumElements() * 2);
+      Src = DAG.getNode(ISD::CONCAT_VECTORS, dl, NewVT, Src,
+                        DAG.getUNDEF(SrcVT));
     } else {
       assert(SrcVT == MVT::i64 && !Subtarget.is64Bit() &&
              "Unexpected source type in LowerBITCAST");
-      Elts.push_back(DAG.getNode(ISD::EXTRACT_ELEMENT, dl, MVT::i32, Src,
-                                 DAG.getIntPtrConstant(0, dl)));
-      Elts.push_back(DAG.getNode(ISD::EXTRACT_ELEMENT, dl, MVT::i32, Src,
-                                 DAG.getIntPtrConstant(1, dl)));
-      NumElts = 2;
-      SVT = MVT::i32;
+      Src = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl, MVT::v2i64, Src);
     }
-    // Explicitly mark the extra elements as Undef.
-    Elts.append(NumElts, DAG.getUNDEF(SVT));
 
-    EVT NewVT = EVT::getVectorVT(*DAG.getContext(), SVT, NumElts * 2);
-    SDValue BV = DAG.getBuildVector(NewVT, dl, Elts);
-    SDValue ToV2F64 = DAG.getBitcast(MVT::v2f64, BV);
-    return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, MVT::f64, ToV2F64,
+    MVT V2X64VT = DstVT == MVT::f64 ? MVT::v2f64 : MVT::v2i64;
+    Src = DAG.getNode(ISD::BITCAST, dl, V2X64VT, Src);
+
+    if (DstVT == MVT::x86mmx)
+      return DAG.getNode(X86ISD::MOVDQ2Q, dl, DstVT, Src);
+
+    return DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, DstVT, Src,
                        DAG.getIntPtrConstant(0, dl));
   }
 
