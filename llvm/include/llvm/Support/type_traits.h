@@ -28,9 +28,10 @@ namespace llvm {
 /// If the compiler is able to implement is_trivially_copyable
 /// define LLVM_IS_TRIVIALLY_COPYABLE, otherwise leave it undefined.
 #if (__has_feature(is_trivially_copyable) && defined(_LIBCPP_VERSION)) ||      \
-    (defined(__GNUC__) && __GNUC__ >= 5)
+    (defined(__GNUC__) && __GNUC__ >= 5) || defined(_MSC_VER)
 // std::is_trivially_copyable is available in libc++ with clang, libstdc++
-// that comes with GCC 5.
+// that comes with GCC 5.  MSVC 2015 and newer also have
+// std::is_trivially_copyable.
 #define LLVM_IS_TRIVIALLY_COPYABLE(Ty) std::is_trivially_copyable<Ty>::value
 #elif __has_feature(is_trivially_copyable)
 // Use the internal name if the compiler supports is_trivially_copyable but we
