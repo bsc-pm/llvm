@@ -298,14 +298,14 @@ void mixed_float_int(struct mixed_float_int_t);
 // RISCV64-LP64F-NEXT:  entry:
 // RISCV64-LP64F-NEXT:    [[TMP0:%.*]] = load float, float* getelementptr inbounds (%6, %6* bitcast (%struct.mixed_float_int_t* @a_mixed_float_int to %6*), i32 0, i32 0), align 4
 // RISCV64-LP64F-NEXT:    [[TMP1:%.*]] = load i32, i32* getelementptr inbounds (%6, %6* bitcast (%struct.mixed_float_int_t* @a_mixed_float_int to %6*), i32 0, i32 1), align 4
-// RISCV64-LP64F-NEXT:    call void @mixed_float_int(float [[TMP0]], i32 signext [[TMP1]])
+// RISCV64-LP64F-NEXT:    call void @mixed_float_int(float [[TMP0]], i32 [[TMP1]])
 // RISCV64-LP64F-NEXT:    ret void
 //
 // RISCV64-LP64D-LABEL: @test_mixed_float_int(
 // RISCV64-LP64D-NEXT:  entry:
 // RISCV64-LP64D-NEXT:    [[TMP0:%.*]] = load float, float* getelementptr inbounds (%8, %8* bitcast (%struct.mixed_float_int_t* @a_mixed_float_int to %8*), i32 0, i32 0), align 4
 // RISCV64-LP64D-NEXT:    [[TMP1:%.*]] = load i32, i32* getelementptr inbounds (%8, %8* bitcast (%struct.mixed_float_int_t* @a_mixed_float_int to %8*), i32 0, i32 1), align 4
-// RISCV64-LP64D-NEXT:    call void @mixed_float_int(float [[TMP0]], i32 signext [[TMP1]])
+// RISCV64-LP64D-NEXT:    call void @mixed_float_int(float [[TMP0]], i32 [[TMP1]])
 // RISCV64-LP64D-NEXT:    ret void
 //
 void test_mixed_float_int(void)
@@ -336,7 +336,7 @@ void mixed_float_short(struct mixed_float_short_t, short c);
 // RISCV64-LP64F-NEXT:    [[TMP0:%.*]] = load i16, i16* [[S]], align 2
 // RISCV64-LP64F-NEXT:    [[TMP1:%.*]] = load float, float* getelementptr inbounds (%7, %7* bitcast (%struct.mixed_float_short_t* @a_mixed_float_short to %7*), i32 0, i32 0), align 4
 // RISCV64-LP64F-NEXT:    [[TMP2:%.*]] = load i16, i16* getelementptr inbounds (%7, %7* bitcast (%struct.mixed_float_short_t* @a_mixed_float_short to %7*), i32 0, i32 1), align 4
-// RISCV64-LP64F-NEXT:    call void @mixed_float_short(float [[TMP1]], i16 zeroext [[TMP2]], i16 signext [[TMP0]])
+// RISCV64-LP64F-NEXT:    call void @mixed_float_short(float [[TMP1]], i16 [[TMP2]], i16 signext [[TMP0]])
 // RISCV64-LP64F-NEXT:    ret void
 //
 // RISCV64-LP64D-LABEL: @test_mixed_float_short(
@@ -346,7 +346,7 @@ void mixed_float_short(struct mixed_float_short_t, short c);
 // RISCV64-LP64D-NEXT:    [[TMP0:%.*]] = load i16, i16* [[S]], align 2
 // RISCV64-LP64D-NEXT:    [[TMP1:%.*]] = load float, float* getelementptr inbounds (%9, %9* bitcast (%struct.mixed_float_short_t* @a_mixed_float_short to %9*), i32 0, i32 0), align 4
 // RISCV64-LP64D-NEXT:    [[TMP2:%.*]] = load i16, i16* getelementptr inbounds (%9, %9* bitcast (%struct.mixed_float_short_t* @a_mixed_float_short to %9*), i32 0, i32 1), align 4
-// RISCV64-LP64D-NEXT:    call void @mixed_float_short(float [[TMP1]], i16 zeroext [[TMP2]], i16 signext [[TMP0]])
+// RISCV64-LP64D-NEXT:    call void @mixed_float_short(float [[TMP1]], i16 [[TMP2]], i16 signext [[TMP0]])
 // RISCV64-LP64D-NEXT:    ret void
 //
 void test_mixed_float_short(void)
@@ -387,7 +387,7 @@ void mixed_double_short(struct mixed_double_short_t, short c);
 // RISCV64-LP64D-NEXT:    [[TMP0:%.*]] = load i16, i16* [[S]], align 2
 // RISCV64-LP64D-NEXT:    [[TMP1:%.*]] = load double, double* getelementptr inbounds (%10, %10* bitcast (%struct.mixed_double_short_t* @a_mixed_double_short to %10*), i32 0, i32 0), align 8
 // RISCV64-LP64D-NEXT:    [[TMP2:%.*]] = load i16, i16* getelementptr inbounds (%10, %10* bitcast (%struct.mixed_double_short_t* @a_mixed_double_short to %10*), i32 0, i32 1), align 8
-// RISCV64-LP64D-NEXT:    call void @mixed_double_short(double [[TMP1]], i16 zeroext [[TMP2]], i16 signext [[TMP0]])
+// RISCV64-LP64D-NEXT:    call void @mixed_double_short(double [[TMP1]], i16 [[TMP2]], i16 signext [[TMP0]])
 // RISCV64-LP64D-NEXT:    ret void
 //
 void test_mixed_double_short(void)

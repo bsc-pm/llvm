@@ -1980,6 +1980,7 @@ void CodeGenModule::ConstructAttributeList(
 
   case ABIArgInfo::CoerceAndExpand:
     break;
+
   case ABIArgInfo::Expand:
     llvm_unreachable("Invalid ABI kind for return argument");
   }
@@ -2017,8 +2018,6 @@ void CodeGenModule::ConstructAttributeList(
         llvm::AttributeSet::get(getLLVMContext(), Attrs);
   }
 
-  SmallVector<llvm::AttrBuilder, 4> CoerceAndExpandAttrs(IRFunctionArgs.totalIRArgs());
-  bool CoerceAndExpandHasAttributes = false;
   unsigned ArgNo = 0;
   for (CGFunctionInfo::const_arg_iterator I = FI.arg_begin(),
                                           E = FI.arg_end();
@@ -2087,39 +2086,9 @@ void CodeGenModule::ConstructAttributeList(
     }
     case ABIArgInfo::Ignore:
     case ABIArgInfo::Expand:
-      break;
     case ABIArgInfo::CoerceAndExpand:
-      if (AI.getExtendSeq()) {
-        // Handle extends in expanded items
-        unsigned FirstIRArg, NumIRArgs;
-        std::tie(FirstIRArg, NumIRArgs) = IRFunctionArgs.getIRArgs(ArgNo);
-        llvm::StructType *CoercionType = AI.getCoerceAndExpandType();
-        for (unsigned I = 0, Ext = 0; I < NumIRArgs; I++) {
-          llvm::Type *EltType = CoercionType->getElementType(I);
-          if (ABIArgInfo::isPaddingForCoerceAndExpand(EltType))
-            continue;
-
-          uint64_t ExtendKind = AI.getExtendSeq()->getElementAsInteger(Ext++);
-          switch (ABIArgInfo::getExtendKind(ExtendKind)) {
-          case ABIArgInfo::ExtendKind::None:
-            break;
-          case ABIArgInfo::ExtendKind::SignExt: {
-            CoerceAndExpandHasAttributes = true;
-            CoerceAndExpandAttrs[FirstIRArg + I].addAttribute(
-                llvm::Attribute::SExt);
-            break;
-          }
-          case ABIArgInfo::ExtendKind::ZeroExt: {
-            CoerceAndExpandHasAttributes = true;
-            CoerceAndExpandAttrs[FirstIRArg + I].addAttribute(
-                llvm::Attribute::ZExt);
-            break;
-          }
-          }
-        }
-      }
-
       break;
+
     case ABIArgInfo::InAlloca:
       // inalloca disables readnone and readonly.
       FuncAttrs.removeAttribute(llvm::Attribute::ReadOnly)
@@ -2175,16 +2144,12 @@ void CodeGenModule::ConstructAttributeList(
     if (FI.getExtParameterInfo(ArgNo).isNoEscape())
       Attrs.addAttribute(llvm::Attribute::NoCapture);
 
-    if (Attrs.hasAttributes() || CoerceAndExpandHasAttributes) {
+    if (Attrs.hasAttributes()) {
       unsigned FirstIRArg, NumIRArgs;
       std::tie(FirstIRArg, NumIRArgs) = IRFunctionArgs.getIRArgs(ArgNo);
       for (unsigned i = 0; i < NumIRArgs; i++)
-      {
-        llvm::AttrBuilder CoerceAndExpandMergedAttrs(Attrs);
-        CoerceAndExpandMergedAttrs.merge(CoerceAndExpandAttrs[FirstIRArg + i]);
         ArgAttrs[FirstIRArg + i] =
-            llvm::AttributeSet::get(getLLVMContext(), CoerceAndExpandMergedAttrs);
-      }
+            llvm::AttributeSet::get(getLLVMContext(), Attrs);
     }
   }
   assert(ArgNo == FI.arg_size());

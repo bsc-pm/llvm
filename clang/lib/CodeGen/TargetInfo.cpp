@@ -9050,7 +9050,6 @@ private:
                            ASTContext &Context) const;
   bool isFloatingAndIntegerStruct(QualType T, unsigned XLen, unsigned FLen,
                                   llvm::StructType *&CoercedType,
-                                  llvm::ConstantDataArray *&ExtendSet,
                                   ASTContext &Context) const;
 
 public:
@@ -9169,20 +9168,22 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
     return ABIArgInfo::getDirect(llvm::ArrayType::get(FloatTy, 2));
   }
 
-  // A struct containing one-floating point real and one integer, in either
-  // order is passed in a floating point register and an integer register, with
-  // the integer zero or sign extended as though it were a scalar, provided the
-  // floating-point real is no more than FLEN bits and the integer is no more
-  // than XLEN bits wide and at least one floating-point argument register and
-  // at least one integer argument registers is available.
-  llvm::ConstantDataArray *ExtendSet = nullptr;
+  // A struct containing one floating-point real and one integer (or bitfield),
+  // in either order, is passed in a floating-point register and an integer
+  // register, with the integer zero- or sign-extended as though it were a
+  // scalar, provided the floating-point real is no more than FLEN bits wide and
+  // the integer is no more than XLEN bits wide, and at least one floating-point
+  // argument register and at least one integer argument register is available,
+  // with the integer placed in its argument register **without extension** to
+  // XLEN bits. Otherwise, it is passed according to the integer calling
+  // convention.
   if (IsFixed && isHardFloat() &&
-      isFloatingAndIntegerStruct(Ty, XLen, FLen, CoercedType, ExtendSet,
+      isFloatingAndIntegerStruct(Ty, XLen, FLen, CoercedType,
                                  getContext()) &&
       ArgGPRsLeft >= 1 && ArgFPRsLeft >= 1) {
     ArgGPRsLeft -= 1;
     ArgFPRsLeft -= 1;
-    return ABIArgInfo::getCoerceAndExpand(CoercedType, CoercedType, ExtendSet);
+    return ABIArgInfo::getCoerceAndExpand(CoercedType, CoercedType);
   }
 
   // Determine the number of GPRs needed to pass the current argument
@@ -9378,9 +9379,10 @@ bool RISCVABIInfo::isTwoFloatingStruct(QualType T, unsigned FLen,
   return true;
 }
 
-bool RISCVABIInfo::isFloatingAndIntegerStruct(
-    QualType T, unsigned XLen, unsigned FLen, llvm::StructType *&CoercedType,
-    llvm::ConstantDataArray *&ExtendSet, ASTContext &Context) const {
+bool RISCVABIInfo::isFloatingAndIntegerStruct(QualType T, unsigned XLen,
+                                              unsigned FLen,
+                                              llvm::StructType *&CoercedType,
+                                              ASTContext &Context) const {
   // Unions are never flattened.
   if (T->isUnionType())
     return false;
@@ -9403,24 +9405,6 @@ bool RISCVABIInfo::isFloatingAndIntegerStruct(
   CoercedType =
       llvm::StructType::create({CGT.ConvertType(QualType(TypeSeq[0], 0)),
                                 CGT.ConvertType(QualType(TypeSeq[1], 0))});
-
-  unsigned IntegerIdx = TypeSeq[0]->isIntegralOrEnumerationType() ? 0 : 1;
-  uint64_t Extend = static_cast<uint64_t>(
-      TypeSeq[IntegerIdx]->hasSignedIntegerRepresentation()
-          ? ABIArgInfo::ExtendKind::SignExt
-          : ABIArgInfo::ExtendKind::ZeroExt);
-  uint64_t ExtendNone = static_cast<uint64_t>(ABIArgInfo::ExtendKind::None);
-
-  llvm::SmallVector<uint64_t, 2> Elements;
-  if (IntegerIdx == 0)
-    Elements = {Extend, ExtendNone};
-  else
-    Elements = {ExtendNone, Extend};
-
-  llvm::Constant *CDA =
-      llvm::ConstantDataArray::get(getVMContext(), Elements);
-  ExtendSet = cast<llvm::ConstantDataArray>(CDA);
-
   return true;
 }
 
