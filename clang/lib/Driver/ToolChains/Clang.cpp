@@ -2152,6 +2152,9 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
           }
           CmdArgs.push_back(Value.data());
           TakeNextArg = true;
+      } else if (Value == "-fdebug-compilation-dir") {
+        CmdArgs.push_back("-fdebug-compilation-dir");
+        TakeNextArg = true;
       } else {
         D.Diag(diag::err_drv_unsupported_option_argument)
             << A->getOption().getName() << Value;
@@ -2828,7 +2831,6 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
   // When ObjectiveC legacy runtime is in effect on MacOSX, turn on the option
   // to do Array/Dictionary subscripting by default.
   if (Arch == llvm::Triple::x86 && T.isMacOSX() &&
-      !T.isMacOSXVersionLT(10, 7) &&
       Runtime.getKind() == ObjCRuntime::FragileMacOSX && Runtime.isNeXTFamily())
     CmdArgs.push_back("-fobjc-subscripting-legacy-runtime");
 
