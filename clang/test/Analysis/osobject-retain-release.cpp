@@ -5,6 +5,7 @@ struct OSMetaClass;
 #define OS_CONSUME __attribute__((os_consumed))
 #define OS_RETURNS_RETAINED __attribute__((os_returns_retained))
 #define OS_RETURNS_NOT_RETAINED __attribute__((os_returns_not_retained))
+#define OS_CONSUMES_THIS __attribute__((os_consumes_this))
 
 #define OSTypeID(type)   (type::metaClass)
 
@@ -21,11 +22,12 @@ struct OSObject {
 
   unsigned int foo() { return 42; }
 
+  virtual OS_RETURNS_NOT_RETAINED OSObject *identity();
+
   static OSObject *generateObject(int);
 
   static OSObject *getObject();
   static OSObject *GetObject();
-
 
   static void * operator new(size_t size);
 
@@ -40,6 +42,19 @@ struct OSIterator : public OSObject {
 struct OSArray : public OSObject {
   unsigned int getCount();
 
+  OSIterator * getIterator();
+
+  OSObject *identity() override;
+
+  virtual OSObject *generateObject(OSObject *input);
+
+  virtual void consumeReference(OS_CONSUME OSArray *other);
+
+  void putIntoArray(OSArray *array) OS_CONSUMES_THIS;
+
+  template <typename T>
+  void putIntoT(T *owner) OS_CONSUMES_THIS;
+
   static OSArray *generateArrayHasCode() {
     return new OSArray;
   }
@@ -51,12 +66,18 @@ struct OSArray : public OSObject {
     return nullptr;
   }
 
-  OSIterator * getIterator();
-
   static OS_RETURNS_NOT_RETAINED OSArray *MaskedGetter();
   static OS_RETURNS_RETAINED OSArray *getOoopsActuallyCreate();
 
   static const OSMetaClass * const metaClass;
+};
+
+struct MyArray : public OSArray {
+  void consumeReference(OSArray *other) override;
+
+  OSObject *identity() override;
+
+  OSObject *generateObject(OSObject *input) override;
 };
 
 struct OtherStruct {
@@ -67,6 +88,45 @@ struct OtherStruct {
 struct OSMetaClassBase {
   static OSObject *safeMetaCast(const OSObject *inst, const OSMetaClass *meta);
 };
+
+void test_no_infinite_check_recursion(MyArray *arr) {
+  OSObject *input = new OSObject;
+  OSObject *o = arr->generateObject(input);
+  o->release();
+  input->release();
+}
+
+
+void check_param_attribute_propagation(MyArray *parent) {
+  OSArray *arr = new OSArray;
+  parent->consumeReference(arr);
+}
+
+unsigned int check_attribute_propagation(OSArray *arr) {
+  OSObject *other = arr->identity();
+  OSArray *casted = OSDynamicCast(OSArray, other);
+  if (casted)
+    return casted->getCount();
+  return 0;
+}
+
+unsigned int check_attribute_indirect_propagation(MyArray *arr) {
+  OSObject *other = arr->identity();
+  OSArray *casted = OSDynamicCast(OSArray, other);
+  if (casted)
+    return casted->getCount();
+  return 0;
+}
+
+void check_consumes_this(OSArray *owner) {
+  OSArray *arr = new OSArray;
+  arr->putIntoArray(owner);
+}
+
+void check_consumes_this_with_template(OSArray *owner) {
+  OSArray *arr = new OSArray;
+  arr->putIntoT(owner);
+}
 
 void check_free_no_error() {
   OSArray *arr = OSArray::withCapacity(10);

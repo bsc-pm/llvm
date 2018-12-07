@@ -1,4 +1,3 @@
-// REQUIRES: riscv-registered-target
 // XFAIL: *
 
 // Check gnutools are invoked with propagated values for -mabi and -march.
