@@ -112,6 +112,12 @@ static cl::opt<bool>
   MaySplitLoadIndex("combiner-split-load-index", cl::Hidden, cl::init(true),
                     cl::desc("DAG combiner may split indexing from loads"));
 
+// This is a temporary debug flag to disable a combine that is known to
+// conflict with another combine.
+static cl::opt<bool>
+NarrowTruncatedBinops("narrow-truncated-binops", cl::Hidden, cl::init(false),
+                      cl::desc("Move truncates ahead of binops"));
+
 namespace {
 
   class DAGCombiner {
@@ -3755,7 +3761,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
       }
       // logic_op (hand_op X), (hand_op Y) --> hand_op (logic_op X, Y)
       SDValue Logic = DAG.getNode(LogicOpcode, DL, XVT, X, Y);
-      AddToWorklist(Logic.getNode());
       return DAG.getNode(HandOpcode, DL, VT, Logic);
   }
 
@@ -3768,7 +3773,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     if (!N0.hasOneUse() || !N1.hasOneUse())
       return SDValue();
     SDValue Logic = DAG.getNode(LogicOpcode, DL, XVT, X, Y);
-    AddToWorklist(Logic.getNode());
     return DAG.getNode(HandOpcode, DL, VT, Logic, N0.getOperand(1));
   }
 
@@ -3778,7 +3782,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     if (!N0.hasOneUse() || !N1.hasOneUse())
       return SDValue();
     SDValue Logic = DAG.getNode(LogicOpcode, DL, XVT, X, Y);
-    AddToWorklist(Logic.getNode());
     return DAG.getNode(HandOpcode, DL, VT, Logic);
   }
 
@@ -3794,7 +3797,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     // Input types must be integer and the same.
     if (XVT.isInteger() && XVT == Y.getValueType()) {
       SDValue Logic = DAG.getNode(LogicOpcode, DL, XVT, X, Y);
-      AddToWorklist(Logic.getNode());
       return DAG.getNode(HandOpcode, DL, VT, Logic);
     }
   }
@@ -3835,7 +3837,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     if (N0.getOperand(1) == N1.getOperand(1) && ShOp.getNode()) {
       SDValue Logic = DAG.getNode(LogicOpcode, DL, VT,
                                   N0.getOperand(0), N1.getOperand(0));
-      AddToWorklist(Logic.getNode());
       return DAG.getVectorShuffle(VT, DL, Logic, ShOp, SVN0->getMask());
     }
 
@@ -3849,7 +3850,6 @@ SDValue DAGCombiner::hoistLogicOpWithSameOpcodeHands(SDNode *N) {
     if (N0.getOperand(0) == N1.getOperand(0) && ShOp.getNode()) {
       SDValue Logic = DAG.getNode(LogicOpcode, DL, VT, N0.getOperand(1),
                                   N1.getOperand(1));
-      AddToWorklist(Logic.getNode());
       return DAG.getVectorShuffle(VT, DL, ShOp, Logic, SVN0->getMask());
     }
   }
@@ -9810,7 +9810,7 @@ SDValue DAGCombiner::visitTRUNCATE(SDNode *N) {
   case ISD::AND:
   case ISD::OR:
   case ISD::XOR:
-    if (!LegalOperations && N0.hasOneUse() &&
+    if (NarrowTruncatedBinops && !LegalOperations && N0.hasOneUse() &&
         (isConstantOrConstantVector(N0.getOperand(0)) ||
          isConstantOrConstantVector(N0.getOperand(1)))) {
       // TODO: We already restricted this to pre-legalization, but for vectors
