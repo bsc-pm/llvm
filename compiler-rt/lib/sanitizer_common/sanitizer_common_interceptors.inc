@@ -7809,9 +7809,88 @@ INTERCEPTOR(int, fstatvfs1, int fd, void *buf, int flags) {
 #define INIT_STATVFS1
 #endif
 
+#if SANITIZER_INTERCEPT_STRTOI
+INTERCEPTOR(INTMAX_T, strtoi, const char *nptr, char **endptr, int base,
+            INTMAX_T low, INTMAX_T high, int *rstatus) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, strtoi, nptr, endptr, base, low, high, rstatus);
+  char *real_endptr;
+  INTMAX_T ret = REAL(strtoi)(nptr, &real_endptr, base, low, high, rstatus);
+  StrtolFixAndCheck(ctx, nptr, endptr, real_endptr, base);
+  if (rstatus)
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, rstatus, sizeof(*rstatus));
+  return ret;
+}
+
+INTERCEPTOR(UINTMAX_T, strtou, const char *nptr, char **endptr, int base,
+            UINTMAX_T low, UINTMAX_T high, int *rstatus) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, strtou, nptr, endptr, base, low, high, rstatus);
+  char *real_endptr;
+  UINTMAX_T ret = REAL(strtou)(nptr, &real_endptr, base, low, high, rstatus);
+  StrtolFixAndCheck(ctx, nptr, endptr, real_endptr, base);
+  if (rstatus)
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, rstatus, sizeof(*rstatus));
+  return ret;
+}
+#define INIT_STRTOI                                                            \
+  COMMON_INTERCEPT_FUNCTION(strtoi);                                           \
+  COMMON_INTERCEPT_FUNCTION(strtou)
+#else
+#define INIT_STRTOI
+#endif
+
+#if SANITIZER_INTERCEPT_CAPSICUM
+INTERCEPTOR(int, cap_rights_limit, int fd,
+            const __sanitizer_cap_rights_t *rights) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, cap_rights_limit, fd, rights);
+  if (rights)
+    COMMON_INTERCEPTOR_READ_RANGE(ctx, rights, sizeof(*rights));
+
+  return REAL(cap_rights_limit)(fd, rights);
+}
+
+INTERCEPTOR(int, cap_rights_get, int fd, __sanitizer_cap_rights_t *rights) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, cap_rights_get, fd, rights);
+  int ret = REAL(cap_rights_get)(fd, rights);
+  if (!ret && rights)
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, rights, sizeof(*rights));
+
+  return ret;
+}
+
+INTERCEPTOR(int, cap_ioctls_limit, int fd, const uptr *cmds, SIZE_T ncmds) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, cap_ioctls_limit, fd, cmds, ncmds);
+  if (cmds)
+    COMMON_INTERCEPTOR_READ_RANGE(ctx, cmds, sizeof(*cmds) * ncmds);
+
+  return REAL(cap_ioctls_limit)(fd, cmds, ncmds);
+}
+
+INTERCEPTOR(int, cap_ioctls_get, int fd, uptr *cmds, SIZE_T maxcmds) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, cap_ioctls_get, fd, cmds, maxcmds);
+  int ret = REAL(cap_ioctls_get)(fd, cmds, maxcmds);
+  if (!ret && cmds)
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, cmds, sizeof(*cmds) * maxcmds);
+
+  return ret;
+}
+#define INIT_CAPSICUM                          \
+  COMMON_INTERCEPT_FUNCTION(cap_rights_get);   \
+  COMMON_INTERCEPT_FUNCTION(cap_rights_limit); \
+  COMMON_INTERCEPT_FUNCTION(cap_ioctls_get);   \
+  COMMON_INTERCEPT_FUNCTION(cap_ioctls_limit)
+#else
+#define INIT_CAPSICUM
+#endif
+
 static void InitializeCommonInterceptors() {
   static u64 metadata_mem[sizeof(MetadataHashMap) / sizeof(u64) + 1];
-  interceptor_metadata_map = new((void *)&metadata_mem) MetadataHashMap();
+  interceptor_metadata_map = new ((void *)&metadata_mem) MetadataHashMap();
 
   INIT_MMAP;
   INIT_MMAP64;
@@ -8076,6 +8155,8 @@ static void InitializeCommonInterceptors() {
   INIT_STRTONUM;
   INIT_FPARSELN;
   INIT_STATVFS1;
+  INIT_STRTOI;
+  INIT_CAPSICUM;
 
   INIT___PRINTF_CHK;
 }
