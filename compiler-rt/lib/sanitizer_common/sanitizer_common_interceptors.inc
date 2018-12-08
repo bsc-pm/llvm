@@ -4277,11 +4277,16 @@ INTERCEPTOR(int, statvfs, char *path, void *buf) {
 INTERCEPTOR(int, fstatvfs, int fd, void *buf) {
   void *ctx;
   COMMON_INTERCEPTOR_ENTER(ctx, fstatvfs, fd, buf);
+  COMMON_INTERCEPTOR_FD_ACCESS(ctx, fd);
   // FIXME: under ASan the call below may write to freed memory and corrupt
   // its metadata. See
   // https://github.com/google/sanitizers/issues/321.
   int res = REAL(fstatvfs)(fd, buf);
-  if (!res) COMMON_INTERCEPTOR_WRITE_RANGE(ctx, buf, struct_statvfs_sz);
+  if (!res) {
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, buf, struct_statvfs_sz);
+    if (fd >= 0)
+      COMMON_INTERCEPTOR_FD_ACQUIRE(ctx, fd);
+  }
   return res;
 }
 #define INIT_STATVFS                  \
@@ -7728,6 +7733,82 @@ INTERCEPTOR(int, modctl, int operation, void *argp) {
 #define INIT_MODCTL
 #endif
 
+#if SANITIZER_INTERCEPT_STRTONUM
+INTERCEPTOR(long long, strtonum, const char *nptr, long long minval,
+            long long maxval, const char **errstr) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, strtonum, nptr, minval, maxval, errstr);
+
+  // TODO(kamil): Implement strtoll as a common inteceptor
+  char *real_endptr;
+  long long ret = (long long)REAL(strtoimax)(nptr, &real_endptr, 10);
+  StrtolFixAndCheck(ctx, nptr, nullptr, real_endptr, 10);
+
+  ret = REAL(strtonum)(nptr, minval, maxval, errstr);
+  if (errstr) {
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, errstr, sizeof(const char *));
+     if (*errstr)
+      COMMON_INTERCEPTOR_WRITE_RANGE(ctx, *errstr, REAL(strlen)(*errstr) + 1);
+  }
+  return ret;
+}
+#define INIT_STRTONUM COMMON_INTERCEPT_FUNCTION(strtonum)
+#else
+#define INIT_STRTONUM
+#endif
+
+#if SANITIZER_INTERCEPT_FPARSELN
+INTERCEPTOR(char *, fparseln, __sanitizer_FILE *stream, SIZE_T *len,
+            SIZE_T *lineno, const char delim[3], int flags) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, fparseln, stream, len, lineno, delim, flags);
+  if (lineno)
+    COMMON_INTERCEPTOR_READ_RANGE(ctx, lineno, sizeof(*lineno));
+  if (delim)
+    COMMON_INTERCEPTOR_READ_RANGE(ctx, delim, sizeof(delim[0]) * 3);
+  char *ret = REAL(fparseln)(stream, len, lineno, delim, flags);
+  if (ret) {
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, ret, REAL(strlen)(ret) + 1);
+    if (len)
+      COMMON_INTERCEPTOR_WRITE_RANGE(ctx, len, sizeof(*len));
+    if (lineno)
+      COMMON_INTERCEPTOR_WRITE_RANGE(ctx, lineno, sizeof(*lineno));
+  }
+  return ret;
+}
+#define INIT_FPARSELN COMMON_INTERCEPT_FUNCTION(fparseln)
+#else
+#define INIT_FPARSELN
+#endif
+
+#if SANITIZER_INTERCEPT_STATVFS1
+INTERCEPTOR(int, statvfs1, const char *path, void *buf, int flags) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, statvfs1, path, buf, flags);
+  if (path) COMMON_INTERCEPTOR_READ_RANGE(ctx, path, REAL(strlen)(path) + 1);
+  int res = REAL(statvfs1)(path, buf, flags);
+  if (!res) COMMON_INTERCEPTOR_WRITE_RANGE(ctx, buf, struct_statvfs_sz);
+  return res;
+}
+INTERCEPTOR(int, fstatvfs1, int fd, void *buf, int flags) {
+  void *ctx;
+  COMMON_INTERCEPTOR_ENTER(ctx, fstatvfs1, fd, buf, flags);
+  COMMON_INTERCEPTOR_FD_ACCESS(ctx, fd);
+  int res = REAL(fstatvfs1)(fd, buf, flags);
+  if (!res) {
+    COMMON_INTERCEPTOR_WRITE_RANGE(ctx, buf, struct_statvfs_sz);
+    if (fd >= 0)
+      COMMON_INTERCEPTOR_FD_ACQUIRE(ctx, fd);
+  }
+  return res;
+}
+#define INIT_STATVFS1                  \
+  COMMON_INTERCEPT_FUNCTION(statvfs1);  \
+  COMMON_INTERCEPT_FUNCTION(fstatvfs1);
+#else
+#define INIT_STATVFS1
+#endif
+
 static void InitializeCommonInterceptors() {
   static u64 metadata_mem[sizeof(MetadataHashMap) / sizeof(u64) + 1];
   interceptor_metadata_map = new((void *)&metadata_mem) MetadataHashMap();
@@ -7992,6 +8073,9 @@ static void InitializeCommonInterceptors() {
   INIT_SYSCTLGETMIBINFO;
   INIT_NL_LANGINFO;
   INIT_MODCTL;
+  INIT_STRTONUM;
+  INIT_FPARSELN;
+  INIT_STATVFS1;
 
   INIT___PRINTF_CHK;
 }
