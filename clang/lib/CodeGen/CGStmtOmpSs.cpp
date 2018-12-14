@@ -27,6 +27,20 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
 }
 
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
-  CGM.getOmpSsRuntime().emitTaskCall(*this, S.getBeginLoc());
+  OSSTaskDataTy Data;
+  for (const auto *C : S.getClausesOfKind<OSSSharedClause>()) {
+      for (const Expr *Ref : C->varlists())
+          Data.SharedVars.push_back(Ref);
+  }
+  for (const auto *C : S.getClausesOfKind<OSSPrivateClause>()) {
+      for (const Expr *Ref : C->varlists())
+          Data.PrivateVars.push_back(Ref);
+  }
+  for (const auto *C : S.getClausesOfKind<OSSFirstprivateClause>()) {
+      for (const Expr *Ref : C->varlists())
+          Data.FirstprivateVars.push_back(Ref);
+  }
+
+  CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }
 

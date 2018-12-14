@@ -87,6 +87,81 @@ protected:
   }
 
 public:
+  /// Iterates over a filtered subrange of clauses applied to a
+  /// directive.
+  ///
+  /// This iterator visits only clauses of type SpecificClause.
+  template <typename SpecificClause>
+  class specific_clause_iterator
+      : public llvm::iterator_adaptor_base<
+            specific_clause_iterator<SpecificClause>,
+            ArrayRef<OSSClause *>::const_iterator, std::forward_iterator_tag,
+            const SpecificClause *, ptrdiff_t, const SpecificClause *,
+            const SpecificClause *> {
+    ArrayRef<OSSClause *>::const_iterator End;
+
+    void SkipToNextClause() {
+      while (this->I != End && !isa<SpecificClause>(*this->I))
+        ++this->I;
+    }
+
+  public:
+    explicit specific_clause_iterator(ArrayRef<OSSClause *> Clauses)
+        : specific_clause_iterator::iterator_adaptor_base(Clauses.begin()),
+          End(Clauses.end()) {
+      SkipToNextClause();
+    }
+
+    const SpecificClause *operator*() const {
+      return cast<SpecificClause>(*this->I);
+    }
+    const SpecificClause *operator->() const { return **this; }
+
+    specific_clause_iterator &operator++() {
+      ++this->I;
+      SkipToNextClause();
+      return *this;
+    }
+  };
+
+  template <typename SpecificClause>
+  static llvm::iterator_range<specific_clause_iterator<SpecificClause>>
+  getClausesOfKind(ArrayRef<OSSClause *> Clauses) {
+    return {specific_clause_iterator<SpecificClause>(Clauses),
+            specific_clause_iterator<SpecificClause>(
+                llvm::makeArrayRef(Clauses.end(), 0))};
+  }
+
+  template <typename SpecificClause>
+  llvm::iterator_range<specific_clause_iterator<SpecificClause>>
+  getClausesOfKind() const {
+    return getClausesOfKind<SpecificClause>(clauses());
+  }
+
+  /// Gets a single clause of the specified kind associated with the
+  /// current directive iff there is only one clause of this kind (and assertion
+  /// is fired if there is more than one clause is associated with the
+  /// directive). Returns nullptr if no clause of this kind is associated with
+  /// the directive.
+  template <typename SpecificClause>
+  const SpecificClause *getSingleClause() const {
+    auto Clauses = getClausesOfKind<SpecificClause>();
+
+    if (Clauses.begin() != Clauses.end()) {
+      assert(std::next(Clauses.begin()) == Clauses.end() &&
+             "There are at least 2 clauses of the specified kind");
+      return *Clauses.begin();
+    }
+    return nullptr;
+  }
+
+  /// Returns true if the current directive has one or more clauses of a
+  /// specific kind.
+  template <typename SpecificClause>
+  bool hasClausesOfKind() const {
+    auto Clauses = getClausesOfKind<SpecificClause>();
+    return Clauses.begin() != Clauses.end();
+  }
 
   /// Returns starting location of directive kind.
   SourceLocation getBeginLoc() const { return StartLoc; }

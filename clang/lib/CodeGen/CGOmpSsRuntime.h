@@ -32,6 +32,12 @@ class Address;
 class CodeGenFunction;
 class CodeGenModule;
 
+struct OSSTaskDataTy final {
+  SmallVector<const Expr *, 4> SharedVars;
+  SmallVector<const Expr *, 4> PrivateVars;
+  SmallVector<const Expr *, 4> FirstprivateVars;
+};
+
 class CGOmpSsRuntime {
 protected:
   CodeGenModule &CGM;
@@ -43,7 +49,10 @@ public:
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);
-  virtual void emitTaskCall(CodeGenFunction &CGF, SourceLocation Loc);
+  virtual void emitTaskCall(CodeGenFunction &CGF,
+                            const OSSExecutableDirective &D,
+                            SourceLocation Loc,
+                            const OSSTaskDataTy &Data);
 
 };
 

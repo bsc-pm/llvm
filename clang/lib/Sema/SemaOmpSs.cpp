@@ -717,7 +717,18 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
       S.Diag(ELoc, diag::err_oss_expected_var_name) << ERange;
       return nullptr;
   }
-  return getCanonicalDecl(DE->getDecl());
+
+  auto *VD = dyn_cast<VarDecl>(DE->getDecl());
+  QualType Type = VD->getType();
+  if (!Type.isPODType(S.Context)) {
+      S.Diag(ELoc, diag::err_oss_pod_not_supported) << ERange;
+      return nullptr;
+  }
+  if (Type->isVariableArrayType()) {
+      S.Diag(ELoc, diag::err_oss_vla_not_supported) << ERange;
+      return nullptr;
+  }
+  return getCanonicalDecl(VD);
 }
 
 OSSClause *

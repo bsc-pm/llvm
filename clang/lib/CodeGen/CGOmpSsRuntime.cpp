@@ -29,20 +29,45 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/SemaDiagnostic.h"
-#include <cassert>
+#include "llvm/IR/Intrinsics.h"
 
 using namespace clang;
 using namespace CodeGen;
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                       SourceLocation Loc) {
-  DiagnosticsEngine &Diags = CGM.getDiags();
-  Diags.Report(Loc, diag::err_oss_taskwait_codegen_not_implemented);
+  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::ompss_marker);
+  CGF.Builder.CreateCall(Callee,
+                         {},
+                         {llvm::OperandBundleDef("kind",
+                                                 llvm::ConstantDataArray::getString(CGM.getLLVMContext(),
+                                                                                    "taskwait"))});
 }
 
 void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
-                                  SourceLocation Loc) {
-  DiagnosticsEngine &Diags = CGM.getDiags();
-  Diags.Report(Loc, diag::err_oss_task_codegen_not_implemented);
+                                  const OSSExecutableDirective &D,
+                                  SourceLocation Loc,
+                                  const OSSTaskDataTy &Data) {
+  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_entry);
+  SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
+  TaskInfo.emplace_back("kind", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "task"));
+  for (const Expr *E : Data.SharedVars) {
+    const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+    Address Addr = CGF.GetAddrOfLocalVar(VD);
+    TaskInfo.emplace_back("shared", Addr.getPointer());
+  }
+  for (const Expr *E : Data.PrivateVars) {
+    const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+    Address Addr = CGF.GetAddrOfLocalVar(VD);
+    TaskInfo.emplace_back("private", Addr.getPointer());
+  }
+  for (const Expr *E : Data.FirstprivateVars) {
+    const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+    Address Addr = CGF.GetAddrOfLocalVar(VD);
+    TaskInfo.emplace_back("firstprivate", Addr.getPointer());
+  }
+  CGF.Builder.CreateCall(Callee,
+                         {},
+                         llvm::makeArrayRef(TaskInfo));
 }
 
