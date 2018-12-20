@@ -69,5 +69,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   CGF.Builder.CreateCall(Callee,
                          {},
                          llvm::makeArrayRef(TaskInfo));
+
+  CGF.EmitStmt(D.getAssociatedStmt());
 }
 

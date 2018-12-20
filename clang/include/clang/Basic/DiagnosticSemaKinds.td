@@ -9484,10 +9484,6 @@ def err_std_compare_type_not_supported : Error<
    "the type does not have the expected form}1">;
 
 // OmpSs errors
-def err_oss_taskwait_codegen_not_implemented : Error<
- "oss taskwait codegen not supported yet">;
-def err_oss_task_codegen_not_implemented : Error<
- "oss task codegen not supported yet">;
 def err_oss_unexpected_clause_value : Error<
   "expected %0 in OmpSs-2 clause '%1'">;
 def err_oss_depend_weak_required : Error<
