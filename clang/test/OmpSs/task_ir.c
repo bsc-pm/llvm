@@ -15,3 +15,4 @@ int main(void) {
 // CHECK-NEXT: %2 = load i32*, i32** %pi, align 8
 // CHECK-NEXT: store i32 %1, i32* %2, align 4
 // CHECK-NEXT: store i32 %1, i32* %i, align 4
+// CHECK-NEXT: call void @llvm.ompss.region.exit(token %0)

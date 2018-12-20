@@ -48,7 +48,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   const OSSExecutableDirective &D,
                                   SourceLocation Loc,
                                   const OSSTaskDataTy &Data) {
-  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_entry);
+  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_entry);
+  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("kind", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "task"));
   for (const Expr *E : Data.SharedVars) {
@@ -66,10 +67,15 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     Address Addr = CGF.GetAddrOfLocalVar(VD);
     TaskInfo.emplace_back("firstprivate", Addr.getPointer());
   }
-  CGF.Builder.CreateCall(Callee,
-                         {},
-                         llvm::makeArrayRef(TaskInfo));
+
+  llvm::Value *Result =
+    CGF.Builder.CreateCall(EntryCallee,
+                           {},
+                           llvm::makeArrayRef(TaskInfo));
 
   CGF.EmitStmt(D.getAssociatedStmt());
+
+  CGF.Builder.CreateCall(ExitCallee,
+                         Result);
 }
 
