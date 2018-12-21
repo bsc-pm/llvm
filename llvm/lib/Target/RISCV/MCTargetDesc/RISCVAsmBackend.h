@@ -49,29 +49,8 @@ public:
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;
 
-  // If linker relaxation is enabled, or the relax option had previously been
-  // enabled, always emit relocations even if the fixup can be resolved. This is
-  // necessary for correctness as offsets may change during relaxation.
   bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
-                             const MCValue &Target) override {
-    if (STI.getFeatureBits()[RISCV::FeatureRelax] || ForceRelocs)
-      return true;
-
-    RISCV::Fixups Kind = static_cast<RISCV::Fixups>(Fixup.getKind());
-    // FIXME: Is there a case where pcrel accesses could be resolved?
-    // If so, it looks like we will want to finely-grain distinguish those
-    // that don't.
-    switch (Kind) {
-    default:
-      return false;
-    case RISCV::fixup_riscv_got_hi20:
-    case RISCV::fixup_riscv_pcrel_hi20:
-    case RISCV::fixup_riscv_pcrel_lo12_i:
-    case RISCV::fixup_riscv_pcrel_lo12_s:
-    case RISCV::fixup_riscv_call_plt:
-      return true;
-    }
-  }
+                             const MCValue &Target) override;
 
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
                             const MCRelaxableFragment *DF,
