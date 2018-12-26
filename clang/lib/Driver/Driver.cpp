@@ -2062,7 +2062,8 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
           Ty = types::TY_C;
         } else {
           // Otherwise lookup by extension.
-          // Fallback is C if invoked as C preprocessor or Object otherwise.
+          // Fallback is C if invoked as C preprocessor, C++ if invoked with
+          // clang-cl /E, or Object otherwise.
           // We use a host hook here because Darwin at least has its own
           // idea of what .s is.
           if (const char *Ext = strrchr(Value, '.'))
@@ -2071,6 +2072,8 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
           if (Ty == types::TY_INVALID) {
             if (CCCIsCPP())
               Ty = types::TY_C;
+            else if (IsCLMode() && Args.hasArgNoClaim(options::OPT_E))
+              Ty = types::TY_CXX;
             else
               Ty = types::TY_Object;
           }
