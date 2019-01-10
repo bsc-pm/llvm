@@ -64,7 +64,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     addRegisterClass(MVT::v8i16, &WebAssembly::V128RegClass);
     addRegisterClass(MVT::v4i32, &WebAssembly::V128RegClass);
     addRegisterClass(MVT::v4f32, &WebAssembly::V128RegClass);
-    if (Subtarget->hasUnimplementedSIMD128()) {
+    if (Subtarget->hasSIMD128Unimplemented()) {
       addRegisterClass(MVT::v2i64, &WebAssembly::V128RegClass);
       addRegisterClass(MVT::v2f64, &WebAssembly::V128RegClass);
     }
@@ -129,7 +129,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
       for (auto T : {MVT::v16i8, MVT::v8i16, MVT::v4i32}) {
         setOperationAction(Op, T, Expand);
       }
-      if (Subtarget->hasUnimplementedSIMD128()) {
+      if (Subtarget->hasSIMD128Unimplemented()) {
         setOperationAction(Op, MVT::v2i64, Expand);
       }
     }
@@ -143,7 +143,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     for (auto T : {MVT::v16i8, MVT::v8i16, MVT::v4i32, MVT::v4f32}) {
       setOperationAction(ISD::VECTOR_SHUFFLE, T, Custom);
     }
-    if (Subtarget->hasUnimplementedSIMD128()) {
+    if (Subtarget->hasSIMD128Unimplemented()) {
       setOperationAction(ISD::VECTOR_SHUFFLE, MVT::v2i64, Custom);
       setOperationAction(ISD::VECTOR_SHUFFLE, MVT::v2f64, Custom);
     }
@@ -154,7 +154,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     for (auto T : {MVT::v16i8, MVT::v8i16, MVT::v4i32})
       for (auto Op : {ISD::SHL, ISD::SRA, ISD::SRL})
         setOperationAction(Op, T, Custom);
-    if (Subtarget->hasUnimplementedSIMD128())
+    if (Subtarget->hasSIMD128Unimplemented())
       for (auto Op : {ISD::SHL, ISD::SRA, ISD::SRL})
         setOperationAction(Op, MVT::v2i64, Custom);
   }
@@ -164,7 +164,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     for (auto Op : {ISD::VSELECT, ISD::SELECT_CC, ISD::SELECT}) {
       for (auto T : {MVT::v16i8, MVT::v8i16, MVT::v4i32, MVT::v4f32})
         setOperationAction(Op, T, Expand);
-      if (Subtarget->hasUnimplementedSIMD128())
+      if (Subtarget->hasSIMD128Unimplemented())
         for (auto T : {MVT::v2i64, MVT::v2f64})
           setOperationAction(Op, T, Expand);
     }
@@ -221,7 +221,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
   }
 
   // Expand additional SIMD ops that V8 hasn't implemented yet
-  if (Subtarget->hasSIMD128() && !Subtarget->hasUnimplementedSIMD128()) {
+  if (Subtarget->hasSIMD128() && !Subtarget->hasSIMD128Unimplemented()) {
     setOperationAction(ISD::FSQRT, MVT::v4f32, Expand);
     setOperationAction(ISD::FDIV, MVT::v4f32, Expand);
   }
@@ -232,7 +232,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
       setOperationAction(ISD::EXTRACT_VECTOR_ELT, T, Custom);
       setOperationAction(ISD::INSERT_VECTOR_ELT, T, Custom);
     }
-    if (Subtarget->hasUnimplementedSIMD128()) {
+    if (Subtarget->hasSIMD128Unimplemented()) {
       for (auto T : {MVT::v2i64, MVT::v2f64}) {
         setOperationAction(ISD::EXTRACT_VECTOR_ELT, T, Custom);
         setOperationAction(ISD::INSERT_VECTOR_ELT, T, Custom);

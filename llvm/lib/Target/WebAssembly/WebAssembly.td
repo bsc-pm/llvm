@@ -26,9 +26,9 @@ include "llvm/Target/Target.td"
 def FeatureSIMD128 : SubtargetFeature<"simd128", "HasSIMD128", "true",
                                       "Enable 128-bit SIMD">;
 
-def FeatureUnimplementedSIMD128 :
-      SubtargetFeature<"unimplemented-simd128",
-                       "HasUnimplementedSIMD128", "true",
+def FeatureSIMD128Unimplemented :
+      SubtargetFeature<"simd128-unimplemented",
+                       "HasSIMD128Unimplemented", "true",
                        "Enable 128-bit SIMD not yet implemented in engines",
                        [FeatureSIMD128]>;
 
