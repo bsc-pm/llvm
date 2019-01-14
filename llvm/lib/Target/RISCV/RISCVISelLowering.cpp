@@ -700,7 +700,7 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
   case ISD::ANY_EXTEND:
   case ISD::SIGN_EXTEND: {
     SDValue Src = N->getOperand(0);
-    if (isF32ToI32Bitcast(Src)) {
+    if (Subtarget.hasStdExtF() && isF32ToI32Bitcast(Src)) {
       assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
       return DCI.CombineTo(N,
                            DAG.getNode(RISCVISD::BitcastAndSextF32ToI64,
@@ -723,7 +723,7 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
   }
   case ISD::ZERO_EXTEND: {
     SDValue Op0 = N->getOperand(0);
-    if (isF32ToI32Bitcast(Op0)) {
+    if (Subtarget.hasStdExtF() && isF32ToI32Bitcast(Op0)) {
       assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
       SDValue FPConv = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, SDLoc(N),
                                    MVT::i64, Op0.getOperand(0));
@@ -734,8 +734,8 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
   }
   case ISD::BITCAST: {
     SDValue Op0 = N->getOperand(0);
-    if (N->getValueType(0) == MVT::f32 && Op0.getOpcode() == ISD::TRUNCATE &&
-        Op0.getValueType() == MVT::i32 &&
+    if (Subtarget.hasStdExtF() && N->getValueType(0) == MVT::f32 &&
+        Op0.getOpcode() == ISD::TRUNCATE && Op0.getValueType() == MVT::i32 &&
         Op0.getOperand(0).getValueType() == MVT::i64) {
       assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
       SDValue FPConv = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, SDLoc(N),
@@ -756,6 +756,7 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     // If the input to BitcastAndSextF32ToI64 is just TruncAndBitcastI64ToF32
     // then the operation is redundnat. Instead, use TruncAndBitcastI64ToF32
     // operand directly.
+    assert(Subtarget.hasStdExtF() && "This node should not have been emitted");
     SDValue Op0 = N->getOperand(0);
     if (Op0->getOpcode() != RISCVISD::TruncAndBitcastI64ToF32)
       break;
@@ -1201,7 +1202,10 @@ static SDValue convertLocVTToValVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
-    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+    const RISCVSubtarget &Subtarget =
+        static_cast<const RISCVSubtarget&>(DAG.getSubtarget());
+    if (Subtarget.hasStdExtF() && VA.getLocVT() == MVT::i64 &&
+        VA.getValVT() == MVT::f32) {
       Val = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, DL, MVT::f32, Val);
       break;
     }
@@ -1240,7 +1244,10 @@ static SDValue convertValVTToLocVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
-    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+    const RISCVSubtarget &Subtarget =
+        static_cast<const RISCVSubtarget &>(DAG.getSubtarget());
+    if (Subtarget.hasStdExtF() && VA.getLocVT() == MVT::i64 &&
+        VA.getValVT() == MVT::f32) {
       Val = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, DL, MVT::i64, Val);
       break;
     }
