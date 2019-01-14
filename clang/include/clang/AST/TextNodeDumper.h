@@ -159,6 +159,10 @@ public:
 
   void Visit(const Stmt *Node);
 
+  void Visit(const Type *T);
+
+  void Visit(QualType T);
+
   void dumpPointer(const void *Ptr);
   void dumpLocation(SourceLocation Loc);
   void dumpSourceRange(SourceRange R);
