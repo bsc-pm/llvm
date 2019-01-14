@@ -333,11 +333,10 @@ define float @fmuladd_f32(float %a, float %b, float %c) nounwind {
 ;
 ; RV64IF-LABEL: fmuladd_f32:
 ; RV64IF:       # %bb.0:
-; RV64IF-NEXT:    fmv.w.x ft0, a1
-; RV64IF-NEXT:    fmv.w.x ft1, a0
-; RV64IF-NEXT:    fmul.s ft0, ft1, ft0
-; RV64IF-NEXT:    fmv.w.x ft1, a2
-; RV64IF-NEXT:    fadd.s ft0, ft0, ft1
+; RV64IF-NEXT:    fmv.w.x ft0, a2
+; RV64IF-NEXT:    fmv.w.x ft1, a1
+; RV64IF-NEXT:    fmv.w.x ft2, a0
+; RV64IF-NEXT:    fmadd.s ft0, ft2, ft1, ft0
 ; RV64IF-NEXT:    fmv.x.w a0, ft0
 ; RV64IF-NEXT:    ret
   %1 = call float @llvm.fmuladd.f32(float %a, float %b, float %c)

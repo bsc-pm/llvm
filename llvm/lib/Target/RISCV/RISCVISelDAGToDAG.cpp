@@ -163,12 +163,19 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
       break;
     SDValue Op0 = Node->getOperand(0);
     EVT Op1VT = cast<VTSDNode>(Node->getOperand(1))->getVT();
-    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_SINT &&
-        Op0.getOperand(0).getValueType() == MVT::f32) {
+    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_SINT) {
+      EVT FPVT = Op0.getOperand(0).getValueType();
+      unsigned Opcode;
+      if (FPVT == MVT::f32)
+        Opcode = RISCV::FCVT_W_S;
+      else if (FPVT == MVT::f64)
+        Opcode = RISCV::FCVT_W_D;
+      else
+        llvm_unreachable("Unexpected FP type");
+
       // Round-to-zero must be used.
       SDValue RndMode = CurDAG->getTargetConstant(1, SDLoc(Node), MVT::i64);
-      CurDAG->SelectNodeTo(Node, RISCV::FCVT_W_S, MVT::i64, Op0.getOperand(0),
-                           RndMode);
+      CurDAG->SelectNodeTo(Node, Opcode, MVT::i64, Op0.getOperand(0), RndMode);
       return;
     }
     break;
@@ -178,12 +185,19 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
       break;
     SDValue Op0 = Node->getOperand(0);
     EVT Op1VT = cast<VTSDNode>(Node->getOperand(1))->getVT();
-    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_UINT &&
-        Op0.getOperand(0).getValueType() == MVT::f32) {
+    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_UINT) {
+      EVT FPVT = Op0.getOperand(0).getValueType();
+      unsigned Opcode;
+      if (FPVT == MVT::f32)
+        Opcode = RISCV::FCVT_WU_S;
+      else if (FPVT == MVT::f64)
+        Opcode = RISCV::FCVT_WU_D;
+      else
+        llvm_unreachable("Unexpected FP type");
+
       // Round-to-zero must be used.
       SDValue RndMode = CurDAG->getTargetConstant(1, SDLoc(Node), MVT::i64);
-      CurDAG->SelectNodeTo(Node, RISCV::FCVT_WU_S, MVT::i64, Op0.getOperand(0),
-                           RndMode);
+      CurDAG->SelectNodeTo(Node, Opcode, MVT::i64, Op0.getOperand(0), RndMode);
       return;
     }
     break;

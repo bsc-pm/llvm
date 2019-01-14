@@ -329,11 +329,20 @@ def : Pat<(uint_to_fp GPR:$rs1), (FCVT_D_WU GPR:$rs1)>;
 } // Predicates = [HasStdExtD, IsRV32]
 
 let Predicates = [HasStdExtD, IsRV64] in {
-// double->[u]int64. Round-to-zero must be used
-def : Pat<(fp_to_sint FPR64:$rs1), (FCVT_L_D $rs1, 0b001)>;
-def : Pat<(fp_to_uint FPR64:$rs1), (FCVT_LU_D $rs1, 0b001)>;
+def : Pat<(bitconvert GPR:$rs1), (FMV_D_X GPR:$rs1)>;
+def : Pat<(bitconvert FPR64:$rs1), (FMV_X_D FPR64:$rs1)>;
 
-// [u]int64->double
+// FP->[u]int32 are handled with custom selection code, because the root
+// assertsext node never reaches the tablegenerated matcher.
+
+// [u]int32->fp
+def : Pat<(sint_to_fp (sext_inreg GPR:$rs1, i32)), (FCVT_D_W $rs1)>;
+def : Pat<(uint_to_fp (zexti32 GPR:$rs1)), (FCVT_D_WU $rs1)>;
+
+def : Pat<(fp_to_sint FPR64:$rs1), (FCVT_L_D FPR64:$rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR64:$rs1), (FCVT_LU_D FPR64:$rs1, 0b001)>;
+
+// [u]int64->fp. Match GCC and default to using dynamic rounding mode.
 def : Pat<(sint_to_fp GPR:$rs1), (FCVT_D_L GPR:$rs1, 0b111)>;
 def : Pat<(uint_to_fp GPR:$rs1), (FCVT_D_LU GPR:$rs1, 0b111)>;
 } // Predicates = [HasStdExtD, IsRV64]

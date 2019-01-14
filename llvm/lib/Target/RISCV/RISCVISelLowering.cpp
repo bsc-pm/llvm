@@ -991,9 +991,15 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
   unsigned XLen = DL.getLargestLegalIntTypeSizeInBits();
   assert(XLen == 32 || XLen == 64);
   MVT XLenVT = XLen == 32 ? MVT::i32 : MVT::i64;
-  if (Subtarget.isSoftFloat() && ValVT == MVT::f32) {
-    LocVT = XLenVT;
-    LocInfo = CCValAssign::BCvt;
+  if (Subtarget.isSoftFloat()) {
+    if (ValVT == MVT::f32) {
+      LocVT = XLenVT;
+      LocInfo = CCValAssign::BCvt;
+    }
+    if (XLen == 64 && ValVT == MVT::f64) {
+      LocVT = MVT::i64;
+      LocInfo = CCValAssign::BCvt;
+    }
   }
 
   // Any return value split in to more than two values can't be returned
@@ -1131,8 +1137,9 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
     return false;
   }
 
-  if (ValVT == MVT::f32) {
-    LocVT = MVT::f32;
+  // When an f32 or f64 is passed on the stack, no bit-conversion is needed.
+  if (ValVT == MVT::f32 || ValVT == MVT::f64) {
+    LocVT = ValVT;
     LocInfo = CCValAssign::Full;
   }
   State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
@@ -1267,8 +1274,6 @@ static SDValue unpackFromMemLoc(SelectionDAG &DAG, SDValue Chain,
     ExtType = ISD::NON_EXTLOAD;
     break;
   }
-  if (ValVT == MVT::f32)
-    LocVT = MVT::f32;
   Val = DAG.getExtLoad(
       ExtType, DL, LocVT, Chain, FIN,
       MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI), ValVT);
