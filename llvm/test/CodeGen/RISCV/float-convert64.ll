@@ -15,9 +15,7 @@ entry:
 define dso_local float @u32tof32(i32 signext %x) nounwind {
 ; CHECK-LABEL: u32tof32:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    slli a0, a0, 32
-; CHECK-NEXT:    srli a0, a0, 32
-; CHECK-NEXT:    fcvt.s.lu fa0, a0
+; CHECK-NEXT:    fcvt.s.wu fa0, a0
 ; CHECK-NEXT:    ret
 entry:
   %conv = uitofp i32 %x to float

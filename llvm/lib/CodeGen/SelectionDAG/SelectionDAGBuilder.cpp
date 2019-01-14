@@ -9138,7 +9138,9 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
     for (unsigned i = 0, e = Ins.size(); i != e; ++i) {
       assert(InVals[i].getNode() &&
              "LowerFormalArguments emitted a null value!");
-      assert(EVT(Ins[i].VT) == InVals[i].getValueType() &&
+      auto A = EVT(Ins[i].VT);
+      auto B = InVals[i].getValueType();
+      assert(A == B &&
              "LowerFormalArguments emitted a value with the wrong type!");
     }
   });

@@ -156,6 +156,37 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
         return;
       }
     }
+    break;
+  }
+  case ISD::AssertSext: {
+    if (!Subtarget->is64Bit())
+      break;
+    SDValue Op0 = Node->getOperand(0);
+    EVT Op1VT = cast<VTSDNode>(Node->getOperand(1))->getVT();
+    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_SINT &&
+        Op0.getOperand(0).getValueType() == MVT::f32) {
+      // Round-to-zero must be used.
+      SDValue RndMode = CurDAG->getTargetConstant(1, SDLoc(Node), MVT::i64);
+      CurDAG->SelectNodeTo(Node, RISCV::FCVT_W_S, MVT::i64, Op0.getOperand(0),
+                           RndMode);
+      return;
+    }
+    break;
+  }
+  case ISD::AssertZext: {
+    if (!Subtarget->is64Bit())
+      break;
+    SDValue Op0 = Node->getOperand(0);
+    EVT Op1VT = cast<VTSDNode>(Node->getOperand(1))->getVT();
+    if (Op1VT == MVT::i32 && Op0.getOpcode() == ISD::FP_TO_UINT &&
+        Op0.getOperand(0).getValueType() == MVT::f32) {
+      // Round-to-zero must be used.
+      SDValue RndMode = CurDAG->getTargetConstant(1, SDLoc(Node), MVT::i64);
+      CurDAG->SelectNodeTo(Node, RISCV::FCVT_WU_S, MVT::i64, Op0.getOperand(0),
+                           RndMode);
+      return;
+    }
+    break;
   }
   }
 

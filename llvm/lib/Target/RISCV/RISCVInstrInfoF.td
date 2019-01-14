@@ -16,11 +16,17 @@
 // RISC-V specific DAG Nodes.
 //===----------------------------------------------------------------------===//
 
-def SDT_RISCVF32ToI64 : SDTypeProfile<1, 1, [SDTCisVT<0, i64>, SDTCisVT<1, f32>]>;
-def SDT_RISCVI64ToF32 : SDTypeProfile<1, 1, [SDTCisVT<0, f32>, SDTCisVT<1, i64>]>;
+def SDT_RISCVTruncAndBitcastI64ToF32
+    : SDTypeProfile<1, 1, [SDTCisVT<0, f32>, SDTCisVT<1, i64>]>;
+def SDT_RISCVBitcastAndSextF32ToI64
+    : SDTypeProfile<1, 1, [SDTCisVT<0, i64>, SDTCisVT<1, f32>]>;
 
-def RISCVF32ToI64 : SDNode<"RISCVISD::F32ToI64", SDT_RISCVF32ToI64>;
-def RISCVI64ToF32 : SDNode<"RISCVISD::I64ToF32", SDT_RISCVI64ToF32>;
+def RISCVTruncAndBitcastI64ToF32
+    : SDNode<"RISCVISD::TruncAndBitcastI64ToF32",
+             SDT_RISCVTruncAndBitcastI64ToF32>;
+def RISCVBitcastAndSextF32ToI64
+    : SDNode<"RISCVISD::BitcastAndSextF32ToI64",
+             SDT_RISCVBitcastAndSextF32ToI64>;
 
 //===----------------------------------------------------------------------===//
 // Operand and SDNode transformation definitions.
@@ -389,10 +395,34 @@ def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_LU_S $rs1, 0b001)>;
 def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_L $rs1, 0b111)>;
 def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_LU $rs1, 0b111)>;
 
-// bitmove f32 to i64. Used for soft-float ABI in RV64F
-def : Pat<(RISCVF32ToI64 FPR32:$src),
-          (FMV_X_W FPR32:$src)>;
-// bitmove i64 to f32. Used for soft-float ABI in RV64F
-def : Pat<(RISCVI64ToF32 GPR:$src),
-          (FMV_W_X GPR:$src)>;
+def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_W $rs1, 0b111)>;
+def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_WU $rs1, 0b111)>;
+} // Predicates = [HasStdExtF, IsRV32]
+
+let Predicates = [HasStdExtF, IsRV32] in {
+// FP->[u]int. Round-to-zero must be used
+def : Pat<(fp_to_sint FPR32:$rs1), (FCVT_W_S $rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_WU_S $rs1, 0b001)>;
+
+// [u]int->fp. Match GCC and default to using dynamic rounding mode.
+def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_W $rs1, 0b111)>;
+def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_WU $rs1, 0b111)>;
+} // Predicates = [HasStdExtF, IsRV32]
+
+let Predicates = [HasStdExtF, IsRV64] in {
+def : Pat<(RISCVTruncAndBitcastI64ToF32 GPR:$src), (FMV_W_X GPR:$src)>;
+def : Pat<(RISCVBitcastAndSextF32ToI64 FPR32:$src), (FMV_X_W FPR32:$src)>;
+
+// FP->[u]int32 are handled with custom selection code, because the root
+// assertsext node never reaches the tablegenerated matcher.
+
+// FP->[u]int64
+def : Pat<(fp_to_sint FPR32:$rs1), (FCVT_L_S $rs1, 0b001)>;
+def : Pat<(fp_to_uint FPR32:$rs1), (FCVT_LU_S $rs1, 0b001)>;
+
+// [u]int->fp. Match GCC and default to using dynamic rounding mode.
+def : Pat<(sint_to_fp (sext_inreg GPR:$rs1, i32)), (FCVT_S_W $rs1, 0b111)>;
+def : Pat<(uint_to_fp (zexti32 GPR:$rs1)), (FCVT_S_WU $rs1, 0b111)>;
+def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_L $rs1, 0b111)>;
+def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_LU $rs1, 0b111)>;
 } // Predicates = [HasStdExtF, IsRV64]

@@ -133,6 +133,13 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
       setOperationAction(Op, MVT::f32, Expand);
   }
 
+  if (Subtarget.hasStdExtF() && Subtarget.is64Bit()) {
+    setTargetDAGCombine(ISD::BITCAST);
+    setTargetDAGCombine(ISD::ANY_EXTEND);
+    setTargetDAGCombine(ISD::SIGN_EXTEND);
+    setTargetDAGCombine(ISD::ZERO_EXTEND);
+  }
+
   if (Subtarget.hasStdExtD()) {
     setOperationAction(ISD::FMINNUM, MVT::f64, Legal);
     setOperationAction(ISD::FMAXNUM, MVT::f64, Legal);
@@ -659,6 +666,11 @@ static bool isVariableSDivUDivURem(SDValue Val) {
   }
 }
 
+static bool isF32ToI32Bitcast(SDValue Val) {
+  return Val.getOpcode() == ISD::BITCAST && Val.getValueType() == MVT::i32 &&
+         Val.getOperand(0).getValueType() == MVT::f32;
+}
+
 SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
                                                DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -685,11 +697,22 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     return DCI.CombineTo(
         N, DAG.getNode(N->getOpcode(), DL, LHS.getValueType(), LHS, NewRHS));
   }
-  case ISD::ANY_EXTEND: {
+  case ISD::ANY_EXTEND:
+  case ISD::SIGN_EXTEND: {
+    SDValue Src = N->getOperand(0);
+    if (isF32ToI32Bitcast(Src)) {
+      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
+      return DCI.CombineTo(N,
+                           DAG.getNode(RISCVISD::BitcastAndSextF32ToI64,
+                                       SDLoc(N), MVT::i64, Src.getOperand(0)));
+    }
+
+    if (N->getOpcode() == ISD::SIGN_EXTEND)
+      break;
+
     // If any-extending an i32 variable-length shift or sdiv/udiv/urem to i64,
     // then instead sign-extend in order to increase the chance of being able
     // to select the sllw/srlw/sraw/divw/divuw/remuw instructions.
-    SDValue Src = N->getOperand(0);
     if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
       break;
     if (!isVariableShift(Src) &&
@@ -698,6 +721,29 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     SDLoc DL(N);
     return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src));
   }
+  case ISD::ZERO_EXTEND: {
+    SDValue Op0 = N->getOperand(0);
+    if (isF32ToI32Bitcast(Op0)) {
+      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
+      SDValue FPConv = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, SDLoc(N),
+                                   MVT::i64, Op0.getOperand(0));
+      SDValue ZExt = DAG.getZeroExtendInReg(FPConv, SDLoc(N), MVT::i32);
+      return DCI.CombineTo(N, ZExt);
+    }
+    break;
+  }
+  case ISD::BITCAST: {
+    SDValue Op0 = N->getOperand(0);
+    if (N->getValueType(0) == MVT::f32 && Op0.getOpcode() == ISD::TRUNCATE &&
+        Op0.getValueType() == MVT::i32 &&
+        Op0.getOperand(0).getValueType() == MVT::i64) {
+      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
+      SDValue FPConv = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, SDLoc(N),
+                                   MVT::f32, Op0.getOperand(0));
+      return DCI.CombineTo(N, FPConv);
+    }
+    break;
+  }
   case RISCVISD::SplitF64: {
     // If the input to SplitF64 is just BuildPairF64 then the operation is
     // redundant. Instead, use BuildPairF64's operands directly.
@@ -705,6 +751,15 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     if (Op0->getOpcode() != RISCVISD::BuildPairF64)
       break;
     return DCI.CombineTo(N, Op0.getOperand(0), Op0.getOperand(1));
+  }
+  case RISCVISD::BitcastAndSextF32ToI64: {
+    // If the input to BitcastAndSextF32ToI64 is just TruncAndBitcastI64ToF32
+    // then the operation is redundnat. Instead, use TruncAndBitcastI64ToF32
+    // operand directly.
+    SDValue Op0 = N->getOperand(0);
+    if (Op0->getOpcode() != RISCVISD::TruncAndBitcastI64ToF32)
+      break;
+    return DCI.CombineTo(N, Op0.getOperand(0));
   }
   }
 
@@ -936,14 +991,9 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
   unsigned XLen = DL.getLargestLegalIntTypeSizeInBits();
   assert(XLen == 32 || XLen == 64);
   MVT XLenVT = XLen == 32 ? MVT::i32 : MVT::i64;
-  if (Subtarget.isSoftFloat()) {
-    if (XLen == 32 && ValVT == MVT::f32) {
-      LocVT = MVT::i32;
-      LocInfo = CCValAssign::BCvt;
-    } else if (XLen == 64 && ValVT == MVT::f64) {
-      LocVT = MVT::i64;
-      LocInfo = CCValAssign::BCvt;
-    }
+  if (Subtarget.isSoftFloat() && ValVT == MVT::f32) {
+    LocVT = XLenVT;
+    LocInfo = CCValAssign::BCvt;
   }
 
   // Any return value split in to more than two values can't be returned
@@ -1144,6 +1194,10 @@ static SDValue convertLocVTToValVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
+    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+      Val = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, DL, MVT::f32, Val);
+      break;
+    }
     Val = DAG.getNode(ISD::BITCAST, DL, VA.getValVT(), Val);
     break;
   }
@@ -1179,6 +1233,10 @@ static SDValue convertValVTToLocVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
+    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+      Val = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, DL, MVT::i64, Val);
+      break;
+    }
     Val = DAG.getNode(ISD::BITCAST, DL, LocVT, Val);
     break;
   }
@@ -1205,9 +1263,12 @@ static SDValue unpackFromMemLoc(SelectionDAG &DAG, SDValue Chain,
     llvm_unreachable("Unexpected CCValAssign::LocInfo");
   case CCValAssign::Full:
   case CCValAssign::Indirect:
+  case CCValAssign::BCvt:
     ExtType = ISD::NON_EXTLOAD;
     break;
   }
+  if (ValVT == MVT::f32)
+    LocVT = MVT::f32;
   Val = DAG.getExtLoad(
       ExtType, DL, LocVT, Chain, FIN,
       MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI), ValVT);
@@ -1249,30 +1310,6 @@ static SDValue unpackF64OnRV32DSoftABI(SelectionDAG &DAG, SDValue Chain,
     Hi = DAG.getCopyFromReg(Chain, DL, HiVReg, MVT::i32);
   }
   return DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
-}
-
-static SDValue unpackF32onRV64SoftABI(SelectionDAG &DAG, SDValue Chain,
-                                      const CCValAssign &VA, const SDLoc &DL) {
-  assert(VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32 &&
-         "Unexpected VA");
-  MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo &MFI = MF.getFrameInfo();
-  MachineRegisterInfo &RegInfo = MF.getRegInfo();
-
-  if (VA.isMemLoc()) {
-    // f32 is passed on the stack.
-    int FI = MFI.CreateFixedObject(8, VA.getLocMemOffset(), /*Immutable=*/true);
-    SDValue FIN = DAG.getFrameIndex(FI, MVT::i64);
-    return DAG.getLoad(MVT::f32, DL, Chain, FIN,
-                       MachinePointerInfo::getFixedStack(MF, FI));
-  }
-
-  assert(VA.isRegLoc() && "Expected register VA assignment");
-
-  unsigned VReg = RegInfo.createVirtualRegister(&RISCV::GPRRegClass);
-  RegInfo.addLiveIn(VA.getLocReg(), VReg);
-  SDValue Val = DAG.getCopyFromReg(Chain, DL, VReg, MVT::i64);
-  return DAG.getNode(RISCVISD::I64ToF32, DL, MVT::f32, Val);
 }
 
 // Transform physical registers into virtual registers.
@@ -1325,10 +1362,6 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
         (Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
         VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64)
       ArgValue = unpackF64OnRV32DSoftABI(DAG, Chain, VA, DL);
-    // Passing f32 on RV64{F,D} with a soft float must be handled as special case
-    else if (XLenVT == MVT::i64 && Subtarget.isSoftFloat() &&
-        VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32)
-      ArgValue = unpackF32onRV64SoftABI(DAG, Chain, VA, DL);
     else if (VA.isRegLoc())
       ArgValue = unpackFromRegLoc(DAG, Chain, VA, DL);
     else
@@ -1583,9 +1616,6 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
         XLenVT == MVT::i32 &&
         (Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
         VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64;
-    bool IsF32onRV64SoftABI = XLenVT == MVT::i64 && Subtarget.isSoftFloat() &&
-                              VA.getLocVT() == MVT::i64 &&
-                              VA.getValVT() == MVT::f32;
     if (IsF64OnRV32DSoftABI && VA.isRegLoc()) {
       SDValue SplitF64 = DAG.getNode(
           RISCVISD::SplitF64, DL, DAG.getVTList(MVT::i32, MVT::i32), ArgValue);
@@ -1608,9 +1638,6 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
         unsigned RegHigh = RegLo + 1;
         RegsToPass.push_back(std::make_pair(RegHigh, Hi));
       }
-      continue;
-    } else if (IsF32onRV64SoftABI && VA.isRegLoc()) {
-      ArgValue = DAG.getNode(RISCVISD::F32ToI64, DL, VA.getLocVT(), ArgValue);
       continue;
     }
 
@@ -1830,15 +1857,6 @@ RISCVTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
       Chain = DAG.getCopyToReg(Chain, DL, RegHi, Hi, Glue);
       Glue = Chain.getValue(1);
       RetOps.push_back(DAG.getRegister(RegHi, MVT::i32));
-    } else if (Subtarget.getXLenVT() == MVT::i64 && Subtarget.isSoftFloat() &&
-               VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
-      // Handle returning f32 on RV64{F,D} with a soft float ABI
-      Val = DAG.getNode(RISCVISD::F32ToI64, DL, MVT::i64, Val);
-      Chain = DAG.getCopyToReg(Chain, DL, VA.getLocReg(), Val, Glue);
-
-      // Guarantee that all emitted copies are stuck together.
-      Glue = Chain.getValue(1);
-      RetOps.push_back(DAG.getRegister(VA.getLocReg(), VA.getLocVT()));
     } else {
       // Handle a 'normal' return.
       Val = convertValVTToLocVT(DAG, Val, VA, DL);
@@ -1898,14 +1916,14 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::CALL";
   case RISCVISD::SELECT_CC:
     return "RISCVISD::SELECT_CC";
+  case RISCVISD::TruncAndBitcastI64ToF32:
+    return "RISCVISD::TruncAndBitcastI64ToF32";
+  case RISCVISD::BitcastAndSextF32ToI64:
+    return "RISCVISD::BitcastAndSextF32ToI64";
   case RISCVISD::BuildPairF64:
     return "RISCVISD::BuildPairF64";
   case RISCVISD::SplitF64:
     return "RISCVISD::SplitF64";
-  case RISCVISD::F32ToI64:
-    return "RISCVISD::F32ToI64";
-  case RISCVISD::I64ToF32:
-    return "RISCVISD::I64ToF32";
   case RISCVISD::TAIL:
     return "RISCVISD::TAIL";
   case RISCVISD::WRAPPER_PIC:
