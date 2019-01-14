@@ -122,6 +122,9 @@ namespace  {
     void VisitComplexType(const ComplexType *T) {
       dumpTypeAsChild(T->getElementType());
     }
+    void VisitLocInfoType(const LocInfoType *T) {
+      dumpTypeAsChild(T->getTypeSourceInfo()->getType());
+    }
     void VisitPointerType(const PointerType *T) {
       dumpTypeAsChild(T->getPointeeType());
     }
@@ -419,57 +422,20 @@ void ASTDumper::dumpTypeAsChild(QualType T) {
     return dumpTypeAsChild(SQT.Ty);
 
   dumpChild([=] {
-    OS << "QualType";
-    NodeDumper.dumpPointer(T.getAsOpaquePtr());
-    OS << " ";
-    NodeDumper.dumpBareType(T, false);
-    OS << " " << T.split().Quals.getAsString();
+    NodeDumper.Visit(T);
     dumpTypeAsChild(T.split().Ty);
   });
 }
 
 void ASTDumper::dumpTypeAsChild(const Type *T) {
   dumpChild([=] {
-    if (!T) {
-      ColorScope Color(OS, ShowColors, NullColor);
-      OS << "<<<NULL>>>";
+    NodeDumper.Visit(T);
+    if (!T)
       return;
-    }
-    if (const LocInfoType *LIT = llvm::dyn_cast<LocInfoType>(T)) {
-      {
-        ColorScope Color(OS, ShowColors, TypeColor);
-        OS << "LocInfo Type";
-      }
-      NodeDumper.dumpPointer(T);
-      dumpTypeAsChild(LIT->getTypeSourceInfo()->getType());
-      return;
-    }
-
-    {
-      ColorScope Color(OS, ShowColors, TypeColor);
-      OS << T->getTypeClassName() << "Type";
-    }
-    NodeDumper.dumpPointer(T);
-    OS << " ";
-    NodeDumper.dumpBareType(QualType(T, 0), false);
+    TypeVisitor<ASTDumper>::Visit(T);
 
     QualType SingleStepDesugar =
         T->getLocallyUnqualifiedSingleStepDesugaredType();
-    if (SingleStepDesugar != QualType(T, 0))
-      OS << " sugar";
-    if (T->isDependentType())
-      OS << " dependent";
-    else if (T->isInstantiationDependentType())
-      OS << " instantiation_dependent";
-    if (T->isVariablyModifiedType())
-      OS << " variably_modified";
-    if (T->containsUnexpandedParameterPack())
-      OS << " contains_unexpanded_pack";
-    if (T->isFromAST())
-      OS << " imported";
-
-    TypeVisitor<ASTDumper>::Visit(T);
-
     if (SingleStepDesugar != QualType(T, 0))
       dumpTypeAsChild(SingleStepDesugar);
   });
