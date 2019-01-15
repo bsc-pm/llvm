@@ -3861,6 +3861,124 @@ let TargetPrefix = "x86" in {
                      llvm_i32_ty, llvm_i32_ty], [IntrArgMemOnly]>;
 }
 
+// AVX512 gather intrinsics that use vXi1 masks.
+let TargetPrefix = "x86" in {
+  def int_x86_avx512_mask_gather_dpd_512  :
+          Intrinsic<[llvm_v8f64_ty], [llvm_v8f64_ty, llvm_ptr_ty,
+                     llvm_v8i32_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_dps_512  :
+          Intrinsic<[llvm_v16f32_ty], [llvm_v16f32_ty, llvm_ptr_ty,
+                     llvm_v16i32_ty, llvm_v16i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_qpd_512  :
+          Intrinsic<[llvm_v8f64_ty], [llvm_v8f64_ty, llvm_ptr_ty,
+                     llvm_v8i64_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_qps_512  :
+          Intrinsic<[llvm_v8f32_ty], [llvm_v8f32_ty, llvm_ptr_ty,
+                     llvm_v8i64_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+
+
+  def int_x86_avx512_mask_gather_dpq_512  :
+          Intrinsic<[llvm_v8i64_ty], [llvm_v8i64_ty, llvm_ptr_ty,
+                     llvm_v8i32_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_dpi_512  :
+          Intrinsic<[llvm_v16i32_ty], [llvm_v16i32_ty, llvm_ptr_ty,
+                     llvm_v16i32_ty, llvm_v16i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_qpq_512  :
+          Intrinsic<[llvm_v8i64_ty], [llvm_v8i64_ty, llvm_ptr_ty,
+                     llvm_v8i64_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+  def int_x86_avx512_mask_gather_qpi_512  :
+          Intrinsic<[llvm_v8i32_ty], [llvm_v8i32_ty, llvm_ptr_ty,
+                     llvm_v8i64_ty, llvm_v8i1_ty, llvm_i32_ty],
+                    [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div2_df :
+          Intrinsic<[llvm_v2f64_ty],
+          [llvm_v2f64_ty, llvm_ptr_ty, llvm_v2i64_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div2_di :
+          Intrinsic<[llvm_v2i64_ty],
+          [llvm_v2i64_ty, llvm_ptr_ty, llvm_v2i64_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div4_df :
+          Intrinsic<[llvm_v4f64_ty],
+          [llvm_v4f64_ty, llvm_ptr_ty, llvm_v4i64_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div4_di :
+          Intrinsic<[llvm_v4i64_ty],
+          [llvm_v4i64_ty, llvm_ptr_ty, llvm_v4i64_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div4_sf :
+          Intrinsic<[llvm_v4f32_ty],
+          [llvm_v4f32_ty, llvm_ptr_ty, llvm_v2i64_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div4_si :
+          Intrinsic<[llvm_v4i32_ty],
+          [llvm_v4i32_ty, llvm_ptr_ty, llvm_v2i64_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div8_sf :
+          Intrinsic<[llvm_v4f32_ty],
+          [llvm_v4f32_ty, llvm_ptr_ty, llvm_v4i64_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3div8_si :
+          Intrinsic<[llvm_v4i32_ty],
+          [llvm_v4i32_ty, llvm_ptr_ty, llvm_v4i64_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv2_df :
+          Intrinsic<[llvm_v2f64_ty],
+          [llvm_v2f64_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv2_di :
+          Intrinsic<[llvm_v2i64_ty],
+          [llvm_v2i64_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v2i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv4_df :
+          Intrinsic<[llvm_v4f64_ty],
+          [llvm_v4f64_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv4_di :
+          Intrinsic<[llvm_v4i64_ty],
+          [llvm_v4i64_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv4_sf :
+          Intrinsic<[llvm_v4f32_ty],
+          [llvm_v4f32_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv4_si :
+          Intrinsic<[llvm_v4i32_ty],
+          [llvm_v4i32_ty, llvm_ptr_ty, llvm_v4i32_ty, llvm_v4i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv8_sf :
+          Intrinsic<[llvm_v8f32_ty],
+          [llvm_v8f32_ty, llvm_ptr_ty, llvm_v8i32_ty, llvm_v8i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+
+  def int_x86_avx512_mask_gather3siv8_si :
+          Intrinsic<[llvm_v8i32_ty],
+          [llvm_v8i32_ty, llvm_ptr_ty, llvm_v8i32_ty, llvm_v8i1_ty, llvm_i32_ty],
+          [IntrReadMem, IntrArgMemOnly]>;
+}
+
 // AVX-512 conflict detection instruction
 // Instructions that count the number of leading zero bits
 let TargetPrefix = "x86" in {
