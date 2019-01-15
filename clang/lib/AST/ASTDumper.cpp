@@ -283,6 +283,7 @@ namespace  {
     void VisitObjCCompatibleAliasDecl(const ObjCCompatibleAliasDecl *D);
     void VisitObjCPropertyDecl(const ObjCPropertyDecl *D);
     void VisitObjCPropertyImplDecl(const ObjCPropertyImplDecl *D);
+    void Visit(const BlockDecl::Capture &C);
     void VisitBlockDecl(const BlockDecl *D);
 
     // Stmts.
@@ -292,6 +293,7 @@ namespace  {
     void VisitCapturedStmt(const CapturedStmt *Node);
 
     // OpenMP
+    void Visit(const OMPClause *C);
     void VisitOMPExecutableDirective(const OMPExecutableDirective *Node);
 
     // Exprs
@@ -441,17 +443,7 @@ void ASTDumper::dumpAttr(const Attr *A) {
 
 void ASTDumper::dumpCXXCtorInitializer(const CXXCtorInitializer *Init) {
   dumpChild([=] {
-    OS << "CXXCtorInitializer";
-    if (Init->isAnyMemberInitializer()) {
-      OS << ' ';
-      NodeDumper.dumpBareDeclRef(Init->getAnyMember());
-    } else if (Init->isBaseInitializer()) {
-      NodeDumper.dumpType(QualType(Init->getBaseClass(), 0));
-    } else if (Init->isDelegatingInitializer()) {
-      NodeDumper.dumpType(Init->getTypeSourceInfo()->getType());
-    } else {
-      llvm_unreachable("Unknown initializer type");
-    }
+    NodeDumper.Visit(Init);
     dumpStmt(Init->getInit());
   });
 }
@@ -1380,6 +1372,14 @@ void ASTDumper::VisitObjCPropertyImplDecl(const ObjCPropertyImplDecl *D) {
   NodeDumper.dumpDeclRef(D->getPropertyIvarDecl());
 }
 
+void ASTDumper::Visit(const BlockDecl::Capture &C) {
+  dumpChild([=] {
+    NodeDumper.Visit(C);
+    if (C.hasCopyExpr())
+      dumpStmt(C.getCopyExpr());
+  });
+}
+
 void ASTDumper::VisitBlockDecl(const BlockDecl *D) {
   for (auto I : D->parameters())
     dumpDecl(I);
@@ -1390,21 +1390,8 @@ void ASTDumper::VisitBlockDecl(const BlockDecl *D) {
   if (D->capturesCXXThis())
     dumpChild([=]{ OS << "capture this"; });
 
-  for (const auto &I : D->captures()) {
-    dumpChild([=] {
-      OS << "capture";
-      if (I.isByRef())
-        OS << " byref";
-      if (I.isNested())
-        OS << " nested";
-      if (I.getVariable()) {
-        OS << ' ';
-        NodeDumper.dumpBareDeclRef(I.getVariable());
-      }
-      if (I.hasCopyExpr())
-        dumpStmt(I.getCopyExpr());
-    });
-  }
+  for (const auto &I : D->captures())
+    Visit(I);
   dumpStmt(D->getBody());
 }
 
@@ -1458,29 +1445,18 @@ void ASTDumper::VisitCapturedStmt(const CapturedStmt *Node) {
 //  OpenMP dumping methods.
 //===----------------------------------------------------------------------===//
 
+void ASTDumper::Visit(const OMPClause *C) {
+  dumpChild([=] {
+    NodeDumper.Visit(C);
+    for (auto *S : C->children())
+      dumpStmt(S);
+  });
+}
+
 void ASTDumper::VisitOMPExecutableDirective(
     const OMPExecutableDirective *Node) {
-  for (auto *C : Node->clauses()) {
-    dumpChild([=] {
-      if (!C) {
-        ColorScope Color(OS, ShowColors, NullColor);
-        OS << "<<<NULL>>> OMPClause";
-        return;
-      }
-      {
-        ColorScope Color(OS, ShowColors, AttrColor);
-        StringRef ClauseName(getOpenMPClauseName(C->getClauseKind()));
-        OS << "OMP" << ClauseName.substr(/*Start=*/0, /*N=*/1).upper()
-           << ClauseName.drop_front() << "Clause";
-      }
-      NodeDumper.dumpPointer(C);
-      NodeDumper.dumpSourceRange(SourceRange(C->getBeginLoc(), C->getEndLoc()));
-      if (C->isImplicit())
-        OS << " <implicit>";
-      for (auto *S : C->children())
-        dumpStmt(S);
-    });
-  }
+  for (const auto *C : Node->clauses())
+    Visit(C);
 }
 
 //===----------------------------------------------------------------------===//
