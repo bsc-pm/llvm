@@ -39,6 +39,8 @@ define i32 @urem(i32 %a, i32 %b) nounwind {
 ; RV64IM-LABEL: urem:
 ; RV64IM:       # %bb.0:
 ; RV64IM-NEXT:    remuw a0, a0, a1
+; RV64IM-NEXT:    slli a0, a0, 32
+; RV64IM-NEXT:    srli a0, a0, 32
 ; RV64IM-NEXT:    ret
   %1 = urem i32 %a, %b
   ret i32 %1

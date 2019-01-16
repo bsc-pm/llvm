@@ -84,7 +84,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setTargetDAGCombine(ISD::SHL);
     setTargetDAGCombine(ISD::SRL);
     setTargetDAGCombine(ISD::SRA);
-    setTargetDAGCombine(ISD::ANY_EXTEND);
+    // setTargetDAGCombine(ISD::ANY_EXTEND);
   }
 
   if (!Subtarget.hasStdExtM()) {
