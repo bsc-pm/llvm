@@ -37,14 +37,14 @@ public:
 
 private:
   QueryParser(StringRef Line, const QuerySession &QS)
-      : Begin(Line.begin()), End(Line.end()), CompletionPos(nullptr), QS(QS) {}
+      : Line(Line), CompletionPos(nullptr), QS(QS) {}
 
   StringRef lexWord();
 
   template <typename T> struct LexOrCompleteWord;
 
   QueryRef parseSetBool(bool QuerySession::*Var);
-  QueryRef parseSetOutputKind();
+  template <typename QueryType> QueryRef parseSetOutputKind();
   QueryRef completeMatcherExpression();
 
   QueryRef endQuery(QueryRef Q);
@@ -55,8 +55,7 @@ private:
   /// \c InvalidQuery if a parse error occurs.
   QueryRef doParse();
 
-  const char *Begin;
-  const char *End;
+  StringRef Line;
 
   const char *CompletionPos;
   std::vector<llvm::LineEditor::Completion> Completions;

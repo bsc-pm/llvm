@@ -50,11 +50,20 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
         D.Diag(diag::err_drv_clang_unsupported)
             << (std::string(XRayInstrumentOption) + " on " + Triple.str());
       }
-    } else if (Triple.getOS() == llvm::Triple::FreeBSD ||
-               Triple.getOS() == llvm::Triple::OpenBSD ||
-               Triple.getOS() == llvm::Triple::NetBSD ||
+    } else if (Triple.isOSFreeBSD() ||
+               Triple.isOSOpenBSD() ||
+               Triple.isOSNetBSD() ||
                Triple.getOS() == llvm::Triple::Darwin) {
       if (Triple.getArch() != llvm::Triple::x86_64) {
+        D.Diag(diag::err_drv_clang_unsupported)
+            << (std::string(XRayInstrumentOption) + " on " + Triple.str());
+      }
+    } else if (Triple.getOS() == llvm::Triple::Fuchsia) {
+      switch (Triple.getArch()) {
+      case llvm::Triple::x86_64:
+      case llvm::Triple::aarch64:
+        break;
+      default:
         D.Diag(diag::err_drv_clang_unsupported)
             << (std::string(XRayInstrumentOption) + " on " + Triple.str());
       }
@@ -165,7 +174,7 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
       }
 
     // Then we want to sort and unique the modes we've collected.
-    llvm::sort(Modes.begin(), Modes.end());
+    llvm::sort(Modes);
     Modes.erase(std::unique(Modes.begin(), Modes.end()), Modes.end());
   }
 }

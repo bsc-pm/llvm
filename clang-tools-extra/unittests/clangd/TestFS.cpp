@@ -8,43 +8,42 @@
 //===----------------------------------------------------------------------===//
 #include "TestFS.h"
 #include "URI.h"
-#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Path.h"
-#include "gtest/gtest.h"
 
 namespace clang {
 namespace clangd {
-using namespace llvm;
 
-IntrusiveRefCntPtr<vfs::FileSystem>
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 buildTestFS(llvm::StringMap<std::string> const &Files,
             llvm::StringMap<time_t> const &Timestamps) {
-  IntrusiveRefCntPtr<vfs::InMemoryFileSystem> MemFS(
-      new vfs::InMemoryFileSystem);
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS(
+      new llvm::vfs::InMemoryFileSystem);
+  MemFS->setCurrentWorkingDirectory(testRoot());
   for (auto &FileAndContents : Files) {
-    StringRef File = FileAndContents.first();
+    llvm::StringRef File = FileAndContents.first();
     MemFS->addFile(
         File, Timestamps.lookup(File),
-        MemoryBuffer::getMemBufferCopy(FileAndContents.second, File));
+        llvm::MemoryBuffer::getMemBufferCopy(FileAndContents.second, File));
   }
   return MemFS;
 }
 
-MockCompilationDatabase::MockCompilationDatabase(StringRef Directory,
-                                                 StringRef RelPathPrefix)
+MockCompilationDatabase::MockCompilationDatabase(llvm::StringRef Directory,
+                                                 llvm::StringRef RelPathPrefix)
     : ExtraClangFlags({"-ffreestanding"}), Directory(Directory),
       RelPathPrefix(RelPathPrefix) {
   // -ffreestanding avoids implicit stdc-predef.h.
 }
 
-Optional<tooling::CompileCommand>
-MockCompilationDatabase::getCompileCommand(PathRef File) const {
+llvm::Optional<tooling::CompileCommand>
+MockCompilationDatabase::getCompileCommand(PathRef File,
+                                           ProjectInfo *Project) const {
   if (ExtraClangFlags.empty())
     return None;
 
-  auto FileName = sys::path::filename(File);
+  auto FileName = llvm::sys::path::filename(File);
 
   // Build the compile command.
   auto CommandLine = ExtraClangFlags;
@@ -54,14 +53,17 @@ MockCompilationDatabase::getCompileCommand(PathRef File) const {
     CommandLine.push_back(File);
   } else {
     // Build a relative path using RelPathPrefix.
-    SmallString<32> RelativeFilePath(RelPathPrefix);
+    llvm::SmallString<32> RelativeFilePath(RelPathPrefix);
     llvm::sys::path::append(RelativeFilePath, FileName);
     CommandLine.push_back(RelativeFilePath.str());
   }
 
-  return {tooling::CompileCommand(
-      Directory != StringRef() ? Directory : sys::path::parent_path(File),
-      FileName, std::move(CommandLine), "")};
+  if (Project)
+    Project->SourceRoot = Directory;
+  return {tooling::CompileCommand(Directory != llvm::StringRef()
+                                      ? Directory
+                                      : llvm::sys::path::parent_path(File),
+                                  FileName, std::move(CommandLine), "")};
 }
 
 const char *testRoot() {
@@ -73,12 +75,12 @@ const char *testRoot() {
 }
 
 std::string testPath(PathRef File) {
-  assert(sys::path::is_relative(File) && "FileName should be relative");
+  assert(llvm::sys::path::is_relative(File) && "FileName should be relative");
 
-  SmallString<32> NativeFile = File;
-  sys::path::native(NativeFile);
-  SmallString<32> Path;
-  sys::path::append(Path, testRoot(), NativeFile);
+  llvm::SmallString<32> NativeFile = File;
+  llvm::sys::path::native(NativeFile);
+  llvm::SmallString<32> Path;
+  llvm::sys::path::append(Path, testRoot(), NativeFile);
   return Path.str();
 }
 
@@ -92,7 +94,10 @@ public:
   llvm::Expected<std::string>
   getAbsolutePath(llvm::StringRef /*Authority*/, llvm::StringRef Body,
                   llvm::StringRef HintPath) const override {
-    assert(HintPath.startswith(testRoot()));
+    if (!HintPath.startswith(testRoot()))
+      return llvm::make_error<llvm::StringError>(
+          "Hint path doesn't start with test root: " + HintPath,
+          llvm::inconvertibleErrorCode());
     if (!Body.consume_front("/"))
       return llvm::make_error<llvm::StringError>(
           "Body of an unittest: URI must start with '/'",

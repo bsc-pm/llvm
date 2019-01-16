@@ -33,6 +33,8 @@
 namespace clang {
 namespace clangd {
 
+namespace {
+
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Field;
@@ -41,7 +43,9 @@ using ::testing::IsEmpty;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
-namespace {
+MATCHER_P2(FileRange, File, Range, "") {
+  return Location{URIForFile::canonicalize(File, testRoot()), Range} == arg;
+}
 
 bool diagsContainErrors(const std::vector<Diag> &Diagnostics) {
   for (auto D : Diagnostics) {
@@ -110,7 +114,7 @@ private:
 /// Replaces all patterns of the form 0x123abc with spaces
 std::string replacePtrsInDump(std::string const &Dump) {
   llvm::Regex RE("0x[0-9a-fA-F]+");
-  llvm::SmallVector<StringRef, 1> Matches;
+  llvm::SmallVector<llvm::StringRef, 1> Matches;
   llvm::StringRef Pending = Dump;
 
   std::string Result;
@@ -134,8 +138,8 @@ std::string dumpASTWithoutMemoryLocs(ClangdServer &Server, PathRef File) {
 class ClangdVFSTest : public ::testing::Test {
 protected:
   std::string parseSourceAndDumpAST(
-      PathRef SourceFileRelPath, StringRef SourceContents,
-      std::vector<std::pair<PathRef, StringRef>> ExtraFiles = {},
+      PathRef SourceFileRelPath, llvm::StringRef SourceContents,
+      std::vector<std::pair<PathRef, llvm::StringRef>> ExtraFiles = {},
       bool ExpectErrors = false) {
     MockFSProvider FS;
     ErrorCheckingDiagConsumer DiagConsumer;
@@ -264,11 +268,11 @@ int b = a;
 TEST_F(ClangdVFSTest, PropagatesContexts) {
   static Key<int> Secret;
   struct FSProvider : public FileSystemProvider {
-    IntrusiveRefCntPtr<vfs::FileSystem> getFileSystem() override {
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const override {
       Got = Context::current().getExisting(Secret);
       return buildTestFS({});
     }
-    int Got;
+    mutable int Got;
   } FS;
   struct DiagConsumer : public DiagnosticsConsumer {
     void onDiagnosticsReady(PathRef File,
@@ -456,8 +460,8 @@ int hello;
 
   auto Locations = runFindDefinitions(Server, FooCpp, FooSource.point());
   EXPECT_TRUE(bool(Locations));
-  EXPECT_THAT(*Locations, ElementsAre(Location{URIForFile{FooCpp},
-                                               FooSource.range("one")}));
+  EXPECT_THAT(*Locations,
+              ElementsAre(FileRange(FooCpp, FooSource.range("one"))));
 
   // Undefine MACRO, close baz.cpp.
   CDB.ExtraClangFlags.clear();
@@ -472,8 +476,8 @@ int hello;
 
   Locations = runFindDefinitions(Server, FooCpp, FooSource.point());
   EXPECT_TRUE(bool(Locations));
-  EXPECT_THAT(*Locations, ElementsAre(Location{URIForFile{FooCpp},
-                                               FooSource.range("two")}));
+  EXPECT_THAT(*Locations,
+              ElementsAre(FileRange(FooCpp, FooSource.range("two"))));
 }
 
 TEST_F(ClangdVFSTest, MemoryUsage) {
@@ -747,7 +751,8 @@ int d;
         BlockingRequests[RequestIndex]();
       }
     }
-  } // Wait for ClangdServer to shutdown before proceeding.
+    ASSERT_TRUE(Server.blockUntilIdleForTest());
+  }
 
   // Check some invariants about the state of the program.
   std::vector<FileStat> Stats = DiagConsumer.takeFileStats();
@@ -781,7 +786,7 @@ TEST_F(ClangdVFSTest, CheckSourceHeaderSwitch) {
   FS.Files[FooH] = "int a;";
   FS.Files[Invalid] = "int main() { \n return 0; \n }";
 
-  llvm::Optional<Path> PathResult = Server.switchSourceHeader(FooCpp);
+  Optional<Path> PathResult = Server.switchSourceHeader(FooCpp);
   EXPECT_TRUE(PathResult.hasValue());
   ASSERT_EQ(PathResult.getValue(), FooH);
 
@@ -962,6 +967,75 @@ TEST_F(ClangdVFSTest, ChangedHeaderFromISystem) {
   EXPECT_THAT(Completions, ElementsAre(Field(&CodeCompletion::Name, "bar"),
                                        Field(&CodeCompletion::Name, "baz")));
 }
+
+// FIXME(ioeric): make this work for windows again.
+#ifndef _WIN32
+// Check that running code completion doesn't stat() a bunch of files from the
+// preamble again. (They should be using the preamble's stat-cache)
+TEST(ClangdTests, PreambleVFSStatCache) {
+  class ListenStatsFSProvider : public FileSystemProvider {
+  public:
+    ListenStatsFSProvider(llvm::StringMap<unsigned> &CountStats)
+        : CountStats(CountStats) {}
+
+    IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const override {
+      class ListenStatVFS : public llvm::vfs::ProxyFileSystem {
+      public:
+        ListenStatVFS(IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
+                      llvm::StringMap<unsigned> &CountStats)
+            : ProxyFileSystem(std::move(FS)), CountStats(CountStats) {}
+
+        llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+        openFileForRead(const Twine &Path) override {
+          ++CountStats[llvm::sys::path::filename(Path.str())];
+          return ProxyFileSystem::openFileForRead(Path);
+        }
+        llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override {
+          ++CountStats[llvm::sys::path::filename(Path.str())];
+          return ProxyFileSystem::status(Path);
+        }
+
+      private:
+        llvm::StringMap<unsigned> &CountStats;
+      };
+
+      return IntrusiveRefCntPtr<ListenStatVFS>(
+          new ListenStatVFS(buildTestFS(Files), CountStats));
+    }
+
+    // If relative paths are used, they are resolved with testPath().
+    llvm::StringMap<std::string> Files;
+    llvm::StringMap<unsigned> &CountStats;
+  };
+
+  llvm::StringMap<unsigned> CountStats;
+  ListenStatsFSProvider FS(CountStats);
+  ErrorCheckingDiagConsumer DiagConsumer;
+  MockCompilationDatabase CDB;
+  ClangdServer Server(CDB, FS, DiagConsumer, ClangdServer::optsForTest());
+
+  auto SourcePath = testPath("foo.cpp");
+  auto HeaderPath = testPath("foo.h");
+  FS.Files[HeaderPath] = "struct TestSym {};";
+  Annotations Code(R"cpp(
+    #include "foo.h"
+
+    int main() {
+      TestSy^
+    })cpp");
+
+  runAddDocument(Server, SourcePath, Code.code());
+
+  unsigned Before = CountStats["foo.h"];
+  EXPECT_GT(Before, 0u);
+  auto Completions = cantFail(runCodeComplete(Server, SourcePath, Code.point(),
+                                              clangd::CodeCompleteOptions()))
+                         .Completions;
+  EXPECT_EQ(CountStats["foo.h"], Before);
+  EXPECT_THAT(Completions,
+              ElementsAre(Field(&CodeCompletion::Name, "TestSym")));
+}
+#endif
 
 } // namespace
 } // namespace clangd

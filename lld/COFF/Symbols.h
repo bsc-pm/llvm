@@ -39,7 +39,7 @@ class Symbol {
 public:
   enum Kind {
     // The order of these is significant. We start with the regular defined
-    // symbols as those are the most prevelant and the zero tag is the cheapest
+    // symbols as those are the most prevalent and the zero tag is the cheapest
     // to set. Among the defined kinds, the lower the kind is preferred over
     // the higher kind when testing whether one symbol should take precedence
     // over another.
@@ -80,7 +80,7 @@ protected:
   explicit Symbol(Kind K, StringRef N = "")
       : SymbolKind(K), IsExternal(true), IsCOMDAT(false),
         WrittenToSymtab(false), PendingArchiveLoad(false), IsGCRoot(false),
-        Name(N) {}
+        IsRuntimePseudoReloc(false), Name(N) {}
 
   const unsigned SymbolKind : 8;
   unsigned IsExternal : 1;
@@ -103,6 +103,8 @@ public:
 
   /// True if we've already added this symbol to the list of GC roots.
   unsigned IsGCRoot : 1;
+
+  unsigned IsRuntimePseudoReloc : 1;
 
 protected:
   StringRef Name;
@@ -309,8 +311,6 @@ public:
   uint16_t getOrdinal() { return File->Hdr->OrdinalHint; }
 
   ImportFile *File;
-
-  bool IsRuntimePseudoReloc = false;
 };
 
 // This class represents a symbol for a jump table entry which jumps

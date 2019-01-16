@@ -2,7 +2,10 @@ set(LLVM_LINK_COMPONENTS support)
 
 add_clang_library(clangTidyModernizeModule
   AvoidBindCheck.cpp
+  AvoidCArraysCheck.cpp
+  ConcatNestedNamespacesCheck.cpp
   DeprecatedHeadersCheck.cpp
+  DeprecatedIosBaseAliasesCheck.cpp
   LoopConvertCheck.cpp
   LoopConvertUtils.cpp
   MakeSharedCheck.cpp
@@ -23,6 +26,7 @@ add_clang_library(clangTidyModernizeModule
   UseEmplaceCheck.cpp
   UseEqualsDefaultCheck.cpp
   UseEqualsDeleteCheck.cpp
+  UseNodiscardCheck.cpp
   UseNoexceptCheck.cpp
   UseNullptrCheck.cpp
   UseOverrideCheck.cpp

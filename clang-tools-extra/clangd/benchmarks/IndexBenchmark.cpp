@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../index/SymbolYAML.h"
+#include "../index/Serialization.h"
 #include "../index/dex/Dex.h"
 #include "benchmark/benchmark.h"
 #include "llvm/ADT/SmallVector.h"
@@ -26,11 +26,11 @@ namespace clangd {
 namespace {
 
 std::unique_ptr<SymbolIndex> buildMem() {
-  return loadIndex(IndexFilename, {}, false);
+  return loadIndex(IndexFilename, /*UseDex=*/false);
 }
 
 std::unique_ptr<SymbolIndex> buildDex() {
-  return loadIndex(IndexFilename, {}, true);
+  return loadIndex(IndexFilename, /*UseDex=*/true);
 }
 
 // Reads JSON array of serialized FuzzyFindRequest's from user-provided file.

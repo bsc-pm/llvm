@@ -8,12 +8,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "SyncAPI.h"
+#include "index/Index.h"
 
 namespace clang {
 namespace clangd {
 
-void runAddDocument(ClangdServer &Server, PathRef File, StringRef Contents,
-                    WantDiagnostics WantDiags) {
+void runAddDocument(ClangdServer &Server, PathRef File,
+                    llvm::StringRef Contents, WantDiagnostics WantDiags) {
   Server.addDocument(File, Contents, WantDiags);
   if (!Server.blockUntilIdleForTest())
     llvm_unreachable("not idle after addDocument");
@@ -99,7 +100,8 @@ runFindDocumentHighlights(ClangdServer &Server, PathRef File, Position Pos) {
 }
 
 llvm::Expected<std::vector<tooling::Replacement>>
-runRename(ClangdServer &Server, PathRef File, Position Pos, StringRef NewName) {
+runRename(ClangdServer &Server, PathRef File, Position Pos,
+          llvm::StringRef NewName) {
   llvm::Optional<llvm::Expected<std::vector<tooling::Replacement>>> Result;
   Server.rename(File, Pos, NewName, capture(Result));
   return std::move(*Result);
@@ -112,17 +114,38 @@ std::string runDumpAST(ClangdServer &Server, PathRef File) {
 }
 
 llvm::Expected<std::vector<SymbolInformation>>
-runWorkspaceSymbols(ClangdServer &Server, StringRef Query, int Limit) {
+runWorkspaceSymbols(ClangdServer &Server, llvm::StringRef Query, int Limit) {
   llvm::Optional<llvm::Expected<std::vector<SymbolInformation>>> Result;
   Server.workspaceSymbols(Query, Limit, capture(Result));
   return std::move(*Result);
 }
 
-llvm::Expected<std::vector<SymbolInformation>>
+llvm::Expected<std::vector<DocumentSymbol>>
 runDocumentSymbols(ClangdServer &Server, PathRef File) {
-  llvm::Optional<llvm::Expected<std::vector<SymbolInformation>>> Result;
+  llvm::Optional<llvm::Expected<std::vector<DocumentSymbol>>> Result;
   Server.documentSymbols(File, capture(Result));
   return std::move(*Result);
+}
+
+SymbolSlab runFuzzyFind(const SymbolIndex &Index, llvm::StringRef Query) {
+  FuzzyFindRequest Req;
+  Req.Query = Query;
+  Req.AnyScope = true;
+  return runFuzzyFind(Index, Req);
+}
+
+SymbolSlab runFuzzyFind(const SymbolIndex &Index, const FuzzyFindRequest &Req) {
+  SymbolSlab::Builder Builder;
+  Index.fuzzyFind(Req, [&](const Symbol &Sym) { Builder.insert(Sym); });
+  return std::move(Builder).build();
+}
+
+RefSlab getRefs(const SymbolIndex &Index, SymbolID ID) {
+  RefsRequest Req;
+  Req.IDs = {ID};
+  RefSlab::Builder Slab;
+  Index.refs(Req, [&](const Ref &S) { Slab.insert(ID, S); });
+  return std::move(Slab).build();
 }
 
 } // namespace clangd

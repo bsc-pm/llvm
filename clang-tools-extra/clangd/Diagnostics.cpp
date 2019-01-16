@@ -51,18 +51,25 @@ bool locationInRange(SourceLocation L, CharSourceRange R,
 Range diagnosticRange(const clang::Diagnostic &D, const LangOptions &L) {
   auto &M = D.getSourceManager();
   auto Loc = M.getFileLoc(D.getLocation());
-  // Accept the first range that contains the location.
   for (const auto &CR : D.getRanges()) {
     auto R = Lexer::makeFileCharRange(CR, M, L);
     if (locationInRange(Loc, R, M))
       return halfOpenToRange(M, R);
   }
+  llvm::Optional<Range> FallbackRange;
   // The range may be given as a fixit hint instead.
   for (const auto &F : D.getFixItHints()) {
     auto R = Lexer::makeFileCharRange(F.RemoveRange, M, L);
     if (locationInRange(Loc, R, M))
       return halfOpenToRange(M, R);
+    // If there's a fixit that performs insertion, it has zero-width. Therefore
+    // it can't contain the location of the diag, but it might be possible that
+    // this should be reported as range. For example missing semicolon.
+    if (R.getBegin() == R.getEnd() && Loc == R.getBegin())
+      FallbackRange = halfOpenToRange(M, R);
   }
+  if (FallbackRange)
+    return *FallbackRange;
   // If no suitable range is found, just use the token at the location.
   auto R = Lexer::makeFileCharRange(CharSourceRange::getTokenRange(Loc), M, L);
   if (!R.isValid()) // Fall back to location only, let the editor deal with it.
@@ -71,7 +78,7 @@ Range diagnosticRange(const clang::Diagnostic &D, const LangOptions &L) {
 }
 
 bool isInsideMainFile(const SourceLocation Loc, const SourceManager &M) {
-  return Loc.isValid() && M.isInMainFile(Loc);
+  return Loc.isValid() && M.isWrittenInMainFile(M.getFileLoc(Loc));
 }
 
 bool isInsideMainFile(const clang::Diagnostic &D) {
@@ -182,8 +189,11 @@ std::string noteMessage(const Diag &Main, const DiagBase &Note) {
 } // namespace
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const DiagBase &D) {
+  OS << "[";
   if (!D.InsideMainFile)
-    OS << "[in " << D.File << "] ";
+    OS << D.File << ":";
+  OS << D.Range.start << "-" << D.Range.end << "] ";
+
   return OS << D.Message;
 }
 
@@ -219,20 +229,37 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Diag &D) {
   return OS;
 }
 
+CodeAction toCodeAction(const Fix &F, const URIForFile &File) {
+  CodeAction Action;
+  Action.title = F.Message;
+  Action.kind = CodeAction::QUICKFIX_KIND;
+  Action.edit.emplace();
+  Action.edit->changes.emplace();
+  (*Action.edit->changes)[File.uri()] = {F.Edits.begin(), F.Edits.end()};
+  return Action;
+}
+
 void toLSPDiags(
-    const Diag &D,
+    const Diag &D, const URIForFile &File, const ClangdDiagnosticOptions &Opts,
     llvm::function_ref<void(clangd::Diagnostic, llvm::ArrayRef<Fix>)> OutFn) {
   auto FillBasicFields = [](const DiagBase &D) -> clangd::Diagnostic {
     clangd::Diagnostic Res;
     Res.range = D.Range;
     Res.severity = getSeverity(D.Severity);
-    Res.category = D.Category;
     return Res;
   };
 
   {
     clangd::Diagnostic Main = FillBasicFields(D);
     Main.message = mainMessage(D);
+    if (Opts.EmbedFixesInDiagnostics) {
+      Main.codeActions.emplace();
+      for (const auto &Fix : D.Fixes)
+        Main.codeActions->push_back(toCodeAction(Fix, File));
+    }
+    if (Opts.SendDiagnosticCategory && !D.Category.empty())
+      Main.category = D.Category;
+
     OutFn(std::move(Main), D.Fixes);
   }
 
@@ -271,7 +298,7 @@ void StoreDiags::BeginSourceFile(const LangOptions &Opts,
 
 void StoreDiags::EndSourceFile() {
   flushLastDiag();
-  LangOpts = llvm::None;
+  LangOpts = None;
 }
 
 void StoreDiags::HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
@@ -318,9 +345,9 @@ void StoreDiags::HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
     if (SyntheticMessage && Info.getNumFixItHints() == 1) {
       const auto &FixIt = Info.getFixItHint(0);
       bool Invalid = false;
-      StringRef Remove = Lexer::getSourceText(
+      llvm::StringRef Remove = Lexer::getSourceText(
           FixIt.RemoveRange, Info.getSourceManager(), *LangOpts, &Invalid);
-      StringRef Insert = FixIt.CodeToInsert;
+      llvm::StringRef Insert = FixIt.CodeToInsert;
       if (!Invalid) {
         llvm::raw_svector_ostream M(Message);
         if (!Remove.empty() && !Insert.empty())

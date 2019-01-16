@@ -235,6 +235,20 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
 
   while (true) {
     if (HasScopeSpecifier) {
+      if (Tok.is(tok::code_completion)) {
+        // Code completion for a nested-name-specifier, where the code
+        // completion token follows the '::'.
+        Actions.CodeCompleteQualifiedId(getCurScope(), SS, EnteringContext,
+                                        ObjectType.get());
+        // Include code completion token into the range of the scope otherwise
+        // when we try to annotate the scope tokens the dangling code completion
+        // token will cause assertion in
+        // Preprocessor::AnnotatePreviousCachedTokens.
+        SS.setEndLoc(Tok.getLocation());
+        cutOffParsing();
+        return true;
+      }
+
       // C++ [basic.lookup.classref]p5:
       //   If the qualified-id has the form
       //
@@ -246,19 +260,6 @@ bool Parser::ParseOptionalCXXScopeSpecifier(CXXScopeSpec &SS,
       // To implement this, we clear out the object type as soon as we've
       // seen a leading '::' or part of a nested-name-specifier.
       ObjectType = nullptr;
-
-      if (Tok.is(tok::code_completion)) {
-        // Code completion for a nested-name-specifier, where the code
-        // completion token follows the '::'.
-        Actions.CodeCompleteQualifiedId(getCurScope(), SS, EnteringContext);
-        // Include code completion token into the range of the scope otherwise
-        // when we try to annotate the scope tokens the dangling code completion
-        // token will cause assertion in
-        // Preprocessor::AnnotatePreviousCachedTokens.
-        SS.setEndLoc(Tok.getLocation());
-        cutOffParsing();
-        return true;
-      }
     }
 
     // nested-name-specifier:
@@ -774,7 +775,7 @@ Optional<unsigned> Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
         // send. In that case, fail here and let the ObjC message
         // expression parser perform the completion.
         if (Tok.is(tok::code_completion) &&
-            !(getLangOpts().ObjC1 && Intro.Default == LCD_None &&
+            !(getLangOpts().ObjC && Intro.Default == LCD_None &&
               !Intro.Captures.empty())) {
           Actions.CodeCompleteLambdaIntroducer(getCurScope(), Intro,
                                                /*AfterAmpersand=*/false);
@@ -790,7 +791,7 @@ Optional<unsigned> Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
     if (Tok.is(tok::code_completion)) {
       // If we're in Objective-C++ and we have a bare '[', then this is more
       // likely to be a message receiver.
-      if (getLangOpts().ObjC1 && first)
+      if (getLangOpts().ObjC && first)
         Actions.CodeCompleteObjCMessageReceiver(getCurScope());
       else
         Actions.CodeCompleteLambdaIntroducer(getCurScope(), Intro,
@@ -1205,12 +1206,8 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
                       /*hasProto=*/true,
                       /*isAmbiguous=*/false, LParenLoc, ParamInfo.data(),
                       ParamInfo.size(), EllipsisLoc, RParenLoc,
-                      DS.getTypeQualifiers(),
                       /*RefQualifierIsLValueRef=*/true,
-                      /*RefQualifierLoc=*/NoLoc,
-                      /*ConstQualifierLoc=*/NoLoc,
-                      /*VolatileQualifierLoc=*/NoLoc,
-                      /*RestrictQualifierLoc=*/NoLoc, MutableLoc, ESpecType,
+                      /*RefQualifierLoc=*/NoLoc, MutableLoc, ESpecType,
                       ESpecRange, DynamicExceptions.data(),
                       DynamicExceptionRanges.data(), DynamicExceptions.size(),
                       NoexceptExpr.isUsable() ? NoexceptExpr.get() : nullptr,
@@ -1272,12 +1269,8 @@ ExprResult Parser::ParseLambdaExpressionAfterIntroducer(
                       /*NumParams=*/0,
                       /*EllipsisLoc=*/NoLoc,
                       /*RParenLoc=*/NoLoc,
-                      /*TypeQuals=*/0,
                       /*RefQualifierIsLValueRef=*/true,
-                      /*RefQualifierLoc=*/NoLoc,
-                      /*ConstQualifierLoc=*/NoLoc,
-                      /*VolatileQualifierLoc=*/NoLoc,
-                      /*RestrictQualifierLoc=*/NoLoc, MutableLoc, EST_None,
+                      /*RefQualifierLoc=*/NoLoc, MutableLoc, EST_None,
                       /*ESpecRange=*/SourceRange(),
                       /*Exceptions=*/nullptr,
                       /*ExceptionRanges=*/nullptr,
@@ -1738,10 +1731,14 @@ Parser::ParseCXXTypeConstructExpression(const DeclSpec &DS) {
 /// \param Loc The location of the start of the statement that requires this
 /// condition, e.g., the "for" in a for loop.
 ///
+/// \param FRI If non-null, a for range declaration is permitted, and if
+/// present will be parsed and stored here, and a null result will be returned.
+///
 /// \returns The parsed condition.
 Sema::ConditionResult Parser::ParseCXXCondition(StmtResult *InitStmt,
                                                 SourceLocation Loc,
-                                                Sema::ConditionKind CK) {
+                                                Sema::ConditionKind CK,
+                                                ForRangeInfo *FRI) {
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
   if (Tok.is(tok::code_completion)) {
@@ -1761,7 +1758,7 @@ Sema::ConditionResult Parser::ParseCXXCondition(StmtResult *InitStmt,
   };
 
   // Determine what kind of thing we have.
-  switch (isCXXConditionDeclarationOrInitStatement(InitStmt)) {
+  switch (isCXXConditionDeclarationOrInitStatement(InitStmt, FRI)) {
   case ConditionOrInitStatement::Expression: {
     ProhibitAttributes(attrs);
 
@@ -1769,7 +1766,13 @@ Sema::ConditionResult Parser::ParseCXXCondition(StmtResult *InitStmt,
     //   if (; true);
     if (InitStmt && Tok.is(tok::semi)) {
       WarnOnInit();
-      SourceLocation SemiLoc = ConsumeToken();
+      SourceLocation SemiLoc = Tok.getLocation();
+      if (!Tok.hasLeadingEmptyMacro() && !SemiLoc.isMacroID()) {
+        Diag(SemiLoc, diag::warn_empty_init_statement)
+            << (CK == Sema::ConditionKind::Switch)
+            << FixItHint::CreateRemoval(SemiLoc);
+      }
+      ConsumeToken();
       *InitStmt = Actions.ActOnNullStmt(SemiLoc);
       return ParseCXXCondition(nullptr, Loc, CK);
     }
@@ -1797,6 +1800,15 @@ Sema::ConditionResult Parser::ParseCXXCondition(StmtResult *InitStmt,
                                attrs, /*RequireSemi=*/true);
     *InitStmt = Actions.ActOnDeclStmt(DG, DeclStart, DeclEnd);
     return ParseCXXCondition(nullptr, Loc, CK);
+  }
+
+  case ConditionOrInitStatement::ForRangeDecl: {
+    assert(FRI && "should not parse a for range declaration here");
+    SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
+    DeclGroupPtrTy DG = ParseSimpleDeclaration(
+        DeclaratorContext::ForContext, DeclEnd, attrs, false, FRI);
+    FRI->LoopVar = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
+    return Sema::ConditionResult();
   }
 
   case ConditionOrInitStatement::ConditionDecl:

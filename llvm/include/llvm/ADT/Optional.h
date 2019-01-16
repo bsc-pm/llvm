@@ -22,7 +22,6 @@
 #include "llvm/Support/type_traits.h"
 #include <algorithm>
 #include <cassert>
-#include <cstring>
 #include <new>
 #include <utility>
 
@@ -30,7 +29,7 @@ namespace llvm {
 
 namespace optional_detail {
 /// Storage for any type.
-template <typename T, bool IsPodLike> struct OptionalStorage {
+template <typename T, bool = isPodLike<T>::value> struct OptionalStorage {
   AlignedCharArrayUnion<T> storage;
   bool hasVal = false;
 
@@ -109,31 +108,10 @@ template <typename T, bool IsPodLike> struct OptionalStorage {
   }
 };
 
-/// Storage for trivially copyable types only.
-template <typename T> struct OptionalStorage<T, true> {
-  AlignedCharArrayUnion<T> storage;
-  bool hasVal = false;
-
-  OptionalStorage() = default;
-
-  OptionalStorage(const T &y) : hasVal(true) {
-    std::memmove(storage.buffer, &y, sizeof(y));
-  }
-  OptionalStorage &operator=(const T &y) {
-    std::memmove(storage.buffer, &y, sizeof(y));
-    hasVal = true;
-    return *this;
-  }
-
-  void reset() { hasVal = false; }
-};
 } // namespace optional_detail
 
 template <typename T> class Optional {
-  // GCC 5.4 miscompiles the trivially copyable OptionalStorage. Blacklist it.
-  optional_detail::OptionalStorage<T, isPodLike<T>::value &&
-                                          !std::is_enum<T>::value>
-      Storage;
+  optional_detail::OptionalStorage<T> Storage;
 
 public:
   using value_type = T;

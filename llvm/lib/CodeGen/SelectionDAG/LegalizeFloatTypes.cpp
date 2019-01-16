@@ -1910,8 +1910,8 @@ void DAGTypeLegalizer::PromoteFloatResult(SDNode *N, unsigned ResNo) {
     // Binary FP Operations
     case ISD::FADD:
     case ISD::FDIV:
-    case ISD::FMAXNAN:
-    case ISD::FMINNAN:
+    case ISD::FMAXIMUM:
+    case ISD::FMINIMUM:
     case ISD::FMAXNUM:
     case ISD::FMINNUM:
     case ISD::FMUL:
@@ -2143,9 +2143,9 @@ SDValue DAGTypeLegalizer::PromoteFloatRes_SELECT_CC(SDNode *N) {
   SDValue TrueVal = GetPromotedFloat(N->getOperand(2));
   SDValue FalseVal = GetPromotedFloat(N->getOperand(3));
 
-  return DAG.getNode(ISD::SELECT_CC, SDLoc(N), N->getValueType(0),
-                     N->getOperand(0), N->getOperand(1), TrueVal, FalseVal,
-                     N->getOperand(4));
+  return DAG.getNode(ISD::SELECT_CC, SDLoc(N),
+                     TrueVal.getNode()->getValueType(0), N->getOperand(0),
+                     N->getOperand(1), TrueVal, FalseVal, N->getOperand(4));
 }
 
 // Construct a SDNode that transforms the SINT or UINT operand to the promoted

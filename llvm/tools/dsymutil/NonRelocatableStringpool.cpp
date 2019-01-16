@@ -16,6 +16,8 @@ DwarfStringPoolEntryRef NonRelocatableStringpool::getEntry(StringRef S) {
   if (S.empty() && !Strings.empty())
     return EmptyString;
 
+  if (Translator)
+    S = Translator(S);
   auto I = Strings.insert({S, DwarfStringPoolEntry()});
   auto &Entry = I.first->second;
   if (I.second || !Entry.isIndexed()) {
@@ -29,6 +31,10 @@ DwarfStringPoolEntryRef NonRelocatableStringpool::getEntry(StringRef S) {
 
 StringRef NonRelocatableStringpool::internString(StringRef S) {
   DwarfStringPoolEntry Entry{nullptr, 0, DwarfStringPoolEntry::NotIndexed};
+
+  if (Translator)
+    S = Translator(S);
+
   auto InsertResult = Strings.insert({S, Entry});
   return InsertResult.first->getKey();
 }
@@ -40,11 +46,10 @@ NonRelocatableStringpool::getEntriesForEmission() const {
   for (const auto &E : Strings)
     if (E.getValue().isIndexed())
       Result.emplace_back(E, true);
-  llvm::sort(
-      Result.begin(), Result.end(),
-      [](const DwarfStringPoolEntryRef A, const DwarfStringPoolEntryRef B) {
-        return A.getIndex() < B.getIndex();
-      });
+  llvm::sort(Result, [](const DwarfStringPoolEntryRef A,
+                        const DwarfStringPoolEntryRef B) {
+    return A.getIndex() < B.getIndex();
+  });
   return Result;
 }
 

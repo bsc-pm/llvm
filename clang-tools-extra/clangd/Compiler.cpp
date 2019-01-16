@@ -19,10 +19,11 @@ namespace clangd {
 
 void IgnoreDiagnostics::log(DiagnosticsEngine::Level DiagLevel,
                             const clang::Diagnostic &Info) {
-  SmallString<64> Message;
+  // FIXME: format lazily, in case vlog is off.
+  llvm::SmallString<64> Message;
   Info.FormatDiagnostic(Message);
 
-  SmallString<64> Location;
+  llvm::SmallString<64> Location;
   if (Info.hasSourceManager() && Info.getLocation().isValid()) {
     auto &SourceMgr = Info.getSourceManager();
     auto Loc = SourceMgr.getFileLoc(Info.getLocation());
@@ -31,7 +32,7 @@ void IgnoreDiagnostics::log(DiagnosticsEngine::Level DiagLevel,
     OS << ":";
   }
 
-  clangd::log("Ignored diagnostic. {0}{1}", Location, Message);
+  clangd::vlog("Ignored diagnostic. {0}{1}", Location, Message);
 }
 
 void IgnoreDiagnostics::HandleDiagnostic(DiagnosticsEngine::Level DiagLevel,
@@ -44,7 +45,7 @@ prepareCompilerInstance(std::unique_ptr<clang::CompilerInvocation> CI,
                         const PrecompiledPreamble *Preamble,
                         std::unique_ptr<llvm::MemoryBuffer> Buffer,
                         std::shared_ptr<PCHContainerOperations> PCHs,
-                        IntrusiveRefCntPtr<vfs::FileSystem> VFS,
+                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                         DiagnosticConsumer &DiagsClient) {
   assert(VFS && "VFS is null");
   assert(!CI->getPreprocessorOpts().RetainRemappedFileBuffers &&

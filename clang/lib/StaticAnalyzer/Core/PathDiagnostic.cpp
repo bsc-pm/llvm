@@ -723,6 +723,8 @@ PathDiagnosticLocation::create(const ProgramPoint& P,
   } else if (Optional<PostInitializer> PIP = P.getAs<PostInitializer>()) {
     return PathDiagnosticLocation(PIP->getInitializer()->getSourceLocation(),
                                   SMng);
+  } else if (Optional<PreImplicitCall> PIC = P.getAs<PreImplicitCall>()) {
+    return PathDiagnosticLocation(PIC->getLocation(), SMng);
   } else if (Optional<PostImplicitCall> PIE = P.getAs<PostImplicitCall>()) {
     return PathDiagnosticLocation(PIE->getLocation(), SMng);
   } else if (Optional<CallEnter> CE = P.getAs<CallEnter>()) {
@@ -970,7 +972,7 @@ void PathDiagnosticLocation::flatten() {
 //===----------------------------------------------------------------------===//
 
 std::shared_ptr<PathDiagnosticCallPiece>
-PathDiagnosticCallPiece::construct(const ExplodedNode *N, const CallExitEnd &CE,
+PathDiagnosticCallPiece::construct(const CallExitEnd &CE,
                                    const SourceManager &SM) {
   const Decl *caller = CE.getLocationContext()->getDecl();
   PathDiagnosticLocation pos = getLocationForCaller(CE.getCalleeContext(),

@@ -46,18 +46,17 @@ CanonicalIncludes::mapHeader(llvm::ArrayRef<std::string> Headers,
     return SE->second;
   // Find the first header such that the extension is not '.inc', and isn't a
   // recognized non-header file
-  auto I =
-      std::find_if(Headers.begin(), Headers.end(), [](llvm::StringRef Include) {
-        // Skip .inc file whose including header file should
-        // be #included instead.
-        return !Include.endswith(".inc");
-      });
+  auto I = llvm::find_if(Headers, [](llvm::StringRef Include) {
+    // Skip .inc file whose including header file should
+    // be #included instead.
+    return !Include.endswith(".inc");
+  });
   if (I == Headers.end())
     return Headers[0]; // Fallback to the declaring header.
-  StringRef Header = *I;
+  llvm::StringRef Header = *I;
   // If Header is not expected be included (e.g. .cc file), we fall back to
   // the declaring header.
-  StringRef Ext = llvm::sys::path::extension(Header).trim('.');
+  llvm::StringRef Ext = llvm::sys::path::extension(Header).trim('.');
   // Include-able headers must have precompile type. Treat files with
   // non-recognized extenstions (TY_INVALID) as headers.
   auto ExtType = driver::types::lookupTypeForExtension(Ext);
@@ -88,7 +87,7 @@ collectIWYUHeaderMaps(CanonicalIncludes *Includes) {
     PragmaCommentHandler(CanonicalIncludes *Includes) : Includes(Includes) {}
 
     bool HandleComment(Preprocessor &PP, SourceRange Range) override {
-      StringRef Text =
+      llvm::StringRef Text =
           Lexer::getSourceText(CharSourceRange::getCharRange(Range),
                                PP.getSourceManager(), PP.getLangOpts());
       if (!Text.consume_front(IWYUPragma))
@@ -143,6 +142,7 @@ void addSystemHeadersMapping(CanonicalIncludes *Includes) {
       {"std::basic_stringstream", "<sstream>"},
       {"std::istringstream", "<sstream>"},
       {"std::ostringstream", "<sstream>"},
+      {"std::string", "<string>"},
       {"std::stringbuf", "<sstream>"},
       {"std::stringstream", "<sstream>"},
       {"std::wistringstream", "<sstream>"},

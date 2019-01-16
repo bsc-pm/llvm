@@ -55,6 +55,7 @@ void InputChunk::verifyRelocTargets() const {
     case R_WEBASSEMBLY_TYPE_INDEX_LEB:
     case R_WEBASSEMBLY_FUNCTION_INDEX_LEB:
     case R_WEBASSEMBLY_GLOBAL_INDEX_LEB:
+    case R_WEBASSEMBLY_EVENT_INDEX_LEB:
     case R_WEBASSEMBLY_MEMORY_ADDR_LEB:
       ExistingValue = decodeULEB128(Loc, &BytesRead);
       break;
@@ -111,6 +112,7 @@ void InputChunk::writeTo(uint8_t *Buf) const {
     case R_WEBASSEMBLY_TYPE_INDEX_LEB:
     case R_WEBASSEMBLY_FUNCTION_INDEX_LEB:
     case R_WEBASSEMBLY_GLOBAL_INDEX_LEB:
+    case R_WEBASSEMBLY_EVENT_INDEX_LEB:
     case R_WEBASSEMBLY_MEMORY_ADDR_LEB:
       encodeULEB128(Value, Loc, 5);
       break;
@@ -180,6 +182,7 @@ static unsigned writeCompressedReloc(uint8_t *Buf, const WasmRelocation &Rel,
   case R_WEBASSEMBLY_TYPE_INDEX_LEB:
   case R_WEBASSEMBLY_FUNCTION_INDEX_LEB:
   case R_WEBASSEMBLY_GLOBAL_INDEX_LEB:
+  case R_WEBASSEMBLY_EVENT_INDEX_LEB:
   case R_WEBASSEMBLY_MEMORY_ADDR_LEB:
     return encodeULEB128(Value, Buf);
   case R_WEBASSEMBLY_TABLE_INDEX_SLEB:
@@ -195,6 +198,7 @@ static unsigned getRelocWidthPadded(const WasmRelocation &Rel) {
   case R_WEBASSEMBLY_TYPE_INDEX_LEB:
   case R_WEBASSEMBLY_FUNCTION_INDEX_LEB:
   case R_WEBASSEMBLY_GLOBAL_INDEX_LEB:
+  case R_WEBASSEMBLY_EVENT_INDEX_LEB:
   case R_WEBASSEMBLY_MEMORY_ADDR_LEB:
   case R_WEBASSEMBLY_TABLE_INDEX_SLEB:
   case R_WEBASSEMBLY_MEMORY_ADDR_SLEB:
@@ -220,7 +224,7 @@ static unsigned getRelocWidth(const WasmRelocation &Rel, uint32_t Value) {
 // This function only computes the final output size.  It must be called
 // before getSize() is used to calculate of layout of the code section.
 void InputFunction::calculateSize() {
-  if (!File || !Config->CompressRelocTargets)
+  if (!File || !Config->CompressRelocations)
     return;
 
   LLVM_DEBUG(dbgs() << "calculateSize: " << getName() << "\n");
@@ -255,7 +259,7 @@ void InputFunction::calculateSize() {
 // Override the default writeTo method so that we can (optionally) write the
 // compressed version of the function.
 void InputFunction::writeTo(uint8_t *Buf) const {
-  if (!File || !Config->CompressRelocTargets)
+  if (!File || !Config->CompressRelocations)
     return InputChunk::writeTo(Buf);
 
   Buf += OutputOffset;

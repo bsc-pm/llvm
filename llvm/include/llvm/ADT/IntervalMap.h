@@ -964,6 +964,7 @@ public:
 
 private:
   // The root data is either a RootLeaf or a RootBranchData instance.
+  LLVM_ALIGNAS(RootLeaf) LLVM_ALIGNAS(RootBranchData)
   AlignedCharArrayUnion<RootLeaf, RootBranchData> data;
 
   // Tree height.
@@ -1132,6 +1133,19 @@ public:
     iterator I(*this);
     I.find(x);
     return I;
+  }
+
+  /// overlaps(a, b) - Return true if the intervals in this map overlap with the
+  /// interval [a;b].
+  bool overlaps(KeyT a, KeyT b) {
+    assert(Traits::nonEmpty(a, b));
+    const_iterator I = find(a);
+    if (!I.valid())
+      return false;
+    // [a;b] and [x;y] overlap iff x<=b and a<=y. The find() call guarantees the
+    // second part (y = find(a).stop()), so it is sufficient to check the first
+    // one.
+    return !Traits::stopLess(b, I.start());
   }
 };
 

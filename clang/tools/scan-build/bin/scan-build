@@ -1193,6 +1193,11 @@ OPTIONS:
 
    Display the description of defects in the list
 
+ -sarif
+
+  By default the output of scan-build is a set of HTML files. This option
+  outputs the results in SARIF format.
+ 
  -plist
 
    By default the output of scan-build is a set of HTML files. This option
@@ -1207,7 +1212,7 @@ OPTIONS:
 
    By default, the exit status of scan-build is the same as the executed build
    command. Specifying this option causes the exit status of scan-build to be 1
-   if it found potential bugs and 0 otherwise.
+   if it found potential bugs and the exit status of the build itself otherwise.
 
  --exclude <path>
 
@@ -1665,6 +1670,12 @@ sub ProcessArgs {
       next;
     }
 
+    if ($arg eq "-sarif") {
+      shift @$Args;
+      $Options{OutputFormat} = "sarif";
+      next;
+    }
+
     if ($arg eq "-plist") {
       shift @$Args;
       $Options{OutputFormat} = "plist";
@@ -1888,9 +1899,12 @@ my $ExitStatus = RunBuildCommand(\@ARGV, $Options{IgnoreErrors}, $Options{KeepCC
 	                        $Cmd, $CmdCXX, \%EnvVars);
 
 if (defined $Options{OutputFormat}) {
-  if ($Options{OutputFormat} =~ /plist/) {
+  if ($Options{OutputFormat} =~ /plist/ ||
+      $Options{OutputFormat} =~ /sarif/) {
     Diag "Analysis run complete.\n";
-    Diag "Analysis results (plist files) deposited in '$Options{OutputDir}'\n";
+    Diag "Analysis results (" .
+      ($Options{OutputFormat} =~ /plist/ ? "plist" : "sarif") .
+      " files) deposited in '$Options{OutputDir}'\n";
   }
   if ($Options{OutputFormat} =~ /html/) {
     # Postprocess the HTML directory.
@@ -1908,7 +1922,7 @@ if (defined $Options{OutputFormat}) {
 
     if ($Options{ExitStatusFoundBugs}) {
       exit 1 if ($NumBugs > 0);
-      exit 0;
+      exit $ExitStatus;
     }
   }
 }

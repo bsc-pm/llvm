@@ -8,10 +8,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "URI.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -28,10 +31,10 @@ inline llvm::Error make_string_error(const llvm::Twine &Message) {
 
 /// \brief This manages file paths in the file system. All paths in the scheme
 /// are absolute (with leading '/').
+/// Note that this scheme is hardcoded into the library and not registered in
+/// registry.
 class FileSystemScheme : public URIScheme {
 public:
-  static const char *Scheme;
-
   llvm::Expected<std::string>
   getAbsolutePath(llvm::StringRef /*Authority*/, llvm::StringRef Body,
                   llvm::StringRef /*HintPath*/) const override {
@@ -49,25 +52,20 @@ public:
 
   llvm::Expected<URI>
   uriFromAbsolutePath(llvm::StringRef AbsolutePath) const override {
-    using namespace llvm::sys;
-
     std::string Body;
     // For Windows paths e.g. X:
     if (AbsolutePath.size() > 1 && AbsolutePath[1] == ':')
       Body = "/";
-    Body += path::convert_to_slash(AbsolutePath);
-    return URI(Scheme, /*Authority=*/"", Body);
+    Body += llvm::sys::path::convert_to_slash(AbsolutePath);
+    return URI("file", /*Authority=*/"", Body);
   }
 };
 
-const char *FileSystemScheme::Scheme = "file";
-
-static URISchemeRegistry::Add<FileSystemScheme>
-    X(FileSystemScheme::Scheme,
-      "URI scheme for absolute paths in the file system.");
-
 llvm::Expected<std::unique_ptr<URIScheme>>
 findSchemeByName(llvm::StringRef Scheme) {
+  if (Scheme == "file")
+    return llvm::make_unique<FileSystemScheme>();
+
   for (auto I = URISchemeRegistry::begin(), E = URISchemeRegistry::end();
        I != E; ++I) {
     if (I->getName() != Scheme)
@@ -88,6 +86,8 @@ bool shouldEscape(unsigned char C) {
   case '.':
   case '~':
   case '/': // '/' is only reserved when parsing.
+  // ':' is only reserved for relative URI paths, which clangd doesn't produce.
+  case ':':
     return false;
   }
   return true;
@@ -102,7 +102,7 @@ std::string percentEncode(llvm::StringRef Content) {
   llvm::raw_string_ostream OS(Result);
   for (unsigned char C : Content)
     if (shouldEscape(C))
-      OS << '%' << llvm::format_hex_no_prefix(C, 2);
+      OS << '%' << llvm::format_hex_no_prefix(C, 2, /*Upper = */ true);
     else
       OS << C;
 
@@ -126,6 +126,16 @@ std::string percentDecode(llvm::StringRef Content) {
       Result.push_back(*I);
   }
   return Result;
+}
+
+bool isValidScheme(llvm::StringRef Scheme) {
+  if (Scheme.empty())
+    return false;
+  if (!llvm::isAlpha(Scheme[0]))
+    return false;
+  return std::all_of(Scheme.begin() + 1, Scheme.end(), [](char C) {
+    return llvm::isAlnum(C) || C == '+' || C == '.' || C == '-';
+  });
 }
 
 } // namespace
@@ -158,9 +168,13 @@ llvm::Expected<URI> URI::parse(llvm::StringRef OrigUri) {
   llvm::StringRef Uri = OrigUri;
 
   auto Pos = Uri.find(':');
-  if (Pos == 0 || Pos == llvm::StringRef::npos)
+  if (Pos == llvm::StringRef::npos)
     return make_string_error("Scheme must be provided in URI: " + OrigUri);
-  U.Scheme = percentDecode(Uri.substr(0, Pos));
+  auto SchemeStr = Uri.substr(0, Pos);
+  U.Scheme = percentDecode(SchemeStr);
+  if (!isValidScheme(U.Scheme))
+    return make_string_error(llvm::formatv("Invalid scheme: {0} (decoded: {1})",
+                                           SchemeStr, U.Scheme));
   Uri = Uri.substr(Pos + 1);
   if (Uri.consume_front("//")) {
     Pos = Uri.find('/');
@@ -181,12 +195,12 @@ llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
   return S->get()->uriFromAbsolutePath(AbsolutePath);
 }
 
-llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
-                                const std::vector<std::string> &Schemes) {
+URI URI::create(llvm::StringRef AbsolutePath) {
   if (!llvm::sys::path::is_absolute(AbsolutePath))
-    return make_string_error("Not a valid absolute path: " + AbsolutePath);
-  for (const auto &Scheme : Schemes) {
-    auto URI = URI::create(AbsolutePath, Scheme);
+    llvm_unreachable(
+        ("Not a valid absolute path: " + AbsolutePath).str().c_str());
+  for (auto &Entry : URISchemeRegistry::entries()) {
+    auto URI = Entry.instantiate()->uriFromAbsolutePath(AbsolutePath);
     // For some paths, conversion to different URI schemes is impossible. These
     // should be just skipped.
     if (!URI) {
@@ -194,15 +208,14 @@ llvm::Expected<URI> URI::create(llvm::StringRef AbsolutePath,
       llvm::consumeError(URI.takeError());
       continue;
     }
-    return URI;
+    return std::move(*URI);
   }
-  return make_string_error(
-      "Couldn't convert " + AbsolutePath +
-      " to any given scheme: " + llvm::join(Schemes, ", "));
+  // Fallback to file: scheme which should work for any paths.
+  return URI::createFile(AbsolutePath);
 }
 
 URI URI::createFile(llvm::StringRef AbsolutePath) {
-  auto U = create(AbsolutePath, "file");
+  auto U = FileSystemScheme().uriFromAbsolutePath(AbsolutePath);
   if (!U)
     llvm_unreachable(llvm::toString(U.takeError()).c_str());
   return std::move(*U);
@@ -214,6 +227,26 @@ llvm::Expected<std::string> URI::resolve(const URI &Uri,
   if (!S)
     return S.takeError();
   return S->get()->getAbsolutePath(Uri.Authority, Uri.Body, HintPath);
+}
+
+llvm::Expected<std::string> URI::resolvePath(llvm::StringRef AbsPath,
+                                             llvm::StringRef HintPath) {
+  if (!llvm::sys::path::is_absolute(AbsPath))
+    llvm_unreachable(("Not a valid absolute path: " + AbsPath).str().c_str());
+  for (auto &Entry : URISchemeRegistry::entries()) {
+    auto S = Entry.instantiate();
+    auto U = S->uriFromAbsolutePath(AbsPath);
+    // For some paths, conversion to different URI schemes is impossible. These
+    // should be just skipped.
+    if (!U) {
+      // Ignore the error.
+      llvm::consumeError(U.takeError());
+      continue;
+    }
+    return S->getAbsolutePath(U->Authority, U->Body, HintPath);
+  }
+  // Fallback to file: scheme which doesn't do any canonicalization.
+  return AbsPath;
 }
 
 llvm::Expected<std::string> URI::includeSpelling(const URI &Uri) {

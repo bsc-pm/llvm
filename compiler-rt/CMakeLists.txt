@@ -200,7 +200,7 @@ set(CXXABIS none default libstdc++ libc++)
 set_property(CACHE SANITIZER_CXX_ABI PROPERTY STRINGS ;${CXXABIS})
 
 if (SANITIZER_CXX_ABI STREQUAL "default")
-  if (APPLE)
+  if (APPLE OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     set(SANITIZER_CXX_ABI_LIBNAME "libc++")
     set(SANITIZER_CXX_ABI_SYSTEM 1)
   elseif (FUCHSIA)
@@ -368,11 +368,14 @@ append_list_if(COMPILER_RT_HAS_WD4391_FLAG /wd4391 SANITIZER_COMMON_CFLAGS)
 append_list_if(COMPILER_RT_HAS_WD4722_FLAG /wd4722 SANITIZER_COMMON_CFLAGS)
 append_list_if(COMPILER_RT_HAS_WD4800_FLAG /wd4800 SANITIZER_COMMON_CFLAGS)
 
+append_list_if(MINGW -fms-extensions SANITIZER_COMMON_CFLAGS)
+
 # Set common link flags.
 append_list_if(COMPILER_RT_HAS_NODEFAULTLIBS_FLAG -nodefaultlibs SANITIZER_COMMON_LINK_FLAGS)
 
 if (COMPILER_RT_USE_BUILTINS_LIBRARY)
   list(APPEND SANITIZER_COMMON_LINK_LIBS ${COMPILER_RT_BUILTINS_LIBRARY})
+  string(REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
 else()
   if (ANDROID)
     append_list_if(COMPILER_RT_HAS_GCC_LIB gcc SANITIZER_COMMON_LINK_LIBS)
@@ -382,14 +385,6 @@ else()
 endif()
 
 append_list_if(COMPILER_RT_HAS_LIBC c SANITIZER_COMMON_LINK_LIBS)
-
-if(ANDROID)
-# Put the Sanitizer shared libraries in the global group. For more details, see
-# android-changes-for-ndk-developers.md#changes-to-library-search-order
-  if (COMPILER_RT_HAS_Z_GLOBAL)
-    list(APPEND SANITIZER_COMMON_LINK_FLAGS -Wl,-z,global)
-  endif()
-endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Fuchsia")
   list(APPEND SANITIZER_COMMON_LINK_FLAGS -Wl,-z,defs,-z,now,-z,relro)
@@ -433,15 +428,19 @@ endif()
 
 add_subdirectory(include)
 
-foreach(path IN ITEMS ${LLVM_MAIN_SRC_DIR}/projects/libcxx
-                      ${LLVM_MAIN_SRC_DIR}/runtimes/libcxx
-                      ${LLVM_MAIN_SRC_DIR}/../libcxx
-                      ${LLVM_EXTERNAL_LIBCXX_SOURCE_DIR})
-  if(IS_DIRECTORY ${path})
-    set(COMPILER_RT_LIBCXX_PATH ${path})
-    break()
-  endif()
-endforeach()
+option(COMPILER_RT_USE_LIBCXX
+  "Enable compiler-rt to use libc++ from the source tree" ON)
+if(COMPILER_RT_USE_LIBCXX)
+  foreach(path IN ITEMS ${LLVM_MAIN_SRC_DIR}/projects/libcxx
+                        ${LLVM_MAIN_SRC_DIR}/runtimes/libcxx
+                        ${LLVM_MAIN_SRC_DIR}/../libcxx
+                        ${LLVM_EXTERNAL_LIBCXX_SOURCE_DIR})
+    if(IS_DIRECTORY ${path})
+      set(COMPILER_RT_LIBCXX_PATH ${path})
+      break()
+    endif()
+  endforeach()
+endif()
 
 set(COMPILER_RT_LLD_PATH ${LLVM_MAIN_SRC_DIR}/tools/lld)
 if(EXISTS ${COMPILER_RT_LLD_PATH}/ AND LLVM_TOOL_LLD_BUILD)

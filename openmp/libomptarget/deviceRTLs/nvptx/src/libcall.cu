@@ -39,14 +39,17 @@ EXTERN void omp_set_num_threads(int num) {
   if (num <= 0) {
     WARNING0(LW_INPUT, "expected positive num; ignore\n");
   } else {
-    omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+    omptarget_nvptx_TaskDescr *currTaskDescr =
+        getMyTopTaskDescriptor(/*isSPMDExecutionMode=*/false);
     currTaskDescr->NThreads() = num;
   }
 }
 
 EXTERN int omp_get_num_threads(void) {
-  int tid = GetLogicalThreadIdInBlock();
-  int rc = GetNumberOfOmpThreads(tid, isSPMDMode(), isRuntimeUninitialized());
+  bool isSPMDExecutionMode = isSPMDMode();
+  int tid = GetLogicalThreadIdInBlock(isSPMDExecutionMode);
+  int rc =
+      GetNumberOfOmpThreads(tid, isSPMDExecutionMode, isRuntimeUninitialized());
   PRINT(LD_IO, "call omp_get_num_threads() return %d\n", rc);
   return rc;
 }
@@ -58,11 +61,12 @@ EXTERN int omp_get_max_threads(void) {
     // We're already in parallel region.
     return 1;  // default is 1 thread avail
   }
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+  omptarget_nvptx_TaskDescr *currTaskDescr =
+      getMyTopTaskDescriptor(isSPMDMode());
   int rc = 1; // default is 1 thread avail
   if (!currTaskDescr->InParallelRegion()) {
-    // not currently in a parallel region... all are available
-    rc = GetNumberOfProcsInTeam();
+    // Not currently in a parallel region, return what was set.
+    rc = currTaskDescr->NThreads();
     ASSERT0(LT_FUSSY, rc >= 0, "bad number of threads");
   }
   PRINT(LD_IO, "call omp_get_max_threads() return %d\n", rc);
@@ -76,21 +80,23 @@ EXTERN int omp_get_thread_limit(void) {
     return 0;  // default is 0
   }
   // per contention group.. meaning threads in current team
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+  omptarget_nvptx_TaskDescr *currTaskDescr =
+      getMyTopTaskDescriptor(isSPMDMode());
   int rc = currTaskDescr->ThreadLimit();
   PRINT(LD_IO, "call omp_get_thread_limit() return %d\n", rc);
   return rc;
 }
 
 EXTERN int omp_get_thread_num() {
-  int tid = GetLogicalThreadIdInBlock();
-  int rc = GetOmpThreadId(tid, isSPMDMode(), isRuntimeUninitialized());
+  bool isSPMDExecutionMode = isSPMDMode();
+  int tid = GetLogicalThreadIdInBlock(isSPMDExecutionMode);
+  int rc = GetOmpThreadId(tid, isSPMDExecutionMode, isRuntimeUninitialized());
   PRINT(LD_IO, "call omp_get_thread_num() returns %d\n", rc);
   return rc;
 }
 
 EXTERN int omp_get_num_procs(void) {
-  int rc = GetNumberOfProcsInDevice();
+  int rc = GetNumberOfProcsInDevice(isSPMDMode());
   PRINT(LD_IO, "call omp_get_num_procs() returns %d\n", rc);
   return rc;
 }
@@ -102,7 +108,8 @@ EXTERN int omp_in_parallel(void) {
             "Expected SPMD mode only with uninitialized runtime.");
     rc = 1;  // SPMD mode is always in parallel.
   } else {
-    omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+    omptarget_nvptx_TaskDescr *currTaskDescr =
+        getMyTopTaskDescriptor(isSPMDMode());
     if (currTaskDescr->InParallelRegion()) {
       rc = 1;
     }
@@ -122,32 +129,11 @@ EXTERN int omp_in_final(void) {
 }
 
 EXTERN void omp_set_dynamic(int flag) {
-  PRINT(LD_IO, "call omp_set_dynamic(%d)\n", flag);
-  if (isRuntimeUninitialized()) {
-    ASSERT0(LT_FUSSY, isSPMDMode(),
-            "Expected SPMD mode only with uninitialized runtime.");
-    return;
-  }
-
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
-  if (flag) {
-    currTaskDescr->SetDynamic();
-  } else {
-    currTaskDescr->ClearDynamic();
-  }
+  PRINT(LD_IO, "call omp_set_dynamic(%d) is ignored (no support)\n", flag);
 }
 
 EXTERN int omp_get_dynamic(void) {
   int rc = 0;
-  if (isRuntimeUninitialized()) {
-    ASSERT0(LT_FUSSY, isSPMDMode(),
-            "Expected SPMD mode only with uninitialized runtime.");
-    return rc;
-  }
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
-  if (currTaskDescr->IsDynamic()) {
-    rc = 1;
-  }
   PRINT(LD_IO, "call omp_get_dynamic() returns %d\n", rc);
   return rc;
 }
@@ -179,10 +165,11 @@ EXTERN int omp_get_level(void) {
   if (isRuntimeUninitialized()) {
     ASSERT0(LT_FUSSY, isSPMDMode(),
             "Expected SPMD mode only with uninitialized runtime.");
-    return omptarget_nvptx_simpleThreadPrivateContext->GetParallelLevel();
+    return parallelLevel;
   }
   int level = 0;
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+  omptarget_nvptx_TaskDescr *currTaskDescr =
+      getMyTopTaskDescriptor(isSPMDMode());
   ASSERT0(LT_FUSSY, currTaskDescr,
           "do not expect fct to be called in a non-active thread");
   do {
@@ -202,7 +189,8 @@ EXTERN int omp_get_active_level(void) {
     return 1;
   }
   int level = 0; // no active level parallelism
-  omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+  omptarget_nvptx_TaskDescr *currTaskDescr =
+      getMyTopTaskDescriptor(isSPMDMode());
   ASSERT0(LT_FUSSY, currTaskDescr,
           "do not expect fct to be called in a non-active thread");
   do {
@@ -223,11 +211,14 @@ EXTERN int omp_get_ancestor_thread_num(int level) {
             "Expected SPMD mode only with uninitialized runtime.");
     return level == 1 ? GetThreadIdInBlock() : 0;
   }
-  int rc = 0; // default at level 0
-  if (level >= 0) {
+  int rc = -1;
+  if (level == 0) {
+    rc = 0;
+  } else if (level > 0) {
     int totLevel = omp_get_level();
     if (level <= totLevel) {
-      omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+      omptarget_nvptx_TaskDescr *currTaskDescr =
+          getMyTopTaskDescriptor(isSPMDMode());
       int steps = totLevel - level;
       PRINT(LD_IO, "backtrack %d steps\n", steps);
       ASSERT0(LT_FUSSY, currTaskDescr,
@@ -237,14 +228,15 @@ EXTERN int omp_get_ancestor_thread_num(int level) {
           // print current state
           omp_sched_t sched = currTaskDescr->GetRuntimeSched();
           PRINT(LD_ALL,
-                "task descr %s %d: %s, in par %d, dyn %d, rt sched %d,"
+                "task descr %s %d: %s, in par %d, rt sched %d,"
                 " chunk %" PRIu64 "; tid %d, tnum %d, nthreads %d\n",
                 "ancestor", steps,
                 (currTaskDescr->IsParallelConstruct() ? "par" : "task"),
-                currTaskDescr->InParallelRegion(), currTaskDescr->IsDynamic(),
-                sched, currTaskDescr->RuntimeChunkSize(),
-                currTaskDescr->ThreadId(), currTaskDescr->ThreadsInTeam(),
-                currTaskDescr->NThreads());
+                (int)currTaskDescr->InParallelRegion(), (int)sched,
+                currTaskDescr->RuntimeChunkSize(),
+                (int)currTaskDescr->ThreadId(),
+                (int)currTaskDescr->ThreadsInTeam(),
+                (int)currTaskDescr->NThreads());
         }
 
         if (currTaskDescr->IsParallelConstruct()) {
@@ -271,11 +263,14 @@ EXTERN int omp_get_team_size(int level) {
             "Expected SPMD mode only with uninitialized runtime.");
     return level == 1 ? GetNumberOfThreadsInBlock() : 1;
   }
-  int rc = 1; // default at level 0
-  if (level >= 0) {
+  int rc = -1;
+  if (level == 0) {
+    rc = 1;
+  } else if (level > 0) {
     int totLevel = omp_get_level();
     if (level <= totLevel) {
-      omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+      omptarget_nvptx_TaskDescr *currTaskDescr =
+          getMyTopTaskDescriptor(isSPMDMode());
       int steps = totLevel - level;
       ASSERT0(LT_FUSSY, currTaskDescr,
               "do not expect fct to be called in a non-active thread");
@@ -304,7 +299,8 @@ EXTERN void omp_get_schedule(omp_sched_t *kind, int *modifier) {
     *kind = omp_sched_static;
     *modifier = 1;
   } else {
-    omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+    omptarget_nvptx_TaskDescr *currTaskDescr =
+        getMyTopTaskDescriptor(isSPMDMode());
     *kind = currTaskDescr->GetRuntimeSched();
     *modifier = currTaskDescr->RuntimeChunkSize();
   }
@@ -321,7 +317,8 @@ EXTERN void omp_set_schedule(omp_sched_t kind, int modifier) {
     return;
   }
   if (kind >= omp_sched_static && kind < omp_sched_auto) {
-    omptarget_nvptx_TaskDescr *currTaskDescr = getMyTopTaskDescriptor();
+    omptarget_nvptx_TaskDescr *currTaskDescr =
+        getMyTopTaskDescriptor(isSPMDMode());
     currTaskDescr->SetRuntimeSched(kind);
     currTaskDescr->RuntimeChunkSize() = modifier;
     PRINT(LD_IOD, "omp_set_schedule did set sched %d & modif %" PRIu64 "\n",
@@ -422,23 +419,21 @@ EXTERN int omp_get_max_task_priority(void) {
 #define SET 1
 
 EXTERN void omp_init_lock(omp_lock_t *lock) {
-  *lock = UNSET;
+  omp_unset_lock(lock);
   PRINT0(LD_IO, "call omp_init_lock()\n");
 }
 
 EXTERN void omp_destroy_lock(omp_lock_t *lock) {
+  omp_unset_lock(lock);
   PRINT0(LD_IO, "call omp_destroy_lock()\n");
 }
 
 EXTERN void omp_set_lock(omp_lock_t *lock) {
   // int atomicCAS(int* address, int compare, int val);
   // (old == compare ? val : old)
-  int compare = UNSET;
-  int val = SET;
 
   // TODO: not sure spinning is a good idea here..
-  while (atomicCAS(lock, compare, val) != UNSET) {
-
+  while (atomicCAS(lock, UNSET, SET) != UNSET) {
     clock_t start = clock();
     clock_t now;
     for (;;) {
@@ -454,9 +449,7 @@ EXTERN void omp_set_lock(omp_lock_t *lock) {
 }
 
 EXTERN void omp_unset_lock(omp_lock_t *lock) {
-  int compare = SET;
-  int val = UNSET;
-  int old = atomicCAS(lock, compare, val);
+  (void)atomicExch(lock, UNSET);
 
   PRINT0(LD_IO, "call omp_unset_lock()\n");
 }
@@ -464,10 +457,7 @@ EXTERN void omp_unset_lock(omp_lock_t *lock) {
 EXTERN int omp_test_lock(omp_lock_t *lock) {
   // int atomicCAS(int* address, int compare, int val);
   // (old == compare ? val : old)
-  int compare = UNSET;
-  int val = SET;
-
-  int ret = atomicCAS(lock, compare, val);
+  int ret = atomicAdd(lock, 0);
 
   PRINT(LD_IO, "call omp_test_lock() return %d\n", ret);
 

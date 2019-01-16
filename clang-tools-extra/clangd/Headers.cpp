@@ -34,13 +34,17 @@ public:
                           llvm::StringRef /*SearchPath*/,
                           llvm::StringRef /*RelativePath*/,
                           const Module * /*Imported*/,
-                          SrcMgr::CharacteristicKind /*FileType*/) override {
-    if (SM.isInMainFile(HashLoc))
-      Out->MainFileIncludes.push_back({
-          halfOpenToRange(SM, FilenameRange),
-          (IsAngled ? "<" + FileName + ">" : "\"" + FileName + "\"").str(),
-          File ? File->tryGetRealPathName() : "",
-      });
+                          SrcMgr::CharacteristicKind FileKind) override {
+    if (SM.isWrittenInMainFile(HashLoc)) {
+      Out->MainFileIncludes.emplace_back();
+      auto &Inc = Out->MainFileIncludes.back();
+      Inc.R = halfOpenToRange(SM, FilenameRange);
+      Inc.Written =
+          (IsAngled ? "<" + FileName + ">" : "\"" + FileName + "\"").str();
+      Inc.Resolved = File ? File->tryGetRealPathName() : "";
+      Inc.HashOffset = SM.getFileOffset(HashLoc);
+      Inc.FileKind = FileKind;
+    }
     if (File) {
       auto *IncludingFileEntry = SM.getFileEntryForID(SM.getFileID(HashLoc));
       if (!IncludingFileEntry) {
@@ -126,6 +130,12 @@ IncludeStructure::includeDepth(llvm::StringRef Root) const {
   return Result;
 }
 
+void IncludeInserter::addExisting(const Inclusion &Inc) {
+  IncludedHeaders.insert(Inc.Written);
+  if (!Inc.Resolved.empty())
+    IncludedHeaders.insert(Inc.Resolved);
+}
+
 /// FIXME(ioeric): we might not want to insert an absolute include path if the
 /// path is not shortened.
 bool IncludeInserter::shouldInsertInclude(
@@ -133,12 +143,6 @@ bool IncludeInserter::shouldInsertInclude(
   assert(DeclaringHeader.valid() && InsertedHeader.valid());
   if (FileName == DeclaringHeader.File || FileName == InsertedHeader.File)
     return false;
-  llvm::StringSet<> IncludedHeaders;
-  for (const auto &Inc : Inclusions) {
-    IncludedHeaders.insert(Inc.Written);
-    if (!Inc.Resolved.empty())
-      IncludedHeaders.insert(Inc.Resolved);
-  }
   auto Included = [&](llvm::StringRef Header) {
     return IncludedHeaders.find(Header) != IncludedHeaders.end();
   };
@@ -161,12 +165,19 @@ IncludeInserter::calculateIncludePath(const HeaderFile &DeclaringHeader,
   return Suggested;
 }
 
-Optional<TextEdit> IncludeInserter::insert(StringRef VerbatimHeader) const {
-  Optional<TextEdit> Edit = None;
+llvm::Optional<TextEdit>
+IncludeInserter::insert(llvm::StringRef VerbatimHeader) const {
+  llvm::Optional<TextEdit> Edit = None;
   if (auto Insertion = Inserter.insert(VerbatimHeader.trim("\"<>"),
                                        VerbatimHeader.startswith("<")))
     Edit = replacementToEdit(Code, *Insertion);
   return Edit;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Inclusion &Inc) {
+  return OS << Inc.Written << " = "
+            << (Inc.Resolved.empty() ? Inc.Resolved : "[unresolved]") << " at "
+            << Inc.R;
 }
 
 } // namespace clangd

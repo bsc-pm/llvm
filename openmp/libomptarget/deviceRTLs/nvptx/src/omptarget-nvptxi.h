@@ -16,7 +16,7 @@
 // Task Descriptor
 ////////////////////////////////////////////////////////////////////////////////
 
-INLINE omp_sched_t omptarget_nvptx_TaskDescr::GetRuntimeSched() {
+INLINE omp_sched_t omptarget_nvptx_TaskDescr::GetRuntimeSched() const {
   // sched starts from 1..4; encode it as 0..3; so add 1 here
   uint8_t rc = (items.flags & TaskDescr_SchedMask) + 1;
   return (omp_sched_t)rc;
@@ -31,7 +31,8 @@ INLINE void omptarget_nvptx_TaskDescr::SetRuntimeSched(omp_sched_t sched) {
   items.flags |= val;
 }
 
-INLINE void omptarget_nvptx_TaskDescr::InitLevelZeroTaskDescr() {
+INLINE void
+omptarget_nvptx_TaskDescr::InitLevelZeroTaskDescr(bool isSPMDExecutionMode) {
   // slow method
   // flag:
   //   default sched is static,
@@ -39,7 +40,7 @@ INLINE void omptarget_nvptx_TaskDescr::InitLevelZeroTaskDescr() {
   //   not in parallel
 
   items.flags = 0;
-  items.nthreads = GetNumberOfProcsInTeam();
+  items.nthreads = GetNumberOfProcsInTeam(isSPMDExecutionMode);
   ;                                // threads: whatever was alloc by kernel
   items.threadId = 0;         // is master
   items.threadsInTeam = 1;    // sequential
@@ -154,7 +155,7 @@ INLINE void omptarget_nvptx_TaskDescr::RestoreLoopData() const {
 ////////////////////////////////////////////////////////////////////////////////
 
 INLINE omptarget_nvptx_TaskDescr *
-omptarget_nvptx_ThreadPrivateContext::GetTopLevelTaskDescr(int tid) {
+omptarget_nvptx_ThreadPrivateContext::GetTopLevelTaskDescr(int tid) const {
   ASSERT0(
       LT_FUSSY, tid < MAX_THREADS_PER_TEAM,
       "Getting top level, tid is larger than allocated data structure size");
@@ -177,8 +178,8 @@ omptarget_nvptx_ThreadPrivateContext::InitThreadPrivateContext(int tid) {
 // Team Descriptor
 ////////////////////////////////////////////////////////////////////////////////
 
-INLINE void omptarget_nvptx_TeamDescr::InitTeamDescr() {
-  levelZeroTaskDescr.InitLevelZeroTaskDescr();
+INLINE void omptarget_nvptx_TeamDescr::InitTeamDescr(bool isSPMDExecutionMode) {
+  levelZeroTaskDescr.InitLevelZeroTaskDescr(isSPMDExecutionMode);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -199,39 +200,35 @@ INLINE omptarget_nvptx_TaskDescr *getMyTopTaskDescriptor(int threadId) {
   return omptarget_nvptx_threadPrivateContext->GetTopLevelTaskDescr(threadId);
 }
 
-INLINE omptarget_nvptx_TaskDescr *getMyTopTaskDescriptor() {
-  return getMyTopTaskDescriptor(GetLogicalThreadIdInBlock());
+INLINE omptarget_nvptx_TaskDescr *
+getMyTopTaskDescriptor(bool isSPMDExecutionMode) {
+  return getMyTopTaskDescriptor(GetLogicalThreadIdInBlock(isSPMDExecutionMode));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Lightweight runtime functions.
+// Memory management runtime functions.
 ////////////////////////////////////////////////////////////////////////////////
 
-// Shared memory buffer for globalization support.
-static __align__(16) __device__ __shared__ char
-    omptarget_static_buffer[DS_Shared_Memory_Size];
-static __device__ __shared__ void *omptarget_spmd_allocated;
-
-extern __device__ __shared__ void *omptarget_nvptx_simpleGlobalData;
-
-INLINE void *
-omptarget_nvptx_SimpleThreadPrivateContext::Allocate(size_t DataSize) {
-  if (DataSize <= DS_Shared_Memory_Size)
-    return ::omptarget_static_buffer;
-  if (DataSize <= sizeof(omptarget_nvptx_ThreadPrivateContext))
-    return ::omptarget_nvptx_simpleGlobalData;
-  if (threadIdx.x == 0)
-    omptarget_spmd_allocated = SafeMalloc(DataSize, "SPMD teams alloc");
-  __syncthreads();
-  return omptarget_spmd_allocated;
+INLINE void omptarget_nvptx_SimpleMemoryManager::Release() {
+  ASSERT0(LT_FUSSY, usedSlotIdx < MAX_SM,
+          "SlotIdx is too big or uninitialized.");
+  ASSERT0(LT_FUSSY, usedMemIdx < OMP_STATE_COUNT,
+          "MemIdx is too big or uninitialized.");
+  MemDataTy &MD = MemData[usedSlotIdx];
+  atomicExch((unsigned *)&MD.keys[usedMemIdx], 0);
 }
 
-INLINE void
-omptarget_nvptx_SimpleThreadPrivateContext::Deallocate(void *Ptr) {
-  if (Ptr != ::omptarget_static_buffer &&
-      Ptr != ::omptarget_nvptx_simpleGlobalData) {
-    __syncthreads();
-    if (threadIdx.x == 0)
-      SafeFree(Ptr, "SPMD teams dealloc");
+INLINE const void *omptarget_nvptx_SimpleMemoryManager::Acquire(const void *buf,
+                                                                size_t size) {
+  ASSERT0(LT_FUSSY, usedSlotIdx < MAX_SM,
+          "SlotIdx is too big or uninitialized.");
+  const unsigned sm = usedSlotIdx;
+  MemDataTy &MD = MemData[sm];
+  unsigned i = hash(GetBlockIdInKernel());
+  while (atomicCAS((unsigned *)&MD.keys[i], 0, 1) != 0) {
+    i = hash(i + 1);
   }
+  usedSlotIdx = sm;
+  usedMemIdx = i;
+  return static_cast<const char *>(buf) + (sm * OMP_STATE_COUNT + i) * size;
 }

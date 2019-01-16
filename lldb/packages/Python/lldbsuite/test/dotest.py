@@ -308,11 +308,22 @@ def parseOptionsAndInitTestdirs():
           'xcrun -find -toolchain default dsymutil')
 
     if args.filecheck:
-        # The CMake build passes in a path to a working FileCheck binary.
+        # The lldb-dotest script produced by the CMake build passes in a path
+        # to a working FileCheck binary. So does one specific Xcode project
+        # target. However, when invoking dotest.py directly, a valid --filecheck
+        # option needs to be given.
         configuration.filecheck = os.path.abspath(args.filecheck)
     else:
-        logging.error('No valid FileCheck executable; aborting...')
-        sys.exit(-1)
+        outputPaths = get_llvm_bin_dirs()
+        for outputPath in outputPaths:
+            candidatePath = os.path.join(outputPath, 'FileCheck')
+            if is_exe(candidatePath):
+                configuration.filecheck = candidatePath
+                break
+
+    if not configuration.get_filecheck_path():
+        logging.warning('No valid FileCheck executable; some tests may fail...')
+        logging.warning('(Double-check the --filecheck argument to dotest.py)')
 
     if args.channels:
         lldbtest_config.channels = args.channels
@@ -623,6 +634,31 @@ def getOutputPaths(lldbRootDirectory):
 
     return result
 
+def get_llvm_bin_dirs():
+    """
+    Returns an array of paths that may have the llvm/clang/etc binaries
+    in them, relative to this current file.  
+    Returns an empty array if none are found.
+    """
+    result = []
+
+    lldb_root_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "..")
+    paths_to_try = [
+        "llvm-build/Release+Asserts/x86_64/bin",
+        "llvm-build/Debug+Asserts/x86_64/bin",
+        "llvm-build/Release/x86_64/bin",
+        "llvm-build/Debug/x86_64/bin",
+        "llvm-build/Ninja-DebugAssert/llvm-macosx-x86_64/bin",
+        "llvm-build/Ninja-ReleaseAssert/llvm-macosx-x86_64/bin",
+        "llvm-build/Ninja-RelWithDebInfoAssert/llvm-macosx-x86_64/bin",
+    ]
+    for p in paths_to_try:
+        path = os.path.join(lldb_root_path, p)
+        if os.path.exists(path):
+            result.append(path)
+
+    return result
 
 def setupSysPath():
     """
@@ -1025,14 +1061,15 @@ def getMyCommandLine():
 
 def checkDsymForUUIDIsNotOn():
     cmd = ["defaults", "read", "com.apple.DebugSymbols"]
-    pipe = subprocess.Popen(
+    process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT)
-    cmd_output = pipe.stdout.read()
-    if cmd_output and "DBGFileMappedPaths = " in cmd_output:
+    cmd_output = process.stdout.read()
+    output_str = cmd_output.decode("utf-8")
+    if "DBGFileMappedPaths = " in output_str:
         print("%s =>" % ' '.join(cmd))
-        print(cmd_output)
+        print(output_str)
         print(
             "Disable automatic lookup and caching of dSYMs before running the test suite!")
         print("Exiting...")

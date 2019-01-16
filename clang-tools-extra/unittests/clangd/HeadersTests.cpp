@@ -11,6 +11,7 @@
 
 #include "Compiler.h"
 #include "TestFS.h"
+#include "TestTU.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
@@ -23,6 +24,7 @@ namespace clangd {
 namespace {
 
 using ::testing::AllOf;
+using ::testing::ElementsAre;
 using ::testing::UnorderedElementsAre;
 
 class HeadersTest : public ::testing::Test {
@@ -41,17 +43,11 @@ private:
     auto VFS = FS.getFileSystem();
     VFS->setCurrentWorkingDirectory(Cmd->Directory);
 
-    std::vector<const char *> Argv;
-    for (const auto &S : Cmd->CommandLine)
-      Argv.push_back(S.c_str());
-    auto CI = clang::createInvocationFromCommandLine(
-        Argv,
-        CompilerInstance::createDiagnostics(new DiagnosticOptions(),
-                                            &IgnoreDiags, false),
-        VFS);
+    ParseInputs PI;
+    PI.CompileCommand = *Cmd;
+    PI.FS = VFS;
+    auto CI = buildCompilerInvocation(PI);
     EXPECT_TRUE(static_cast<bool>(CI));
-    CI->getFrontendOpts().DisableFree = false;
-
     // The diagnostic options must be set before creating a CompilerInstance.
     CI->getDiagnosticOpts().IgnoreWarnings = true;
     auto Clang = prepareCompilerInstance(
@@ -107,7 +103,7 @@ protected:
     return Path;
   }
 
-  Optional<TextEdit> insert(StringRef VerbatimHeader) {
+  llvm::Optional<TextEdit> insert(llvm::StringRef VerbatimHeader) {
     auto Clang = setupClang();
     PreprocessOnlyAction Action;
     EXPECT_TRUE(
@@ -131,6 +127,7 @@ protected:
 
 MATCHER_P(Written, Name, "") { return arg.Written == Name; }
 MATCHER_P(Resolved, Name, "") { return arg.Resolved == Name; }
+MATCHER_P(IncludeLine, N, "") { return arg.R.start.line == N; }
 
 MATCHER_P2(Distance, File, D, "") {
   if (arg.getKey() != File)
@@ -178,6 +175,21 @@ TEST_F(HeadersTest, OnlyCollectInclusionsInMain) {
                                    Distance(testPath("sub/baz.h"), 1u)));
 }
 
+TEST_F(HeadersTest, PreambleIncludesPresentOnce) {
+  // We use TestTU here, to ensure we use the preamble replay logic.
+  // We're testing that the logic doesn't crash, and doesn't result in duplicate
+  // includes. (We'd test more directly, but it's pretty well encapsulated!)
+  auto TU = TestTU::withCode(R"cpp(
+    #include "a.h"
+    #include "a.h"
+    void foo();
+    #include "a.h"
+  )cpp");
+  TU.HeaderFilename = "a.h"; // suppress "not found".
+  EXPECT_THAT(TU.build().getIncludeStructure().MainFileIncludes,
+              ElementsAre(IncludeLine(1), IncludeLine(2), IncludeLine(4)));
+}
+
 TEST_F(HeadersTest, UnResolvedInclusion) {
   FS.Files[MainFile] = R"cpp(
 #include "foo.h"
@@ -219,25 +231,26 @@ TEST_F(HeadersTest, PreferredHeader) {
 }
 
 TEST_F(HeadersTest, DontInsertDuplicatePreferred) {
-  std::vector<Inclusion> Inclusions = {
-      {Range(), /*Written*/ "\"bar.h\"", /*Resolved*/ ""}};
-  EXPECT_EQ(calculate(testPath("sub/bar.h"), "\"bar.h\"", Inclusions), "");
-  EXPECT_EQ(calculate("\"x.h\"", "\"bar.h\"", Inclusions), "");
+  Inclusion Inc;
+  Inc.Written = "\"bar.h\"";
+  Inc.Resolved = "";
+  EXPECT_EQ(calculate(testPath("sub/bar.h"), "\"bar.h\"", {Inc}), "");
+  EXPECT_EQ(calculate("\"x.h\"", "\"bar.h\"", {Inc}), "");
 }
 
 TEST_F(HeadersTest, DontInsertDuplicateResolved) {
-  std::string BarHeader = testPath("sub/bar.h");
-  std::vector<Inclusion> Inclusions = {
-      {Range(), /*Written*/ "fake-bar.h", /*Resolved*/ BarHeader}};
-  EXPECT_EQ(calculate(BarHeader, "", Inclusions), "");
+  Inclusion Inc;
+  Inc.Written = "fake-bar.h";
+  Inc.Resolved = testPath("sub/bar.h");
+  EXPECT_EQ(calculate(Inc.Resolved, "", {Inc}), "");
   // Do not insert preferred.
-  EXPECT_EQ(calculate(BarHeader, "\"BAR.h\"", Inclusions), "");
+  EXPECT_EQ(calculate(Inc.Resolved, "\"BAR.h\"", {Inc}), "");
 }
 
 TEST_F(HeadersTest, PreferInserted) {
   auto Edit = insert("<y>");
   EXPECT_TRUE(Edit.hasValue());
-  EXPECT_TRUE(llvm::StringRef(Edit->newText).contains("<y>"));
+  EXPECT_TRUE(StringRef(Edit->newText).contains("<y>"));
 }
 
 } // namespace

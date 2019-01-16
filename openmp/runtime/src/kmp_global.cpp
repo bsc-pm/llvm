@@ -60,8 +60,8 @@ int __kmp_init_counter = 0;
 int __kmp_root_counter = 0;
 int __kmp_version = 0;
 
-std::atomic<kmp_uint32> __kmp_team_counter = ATOMIC_VAR_INIT(0);
-std::atomic<kmp_uint32> __kmp_task_counter = ATOMIC_VAR_INIT(0);
+std::atomic<kmp_int32> __kmp_team_counter = ATOMIC_VAR_INIT(0);
+std::atomic<kmp_int32> __kmp_task_counter = ATOMIC_VAR_INIT(0);
 
 unsigned int __kmp_init_wait =
     KMP_DEFAULT_INIT_WAIT; /* initial number of spin-tests   */
@@ -281,6 +281,11 @@ char *__kmp_cpuinfo_file = NULL;
 kmp_nested_proc_bind_t __kmp_nested_proc_bind = {NULL, 0, 0};
 int __kmp_affinity_num_places = 0;
 #endif
+
+#if OMP_50_ENABLED
+int __kmp_display_affinity = FALSE;
+char *__kmp_affinity_format = NULL;
+#endif // OMP_50_ENABLED
 
 kmp_hws_item_t __kmp_hws_socket = {0, 0};
 kmp_hws_item_t __kmp_hws_node = {0, 0};

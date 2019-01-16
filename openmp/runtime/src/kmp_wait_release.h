@@ -119,13 +119,13 @@ public:
 };
 
 #if OMPT_SUPPORT
-static inline void __ompt_implicit_task_end(kmp_info_t *this_thr,
-                                            omp_state_t omp_state,
-                                            ompt_data_t *tId,
-                                            ompt_data_t *pId) {
+OMPT_NOINLINE
+static void __ompt_implicit_task_end(kmp_info_t *this_thr,
+                                     ompt_state_t ompt_state,
+                                     ompt_data_t *tId) {
   int ds_tid = this_thr->th.th_info.ds.ds_tid;
-  if (omp_state == omp_state_wait_barrier_implicit) {
-    this_thr->th.ompt_thread_info.state = omp_state_overhead;
+  if (ompt_state == ompt_state_wait_barrier_implicit) {
+    this_thr->th.ompt_thread_info.state = ompt_state_overhead;
 #if OMPT_OPTIONAL
     void *codeptr = NULL;
     if (ompt_enabled.ompt_callback_sync_region_wait) {
@@ -140,12 +140,12 @@ static inline void __ompt_implicit_task_end(kmp_info_t *this_thr,
     if (!KMP_MASTER_TID(ds_tid)) {
       if (ompt_enabled.ompt_callback_implicit_task) {
         ompt_callbacks.ompt_callback(ompt_callback_implicit_task)(
-            ompt_scope_end, NULL, tId, 0, ds_tid);
+            ompt_scope_end, NULL, tId, 0, ds_tid, ompt_task_implicit);
       }
       // return to idle state
-      this_thr->th.ompt_thread_info.state = omp_state_idle;
+      this_thr->th.ompt_thread_info.state = ompt_state_idle;
     } else {
-      this_thr->th.ompt_thread_info.state = omp_state_overhead;
+      this_thr->th.ompt_thread_info.state = ompt_state_overhead;
     }
   }
 }
@@ -199,27 +199,27 @@ THIS function is called from
 function.
        Events are triggered in the calling code (__kmp_barrier):
 
-                state := omp_state_overhead
+                state := ompt_state_overhead
             barrier-begin
             barrier-wait-begin
-                state := omp_state_wait_barrier
+                state := ompt_state_wait_barrier
           call join-barrier-implementation (finally arrive here)
           {}
           call fork-barrier-implementation (finally arrive here)
           {}
-                state := omp_state_overhead
+                state := ompt_state_overhead
             barrier-wait-end
             barrier-end
-                state := omp_state_work_parallel
+                state := ompt_state_work_parallel
 
 
   __kmp_fork_barrier  (after thread creation, before executing implicit task)
           call fork-barrier-implementation (finally arrive here)
-          {} // worker arrive here with state = omp_state_idle
+          {} // worker arrive here with state = ompt_state_idle
 
 
   __kmp_join_barrier  (implicit barrier at end of parallel region)
-                state := omp_state_barrier_implicit
+                state := ompt_state_barrier_implicit
             barrier-begin
             barrier-wait-begin
           call join-barrier-implementation (finally arrive here
@@ -234,37 +234,33 @@ final_spin=FALSE)
             barrier-end
             implicit-task-end
             idle-begin
-                state := omp_state_idle
+                state := ompt_state_idle
 
-       Before leaving, if state = omp_state_idle
+       Before leaving, if state = ompt_state_idle
             idle-end
-                state := omp_state_overhead
+                state := ompt_state_overhead
 */
 #if OMPT_SUPPORT
-  omp_state_t ompt_entry_state;
-  ompt_data_t *pId = NULL;
+  ompt_state_t ompt_entry_state;
   ompt_data_t *tId;
   if (ompt_enabled.enabled) {
     ompt_entry_state = this_thr->th.ompt_thread_info.state;
-    if (!final_spin || ompt_entry_state != omp_state_wait_barrier_implicit ||
+    if (!final_spin || ompt_entry_state != ompt_state_wait_barrier_implicit ||
         KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid)) {
       ompt_lw_taskteam_t *team =
           this_thr->th.th_team->t.ompt_serialized_team_info;
       if (team) {
-        pId = &(team->ompt_team_info.parallel_data);
         tId = &(team->ompt_task_info.task_data);
       } else {
-        pId = OMPT_CUR_TEAM_DATA(this_thr);
         tId = OMPT_CUR_TASK_DATA(this_thr);
       }
     } else {
-      pId = NULL;
       tId = &(this_thr->th.ompt_thread_info.task_data);
     }
-        if (final_spin && (__kmp_tasking_mode == tskm_immediate_exec ||
-                           this_thr->th.th_task_team == NULL)) {
+    if (final_spin && (__kmp_tasking_mode == tskm_immediate_exec ||
+                       this_thr->th.th_task_team == NULL)) {
       // implicit task is done. Either no taskqueue, or task-team finished
-      __ompt_implicit_task_end(this_thr, ompt_entry_state, tId, pId);
+      __ompt_implicit_task_end(this_thr, ompt_entry_state, tId);
     }
   }
 #endif
@@ -334,7 +330,7 @@ final_spin=FALSE)
 #if OMPT_SUPPORT
           // task-team is done now, other cases should be catched above
           if (final_spin && ompt_enabled.enabled)
-            __ompt_implicit_task_end(this_thr, ompt_entry_state, tId, pId);
+            __ompt_implicit_task_end(this_thr, ompt_entry_state, tId);
 #endif
           this_thr->th.th_task_team = NULL;
           this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
@@ -432,16 +428,16 @@ final_spin=FALSE)
   }
 
 #if OMPT_SUPPORT
-  omp_state_t ompt_exit_state = this_thr->th.ompt_thread_info.state;
-  if (ompt_enabled.enabled && ompt_exit_state != omp_state_undefined) {
+  ompt_state_t ompt_exit_state = this_thr->th.ompt_thread_info.state;
+  if (ompt_enabled.enabled && ompt_exit_state != ompt_state_undefined) {
 #if OMPT_OPTIONAL
     if (final_spin) {
-      __ompt_implicit_task_end(this_thr, ompt_exit_state, tId, pId);
+      __ompt_implicit_task_end(this_thr, ompt_exit_state, tId);
       ompt_exit_state = this_thr->th.ompt_thread_info.state;
     }
 #endif
-    if (ompt_exit_state == omp_state_idle) {
-      this_thr->th.ompt_thread_info.state = omp_state_overhead;
+    if (ompt_exit_state == ompt_state_idle) {
+      this_thr->th.ompt_thread_info.state = ompt_state_overhead;
     }
   }
 #endif

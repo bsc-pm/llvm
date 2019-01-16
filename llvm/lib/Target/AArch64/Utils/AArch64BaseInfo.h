@@ -388,6 +388,14 @@ namespace AArch64PSBHint {
   #include "AArch64GenSystemOperands.inc"
 }
 
+namespace AArch64BTIHint {
+  struct BTI : SysAlias {
+    using SysAlias::SysAlias;
+  };
+  #define GET_BTI_DECL
+  #include "AArch64GenSystemOperands.inc"
+}
+
 namespace AArch64SE {
     enum ShiftExtSpecifiers {
         Invalid = -1,
@@ -499,6 +507,14 @@ namespace AArch64TLBI {
   #include "AArch64GenSystemOperands.inc"
 }
 
+namespace AArch64PRCTX {
+  struct PRCTX : SysAliasReg {
+    using SysAliasReg::SysAliasReg;
+  };
+  #define GET_PRCTX_DECL
+  #include "AArch64GenSystemOperands.inc"
+}
+
 namespace AArch64II {
   /// Target Operand Flag enum.
   enum TOF {
@@ -565,6 +581,10 @@ namespace AArch64II {
     /// to the symbol is for an import stub.  This is used for DLL import
     /// storage class indication on Windows.
     MO_DLLIMPORT = 0x80,
+
+    /// MO_S - Indicates that the bits of the symbol operand represented by
+    /// MO_G0 etc are signed.
+    MO_S = 0x100,
   };
 } // end namespace AArch64II
 

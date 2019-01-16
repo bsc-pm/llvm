@@ -1,10 +1,13 @@
+option(CLANGD_BUILD_XPC "Build XPC Support For Clangd." OFF)
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(CLANGD_BUILD_XPC ON CACHE BOOL "" FORCE)
+endif ()
+
 add_subdirectory(clang-apply-replacements)
 add_subdirectory(clang-reorder-fields)
 add_subdirectory(modularize)
-if(CLANG_ENABLE_STATIC_ANALYZER)
 add_subdirectory(clang-tidy)
 add_subdirectory(clang-tidy-vs)
-endif()
 
 add_subdirectory(change-namespace)
 add_subdirectory(clang-doc)

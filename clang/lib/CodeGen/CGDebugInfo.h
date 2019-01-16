@@ -20,8 +20,8 @@
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeOrdering.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/SourceLocation.h"
-#include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
@@ -76,6 +76,9 @@ class CGDebugInfo {
   llvm::DIType *OCLQueueDITy = nullptr;
   llvm::DIType *OCLNDRangeDITy = nullptr;
   llvm::DIType *OCLReserveIDDITy = nullptr;
+#define EXT_OPAQUE_TYPE(ExtType, Id, Ext) \
+  llvm::DIType *Id##Ty = nullptr;
+#include "clang/Basic/OpenCLExtensionTypes.def"
 
   /// Cache of previously constructed Types.
   llvm::DenseMap<const void *, llvm::TrackingMDRef> TypeCache;
@@ -248,6 +251,11 @@ class CGDebugInfo {
   llvm::DINodeArray CollectFunctionTemplateParams(const FunctionDecl *FD,
                                                   llvm::DIFile *Unit);
 
+  /// A helper function to collect debug info for function template
+  /// parameters.
+  llvm::DINodeArray CollectVarTemplateParams(const VarDecl *VD,
+                                             llvm::DIFile *Unit);
+
   /// A helper function to collect debug info for template
   /// parameters.
   llvm::DINodeArray
@@ -333,6 +341,9 @@ public:
 
   void finalize();
 
+  /// Remap a given path with the current debug prefix map
+  std::string remapDIPath(StringRef) const;
+
   /// Register VLA size expression debug node with the qualified type.
   void registerVLASizeExpression(QualType Ty, llvm::Metadata *SizeExpr) {
     SizeExprCache[Ty] = SizeExpr;
@@ -377,9 +388,7 @@ public:
   /// Emit metadata to indicate a change in line/column information in
   /// the source file. If the location is invalid, the previous
   /// location will be reused.
-  /// \param ImplicitCode  True if the Loc must have coverage information
-  void EmitLocation(CGBuilderTy &Builder, SourceLocation Loc,
-                    bool ImplicitCode = false);
+  void EmitLocation(CGBuilderTy &Builder, SourceLocation Loc);
 
   /// Emit a call to llvm.dbg.function.start to indicate
   /// start of a new function.
@@ -522,9 +531,6 @@ private:
   /// Create new compile unit.
   void CreateCompileUnit();
 
-  /// Remap a given path with the current debug prefix map
-  std::string remapDIPath(StringRef) const;
-
   /// Compute the file checksum debug info for input file ID.
   Optional<llvm::DIFile::ChecksumKind>
   computeChecksum(FileID FID, SmallString<32> &Checksum) const;
@@ -532,11 +538,15 @@ private:
   /// Get the source of the given file ID.
   Optional<StringRef> getSource(const SourceManager &SM, FileID FID);
 
-  /// Get the file debug info descriptor for the input location.
+  /// Convenience function to get the file debug info descriptor for the input
+  /// location.
   llvm::DIFile *getOrCreateFile(SourceLocation Loc);
 
-  /// Get the file info for main compile unit.
-  llvm::DIFile *getOrCreateMainFile();
+  /// Create a file debug info descriptor for a source file.
+  llvm::DIFile *
+  createFile(StringRef FileName,
+             Optional<llvm::DIFile::ChecksumInfo<StringRef>> CSInfo,
+             Optional<StringRef> Source);
 
   /// Get the type from the cache or create a new type if necessary.
   llvm::DIType *getOrCreateType(QualType Ty, llvm::DIFile *Fg);
@@ -605,6 +615,11 @@ private:
                          unsigned LineNo, StringRef LinkageName,
                          llvm::GlobalVariable *Var, llvm::DIScope *DContext);
 
+
+  /// Return flags which enable debug info emission for call sites, provided
+  /// that it is supported and enabled.
+  llvm::DINode::DIFlags getCallSiteRelatedAttrs() const;
+
   /// Get the printing policy for producing names for debug info.
   PrintingPolicy getPrintingPolicy() const;
 
@@ -647,7 +662,9 @@ private:
   /// Collect various properties of a VarDecl.
   void collectVarDeclProps(const VarDecl *VD, llvm::DIFile *&Unit,
                            unsigned &LineNo, QualType &T, StringRef &Name,
-                           StringRef &LinkageName, llvm::DIScope *&VDContext);
+                           StringRef &LinkageName,
+                           llvm::MDTuple *&TemplateParameters,
+                           llvm::DIScope *&VDContext);
 
   /// Allocate a copy of \p A using the DebugInfoNames allocator
   /// and return a reference to it. If multiple arguments are given the strings
@@ -666,19 +683,16 @@ private:
 /// location or preferred location of the specified Expr.
 class ApplyDebugLocation {
 private:
-  void init(SourceLocation TemporaryLocation, bool DefaultToEmpty = false,
-            bool ImplicitCode = false);
+  void init(SourceLocation TemporaryLocation, bool DefaultToEmpty = false);
   ApplyDebugLocation(CodeGenFunction &CGF, bool DefaultToEmpty,
-                     SourceLocation TemporaryLocation,
-                     bool ImplicitCode = false);
+                     SourceLocation TemporaryLocation);
 
   llvm::DebugLoc OriginalLocation;
   CodeGenFunction *CGF;
 
 public:
   /// Set the location to the (valid) TemporaryLocation.
-  ApplyDebugLocation(CodeGenFunction &CGF, SourceLocation TemporaryLocation,
-                     bool ImplicitCode = false);
+  ApplyDebugLocation(CodeGenFunction &CGF, SourceLocation TemporaryLocation);
   ApplyDebugLocation(CodeGenFunction &CGF, const Expr *E);
   ApplyDebugLocation(CodeGenFunction &CGF, llvm::DebugLoc Loc);
   ApplyDebugLocation(ApplyDebugLocation &&Other) : CGF(Other.CGF) {
@@ -701,15 +715,13 @@ public:
   static ApplyDebugLocation CreateArtificial(CodeGenFunction &CGF) {
     return ApplyDebugLocation(CGF, false, SourceLocation());
   }
-
   /// Apply TemporaryLocation if it is valid. Otherwise switch
   /// to an artificial debug location that has a valid scope, but no
   /// line information.
   static ApplyDebugLocation
   CreateDefaultArtificial(CodeGenFunction &CGF,
-                          SourceLocation TemporaryLocation,
-                          bool ImplicitCode = false) {
-    return ApplyDebugLocation(CGF, false, TemporaryLocation, ImplicitCode);
+                          SourceLocation TemporaryLocation) {
+    return ApplyDebugLocation(CGF, false, TemporaryLocation);
   }
 
   /// Set the IRBuilder to not attach debug locations.  Note that
@@ -732,7 +744,7 @@ public:
   /// function \p InlinedFn. The current debug location becomes the inlined call
   /// site of the inlined function.
   ApplyInlineDebugLocation(CodeGenFunction &CGF, GlobalDecl InlinedFn);
-  /// Restore everything back to the orginial state.
+  /// Restore everything back to the original state.
   ~ApplyInlineDebugLocation();
 };
 

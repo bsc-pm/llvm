@@ -21,7 +21,7 @@ CompileUnit::CompileUnit(const lldb::ModuleSP &module_sp, void *user_data,
                          const char *pathname, const lldb::user_id_t cu_sym_id,
                          lldb::LanguageType language,
                          lldb_private::LazyBool is_optimized)
-    : ModuleChild(module_sp), FileSpec(pathname, false), UserID(cu_sym_id),
+    : ModuleChild(module_sp), FileSpec(pathname), UserID(cu_sym_id),
       m_user_data(user_data), m_language(language), m_flags(0),
       m_support_files(), m_line_table_ap(), m_variables(),
       m_is_optimized(is_optimized) {
@@ -72,10 +72,10 @@ void CompileUnit::ForeachFunction(
   sorted_functions.reserve(m_functions_by_uid.size());
   for (auto &p : m_functions_by_uid)
     sorted_functions.push_back(p.second);
-  std::sort(sorted_functions.begin(), sorted_functions.end(),
-            [](const lldb::FunctionSP &a, const lldb::FunctionSP &b) {
-              return a->GetID() < b->GetID();
-            });
+  llvm::sort(sorted_functions.begin(), sorted_functions.end(),
+             [](const lldb::FunctionSP &a, const lldb::FunctionSP &b) {
+               return a->GetID() < b->GetID();
+             });
 
   for (auto &f : sorted_functions)
     if (lambda(f))
@@ -182,9 +182,7 @@ lldb::LanguageType CompileUnit::GetLanguage() {
       m_flags.Set(flagsParsedLanguage);
       SymbolVendor *symbol_vendor = GetModule()->GetSymbolVendor();
       if (symbol_vendor) {
-        SymbolContext sc;
-        CalculateSymbolContext(&sc);
-        m_language = symbol_vendor->ParseCompileUnitLanguage(sc);
+        m_language = symbol_vendor->ParseLanguage(*this);
       }
     }
   }
@@ -196,11 +194,8 @@ LineTable *CompileUnit::GetLineTable() {
     if (m_flags.IsClear(flagsParsedLineTable)) {
       m_flags.Set(flagsParsedLineTable);
       SymbolVendor *symbol_vendor = GetModule()->GetSymbolVendor();
-      if (symbol_vendor) {
-        SymbolContext sc;
-        CalculateSymbolContext(&sc);
-        symbol_vendor->ParseCompileUnitLineTable(sc);
-      }
+      if (symbol_vendor)
+        symbol_vendor->ParseLineTable(*this);
     }
   }
   return m_line_table_ap.get();
@@ -220,9 +215,7 @@ DebugMacros *CompileUnit::GetDebugMacros() {
       m_flags.Set(flagsParsedDebugMacros);
       SymbolVendor *symbol_vendor = GetModule()->GetSymbolVendor();
       if (symbol_vendor) {
-        SymbolContext sc;
-        CalculateSymbolContext(&sc);
-        symbol_vendor->ParseCompileUnitDebugMacros(sc);
+        symbol_vendor->ParseDebugMacros(*this);
       }
     }
   }
@@ -278,7 +271,8 @@ uint32_t CompileUnit::FindLineEntry(uint32_t start_idx, uint32_t line,
 
 uint32_t CompileUnit::ResolveSymbolContext(const FileSpec &file_spec,
                                            uint32_t line, bool check_inlines,
-                                           bool exact, uint32_t resolve_scope,
+                                           bool exact,
+                                           SymbolContextItem resolve_scope,
                                            SymbolContextList &sc_list) {
   // First find all of the file indexes that match our "file_spec". If
   // "file_spec" has an empty directory, then only compare the basenames when
@@ -290,7 +284,7 @@ uint32_t CompileUnit::ResolveSymbolContext(const FileSpec &file_spec,
 
   // If we are not looking for inlined functions and our file spec doesn't
   // match then we are done...
-  if (file_spec_matches_cu_file_spec == false && check_inlines == false)
+  if (!file_spec_matches_cu_file_spec && !check_inlines)
     return 0;
 
   uint32_t file_idx =
@@ -386,9 +380,7 @@ bool CompileUnit::GetIsOptimized() {
   if (m_is_optimized == eLazyBoolCalculate) {
     m_is_optimized = eLazyBoolNo;
     if (SymbolVendor *symbol_vendor = GetModule()->GetSymbolVendor()) {
-      SymbolContext sc;
-      CalculateSymbolContext(&sc);
-      if (symbol_vendor->ParseCompileUnitIsOptimized(sc))
+      if (symbol_vendor->ParseIsOptimized(*this))
         m_is_optimized = eLazyBoolYes;
     }
   }
@@ -418,9 +410,7 @@ FileSpecList &CompileUnit::GetSupportFiles() {
       m_flags.Set(flagsParsedSupportFiles);
       SymbolVendor *symbol_vendor = GetModule()->GetSymbolVendor();
       if (symbol_vendor) {
-        SymbolContext sc;
-        CalculateSymbolContext(&sc);
-        symbol_vendor->ParseCompileUnitSupportFiles(sc, m_support_files);
+        symbol_vendor->ParseSupportFiles(*this, m_support_files);
       }
     }
   }

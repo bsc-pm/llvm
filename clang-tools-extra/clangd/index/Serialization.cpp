@@ -6,54 +6,112 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+
 #include "Serialization.h"
 #include "Index.h"
+#include "Logger.h"
 #include "RIFF.h"
+#include "Trace.h"
+#include "dex/Dex.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 
-using namespace llvm;
 namespace clang {
 namespace clangd {
 namespace {
-Error makeError(const Twine &Msg) {
-  return make_error<StringError>(Msg, inconvertibleErrorCode());
+llvm::Error makeError(const llvm::Twine &Msg) {
+  return llvm::make_error<llvm::StringError>(Msg,
+                                             llvm::inconvertibleErrorCode());
 }
 
 // IO PRIMITIVES
 // We use little-endian 32 bit ints, sometimes with variable-length encoding.
-
-StringRef consume(StringRef &Data, int N) {
-  StringRef Ret = Data.take_front(N);
-  Data = Data.drop_front(N);
-  return Ret;
-}
-
-uint8_t consume8(StringRef &Data) {
-  uint8_t Ret = Data.front();
-  Data = Data.drop_front();
-  return Ret;
-}
-
-uint32_t consume32(StringRef &Data) {
-  auto Ret = support::endian::read32le(Data.bytes_begin());
-  Data = Data.drop_front(4);
-  return Ret;
-}
-
-void write32(uint32_t I, raw_ostream &OS) {
-  char buf[4];
-  support::endian::write32le(buf, I);
-  OS.write(buf, sizeof(buf));
-}
-
+//
 // Variable-length int encoding (varint) uses the bottom 7 bits of each byte
 // to encode the number, and the top bit to indicate whether more bytes follow.
 // e.g. 9a 2f means [0x1a and keep reading, 0x2f and stop].
 // This represents 0x1a | 0x2f<<7 = 6042.
 // A 32-bit integer takes 1-5 bytes to encode; small numbers are more compact.
-void writeVar(uint32_t I, raw_ostream &OS) {
+
+// Reads binary data from a StringRef, and keeps track of position.
+class Reader {
+  const char *Begin, *End;
+  bool Err = false;
+
+public:
+  Reader(llvm::StringRef Data) : Begin(Data.begin()), End(Data.end()) {}
+  // The "error" bit is set by reading past EOF or reading invalid data.
+  // When in an error state, reads may return zero values: callers should check.
+  bool err() const { return Err; }
+  // Did we read all the data, or encounter an error?
+  bool eof() const { return Begin == End || Err; }
+  // All the data we didn't read yet.
+  llvm::StringRef rest() const { return llvm::StringRef(Begin, End - Begin); }
+
+  uint8_t consume8() {
+    if (LLVM_UNLIKELY(Begin == End)) {
+      Err = true;
+      return 0;
+    }
+    return *Begin++;
+  }
+
+  uint32_t consume32() {
+    if (LLVM_UNLIKELY(Begin + 4 > End)) {
+      Err = true;
+      return 0;
+    }
+    auto Ret = llvm::support::endian::read32le(Begin);
+    Begin += 4;
+    return Ret;
+  }
+
+  llvm::StringRef consume(int N) {
+    if (LLVM_UNLIKELY(Begin + N > End)) {
+      Err = true;
+      return llvm::StringRef();
+    }
+    llvm::StringRef Ret(Begin, N);
+    Begin += N;
+    return Ret;
+  }
+
+  uint32_t consumeVar() {
+    constexpr static uint8_t More = 1 << 7;
+    uint8_t B = consume8();
+    if (LLVM_LIKELY(!(B & More)))
+      return B;
+    uint32_t Val = B & ~More;
+    for (int Shift = 7; B & More && Shift < 32; Shift += 7) {
+      B = consume8();
+      Val |= (B & ~More) << Shift;
+    }
+    return Val;
+  }
+
+  llvm::StringRef consumeString(llvm::ArrayRef<llvm::StringRef> Strings) {
+    auto StringIndex = consumeVar();
+    if (LLVM_UNLIKELY(StringIndex >= Strings.size())) {
+      Err = true;
+      return llvm::StringRef();
+    }
+    return Strings[StringIndex];
+  }
+
+  SymbolID consumeID() {
+    llvm::StringRef Raw = consume(SymbolID::RawSize); // short if truncated.
+    return LLVM_UNLIKELY(err()) ? SymbolID() : SymbolID::fromRaw(Raw);
+  }
+};
+
+void write32(uint32_t I, llvm::raw_ostream &OS) {
+  char buf[4];
+  llvm::support::endian::write32le(buf, I);
+  OS.write(buf, sizeof(buf));
+}
+
+void writeVar(uint32_t I, llvm::raw_ostream &OS) {
   constexpr static uint8_t More = 1 << 7;
   if (LLVM_LIKELY(I < 1 << 7)) {
     OS.write(I);
@@ -67,19 +125,6 @@ void writeVar(uint32_t I, raw_ostream &OS) {
       return;
     }
   }
-}
-
-uint32_t consumeVar(StringRef &Data) {
-  constexpr static uint8_t More = 1 << 7;
-  uint8_t B = consume8(Data);
-  if (LLVM_LIKELY(!(B & More)))
-    return B;
-  uint32_t Val = B & ~More;
-  for (int Shift = 7; B & More && Shift < 32; Shift += 7) {
-    B = consume8(Data);
-    Val |= (B & ~More) << Shift;
-  }
-  return Val;
 }
 
 // STRING TABLE ENCODING
@@ -97,10 +142,10 @@ uint32_t consumeVar(StringRef &Data) {
 // Maps each string to a canonical representation.
 // Strings remain owned externally (e.g. by SymbolSlab).
 class StringTableOut {
-  DenseSet<StringRef> Unique;
-  std::vector<StringRef> Sorted;
+  llvm::DenseSet<llvm::StringRef> Unique;
+  std::vector<llvm::StringRef> Sorted;
   // Since strings are interned, look up can be by pointer.
-  DenseMap<std::pair<const char *, size_t>, unsigned> Index;
+  llvm::DenseMap<std::pair<const char *, size_t>, unsigned> Index;
 
 public:
   StringTableOut() {
@@ -109,22 +154,22 @@ public:
     Unique.insert("");
   }
   // Add a string to the table. Overwrites S if an identical string exists.
-  void intern(StringRef &S) { S = *Unique.insert(S).first; };
+  void intern(llvm::StringRef &S) { S = *Unique.insert(S).first; };
   // Finalize the table and write it to OS. No more strings may be added.
-  void finalize(raw_ostream &OS) {
+  void finalize(llvm::raw_ostream &OS) {
     Sorted = {Unique.begin(), Unique.end()};
-    std::sort(Sorted.begin(), Sorted.end());
+    llvm::sort(Sorted);
     for (unsigned I = 0; I < Sorted.size(); ++I)
       Index.try_emplace({Sorted[I].data(), Sorted[I].size()}, I);
 
     std::string RawTable;
-    for (StringRef S : Sorted) {
+    for (llvm::StringRef S : Sorted) {
       RawTable.append(S);
       RawTable.push_back(0);
     }
-    if (zlib::isAvailable()) {
-      SmallString<1> Compressed;
-      cantFail(zlib::compress(RawTable, Compressed));
+    if (llvm::zlib::isAvailable()) {
+      llvm::SmallString<1> Compressed;
+      llvm::cantFail(llvm::zlib::compress(RawTable, Compressed));
       write32(RawTable.size(), OS);
       OS << Compressed;
     } else {
@@ -133,7 +178,7 @@ public:
     }
   }
   // Get the ID of an string, which must be interned. Table must be finalized.
-  unsigned index(StringRef S) const {
+  unsigned index(llvm::StringRef S) const {
     assert(!Sorted.empty() && "table not finalized");
     assert(Index.count({S.data(), S.size()}) && "string not interned");
     return Index.find({S.data(), S.size()})->second;
@@ -141,35 +186,39 @@ public:
 };
 
 struct StringTableIn {
-  BumpPtrAllocator Arena;
-  std::vector<StringRef> Strings;
+  llvm::BumpPtrAllocator Arena;
+  std::vector<llvm::StringRef> Strings;
 };
 
-Expected<StringTableIn> readStringTable(StringRef Data) {
-  if (Data.size() < 4)
-    return makeError("Bad string table: not enough metadata");
-  size_t UncompressedSize = consume32(Data);
+llvm::Expected<StringTableIn> readStringTable(llvm::StringRef Data) {
+  Reader R(Data);
+  size_t UncompressedSize = R.consume32();
+  if (R.err())
+    return makeError("Truncated string table");
 
-  StringRef Uncompressed;
-  SmallString<1> UncompressedStorage;
+  llvm::StringRef Uncompressed;
+  llvm::SmallString<1> UncompressedStorage;
   if (UncompressedSize == 0) // No compression
-    Uncompressed = Data;
+    Uncompressed = R.rest();
   else {
-    if (Error E =
-            llvm::zlib::uncompress(Data, UncompressedStorage, UncompressedSize))
+    if (llvm::Error E = llvm::zlib::uncompress(R.rest(), UncompressedStorage,
+                                               UncompressedSize))
       return std::move(E);
     Uncompressed = UncompressedStorage;
   }
 
   StringTableIn Table;
-  StringSaver Saver(Table.Arena);
-  for (StringRef Rest = Uncompressed; !Rest.empty();) {
-    auto Len = Rest.find(0);
-    if (Len == StringRef::npos)
+  llvm::StringSaver Saver(Table.Arena);
+  R = Reader(Uncompressed);
+  for (Reader R(Uncompressed); !R.eof();) {
+    auto Len = R.rest().find(0);
+    if (Len == llvm::StringRef::npos)
       return makeError("Bad string table: not null terminated");
-    Table.Strings.push_back(Saver.save(consume(Rest, Len)));
-    Rest = Rest.drop_front();
+    Table.Strings.push_back(Saver.save(R.consume(Len)));
+    R.consume8();
   }
+  if (R.err())
+    return makeError("Truncated string table");
   return std::move(Table);
 }
 
@@ -179,27 +228,62 @@ Expected<StringTableIn> readStringTable(StringRef Data) {
 //  - enums encode as the underlying type
 //  - most numbers encode as varint
 
-// It's useful to the implementation to assume symbols have a bounded size.
-constexpr size_t SymbolSizeBound = 512;
-// To ensure the bounded size, restrict the number of include headers stored.
-constexpr unsigned MaxIncludes = 50;
+void writeLocation(const SymbolLocation &Loc, const StringTableOut &Strings,
+                   llvm::raw_ostream &OS) {
+  writeVar(Strings.index(Loc.FileURI), OS);
+  for (const auto &Endpoint : {Loc.Start, Loc.End}) {
+    writeVar(Endpoint.line(), OS);
+    writeVar(Endpoint.column(), OS);
+  }
+}
+
+SymbolLocation readLocation(Reader &Data,
+                            llvm::ArrayRef<llvm::StringRef> Strings) {
+  SymbolLocation Loc;
+  Loc.FileURI = Data.consumeString(Strings).data();
+  for (auto *Endpoint : {&Loc.Start, &Loc.End}) {
+    Endpoint->setLine(Data.consumeVar());
+    Endpoint->setColumn(Data.consumeVar());
+  }
+  return Loc;
+}
+
+IncludeGraphNode readIncludeGraphNode(Reader &Data,
+                                      llvm::ArrayRef<llvm::StringRef> Strings) {
+  IncludeGraphNode IGN;
+  IGN.IsTU = Data.consume8();
+  IGN.URI = Data.consumeString(Strings);
+  llvm::StringRef Digest = Data.consume(IGN.Digest.size());
+  std::copy(Digest.bytes_begin(), Digest.bytes_end(), IGN.Digest.begin());
+  IGN.DirectIncludes.resize(Data.consumeVar());
+  for (llvm::StringRef &Include : IGN.DirectIncludes)
+    Include = Data.consumeString(Strings);
+  return IGN;
+}
+
+void writeIncludeGraphNode(const IncludeGraphNode &IGN,
+                           const StringTableOut &Strings,
+                           llvm::raw_ostream &OS) {
+  OS.write(IGN.IsTU);
+  writeVar(Strings.index(IGN.URI), OS);
+  llvm::StringRef Hash(reinterpret_cast<const char *>(IGN.Digest.data()),
+                       IGN.Digest.size());
+  OS << Hash;
+  writeVar(IGN.DirectIncludes.size(), OS);
+  for (llvm::StringRef Include : IGN.DirectIncludes)
+    writeVar(Strings.index(Include), OS);
+}
 
 void writeSymbol(const Symbol &Sym, const StringTableOut &Strings,
-                 raw_ostream &OS) {
-  auto StartOffset = OS.tell();
+                 llvm::raw_ostream &OS) {
   OS << Sym.ID.raw(); // TODO: once we start writing xrefs and posting lists,
                       // symbol IDs should probably be in a string table.
   OS.write(static_cast<uint8_t>(Sym.SymInfo.Kind));
   OS.write(static_cast<uint8_t>(Sym.SymInfo.Lang));
   writeVar(Strings.index(Sym.Name), OS);
   writeVar(Strings.index(Sym.Scope), OS);
-  for (const auto &Loc : {Sym.Definition, Sym.CanonicalDeclaration}) {
-    writeVar(Strings.index(Loc.FileURI), OS);
-    for (const auto &Endpoint : {Loc.Start, Loc.End}) {
-      writeVar(Endpoint.Line, OS);
-      writeVar(Endpoint.Column, OS);
-    }
-  }
+  writeLocation(Sym.Definition, Strings, OS);
+  writeLocation(Sym.CanonicalDeclaration, Strings, OS);
   writeVar(Sym.References, OS);
   OS.write(static_cast<uint8_t>(Sym.Flags));
   OS.write(static_cast<uint8_t>(Sym.Origin));
@@ -207,123 +291,102 @@ void writeSymbol(const Symbol &Sym, const StringTableOut &Strings,
   writeVar(Strings.index(Sym.CompletionSnippetSuffix), OS);
   writeVar(Strings.index(Sym.Documentation), OS);
   writeVar(Strings.index(Sym.ReturnType), OS);
+  writeVar(Strings.index(Sym.Type), OS);
 
   auto WriteInclude = [&](const Symbol::IncludeHeaderWithReferences &Include) {
     writeVar(Strings.index(Include.IncludeHeader), OS);
     writeVar(Include.References, OS);
   };
-  // There are almost certainly few includes, so we can just write them.
-  if (LLVM_LIKELY(Sym.IncludeHeaders.size() <= MaxIncludes)) {
-    writeVar(Sym.IncludeHeaders.size(), OS);
-    for (const auto &Include : Sym.IncludeHeaders)
-      WriteInclude(Include);
-  } else {
-    // If there are too many, make sure we truncate the least important.
-    using Pointer = const Symbol::IncludeHeaderWithReferences *;
-    std::vector<Pointer> Pointers;
-    for (const auto &Include : Sym.IncludeHeaders)
-      Pointers.push_back(&Include);
-    std::sort(Pointers.begin(), Pointers.end(), [](Pointer L, Pointer R) {
-      return L->References > R->References;
-    });
-    Pointers.resize(MaxIncludes);
-
-    writeVar(MaxIncludes, OS);
-    for (Pointer P : Pointers)
-      WriteInclude(*P);
-  }
-
-  assert(OS.tell() - StartOffset < SymbolSizeBound && "Symbol length unsafe!");
-  (void)StartOffset; // Unused in NDEBUG;
+  writeVar(Sym.IncludeHeaders.size(), OS);
+  for (const auto &Include : Sym.IncludeHeaders)
+    WriteInclude(Include);
 }
 
-Expected<Symbol> readSymbol(StringRef &Data, const StringTableIn &Strings) {
-  // Usually we can skip bounds checks because the buffer is huge.
-  // Near the end of the buffer, this would be unsafe. In this rare case, copy
-  // the data into a bigger buffer so we can again skip the checks.
-  if (LLVM_UNLIKELY(Data.size() < SymbolSizeBound)) {
-    std::string Buf(Data);
-    Buf.resize(SymbolSizeBound);
-    StringRef ExtendedData = Buf;
-    auto Ret = readSymbol(ExtendedData, Strings);
-    unsigned BytesRead = Buf.size() - ExtendedData.size();
-    if (BytesRead > Data.size())
-      return makeError("read past end of data");
-    Data = Data.drop_front(BytesRead);
-    return Ret;
-  }
-
-#define READ_STRING(Field)                                                     \
-  do {                                                                         \
-    auto StringIndex = consumeVar(Data);                                       \
-    if (LLVM_UNLIKELY(StringIndex >= Strings.Strings.size()))                  \
-      return makeError("Bad string index");                                    \
-    Field = Strings.Strings[StringIndex];                                      \
-  } while (0)
-
+Symbol readSymbol(Reader &Data, llvm::ArrayRef<llvm::StringRef> Strings) {
   Symbol Sym;
-  Sym.ID = SymbolID::fromRaw(consume(Data, 20));
-  Sym.SymInfo.Kind = static_cast<index::SymbolKind>(consume8(Data));
-  Sym.SymInfo.Lang = static_cast<index::SymbolLanguage>(consume8(Data));
-  READ_STRING(Sym.Name);
-  READ_STRING(Sym.Scope);
-  for (SymbolLocation *Loc : {&Sym.Definition, &Sym.CanonicalDeclaration}) {
-    READ_STRING(Loc->FileURI);
-    for (auto &Endpoint : {&Loc->Start, &Loc->End}) {
-      Endpoint->Line = consumeVar(Data);
-      Endpoint->Column = consumeVar(Data);
-    }
-  }
-  Sym.References = consumeVar(Data);
-  Sym.Flags = static_cast<Symbol::SymbolFlag>(consume8(Data));
-  Sym.Origin = static_cast<SymbolOrigin>(consume8(Data));
-  READ_STRING(Sym.Signature);
-  READ_STRING(Sym.CompletionSnippetSuffix);
-  READ_STRING(Sym.Documentation);
-  READ_STRING(Sym.ReturnType);
-  unsigned IncludeHeaderN = consumeVar(Data);
-  if (IncludeHeaderN > MaxIncludes)
-    return makeError("too many IncludeHeaders");
-  Sym.IncludeHeaders.resize(IncludeHeaderN);
+  Sym.ID = Data.consumeID();
+  Sym.SymInfo.Kind = static_cast<index::SymbolKind>(Data.consume8());
+  Sym.SymInfo.Lang = static_cast<index::SymbolLanguage>(Data.consume8());
+  Sym.Name = Data.consumeString(Strings);
+  Sym.Scope = Data.consumeString(Strings);
+  Sym.Definition = readLocation(Data, Strings);
+  Sym.CanonicalDeclaration = readLocation(Data, Strings);
+  Sym.References = Data.consumeVar();
+  Sym.Flags = static_cast<Symbol::SymbolFlag>(Data.consumeVar());
+  Sym.Origin = static_cast<SymbolOrigin>(Data.consumeVar());
+  Sym.Signature = Data.consumeString(Strings);
+  Sym.CompletionSnippetSuffix = Data.consumeString(Strings);
+  Sym.Documentation = Data.consumeString(Strings);
+  Sym.ReturnType = Data.consumeString(Strings);
+  Sym.Type = Data.consumeString(Strings);
+  Sym.IncludeHeaders.resize(Data.consumeVar());
   for (auto &I : Sym.IncludeHeaders) {
-    READ_STRING(I.IncludeHeader);
-    I.References = consumeVar(Data);
+    I.IncludeHeader = Data.consumeString(Strings);
+    I.References = Data.consumeVar();
   }
-
-#undef READ_STRING
-  return std::move(Sym);
+  return Sym;
 }
 
-} // namespace
+// REFS ENCODING
+// A refs section has data grouped by Symbol. Each symbol has:
+//  - SymbolID: 8 bytes
+//  - NumRefs: varint
+//  - Ref[NumRefs]
+// Fields of Ref are encoded in turn, see implementation.
+
+void writeRefs(const SymbolID &ID, llvm::ArrayRef<Ref> Refs,
+               const StringTableOut &Strings, llvm::raw_ostream &OS) {
+  OS << ID.raw();
+  writeVar(Refs.size(), OS);
+  for (const auto &Ref : Refs) {
+    OS.write(static_cast<unsigned char>(Ref.Kind));
+    writeLocation(Ref.Location, Strings, OS);
+  }
+}
+
+std::pair<SymbolID, std::vector<Ref>>
+readRefs(Reader &Data, llvm::ArrayRef<llvm::StringRef> Strings) {
+  std::pair<SymbolID, std::vector<Ref>> Result;
+  Result.first = Data.consumeID();
+  Result.second.resize(Data.consumeVar());
+  for (auto &Ref : Result.second) {
+    Ref.Kind = static_cast<RefKind>(Data.consume8());
+    Ref.Location = readLocation(Data, Strings);
+  }
+  return Result;
+}
 
 // FILE ENCODING
 // A file is a RIFF chunk with type 'CdIx'.
 // It contains the sections:
 //   - meta: version number
+//   - srcs: information related to include graph
 //   - stri: string table
 //   - symb: symbols
+//   - refs: references to symbols
 
 // The current versioning scheme is simple - non-current versions are rejected.
 // If you make a breaking change, bump this version number to invalidate stored
 // data. Later we may want to support some backward compatibility.
-constexpr static uint32_t Version = 3;
+constexpr static uint32_t Version = 8;
 
-Expected<IndexFileIn> readIndexFile(StringRef Data) {
+llvm::Expected<IndexFileIn> readRIFF(llvm::StringRef Data) {
   auto RIFF = riff::readFile(Data);
   if (!RIFF)
     return RIFF.takeError();
   if (RIFF->Type != riff::fourCC("CdIx"))
     return makeError("wrong RIFF type");
-  StringMap<StringRef> Chunks;
+  llvm::StringMap<llvm::StringRef> Chunks;
   for (const auto &Chunk : RIFF->Chunks)
-    Chunks.try_emplace(StringRef(Chunk.ID.data(), Chunk.ID.size()), Chunk.Data);
+    Chunks.try_emplace(llvm::StringRef(Chunk.ID.data(), Chunk.ID.size()),
+                       Chunk.Data);
 
-  for (StringRef RequiredChunk : {"meta", "stri"})
+  for (llvm::StringRef RequiredChunk : {"meta", "stri"})
     if (!Chunks.count(RequiredChunk))
       return makeError("missing required chunk " + RequiredChunk);
 
-  StringRef Meta = Chunks.lookup("meta");
-  if (Meta.size() < 4 || consume32(Meta) != Version)
+  Reader Meta(Chunks.lookup("meta"));
+  if (Meta.consume32() != Version)
     return makeError("wrong version");
 
   auto Strings = readStringTable(Chunks.lookup("stri"));
@@ -331,27 +394,62 @@ Expected<IndexFileIn> readIndexFile(StringRef Data) {
     return Strings.takeError();
 
   IndexFileIn Result;
+  if (Chunks.count("srcs")) {
+    Reader SrcsReader(Chunks.lookup("srcs"));
+    Result.Sources.emplace();
+    while (!SrcsReader.eof()) {
+      auto IGN = readIncludeGraphNode(SrcsReader, Strings->Strings);
+      auto Entry = Result.Sources->try_emplace(IGN.URI).first;
+      Entry->getValue() = std::move(IGN);
+      // We change all the strings inside the structure to point at the keys in
+      // the map, since it is the only copy of the string that's going to live.
+      Entry->getValue().URI = Entry->getKey();
+      for (auto &Include : Entry->getValue().DirectIncludes)
+        Include = Result.Sources->try_emplace(Include).first->getKey();
+    }
+    if (SrcsReader.err())
+      return makeError("malformed or truncated include uri");
+  }
+
   if (Chunks.count("symb")) {
-    StringRef SymbolData = Chunks.lookup("symb");
+    Reader SymbolReader(Chunks.lookup("symb"));
     SymbolSlab::Builder Symbols;
-    while (!SymbolData.empty())
-      if (auto Sym = readSymbol(SymbolData, *Strings))
-        Symbols.insert(*Sym);
-      else
-        return Sym.takeError();
+    while (!SymbolReader.eof())
+      Symbols.insert(readSymbol(SymbolReader, Strings->Strings));
+    if (SymbolReader.err())
+      return makeError("malformed or truncated symbol");
     Result.Symbols = std::move(Symbols).build();
+  }
+  if (Chunks.count("refs")) {
+    Reader RefsReader(Chunks.lookup("refs"));
+    RefSlab::Builder Refs;
+    while (!RefsReader.eof()) {
+      auto RefsBundle = readRefs(RefsReader, Strings->Strings);
+      for (const auto &Ref : RefsBundle.second) // FIXME: bulk insert?
+        Refs.insert(RefsBundle.first, Ref);
+    }
+    if (RefsReader.err())
+      return makeError("malformed or truncated refs");
+    Result.Refs = std::move(Refs).build();
   }
   return std::move(Result);
 }
 
-raw_ostream &operator<<(raw_ostream &OS, const IndexFileOut &Data) {
+template <class Callback>
+void visitStrings(IncludeGraphNode &IGN, const Callback &CB) {
+  CB(IGN.URI);
+  for (llvm::StringRef &Include : IGN.DirectIncludes)
+    CB(Include);
+}
+
+void writeRIFF(const IndexFileOut &Data, llvm::raw_ostream &OS) {
   assert(Data.Symbols && "An index file without symbols makes no sense!");
   riff::File RIFF;
   RIFF.Type = riff::fourCC("CdIx");
 
-  SmallString<4> Meta;
+  llvm::SmallString<4> Meta;
   {
-    raw_svector_ostream MetaOS(Meta);
+    llvm::raw_svector_ostream MetaOS(Meta);
     write32(Version, MetaOS);
   }
   RIFF.Chunks.push_back({riff::fourCC("meta"), Meta});
@@ -360,25 +458,132 @@ raw_ostream &operator<<(raw_ostream &OS, const IndexFileOut &Data) {
   std::vector<Symbol> Symbols;
   for (const auto &Sym : *Data.Symbols) {
     Symbols.emplace_back(Sym);
-    visitStrings(Symbols.back(), [&](StringRef &S) { Strings.intern(S); });
+    visitStrings(Symbols.back(),
+                 [&](llvm::StringRef &S) { Strings.intern(S); });
+  }
+  std::vector<IncludeGraphNode> Sources;
+  if (Data.Sources)
+    for (const auto &Source : *Data.Sources) {
+      Sources.push_back(Source.getValue());
+      visitStrings(Sources.back(),
+                   [&](llvm::StringRef &S) { Strings.intern(S); });
+    }
+
+  std::vector<std::pair<SymbolID, std::vector<Ref>>> Refs;
+  if (Data.Refs) {
+    for (const auto &Sym : *Data.Refs) {
+      Refs.emplace_back(Sym);
+      for (auto &Ref : Refs.back().second) {
+        llvm::StringRef File = Ref.Location.FileURI;
+        Strings.intern(File);
+        Ref.Location.FileURI = File.data();
+      }
+    }
   }
 
   std::string StringSection;
   {
-    raw_string_ostream StringOS(StringSection);
+    llvm::raw_string_ostream StringOS(StringSection);
     Strings.finalize(StringOS);
   }
   RIFF.Chunks.push_back({riff::fourCC("stri"), StringSection});
 
   std::string SymbolSection;
   {
-    raw_string_ostream SymbolOS(SymbolSection);
+    llvm::raw_string_ostream SymbolOS(SymbolSection);
     for (const auto &Sym : Symbols)
       writeSymbol(Sym, Strings, SymbolOS);
   }
   RIFF.Chunks.push_back({riff::fourCC("symb"), SymbolSection});
 
-  return OS << RIFF;
+  std::string RefsSection;
+  if (Data.Refs) {
+    {
+      llvm::raw_string_ostream RefsOS(RefsSection);
+      for (const auto &Sym : Refs)
+        writeRefs(Sym.first, Sym.second, Strings, RefsOS);
+    }
+    RIFF.Chunks.push_back({riff::fourCC("refs"), RefsSection});
+  }
+
+  std::string SrcsSection;
+  {
+    {
+      llvm::raw_string_ostream SrcsOS(SrcsSection);
+      for (const auto &SF : Sources)
+        writeIncludeGraphNode(SF, Strings, SrcsOS);
+    }
+    RIFF.Chunks.push_back({riff::fourCC("srcs"), SrcsSection});
+  }
+
+  OS << RIFF;
+}
+
+} // namespace
+
+// Defined in YAMLSerialization.cpp.
+void writeYAML(const IndexFileOut &, llvm::raw_ostream &);
+llvm::Expected<IndexFileIn> readYAML(llvm::StringRef);
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const IndexFileOut &O) {
+  switch (O.Format) {
+  case IndexFileFormat::RIFF:
+    writeRIFF(O, OS);
+    break;
+  case IndexFileFormat::YAML:
+    writeYAML(O, OS);
+    break;
+  }
+  return OS;
+}
+
+llvm::Expected<IndexFileIn> readIndexFile(llvm::StringRef Data) {
+  if (Data.startswith("RIFF")) {
+    return readRIFF(Data);
+  } else if (auto YAMLContents = readYAML(Data)) {
+    return std::move(*YAMLContents);
+  } else {
+    return makeError("Not a RIFF file and failed to parse as YAML: " +
+                     llvm::toString(YAMLContents.takeError()));
+  }
+}
+
+std::unique_ptr<SymbolIndex> loadIndex(llvm::StringRef SymbolFilename,
+                                       bool UseDex) {
+  trace::Span OverallTracer("LoadIndex");
+  auto Buffer = llvm::MemoryBuffer::getFile(SymbolFilename);
+  if (!Buffer) {
+    llvm::errs() << "Can't open " << SymbolFilename << "\n";
+    return nullptr;
+  }
+
+  SymbolSlab Symbols;
+  RefSlab Refs;
+  {
+    trace::Span Tracer("ParseIndex");
+    if (auto I = readIndexFile(Buffer->get()->getBuffer())) {
+      if (I->Symbols)
+        Symbols = std::move(*I->Symbols);
+      if (I->Refs)
+        Refs = std::move(*I->Refs);
+    } else {
+      llvm::errs() << "Bad Index: " << llvm::toString(I.takeError()) << "\n";
+      return nullptr;
+    }
+  }
+
+  size_t NumSym = Symbols.size();
+  size_t NumRefs = Refs.numRefs();
+
+  trace::Span Tracer("BuildIndex");
+  auto Index = UseDex ? dex::Dex::build(std::move(Symbols), std::move(Refs))
+                      : MemIndex::build(std::move(Symbols), std::move(Refs));
+  vlog("Loaded {0} from {1} with estimated memory usage {2} bytes\n"
+       "  - number of symbols: {3}\n"
+       "  - number of refs: {4}\n",
+       UseDex ? "Dex" : "MemIndex", SymbolFilename,
+       Index->estimateMemoryUsage(), NumSym, NumRefs);
+  return Index;
 }
 
 } // namespace clangd

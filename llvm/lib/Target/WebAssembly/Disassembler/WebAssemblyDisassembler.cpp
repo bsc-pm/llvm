@@ -36,6 +36,8 @@ using DecodeStatus = MCDisassembler::DecodeStatus;
 #include "WebAssemblyGenDisassemblerTables.inc"
 
 namespace {
+static constexpr int WebAssemblyInstructionTableSize = 256;
+
 class WebAssemblyDisassembler final : public MCDisassembler {
   std::unique_ptr<const MCInstrInfo> MCII;
 
@@ -74,18 +76,26 @@ static int nextByte(ArrayRef<uint8_t> Bytes, uint64_t &Size) {
   return V;
 }
 
-static bool parseLEBImmediate(MCInst &MI, uint64_t &Size,
-                              ArrayRef<uint8_t> Bytes, bool Signed) {
+static bool nextLEB(int64_t &Val, ArrayRef<uint8_t> Bytes, uint64_t &Size,
+                    bool Signed = false) {
   unsigned N = 0;
   const char *Error = nullptr;
-  auto Val = Signed ? decodeSLEB128(Bytes.data() + Size, &N,
-                                    Bytes.data() + Bytes.size(), &Error)
-                    : static_cast<int64_t>(
-                          decodeULEB128(Bytes.data() + Size, &N,
-                                        Bytes.data() + Bytes.size(), &Error));
+  Val = Signed ? decodeSLEB128(Bytes.data() + Size, &N,
+                               Bytes.data() + Bytes.size(), &Error)
+               : static_cast<int64_t>(decodeULEB128(Bytes.data() + Size, &N,
+                                                    Bytes.data() + Bytes.size(),
+                                                    &Error));
   if (Error)
     return false;
   Size += N;
+  return true;
+}
+
+static bool parseLEBImmediate(MCInst &MI, uint64_t &Size,
+                              ArrayRef<uint8_t> Bytes, bool Signed) {
+  int64_t Val;
+  if (!nextLEB(Val, Bytes, Size, Signed))
+    return false;
   MI.addOperand(MCOperand::createImm(Val));
   return true;
 }
@@ -111,7 +121,7 @@ MCDisassembler::DecodeStatus WebAssemblyDisassembler::getInstruction(
     raw_ostream & /*OS*/, raw_ostream &CS) const {
   CommentStream = &CS;
   Size = 0;
-  auto Opc = nextByte(Bytes, Size);
+  int Opc = nextByte(Bytes, Size);
   if (Opc < 0)
     return MCDisassembler::Fail;
   const auto *WasmInst = &InstructionTable0[Opc];
@@ -127,10 +137,12 @@ MCDisassembler::DecodeStatus WebAssemblyDisassembler::getInstruction(
     }
     if (!WasmInst)
       return MCDisassembler::Fail;
-    Opc = nextByte(Bytes, Size);
-    if (Opc < 0)
+    int64_t PrefixedOpc;
+    if (!nextLEB(PrefixedOpc, Bytes, Size))
       return MCDisassembler::Fail;
-    WasmInst += Opc;
+    if (PrefixedOpc < 0 || PrefixedOpc >= WebAssemblyInstructionTableSize)
+      return MCDisassembler::Fail;
+    WasmInst += PrefixedOpc;
   }
   if (WasmInst->ET == ET_Unused)
     return MCDisassembler::Fail;
@@ -139,7 +151,8 @@ MCDisassembler::DecodeStatus WebAssemblyDisassembler::getInstruction(
   MI.setOpcode(WasmInst->Opcode);
   // Parse any operands.
   for (uint8_t OPI = 0; OPI < WasmInst->NumOperands; OPI++) {
-    switch (OperandTable[WasmInst->OperandStart + OPI]) {
+    auto OT = OperandTable[WasmInst->OperandStart + OPI];
+    switch (OT) {
     // ULEB operands:
     case WebAssembly::OPERAND_BASIC_BLOCK:
     case WebAssembly::OPERAND_LOCAL:
@@ -155,9 +168,14 @@ MCDisassembler::DecodeStatus WebAssemblyDisassembler::getInstruction(
     }
     // SLEB operands:
     case WebAssembly::OPERAND_I32IMM:
-    case WebAssembly::OPERAND_I64IMM:
-    case WebAssembly::OPERAND_SIGNATURE: {
+    case WebAssembly::OPERAND_I64IMM: {
       if (!parseLEBImmediate(MI, Size, Bytes, true))
+        return MCDisassembler::Fail;
+      break;
+    }
+    // block_type operands (uint8_t).
+    case WebAssembly::OPERAND_SIGNATURE: {
+      if (!parseImmediate<uint8_t>(MI, Size, Bytes))
         return MCDisassembler::Fail;
       break;
     }
@@ -190,6 +208,19 @@ MCDisassembler::DecodeStatus WebAssemblyDisassembler::getInstruction(
     }
     case WebAssembly::OPERAND_VEC_I64IMM: {
       if (!parseImmediate<uint64_t>(MI, Size, Bytes))
+        return MCDisassembler::Fail;
+      break;
+    }
+    case WebAssembly::OPERAND_BRLIST: {
+      int64_t TargetTableLen;
+      if (!nextLEB(TargetTableLen, Bytes, Size, false))
+        return MCDisassembler::Fail;
+      for (int64_t I = 0; I < TargetTableLen; I++) {
+        if (!parseLEBImmediate(MI, Size, Bytes, false))
+          return MCDisassembler::Fail;
+      }
+      // Default case.
+      if (!parseLEBImmediate(MI, Size, Bytes, false))
         return MCDisassembler::Fail;
       break;
     }
