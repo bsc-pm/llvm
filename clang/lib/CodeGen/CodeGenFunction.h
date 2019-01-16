@@ -31,6 +31,7 @@
 #include "clang/Basic/CapturedStmt.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -2918,6 +2919,10 @@ public:
   llvm::Value *EmitSEHExceptionCode();
   llvm::Value *EmitSEHExceptionInfo();
   llvm::Value *EmitSEHAbnormalTermination();
+
+  // OmpSs statements
+  void EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S);
+  void EmitOSSTaskDirective(const OSSTaskDirective &S);
 
   /// Emit simple code for OpenMP directives in Simd-only mode.
   void EmitSimpleOMPExecutableDirective(const OMPExecutableDirective &D);

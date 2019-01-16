@@ -34,6 +34,7 @@
 #include "clang/Basic/ExpressionTraits.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/PragmaKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TemplateKinds.h"
@@ -157,6 +158,7 @@ namespace clang {
   class OMPDeclareReductionDecl;
   class OMPDeclareSimdDecl;
   class OMPClause;
+  class OSSClause;
   struct OverloadCandidate;
   class OverloadCandidateSet;
   class OverloadExpr;
@@ -9386,6 +9388,84 @@ public:
                                           SourceLocation StartLoc,
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc);
+  //===--------------------------------------------------------------------===//
+  // OmpSs directives and clauses.
+  //
+  void *VarDataSharingAttributesStackOmpSs;
+  /// Initialization of data-sharing attributes stack.
+  void InitDataSharingAttributesStackOmpSs();
+  void DestroyDataSharingAttributesStackOmpSs();
+  /// Called on start of new data sharing attribute block.
+  void StartOmpSsDSABlock(OmpSsDirectiveKind K,
+                          Scope *CurScope,
+                          SourceLocation Loc);
+  /// Called on end of data sharing attribute block.
+  void EndOmpSsDSABlock(Stmt *CurDirective);
+
+  // Check if there are conflicts between depend() and other DSA clauses
+  // This must happen before parsing the statement (if any) so child tasks
+  // can see DSA derived from 'depend' clauses
+  void ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses);
+
+  StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
+      OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss taskwait'.
+  StmtResult ActOnOmpSsTaskwaitDirective(SourceLocation StartLoc,
+                                         SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma omp task' after parsing of the
+  /// associated statement.
+  StmtResult ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
+                                     Stmt *AStmt,
+                                     SourceLocation StartLoc,
+                                     SourceLocation EndLoc);
+
+  OSSClause *ActOnOmpSsVarListClause(
+      OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
+      SourceLocation StartLoc, SourceLocation LParenLoc,
+      SourceLocation ColonLoc, SourceLocation EndLoc,
+      const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
+      SourceLocation DepLoc);
+
+  OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
+                                    unsigned Argument,
+                                    SourceLocation ArgumentLoc,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
+
+  /// Called on well-formed 'default' clause.
+  OSSClause *ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
+                                      SourceLocation KindLoc,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
+
+  /// Called on well-formed 'shared' clause.
+  OSSClause *ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc);
+
+  /// Called on well-formed 'private' clause.
+  OSSClause *ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc);
+
+  /// Called on well-formed 'firstprivate' clause.
+  OSSClause *ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc);
+
+  /// Called on well-formed 'depend' clause.
+  OSSClause *
+  ActOnOmpSsDependClause(const SmallVector<OmpSsDependClauseKind, 2>& DepKind, SourceLocation DepLoc,
+                          SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                          SourceLocation StartLoc, SourceLocation LParenLoc,
+                          SourceLocation EndLoc);
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {

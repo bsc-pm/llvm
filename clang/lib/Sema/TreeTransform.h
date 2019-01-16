@@ -27,6 +27,7 @@
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
+#include "clang/AST/StmtOmpSs.h"
 #include "clang/Sema/Designator.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Ownership.h"
@@ -665,6 +666,9 @@ public:
   ExprResult TransformParenDependentScopeDeclRefExpr(
       ParenExpr *PE, DependentScopeDeclRefExpr *DRE, bool IsAddressOfOperand,
       TypeSourceInfo **RecoveryTSI);
+
+  // OmpSs
+  StmtResult TransformOSSExecutableDirective(OSSExecutableDirective *S);
 
   StmtResult TransformOMPExecutableDirective(OMPExecutableDirective *S);
 
@@ -1471,6 +1475,18 @@ public:
   StmtResult RebuildObjCAtThrowStmt(SourceLocation AtLoc,
                                           Expr *Operand) {
     return getSema().BuildObjCAtThrowStmt(AtLoc, Operand);
+  }
+
+  /// Build a new OmpSs executable directive.
+  ///
+  /// By default, performs semantic analysis to build the new statement.
+  /// Subclasses may override this routine to provide different behavior.
+  StmtResult RebuildOSSExecutableDirective(OmpSsDirectiveKind Kind,
+                                           SourceLocation StartLoc,
+                                           SourceLocation EndLoc,
+                                           ArrayRef<OSSClause *> Clauses) {
+    return getSema().ActOnOmpSsExecutableDirective(Clauses,
+        Kind, StartLoc, EndLoc);
   }
 
   /// Build a new OpenMP executable directive.
@@ -8945,6 +8961,34 @@ TreeTransform<Derived>::TransformOMPIsDevicePtrClause(OMPIsDevicePtrClause *C) {
   }
   return getDerived().RebuildOMPIsDevicePtrClause(
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+//===----------------------------------------------------------------------===//
+// OmpSs directive transformation
+//===----------------------------------------------------------------------===//
+
+template <typename Derived>
+StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
+    OSSExecutableDirective *D) {
+
+  llvm_unreachable("Not implemented yet");
+  return StmtError();
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
+  StmtResult Res = StmtError();
+  Res = getDerived().TransformOSSExecutableDirective(D);
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
+  StmtResult Res = StmtError();
+  Res = getDerived().TransformOSSExecutableDirective(D);
+  return Res;
 }
 
 //===----------------------------------------------------------------------===//

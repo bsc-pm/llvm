@@ -2269,6 +2269,22 @@ void ASTStmtReader::VisitOMPTargetTeamsDistributeSimdDirective(
 }
 
 //===----------------------------------------------------------------------===//
+// OmpSs Directives.
+//===----------------------------------------------------------------------===//
+
+void ASTStmtReader::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtReader::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtReader::VisitOSSTaskDirective(OSSTaskDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+//===----------------------------------------------------------------------===//
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//
 

@@ -296,4 +296,9 @@ def err_unknown_analyzer_checker : Error<
     "no analyzer checkers are associated with '%0'">;
 def note_suggest_disabling_all_checkers : Note<
     "use -analyzer-disable-all-checks to disable all static analyzer checkers">;
+
+// OmpSs
+def err_oss_more_one_clause : Error<
+  "directive '#pragma oss %0' cannot contain more than one '%1' clause%select{| with '%3' name modifier| with 'source' dependence}2">;
+
 }

@@ -2063,6 +2063,10 @@ public:
   void VisitOMPTargetTeamsDistributeSimdDirective(
       const OMPTargetTeamsDistributeSimdDirective *D);
 
+  void VisitOSSExecutableDirective(const OSSExecutableDirective *D);
+  void VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *D);
+  void VisitOSSTaskDirective(const OSSTaskDirective *D);
+
 private:
   void AddDeclarationNameInfo(const Stmt *S);
   void AddNestedNameSpecifierLoc(NestedNameSpecifierLoc Qualifier);
@@ -2946,6 +2950,21 @@ void EnqueueVisitor::VisitOMPTargetTeamsDistributeParallelForSimdDirective(
 void EnqueueVisitor::VisitOMPTargetTeamsDistributeSimdDirective(
     const OMPTargetTeamsDistributeSimdDirective *D) {
   VisitOMPLoopDirective(D);
+}
+
+// OmpSs
+
+void EnqueueVisitor::VisitOSSExecutableDirective(
+  const OSSExecutableDirective *D) {
+  EnqueueChildren(D);
+}
+
+void EnqueueVisitor::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *D) {
+  VisitOSSExecutableDirective(D);
+}
+
+void EnqueueVisitor::VisitOSSTaskDirective(const OSSTaskDirective *D) {
+  VisitOSSExecutableDirective(D);
 }
 
 void CursorVisitor::EnqueueWorkList(VisitorWorkList &WL, const Stmt *S) {

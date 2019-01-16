@@ -89,6 +89,7 @@ class CGDebugInfo;
 class CGObjCRuntime;
 class CGOpenCLRuntime;
 class CGOpenMPRuntime;
+class CGOmpSsRuntime;
 class CGCUDARuntime;
 class BlockFieldFlags;
 class FunctionArgList;
@@ -316,6 +317,7 @@ private:
   std::unique_ptr<CGObjCRuntime> ObjCRuntime;
   std::unique_ptr<CGOpenCLRuntime> OpenCLRuntime;
   std::unique_ptr<CGOpenMPRuntime> OpenMPRuntime;
+  std::unique_ptr<CGOmpSsRuntime> OmpSsRuntime;
   std::unique_ptr<CGCUDARuntime> CUDARuntime;
   std::unique_ptr<CGDebugInfo> DebugInfo;
   std::unique_ptr<ObjCEntrypoints> ObjCData;
@@ -482,6 +484,7 @@ private:
 
   void createOpenCLRuntime();
   void createOpenMPRuntime();
+  void createOmpSsRuntime();
   void createCUDARuntime();
 
   bool isTriviallyRecursive(const FunctionDecl *F);
@@ -571,6 +574,12 @@ public:
   CGOpenMPRuntime &getOpenMPRuntime() {
     assert(OpenMPRuntime != nullptr);
     return *OpenMPRuntime;
+  }
+
+  /// Return a reference to the configured OmpSs runtime.
+  CGOmpSsRuntime &getOmpSsRuntime() {
+    assert(OmpSsRuntime != nullptr);
+    return *OmpSsRuntime;
   }
 
   /// Return a reference to the configured CUDA runtime.

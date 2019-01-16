@@ -169,6 +169,8 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
 
   // Initialization of data sharing attributes stack for OpenMP
   InitDataSharingAttributesStack();
+  // Initilization of data sharing attributes stack for OmpSs
+  InitDataSharingAttributesStackOmpSs();
 
   std::unique_ptr<sema::SemaPPCallbacks> Callbacks =
       llvm::make_unique<sema::SemaPPCallbacks>();

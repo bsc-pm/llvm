@@ -18,6 +18,7 @@
 #include "clang/AST/Availability.h"
 #include "clang/Basic/BitmaskEnum.h"
 #include "clang/Basic/OpenMPKinds.h"
+#include "clang/Basic/OmpSsKinds.h"
 #include "clang/Basic/OperatorPrecedence.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Lex/CodeCompletionHandler.h"
@@ -48,6 +49,7 @@ namespace clang {
   class InMessageExpressionRAIIObject;
   class PoisonSEHIdentifiersRAIIObject;
   class OMPClause;
+  class OSSClause;
   class ObjCTypeParamList;
   class ObjCTypeParameter;
 
@@ -167,6 +169,7 @@ class Parser : public CodeCompletionHandler {
   std::unique_ptr<PragmaHandler> FPContractHandler;
   std::unique_ptr<PragmaHandler> OpenCLExtensionHandler;
   std::unique_ptr<PragmaHandler> OpenMPHandler;
+  std::unique_ptr<PragmaHandler> OmpSsHandler;
   std::unique_ptr<PragmaHandler> PCSectionHandler;
   std::unique_ptr<PragmaHandler> MSCommentHandler;
   std::unique_ptr<PragmaHandler> MSDetectMismatchHandler;
@@ -2774,7 +2777,51 @@ private:
   bool ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
                                   ParsedType ObjectType,
                                   UnqualifiedId &Result);
+  //===--------------------------------------------------------------------===//
+  // OpenSs: Directives and clauses.
+  StmtResult
+  ParseOmpSsDeclarativeOrExecutableDirective(AllowedConstructsKind Allowed);
 
+  /// Parses clause of kind \a CKind for directive of a kind \a Kind.
+  ///
+  /// \param DKind Kind of current directive.
+  /// \param CKind Kind of current clause.
+  /// \param FirstClause true, if this is the first clause of a kind \a CKind
+  /// in current directive.
+  ///
+  OSSClause *ParseOmpSsClause(OmpSsDirectiveKind DKind,
+                              OmpSsClauseKind CKind, bool FirstClause);
+
+  /// Parses clause with the list of variables of a kind \a Kind.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
+                                     OmpSsClauseKind Kind, bool ParseOnly);
+  /// Parses simple clause of a kind \a Kind.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsSimpleClause(OmpSsClauseKind Kind, bool ParseOnly);
+public:
+
+  /// Data used for parsing list of variables in OmpSs clauses.
+  struct OmpSsVarListDataTy {
+    SourceLocation ColonLoc;
+    SourceLocation RLoc;
+    SourceLocation DepLoc;
+    SmallVector<OmpSsDependClauseKind, 2> DepKinds;
+  };
+
+  /// Parses clauses with list.
+  bool ParseOmpSsVarList(OmpSsDirectiveKind DKind, OmpSsClauseKind Kind,
+                          SmallVectorImpl<Expr *> &Vars,
+                          OmpSsVarListDataTy &Data);
+private:
   //===--------------------------------------------------------------------===//
   // OpenMP: Directives and clauses.
   /// Parse clauses for '#pragma omp declare simd'.

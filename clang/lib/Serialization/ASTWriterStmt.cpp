@@ -2265,6 +2265,21 @@ void ASTStmtWriter::VisitOMPTargetTeamsDistributeSimdDirective(
 }
 
 //===----------------------------------------------------------------------===//
+// OmpSs Directives.
+//===----------------------------------------------------------------------===//
+void ASTStmtWriter::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtWriter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtWriter::VisitOSSTaskDirective(OSSTaskDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+//===----------------------------------------------------------------------===//
 // ASTWriter Implementation
 //===----------------------------------------------------------------------===//
 

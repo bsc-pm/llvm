@@ -995,6 +995,9 @@ def ASM : DiagGroup<"asm", [
     ASMOperandWidths, ASMIgnoredQualifier
   ]>;
 
+// OmpSs warnings.
+def SourceUsesOmpSs : DiagGroup<"source-uses-ompss">;
+
 // OpenMP warnings.
 def SourceUsesOpenMP : DiagGroup<"source-uses-openmp">;
 def OpenMPClauses : DiagGroup<"openmp-clauses">;

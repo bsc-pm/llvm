@@ -69,9 +69,11 @@ add_clang_library(clangCodeGen
   CGOpenCLRuntime.cpp
   CGOpenMPRuntime.cpp
   CGOpenMPRuntimeNVPTX.cpp
+  CGOmpSsRuntime.cpp
   CGRecordLayoutBuilder.cpp
   CGStmt.cpp
   CGStmtOpenMP.cpp
+  CGStmtOmpSs.cpp
   CGVTT.cpp
   CGVTables.cpp
   CodeGenABITypes.cpp
