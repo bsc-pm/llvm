@@ -39,9 +39,9 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
   llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::ompss_marker);
   CGF.Builder.CreateCall(Callee,
                          {},
-                         {llvm::OperandBundleDef("kind",
+                         {llvm::OperandBundleDef("DIR.OSS",
                                                  llvm::ConstantDataArray::getString(CGM.getLLVMContext(),
-                                                                                    "taskwait"))});
+                                                                                    "TASKWAIT"))});
 }
 
 void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
@@ -51,35 +51,35 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_entry);
   llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
-  TaskInfo.emplace_back("kind", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "task"));
+  TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
   for (const Expr *E : Data.SharedVars) {
     const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
     if (VD->hasLocalStorage()) {
         Address Addr = CGF.GetAddrOfLocalVar(VD);
-        TaskInfo.emplace_back("shared", Addr.getPointer());
+        TaskInfo.emplace_back("QUAL.OSS.SHARED", Addr.getPointer());
     }
     else {
-        TaskInfo.emplace_back("shared", CGM.GetAddrOfGlobalVar(VD));
+        TaskInfo.emplace_back("QUAL.OSS.SHARED", CGM.GetAddrOfGlobalVar(VD));
     }
   }
   for (const Expr *E : Data.PrivateVars) {
     const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
     if (VD->hasLocalStorage()) {
         Address Addr = CGF.GetAddrOfLocalVar(VD);
-        TaskInfo.emplace_back("private", Addr.getPointer());
+        TaskInfo.emplace_back("QUAL.OSS.PRIVATE", Addr.getPointer());
     }
     else {
-        TaskInfo.emplace_back("private", CGM.GetAddrOfGlobalVar(VD));
+        TaskInfo.emplace_back("QUAL.OSS.PRIVATE", CGM.GetAddrOfGlobalVar(VD));
     }
   }
   for (const Expr *E : Data.FirstprivateVars) {
     const auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
     if (VD->hasLocalStorage()) {
         Address Addr = CGF.GetAddrOfLocalVar(VD);
-        TaskInfo.emplace_back("firstprivate", Addr.getPointer());
+        TaskInfo.emplace_back("QUAL.OSS.FIRSTPRIVATE", Addr.getPointer());
     }
     else {
-        TaskInfo.emplace_back("firstprivate", CGM.GetAddrOfGlobalVar(VD));
+        TaskInfo.emplace_back("QUAL.OSS.FIRSTPRIVATE", CGM.GetAddrOfGlobalVar(VD));
     }
   }
 
