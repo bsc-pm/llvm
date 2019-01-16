@@ -9497,8 +9497,8 @@ def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element or array section">;
 def err_oss_expected_var_name: Error<
   "expected variable name">;
-def err_oss_pod_not_supported: Error<
-  "PODs are not supported">;
+def err_oss_non_pod_not_supported: Error<
+  "Non-POD structs are not supported">;
 def err_oss_vla_not_supported: Error<
   "VLAs are not supported">;
 

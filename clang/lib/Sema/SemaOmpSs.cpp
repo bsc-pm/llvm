@@ -302,6 +302,12 @@ public:
             llvm_unreachable("unexpected DSA from parent");
           }
       } else {
+
+        QualType Type = VD->getType();
+        if (!Type.isPODType(SemaRef.Context) || Type->isVariableArrayType()) {
+          return;
+        }
+
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
         switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
         case DSA_shared:
@@ -777,7 +783,7 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   auto *VD = dyn_cast<VarDecl>(DE->getDecl());
   QualType Type = VD->getType();
   if (!Type.isPODType(S.Context)) {
-      S.Diag(ELoc, diag::err_oss_pod_not_supported) << ERange;
+      S.Diag(ELoc, diag::err_oss_non_pod_not_supported) << ERange;
       return nullptr;
   }
   if (Type->isVariableArrayType()) {
