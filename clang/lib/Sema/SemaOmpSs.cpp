@@ -362,6 +362,8 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   DSAStackTy *Stack;
   Sema &SemaRef;
   bool ErrorFound = false;
+  llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
+  llvm::SmallVector<Expr *, 4> ImplicitShared;
 public:
   void VisitDeclRefExpr(DeclRefExpr *E) {
     if (E->isTypeDependent() || E->isValueDependent() ||
@@ -402,11 +404,17 @@ public:
             << getOmpSsClauseName(VKind) << ERange;
         }
         break;
-      default:
-        // OK: no DSA explicit, record DSA as explicit, but do not
-        // make a node for it
+      case OSSC_unknown:
+        // OK: no DSA explicit, record DSA as explicit
+        if (VKind == OSSC_shared)
+          ImplicitShared.push_back(E);
+        if (VKind == OSSC_firstprivate)
+          ImplicitFirstprivate.push_back(E);
+
         Stack->addDSA(VD, E, VKind, false);
         break;
+      default:
+        llvm_unreachable("unexpected DSA");
       }
     }
   }
@@ -429,6 +437,14 @@ public:
 
   OSSClauseDSAChecker(DSAStackTy *S, Sema &SemaRef)
       : Stack(S), SemaRef(SemaRef), ErrorFound(false) {}
+
+  ArrayRef<Expr *> getImplicitShared() const {
+    return ImplicitShared;
+  }
+
+  ArrayRef<Expr *> getImplicitFirstprivate() const {
+    return ImplicitFirstprivate;
+  }
 };
 } // namespace
 
@@ -473,11 +489,51 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
   return Out.str();
 }
 
-void Sema::ActOnOmpSsAfterClauseGathering(ArrayRef<OSSClause *> Clauses) {
+void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses) {
+
+  bool ErrorFound = false;
+
   OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
-    if (Clause->getClauseKind() == OSSC_depend)
+    if (isa<OSSDependClause>(Clause)) {
       OSSDependChecker.VisitOSSDepend(cast<OSSDependClause> (Clause));
+
+      if (OSSDependChecker.isErrorFound())
+        ErrorFound = true;
+
+      SmallVector<Expr *, 4> ImplicitShared(
+          OSSDependChecker.getImplicitShared().begin(),
+          OSSDependChecker.getImplicitShared().end());
+
+      SmallVector<Expr *, 4> ImplicitFirstprivate(
+          OSSDependChecker.getImplicitFirstprivate().begin(),
+          OSSDependChecker.getImplicitFirstprivate().end());
+
+      if (!ImplicitShared.empty()) {
+        if (OSSClause *Implicit = ActOnOmpSsSharedClause(
+                ImplicitShared, SourceLocation(), SourceLocation(),
+                SourceLocation())) {
+          Clauses.push_back(Implicit);
+          if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
+            ErrorFound = true;
+
+        } else {
+          ErrorFound = true;
+        }
+      }
+
+      if (!ImplicitFirstprivate.empty()) {
+        if (OSSClause *Implicit = ActOnOmpSsFirstprivateClause(
+                ImplicitFirstprivate, SourceLocation(), SourceLocation(),
+                SourceLocation())) {
+          Clauses.push_back(Implicit);
+          if (cast<OSSFirstprivateClause>(Implicit)->varlist_size() != ImplicitFirstprivate.size())
+            ErrorFound = true;
+        } else {
+          ErrorFound = true;
+        }
+      }
+    }
   }
 }
 
@@ -509,8 +565,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
               ImplicitShared, SourceLocation(), SourceLocation(),
               SourceLocation())) {
         ClausesWithImplicit.push_back(Implicit);
-        ErrorFound = cast<OSSSharedClause>(Implicit)->varlist_size() !=
-                     ImplicitShared.size();
+        if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
+          ErrorFound = true;
       } else {
         ErrorFound = true;
       }
@@ -521,8 +577,8 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
               ImplicitFirstprivate, SourceLocation(), SourceLocation(),
               SourceLocation())) {
         ClausesWithImplicit.push_back(Implicit);
-        ErrorFound = cast<OSSFirstprivateClause>(Implicit)->varlist_size() !=
-                     ImplicitFirstprivate.size();
+        if (cast<OSSFirstprivateClause>(Implicit)->varlist_size() != ImplicitFirstprivate.size())
+          ErrorFound = true;
       } else {
         ErrorFound = true;
       }

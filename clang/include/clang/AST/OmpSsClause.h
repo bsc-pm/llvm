@@ -3077,7 +3077,7 @@ public:
   static OSSDependClause *CreateEmpty(const ASTContext &C, unsigned N);
 
   /// Get dependency types.
-  SmallVector<OmpSsDependClauseKind, 2> getDependencyKind() const { return DepKinds; }
+  ArrayRef<OmpSsDependClauseKind> getDependencyKind() const { return DepKinds; }
 
   /// Get dependency type location.
   SourceLocation getDependencyLoc() const { return DepLoc; }
