@@ -599,7 +599,7 @@ void ASTDumper::VisitFunctionDecl(const FunctionDecl *D) {
   if (D->isTrivial())
     OS << " trivial";
 
-  if (const FunctionProtoType *FPT = D->getType()->getAs<FunctionProtoType>()) {
+  if (const auto *FPT = D->getType()->getAs<FunctionProtoType>()) {
     FunctionProtoType::ExtProtoInfo EPI = FPT->getExtProtoInfo();
     switch (EPI.ExceptionSpec.Type) {
     default: break;
@@ -612,23 +612,7 @@ void ASTDumper::VisitFunctionDecl(const FunctionDecl *D) {
     }
   }
 
-  if (const FunctionTemplateSpecializationInfo *FTSI =
-          D->getTemplateSpecializationInfo())
-    dumpTemplateArgumentList(*FTSI->TemplateArguments);
-
-  if (!D->param_begin() && D->getNumParams())
-    dumpChild([=] { OS << "<<NULL params x " << D->getNumParams() << ">>"; });
-  else
-    for (const ParmVarDecl *Parameter : D->parameters())
-      dumpDecl(Parameter);
-
-  if (const CXXConstructorDecl *C = dyn_cast<CXXConstructorDecl>(D))
-    for (CXXConstructorDecl::init_const_iterator I = C->init_begin(),
-                                                 E = C->init_end();
-         I != E; ++I)
-      dumpCXXCtorInitializer(*I);
-
-  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(D)) {
+  if (const auto *MD = dyn_cast<CXXMethodDecl>(D)) {
     if (MD->size_overridden_methods() != 0) {
       auto dumpOverride = [=](const CXXMethodDecl *D) {
         SplitQualType T_split = D->getType().split();
@@ -650,6 +634,19 @@ void ASTDumper::VisitFunctionDecl(const FunctionDecl *D) {
       });
     }
   }
+
+  if (const auto *FTSI = D->getTemplateSpecializationInfo())
+    dumpTemplateArgumentList(*FTSI->TemplateArguments);
+
+  if (!D->param_begin() && D->getNumParams())
+    dumpChild([=] { OS << "<<NULL params x " << D->getNumParams() << ">>"; });
+  else
+    for (const ParmVarDecl *Parameter : D->parameters())
+      dumpDecl(Parameter);
+
+  if (const auto *C = dyn_cast<CXXConstructorDecl>(D))
+    for (const auto *I : C->inits())
+      dumpCXXCtorInitializer(I);
 
   if (D->doesThisDeclarationHaveABody())
     dumpStmt(D->getBody());
@@ -1276,12 +1273,12 @@ void ASTDumper::VisitObjCTypeParamDecl(const ObjCTypeParamDecl *D) {
 void ASTDumper::VisitObjCCategoryDecl(const ObjCCategoryDecl *D) {
   NodeDumper.dumpName(D);
   NodeDumper.dumpDeclRef(D->getClassInterface());
-  dumpObjCTypeParamList(D->getTypeParamList());
   NodeDumper.dumpDeclRef(D->getImplementation());
   for (ObjCCategoryDecl::protocol_iterator I = D->protocol_begin(),
                                            E = D->protocol_end();
        I != E; ++I)
     NodeDumper.dumpDeclRef(*I);
+  dumpObjCTypeParamList(D->getTypeParamList());
 }
 
 void ASTDumper::VisitObjCCategoryImplDecl(const ObjCCategoryImplDecl *D) {
@@ -1299,12 +1296,12 @@ void ASTDumper::VisitObjCProtocolDecl(const ObjCProtocolDecl *D) {
 
 void ASTDumper::VisitObjCInterfaceDecl(const ObjCInterfaceDecl *D) {
   NodeDumper.dumpName(D);
-  dumpObjCTypeParamList(D->getTypeParamListAsWritten());
   NodeDumper.dumpDeclRef(D->getSuperClass(), "super");
 
   NodeDumper.dumpDeclRef(D->getImplementation());
   for (auto *Child : D->protocols())
     NodeDumper.dumpDeclRef(Child);
+  dumpObjCTypeParamList(D->getTypeParamListAsWritten());
 }
 
 void ASTDumper::VisitObjCImplementationDecl(const ObjCImplementationDecl *D) {
