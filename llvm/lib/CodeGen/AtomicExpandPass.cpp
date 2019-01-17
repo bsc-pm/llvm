@@ -243,16 +243,7 @@ bool AtomicExpand::runOnFunction(Function &F) {
         continue;
       }
     } else if (CASI) {
-      // For rv64a cmpxcgh involving i8 or i16 don't work yet.
-      // This is a stop-gap until we fully devise a solution.
-      auto isNotSupportedRISCV64 = [&]() {
-        auto Triple = TM.getTargetTriple();
-        auto Arch = Triple.getArch();
-        unsigned Size = getAtomicOpSize(CASI);
-
-        return (Arch == llvm::Triple::riscv64) && (Size < 4);
-      };
-      if (!atomicSizeSupported(TLI, CASI) || isNotSupportedRISCV64()) {
+      if (!atomicSizeSupported(TLI, CASI)) {
         expandAtomicCASToLibcall(CASI);
         MadeChange = true;
         continue;

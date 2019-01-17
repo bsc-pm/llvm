@@ -87,6 +87,9 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
   case RISCV::PseudoAtomicLoadNand32:
     return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 32,
                              NextMBBI);
+  case RISCV::PseudoAtomicLoadNand64:
+    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 64,
+                             NextMBBI);
   case RISCV::PseudoMaskedAtomicSwap32:
     return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Xchg, true, 32,
                              NextMBBI);
@@ -111,37 +114,10 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                 NextMBBI);
   case RISCV::PseudoCmpXchg32:
     return expandAtomicCmpXchg(MBB, MBBI, false, 32, NextMBBI);
-  case RISCV::PseudoMaskedCmpXchg32:
-    return expandAtomicCmpXchg(MBB, MBBI, true, 32, NextMBBI);
-  case RISCV::PseudoAtomicLoadNand64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 64,
-                             NextMBBI);
-  case RISCV::PseudoMaskedAtomicSwap64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Xchg, true, 64,
-                             NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadAdd64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Add, true, 64, NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadSub64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Sub, true, 64, NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadNand64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, true, 64,
-                             NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadMax64:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::Max, true, 64,
-                                NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadMin64:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::Min, true, 64,
-                                NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadUMax64:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::UMax, true, 64,
-                                NextMBBI);
-  case RISCV::PseudoMaskedAtomicLoadUMin64:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::UMin, true, 64,
-                                NextMBBI);
   case RISCV::PseudoCmpXchg64:
     return expandAtomicCmpXchg(MBB, MBBI, false, 64, NextMBBI);
-  case RISCV::PseudoMaskedCmpXchg64:
-    return expandAtomicCmpXchg(MBB, MBBI, true, 64, NextMBBI);
+  case RISCV::PseudoMaskedCmpXchg32:
+    return expandAtomicCmpXchg(MBB, MBBI, true, 32, NextMBBI);
   }
 
   return false;
@@ -215,22 +191,20 @@ static unsigned getSCForRMW64(AtomicOrdering Ordering) {
   }
 }
 
-static unsigned getSCForRMW(int Width, AtomicOrdering Ordering)
-{
-  switch (Width) {
-    case 32: return getSCForRMW32(Ordering);
-    case 64: return getSCForRMW64(Ordering);
-  }
-  llvm_unreachable("Invalid width");
+static unsigned getLRForRMW(AtomicOrdering Ordering, int Width) {
+  if (Width == 32)
+    return getLRForRMW32(Ordering);
+  if (Width == 64)
+    return getLRForRMW64(Ordering);
+  llvm_unreachable("Unexpected LR width\n");
 }
 
-static unsigned getLRForRMW(int Width, AtomicOrdering Ordering)
-{
-  switch (Width) {
-    case 32: return getLRForRMW32(Ordering);
-    case 64: return getLRForRMW64(Ordering);
-  }
-  llvm_unreachable("Invalid width");
+static unsigned getSCForRMW(AtomicOrdering Ordering, int Width) {
+  if (Width == 32)
+    return getSCForRMW32(Ordering);
+  if (Width == 64)
+    return getSCForRMW64(Ordering);
+  llvm_unreachable("Unexpected SC width\n");
 }
 
 static void doAtomicBinOpExpansion(const RISCVInstrInfo *TII, MachineInstr &MI,
@@ -246,11 +220,11 @@ static void doAtomicBinOpExpansion(const RISCVInstrInfo *TII, MachineInstr &MI,
       static_cast<AtomicOrdering>(MI.getOperand(4).getImm());
 
   // .loop:
-  //   lr.w dest, (addr)
+  //   lr.[w|d] dest, (addr)
   //   binop scratch, dest, val
-  //   sc.w scratch, scratch, (addr)
+  //   sc.[w|d] scratch, scratch, (addr)
   //   bnez scratch, loop
-  BuildMI(LoopMBB, DL, TII->get(getLRForRMW(Width, Ordering)), DestReg)
+  BuildMI(LoopMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
       .addReg(AddrReg);
   switch (BinOp) {
   default:
@@ -264,7 +238,7 @@ static void doAtomicBinOpExpansion(const RISCVInstrInfo *TII, MachineInstr &MI,
         .addImm(-1);
     break;
   }
-  BuildMI(LoopMBB, DL, TII->get(getSCForRMW(Width, Ordering)), ScratchReg)
+  BuildMI(LoopMBB, DL, TII->get(getSCForRMW(Ordering, Width)), ScratchReg)
       .addReg(AddrReg)
       .addReg(ScratchReg);
   BuildMI(LoopMBB, DL, TII->get(RISCV::BNE))
@@ -299,6 +273,7 @@ static void doMaskedAtomicBinOpExpansion(
     const RISCVInstrInfo *TII, MachineInstr &MI, DebugLoc DL,
     MachineBasicBlock *ThisMBB, MachineBasicBlock *LoopMBB,
     MachineBasicBlock *DoneMBB, AtomicRMWInst::BinOp BinOp, int Width) {
+  assert(Width == 32 && "Should never need to expand masked 64-bit operations");
   unsigned DestReg = MI.getOperand(0).getReg();
   unsigned ScratchReg = MI.getOperand(1).getReg();
   unsigned AddrReg = MI.getOperand(2).getReg();
@@ -315,7 +290,7 @@ static void doMaskedAtomicBinOpExpansion(
   //   xor scratch, destreg, scratch
   //   sc.w scratch, scratch, (alignedaddr)
   //   bnez scratch, loop
-  BuildMI(LoopMBB, DL, TII->get(getLRForRMW(Width, Ordering)), DestReg)
+  BuildMI(LoopMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
       .addReg(AddrReg);
   switch (BinOp) {
   default:
@@ -348,7 +323,7 @@ static void doMaskedAtomicBinOpExpansion(
   insertMaskedMerge(TII, DL, LoopMBB, ScratchReg, DestReg, ScratchReg, MaskReg,
                     ScratchReg);
 
-  BuildMI(LoopMBB, DL, TII->get(getSCForRMW(Width, Ordering)), ScratchReg)
+  BuildMI(LoopMBB, DL, TII->get(getSCForRMW(Ordering, Width)), ScratchReg)
       .addReg(AddrReg)
       .addReg(ScratchReg);
   BuildMI(LoopMBB, DL, TII->get(RISCV::BNE))
@@ -412,6 +387,7 @@ bool RISCVExpandPseudo::expandAtomicMinMaxOp(
     MachineBasicBlock::iterator &NextMBBI) {
   assert(IsMasked == true &&
          "Should only need to expand masked atomic max/min");
+  assert(Width == 32 && "Should never need to expand masked 64-bit operations");
 
   MachineInstr &MI = *MBBI;
   DebugLoc DL = MI.getDebugLoc();
@@ -454,7 +430,7 @@ bool RISCVExpandPseudo::expandAtomicMinMaxOp(
   //   mv scratch1, destreg
   //   [sext scratch2 if signed min/max]
   //   ifnochangeneeded scratch2, incr, .looptail
-  BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Width, Ordering)), DestReg)
+  BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
       .addReg(AddrReg);
   BuildMI(LoopHeadMBB, DL, TII->get(RISCV::AND), Scratch2Reg)
       .addReg(DestReg)
@@ -506,7 +482,7 @@ bool RISCVExpandPseudo::expandAtomicMinMaxOp(
   // .looptail:
   //   sc.w scratch1, scratch1, (addr)
   //   bnez scratch1, loop
-  BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Width, Ordering)), Scratch1Reg)
+  BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width)), Scratch1Reg)
       .addReg(AddrReg)
       .addReg(Scratch1Reg);
   BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
@@ -560,18 +536,18 @@ bool RISCVExpandPseudo::expandAtomicCmpXchg(
 
   if (!IsMasked) {
     // .loophead:
-    //   lr.w dest, (addr)
+    //   lr.[w|d] dest, (addr)
     //   bne dest, cmpval, done
-    BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Width, Ordering)), DestReg)
+    BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
         .addReg(AddrReg);
     BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BNE))
         .addReg(DestReg)
         .addReg(CmpValReg)
         .addMBB(DoneMBB);
     // .looptail:
-    //   sc.w scratch, newval, (addr)
+    //   sc.[w|d] scratch, newval, (addr)
     //   bnez scratch, loophead
-    BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Width, Ordering)), ScratchReg)
+    BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width)), ScratchReg)
         .addReg(AddrReg)
         .addReg(NewValReg);
     BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
@@ -584,7 +560,7 @@ bool RISCVExpandPseudo::expandAtomicCmpXchg(
     //   and scratch, dest, mask
     //   bne scratch, cmpval, done
     unsigned MaskReg = MI.getOperand(5).getReg();
-    BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Width, Ordering)), DestReg)
+    BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
         .addReg(AddrReg);
     BuildMI(LoopHeadMBB, DL, TII->get(RISCV::AND), ScratchReg)
         .addReg(DestReg)
@@ -602,7 +578,7 @@ bool RISCVExpandPseudo::expandAtomicCmpXchg(
     //   bnez scratch, loophead
     insertMaskedMerge(TII, DL, LoopTailMBB, ScratchReg, DestReg, NewValReg,
                       MaskReg, ScratchReg);
-    BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Width, Ordering)), ScratchReg)
+    BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width)), ScratchReg)
         .addReg(AddrReg)
         .addReg(ScratchReg);
     BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
