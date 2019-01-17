@@ -84,7 +84,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setTargetDAGCombine(ISD::SHL);
     setTargetDAGCombine(ISD::SRL);
     setTargetDAGCombine(ISD::SRA);
-    // setTargetDAGCombine(ISD::ANY_EXTEND);
+    setTargetDAGCombine(ISD::ANY_EXTEND);
   }
 
   if (!Subtarget.hasStdExtM()) {
@@ -640,6 +640,7 @@ SDValue RISCVTargetLowering::lowerRETURNADDR(SDValue Op,
   return DAG.getCopyFromReg(DAG.getEntryNode(), DL, Reg, XLenVT);
 }
 
+#if 0
 // Return true if the given node is a shift with a non-constant shift amount.
 static bool isVariableShift(SDValue Val) {
   switch (Val.getOpcode()) {
@@ -665,6 +666,7 @@ static bool isVariableSDivUDivURem(SDValue Val) {
            Val.getOperand(1).getOpcode() != ISD::Constant;
   }
 }
+#endif
 
 static bool isF32ToI32Bitcast(SDValue Val) {
   return Val.getOpcode() == ISD::BITCAST && Val.getValueType() == MVT::i32 &&
@@ -710,16 +712,19 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     if (N->getOpcode() == ISD::SIGN_EXTEND)
       break;
 
-    // If any-extending an i32 variable-length shift or sdiv/udiv/urem to i64,
-    // then instead sign-extend in order to increase the chance of being able
-    // to select the sllw/srlw/sraw/divw/divuw/remuw instructions.
-    if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
-      break;
-    if (!isVariableShift(Src) &&
-        !(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
-      break;
-    SDLoc DL(N);
-    return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src));
+    // Disabling the code below due to a loop in SelectionDAG
+    // https://bugs.llvm.org/show_bug.cgi?id=40333
+    break;
+    // // If any-extending an i32 variable-length shift or sdiv/udiv/urem to i64,
+    // // then instead sign-extend in order to increase the chance of being able
+    // // to select the sllw/srlw/sraw/divw/divuw/remuw instructions.
+    // if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
+    //   break;
+    // if (!isVariableShift(Src) &&
+    //     !(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
+    //   break;
+    // SDLoc DL(N);
+    // return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src));
   }
   case ISD::ZERO_EXTEND: {
     SDValue Op0 = N->getOperand(0);
