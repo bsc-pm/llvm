@@ -36,7 +36,7 @@ using namespace CodeGen;
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                       SourceLocation Loc) {
-  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::ompss_marker);
+  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
   CGF.Builder.CreateCall(Callee,
                          {},
                          {llvm::OperandBundleDef("DIR.OSS",
@@ -48,8 +48,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   const OSSExecutableDirective &D,
                                   SourceLocation Loc,
                                   const OSSTaskDataTy &Data) {
-  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_entry);
-  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::ompss_region_exit);
+  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
   for (const Expr *E : Data.SharedVars) {

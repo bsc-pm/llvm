@@ -5,4 +5,4 @@ int main(void) {
   #pragma oss taskwait
 }
 
-// CHECK: call i1 @llvm.ompss.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ]
+// CHECK: call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ]
