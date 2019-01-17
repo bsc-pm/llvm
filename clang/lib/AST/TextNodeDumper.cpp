@@ -302,6 +302,25 @@ void TextNodeDumper::Visit(const OMPClause *C) {
     OS << " <implicit>";
 }
 
+// OmpSs
+void TextNodeDumper::Visit(const OSSClause *C) {
+  if (!C) {
+    ColorScope Color(OS, ShowColors, NullColor);
+    OS << "<<<NULL>>> OSSClause";
+    return;
+  }
+  {
+    ColorScope Color(OS, ShowColors, AttrColor);
+    StringRef ClauseName(getOmpSsClauseName(C->getClauseKind()));
+    OS << "OSS" << ClauseName.substr(/*Start=*/0, /*N=*/1).upper()
+       << ClauseName.drop_front() << "Clause";
+  }
+  dumpPointer(C);
+  dumpSourceRange(SourceRange(C->getBeginLoc(), C->getEndLoc()));
+  if (C->isImplicit())
+    OS << " <implicit>";
+}
+
 void TextNodeDumper::dumpPointer(const void *Ptr) {
   ColorScope Color(OS, ShowColors, AddressColor);
   OS << ' ' << Ptr;

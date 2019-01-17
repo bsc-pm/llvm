@@ -171,6 +171,9 @@ public:
 
   void Visit(const OMPClause *C);
 
+  // OmpSs
+  void Visit(const OSSClause *C);
+
   void Visit(const BlockDecl::Capture &C);
 
   void dumpPointer(const void *Ptr);

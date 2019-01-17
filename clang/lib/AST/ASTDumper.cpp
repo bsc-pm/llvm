@@ -297,6 +297,7 @@ namespace  {
     void VisitOMPExecutableDirective(const OMPExecutableDirective *Node);
 
     // OmpSs
+    void Visit(const OSSClause *C);
     void VisitOSSExecutableDirective(const OSSExecutableDirective *Node);
 
     // Exprs
@@ -1463,29 +1464,18 @@ void ASTDumper::VisitOMPExecutableDirective(
 //  OmpSs dumping methods.
 //===----------------------------------------------------------------------===//
 
+void ASTDumper::Visit(const OSSClause *C) {
+  dumpChild([=] {
+    NodeDumper.Visit(C);
+    for (auto *S : C->children())
+      dumpStmt(S);
+  });
+}
+
 void ASTDumper::VisitOSSExecutableDirective(
     const OSSExecutableDirective *Node) {
-  VisitStmt(Node);
-  for (auto *C : Node->clauses()) {
-    dumpChild([=] {
-      if (!C) {
-        ColorScope Color(*this, NullColor);
-        OS << "<<<NULL>>> OSSClause";
-        return;
-      }
-      {
-        ColorScope Color(*this, AttrColor);
-        StringRef ClauseName(getOmpSsClauseName(C->getClauseKind()));
-        OS << "OSS" << ClauseName.substr(/*Start=*/0, /*N=*/1).upper()
-           << ClauseName.drop_front() << "Clause";
-      }
-      dumpPointer(C);
-      dumpSourceRange(SourceRange(C->getBeginLoc(), C->getEndLoc()));
-      if (C->isImplicit())
-        OS << " <implicit>";
-      for (auto *S : C->children())
-        dumpStmt(S);
-    });
+  for (const auto *C : Node->clauses()) {
+      Visit(C);
   }
 }
 
