@@ -21,7 +21,6 @@
 #include "lld/Common/Strings.h"
 #include "lld/Common/Threads.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/BinaryFormat/Wasm.h"
@@ -645,12 +644,14 @@ void Writer::createProducersSection() {
     const WasmProducerInfo &Info = File->getWasmObj()->getProducerInfo();
     for (auto &Producers : {std::make_pair(&Info.Languages, &Languages),
                             std::make_pair(&Info.Tools, &Tools),
-                            std::make_pair(&Info.SDKs, &SDKs)}) {
-      llvm::SmallSet<StringRef, 8> SeenProducers;
+                            std::make_pair(&Info.SDKs, &SDKs)})
       for (auto &Producer : *Producers.first)
-        if (SeenProducers.insert(Producer.first).second)
+        if (Producers.second->end() ==
+            std::find_if(Producers.second->begin(), Producers.second->end(),
+                         [&](std::pair<std::string, std::string> Seen) {
+                           return Seen.first == Producer.first;
+                         }))
           Producers.second->push_back(Producer);
-    }
   }
   int FieldCount =
       int(!Languages.empty()) + int(!Tools.empty()) + int(!SDKs.empty());
@@ -660,9 +661,9 @@ void Writer::createProducersSection() {
       createSyntheticSection(WASM_SEC_CUSTOM, "producers");
   auto &OS = Section->getStream();
   writeUleb128(OS, FieldCount, "field count");
-  for (auto &Field : {std::make_pair(StringRef("language"), Languages),
-                      std::make_pair(StringRef("processed-by"), Tools),
-                      std::make_pair(StringRef("sdk"), SDKs)}) {
+  for (auto &Field :
+       {std::make_pair("language", Languages),
+        std::make_pair("processed-by", Tools), std::make_pair("sdk", SDKs)}) {
     if (Field.second.empty())
       continue;
     writeStr(OS, Field.first, "field name");
