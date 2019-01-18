@@ -101,7 +101,7 @@ bool blockEndsInUnreachable(const BasicBlock &BB) {
 
 bool unlikelyExecuted(BasicBlock &BB) {
   // Exception handling blocks are unlikely executed.
-  if (BB.isEHPad())
+  if (BB.isEHPad() || isa<ResumeInst>(BB.getTerminator()))
     return true;
 
   // The block is cold if it calls/invokes a cold function.
@@ -252,16 +252,6 @@ Function *HotColdSplitting::extractColdRegion(const BlockSequence &Region,
                    /* AllowAlloca */ false,
                    /* Suffix */ "cold." + std::to_string(Count));
 
-  SetVector<Value *> Inputs, Outputs, Sinks;
-  CE.findInputsOutputs(Inputs, Outputs, Sinks);
-
-  // Do not extract regions that have live exit variables.
-  if (Outputs.size() > 0) {
-    LLVM_DEBUG(llvm::dbgs() << "Not outlining; live outputs\n");
-    return nullptr;
-  }
-
-  // TODO: Run MergeBasicBlockIntoOnlyPred on the outlined function.
   Function *OrigF = Region[0]->getParent();
   if (Function *OutF = CE.extractCodeRegion()) {
     User *U = *OutF->user_begin();
