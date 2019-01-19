@@ -1,9 +1,8 @@
 //===--- ASTDumper.cpp - Dumping implementation for ASTs ------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -360,13 +359,6 @@ void ASTDumper::dumpDeclContext(const DeclContext *DC) {
 
   for (auto *D : (Deserialize ? DC->decls() : DC->noload_decls()))
     dumpDecl(D);
-
-  if (DC->hasExternalLexicalStorage()) {
-    dumpChild([=] {
-      ColorScope Color(OS, ShowColors, UndeserializedColor);
-      OS << "<undeserialized declarations>";
-    });
-  }
 }
 
 void ASTDumper::dumpLookups(const DeclContext *DC, bool DumpDecls) {
