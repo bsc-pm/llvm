@@ -513,11 +513,7 @@ void ASTDumper::dumpDecl(const Decl *D) {
 
     // Decls within functions are visited by the body.
     if (!isa<FunctionDecl>(*D) && !isa<ObjCMethodDecl>(*D)) {
-      auto DC = dyn_cast<DeclContext>(D);
-      if (DC &&
-          (DC->hasExternalLexicalStorage() ||
-           (Deserialize ? DC->decls_begin() != DC->decls_end()
-                        : DC->noload_decls_begin() != DC->noload_decls_end())))
+      if (const auto *DC = dyn_cast<DeclContext>(D))
         dumpDeclContext(DC);
     }
   });
@@ -633,13 +629,18 @@ void ASTDumper::VisitFunctionDecl(const FunctionDecl *D) {
     }
   }
 
+  // Since NumParams comes from the FunctionProtoType of the FunctionDecl and
+  // the Params are set later, it is possible for a dump during debugging to
+  // encounter a FunctionDecl that has been created but hasn't been assigned
+  // ParmVarDecls yet.
+  if (!D->param_empty() && !D->param_begin())
+    OS << " <<<NULL params x " << D->getNumParams() << ">>>";
+
   if (const auto *FTSI = D->getTemplateSpecializationInfo())
     dumpTemplateArgumentList(*FTSI->TemplateArguments);
 
-  if (!D->param_begin() && D->getNumParams())
-    dumpChild([=] { OS << "<<NULL params x " << D->getNumParams() << ">>"; });
-  else
-    for (const ParmVarDecl *Parameter : D->parameters())
+  if (D->param_begin())
+    for (const auto *Parameter : D->parameters())
       dumpDecl(Parameter);
 
   if (const auto *C = dyn_cast<CXXConstructorDecl>(D))
@@ -1237,12 +1238,11 @@ void ASTDumper::VisitObjCMethodDecl(const ObjCMethodDecl *D) {
   if (D->isVariadic())
     OS << " variadic";
 
-  if (D->isThisDeclarationADefinition()) {
+  if (D->isThisDeclarationADefinition())
     dumpDeclContext(D);
-  } else {
+  else
     for (const ParmVarDecl *Parameter : D->parameters())
       dumpDecl(Parameter);
-  }
 
   if (D->hasBody())
     dumpStmt(D->getBody());
@@ -1379,11 +1379,11 @@ void ASTDumper::VisitBlockDecl(const BlockDecl *D) {
   if (D->isVariadic())
     OS << " variadic";
 
+  if (D->capturesCXXThis())
+    OS << " captures_this";
+
   for (auto I : D->parameters())
     dumpDecl(I);
-
-  if (D->capturesCXXThis())
-    dumpChild([=]{ OS << "capture this"; });
 
   for (const auto &I : D->captures())
     Visit(I);
