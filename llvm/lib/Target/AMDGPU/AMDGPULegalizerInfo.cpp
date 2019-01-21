@@ -22,6 +22,7 @@
 
 using namespace llvm;
 using namespace LegalizeActions;
+using namespace LegalityPredicates;
 
 AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
                                          const GCNTargetMachine &TM) {
@@ -103,11 +104,12 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
                                G_UADDE, G_SADDE, G_USUBE, G_SSUBE})
     .legalFor({{S32, S1}});
 
-  setAction({G_BITCAST, V2S16}, Legal);
-  setAction({G_BITCAST, 1, S32}, Legal);
-
-  setAction({G_BITCAST, S32}, Legal);
-  setAction({G_BITCAST, 1, V2S16}, Legal);
+  getActionDefinitionsBuilder(G_BITCAST)
+    .legalForCartesianProduct({S32, V2S16})
+    .legalForCartesianProduct({S64, V2S32, V4S16})
+    .legalForCartesianProduct({V2S64, V4S32})
+    // Don't worry about the size constraint.
+    .legalIf(all(isPointer(0), isPointer(1)));
 
   getActionDefinitionsBuilder(G_FCONSTANT)
     .legalFor({S32, S64, S16});
@@ -136,27 +138,30 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   getActionDefinitionsBuilder(
     { G_FADD, G_FMUL, G_FNEG, G_FABS, G_FMA})
-    .legalFor({S32, S64});
+    .legalFor({S32, S64})
+    .clampScalar(0, S32, S64);
 
   getActionDefinitionsBuilder(G_FPTRUNC)
-    .legalFor({{S32, S64}});
+    .legalFor({{S32, S64}, {S16, S32}});
 
   getActionDefinitionsBuilder(G_FPEXT)
     .legalFor({{S64, S32}, {S32, S16}})
     .lowerFor({{S64, S16}}); // FIXME: Implement
 
-  // Use actual fsub instruction
-  setAction({G_FSUB, S32}, Legal);
-
-  // Must use fadd + fneg
-  setAction({G_FSUB, S64}, Lower);
+  getActionDefinitionsBuilder(G_FSUB)
+    // Use actual fsub instruction
+    .legalFor({S32})
+    // Must use fadd + fneg
+    .lowerFor({S64, S16})
+    .clampScalar(0, S32, S64);
 
   setAction({G_FCMP, S1}, Legal);
   setAction({G_FCMP, 1, S32}, Legal);
   setAction({G_FCMP, 1, S64}, Legal);
 
   getActionDefinitionsBuilder({G_SEXT, G_ZEXT, G_ANYEXT})
-    .legalFor({{S64, S32}, {S32, S16}, {S64, S16}});
+    .legalFor({{S64, S32}, {S32, S16}, {S64, S16},
+               {S32, S1}, {S64, S1}, {S16, S1}});
 
   setAction({G_FPTOSI, S32}, Legal);
   setAction({G_FPTOSI, 1, S32}, Legal);
