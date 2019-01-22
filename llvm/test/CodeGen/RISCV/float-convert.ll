@@ -14,7 +14,7 @@ define i32 @fcvt_w_s(float %a) nounwind {
 ; RV64IF-LABEL: fcvt_w_s:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    fmv.w.x ft0, a0
-; RV64IF-NEXT:    fcvt.w.s a0, ft0, rtz
+; RV64IF-NEXT:    fcvt.l.s a0, ft0, rtz
 ; RV64IF-NEXT:    ret
   %1 = fptosi float %a to i32
   ret i32 %1
@@ -30,7 +30,7 @@ define i32 @fcvt_wu_s(float %a) nounwind {
 ; RV64IF-LABEL: fcvt_wu_s:
 ; RV64IF:       # %bb.0:
 ; RV64IF-NEXT:    fmv.w.x ft0, a0
-; RV64IF-NEXT:    fcvt.wu.s a0, ft0, rtz
+; RV64IF-NEXT:    fcvt.lu.s a0, ft0, rtz
 ; RV64IF-NEXT:    ret
   %1 = fptoui float %a to i32
   ret i32 %1
