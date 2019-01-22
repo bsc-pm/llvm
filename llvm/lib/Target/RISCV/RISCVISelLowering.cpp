@@ -711,19 +711,12 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     if (N->getOpcode() == ISD::SIGN_EXTEND)
       break;
 
-    // Disabling the code below due to a loop in SelectionDAG
-    // https://bugs.llvm.org/show_bug.cgi?id=40333
-    break;
-    // // If any-extending an i32 variable-length shift or sdiv/udiv/urem to i64,
-    // // then instead sign-extend in order to increase the chance of being able
-    // // to select the sllw/srlw/sraw/divw/divuw/remuw instructions.
-    // if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
-    //   break;
-    // if (!isVariableShift(Src) &&
-    //     !(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
-    //   break;
-    // SDLoc DL(N);
-    // return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src));
+    SDLoc DL(N);
+    // Don't add the new node to the DAGCombiner worklist, in order to avoid
+    // an infinite cycle due to SimplifyDemandedBits converting the
+    // SIGN_EXTEND back to ANY_EXTEND.
+    return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src),
+                         false);
   }
   case ISD::ZERO_EXTEND: {
     SDValue Op0 = N->getOperand(0);
