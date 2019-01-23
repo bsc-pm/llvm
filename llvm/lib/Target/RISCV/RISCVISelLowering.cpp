@@ -753,23 +753,7 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
                            DAG.getNode(RISCVISD::BitcastAndSextF32ToI64,
                                        SDLoc(N), MVT::i64, Src.getOperand(0)));
     }
-
-    if (N->getOpcode() == ISD::SIGN_EXTEND)
-      break;
-
-    // If any-extending an i32 sdiv/udiv/urem to i64, then instead sign-extend
-    // in order to increase the chance of being able to select the
-    // divw/divuw/remuw instructions.
-    if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
-      break;
-    if (!(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
-      break;
-    SDLoc DL(N);
-    // Don't add the new node to the DAGCombiner worklist, in order to avoid
-    // an infinite cycle due to SimplifyDemandedBits converting the
-    // SIGN_EXTEND back to ANY_EXTEND.
-    return DCI.CombineTo(N, DAG.getNode(ISD::SIGN_EXTEND, DL, MVT::i64, Src),
-                         false);
+    break;
   }
   case ISD::ZERO_EXTEND: {
     SDValue Op0 = N->getOperand(0);
