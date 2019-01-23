@@ -80,10 +80,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
 
   if (Subtarget.is64Bit()) {
-    setTargetDAGCombine(ISD::SHL);
-    setTargetDAGCombine(ISD::SRL);
-    setTargetDAGCombine(ISD::SRA);
     setTargetDAGCombine(ISD::ANY_EXTEND);
+    setOperationAction(ISD::SHL, MVT::i32, Custom);
+    setOperationAction(ISD::SRA, MVT::i32, Custom);
+    setOperationAction(ISD::SRL, MVT::i32, Custom);
   }
 
   if (!Subtarget.hasStdExtM()) {
@@ -639,15 +639,53 @@ SDValue RISCVTargetLowering::lowerRETURNADDR(SDValue Op,
   return DAG.getCopyFromReg(DAG.getEntryNode(), DL, Reg, XLenVT);
 }
 
-// Return true if the given node is a shift with a non-constant shift amount.
-static bool isVariableShift(SDValue Val) {
-  switch (Val.getOpcode()) {
+// Returns the opcode of the target-specific SDNode that implements the 32-bit
+// form of the given shift Opcode.
+static RISCVISD::NodeType getRISCVShiftWOpcode(unsigned Opcode) {
+  switch (Opcode) {
   default:
-    return false;
+    llvm_unreachable("Unexpected opcode");
+  case ISD::SHL:
+    return RISCVISD::SHLW;
+  case ISD::SRA:
+    return RISCVISD::SRAW;
+  case ISD::SRL:
+    return RISCVISD::SRLW;
+  }
+}
+
+void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
+                                             SmallVectorImpl<SDValue> &Results,
+                                             SelectionDAG &DAG) const {
+  SDLoc DL(N);
+  switch (N->getOpcode()) {
+  default:
+    llvm_unreachable("Do not know how to custom type legalize this operation!");
   case ISD::SHL:
   case ISD::SRA:
-  case ISD::SRL:
-    return Val.getOperand(1).getOpcode() != ISD::Constant;
+  case ISD::SRL: {
+    // Custom legalize 32-bit variable shifts to target-specific nodes on RV64.
+    // Because i32 isn't a legal type for RV64 they would otherwise be
+    // expanded to i64 operations, making it very difficult to select
+    // SLLW/SRLW/SRAW as the fact the shifts were originally 32-bit is lost.
+    assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
+           "Unexpected custom legalisation");
+    if (N->getOperand(1).getOpcode() == ISD::Constant)
+      return;
+    SDValue NewOp0 =
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(0));
+    SDValue NewOp1 =
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(1));
+    SDValue NewShift = DAG.getNode(getRISCVShiftWOpcode(N->getOpcode()), DL,
+                                   MVT::i64, NewOp0, NewOp1);
+    // We need to replace the i32 shift with another i32 node. Replacing with
+    // an i64 node doesn't trigger an assert, but does lead to problems in the
+    // case that the result was extended. This is because the DAG combiner
+    // assumes that ty->ty no-op extends don't exist due to the folding logic
+    // in DAG.getNode.
+    Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, NewShift));
+    break;
+  }
   }
 }
 
@@ -709,13 +747,12 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     if (N->getOpcode() == ISD::SIGN_EXTEND)
       break;
 
-    // If any-extending an i32 variable-length shift or sdiv/udiv/urem to i64,
-    // then instead sign-extend in order to increase the chance of being able
-    // to select the sllw/srlw/sraw/divw/divuw/remuw instructions.
+    // If any-extending an i32 sdiv/udiv/urem to i64, then instead sign-extend
+    // in order to increase the chance of being able to select the
+    // divw/divuw/remuw instructions.
     if (N->getValueType(0) != MVT::i64 || Src.getValueType() != MVT::i32)
       break;
-    if (!isVariableShift(Src) &&
-        !(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
+    if (!(Subtarget.hasStdExtM() && isVariableSDivUDivURem(Src)))
       break;
     SDLoc DL(N);
     // Don't add the new node to the DAGCombiner worklist, in order to avoid
@@ -1941,6 +1978,12 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::SplitF64";
   case RISCVISD::TAIL:
     return "RISCVISD::TAIL";
+  case RISCVISD::SHLW:
+    return "RISCVISD::SHLW";
+  case RISCVISD::SRAW:
+    return "RISCVISD::SRAW";
+  case RISCVISD::SRLW:
+    return "RISCVISD::SRLW";
   case RISCVISD::WRAPPER_PIC:
     return "RISCVISD::WRAPPER_PIC";
   case RISCVISD::WRAPPER_TLS_IE:
