@@ -80,7 +80,6 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
 
   if (Subtarget.is64Bit()) {
-    setTargetDAGCombine(ISD::ANY_EXTEND);
     setOperationAction(ISD::SHL, MVT::i32, Custom);
     setOperationAction(ISD::SRA, MVT::i32, Custom);
     setOperationAction(ISD::SRL, MVT::i32, Custom);
@@ -94,6 +93,12 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::UDIV, XLenVT, Expand);
     setOperationAction(ISD::SREM, XLenVT, Expand);
     setOperationAction(ISD::UREM, XLenVT, Expand);
+  }
+
+  if (Subtarget.is64Bit() && Subtarget.hasStdExtM()) {
+    setOperationAction(ISD::SDIV, MVT::i32, Custom);
+    setOperationAction(ISD::UDIV, MVT::i32, Custom);
+    setOperationAction(ISD::UREM, MVT::i32, Custom);
   }
 
   setOperationAction(ISD::SDIVREM, XLenVT, Expand);
@@ -640,8 +645,8 @@ SDValue RISCVTargetLowering::lowerRETURNADDR(SDValue Op,
 }
 
 // Returns the opcode of the target-specific SDNode that implements the 32-bit
-// form of the given shift Opcode.
-static RISCVISD::NodeType getRISCVShiftWOpcode(unsigned Opcode) {
+// form of the given Opcode.
+static RISCVISD::NodeType getRISCVWOpcode(unsigned Opcode) {
   switch (Opcode) {
   default:
     llvm_unreachable("Unexpected opcode");
@@ -651,7 +656,32 @@ static RISCVISD::NodeType getRISCVShiftWOpcode(unsigned Opcode) {
     return RISCVISD::SRAW;
   case ISD::SRL:
     return RISCVISD::SRLW;
+  case ISD::SDIV:
+    return RISCVISD::DIVW;
+  case ISD::UDIV:
+    return RISCVISD::DIVUW;
+  case ISD::UREM:
+    return RISCVISD::REMUW;
   }
+}
+
+// Converts the given 32-bit operation to a target-specific SelectionDAG node.
+// Because i32 isn't a legal type for RV64, these operations would otherwise
+// be promoted to i64, making it difficult to select the SLLW/DIVUW/.../*W
+// later one because the fact the operation was originally of type i32 is
+// lost.
+static SDValue customLegalizeToWOp(SDNode *N, SelectionDAG &DAG) {
+  SDLoc DL(N);
+  RISCVISD::NodeType WOpcode = getRISCVWOpcode(N->getOpcode());
+  SDValue NewOp0 = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(0));
+  SDValue NewOp1 = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(1));
+  SDValue NewRes = DAG.getNode(WOpcode, DL, MVT::i64, NewOp0, NewOp1);
+  // We need to replace the i32 node with another i32 node. Replacing with
+  // an i64 node doesn't trigger an assert, but does lead to problems in the
+  // case that the result was extended. This is because the DAG combiner
+  // assumes that ty->ty no-op extends don't exist due to the folding logic
+  // in DAG.getNode.
+  return DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, NewRes);
 }
 
 void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
@@ -660,46 +690,26 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
   SDLoc DL(N);
   switch (N->getOpcode()) {
   default:
-    llvm_unreachable("Do not know how to custom type legalize this operation!");
+    llvm_unreachable("Don't know how to custom type legalize this operation!");
   case ISD::SHL:
   case ISD::SRA:
-  case ISD::SRL: {
-    // Custom legalize 32-bit variable shifts to target-specific nodes on RV64.
-    // Because i32 isn't a legal type for RV64 they would otherwise be
-    // expanded to i64 operations, making it very difficult to select
-    // SLLW/SRLW/SRAW as the fact the shifts were originally 32-bit is lost.
+  case ISD::SRL:
     assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
            "Unexpected custom legalisation");
     if (N->getOperand(1).getOpcode() == ISD::Constant)
       return;
-    SDValue NewOp0 =
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(0));
-    SDValue NewOp1 =
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(1));
-    SDValue NewShift = DAG.getNode(getRISCVShiftWOpcode(N->getOpcode()), DL,
-                                   MVT::i64, NewOp0, NewOp1);
-    // We need to replace the i32 shift with another i32 node. Replacing with
-    // an i64 node doesn't trigger an assert, but does lead to problems in the
-    // case that the result was extended. This is because the DAG combiner
-    // assumes that ty->ty no-op extends don't exist due to the folding logic
-    // in DAG.getNode.
-    Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, NewShift));
+    Results.push_back(customLegalizeToWOp(N, DAG));
     break;
-  }
-  }
-}
-
-// Returns true if the given node is an sdiv, udiv, or urem with non-constant
-// operands.
-static bool isVariableSDivUDivURem(SDValue Val) {
-  switch (Val.getOpcode()) {
-  default:
-    return false;
   case ISD::SDIV:
   case ISD::UDIV:
   case ISD::UREM:
-    return Val.getOperand(0).getOpcode() != ISD::Constant &&
-           Val.getOperand(1).getOpcode() != ISD::Constant;
+    assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
+           Subtarget.hasStdExtM() && "Unexpected custom legalisation");
+    if (N->getOperand(0).getOpcode() == ISD::Constant ||
+        N->getOperand(1).getOpcode() == ISD::Constant)
+      return;
+    Results.push_back(customLegalizeToWOp(N, DAG));
+    break;
   }
 }
 
@@ -1984,6 +1994,12 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::SRAW";
   case RISCVISD::SRLW:
     return "RISCVISD::SRLW";
+  case RISCVISD::DIVW:
+    return "RISCVISD::DIVW";
+  case RISCVISD::DIVUW:
+    return "RISCVISD::DIVUW";
+  case RISCVISD::REMUW:
+    return "RISCVISD::REMUW";
   case RISCVISD::WRAPPER_PIC:
     return "RISCVISD::WRAPPER_PIC";
   case RISCVISD::WRAPPER_TLS_IE:
