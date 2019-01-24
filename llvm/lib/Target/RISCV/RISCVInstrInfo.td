@@ -877,7 +877,7 @@ def PseudoRET : Pseudo<(outs), (ins), [(riscv_ret_flag)]>,
 // expand to auipc and jalr while encoding.
 // Define AsmString to print "tail" when compile with -S flag.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2],
-    isCodeGenOnly = 0, Size = 8 in
+    isCodeGenOnly = 0 in
 def PseudoTAIL : Pseudo<(outs), (ins bare_symbol_or_plt:$dst), []> {
   let AsmString = "tail\t$dst";
 }
