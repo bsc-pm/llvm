@@ -61,18 +61,10 @@ let Predicates = [HasStdExtM, IsRV64] in {
 def : Pat<(sext_inreg (mul GPR:$rs1, GPR:$rs2), i32),
           (MULW GPR:$rs1, GPR:$rs2)>;
 
-def : Pat<(riscv_divw GPR:$rs1, GPR:$rs2),
-          (DIVW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(sext_inreg (riscv_divw GPR:$rs1, GPR:$rs2), i32),
-          (DIVW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(riscv_divuw GPR:$rs1, GPR:$rs2),
-          (DIVUW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(sext_inreg (riscv_divuw GPR:$rs1, GPR:$rs2), i32),
-          (DIVUW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(riscv_remuw GPR:$rs1, GPR:$rs2),
-          (REMUW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(sext_inreg (riscv_remuw GPR:$rs1, GPR:$rs2), i32),
-          (REMUW GPR:$rs1, GPR:$rs2)>;
+
+def : PatGprGpr<riscv_divw, DIVW>;
+def : PatGprGpr<riscv_divuw, DIVUW>;
+def : PatGprGpr<riscv_remuw, REMUW>;
 
 // Handle the specific cases where using DIVU/REMU would be correct and result
 // in fewer instructions than emitting DIVUW/REMUW then zero-extending the

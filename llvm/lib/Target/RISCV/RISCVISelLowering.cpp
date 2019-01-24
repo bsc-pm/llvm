@@ -651,7 +651,7 @@ static RISCVISD::NodeType getRISCVWOpcode(unsigned Opcode) {
   default:
     llvm_unreachable("Unexpected opcode");
   case ISD::SHL:
-    return RISCVISD::SHLW;
+    return RISCVISD::SLLW;
   case ISD::SRA:
     return RISCVISD::SRAW;
   case ISD::SRL:
@@ -676,11 +676,7 @@ static SDValue customLegalizeToWOp(SDNode *N, SelectionDAG &DAG) {
   SDValue NewOp0 = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(0));
   SDValue NewOp1 = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(1));
   SDValue NewRes = DAG.getNode(WOpcode, DL, MVT::i64, NewOp0, NewOp1);
-  // We need to replace the i32 node with another i32 node. Replacing with
-  // an i64 node doesn't trigger an assert, but does lead to problems in the
-  // case that the result was extended. This is because the DAG combiner
-  // assumes that ty->ty no-op extends don't exist due to the folding logic
-  // in DAG.getNode.
+  // ReplaceNodeResults requires we maintain the same type for the return value.
   return DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, NewRes);
 }
 
@@ -725,25 +721,6 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
   switch (N->getOpcode()) {
   default:
     break;
-  case ISD::SHL:
-  case ISD::SRL:
-  case ISD::SRA: {
-    assert(Subtarget.getXLen() == 64 && "Combine should be 64-bit only");
-    if (!DCI.isBeforeLegalize())
-      break;
-    SDValue RHS = N->getOperand(1);
-    if (N->getValueType(0) != MVT::i32 || RHS->getOpcode() == ISD::Constant ||
-        (RHS->getOpcode() == ISD::AssertZext &&
-         cast<VTSDNode>(RHS->getOperand(1))->getVT().getSizeInBits() <= 5))
-      break;
-    SDValue LHS = N->getOperand(0);
-    SDLoc DL(N);
-    SDValue NewRHS =
-        DAG.getNode(ISD::AssertZext, DL, RHS.getValueType(), RHS,
-                    DAG.getValueType(EVT::getIntegerVT(*DAG.getContext(), 5)));
-    return DCI.CombineTo(
-        N, DAG.getNode(N->getOpcode(), DL, LHS.getValueType(), LHS, NewRHS));
-  }
   case ISD::ANY_EXTEND:
   case ISD::SIGN_EXTEND: {
     SDValue Src = N->getOperand(0);
@@ -796,9 +773,43 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
       break;
     return DCI.CombineTo(N, Op0.getOperand(0));
   }
+  case RISCVISD::SLLW:
+  case RISCVISD::SRAW:
+  case RISCVISD::SRLW: {
+    // Only the lower 32 bits of LHS and lower 5 bits of RHS are read.
+    SDValue LHS = N->getOperand(0);
+    SDValue RHS = N->getOperand(1);
+    APInt LHSMask = APInt::getLowBitsSet(LHS.getValueSizeInBits(), 32);
+    APInt RHSMask = APInt::getLowBitsSet(RHS.getValueSizeInBits(), 5);
+    if ((SimplifyDemandedBits(N->getOperand(0), LHSMask, DCI)) ||
+        (SimplifyDemandedBits(N->getOperand(1), RHSMask, DCI)))
+      return SDValue();
+    break;
+  }
   }
 
   return SDValue();
+}
+
+unsigned RISCVTargetLowering::ComputeNumSignBitsForTargetNode(
+    SDValue Op, const APInt &DemandedElts, const SelectionDAG &DAG,
+    unsigned Depth) const {
+  switch (Op.getOpcode()) {
+  default:
+    break;
+  case RISCVISD::SLLW:
+  case RISCVISD::SRAW:
+  case RISCVISD::SRLW:
+  case RISCVISD::DIVW:
+  case RISCVISD::DIVUW:
+  case RISCVISD::REMUW:
+    // TODO: As the result is sign-extended, this is conservatively correct. A
+    // more precise answer could be calculated for SRAW depending on known
+    // bits in the shift amount.
+    return 33;
+  }
+
+  return 1;
 }
 
 static MachineBasicBlock *emitSplitF64Pseudo(MachineInstr &MI,
@@ -1972,8 +1983,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::SplitF64";
   case RISCVISD::TAIL:
     return "RISCVISD::TAIL";
-  case RISCVISD::SHLW:
-    return "RISCVISD::SHLW";
+  case RISCVISD::SLLW:
+    return "RISCVISD::SLLW";
   case RISCVISD::SRAW:
     return "RISCVISD::SRAW";
   case RISCVISD::SRLW:

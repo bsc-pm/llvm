@@ -51,7 +51,7 @@ def riscv_selectcc  : SDNode<"RISCVISD::SELECT_CC", SDT_RISCVSelectCC,
 def riscv_tail      : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                              [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                               SDNPVariadic]>;
-def riscv_shlw      : SDNode<"RISCVISD::SHLW", SDTIntShiftOp>;
+def riscv_sllw      : SDNode<"RISCVISD::SLLW", SDTIntShiftOp>;
 def riscv_sraw      : SDNode<"RISCVISD::SRAW", SDTIntShiftOp>;
 def riscv_srlw      : SDNode<"RISCVISD::SRLW", SDTIntShiftOp>;
 
@@ -730,11 +730,6 @@ def assertzexti32 : PatFrag<(ops node:$src), (assertzext node:$src), [{
 def zexti32 : PatFrags<(ops node:$src),
                        [(and node:$src, 0xffffffff),
                         (assertzexti32 node:$src)]>;
-// Defines a legal mask for (and src, mask) to be combinable with a shiftw
-// operation. The mask mustn't modify the lower 5 bits or the upper 32 bits.
-def shiftwamt_mask : ImmLeaf<XLenVT, [{
-  return countTrailingOnes<uint64_t>(Imm) >= 5 && isUInt<32>(Imm);
-}]>;
 
 /// Immediates
 
@@ -1060,20 +1055,9 @@ def : Pat<(sext_inreg (shl GPR:$rs1, uimm5:$shamt), i32),
 def : Pat<(sra (sext_inreg GPR:$rs1, i32), uimm5:$shamt),
           (SRAIW GPR:$rs1, uimm5:$shamt)>;
 
-multiclass ShiftWPat<PatFrag ShiftWOp, RVInst Inst> {
-  def : Pat<(ShiftWOp GPR:$rs1, (and GPR:$rs2, shiftwamt_mask)),
-            (Inst GPR:$rs1, GPR:$rs2)>;
-  def : Pat<(ShiftWOp GPR:$rs1, GPR:$rs2),
-            (Inst GPR:$rs1, GPR:$rs2)>;
-  def : Pat<(sext_inreg (ShiftWOp GPR:$rs1, (and GPR:$rs2, shiftwamt_mask)), i32),
-            (Inst GPR:$rs1, GPR:$rs2)>;
-  def : Pat<(sext_inreg (ShiftWOp GPR:$rs1, GPR:$rs2), i32),
-            (Inst GPR:$rs1, GPR:$rs2)>;
-}
-
-defm : ShiftWPat<riscv_shlw, SLLW>;
-defm : ShiftWPat<riscv_srlw, SRLW>;
-defm : ShiftWPat<riscv_sraw, SRAW>;
+def : PatGprGpr<riscv_sllw, SLLW>;
+def : PatGprGpr<riscv_srlw, SRLW>;
+def : PatGprGpr<riscv_sraw, SRAW>;
 
 /// Loads
 
