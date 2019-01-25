@@ -34,8 +34,8 @@ enum NodeType : unsigned {
   BuildPairF64,
   SplitF64,
   TAIL,
-	// RV64I shifts, directly matching the semantics of the named RISC-V
-	// instructions.
+  // RV64I shifts, directly matching the semantics of the named RISC-V
+  // instructions.
   SLLW,
   SRAW,
   SRLW,
@@ -44,6 +44,7 @@ enum NodeType : unsigned {
   DIVW,
   DIVUW,
   REMUW,
+  // Wrappers for PIC and TLS
   WRAPPER_PIC,
   WRAPPER_TLS_IE,
   WRAPPER_TLS_GD,

@@ -1396,6 +1396,7 @@ LegalizerHelper::fewerElementsVector(MachineInstr &MI, unsigned TypeIdx,
     return Legalized;
   }
   case TargetOpcode::G_ADD:
+  case TargetOpcode::G_SUB:
   case TargetOpcode::G_MUL:
   case TargetOpcode::G_SMULH:
   case TargetOpcode::G_UMULH:
@@ -1407,6 +1408,12 @@ LegalizerHelper::fewerElementsVector(MachineInstr &MI, unsigned TypeIdx,
   case TargetOpcode::G_FDIV:
   case TargetOpcode::G_FREM:
   case TargetOpcode::G_FMA:
+  case TargetOpcode::G_FPOW:
+  case TargetOpcode::G_FEXP:
+  case TargetOpcode::G_FEXP2:
+  case TargetOpcode::G_FLOG:
+  case TargetOpcode::G_FLOG2:
+  case TargetOpcode::G_FLOG10:
   case TargetOpcode::G_FCEIL: {
     unsigned NarrowSize = NarrowTy.getSizeInBits();
     unsigned DstReg = MI.getOperand(0).getReg();
@@ -1505,6 +1512,11 @@ LegalizerHelper::fewerElementsVector(MachineInstr &MI, unsigned TypeIdx,
   case TargetOpcode::G_SEXT:
   case TargetOpcode::G_ANYEXT:
   case TargetOpcode::G_FPEXT:
+  case TargetOpcode::G_FPTRUNC:
+  case TargetOpcode::G_SITOFP:
+  case TargetOpcode::G_UITOFP:
+  case TargetOpcode::G_FPTOSI:
+  case TargetOpcode::G_FPTOUI:
     return fewerElementsVectorCasts(MI, TypeIdx, NarrowTy);
   }
 }

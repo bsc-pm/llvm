@@ -61,7 +61,6 @@ let Predicates = [HasStdExtM, IsRV64] in {
 def : Pat<(sext_inreg (mul GPR:$rs1, GPR:$rs2), i32),
           (MULW GPR:$rs1, GPR:$rs2)>;
 
-
 def : PatGprGpr<riscv_divw, DIVW>;
 def : PatGprGpr<riscv_divuw, DIVUW>;
 def : PatGprGpr<riscv_remuw, REMUW>;
