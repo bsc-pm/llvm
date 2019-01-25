@@ -381,7 +381,7 @@ TEST_F(StructuralEquivalenceFunctionTest, FunctionsWithDifferentNoreturnAttr) {
 // These attributes may not be available on certain platforms.
 #if defined(__x86_64__) && defined(__linux__)
 TEST_F(StructuralEquivalenceFunctionTest,
-    FunctionsWithDifferentCallingConventions) {
+    DISABLED_FunctionsWithDifferentCallingConventions) {
   auto t = makeNamedDecls(
       "__attribute__((preserve_all)) void foo();",
       "__attribute__((ms_abi))   void foo();",
@@ -389,7 +389,8 @@ TEST_F(StructuralEquivalenceFunctionTest,
   EXPECT_FALSE(testStructuralMatch(t));
 }
 
-TEST_F(StructuralEquivalenceFunctionTest, FunctionsWithDifferentSavedRegsAttr) {
+TEST_F(StructuralEquivalenceFunctionTest,
+       DISABLED_FunctionsWithDifferentSavedRegsAttr) {
   auto t = makeNamedDecls(
       "__attribute__((no_caller_saved_registers)) void foo();",
       "                                           void foo();",
