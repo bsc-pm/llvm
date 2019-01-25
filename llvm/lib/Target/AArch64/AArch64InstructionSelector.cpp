@@ -396,6 +396,7 @@ static unsigned selectLoadStoreUIOp(unsigned GenericOpc, unsigned RegBankID,
   return GenericOpc;
 }
 
+#ifndef NDEBUG
 /// Helper function that verifies that we have a valid copy at the end of
 /// selectCopy. Verifies that the source and dest have the expected sizes and
 /// then returns true.
@@ -426,6 +427,7 @@ static bool isValidCopy(const MachineInstr &I, const RegisterBank &DstBank,
 
   return true;
 }
+#endif
 
 /// Helper function for selectCopy. Inserts a subregister copy from
 /// \p *From to \p *To, linking it up to \p I.
@@ -485,7 +487,7 @@ static bool selectCopy(MachineInstr &I, const TargetInstrInfo &TII,
   // Returns true, or asserts if something we don't expect happens. Instead of
   // returning true, we return isValidCopy() to ensure that we verify the
   // result.
-  auto CheckCopy = [&I, &DstRegBank, &MRI, &TRI, &RBI, &KnownValid]() {
+  auto CheckCopy = [&]() {
     // If we have a bitcast or something, we can't have physical registers.
     assert(
         I.isCopy() ||
@@ -1800,6 +1802,7 @@ bool AArch64InstructionSelector::selectUnmergeValues(
   unsigned SrcReg = I.getOperand(NumElts).getReg();
   const LLT NarrowTy = MRI.getType(I.getOperand(0).getReg());
   const LLT WideTy = MRI.getType(SrcReg);
+  (void)WideTy;
   assert(WideTy.isVector() && "can only unmerge from vector types!");
   assert(WideTy.getSizeInBits() > NarrowTy.getSizeInBits() &&
          "source register size too small!");
