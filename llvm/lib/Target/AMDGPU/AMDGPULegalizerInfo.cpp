@@ -37,6 +37,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   const LLT S16 = LLT::scalar(16);
   const LLT S32 = LLT::scalar(32);
   const LLT S64 = LLT::scalar(64);
+  const LLT S128 = LLT::scalar(128);
   const LLT S256 = LLT::scalar(256);
   const LLT S512 = LLT::scalar(512);
 
@@ -96,7 +97,10 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   setAction({G_ASHR, S32}, Legal);
   setAction({G_ASHR, 1, S32}, Legal);
   setAction({G_SUB, S32}, Legal);
-  setAction({G_MUL, S32}, Legal);
+
+  getActionDefinitionsBuilder({G_MUL, G_UMULH, G_SMULH})
+    .legalFor({S32})
+    .scalarize(0);
 
   // FIXME: 64-bit ones only legal for scalar
   getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
@@ -148,7 +152,8 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   getActionDefinitionsBuilder(G_FPEXT)
     .legalFor({{S64, S32}, {S32, S16}})
-    .lowerFor({{S64, S16}}); // FIXME: Implement
+    .lowerFor({{S64, S16}}) // FIXME: Implement
+    .scalarize(0);
 
   getActionDefinitionsBuilder(G_FSUB)
       // Use actual fsub instruction
@@ -158,13 +163,12 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
       .scalarize(0)
       .clampScalar(0, S32, S64);
 
-  setAction({G_FCMP, S1}, Legal);
-  setAction({G_FCMP, 1, S32}, Legal);
-  setAction({G_FCMP, 1, S64}, Legal);
-
   getActionDefinitionsBuilder({G_SEXT, G_ZEXT, G_ANYEXT})
     .legalFor({{S64, S32}, {S32, S16}, {S64, S16},
-               {S32, S1}, {S64, S1}, {S16, S1}});
+               {S32, S1}, {S64, S1}, {S16, S1},
+               // FIXME: Hack
+               {S128, S32}})
+    .scalarize(0);
 
   getActionDefinitionsBuilder({G_SITOFP, G_UITOFP})
     .legalFor({{S32, S32}, {S64, S32}});
@@ -187,8 +191,14 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   setAction({G_BLOCK_ADDR, CodePtr}, Legal);
 
-  setAction({G_ICMP, S1}, Legal);
-  setAction({G_ICMP, 1, S32}, Legal);
+  getActionDefinitionsBuilder({G_ICMP, G_FCMP})
+    .legalFor({{S1, S32}, {S1, S64}})
+    .widenScalarToNextPow2(1)
+    .clampScalar(1, S32, S64)
+    .clampMaxNumElements(0, S1, 1)
+    .clampMaxNumElements(1, S32, 1);
+
+
 
   setAction({G_CTLZ, S32}, Legal);
   setAction({G_CTLZ_ZERO_UNDEF, S32}, Legal);
