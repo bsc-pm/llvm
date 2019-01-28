@@ -82,8 +82,11 @@ public:
 
   std::pair<unsigned, unsigned>
   decomposeMachineOperandsTargetFlags(unsigned TF) const override;
+
   ArrayRef<std::pair<unsigned, const char *>>
   getSerializableDirectMachineOperandTargetFlags() const override;
+
+  bool isAsCheapAsAMove(const MachineInstr &MI) const override;
 };
 }
 #endif
