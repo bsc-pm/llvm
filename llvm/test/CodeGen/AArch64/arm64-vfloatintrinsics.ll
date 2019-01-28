@@ -73,17 +73,25 @@ define %v4f16 @test_v4f16.exp2(%v4f16 %a) {
   %1 = call %v4f16 @llvm.exp2.v4f16(%v4f16 %a)
   ret %v4f16 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v4f16.log
 define %v4f16 @test_v4f16.log(%v4f16 %a) {
   ; This operation is expanded, whether with or without +fullfp16.
   ; CHECK-LABEL:   test_v4f16.log:
   ; CHECK-COUNT-4: bl log
+  ; GISEL-LABEL:   test_v4f16.log:
+  ; GISEL-COUNT-4: bl log
   %1 = call %v4f16 @llvm.log.v4f16(%v4f16 %a)
   ret %v4f16 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v4f16.log10
 define %v4f16 @test_v4f16.log10(%v4f16 %a) {
   ; This operation is expanded, whether with or without +fullfp16.
   ; CHECK-LABEL:   test_v4f16.log10:
   ; CHECK-COUNT-4: bl log10
+  ; GISEL-LABEL:   test_v4f16.log10:
+  ; GISEL-COUNT-4: bl log10
   %1 = call %v4f16 @llvm.log10.v4f16(%v4f16 %a)
   ret %v4f16 %1
 }
@@ -244,17 +252,25 @@ define %v8f16 @test_v8f16.exp2(%v8f16 %a) {
   %1 = call %v8f16 @llvm.exp2.v8f16(%v8f16 %a)
   ret %v8f16 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v8f16.log
 define %v8f16 @test_v8f16.log(%v8f16 %a) {
   ; This operation is expanded, whether with or without +fullfp16.
   ; CHECK-LABEL:   test_v8f16.log:
   ; CHECK-COUNT-8: bl log
+  ; GISEL-LABEL:   test_v8f16.log:
+  ; GISEL-COUNT-8: bl log
   %1 = call %v8f16 @llvm.log.v8f16(%v8f16 %a)
   ret %v8f16 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v8f16.log10
 define %v8f16 @test_v8f16.log10(%v8f16 %a) {
   ; This operation is expanded, whether with or without +fullfp16.
   ; CHECK-LABEL:   test_v8f16.log10:
   ; CHECK-COUNT-8: bl log10
+  ; GISEL-LABEL:   test_v8f16.log10:
+  ; GISEL-COUNT-8: bl log10
   %1 = call %v8f16 @llvm.log10.v8f16(%v8f16 %a)
   ret %v8f16 %1
 }
@@ -404,15 +420,22 @@ define %v2f32 @test_v2f32.exp2(%v2f32 %a) {
   %1 = call %v2f32 @llvm.exp2.v2f32(%v2f32 %a)
   ret %v2f32 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v2f32.log
 ; CHECK: test_v2f32.log:
 define %v2f32 @test_v2f32.log(%v2f32 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v2f32 @llvm.log.v2f32(%v2f32 %a)
   ret %v2f32 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v2f32.log10
 ; CHECK: test_v2f32.log10:
+; GISEL: test_v2f32.log10:
 define %v2f32 @test_v2f32.log10(%v2f32 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v2f32 @llvm.log10.v2f32(%v2f32 %a)
   ret %v2f32 %1
 }
@@ -538,15 +561,21 @@ define %v4f32 @test_v4f32.exp2(%v4f32 %a) {
   %1 = call %v4f32 @llvm.exp2.v4f32(%v4f32 %a)
   ret %v4f32 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v4f32.log
 ; CHECK: test_v4f32.log:
 define %v4f32 @test_v4f32.log(%v4f32 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v4f32 @llvm.log.v4f32(%v4f32 %a)
   ret %v4f32 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v4f32.log10
 ; CHECK: test_v4f32.log10:
 define %v4f32 @test_v4f32.log10(%v4f32 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v4f32 @llvm.log10.v4f32(%v4f32 %a)
   ret %v4f32 %1
 }
@@ -671,15 +700,22 @@ define %v2f64 @test_v2f64.exp2(%v2f64 %a) {
   %1 = call %v2f64 @llvm.exp2.v2f64(%v2f64 %a)
   ret %v2f64 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v2f64.log
 ; CHECK: test_v2f64.log:
 define %v2f64 @test_v2f64.log(%v2f64 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v2f64 @llvm.log.v2f64(%v2f64 %a)
   ret %v2f64 %1
 }
+
+; FALLBACK-NOT: remark{{.*}}test_v2f64.log10
 ; CHECK: test_v2f64.log10:
+; GISEL: test_v2f64.log10:
 define %v2f64 @test_v2f64.log10(%v2f64 %a) {
   ; CHECK: log
+  ; GISEL: log
   %1 = call %v2f64 @llvm.log10.v2f64(%v2f64 %a)
   ret %v2f64 %1
 }
