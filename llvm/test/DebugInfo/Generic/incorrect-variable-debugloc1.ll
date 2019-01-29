@@ -1,9 +1,13 @@
 ; XFAIL: riscv
 ; REQUIRES: object-emission
 
-; RUN: %llc_dwarf -O2  -dwarf-version 2 -filetype=obj < %s | llvm-dwarfdump - | FileCheck %s  --check-prefix=DWARF23
-; RUN: %llc_dwarf -O2  -dwarf-version 3 -filetype=obj < %s | llvm-dwarfdump - | FileCheck %s  --check-prefix=DWARF23
-; RUN: %llc_dwarf -O2  -dwarf-version 4 -filetype=obj < %s | llvm-dwarfdump - | FileCheck %s  --check-prefix=DWARF4
+; RUN: %llc_dwarf -O2  -dwarf-version 2 -filetype=obj < %s | llvm-dwarfdump - 2>&1 | FileCheck %s  --check-prefix=RELOC --check-prefix=DWARF23
+; RUN: %llc_dwarf -O2  -dwarf-version 3 -filetype=obj < %s | llvm-dwarfdump - 2>&1 | FileCheck %s  --check-prefix=RELOC --check-prefix=DWARF23
+; RUN: %llc_dwarf -O2  -dwarf-version 4 -filetype=obj < %s | llvm-dwarfdump - 2>&1 | FileCheck %s  --check-prefix=RELOC --check-prefix=DWARF4
+
+; We don't want to mark this as UNSUPPORTED in RISC-V, but sometimes the output
+; if llvm-dwarfdump reports errors and the test doesn't fail
+; RELOC-NOT: error: failed to compute relocation
 
 ; This is a test for PR21176.
 ; DW_OP_const <const> doesn't describe a constant value, but a value at a constant address.
