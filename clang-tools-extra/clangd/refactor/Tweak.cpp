@@ -14,7 +14,7 @@
 #include <functional>
 #include <memory>
 
-LLVM_INSTANTIATE_REGISTRY(llvm::Registry<clang::clangd::Tweak>);
+LLVM_INSTANTIATE_REGISTRY(llvm::Registry<clang::clangd::Tweak>)
 
 namespace clang {
 namespace clangd {
@@ -67,7 +67,7 @@ llvm::Expected<std::unique_ptr<Tweak>> prepareTweak(TweakID ID,
   if (!T->prepare(S))
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "failed to prepare() a check");
-  return T;
+  return std::move(T);
 }
 
 } // namespace clangd
