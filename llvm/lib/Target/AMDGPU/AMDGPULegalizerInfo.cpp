@@ -237,6 +237,14 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
       [](const LegalityQuery &Query) {
         return std::make_pair(0, LLT::scalar(32));
       })
+    .fewerElementsIf([=, &ST](const LegalityQuery &Query) {
+        unsigned MemSize = Query.MMODescrs[0].SizeInBits;
+        return Query.Types[0].isVector() && (MemSize == 96) &&
+               ST.getGeneration() < AMDGPUSubtarget::SEA_ISLANDS;
+      },
+      [=](const LegalityQuery &Query) {
+        return std::make_pair(0, V2S32);
+      })
     .legalIf([=, &ST](const LegalityQuery &Query) {
         const LLT &Ty0 = Query.Types[0];
 
@@ -312,9 +320,10 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   // be more flexible with the shift amount type.
   auto &Shifts = getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
     .legalFor({{S32, S32}, {S64, S32}});
-  if (ST.has16BitInsts())
+  if (ST.has16BitInsts()) {
     Shifts.legalFor({{S16, S32}, {S16, S16}});
-  else
+    Shifts.clampScalar(0, S16, S64);
+  } else
     Shifts.clampScalar(0, S32, S64);
   Shifts.clampScalar(1, S32, S32);
 
