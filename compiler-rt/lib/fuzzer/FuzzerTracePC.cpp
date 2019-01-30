@@ -23,15 +23,6 @@
 #include "FuzzerValueBitMap.h"
 #include <set>
 
-// The coverage counters and PCs.
-// These are declared as global variables named "__sancov_*" to simplify
-// experiments with inlined instrumentation.
-alignas(64) ATTRIBUTE_INTERFACE
-uint8_t __sancov_trace_pc_guard_8bit_counters[fuzzer::TracePC::kNumPCs];
-
-ATTRIBUTE_INTERFACE
-uintptr_t __sancov_trace_pc_pcs[fuzzer::TracePC::kNumPCs];
-
 // Used by -fsanitize-coverage=stack-depth to track stack depth
 ATTRIBUTES_INTERFACE_TLS_INITIAL_EXEC uintptr_t __sancov_lowest_stack;
 
@@ -39,22 +30,8 @@ namespace fuzzer {
 
 TracePC TPC;
 
-uint8_t *TracePC::Counters() const {
-  return __sancov_trace_pc_guard_8bit_counters;
-}
-
-uintptr_t *TracePC::PCs() const {
-  return __sancov_trace_pc_pcs;
-}
-
 size_t TracePC::GetTotalPCCoverage() {
-  if (ObservedPCs.size())
-    return ObservedPCs.size();
-  size_t Res = 0;
-  for (size_t i = 1, N = GetNumPCs(); i < N; i++)
-    if (PCs()[i])
-      Res++;
-  return Res;
+  return ObservedPCs.size();
 }
 
 
@@ -77,32 +54,7 @@ void TracePC::HandlePCsInit(const uintptr_t *Start, const uintptr_t *Stop) {
   NumPCsInPCTables += E - B;
 }
 
-void TracePC::HandleInit(uint32_t *Start, uint32_t *Stop) {
-  if (Start == Stop || *Start) return;
-  assert(NumModules < sizeof(Modules) / sizeof(Modules[0]));
-  for (uint32_t *P = Start; P < Stop; P++) {
-    NumGuards++;
-    if (NumGuards == kNumPCs) {
-      RawPrint(
-          "WARNING: The binary has too many instrumented PCs.\n"
-          "         You may want to reduce the size of the binary\n"
-          "         for more efficient fuzzing and precise coverage data\n");
-    }
-    *P = NumGuards % kNumPCs;
-  }
-  Modules[NumModules].Start = Start;
-  Modules[NumModules].Stop = Stop;
-  NumModules++;
-}
-
 void TracePC::PrintModuleInfo() {
-  if (NumGuards) {
-    Printf("INFO: Loaded %zd modules   (%zd guards): ", NumModules, NumGuards);
-    for (size_t i = 0; i < NumModules; i++)
-      Printf("%zd [%p, %p), ", Modules[i].Stop - Modules[i].Start,
-             Modules[i].Start, Modules[i].Stop);
-    Printf("\n");
-  }
   if (NumModulesWithInline8bitCounters) {
     Printf("INFO: Loaded %zd modules   (%zd inline 8-bit counters): ",
            NumModulesWithInline8bitCounters, NumInline8bitCounters);
@@ -120,8 +72,7 @@ void TracePC::PrintModuleInfo() {
     }
     Printf("\n");
 
-    if ((NumGuards && NumGuards != NumPCsInPCTables) ||
-        (NumInline8bitCounters && NumInline8bitCounters != NumPCsInPCTables)) {
+    if (NumInline8bitCounters && NumInline8bitCounters != NumPCsInPCTables) {
       Printf("ERROR: The size of coverage PC tables does not match the\n"
              "number of instrumented PCs. This might be a compiler bug,\n"
              "please contact the libFuzzer developers.\n"
@@ -198,17 +149,6 @@ void TracePC::UpdateObservedPCs() {
                (size_t)(ModulePCTable[i].Stop - ModulePCTable[i].Start));
         for (size_t j = 0; j < Size; j++)
           if (Beg[j])
-            Observe(ModulePCTable[i].Start[j]);
-      }
-    } else if (NumGuards == NumPCsInPCTables) {
-      size_t GuardIdx = 1;
-      for (size_t i = 0; i < NumModules; i++) {
-        uint32_t *Beg = Modules[i].Start;
-        size_t Size = Modules[i].Stop - Beg;
-        assert(Size ==
-               (size_t)(ModulePCTable[i].Stop - ModulePCTable[i].Start));
-        for (size_t j = 0; j < Size; j++, GuardIdx++)
-          if (Counters()[GuardIdx])
             Observe(ModulePCTable[i].Start[j]);
       }
     }
@@ -322,15 +262,6 @@ void TracePC::PrintCoverage() {
   IterateCoveredFunctions(CoveredFunctionCallback);
 }
 
-void TracePC::DumpCoverage() {
-  if (EF->__sanitizer_dump_coverage) {
-    Vector<uintptr_t> PCsCopy(GetNumPCs());
-    for (size_t i = 0; i < GetNumPCs(); i++)
-      PCsCopy[i] = PCs()[i] ? GetPreviousInstructionPc(PCs()[i]) : 0;
-    EF->__sanitizer_dump_coverage(PCsCopy.data(), PCsCopy.size());
-  }
-}
-
 // Value profile.
 // We keep track of various values that affect control flow.
 // These values are inserted into a bit-set-based hash map.
@@ -416,16 +347,20 @@ uintptr_t TracePC::GetMaxStackOffset() const {
   return InitialStack - __sancov_lowest_stack;  // Stack grows down
 }
 
+void WarnAboutDeprecatedInstrumentation(const char *flag) {
+  Printf("libFuzzer does not support %s any more.\n"
+         "Please either migrate to a compiler that supports -fsanitize=fuzzer\n"
+         "or use an older version of libFuzzer\n", flag);
+  exit(1);
+}
+
 } // namespace fuzzer
 
 extern "C" {
 ATTRIBUTE_INTERFACE
 ATTRIBUTE_NO_SANITIZE_ALL
 void __sanitizer_cov_trace_pc_guard(uint32_t *Guard) {
-  uintptr_t PC = reinterpret_cast<uintptr_t>(GET_CALLER_PC());
-  uint32_t Idx = *Guard;
-  __sancov_trace_pc_pcs[Idx] = PC;
-  __sancov_trace_pc_guard_8bit_counters[Idx]++;
+  fuzzer::WarnAboutDeprecatedInstrumentation("-fsanitize-coverage=trace-pc");
 }
 
 // Best-effort support for -fsanitize-coverage=trace-pc, which is available
@@ -433,15 +368,14 @@ void __sanitizer_cov_trace_pc_guard(uint32_t *Guard) {
 ATTRIBUTE_INTERFACE
 ATTRIBUTE_NO_SANITIZE_ALL
 void __sanitizer_cov_trace_pc() {
-  uintptr_t PC = reinterpret_cast<uintptr_t>(GET_CALLER_PC());
-  uintptr_t Idx = PC & (((uintptr_t)1 << fuzzer::TracePC::kTracePcBits) - 1);
-  __sancov_trace_pc_pcs[Idx] = PC;
-  __sancov_trace_pc_guard_8bit_counters[Idx]++;
+  fuzzer::WarnAboutDeprecatedInstrumentation(
+      "-fsanitize-coverage=trace-pc-guard");
 }
 
 ATTRIBUTE_INTERFACE
 void __sanitizer_cov_trace_pc_guard_init(uint32_t *Start, uint32_t *Stop) {
-  fuzzer::TPC.HandleInit(Start, Stop);
+  fuzzer::WarnAboutDeprecatedInstrumentation(
+      "-fsanitize-coverage=trace-pc-guard");
 }
 
 ATTRIBUTE_INTERFACE
