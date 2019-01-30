@@ -40,6 +40,32 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
       for (const Expr *Ref : C->varlists())
           Data.FirstprivateVars.push_back(Ref);
   }
+  for (const auto *C : S.getClausesOfKind<OSSDependClause>()) {
+    ArrayRef<OmpSsDependClauseKind> DepKinds = C->getDependencyKind();
+    if (DepKinds.size() == 2) {
+      for (const Expr *Ref : C->varlists()) {
+        if (DepKinds[0] == OSSC_DEPEND_in
+            || DepKinds[1] == OSSC_DEPEND_in)
+          Data.DependWeakIn.push_back(Ref);
+        if (DepKinds[0] == OSSC_DEPEND_out
+            || DepKinds[1] == OSSC_DEPEND_out)
+          Data.DependWeakOut.push_back(Ref);
+        if (DepKinds[0] == OSSC_DEPEND_inout
+            || DepKinds[1] == OSSC_DEPEND_inout)
+          Data.DependWeakInout.push_back(Ref);
+      }
+    }
+    else {
+      for (const Expr *Ref : C->varlists()) {
+        if (DepKinds[0] == OSSC_DEPEND_in)
+          Data.DependIn.push_back(Ref);
+        if (DepKinds[0] == OSSC_DEPEND_out)
+          Data.DependOut.push_back(Ref);
+        if (DepKinds[0] == OSSC_DEPEND_inout)
+          Data.DependInout.push_back(Ref);
+      }
+    }
+  }
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }

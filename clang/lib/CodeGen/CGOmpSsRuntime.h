@@ -36,6 +36,12 @@ struct OSSTaskDataTy final {
   SmallVector<const Expr *, 4> SharedVars;
   SmallVector<const Expr *, 4> PrivateVars;
   SmallVector<const Expr *, 4> FirstprivateVars;
+  SmallVector<const Expr *, 4> DependWeakIn;
+  SmallVector<const Expr *, 4> DependWeakOut;
+  SmallVector<const Expr *, 4> DependWeakInout;
+  SmallVector<const Expr *, 4> DependIn;
+  SmallVector<const Expr *, 4> DependOut;
+  SmallVector<const Expr *, 4> DependInout;
 };
 
 class CGOmpSsRuntime {
