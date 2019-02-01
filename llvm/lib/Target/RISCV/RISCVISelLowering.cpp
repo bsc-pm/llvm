@@ -137,12 +137,8 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
       setOperationAction(Op, MVT::f32, Expand);
   }
 
-  if (Subtarget.hasStdExtF() && Subtarget.is64Bit()) {
-    setTargetDAGCombine(ISD::BITCAST);
-    setTargetDAGCombine(ISD::ANY_EXTEND);
-    setTargetDAGCombine(ISD::SIGN_EXTEND);
-    setTargetDAGCombine(ISD::ZERO_EXTEND);
-  }
+  if (Subtarget.hasStdExtF() && Subtarget.is64Bit())
+    setOperationAction(ISD::BITCAST, MVT::i32, Custom);
 
   if (Subtarget.hasStdExtD()) {
     setOperationAction(ISD::FMINNUM, MVT::f64, Legal);
@@ -368,6 +364,17 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return lowerFRAMEADDR(Op, DAG);
   case ISD::RETURNADDR:
     return lowerRETURNADDR(Op, DAG);
+  case ISD::BITCAST: {
+    assert(Subtarget.is64Bit() && Subtarget.hasStdExtF() &&
+           "Unexpected custom legalisation");
+    SDLoc DL(Op);
+    SDValue Op0 = Op.getOperand(0);
+    if (Op.getValueType() != MVT::f32 || Op0.getValueType() != MVT::i32)
+      return SDValue();
+    SDValue NewOp0 = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op0);
+    SDValue FPConv = DAG.getNode(RISCVISD::FMV_W_X_RV64, DL, MVT::f32, NewOp0);
+    return FPConv;
+  }
   }
 }
 
@@ -706,12 +713,19 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
       return;
     Results.push_back(customLegalizeToWOp(N, DAG));
     break;
+  case ISD::BITCAST: {
+    assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
+           Subtarget.hasStdExtF() && "Unexpected custom legalisation");
+    SDLoc DL(N);
+    SDValue Op0 = N->getOperand(0);
+    if (Op0.getValueType() != MVT::f32)
+      return;
+    SDValue FPConv =
+        DAG.getNode(RISCVISD::FMV_X_ANYEXTW_RV64, DL, MVT::i64, Op0);
+    Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, FPConv));
+    break;
   }
-}
-
-static bool isF32ToI32Bitcast(SDValue Val) {
-  return Val.getOpcode() == ISD::BITCAST && Val.getValueType() == MVT::i32 &&
-         Val.getOperand(0).getValueType() == MVT::f32;
+  }
 }
 
 SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
@@ -721,40 +735,6 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
   switch (N->getOpcode()) {
   default:
     break;
-  case ISD::ANY_EXTEND:
-  case ISD::SIGN_EXTEND: {
-    SDValue Src = N->getOperand(0);
-    if (Subtarget.hasStdExtF() && isF32ToI32Bitcast(Src)) {
-      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
-      return DCI.CombineTo(N,
-                           DAG.getNode(RISCVISD::BitcastAndSextF32ToI64,
-                                       SDLoc(N), MVT::i64, Src.getOperand(0)));
-    }
-    break;
-  }
-  case ISD::ZERO_EXTEND: {
-    SDValue Op0 = N->getOperand(0);
-    if (Subtarget.hasStdExtF() && isF32ToI32Bitcast(Op0)) {
-      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
-      SDValue FPConv = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, SDLoc(N),
-                                   MVT::i64, Op0.getOperand(0));
-      SDValue ZExt = DAG.getZeroExtendInReg(FPConv, SDLoc(N), MVT::i32);
-      return DCI.CombineTo(N, ZExt);
-    }
-    break;
-  }
-  case ISD::BITCAST: {
-    SDValue Op0 = N->getOperand(0);
-    if (Subtarget.hasStdExtF() && N->getValueType(0) == MVT::f32 &&
-        Op0.getOpcode() == ISD::TRUNCATE && Op0.getValueType() == MVT::i32 &&
-        Op0.getOperand(0).getValueType() == MVT::i64) {
-      assert(Subtarget.is64Bit() && "RV64-only codepath unexpectedly reached");
-      SDValue FPConv = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, SDLoc(N),
-                                   MVT::f32, Op0.getOperand(0));
-      return DCI.CombineTo(N, FPConv);
-    }
-    break;
-  }
   case RISCVISD::SplitF64: {
     SDValue Op0 = N->getOperand(0);
     // If the input to SplitF64 is just BuildPairF64 then the operation is
@@ -786,16 +766,6 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
                                 DAG.getConstant(~SignBit, DL, MVT::i32));
     return DCI.CombineTo(N, Lo, NewHi);
   }
-  case RISCVISD::BitcastAndSextF32ToI64: {
-    // If the input to BitcastAndSextF32ToI64 is just TruncAndBitcastI64ToF32
-    // then the operation is redundnat. Instead, use TruncAndBitcastI64ToF32
-    // operand directly.
-    assert(Subtarget.hasStdExtF() && "This node should not have been emitted");
-    SDValue Op0 = N->getOperand(0);
-    if (Op0->getOpcode() != RISCVISD::TruncAndBitcastI64ToF32)
-      break;
-    return DCI.CombineTo(N, Op0.getOperand(0));
-  }
   case RISCVISD::SLLW:
   case RISCVISD::SRAW:
   case RISCVISD::SRLW: {
@@ -808,6 +778,38 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
         (SimplifyDemandedBits(N->getOperand(1), RHSMask, DCI)))
       return SDValue();
     break;
+  }
+  case RISCVISD::FMV_X_ANYEXTW_RV64: {
+    SDLoc DL(N);
+    SDValue Op0 = N->getOperand(0);
+    // If the input to FMV_X_ANYEXTW_RV64 is just FMV_W_X_RV64 then the
+    // conversion is unnecessary and can be replaced with an ANY_EXTEND
+    // of the FMV_W_X_RV64 operand.
+    if (Op0->getOpcode() == RISCVISD::FMV_W_X_RV64) {
+      SDValue AExtOp =
+          DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op0.getOperand(0));
+      return DCI.CombineTo(N, AExtOp);
+    }
+
+    // This is a target-specific version of a DAGCombine performed in
+    // DAGCombiner::visitBITCAST. It performs the equivalent of:
+    // fold (bitconvert (fneg x)) -> (xor (bitconvert x), signbit)
+    // fold (bitconvert (fabs x)) -> (and (bitconvert x), (not signbit))
+    if (!(Op0.getOpcode() == ISD::FNEG || Op0.getOpcode() == ISD::FABS) ||
+        !Op0.getNode()->hasOneUse())
+      break;
+    SDValue NewFMV = DAG.getNode(RISCVISD::FMV_X_ANYEXTW_RV64, DL, MVT::i64,
+                                 Op0.getOperand(0));
+    APInt SignBit = APInt::getSignMask(32).sext(64);
+    if (Op0.getOpcode() == ISD::FNEG) {
+      return DCI.CombineTo(N,
+                           DAG.getNode(ISD::XOR, DL, MVT::i64, NewFMV,
+                                       DAG.getConstant(SignBit, DL, MVT::i64)));
+    }
+    assert(Op0.getOpcode() == ISD::FABS);
+    return DCI.CombineTo(N,
+                         DAG.getNode(ISD::AND, DL, MVT::i64, NewFMV,
+                                     DAG.getConstant(~SignBit, DL, MVT::i64)));
   }
   }
 
@@ -1270,11 +1272,8 @@ static SDValue convertLocVTToValVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
-    const RISCVSubtarget &Subtarget =
-        static_cast<const RISCVSubtarget&>(DAG.getSubtarget());
-    if (Subtarget.hasStdExtF() && VA.getLocVT() == MVT::i64 &&
-        VA.getValVT() == MVT::f32) {
-      Val = DAG.getNode(RISCVISD::TruncAndBitcastI64ToF32, DL, MVT::f32, Val);
+    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+      Val = DAG.getNode(RISCVISD::FMV_W_X_RV64, DL, MVT::f32, Val);
       break;
     }
     Val = DAG.getNode(ISD::BITCAST, DL, VA.getValVT(), Val);
@@ -1312,11 +1311,8 @@ static SDValue convertValVTToLocVT(SelectionDAG &DAG, SDValue Val,
   case CCValAssign::Full:
     break;
   case CCValAssign::BCvt:
-    const RISCVSubtarget &Subtarget =
-        static_cast<const RISCVSubtarget &>(DAG.getSubtarget());
-    if (Subtarget.hasStdExtF() && VA.getLocVT() == MVT::i64 &&
-        VA.getValVT() == MVT::f32) {
-      Val = DAG.getNode(RISCVISD::BitcastAndSextF32ToI64, DL, MVT::i64, Val);
+    if (VA.getLocVT() == MVT::i64 && VA.getValVT() == MVT::f32) {
+      Val = DAG.getNode(RISCVISD::FMV_X_ANYEXTW_RV64, DL, MVT::i64, Val);
       break;
     }
     Val = DAG.getNode(ISD::BITCAST, DL, LocVT, Val);
@@ -1996,10 +1992,6 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::CALL";
   case RISCVISD::SELECT_CC:
     return "RISCVISD::SELECT_CC";
-  case RISCVISD::TruncAndBitcastI64ToF32:
-    return "RISCVISD::TruncAndBitcastI64ToF32";
-  case RISCVISD::BitcastAndSextF32ToI64:
-    return "RISCVISD::BitcastAndSextF32ToI64";
   case RISCVISD::BuildPairF64:
     return "RISCVISD::BuildPairF64";
   case RISCVISD::SplitF64:
@@ -2018,6 +2010,10 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::DIVUW";
   case RISCVISD::REMUW:
     return "RISCVISD::REMUW";
+  case RISCVISD::FMV_W_X_RV64:
+    return "RISCVISD::FMV_W_X_RV64";
+  case RISCVISD::FMV_X_ANYEXTW_RV64:
+    return "RISCVISD::FMV_X_ANYEXTW_RV64";
   case RISCVISD::WRAPPER_PIC:
     return "RISCVISD::WRAPPER_PIC";
   case RISCVISD::WRAPPER_TLS_IE:

@@ -355,9 +355,9 @@ define float @fabs_f32(float %a) nounwind {
 ;
 ; RV64IF-LABEL: fabs_f32:
 ; RV64IF:       # %bb.0:
-; RV64IF-NEXT:    fmv.w.x ft0, a0
-; RV64IF-NEXT:    fabs.s ft0, ft0
-; RV64IF-NEXT:    fmv.x.w a0, ft0
+; RV64IF-NEXT:    lui a1, 524288
+; RV64IF-NEXT:    addiw a1, a1, -1
+; RV64IF-NEXT:    and a0, a0, a1
 ; RV64IF-NEXT:    ret
   %1 = call float @llvm.fabs.f32(float %a)
   ret float %1
