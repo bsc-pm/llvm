@@ -55,19 +55,17 @@ void RISCVTargetELFStreamer::emitDirectiveOptionRelax() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoRelax() {}
 
 void RISCVELFStreamer::EmitInstruction(const MCInst &Inst,
-                                       const MCSubtargetInfo &STI,
-                                       bool PrintSchedInfo) {
+                                       const MCSubtargetInfo &STI) {
   // Lower pseudo-instructions that we can't lower any later
   // because they require labels.
-  if (EmitPseudoInstruction(Inst, STI, PrintSchedInfo))
+  if (EmitPseudoInstruction(Inst, STI))
     return;
 
-  MCELFStreamer::EmitInstruction(Inst, STI, PrintSchedInfo);
+  MCELFStreamer::EmitInstruction(Inst, STI);
 }
 
 bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
-                                             const MCSubtargetInfo &STI,
-                                             bool PrintSchedInfo) {
+                                             const MCSubtargetInfo &STI) {
   switch (Inst.getOpcode()) {
   default:
     return false;
@@ -88,7 +86,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI, PrintSchedInfo);
+    EmitInstruction(AUIPC, STI);
 
     const MCExpr *RefToLinkTmpLabel =
         RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
@@ -98,7 +96,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Addi, STI, PrintSchedInfo);
+    EmitInstruction(Addi, STI);
     break;
   }
   case RISCV::PseudoLA: {
@@ -118,7 +116,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI, PrintSchedInfo);
+    EmitInstruction(AUIPC, STI);
 
     const MCExpr *RefToLinkTmpLabel =
         RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
@@ -130,7 +128,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Load, STI, PrintSchedInfo);
+    EmitInstruction(Load, STI);
     break;
   }
   case RISCV::PseudoLATLSIE: {
@@ -151,7 +149,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI, PrintSchedInfo);
+    EmitInstruction(AUIPC, STI);
 
     const MCExpr *RefToLinkTmpLabel =
         RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
@@ -163,7 +161,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Load, STI, PrintSchedInfo);
+    EmitInstruction(Load, STI);
     break;
   }
   case RISCV::PseudoLATLSGD: {
@@ -184,7 +182,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI, PrintSchedInfo);
+    EmitInstruction(AUIPC, STI);
 
     const MCExpr *RefToLinkTmpLabel =
         RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
@@ -194,7 +192,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                       .addOperand(DestReg)
                       .addOperand(DestReg)
                       .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Addi, STI, PrintSchedInfo);
+    EmitInstruction(Addi, STI);
     break;
   }
   }

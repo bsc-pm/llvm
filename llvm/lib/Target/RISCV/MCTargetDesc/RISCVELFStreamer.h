@@ -32,14 +32,12 @@ public:
 
 class RISCVELFStreamer : public MCELFStreamer {
 private:
-  bool EmitPseudoInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
-                             bool PrintSchedInfo);
+  bool EmitPseudoInstruction(const MCInst &Inst, const MCSubtargetInfo &STI);
 
 public:
   using MCELFStreamer::MCELFStreamer;
 
-  void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
-                       bool PrintSchedInfo) override;
+  void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI) override;
 };
 }
 #endif
