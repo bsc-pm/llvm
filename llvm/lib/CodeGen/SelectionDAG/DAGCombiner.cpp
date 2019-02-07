@@ -7444,6 +7444,9 @@ SDValue DAGCombiner::visitSELECT(SDNode *N) {
       if (normalizeToSequence || !InnerSelect.use_empty())
         return DAG.getNode(ISD::SELECT, DL, N1.getValueType(), Cond0,
                            InnerSelect, N2);
+      // Cleanup on failure.
+      if (InnerSelect.use_empty())
+        recursivelyDeleteUnusedNodes(InnerSelect.getNode());
     }
     // select (or Cond0, Cond1), X, Y -> select Cond0, X, (select Cond1, X, Y)
     if (N0->getOpcode() == ISD::OR && N0->hasOneUse()) {
@@ -7454,6 +7457,9 @@ SDValue DAGCombiner::visitSELECT(SDNode *N) {
       if (normalizeToSequence || !InnerSelect.use_empty())
         return DAG.getNode(ISD::SELECT, DL, N1.getValueType(), Cond0, N1,
                            InnerSelect);
+      // Cleanup on failure.
+      if (InnerSelect.use_empty())
+        recursivelyDeleteUnusedNodes(InnerSelect.getNode());
     }
 
     // select Cond0, (select Cond1, X, Y), Y -> select (and Cond0, Cond1), X, Y
@@ -13123,30 +13129,42 @@ SDValue DAGCombiner::ForwardStoreValueToDirectLoad(LoadSDNode *LD) {
   if (LD->getBasePtr().isUndef() || Offset != 0)
     return SDValue();
   // Model necessary truncations / extenstions.
-  SDValue Val;
+  SmallVector<SDNode *, 4> Vals; // Temporaries which may need to be deleted.
+  SDValue Val, RV;
   // Truncate Value To Stored Memory Size.
   do {
     if (!getTruncatedStoreValue(ST, Val))
       continue;
+    if (Vals.empty() || Vals.back() != Val.getNode())
+      Vals.push_back(Val.getNode());
     if (!isTypeLegal(LDMemType))
       continue;
     if (STMemType != LDMemType) {
       // TODO: Support vectors? This requires extract_subvector/bitcast.
       if (!STMemType.isVector() && !LDMemType.isVector() &&
-          STMemType.isInteger() && LDMemType.isInteger())
+          STMemType.isInteger() && LDMemType.isInteger()) {
+        Vals.push_back(Val.getNode());
         Val = DAG.getNode(ISD::TRUNCATE, SDLoc(LD), LDMemType, Val);
-      else
+      } else
         continue;
     }
-    if (!extendLoadedValueToExtension(LD, Val))
-      continue;
-    return ReplaceLd(LD, Val, Chain);
+    if (Vals.empty() || Vals.back() != Val.getNode())
+      Vals.push_back(Val.getNode());
+    if (extendLoadedValueToExtension(LD, Val))
+      RV = ReplaceLd(LD, Val, Chain);
+    else if (Vals.empty() || Vals.back() != Val.getNode())
+      Vals.push_back(Val.getNode());
   } while (false);
 
   // On failure, cleanup dead nodes we may have created.
-  if (Val->use_empty())
-    deleteAndRecombine(Val.getNode());
-  return SDValue();
+  if (Vals.empty() || Vals.back() != Val.getNode())
+    Vals.push_back(Val.getNode());
+  while (!Vals.empty()) {
+    SDNode *Val = Vals.pop_back_val();
+    if (Val->use_empty())
+      recursivelyDeleteUnusedNodes(Val);
+  }
+  return RV;
 }
 
 SDValue DAGCombiner::visitLOAD(SDNode *N) {
@@ -18642,14 +18660,21 @@ SDValue DAGCombiner::SimplifySelectCC(const SDLoc &DL, SDValue N0, SDValue N1,
   auto *N3C = dyn_cast<ConstantSDNode>(N3.getNode());
 
   // Determine if the condition we're dealing with is constant.
-  SDValue SCC = SimplifySetCC(getSetCCResultType(CmpOpVT), N0, N1, CC, DL,
-                              false);
-  if (SCC.getNode()) AddToWorklist(SCC.getNode());
-
-  if (auto *SCCC = dyn_cast_or_null<ConstantSDNode>(SCC.getNode())) {
-    // fold select_cc true, x, y -> x
-    // fold select_cc false, x, y -> y
-    return !SCCC->isNullValue() ? N2 : N3;
+  if (SDValue SCC =
+          SimplifySetCC(getSetCCResultType(CmpOpVT), N0, N1, CC, DL, false)) {
+    AddToWorklist(SCC.getNode());
+    if (auto *SCCC = dyn_cast<ConstantSDNode>(SCC.getNode())) {
+      // fold select_cc true, x, y -> x
+      // fold select_cc false, x, y -> y
+      bool isNull = SCCC->isNullValue();
+      SDValue RV = isNull ? N3 : N2;
+      // Delete SCC if we don't use it.
+      if (SCCC != RV.getNode())
+        recursivelyDeleteUnusedNodes(SCCC);
+      return RV;
+    }
+    // Don't combine. Cleanup SCC.
+    recursivelyDeleteUnusedNodes(SCC.getNode());
   }
 
   if (SDValue V =
