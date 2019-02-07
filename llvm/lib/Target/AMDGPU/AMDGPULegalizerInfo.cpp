@@ -403,11 +403,16 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   auto &Shifts = getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
     .legalFor({{S32, S32}, {S64, S32}});
   if (ST.has16BitInsts()) {
-    Shifts.legalFor({{S16, S32}, {S16, S16}});
+    if (ST.hasVOP3PInsts()) {
+      Shifts.legalFor({{S16, S32}, {S16, S16}, {V2S16, V2S16}})
+            .clampMaxNumElements(0, S16, 2);
+    } else
+      Shifts.legalFor({{S16, S32}, {S16, S16}});
     Shifts.clampScalar(0, S16, S64);
   } else
     Shifts.clampScalar(0, S32, S64);
-  Shifts.clampScalar(1, S32, S32);
+  Shifts.clampScalar(1, S32, S32)
+        .scalarize(0);
 
   for (unsigned Op : {G_EXTRACT_VECTOR_ELT, G_INSERT_VECTOR_ELT}) {
     unsigned VecTypeIdx = Op == G_EXTRACT_VECTOR_ELT ? 1 : 0;
@@ -435,29 +440,18 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   // FIXME: Doesn't handle extract of illegal sizes.
   getActionDefinitionsBuilder({G_EXTRACT, G_INSERT})
-    .legalIf([=](const LegalityQuery &Query) {
+      .legalIf([=](const LegalityQuery &Query) {
         const LLT &Ty0 = Query.Types[0];
         const LLT &Ty1 = Query.Types[1];
         return (Ty0.getSizeInBits() % 16 == 0) &&
                (Ty1.getSizeInBits() % 16 == 0);
       })
-    .widenScalarIf(
-      [=](const LegalityQuery &Query) {
-        const LLT &Ty1 = Query.Types[1];
-        return (Ty1.getScalarSizeInBits() < 16);
-      },
-      // TODO Use generic LegalizeMutation
-      [](const LegalityQuery &Query) {
-        LLT Ty1 = Query.Types[1];
-        unsigned NewEltSizeInBits =
-          std::max(1 << Log2_32_Ceil(Ty1.getScalarSizeInBits()), 16);
-        if (Ty1.isVector()) {
-          return std::make_pair(1, LLT::vector(Ty1.getNumElements(),
-                                               NewEltSizeInBits));
-        }
-
-        return std::make_pair(1, LLT::scalar(NewEltSizeInBits));
-      });
+      .widenScalarIf(
+          [=](const LegalityQuery &Query) {
+            const LLT Ty1 = Query.Types[1];
+            return (Ty1.getScalarSizeInBits() < 16);
+          },
+          LegalizeMutations::widenScalarOrEltToNextPow2(1, 16));
 
   // TODO: vectors of pointers
   getActionDefinitionsBuilder(G_BUILD_VECTOR)
