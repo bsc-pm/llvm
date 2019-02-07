@@ -25,6 +25,16 @@ using namespace LegalizeActions;
 using namespace LegalizeMutations;
 using namespace LegalityPredicates;
 
+
+static LegalityPredicate isMultiple32(unsigned TypeIdx,
+                                      unsigned MaxSize = 512) {
+  return [=](const LegalityQuery &Query) {
+    const LLT Ty = Query.Types[TypeIdx];
+    const LLT EltTy = Ty.getScalarType();
+    return Ty.getSizeInBits() <= MaxSize && EltTy.getSizeInBits() % 32 == 0;
+  };
+}
+
 AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
                                          const GCNTargetMachine &TM) {
   using namespace TargetOpcode;
@@ -121,15 +131,12 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   getActionDefinitionsBuilder(G_FCONSTANT)
     .legalFor({S32, S64, S16});
 
-  // G_IMPLICIT_DEF is a no-op so we can make it legal for any value type that
-  // can fit in a register.
-  // FIXME: We need to legalize several more operations before we can add
-  // a test case for size > 512.
   getActionDefinitionsBuilder(G_IMPLICIT_DEF)
-    .legalIf([=](const LegalityQuery &Query) {
-        return Query.Types[0].getSizeInBits() <= 512;
-    })
-    .clampScalar(0, S1, S512);
+    .legalFor({S1, S32, S64, V2S32, V4S32, V2S16, V4S16, GlobalPtr,
+               ConstantPtr, LocalPtr, FlatPtr, PrivatePtr})
+    .legalFor({LLT::vector(3, 16)})// FIXME: Hack
+    .clampScalarOrElt(0, S32, S512)
+    .legalIf(isMultiple32(0));
 
 
   // FIXME: i1 operands to intrinsics should always be legal, but other i1
@@ -144,10 +151,34 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   setAction({G_FRAME_INDEX, PrivatePtr}, Legal);
 
-  getActionDefinitionsBuilder({G_FADD, G_FMUL, G_FNEG, G_FABS, G_FMA})
+  auto &FPOpActions = getActionDefinitionsBuilder(
+    { G_FADD, G_FMUL, G_FNEG, G_FABS, G_FMA})
+    .legalFor({S32, S64});
+
+  if (ST.has16BitInsts()) {
+    if (ST.hasVOP3PInsts())
+      FPOpActions.legalFor({S16, V2S16});
+    else
+      FPOpActions.legalFor({S16});
+  }
+
+  if (ST.hasVOP3PInsts())
+    FPOpActions.clampMaxNumElements(0, S16, 2);
+  FPOpActions
+    .scalarize(0)
+    .clampScalar(0, ST.has16BitInsts() ? S16 : S32, S64);
+
+  if (ST.has16BitInsts()) {
+    getActionDefinitionsBuilder(G_FSQRT)
+      .legalFor({S32, S64, S16})
+      .scalarize(0)
+      .clampScalar(0, S16, S64);
+  } else {
+    getActionDefinitionsBuilder(G_FSQRT)
       .legalFor({S32, S64})
       .scalarize(0)
       .clampScalar(0, S32, S64);
+  }
 
   getActionDefinitionsBuilder(G_FPTRUNC)
     .legalFor({{S32, S64}, {S16, S32}})
@@ -403,11 +434,22 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
   auto &Shifts = getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
     .legalFor({{S32, S32}, {S64, S32}});
   if (ST.has16BitInsts()) {
-    Shifts.legalFor({{S16, S32}, {S16, S16}});
+    if (ST.hasVOP3PInsts()) {
+      Shifts.legalFor({{S16, S32}, {S16, S16}, {V2S16, V2S16}})
+            .clampMaxNumElements(0, S16, 2);
+    } else
+      Shifts.legalFor({{S16, S32}, {S16, S16}});
+
+    Shifts.clampScalar(1, S16, S32);
     Shifts.clampScalar(0, S16, S64);
-  } else
+  } else {
+    // Make sure we legalize the shift amount type first, as the general
+    // expansion for the shifted type will produce much worse code if it hasn't
+    // been truncated already.
+    Shifts.clampScalar(1, S32, S32);
     Shifts.clampScalar(0, S32, S64);
-  Shifts.clampScalar(1, S32, S32);
+  }
+  Shifts.scalarize(0);
 
   for (unsigned Op : {G_EXTRACT_VECTOR_ELT, G_INSERT_VECTOR_ELT}) {
     unsigned VecTypeIdx = Op == G_EXTRACT_VECTOR_ELT ? 1 : 0;
