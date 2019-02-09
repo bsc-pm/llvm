@@ -63,16 +63,17 @@ struct Merger {
   bool Parse(std::istream &IS, bool ParseCoverage);
   bool Parse(const std::string &Str, bool ParseCoverage);
   void ParseOrExit(std::istream &IS, bool ParseCoverage);
-  void PrintSummary(std::ostream &OS);
-  Set<uint32_t> ParseSummary(std::istream &IS);
   size_t Merge(const Set<uint32_t> &InitialFeatures,
                Vector<std::string> *NewFiles);
-  size_t Merge(Vector<std::string> *NewFiles) {
-    return Merge(Set<uint32_t>{}, NewFiles);
-  }
   size_t ApproximateMemoryConsumption() const;
   Set<uint32_t> AllFeatures() const;
 };
+
+Vector<std::string>
+CrashResistantMerge(const Vector<std::string> &Args,
+                    const Vector<SizedFile> &OldCorpus,
+                    const Vector<SizedFile> &NewCorpus,
+                    const std::string &CFPath);
 
 }  // namespace fuzzer
 
