@@ -23,8 +23,8 @@ body:             |
     ; frequently modifying generic opcodes, we could just regex
     ; the opcodes in the following lines instead of checking for
     ; specific opcode numbers.
-    ; CHECK: CSEInfo::CSE Hit for Opc 82 : 1
-    ; CHECK: CSEInfo::CSE Hit for Opc 41 : 1
+    ; CHECK: CSEInfo::CSE Hit for Opc 42 : 1
+    ; CHECK: CSEInfo::CSE Hit for Opc 84 : 1
     ; CHECK: CSEInfo::CSE Hit for Opc 83 : 1
     %0:_(s64) = COPY $x0
     %1:_(s8) = G_TRUNC %0(s64)
