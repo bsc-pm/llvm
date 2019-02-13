@@ -12,15 +12,11 @@
 #include "gtest/gtest-spi.h"
 #include "gtest/gtest.h"
 
+#include <array>
+
 using namespace llvm;
 
 namespace {
-
-static_assert(llvm::is_trivially_copyable<Optional<int>>::value,
-              "trivially copyable");
-
-static_assert(llvm::is_trivially_copyable<Optional<std::array<int, 3>>>::value,
-              "trivially copyable");
 
 struct NonDefaultConstructible {
   static unsigned CopyConstructions;
@@ -48,10 +44,6 @@ struct NonDefaultConstructible {
 unsigned NonDefaultConstructible::CopyConstructions = 0;
 unsigned NonDefaultConstructible::Destructions = 0;
 unsigned NonDefaultConstructible::CopyAssignments = 0;
-
-static_assert(
-    !llvm::is_trivially_copyable<Optional<NonDefaultConstructible>>::value,
-    "not trivially copyable");
 
 // Test fixture
 class OptionalTest : public testing::Test {
@@ -211,10 +203,6 @@ struct MultiArgConstructor {
 };
 unsigned MultiArgConstructor::Destructions = 0;
 
-static_assert(
-    !llvm::is_trivially_copyable<Optional<MultiArgConstructor>>::value,
-    "not trivially copyable");
-
 TEST_F(OptionalTest, Emplace) {
   MultiArgConstructor::ResetCounts();
   Optional<MultiArgConstructor> A;
@@ -261,9 +249,6 @@ struct MoveOnly {
 unsigned MoveOnly::MoveConstructions = 0;
 unsigned MoveOnly::Destructions = 0;
 unsigned MoveOnly::MoveAssignments = 0;
-
-static_assert(!llvm::is_trivially_copyable<Optional<MoveOnly>>::value,
-              "not trivially copyable");
 
 TEST_F(OptionalTest, MoveOnlyNull) {
   MoveOnly::ResetCounts();
@@ -365,9 +350,6 @@ private:
 
 unsigned Immovable::Constructions = 0;
 unsigned Immovable::Destructions = 0;
-
-static_assert(!llvm::is_trivially_copyable<Optional<Immovable>>::value,
-              "not trivially copyable");
 
 TEST_F(OptionalTest, ImmovableEmplace) {
   Optional<Immovable> A;
