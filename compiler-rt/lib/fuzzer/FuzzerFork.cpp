@@ -13,6 +13,7 @@
 #include "FuzzerIO.h"
 #include "FuzzerMerge.h"
 #include "FuzzerSHA1.h"
+#include "FuzzerTracePC.h"
 #include "FuzzerUtil.h"
 
 #include <atomic>
@@ -72,7 +73,7 @@ struct GlobalEnv {
   Vector<std::string> CorpusDirs;
   std::string MainCorpusDir;
   std::string TempDir;
-  Set<uint32_t> Features;
+  Set<uint32_t> Features, Cov;
   Vector<std::string> Files;
   Random *Rand;
   int Verbosity = 0;
@@ -86,11 +87,13 @@ struct GlobalEnv {
       Cmd.removeArgument(C);
     Cmd.addFlag("reload", "0");  // working in an isolated dir, no reload.
     Cmd.addFlag("print_final_stats", "1");
+    Cmd.addFlag("print_funcs", "0");  // no need to spend time symbolizing.
     Cmd.addFlag("max_total_time", std::to_string(std::min((size_t)300, JobId)));
 
     auto Job = new FuzzJob;
     std::string Seeds;
-    if (size_t CorpusSubsetSize = std::min(Files.size(), (size_t)100))
+    if (size_t CorpusSubsetSize =
+            std::min(Files.size(), (size_t)sqrt(Files.size() + 2)))
       for (size_t i = 0; i < CorpusSubsetSize; i++)
         Seeds += (Seeds.empty() ? "" : ",") +
                  Files[Rand->SkewTowardsLast(Files.size())];
@@ -122,9 +125,9 @@ struct GlobalEnv {
     GetSizedFilesFromDir(Job->CorpusDir, &TempFiles);
 
     Vector<std::string> FilesToAdd;
-    Set<uint32_t> NewFeatures;
+    Set<uint32_t> NewFeatures, NewCov;
     CrashResistantMerge(Args, {}, TempFiles, &FilesToAdd, Features,
-                        &NewFeatures, Job->CFPath, false);
+                        &NewFeatures, Cov, &NewCov, Job->CFPath, false);
     RemoveFile(Job->CFPath);
     for (auto &Path : FilesToAdd) {
       auto U = FileToVector(Path);
@@ -134,11 +137,18 @@ struct GlobalEnv {
     }
     RmDirRecursive(Job->CorpusDir);
     Features.insert(NewFeatures.begin(), NewFeatures.end());
+    Cov.insert(NewCov.begin(), NewCov.end());
+    for (auto Idx : NewCov)
+      if (auto *TE = TPC.PCTableEntryByIdx(Idx))
+        if (TPC.PcIsFuncEntry(TE))
+          PrintPC("  NEW_FUNC: %p %F %L\n", "",
+                  TPC.GetNextInstructionPc(TE->PC));
+
     auto Stats = ParseFinalStatsFromLog(Job->LogPath);
     NumRuns += Stats.number_of_executed_units;
     if (!FilesToAdd.empty())
-      Printf("#%zd: ft: %zd corp: %zd exec/s %zd\n", NumRuns,
-             Features.size(), Files.size(),
+      Printf("#%zd: cov: %zd ft: %zd corp: %zd exec/s %zd\n", NumRuns,
+             Cov.size(), Features.size(), Files.size(),
              Stats.average_exec_per_sec);
   }
 };
@@ -202,6 +212,7 @@ void FuzzWithFork(Random &Rand, const FuzzingOptions &Options,
 
   auto CFPath = DirPlusFile(Env.TempDir, "merge.txt");
   CrashResistantMerge(Env.Args, {}, SeedFiles, &Env.Files, {}, &Env.Features,
+                      {}, &Env.Cov,
                       CFPath, false);
   RemoveFile(CFPath);
   Printf("INFO: -fork=%d: %zd seeds, starting to fuzz; scratch: %s\n",
