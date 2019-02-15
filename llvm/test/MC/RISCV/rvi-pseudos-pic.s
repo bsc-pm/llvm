@@ -46,19 +46,19 @@ la a0, a_symbol
 
 
 ## la (under pic)
-# CHECK-ASM: la a0, a_symbol
+# CHECK-ASM: auipc a0
 
-# CHECK-OBJ32: .Lgot_hi0:
+# CHECK-OBJ32: .Lpcrel_hi2:
 # CHECK-OBJ32-NEXT: auipc a0, 0
 # CHECK-OBJ32-NEXT: R_RISCV_GOT_HI20 a_symbol
 # CHECK-OBJ32-NEXT: lw  a0, 0(a0)
-# CHECK-OBJ32-NEXT: R_RISCV_PCREL_LO12_I .Lgot_hi0
+# CHECK-OBJ32-NEXT: R_RISCV_PCREL_LO12_I .Lpcrel_hi2
 
-# CHECK-OBJ64: .Lgot_hi0:
+# CHECK-OBJ64: .Lpcrel_hi2:
 # CHECK-OBJ64-NEXT: auipc a0, 0
 # CHECK-OBJ64-NEXT: R_RISCV_GOT_HI20 a_symbol
 # CHECK-OBJ64-NEXT: ld  a0, 0(a0)
-# CHECK-OBJ64-NEXT: R_RISCV_PCREL_LO12_I .Lgot_hi0
+# CHECK-OBJ64-NEXT: R_RISCV_PCREL_LO12_I .Lpcrel_hi2
 .option pic
 la a0, a_symbol
 
@@ -66,11 +66,11 @@ la a0, a_symbol
 ## la (under nopic)
 # CHECK-ASM: auipc a0
 
-# CHECK-OBJ: .Lpcrel_hi2:
+# CHECK-OBJ: .Lpcrel_hi3:
 # CHECK-OBJ: auipc a0, 0
 # CHECK-OBJ: R_RISCV_PCREL_HI20 a_symbol
 # CHECK-OBJ: mv  a0, a0
-# CHECK-OBJ: R_RISCV_PCREL_LO12_I .Lpcrel_hi2
+# CHECK-OBJ: R_RISCV_PCREL_LO12_I .Lpcrel_hi3
 .option nopic
 la a0, a_symbol
 

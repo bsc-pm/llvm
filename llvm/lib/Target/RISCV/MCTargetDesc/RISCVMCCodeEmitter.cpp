@@ -274,9 +274,7 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
       FixupKind = RISCV::fixup_riscv_pcrel_hi20;
       RelaxCandidate = true;
       break;
-    case RISCVMCExpr::VK_RISCV_GOT_HI_Pseudo:
-      assert(MIFrm == RISCVII::InstFormatU &&
-             "VK_RISCV_GOT_HI is only valid in U-format");
+    case RISCVMCExpr::VK_RISCV_GOT_HI:
       FixupKind = RISCV::fixup_riscv_got_hi20;
       break;
     case RISCVMCExpr::VK_RISCV_CALL: {

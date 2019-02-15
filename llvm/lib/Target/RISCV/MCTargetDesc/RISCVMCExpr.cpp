@@ -43,7 +43,6 @@ void RISCVMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
     default: break;
     case VK_RISCV_None:
     case VK_RISCV_CALL:
-    case VK_RISCV_GOT_HI_Pseudo:
     case VK_RISCV_TLS_GOT_HI_Pseudo:
       HasVariant = false;
       break;
@@ -163,7 +162,7 @@ bool RISCVMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
     case VK_RISCV_HI:
     case VK_RISCV_PCREL_LO:
     case VK_RISCV_PCREL_HI:
-    case VK_RISCV_GOT_HI_Pseudo:
+    case VK_RISCV_GOT_HI:
     case VK_RISCV_TPREL_LO:
     case VK_RISCV_TPREL_HI:
     case VK_RISCV_TPREL_ADD:
@@ -186,6 +185,7 @@ RISCVMCExpr::VariantKind RISCVMCExpr::getVariantKindForName(StringRef name) {
       .Case("hi", VK_RISCV_HI)
       .Case("pcrel_lo", VK_RISCV_PCREL_LO)
       .Case("pcrel_hi", VK_RISCV_PCREL_HI)
+      .Case("got_pcrel_hi", VK_RISCV_GOT_HI)
       .Case("tprel_lo", VK_RISCV_TPREL_LO)
       .Case("tprel_hi", VK_RISCV_TPREL_HI)
       .Case("tprel_add", VK_RISCV_TPREL_ADD)
@@ -204,6 +204,8 @@ StringRef RISCVMCExpr::getVariantKindName(VariantKind Kind) {
     return "pcrel_lo";
   case VK_RISCV_PCREL_HI:
     return "pcrel_hi";
+  case VK_RISCV_GOT_HI:
+    return "got_pcrel_hi";
   case VK_RISCV_TPREL_LO:
     return "tprel_lo";
   case VK_RISCV_TPREL_ADD:
@@ -223,6 +225,7 @@ bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
   case VK_RISCV_PCREL_LO:
   case VK_RISCV_TPREL_HI:
   case VK_RISCV_TPREL_LO:
+  case VK_RISCV_GOT_HI:
   case VK_RISCV_CALL:
     return false;
   }

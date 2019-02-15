@@ -892,17 +892,15 @@ def : Pat<(riscv_tail (iPTR tglobaladdr:$dst)),
 def : Pat<(riscv_tail (iPTR texternalsym:$dst)),
           (PseudoTAIL texternalsym:$dst)>;
 
-// We will cheat a bit here and the assembler parser will convert "la" into an
-// "lla" if we are not compiling for PIC.
-// This effectively means "la" we will use "la" for GOT and "lla" for PC-rel.
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0 in
-def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
-                      "la", "$dst, $src">;
-
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     isAsmParserOnly = 1 in
 def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
                        "lla", "$dst, $src">;
+
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
+    isAsmParserOnly = 1 in
+def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
+                      "la", "$dst, $src">;
 
 // Here mayLoad = 1 because GOT addressing reads memory
 let Size = 8, mayLoad = 1 in
