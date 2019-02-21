@@ -36,6 +36,7 @@
 using namespace clang;
 using namespace CodeGen;
 
+namespace {
 class OSSDependVisitor
   : public ConstStmtVisitor<OSSDependVisitor, void> {
   CodeGenFunction &CGF;
@@ -177,6 +178,7 @@ public:
   }
 
 };
+} // namespace
 
 static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
                     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
