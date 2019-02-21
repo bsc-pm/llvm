@@ -366,7 +366,14 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   bool ErrorFound = false;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
+  bool IsArraySubscriptIdx = false;
 public:
+  void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+    VisitExpr(E->getBase());
+    IsArraySubscriptIdx = true;
+    VisitExpr(E->getIdx());
+    IsArraySubscriptIdx = false;
+  }
   void VisitDeclRefExpr(DeclRefExpr *E) {
     if (E->isTypeDependent() || E->isValueDependent() ||
         E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
@@ -382,6 +389,8 @@ public:
       // inout(ps->x)          | firstprivate(ps) | struct S *ps;
       OmpSsClauseKind VKind = OSSC_shared;
       if (VD->getType()->isPointerType())
+        VKind = OSSC_firstprivate;
+      else if (IsArraySubscriptIdx)
         VKind = OSSC_firstprivate;
 
       SourceLocation ELoc = E->getExprLoc();
