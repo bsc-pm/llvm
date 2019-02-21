@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- stdio.h - Stub header for tests ------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,19 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <functional>
+#ifndef _STDIO_H_
+#define _STDIO_H_
 
-// class function<R(ArgTypes...)>
+// A header intended to contain C standard input and output library
+// declarations.
 
-// function();
+int printf(const char *, ...);
 
-#include <functional>
-#include <cassert>
+#endif // _STDIO_H_
 
-int main(int, char**)
-{
-    std::function<int(int)> f;
-    assert(!f);
-
-  return 0;
-}
