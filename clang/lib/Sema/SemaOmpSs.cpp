@@ -46,11 +46,11 @@ public:
     OmpSsDirectiveKind DKind = OSSD_unknown;
     OmpSsClauseKind CKind = OSSC_unknown;
     const Expr *RefExpr = nullptr;
-    bool IsImplicit = true;
+    bool Ignore = false;
     DSAVarData() = default;
     DSAVarData(OmpSsDirectiveKind DKind, OmpSsClauseKind CKind,
-               const Expr *RefExpr, bool IsImplicit)
-        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), IsImplicit(IsImplicit)
+               const Expr *RefExpr, bool Ignore)
+        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), Ignore(Ignore)
           {}
   };
 
@@ -58,7 +58,7 @@ private:
   struct DSAInfo {
     OmpSsClauseKind Attributes = OSSC_unknown;
     const Expr * RefExpr;
-    bool IsImplicit;
+    bool Ignore = false;
   };
   using DeclSAMapTy = llvm::SmallDenseMap<const ValueDecl *, DSAInfo, 8>;
 
@@ -112,7 +112,7 @@ public:
   }
 
   /// Adds explicit data sharing attribute to the specified declaration.
-  void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool IsImplicit);
+  void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool Ignore=false);
 
   /// Returns data sharing attributes from top of the stack for the
   /// specified declaration.
@@ -179,7 +179,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
   if (Iter->SharingMap.count(D)) {
     const DSAInfo &Data = Iter->SharingMap.lookup(D);
     DVar.RefExpr = Data.RefExpr;
-    DVar.IsImplicit = Data.IsImplicit;
+    DVar.Ignore = Data.Ignore;
     DVar.CKind = Data.Attributes;
     return DVar;
   }
@@ -187,13 +187,13 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
   return DVar;
 }
 
-void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool IsImplicit) {
+void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool Ignore) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
   DSAInfo &Data = Stack.back().first.back().SharingMap[D];
   Data.Attributes = A;
   Data.RefExpr = E;
-  Data.IsImplicit = IsImplicit;
+  Data.Ignore = Ignore;
 }
 
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
@@ -276,8 +276,8 @@ public:
       DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
       DSAStackTy::DSAVarData DVarFromParent = Stack->getTopDSA(VD, /*FromParent=*/true);
 
-      bool IsParentExplicit = DVarFromParent.RefExpr && !DVarFromParent.IsImplicit;
-      bool IsCurrentExplicit = DVarCurrent.RefExpr && !DVarCurrent.IsImplicit;
+      bool IsParentExplicit = DVarFromParent.RefExpr && !DVarFromParent.Ignore;
+      bool IsCurrentExplicit = DVarCurrent.RefExpr && !DVarCurrent.Ignore;
 
       // Check if the variable has explicit DSA only set on the current
       // directive and stop analysis if it so.
@@ -285,11 +285,6 @@ public:
         return;
       // If explicit DSA comes from parent inherit it
       if (IsParentExplicit) {
-          Stack->addDSA(VD,
-                        E,
-                        DVarFromParent.CKind == OSSC_private ?
-                          OSSC_firstprivate : DVarFromParent.CKind,
-                        true);
           switch (DVarFromParent.CKind) {
           case OSSC_shared:
             ImplicitShared.push_back(E);
@@ -311,20 +306,22 @@ public:
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
         switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
         case DSA_shared:
-          Stack->addDSA(VD, E, OSSC_shared, true);
-
           // Define implicit data-sharing attributes for task.
           if (isOmpSsTaskingDirective(DKind))
             ImplicitShared.push_back(E);
           break;
         case DSA_none:
+          if (!DVarCurrent.Ignore) {
+            SemaRef.Diag(E->getExprLoc(), diag::err_oss_not_defined_dsa_when_default_none) << E->getDecl();
+            // Record DSA as ignored to diagnostic only once
+            Stack->addDSA(VD, E, OSSC_unknown, /*Ignore=*/true);
+          }
           break;
         case DSA_unspecified:
           if (VD->hasLocalStorage()) {
             // If no default clause is present and the variable was private/local
             // in the context encountering the construct, the variable will
             // be firstprivate
-            Stack->addDSA(VD, E, OSSC_firstprivate, true);
 
             // Define implicit data-sharing attributes for task.
             if (isOmpSsTaskingDirective(DKind))
@@ -332,7 +329,6 @@ public:
           } else {
             // If no default clause is present and the variable was shared/global
             // in the context encountering the construct, the variable will be shared.
-            Stack->addDSA(VD, E, OSSC_shared, true);
 
             // Define implicit data-sharing attributes for task.
             if (isOmpSsTaskingDirective(DKind))
@@ -411,13 +407,22 @@ public:
         }
         break;
       case OSSC_unknown:
-        // OK: no DSA explicit, record DSA as explicit
-        if (VKind == OSSC_shared)
-          ImplicitShared.push_back(E);
-        if (VKind == OSSC_firstprivate)
-          ImplicitFirstprivate.push_back(E);
+        // No DSA explicit
+        if (Stack->getCurrentDefaultDataSharingAttributtes() == DSA_none) {
+          // KO: but default(none)
+          // Record DSA as ignored
+          SemaRef.Diag(ELoc, diag::err_oss_not_defined_dsa_when_default_none) << E->getDecl();
+          Stack->addDSA(VD, E, OSSC_unknown, /*Ignore=*/true);
+        } else {
+          // OK: record DSA as explicit
+          if (VKind == OSSC_shared)
+            ImplicitShared.push_back(E);
+          if (VKind == OSSC_firstprivate)
+            ImplicitFirstprivate.push_back(E);
 
-        Stack->addDSA(VD, E, VKind, false);
+          Stack->addDSA(VD, E, VKind);
+        }
+
         break;
       default:
         llvm_unreachable("unexpected DSA");
@@ -814,7 +819,7 @@ Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_shared);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_shared, false);
+    DSAStack->addDSA(D, RefExpr, OSSC_shared);
     ClauseVars.push_back(RefExpr);
   }
 
@@ -845,7 +850,7 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_private);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_private, false);
+    DSAStack->addDSA(D, RefExpr, OSSC_private);
     ClauseVars.push_back(RefExpr);
   }
 
@@ -876,7 +881,7 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_firstprivate);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, false);
+    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate);
     ClauseVars.push_back(RefExpr);
   }
 

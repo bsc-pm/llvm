@@ -9501,6 +9501,8 @@ def err_oss_wrong_dsa : Error<
   "%0 variable cannot be %1">;
 def err_oss_mismatch_depend_dsa : Error<
   "the data-sharing '%0' conflicts with '%1' required by the dependency">;
+def err_oss_not_defined_dsa_when_default_none : Error<
+  "expected explicit data-sharing for %0">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element or array section">;
