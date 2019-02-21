@@ -26,20 +26,28 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc());
 }
 
+template<typename DSAKind>
+static void AddDSAData(const OSSTaskDirective &S, SmallVectorImpl<const Expr *> &Data) {
+  // All DSA are DeclRefExpr
+  llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
+  for (const auto *C : S.getClausesOfKind<DSAKind>()) {
+      for (const Expr *Ref : C->varlists()) {
+        if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Ref)) {
+          const ValueDecl *VD = DRE->getDecl();
+          if (DeclExpr.insert(VD).second)
+            Data.push_back(Ref);
+        }
+      }
+  }
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
-  for (const auto *C : S.getClausesOfKind<OSSSharedClause>()) {
-      for (const Expr *Ref : C->varlists())
-          Data.SharedVars.push_back(Ref);
-  }
-  for (const auto *C : S.getClausesOfKind<OSSPrivateClause>()) {
-      for (const Expr *Ref : C->varlists())
-          Data.PrivateVars.push_back(Ref);
-  }
-  for (const auto *C : S.getClausesOfKind<OSSFirstprivateClause>()) {
-      for (const Expr *Ref : C->varlists())
-          Data.FirstprivateVars.push_back(Ref);
-  }
+
+  AddDSAData<OSSSharedClause>(S, Data.SharedVars);
+  AddDSAData<OSSPrivateClause>(S, Data.PrivateVars);
+  AddDSAData<OSSFirstprivateClause>(S, Data.FirstprivateVars);
+
   for (const auto *C : S.getClausesOfKind<OSSDependClause>()) {
     ArrayRef<OmpSsDependClauseKind> DepKinds = C->getDependencyKind();
     if (DepKinds.size() == 2) {
