@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   int e[argc];
   D d;
   F f;
-  #pragma oss task shared(a, b, c, d, e, f) // expected-error {{Non-POD structs are not supported}} expected-error {{VLAs are not supported}}
+  #pragma oss task shared(a, b, c, d, e, f) // expected-error {{Non-POD structs are not supported}}
   { a = *b = c[0] = e[0] = d.x = f.x; }
 }
 

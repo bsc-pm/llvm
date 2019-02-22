@@ -9510,7 +9510,5 @@ def err_oss_expected_var_name: Error<
   "expected variable name">;
 def err_oss_non_pod_not_supported: Error<
   "Non-POD structs are not supported">;
-def err_oss_vla_not_supported: Error<
-  "VLAs are not supported">;
 
 } // end of sema component.

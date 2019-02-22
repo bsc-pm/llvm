@@ -800,10 +800,6 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
       S.Diag(ELoc, diag::err_oss_non_pod_not_supported) << ERange;
       return nullptr;
   }
-  if (Type->isVariableArrayType()) {
-      S.Diag(ELoc, diag::err_oss_vla_not_supported) << ERange;
-      return nullptr;
-  }
   return getCanonicalDecl(VD);
 }
 

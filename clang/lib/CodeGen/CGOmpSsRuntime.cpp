@@ -62,23 +62,35 @@ public:
 
   void FillBaseExprDimsAndType(const Expr *E) {
     BaseElementTy = E->getType();
-    if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
-      BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+    if (BaseElementTy->isArrayType()) {
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
+        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(BaseElementTy)){
+        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
     }
     QualType TmpTy = E->getType();
     // Add Dimensions
-    if (TmpTy->isPointerType()) {
-      // T *
-      Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
-    } else if (!TmpTy->isArrayType()) {
-      // T
+    if (TmpTy->isPointerType() || !TmpTy->isArrayType()) {
+      // T * || T
       Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
     }
-    while (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)){
+    while (TmpTy->isArrayType()) {
       // T []
-      uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-      Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
-      TmpTy = BaseArrayTy->getElementType();
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+        uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
+        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+        llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
+        DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+        Dims.push_back(DimExpr);
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
     }
   }
 
@@ -105,18 +117,23 @@ public:
   }
 
   void VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
-    BaseElementTy = E->getType();
     // Get Base Type
-    if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
-      BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+    BaseElementTy = E->getType();
+    if (BaseElementTy->isArrayType()) {
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
+        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(BaseElementTy)){
+        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
     }
     // Get the inner expr
     const Expr *Expr = E;
     while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(Expr->IgnoreParenImpCasts())) {
       Expr = ASE->getBase();
       // Add indexes
-      llvm::Value *Idx = ConstantEmitter(CGF).emitAbstract(ASE->getIdx(),
-                                                           ASE->getIdx()->getType());
+      llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
       Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
       llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       Starts.push_back(Idx);
@@ -134,11 +151,20 @@ public:
         // T (*)[]
         Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
         TmpTy = cast<PointerType>(TmpTy)->getPointeeType();
-        while (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)){
+        while (TmpTy->isArrayType()) {
           // T []
-          uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-          Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
-          TmpTy = BaseArrayTy->getElementType();
+          if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+            uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
+            Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+            TmpTy = BaseArrayTy->getElementType();
+          } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+            llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
+            DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+            Dims.push_back(DimExpr);
+            TmpTy = BaseArrayTy->getElementType();
+          } else {
+            llvm_unreachable("Unhandled array type");
+          }
         }
       } else {
         // T *
@@ -182,8 +208,39 @@ public:
 
 static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
                     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  // C long -> LLVM long
+  llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
+
+  std::string Basename = Name;
+
+  SmallVector<llvm::Value*, 4> DsaData;
+  SmallVector<llvm::Value*, 4> TmpDsaData; // save all dimensions always. if vla add all of them
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    TaskInfo.emplace_back(Name, CGF.EmitDeclRefLValue(DRE).getPointer());
+    DsaData.push_back(CGF.EmitDeclRefLValue(DRE).getPointer());
+    QualType TmpTy = DRE->getType();
+    bool FirstTime = true;
+    while (TmpTy->isArrayType()) {
+      if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+        // New type of bundle for vlas
+        if (FirstTime) {
+          FirstTime = false;
+          Basename += ".VLA";
+        }
+        llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
+        DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+        DsaData.push_back(DimExpr);
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+        uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
+        TmpDsaData.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+    if (!FirstTime) // We have seen a vla, save dimensions
+      DsaData.append(TmpDsaData.begin(), TmpDsaData.end());
+    TaskInfo.emplace_back(Basename, DsaData);
   }
   else {
     llvm_unreachable("Unhandled expression");
