@@ -65,8 +65,7 @@ class Driver {
     GCCMode,
     GXXMode,
     CPPMode,
-    CLMode,
-    FortranMode
+    CLMode
   } Mode;
 
   enum SaveTempsMode {
@@ -180,9 +179,6 @@ public:
 
   /// Whether the driver should follow cl.exe like behavior.
   bool IsCLMode() const { return Mode == CLMode; }
-
-  /// Whether the driver should follow gfortran like behavior.
-  bool IsFortranMode() const { return Mode == FortranMode; }
 
   /// Only print tool bindings, don't build any jobs.
   unsigned CCCPrintBindings : 1;
