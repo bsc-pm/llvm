@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // REQUIRES: mips-registered-target
 
 // Check frontend and linker invocations on the IMG v2 MIPS toolchain.

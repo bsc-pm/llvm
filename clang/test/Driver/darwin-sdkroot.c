@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // Check that SDKROOT is used to define the default for -isysroot on Darwin.
 //
 // RUN: rm -rf %t.tmpdir

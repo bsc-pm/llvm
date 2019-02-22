@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // A basic clang -cc1 command-line, and simple environment check.
 
 // RUN: %clang %s -### -no-canonical-prefixes -target msp430 2>&1 \

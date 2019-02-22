@@ -1,4 +1,3 @@
-// XFAIL: riscv
 // REQUIRES: mips-registered-target
 
 // Check frontend and linker invocations on FSF MIPS toolchain.
