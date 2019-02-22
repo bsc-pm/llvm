@@ -469,16 +469,26 @@ std::string Linux::computeSysRoot() const {
     return getDriver().SysRoot;
 
   auto Arch = getTriple().getArch();
-  bool IsRISCV = Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64;
 
   // We will use the same strategy as Android for RISC-V
-  if (getTriple().isAndroid() || IsRISCV) {
+  if (getTriple().isAndroid()) {
     // Android toolchains typically include a sysroot at ../sysroot relative to
     // the clang binary.
     const StringRef ClangDir = getDriver().getInstalledDir();
     std::string AndroidSysRootPath = (ClangDir + "/../sysroot").str();
     if (getVFS().exists(AndroidSysRootPath))
       return AndroidSysRootPath;
+  }
+
+  // Make this match what crosstool generates
+  bool IsRISCV64 = Arch == llvm::Triple::riscv64;
+  if (IsRISCV64) {
+    const StringRef ClangDir = getDriver().getInstalledDir();
+    const StringRef TripleStr = getTriple().str();
+    std::string CrosstoolSysRootPath =
+        (ClangDir + "/../" + TripleStr + "/sysroot").str();
+    if (getVFS().exists(CrosstoolSysRootPath))
+      return CrosstoolSysRootPath;
   }
 
   if (!GCCInstallation.isValid() || !getTriple().isMIPS())
