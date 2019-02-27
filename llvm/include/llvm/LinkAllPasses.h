@@ -47,6 +47,7 @@
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/BoundsChecking.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/OmpSs.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
@@ -148,6 +149,7 @@ namespace {
       (void) llvm::createObjCARCExpandPass();
       (void) llvm::createObjCARCContractPass();
       (void) llvm::createObjCARCOptPass();
+      (void) llvm::createOmpSsPass();
       (void) llvm::createPAEvalPass();
       (void) llvm::createPromoteMemoryToRegisterPass();
       (void) llvm::createDemoteRegisterToMemoryPass();
