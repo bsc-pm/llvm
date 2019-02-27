@@ -58,6 +58,7 @@
 #include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/ObjCARC.h"
+#include "llvm/Transforms/OmpSs.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils.h"
@@ -163,6 +164,10 @@ private:
   const CodeGenOptions &CGOpts;
   const LangOptions &LangOpts;
 };
+}
+
+static void addOmpSsPass(const PassManagerBuilder &Builder, PassManagerBase &PM) {
+  PM.add(createOmpSsPass());
 }
 
 static void addObjCARCAPElimPass(const PassManagerBuilder &Builder, PassManagerBase &PM) {
@@ -563,6 +568,11 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
 
   if (TM)
     TM->adjustPassManager(PMBuilder);
+
+  if (LangOpts.OmpSs) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                           addOmpSsPass);
+  }
 
   if (CodeGenOpts.DebugInfoForProfiling ||
       !CodeGenOpts.SampleProfileFile.empty())
