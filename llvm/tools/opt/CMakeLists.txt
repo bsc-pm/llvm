@@ -17,6 +17,7 @@ set(LLVM_LINK_COMPONENTS
   Target
   TransformUtils
   Vectorize
+  OmpSs
   Passes
   )
 
