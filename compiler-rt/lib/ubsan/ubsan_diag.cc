@@ -26,8 +26,11 @@
 
 using namespace __ubsan;
 
-void __ubsan::GetStackTrace(BufferedStackTrace *stack, uptr max_depth, uptr pc,
-                            uptr bp, void *context, bool fast) {
+// Weak linkage: UBSan is combined with runtimes that already provide this
+// functionality (e.g., ASan) as well as runtimes that lack it (e.g., scudo).
+SANITIZER_WEAK_ATTRIBUTE
+void __sanitizer::GetStackTrace(BufferedStackTrace *stack, uptr max_depth,
+                                uptr pc, uptr bp, void *context, bool fast) {
   uptr top = 0;
   uptr bottom = 0;
   if (StackTrace::WillUseFastUnwind(fast)) {
