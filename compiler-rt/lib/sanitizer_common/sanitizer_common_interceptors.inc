@@ -238,43 +238,48 @@ bool PlatformHasDifferentMemcpyAndMemmove();
 
 #ifndef COMMON_INTERCEPTOR_MEMSET_IMPL
 #define COMMON_INTERCEPTOR_MEMSET_IMPL(ctx, dst, v, size) \
-  {                                                       \
-    if (COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED)        \
-      return internal_memset(dst, v, size);               \
+  do {                                                    \
+    if (COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED) {      \
+      internal_memset(dst, v, size);                      \
+      break;                                              \
+    }                                                     \
     COMMON_INTERCEPTOR_ENTER(ctx, memset, dst, v, size);  \
     if (common_flags()->intercept_intrin)                 \
       COMMON_INTERCEPTOR_WRITE_RANGE(ctx, dst, size);     \
-    return REAL(memset)(dst, v, size);                    \
-  }
+    REAL(memset)(dst, v, size);                           \
+  } while (0)
 #endif
 
 #ifndef COMMON_INTERCEPTOR_MEMMOVE_IMPL
 #define COMMON_INTERCEPTOR_MEMMOVE_IMPL(ctx, dst, src, size) \
-  {                                                          \
-    if (COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED)           \
-      return internal_memmove(dst, src, size);               \
+  do {                                                       \
+    if (COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED) {         \
+      internal_memmove(dst, src, size);                      \
+      break;                                                 \
+    }                                                        \
     COMMON_INTERCEPTOR_ENTER(ctx, memmove, dst, src, size);  \
     if (common_flags()->intercept_intrin) {                  \
       COMMON_INTERCEPTOR_WRITE_RANGE(ctx, dst, size);        \
       COMMON_INTERCEPTOR_READ_RANGE(ctx, src, size);         \
     }                                                        \
-    return REAL(memmove)(dst, src, size);                    \
-  }
+    REAL(memmove)(dst, src, size);                           \
+  } while (0)
 #endif
 
 #ifndef COMMON_INTERCEPTOR_MEMCPY_IMPL
 #define COMMON_INTERCEPTOR_MEMCPY_IMPL(ctx, dst, src, size) \
-  {                                                         \
+  do {                                                      \
     if (COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED) {        \
-      return internal_memmove(dst, src, size);              \
+      internal_memmove(dst, src, size);                     \
+      break;                                                \
     }                                                       \
     COMMON_INTERCEPTOR_ENTER(ctx, memcpy, dst, src, size);  \
     if (common_flags()->intercept_intrin) {                 \
       COMMON_INTERCEPTOR_WRITE_RANGE(ctx, dst, size);       \
       COMMON_INTERCEPTOR_READ_RANGE(ctx, src, size);        \
     }                                                       \
-    return REAL(memcpy)(dst, src, size);                    \
-  }
+    REAL(memcpy)(dst, src, size);                           \
+  } while (0)
 #endif
 
 #ifndef COMMON_INTERCEPTOR_MMAP_IMPL
