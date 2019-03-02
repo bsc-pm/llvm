@@ -185,10 +185,10 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
 
     // Expand float operations supported for scalars but not SIMD
     for (auto Op : {ISD::FCEIL, ISD::FFLOOR, ISD::FTRUNC, ISD::FNEARBYINT,
-            ISD::FCOPYSIGN}) {
+                    ISD::FCOPYSIGN}) {
       setOperationAction(Op, MVT::v4f32, Expand);
       if (Subtarget->hasUnimplementedSIMD128())
-        setOperationAction(Op, MVT::v2f32, Expand);
+        setOperationAction(Op, MVT::v2f64, Expand);
     }
 
     // Expand additional SIMD ops that V8 hasn't implemented yet
