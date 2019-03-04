@@ -290,27 +290,24 @@ def EPI_MASK_TO_SCALAR_INT_UNARY(string_name):
 
 def EPI_INT_TO_MASK_UNARY(string_name):
     global template_dict
-    template_dict[string_name + "_i1"] = UnaryTemplate
     template_dict[string_name + "_i8"] = UnaryTemplate
     template_dict[string_name + "_i16"] = UnaryTemplate
     template_dict[string_name + "_i32"] = UnaryTemplate
     template_dict[string_name + "_i64"] = UnaryTemplate
-    template_dict[string_name + "_i1_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_i8_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_i16_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_i32_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_i64_mask"] = UnaryMaskTemplate
 
 EPI_MASK_UNARY = EPI_MASK_TO_SCALAR_INT_UNARY
+EPI_INT_UNARY = EPI_INT_TO_MASK_UNARY
 
 def EPI_INT_BINARY(string_name):
     global template_dict
-    template_dict[string_name + "_i1"] = BinaryTemplate
     template_dict[string_name + "_i8"] = BinaryTemplate
     template_dict[string_name + "_i16"] = BinaryTemplate
     template_dict[string_name + "_i32"] = BinaryTemplate
     template_dict[string_name + "_i64"] = BinaryTemplate
-    template_dict[string_name + "_i1_mask"] = BinaryMaskTemplate
     template_dict[string_name + "_i8_mask"] = BinaryMaskTemplate
     template_dict[string_name + "_i16_mask"] = BinaryMaskTemplate
     template_dict[string_name + "_i32_mask"] = BinaryMaskTemplate
