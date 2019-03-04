@@ -2041,7 +2041,7 @@ def : Pat<(vtp.Scalar (int_epi_vfmv_f_s (vtp.Vector EPIVR:$rs2))),
           (VFMV_F_S $rs2)>;
 
 foreach vtp = AllFloatVectors.Values in
-def : Pat<(vtp.Vector (int_epi_vfmv_s_f GPR:$rs2)),
+def : Pat<(vtp.Vector (int_epi_vfmv_s_f (vtp.Scalar EPIFPR:$rs2))),
           (VFMV_S_F $rs2)>;
 
 defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vfeq", "VFEQ">;
