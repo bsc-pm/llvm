@@ -12756,7 +12756,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
   case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
     IntrinsicTypes = {ResultType};                                             \
-    ID = Intrinsic::epi_##ID_##_mask;                                           \
+    ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_MASK_TO_SCALAR_INT_UNARY(ID_)                                      \
