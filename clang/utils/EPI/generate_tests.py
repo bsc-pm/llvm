@@ -489,6 +489,9 @@ EPI_INT_BINARY("vdot")
 EPI_INT_BINARY("vdotu")
 EPI_FP_BINARY("vfdot")
 
+EPI_INT_UNARY("vbroadcast")
+EPI_FP_UNARY("vbroadcast")
+
 
 def emit_test(builtin_name, prototype):
     if builtin_name not in template_dict:

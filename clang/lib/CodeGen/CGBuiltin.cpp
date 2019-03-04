@@ -13100,6 +13100,9 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_FP_TO_FP_NARROW_CONVERSION(vfncvt_f_f)
     EPI_FP_TO_FP_WIDEN_CONVERSION(vfwcvt_f_f)
 
+    EPI_INT_UNARY(vbroadcast)
+    EPI_FP_UNARY(vbroadcast)
+
     // Stores must be handled manually
     EPI_MEM(vload)
 
