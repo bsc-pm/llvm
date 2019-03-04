@@ -142,6 +142,24 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
+  // FPR64->EPIFPR
+  // This is like FPR64->FPR64
+  if (RISCV::EPIFPRRegClass.contains(DstReg) &&
+      RISCV::FPR64RegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FSGNJ_D), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc))
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+  // FPR32->EPIFPR
+  // This is not a copy exactly but no precision should be lost here.
+  if (RISCV::EPIFPRRegClass.contains(DstReg) &&
+      RISCV::FPR32RegClass.contains(SrcReg)) {
+    BuildMI(MBB, MBBI, DL, get(RISCV::FCVT_D_S), DstReg)
+        .addReg(SrcReg, getKillRegState(KillSrc));
+    return;
+  }
+
   llvm_unreachable("Impossible reg-to-reg copy");
 }
 
