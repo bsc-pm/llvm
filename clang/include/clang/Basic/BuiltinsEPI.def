@@ -58,13 +58,11 @@ EPI_BUILTIN(vload_f32, "QV0ff*", "n")
 EPI_BUILTIN(vload_f64, "QV0dd*", "n")
 
 #define EPI_INT_BINARY(name)                                                   \
-  EPI_BUILTIN(name##_i1, "QV0bQV0bQV0b", "Un")                                 \
   EPI_BUILTIN(name##_i8, "QV0ScQV0ScQV0Sc", "Un")                              \
   EPI_BUILTIN(name##_i16, "QV0SsQV0SsQV0Ss", "Un")                             \
   EPI_BUILTIN(name##_i32, "QV0SiQV0SiQV0Si", "Un")                             \
   EPI_BUILTIN(name##_i64, "QV0SWiQV0SWiQV0SWi", "Un")                          \
                                                                                \
-  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0bQV0b", "Un")                        \
   EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScQV0ScQV0b", "Un")                     \
   EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsQV0SsQV0b", "Un")                    \
   EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiQV0SiQV0b", "Un")                    \
@@ -91,13 +89,11 @@ EPI_BUILTIN(vload_f64, "QV0dd*", "n")
   EPI_BUILTIN(name##_f64_mask, "QV0dQV0dQV0dQV0b", "Un")
 
 #define EPI_INT_RELATIONAL(name)                                               \
-  EPI_BUILTIN(name##_i1, "QV0bQV0bQV0b", "Un")                                 \
   EPI_BUILTIN(name##_i8, "QV0bQV0ScQV0Sc", "Un")                               \
   EPI_BUILTIN(name##_i16, "QV0bQV0SsQV0Ss", "Un")                              \
   EPI_BUILTIN(name##_i32, "QV0bQV0SiQV0Si", "Un")                              \
   EPI_BUILTIN(name##_i64, "QV0bQV0SWiQV0SWi", "Un")                            \
                                                                                \
-  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0bQV0b", "Un")                        \
   EPI_BUILTIN(name##_i8_mask, "QV0bQV0ScQV0ScQV0b", "Un")                      \
   EPI_BUILTIN(name##_i16_mask, "QV0bQV0SsQV0SsQV0b", "Un")                     \
   EPI_BUILTIN(name##_i32_mask, "QV0bQV0SiQV0SiQV0b", "Un")                     \
@@ -111,13 +107,11 @@ EPI_BUILTIN(vload_f64, "QV0dd*", "n")
   EPI_BUILTIN(name##_f64_mask, "QV0bQV0dQV0dQV0b", "Un")
 
 #define EPI_INT_UNARY(name)                                                    \
-  EPI_BUILTIN(name##_i1, "QV0bQV0b", "Un")                                     \
   EPI_BUILTIN(name##_i8, "QV0ScQV0Sc", "Un")                                   \
   EPI_BUILTIN(name##_i16, "QV0SsQV0Ss", "Un")                                  \
   EPI_BUILTIN(name##_i32, "QV0SiQV0Si", "Un")                                  \
   EPI_BUILTIN(name##_i64, "QV0SWiQV0SWi", "Un")                                \
                                                                                \
-  EPI_BUILTIN(name##_i1_mask, "QV0bQV0bQV0b", "Un")                            \
   EPI_BUILTIN(name##_i8_mask, "QV0ScQV0ScQV0b", "Un")                          \
   EPI_BUILTIN(name##_i16_mask, "QV0SsQV0SsQV0b", "Un")                         \
   EPI_BUILTIN(name##_i32_mask, "QV0SiQV0SiQV0b", "Un")                         \

@@ -12633,7 +12633,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   llvm::SmallVector<llvm::Type*, 2> IntrinsicTypes;
 
 #define EPI_INT_BINARY(ID_)                                                    \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
   case RISCV::EPI_BI_##ID_##_i8:                                               \
   case RISCV::EPI_BI_##ID_##_i16:                                              \
   case RISCV::EPI_BI_##ID_##_i32:                                              \
@@ -12641,7 +12640,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i1_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
   case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
@@ -12667,7 +12665,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;
 
 #define EPI_INT_RELATIONAL(ID_)                                                \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
   case RISCV::EPI_BI_##ID_##_i8:                                               \
   case RISCV::EPI_BI_##ID_##_i16:                                              \
   case RISCV::EPI_BI_##ID_##_i32:                                              \
@@ -12675,7 +12672,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     IntrinsicTypes = {Ops[0]->getType(), Ops[1]->getType()};                   \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i1_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
   case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
@@ -12727,7 +12723,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;
 
 #define EPI_INT_UNARY(ID_)                                                     \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
   case RISCV::EPI_BI_##ID_##_i8:                                               \
   case RISCV::EPI_BI_##ID_##_i16:                                              \
   case RISCV::EPI_BI_##ID_##_i32:                                              \
@@ -12735,7 +12730,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i1_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
   case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
   case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
