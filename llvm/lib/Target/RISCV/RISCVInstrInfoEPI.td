@@ -1114,8 +1114,7 @@ class ValueTypeList<list<VectorScalar> Vs>
 }
 
 def AllIntegerVectors
-    : ValueTypeList<[VectorScalar<nxv1i1, i1>,
-                     VectorScalar<nxv1i8, i8>,
+    : ValueTypeList<[VectorScalar<nxv1i8, i8>,
                      VectorScalar<nxv1i16, i16>,
                      VectorScalar<nxv1i32, i32>,
                      VectorScalar<nxv1i64, i64>]>;

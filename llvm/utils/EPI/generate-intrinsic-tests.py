@@ -138,12 +138,12 @@ def generate_binary_any_types():
         yield IntrinsicType(x, [x] * 2)
 
 def generate_binary_any_and_mask_types():
-    for x in integer_types + float_types + mask_types:
+    for x in integer_types + float_types:
         assert(len(mask_types) == 1)
         yield IntrinsicType(x, [x, mask_types[0]])
 
 def generate_binary_any_and_integer_types():
-    for x in integer_types + float_types + mask_types:
+    for x in integer_types + float_types:
         for i in integer_types:
             assert(len(mask_types) == 1)
             yield IntrinsicType(x, [x, i])
