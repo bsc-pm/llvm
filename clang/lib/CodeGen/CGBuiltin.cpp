@@ -12770,12 +12770,12 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
 #define EPI_FP_UNARY(ID_)                                                      \
   case RISCV::EPI_BI_##ID_##_f32:                                              \
   case RISCV::EPI_BI_##ID_##_f64:                                              \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[0]->getType()};                   \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
   case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[0]->getType()};                   \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
