@@ -2116,6 +2116,25 @@ foreach vtp = AllIntegerVectors.Values in
             (VID_V_MASK vmask_only_true.Value)>;
 }
 
+foreach vtp = AllIntegerVectors.Values in {
+def : Pat<(vtp.Vector (int_epi_vbroadcast GPR:$rs2)),
+          (VMERGE_VX (vtp.Vector (IMPLICIT_DEF)), $rs2)>;
+def : Pat<(vtp.Vector (int_epi_vbroadcast simm5:$imm5)),
+          (VMERGE_VI (vtp.Vector (IMPLICIT_DEF)), $imm5)>;
+
+def : Pat<(vtp.Vector (int_epi_vbroadcast_mask GPR:$rs2, V0)),
+          (VMERGE_VX_MASK (vtp.Vector (IMPLICIT_DEF)), $rs2, vmask_only_true.Value)>;
+def : Pat<(vtp.Vector (int_epi_vbroadcast_mask simm5:$imm5, V0)),
+          (VMERGE_VI_MASK (vtp.Vector (IMPLICIT_DEF)), $imm5, vmask_only_true.Value)>;
+}
+foreach vtp = AllFloatVectors.Values in {
+def : Pat<(vtp.Vector (int_epi_vbroadcast (vtp.Scalar EPIFPR:$rs2))),
+          (VFMERGE_VF (vtp.Vector (IMPLICIT_DEF)), $rs2)>;
+
+def : Pat<(vtp.Vector (int_epi_vbroadcast_mask (vtp.Scalar EPIFPR:$rs2), V0)),
+          (VFMERGE_VF_MASK (vtp.Vector (IMPLICIT_DEF)), $rs2, vmask_only_true.Value)>;
+}
+
 }
 
 //===----------------------------------------------------------------------===//

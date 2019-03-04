@@ -386,6 +386,7 @@ defm vfncvt_f_xu : epi_conversions;
 defm vfncvt_f_x : epi_conversions;
 defm vfncvt_f_f : epi_conversions;
 
+defm vbroadcast : epi_unary;
 
 // FIXME: Load/store intrinsics are not generic yet.
 // Loads
