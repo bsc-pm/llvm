@@ -1942,10 +1942,10 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
 
   static const char *const RISCV32LibDirs[] = {"/lib", "/lib32"};
   static const char *const RISCV64LibDirs[] = {"/lib", "/lib64"};
-  static const char *const RISCVTriples[] = {"riscv32-unknown-linux-gnu",
-                                             "riscv64-unknown-linux-gnu",
-                                             "riscv32-unknown-elf",
-                                             "riscv64-unknown-elf"};
+  static const char *const RISCVTriplesLinux[] = {"riscv32-unknown-linux-gnu",
+                                                  "riscv64-unknown-linux-gnu"};
+  static const char *const RISCVTriplesBaremetal[] = {"riscv32-unknown-elf",
+                                                      "riscv64-unknown-elf"};
 
   static const char *const SPARCv8LibDirs[] = {"/lib32", "/lib"};
   static const char *const SPARCv8Triples[] = {"sparc-linux-gnu",
@@ -2176,14 +2176,25 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
   case llvm::Triple::riscv32:
     LibDirs.append(begin(RISCV32LibDirs), end(RISCV32LibDirs));
     BiarchLibDirs.append(begin(RISCV32LibDirs), end(RISCV32LibDirs));
-    TripleAliases.append(begin(RISCVTriples), end(RISCVTriples));
-    BiarchTripleAliases.append(begin(RISCVTriples), end(RISCVTriples));
+    TripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+    TripleAliases.append(begin(RISCVTriplesBaremetal), end(RISCVTriplesBaremetal));
+    BiarchTripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+    BiarchTripleAliases.append(begin(RISCVTriplesBaremetal), end(RISCVTriplesBaremetal));
     break;
   case llvm::Triple::riscv64:
     LibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
     BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
-    TripleAliases.append(begin(RISCVTriples), end(RISCVTriples));
-    BiarchTripleAliases.append(begin(RISCVTriples), end(RISCVTriples));
+    // Only search for Linux toolchains if the target says so
+    if (TargetTriple.getOS() == llvm::Triple::Linux &&
+        TargetTriple.getEnvironment() == llvm::Triple::GNU) {
+      TripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+      BiarchTripleAliases.append(begin(RISCVTriplesLinux),
+                                 end(RISCVTriplesLinux));
+    }
+    TripleAliases.append(begin(RISCVTriplesBaremetal),
+                         end(RISCVTriplesBaremetal));
+    BiarchTripleAliases.append(begin(RISCVTriplesBaremetal),
+                               end(RISCVTriplesBaremetal));
     break;
   case llvm::Triple::sparc:
   case llvm::Triple::sparcel:
