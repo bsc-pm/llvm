@@ -2185,8 +2185,7 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
     LibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
     BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
     // Only search for Linux toolchains if the target says so
-    if (TargetTriple.getOS() == llvm::Triple::Linux &&
-        TargetTriple.getEnvironment() == llvm::Triple::GNU) {
+    if (TargetTriple.getOS() == llvm::Triple::Linux) {
       TripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
       BiarchTripleAliases.append(begin(RISCVTriplesLinux),
                                  end(RISCVTriplesLinux));
