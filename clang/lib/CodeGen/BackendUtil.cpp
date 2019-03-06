@@ -570,7 +570,9 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
     TM->adjustPassManager(PMBuilder);
 
   if (LangOpts.OmpSs) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+    PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
+                           addOmpSsPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addOmpSsPass);
   }
 
