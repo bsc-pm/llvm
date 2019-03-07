@@ -562,14 +562,15 @@ TEST(ConstantsTest, FoldGlobalVariablePtr) {
 
   IntegerType *IntType(Type::getInt32Ty(Context));
 
-  GlobalVariable Global(IntType, true, GlobalValue::ExternalLinkage);
+  std::unique_ptr<GlobalVariable> Global(
+      new GlobalVariable(IntType, true, GlobalValue::ExternalLinkage));
 
-  Global.setAlignment(4);
+  Global->setAlignment(4);
 
   ConstantInt *TheConstant(ConstantInt::get(IntType, 2));
 
   Constant *TheConstantExpr(
-      ConstantExpr::getPtrToInt(&Global, IntType));
+      ConstantExpr::getPtrToInt(Global.get(), IntType));
 
   ASSERT_TRUE(ConstantExpr::get( \
       Instruction::And, TheConstantExpr, TheConstant)->isNullValue());
