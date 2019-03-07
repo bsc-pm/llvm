@@ -164,6 +164,10 @@ inline BENCHMARK_ALWAYS_INLINE int64_t Now() {
   uint64_t tsc;
   asm("stck %0" : "=Q" (tsc) : : "cc");
   return tsc;
+#elif defined(__riscv) && __riscv_xlen == 64
+  uint64_t cycle;
+  asm("rdcycle %0" : "=r"(cycle));
+  return cycle;
 #else
 // The soft failover to a generic implementation is automatic only for ARM.
 // For other platforms the developer is expected to make an attempt to create
