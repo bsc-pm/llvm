@@ -62,33 +62,6 @@ fi
 CMAKE_INVOCATION_EXTRA_FLAGS=("-DCMAKE_INSTALL_PREFIX=${INSTALLDIR}")
 
 ################################################################################
-# Detection of toolchain and sysroot
-################################################################################
-
-if [ -z "$GCC_TOOLCHAIN" ];
-then
-  die "Please, set the GCC_TOOLCHAIN environment variable to the location of the riscv64-unknown-linux-gnu toolchain. If you do not have a GCC toolchain yet, follow the instructions at https://pm.bsc.es/gitlab/EPI/project/wikis/install-toolchain"
-fi
-
-if [ ! -e "$GCC_TOOLCHAIN" ];
-then
-  die "GCC riscv64-unknown-linux-gnu toolchain location '$GCC_TOOLCHAIN' does not exist"
-fi
-
-if [ ! -d "$GCC_TOOLCHAIN" ];
-then
-  die "GCC riscv64-unknown-linux-gnu toolchain location '$GCC_TOOLCHAIN' must be a directory"
-fi
-
-info "Using GCC riscv64-unknown-linux-gnu toolchain at '$GCC_TOOLCHAIN'"
-
-RISCV_SYSROOT=${RISCV_SYSROOT:-"${GCC_TOOLCHAIN}/sysroot"}
-if [ ! -e "${RISCV_SYSROOT}" ];
-then
-  die "Linux RISC-V sysroot at '${RISCV_SYSROOT}' not found. You can override it setting the RISCV_SYSROOT environment variable"
-fi
-
-################################################################################
 # Detection of build system
 ################################################################################
 
@@ -263,8 +236,6 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR} \
    -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=RISCV \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
    -DLLVM_DEFAULT_TARGET_TRIPLE=riscv64-unknown-linux-gnu \
-   -DDEFAULT_SYSROOT=${RISCV_SYSROOT} \
-   -DGCC_INSTALL_PREFIX=${GCC_TOOLCHAIN} \
    -DLLVM_INSTALL_UTILS=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
