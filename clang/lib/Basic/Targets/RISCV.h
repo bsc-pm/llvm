@@ -30,13 +30,11 @@ protected:
   bool HasF;
   bool HasD;
   bool HasC;
-  bool HardFloatSingle;
-  bool HardFloatDouble;
 
 public:
   RISCVTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple), HasM(false), HasA(false), HasF(false), HasD(false),
-        HasC(false), HardFloatSingle(false), HardFloatDouble(false) {
+        HasC(false) {
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
     LongDoubleFormat = &llvm::APFloat::IEEEquad();

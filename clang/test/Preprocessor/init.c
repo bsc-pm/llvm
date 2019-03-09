@@ -10186,18 +10186,18 @@
 // RISCV64-LINUX: #define linux 1
 // RISCV64-LINUX: #define unix 1
 
-// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32f -target-feature +hard-float-single < /dev/null \
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32f < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV32-ILP32F %s
 // RISCV32-ILP32F: #define __riscv_float_abi_single 1
 
-// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32d -target-feature +hard-float-double < /dev/null \
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32d < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV32-ILP32D %s
 // RISCV32-ILP32D: #define __riscv_float_abi_double 1
 
-// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64f -target-feature +hard-float-single < /dev/null \
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64f < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV64-LP64F %s
 // RISCV64-LP64F: #define __riscv_float_abi_single 1
 
-// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64d -target-feature +hard-float-double < /dev/null \
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64d < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV64-LP64D %s
 // RISCV64-LP64D: #define __riscv_float_abi_double 1

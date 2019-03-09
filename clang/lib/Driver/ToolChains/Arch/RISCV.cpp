@@ -386,13 +386,6 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     }
   }
 
-  // Forward the ABI correctly for code generation.
-  StringRef ABI = getRISCVABI(Args, Triple);
-  if (ABI == "ilp32f" || ABI == "lp64f")
-    Features.push_back("+hard-float-single");
-  else if (ABI == "ilp32d" || ABI == "lp64d")
-    Features.push_back("+hard-float-double");
-
   // -mrelax is default, unless -mno-relax is specified.
   bool Relax = true;
   if (auto *A = Args.getLastArg(options::OPT_mrelax, options::OPT_mno_relax)) {
