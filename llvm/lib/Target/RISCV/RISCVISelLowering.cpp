@@ -42,6 +42,22 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
                                          const RISCVSubtarget &STI)
     : TargetLowering(TM), Subtarget(STI) {
 
+  RISCVABI::ABI ABI = Subtarget.getTargetABI();
+  assert(ABI != RISCVABI::ABI_Unknown && "Improperly initialised target ABI");
+
+  switch (ABI) {
+  default:
+    report_fatal_error("Don't know how to lower this ABI");
+  case RISCVABI::ABI_ILP32:
+  case RISCVABI::ABI_ILP32F:
+  case RISCVABI::ABI_ILP32D:
+
+  case RISCVABI::ABI_LP64:
+  case RISCVABI::ABI_LP64F:
+  case RISCVABI::ABI_LP64D:
+    break;
+  }
+
   MVT XLenVT = Subtarget.getXLenVT();
 
   // Set up the register classes.
@@ -901,22 +917,8 @@ static MachineBasicBlock *emitBuildPairF64Pseudo(MachineInstr &MI,
   return BB;
 }
 
-MachineBasicBlock *
-RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
-                                                 MachineBasicBlock *BB) const {
-  switch (MI.getOpcode()) {
-  default:
-    llvm_unreachable("Unexpected instr type to insert");
-  case RISCV::Select_GPR_Using_CC_GPR:
-  case RISCV::Select_FPR32_Using_CC_GPR:
-  case RISCV::Select_FPR64_Using_CC_GPR:
-    break;
-  case RISCV::BuildPairF64Pseudo:
-    return emitBuildPairF64Pseudo(MI, BB);
-  case RISCV::SplitF64Pseudo:
-    return emitSplitF64Pseudo(MI, BB);
-  }
-
+static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
+                                           MachineBasicBlock *BB) {
   // To "insert" a SELECT instruction, we actually have to insert the triangle
   // control-flow pattern.  The incoming instruction knows the destination vreg
   // to set, the condition code register to branch on, the true/false values to
@@ -974,6 +976,23 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
 
   MI.eraseFromParent(); // The pseudo instruction is gone now.
   return TailMBB;
+}
+
+MachineBasicBlock *
+RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
+                                                 MachineBasicBlock *BB) const {
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instr type to insert");
+  case RISCV::Select_GPR_Using_CC_GPR:
+  case RISCV::Select_FPR32_Using_CC_GPR:
+  case RISCV::Select_FPR64_Using_CC_GPR:
+    return emitSelectPseudo(MI, BB);
+  case RISCV::BuildPairF64Pseudo:
+    return emitBuildPairF64Pseudo(MI, BB);
+  case RISCV::SplitF64Pseudo:
+    return emitSplitF64Pseudo(MI, BB);
+  }
 }
 
 // Calling Convention Implementation.

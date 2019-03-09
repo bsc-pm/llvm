@@ -1,4 +1,4 @@
-; RUN: llc -mtriple=riscv64 -mattr=+f,+d,+hard-float-double < %s | FileCheck %s
+; RUN: llc -mtriple=riscv64 -target-abi lp64d -mattr=+f,+d < %s | FileCheck %s
 
 ; -- float
 

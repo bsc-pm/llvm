@@ -58,15 +58,6 @@ def FeatureRelax
     : SubtargetFeature<"relax", "EnableLinkerRelax", "true",
                        "Enable Linker relaxation.">;
 
-def SoftFloat : SubtargetFeature<"soft-float", "ABI", "FloatABI::Soft",
-                                 "Enables a soft-float ABI">;
-def HardFloatSingle : SubtargetFeature<"hard-float-single", "ABI", "FloatABI::HardSingle",
-                                 "Enables a hard-float ABI up to 32-bit floats",
-                                 [FeatureStdExtF]>;
-def HardFloatDouble : SubtargetFeature<"hard-float-double", "ABI", "FloatABI::HardDouble",
-                                 "Enables a hard-float ABI up to 64-bit floats",
-                                 [FeatureStdExtD]>;
-
 //===----------------------------------------------------------------------===//
 // Registers, calling conventions, instruction descriptions.
 //===----------------------------------------------------------------------===//
