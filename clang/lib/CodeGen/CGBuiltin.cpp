@@ -13026,9 +13026,9 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_FP_RELATIONAL(vfeq)
     EPI_FP_RELATIONAL(vfne)
     EPI_FP_RELATIONAL(vflt)
-    EPI_FP_RELATIONAL(vflte)
+    EPI_FP_RELATIONAL(vfle)
     EPI_FP_RELATIONAL(vfgt)
-    EPI_FP_RELATIONAL(vfgte)
+    EPI_FP_RELATIONAL(vfge)
     EPI_FP_RELATIONAL(vford)
 
     EPI_FP_BINARY(vfmerge)
