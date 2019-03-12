@@ -4,6 +4,18 @@
 ; RUN: llc -mtriple=riscv64 -verify-machineinstrs -frame-pointer=all < %s \
 ; RUN:   | FileCheck -check-prefix=RV64I-WITHFP %s
 
+; RUN: llc -mtriple=riscv64 -mattr=+f -target-abi lp64f \
+; RUN:   -verify-machineinstrs < %s | FileCheck -check-prefix=RV64F-FPELIM %s
+; RUN: llc -mtriple=riscv64 -mattr=+f -target-abi lp64f \
+; RUN:   -verify-machineinstrs -frame-pointer=all < %s \
+; RUN:   | FileCheck -check-prefix=RV64F-WITHFP %s
+
+; RUN: llc -mtriple=riscv64 -mattr=+f,+d -target-abi lp64d \
+; RUN:   -verify-machineinstrs < %s | FileCheck -check-prefix=RV64D-FPELIM %s
+; RUN: llc -mtriple=riscv64 -mattr=+f,+d -target-abi lp64d \
+; RUN:   -verify-machineinstrs -frame-pointer=all < %s \
+; RUN:   | FileCheck -check-prefix=RV64D-WITHFP %s
+
 ; As well as calling convention details, we check that ra and fp are
 ; consistently stored to fp-8 and fp-16.
 
@@ -47,6 +59,44 @@ define i64 @callee_float_in_regs(i64 %a, float %b) nounwind {
 ; RV64I-WITHFP-NEXT:    ld ra, 24(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 32
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: callee_float_in_regs:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    fcvt.l.s a1, fa0, rtz
+; RV64F-FPELIM-NEXT:    add a0, a0, a1
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: callee_float_in_regs:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    fcvt.l.s a1, fa0, rtz
+; RV64F-WITHFP-NEXT:    add a0, a0, a1
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: callee_float_in_regs:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    fcvt.l.s a1, fa0, rtz
+; RV64D-FPELIM-NEXT:    add a0, a0, a1
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: callee_float_in_regs:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    fcvt.l.s a1, fa0, rtz
+; RV64D-WITHFP-NEXT:    add a0, a0, a1
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   %b_fptosi = fptosi float %b to i64
   %1 = add i64 %a, %b_fptosi
   ret i64 %1
@@ -77,6 +127,64 @@ define i64 @caller_float_in_regs() nounwind {
 ; RV64I-WITHFP-NEXT:    ld ra, 8(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 16
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: caller_float_in_regs:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    addi sp, sp, -16
+; RV64F-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64F-FPELIM-NEXT:    lui a0, %hi(.LCPI1_0)
+; RV64F-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI1_0)
+; RV64F-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64F-FPELIM-NEXT:    addi a0, zero, 1
+; RV64F-FPELIM-NEXT:    call callee_float_in_regs
+; RV64F-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64F-FPELIM-NEXT:    addi sp, sp, 16
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: caller_float_in_regs:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    lui a0, %hi(.LCPI1_0)
+; RV64F-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI1_0)
+; RV64F-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64F-WITHFP-NEXT:    addi a0, zero, 1
+; RV64F-WITHFP-NEXT:    call callee_float_in_regs
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: caller_float_in_regs:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    addi sp, sp, -16
+; RV64D-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64D-FPELIM-NEXT:    lui a0, %hi(.LCPI1_0)
+; RV64D-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI1_0)
+; RV64D-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64D-FPELIM-NEXT:    addi a0, zero, 1
+; RV64D-FPELIM-NEXT:    call callee_float_in_regs
+; RV64D-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64D-FPELIM-NEXT:    addi sp, sp, 16
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: caller_float_in_regs:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    lui a0, %hi(.LCPI1_0)
+; RV64D-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI1_0)
+; RV64D-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64D-WITHFP-NEXT:    addi a0, zero, 1
+; RV64D-WITHFP-NEXT:    call callee_float_in_regs
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   %1 = call i64 @callee_float_in_regs(i64 1, float 2.0)
   ret i64 %1
 }
@@ -98,6 +206,40 @@ define i64 @callee_float_on_stack(i128 %a, i128 %b, i128 %c, i128 %d, float %e) 
 ; RV64I-WITHFP-NEXT:    ld ra, 8(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 16
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: callee_float_on_stack:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    fmv.x.w a0, fa0
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: callee_float_on_stack:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    fmv.x.w a0, fa0
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: callee_float_on_stack:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    fmv.x.w a0, fa0
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: callee_float_on_stack:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    fmv.x.w a0, fa0
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   %1 = trunc i128 %d to i64
   %2 = bitcast float %e to i32
   %3 = sext i32 %2 to i64
@@ -146,6 +288,92 @@ define i64 @caller_float_on_stack() nounwind {
 ; RV64I-WITHFP-NEXT:    ld ra, 24(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 32
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: caller_float_on_stack:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    addi sp, sp, -16
+; RV64F-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64F-FPELIM-NEXT:    lui a0, %hi(.LCPI3_0)
+; RV64F-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI3_0)
+; RV64F-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64F-FPELIM-NEXT:    addi a0, zero, 1
+; RV64F-FPELIM-NEXT:    mv a1, zero
+; RV64F-FPELIM-NEXT:    addi a2, zero, 2
+; RV64F-FPELIM-NEXT:    mv a3, zero
+; RV64F-FPELIM-NEXT:    addi a4, zero, 3
+; RV64F-FPELIM-NEXT:    mv a5, zero
+; RV64F-FPELIM-NEXT:    addi a6, zero, 4
+; RV64F-FPELIM-NEXT:    mv a7, zero
+; RV64F-FPELIM-NEXT:    call callee_float_on_stack
+; RV64F-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64F-FPELIM-NEXT:    addi sp, sp, 16
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: caller_float_on_stack:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    lui a0, %hi(.LCPI3_0)
+; RV64F-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI3_0)
+; RV64F-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64F-WITHFP-NEXT:    addi a0, zero, 1
+; RV64F-WITHFP-NEXT:    mv a1, zero
+; RV64F-WITHFP-NEXT:    addi a2, zero, 2
+; RV64F-WITHFP-NEXT:    mv a3, zero
+; RV64F-WITHFP-NEXT:    addi a4, zero, 3
+; RV64F-WITHFP-NEXT:    mv a5, zero
+; RV64F-WITHFP-NEXT:    addi a6, zero, 4
+; RV64F-WITHFP-NEXT:    mv a7, zero
+; RV64F-WITHFP-NEXT:    call callee_float_on_stack
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: caller_float_on_stack:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    addi sp, sp, -16
+; RV64D-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64D-FPELIM-NEXT:    lui a0, %hi(.LCPI3_0)
+; RV64D-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI3_0)
+; RV64D-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64D-FPELIM-NEXT:    addi a0, zero, 1
+; RV64D-FPELIM-NEXT:    mv a1, zero
+; RV64D-FPELIM-NEXT:    addi a2, zero, 2
+; RV64D-FPELIM-NEXT:    mv a3, zero
+; RV64D-FPELIM-NEXT:    addi a4, zero, 3
+; RV64D-FPELIM-NEXT:    mv a5, zero
+; RV64D-FPELIM-NEXT:    addi a6, zero, 4
+; RV64D-FPELIM-NEXT:    mv a7, zero
+; RV64D-FPELIM-NEXT:    call callee_float_on_stack
+; RV64D-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64D-FPELIM-NEXT:    addi sp, sp, 16
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: caller_float_on_stack:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    lui a0, %hi(.LCPI3_0)
+; RV64D-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI3_0)
+; RV64D-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64D-WITHFP-NEXT:    addi a0, zero, 1
+; RV64D-WITHFP-NEXT:    mv a1, zero
+; RV64D-WITHFP-NEXT:    addi a2, zero, 2
+; RV64D-WITHFP-NEXT:    mv a3, zero
+; RV64D-WITHFP-NEXT:    addi a4, zero, 3
+; RV64D-WITHFP-NEXT:    mv a5, zero
+; RV64D-WITHFP-NEXT:    addi a6, zero, 4
+; RV64D-WITHFP-NEXT:    mv a7, zero
+; RV64D-WITHFP-NEXT:    call callee_float_on_stack
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   %1 = call i64 @callee_float_on_stack(i128 1, i128 2, i128 3, i128 4, float 5.0)
   ret i64 %1
 }
@@ -167,6 +395,48 @@ define float @callee_tiny_scalar_ret() nounwind {
 ; RV64I-WITHFP-NEXT:    ld ra, 8(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 16
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: callee_tiny_scalar_ret:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    lui a0, %hi(.LCPI4_0)
+; RV64F-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI4_0)
+; RV64F-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: callee_tiny_scalar_ret:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    lui a0, %hi(.LCPI4_0)
+; RV64F-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI4_0)
+; RV64F-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: callee_tiny_scalar_ret:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    lui a0, %hi(.LCPI4_0)
+; RV64D-FPELIM-NEXT:    addi a0, a0, %lo(.LCPI4_0)
+; RV64D-FPELIM-NEXT:    flw fa0, 0(a0)
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: callee_tiny_scalar_ret:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    lui a0, %hi(.LCPI4_0)
+; RV64D-WITHFP-NEXT:    addi a0, a0, %lo(.LCPI4_0)
+; RV64D-WITHFP-NEXT:    flw fa0, 0(a0)
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   ret float 1.0
 }
 
@@ -196,6 +466,52 @@ define i64 @caller_tiny_scalar_ret() nounwind {
 ; RV64I-WITHFP-NEXT:    ld ra, 8(sp)
 ; RV64I-WITHFP-NEXT:    addi sp, sp, 16
 ; RV64I-WITHFP-NEXT:    ret
+;
+; RV64F-FPELIM-LABEL: caller_tiny_scalar_ret:
+; RV64F-FPELIM:       # %bb.0:
+; RV64F-FPELIM-NEXT:    addi sp, sp, -16
+; RV64F-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64F-FPELIM-NEXT:    call callee_tiny_scalar_ret
+; RV64F-FPELIM-NEXT:    fmv.x.w a0, fa0
+; RV64F-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64F-FPELIM-NEXT:    addi sp, sp, 16
+; RV64F-FPELIM-NEXT:    ret
+;
+; RV64F-WITHFP-LABEL: caller_tiny_scalar_ret:
+; RV64F-WITHFP:       # %bb.0:
+; RV64F-WITHFP-NEXT:    addi sp, sp, -16
+; RV64F-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64F-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64F-WITHFP-NEXT:    addi s0, sp, 16
+; RV64F-WITHFP-NEXT:    call callee_tiny_scalar_ret
+; RV64F-WITHFP-NEXT:    fmv.x.w a0, fa0
+; RV64F-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64F-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64F-WITHFP-NEXT:    addi sp, sp, 16
+; RV64F-WITHFP-NEXT:    ret
+;
+; RV64D-FPELIM-LABEL: caller_tiny_scalar_ret:
+; RV64D-FPELIM:       # %bb.0:
+; RV64D-FPELIM-NEXT:    addi sp, sp, -16
+; RV64D-FPELIM-NEXT:    sd ra, 8(sp)
+; RV64D-FPELIM-NEXT:    call callee_tiny_scalar_ret
+; RV64D-FPELIM-NEXT:    fmv.x.w a0, fa0
+; RV64D-FPELIM-NEXT:    ld ra, 8(sp)
+; RV64D-FPELIM-NEXT:    addi sp, sp, 16
+; RV64D-FPELIM-NEXT:    ret
+;
+; RV64D-WITHFP-LABEL: caller_tiny_scalar_ret:
+; RV64D-WITHFP:       # %bb.0:
+; RV64D-WITHFP-NEXT:    addi sp, sp, -16
+; RV64D-WITHFP-NEXT:    sd ra, 8(sp)
+; RV64D-WITHFP-NEXT:    sd s0, 0(sp)
+; RV64D-WITHFP-NEXT:    addi s0, sp, 16
+; RV64D-WITHFP-NEXT:    call callee_tiny_scalar_ret
+; RV64D-WITHFP-NEXT:    fmv.x.w a0, fa0
+; RV64D-WITHFP-NEXT:    ld s0, 0(sp)
+; RV64D-WITHFP-NEXT:    ld ra, 8(sp)
+; RV64D-WITHFP-NEXT:    addi sp, sp, 16
+; RV64D-WITHFP-NEXT:    ret
   %1 = call float @callee_tiny_scalar_ret()
   %2 = bitcast float %1 to i32
   %3 = sext i32 %2 to i64
