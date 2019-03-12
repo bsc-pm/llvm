@@ -982,9 +982,9 @@ intrinsics = [
         BinaryIntrinsic("vfeq", type_generator = generate_binary_float_types_relational, variants = vv_vf),
         BinaryIntrinsic("vfne", type_generator = generate_binary_float_types_relational, variants = vv_vf),
         BinaryIntrinsic("vflt", type_generator = generate_binary_float_types_relational, variants = vv_vf),
-        BinaryIntrinsic("vflte", type_generator = generate_binary_float_types_relational, variants = vv_vf),
+        BinaryIntrinsic("vfle", type_generator = generate_binary_float_types_relational, variants = vv_vf),
         BinaryIntrinsic("vfgt", type_generator = generate_binary_float_types_relational, variants = vf),
-        BinaryIntrinsic("vfgte", type_generator = generate_binary_float_types_relational, variants = vf),
+        BinaryIntrinsic("vfge", type_generator = generate_binary_float_types_relational, variants = vf),
         BinaryIntrinsic("vford", type_generator = generate_binary_float_types_relational, variants = vv_vf),
 
         BinaryIntrinsic("vfmerge", type_generator = generate_binary_float_types, variants = vv, instruction = "vmerge"),

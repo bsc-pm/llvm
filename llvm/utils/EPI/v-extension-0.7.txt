@@ -236,10 +236,10 @@ vfne.vv vd, vs2, vs1, vm
 vfne.vf vd, vs2, rs1, vm
 vflt.vv vd, vs2, vs1, vm
 vflt.vf vd, vs2, rs1, vm
-vflte.vv vd, vs2, vs1, vm
-vflte.vf vd, vs2, rs1, vm
+vfle.vv vd, vs2, vs1, vm
+vfle.vf vd, vs2, rs1, vm
 vfgt.vf vd, vs2, rs1, vm
-vfgte.vf vd, vs2, rs1, vm
+vfge.vf vd, vs2, rs1, vm
 vford.vv vd, vs2, vs1, vm
 vford.vf vd, vs2, rs1, vm
 vfclass.v vd, vs2, vm
@@ -560,8 +560,8 @@ vfmv.s.f|OPFVF|funct=001101|vs2=00000|vm=1
 vfmerge.vf|OPFVF|funct=010111
 vfeq.vv|OPFVV|funct=011000
 vfeq.vf|OPFVF|funct=011000
-vflte.vv|OPFVV|funct=011001
-vflte.vf|OPFVF|funct=011001
+vfle.vv|OPFVV|funct=011001
+vfle.vf|OPFVF|funct=011001
 vford.vv|OPFVV|funct=011010
 vford.vf|OPFVF|funct=011010
 vflt.vv|OPFVV|funct=011011
@@ -569,7 +569,7 @@ vflt.vf|OPFVF|funct=011011
 vfne.vv|OPFVV|funct=011100
 vfne.vf|OPFVF|funct=011100
 vfgt.vf|OPFVF|funct=011101
-vfgte.vf|OPFVF|funct=011111
+vfge.vf|OPFVF|funct=011111
 vfdiv.vv|OPFVV|funct=100000
 vfdiv.vf|OPFVF|funct=100000
 vfrdiv.vf|OPFVF|funct=100001
