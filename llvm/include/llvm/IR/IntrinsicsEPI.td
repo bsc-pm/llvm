@@ -277,9 +277,9 @@ defm vfsgnjx : epi_binary;
 defm vfeq : epi_relational;
 defm vfne : epi_relational;
 defm vflt : epi_relational;
-defm vflte : epi_relational;
+defm vfle : epi_relational;
 defm vfgt : epi_relational;
-defm vfgte : epi_relational;
+defm vfge : epi_relational;
 defm vford : epi_relational;
 
 defm vfmerge : epi_binary;

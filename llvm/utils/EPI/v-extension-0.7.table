@@ -213,8 +213,8 @@ VFMV.S.F|vd,rs1|001101|1|00000|rs1|101|vd|1010111
 VFMERGE.VF|vd,vs2,rs1,vm|010111|vm|vs2|rs1|101|vd|1010111
 VFEQ.VV|vd,vs2,vs1,vm|011000|vm|vs2|vs1|001|vd|1010111
 VFEQ.VF|vd,vs2,rs1,vm|011000|vm|vs2|rs1|101|vd|1010111
-VFLTE.VV|vd,vs2,vs1,vm|011001|vm|vs2|vs1|001|vd|1010111
-VFLTE.VF|vd,vs2,rs1,vm|011001|vm|vs2|rs1|101|vd|1010111
+VFLE.VV|vd,vs2,vs1,vm|011001|vm|vs2|vs1|001|vd|1010111
+VFLE.VF|vd,vs2,rs1,vm|011001|vm|vs2|rs1|101|vd|1010111
 VFORD.VV|vd,vs2,vs1,vm|011010|vm|vs2|vs1|001|vd|1010111
 VFORD.VF|vd,vs2,rs1,vm|011010|vm|vs2|rs1|101|vd|1010111
 VFLT.VV|vd,vs2,vs1,vm|011011|vm|vs2|vs1|001|vd|1010111
@@ -222,7 +222,7 @@ VFLT.VF|vd,vs2,rs1,vm|011011|vm|vs2|rs1|101|vd|1010111
 VFNE.VV|vd,vs2,vs1,vm|011100|vm|vs2|vs1|001|vd|1010111
 VFNE.VF|vd,vs2,rs1,vm|011100|vm|vs2|rs1|101|vd|1010111
 VFGT.VF|vd,vs2,rs1,vm|011101|vm|vs2|rs1|101|vd|1010111
-VFGTE.VF|vd,vs2,rs1,vm|011111|vm|vs2|rs1|101|vd|1010111
+VFGE.VF|vd,vs2,rs1,vm|011111|vm|vs2|rs1|101|vd|1010111
 VFDIV.VV|vd,vs2,vs1,vm|100000|vm|vs2|vs1|001|vd|1010111
 VFDIV.VF|vd,vs2,rs1,vm|100000|vm|vs2|rs1|101|vd|1010111
 VFRDIV.VF|vd,vs2,rs1,vm|100001|vm|vs2|rs1|101|vd|1010111

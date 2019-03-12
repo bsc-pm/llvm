@@ -1040,15 +1040,15 @@ vfeq.vf v8, v7, fs2
 # CHECK: vfeq.vf v10, v9, fs3, v0.t
 vfeq.vf v10, v9, fs3, v0.t
 
-# CHECK: vflte.vv v13, v11, v12
-vflte.vv v13, v11, v12
-# CHECK: vflte.vv v16, v14, v15, v0.t
-vflte.vv v16, v14, v15, v0.t
+# CHECK: vfle.vv v13, v11, v12
+vfle.vv v13, v11, v12
+# CHECK: vfle.vv v16, v14, v15, v0.t
+vfle.vv v16, v14, v15, v0.t
 
-# CHECK: vflte.vf v18, v17, fs4
-vflte.vf v18, v17, fs4
-# CHECK: vflte.vf v20, v19, fs5, v0.t
-vflte.vf v20, v19, fs5, v0.t
+# CHECK: vfle.vf v18, v17, fs4
+vfle.vf v18, v17, fs4
+# CHECK: vfle.vf v20, v19, fs5, v0.t
+vfle.vf v20, v19, fs5, v0.t
 
 # CHECK: vford.vv v23, v21, v22
 vford.vv v23, v21, v22
@@ -1085,10 +1085,10 @@ vfgt.vf v20, v19, ft8
 # CHECK: vfgt.vf v22, v21, ft9, v0.t
 vfgt.vf v22, v21, ft9, v0.t
 
-# CHECK: vfgte.vf v24, v23, ft10
-vfgte.vf v24, v23, ft10
-# CHECK: vfgte.vf v26, v25, ft0, v0.t
-vfgte.vf v26, v25, ft0, v0.t
+# CHECK: vfge.vf v24, v23, ft10
+vfge.vf v24, v23, ft10
+# CHECK: vfge.vf v26, v25, ft0, v0.t
+vfge.vf v26, v25, ft0, v0.t
 
 # CHECK: vfdiv.vv v29, v27, v28
 vfdiv.vv v29, v27, v28

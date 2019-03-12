@@ -910,12 +910,12 @@ def VFMERGE_VF_MASK : RVInstEPIOPV_FVF<0b010111,
            "${rd}, ${rs2}, ${rs1}, ${vm}">;
 
 defm VFEQ    : binary_arithmetic_float_vf<"vfeq",  0b011000>;
-defm VFLTE   : binary_arithmetic_float_vf<"vflte", 0b011001>;
+defm VFLE   : binary_arithmetic_float_vf<"vfle", 0b011001>;
 defm VFORD   : binary_arithmetic_float_vf<"vford", 0b011010>;
 defm VFLT    : binary_arithmetic_float_vf<"vflt",  0b011011>;
 defm VFNE    : binary_arithmetic_float_vf<"vfne",  0b011100>;
 defm VFGT    : binary_arithmetic_float_f<"vfgt",  0b011101>;
-defm VFGTE   : binary_arithmetic_float_f<"vfgte", 0b011111>;
+defm VFGE   : binary_arithmetic_float_f<"vfge", 0b011111>;
 
 defm VFDIV   : binary_arithmetic_float_vf<"vfdiv",  0b100000>;
 defm VFRDIV  : binary_arithmetic_float_vf<"vfrdiv", 0b100001>;
@@ -2045,23 +2045,23 @@ def : Pat<(vtp.Vector (int_epi_vfmv_s_f (vtp.Scalar EPIFPR:$rs2))),
           (VFMV_S_F $rs2)>;
 
 defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vfeq", "VFEQ">;
-defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vflte", "VFLTE">;
+defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vfle", "VFLE">;
 defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vford", "VFORD">;
 defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vflt", "VFLT">;
 defm "" : pat_intrinsic_binary_relational_fp_vv_vf<"int_epi_vfne", "VFNE">;
 
 defm "" : pat_intrinsic_binary_relational_fp_vf<"int_epi_vfgt", "VFGT">;
-defm "" : pat_intrinsic_binary_relational_fp_vf<"int_epi_vfgte", "VFGTE">;
+defm "" : pat_intrinsic_binary_relational_fp_vf<"int_epi_vfge", "VFGE">;
 foreach vtp = AllFloatVectors.Values in {
    def : Pat<(nxv1i1 (int_epi_vfgt (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
              (VFLT_VV $rs2, $rs1)>;
    def : Pat<(nxv1i1 (int_epi_vfgt_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
              (VFLT_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
 
-   def : Pat<(nxv1i1 (int_epi_vfgte (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
-             (VFLTE_VV $rs2, $rs1)>;
-   def : Pat<(nxv1i1 (int_epi_vfgte_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
-             (VFLTE_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
+   def : Pat<(nxv1i1 (int_epi_vfge (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
+             (VFLE_VV $rs2, $rs1)>;
+   def : Pat<(nxv1i1 (int_epi_vfge_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
+             (VFLE_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
 }
 
 defm "" : pat_intrinsic_binary_fp_vv_vf<"int_epi_vfdiv", "VFDIV">;
