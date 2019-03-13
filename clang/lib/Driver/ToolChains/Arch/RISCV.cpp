@@ -366,8 +366,7 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
   } else {
     // GNU/Linux uses RV64GC
     if (Triple.getArch() == llvm::Triple::riscv64 &&
-        Triple.getOS() == llvm::Triple::Linux &&
-        Triple.getEnvironment() == llvm::Triple::GNU) {
+        Triple.getOS() == llvm::Triple::Linux) {
       Features.push_back("+m");
       Features.push_back("+a");
       Features.push_back("+f");
