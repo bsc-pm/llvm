@@ -6,31 +6,31 @@ define i32 @callee(i32 %a, i64 %b, i32 %c, i32 %d, double %e) {
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    addi sp, sp, -32
 ; CHECK-NEXT:    sw ra, 28(sp)
-; CHECK-NEXT:    sw s1, 24(sp)
-; CHECK-NEXT:    sw s2, 20(sp)
-; CHECK-NEXT:    sw s3, 16(sp)
-; CHECK-NEXT:    sw s4, 12(sp)
+; CHECK-NEXT:    sw s0, 24(sp)
+; CHECK-NEXT:    sw s1, 20(sp)
+; CHECK-NEXT:    sw s2, 16(sp)
+; CHECK-NEXT:    sw s3, 12(sp)
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-NEXT:    .cfi_offset 1, -4
-; CHECK-NEXT:    .cfi_offset 9, -8
-; CHECK-NEXT:    .cfi_offset 18, -12
-; CHECK-NEXT:    .cfi_offset 19, -16
-; CHECK-NEXT:    .cfi_offset 20, -20
+; CHECK-NEXT:    .cfi_offset 8, -8
+; CHECK-NEXT:    .cfi_offset 9, -12
+; CHECK-NEXT:    .cfi_offset 18, -16
+; CHECK-NEXT:    .cfi_offset 19, -20
 ; CHECK-NEXT:    mv s2, a4
 ; CHECK-NEXT:    mv s3, a3
-; CHECK-NEXT:    mv s4, a1
+; CHECK-NEXT:    mv s0, a1
 ; CHECK-NEXT:    mv s1, a0
 ; CHECK-NEXT:    mv a0, a5
 ; CHECK-NEXT:    mv a1, a6
 ; CHECK-NEXT:    call __fixdfsi
-; CHECK-NEXT:    add a1, s1, s4
+; CHECK-NEXT:    add a1, s1, s0
 ; CHECK-NEXT:    add a1, a1, s3
 ; CHECK-NEXT:    add a1, a1, s2
 ; CHECK-NEXT:    add a0, a1, a0
-; CHECK-NEXT:    lw s4, 12(sp)
-; CHECK-NEXT:    lw s3, 16(sp)
-; CHECK-NEXT:    lw s2, 20(sp)
-; CHECK-NEXT:    lw s1, 24(sp)
+; CHECK-NEXT:    lw s3, 12(sp)
+; CHECK-NEXT:    lw s2, 16(sp)
+; CHECK-NEXT:    lw s1, 20(sp)
+; CHECK-NEXT:    lw s0, 24(sp)
 ; CHECK-NEXT:    lw ra, 28(sp)
 ; CHECK-NEXT:    addi sp, sp, 32
 ; CHECK-NEXT:    ret
