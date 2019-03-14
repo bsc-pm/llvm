@@ -386,17 +386,16 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     }
   }
 
-  // -mrelax is default, unless -mno-relax is specified.
-  bool Relax = true;
+  // -mno-relax is default, unless -mrelax is specified.
+  bool Relax = false;
   if (auto *A = Args.getLastArg(options::OPT_mrelax, options::OPT_mno_relax)) {
-    if (A->getOption().matches(options::OPT_mno_relax)) {
-      Relax = false;
-      Features.push_back("-relax");
-    }
+    Relax = A->getOption().matches(options::OPT_mrelax);
   }
 
   if (Relax)
     Features.push_back("+relax");
+  else
+    Features.push_back("-relax");
 
   // Now add any that the user explicitly requested on the command line,
   // which may override the defaults.
