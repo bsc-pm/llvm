@@ -84,21 +84,6 @@ public:
   MVT getXLenVT() const { return XLenVT; }
   unsigned getXLen() const { return XLen; }
 
-  bool isSoftFloat() const {
-    return TargetABI == RISCVABI::ABI_ILP32 || TargetABI == RISCVABI::ABI_LP64;
-  }
-  bool isHardFloat() const {
-    return isHardFloatSingle() || isHardFloatDouble();
-  }
-  bool isHardFloatSingle() const {
-    return TargetABI == RISCVABI::ABI_ILP32F ||
-           TargetABI == RISCVABI::ABI_LP64F;
-  }
-  bool isHardFloatDouble() const {
-    return TargetABI == RISCVABI::ABI_ILP32D ||
-           TargetABI == RISCVABI::ABI_LP64D;
-  }
-
   unsigned char ClassifyPICGlobalReference(const GlobalValue *GV,
                                            const TargetMachine &TM) const;
 

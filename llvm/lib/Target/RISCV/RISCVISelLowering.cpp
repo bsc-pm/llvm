@@ -51,7 +51,6 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   case RISCVABI::ABI_ILP32:
   case RISCVABI::ABI_ILP32F:
   case RISCVABI::ABI_ILP32D:
-
   case RISCVABI::ABI_LP64:
   case RISCVABI::ABI_LP64F:
   case RISCVABI::ABI_LP64D:
@@ -1024,13 +1023,11 @@ static const MCPhysReg ArgGPRs[] = {
   RISCV::X10, RISCV::X11, RISCV::X12, RISCV::X13,
   RISCV::X14, RISCV::X15, RISCV::X16, RISCV::X17
 };
-
-static const MCPhysReg ArgF32PRs[] = {
+static const MCPhysReg ArgFPR32s[] = {
   RISCV::F10_32, RISCV::F11_32, RISCV::F12_32, RISCV::F13_32,
   RISCV::F14_32, RISCV::F15_32, RISCV::F16_32, RISCV::F17_32
 };
-
-static const MCPhysReg ArgF64PRs[] = {
+static const MCPhysReg ArgFPR64s[] = {
   RISCV::F10_64, RISCV::F11_64, RISCV::F12_64, RISCV::F13_64,
   RISCV::F14_64, RISCV::F15_64, RISCV::F16_64, RISCV::F17_64
 };
@@ -1074,10 +1071,10 @@ static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
 }
 
 // Implements the RISC-V calling convention. Returns true upon failure.
-static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
-                     CCValAssign::LocInfo LocInfo, ISD::ArgFlagsTy ArgFlags,
-                     CCState &State, bool IsFixed, bool IsRet, Type *OrigTy,
-                     const RISCVSubtarget& Subtarget) {
+static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
+                     MVT ValVT, MVT LocVT, CCValAssign::LocInfo LocInfo,
+                     ISD::ArgFlagsTy ArgFlags, CCState &State, bool IsFixed,
+                     bool IsRet, Type *OrigTy) {
   unsigned XLen = DL.getLargestLegalIntTypeSizeInBits();
   assert(XLen == 32 || XLen == 64);
   MVT XLenVT = XLen == 32 ? MVT::i32 : MVT::i64;
@@ -1087,14 +1084,44 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
   if (IsRet && ValNo > 1)
     return true;
 
-  if (Subtarget.isSoftFloat()) {
-    if (ValVT == MVT::f32) {
-      LocVT = XLenVT;
-      LocInfo = CCValAssign::BCvt;
-    } else if (XLen == 64 && ValVT == MVT::f64) {
-      LocVT = MVT::i64;
-      LocInfo = CCValAssign::BCvt;
-    }
+  // UseGPRForF32 if targeting one of the soft-float ABIs, if passing a
+  // variadic argument, or if no F32 argument registers are available.
+  bool UseGPRForF32 = true;
+  // UseGPRForF64 if targeting soft-float ABIs or an FLEN=32 ABI, if passing a
+  // variadic argument, or if no F64 argument registers are available.
+  bool UseGPRForF64 = true;
+
+  switch (ABI) {
+  default:
+    llvm_unreachable("Unexpected ABI");
+  case RISCVABI::ABI_ILP32:
+  case RISCVABI::ABI_LP64:
+    break;
+  case RISCVABI::ABI_ILP32F:
+  case RISCVABI::ABI_LP64F:
+    UseGPRForF32 = !IsFixed;
+    break;
+  case RISCVABI::ABI_ILP32D:
+  case RISCVABI::ABI_LP64D:
+    UseGPRForF32 = !IsFixed;
+    UseGPRForF64 = !IsFixed;
+    break;
+  }
+
+  if (State.getFirstUnallocated(ArgFPR32s) == array_lengthof(ArgFPR32s))
+    UseGPRForF32 = true;
+  if (State.getFirstUnallocated(ArgFPR64s) == array_lengthof(ArgFPR64s))
+    UseGPRForF64 = true;
+
+  // From this point on, rely on UseGPRForF32, UseGPRForF64 and similar local
+  // variables rather than directly checking against the target ABI.
+
+  if (UseGPRForF32 && ValVT == MVT::f32) {
+    LocVT = XLenVT;
+    LocInfo = CCValAssign::BCvt;
+  } else if (UseGPRForF64 && XLen == 64 && ValVT == MVT::f64) {
+    LocVT = MVT::i64;
+    LocInfo = CCValAssign::BCvt;
   }
 
   // If this is a variadic argument, the RISC-V calling convention requires
@@ -1120,9 +1147,9 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
   assert(PendingLocs.size() == PendingArgFlags.size() &&
          "PendingLocs and PendingArgFlags out of sync");
 
-  // Handle passing f64 on RV32D with a soft float or hard float single ABI
-  if ((Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
-      XLen == 32 && ValVT == MVT::f64) {
+  // Handle passing f64 on RV32D with a soft float ABI or when floating point
+  // registers are exhausted.
+  if (UseGPRForF64 && XLen == 32 && ValVT == MVT::f64) {
     assert(!ArgFlags.isSplit() && PendingLocs.empty() &&
            "Can't lower f64 if it is split");
     // Depending on available argument GPRS, f64 may be passed in a pair of
@@ -1140,21 +1167,6 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
     if (!State.AllocateReg(ArgGPRs))
       State.AllocateStack(4, 4);
     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
-    return false;
-  }
-
-  // Handle passing f32 on RV64{F,D} with a soft float ABI
-  // LowerCall/LowerFormalArguments/LowerReturn must recognise these cases.
-  if (XLen == 64 && Subtarget.isSoftFloat() && ValVT == MVT::f32) {
-    unsigned Reg = State.AllocateReg(ArgGPRs);
-    LocVT = MVT::i64;
-    if (!Reg) {
-      unsigned StackOffset = State.AllocateStack(8, 8);
-      State.addLoc(
-          CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
-    } else {
-      State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
-    }
     return false;
   }
 
@@ -1185,21 +1197,14 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
                                ArgFlags);
   }
 
-  // Allocate this float to a floating point register if possible.
-  unsigned Reg = 0;
-  if (IsFixed && ((ValVT == MVT::f32 && Subtarget.isHardFloatSingle()) ||
-                   ((ValVT == MVT::f32 || ValVT == MVT::f64) &&
-                    Subtarget.isHardFloatDouble()))) {
-    // Use hard float registers if possible.
-    if (ValVT == MVT::f32)
-      Reg = State.AllocateReg(ArgF32PRs);
-    else if (ValVT == MVT::f64)
-      Reg = State.AllocateReg(ArgF64PRs);
-    else
-      llvm_unreachable("Unhandled float ABI");
-  }
-
-  if (!Reg) Reg = State.AllocateReg(ArgGPRs);
+  // Allocate to a register if possible, or else a stack slot.
+  unsigned Reg;
+  if (ValVT == MVT::f32 && !UseGPRForF32)
+    Reg = State.AllocateReg(ArgFPR32s, ArgFPR64s);
+  else if (ValVT == MVT::f64 && !UseGPRForF64)
+    Reg = State.AllocateReg(ArgFPR64s, ArgFPR32s);
+  else
+    Reg = Reg = State.AllocateReg(ArgGPRs);
   unsigned StackOffset = Reg ? 0 : State.AllocateStack(XLen / 8, XLen / 8);
 
   // If we reach this point and PendingLocs is non-empty, we must be at the
@@ -1220,7 +1225,8 @@ static bool CC_RISCV(const DataLayout &DL, unsigned ValNo, MVT ValVT, MVT LocVT,
     return false;
   }
 
-  assert(!Subtarget.isSoftFloat() || LocVT == XLenVT && "Expected an XLenVT at this stage");
+  assert((!UseGPRForF32 || !UseGPRForF64 || LocVT == XLenVT) &&
+         "Expected an XLenVT at this stage");
 
   if (Reg) {
     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
@@ -1252,8 +1258,9 @@ void RISCVTargetLowering::analyzeInputArgs(
     else if (Ins[i].isOrigArg())
       ArgTy = FType->getParamType(Ins[i].getOrigArgIndex());
 
-    if (CC_RISCV(MF.getDataLayout(), i, ArgVT, ArgVT, CCValAssign::Full,
-                 ArgFlags, CCInfo, /*IsRet=*/true, IsRet, ArgTy, Subtarget)) {
+    RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
+    if (CC_RISCV(MF.getDataLayout(), ABI, i, ArgVT, ArgVT, CCValAssign::Full,
+                 ArgFlags, CCInfo, /*IsRet=*/true, IsRet, ArgTy)) {
       LLVM_DEBUG(dbgs() << "InputArg #" << i << " has unhandled type "
                         << EVT(ArgVT).getEVTString() << '\n');
       llvm_unreachable(nullptr);
@@ -1272,8 +1279,9 @@ void RISCVTargetLowering::analyzeOutputArgs(
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
     Type *OrigTy = CLI ? CLI->getArgs()[Outs[i].OrigArgIndex].Ty : nullptr;
 
-    if (CC_RISCV(MF.getDataLayout(), i, ArgVT, ArgVT, CCValAssign::Full,
-                 ArgFlags, CCInfo, Outs[i].IsFixed, IsRet, OrigTy, Subtarget)) {
+    RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
+    if (CC_RISCV(MF.getDataLayout(), ABI, i, ArgVT, ArgVT, CCValAssign::Full,
+                 ArgFlags, CCInfo, Outs[i].IsFixed, IsRet, OrigTy)) {
       LLVM_DEBUG(dbgs() << "OutputArg #" << i << " has unhandled type "
                         << EVT(ArgVT).getEVTString() << "\n");
       llvm_unreachable(nullptr);
@@ -1309,8 +1317,24 @@ static SDValue unpackFromRegLoc(SelectionDAG &DAG, SDValue Chain,
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
   EVT LocVT = VA.getLocVT();
   SDValue Val;
+  const TargetRegisterClass *RC;
 
-  unsigned VReg = RegInfo.createVirtualRegister(&RISCV::GPRRegClass);
+  switch (LocVT.getSimpleVT().SimpleTy) {
+  default:
+    llvm_unreachable("Unexpected register type");
+  case MVT::i32:
+  case MVT::i64:
+    RC = &RISCV::GPRRegClass;
+    break;
+  case MVT::f32:
+    RC = &RISCV::FPR32RegClass;
+    break;
+  case MVT::f64:
+    RC = &RISCV::FPR64RegClass;
+    break;
+  }
+
+  unsigned VReg = RegInfo.createVirtualRegister(RC);
   RegInfo.addLiveIn(VA.getLocReg(), VReg);
   Val = DAG.getCopyFromReg(Chain, DL, VReg, LocVT);
 
@@ -1451,11 +1475,9 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     CCValAssign &VA = ArgLocs[i];
     SDValue ArgValue;
-    // Passing f64 on RV32D with a soft float or hard float single ABI must be
-    // handled as a special case.
-    if (XLenVT == MVT::i32 &&
-        (Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
-        VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64)
+    // Passing f64 on RV32D with a soft float ABI must be handled as a special
+    // case.
+    if (VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64)
       ArgValue = unpackF64OnRV32DSoftABI(DAG, Chain, VA, DL);
     else if (VA.isRegLoc())
       ArgValue = unpackFromRegLoc(DAG, Chain, VA, DL);
@@ -1707,8 +1729,6 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
     // Handle passing f64 on RV32D with a soft float or hard float single ABI as
     // a special case.
     bool IsF64OnRV32DSoftABI =
-        XLenVT == MVT::i32 &&
-        (Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
         VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64;
     if (IsF64OnRV32DSoftABI && VA.isRegLoc()) {
       SDValue SplitF64 = DAG.getNode(
@@ -1902,8 +1922,9 @@ bool RISCVTargetLowering::CanLowerReturn(
   for (unsigned i = 0, e = Outs.size(); i != e; ++i) {
     MVT VT = Outs[i].VT;
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
-    if (CC_RISCV(MF.getDataLayout(), i, VT, VT, CCValAssign::Full, ArgFlags,
-                 CCInfo, /*IsFixed=*/true, /*IsRet=*/true, nullptr, Subtarget))
+    RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
+    if (CC_RISCV(MF.getDataLayout(), ABI, i, VT, VT, CCValAssign::Full,
+                 ArgFlags, CCInfo, /*IsFixed=*/true, /*IsRet=*/true, nullptr))
       return false;
   }
   return true;
@@ -1934,10 +1955,8 @@ RISCVTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
     CCValAssign &VA = RVLocs[i];
     assert(VA.isRegLoc() && "Can only return in registers!");
 
-    if (Subtarget.getXLenVT() == MVT::i32 &&
-        (Subtarget.isSoftFloat() || Subtarget.isHardFloatSingle()) &&
-        VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64) {
-      // Handle returning f64 on RV32D with a soft float or hard float single ABI.
+    if (VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64) {
+      // Handle returning f64 on RV32D with a soft float ABI.
       assert(VA.isRegLoc() && "Expected return via registers");
       SDValue SplitF64 = DAG.getNode(RISCVISD::SplitF64, DL,
                                      DAG.getVTList(MVT::i32, MVT::i32), Val);
