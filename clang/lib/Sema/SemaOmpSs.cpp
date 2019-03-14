@@ -264,6 +264,7 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   Stmt *CS = nullptr;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
+  llvm::SmallSet<const ValueDecl *, 4> InnerDecls;
 
 public:
   void VisitDeclRefExpr(DeclRefExpr *E) {
@@ -273,18 +274,24 @@ public:
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
 
+      // Variables declared inside region don't have DSA
+      if (InnerDecls.count(VD))
+        return;
+
       DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
       DSAStackTy::DSAVarData DVarFromParent = Stack->getTopDSA(VD, /*FromParent=*/true);
 
-      bool IsParentExplicit = DVarFromParent.RefExpr && !DVarFromParent.Ignore;
-      bool IsCurrentExplicit = DVarCurrent.RefExpr && !DVarCurrent.Ignore;
+      bool ExistsParent = DVarFromParent.RefExpr;
+      bool ParentIgnore = DVarFromParent.Ignore;
 
-      // Check if the variable has explicit DSA only set on the current
+      bool ExistsCurrent = DVarCurrent.RefExpr;
+
+      // Check if the variable has DSA set on the current
       // directive and stop analysis if it so.
-      if (IsCurrentExplicit)
+      if (ExistsCurrent)
         return;
       // If explicit DSA comes from parent inherit it
-      if (IsParentExplicit) {
+      if (ExistsParent && !ParentIgnore) {
           switch (DVarFromParent.CKind) {
           case OSSC_shared:
             ImplicitShared.push_back(E);
@@ -309,6 +316,8 @@ public:
           // Define implicit data-sharing attributes for task.
           if (isOmpSsTaskingDirective(DKind))
             ImplicitShared.push_back(E);
+          // Record DSA as Ignored to avoid making the same node again
+          Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true);
           break;
         case DSA_none:
           if (!DVarCurrent.Ignore) {
@@ -326,6 +335,9 @@ public:
             // Define implicit data-sharing attributes for task.
             if (isOmpSsTaskingDirective(DKind))
               ImplicitFirstprivate.push_back(E);
+
+            // Record DSA as Ignored to avoid making the same node again
+            Stack->addDSA(VD, E, OSSC_firstprivate, /*Ignore=*/true);
           } else {
             // If no default clause is present and the variable was shared/global
             // in the context encountering the construct, the variable will be shared.
@@ -333,6 +345,9 @@ public:
             // Define implicit data-sharing attributes for task.
             if (isOmpSsTaskingDirective(DKind))
               ImplicitShared.push_back(E);
+
+            // Record DSA as Ignored to avoid making the same node again
+            Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true);
           }
         }
       }
@@ -344,6 +359,12 @@ public:
       if (C)
         Visit(C);
     }
+  }
+
+  void VisitDeclStmt(DeclStmt *S) {
+    for (const Decl *D : S->decls())
+      if (const auto *VD = dyn_cast_or_null<ValueDecl>(D))
+        InnerDecls.insert(VD);
   }
 
   bool isErrorFound() const { return ErrorFound; }

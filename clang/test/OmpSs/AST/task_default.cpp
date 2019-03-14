@@ -12,3 +12,17 @@ int main() {
 // CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'
 
+void foo()
+{
+    #pragma oss task default(none)
+    {
+        int k, asdf;
+        k = asdf + 0;
+        k = asdf + 1;
+        k = asdf + 2;
+    }
+}
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
+// CHECK_NEXT: OSSDefaultClause {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
+// CHECK_NEXT: CompoundStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, line:{{[a-z0-9]+}}:{{[a-z0-9]+}}>
