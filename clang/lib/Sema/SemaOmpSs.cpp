@@ -786,7 +786,7 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
     DSAStack->setDefaultDSAShared(KindKwLoc);
     break;
   case OSSC_DEFAULT_unknown:
-    Diag(KindKwLoc, diag::err_omp_unexpected_clause_value)
+    Diag(KindKwLoc, diag::err_oss_unexpected_clause_value)
         << getListOfPossibleValues(OSSC_default, /*First=*/0,
                                    /*Last=*/OSSC_DEFAULT_unknown)
         << getOmpSsClauseName(OSSC_default);
