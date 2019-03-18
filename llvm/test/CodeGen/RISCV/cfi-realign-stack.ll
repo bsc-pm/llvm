@@ -3,14 +3,14 @@
 
 define dso_local void @realign() {
 ; RV32-LABEL: realign:
-; RV32:    .cfi_def_cfa 8, 0
-; RV32-NEXT:    .cfi_offset 1, -4
-; RV32-NEXT:    .cfi_offset 8, -8
+; RV32:    .cfi_def_cfa s0, 0
+; RV32-NEXT:    .cfi_offset ra, -4
+; RV32-NEXT:    .cfi_offset s0, -8
 
 ; RV64-LABEL: realign:
-; RV64:    .cfi_def_cfa 8, 0
-; RV64-NEXT:    .cfi_offset 1, -8
-; RV64-NEXT:    .cfi_offset 8, -16
+; RV64:    .cfi_def_cfa s0, 0
+; RV64-NEXT:    .cfi_offset ra, -8
+; RV64-NEXT:    .cfi_offset s0, -16
 entry:
   %x = alloca i32, align 32
   %x.0.x.0. = load volatile i32, i32* %x, align 32

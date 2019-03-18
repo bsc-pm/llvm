@@ -11,11 +11,11 @@ define i32 @callee(i32 %a, i64 %b, i32 %c, i32 %d, double %e) {
 ; CHECK-NEXT:    sw s2, 16(sp)
 ; CHECK-NEXT:    sw s3, 12(sp)
 ; CHECK-NEXT:    .cfi_def_cfa_offset 32
-; CHECK-NEXT:    .cfi_offset 1, -4
-; CHECK-NEXT:    .cfi_offset 8, -8
-; CHECK-NEXT:    .cfi_offset 9, -12
-; CHECK-NEXT:    .cfi_offset 18, -16
-; CHECK-NEXT:    .cfi_offset 19, -20
+; CHECK-NEXT:    .cfi_offset ra, -4
+; CHECK-NEXT:    .cfi_offset s0, -8
+; CHECK-NEXT:    .cfi_offset s1, -12
+; CHECK-NEXT:    .cfi_offset s2, -16
+; CHECK-NEXT:    .cfi_offset s3, -20
 ; CHECK-NEXT:    mv s2, a4
 ; CHECK-NEXT:    mv s3, a3
 ; CHECK-NEXT:    mv s0, a1
