@@ -52,6 +52,11 @@ RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     return CSR_ILP32F_LP64F_SaveList;
   case RISCVABI::ABI_ILP32D:
   case RISCVABI::ABI_LP64D:
+    // Vector registers are special in that we don't want to spill them but
+    // we presume the caller will not modify them. This makes them useable only
+    // in functions that do not call functions that use vectors.
+    // if (Subtarget.hasExtEPI())
+    //   return CSR_ILP32D_LP64D_EPI_SaveList;
     return CSR_ILP32D_LP64D_SaveList;
   }
 }
@@ -175,6 +180,8 @@ RISCVRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
     return CSR_ILP32F_LP64F_RegMask;
   case RISCVABI::ABI_ILP32D:
   case RISCVABI::ABI_LP64D:
+    if (Subtarget.hasExtEPI())
+      return CSR_ILP32D_LP64D_EPI_RegMask;
     return CSR_ILP32D_LP64D_RegMask;
   }
 }
