@@ -191,11 +191,15 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   // to the stack, not before.
   // FIXME: assumes exactly one instruction is used to save each callee-saved
   // register.
-  // XXX: This will break horribly when among the callee-saved registers
-  // there are EPI vectors because storing them DOES need more than one
-  // instruction.
+  // EPI registers break this assumption but they are to be handled after we
+  // adjust the FP.
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
-  std::advance(MBBI, CSI.size());
+  int InsnToSkip = CSI.size();
+  for (auto &CS : CSI) {
+    if (RISCV::EPIVRRegClass.contains(CS.getReg()))
+      InsnToSkip--;
+  }
+  std::advance(MBBI, InsnToSkip);
 
   // Generate new FP.
   // This does
@@ -248,6 +252,7 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
         .setMIFlags(MachineInstr::FrameSetup);
   }
 
+  // Allocate space for dynamic objects
   setupHandleObjects(MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
 }
 
@@ -265,14 +270,23 @@ void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
 
   // FIXME: We're presuming in advance that this is all about EPIVR
   // FIXME: We are assuming the width of the element is 64 bit, we will want
-  // something like a Subtarget feature or a way to query this from the CPU (via
-  // a CSR) Compute the SizeOfVector in bytes
+  // something like an ABI feature or a way to query this from the CPU (via
+  // a CSR)
+
+  // Save VTYPE (1)
+  unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::CSRRS), OldVTypeReg)
+      .addImm(EPICSR::VTYPE)
+      .addReg(RISCV::X0);
+
+  // Get VLMAX (2)
   unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
   BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVLI), SizeOfVector)
     .addReg(RISCV::X0)
-    // FIXME - We need to change this
-    .addImm(3) // SEW=64b
+    // FIXME - Hardcoded to SEW=64
+    .addImm(3)
     .addImm(0); // VLMUL=1
+  // Compute the size in bytes (3)
   BuildMI(MBB, MBBI, DL, TII.get(RISCV::SLLI), SizeOfVector)
       .addReg(SizeOfVector)
       .addImm(3); // 2^3 = 8 bytes
@@ -321,6 +335,11 @@ void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
     } else
       llvm_unreachable("We only handle EPIVR as dynamic spills");
   }
+
+  // Restore VTYPE
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::CSRRW), RISCV::X0)
+      .addImm(EPICSR::VTYPE)
+      .addReg(OldVTypeReg);
 }
 
 void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
@@ -336,7 +355,14 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // Skip to before the restores of callee-saved registers
   // FIXME: assumes exactly one instruction is used to restore each
   // callee-saved register.
-  auto LastFrameDestroy = std::prev(MBBI, MFI.getCalleeSavedInfo().size());
+  // Ignore the EPI registers as we did in the prologue.
+  const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
+  int InsnToSkip = CSI.size();
+  for (auto &CS : CSI) {
+    if (RISCV::EPIVRRegClass.contains(CS.getReg()))
+      InsnToSkip--;
+  }
+  auto LastFrameDestroy = std::prev(MBBI, InsnToSkip);
 
   uint64_t StackSize = MFI.getStackSize();
 
@@ -381,7 +407,7 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
   bool IsCSR = FI >= MinCSFI && FI <= MaxCSFI;
   bool isFixed = !IsCSR && MFI.isFixedObjectIndex(FI);
 
-  if (IsCSR) {
+  if (IsCSR && !MFI.isObjectHandle(FI)) {
     FrameReg = getSPReg(STI);
     Offset += MF.getFrameInfo().getStackSize();
   } else {
@@ -403,10 +429,6 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
   const RISCVRegisterInfo *RI =
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
-
-  // This is what Hexagon does but makes me wonder if this is the best place
-  // to do this. At least will happen once.
-  expandVectorSpillReload(MF);
 
   // Unconditionally spill RA and FP only if the function uses a frame
   // pointer.
@@ -445,71 +467,6 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
         if (RISCV::FPR32RegClass.contains(Regs[i]) ||
             RISCV::FPR64RegClass.contains(Regs[i]))
           SavedRegs.set(Regs[i]);
-    }
-  }
-}
-
-static void expandVectorSpillReloadPseudo(MachineBasicBlock &MBB,
-                                          MachineBasicBlock::iterator I,
-                                          MachineRegisterInfo &MRI,
-                                          const RISCVInstrInfo &TII,
-                                          const TargetRegisterInfo &TRI) {
-  MachineInstr &MI = *I;
-  DebugLoc DL = MI.getDebugLoc();
-
-  // FIXME - This is ignoring VL!
-
-  // Compute address to the handle
-  MachineOperand &OpFI = MI.getOperand(1);
-  unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  unsigned LoadHandleOpcode =
-      TRI.getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
-  BuildMI(MBB, I, DL, TII.get(LoadHandleOpcode), HandleReg)
-      .addFrameIndex(OpFI.getIndex())
-      .addImm(0);
-
-  // Do the memory operation
-  MachineOperand &OpReg = MI.getOperand(0);
-  switch (MI.getOpcode()) {
-  default:
-    llvm_unreachable("Unexpected instruction");
-  case RISCV::PseudoVSPILL: {
-    // FIXME: hardcoded to SEW for now
-    BuildMI(MBB, I, DL, TII.get(RISCV::VSE_V))
-        .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-        .addReg(HandleReg);
-    break;
-  }
-  case RISCV::PseudoVRELOAD: {
-    // FIXME: hardcodeo to SEW for now
-    BuildMI(MBB, I, DL, TII.get(RISCV::VLE_V), OpReg.getReg())
-        .addReg(HandleReg);
-    break;
-  }
-  }
-
-  // Remove the pseudo instruction.
-  MBB.erase(I);
-}
-
-
-void RISCVFrameLowering::expandVectorSpillReload(MachineFunction &MF) const {
-  const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
-  const RISCVInstrInfo &TII = *STI.getInstrInfo();
-  MachineRegisterInfo &MRI = MF.getRegInfo();
-  for (auto &MBB : MF) {
-    MachineBasicBlock::iterator NextI;
-    for (auto I = MBB.begin(), E = MBB.end(); I != E; I = NextI) {
-      MachineInstr &MI = *I;
-      NextI = std::next(I);
-
-      unsigned Opc = MI.getOpcode();
-      switch (Opc) {
-      case RISCV::PseudoVSPILL:
-      case RISCV::PseudoVRELOAD:
-        expandVectorSpillReloadPseudo(MBB, I, MRI, TII, *TRI);
-        break;
-      }
     }
   }
 }

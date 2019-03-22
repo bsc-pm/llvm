@@ -52,11 +52,8 @@ RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     return CSR_ILP32F_LP64F_SaveList;
   case RISCVABI::ABI_ILP32D:
   case RISCVABI::ABI_LP64D:
-    // Vector registers are special in that we don't want to spill them but
-    // we presume the caller will not modify them. This makes them useable only
-    // in functions that do not call functions that use vectors.
-    // if (Subtarget.hasExtEPI())
-    //   return CSR_ILP32D_LP64D_EPI_SaveList;
+    if (Subtarget.hasExtEPI())
+      return CSR_ILP32D_LP64D_EPI_SaveList;
     return CSR_ILP32D_LP64D_SaveList;
   }
 }
@@ -115,6 +112,9 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   switch (MI.getOpcode()) {
   case RISCV::VLE_V:
   case RISCV::VSE_V:
+    // These two are handled later in this function
+  case RISCV::PseudoVSPILL:
+  case RISCV::PseudoVRELOAD:
     break;
   default:
     OffsetIndex = FIOperandNum + 1;
@@ -149,6 +149,60 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
   if (OffsetIndex >= 0) {
     MI.getOperand(OffsetIndex).ChangeToImmediate(Offset);
+  }
+
+  // Handle vector spills here
+  if (MI.getOpcode() == RISCV::PseudoVSPILL ||
+      MI.getOpcode() == RISCV::PseudoVRELOAD) {
+    unsigned SlotAddrReg = MI.getOperand(1).getReg();
+
+    // Save VTYPE
+    unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    BuildMI(MBB, II, DL, TII->get(RISCV::CSRRS), OldVTypeReg)
+        .addImm(EPICSR::VTYPE)
+        .addReg(RISCV::X0);
+
+    // TODO: Consider using loadRegFromStackSlot but this has to be before
+    // replacing the FI above.
+    unsigned LoadHandleOpcode =
+        getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
+    unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    BuildMI(MBB, II, DL, TII->get(LoadHandleOpcode), HandleReg)
+        .addReg(SlotAddrReg)
+        .addImm(0);
+
+    // Make sure we spill/reload all the bits
+    BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
+        .addReg(RISCV::X0)
+        // FIXME - Hardcoded to SEW=64
+        .addImm(3)
+        // VLMUL=1
+        .addImm(0);
+
+    MachineOperand &OpReg = MI.getOperand(0);
+    switch (MI.getOpcode()) {
+    default:
+      llvm_unreachable("Unexpected instruction");
+    case RISCV::PseudoVSPILL: {
+      BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
+          .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
+          .addReg(HandleReg);
+      break;
+    }
+    case RISCV::PseudoVRELOAD: {
+      BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
+          .addReg(HandleReg);
+      break;
+    }
+    }
+
+    // Restore VTYPE
+    BuildMI(MBB, II, DL, TII->get(RISCV::CSRRW), RISCV::X0)
+        .addImm(EPICSR::VTYPE)
+        .addReg(OldVTypeReg);
+
+    // Remove the pseudo
+    MI.eraseFromParent();
   }
 }
 

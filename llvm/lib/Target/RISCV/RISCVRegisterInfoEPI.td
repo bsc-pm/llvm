@@ -29,7 +29,11 @@ def EPIVR : RegisterClass<"RISCV",
                           [nxv1i64, nxv1i32, nxv1i16, nxv1i8, nxv1i1,
                            nxv1f64, nxv1f32],
                           128,
-                          (add (sequence "V%u", 0, 31))> {
+                          // Prioritise caller-save and then callee-save
+                          (add (sequence "V%u", 0, 7),
+                               (sequence "V%u", 16, 23),
+                               (sequence "V%u", 8, 15),
+                               (sequence "V%u", 24, 31))> {
   let isDynamicSpillSize = 1;
 }
 
