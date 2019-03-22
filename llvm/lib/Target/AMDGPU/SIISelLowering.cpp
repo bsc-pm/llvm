@@ -4701,14 +4701,14 @@ static SDValue constructRetValue(SelectionDAG &DAG,
   EVT CastVT = NumElts > 1 ? EVT::getVectorVT(Context, AdjEltVT, NumElts)
                            : AdjEltVT;
 
-  // Special case for v8f16. Rather than add support for this, use v4i32 to
+  // Special case for v6f16. Rather than add support for this, use v3i32 to
   // extract the data elements
-  bool V8F16Special = false;
-  if (CastVT == MVT::v8f16) {
-    CastVT = MVT::v4i32;
+  bool V6F16Special = false;
+  if (NumElts == 6) {
+    CastVT = EVT::getVectorVT(Context, MVT::i32, NumElts / 2);
     DMaskPop >>= 1;
     ReqRetNumElts >>= 1;
-    V8F16Special = true;
+    V6F16Special = true;
     AdjVT = MVT::v2i32;
   }
 
@@ -4738,7 +4738,7 @@ static SDValue constructRetValue(SelectionDAG &DAG,
     PreTFCRes = BVElts[0];
   }
 
-  if (V8F16Special)
+  if (V6F16Special)
     PreTFCRes = DAG.getNode(ISD::BITCAST, DL, MVT::v4f16, PreTFCRes);
 
   if (!IsTexFail) {
@@ -4970,9 +4970,6 @@ SDValue SITargetLowering::lowerImage(SDValue Op,
         return DAG.getMergeValues({Undef, Op.getOperand(0)}, DL);
       return Undef;
     }
-
-    // Have to use a power of 2 number of dwords
-    NumVDataDwords = 1 << Log2_32_Ceil(NumVDataDwords);
 
     EVT NewVT = NumVDataDwords > 1 ?
                   EVT::getVectorVT(*DAG.getContext(), MVT::f32, NumVDataDwords)
@@ -5625,8 +5622,8 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
         LoadVT.getScalarType() == MVT::i16)
       return handleByteShortBufferLoads(DAG, LoadVT, DL, Ops, M);
 
-    return DAG.getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
+                               M->getMemOperand(), DAG);
   }
   case Intrinsic::amdgcn_raw_buffer_load:
   case Intrinsic::amdgcn_raw_buffer_load_format: {
@@ -5659,8 +5656,8 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
         LoadVT.getScalarType() == MVT::i16)
       return handleByteShortBufferLoads(DAG, LoadVT, DL, Ops, M);
 
-    return DAG.getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
+                               M->getMemOperand(), DAG);
   }
   case Intrinsic::amdgcn_struct_buffer_load:
   case Intrinsic::amdgcn_struct_buffer_load_format: {
@@ -5693,8 +5690,8 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
         LoadVT.getScalarType() == MVT::i16)
       return handleByteShortBufferLoads(DAG, LoadVT, DL, Ops, M);
 
-    return DAG.getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(Opc, DL, Op->getVTList(), Ops, IntVT,
+                               M->getMemOperand(), DAG);
   }
   case Intrinsic::amdgcn_tbuffer_load: {
     MemSDNode *M = cast<MemSDNode>(Op);
@@ -5722,9 +5719,9 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
     if (LoadVT.getScalarType() == MVT::f16)
       return adjustLoadValueType(AMDGPUISD::TBUFFER_LOAD_FORMAT_D16,
                                  M, DAG, Ops);
-    return DAG.getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
-                                   Op->getVTList(), Ops, LoadVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
+                               Op->getVTList(), Ops, LoadVT, M->getMemOperand(),
+                               DAG);
   }
   case Intrinsic::amdgcn_raw_tbuffer_load: {
     MemSDNode *M = cast<MemSDNode>(Op);
@@ -5746,9 +5743,9 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
     if (LoadVT.getScalarType() == MVT::f16)
       return adjustLoadValueType(AMDGPUISD::TBUFFER_LOAD_FORMAT_D16,
                                  M, DAG, Ops);
-    return DAG.getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
-                                   Op->getVTList(), Ops, LoadVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
+                               Op->getVTList(), Ops, LoadVT, M->getMemOperand(),
+                               DAG);
   }
   case Intrinsic::amdgcn_struct_tbuffer_load: {
     MemSDNode *M = cast<MemSDNode>(Op);
@@ -5770,9 +5767,9 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
     if (LoadVT.getScalarType() == MVT::f16)
       return adjustLoadValueType(AMDGPUISD::TBUFFER_LOAD_FORMAT_D16,
                                  M, DAG, Ops);
-    return DAG.getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
-                                   Op->getVTList(), Ops, LoadVT,
-                                   M->getMemOperand());
+    return getMemIntrinsicNode(AMDGPUISD::TBUFFER_LOAD_FORMAT, DL,
+                               Op->getVTList(), Ops, LoadVT, M->getMemOperand(),
+                               DAG);
   }
   case Intrinsic::amdgcn_buffer_atomic_swap:
   case Intrinsic::amdgcn_buffer_atomic_add:
@@ -6045,6 +6042,39 @@ SDValue SITargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
 
     return SDValue();
   }
+}
+
+// Call DAG.getMemIntrinsicNode for a load, but first widen a dwordx3 type to
+// dwordx4 if on SI.
+SDValue SITargetLowering::getMemIntrinsicNode(unsigned Opcode, const SDLoc &DL,
+                                              SDVTList VTList,
+                                              ArrayRef<SDValue> Ops, EVT MemVT,
+                                              MachineMemOperand *MMO,
+                                              SelectionDAG &DAG) const {
+  EVT VT = VTList.VTs[0];
+  EVT WidenedVT = VT;
+  EVT WidenedMemVT = MemVT;
+  if (!Subtarget->hasDwordx3LoadStores() &&
+      (WidenedVT == MVT::v3i32 || WidenedVT == MVT::v3f32)) {
+    WidenedVT = EVT::getVectorVT(*DAG.getContext(),
+                                 WidenedVT.getVectorElementType(), 4);
+    WidenedMemVT = EVT::getVectorVT(*DAG.getContext(),
+                                    WidenedMemVT.getVectorElementType(), 4);
+    MMO = DAG.getMachineFunction().getMachineMemOperand(MMO, 0, 16);
+  }
+
+  assert(VTList.NumVTs == 2);
+  SDVTList WidenedVTList = DAG.getVTList(WidenedVT, VTList.VTs[1]);
+
+  auto NewOp = DAG.getMemIntrinsicNode(Opcode, DL, WidenedVTList, Ops,
+                                       WidenedMemVT, MMO);
+  if (WidenedVT != VT) {
+    auto Extract = DAG.getNode(
+        ISD::EXTRACT_SUBVECTOR, DL, VT, NewOp,
+        DAG.getConstant(0, DL, getVectorIdxTy(DAG.getDataLayout())));
+    NewOp = DAG.getMergeValues({ Extract, SDValue(NewOp.getNode(), 1) }, DL);
+  }
+  return NewOp;
 }
 
 SDValue SITargetLowering::handleD16VData(SDValue VData,
