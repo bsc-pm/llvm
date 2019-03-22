@@ -221,14 +221,6 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
                     STI);
     break;
   }
-  // case RISCV::PseudoReadVType: {
-  //   EmitInstruction(MCInstBuilder(RISCV::CSRRS)
-  //                       .addOperand(Inst.getOperand(0))
-  //                       .addImm(EPICSR::VTYPE)
-  //                       .addReg(RISCV::X0),
-  //                   STI);
-  //   break;
-  // }
   }
 
   return true;
