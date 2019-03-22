@@ -432,16 +432,31 @@ static void assignCalleeSavedSpillSlots(MachineFunction &F,
       unsigned Size = RegInfo->getSpillSize(*RC);
       if (FixedSlot == FixedSpillSlots + NumFixedSpillSlots) {
         // Nope, just spill it anywhere convenient.
-        unsigned Align = RegInfo->getSpillAlignment(*RC);
         unsigned StackAlign = TFI->getStackAlignment();
 
-        // We may not be able to satisfy the desired alignment specification of
-        // the TargetRegisterClass if the stack alignment is smaller. Use the
-        // min.
+        unsigned Align = RegInfo->getSpillAlignment(*RC);
+        // We may not be able to satisfy the desired alignment specification
+        // of the TargetRegisterClass if the stack alignment is smaller. Use
+        // the min.
         Align = std::min(Align, StackAlign);
-        FrameIdx = MFI.CreateStackObject(Size, Align, true);
-        if ((unsigned)FrameIdx < MinCSFrameIndex) MinCSFrameIndex = FrameIdx;
-        if ((unsigned)FrameIdx > MaxCSFrameIndex) MaxCSFrameIndex = FrameIdx;
+
+        if (!RegInfo->isDynamicSpillSize(*RC)) {
+          FrameIdx = MFI.CreateStackObject(Size, Align, true);
+        } else {
+          const TargetRegisterClass &PtrClass = *RegInfo->getPointerRegClass(F);
+          unsigned FixedHandleSize = RegInfo->getSpillSize(PtrClass);
+          unsigned FixedHandleAlignment = RegInfo->getSpillAlignment(PtrClass);
+          FrameIdx = F.getFrameInfo().CreateSpillStackObject(
+              FixedHandleSize, FixedHandleAlignment);
+          int DynamicSpillIdx =
+              F.getFrameInfo().CreateDynamicSpillStackObject(Align, RC);
+          F.getFrameInfo().setObjectHandle(FrameIdx, DynamicSpillIdx);
+        }
+
+        if ((unsigned)FrameIdx < MinCSFrameIndex)
+          MinCSFrameIndex = FrameIdx;
+        if ((unsigned)FrameIdx > MaxCSFrameIndex)
+          MaxCSFrameIndex = FrameIdx;
       } else {
         // Spill it to the stack where we must.
         FrameIdx = MFI.CreateFixedSpillStackObject(Size, FixedSlot->Offset);
@@ -825,6 +840,9 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
       if (MFI.getStackID(i)) // Only allocate objects on the default stack.
         continue;
 
+      if (MFI.isObjectDynamicSpill(i))
+        continue;
+
       // If the stack grows down, we need to add the size to find the lowest
       // address of the object.
       Offset += MFI.getObjectSize(i);
@@ -840,6 +858,9 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
     // Be careful about underflow in comparisons agains MinCSFrameIndex.
     for (unsigned i = MaxCSFrameIndex; i != MinCSFrameIndex - 1; --i) {
       if (MFI.getStackID(i)) // Only allocate objects on the default stack.
+        continue;
+
+      if (MFI.isObjectDynamicSpill(i))
         continue;
 
       if (MFI.isDeadObjectIndex(i))
