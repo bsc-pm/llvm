@@ -29,11 +29,12 @@ bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
   // - we are told to have one
   // - the stack needs realignment (due to overaligned local objects)
   // - the stack has VLAs
+  // - the function has dynamic spills
   // - the function uses @llvm.frameaddress
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   return MF.getTarget().Options.DisableFramePointerElim(MF) ||
          RegInfo->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
-         MFI.isFrameAddressTaken();
+         MFI.hasDynamicSpillObjects() || MFI.isFrameAddressTaken();
 }
 
 // Determines the size of the frame and maximum call frame size.
@@ -342,7 +343,8 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // Restore the stack pointer using the value of the frame pointer. Only
   // necessary if the stack pointer was modified, meaning the stack size is
   // unknown.
-  if (RI->needsStackRealignment(MF) || MFI.hasVarSizedObjects()) {
+  if (RI->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
+      MFI.hasDynamicSpillObjects()) {
     assert(hasFP(MF) && "frame pointer should not have been eliminated");
     adjustReg(MBB, LastFrameDestroy, DL, SPReg, FPReg,
               -StackSize + RVFI->getVarArgsSaveSize(),

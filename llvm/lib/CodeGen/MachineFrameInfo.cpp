@@ -77,7 +77,6 @@ int MachineFrameInfo::CreateSpillStackObject(uint64_t Size,
 
 int MachineFrameInfo::CreateDynamicSpillStackObject(
     unsigned Alignment, const TargetRegisterClass *RC) {
-  HasVarSizedObjects = true;
   HasDynamicSpillObjects = true;
   Alignment = clampStackAlignment(!StackRealignable, Alignment, StackAlignment);
   CreateStackObject(0, Alignment, true, /* Alloca */ nullptr, /* StackID */ 0,
