@@ -192,7 +192,8 @@ bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   // - the stack has VLAs
   // Note that when we need a BP the conditions also imply a FP.
   const MachineFrameInfo &MFI = MF.getFrameInfo();
-  return needsStackRealignment(MF) && MFI.hasVarSizedObjects();
+  return needsStackRealignment(MF) &&
+         (MFI.hasVarSizedObjects() || MFI.hasDynamicSpillObjects());
 }
 
 const TargetRegisterClass *
