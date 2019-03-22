@@ -507,11 +507,6 @@ bool StackSlotColoring::runOnMachineFunction(MachineFunction &MF) {
   if (MF.exposesReturnsTwice())
     return false;
 
-  // For now we don't believe stack coloring is possible in the presence of
-  // dynamic spill objects.
-  if (MFI->hasDynamicSpillObjects())
-    return false;
-
   // Gather spill slot references
   ScanForSpillSlotRefs(MF);
   InitializeSlots();
