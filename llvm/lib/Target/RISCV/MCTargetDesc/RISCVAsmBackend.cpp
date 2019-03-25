@@ -35,37 +35,35 @@ bool RISCVAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
     break;
   case RISCV::fixup_riscv_got_hi20:
   case RISCV::fixup_riscv_pcrel_hi20:
-  case RISCV::fixup_riscv_pcrel_lo12_i:
-  case RISCV::fixup_riscv_pcrel_lo12_s:
   case RISCV::fixup_riscv_call_plt:
     return true;
-  // case RISCV::fixup_riscv_pcrel_lo12_i:
-  // case RISCV::fixup_riscv_pcrel_lo12_s: {
-  //   // For pcrel_lo12, force a relocation if the target of the corresponding
-  //   // pcrel_hi20 is not in the same fragment.
-  //   const MCFixup *T = cast<RISCVMCExpr>(Fixup.getValue())->getPCRelHiFixup();
-  //   if (!T) {
-  //     Asm.getContext().reportError(Fixup.getLoc(),
-  //                                  "could not find corresponding %pcrel_hi");
-  //     return false;
-  //   }
+  case RISCV::fixup_riscv_pcrel_lo12_i:
+  case RISCV::fixup_riscv_pcrel_lo12_s: {
+    // For pcrel_lo12, force a relocation if the target of the corresponding
+    // pcrel_hi20 is not in the same fragment.
+    const MCFixup *T = cast<RISCVMCExpr>(Fixup.getValue())->getPCRelHiFixup();
+    if (!T) {
+      Asm.getContext().reportError(Fixup.getLoc(),
+                                   "could not find corresponding %pcrel_hi");
+      return false;
+    }
 
-  //   // Check the reloc pointed by this %pcrel_lo one
-  //   switch ((unsigned)T->getKind()) {
-  //   default:
-  //     llvm_unreachable("Unexpected fixup kind for pcrel_lo12");
-  //     break;
-  //   case RISCV::fixup_riscv_pcrel_hi20:
-  //     ShouldForce = T->getValue()->findAssociatedFragment() !=
-  //                   Fixup.getValue()->findAssociatedFragment();
-  //     break;
-  //   case RISCV::fixup_riscv_got_hi20:
-  //   case RISCV::fixup_riscv_tls_gd_hi20:
-  //   case RISCV::fixup_riscv_tls_got_hi20:
-  //     return true;
-  //   }
-  //   break;
-  // }
+    // Check the reloc pointed by this %pcrel_lo one
+    switch ((unsigned)T->getKind()) {
+    default:
+      llvm_unreachable("Unexpected fixup kind for pcrel_lo12");
+      break;
+    case RISCV::fixup_riscv_pcrel_hi20:
+      ShouldForce = T->getValue()->findAssociatedFragment() !=
+                    Fixup.getValue()->findAssociatedFragment();
+      break;
+    case RISCV::fixup_riscv_got_hi20:
+    case RISCV::fixup_riscv_tls_gd_hi20:
+    case RISCV::fixup_riscv_tls_got_hi20:
+      return true;
+    }
+    break;
+  }
   }
 
   return ShouldForce || STI.getFeatureBits()[RISCV::FeatureRelax] ||

@@ -11,10 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RISCV.h"
 #include "RISCVMCExpr.h"
+#include "MCTargetDesc/RISCVAsmBackend.h"
+#include "RISCV.h"
 #include "RISCVFixupKinds.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/MC/MCAsmLayout.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCStreamer.h"
@@ -111,6 +113,16 @@ bool RISCVMCExpr::evaluatePCRelLo(MCValue &Res, const MCAsmLayout *Layout,
   // (<real target> + <offset from this fixup to the auipc fixup>).  The Fixup
   // is pcrel relative to the VK_RISCV_PCREL_LO fixup, so we need to add the
   // offset to the VK_RISCV_PCREL_HI Fixup from VK_RISCV_PCREL_LO to correct.
+
+  // Don't try to evaluate if the fixup will be forced as a relocation (e.g.
+  // as linker relaxation is enabled). If we evaluated pcrel_lo in this case,
+  // the modified fixup will be converted into a relocation that no longer
+  // points to the pcrel_hi as the linker requires.
+  auto &RAB =
+      static_cast<RISCVAsmBackend &>(Layout->getAssembler().getBackend());
+  if (RAB.willForceRelocations())
+    return false;
+
   MCValue AUIPCLoc;
   if (!getSubExpr()->evaluateAsValue(AUIPCLoc, *Layout))
     return false;
@@ -154,9 +166,8 @@ bool RISCVMCExpr::evaluatePCRelLo(MCValue &Res, const MCAsmLayout *Layout,
 bool RISCVMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
                                             const MCAsmLayout *Layout,
                                             const MCFixup *Fixup) const {
-  // FIXME: This seems wrong.
-  // if (Kind == VK_RISCV_PCREL_LO && evaluatePCRelLo(Res, Layout, Fixup))
-  //   return true;
+  if (Kind == VK_RISCV_PCREL_LO && evaluatePCRelLo(Res, Layout, Fixup))
+    return true;
 
   if (!getSubExpr()->evaluateAsRelocatable(Res, Layout, Fixup))
     return false;

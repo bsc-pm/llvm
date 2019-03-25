@@ -1,4 +1,3 @@
-# XFAIL: *
 # RUN: not llvm-mc -triple riscv32 -mattr=-relax -filetype obj < %s -o /dev/null 2>&1 | FileCheck %s
 # RUN: not llvm-mc -triple riscv32 -mattr=+relax -filetype obj < %s -o /dev/null 2>&1 | FileCheck %s
 
