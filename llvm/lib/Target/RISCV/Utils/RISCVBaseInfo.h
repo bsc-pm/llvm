@@ -80,8 +80,8 @@ enum {
   VSTART = 0x008,
   VXSAT = 0x009,
   VXRM = 0x00A,
-  VTYPE = 0x00B,
   VL = 0xC20,
+  VTYPE = 0xC21,
 };
 
 }
