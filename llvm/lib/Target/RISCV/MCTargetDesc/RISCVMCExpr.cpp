@@ -166,8 +166,9 @@ bool RISCVMCExpr::evaluatePCRelLo(MCValue &Res, const MCAsmLayout *Layout,
 bool RISCVMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
                                             const MCAsmLayout *Layout,
                                             const MCFixup *Fixup) const {
-  if (Kind == VK_RISCV_PCREL_LO && evaluatePCRelLo(Res, Layout, Fixup))
-    return true;
+  // FIXME: This seems wrong.
+  // if (Kind == VK_RISCV_PCREL_LO && evaluatePCRelLo(Res, Layout, Fixup))
+  //   return true;
 
   if (!getSubExpr()->evaluateAsRelocatable(Res, Layout, Fixup))
     return false;
