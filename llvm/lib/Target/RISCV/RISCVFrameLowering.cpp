@@ -210,21 +210,24 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
 
     assert(hasFP(MF) && "we need an FP to properly realign the stack");
 
-    // .cfi_def_cfa FP, 0
-    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
-        nullptr, MRI->getDwarfRegNum(FPReg, true), 0));
-    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex)
-        .setMIFlags(MachineInstr::FrameSetup);
-
     if (RegInfo->hasBasePointer(MF)) {
       // Set BP to be the current SP
       adjustReg(MBB, MBBI, DL, BPReg, SPReg, 0, MachineInstr::FrameSetup);
     }
-  } else {
+  }
+
+  if (!hasFP(MF)) {
     // .cfi_def_cfa_offset -StackSize
     unsigned CFIIndex = MF.addFrameInst(
         MCCFIInstruction::createDefCfaOffset(nullptr, -StackSize));
+    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+        .addCFIIndex(CFIIndex)
+        .setMIFlags(MachineInstr::FrameSetup);
+  }
+  else {
+    // .cfi_def_cfa FP, 0
+    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
+        nullptr, MRI->getDwarfRegNum(FPReg, true), 0));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
         .addCFIIndex(CFIIndex)
         .setMIFlags(MachineInstr::FrameSetup);
