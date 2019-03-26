@@ -286,7 +286,7 @@ bool AssemblerInvocation::CreateFromArgs(AssemblerInvocation &Opts,
   Opts.NoExecStack = Args.hasArg(OPT_mno_exec_stack);
   Opts.FatalWarnings = Args.hasArg(OPT_massembler_fatal_warnings);
   Opts.RelocationModel = Args.getLastArgValue(OPT_mrelocation_model, "pic");
-  Opts.TargetABI = Args.getLastArgValue(OPT_target_abi, "");
+  Opts.TargetABI = Args.getLastArgValue(OPT_target_abi);
   Opts.IncrementalLinkerCompatible =
       Args.hasArg(OPT_mincremental_linker_compatible);
   Opts.SymbolDefs = Args.getAllArgValues(OPT_defsym);
