@@ -85,6 +85,23 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "gc-transition operand bundle id drifted!");
   (void)GCTransitionEntry;
 
+  // OmpSs IDs
+  auto *OSSSharedEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.SHARED");
+  assert(OSSSharedEntry->second == LLVMContext::OB_oss_shared &&
+         "oss_shared operand bundle id drifted!");
+  (void)OSSSharedEntry;
+
+  auto *OSSPrivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.PRIVATE");
+  assert(OSSPrivateEntry->second == LLVMContext::OB_oss_private &&
+         "oss_private operand bundle id drifted!");
+  (void)OSSPrivateEntry;
+
+  auto *OSSFirstPrivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE");
+  assert(OSSFirstPrivateEntry->second == LLVMContext::OB_oss_firstprivate &&
+         "oss_firstprivate operand bundle id drifted!");
+  (void)OSSFirstPrivateEntry;
+  // END OmpSs IDs
+
   SyncScope::ID SingleThreadSSID =
       pImpl->getOrInsertSyncScopeID("singlethread");
   assert(SingleThreadSSID == SyncScope::SingleThread &&

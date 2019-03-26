@@ -66,6 +66,7 @@ add_llvm_library(LLVMAnalysis
   ObjCARCAliasAnalysis.cpp
   ObjCARCAnalysisUtils.cpp
   ObjCARCInstKind.cpp
+  OmpSsRegionAnalysis.cpp
   OptimizationRemarkEmitter.cpp
   OrderedBasicBlock.cpp
   OrderedInstructions.cpp
