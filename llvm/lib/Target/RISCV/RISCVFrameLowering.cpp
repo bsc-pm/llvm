@@ -273,11 +273,11 @@ void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
   // something like an ABI feature or a way to query this from the CPU (via
   // a CSR)
 
-  // Save VTYPE (1)
+  // Save VTYPE and VL (1)
   unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::CSRRS), OldVTypeReg)
-      .addImm(EPICSR::VTYPE)
-      .addReg(RISCV::X0);
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVTYPE), OldVTypeReg);
+  unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVL), OldVLReg);
 
   // Get VLMAX (2)
   unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
@@ -337,8 +337,8 @@ void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
   }
 
   // Restore VTYPE
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::CSRRW), RISCV::X0)
-      .addImm(EPICSR::VTYPE)
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
+      .addReg(OldVLReg)
       .addReg(OldVTypeReg);
 }
 

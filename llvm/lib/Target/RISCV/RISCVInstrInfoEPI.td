@@ -1013,7 +1013,12 @@ def VSETVL : RVInst<
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     Uses = [VL] in
 def PseudoReadVL : Pseudo<(outs GPR:$rd),
-                          (ins), [], "readvl $rd">;
+                          (ins), [], "rdvl $rd">;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
+    Uses = [VTYPE] in
+def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
+                          (ins), [], "rdvtype $rd">;
 
 // TODO: Unit-stride fault-only first loads
 defm VS : vector_store<"vs">;

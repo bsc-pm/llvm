@@ -112,7 +112,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   switch (MI.getOpcode()) {
   case RISCV::VLE_V:
   case RISCV::VSE_V:
-    // These two are handled later in this function
+    // The following two are handled later in this function
   case RISCV::PseudoVSPILL:
   case RISCV::PseudoVRELOAD:
     break;
@@ -129,38 +129,17 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   }
 
   MachineBasicBlock &MBB = *MI.getParent();
-  bool FrameRegIsKill = false;
-
-  if (!OffsetFits) {
-    assert(isInt<32>(Offset) && "Int32 expected");
-    // The offset won't fit in an immediate, so use a scratch register instead
-    // Modify Offset and FrameReg appropriately
-    unsigned ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    TII->movImm32(MBB, II, DL, ScratchReg, Offset);
-    BuildMI(MBB, II, DL, TII->get(RISCV::ADD), ScratchReg)
-        .addReg(FrameReg)
-        .addReg(ScratchReg, RegState::Kill);
-    Offset = 0;
-    FrameReg = ScratchReg;
-    FrameRegIsKill = true;
-  }
-
-  MI.getOperand(FIOperandNum)
-      .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
-  if (OffsetIndex >= 0) {
-    MI.getOperand(OffsetIndex).ChangeToImmediate(Offset);
-  }
 
   // Handle vector spills here
   if (MI.getOpcode() == RISCV::PseudoVSPILL ||
       MI.getOpcode() == RISCV::PseudoVRELOAD) {
-    unsigned SlotAddrReg = MI.getOperand(1).getReg();
+    MachineOperand SlotAddr = MI.getOperand(FIOperandNum);
 
-    // Save VTYPE
+    // Save VTYPE and VL
     unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    BuildMI(MBB, II, DL, TII->get(RISCV::CSRRS), OldVTypeReg)
-        .addImm(EPICSR::VTYPE)
-        .addReg(RISCV::X0);
+    BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVTYPE), OldVTypeReg);
+    unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVL), OldVLReg);
 
     // TODO: Consider using loadRegFromStackSlot but this has to be before
     // replacing the FI above.
@@ -168,8 +147,9 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
         getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
     unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
     BuildMI(MBB, II, DL, TII->get(LoadHandleOpcode), HandleReg)
-        .addReg(SlotAddrReg)
+        .add(SlotAddr)
         .addImm(0);
+    MachineBasicBlock::iterator RemoveFI = std::prev(II);
 
     // Make sure we spill/reload all the bits
     BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
@@ -196,13 +176,38 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     }
     }
 
-    // Restore VTYPE
-    BuildMI(MBB, II, DL, TII->get(RISCV::CSRRW), RISCV::X0)
-        .addImm(EPICSR::VTYPE)
+    // Restore VTYPE and VL
+    BuildMI(MBB, II, DL, TII->get(RISCV::VSETVL), RISCV::X0)
+        .addReg(OldVLReg)
         .addReg(OldVTypeReg);
 
     // Remove the pseudo
     MI.eraseFromParent();
+
+    // Now remove the FI of the handle load
+    return eliminateFrameIndex(RemoveFI, /* SPAdj */ 0, 1, RS);
+  }
+
+  bool FrameRegIsKill = false;
+
+  if (!OffsetFits) {
+    assert(isInt<32>(Offset) && "Int32 expected");
+    // The offset won't fit in an immediate, so use a scratch register instead
+    // Modify Offset and FrameReg appropriately
+    unsigned ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    TII->movImm32(MBB, II, DL, ScratchReg, Offset);
+    BuildMI(MBB, II, DL, TII->get(RISCV::ADD), ScratchReg)
+        .addReg(FrameReg)
+        .addReg(ScratchReg, RegState::Kill);
+    Offset = 0;
+    FrameReg = ScratchReg;
+    FrameRegIsKill = true;
+  }
+
+  MI.getOperand(FIOperandNum)
+      .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
+  if (OffsetIndex >= 0) {
+    MI.getOperand(OffsetIndex).ChangeToImmediate(Offset);
   }
 }
 
