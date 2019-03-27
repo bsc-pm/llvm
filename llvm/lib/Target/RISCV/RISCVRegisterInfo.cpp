@@ -59,9 +59,9 @@ RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 }
 
 BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+  const RISCVSubtarget &Subtarget = MF.getSubtarget<RISCVSubtarget>();
   const TargetFrameLowering *TFI = getFrameLowering(MF);
   BitVector Reserved(getNumRegs());
-
 
   // Use markSuperRegs to ensure any register aliases are also reserved
   markSuperRegs(Reserved, RISCV::X0); // zero
@@ -69,7 +69,12 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   markSuperRegs(Reserved, RISCV::X2); // sp
   markSuperRegs(Reserved, RISCV::X3); // gp
   markSuperRegs(Reserved, RISCV::X4); // tp
-  if (TFI->hasFP(MF))
+  // When using EPI we need to reserve FP tentatively just in case there is a
+  // spill.  Unfortunately we know there are spills _after_ the Register
+  // Allocator has queried the reserved registers.
+  //
+  // TODO: Add a pass that undoes this.
+  if (TFI->hasFP(MF) || Subtarget.hasExtEPI())
     markSuperRegs(Reserved, RISCV::X8); // fp
   if (hasBasePointer(MF))
     markSuperRegs(Reserved, RISCV::X9); // bp
