@@ -167,7 +167,8 @@ ompt_label_##id:
   printf("%" PRIu64 ": current_address=%p or %p\n", ompt_get_thread_data()->value, \
          ((char *)addr) - 4, ((char *)addr) - 8)
 #elif KMP_ARCH_RISCV64
-// On RV64C the C.NOP instruction is 2 byte long. In addition, the compiler
+#if __riscv_compressed
+// On RV64GC the C.NOP instruction is 2 byte long. In addition, the compiler
 // inserts a data-movement instruction for non-void runtime functions which
 // accounts for another 2 or 4 bytes. Finally, a C.J instruction may appear
 // (adding 2 more bytes).
@@ -175,6 +176,16 @@ ompt_label_##id:
   printf("%" PRIu64 ": current_address=%p or %p or %p or %p\n", \
          ompt_get_thread_data()->value, ((char *)addr) - 2, ((char *)addr) - 4, \
          ((char *)addr) - 6, ((char *)addr) - 8)
+#else
+// On RV64G the NOP instruction is 4 byte long. In addition, the compiler
+// inserts a data-movement instruction for non-void runtime functions which
+// accounts for another 4 bytes. Finally, a J instruction may appear (adding 4
+// more bytes).
+#define print_possible_return_addresses(addr) \
+  printf("%" PRIu64 ": current_address=%p or %p or %p\n", \
+         ompt_get_thread_data()->value, ((char *)addr) - 4, ((char *)addr) - 8, \
+         ((char *)addr) - 12)
+#endif
 #else
 #error Unsupported target architecture, cannot determine address offset!
 #endif
