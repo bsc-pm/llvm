@@ -137,6 +137,10 @@ namespace {
     /// them) when they are deleted from the underlying DAG. It relies on
     /// stable indices of nodes within the worklist.
     DenseMap<SDNode *, unsigned> WorklistMap;
+    /// This records all nodes attempted to add to the worklist since we
+    /// considered a new worklist entry. As we keep do not add duplicate nodes
+    /// in the worklist, this is different from the tail of the worklist.
+    SmallSetVector<SDNode *, 32> PruningList;
 
     /// Set of nodes which have been combined (at least once).
     ///
@@ -152,6 +156,37 @@ namespace {
     void AddUsersToWorklist(SDNode *N) {
       for (SDNode *Node : N->uses())
         AddToWorklist(Node);
+    }
+
+    // Prune potentially dangling nodes. This is called after
+    // any visit to a node, but should also be called during a visit after any
+    // failed combine which may have created a DAG node.
+    void clearAddedDanglingWorklistEntries() {
+      // Check any nodes added to the worklist to see if they are prunable.
+      while (!PruningList.empty()) {
+        auto *N = PruningList.pop_back_val();
+        if (N->use_empty())
+          recursivelyDeleteUnusedNodes(N);
+      }
+    }
+
+    SDNode *getNextWorklistEntry() {
+      // Before we do any work, remove nodes that are not in use.
+      clearAddedDanglingWorklistEntries();
+      SDNode *N = nullptr;
+      // The Worklist holds the SDNodes in order, but it may contain null
+      // entries.
+      while (!N && !Worklist.empty()) {
+        N = Worklist.pop_back_val();
+      }
+
+      if (N) {
+        bool GoodWorklistEntry = WorklistMap.erase(N);
+        (void)GoodWorklistEntry;
+        assert(GoodWorklistEntry &&
+               "Found a worklist entry without a corresponding map entry!");
+      }
+      return N;
     }
 
     /// Call the node-specific routine that folds each particular type of node.
@@ -171,6 +206,11 @@ namespace {
           MaximumLegalStoreInBits = VT.getSizeInBits();
     }
 
+    void ConsiderForPruning(SDNode *N) {
+      // Mark this for potential pruning.
+      PruningList.insert(N);
+    }
+
     /// Add to the worklist making sure its instance is at the back (next to be
     /// processed.)
     void AddToWorklist(SDNode *N) {
@@ -182,6 +222,8 @@ namespace {
       if (N->getOpcode() == ISD::HANDLENODE)
         return;
 
+      ConsiderForPruning(N);
+
       if (WorklistMap.insert(std::make_pair(N, Worklist.size())).second)
         Worklist.push_back(N);
     }
@@ -189,6 +231,7 @@ namespace {
     /// Remove all instances of N from the worklist.
     void removeFromWorklist(SDNode *N) {
       CombinedNodes.erase(N);
+      PruningList.remove(N);
 
       auto It = WorklistMap.find(N);
       if (It == WorklistMap.end())
@@ -384,6 +427,10 @@ namespace {
     SDValue replaceStoreOfFPConstant(StoreSDNode *ST);
 
     SDValue visitSTORE(SDNode *N);
+
+    SDValue ImproveLifetimeNodeChain(SDNode *N);
+
+    SDValue visitLIFETIME_START(SDNode *N);
     SDValue visitLIFETIME_END(SDNode *N);
     SDValue visitINSERT_VECTOR_ELT(SDNode *N);
     SDValue visitEXTRACT_VECTOR_ELT(SDNode *N);
@@ -641,6 +688,18 @@ public:
   void NodeDeleted(SDNode *N, SDNode *E) override {
     DC.removeFromWorklist(N);
   }
+};
+
+class WorklistInserter : public SelectionDAG::DAGUpdateListener {
+  DAGCombiner &DC;
+
+public:
+  explicit WorklistInserter(DAGCombiner &dc)
+      : SelectionDAG::DAGUpdateListener(dc.getDAG()), DC(dc) {}
+
+  // FIXME: Ideally we could add N to the worklist, but this causes exponential
+  //        compile time costs in large DAGs, e.g. Halide.
+  void NodeInserted(SDNode *N) override { DC.ConsiderForPruning(N); }
 };
 
 } // end anonymous namespace
@@ -1395,6 +1454,8 @@ void DAGCombiner::Run(CombineLevel AtLevel) {
   LegalOperations = Level >= AfterLegalizeVectorOps;
   LegalTypes = Level >= AfterLegalizeTypes;
 
+  WorklistInserter AddNodes(*this);
+
   // Add all the dag nodes to the worklist.
   for (SDNode &Node : DAG.allnodes())
     AddToWorklist(&Node);
@@ -1404,19 +1465,8 @@ void DAGCombiner::Run(CombineLevel AtLevel) {
   // changes of the root.
   HandleSDNode Dummy(DAG.getRoot());
 
-  // While the worklist isn't empty, find a node and try to combine it.
-  while (!WorklistMap.empty()) {
-    SDNode *N;
-    // The Worklist holds the SDNodes in order, but it may contain null entries.
-    do {
-      N = Worklist.pop_back_val();
-    } while (!N);
-
-    bool GoodWorklistEntry = WorklistMap.erase(N);
-    (void)GoodWorklistEntry;
-    assert(GoodWorklistEntry &&
-           "Found a worklist entry without a corresponding map entry!");
-
+  // While we have a valid worklist entry node, try to combine it.
+  while (SDNode *N = getNextWorklistEntry()) {
     // If N has no uses, it is dead.  Make sure to revisit all N's operands once
     // N is deleted from the DAG, since they too may now be dead or may have a
     // reduced number of uses, allowing other xforms.
@@ -1604,6 +1654,7 @@ SDValue DAGCombiner::visit(SDNode *N) {
   case ISD::MLOAD:              return visitMLOAD(N);
   case ISD::MSCATTER:           return visitMSCATTER(N);
   case ISD::MSTORE:             return visitMSTORE(N);
+  case ISD::LIFETIME_START:     return visitLIFETIME_START(N);
   case ISD::LIFETIME_END:       return visitLIFETIME_END(N);
   case ISD::FP_TO_FP16:         return visitFP_TO_FP16(N);
   case ISD::FP16_TO_FP:         return visitFP16_TO_FP(N);
@@ -15654,7 +15705,32 @@ SDValue DAGCombiner::visitSTORE(SDNode *N) {
   return ReduceLoadOpStoreWidth(N);
 }
 
+SDValue DAGCombiner::ImproveLifetimeNodeChain(SDNode *N) {
+  auto Chain = N->getOperand(0);
+  auto NewChain = FindBetterChain(N, Chain);
+  if (NewChain != Chain) {
+    SDNode *N2 = DAG.UpdateNodeOperands(N, NewChain, N->getOperand(1));
+    // Make sure users of new N still depend on Chain
+    auto TF = DAG.getNode(ISD::TokenFactor, SDLoc(N2), MVT::Other, Chain,
+                          SDValue(N2, 0));
+    DAG.ReplaceAllUsesOfValueWith(SDValue(N2, 0), TF);
+    AddToWorklist(DAG.UpdateNodeOperands(TF.getNode(), Chain, SDValue(N2, 0)));
+    AddToWorklist(N2);
+    return SDValue(N, 0);
+  }
+  return SDValue();
+}
+
+SDValue DAGCombiner::visitLIFETIME_START(SDNode *N) {
+  if (SDValue V = ImproveLifetimeNodeChain(N))
+    return V;
+  return SDValue();
+}
+
 SDValue DAGCombiner::visitLIFETIME_END(SDNode *N) {
+  if (SDValue V = ImproveLifetimeNodeChain(N))
+    return V;
+
   const auto *LifetimeEnd = cast<LifetimeSDNode>(N);
   if (!LifetimeEnd->hasOffset())
     return SDValue();
@@ -17946,6 +18022,34 @@ static SDValue replaceShuffleOfInsert(ShuffleVectorSDNode *Shuf,
                      Op1, Op0.getOperand(1), NewInsIndex);
 }
 
+/// If we have a unary shuffle of a shuffle, see if it can be folded away
+/// completely. This has the potential to lose undef knowledge because the first
+/// shuffle may not have an undef mask element where the second one does. So
+/// only call this after doing simplifications based on demanded elements.
+static SDValue simplifyShuffleOfShuffle(ShuffleVectorSDNode *Shuf) {
+  // shuf (shuf0 X, Y, Mask0), undef, Mask
+  auto *Shuf0 = dyn_cast<ShuffleVectorSDNode>(Shuf->getOperand(0));
+  if (!Shuf0 || !Shuf->getOperand(1).isUndef())
+    return SDValue();
+
+  ArrayRef<int> Mask = Shuf->getMask();
+  ArrayRef<int> Mask0 = Shuf0->getMask();
+  for (int i = 0, e = (int)Mask.size(); i != e; ++i) {
+    // Ignore undef elements.
+    if (Mask[i] == -1)
+      continue;
+    assert(Mask[i] >= 0 && Mask[i] < e && "Unexpected shuffle mask value");
+
+    // Is the element of the shuffle operand chosen by this shuffle the same as
+    // the element chosen by the shuffle operand itself?
+    if (Mask0[Mask[i]] != Mask0[i])
+      return SDValue();
+  }
+  // Every element of this shuffle is identical to the result of the previous
+  // shuffle, so we can replace this value.
+  return Shuf->getOperand(0);
+}
+
 SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
   EVT VT = N->getValueType(0);
   unsigned NumElts = VT.getVectorNumElements();
@@ -18055,6 +18159,11 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
   // Simplify source operands based on shuffle mask.
   if (SimplifyDemandedVectorElts(SDValue(N, 0)))
     return SDValue(N, 0);
+
+  // This is intentionally placed after demanded elements simplification because
+  // it could eliminate knowledge of undef elements created by this shuffle.
+  if (SDValue ShufOp = simplifyShuffleOfShuffle(SVN))
+    return ShufOp;
 
   // Match shuffles that can be converted to any_vector_extend_in_reg.
   if (SDValue V = combineShuffleToVectorExtend(SVN, DAG, TLI, LegalOperations))
