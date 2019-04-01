@@ -289,6 +289,10 @@ def : Pat<(fma FPR64:$rs1, (fneg FPR64:$rs2), FPR64:$rs3),
 // handled by a RISC-V instruction and aren't expanded in the SelectionDAG
 // Legalizer.
 
+def : Pat<(seto FPR64:$rs1, FPR64:$rs2),
+          (AND (FEQ_D FPR64:$rs1, FPR64:$rs1),
+               (FEQ_D FPR64:$rs2, FPR64:$rs2))>;
+
 def : Pat<(setuo FPR64:$rs1, FPR64:$rs2),
           (SLTIU (AND (FEQ_D FPR64:$rs1, FPR64:$rs1),
                       (FEQ_D FPR64:$rs2, FPR64:$rs2)),
