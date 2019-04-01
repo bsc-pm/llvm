@@ -99,7 +99,7 @@ define i32 @caller_double_in_gpr_exhausted_fprs() nounwind {
 ; RV32-ILP32D-NEXT:    addi sp, sp, -16
 ; RV32-ILP32D-NEXT:    sw ra, 12(sp)
 ; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI5_0)
-; RV32-ILP32D-NEXT:    addi a6, a0, %lo(.LCPI5_0)
+; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI5_0)
 ; RV32-ILP32D-NEXT:    lui a1, %hi(.LCPI5_1)
 ; RV32-ILP32D-NEXT:    addi a1, a1, %lo(.LCPI5_1)
 ; RV32-ILP32D-NEXT:    lui a2, %hi(.LCPI5_2)
@@ -110,24 +110,20 @@ define i32 @caller_double_in_gpr_exhausted_fprs() nounwind {
 ; RV32-ILP32D-NEXT:    addi a4, a4, %lo(.LCPI5_4)
 ; RV32-ILP32D-NEXT:    lui a5, %hi(.LCPI5_5)
 ; RV32-ILP32D-NEXT:    addi a5, a5, %lo(.LCPI5_5)
+; RV32-ILP32D-NEXT:    fld fa0, 0(a5)
+; RV32-ILP32D-NEXT:    fld fa1, 0(a4)
+; RV32-ILP32D-NEXT:    fld fa2, 0(a3)
+; RV32-ILP32D-NEXT:    fld fa3, 0(a2)
+; RV32-ILP32D-NEXT:    fld fa4, 0(a1)
+; RV32-ILP32D-NEXT:    fld fa5, 0(a0)
 ; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI5_6)
 ; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI5_6)
-; RV32-ILP32D-NEXT:    fld fa0, 0(a0)
-; RV32-ILP32D-NEXT:    fld fa1, 0(a5)
-; RV32-ILP32D-NEXT:    fld fa2, 0(a4)
-; RV32-ILP32D-NEXT:    fld fa3, 0(a3)
-; RV32-ILP32D-NEXT:    fld fa4, 0(a2)
-; RV32-ILP32D-NEXT:    fld fa5, 0(a1)
-; RV32-ILP32D-NEXT:    fld fa6, 0(a6)
+; RV32-ILP32D-NEXT:    fld fa6, 0(a0)
 ; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI5_7)
 ; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI5_7)
 ; RV32-ILP32D-NEXT:    fld fa7, 0(a0)
-; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI5_8)
-; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI5_8)
-; RV32-ILP32D-NEXT:    fld ft0, 0(a0)
-; RV32-ILP32D-NEXT:    fsd ft0, 0(sp)
-; RV32-ILP32D-NEXT:    lw a0, 0(sp)
-; RV32-ILP32D-NEXT:    lw a1, 4(sp)
+; RV32-ILP32D-NEXT:    mv a0, zero
+; RV32-ILP32D-NEXT:    lui a1, 262688
 ; RV32-ILP32D-NEXT:    call callee_double_in_gpr_exhausted_fprs
 ; RV32-ILP32D-NEXT:    lw ra, 12(sp)
 ; RV32-ILP32D-NEXT:    addi sp, sp, 16
@@ -159,29 +155,24 @@ define i32 @callee_double_in_gpr_and_stack_almost_exhausted_gprs_fprs(i64 %a, do
 define i32 @caller_double_in_gpr_and_stack_almost_exhausted_gprs_fprs() nounwind {
 ; RV32-ILP32D-LABEL: caller_double_in_gpr_and_stack_almost_exhausted_gprs_fprs:
 ; RV32-ILP32D:       # %bb.0:
-; RV32-ILP32D-NEXT:    addi sp, sp, -32
-; RV32-ILP32D-NEXT:    sw ra, 28(sp)
-; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_0)
-; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI7_0)
-; RV32-ILP32D-NEXT:    fld ft0, 0(a0)
-; RV32-ILP32D-NEXT:    fsd ft0, 16(sp)
-; RV32-ILP32D-NEXT:    lw a7, 16(sp)
-; RV32-ILP32D-NEXT:    lw a0, 20(sp)
+; RV32-ILP32D-NEXT:    addi sp, sp, -16
+; RV32-ILP32D-NEXT:    sw ra, 12(sp)
+; RV32-ILP32D-NEXT:    lui a0, 262816
 ; RV32-ILP32D-NEXT:    sw a0, 0(sp)
-; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_1)
-; RV32-ILP32D-NEXT:    addi a6, a0, %lo(.LCPI7_1)
-; RV32-ILP32D-NEXT:    lui a1, %hi(.LCPI7_2)
-; RV32-ILP32D-NEXT:    addi a1, a1, %lo(.LCPI7_2)
-; RV32-ILP32D-NEXT:    lui a2, %hi(.LCPI7_3)
-; RV32-ILP32D-NEXT:    addi a2, a2, %lo(.LCPI7_3)
-; RV32-ILP32D-NEXT:    lui a3, %hi(.LCPI7_4)
-; RV32-ILP32D-NEXT:    addi a3, a3, %lo(.LCPI7_4)
-; RV32-ILP32D-NEXT:    lui a4, %hi(.LCPI7_5)
-; RV32-ILP32D-NEXT:    addi a4, a4, %lo(.LCPI7_5)
-; RV32-ILP32D-NEXT:    lui a5, %hi(.LCPI7_6)
-; RV32-ILP32D-NEXT:    addi a5, a5, %lo(.LCPI7_6)
-; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_7)
-; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI7_7)
+; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_0)
+; RV32-ILP32D-NEXT:    addi a6, a0, %lo(.LCPI7_0)
+; RV32-ILP32D-NEXT:    lui a1, %hi(.LCPI7_1)
+; RV32-ILP32D-NEXT:    addi a1, a1, %lo(.LCPI7_1)
+; RV32-ILP32D-NEXT:    lui a2, %hi(.LCPI7_2)
+; RV32-ILP32D-NEXT:    addi a2, a2, %lo(.LCPI7_2)
+; RV32-ILP32D-NEXT:    lui a3, %hi(.LCPI7_3)
+; RV32-ILP32D-NEXT:    addi a3, a3, %lo(.LCPI7_3)
+; RV32-ILP32D-NEXT:    lui a4, %hi(.LCPI7_4)
+; RV32-ILP32D-NEXT:    addi a4, a4, %lo(.LCPI7_4)
+; RV32-ILP32D-NEXT:    lui a5, %hi(.LCPI7_5)
+; RV32-ILP32D-NEXT:    addi a5, a5, %lo(.LCPI7_5)
+; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_6)
+; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI7_6)
 ; RV32-ILP32D-NEXT:    fld fa0, 0(a0)
 ; RV32-ILP32D-NEXT:    fld fa1, 0(a5)
 ; RV32-ILP32D-NEXT:    fld fa2, 0(a4)
@@ -189,8 +180,8 @@ define i32 @caller_double_in_gpr_and_stack_almost_exhausted_gprs_fprs() nounwind
 ; RV32-ILP32D-NEXT:    fld fa4, 0(a2)
 ; RV32-ILP32D-NEXT:    fld fa5, 0(a1)
 ; RV32-ILP32D-NEXT:    fld fa6, 0(a6)
-; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_8)
-; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI7_8)
+; RV32-ILP32D-NEXT:    lui a0, %hi(.LCPI7_7)
+; RV32-ILP32D-NEXT:    addi a0, a0, %lo(.LCPI7_7)
 ; RV32-ILP32D-NEXT:    fld fa7, 0(a0)
 ; RV32-ILP32D-NEXT:    addi a0, zero, 1
 ; RV32-ILP32D-NEXT:    mv a1, zero
@@ -199,9 +190,10 @@ define i32 @caller_double_in_gpr_and_stack_almost_exhausted_gprs_fprs() nounwind
 ; RV32-ILP32D-NEXT:    addi a4, zero, 5
 ; RV32-ILP32D-NEXT:    mv a5, zero
 ; RV32-ILP32D-NEXT:    addi a6, zero, 7
+; RV32-ILP32D-NEXT:    mv a7, zero
 ; RV32-ILP32D-NEXT:    call callee_double_in_gpr_and_stack_almost_exhausted_gprs_fprs
-; RV32-ILP32D-NEXT:    lw ra, 28(sp)
-; RV32-ILP32D-NEXT:    addi sp, sp, 32
+; RV32-ILP32D-NEXT:    lw ra, 12(sp)
+; RV32-ILP32D-NEXT:    addi sp, sp, 16
 ; RV32-ILP32D-NEXT:    ret
   %1 = call i32 @callee_double_in_gpr_and_stack_almost_exhausted_gprs_fprs(
       i64 1, double 2.0, i64 3, double 4.0, i64 5, double 6.0, i32 7, double 8.0,

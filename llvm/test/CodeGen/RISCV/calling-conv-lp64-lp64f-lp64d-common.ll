@@ -10,13 +10,6 @@
 
 ; This file contains tests that should have identical output for the lp64,
 ; lp64f, and lp64d ABIs. i.e. where no arguments are passed according to
-; RUN: llc -mtriple=riscv64 -target-abi lp64f -mattr=+f \
-; RUN:   -verify-machineinstrs < %s | FileCheck -check-prefix=RV64I %s
-; RUN: llc -mtriple=riscv64 -target-abi lp64d -mattr=+f,+d \
-; RUN:   -verify-machineinstrs < %s | FileCheck -check-prefix=RV64I %s
-
-; This file contains tests that should have identical output for the lp64,
-; lp64f, and lp64d ABIs. i.e. where no arguments are passed according to
 ; the floating point ABI. It doesn't check codegen when frame pointer
 ; elimination is disabled, as there is sufficient coverage for this case in
 ; other files.
