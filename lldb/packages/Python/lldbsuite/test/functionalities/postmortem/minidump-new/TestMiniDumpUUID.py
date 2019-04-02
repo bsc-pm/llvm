@@ -30,7 +30,10 @@ class MiniDumpUUIDTestCase(TestBase):
 
     def verify_module(self, module, verify_path, verify_uuid):
         uuid = module.GetUUIDString()
-        self.assertEqual(verify_path, module.GetFileSpec().fullpath)
+        fullpath = module.GetFileSpec().fullpath
+        msg = 'Verify path ("%s") is contained in the fullpath ("%s")' % (
+                verify_path, fullpath)
+        self.assertTrue(verify_path in fullpath, msg)
         self.assertEqual(verify_uuid, uuid)
 
     def test_zero_uuid_modules(self):
@@ -134,6 +137,7 @@ class MiniDumpUUIDTestCase(TestBase):
         self.verify_module(modules[0], "/not/exist/a", None)
         self.verify_module(modules[1], "/not/exist/b", None)
 
+    @skipIf(oslist=['windows'])
     def test_partial_uuid_match(self):
         """
             Breakpad has been known to create minidump files using CvRecord in each
@@ -160,6 +164,7 @@ class MiniDumpUUIDTestCase(TestBase):
                            "libuuidmatch.so", 
                            "7295E17C-6668-9E05-CBB5-DEE5003865D5-5267C116")
 
+    @skipIf(oslist=['windows'])
     def test_partial_uuid_mismatch(self):
         """
             Breakpad has been known to create minidump files using CvRecord in each
