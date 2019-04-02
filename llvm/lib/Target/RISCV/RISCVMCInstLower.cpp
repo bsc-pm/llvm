@@ -34,20 +34,21 @@ static MCOperand lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
   default:
     llvm_unreachable("Unknown target flag on GV operand");
   case RISCVII::MO_None:
-  case RISCVII::MO_PCREL:
-  case RISCVII::MO_GOT:
   case RISCVII::MO_TLS_GOT:
   case RISCVII::MO_TLS_GD:
     Kind = RISCVMCExpr::VK_RISCV_None;
+    break;
+  case RISCVII::MO_CALL:
+    Kind = RISCVMCExpr::VK_RISCV_CALL;
+    break;
+  case RISCVII::MO_CALL_PLT:
+    Kind = RISCVMCExpr::VK_RISCV_CALL_PLT;
     break;
   case RISCVII::MO_LO:
     Kind = RISCVMCExpr::VK_RISCV_LO;
     break;
   case RISCVII::MO_HI:
     Kind = RISCVMCExpr::VK_RISCV_HI;
-    break;
-  case RISCVII::MO_PLT:
-    Kind = RISCVMCExpr::VK_RISCV_PLT;
     break;
   case RISCVII::MO_TPREL_HI:
     Kind = RISCVMCExpr::VK_RISCV_TPREL_HI;
@@ -57,6 +58,15 @@ static MCOperand lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
     break;
   case RISCVII::MO_TPREL_LO:
     Kind = RISCVMCExpr::VK_RISCV_TPREL_LO;
+    break;
+  case RISCVII::MO_PCREL_LO:
+    Kind = RISCVMCExpr::VK_RISCV_PCREL_LO;
+    break;
+  case RISCVII::MO_PCREL_HI:
+    Kind = RISCVMCExpr::VK_RISCV_PCREL_HI;
+    break;
+  case RISCVII::MO_GOT_HI:
+    Kind = RISCVMCExpr::VK_RISCV_GOT_HI;
     break;
   }
 

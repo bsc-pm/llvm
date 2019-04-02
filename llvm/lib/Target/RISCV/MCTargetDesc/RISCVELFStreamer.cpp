@@ -88,66 +88,66 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
   default:
     return false;
   // FIXME this should go away
-  case RISCV::PseudoLLA: {
-    // PC-rel addressing
-    MCContext &Ctx = getContext();
+  // case RISCV::PseudoLLA: {
+  //   // PC-rel addressing
+  //   MCContext &Ctx = getContext();
 
-    // TmpLabel: AUIPC rdest, %pcrel_hi(symbol)
-    //           ADDI rdest, %pcrel_lo(TmpLabel)
-    MCSymbol *TmpLabel = Ctx.createTempSymbol(
-        "pcrel_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
-    EmitLabel(TmpLabel);
+  //   // TmpLabel: AUIPC rdest, %pcrel_hi(symbol)
+  //   //           ADDI rdest, %pcrel_lo(TmpLabel)
+  //   MCSymbol *TmpLabel = Ctx.createTempSymbol(
+  //       "pcrel_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
+  //   EmitLabel(TmpLabel);
 
-    MCOperand DestReg = Inst.getOperand(0);
-    const RISCVMCExpr *Symbol = RISCVMCExpr::create(
-        Inst.getOperand(1).getExpr(), RISCVMCExpr::VK_RISCV_PCREL_HI, Ctx);
+  //   MCOperand DestReg = Inst.getOperand(0);
+  //   const RISCVMCExpr *Symbol = RISCVMCExpr::create(
+  //       Inst.getOperand(1).getExpr(), RISCVMCExpr::VK_RISCV_PCREL_HI, Ctx);
 
-    MCInst AUIPC =
-        MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI);
+  //   MCInst AUIPC =
+  //       MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
+  //   EmitInstruction(AUIPC, STI);
 
-    const MCExpr *RefToLinkTmpLabel =
-        RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
-                            RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
+  //   const MCExpr *RefToLinkTmpLabel =
+  //       RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
+  //                           RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
 
-    MCInst Addi = MCInstBuilder(RISCV::ADDI)
-                      .addOperand(DestReg)
-                      .addOperand(DestReg)
-                      .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Addi, STI);
-    break;
-  }
-  case RISCV::PseudoLA: {
-    // GOT addressing
-    MCContext &Ctx = getContext();
+  //   MCInst Addi = MCInstBuilder(RISCV::ADDI)
+  //                     .addOperand(DestReg)
+  //                     .addOperand(DestReg)
+  //                     .addExpr(RefToLinkTmpLabel);
+  //   EmitInstruction(Addi, STI);
+  //   break;
+  // }
+  // case RISCV::PseudoLA: {
+  //   // GOT addressing
+  //   MCContext &Ctx = getContext();
 
-    // TmpLabel: AUIPC rdest, %got_pcrel_hi(symbol)
-    //         L{W,D} rdest, rdest, %pcrel_lo(TmpLabel)
-    MCSymbol *TmpLabel = Ctx.createTempSymbol(
-        "got_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
-    EmitLabel(TmpLabel);
+  //   // TmpLabel: AUIPC rdest, %got_pcrel_hi(symbol)
+  //   //         L{W,D} rdest, rdest, %pcrel_lo(TmpLabel)
+  //   MCSymbol *TmpLabel = Ctx.createTempSymbol(
+  //       "got_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
+  //   EmitLabel(TmpLabel);
 
-    MCOperand DestReg = Inst.getOperand(0);
-    const RISCVMCExpr *Symbol = RISCVMCExpr::create(
-        Inst.getOperand(1).getExpr(), RISCVMCExpr::VK_RISCV_GOT_HI, Ctx);
+  //   MCOperand DestReg = Inst.getOperand(0);
+  //   const RISCVMCExpr *Symbol = RISCVMCExpr::create(
+  //       Inst.getOperand(1).getExpr(), RISCVMCExpr::VK_RISCV_GOT_HI, Ctx);
 
-    MCInst AUIPC =
-        MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI);
+  //   MCInst AUIPC =
+  //       MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
+  //   EmitInstruction(AUIPC, STI);
 
-    const MCExpr *RefToLinkTmpLabel =
-        RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
-                            RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
+  //   const MCExpr *RefToLinkTmpLabel =
+  //       RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
+  //                           RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
 
-    bool is64Bit = STI.getTargetTriple().getArch() == Triple::riscv64;
-    unsigned int LoadOpCode = is64Bit ? RISCV::LD : RISCV::LW;
-    MCInst Load = MCInstBuilder(LoadOpCode)
-                      .addOperand(DestReg)
-                      .addOperand(DestReg)
-                      .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Load, STI);
-    break;
-  }
+  //   bool is64Bit = STI.getTargetTriple().getArch() == Triple::riscv64;
+  //   unsigned int LoadOpCode = is64Bit ? RISCV::LD : RISCV::LW;
+  //   MCInst Load = MCInstBuilder(LoadOpCode)
+  //                     .addOperand(DestReg)
+  //                     .addOperand(DestReg)
+  //                     .addExpr(RefToLinkTmpLabel);
+  //   EmitInstruction(Load, STI);
+  //   break;
+  // }
   case RISCV::PseudoLATLSIE: {
     // GOT addressing
     MCContext &Ctx = getContext();

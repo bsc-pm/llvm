@@ -21,12 +21,16 @@ define void @test1() nounwind {
 ;
 ; RV32-PIC-LABEL: test1:
 ; RV32-PIC:       # %bb.0:
-; RV32-PIC-NEXT:    lla a0, .L.str
+; RV32-PIC-NEXT:  .LBB0_1: # Label of block must be emitted
+; RV32-PIC-NEXT:    auipc a0, %pcrel_hi(.L.str)
+; RV32-PIC-NEXT:    addi a0, a0, %pcrel_lo(.LBB0_1)
 ; RV32-PIC-NEXT:    tail a@plt
 ;
 ; RV64-PIC-LABEL: test1:
 ; RV64-PIC:       # %bb.0:
-; RV64-PIC-NEXT:    lla a0, .L.str
+; RV64-PIC-NEXT:  .LBB0_1: # Label of block must be emitted
+; RV64-PIC-NEXT:    auipc a0, %pcrel_hi(.L.str)
+; RV64-PIC-NEXT:    addi a0, a0, %pcrel_lo(.LBB0_1)
 ; RV64-PIC-NEXT:    tail a@plt
     tail call void @a(i8* getelementptr inbounds ([2 x i8], [2 x i8]* @.str, i32 0, i32 0)) #2
     ret void

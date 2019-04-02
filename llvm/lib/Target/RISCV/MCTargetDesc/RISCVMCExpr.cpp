@@ -48,7 +48,7 @@ void RISCVMCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
     case VK_RISCV_TLS_GOT_HI_Pseudo:
       HasVariant = false;
       break;
-    case VK_RISCV_PLT:
+    case VK_RISCV_CALL_PLT:
       HasVariant = false;
       HasSuffix = true;
       Suffix = "@plt";
@@ -247,6 +247,7 @@ bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
   case VK_RISCV_TPREL_LO:
   case VK_RISCV_GOT_HI:
   case VK_RISCV_CALL:
+  case VK_RISCV_CALL_PLT:
     return false;
   }
 

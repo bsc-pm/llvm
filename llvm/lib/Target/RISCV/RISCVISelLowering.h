@@ -147,6 +147,13 @@ private:
                                          Type *Ty) const override {
     return true;
   }
+
+  template <class NodeTy>
+  SDValue getAddr(NodeTy *N, SelectionDAG &DAG) const;
+
+  template <class NodeTy>
+  SDValue getPICAddr(NodeTy *N, SelectionDAG &DAG) const;
+
   SDValue lowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;

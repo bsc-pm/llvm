@@ -86,9 +86,6 @@ public:
   MVT getXLenVT() const { return XLenVT; }
   unsigned getXLen() const { return XLen; }
 
-  unsigned char ClassifyPICGlobalReference(const GlobalValue *GV,
-                                           const TargetMachine &TM) const;
-
   RISCVABI::ABI getTargetABI() const { return TargetABI; }
 };
 } // End llvm namespace

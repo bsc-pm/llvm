@@ -130,11 +130,7 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI, raw_ostream &OS,
 
   assert(Func.isExpr() && "Expected expression");
 
-  const MCExpr *Expr = Func.getExpr();
-
-  // Create function call expression CallExpr for AUIPC.
-  const MCExpr *CallExpr =
-      RISCVMCExpr::create(Expr, RISCVMCExpr::VK_RISCV_CALL, Ctx);
+  const MCExpr *CallExpr = Func.getExpr();
 
   // Emit AUIPC Ra, Func with R_RISCV_CALL relocation type.
   TmpInst = MCInstBuilder(RISCV::AUIPC)
@@ -245,8 +241,6 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_None:
     case RISCVMCExpr::VK_RISCV_Invalid:
       llvm_unreachable("Unhandled fixup kind!");
-    case RISCVMCExpr::VK_RISCV_PLT:
-      llvm_unreachable("This variant kind cannot appear at this level");
     case RISCVMCExpr::VK_RISCV_LO:
       if (MIFrm == RISCVII::InstFormatI)
         FixupKind = RISCV::fixup_riscv_lo12_i;
@@ -277,29 +271,21 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_GOT_HI:
       FixupKind = RISCV::fixup_riscv_got_hi20;
       break;
-    case RISCVMCExpr::VK_RISCV_CALL: {
+    case RISCVMCExpr::VK_RISCV_CALL:
       FixupKind = RISCV::fixup_riscv_call;
       RelaxCandidate = true;
-      if (RVExpr->getSubExpr()->getKind() == MCExpr::Target) {
-        assert(cast<RISCVMCExpr>(RVExpr->getSubExpr())->getKind() ==
-                   RISCVMCExpr::VK_RISCV_PLT &&
-               "Only PLT is allowed");
-        FixupKind = RISCV::fixup_riscv_call_plt;
-      } else if (RVExpr->getSubExpr()->getKind() == MCExpr::SymbolRef)
-        FixupKind = RISCV::fixup_riscv_call;
-      else
-        llvm_unreachable("Invalid subexpression in target node");
       break;
-    }
-    case RISCVMCExpr::VK_RISCV_TPREL_HI: {
+    case RISCVMCExpr::VK_RISCV_CALL_PLT:
+      FixupKind = RISCV::fixup_riscv_call_plt;
+      RelaxCandidate = true;
+      break;
+    case RISCVMCExpr::VK_RISCV_TPREL_HI:
       FixupKind = RISCV::fixup_riscv_tprel_hi20;
       break;
-    }
-    case RISCVMCExpr::VK_RISCV_TPREL_ADD: {
+    case RISCVMCExpr::VK_RISCV_TPREL_ADD:
       FixupKind = RISCV::fixup_riscv_tprel_add;
       break;
-    }
-    case RISCVMCExpr::VK_RISCV_TPREL_LO: {
+    case RISCVMCExpr::VK_RISCV_TPREL_LO:
       if (MIFrm == RISCVII::InstFormatI)
         FixupKind = RISCV::fixup_riscv_tprel_lo12_i;
       else if (MIFrm == RISCVII::InstFormatS)
@@ -308,19 +294,16 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
         llvm_unreachable(
             "VK_RISCV_TPREL_LO used with unexpected instruction format");
       break;
-    }
-    case RISCVMCExpr::VK_RISCV_TLS_GOT_HI_Pseudo: {
+    case RISCVMCExpr::VK_RISCV_TLS_GOT_HI_Pseudo:
       assert(MIFrm == RISCVII::InstFormatU &&
              "VK_RISCV_GOT_HI is only valid in U-format");
       FixupKind = RISCV::fixup_riscv_tls_got_hi20;
       break;
-    }
-    case RISCVMCExpr::VK_RISCV_TLS_GD_HI_Pseudo: {
+    case RISCVMCExpr::VK_RISCV_TLS_GD_HI_Pseudo:
       assert(MIFrm == RISCVII::InstFormatU &&
              "VK_RISCV_GOT_HI is only valid in U-format");
       FixupKind = RISCV::fixup_riscv_tls_gd_hi20;
       break;
-    }
     }
   } else if (Kind == MCExpr::SymbolRef &&
              cast<MCSymbolRefExpr>(Expr)->getKind() == MCSymbolRefExpr::VK_None) {

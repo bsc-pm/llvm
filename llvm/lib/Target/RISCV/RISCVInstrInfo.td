@@ -195,21 +195,6 @@ def bare_symbol : Operand<XLenVT> {
   let ParserMatchClass = BareSymbol;
 }
 
-def BareSymbolOrPlt : AsmOperandClass {
-  let Name = "BareSymbolOrPlt";
-  let RenderMethod = "addImmOperands";
-  let DiagnosticType = "InvalidBareSymbolOrPlt";
-  let ParserMethod = "parseBareSymbolOrPlt";
-}
-
-// A bare symbol optionally decorated with @plt.
-def bare_symbol_or_plt : Operand<XLenVT> {
-  let ParserMatchClass = BareSymbolOrPlt;
-  let MCOperandPredicate = [{
-     return MCOp.isBareSymbolRef();
-  }];
-}
-
 def BareSymbolTpRelAdd : AsmOperandClass {
   let Name = "BareSymbolTpRelAdd";
   let RenderMethod = "addImmOperands";
@@ -222,6 +207,19 @@ def bare_symbol_tprel_add : Operand<XLenVT> {
   let MCOperandPredicate = [{
      return MCOp.isBareSymbolRef();
   }];
+}
+
+
+def CallSymbol : AsmOperandClass {
+  let Name = "CallSymbol";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidCallSymbol";
+  let ParserMethod = "parseCallSymbol";
+}
+
+// A bare symbol used in call/tail only.
+def call_symbol : Operand<XLenVT> {
+  let ParserMatchClass = CallSymbol;
 }
 
 def CSRSystemRegister : AsmOperandClass {
@@ -897,7 +895,7 @@ def : Pat<(brind (add GPR:$rs1, simm12:$imm12)),
 // Define AsmString to print "call" when compile with -S flag.
 // Define isCodeGenOnly = 0 to support parsing assembly "call" instruction.
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0 in
-def PseudoCALL : Pseudo<(outs), (ins bare_symbol_or_plt:$func),
+def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func),
                         [(riscv_call tglobaladdr:$func)]> {
   let AsmString = "call\t$func";
 }
@@ -922,7 +920,7 @@ def PseudoRET : Pseudo<(outs), (ins), [(riscv_ret_flag)]>,
 // Define AsmString to print "tail" when compile with -S flag.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2],
     isCodeGenOnly = 0 in
-def PseudoTAIL : Pseudo<(outs), (ins bare_symbol_or_plt:$dst), []> {
+def PseudoTAIL : Pseudo<(outs), (ins call_symbol:$dst), []> {
   let AsmString = "tail\t$dst";
 }
 
@@ -945,17 +943,6 @@ let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
     isAsmParserOnly = 1 in
 def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
                       "la", "$dst, $src">;
-
-// Here mayLoad = 1 because GOT addressing reads memory
-let Size = 8, mayLoad = 1 in
-def PseudoAddrPIC : Pseudo<(outs GPR:$dst), (ins ixlenimm:$addr),
-                           [(set GPR:$dst, (WrapperPIC tglobaladdr:$addr))]>;
-
-def : Pat<(WrapperPIC tblockaddress:$addr),
-          (PseudoAddrPIC tblockaddress:$addr)>;
-
-def : Pat<(WrapperPIC tconstpool:$addr),
-          (PseudoAddrPIC tconstpool:$addr)>;
 
 // Thread local storage: Local Exec
 //   add $dst, $rs1, $rs2, %tprel_add($sym)

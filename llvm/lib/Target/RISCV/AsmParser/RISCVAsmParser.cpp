@@ -114,7 +114,7 @@ class RISCVAsmParser : public MCTargetAsmParser {
   OperandMatchResultTy parseMemOpBaseReg(OperandVector &Operands);
   OperandMatchResultTy parseOperandWithModifier(OperandVector &Operands);
   OperandMatchResultTy parseBareSymbol(OperandVector &Operands);
-  OperandMatchResultTy parseBareSymbolOrPlt(OperandVector &Operands);
+  OperandMatchResultTy parseCallSymbol(OperandVector &Operands);
   OperandMatchResultTy parseJALOffset(OperandVector &Operands);
 
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
@@ -290,15 +290,15 @@ public:
            VK == RISCVMCExpr::VK_RISCV_None;
   }
 
-  bool isBareSymbolOrPlt() const {
+  bool isCallSymbol() const {
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
     // Must be of 'immediate' type but not a constant.
     if (!isImm() || evaluateConstantImm(getImm(), Imm, VK))
       return false;
     return RISCVAsmParser::classifySymbolRef(getImm(), VK, Imm) &&
-           (VK == RISCVMCExpr::VK_RISCV_None ||
-            VK == RISCVMCExpr::VK_RISCV_PLT);
+           (VK == RISCVMCExpr::VK_RISCV_CALL ||
+            VK == RISCVMCExpr::VK_RISCV_CALL_PLT);
   }
 
   bool isBareSymbolTpRelAdd() const {
@@ -828,7 +828,7 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
         return Error(ErrorLoc, "too few operands for instruction");
   }
 
-  switch(Result) {
+  switch (Result) {
   default:
     break;
   case Match_InvalidImmXLenLI:
@@ -935,17 +935,15 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
     return Error(ErrorLoc, "operand must be a bare symbol name");
   }
-  case Match_InvalidBareSymbolOrPlt: {
+  case Match_InvalidCallSymbol: {
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
     return Error(
         ErrorLoc,
-        "operand must be a bare symbol name optionally followed by @plt");
+        "operand must be a bare symbol name, optionally with a '@plt' suffix");
   }
   case Match_InvalidBareSymbolTpRelAdd: {
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
-    return Error(
-        ErrorLoc,
-        "operand must be of the form '%tprel_add(symbol)'");
+    return Error(ErrorLoc, "operand must be of the form '%tprel_add(symbol)'");
   }
   }
 
@@ -1185,25 +1183,7 @@ OperandMatchResultTy RISCVAsmParser::parseBareSymbol(OperandVector &Operands) {
   return MatchOperand_Success;
 }
 
-OperandMatchResultTy RISCVAsmParser::parseJALOffset(OperandVector &Operands) {
-  // Parsing jal operands is fiddly due to the `jal foo` and `jal ra, foo`
-  // both being acceptable forms. When parsing `jal ra, foo` this function
-  // will be called for the `ra` register operand in an attempt to match the
-  // single-operand alias. parseJALOffset must fail for this case. It would
-  // seem logical to try parse the operand using parseImmediate and return
-  // NoMatch if the next token is a comma (meaning we must be parsing a jal in
-  // the second form rather than the first). We can't do this as there's no
-  // way of rewinding the lexer state. Instead, return NoMatch if this operand
-  // is an identifier and is followed by a comma.
-  if (getLexer().is(AsmToken::Identifier) &&
-      getLexer().peekTok().is(AsmToken::Comma))
-    return MatchOperand_NoMatch;
-
-  return parseImmediate(Operands);
-}
-
-OperandMatchResultTy
-RISCVAsmParser::parseBareSymbolOrPlt(OperandVector &Operands) {
+OperandMatchResultTy RISCVAsmParser::parseCallSymbol(OperandVector &Operands) {
   SMLoc S = getLoc();
   SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
   const MCExpr *Res;
@@ -1223,14 +1203,30 @@ RISCVAsmParser::parseBareSymbolOrPlt(OperandVector &Operands) {
 
   MCSymbol *Sym = getContext().getOrCreateSymbol(Identifier);
   Res = MCSymbolRefExpr::create(Sym, MCSymbolRefExpr::VK_None, getContext());
-  // We'd like to use a plain MCSymbolRefExpr::VK_PLT but LLVM emits @PLT and
-  // this is at the moment not valid for GNU (only @plt) so let's stick to
-  // the syntax and use a kind of ours.
   if (IsPLT)
-    Res = RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_PLT, getContext());
-
+    Res =
+        RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_CALL_PLT, getContext());
+  else
+    Res = RISCVMCExpr::create(Res, RISCVMCExpr::VK_RISCV_CALL, getContext());
   Operands.push_back(RISCVOperand::createImm(Res, S, E, isRV64()));
   return MatchOperand_Success;
+}
+
+OperandMatchResultTy RISCVAsmParser::parseJALOffset(OperandVector &Operands) {
+  // Parsing jal operands is fiddly due to the `jal foo` and `jal ra, foo`
+  // both being acceptable forms. When parsing `jal ra, foo` this function
+  // will be called for the `ra` register operand in an attempt to match the
+  // single-operand alias. parseJALOffset must fail for this case. It would
+  // seem logical to try parse the operand using parseImmediate and return
+  // NoMatch if the next token is a comma (meaning we must be parsing a jal in
+  // the second form rather than the first). We can't do this as there's no
+  // way of rewinding the lexer state. Instead, return NoMatch if this operand
+  // is an identifier and is followed by a comma.
+  if (getLexer().is(AsmToken::Identifier) &&
+      getLexer().peekTok().is(AsmToken::Comma))
+    return MatchOperand_NoMatch;
+
+  return parseImmediate(Operands);
 }
 
 OperandMatchResultTy

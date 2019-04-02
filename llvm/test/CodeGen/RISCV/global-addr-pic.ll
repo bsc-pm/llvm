@@ -9,13 +9,19 @@
 define signext i32 @get_local() nounwind {
 ; RV32-LABEL: get_local:
 ; RV32:       # %bb.0: # %entry
-; RV32-NEXT:    lla a0, local
+; RV32-NEXT:  .LBB0_1: # %entry
+; RV32-NEXT:    # Label of block must be emitted
+; RV32-NEXT:    auipc a0, %pcrel_hi(local)
+; RV32-NEXT:    addi a0, a0, %pcrel_lo(.LBB0_1)
 ; RV32-NEXT:    lw a0, 0(a0)
 ; RV32-NEXT:    ret
 ;
 ; RV64-LABEL: get_local:
 ; RV64:       # %bb.0: # %entry
-; RV64-NEXT:    lla a0, local
+; RV64-NEXT:  .LBB0_1: # %entry
+; RV64-NEXT:    # Label of block must be emitted
+; RV64-NEXT:    auipc a0, %pcrel_hi(local)
+; RV64-NEXT:    addi a0, a0, %pcrel_lo(.LBB0_1)
 ; RV64-NEXT:    lw a0, 0(a0)
 ; RV64-NEXT:    ret
 entry:
@@ -26,13 +32,19 @@ entry:
 define signext i32 @get_global() nounwind {
 ; RV32-LABEL: get_global:
 ; RV32:       # %bb.0: # %entry
-; RV32-NEXT:    la a0, global
+; RV32-NEXT:  .LBB1_1: # %entry
+; RV32-NEXT:    # Label of block must be emitted
+; RV32-NEXT:    auipc a0, %got_pcrel_hi(global)
+; RV32-NEXT:    addi a0, a0, %pcrel_lo(.LBB1_1)
 ; RV32-NEXT:    lw a0, 0(a0)
 ; RV32-NEXT:    ret
 ;
 ; RV64-LABEL: get_global:
 ; RV64:       # %bb.0: # %entry
-; RV64-NEXT:    la a0, global
+; RV64-NEXT:  .LBB1_1: # %entry
+; RV64-NEXT:    # Label of block must be emitted
+; RV64-NEXT:    auipc a0, %got_pcrel_hi(global)
+; RV64-NEXT:    addi a0, a0, %pcrel_lo(.LBB1_1)
 ; RV64-NEXT:    lw a0, 0(a0)
 ; RV64-NEXT:    ret
 entry:

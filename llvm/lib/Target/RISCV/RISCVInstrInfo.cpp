@@ -470,6 +470,7 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
     return 0;
   case RISCV::PseudoCALL:
   case RISCV::PseudoTAIL:
+  case RISCV::PseudoLLA:
     return 8;
   case TargetOpcode::INLINEASM:
   case TargetOpcode::INLINEASM_BR: {
@@ -494,9 +495,11 @@ RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
   static const std::pair<unsigned, const char *> TargetFlags[] = {
       {MO_LO, "riscv-abs-lo"},
       {MO_HI, "riscv-abs-hi"},
-      {MO_PCREL, "riscv-pcrel"},
-      {MO_GOT, "riscv-got"},
-      {MO_PLT, "riscv-plt"},
+      {MO_GOT_HI, "riscv-got-hi"},
+      {MO_PCREL_HI, "riscv-pcrel-hi"},
+      {MO_PCREL_LO, "riscv-pcrel-lo"},
+      {MO_CALL, "riscv-call"},
+      {MO_CALL_PLT, "riscv-call-plt"},
       {MO_TPREL_HI, "riscv-tprel-hi"},
       {MO_TPREL_ADD, "riscv-tprel-add"},
       {MO_TPREL_LO, "riscv-tprel-lo"},
