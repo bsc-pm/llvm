@@ -301,7 +301,7 @@ public:
             VK == RISCVMCExpr::VK_RISCV_CALL_PLT);
   }
 
-  bool isBareSymbolTpRelAdd() const {
+  bool isTPRelAddSymbol() const {
     int64_t Imm;
     RISCVMCExpr::VariantKind VK;
     // Must be of 'immediate' type but not a constant.
@@ -891,8 +891,8 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   case Match_InvalidSImm12:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, -(1 << 11), (1 << 11) - 1,
-        "operand must be a symbol with %lo/%pcrel_lo modifier or an integer in "
-        "the range");
+        "operand must be a symbol with %lo/%pcrel_lo/%tprel_lo modifier or an "
+        "integer in the range");
   case Match_InvalidSImm12Lsb0:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, -(1 << 11), (1 << 11) - 2,
@@ -903,8 +903,9 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
         "immediate must be a multiple of 2 bytes in the range");
   case Match_InvalidUImm20LUI:
     return generateImmOutOfRangeError(Operands, ErrorInfo, 0, (1 << 20) - 1,
-                                      "operand must be a symbol with %hi() "
-                                      "modifier or an integer in the range");
+                                      "operand must be a symbol with "
+                                      "%hi/%tprel_hi modifier or an integer in "
+                                      "the range");
   case Match_InvalidUImm20AUIPC:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, 0, (1 << 20) - 1,
@@ -941,9 +942,9 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
         ErrorLoc,
         "operand must be a bare symbol name, optionally with a '@plt' suffix");
   }
-  case Match_InvalidBareSymbolTpRelAdd: {
+  case Match_InvalidTPRelAddSymbol: {
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
-    return Error(ErrorLoc, "operand must be of the form '%tprel_add(symbol)'");
+    return Error(ErrorLoc, "operand must be a symbol with %tprel_add modifier");
   }
   }
 

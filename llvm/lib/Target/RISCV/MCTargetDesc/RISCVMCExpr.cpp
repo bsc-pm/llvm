@@ -211,48 +211,10 @@ StringRef RISCVMCExpr::getVariantKindName(VariantKind Kind) {
     return "got_pcrel_hi";
   case VK_RISCV_TPREL_LO:
     return "tprel_lo";
-  case VK_RISCV_TPREL_ADD:
-    return "tprel_add";
   case VK_RISCV_TPREL_HI:
     return "tprel_hi";
-  }
-}
-
-bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
-  MCValue Value;
-
-  switch (Kind) {
-  default:
-    break;
-  case VK_RISCV_PCREL_HI:
-  case VK_RISCV_PCREL_LO:
-  case VK_RISCV_TPREL_HI:
-  case VK_RISCV_TPREL_LO:
-  case VK_RISCV_GOT_HI:
-  case VK_RISCV_CALL:
-  case VK_RISCV_CALL_PLT:
-    return false;
-  }
-
-  if (!getSubExpr()->evaluateAsRelocatable(Value, nullptr, nullptr))
-    return false;
-
-  if (!Value.isAbsolute())
-    return false;
-
-  Res = evaluateAsInt64(Value.getConstant());
-  return true;
-}
-
-int64_t RISCVMCExpr::evaluateAsInt64(int64_t Value) const {
-  switch (Kind) {
-  default:
-    llvm_unreachable("Invalid kind");
-  case VK_RISCV_LO:
-    return SignExtend64<12>(Value);
-  case VK_RISCV_HI:
-    // Add 1 if bit 11 is 1, to compensate for low 12 bits being negative.
-    return ((Value + 0x800) >> 12) & 0xfffff;
+  case VK_RISCV_TPREL_ADD:
+    return "tprel_add";
   }
 }
 
@@ -289,13 +251,40 @@ void RISCVMCExpr::fixELFSymbolsInTLSFixups(MCAssembler &Asm) const {
   switch (getKind()) {
   default:
     return;
-  case VK_RISCV_TPREL_LO:
-  case VK_RISCV_TPREL_ADD:
   case VK_RISCV_TPREL_HI:
-  case VK_RISCV_TLS_GOT_HI_Pseudo:
-  case VK_RISCV_TLS_GD_HI_Pseudo:
     break;
   }
 
   fixELFSymbolsInTLSFixupsImpl(getSubExpr(), Asm);
+}
+
+bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
+  MCValue Value;
+
+  if (Kind == VK_RISCV_PCREL_HI || Kind == VK_RISCV_PCREL_LO ||
+      Kind == VK_RISCV_GOT_HI || Kind == VK_RISCV_TPREL_HI ||
+      Kind == VK_RISCV_TPREL_LO || Kind == VK_RISCV_TPREL_ADD ||
+      Kind == VK_RISCV_CALL || Kind == VK_RISCV_CALL_PLT)
+    return false;
+
+  if (!getSubExpr()->evaluateAsRelocatable(Value, nullptr, nullptr))
+    return false;
+
+  if (!Value.isAbsolute())
+    return false;
+
+  Res = evaluateAsInt64(Value.getConstant());
+  return true;
+}
+
+int64_t RISCVMCExpr::evaluateAsInt64(int64_t Value) const {
+  switch (Kind) {
+  default:
+    llvm_unreachable("Invalid kind");
+  case VK_RISCV_LO:
+    return SignExtend64<12>(Value);
+  case VK_RISCV_HI:
+    // Add 1 if bit 11 is 1, to compensate for low 12 bits being negative.
+    return ((Value + 0x800) >> 12) & 0xfffff;
+  }
 }

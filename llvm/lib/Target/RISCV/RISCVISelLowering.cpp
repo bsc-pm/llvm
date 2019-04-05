@@ -507,7 +507,7 @@ SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
         DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_ADD);
     SDValue TP = DAG.getRegister(RISCV::X4, XLenVT);
     SDValue MNAdd = SDValue(
-        DAG.getMachineNode(RISCV::PseudoAddTp, DL, Ty, MNHi, TP, TPRelAdd), 0);
+        DAG.getMachineNode(RISCV::PseudoAddTPRel, DL, Ty, MNHi, TP, TPRelAdd), 0);
     SDValue TPRelLo =
         DAG.getTargetGlobalAddress(GV, DL, Ty, 0, RISCVII::MO_TPREL_LO);
     SDValue MNLo =

@@ -195,21 +195,6 @@ def bare_symbol : Operand<XLenVT> {
   let ParserMatchClass = BareSymbol;
 }
 
-def BareSymbolTpRelAdd : AsmOperandClass {
-  let Name = "BareSymbolTpRelAdd";
-  let RenderMethod = "addImmOperands";
-  let DiagnosticType = "InvalidBareSymbolTpRelAdd";
-}
-
-// A bare symbol that must be decorated with %tprel_add
-def bare_symbol_tprel_add : Operand<XLenVT> {
-  let ParserMatchClass = BareSymbolTpRelAdd;
-  let MCOperandPredicate = [{
-     return MCOp.isBareSymbolRef();
-  }];
-}
-
-
 def CallSymbol : AsmOperandClass {
   let Name = "CallSymbol";
   let RenderMethod = "addImmOperands";
@@ -220,6 +205,18 @@ def CallSymbol : AsmOperandClass {
 // A bare symbol used in call/tail only.
 def call_symbol : Operand<XLenVT> {
   let ParserMatchClass = CallSymbol;
+}
+
+def TPRelAddSymbol : AsmOperandClass {
+  let Name = "TPRelAddSymbol";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidTPRelAddSymbol";
+  let ParserMethod = "parseOperandWithModifier";
+}
+
+// A bare symbol with the %tprel_add variant.
+def tprel_add_symbol : Operand<XLenVT> {
+  let ParserMatchClass = TPRelAddSymbol;
 }
 
 def CSRSystemRegister : AsmOperandClass {
@@ -804,6 +801,15 @@ def : PatGprGpr<shiftop<shl>, SLL>;
 def : PatGprGpr<shiftop<srl>, SRL>;
 def : PatGprGpr<shiftop<sra>, SRA>;
 
+// This is a special case of the ADD instruction used to facilitate the use of a
+// fourth operand to emit a relocation on a symbol relating to this instruction.
+// The relocation does not affect any bits of the instruction itself but is used
+// as a hint to the linker.
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoAddTPRel : Pseudo<(outs GPR:$rd),
+                            (ins GPR:$rs1, GPR:$rs2, tprel_add_symbol:$src), [],
+                            "add", "$rd, $rs1, $rs2, $src">;
+
 /// FrameIndex calculations
 
 def : Pat<(add (i32 AddrFI:$Rs), simm12:$imm12),
@@ -943,14 +949,6 @@ let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
     isAsmParserOnly = 1 in
 def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
                       "la", "$dst, $src">;
-
-// Thread local storage: Local Exec
-//   add $dst, $rs1, $rs2, %tprel_add($sym)
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
-def PseudoAddTp : Pseudo<(outs GPR:$dst),
-                         (ins GPR:$rs1, GPR:$rs2,
-                              bare_symbol_tprel_add:$sym), [],
-                         "add", "$dst, $rs1, $rs2, $sym">;
 
 // Thread local storage: Initial Exec
 let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,

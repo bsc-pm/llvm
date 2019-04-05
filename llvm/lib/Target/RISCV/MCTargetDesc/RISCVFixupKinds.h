@@ -38,17 +38,17 @@ enum Fixups {
   // instructions like auipc
   fixup_riscv_got_hi20,
   // fixup_riscv_tprel_hi20 - 20-bit fixup corresponding to tprel_hi(foo) for
-  // instructions like auipc
+  // instructions like lui
   fixup_riscv_tprel_hi20,
-  // fixup_riscv_tprel_add - no bit fixup, corresponding to tprel_add(foo)
-  // instructions like add
-  fixup_riscv_tprel_add,
   // fixup_riscv_tprel_lo12_i - 12-bit fixup corresponding to tprel_lo(foo) for
   // instructions like addi
   fixup_riscv_tprel_lo12_i,
   // fixup_riscv_tprel_lo12_s - 12-bit fixup corresponding to tprel_lo(foo) for
   // the S-type store instructions
   fixup_riscv_tprel_lo12_s,
+  // fixup_riscv_tprel_add - A fixup corresponding to %tprel_add(foo) for the
+  // add_tls instruction. Used to provide a hint to the linker.
+  fixup_riscv_tprel_add,
   // fixup_riscv_tls_got_hi20 - 20-bit fixup corresponding to the offset in the
   // TCB under TLS mode Initial Exec
   fixup_riscv_tls_got_hi20,
