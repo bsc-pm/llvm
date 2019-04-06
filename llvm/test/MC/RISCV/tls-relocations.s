@@ -3,23 +3,46 @@
 # RUN: llvm-mc -filetype obj -triple riscv64 < %s \
 # RUN:    | llvm-readobj -r -t - | FileCheck --check-prefix=CHECK-ELF %s
 
-# CHECK: 	lui	a0, 0
-# CHECK:  R_RISCV_TPREL_HI20	y
-# CHECK: 	add	a0, a0, tp
-# CHECK:  R_RISCV_TPREL_ADD	y
-# CHECK: 	lw	a1, 0(a0)
-# CHECK:  R_RISCV_TPREL_LO12_I	y
-# CHECK: 	sw	a1, 0(a0)
-# CHECK:  R_RISCV_TPREL_LO12_S	y
+# CHECK: lui	a0, 0
+# CHECK: R_RISCV_TPREL_HI20	a
+# CHECK: add	a0, a0, tp
+# CHECK: R_RISCV_TPREL_ADD	a
+# CHECK: lw	a1, 0(a0)
+# CHECK: R_RISCV_TPREL_LO12_I	a
+# CHECK: sw	a1, 0(a0)
+# CHECK: R_RISCV_TPREL_LO12_S	a
 
-# CHECK-ELF: Symbol {
-# CHECK-ELF: Name: y (1)
-# CHECK-ELF-NEXT: Value: 0x0
-# CHECK-ELF-NEXT: Size: 0
-# CHECK-ELF-NEXT: Binding: Global (0x1)
-# CHECK-ELF-NEXT: Type: TLS (0x6)
+# CHECK-ELF: Symbols [
 
-lui	a0, %tprel_hi(y)
-add	a0, a0, tp, %tprel_add(y)
-lw	a1, %tprel_lo(y)(a0)
-sw	a1, %tprel_lo(y)(a0)
+# CHECK-ELF-LABEL: Name: a (
+# CHECK-ELF: Binding: Global (0x1)
+# CHECK-ELF: Type: TLS (0x6)
+
+lui	a0, %tprel_hi(a)
+add	a0, a0, tp, %tprel_add(a)
+lw	a1, %tprel_lo(a)(a0)
+sw	a1, %tprel_lo(a)(a0)
+
+# CHECK: auipc a0, 0
+# CHECK: R_RISCV_TLS_GD_HI20  b
+# CHECK: mv  a0, a0
+# CHECK: R_RISCV_PCREL_LO12_I .Ltls_gd_hi0
+
+# CHECK-ELF-LABEL: Name: b (
+# CHECK-ELF: Binding: Global (0x1)
+# CHECK-ELF: Type: TLS (0x6)
+
+la.tls.gd a0, b
+
+# CHECK: auipc a5, 0
+# CHECK: R_RISCV_TLS_GOT_HI20 c
+# CHECK: ld  a5, 0(a5)
+# CHECK: R_RISCV_PCREL_LO12_I .Ltls_got_hi0
+
+# CHECK-ELF-LABEL: Name: c (
+# CHECK-ELF: Binding: Global (0x1)
+# CHECK-ELF: Type: TLS (0x6)
+
+la.tls.ie a5, c
+
+# CHECK-ELF: ]

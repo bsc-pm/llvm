@@ -252,6 +252,8 @@ void RISCVMCExpr::fixELFSymbolsInTLSFixups(MCAssembler &Asm) const {
   default:
     return;
   case VK_RISCV_TPREL_HI:
+  case VK_RISCV_TLS_GOT_HI_Pseudo:
+  case VK_RISCV_TLS_GD_HI_Pseudo:
     break;
   }
 
