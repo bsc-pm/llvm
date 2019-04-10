@@ -1,3 +1,4 @@
+; XFAIL: riscv
 ; REQUIRES: object-emission
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s > %t
 ; RUN: llvm-dwarfdump -debug-info %t | FileCheck %s
