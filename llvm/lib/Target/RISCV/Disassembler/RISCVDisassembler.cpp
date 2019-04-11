@@ -149,12 +149,6 @@ static DecodeStatus DecodeFPR64RegisterClass(MCInst &Inst, uint64_t RegNo,
   return MCDisassembler::Success;
 }
 
-static DecodeStatus DecodeEPIFPRRegisterClass(MCInst &Inst, uint64_t RegNo,
-                                             uint64_t Address,
-                                             const void *Decoder) {
-  return DecodeFPR64RegisterClass(Inst, RegNo, Address, Decoder);
-}
-
 static DecodeStatus DecodeFPR64CRegisterClass(MCInst &Inst, uint64_t RegNo,
                                               uint64_t Address,
                                               const void *Decoder) {

@@ -360,6 +360,22 @@ using namespace RISCV;
 
 } // end namespace RISCVEPIIntrinsicsTable
 
+namespace RISCVEPIPseudosTable {
+
+struct EPIPseudoInfo {
+  unsigned int Pseudo;
+  unsigned int BaseInstr;
+  unsigned char VLIndex;
+  unsigned char SEWIndex;
+  unsigned char VLMul;
+};
+
+#define GET_EPIPseudosTable_DECL
+using namespace RISCV;
+#include "RISCVGenSearchableTables.inc"
+
+} // end namespace RISCVEPIPseudosTable
+
 } // namespace llvm
 
 #endif
