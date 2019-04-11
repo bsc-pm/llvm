@@ -87,4 +87,11 @@ namespace RISCVEPIIntrinsicsTable {
 
 } // namespace RISCVEPIIntrinsicsTable
 
+namespace RISCVEPIPseudosTable {
+
+#define GET_EPIPseudosTable_IMPL
+#include "RISCVGenSearchableTables.inc"
+
+} // namespace RISCVEPIPseudosTable
+
 } // namespace llvm

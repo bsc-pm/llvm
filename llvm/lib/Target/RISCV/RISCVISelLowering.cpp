@@ -73,13 +73,49 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
   if (Subtarget.hasExtEPI()) {
     addRegisterClass(MVT::nxv1i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv1i8, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv1i16, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv1i32, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv1i64, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv2i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv4i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv8i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv16i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv32i1, &RISCV::EPIVRRegClass);
+    //addRegisterClass(MVT::nxv64i1, &RISCV::EPIVRRegClass); // FIXME undefined type
 
-    addRegisterClass(MVT::nxv1f32, &RISCV::EPIVRRegClass);
+    //addRegisterClass(MVT::nxv1i8, &RISCV::EPIVRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv2i8, &RISCV::EPIVRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv4i8, &RISCV::EPIVRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv8i8, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv16i8, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv32i8, &RISCV::EPIVR4RegClass);
+    //addRegisterClass(MVT::nxv64i8, &RISCV::EPIVR8RegClass); // FIXME undefined type
+
+    //addRegisterClass(MVT::nxv1i16, &RISCV::EPIVRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv2i16, &RISCV::EPIVRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv4i16, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv8i16, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv16i16, &RISCV::EPIVR4RegClass);
+    addRegisterClass(MVT::nxv32i16, &RISCV::EPIVR8RegClass);
+
+    //addRegisterClass(MVT::nxv1i32, &RISCV::EPIVRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv2i32, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv4i32, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv8i32, &RISCV::EPIVR4RegClass);
+    addRegisterClass(MVT::nxv16i32, &RISCV::EPIVR8RegClass);
+
+    addRegisterClass(MVT::nxv1i64, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv2i64, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv4i64, &RISCV::EPIVR4RegClass);
+    addRegisterClass(MVT::nxv8i64, &RISCV::EPIVR8RegClass);
+
+    //addRegisterClass(MVT::nxv1f32, &RISCV::EPIVRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv2f32, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv4f32, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv8f32, &RISCV::EPIVR4RegClass);
+    addRegisterClass(MVT::nxv16f32, &RISCV::EPIVR8RegClass);
+
     addRegisterClass(MVT::nxv1f64, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv2f64, &RISCV::EPIVR2RegClass);
+    addRegisterClass(MVT::nxv4f64, &RISCV::EPIVR4RegClass);
+    addRegisterClass(MVT::nxv8f64, &RISCV::EPIVR8RegClass);
   }
 
   // Compute derived properties from the register classes.
@@ -1215,9 +1251,69 @@ static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
   return TailMBB;
 }
 
+static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
+                                      unsigned VLIndex, unsigned SEWIndex,
+                                      unsigned VLMul) {
+  MachineFunction &MF = *BB->getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  unsigned VL = MI.getOperand(VLIndex).getReg();
+  unsigned SEW = MI.getOperand(SEWIndex).getImm();
+  RISCVEPIVectorMultiplier::VectorMultiplier Multiplier;
+
+  switch (VLMul) {
+  default:
+    llvm_unreachable("Unexpected VLMul");
+  case 1:
+    Multiplier = RISCVEPIVectorMultiplier::VMul1;
+    break;
+  case 2:
+    Multiplier = RISCVEPIVectorMultiplier::VMul2;
+    break;
+  case 4:
+    Multiplier = RISCVEPIVectorMultiplier::VMul4;
+    break;
+  case 8:
+    Multiplier = RISCVEPIVectorMultiplier::VMul8;
+  }
+
+  RISCVEPIVectorElementWidth::VectorElementWidth ElementWidth;
+  switch (SEW) {
+  default:
+    llvm_unreachable("Unexpected SEW for instruction");
+  case 8:
+    ElementWidth = RISCVEPIVectorElementWidth::ElementWidth8;
+    break;
+  case 16:
+    ElementWidth = RISCVEPIVectorElementWidth::ElementWidth16;
+    break;
+  case 32:
+    ElementWidth = RISCVEPIVectorElementWidth::ElementWidth32;
+    break;
+  case 64:
+    ElementWidth = RISCVEPIVectorElementWidth::ElementWidth64;
+    break;
+  case 128:
+    ElementWidth = RISCVEPIVectorElementWidth::ElementWidth128;
+  }
+
+  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), RISCV::X0)
+      .addReg(VL)
+      .addImm(ElementWidth)
+      .addImm(Multiplier);
+
+  return BB;
+}
+
 MachineBasicBlock *
 RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                  MachineBasicBlock *BB) const {
+  if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
+          RISCVEPIPseudosTable::getEPIPseudoInfo(MI.getOpcode())) {
+    return addEPISetVL(MI, BB, EPI->VLIndex, EPI->SEWIndex, EPI->VLMul);
+  }
+
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");

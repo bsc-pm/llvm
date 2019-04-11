@@ -60,6 +60,8 @@ private:
   bool expandLoadAddress(MachineBasicBlock &MBB,
                          MachineBasicBlock::iterator MBBI,
                          MachineBasicBlock::iterator &NextMBBI);
+  bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
+                 unsigned BaseInstr, unsigned VLIndex, unsigned SEWIndex);
 };
 
 char RISCVExpandPseudo::ID = 0;
@@ -88,6 +90,11 @@ bool RISCVExpandPseudo::expandMBB(MachineBasicBlock &MBB) {
 bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MBBI,
                                  MachineBasicBlock::iterator &NextMBBI) {
+  if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
+          RISCVEPIPseudosTable::getEPIPseudoInfo(MBBI->getOpcode())) {
+    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->VLIndex, EPI->SEWIndex);
+  }
+
   switch (MBBI->getOpcode()) {
   case RISCV::PseudoAtomicLoadNand32:
     return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 32,
@@ -688,6 +695,67 @@ bool RISCVExpandPseudo::expandLoadAddress(
 
   NextMBBI = MBB.end();
   MI.eraseFromParent();
+  return true;
+}
+
+bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
+                                  MachineBasicBlock::iterator MBBI,
+                                  unsigned BaseInstr, unsigned VLIndex,
+                                  unsigned SEWIndex) {
+  MachineInstr &MI = *MBBI;
+  MachineFunction &MF = *MBB.getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
+
+  const MCInstrDesc *MCInstr = &TII.get(BaseInstr);
+
+  const MachineInstrBuilder &MIB = BuildMI(MBB, MI, DL, *MCInstr);
+  MachineInstr &MachineInstr = *MIB.getInstr();
+
+  // Remove implicit operands
+  for (MachineInstr::const_mop_iterator Op = MachineInstr.operands_end();
+       Op != MachineInstr.operands_begin(); Op--) {
+    MachineInstr::const_mop_iterator Base = Op - 1;
+    if (Base->isImplicit()) {
+      assert(Base->isReg());
+      MachineInstr.RemoveOperand(MachineInstr.getOperandNo(Base));
+    }
+  }
+
+  for (MachineInstr::const_mop_iterator Op = MI.operands_begin();
+       Op != MI.operands_end(); Op++) {
+    if ((MI.getOperandNo(Op) == VLIndex) || (MI.getOperandNo(Op) == SEWIndex))
+      continue;
+
+    if (Op->isReg()) {
+      unsigned Reg = Op->getReg();
+
+      const TargetRegisterClass *RC = RI.getMinimalPhysRegClass(Reg);
+      if ((RC == &RISCV::EPIVR2RegClass) || (RC == &RISCV::EPIVR4RegClass) ||
+          (RC == &RISCV::EPIVR8RegClass)) {
+        Reg = RI.getSubReg(Reg, RISCV::epivreven);
+        assert(Reg && "Subregister does not exist");
+      }
+
+      unsigned int Flags = 0;
+      if (Op->isImplicit())
+        Flags |= RegState::Implicit;
+
+      if (Op->isDef())
+        Flags |= RegState::Define;
+
+      if (Op->isUndef())
+        Flags |= RegState::Undef;
+
+      MIB.addReg(Reg, Flags);
+    } else {
+      MIB.add(*Op);
+    }
+  }
+
+  MI.eraseFromParent(); // The pseudo instruction is gone now.
   return true;
 }
 
