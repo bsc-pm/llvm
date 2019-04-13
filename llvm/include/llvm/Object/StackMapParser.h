@@ -19,8 +19,9 @@
 
 namespace llvm {
 
+/// A parser for the latest stackmap format.  At the moment, latest=V2.
 template <support::endianness Endianness>
-class StackMapV2Parser {
+class StackMapParser {
 public:
   template <typename AccessorT>
   class AccessorIterator {
@@ -49,7 +50,7 @@ public:
 
   /// Accessor for function records.
   class FunctionAccessor {
-    friend class StackMapV2Parser;
+    friend class StackMapParser;
 
   public:
     /// Get the function address.
@@ -81,7 +82,7 @@ public:
 
   /// Accessor for constants.
   class ConstantAccessor {
-    friend class StackMapV2Parser;
+    friend class StackMapParser;
 
   public:
     /// Return the value of this constant.
@@ -105,13 +106,19 @@ public:
 
   /// Accessor for location records.
   class LocationAccessor {
-    friend class StackMapV2Parser;
+    friend class StackMapParser;
     friend class RecordAccessor;
 
   public:
     /// Get the Kind for this location.
     LocationKind getKind() const {
       return LocationKind(P[KindOffset]);
+    }
+
+    /// Get the Size for this location.
+    uint8_t getSize() const {
+        return read<uint8_t>(P + SizeOffset);
+
     }
 
     /// Get the Dwarf register number for this location.
@@ -148,7 +155,8 @@ public:
     }
 
     static const int KindOffset = 0;
-    static const int DwarfRegNumOffset = KindOffset + sizeof(uint16_t);
+    static const int SizeOffset = KindOffset + sizeof(uint8_t);
+    static const int DwarfRegNumOffset = SizeOffset + sizeof(uint8_t);
     static const int SmallConstantOffset = DwarfRegNumOffset + sizeof(uint16_t);
     static const int LocationAccessorSize = sizeof(uint64_t);
 
@@ -157,7 +165,7 @@ public:
 
   /// Accessor for stackmap live-out fields.
   class LiveOutAccessor {
-    friend class StackMapV2Parser;
+    friend class StackMapParser;
     friend class RecordAccessor;
 
   public:
@@ -188,7 +196,7 @@ public:
 
   /// Accessor for stackmap records.
   class RecordAccessor {
-    friend class StackMapV2Parser;
+    friend class StackMapParser;
 
   public:
     using location_iterator = AccessorIterator<LocationAccessor>;
@@ -292,12 +300,12 @@ public:
 
   /// Construct a parser for a version-2 stackmap. StackMap data will be read
   /// from the given array.
-  StackMapV2Parser(ArrayRef<uint8_t> StackMapSection)
+  StackMapParser(ArrayRef<uint8_t> StackMapSection)
       : StackMapSection(StackMapSection) {
     ConstantsListOffset = FunctionListOffset + getNumFunctions() * FunctionSize;
 
     assert(StackMapSection[0] == 2 &&
-           "StackMapV2Parser can only parse version 2 stackmaps");
+           "StackMapParser can only parse version 2 stackmaps");
 
     unsigned CurrentRecordOffset =
       ConstantsListOffset + getNumConstants() * ConstantSize;
