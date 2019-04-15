@@ -33,10 +33,10 @@ bool RISCVAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
   switch ((unsigned)Fixup.getKind()) {
   default:
     break;
-  case RISCV::fixup_riscv_got_hi20:
-  case RISCV::fixup_riscv_pcrel_hi20:
   case RISCV::fixup_riscv_call_plt:
-    return true;
+  case RISCV::fixup_riscv_got_hi20:
+    ShouldForce = true;
+    break;
   case RISCV::fixup_riscv_pcrel_lo12_i:
   case RISCV::fixup_riscv_pcrel_lo12_s: {
     // For pcrel_lo12, force a relocation if the target of the corresponding
@@ -48,19 +48,22 @@ bool RISCVAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
       return false;
     }
 
-    // Check the reloc pointed by this %pcrel_lo one
     switch ((unsigned)T->getKind()) {
     default:
       llvm_unreachable("Unexpected fixup kind for pcrel_lo12");
       break;
-    case RISCV::fixup_riscv_pcrel_hi20:
-      ShouldForce = T->getValue()->findAssociatedFragment() !=
-                    Fixup.getValue()->findAssociatedFragment();
+    case RISCV::fixup_riscv_pcrel_hi20: {
+      MCFragment *TFragment = T->getValue()->findAssociatedFragment();
+      MCFragment *FixupFragment = Fixup.getValue()->findAssociatedFragment();
+      ShouldForce = !TFragment || !FixupFragment ||
+                    TFragment->getParent() != FixupFragment->getParent();
       break;
+    }
     case RISCV::fixup_riscv_got_hi20:
     case RISCV::fixup_riscv_tls_gd_hi20:
     case RISCV::fixup_riscv_tls_got_hi20:
-      return true;
+      ShouldForce = true;
+      break;
     }
     break;
   }
