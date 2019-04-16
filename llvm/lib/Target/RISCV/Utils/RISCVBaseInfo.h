@@ -241,10 +241,10 @@ inline static bool isValidVectorElementWidth(unsigned Mode) {
 namespace RISCVEPIVectorMultiplier {
 
 #define VECTOR_MULTIPLIER_LIST                                                 \
-  VECTOR_MULTIPLIER(VTypeInt8, 0, "m1")                                        \
-  VECTOR_MULTIPLIER(VTypeInt16, 1, "m2")                                       \
-  VECTOR_MULTIPLIER(VTypeInt32, 2, "m4")                                       \
-  VECTOR_MULTIPLIER(VTypeInt64, 3, "m8")
+  VECTOR_MULTIPLIER(VMul1, 0, "m1")                                            \
+  VECTOR_MULTIPLIER(VMul2, 1, "m2")                                            \
+  VECTOR_MULTIPLIER(VMul4, 2, "m4")                                            \
+  VECTOR_MULTIPLIER(VMul8, 3, "m8")
 
 enum VectorMultiplier {
 #define VECTOR_MULTIPLIER(ID, ENC, __) ID = ENC,
