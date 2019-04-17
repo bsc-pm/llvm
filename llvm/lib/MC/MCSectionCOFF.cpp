@@ -104,7 +104,7 @@ void MCSectionCOFF::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
   OS << '\n';
 }
 
-bool MCSectionCOFF::UseCodeAlign() const {
+bool MCSectionCOFF::isCodeSection() const {
   return getKind().isText();
 }
 

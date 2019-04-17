@@ -164,7 +164,7 @@ void MCSectionMachO::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
   OS << '\n';
 }
 
-bool MCSectionMachO::UseCodeAlign() const {
+bool MCSectionMachO::isCodeSection() const {
   return hasAttribute(MachO::S_ATTR_PURE_INSTRUCTIONS);
 }
 

@@ -185,7 +185,7 @@ void MCSectionELF::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
   }
 }
 
-bool MCSectionELF::UseCodeAlign() const {
+bool MCSectionELF::isCodeSection() const {
   return getFlags() & ELF::SHF_EXECINSTR;
 }
 

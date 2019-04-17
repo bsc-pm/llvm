@@ -325,7 +325,7 @@ uint64_t MCAssembler::computeFragmentSize(const MCAsmLayout &Layout,
 
     // Insert extra Nops for code alignment if the target define
     // shouldInsertExtraNopBytesForCodeAlign target hook.
-    if (AF.getParent()->UseCodeAlign() && AF.hasEmitNops() &&
+    if (AF.getParent()->isCodeSection() && AF.hasEmitNops() &&
         getBackend().shouldInsertExtraNopBytesForCodeAlign(AF, Size))
       return Size;
 
@@ -836,7 +836,7 @@ void MCAssembler::layout(MCAsmLayout &Layout) {
       } else if (auto *AF = dyn_cast<MCAlignFragment>(&Frag)) {
         // Insert fixup type for code alignment if the target define
         // shouldInsertFixupForCodeAlign target hook.
-        if (Sec.UseCodeAlign() && AF->hasEmitNops()) {
+        if (Sec.isCodeSection() && AF->hasEmitNops()) {
           getBackend().shouldInsertFixupForCodeAlign(*this, Layout, *AF);
         }
         continue;
