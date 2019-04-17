@@ -30,6 +30,9 @@ bool RISCVAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
                                             const MCValue &Target) {
   bool ShouldForce = false;
 
+  if (Fixup.getKind() < FirstTargetFixupKind)
+    return false;
+
   switch ((unsigned)Fixup.getKind()) {
   default:
     break;
