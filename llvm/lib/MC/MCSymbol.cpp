@@ -13,6 +13,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFragment.h"
+#include "llvm/MC/MCSection.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -54,6 +55,16 @@ void MCSymbol::setVariableValue(const MCExpr *Value) {
   this->Value = Value;
   SymbolContents = SymContentsVariable;
   setUndefined();
+}
+
+bool MCSymbol::isInCodeSection() const {
+  MCFragment *F = getFragment();
+  if (!F)
+    return false;
+  MCSection *S = F->getParent();
+  if (!S)
+    return false;
+  return S->isCodeSection();
 }
 
 void MCSymbol::print(raw_ostream &OS, const MCAsmInfo *MAI) const {

@@ -380,6 +380,9 @@ public:
     return SymbolContents == SymContentsCommon;
   }
 
+  /// Is this symbol known to be in a code section.
+  bool isInCodeSection() const;
+
   MCFragment *getFragment(bool SetUsed = true) const {
     MCFragment *Fragment = FragmentAndHasName.getPointer();
     if (Fragment || !isVariable())
