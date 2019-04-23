@@ -731,7 +731,8 @@ MCAssembler::handleFixup(const MCAsmLayout &Layout, MCFragment &F,
     // writer of the relocation, and give it an opportunity to adjust the
     // fixup value if need be.
     if (Target.getSymA() && Target.getSymB() &&
-        getBackend().requiresDiffExpressionRelocations()) {
+        getBackend().requiresDiffExpressionRelocations(
+            {&Target.getSymA()->getSymbol(), &Target.getSymB()->getSymbol()})) {
       // The fixup represents the difference between two symbols, which the
       // backend has indicated must be resolved at link time. Split up the fixup
       // into two relocations, one for the add, and one for the sub, and emit

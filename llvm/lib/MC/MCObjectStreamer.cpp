@@ -84,7 +84,7 @@ void MCObjectStreamer::resolvePendingFixups() {
 static Optional<uint64_t>
 absoluteSymbolDiff(MCAssembler &Asm, const MCSymbol *Hi, const MCSymbol *Lo) {
   assert(Hi && Lo);
-  if (Asm.getBackendPtr()->requiresDiffExpressionRelocations())
+  if (Asm.getBackendPtr()->requiresDiffExpressionRelocations({Lo, Hi}))
     return None;
 
   if (!Hi->getFragment() || Hi->getFragment() != Lo->getFragment() ||

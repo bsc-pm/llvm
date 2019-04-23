@@ -15,6 +15,7 @@
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCSymbol.h"
 
 namespace llvm {
 class MCAssembler;
@@ -52,7 +53,16 @@ public:
   // Generate diff expression relocations if the relax feature is enabled or had
   // previously been enabled, otherwise it is safe for the assembler to
   // calculate these internally.
-  bool requiresDiffExpressionRelocations() const override {
+  bool requiresDiffExpressionRelocations(
+      ArrayRef<const MCSymbol *> Symbols) const override {
+    // If any of the symbols is not in a code section, do not require a diff
+    // expression relocation.
+    if (std::any_of(Symbols.begin(), Symbols.end(),
+                    [](const MCSymbol *Sym) -> bool {
+                      assert(Sym && "Invalid symbol");
+                      return !Sym->isInCodeSection();
+                    }))
+      return false;
     return willForceRelocations();
   }
 

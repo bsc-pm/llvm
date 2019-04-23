@@ -606,8 +606,18 @@ EvaluateSymbolicAdd(const MCAssembler *Asm, const MCAsmLayout *Layout,
   // the backend requires this to be emitted as individual relocations, unless
   // the InSet flag is set to get the current difference anyway (used for
   // example to calculate symbol sizes).
-  if (Asm &&
-      (InSet || !Asm->getBackend().requiresDiffExpressionRelocations())) {
+  SmallVector<const MCSymbol *, 4> Symbols;
+  if (LHS_A)
+    Symbols.push_back(&LHS_A->getSymbol());
+  if (LHS_B)
+    Symbols.push_back(&LHS_B->getSymbol());
+  if (RHS_A)
+    Symbols.push_back(&RHS_A->getSymbol());
+  if (RHS_B)
+    Symbols.push_back(&RHS_B->getSymbol());
+
+  if (Asm && (InSet ||
+              !Asm->getBackend().requiresDiffExpressionRelocations(Symbols))) {
     // First, fold out any differences which are fully resolved. By
     // reassociating terms in
     //   Result = (LHS_A - LHS_B + LHS_Cst) + (RHS_A - RHS_B + RHS_Cst).
@@ -616,8 +626,8 @@ EvaluateSymbolicAdd(const MCAssembler *Asm, const MCAsmLayout *Layout,
     //   (LHS_A - RHS_B),
     //   (RHS_A - LHS_B),
     //   (RHS_A - RHS_B).
-    // Since we are attempting to be as aggressive as possible about folding, we
-    // attempt to evaluate each possible alternative.
+    // Since we are attempting to be as aggressive as possible about folding,
+    // we attempt to evaluate each possible alternative.
     AttemptToFoldSymbolOffsetDifference(Asm, Layout, Addrs, InSet, LHS_A, LHS_B,
                                         Result_Cst);
     AttemptToFoldSymbolOffsetDifference(Asm, Layout, Addrs, InSet, LHS_A, RHS_B,

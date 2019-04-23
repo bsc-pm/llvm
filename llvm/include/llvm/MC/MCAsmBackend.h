@@ -116,7 +116,10 @@ public:
 
   /// Check whether the given target requires emitting differences of two
   /// symbols as a set of relocations.
-  virtual bool requiresDiffExpressionRelocations() const { return false; }
+  virtual bool
+  requiresDiffExpressionRelocations(ArrayRef<const MCSymbol *> = {}) const {
+    return false;
+  }
 
   /// @}
 
