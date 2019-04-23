@@ -168,8 +168,8 @@ bool RISCVMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
     case VK_RISCV_TPREL_LO:
     case VK_RISCV_TPREL_HI:
     case VK_RISCV_TPREL_ADD:
-    case VK_RISCV_TLS_GOT_HI_Pseudo:
-    case VK_RISCV_TLS_GD_HI_Pseudo:
+    case VK_RISCV_TLS_GOT_HI:
+    case VK_RISCV_TLS_GD_HI:
       return false;
     }
   }
@@ -191,6 +191,8 @@ RISCVMCExpr::VariantKind RISCVMCExpr::getVariantKindForName(StringRef name) {
       .Case("tprel_lo", VK_RISCV_TPREL_LO)
       .Case("tprel_hi", VK_RISCV_TPREL_HI)
       .Case("tprel_add", VK_RISCV_TPREL_ADD)
+      .Case("tls_ie_pcrel_hi", VK_RISCV_TLS_GOT_HI)
+      .Case("tls_gd_pcrel_hi", VK_RISCV_TLS_GD_HI)
       .Default(VK_RISCV_Invalid);
 }
 
@@ -214,6 +216,10 @@ StringRef RISCVMCExpr::getVariantKindName(VariantKind Kind) {
     return "tprel_hi";
   case VK_RISCV_TPREL_ADD:
     return "tprel_add";
+  case VK_RISCV_TLS_GOT_HI:
+    return "tls_ie_pcrel_hi";
+  case VK_RISCV_TLS_GD_HI:
+    return "tls_gd_pcrel_hi";
   }
 }
 
@@ -251,8 +257,8 @@ void RISCVMCExpr::fixELFSymbolsInTLSFixups(MCAssembler &Asm) const {
   default:
     return;
   case VK_RISCV_TPREL_HI:
-  case VK_RISCV_TLS_GOT_HI_Pseudo:
-  case VK_RISCV_TLS_GD_HI_Pseudo:
+  case VK_RISCV_TLS_GOT_HI:
+  case VK_RISCV_TLS_GD_HI:
     break;
   }
 
@@ -265,6 +271,7 @@ bool RISCVMCExpr::evaluateAsConstant(int64_t &Res) const {
   if (Kind == VK_RISCV_PCREL_HI || Kind == VK_RISCV_PCREL_LO ||
       Kind == VK_RISCV_GOT_HI || Kind == VK_RISCV_TPREL_HI ||
       Kind == VK_RISCV_TPREL_LO || Kind == VK_RISCV_TPREL_ADD ||
+      Kind == VK_RISCV_TLS_GOT_HI || Kind == VK_RISCV_TLS_GD_HI ||
       Kind == VK_RISCV_CALL || Kind == VK_RISCV_CALL_PLT)
     return false;
 

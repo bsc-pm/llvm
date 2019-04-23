@@ -307,6 +307,12 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
       FixupKind = RISCV::fixup_riscv_tprel_hi20;
       RelaxCandidate = true;
       break;
+    case RISCVMCExpr::VK_RISCV_TLS_GOT_HI:
+      FixupKind = RISCV::fixup_riscv_tls_got_hi20;
+      break;
+    case RISCVMCExpr::VK_RISCV_TLS_GD_HI:
+      FixupKind = RISCV::fixup_riscv_tls_gd_hi20;
+      break;
     case RISCVMCExpr::VK_RISCV_CALL:
       FixupKind = RISCV::fixup_riscv_call;
       RelaxCandidate = true;
@@ -314,16 +320,6 @@ unsigned RISCVMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
     case RISCVMCExpr::VK_RISCV_CALL_PLT:
       FixupKind = RISCV::fixup_riscv_call_plt;
       RelaxCandidate = true;
-      break;
-    case RISCVMCExpr::VK_RISCV_TLS_GOT_HI_Pseudo:
-      assert(MIFrm == RISCVII::InstFormatU &&
-             "VK_RISCV_GOT_HI is only valid in U-format");
-      FixupKind = RISCV::fixup_riscv_tls_got_hi20;
-      break;
-    case RISCVMCExpr::VK_RISCV_TLS_GD_HI_Pseudo:
-      assert(MIFrm == RISCVII::InstFormatU &&
-             "VK_RISCV_GOT_HI is only valid in U-format");
-      FixupKind = RISCV::fixup_riscv_tls_gd_hi20;
       break;
     }
   } else if (Kind == MCExpr::SymbolRef &&

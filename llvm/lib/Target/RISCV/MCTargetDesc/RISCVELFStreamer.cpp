@@ -162,7 +162,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
     MCOperand DestReg = Inst.getOperand(0);
     const RISCVMCExpr *Symbol =
         RISCVMCExpr::create(Inst.getOperand(1).getExpr(),
-                            RISCVMCExpr::VK_RISCV_TLS_GOT_HI_Pseudo, Ctx);
+                            RISCVMCExpr::VK_RISCV_TLS_GOT_HI, Ctx);
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
@@ -195,7 +195,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
     MCOperand DestReg = Inst.getOperand(0);
     const RISCVMCExpr *Symbol =
         RISCVMCExpr::create(Inst.getOperand(1).getExpr(),
-                            RISCVMCExpr::VK_RISCV_TLS_GD_HI_Pseudo, Ctx);
+                            RISCVMCExpr::VK_RISCV_TLS_GD_HI, Ctx);
 
     MCInst AUIPC =
         MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
