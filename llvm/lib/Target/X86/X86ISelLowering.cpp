@@ -5013,7 +5013,18 @@ bool X86TargetLowering::hasAndNot(SDValue Y) const {
 
 bool X86TargetLowering::shouldFoldConstantShiftPairToMask(
     const SDNode *N, CombineLevel Level) const {
-  // TODO - some targets prefer immediate vector shifts to shift+mask.
+  assert((N->getOpcode() == ISD::SHL &&
+          N->getOperand(0).getOpcode() == ISD::SRL) ||
+         (N->getOpcode() == ISD::SRL &&
+          N->getOperand(0).getOpcode() == ISD::SHL) &&
+             "Expected shift-shift mask");
+
+  if (Subtarget.hasFastVectorShiftMasks() && N->getValueType(0).isVector()) {
+    // Only fold if the shift values are equal - so it folds to AND.
+    // TODO - we should fold if either is non-uniform but we don't do the
+    // fold for non-splats yet.
+    return N->getOperand(1) == N->getOperand(0).getOperand(1);
+  }
   return TargetLoweringBase::shouldFoldConstantShiftPairToMask(N, Level);
 }
 
@@ -31770,6 +31781,51 @@ static SDValue combineX86ShuffleChain(ArrayRef<SDValue> Inputs, SDValue Root,
     SDValue VPPERMMaskOp = DAG.getBuildVector(ByteVT, DL, VPPERMMask);
     Res = DAG.getNode(X86ISD::VPPERM, DL, ByteVT, V1, V2, VPPERMMaskOp);
     return DAG.getBitcast(RootVT, Res);
+  }
+
+  // If that failed and both inputs are extracted from the same source then
+  // try to combine as an unary shuffle with the larger type.
+  if (!UnaryShuffle && V1.getOpcode() == ISD::EXTRACT_SUBVECTOR &&
+      V2.getOpcode() == ISD::EXTRACT_SUBVECTOR &&
+      isa<ConstantSDNode>(V1.getOperand(1)) &&
+      isa<ConstantSDNode>(V2.getOperand(1))) {
+    SDValue Src1 = V1.getOperand(0);
+    SDValue Src2 = V2.getOperand(0);
+    if (Src1 == Src2) {
+      unsigned Offset1 = V1.getConstantOperandVal(1);
+      unsigned Offset2 = V2.getConstantOperandVal(1);
+      assert(((Offset1 % VT1.getVectorNumElements()) == 0 ||
+              (Offset2 % VT2.getVectorNumElements()) == 0 ||
+              (Src1.getValueSizeInBits() % RootSizeInBits) == 0) &&
+             "Unexpected subvector extraction");
+      // Convert extraction indices to mask size.
+      Offset1 /= VT1.getVectorNumElements();
+      Offset2 /= VT2.getVectorNumElements();
+      Offset1 *= NumMaskElts;
+      Offset2 *= NumMaskElts;
+
+      // Create new mask for larger type.
+      SmallVector<int, 64> NewMask(Mask);
+      for (int &M : NewMask) {
+        if (M < 0)
+          continue;
+        if (M < (int)NumMaskElts)
+          M += Offset1;
+        else
+          M = (M - NumMaskElts) + Offset2;
+      }
+      unsigned Scale = Src1.getValueSizeInBits() / RootSizeInBits;
+      NewMask.append((Scale - 1) * NumMaskElts, SM_SentinelUndef);
+
+      SDValue NewInputs[] = {Src1};
+      if (SDValue Res = combineX86ShuffleChain(
+              NewInputs, Src1, NewMask, Depth, HasVariableMask,
+              AllowVariableMask, DAG, Subtarget)) {
+        Res = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, VT1, Res,
+                          DAG.getIntPtrConstant(0, DL));
+        return DAG.getBitcast(RootVT, Res);
+      }
+    }
   }
 
   // Failed to find any combines.
