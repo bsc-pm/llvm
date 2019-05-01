@@ -33400,25 +33400,43 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
   }
   }
 
-  // For 256-bit ops that are two 128-bit ops glued together, if we do not
-  // demand any of the high elements, then narrow the op to 128-bits:
+  // For 256/512-bit ops that are 128/256-bit ops glued together, if we do not
+  // demand any of the high elements, then narrow the op to 128/256-bits: e.g.
   // (op ymm0, ymm1) --> insert undef, (op xmm0, xmm1), 0
-  // TODO: Handle 512-bit -> 128/256-bit ops as well.
-  if (VT.is256BitVector() && DemandedElts.lshr(NumElts / 2) == 0) {
+  if ((VT.is256BitVector() || VT.is512BitVector()) &&
+      DemandedElts.lshr(NumElts / 2) == 0) {
+    unsigned SizeInBits = VT.getSizeInBits();
+    unsigned ExtSizeInBits = SizeInBits / 2;
+
+    // See if 512-bit ops only use the bottom 128-bits.
+    if (VT.is512BitVector() && DemandedElts.lshr(NumElts / 4) == 0)
+      ExtSizeInBits = SizeInBits / 4;
+
     switch (Opc) {
       // Target Shuffles.
     case X86ISD::PSHUFB:
+    case X86ISD::UNPCKL:
+    case X86ISD::UNPCKH:
+      // Saturated Packs.
+    case X86ISD::PACKSS:
+    case X86ISD::PACKUS:
       // Horizontal Ops.
     case X86ISD::HADD:
     case X86ISD::HSUB:
     case X86ISD::FHADD:
     case X86ISD::FHSUB: {
       SDLoc DL(Op);
-      SDValue Ext0 = extract128BitVector(Op.getOperand(0), 0, TLO.DAG, DL);
-      SDValue Ext1 = extract128BitVector(Op.getOperand(1), 0, TLO.DAG, DL);
-      SDValue Hop = TLO.DAG.getNode(Opc, DL, Ext0.getValueType(), Ext0, Ext1);
+      MVT ExtVT = VT.getSimpleVT();
+      ExtVT = MVT::getVectorVT(ExtVT.getScalarType(),
+                               ExtSizeInBits / ExtVT.getScalarSizeInBits());
+      SDValue Ext0 =
+          extractSubVector(Op.getOperand(0), 0, TLO.DAG, DL, ExtSizeInBits);
+      SDValue Ext1 =
+          extractSubVector(Op.getOperand(1), 0, TLO.DAG, DL, ExtSizeInBits);
+      SDValue ExtOp = TLO.DAG.getNode(Opc, DL, ExtVT, Ext0, Ext1);
       SDValue UndefVec = TLO.DAG.getUNDEF(VT);
-      SDValue Insert = insert128BitVector(UndefVec, Hop, 0, TLO.DAG, DL);
+      SDValue Insert =
+          insertSubVector(UndefVec, ExtOp, 0, TLO.DAG, DL, ExtSizeInBits);
       return TLO.CombineTo(Op, Insert);
     }
     }
