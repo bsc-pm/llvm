@@ -33237,6 +33237,22 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
 
   // Handle special case opcodes.
   switch (Opc) {
+  case X86ISD::PMULDQ:
+  case X86ISD::PMULUDQ: {
+    APInt LHSUndef, LHSZero;
+    APInt RHSUndef, RHSZero;
+    SDValue LHS = Op.getOperand(0);
+    SDValue RHS = Op.getOperand(1);
+    if (SimplifyDemandedVectorElts(LHS, DemandedElts, LHSUndef, LHSZero, TLO,
+                                   Depth + 1))
+      return true;
+    if (SimplifyDemandedVectorElts(RHS, DemandedElts, RHSUndef, RHSZero, TLO,
+                                   Depth + 1))
+      return true;
+    // Multiply by zero.
+    KnownZero = LHSZero | RHSZero;
+    break;
+  }
   case X86ISD::VSHL:
   case X86ISD::VSRL:
   case X86ISD::VSRA: {
@@ -33398,24 +33414,72 @@ bool X86TargetLowering::SimplifyDemandedVectorEltsForTargetNode(
       return true;
     break;
   }
-  case X86ISD::HADD:
-  case X86ISD::HSUB:
-  case X86ISD::FHADD:
-  case X86ISD::FHSUB: {
-    // 256-bit horizontal ops are two 128-bit ops glued together. If we do not
-    // demand any of the high elements, then narrow the h-op to 128-bits:
-    // (hop ymm0, ymm1) --> insert undef, (hop xmm0, xmm1), 0
-    if (VT.is256BitVector() && DemandedElts.lshr(NumElts / 2) == 0) {
+  }
+
+  // For 256/512-bit ops that are 128/256-bit ops glued together, if we do not
+  // demand any of the high elements, then narrow the op to 128/256-bits: e.g.
+  // (op ymm0, ymm1) --> insert undef, (op xmm0, xmm1), 0
+  if ((VT.is256BitVector() || VT.is512BitVector()) &&
+      DemandedElts.lshr(NumElts / 2) == 0) {
+    unsigned SizeInBits = VT.getSizeInBits();
+    unsigned ExtSizeInBits = SizeInBits / 2;
+
+    // See if 512-bit ops only use the bottom 128-bits.
+    if (VT.is512BitVector() && DemandedElts.lshr(NumElts / 4) == 0)
+      ExtSizeInBits = SizeInBits / 4;
+
+    switch (Opc) {
+      // Byte shifts by immediate.
+    case X86ISD::VSHLDQ:
+    case X86ISD::VSRLDQ:
+      // Shift by uniform.
+    case X86ISD::VSHL:
+    case X86ISD::VSRL:
+    case X86ISD::VSRA:
+      // Shift by immediate.
+    case X86ISD::VSHLI:
+    case X86ISD::VSRLI:
+    case X86ISD::VSRAI: {
       SDLoc DL(Op);
-      SDValue Ext0 = extract128BitVector(Op.getOperand(0), 0, TLO.DAG, DL);
-      SDValue Ext1 = extract128BitVector(Op.getOperand(1), 0, TLO.DAG, DL);
-      SDValue Hop = TLO.DAG.getNode(Opc, DL, Ext0.getValueType(), Ext0, Ext1);
+      SDValue Ext0 =
+          extractSubVector(Op.getOperand(0), 0, TLO.DAG, DL, ExtSizeInBits);
+      SDValue ExtOp =
+          TLO.DAG.getNode(Opc, DL, Ext0.getValueType(), Ext0, Op.getOperand(1));
       SDValue UndefVec = TLO.DAG.getUNDEF(VT);
-      SDValue Insert = insert128BitVector(UndefVec, Hop, 0, TLO.DAG, DL);
+      SDValue Insert =
+          insertSubVector(UndefVec, ExtOp, 0, TLO.DAG, DL, ExtSizeInBits);
       return TLO.CombineTo(Op, Insert);
     }
-    break;
-  }
+      // Arithmetic Ops.
+    case X86ISD::PMULDQ:
+    case X86ISD::PMULUDQ:
+      // Target Shuffles.
+    case X86ISD::PSHUFB:
+    case X86ISD::UNPCKL:
+    case X86ISD::UNPCKH:
+      // Saturated Packs.
+    case X86ISD::PACKSS:
+    case X86ISD::PACKUS:
+      // Horizontal Ops.
+    case X86ISD::HADD:
+    case X86ISD::HSUB:
+    case X86ISD::FHADD:
+    case X86ISD::FHSUB: {
+      SDLoc DL(Op);
+      MVT ExtVT = VT.getSimpleVT();
+      ExtVT = MVT::getVectorVT(ExtVT.getScalarType(),
+                               ExtSizeInBits / ExtVT.getScalarSizeInBits());
+      SDValue Ext0 =
+          extractSubVector(Op.getOperand(0), 0, TLO.DAG, DL, ExtSizeInBits);
+      SDValue Ext1 =
+          extractSubVector(Op.getOperand(1), 0, TLO.DAG, DL, ExtSizeInBits);
+      SDValue ExtOp = TLO.DAG.getNode(Opc, DL, ExtVT, Ext0, Ext1);
+      SDValue UndefVec = TLO.DAG.getUNDEF(VT);
+      SDValue Insert =
+          insertSubVector(UndefVec, ExtOp, 0, TLO.DAG, DL, ExtSizeInBits);
+      return TLO.CombineTo(Op, Insert);
+    }
+    }
   }
 
   // Simplify target shuffles.
@@ -33507,9 +33571,11 @@ bool X86TargetLowering::SimplifyDemandedBitsForTargetNode(
     SDValue RHS = Op.getOperand(1);
     // FIXME: Can we bound this better?
     APInt DemandedMask = APInt::getLowBitsSet(64, 32);
-    if (SimplifyDemandedBits(LHS, DemandedMask, KnownOp, TLO, Depth + 1))
+    if (SimplifyDemandedBits(LHS, DemandedMask, OriginalDemandedElts, KnownOp,
+                             TLO, Depth + 1))
       return true;
-    if (SimplifyDemandedBits(RHS, DemandedMask, KnownOp, TLO, Depth + 1))
+    if (SimplifyDemandedBits(RHS, DemandedMask, OriginalDemandedElts, KnownOp,
+                             TLO, Depth + 1))
       return true;
     break;
   }
@@ -34908,6 +34974,39 @@ static SDValue combineExtractVectorElt(SDNode *N, SelectionDAG &DAG,
 
   if (SDValue V = scalarizeExtEltFP(N, DAG))
     return V;
+
+  // Attempt to extract a i1 element by using MOVMSK to extract the signbits
+  // and then testing the relevant element.
+  if (CIdx && SrcVT.getScalarType() == MVT::i1) {
+    SmallVector<SDNode *, 16> BoolExtracts;
+    auto IsBoolExtract = [&BoolExtracts](SDNode *Use) {
+      if (Use->getOpcode() == ISD::EXTRACT_VECTOR_ELT &&
+          isa<ConstantSDNode>(Use->getOperand(1)) &&
+          Use->getValueType(0) == MVT::i1) {
+        BoolExtracts.push_back(Use);
+        return true;
+      }
+      return false;
+    };
+    if (all_of(InputVector->uses(), IsBoolExtract) &&
+        BoolExtracts.size() > 1) {
+      unsigned NumSrcElts = SrcVT.getVectorNumElements();
+      EVT BCVT = EVT::getIntegerVT(*DAG.getContext(), NumSrcElts);
+      if (SDValue BC =
+              combineBitcastvxi1(DAG, BCVT, InputVector, dl, Subtarget)) {
+        for (SDNode *Use : BoolExtracts) {
+          // extractelement vXi1 X, MaskIdx --> ((movmsk X) & Mask) == Mask
+          unsigned MaskIdx = Use->getConstantOperandVal(1);
+          APInt MaskBit = APInt::getOneBitSet(NumSrcElts, MaskIdx);
+          SDValue Mask = DAG.getConstant(MaskBit, dl, BCVT);
+          SDValue Res = DAG.getNode(ISD::AND, dl, BCVT, BC, Mask);
+          Res = DAG.getSetCC(dl, MVT::i1, Res, Mask, ISD::SETEQ);
+          DCI.CombineTo(Use, Res);
+        }
+        return SDValue(N, 0);
+      }
+    }
+  }
 
   return SDValue();
 }
@@ -42781,18 +42880,6 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
         InVec.getOperand(0).getSimpleValueType().is128BitVector()) {
       return DAG.getNode(InOpcode, SDLoc(N), VT, InVec.getOperand(0));
     }
-    if (InOpcode == ISD::BITCAST) {
-      // TODO - do this for target shuffles in general.
-      SDValue InVecBC = peekThroughOneUseBitcasts(InVec);
-      if (InVecBC.getOpcode() == X86ISD::PSHUFB && VT.is128BitVector()) {
-        SDLoc DL(N);
-        SDValue SubPSHUFB =
-            DAG.getNode(X86ISD::PSHUFB, DL, MVT::v16i8,
-                        extract128BitVector(InVecBC.getOperand(0), 0, DAG, DL),
-                        extract128BitVector(InVecBC.getOperand(1), 0, DAG, DL));
-        return DAG.getBitcast(VT, SubPSHUFB);
-      }
-    }
   }
 
   return SDValue();
@@ -44163,7 +44250,7 @@ void X86TargetLowering::initializeSplitCSR(MachineBasicBlock *Entry) const {
 
   // Update IsSplitCSR in X86MachineFunctionInfo.
   X86MachineFunctionInfo *AFI =
-    Entry->getParent()->getInfo<X86MachineFunctionInfo>();
+      Entry->getParent()->getInfo<X86MachineFunctionInfo>();
   AFI->setIsSplitCSR(true);
 }
 
@@ -44191,9 +44278,9 @@ void X86TargetLowering::insertCopiesSplitCSR(
     // fine for CXX_FAST_TLS since the C++-style TLS access functions should be
     // nounwind. If we want to generalize this later, we may need to emit
     // CFI pseudo-instructions.
-    assert(Entry->getParent()->getFunction().hasFnAttribute(
-               Attribute::NoUnwind) &&
-           "Function should be nounwind in insertCopiesSplitCSR!");
+    assert(
+        Entry->getParent()->getFunction().hasFnAttribute(Attribute::NoUnwind) &&
+        "Function should be nounwind in insertCopiesSplitCSR!");
     Entry->addLiveIn(*I);
     BuildMI(*Entry, MBBI, DebugLoc(), TII->get(TargetOpcode::COPY), NewVR)
         .addReg(*I);
@@ -44212,7 +44299,8 @@ bool X86TargetLowering::supportSwiftError() const {
 
 /// Returns the name of the symbol used to emit stack probes or the empty
 /// string if not applicable.
-StringRef X86TargetLowering::getStackProbeSymbolName(MachineFunction &MF) const {
+StringRef
+X86TargetLowering::getStackProbeSymbolName(MachineFunction &MF) const {
   // If the function specifically requests stack probes, emit them.
   if (MF.getFunction().hasFnAttribute("probe-stack"))
     return MF.getFunction().getFnAttribute("probe-stack").getValueAsString();
