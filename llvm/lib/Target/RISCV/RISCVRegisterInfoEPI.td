@@ -7,13 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-def EPIFPR : RegisterClass<"RISCV", [f32, f64], 64, (add
-    (sequence "F%u_64", 0, 7),
-    (sequence "F%u_64", 10, 17),
-    (sequence "F%u_64", 28, 31),
-    (sequence "F%u_64", 8, 9),
-    (sequence "F%u_64", 18, 27)
-)>;
+def EPIFPR : RegisterClass<"RISCV", [f32, f64], 64, (add FPR32, FPR64)>;
 
 // FIXME: In many places we use 128 but there isn't actually a minimum size
 // defined, so this must be generalised somehow.
