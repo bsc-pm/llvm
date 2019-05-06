@@ -4979,11 +4979,8 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     processTypeAttrs(state, T, TAL_DeclChunk, DeclType.getAttrs());
 
     if (DeclType.Kind != DeclaratorChunk::Paren) {
-      if (ExpectNoDerefChunk) {
-        if (!IsNoDerefableChunk(DeclType))
-          S.Diag(DeclType.Loc, diag::warn_noderef_on_non_pointer_or_array);
-        ExpectNoDerefChunk = false;
-      }
+      if (ExpectNoDerefChunk && !IsNoDerefableChunk(DeclType))
+        S.Diag(DeclType.Loc, diag::warn_noderef_on_non_pointer_or_array);
 
       ExpectNoDerefChunk = state.didParseNoDeref();
     }
@@ -5010,7 +5007,10 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         break;
       case DeclaratorChunk::Function: {
         const DeclaratorChunk::FunctionTypeInfo &FTI = DeclType.Fun;
-        if (FTI.NumParams == 0 && !FTI.isVariadic)
+        // We supress the warning when there's no LParen location, as this
+        // indicates the declaration was an implicit declaration, which gets
+        // warned about separately via -Wimplicit-function-declaration.
+        if (FTI.NumParams == 0 && !FTI.isVariadic && FTI.getLParenLoc().isValid())
           S.Diag(DeclType.Loc, diag::warn_strict_prototypes)
               << IsBlock
               << FixItHint::CreateInsertion(FTI.getRParenLoc(), "void");
