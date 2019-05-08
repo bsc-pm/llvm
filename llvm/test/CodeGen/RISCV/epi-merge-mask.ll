@@ -43,7 +43,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    slli a6, a6, 3
 ; CHECK-O0-NEXT:    sub sp, sp, a6
 ; CHECK-O0-NEXT:    andi sp, sp, -16
-; CHECK-O0-NEXT:    sd sp, -24(s0)
+; CHECK-O0-NEXT:    sd sp, -32(s0)
 ; CHECK-O0-NEXT:    vsetvl zero, a4, a5
 ; CHECK-O0-NEXT:    vsetvli a4, a0, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a3)
@@ -51,7 +51,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    vflt.vv v2, v1, v0
 ; CHECK-O0-NEXT:    rdvtype a6
 ; CHECK-O0-NEXT:    rdvl a5
-; CHECK-O0-NEXT:    ld a7, -24(s0)
+; CHECK-O0-NEXT:    ld a7, -32(s0)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a7)
 ; CHECK-O0-NEXT:    vsetvl zero, a5, a6
@@ -62,16 +62,16 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    vsetvl zero, t1, t0
 ; CHECK-O0-NEXT:    rdvtype a6
 ; CHECK-O0-NEXT:    rdvl a5
-; CHECK-O0-NEXT:    ld a7, -24(s0)
+; CHECK-O0-NEXT:    ld a7, -32(s0)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-O0-NEXT:    vle.v v2, (a7)
 ; CHECK-O0-NEXT:    vsetvl zero, a5, a6
 ; CHECK-O0-NEXT:    vfsub.vv v2, v2, v1, v0.t
 ; CHECK-O0-NEXT:    vse.v v2, (a1)
-; CHECK-O0-NEXT:    sd a3, -32(s0)
-; CHECK-O0-NEXT:    sd a2, -40(s0)
-; CHECK-O0-NEXT:    sd a1, -48(s0)
-; CHECK-O0-NEXT:    sd a0, -56(s0)
+; CHECK-O0-NEXT:    sd a3, -40(s0)
+; CHECK-O0-NEXT:    sd a2, -48(s0)
+; CHECK-O0-NEXT:    sd a1, -56(s0)
+; CHECK-O0-NEXT:    sd a0, -64(s0)
 ; CHECK-O0-NEXT:    addi sp, s0, -64
 ; CHECK-O0-NEXT:    ld s0, 48(sp)
 ; CHECK-O0-NEXT:    ld ra, 56(sp)

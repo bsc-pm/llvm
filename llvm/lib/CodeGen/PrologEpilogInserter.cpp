@@ -441,18 +441,7 @@ static void assignCalleeSavedSpillSlots(MachineFunction &F,
         // the min.
         Align = std::min(Align, StackAlign);
 
-        if (!RegInfo->isDynamicSpillSize(*RC)) {
-          FrameIdx = MFI.CreateStackObject(Size, Align, true);
-        } else {
-          const TargetRegisterClass &PtrClass = *RegInfo->getPointerRegClass(F);
-          unsigned FixedHandleSize = RegInfo->getSpillSize(PtrClass);
-          unsigned FixedHandleAlignment = RegInfo->getSpillAlignment(PtrClass);
-          FrameIdx = F.getFrameInfo().CreateSpillStackObject(
-              FixedHandleSize, FixedHandleAlignment);
-          int DynamicSpillIdx =
-              F.getFrameInfo().CreateDynamicSpillStackObject(Align, RC);
-          F.getFrameInfo().setObjectHandle(FrameIdx, DynamicSpillIdx);
-        }
+        FrameIdx = MFI.CreateStackObject(Size, Align, true);
 
         if ((unsigned)FrameIdx < MinCSFrameIndex)
           MinCSFrameIndex = FrameIdx;
@@ -856,9 +845,6 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
           TargetStackID::Default) // Only allocate objects on the default stack.
         continue;
 
-      if (MFI.isObjectDynamicSpill(i))
-        continue;
-
       // If the stack grows down, we need to add the size to find the lowest
       // address of the object.
       Offset += MFI.getObjectSize(i);
@@ -875,9 +861,6 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
     for (unsigned i = MaxCSFrameIndex; i != MinCSFrameIndex - 1; --i) {
       if (MFI.getStackID(i) !=
           TargetStackID::Default) // Only allocate objects on the default stack.
-        continue;
-
-      if (MFI.isObjectDynamicSpill(i))
         continue;
 
       if (MFI.isDeadObjectIndex(i))
@@ -1033,8 +1016,6 @@ void PEI::calculateFrameObjectOffsets(MachineFunction &MF) {
       continue;
     if (MFI.getStackID(i) !=
         TargetStackID::Default) // Only allocate objects on the default stack.
-      continue;
-    if (MFI.isObjectDynamicSpill(i))
       continue;
 
     // Add the objects that we need to allocate to our working set.

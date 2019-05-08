@@ -164,14 +164,6 @@ private:
     /// this value saves the original IR allocation. Can be NULL.
     const AllocaInst *Alloca;
 
-    // Register class for dynamically sized spills
-    const TargetRegisterClass *RC;
-
-    // If true this is a handle object which points to some other object.
-    // This is used for dynamic size spill objects.
-    bool IsHandle = false;
-    int HandledObject;
-
     // If true, the object was mapped into the local frame
     // block and doesn't need additional handling for allocation beyond that.
     bool PreAllocated = false;
@@ -192,11 +184,10 @@ private:
 
     StackObject(uint64_t Size, llvm::Align Alignment, int64_t SPOffset,
                 bool IsImmutable, bool IsSpillSlot, const AllocaInst *Alloca,
-                bool IsAliased, uint8_t StackID = 0,
-                const TargetRegisterClass *RC = nullptr)
+                bool IsAliased, uint8_t StackID = 0)
         : SPOffset(SPOffset), Size(Size), Alignment(Alignment),
           isImmutable(IsImmutable), isSpillSlot(IsSpillSlot), StackID(StackID),
-          Alloca(Alloca), RC(RC), isAliased(IsAliased), SSPLayout(SSPLK_None) {}
+          Alloca(Alloca), isAliased(IsAliased), SSPLayout(SSPLK_None) {}
   };
 
   /// The alignment of the stack.
@@ -229,14 +220,6 @@ private:
   /// This boolean keeps track of whether any variable
   /// sized objects have been allocated yet.
   bool HasVarSizedObjects = false;
-
-  /// This boolean keeps track of whether any dynamic spill size
-  /// sized objects have been allocated yet.
-  bool HasDynamicSpillObjects = false;
-
-  /// This boolean keeps track of whether any dynamic spill size
-  /// sized objects have been allocated yet.
-  bool HasHandleObjects = false;
 
   /// This boolean keeps track of whether there is a call
   /// to builtin \@llvm.frameaddress.
@@ -367,16 +350,6 @@ public:
   /// contains any variable sized objects.
   bool hasVarSizedObjects() const { return HasVarSizedObjects; }
 
-  /// This method may be called any time after register allocation
-  /// is complete to determine if the stack frame for this function
-  /// contains any variable sized objects.
-  bool hasDynamicSpillObjects() const { return HasDynamicSpillObjects; }
-
-  /// This method may be called any time after register allocation
-  /// is complete to determine if the stack frame for this function
-  /// contains handle objects.
-  bool hasHandleObjects() const { return HasHandleObjects; }
-
   /// Return the index for the stack protector object.
   int getStackProtectorIndex() const { return StackProtectorIdx; }
   void setStackProtectorIndex(int I) { StackProtectorIdx = I; }
@@ -476,8 +449,6 @@ public:
   int64_t getObjectSize(int ObjectIdx) const {
     assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
            "Invalid Object Idx!");
-    assert(!isObjectDynamicSpill(ObjectIdx) &&
-           "Cannot get the object size of a dynamic sized spill slot");
     return Objects[ObjectIdx+NumFixedObjects].Size;
   }
 
@@ -524,21 +495,6 @@ public:
     return Objects[ObjectIdx+NumFixedObjects].SPOffset;
   }
 
-  bool isObjectDynamicSpill(int ObjectIdx) const {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    // FIXME: This is not very elegant.
-    return Objects[ObjectIdx+NumFixedObjects].RC;
-  }
-
-  // Only meaningful when isObjectDynamicSpill returns true
-  const TargetRegisterClass* getRegisterClass(int ObjectIdx) const {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    assert(isObjectDynamicSpill(ObjectIdx) && "Must be a dynamic spill");
-    return Objects[ObjectIdx+NumFixedObjects].RC;
-  }
-
   bool isObjectZExt(int ObjectIdx) const {
     assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
            "Invalid Object Idx!");
@@ -561,27 +517,6 @@ public:
     assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
            "Invalid Object Idx!");
     Objects[ObjectIdx+NumFixedObjects].isSExt = IsSExt;
-  }
-
-  void setObjectHandle(int ObjectIdx, int HandledObject) {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    HasHandleObjects = true;
-    Objects[ObjectIdx+NumFixedObjects].IsHandle = true;
-    Objects[ObjectIdx+NumFixedObjects].HandledObject = HandledObject;
-  }
-
-  bool isObjectHandle(int ObjectIdx) const {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    return Objects[ObjectIdx+NumFixedObjects].IsHandle;
-  }
-
-  int getObjectHandle(int ObjectIdx) const {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    assert(isObjectHandle(ObjectIdx) && "Must be a handle object");
-    return Objects[ObjectIdx+NumFixedObjects].HandledObject;
   }
 
   /// Set the stack frame offset of the specified object. The
@@ -799,16 +734,14 @@ public:
   /// Create a new statically sized stack object, returning
   /// a nonnegative identifier to represent it.
   int CreateStackObject(uint64_t Size, llvm::Align Alignment, bool isSpillSlot,
-                        const AllocaInst *Alloca = nullptr, uint8_t ID = 0,
-                        const TargetRegisterClass *RC = nullptr);
+                        const AllocaInst *Alloca = nullptr, uint8_t ID = 0);
   /// FIXME: Remove this function when transition to llvm::Align is over.
   inline int CreateStackObject(uint64_t Size, unsigned Alignment,
                                bool isSpillSlot,
                                const AllocaInst *Alloca = nullptr,
-                               uint8_t ID = 0,
-                               const TargetRegisterClass *RC = nullptr) {
+                               uint8_t ID = 0) {
     return CreateStackObject(Size, assumeAligned(Alignment), isSpillSlot,
-                             Alloca, ID, RC);
+                             Alloca, ID);
   }
 
   /// Create a new statically sized stack object that represents a spill slot,
@@ -817,16 +750,6 @@ public:
   /// FIXME: Remove this function when transition to llvm::Align is over.
   inline int CreateSpillStackObject(uint64_t Size, unsigned Alignment) {
     return CreateSpillStackObject(Size, assumeAligned(Alignment));
-  }
-
-  /// Create a new dynamically sized stack object that represents a spill slot,
-  /// returning a nonnegative identifier to represent it.
-  int CreateDynamicSpillStackObject(llvm::Align Alignment,
-                                    const TargetRegisterClass *RC);
-  /// FIXME: Remove this function when transition to llvm::Align is over.
-  inline int CreateDynamicSpillStackObject(unsigned Alignment,
-                                           const TargetRegisterClass *RC) {
-    return CreateDynamicSpillStackObject(assumeAligned(Alignment), RC);
   }
 
   /// Remove or mark dead a statically sized stack object.

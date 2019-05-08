@@ -12,6 +12,7 @@
 
 #include "RISCVRegisterInfo.h"
 #include "RISCV.h"
+#include "RISCVMachineFunctionInfo.h"
 #include "RISCVSubtarget.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -256,8 +257,9 @@ bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   // - the stack has VLAs
   // Note that when we need a BP the conditions also imply a FP.
   const MachineFrameInfo &MFI = MF.getFrameInfo();
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   return needsStackRealignment(MF) &&
-         (MFI.hasVarSizedObjects() || MFI.hasDynamicSpillObjects());
+         (MFI.hasVarSizedObjects() || RVFI->hasSpilledEPIVR());
 }
 
 const TargetRegisterClass *

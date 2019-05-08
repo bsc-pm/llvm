@@ -86,6 +86,10 @@ enum {
 
 }
 
+namespace RISCVStackID {
+enum { DEFAULT = 0, EPIVR_SPILL = 1 };
+}
+
 // Describes the predecessor/successor bits used in the FENCE instruction.
 namespace RISCVFenceField {
 enum FenceField {

@@ -93,19 +93,8 @@ void VirtRegMap::assignVirt2Phys(Register virtReg, MCPhysReg physReg) {
 unsigned VirtRegMap::createSpillSlot(const TargetRegisterClass *RC) {
   int SS;
   unsigned Align = TRI->getSpillAlignment(*RC);
-  if (!TRI->isDynamicSpillSize(*RC)) {
-    unsigned Size = TRI->getSpillSize(*RC);
-    SS = MF->getFrameInfo().CreateSpillStackObject(Size, Align);
-  } else {
-    const TargetRegisterClass &PtrClass = *TRI->getPointerRegClass(*MF);
-    unsigned FixedHandleSize = TRI->getSpillSize(PtrClass);
-    unsigned FixedHandleAlignment = TRI->getSpillAlignment(PtrClass);
-    SS = MF->getFrameInfo().CreateSpillStackObject(FixedHandleSize,
-                                                   FixedHandleAlignment);
-    int DynamicSpillIdx =
-        MF->getFrameInfo().CreateDynamicSpillStackObject(Align, RC);
-    MF->getFrameInfo().setObjectHandle(SS, DynamicSpillIdx);
-  }
+  unsigned Size = TRI->getSpillSize(*RC);
+  SS = MF->getFrameInfo().CreateSpillStackObject(Size, Align);
   ++NumSpillSlots;
   return SS;
 }

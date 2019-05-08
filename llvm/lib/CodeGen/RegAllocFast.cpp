@@ -256,20 +256,8 @@ int RegAllocFast::getStackSpaceFor(unsigned VirtReg, const MachineFunction &MF) 
   const TargetRegisterClass &RC = *MRI->getRegClass(VirtReg);
   int FrameIdx;
   unsigned Align = TRI->getSpillAlignment(RC);
-  if (!TRI->isDynamicSpillSize(RC)) {
-    unsigned Size = TRI->getSpillSize(RC);
-    FrameIdx = MFI->CreateSpillStackObject(Size, Align);
-  } else {
-    // FIXME: We should be able to pass a Kind != 0 here
-    const TargetRegisterClass &PtrClass = *TRI->getPointerRegClass(MF);
-    unsigned FixedHandleSize = TRI->getSpillSize(PtrClass);
-    unsigned FixedHandleAlignment = TRI->getSpillAlignment(PtrClass);
-    FrameIdx =
-        MFI->CreateSpillStackObject(FixedHandleSize, FixedHandleAlignment);
-    int DynamicSpillIdx = MFI->CreateDynamicSpillStackObject(Align, &RC);
-
-    MFI->setObjectHandle(FrameIdx, DynamicSpillIdx);
-  }
+  unsigned Size = TRI->getSpillSize(RC);
+  FrameIdx = MFI->CreateSpillStackObject(Size, Align);
 
   // Assign the slot.
   StackSlotForVirtReg[VirtReg] = FrameIdx;

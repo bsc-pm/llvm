@@ -25,26 +25,46 @@ using namespace llvm;
 
 bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
 
   // We use a FP when any of the following is true:
   // - we are told to have one
   // - the stack needs realignment (due to overaligned local objects)
   // - the stack has VLAs
-  // - the function has dynamic spills
+  // - the function has to spill EPIVR vectors
   // - the function uses @llvm.frameaddress
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   return MF.getTarget().Options.DisableFramePointerElim(MF) ||
          RegInfo->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
-         MFI.hasDynamicSpillObjects() || MFI.isFrameAddressTaken();
+         RVFI->hasSpilledEPIVR() || MFI.isFrameAddressTaken();
 }
 
 // Determines the size of the frame and maximum call frame size.
 void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   MachineFrameInfo &MFI = MF.getFrameInfo();
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
   const RISCVRegisterInfo *RI = STI.getRegisterInfo();
 
   // Get the number of bytes to allocate from the FrameInfo.
   uint64_t FrameSize = MFI.getStackSize();
+
+  // Remove all EPIVR_SPILL from the FrameSize and replace them with the size of
+  // a pointer.
+  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
+       FI < EFI; FI++) {
+    uint8_t StackID = MFI.getStackID(FI);
+    if (StackID == RISCVStackID::DEFAULT)
+      continue;
+
+    switch (StackID) {
+    case RISCVStackID::EPIVR_SPILL:
+      FrameSize -= RegInfo->getSpillSize(RISCV::EPIVRRegClass);
+      FrameSize += RegInfo->getSpillSize(RISCV::GPRRegClass);
+      break;
+    default:
+      llvm_unreachable("Unexpected StackID");
+    }
+  }
 
   // Get the alignment.
   uint64_t StackAlign = RI->needsStackRealignment(MF) ? MFI.getMaxAlignment()
@@ -260,20 +280,19 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
-  setupHandleObjects(MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
+  prepareStorageSpilledEPIVR(MF, MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
 }
 
-void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
-                                            MachineBasicBlock::iterator MBBI,
-                                            const MachineFrameInfo &MFI,
-                                            MachineRegisterInfo &MRI,
-                                            const TargetInstrInfo &TII,
-                                            const DebugLoc &DL) const {
-  assert(MFI.hasDynamicSpillObjects() == MFI.hasHandleObjects() &&
-         "Dynamic spills and handles are out of sync");
-
-  if (!MFI.hasHandleObjects())
+void RISCVFrameLowering::prepareStorageSpilledEPIVR(
+    MachineFunction &MF, MachineBasicBlock &MBB,
+    MachineBasicBlock::iterator MBBI, const MachineFrameInfo &MFI,
+    MachineRegisterInfo &MRI, const TargetInstrInfo &TII,
+    const DebugLoc &DL) const {
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
+  if (!RVFI->hasSpilledEPIVR())
     return;
+
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
   // FIXME: We're presuming in advance that this is all about EPIVR
   // FIXME: We are assuming the width of the element is 64 bit, we will want
@@ -300,47 +319,27 @@ void RISCVFrameLowering::setupHandleObjects(MachineBasicBlock &MBB,
 
   unsigned SPReg = getSPReg(STI);
 
-  // Link each dynamic spill with its handle
-  // FIXME: This is a bit naive.
-  DenseMap<int, int> DynamicToHandle;
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
-    if (!MFI.isObjectDynamicSpill(FI))
+    int8_t StackID = MFI.getStackID(FI);
+    if (StackID == RISCVStackID::DEFAULT)
       continue;
-    int FIHandle = MFI.getObjectIndexBegin();
-    for (; FIHandle < EFI; FIHandle++) {
-      if (FIHandle == FI || !MFI.isObjectHandle(FIHandle))
-        continue;
-      if (MFI.getObjectHandle(FIHandle) == FI) {
-        DynamicToHandle[FI] = FIHandle;
-        break;
-      }
-    }
-    assert(FIHandle < EFI && "We didn't find the handle for this dynamic");
-  }
+    assert(StackID == RISCVStackID::EPIVR_SPILL &&
+           "Unexpected StackID");
 
-  for (const auto &P : DynamicToHandle)
-  {
-    int FI = P.first;
-    int FIHandle = P.second;
-    const TargetRegisterClass *RC = MFI.getRegisterClass(FI);
-    if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
-      // Grow the stack
-      BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
+    // Grow the stack
+    BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
         .addReg(SPReg)
         .addReg(SizeOfVector);
-      // Align the stack
-      alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
-      // Now SP is the value we want to put in the handle spill slot, so
-      // store it.
-      unsigned StoreOpcode =
-          MFI.getObjectSize(FIHandle) == 4 ? RISCV::SW : RISCV::SD;
-      BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))
+    // Align the stack
+    alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
+    // Now SP is the value we want to put in the stack slot.
+    unsigned StoreOpcode =
+        RegInfo->getSpillSize(RISCV::GPRRegClass) == 4 ? RISCV::SW : RISCV::SD;
+    BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))
         .addReg(SPReg)
-        .addFrameIndex(FIHandle)
+        .addFrameIndex(FI)
         .addImm(0);
-    } else
-      llvm_unreachable("We only handle EPIVR as dynamic spills");
   }
 
   // Restore VTYPE
@@ -379,7 +378,7 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // necessary if the stack pointer was modified, meaning the stack size is
   // unknown.
   if (RI->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
-      MFI.hasDynamicSpillObjects()) {
+      RVFI->hasSpilledEPIVR()) {
     assert(hasFP(MF) && "frame pointer should not have been eliminated");
     adjustReg(MBB, LastFrameDestroy, DL, SPReg, FPReg, -FPOffset,
               MachineInstr::FrameDestroy);
@@ -456,7 +455,7 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
   bool IsCSR = FI >= MinCSFI && FI <= MaxCSFI;
   bool isFixed = !IsCSR && MFI.isFixedObjectIndex(FI);
 
-  if (IsCSR && !MFI.isObjectHandle(FI)) {
+  if (IsCSR) {
     FrameReg = getSPReg(STI);
     Offset += MF.getFrameInfo().getStackSize();
   } else {
@@ -524,6 +523,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
     MachineFunction &MF, RegScavenger *RS) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
   MachineFrameInfo &MFI = MF.getFrameInfo();
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const TargetRegisterClass *RC = &RISCV::GPRRegClass;
   // estimateStackSize has been observed to under-estimate the final stack
   // size, so give ourselves wiggle-room by checking for stack size
@@ -531,7 +531,9 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   // FIXME: It may be possible to craft a function with a small stack that
   // still needs an emergency spill slot for branch relaxation. This case
   // would currently be missed.
-  if (!isInt<11>(MFI.estimateStackSize(MF))) {
+  // EPI vectors require more complicated sequences for frames with them so
+  // always have an emergency spill slot.
+  if (!isInt<11>(MFI.estimateStackSize(MF)) || RVFI->hasSpilledEPIVR()) {
     int RegScavFI = MFI.CreateStackObject(
         RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
     RS->addScavengingFrameIndex(RegScavFI);

@@ -61,7 +61,6 @@ class EPIVReg<list<ValueType> regTypes, dag regList, int Vlmul>
                   128,
                   regList> {
   int VLMul = Vlmul;
-  let isDynamicSpillSize = 1;
 }
 
 def EPIVR : EPIVReg<[nxv1i64, nxv2i32, nxv4i16, nxv8i8, nxv1f64, nxv2f32,

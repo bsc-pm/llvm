@@ -50,16 +50,11 @@ static inline llvm::Align clampStackAlignment(bool ShouldClamp,
 int MachineFrameInfo::CreateStackObject(uint64_t Size, llvm::Align Alignment,
                                         bool IsSpillSlot,
                                         const AllocaInst *Alloca,
-                                        uint8_t StackID,
-                                        const TargetRegisterClass *RC) {
-  // FIXME: we can't check here that RC is indeed a isDynamicSpillSize
-  // because we don't have the TargetRegisterInfo.
-  assert((Size != 0 || RC != 0) &&
-         "Cannot allocate zero size stack objects if "
-         "they are not in a dynamic spill size register class!");
+                                        uint8_t StackID) {
+  assert(Size != 0 && "Cannot allocate zero size stack objects!");
   Alignment = clampStackAlignment(!StackRealignable, Alignment, StackAlignment);
   Objects.push_back(StackObject(Size, Alignment, 0, false, IsSpillSlot, Alloca,
-                                !IsSpillSlot, StackID, RC));
+                                !IsSpillSlot, StackID));
   int Index = (int)Objects.size() - NumFixedObjects - 1;
   assert(Index >= 0 && "Bad frame index!");
   if (StackID == 0)
@@ -71,17 +66,6 @@ int MachineFrameInfo::CreateSpillStackObject(uint64_t Size,
                                              llvm::Align Alignment) {
   Alignment = clampStackAlignment(!StackRealignable, Alignment, StackAlignment);
   CreateStackObject(Size, Alignment, true);
-  int Index = (int)Objects.size() - NumFixedObjects - 1;
-  ensureMaxAlignment(Alignment);
-  return Index;
-}
-
-int MachineFrameInfo::CreateDynamicSpillStackObject(
-    llvm::Align Alignment, const TargetRegisterClass *RC) {
-  HasDynamicSpillObjects = true;
-  Alignment = clampStackAlignment(!StackRealignable, Alignment, StackAlignment);
-  CreateStackObject(0, Alignment, true, /* Alloca */ nullptr, /* StackID */ 0,
-                    RC);
   int Index = (int)Objects.size() - NumFixedObjects - 1;
   ensureMaxAlignment(Alignment);
   return Index;
@@ -170,10 +154,6 @@ unsigned MachineFrameInfo::estimateStackSize(const MachineFunction &MF) const {
   for (unsigned i = 0, e = getObjectIndexEnd(); i != e; ++i) {
     // Only estimate stack size of live objects on default stack.
     if (isDeadObjectIndex(i) || getStackID(i) != TargetStackID::Default)
-      continue;
-    // We don't account them here because the backend will have to
-    // handle the stack as if it were a dynamically sized entity.
-    if (isObjectDynamicSpill(i))
       continue;
     Offset += getObjectSize(i);
     unsigned Align = getObjectAlignment(i);

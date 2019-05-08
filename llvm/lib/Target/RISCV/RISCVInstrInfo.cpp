@@ -12,6 +12,7 @@
 
 #include "RISCVInstrInfo.h"
 #include "RISCV.h"
+#include "RISCVMachineFunctionInfo.h"
 #include "RISCVSubtarget.h"
 #include "RISCVTargetMachine.h"
 #include "llvm/ADT/STLExtras.h"
@@ -181,6 +182,10 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
                                          unsigned SrcReg, bool IsKill, int FI,
                                          const TargetRegisterClass *RC,
                                          const TargetRegisterInfo *TRI) const {
+  MachineFunction *MF = MBB.getParent();
+  RISCVMachineFunctionInfo *RVFI = MF->getInfo<RISCVMachineFunctionInfo>();
+  MachineFrameInfo &FrameInfo = MF->getFrameInfo();
+
   DebugLoc DL;
   if (I != MBB.end())
     DL = I->getDebugLoc();
@@ -195,6 +200,8 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSD;
   else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledEPIVR();
+    FrameInfo.setStackID(FI, RISCVStackID::EPIVR_SPILL);
     BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL))
         .addReg(SrcReg, getKillRegState(IsKill))
         .addFrameIndex(FI);
@@ -213,6 +220,10 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                                           unsigned DstReg, int FI,
                                           const TargetRegisterClass *RC,
                                           const TargetRegisterInfo *TRI) const {
+  MachineFunction *MF = MBB.getParent();
+  RISCVMachineFunctionInfo *RVFI = MF->getInfo<RISCVMachineFunctionInfo>();
+  MachineFrameInfo &FrameInfo = MF->getFrameInfo();
+
   DebugLoc DL;
   if (I != MBB.end())
     DL = I->getDebugLoc();
@@ -227,6 +238,8 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLD;
   else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledEPIVR();
+    FrameInfo.setStackID(FI, RISCVStackID::EPIVR_SPILL);
     BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD), DstReg)
         .addFrameIndex(FI);
     return;

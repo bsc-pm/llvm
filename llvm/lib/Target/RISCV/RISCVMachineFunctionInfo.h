@@ -31,6 +31,9 @@ private:
   /// of 32-bit GPRs via the stack.
   int MoveF64FrameIndex = -1;
 
+  // True if this function spills EPIVR
+  bool HasSpilledEPIVR = false;
+
 public:
   RISCVMachineFunctionInfo(MachineFunction &MF) : MF(MF) {}
 
@@ -45,6 +48,9 @@ public:
       MoveF64FrameIndex = MF.getFrameInfo().CreateStackObject(8, 8, false);
     return MoveF64FrameIndex;
   }
+
+  bool hasSpilledEPIVR() const { return HasSpilledEPIVR; }
+  void setHasSpilledEPIVR(bool V = true) { HasSpilledEPIVR = V; }
 };
 
 } // end namespace llvm
