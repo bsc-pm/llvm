@@ -34,6 +34,7 @@ add_llvm_target(RISCVCodeGen
   RISCVTargetMachine.cpp
   RISCVTargetObjectFile.cpp
   RISCVTargetTransformInfo.cpp
+  EPIRemoveRedundantVSETVL.cpp
   )
 
 add_subdirectory(AsmParser)

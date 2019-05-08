@@ -46,6 +46,9 @@ void initializeRISCVExpandPseudoPass(PassRegistry &);
 InstructionSelector *createRISCVInstructionSelector(const RISCVTargetMachine &,
                                                     RISCVSubtarget &,
                                                     RISCVRegisterBankInfo &);
+
+FunctionPass *createEPIRemoveRedundantVSETVLPass();
+void initializeEPIRemoveRedundantVSETVLPass(PassRegistry &);
 }
 
 #endif

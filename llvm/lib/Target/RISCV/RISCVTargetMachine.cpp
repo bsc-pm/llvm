@@ -43,6 +43,7 @@ extern "C" void LLVMInitializeRISCVTarget() {
   auto PR = PassRegistry::getPassRegistry();
   initializeGlobalISel(*PR);
   initializeRISCVExpandPseudoPass(*PR);
+  initializeEPIRemoveRedundantVSETVLPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT) {
@@ -162,4 +163,6 @@ void RISCVPassConfig::addPreEmitPass2() {
 
 void RISCVPassConfig::addPreRegAlloc() {
   addPass(createRISCVMergeBaseOffsetOptPass());
+
+  addPass(createEPIRemoveRedundantVSETVLPass());
 }
