@@ -21,28 +21,38 @@ class TestTemplate(object):
             if result_type.basic_type == TypeBuilder.INT:
                 if result_type.short:
                     store_decl = "short";
-                    store_stmt = "__builtin_epi_vstore_i16({}, result);".format(store_var)
+                    store_stmt = "__builtin_epi_vstore_{}xi16({}, result, gvl);".format(result_type.vector_length, store_var)
                 elif result_type.long:
                     store_decl = "long";
-                    store_stmt = "__builtin_epi_vstore_i64({}, result);".format(store_var)
+                    store_stmt = "__builtin_epi_vstore_{}xi64({}, result, gvl);".format(result_type.vector_length, store_var)
                 else:
                     store_decl = "int";
-                    store_stmt = "__builtin_epi_vstore_i32({}, result);".format(store_var)
+                    store_stmt = "__builtin_epi_vstore_{}xi32({}, result, gvl);".format(result_type.vector_length, store_var)
             elif result_type.basic_type == TypeBuilder.CHAR:
                 store_decl = "signed char"
-                store_stmt = "__builtin_epi_vstore_i8({}, result);".format(store_var)
+                store_stmt = "__builtin_epi_vstore_{}xi8({}, result, gvl);".format(result_type.vector_length, store_var)
             elif result_type.basic_type == TypeBuilder.BOOL:
-                pass
-                # FIXME - We can't store a mask, so we will need to convert it reinterpret to an integer first
-                # TODO - We don't have reinterpret casts yet!
-                # store_decl = "_Bool"
-                # store_stmt = "__builtin_epi_vstore_i1({}, result);".format(store_var)
+                if result_type.vector_length == 1:
+                    store_decl = "unsigned long"
+                    store_stmt = "__builtin_epi_vstore_1xi1({}, result);".format(store_var)
+                elif result_type.vector_length == 2:
+                    store_decl = "unsigned int"
+                    store_stmt = "__builtin_epi_vstore_2xi1({}, result);".format(store_var)
+                elif result_type.vector_length == 4:
+                    store_decl = "unsigned short"
+                    store_stmt = "__builtin_epi_vstore_4xi1({}, result);".format(store_var)
+                elif result_type.vector_length == 8:
+                    store_decl = "unsigned char"
+                    store_stmt = "__builtin_epi_vstore_8xi1({}, result);".format(store_var)
+                else:
+                    raise Exception("Unsupported vector length for masks")
+
             elif result_type.basic_type == TypeBuilder.FLOAT:
                 store_decl = "float"
-                store_stmt = "__builtin_epi_vstore_f32({}, result);".format(store_var)
+                store_stmt = "__builtin_epi_vstore_{}xf32({}, result, gvl);".format(result_type.vector_length, store_var)
             elif result_type.basic_type == TypeBuilder.DOUBLE:
                 store_decl += "double"
-                store_stmt = "__builtin_epi_vstore_f64({}, result);".format(store_var)
+                store_stmt = "__builtin_epi_vstore_{}xf64({}, result, gvl);".format(result_type.vector_length, store_var)
             else:
                 assert False, "Unreachable"
         else:
@@ -89,11 +99,11 @@ class TestTemplate(object):
 class UnaryTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
-  result = __builtin_epi_${intrinsic}(lhs);
+  result = __builtin_epi_${intrinsic}(lhs, gvl);
   ${store_stmt}
 }
 """
@@ -113,12 +123,12 @@ void test_${intrinsic}(void)
 class UnaryMaskTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
-  __epi_i1 mask;
-  result = __builtin_epi_${intrinsic}(lhs, mask);
+  ${c_mask_type} mask;
+  result = __builtin_epi_${intrinsic}(lhs, mask, gvl);
   ${store_stmt}
 }
 """
@@ -131,6 +141,7 @@ void test_${intrinsic}(void)
         subs["intrinsic"] = builtin_name
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
+        subs["c_mask_type"] = TypeRender(argument_types[1]).render()
         (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
 
         return string.Template(UnaryMaskTemplate.TEMPLATE).substitute(subs)
@@ -138,12 +149,12 @@ void test_${intrinsic}(void)
 class BinaryTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
   ${c_rhs_type} rhs;
-  result = __builtin_epi_${intrinsic}(lhs, rhs);
+  result = __builtin_epi_${intrinsic}(lhs, rhs, gvl);
   ${store_stmt}
 }
 """
@@ -164,13 +175,13 @@ void test_${intrinsic}(void)
 class BinaryMaskTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
   ${c_rhs_type} rhs;
-  __epi_i1 mask;
-  result = __builtin_epi_${intrinsic}(lhs, rhs, mask);
+  ${c_mask_type} mask;
+  result = __builtin_epi_${intrinsic}(lhs, rhs, mask, gvl);
   ${store_stmt}
 }
 """
@@ -184,6 +195,7 @@ void test_${intrinsic}(void)
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
         subs["c_rhs_type"] = TypeRender(argument_types[1]).render()
+        subs["c_mask_type"] = TypeRender(argument_types[2]).render()
         (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
 
         return string.Template(BinaryMaskTemplate.TEMPLATE).substitute(subs)
@@ -191,13 +203,13 @@ void test_${intrinsic}(void)
 class TernaryTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
   ${c_rhs_type} rhs;
   ${c_acc_type} acc;
-  result = __builtin_epi_${intrinsic}(lhs, rhs, acc);
+  result = __builtin_epi_${intrinsic}(lhs, rhs, acc, gvl);
   ${store_stmt}
 }
 """
@@ -219,14 +231,14 @@ void test_${intrinsic}(void)
 class TernaryMaskTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
-void test_${intrinsic}(void)
+void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
   ${c_rhs_type} rhs;
   ${c_acc_type} acc;
-  __epi_i1 mask;
-  result = __builtin_epi_${intrinsic}(lhs, rhs, acc, mask);
+  ${c_mask_type} mask;
+  result = __builtin_epi_${intrinsic}(lhs, rhs, acc, mask, gvl);
   ${store_stmt}
 }
 """
@@ -241,6 +253,7 @@ void test_${intrinsic}(void)
         subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
         subs["c_rhs_type"] = TypeRender(argument_types[1]).render()
         subs["c_acc_type"] = TypeRender(argument_types[2]).render()
+        subs["c_mask_type"] = TypeRender(argument_types[3]).render()
         (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
 
         return string.Template(TernaryMaskTemplate.TEMPLATE).substitute(subs)
@@ -250,107 +263,116 @@ template_dict = {}
 
 def EPI_FP_UNARY(string_name):
     global template_dict
-    template_dict[string_name + "_f32"] = UnaryTemplate
-    template_dict[string_name + "_f64"] = UnaryTemplate
-    template_dict[string_name + "_f32"] = UnaryTemplate
-    template_dict[string_name + "_f64"] = UnaryTemplate
-    template_dict[string_name + "_f32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_f64_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_f32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_f64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32"] = UnaryTemplate
+    template_dict[string_name + "_1xf64"] = UnaryTemplate
+    template_dict[string_name + "_2xf32"] = UnaryTemplate
+    template_dict[string_name + "_1xf64"] = UnaryTemplate
+    template_dict[string_name + "_2xf32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xf64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xf64_mask"] = UnaryMaskTemplate
 
 def EPI_FP_TO_INT_CONVERSION(string_name):
     global template_dict
-    template_dict[string_name + "_i32_f32"] = UnaryTemplate
-    template_dict[string_name + "_i64_f64"] = UnaryTemplate
-    template_dict[string_name + "_i32_f32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_i64_f64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xi32_2xf32"] = UnaryTemplate
+    template_dict[string_name + "_1xi64_1xf64"] = UnaryTemplate
+    template_dict[string_name + "_2xi32_2xf32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xi64_1xf64_mask"] = UnaryMaskTemplate
 
 def EPI_INT_TO_FP_CONVERSION(string_name):
     global template_dict
-    template_dict[string_name + "_f32_i32"] = UnaryTemplate
-    template_dict[string_name + "_f64_i64"] = UnaryTemplate
-    template_dict[string_name + "_f32_i32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_f64_i64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_2xi32"] = UnaryTemplate
+    template_dict[string_name + "_1xf64_1xi64"] = UnaryTemplate
+    template_dict[string_name + "_2xf32_2xi32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xf64_1xi64_mask"] = UnaryMaskTemplate
 
 def EPI_FP_TO_FP_WIDEN_CONVERSION(string_name):
     global template_dict
-    template_dict[string_name + "_f64_f32"] = UnaryTemplate
-    template_dict[string_name + "_f64_f32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf64_2xf32"] = UnaryTemplate
+    template_dict[string_name + "_2xf64_2xf32_mask"] = UnaryMaskTemplate
 
 def EPI_FP_TO_FP_NARROW_CONVERSION(string_name):
     global template_dict
-    template_dict[string_name + "_f32_f64"] = UnaryTemplate
-    template_dict[string_name + "_f32_f64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_2xf64"] = UnaryTemplate
+    template_dict[string_name + "_2xf32_2xf64_mask"] = UnaryMaskTemplate
 
 def EPI_MASK_TO_SCALAR_INT_UNARY(string_name):
     global template_dict
-    template_dict[string_name + "_i1"] = UnaryTemplate
-    template_dict[string_name + "_i1_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xi1"] = UnaryTemplate
+    template_dict[string_name + "_2xi1"] = UnaryTemplate
+    template_dict[string_name + "_4xi1"] = UnaryTemplate
+    template_dict[string_name + "_8xi1"] = UnaryTemplate
+    template_dict[string_name + "_1xi1_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xi1_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_4xi1_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_8xi1_mask"] = UnaryMaskTemplate
 
 def EPI_INT_TO_MASK_UNARY(string_name):
     global template_dict
-    template_dict[string_name + "_i8"] = UnaryTemplate
-    template_dict[string_name + "_i16"] = UnaryTemplate
-    template_dict[string_name + "_i32"] = UnaryTemplate
-    template_dict[string_name + "_i64"] = UnaryTemplate
-    template_dict[string_name + "_i8_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_i16_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_i32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_i64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_8xi8"] = UnaryTemplate
+    template_dict[string_name + "_4xi16"] = UnaryTemplate
+    template_dict[string_name + "_2xi32"] = UnaryTemplate
+    template_dict[string_name + "_1xi64"] = UnaryTemplate
+    template_dict[string_name + "_8xi8_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_4xi16_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xi32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_1xi64_mask"] = UnaryMaskTemplate
 
 EPI_MASK_UNARY = EPI_MASK_TO_SCALAR_INT_UNARY
 EPI_INT_UNARY = EPI_INT_TO_MASK_UNARY
 
 def EPI_INT_BINARY(string_name):
     global template_dict
-    template_dict[string_name + "_i8"] = BinaryTemplate
-    template_dict[string_name + "_i16"] = BinaryTemplate
-    template_dict[string_name + "_i32"] = BinaryTemplate
-    template_dict[string_name + "_i64"] = BinaryTemplate
-    template_dict[string_name + "_i8_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i16_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i32_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i64_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_8xi8"] = BinaryTemplate
+    template_dict[string_name + "_4xi16"] = BinaryTemplate
+    template_dict[string_name + "_2xi32"] = BinaryTemplate
+    template_dict[string_name + "_1xi64"] = BinaryTemplate
+    template_dict[string_name + "_8xi8_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_4xi16_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_2xi32_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_1xi64_mask"] = BinaryMaskTemplate
 EPI_INT_RELATIONAL = EPI_INT_BINARY
 
 def EPI_FP_BINARY(string_name):
     global template_dict
-    template_dict[string_name + "_f32"] = BinaryTemplate
-    template_dict[string_name + "_f64"] = BinaryTemplate
-    template_dict[string_name + "_f32_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_f64_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_2xf32"] = BinaryTemplate
+    template_dict[string_name + "_1xf64"] = BinaryTemplate
+    template_dict[string_name + "_2xf32_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_1xf64_mask"] = BinaryMaskTemplate
 EPI_FP_RELATIONAL = EPI_FP_BINARY
 
 def EPI_MASK_BINARY(string_name):
     global template_dict
-    template_dict[string_name + "_i1"] = BinaryTemplate
+    template_dict[string_name + "_1xi1"] = BinaryTemplate
+    template_dict[string_name + "_2xi1"] = BinaryTemplate
+    template_dict[string_name + "_4xi1"] = BinaryTemplate
+    template_dict[string_name + "_8xi1"] = BinaryTemplate
 
 def EPI_ANY_AND_INT_BINARY(string_name):
     global template_dict
-    template_dict[string_name + "_i8"] = BinaryTemplate
-    template_dict[string_name + "_i16"] = BinaryTemplate
-    template_dict[string_name + "_i32"] = BinaryTemplate
-    template_dict[string_name + "_i64"] = BinaryTemplate
+    template_dict[string_name + "_8xi8"] = BinaryTemplate
+    template_dict[string_name + "_4xi16"] = BinaryTemplate
+    template_dict[string_name + "_2xi32"] = BinaryTemplate
+    template_dict[string_name + "_1xi64"] = BinaryTemplate
 
-    template_dict[string_name + "_f32"] = BinaryTemplate
-    template_dict[string_name + "_f64"] = BinaryTemplate
+    template_dict[string_name + "_2xf32"] = BinaryTemplate
+    template_dict[string_name + "_1xf64"] = BinaryTemplate
 
-    template_dict[string_name + "_i8_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i16_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i32_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_i64_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_8xi8_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_4xi16_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_2xi32_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_1xi64_mask"] = BinaryMaskTemplate
 
-    template_dict[string_name + "_f32_mask"] = BinaryMaskTemplate
-    template_dict[string_name + "_f64_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_2xf32_mask"] = BinaryMaskTemplate
+    template_dict[string_name + "_1xf64_mask"] = BinaryMaskTemplate
 EPI_ANY_AND_MASK_BINARY = EPI_ANY_AND_INT_BINARY
 
 def EPI_FP_TERNARY(string_name):
     global template_dict
-    template_dict[string_name + "_f32"] = TernaryTemplate
-    template_dict[string_name + "_f64"] = TernaryTemplate
-    template_dict[string_name + "_f32_mask"] = TernaryMaskTemplate
-    template_dict[string_name + "_f64_mask"] = TernaryMaskTemplate
+    template_dict[string_name + "_2xf32"] = TernaryTemplate
+    template_dict[string_name + "_1xf64"] = TernaryTemplate
+    template_dict[string_name + "_2xf32_mask"] = TernaryMaskTemplate
+    template_dict[string_name + "_1xf64_mask"] = TernaryMaskTemplate
 
 EPI_INT_BINARY("vadd")
 EPI_INT_BINARY("vsub")
@@ -492,18 +514,30 @@ EPI_FP_BINARY("vfdot")
 EPI_INT_UNARY("vbroadcast")
 EPI_FP_UNARY("vbroadcast")
 
+untested = []
+tests = []
 
 def emit_test(builtin_name, prototype):
     if builtin_name not in template_dict:
-        # print "Skipping {}".format(builtin_name)
+        global untested
+        untested.append(builtin_name)
         return
 
     template = template_dict[builtin_name]
 
     (return_type, argument_types) = parse_type(prototype)
-    print template().render(builtin_name, return_type, argument_types)
+    global tests
+    tests.append(template().render(builtin_name, return_type, argument_types))
 
 
 if __name__ == "__main__":
+    print "// RUN: %clang -mepi -O2 -S -emit-llvm -o - %s | FileCheck --check-prefix=CHECK-O2 %s"
+    print ""
     for (builtin_name, prototype) in preprocess_builtins():
         emit_test(builtin_name, prototype)
+
+    for u in untested:
+        print "// Warning: '{}' not tested in this file".format(u)
+    print ""
+    for t in tests:
+        print t

@@ -7,8 +7,6 @@ class TypeRender:
     def render(self):
         if self.type_builder.scalable_vector and not self.type_builder.vector:
             raise Exception("Scalable but not a vector")
-        if self.type_builder.scalable_vector and self.type_builder.vector_length != 0:
-            raise Exception("Scalable but vector length not zero")
         if self.type_builder.basic_type < 0:
             raise Exception("Missing basic type")
         if self.type_builder.signed and self.type_builder.basic_type not in [TypeBuilder.INT, TypeBuilder.CHAR]:
@@ -32,19 +30,19 @@ class TypeRender:
         if self.type_builder.scalable_vector:
             if self.type_builder.basic_type == TypeBuilder.INT:
                 if self.type_builder.short:
-                    rendered += "__epi_i16"
+                    rendered += "__epi_{}xi16".format(self.type_builder.vector_length)
                 elif self.type_builder.long:
-                    rendered += "__epi_i64"
+                    rendered += "__epi_{}xi64".format(self.type_builder.vector_length)
                 else:
-                    rendered += "__epi_i32"
+                    rendered += "__epi_{}xi32".format(self.type_builder.vector_length)
             elif self.type_builder.basic_type == TypeBuilder.CHAR:
-                rendered += "__epi_i8"
+                rendered += "__epi_{}xi8".format(self.type_builder.vector_length)
             elif self.type_builder.basic_type == TypeBuilder.BOOL:
-                rendered += "__epi_i1"
+                rendered += "__epi_{}xi1".format(self.type_builder.vector_length)
             elif self.type_builder.basic_type == TypeBuilder.FLOAT:
-                rendered += "__epi_f32"
+                rendered += "__epi_{}xf32".format(self.type_builder.vector_length)
             elif self.type_builder.basic_type == TypeBuilder.DOUBLE:
-                rendered += "__epi_f64"
+                rendered += "__epi_{}xf64".format(self.type_builder.vector_length)
             else:
                 assert False, "Unreachable"
         else:
