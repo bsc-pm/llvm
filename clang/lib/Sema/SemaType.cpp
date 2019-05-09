@@ -1638,30 +1638,32 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
 #include "clang/Basic/OpenCLImageTypes.def"
 
   // EPI types
-  case DeclSpec::TST_EPI_f16:
-    Result = Context.getVectorType(Context.HalfTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_f32:
-    Result = Context.getVectorType(Context.FloatTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_f64:
-    Result = Context.getVectorType(Context.DoubleTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_i8:
-    Result = Context.getVectorType(Context.SignedCharTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_i16:
-    Result = Context.getVectorType(Context.ShortTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_i32:
-    Result = Context.getVectorType(Context.IntTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_i64:
-    Result = Context.getVectorType(Context.LongTy, 0, VectorType::EPIVector);
-    break;
-  case DeclSpec::TST_EPI_i1:
-    Result = Context.getVectorType(Context.BoolTy, 0, VectorType::EPIVector);
-    break;
+#define EPI_ELEM_TYPE_f16 Context.HalfTy
+#define EPI_ELEM_TYPE_f32 Context.FloatTy
+#define EPI_ELEM_TYPE_f64 Context.DoubleTy
+#define EPI_ELEM_TYPE_i1 Context.BoolTy
+#define EPI_ELEM_TYPE_i8 Context.SignedCharTy
+#define EPI_ELEM_TYPE_i16 Context.ShortTy
+#define EPI_ELEM_TYPE_i32 Context.IntTy
+#define EPI_ELEM_TYPE_i64 Context.LongTy
+
+#define EPI_VECTOR_TYPE(Scale, Type)                                           \
+  case DeclSpec::TST_EPI_##Scale##x##Type: {                                   \
+    QualType ElemType = EPI_ELEM_TYPE_##Type;                                  \
+    Result = Context.getVectorType(ElemType, Scale, VectorType::EPIVector);    \
+    break;                                                                     \
+  }
+
+#include "clang/Basic/EPITypes.def"
+#undef EPI_ELEM_TYPE_f16
+#undef EPI_ELEM_TYPE_f32
+#undef EPI_ELEM_TYPE_f64
+#undef EPI_ELEM_TYPE_i1
+#undef EPI_ELEM_TYPE_i8
+#undef EPI_ELEM_TYPE_i16
+#undef EPI_ELEM_TYPE_i32
+#undef EPI_ELEM_TYPE_i64
+
 
   case DeclSpec::TST_error:
     Result = Context.IntTy;

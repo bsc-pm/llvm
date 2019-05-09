@@ -87,7 +87,7 @@ namespace clang {
     TST_atomic,           // C11 _Atomic
 #define GENERIC_IMAGE_TYPE(ImgType, Id) TST_##ImgType##_t, // OpenCL image types
 #include "clang/Basic/OpenCLImageTypes.def"
-#define EPI_VECTOR_TYPE(TypeName) TST_EPI_##TypeName, // EPI Vector Types
+#define EPI_VECTOR_TYPE(Scale, TypeName) TST_EPI_##Scale##x##TypeName, // EPI Vector Types
 #include "clang/Basic/EPITypes.def"
     TST_error // erroneous type
   };
@@ -95,8 +95,8 @@ namespace clang {
   /// Structure that packs information about the type specifiers that
   /// were written in a particular type specifier sequence.
   struct WrittenBuiltinSpecs {
-    static_assert(TST_error < 1 << 6, "Type bitfield not wide enough for TST");
-    /*DeclSpec::TST*/ unsigned Type  : 6;
+    static_assert(TST_error < 1 << 7, "Type bitfield not wide enough for TST");
+    /*DeclSpec::TST*/ unsigned Type  : 7;
     /*DeclSpec::TSS*/ unsigned Sign  : 2;
     /*DeclSpec::TSW*/ unsigned Width : 2;
     unsigned ModeAttr : 1;

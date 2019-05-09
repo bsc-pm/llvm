@@ -307,8 +307,9 @@ public:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) \
   static const TST TST_##ImgType##_t = clang::TST_##ImgType##_t;
 #include "clang/Basic/OpenCLImageTypes.def"
-#define EPI_VECTOR_TYPE(TypeName) \
-  static const TST TST_EPI_##TypeName = clang::TST_EPI_##TypeName;
+#define EPI_VECTOR_TYPE(Scale, TypeName)                                       \
+  static const TST TST_EPI_##Scale##x##TypeName =                              \
+      clang::TST_EPI_##Scale##x##TypeName;
 #include "clang/Basic/EPITypes.def"
   static const TST TST_error = clang::TST_error;
 
@@ -345,7 +346,7 @@ private:
   /*TSW*/unsigned TypeSpecWidth : 2;
   /*TSC*/unsigned TypeSpecComplex : 2;
   /*TSS*/unsigned TypeSpecSign : 2;
-  /*TST*/unsigned TypeSpecType : 6;
+  /*TST*/unsigned TypeSpecType : 7;
   unsigned TypeAltiVecVector : 1;
   unsigned TypeAltiVecPixel : 1;
   unsigned TypeAltiVecBool : 1;

@@ -12681,7 +12681,10 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;
 
 #define EPI_MASK_BINARY(ID_)                                                   \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
+  case RISCV::EPI_BI_##ID_##_m1:                                               \
+  case RISCV::EPI_BI_##ID_##_m2:                                               \
+  case RISCV::EPI_BI_##ID_##_m4:                                               \
+  case RISCV::EPI_BI_##ID_##_m8:                                               \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;
@@ -12739,7 +12742,10 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;
 
 #define EPI_MASK_UNARY(ID_)                                                    \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
+  case RISCV::EPI_BI_##ID_##_m1:                                               \
+  case RISCV::EPI_BI_##ID_##_m2:                                               \
+  case RISCV::EPI_BI_##ID_##_m4:                                               \
+  case RISCV::EPI_BI_##ID_##_m8:                                               \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
@@ -12761,10 +12767,16 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
 
 #define EPI_MASK_TO_SCALAR_INT_UNARY(ID_)                                      \
   case RISCV::EPI_BI_##ID_##_i1:                                               \
+  case RISCV::EPI_BI_##ID_##_i2:                                               \
+  case RISCV::EPI_BI_##ID_##_i4:                                               \
+  case RISCV::EPI_BI_##ID_##_i8:                                               \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_i1_mask:                                          \
-    ID = Intrinsic::epi_##ID_##_mask;                                           \
+  case RISCV::EPI_BI_##ID_##_i2_mask:                                          \
+  case RISCV::EPI_BI_##ID_##_i4_mask:                                          \
+  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
+    ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_UNARY(ID_)                                                      \
@@ -12857,25 +12869,15 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
 #define EPI_MEM(ID_)                                                           \
   case RISCV::EPI_BI_##ID_##_i8:                                               \
   case RISCV::EPI_BI_##ID_##_unsigned_i8:                                      \
-    ID = Intrinsic::epi_##ID_##_i8;                                            \
-    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_i16:                                              \
   case RISCV::EPI_BI_##ID_##_unsigned_i16:                                     \
-    ID = Intrinsic::epi_##ID_##_i16;                                           \
-    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_i32:                                              \
   case RISCV::EPI_BI_##ID_##_unsigned_i32:                                     \
-    ID = Intrinsic::epi_##ID_##_i32;                                           \
-    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_i64:                                              \
   case RISCV::EPI_BI_##ID_##_unsigned_i64:                                     \
-    ID = Intrinsic::epi_##ID_##_i64;                                           \
-    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_f32:                                              \
-    ID = Intrinsic::epi_##ID_##_f32;                                           \
-    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_f64:                                              \
-    ID = Intrinsic::epi_##ID_##_f64;                                           \
+    ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
   switch ((RISCV::EPIBuiltins)BuiltinID) {

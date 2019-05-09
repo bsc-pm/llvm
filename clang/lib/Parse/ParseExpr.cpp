@@ -1285,7 +1285,7 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   case tok::kw___vector:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
 #include "clang/Basic/OpenCLImageTypes.def"
-#define EPI_VECTOR_TYPE(TypeName) case tok::kw___epi_##TypeName:
+#define EPI_VECTOR_TYPE(Scale, TypeName) case tok::kw___epi_##Scale##x##TypeName:
 #include "clang/Basic/EPITypes.def"
   {
     if (!getLangOpts().CPlusPlus) {
