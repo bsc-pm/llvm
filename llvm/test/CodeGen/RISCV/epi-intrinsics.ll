@@ -45,29 +45,29 @@ declare i64 @llvm.epi.readvl()
 define void @test_load_stores()
 ; CHECK-LABEL: test_load_stores:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli zero, a0, e8, m1
+; CHECK-NEXT:    vsetvli a0, a0, e8, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e8, m1
+; CHECK-NEXT:    vsetvli a0, a0, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e16, m1
+; CHECK-NEXT:    vsetvli a0, a0, e16, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e16, m1
+; CHECK-NEXT:    vsetvli a0, a0, e16, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli zero, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    ret
 {

@@ -1488,7 +1488,11 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
     ElementWidth = RISCVEPIVectorElementWidth::ElementWidth128;
   }
 
-  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), RISCV::X0)
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  unsigned DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+
+  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI))
+      .addReg(DestReg, RegState::Define | RegState::Dead)
       .addReg(VL)
       .addImm(ElementWidth)
       .addImm(Multiplier);
