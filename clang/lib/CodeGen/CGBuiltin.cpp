@@ -12633,252 +12633,308 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   llvm::SmallVector<llvm::Type*, 2> IntrinsicTypes;
 
 #define EPI_INT_BINARY(ID_)                                                    \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_INT_SCALAR_INT_BINARY(ID_)                                         \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_INT_RELATIONAL(ID_)                                                \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[1]->getType()};                   \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[1]->getType()};                   \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_MASK_BINARY(ID_)                                                   \
-  case RISCV::EPI_BI_##ID_##_m1:                                               \
-  case RISCV::EPI_BI_##ID_##_m2:                                               \
-  case RISCV::EPI_BI_##ID_##_m4:                                               \
-  case RISCV::EPI_BI_##ID_##_m8:                                               \
+  case RISCV::EPI_BI_##ID_##_1xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_2xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_8xi1:                                             \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
 #define EPI_FP_BINARY(ID_)                                                     \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_RELATIONAL(ID_)                                                 \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[1]->getType()};                   \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {Ops[0]->getType(), Ops[1]->getType()};                   \
+  case RISCV::EPI_BI_##ID_##_2xf32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_TERNARY(ID_)                                                    \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[3]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_INT_UNARY(ID_)                                                     \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_MASK_UNARY(ID_)                                                    \
-  case RISCV::EPI_BI_##ID_##_m1:                                               \
-  case RISCV::EPI_BI_##ID_##_m2:                                               \
-  case RISCV::EPI_BI_##ID_##_m4:                                               \
-  case RISCV::EPI_BI_##ID_##_m8:                                               \
-    ID = Intrinsic::epi_##ID_;                                                 \
-    break;
-
-#define EPI_MASK_TO_INT_UNARY(ID_)                                             \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
+  case RISCV::EPI_BI_##ID_##_1xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_2xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_8xi1:                                             \
     IntrinsicTypes = {ResultType};                                             \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
+  case RISCV::EPI_BI_##ID_##_1xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_2xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_8xi1_mask:                                        \
     IntrinsicTypes = {ResultType};                                             \
+    ID = Intrinsic::epi_##ID_##_mask;                                          \
+    break;
+
+#define EPI_MASK_TO_INT_UNARY(ID_)                                             \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+    ID = Intrinsic::epi_##ID_;                                                 \
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_MASK_TO_SCALAR_INT_UNARY(ID_)                                      \
-  case RISCV::EPI_BI_##ID_##_i1:                                               \
-  case RISCV::EPI_BI_##ID_##_i2:                                               \
-  case RISCV::EPI_BI_##ID_##_i4:                                               \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
+  case RISCV::EPI_BI_##ID_##_1xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_2xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_8xi1:                                             \
+    IntrinsicTypes = {Ops[0]->getType()};                                      \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i1_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i2_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i4_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
+  case RISCV::EPI_BI_##ID_##_1xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_2xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi1_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_8xi1_mask:                                        \
+    IntrinsicTypes = {Ops[0]->getType()};                                      \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_UNARY(ID_)                                                      \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_ANY_AND_SCALAR_INT_BINARY(ID_)                                     \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i8_mask:                                          \
-  case RISCV::EPI_BI_##ID_##_i16_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_i64_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f32_mask:                                         \
-  case RISCV::EPI_BI_##ID_##_f64_mask:                                         \
-    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_8xi8_mask:                                        \
+  case RISCV::EPI_BI_##ID_##_4xi16_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xi32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_2xf32_mask:                                       \
+  case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_ANY_AND_MASK_BINARY(ID_)                                           \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
     IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
 #define EPI_FP_TO_INT_CONVERSION(ID_)                                          \
-  case RISCV::EPI_BI_##ID_##_i32_f32:                                          \
-  case RISCV::EPI_BI_##ID_##_i64_f64:                                          \
+  case RISCV::EPI_BI_##ID_##_2xi32_2xf32:                                      \
+  case RISCV::EPI_BI_##ID_##_1xi64_1xf64:                                      \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_i32_f32_mask:                                     \
-  case RISCV::EPI_BI_##ID_##_i64_f64_mask:                                     \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xi32_2xf32_mask:                                 \
+  case RISCV::EPI_BI_##ID_##_1xi64_1xf64_mask:                                 \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_INT_TO_FP_CONVERSION(ID_)                                          \
-  case RISCV::EPI_BI_##ID_##_f32_i32:                                          \
-  case RISCV::EPI_BI_##ID_##_f64_i64:                                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_2xi32:                                      \
+  case RISCV::EPI_BI_##ID_##_1xf64_1xi64:                                      \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_i32_mask:                                     \
-  case RISCV::EPI_BI_##ID_##_f64_i64_mask:                                     \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_2xi32_mask:                                 \
+  case RISCV::EPI_BI_##ID_##_1xf64_1xi64_mask:                                 \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_TO_FP_NARROW_CONVERSION(ID_)                                    \
-  case RISCV::EPI_BI_##ID_##_f32_f64:                                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_2xf64:                                      \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f32_f64_mask:                                     \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf32_2xf64_mask:                                 \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
 #define EPI_FP_TO_FP_WIDEN_CONVERSION(ID_)                                     \
-  case RISCV::EPI_BI_##ID_##_f64_f32:                                          \
+  case RISCV::EPI_BI_##ID_##_2xf64_2xf32:                                      \
     IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
-  case RISCV::EPI_BI_##ID_##_f64_f32_mask:                                     \
-    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+  case RISCV::EPI_BI_##ID_##_2xf64_2xf32_mask:                                 \
+    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
-#define EPI_MEM(ID_)                                                           \
-  case RISCV::EPI_BI_##ID_##_i8:                                               \
-  case RISCV::EPI_BI_##ID_##_unsigned_i8:                                      \
-  case RISCV::EPI_BI_##ID_##_i16:                                              \
-  case RISCV::EPI_BI_##ID_##_unsigned_i16:                                     \
-  case RISCV::EPI_BI_##ID_##_i32:                                              \
-  case RISCV::EPI_BI_##ID_##_unsigned_i32:                                     \
-  case RISCV::EPI_BI_##ID_##_i64:                                              \
-  case RISCV::EPI_BI_##ID_##_unsigned_i64:                                     \
-  case RISCV::EPI_BI_##ID_##_f32:                                              \
-  case RISCV::EPI_BI_##ID_##_f64:                                              \
+#define EPI_MEM_LOAD(ID_)                                                      \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_unsigned_8xi8:                                    \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_4xi16:                                   \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_2xi32:                                   \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_1xi64:                                   \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
+  case RISCV::EPI_BI_##ID_##_2xf64:                                            \
+    IntrinsicTypes = {ResultType};                                             \
+    Ops[0] = Builder.CreateBitCast(Ops[0],                                     \
+                                   llvm::PointerType::getUnqual(ResultType));  \
     ID = Intrinsic::epi_##ID_;                                                 \
-    break;
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_8xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_2xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_1xi1: {                                           \
+    Ops[0] = Builder.CreateBitCast(Ops[0],                                     \
+                                   llvm::PointerType::getUnqual(ResultType));  \
+    clang::CharUnits Align =                                                   \
+        getNaturalPointeeTypeAlignment(E->getArg(0)->getType());               \
+    return Builder.CreateAlignedLoad(Ops[0], Align);                           \
+  }
+
+#define EPI_MEM_STORE(ID_)                                                     \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_unsigned_8xi8:                                    \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_4xi16:                                   \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_2xi32:                                   \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+  case RISCV::EPI_BI_##ID_##_unsigned_1xi64:                                   \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
+  case RISCV::EPI_BI_##ID_##_2xf64:                                            \
+    assert(Ops.size() >= 2);                                                   \
+    std::swap(Ops[0], Ops[1]);                                                 \
+    Ops[1] = Builder.CreateBitCast(                                            \
+        Ops[1], llvm::PointerType::getUnqual(Ops[0]->getType()));              \
+    IntrinsicTypes = {Ops[0]->getType()};                                      \
+    ID = Intrinsic::epi_##ID_;                                                 \
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_8xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_2xi1:                                             \
+  case RISCV::EPI_BI_##ID_##_1xi1: {                                           \
+    assert(Ops.size() >= 2);                                                   \
+    std::swap(Ops[0], Ops[1]);                                                 \
+    Ops[1] = Builder.CreateBitCast(                                            \
+        Ops[1], llvm::PointerType::getUnqual(Ops[0]->getType()));              \
+    clang::CharUnits Align =                                                   \
+        getNaturalPointeeTypeAlignment(E->getArg(0)->getType());               \
+    return Builder.CreateAlignedStore(Ops[0], Ops[1], Align);                  \
+  }
 
   switch ((RISCV::EPIBuiltins)BuiltinID) {
 
@@ -13053,7 +13109,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     // EPI_FP_BINARY(vfwredosum)
     // EPI_FP_BINARY(vfwredsum)
 
-    // FIXME
     EPI_MASK_BINARY(vmand)
     EPI_MASK_BINARY(vmnand)
     EPI_MASK_BINARY(vmandnot)
@@ -13105,29 +13160,9 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_INT_UNARY(vbroadcast)
     EPI_FP_UNARY(vbroadcast)
 
-    // Stores must be handled manually
-    EPI_MEM(vload)
+    EPI_MEM_LOAD(vload)
+    EPI_MEM_STORE(vstore)
 
-  case RISCV::EPI_BI_vstore_i8:
-  case RISCV::EPI_BI_vstore_unsigned_i8:
-  case RISCV::EPI_BI_vstore_i16:
-  case RISCV::EPI_BI_vstore_unsigned_i16:
-  case RISCV::EPI_BI_vstore_i32:
-  case RISCV::EPI_BI_vstore_unsigned_i32:
-  case RISCV::EPI_BI_vstore_i64:
-  case RISCV::EPI_BI_vstore_unsigned_i64:
-  case RISCV::EPI_BI_vstore_f32:
-  case RISCV::EPI_BI_vstore_f64:
-    // LLVM intrinsics are (value, addr, ...) but clang builtins are (value,
-    // addr, ...). Swap them.
-    assert(Ops.size() >= 2);
-    std::swap(Ops[0], Ops[1]);
-    switch ((RISCV::EPIBuiltins)BuiltinID) {
-      EPI_MEM(vstore);
-    default:
-      llvm_unreachable("Unhandled store here");
-    }
-    break;
   case RISCV::EPI_BI_vl:
     ID = Intrinsic::epi_readvl;
     break;
