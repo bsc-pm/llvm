@@ -34,9 +34,11 @@ define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
 ; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vsetvli a3, a2, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
+; CHECK-O0-NEXT:    vsetvli a3, a2, e64, m1
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O0-NEXT:    lui a3, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a3, a3, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a4, a2, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a3)
 ; CHECK-O0-NEXT:    sd a1, 8(sp)
 ; CHECK-O0-NEXT:    sd a0, 0(sp)
@@ -48,9 +50,11 @@ define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
+; CHECK-O2-NEXT:    vsetvli a0, a1, e64, m1
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
+; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
@@ -85,9 +89,11 @@ define void @test_setvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
+; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O0-NEXT:    lui a2, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a2, a2, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a3, a1, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a2)
 ; CHECK-O0-NEXT:    sd a0, 8(sp)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
@@ -99,9 +105,11 @@ define void @test_setvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
+; CHECK-O2-NEXT:    vsetvli a0, a1, e64, m1
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
+; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
@@ -135,9 +143,11 @@ define void @test_setvlmax(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
+; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O0-NEXT:    lui a2, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a2, a2, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a3, a1, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a2)
 ; CHECK-O0-NEXT:    sd a0, 8(sp)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
@@ -148,9 +158,11 @@ define void @test_setvlmax(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
+; CHECK-O2-NEXT:    vsetvli a0, a1, e64, m1
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
+; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
@@ -184,9 +196,11 @@ define void @test_gvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    mv a1, zero
 ; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
+; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O0-NEXT:    lui a2, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a2, a2, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a3, a1, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a2)
 ; CHECK-O0-NEXT:    sd a0, 8(sp)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
@@ -197,9 +211,11 @@ define void @test_gvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    mv a1, zero
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
+; CHECK-O2-NEXT:    vsetvli a0, a1, e64, m1
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
+; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
@@ -231,6 +247,7 @@ define void @test_implicit_vlmax(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    addi a1, a1, %lo(scratch)
 ; CHECK-O0-NEXT:    vsetvli a2, zero, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
+; CHECK-O0-NEXT:    vsetvli a2, zero, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a1)
 ; CHECK-O0-NEXT:    sd a0, 8(sp)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
@@ -242,6 +259,7 @@ define void @test_implicit_vlmax(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
+; CHECK-O2-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
