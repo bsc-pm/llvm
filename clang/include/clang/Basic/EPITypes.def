@@ -12,8 +12,8 @@
 //
 //  Two types with the same Scale represent the same number of elements but
 //  the physical size is determined by the size of Type * Scale.
-//
-//  __epi_mask is conceptually Type i1 and Scale 1
+
+// TODO: Still missing subregister sizes like EPI_VECTOR_TYPE(1, f32)
 
 // LMUL=1, ELEN=64
 EPI_VECTOR_TYPE(1, f64)
