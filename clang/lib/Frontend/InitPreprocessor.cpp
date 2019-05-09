@@ -588,12 +588,26 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   Builder.defineMacro("__ATOMIC_SEQ_CST", "5");
 
   if (LangOpts.EPI) {
+    // Full register types aliases
+    Builder.defineMacro("__epi_f64", "__epi_1xf64");
+    Builder.defineMacro("__epi_f32", "__epi_2xf32");
+    Builder.defineMacro("__epi_f16", "__epi_4xf16");
+
+    Builder.defineMacro("__epi_i64", "__epi_1xi64");
+    Builder.defineMacro("__epi_i32", "__epi_2xi32");
+    Builder.defineMacro("__epi_i16", "__epi_4xi16");
+    Builder.defineMacro("__epi_i8", "__epi_8xi8");
+
+    Builder.defineMacro("__epi_i1", "__epi_1xi1");
+
+    // SEW
     Builder.defineMacro("__epi_e8", "0");
     Builder.defineMacro("__epi_e16", "1");
     Builder.defineMacro("__epi_e32", "2");
     Builder.defineMacro("__epi_e64", "3");
     Builder.defineMacro("__epi_e128", "4");
 
+    // LMUL
     Builder.defineMacro("__epi_m1", "0");
     Builder.defineMacro("__epi_m2", "1");
     Builder.defineMacro("__epi_m4", "2");
