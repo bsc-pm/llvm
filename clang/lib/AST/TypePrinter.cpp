@@ -131,7 +131,6 @@ namespace {
     void printBefore(const Type *ty, Qualifiers qs, raw_ostream &OS);
     void printAfter(const Type *ty, Qualifiers qs, raw_ostream &OS);
 
-    template <typename VectorType>
     void printEPIType(const VectorType *T, raw_ostream &OS);
   };
 
@@ -620,10 +619,11 @@ void TypePrinter::printDependentSizedExtVectorAfter(
   printAfter(T->getElementType(), OS);
 }
 
-template <typename VectorType>
 void TypePrinter::printEPIType(const VectorType *T, raw_ostream &OS) {
-  OS << "__epi_";
+  OS << "__epi_" << T->getNumElements() << "x";
   QualType ET = T->getElementType();
+  // FIXME: This is gross and we should be using another approach for these
+  // types. Perhaps calling them as __epi_1xfloat instead.
   if (ET->isHalfType()) {
     OS << "f16";
   } else if (ET->isBooleanType()) {
@@ -632,8 +632,6 @@ void TypePrinter::printEPIType(const VectorType *T, raw_ostream &OS) {
     OS << "i8";
   } else if (ET->isIntegerType() || ET->isFloatingType()) {
     const BuiltinType *BT = cast<BuiltinType>(ET);
-    // FIXME: This is gross and we should be using another approach for these
-    // types.
     switch (BT->getKind()) {
     default:
       llvm_unreachable("Unexpected builtin type");
@@ -735,7 +733,7 @@ void TypePrinter::printDependentVectorBefore(
     printBefore(T->getElementType(), OS);
     break;
   case VectorType::EPIVector:
-    printEPIType(T, OS);
+    llvm_unreachable("An EPI vector should never be dependent");
     break;
   case VectorType::GenericVector: {
     // FIXME: We prefer to print the size directly here, but have no way

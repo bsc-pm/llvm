@@ -8,17 +8,60 @@
 //===----------------------------------------------------------------------===//
 //  This file extends builtin types database with EPI types.
 //  Custom code should define the following macro
-//    EPI_VECTOR_TYPE(Type)
+//    EPI_VECTOR_TYPE(Scale, Type)
+//
+//  Two types with the same Scale represent the same number of elements but
+//  the physical size is determined by the size of Type * Scale.
+//
+//  __epi_mask is conceptually Type i1 and Scale 1
 
-EPI_VECTOR_TYPE(f16)
-EPI_VECTOR_TYPE(f32)
-EPI_VECTOR_TYPE(f64)
+// LMUL=1, ELEN=64
+EPI_VECTOR_TYPE(1, f64)
+EPI_VECTOR_TYPE(2, f32)
+EPI_VECTOR_TYPE(4, f16)
 
-EPI_VECTOR_TYPE(i8)
-EPI_VECTOR_TYPE(i16)
-EPI_VECTOR_TYPE(i32)
-EPI_VECTOR_TYPE(i64)
+EPI_VECTOR_TYPE(1, i64)
+EPI_VECTOR_TYPE(2, i32)
+EPI_VECTOR_TYPE(4, i16)
+EPI_VECTOR_TYPE(8, i8)
 
-EPI_VECTOR_TYPE(i1)
+// LMUL=2, ELEN=64
+EPI_VECTOR_TYPE(2, f64)
+EPI_VECTOR_TYPE(4, f32)
+EPI_VECTOR_TYPE(8, f16)
+
+EPI_VECTOR_TYPE(2, i64)
+EPI_VECTOR_TYPE(4, i32)
+EPI_VECTOR_TYPE(8, i16)
+EPI_VECTOR_TYPE(16, i8)
+
+// LMUL=4, ELEN=64
+EPI_VECTOR_TYPE(4, f64)
+EPI_VECTOR_TYPE(8, f32)
+EPI_VECTOR_TYPE(16, f16)
+
+EPI_VECTOR_TYPE(4, i64)
+EPI_VECTOR_TYPE(8, i32)
+EPI_VECTOR_TYPE(16, i16)
+EPI_VECTOR_TYPE(32, i8)
+
+// LMUL=8, ELEN=64
+EPI_VECTOR_TYPE(8, f64)
+EPI_VECTOR_TYPE(16, f32)
+EPI_VECTOR_TYPE(32, f16)
+
+EPI_VECTOR_TYPE(8, i64)
+EPI_VECTOR_TYPE(16, i32)
+EPI_VECTOR_TYPE(32, i16)
+EPI_VECTOR_TYPE(64, i8)
+
+// Masks
+EPI_VECTOR_TYPE(1, i1)
+EPI_VECTOR_TYPE(2, i1)
+EPI_VECTOR_TYPE(4, i1)
+EPI_VECTOR_TYPE(8, i1)
+EPI_VECTOR_TYPE(16, i1)
+EPI_VECTOR_TYPE(32, i1)
+EPI_VECTOR_TYPE(64, i1)
 
 #undef EPI_VECTOR_TYPE
