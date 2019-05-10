@@ -21,8 +21,8 @@
 // Vector Register File
 //===----------------------------------------------------------------------===//
 
-EPI_BUILTIN(vl, "UWi", "")
-EPI_BUILTIN(setvl, "UWiUWiUWIiUWIi", "")
+EPI_BUILTIN(vreadvl, "UWi", "")
+EPI_BUILTIN(vsetvl, "UWiUWiUWIiUWIi", "")
 
 //===----------------------------------------------------------------------===//
 // Load / store
