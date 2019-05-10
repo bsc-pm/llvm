@@ -4685,6 +4685,12 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
         return ExprError();
       LHSExp = Materialized.get();
     }
+
+    if (VTy->getVectorKind() == VectorType::EPIVector) {
+      Diag(LLoc, diag::err_epi_subscript_vector) << LHSExp->getSourceRange();
+      return ExprError();
+    }
+
     VK = LHSExp->getValueKind();
     if (VK != VK_RValue)
       OK = OK_VectorComponent;
