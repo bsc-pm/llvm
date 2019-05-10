@@ -311,7 +311,7 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr)
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
         return string.Template(LoadStoreMaskTemplate.TEMPLATE).substitute(subs)
 
-class SetVectorLength(TestTemplate):
+class SetVectorLengthTemplate(TestTemplate):
     TEMPLATE = """
 unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
 {
@@ -321,7 +321,7 @@ unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
 """
 
     def __init__(self):
-        super(SetVectorLength, self).__init__()
+        super(SetVectorLengthTemplate, self).__init__()
 
     def render(self, intrinsic_name, return_type, argument_types):
         result = ""
@@ -330,10 +330,10 @@ unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
                 subs = {}
                 subs["sew"] = "__epi_e{}".format(sew)
                 subs["lmul"] = "__epi_m{}".format(lmul)
-                result += string.Template(SetVectorLength.TEMPLATE).substitute(subs)
+                result += string.Template(SetVectorLengthTemplate.TEMPLATE).substitute(subs)
         return result
 
-class ReadVectorLength(TestTemplate):
+class ReadVectorLengthTemplate(TestTemplate):
     TEMPLATE = """
 unsigned long test_vreadvl()
 {
@@ -341,10 +341,10 @@ unsigned long test_vreadvl()
 }
 """
     def __init__(self):
-        super(ReadVectorLength, self).__init__()
+        super(ReadVectorLengthTemplate, self).__init__()
 
     def render(self, intrinsic_name, return_type, argument_types):
-        return ReadVectorLength.TEMPLATE
+        return ReadVectorLengthTemplate.TEMPLATE
 
 template_dict = {}
 
@@ -661,8 +661,8 @@ EPI_LOAD_STORE_FP("vload", "vstore")
 
 EPI_LOAD_STORE_MASK("vload", "vstore")
 
-template_dict["vsetvl"] = SetVectorLength
-template_dict["vreadvl"] = ReadVectorLength
+template_dict["vsetvl"] = SetVectorLengthTemplate
+template_dict["vreadvl"] = ReadVectorLengthTemplate
 
 ################################################################################
 ################################################################################
