@@ -6,6 +6,10 @@ from type_render import *
 
 import string
 
+class NopTemplate(object):
+    def render(self, intrinsic_name, return_type, argument_types):
+        return ""
+
 class TestTemplate(object):
     RESULT_ID = 0
     def __init__(self):
@@ -258,6 +262,89 @@ void test_${intrinsic}(unsigned long gvl)
 
         return string.Template(TernaryMaskTemplate.TEMPLATE).substitute(subs)
 
+class LoadStoreTemplate(TestTemplate):
+    TEMPLATE = """
+void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned long gvl)
+{
+  ${c_result_type} result;
+  result = __builtin_epi_${load_intrinsic}(addr, gvl);
+  __builtin_epi_${store_intrinsic}(addr, result, gvl);
+}
+"""
+
+    def __init__(self, load_name, store_name):
+        super(LoadStoreTemplate, self).__init__()
+        self.load_name = load_name
+        self.store_name = store_name
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["load_intrinsic"] = self.load_name
+        subs["store_intrinsic"] = self.store_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_address_type"] = TypeRender(argument_types[0]).render()
+
+        return string.Template(LoadStoreTemplate.TEMPLATE).substitute(subs)
+
+class LoadStoreMaskTemplate(TestTemplate):
+    TEMPLATE = """
+void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr)
+{
+  ${c_result_type} result;
+  result = __builtin_epi_${load_intrinsic}(addr);
+  __builtin_epi_${store_intrinsic}(addr, result);
+}
+"""
+
+    def __init__(self, load_name, store_name):
+        super(LoadStoreMaskTemplate, self).__init__()
+        self.load_name = load_name
+        self.store_name = store_name
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["load_intrinsic"] = self.load_name
+        subs["store_intrinsic"] = self.store_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_address_type"] = TypeRender(argument_types[0]).render()
+        return string.Template(LoadStoreMaskTemplate.TEMPLATE).substitute(subs)
+
+class SetVectorLength(TestTemplate):
+    TEMPLATE = """
+unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
+{
+    unsigned long gvl = __builtin_epi_vsetvl(rvl, ${sew}, ${lmul});
+    return gvl;
+}
+"""
+
+    def __init__(self):
+        super(SetVectorLength, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        result = ""
+        for lmul in [1, 2, 4, 8]:
+            for sew in [64, 32, 16, 8]:
+                subs = {}
+                subs["sew"] = "__epi_e{}".format(sew)
+                subs["lmul"] = "__epi_m{}".format(lmul)
+                result += string.Template(SetVectorLength.TEMPLATE).substitute(subs)
+        return result
+
+class ReadVectorLength(TestTemplate):
+    TEMPLATE = """
+unsigned long test_vreadvl()
+{
+    return __builtin_epi_vreadvl();
+}
+"""
+    def __init__(self):
+        super(ReadVectorLength, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        return ReadVectorLength.TEMPLATE
 
 template_dict = {}
 
@@ -365,7 +452,16 @@ def EPI_ANY_AND_INT_BINARY(string_name):
 
     template_dict[string_name + "_2xf32_mask"] = BinaryMaskTemplate
     template_dict[string_name + "_1xf64_mask"] = BinaryMaskTemplate
-EPI_ANY_AND_MASK_BINARY = EPI_ANY_AND_INT_BINARY
+
+def EPI_ANY_AND_MASK_BINARY(string_name):
+    global template_dict
+    template_dict[string_name + "_8xi8"] = BinaryTemplate
+    template_dict[string_name + "_4xi16"] = BinaryTemplate
+    template_dict[string_name + "_2xi32"] = BinaryTemplate
+    template_dict[string_name + "_1xi64"] = BinaryTemplate
+
+    template_dict[string_name + "_2xf32"] = BinaryTemplate
+    template_dict[string_name + "_1xf64"] = BinaryTemplate
 
 def EPI_FP_TERNARY(string_name):
     global template_dict
@@ -373,6 +469,50 @@ def EPI_FP_TERNARY(string_name):
     template_dict[string_name + "_1xf64"] = TernaryTemplate
     template_dict[string_name + "_2xf32_mask"] = TernaryMaskTemplate
     template_dict[string_name + "_1xf64_mask"] = TernaryMaskTemplate
+
+def add_load_store(load_name, store_name, suffix):
+    global template_dict
+    # This is a bit convoluted but we need to create the template in
+    # template_dict doing a call with zero arguments, so capture them using
+    # this idiom
+    def create_load_store(load_name, store_name):
+        return lambda : LoadStoreTemplate(load_name, store_name)
+    template_dict[load_name + suffix] = \
+            create_load_store(load_name + suffix, store_name + suffix)
+    # We're testing them inside load name
+    template_dict[store_name + suffix] = NopTemplate
+
+def EPI_LOAD_STORE_INT(load_name, store_name):
+    add_load_store(load_name, store_name, "_1xi64")
+    add_load_store(load_name, store_name, "_2xi32")
+    add_load_store(load_name, store_name, "_4xi16")
+    add_load_store(load_name, store_name, "_8xi8")
+
+def EPI_LOAD_STORE_FP(load_name, store_name):
+    add_load_store(load_name, store_name, "_2xf64")
+    add_load_store(load_name, store_name, "_1xf64")
+    add_load_store(load_name, store_name, "_2xf32")
+
+def EPI_LOAD_STORE_MASK(load_name, store_name):
+    def add_load_store_mask(load_name, store_name, suffix):
+        global template_dict
+        # This is a bit convoluted but we need to create the template in
+        # template_dict doing a call with zero arguments, so capture them using
+        # this idiom
+        def create_load_store(load_name, store_name):
+            return lambda : LoadStoreMaskTemplate(load_name, store_name)
+        template_dict[load_name + suffix] = \
+                create_load_store(load_name + suffix, store_name + suffix)
+        # We're testing them inside load name
+        template_dict[store_name + suffix] = NopTemplate
+    add_load_store_mask(load_name, store_name, "_1xi1")
+    add_load_store_mask(load_name, store_name, "_2xi1")
+    add_load_store_mask(load_name, store_name, "_4xi1")
+    add_load_store_mask(load_name, store_name, "_8xi1")
+
+################################################################################
+################################################################################
+################################################################################
 
 EPI_INT_BINARY("vadd")
 EPI_INT_BINARY("vsub")
@@ -514,8 +654,23 @@ EPI_FP_BINARY("vfdot")
 EPI_INT_UNARY("vbroadcast")
 EPI_FP_UNARY("vbroadcast")
 
+EPI_LOAD_STORE_INT("vload", "vstore")
+EPI_LOAD_STORE_INT("vload_unsigned", "vstore_unsigned")
+
+EPI_LOAD_STORE_FP("vload", "vstore")
+
+EPI_LOAD_STORE_MASK("vload", "vstore")
+
+template_dict["vsetvl"] = SetVectorLength
+template_dict["vreadvl"] = ReadVectorLength
+
+################################################################################
+################################################################################
+################################################################################
+
+tested = []
 untested = []
-tests = []
+test_output = []
 
 def emit_test(builtin_name, prototype):
     if builtin_name not in template_dict:
@@ -523,12 +678,15 @@ def emit_test(builtin_name, prototype):
         untested.append(builtin_name)
         return
 
+    tested.append(builtin_name)
+
     template = template_dict[builtin_name]
 
     (return_type, argument_types) = parse_type(prototype)
-    global tests
-    tests.append(template().render(builtin_name, return_type, argument_types))
-
+    global test_output
+    s = template().render(builtin_name, return_type, argument_types)
+    if s:
+        test_output.append(s)
 
 if __name__ == "__main__":
     print "// RUN: %clang -mepi -O2 -S -emit-llvm -o - %s | FileCheck --check-prefix=CHECK-O2 %s"
@@ -539,5 +697,10 @@ if __name__ == "__main__":
     for u in untested:
         print "// Warning: '{}' not tested in this file".format(u)
     print ""
-    for t in tests:
+    for tpl in template_dict:
+        if (tpl not in tested) and (tpl not in untested):
+            print "// Warning: '{}' registered as a test but no intrinsic exists".format(tpl)
+
+    for t in test_output:
         print t
+

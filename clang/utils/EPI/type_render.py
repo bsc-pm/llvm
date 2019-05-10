@@ -49,7 +49,7 @@ class TypeRender:
             if self.type_builder.basic_type in [TypeBuilder.INT, TypeBuilder.CHAR]:
                 if self.type_builder.unsigned:
                     rendered += "unsigned "
-                elif (self.type_builder.basic_type != TypeBuilder.CHAR and self.type_builder.signed) \
+                elif (self.type_builder.basic_type == TypeBuilder.CHAR and self.type_builder.signed) \
                         or self.type_builder.basic_type == TypeBuilder.INT:
                     rendered += "signed "
                 else:
