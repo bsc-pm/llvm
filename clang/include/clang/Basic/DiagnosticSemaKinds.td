@@ -9740,5 +9740,6 @@ def err_epi_builtin_not_useable : Error<
 def err_epi_sizeof_alignof_vector_type : Error<
   "invalid application of '%select{sizeof|alignof|vec_step|__builtin_omp_required_simd_align}0' to an "
   "EPI vector type">;
+def err_epi_subscript_vector : Error<"subscript of EPI vector">;
 
 } // end of sema component.
