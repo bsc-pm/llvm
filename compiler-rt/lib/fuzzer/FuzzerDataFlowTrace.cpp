@@ -14,6 +14,7 @@
 
 #include <cstdlib>
 #include <fstream>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -193,6 +194,12 @@ void DataFlowTrace::Init(const std::string &DirPath,
   Printf("INFO: DataFlowTrace: %zd trace files, %zd functions, "
          "%zd traces with focus function\n",
          NumTraceFiles, NumFunctions, NumTracesWithFocusFunction);
+}
+
+int CollectDataFlow(const std::string &DFTBinary, const std::string &DirPath,
+                    const Vector<SizedFile> &CorporaFiles) {
+  Printf("INFO: collecting data flow for %zd files\n", CorporaFiles.size());
+  return 0;
 }
 
 }  // namespace fuzzer
