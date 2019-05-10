@@ -49,7 +49,7 @@ EPI_BUILTIN(vload_1xi64, "QV1SWiSWi*UWi", "n")
 EPI_BUILTIN(vload_unsigned_8xi8, "QV8ScUc*UWi", "n")
 EPI_BUILTIN(vload_unsigned_4xi16, "QV4SsUs*UWi", "n")
 EPI_BUILTIN(vload_unsigned_2xi32, "QV2SiUi*UWi", "n")
-EPI_BUILTIN(vload_unsigned_1xi64, "QV1SiUWi*UWi", "n")
+EPI_BUILTIN(vload_unsigned_1xi64, "QV1SWiUWi*UWi", "n")
 
 EPI_BUILTIN(vstore_2xf32, "vf*QV2fUWi", "n")
 EPI_BUILTIN(vstore_1xf64, "vd*QV1dUWi", "n")
