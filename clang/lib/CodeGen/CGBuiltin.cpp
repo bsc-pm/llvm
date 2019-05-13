@@ -13227,6 +13227,30 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_MEM_LOAD(vload)
     EPI_MEM_STORE(vstore)
 
+  case RISCV::EPI_BI_vsetfirst_8xi8:
+  case RISCV::EPI_BI_vsetfirst_4xi16:
+  case RISCV::EPI_BI_vsetfirst_2xi32:
+  case RISCV::EPI_BI_vsetfirst_1xi64:
+    ID = Intrinsic::epi_vmv_s_x;
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};
+    break;
+  case RISCV::EPI_BI_vsetfirst_2xf32:
+  case RISCV::EPI_BI_vsetfirst_1xf64:
+    ID = Intrinsic::epi_vfmv_s_f;
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};
+    break;
+  case RISCV::EPI_BI_vgetfirst_2xf32:
+  case RISCV::EPI_BI_vgetfirst_1xf64:
+    ID = Intrinsic::epi_vfmv_f_s;
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};
+    break;
+  case RISCV::EPI_BI_vextract_8xi8:
+  case RISCV::EPI_BI_vextract_4xi16:
+  case RISCV::EPI_BI_vextract_2xi32:
+  case RISCV::EPI_BI_vextract_1xi64:
+    ID = Intrinsic::epi_vext_x_v;
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};
+    break;
   case RISCV::EPI_BI_vreadvl:
     ID = Intrinsic::epi_vreadvl;
     break;

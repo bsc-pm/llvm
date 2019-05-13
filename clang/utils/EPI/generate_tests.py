@@ -363,6 +363,76 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned 
 
         return string.Template(LoadStoreIndexedTemplate.TEMPLATE).substitute(subs)
 
+class ExtractTemplate(TestTemplate):
+    TEMPLATE = """
+${c_result_type} test_${intrinsic}_(unsigned long idx)
+{
+  ${c_result_type} result;
+  ${c_lhs_type} lhs;
+  result = __builtin_epi_${intrinsic}(lhs, idx);
+  return result;
+}
+"""
+
+    def __init__(self):
+        super(ExtractTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["intrinsic"] = builtin_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
+
+        return string.Template(ExtractTemplate.TEMPLATE).substitute(subs)
+
+class SetFirstTemplate(TestTemplate):
+    TEMPLATE = """
+${store_decl}
+void test_${intrinsic}_(${c_element_type} value, unsigned long gvl)
+{
+  ${c_result_type} result;
+  result = __builtin_epi_${intrinsic}(value, gvl);
+  ${store_stmt}
+}
+"""
+
+    def __init__(self):
+        super(SetFirstTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["intrinsic"] = builtin_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_element_type"] = TypeRender(argument_types[1]).render()
+        (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
+
+        return string.Template(SetFirstTemplate.TEMPLATE).substitute(subs)
+
+class GetFirstTemplate(TestTemplate):
+    TEMPLATE = """
+${c_result_type} test_${intrinsic}_(void)
+{
+  ${c_result_type} result;
+  ${c_lhs_type} lhs;
+  result = __builtin_epi_${intrinsic}(lhs);
+  return result;
+}
+"""
+
+    def __init__(self):
+        super(GetFirstTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["intrinsic"] = builtin_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
+
+        return string.Template(GetFirstTemplate.TEMPLATE).substitute(subs)
+
 class SetVectorLengthTemplate(TestTemplate):
     TEMPLATE = """
 unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
@@ -606,6 +676,27 @@ def EPI_LOAD_STORE_INDEXED_FP(load_name, store_name):
     add_load_store_indexed(load_name, store_name, "_1xf64")
     add_load_store_indexed(load_name, store_name, "_2xf32")
 
+def EPI_EXTRACT(string_name):
+    global template_dict
+    template_dict[string_name + "_1xi64"] = ExtractTemplate
+    template_dict[string_name + "_2xi32"] = ExtractTemplate
+    template_dict[string_name + "_4xi16"] = ExtractTemplate
+    template_dict[string_name + "_8xi8"] = ExtractTemplate
+
+def EPI_SET_FIRST(string_name):
+    global template_dict
+    template_dict[string_name + "_1xi64"] = SetFirstTemplate
+    template_dict[string_name + "_2xi32"] = SetFirstTemplate
+    template_dict[string_name + "_4xi16"] = SetFirstTemplate
+    template_dict[string_name + "_8xi8"] = SetFirstTemplate
+    template_dict[string_name + "_1xf64"] = SetFirstTemplate
+    template_dict[string_name + "_2xf32"] = SetFirstTemplate
+
+def EPI_GET_FIRST(string_name):
+    global template_dict
+    template_dict[string_name + "_1xf64"] = GetFirstTemplate
+    template_dict[string_name + "_2xf32"] = GetFirstTemplate
+
 ################################################################################
 ################################################################################
 ################################################################################
@@ -763,6 +854,10 @@ EPI_LOAD_STORE_INDEXED_INT("vload_indexed_unsigned", "vstore_indexed_unsigned")
 EPI_LOAD_STORE_INDEXED_FP("vload_indexed", "vstore_indexed")
 
 EPI_LOAD_STORE_MASK("vload", "vstore")
+
+EPI_EXTRACT("vextract")
+EPI_SET_FIRST("vsetfirst")
+EPI_GET_FIRST("vgetfirst")
 
 template_dict["vsetvl"] = SetVectorLengthTemplate
 template_dict["vreadvl"] = ReadVectorLengthTemplate
