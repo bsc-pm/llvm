@@ -17,6 +17,7 @@
 #include "CGDebugInfo.h"
 #include "CGObjCRuntime.h"
 #include "CGOpenMPRuntime.h"
+#include "CGOmpSsRuntime.h"
 #include "CGRecordLayout.h"
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
@@ -108,6 +109,11 @@ llvm::AllocaInst *CodeGenFunction::CreateTempAlloca(llvm::Type *Ty,
                                                     llvm::Value *ArraySize) {
   if (ArraySize)
     return Builder.CreateAlloca(Ty, ArraySize, Name);
+  if (getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTask())
+    return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
+                                ArraySize, Name,
+                                CGM.getOmpSsRuntime().getCurrentTask());
+
   return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
                               ArraySize, Name, AllocaInsertPt);
 }

@@ -350,6 +350,14 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                                                                     "TASKWAIT"))});
 }
 
+bool CGOmpSsRuntime::inTask() {
+  return !TaskEntryStack.empty();
+}
+
+llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getCurrentTask() {
+  return TaskEntryStack.back();
+}
+
 void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   const OSSExecutableDirective &D,
                                   SourceLocation Loc,
@@ -386,14 +394,21 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, E, TaskInfo);
   }
 
-  llvm::Value *Result =
-    CGF.Builder.CreateCall(EntryCallee,
-                           {},
-                           llvm::makeArrayRef(TaskInfo));
+  llvm::Instruction *Result =
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+
+  // Push Task Stack
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
+  TaskEntryStack.push_back(TaskAllocaInsertPt);
 
   CGF.EmitStmt(D.getAssociatedStmt());
 
-  CGF.Builder.CreateCall(ExitCallee,
-                         Result);
+  CGF.Builder.CreateCall(ExitCallee, Result);
+
+  // Pop Task Stack
+  TaskEntryStack.pop_back();
+  TaskAllocaInsertPt->eraseFromParent();
+
 }
 

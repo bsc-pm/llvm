@@ -48,13 +48,22 @@ class CGOmpSsRuntime {
 protected:
   CodeGenModule &CGM;
 
+private:
+  SmallVector<llvm::AssertingVH<llvm::Instruction>, 2> TaskEntryStack;
+
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
+  // returns true if we're emitting code inside a task context (entry/exit)
+  bool inTask();
+  // returns the innermost nested task entry mark instruction
+  llvm::AssertingVH<llvm::Instruction> getCurrentTask();
+
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);
+  /// Emit code for 'task' directive.
   virtual void emitTaskCall(CodeGenFunction &CGF,
                             const OSSExecutableDirective &D,
                             SourceLocation Loc,
