@@ -281,6 +281,21 @@ EPI_BUILTIN(vload_8xi1, "QV8bUc*", "n")
   EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2fSWiQV2bUWi", "Un")                   \
   EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1dSWiQV1bUWi", "Un")
 
+#define EPI_ANY_INT_AND_SCALAR_INT_BINARY_NOMASK(name)                         \
+  EPI_BUILTIN(name##_8xi8, "ScQV8ScUWi", "Un")                                 \
+  EPI_BUILTIN(name##_4xi16, "SsQV4SsUWi", "Un")                                \
+  EPI_BUILTIN(name##_2xi32, "SiQV2SiUWi", "Un")                                \
+  EPI_BUILTIN(name##_1xi64, "SWiQV1SWiUWi", "Un")
+
+#define EPI_ANY_AND_SCALAR_BINARY_NOMASK(name)                                 \
+  EPI_BUILTIN(name##_8xi8, "QV8ScScUWi", "Un")                                 \
+  EPI_BUILTIN(name##_4xi16, "QV4SsSsUWi", "Un")                                \
+  EPI_BUILTIN(name##_2xi32, "QV2SiSiUWi", "Un")                                \
+  EPI_BUILTIN(name##_1xi64, "QV1SWiSWiUWi", "Un")                              \
+                                                                               \
+  EPI_BUILTIN(name##_2xf32, "QV2ffUWi", "Un")                                  \
+  EPI_BUILTIN(name##_1xf64, "QV1ddUWi", "Un")
+
 #define EPI_ANY_AND_MASK_BINARY(name)                                          \
   EPI_BUILTIN(name##_8xi8, "QV8ScQV8ScQV8bUWi", "Un")                          \
   EPI_BUILTIN(name##_4xi16, "QV4SsQV4SsQV4bUWi", "Un")                         \
@@ -546,12 +561,11 @@ EPI_MASK_TO_INT_UNARY(vmiota)
 // FIXME
 // EPI_UNARY(vmid)
 
-// FIXME
-// vext.x.v
-// vmv.s.x
-//
-// vfmv.f.s
-// vfmv.s.f
+EPI_ANY_INT_AND_SCALAR_INT_BINARY_NOMASK(vextract)
+EPI_ANY_AND_SCALAR_BINARY_NOMASK(vsetfirst)
+
+EPI_BUILTIN(vgetfirst_2xf32, "fQV2f", "Un")
+EPI_BUILTIN(vgetfirst_1xf64, "dQV1d", "Un")
 
 EPI_ANY_AND_SCALAR_UNSIGNED_INT_BINARY(vslideup)
 EPI_ANY_AND_SCALAR_UNSIGNED_INT_BINARY(vslidedown)
