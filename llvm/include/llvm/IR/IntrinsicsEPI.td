@@ -423,7 +423,7 @@ multiclass epi_load {
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_indexed"      : Intrinsic<[ llvm_anyvector_ty ],
                                   [ LLVMPointerType<LLVMMatchType<0>>,
-                                    llvm_epi_i64_ty, llvm_i64_ty ],
+                                    llvm_anyvector_ty, llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_mask"         : Intrinsic<[ llvm_anyvector_ty ],
                                   [ LLVMPointerType<LLVMMatchType<0>>,
@@ -435,7 +435,7 @@ multiclass epi_load {
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_indexed_mask" : Intrinsic<[ llvm_anyvector_ty ],
                                   [ LLVMPointerType<LLVMMatchType<0>>,
-                                    llvm_epi_i64_ty, llvm_epi_i1_ty,
+                                    llvm_anyvector_ty, llvm_epi_i1_ty,
                                     llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;
 }
@@ -457,7 +457,7 @@ multiclass epi_store {
   def "_indexed"      : Intrinsic<[],
                                   [ llvm_anyvector_ty,
                                     LLVMPointerType<LLVMMatchType<0>>,
-                                    llvm_epi_i64_ty, llvm_i64_ty ],
+                                    llvm_anyvector_ty, llvm_i64_ty ],
                                   [ NoCapture<1>, IntrWriteMem ]>;
   def "_mask"         : Intrinsic<[],
                                   [ llvm_anyvector_ty,
@@ -472,7 +472,7 @@ multiclass epi_store {
   def "_indexed_mask" : Intrinsic<[],
                                   [ llvm_anyvector_ty,
                                     LLVMPointerType<LLVMMatchType<0>>,
-                                    llvm_epi_i64_ty, llvm_epi_i1_ty,
+                                    llvm_anyvector_ty, llvm_epi_i1_ty,
                                     llvm_i64_ty ],
                                   [ NoCapture<1>, IntrWriteMem ]>;
 }
