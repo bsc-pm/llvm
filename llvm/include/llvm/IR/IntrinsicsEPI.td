@@ -108,7 +108,7 @@ class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
 {
   let ExtendOperand = 0b0001;
 }
-let ExtendOperand = 0b0001 in
+let ExtendOperand = 1 in
 class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_any_ty, llvm_anyvector_ty, llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
@@ -353,17 +353,26 @@ defm vslidedown : epi_binary;
 defm vslide1up : epi_binary;
 defm vslide1down : epi_binary;
 
-def int_epi_vext_x_v : Intrinsic< [ llvm_i64_ty ],
-                      [ llvm_anyvector_ty, llvm_any_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic;
+def int_epi_vext_x_v : Intrinsic< [ llvm_anyint_ty ],
+                      [ llvm_anyvector_ty, llvm_i64_ty ],
+                      [ IntrNoMem ] >, EPIIntrinsic
+{
+  let ExtendOperand = 2;
+}
 
 def int_epi_vmv_s_x : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_anyint_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic;
+                      [ llvm_anyint_ty, llvm_i64_ty ],
+                      [ IntrNoMem ] >, EPIIntrinsic
+{
+  let ExtendOperand = 1;
+}
 
-def int_epi_vfmv_f_s : Intrinsic< [ llvm_anyfloat_ty ], [ llvm_anyvector_ty ],
+def int_epi_vfmv_f_s : Intrinsic< [ llvm_anyfloat_ty ],
+                                  [ llvm_anyvector_ty ],
                                   [ IntrNoMem ]>, EPIIntrinsic;
-def int_epi_vfmv_s_f : Intrinsic< [ llvm_anyvector_ty ], [ llvm_anyfloat_ty ],
+def int_epi_vfmv_s_f : Intrinsic< [ llvm_anyvector_ty ],
+                                  [ llvm_anyfloat_ty,
+                                    llvm_i64_ty ],
                                   [ IntrNoMem ]>, EPIIntrinsic;
 
 defm vfsqrt : epi_unary;
