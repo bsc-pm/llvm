@@ -6,10 +6,10 @@
 
 @scratch = global i8 0, align 16
 
-declare i64 @llvm.epi.setvl(
+declare i64 @llvm.epi.vsetvl(
   i64, i64, i64);
 
-declare i64 @llvm.epi.setvlmax(
+declare i64 @llvm.epi.vsetvlmax(
   i64, i64);
 
 declare <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
@@ -26,8 +26,8 @@ declare void @llvm.epi.vstore.nxv1f64(
   <vscale x 1 x double>*,
   i64);
 
-define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
-; CHECK-O0-LABEL: test_setvl_avl:
+define void @test_vsetvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
+; CHECK-O0-LABEL: test_vsetvl_avl:
 ; CHECK-O0:       # %bb.0:
 ; CHECK-O0-NEXT:    addi sp, sp, -16
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 16
@@ -45,7 +45,7 @@ define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
 ; CHECK-O0-NEXT:    ret
 ;
-; CHECK-O2-LABEL: test_setvl_avl:
+; CHECK-O2-LABEL: test_vsetvl_avl:
 ; CHECK-O2:       # %bb.0:
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
@@ -58,7 +58,7 @@ define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
-  %gvl = call i64 @llvm.epi.setvl(
+  %gvl = call i64 @llvm.epi.vsetvl(
     i64 %avl, i64 3, i64 0)
 
   %vec = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(
@@ -80,8 +80,8 @@ define void @test_setvl_avl(<vscale x 1 x double>* %v, i64 signext %avl)
     ret void
 }
 
-define void @test_setvl_zero(<vscale x 1 x double>* %v)
-; CHECK-O0-LABEL: test_setvl_zero:
+define void @test_vsetvl_zero(<vscale x 1 x double>* %v)
+; CHECK-O0-LABEL: test_vsetvl_zero:
 ; CHECK-O0:       # %bb.0:
 ; CHECK-O0-NEXT:    addi sp, sp, -16
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 16
@@ -99,7 +99,7 @@ define void @test_setvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
 ; CHECK-O0-NEXT:    ret
 ;
-; CHECK-O2-LABEL: test_setvl_zero:
+; CHECK-O2-LABEL: test_vsetvl_zero:
 ; CHECK-O2:       # %bb.0:
 ; CHECK-O2-NEXT:    mv a1, zero
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
@@ -113,7 +113,7 @@ define void @test_setvl_zero(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
-  %gvl = call i64 @llvm.epi.setvl(
+  %gvl = call i64 @llvm.epi.vsetvl(
     i64 0, i64 3, i64 0)
 
   %vec = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(
@@ -135,8 +135,8 @@ define void @test_setvl_zero(<vscale x 1 x double>* %v)
     ret void
 }
 
-define void @test_setvlmax(<vscale x 1 x double>* %v)
-; CHECK-O0-LABEL: test_setvlmax:
+define void @test_vsetvlmax(<vscale x 1 x double>* %v)
+; CHECK-O0-LABEL: test_vsetvlmax:
 ; CHECK-O0:       # %bb.0:
 ; CHECK-O0-NEXT:    addi sp, sp, -16
 ; CHECK-O0-NEXT:    .cfi_def_cfa_offset 16
@@ -153,7 +153,7 @@ define void @test_setvlmax(<vscale x 1 x double>* %v)
 ; CHECK-O0-NEXT:    addi sp, sp, 16
 ; CHECK-O0-NEXT:    ret
 ;
-; CHECK-O2-LABEL: test_setvlmax:
+; CHECK-O2-LABEL: test_vsetvlmax:
 ; CHECK-O2:       # %bb.0:
 ; CHECK-O2-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
@@ -166,7 +166,7 @@ define void @test_setvlmax(<vscale x 1 x double>* %v)
 ; CHECK-O2-NEXT:    vse.v v0, (a0)
 ; CHECK-O2-NEXT:    ret
 {
-  %vlmax = call i64 @llvm.epi.setvlmax(
+  %vlmax = call i64 @llvm.epi.vsetvlmax(
     i64 3, i64 0)
 
   %vec = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(

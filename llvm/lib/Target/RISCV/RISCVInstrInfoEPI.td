@@ -1643,16 +1643,16 @@ let Predicates = [HasExtEPI] in {
 // length in bits)
 def : Pat<(int_experimental_vector_vscale), (PseudoReadVL)>;
 
-def : Pat<(int_epi_readvl), (PseudoReadVL)>;
+def : Pat<(int_epi_vreadvl), (PseudoReadVL)>;
 
 // FIXME: uimm5 here is not very precise. It should be uimm3 and uimm2 but we
 // will probably want to wait for intrinsics with constant values constraints.
-def : Pat<(int_epi_setvl GPR:$vl, uimm5:$sew, uimm5:$vmul),
+def : Pat<(int_epi_vsetvl GPR:$vl, uimm5:$sew, uimm5:$vmul),
           (VSETVLI (NoX0 GPR:$vl), uimm5:$sew, uimm5:$vmul)>;
 
 // FIXME: uimm5 here is not very precise. It should be uimm3 and uimm2 but we
 // will probably want to wait for intrinsics with constant values constraints.
-def : Pat<(int_epi_setvlmax uimm5:$sew, uimm5:$vmul),
+def : Pat<(int_epi_vsetvlmax uimm5:$sew, uimm5:$vmul),
           (VSETVLI X0, uimm5:$sew, uimm5:$vmul)>;
 
 }
