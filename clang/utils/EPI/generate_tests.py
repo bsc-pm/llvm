@@ -311,6 +311,58 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr)
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
         return string.Template(LoadStoreMaskTemplate.TEMPLATE).substitute(subs)
 
+class LoadStoreStridedTemplate(TestTemplate):
+    TEMPLATE = """
+void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, signed long stride, unsigned long gvl)
+{
+  ${c_result_type} result;
+  result = __builtin_epi_${load_intrinsic}(addr, stride, gvl);
+  __builtin_epi_${store_intrinsic}(addr, result, stride, gvl);
+}
+"""
+
+    def __init__(self, load_name, store_name):
+        super(LoadStoreStridedTemplate, self).__init__()
+        self.load_name = load_name
+        self.store_name = store_name
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["load_intrinsic"] = self.load_name
+        subs["store_intrinsic"] = self.store_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_address_type"] = TypeRender(argument_types[0]).render()
+
+        return string.Template(LoadStoreStridedTemplate.TEMPLATE).substitute(subs)
+
+class LoadStoreIndexedTemplate(TestTemplate):
+    TEMPLATE = """
+void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned long gvl)
+{
+  ${c_result_type} result;
+  ${c_index_type} index;
+  result = __builtin_epi_${load_intrinsic}(addr, index, gvl);
+  __builtin_epi_${store_intrinsic}(addr, result, index, gvl);
+}
+"""
+
+    def __init__(self, load_name, store_name):
+        super(LoadStoreIndexedTemplate, self).__init__()
+        self.load_name = load_name
+        self.store_name = store_name
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["load_intrinsic"] = self.load_name
+        subs["store_intrinsic"] = self.store_name
+        # We use the load intrinsic
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_address_type"] = TypeRender(argument_types[0]).render()
+        subs["c_index_type"] = TypeRender(argument_types[1]).render()
+
+        return string.Template(LoadStoreIndexedTemplate.TEMPLATE).substitute(subs)
+
 class SetVectorLengthTemplate(TestTemplate):
     TEMPLATE = """
 unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
@@ -510,6 +562,50 @@ def EPI_LOAD_STORE_MASK(load_name, store_name):
     add_load_store_mask(load_name, store_name, "_4xi1")
     add_load_store_mask(load_name, store_name, "_8xi1")
 
+def add_load_store_strided(load_name, store_name, suffix):
+    global template_dict
+    # This is a bit convoluted but we need to create the template in
+    # template_dict doing a call with zero arguments, so capture them using
+    # this idiom
+    def create_load_store(load_name, store_name):
+        return lambda : LoadStoreStridedTemplate(load_name, store_name)
+    template_dict[load_name + suffix] = \
+            create_load_store(load_name + suffix, store_name + suffix)
+    # We're testing them inside load name
+    template_dict[store_name + suffix] = NopTemplate
+
+def EPI_LOAD_STORE_STRIDED_INT(load_name, store_name):
+    add_load_store_strided(load_name, store_name, "_1xi64")
+    add_load_store_strided(load_name, store_name, "_2xi32")
+    add_load_store_strided(load_name, store_name, "_4xi16")
+    add_load_store_strided(load_name, store_name, "_8xi8")
+
+def EPI_LOAD_STORE_STRIDED_FP(load_name, store_name):
+    add_load_store_strided(load_name, store_name, "_1xf64")
+    add_load_store_strided(load_name, store_name, "_2xf32")
+
+def add_load_store_indexed(load_name, store_name, suffix):
+    global template_dict
+    # This is a bit convoluted but we need to create the template in
+    # template_dict doing a call with zero arguments, so capture them using
+    # this idiom
+    def create_load_store(load_name, store_name):
+        return lambda : LoadStoreIndexedTemplate(load_name, store_name)
+    template_dict[load_name + suffix] = \
+            create_load_store(load_name + suffix, store_name + suffix)
+    # We're testing them inside load name
+    template_dict[store_name + suffix] = NopTemplate
+
+def EPI_LOAD_STORE_INDEXED_INT(load_name, store_name):
+    add_load_store_indexed(load_name, store_name, "_1xi64")
+    add_load_store_indexed(load_name, store_name, "_2xi32")
+    add_load_store_indexed(load_name, store_name, "_4xi16")
+    add_load_store_indexed(load_name, store_name, "_8xi8")
+
+def EPI_LOAD_STORE_INDEXED_FP(load_name, store_name):
+    add_load_store_indexed(load_name, store_name, "_1xf64")
+    add_load_store_indexed(load_name, store_name, "_2xf32")
+
 ################################################################################
 ################################################################################
 ################################################################################
@@ -656,8 +752,15 @@ EPI_FP_UNARY("vbroadcast")
 
 EPI_LOAD_STORE_INT("vload", "vstore")
 EPI_LOAD_STORE_INT("vload_unsigned", "vstore_unsigned")
-
 EPI_LOAD_STORE_FP("vload", "vstore")
+
+EPI_LOAD_STORE_STRIDED_INT("vload_strided", "vstore_strided")
+EPI_LOAD_STORE_STRIDED_INT("vload_strided_unsigned", "vstore_strided_unsigned")
+EPI_LOAD_STORE_STRIDED_FP("vload_strided", "vstore_strided")
+
+EPI_LOAD_STORE_INDEXED_INT("vload_indexed", "vstore_indexed")
+EPI_LOAD_STORE_INDEXED_INT("vload_indexed_unsigned", "vstore_indexed_unsigned")
+EPI_LOAD_STORE_INDEXED_FP("vload_indexed", "vstore_indexed")
 
 EPI_LOAD_STORE_MASK("vload", "vstore")
 

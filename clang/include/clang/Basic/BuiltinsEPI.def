@@ -28,39 +28,53 @@ EPI_BUILTIN(vsetvl, "UWiUWiUWIiUWIi", "")
 // Load / store
 //===----------------------------------------------------------------------===//
 
-// TODO: strided load/store
-// TODO: indexed load/store
 // TODO: masked loads/stores
+// Store signed
 EPI_BUILTIN(vstore_8xi8, "vSc*QV8ScUWi", "n")
 EPI_BUILTIN(vstore_4xi16, "vSs*QV4SsUWi", "n")
 EPI_BUILTIN(vstore_2xi32, "vSi*QV2SiUWi", "n")
 EPI_BUILTIN(vstore_1xi64, "vSWi*QV1SWiUWi", "n")
 
+EPI_BUILTIN(vstore_strided_8xi8, "vSc*QV8ScSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_4xi16, "vSs*QV4SsSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_2xi32, "vSi*QV2SiSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_1xi64, "vSWi*QV1SWiSWiUWi", "n")
+
+EPI_BUILTIN(vstore_indexed_8xi8, "vSc*QV8ScQV8ScUWi", "n")
+EPI_BUILTIN(vstore_indexed_4xi16, "vSs*QV4SsQV4SsUWi", "n")
+EPI_BUILTIN(vstore_indexed_2xi32, "vSi*QV2SiQV2SiUWi", "n")
+EPI_BUILTIN(vstore_indexed_1xi64, "vSWi*QV1SWiQV1SWiUWi", "n")
+
+// Store unsigned
 EPI_BUILTIN(vstore_unsigned_8xi8, "vUc*QV8ScUWi", "n")
 EPI_BUILTIN(vstore_unsigned_4xi16, "vUs*QV4SsUWi", "n")
 EPI_BUILTIN(vstore_unsigned_2xi32, "vUi*QV2SiUWi", "n")
 EPI_BUILTIN(vstore_unsigned_1xi64, "vUWi*QV1SWiUWi", "n")
 
-EPI_BUILTIN(vload_8xi8, "QV8ScSc*UWi", "n")
-EPI_BUILTIN(vload_4xi16, "QV4SsSs*UWi", "n")
-EPI_BUILTIN(vload_2xi32, "QV2SiSi*UWi", "n")
-EPI_BUILTIN(vload_1xi64, "QV1SWiSWi*UWi", "n")
+EPI_BUILTIN(vstore_strided_unsigned_8xi8, "vUc*QV8ScSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_unsigned_4xi16, "vUs*QV4SsSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_unsigned_2xi32, "vUi*QV2SiSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_unsigned_1xi64, "vUWi*QV1SWiSWiUWi", "n")
 
-EPI_BUILTIN(vload_unsigned_8xi8, "QV8ScUc*UWi", "n")
-EPI_BUILTIN(vload_unsigned_4xi16, "QV4SsUs*UWi", "n")
-EPI_BUILTIN(vload_unsigned_2xi32, "QV2SiUi*UWi", "n")
-EPI_BUILTIN(vload_unsigned_1xi64, "QV1SWiUWi*UWi", "n")
+EPI_BUILTIN(vstore_indexed_unsigned_8xi8, "vUc*QV8ScQV8ScUWi", "n")
+EPI_BUILTIN(vstore_indexed_unsigned_4xi16, "vUs*QV4SsQV4SsUWi", "n")
+EPI_BUILTIN(vstore_indexed_unsigned_2xi32, "vUi*QV2SiQV2SiUWi", "n")
+EPI_BUILTIN(vstore_indexed_unsigned_1xi64, "vUWi*QV1SWiQV1SWiUWi", "n")
 
+// Store float
 EPI_BUILTIN(vstore_2xf32, "vf*QV2fUWi", "n")
 EPI_BUILTIN(vstore_1xf64, "vd*QV1dUWi", "n")
 EPI_BUILTIN(vstore_2xf64, "vd*QV2dUWi", "n")
 
-EPI_BUILTIN(vload_2xf32, "QV2ff*UWi", "n")
-EPI_BUILTIN(vload_1xf64, "QV1dd*UWi", "n")
-EPI_BUILTIN(vload_2xf64, "QV2dd*UWi", "n")
+EPI_BUILTIN(vstore_strided_2xf32, "vf*QV2fSWiUWi", "n")
+EPI_BUILTIN(vstore_strided_1xf64, "vd*QV1dSWiUWi", "n")
 
-// m is a mask element (the number of bits of which depends on the number of
-// elements of the mask)
+EPI_BUILTIN(vstore_indexed_2xf32, "vf*QV2fQV2SiUWi", "n")
+EPI_BUILTIN(vstore_indexed_1xf64, "vd*QV1dQV1SWiUWi", "n")
+
+// Store mask
+// These intrinsics store the whole mask register, so they don't have a granted
+// vector length parameter.
 EPI_BUILTIN(vstore_1xi1, "vUWi*QV1b", "n")
 EPI_BUILTIN(vstore_2xi1, "vUi*QV2b", "n")
 EPI_BUILTIN(vstore_4xi1, "vUs*QV4b", "n")
@@ -69,6 +83,52 @@ EPI_BUILTIN(vstore_8xi1, "vUc*QV8b", "n")
 // EPI_BUILTIN(vstore_32xi1, "vUSc*QV32bUWi", "n")
 // EPI_BUILTIN(vstore_64xi1, "vUSc*QV64bUWi", "n")
 
+// Load signed
+EPI_BUILTIN(vload_8xi8, "QV8ScSc*UWi", "n")
+EPI_BUILTIN(vload_4xi16, "QV4SsSs*UWi", "n")
+EPI_BUILTIN(vload_2xi32, "QV2SiSi*UWi", "n")
+EPI_BUILTIN(vload_1xi64, "QV1SWiSWi*UWi", "n")
+
+EPI_BUILTIN(vload_strided_8xi8, "QV8ScSc*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_4xi16, "QV4SsSs*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_2xi32, "QV2SiSi*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_1xi64, "QV1SWiSWi*SWiUWi", "n")
+
+EPI_BUILTIN(vload_indexed_8xi8, "QV8ScSc*QV8ScUWi", "n")
+EPI_BUILTIN(vload_indexed_4xi16, "QV4SsSs*QV4SsUWi", "n")
+EPI_BUILTIN(vload_indexed_2xi32, "QV2SiSi*QV2SiUWi", "n")
+EPI_BUILTIN(vload_indexed_1xi64, "QV1SWiSWi*QV1SWiUWi", "n")
+
+// Load unsigned
+EPI_BUILTIN(vload_unsigned_8xi8, "QV8ScUc*UWi", "n")
+EPI_BUILTIN(vload_unsigned_4xi16, "QV4SsUs*UWi", "n")
+EPI_BUILTIN(vload_unsigned_2xi32, "QV2SiUi*UWi", "n")
+EPI_BUILTIN(vload_unsigned_1xi64, "QV1SWiUWi*UWi", "n")
+
+EPI_BUILTIN(vload_strided_unsigned_8xi8, "QV8ScUc*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_unsigned_4xi16, "QV4SsUs*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_unsigned_2xi32, "QV2SiUi*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_unsigned_1xi64, "QV1SWiUWi*SWiUWi", "n")
+
+EPI_BUILTIN(vload_indexed_unsigned_8xi8, "QV8ScUc*QV8ScUWi", "n")
+EPI_BUILTIN(vload_indexed_unsigned_4xi16, "QV4SsUs*QV4SsUWi", "n")
+EPI_BUILTIN(vload_indexed_unsigned_2xi32, "QV2SiUi*QV2SiUWi", "n")
+EPI_BUILTIN(vload_indexed_unsigned_1xi64, "QV1SWiUWi*QV1SWiUWi", "n")
+
+// Load float
+EPI_BUILTIN(vload_2xf32, "QV2ff*UWi", "n")
+EPI_BUILTIN(vload_1xf64, "QV1dd*UWi", "n")
+EPI_BUILTIN(vload_2xf64, "QV2dd*UWi", "n")
+
+EPI_BUILTIN(vload_strided_2xf32, "QV2ff*SWiUWi", "n")
+EPI_BUILTIN(vload_strided_1xf64, "QV1dd*SWiUWi", "n")
+
+EPI_BUILTIN(vload_indexed_2xf32, "QV2ff*QV2SiUWi", "n")
+EPI_BUILTIN(vload_indexed_1xf64, "QV1dd*QV1SWiUWi", "n")
+
+// Load mask
+// These intrinsics load the whole mask register, so they don't have a granted
+// vector length parameter.
 EPI_BUILTIN(vload_1xi1, "QV1bUWi*", "n")
 EPI_BUILTIN(vload_2xi1, "QV2bUi*", "n")
 EPI_BUILTIN(vload_4xi1, "QV4bUs*", "n")
