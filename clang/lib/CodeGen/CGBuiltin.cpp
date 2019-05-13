@@ -12893,6 +12893,36 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
                                    llvm::PointerType::getUnqual(ResultType));  \
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_strided_8xi8:                                     \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_8xi8:                            \
+  case RISCV::EPI_BI_##ID_##_strided_4xi16:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_4xi16:                           \
+  case RISCV::EPI_BI_##ID_##_strided_2xi32:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_2xi32:                           \
+  case RISCV::EPI_BI_##ID_##_strided_1xi64:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_1xi64:                           \
+  case RISCV::EPI_BI_##ID_##_strided_2xf32:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_1xf64:                                    \
+    IntrinsicTypes = {ResultType};                                             \
+    Ops[0] = Builder.CreateBitCast(Ops[0],                                     \
+                                   llvm::PointerType::getUnqual(ResultType));  \
+    ID = Intrinsic::epi_##ID_##_strided;                                       \
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_indexed_8xi8:                                     \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_8xi8:                            \
+  case RISCV::EPI_BI_##ID_##_indexed_4xi16:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_4xi16:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_2xi32:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_2xi32:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_1xi64:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_1xi64:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_2xf32:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_1xf64:                                    \
+    IntrinsicTypes = {ResultType, Ops[1]->getType()};                          \
+    Ops[0] = Builder.CreateBitCast(Ops[0],                                     \
+                                   llvm::PointerType::getUnqual(ResultType));  \
+    ID = Intrinsic::epi_##ID_##_indexed;                                       \
+    break;                                                                     \
   case RISCV::EPI_BI_##ID_##_8xi1:                                             \
   case RISCV::EPI_BI_##ID_##_4xi1:                                             \
   case RISCV::EPI_BI_##ID_##_2xi1:                                             \
@@ -12922,6 +12952,40 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
         Ops[1], llvm::PointerType::getUnqual(Ops[0]->getType()));              \
     IntrinsicTypes = {Ops[0]->getType()};                                      \
     ID = Intrinsic::epi_##ID_;                                                 \
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_strided_8xi8:                                     \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_8xi8:                            \
+  case RISCV::EPI_BI_##ID_##_strided_4xi16:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_4xi16:                           \
+  case RISCV::EPI_BI_##ID_##_strided_2xi32:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_2xi32:                           \
+  case RISCV::EPI_BI_##ID_##_strided_1xi64:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_unsigned_1xi64:                           \
+  case RISCV::EPI_BI_##ID_##_strided_2xf32:                                    \
+  case RISCV::EPI_BI_##ID_##_strided_1xf64:                                    \
+    assert(Ops.size() >= 2);                                                   \
+    std::swap(Ops[0], Ops[1]);                                                 \
+    Ops[1] = Builder.CreateBitCast(                                            \
+        Ops[1], llvm::PointerType::getUnqual(Ops[0]->getType()));              \
+    IntrinsicTypes = {Ops[0]->getType()};                                      \
+    ID = Intrinsic::epi_##ID_##_strided;                                       \
+    break;                                                                     \
+  case RISCV::EPI_BI_##ID_##_indexed_8xi8:                                     \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_8xi8:                            \
+  case RISCV::EPI_BI_##ID_##_indexed_4xi16:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_4xi16:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_2xi32:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_2xi32:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_1xi64:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_unsigned_1xi64:                           \
+  case RISCV::EPI_BI_##ID_##_indexed_2xf32:                                    \
+  case RISCV::EPI_BI_##ID_##_indexed_1xf64:                                    \
+    assert(Ops.size() >= 2);                                                   \
+    std::swap(Ops[0], Ops[1]);                                                 \
+    Ops[1] = Builder.CreateBitCast(                                            \
+        Ops[1], llvm::PointerType::getUnqual(Ops[0]->getType()));              \
+    IntrinsicTypes = {Ops[0]->getType(), Ops[2]->getType()};                   \
+    ID = Intrinsic::epi_##ID_##_indexed;                                       \
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_8xi1:                                             \
   case RISCV::EPI_BI_##ID_##_4xi1:                                             \

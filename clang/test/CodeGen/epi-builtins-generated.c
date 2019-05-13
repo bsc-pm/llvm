@@ -251,6 +251,130 @@ void test_vload_1xi64_vstore_1xi64(signed long int*  addr, unsigned long gvl)
 }
 
 
+// CHECK-O2-LABEL: @test_vload_strided_8xi8_vstore_strided_8xi8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.vload.strided.v8i8(<vscale x 8 x i8>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v8i8(<vscale x 8 x i8> [[TMP1]], <vscale x 8 x i8>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_8xi8_vstore_strided_8xi8(signed char*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_8xi8 result;
+  result = __builtin_epi_vload_strided_8xi8(addr, stride, gvl);
+  __builtin_epi_vstore_strided_8xi8(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_4xi16_vstore_strided_4xi16(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i16* [[ADDR:%.*]] to <vscale x 4 x i16>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.vload.strided.v4i16(<vscale x 4 x i16>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v4i16(<vscale x 4 x i16> [[TMP1]], <vscale x 4 x i16>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_4xi16_vstore_strided_4xi16(signed short int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_4xi16 result;
+  result = __builtin_epi_vload_strided_4xi16(addr, stride, gvl);
+  __builtin_epi_vstore_strided_4xi16(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_2xi32_vstore_strided_2xi32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i32* [[ADDR:%.*]] to <vscale x 2 x i32>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.vload.strided.v2i32(<vscale x 2 x i32>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v2i32(<vscale x 2 x i32> [[TMP1]], <vscale x 2 x i32>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_2xi32_vstore_strided_2xi32(signed int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_2xi32 result;
+  result = __builtin_epi_vload_strided_2xi32(addr, stride, gvl);
+  __builtin_epi_vstore_strided_2xi32(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_1xi64_vstore_strided_1xi64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i64* [[ADDR:%.*]] to <vscale x 1 x i64>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vload.strided.v1i64(<vscale x 1 x i64>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v1i64(<vscale x 1 x i64> [[TMP1]], <vscale x 1 x i64>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_1xi64_vstore_strided_1xi64(signed long int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_1xi64 result;
+  result = __builtin_epi_vload_strided_1xi64(addr, stride, gvl);
+  __builtin_epi_vstore_strided_1xi64(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_8xi8_vstore_indexed_8xi8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.vload.indexed.v8i8.v8i8(<vscale x 8 x i8>* [[TMP0]], <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v8i8.v8i8(<vscale x 8 x i8> [[TMP1]], <vscale x 8 x i8>* [[TMP0]], <vscale x 8 x i8> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_8xi8_vstore_indexed_8xi8(signed char*  addr, unsigned long gvl)
+{
+  __epi_8xi8 result;
+  __epi_8xi8 index;
+  result = __builtin_epi_vload_indexed_8xi8(addr, index, gvl);
+  __builtin_epi_vstore_indexed_8xi8(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_4xi16_vstore_indexed_4xi16(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i16* [[ADDR:%.*]] to <vscale x 4 x i16>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.vload.indexed.v4i16.v4i16(<vscale x 4 x i16>* [[TMP0]], <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v4i16.v4i16(<vscale x 4 x i16> [[TMP1]], <vscale x 4 x i16>* [[TMP0]], <vscale x 4 x i16> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_4xi16_vstore_indexed_4xi16(signed short int*  addr, unsigned long gvl)
+{
+  __epi_4xi16 result;
+  __epi_4xi16 index;
+  result = __builtin_epi_vload_indexed_4xi16(addr, index, gvl);
+  __builtin_epi_vstore_indexed_4xi16(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_2xi32_vstore_indexed_2xi32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i32* [[ADDR:%.*]] to <vscale x 2 x i32>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.vload.indexed.v2i32.v2i32(<vscale x 2 x i32>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v2i32.v2i32(<vscale x 2 x i32> [[TMP1]], <vscale x 2 x i32>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_2xi32_vstore_indexed_2xi32(signed int*  addr, unsigned long gvl)
+{
+  __epi_2xi32 result;
+  __epi_2xi32 index;
+  result = __builtin_epi_vload_indexed_2xi32(addr, index, gvl);
+  __builtin_epi_vstore_indexed_2xi32(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_1xi64_vstore_indexed_1xi64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i64* [[ADDR:%.*]] to <vscale x 1 x i64>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vload.indexed.v1i64.v1i64(<vscale x 1 x i64>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v1i64.v1i64(<vscale x 1 x i64> [[TMP1]], <vscale x 1 x i64>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_1xi64_vstore_indexed_1xi64(signed long int*  addr, unsigned long gvl)
+{
+  __epi_1xi64 result;
+  __epi_1xi64 index;
+  result = __builtin_epi_vload_indexed_1xi64(addr, index, gvl);
+  __builtin_epi_vstore_indexed_1xi64(addr, result, index, gvl);
+}
+
+
 // CHECK-O2-LABEL: @test_vload_unsigned_8xi8_vstore_unsigned_8xi8(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
@@ -311,6 +435,130 @@ void test_vload_unsigned_1xi64_vstore_unsigned_1xi64(unsigned long int*  addr, u
 }
 
 
+// CHECK-O2-LABEL: @test_vload_strided_unsigned_8xi8_vstore_strided_unsigned_8xi8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.vload.strided.v8i8(<vscale x 8 x i8>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v8i8(<vscale x 8 x i8> [[TMP1]], <vscale x 8 x i8>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_unsigned_8xi8_vstore_strided_unsigned_8xi8(unsigned char*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_8xi8 result;
+  result = __builtin_epi_vload_strided_unsigned_8xi8(addr, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_8xi8(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_unsigned_4xi16_vstore_strided_unsigned_4xi16(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i16* [[ADDR:%.*]] to <vscale x 4 x i16>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.vload.strided.v4i16(<vscale x 4 x i16>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v4i16(<vscale x 4 x i16> [[TMP1]], <vscale x 4 x i16>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_unsigned_4xi16_vstore_strided_unsigned_4xi16(unsigned short int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_4xi16 result;
+  result = __builtin_epi_vload_strided_unsigned_4xi16(addr, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_4xi16(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_unsigned_2xi32_vstore_strided_unsigned_2xi32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i32* [[ADDR:%.*]] to <vscale x 2 x i32>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.vload.strided.v2i32(<vscale x 2 x i32>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v2i32(<vscale x 2 x i32> [[TMP1]], <vscale x 2 x i32>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_unsigned_2xi32_vstore_strided_unsigned_2xi32(unsigned int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_2xi32 result;
+  result = __builtin_epi_vload_strided_unsigned_2xi32(addr, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_2xi32(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_unsigned_1xi64_vstore_strided_unsigned_1xi64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i64* [[ADDR:%.*]] to <vscale x 1 x i64>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vload.strided.v1i64(<vscale x 1 x i64>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v1i64(<vscale x 1 x i64> [[TMP1]], <vscale x 1 x i64>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_unsigned_1xi64_vstore_strided_unsigned_1xi64(unsigned long int*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_1xi64 result;
+  result = __builtin_epi_vload_strided_unsigned_1xi64(addr, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_1xi64(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_unsigned_8xi8_vstore_indexed_unsigned_8xi8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.vload.indexed.v8i8.v8i8(<vscale x 8 x i8>* [[TMP0]], <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v8i8.v8i8(<vscale x 8 x i8> [[TMP1]], <vscale x 8 x i8>* [[TMP0]], <vscale x 8 x i8> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_unsigned_8xi8_vstore_indexed_unsigned_8xi8(unsigned char*  addr, unsigned long gvl)
+{
+  __epi_8xi8 result;
+  __epi_8xi8 index;
+  result = __builtin_epi_vload_indexed_unsigned_8xi8(addr, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_8xi8(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_unsigned_4xi16_vstore_indexed_unsigned_4xi16(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i16* [[ADDR:%.*]] to <vscale x 4 x i16>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.vload.indexed.v4i16.v4i16(<vscale x 4 x i16>* [[TMP0]], <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v4i16.v4i16(<vscale x 4 x i16> [[TMP1]], <vscale x 4 x i16>* [[TMP0]], <vscale x 4 x i16> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_unsigned_4xi16_vstore_indexed_unsigned_4xi16(unsigned short int*  addr, unsigned long gvl)
+{
+  __epi_4xi16 result;
+  __epi_4xi16 index;
+  result = __builtin_epi_vload_indexed_unsigned_4xi16(addr, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_4xi16(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_unsigned_2xi32_vstore_indexed_unsigned_2xi32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i32* [[ADDR:%.*]] to <vscale x 2 x i32>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.vload.indexed.v2i32.v2i32(<vscale x 2 x i32>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v2i32.v2i32(<vscale x 2 x i32> [[TMP1]], <vscale x 2 x i32>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_unsigned_2xi32_vstore_indexed_unsigned_2xi32(unsigned int*  addr, unsigned long gvl)
+{
+  __epi_2xi32 result;
+  __epi_2xi32 index;
+  result = __builtin_epi_vload_indexed_unsigned_2xi32(addr, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_2xi32(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_unsigned_1xi64_vstore_indexed_unsigned_1xi64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i64* [[ADDR:%.*]] to <vscale x 1 x i64>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vload.indexed.v1i64.v1i64(<vscale x 1 x i64>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v1i64.v1i64(<vscale x 1 x i64> [[TMP1]], <vscale x 1 x i64>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_unsigned_1xi64_vstore_indexed_unsigned_1xi64(unsigned long int*  addr, unsigned long gvl)
+{
+  __epi_1xi64 result;
+  __epi_1xi64 index;
+  result = __builtin_epi_vload_indexed_unsigned_1xi64(addr, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_1xi64(addr, result, index, gvl);
+}
+
+
 // CHECK-O2-LABEL: @test_vload_2xf32_vstore_2xf32(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast float* [[ADDR:%.*]] to <vscale x 2 x float>*
@@ -353,6 +601,68 @@ void test_vload_2xf64_vstore_2xf64(double*  addr, unsigned long gvl)
   __epi_2xf64 result;
   result = __builtin_epi_vload_2xf64(addr, gvl);
   __builtin_epi_vstore_2xf64(addr, result, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_2xf32_vstore_strided_2xf32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast float* [[ADDR:%.*]] to <vscale x 2 x float>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x float> @llvm.epi.vload.strided.v2f32(<vscale x 2 x float>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v2f32(<vscale x 2 x float> [[TMP1]], <vscale x 2 x float>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_2xf32_vstore_strided_2xf32(float*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_2xf32 result;
+  result = __builtin_epi_vload_strided_2xf32(addr, stride, gvl);
+  __builtin_epi_vstore_strided_2xf32(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_strided_1xf64_vstore_strided_1xf64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast double* [[ADDR:%.*]] to <vscale x 1 x double>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x double> @llvm.epi.vload.strided.v1f64(<vscale x 1 x double>* [[TMP0]], i64 [[STRIDE:%.*]], i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.strided.v1f64(<vscale x 1 x double> [[TMP1]], <vscale x 1 x double>* [[TMP0]], i64 [[STRIDE]], i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_strided_1xf64_vstore_strided_1xf64(double*  addr, signed long stride, unsigned long gvl)
+{
+  __epi_1xf64 result;
+  result = __builtin_epi_vload_strided_1xf64(addr, stride, gvl);
+  __builtin_epi_vstore_strided_1xf64(addr, result, stride, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_2xf32_vstore_indexed_2xf32(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast float* [[ADDR:%.*]] to <vscale x 2 x float>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 2 x float> @llvm.epi.vload.indexed.v2f32.v2i32(<vscale x 2 x float>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v2f32.v2i32(<vscale x 2 x float> [[TMP1]], <vscale x 2 x float>* [[TMP0]], <vscale x 2 x i32> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_2xf32_vstore_indexed_2xf32(float*  addr, unsigned long gvl)
+{
+  __epi_2xf32 result;
+  __epi_2xi32 index;
+  result = __builtin_epi_vload_indexed_2xf32(addr, index, gvl);
+  __builtin_epi_vstore_indexed_2xf32(addr, result, index, gvl);
+}
+
+
+// CHECK-O2-LABEL: @test_vload_indexed_1xf64_vstore_indexed_1xf64(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast double* [[ADDR:%.*]] to <vscale x 1 x double>*
+// CHECK-O2-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x double> @llvm.epi.vload.indexed.v1f64.v1i64(<vscale x 1 x double>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    tail call void @llvm.epi.vstore.indexed.v1f64.v1i64(<vscale x 1 x double> [[TMP1]], <vscale x 1 x double>* [[TMP0]], <vscale x 1 x i64> undef, i64 [[GVL]])
+// CHECK-O2-NEXT:    ret void
+//
+void test_vload_indexed_1xf64_vstore_indexed_1xf64(double*  addr, unsigned long gvl)
+{
+  __epi_1xf64 result;
+  __epi_1xi64 index;
+  result = __builtin_epi_vload_indexed_1xf64(addr, index, gvl);
+  __builtin_epi_vstore_indexed_1xf64(addr, result, index, gvl);
 }
 
 
