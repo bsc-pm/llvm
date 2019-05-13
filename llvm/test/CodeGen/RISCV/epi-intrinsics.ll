@@ -2,8 +2,8 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+m,+f,+d,+a,+c,+epi -verify-machineinstrs < %s \
 ; RUN:    | FileCheck %s
 
-define void @test_setvl()
-; CHECK-LABEL: test_setvl:
+define void @test_vsetvl()
+; CHECK-LABEL: test_vsetvl:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a0, a0, e8, m1
 ; CHECK-NEXT:    vsetvli a0, a0, e16, m1
@@ -16,18 +16,18 @@ define void @test_setvl()
 ; CHECK-NEXT:    ret
 {
 entry:
-  %a1 = call i64 @llvm.epi.setvl(i64 undef, i64 0, i64 0)
-  %a2 = call i64 @llvm.epi.setvl(i64 undef, i64 1, i64 0)
-  %a3 = call i64 @llvm.epi.setvl(i64 undef, i64 2, i64 0)
-  %a4 = call i64 @llvm.epi.setvl(i64 undef, i64 3, i64 0)
-  %a5 = call i64 @llvm.epi.setvl(i64 undef, i64 4, i64 0)
-  %a6 = call i64 @llvm.epi.setvl(i64 undef, i64 0, i64 1)
-  %a7 = call i64 @llvm.epi.setvl(i64 undef, i64 0, i64 2)
-  %a8 = call i64 @llvm.epi.setvl(i64 undef, i64 0, i64 3)
+  %a1 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 0)
+  %a2 = call i64 @llvm.epi.vsetvl(i64 undef, i64 1, i64 0)
+  %a3 = call i64 @llvm.epi.vsetvl(i64 undef, i64 2, i64 0)
+  %a4 = call i64 @llvm.epi.vsetvl(i64 undef, i64 3, i64 0)
+  %a5 = call i64 @llvm.epi.vsetvl(i64 undef, i64 4, i64 0)
+  %a6 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 1)
+  %a7 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 2)
+  %a8 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 3)
   ret void
 }
 
-declare i64 @llvm.epi.setvl(i64, i64, i64)
+declare i64 @llvm.epi.vsetvl(i64, i64, i64)
 
 define i64 @test_vl()
 ; CHECK-LABEL: test_vl:
@@ -35,11 +35,11 @@ define i64 @test_vl()
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    ret
 {
-  %a = call i64 @llvm.epi.readvl()
+  %a = call i64 @llvm.epi.vreadvl()
   ret i64 %a
 }
 
-declare i64 @llvm.epi.readvl()
+declare i64 @llvm.epi.vreadvl()
 
 
 define void @test_load_stores()
