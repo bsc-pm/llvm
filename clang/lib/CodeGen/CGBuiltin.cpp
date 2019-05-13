@@ -13164,10 +13164,10 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_MEM_STORE(vstore)
 
   case RISCV::EPI_BI_vreadvl:
-    ID = Intrinsic::epi_readvl;
+    ID = Intrinsic::epi_vreadvl;
     break;
   case RISCV::EPI_BI_vsetvl:
-    ID = Intrinsic::epi_setvl;
+    ID = Intrinsic::epi_vsetvl;
     break;
   }
 
