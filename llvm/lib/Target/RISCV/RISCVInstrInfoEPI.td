@@ -137,6 +137,26 @@ multiclass binary_arithmetic_integer_n_i<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${imm5}, ${vm}">;
 }
 
+multiclass binary_arithmetic_integer_n_u<string opcodestr, bits<6> funct6,
+  string destoperandkind> {
+
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask_all_lanes.Value,
+      Uses = [VL, VTYPE] in
+  def U : RVInstEPIOPV_IVI<funct6,
+             (outs EPIVR:$rd),
+             (ins EPIVR:$rs2, uimm5:$imm5),
+             opcodestr # "." # destoperandkind # "i",
+             "${rd}, ${rs2}, ${imm5}">;
+
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
+      Uses = [VL, VTYPE, V0] in
+  def U_MASK : RVInstEPIOPV_IVI<funct6,
+             (outs EPIVR:$rd),
+             (ins EPIVR:$rs2, uimm5:$imm5, vectormask:$vm),
+             opcodestr # "." # destoperandkind # "i",
+             "${rd}, ${rs2}, ${imm5}, ${vm}">;
+}
+
 multiclass binary_arithmetic_integer_n_s<string opcodestr, bits<6> funct6,
   string destoperandkind> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask_all_lanes.Value,
@@ -174,6 +194,11 @@ multiclass binary_arithmetic_integer_vx<string opcodestr, bits<6> funct6> {
 multiclass binary_arithmetic_integer_xi<string opcodestr, bits<6> funct6> {
   defm _V : binary_arithmetic_integer_n_x<opcodestr, funct6, "v">;
   defm _V : binary_arithmetic_integer_n_i<opcodestr, funct6, "v">;
+}
+
+multiclass binary_arithmetic_integer_xu<string opcodestr, bits<6> funct6> {
+  defm _V : binary_arithmetic_integer_n_x<opcodestr, funct6, "v">;
+  defm _V : binary_arithmetic_integer_n_u<opcodestr, funct6, "v">;
 }
 
 multiclass binary_arithmetic_integer_v<string opcodestr, bits<6> funct6> {
@@ -677,8 +702,8 @@ defm VXOR  : binary_arithmetic_integer_vxi<"vxor", 0b001011>;
 
 defm VRGATHER : binary_arithmetic_integer_vxi<"vrgather", 0b001100>;
 
-defm VSLIDEUP   : binary_arithmetic_integer_xi<"vslideup", 0b001110>;
-defm VSLIDEDOWN : binary_arithmetic_integer_xi<"vslidedown", 0b001111>;
+defm VSLIDEUP   : binary_arithmetic_integer_xu<"vslideup", 0b001110>;
+defm VSLIDEDOWN : binary_arithmetic_integer_xu<"vslidedown", 0b001111>;
 
 defm VADC : binary_arithmetic_integer_vxi_mask_in<"vadc", 0b010000>;
 defm VSBC : binary_arithmetic_integer_vx_mask_in<"vsbc", 0b010010>;
@@ -691,7 +716,7 @@ defm VSLTU  : binary_arithmetic_integer_vx<"vsltu",  0b011010>;
 defm VSLT   : binary_arithmetic_integer_vx<"vslt",   0b011011>;
 defm VSLEU  : binary_arithmetic_integer_vxi<"vsleu", 0b011100>;
 defm VSLE   : binary_arithmetic_integer_vxi<"vsle",  0b011101>;
-defm VSGTU  : binary_arithmetic_integer_xi<"vsgtu",  0b011110>;
+defm VSGTU  : binary_arithmetic_integer_xu<"vsgtu",  0b011110>;
 defm VSGT   : binary_arithmetic_integer_xi<"vsgt",   0b011111>;
 
 defm VSADDU : binary_arithmetic_integer_vxi<"vsaddu", 0b100000>;
@@ -1321,6 +1346,18 @@ multiclass pseudo_binary_relational_int_m_xi {
   }
 }
 
+multiclass pseudo_binary_relational_int_m_xu {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs.Values in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VX : pseudo_binary<EPIVR, evr, GPR>;
+      defm _VU : pseudo_binary<EPIVR, evr, uimm5>; // FIXME how can this work? uimm5 is not a RegisterClass but an Operand
+    }
+  }
+}
+
 multiclass pseudo_binary_relational_int_m_vxi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
@@ -1414,105 +1451,120 @@ multiclass pseudo_binary_relational_float_m_vf {
   }
 }
 
+multiclass pseudo_binary_arithmetic_any_and_int_v_xu {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs.Values in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VX : pseudo_binary<evr, evr, GPR>;
+      defm _VU : pseudo_binary<evr, evr, uimm5>; // FIXME how can this work? uimm5 is not a RegisterClass but an Operand
+    }
+  }
+}
+
 let Predicates = [HasExtEPI] in {
 
-defm PseudoVADD      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSUB      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVRSUB     : pseudo_binary_arithmetic_int_v_xi;
-defm PseudoVMINU     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMIN      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMAXU     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMAX      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVAND      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVOR       : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVXOR      : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVADD       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSUB       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVRSUB      : pseudo_binary_arithmetic_int_v_xi;
+defm PseudoVMINU      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMIN       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMAXU      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMAX       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVAND       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVOR        : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVXOR       : pseudo_binary_arithmetic_int_v_vxi;
 
-defm PseudoVSEQ      : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSNE      : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSLTU     : pseudo_binary_relational_int_m_vx;
-defm PseudoVSLT      : pseudo_binary_relational_int_m_vx;
-defm PseudoVSLEU     : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSLE      : pseudo_binary_relational_int_m_vxi;
+defm PseudoVSLIDEUP   : pseudo_binary_arithmetic_any_and_int_v_xu;
+defm PseudoVSLIDEDOWN : pseudo_binary_arithmetic_any_and_int_v_xu;
 
-defm PseudoVSGTU     : pseudo_binary_relational_int_m_xi;
-defm PseudoVSGT      : pseudo_binary_relational_int_m_xi;
+defm PseudoVSEQ       : pseudo_binary_relational_int_m_vxi;
+defm PseudoVSNE       : pseudo_binary_relational_int_m_vxi;
+defm PseudoVSLTU      : pseudo_binary_relational_int_m_vx;
+defm PseudoVSLT       : pseudo_binary_relational_int_m_vx;
+defm PseudoVSLEU      : pseudo_binary_relational_int_m_vxi;
+defm PseudoVSLE       : pseudo_binary_relational_int_m_vxi;
 
-defm PseudoVSADDU    : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSADD     : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSUBU    : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSSUB     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVAADD     : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSLL      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVASUB     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSMUL     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSRL      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSRA      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSRL     : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSRA     : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSGTU      : pseudo_binary_relational_int_m_xu;
+defm PseudoVSGT       : pseudo_binary_relational_int_m_xi;
 
-defm PseudoVMERGE    : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSADDU     : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSADD      : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSSUBU     : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVSSUB      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVAADD      : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSLL       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVASUB      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVSMUL      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVSRL       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSRA       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSSRL      : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSSRA      : pseudo_binary_arithmetic_int_v_vxi;
 
-defm PseudoVDOTU     : pseudo_binary_arithmetic_int_v_v;
-defm PseudoVDOT      : pseudo_binary_arithmetic_int_v_v;
+defm PseudoVMERGE     : pseudo_binary_arithmetic_int_v_vxi;
 
-defm PseudoVREDSUM   : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDAND   : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDOR    : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDXOR   : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMINU  : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMIN   : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMAXU  : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMAX   : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVDOTU      : pseudo_binary_arithmetic_int_v_v;
+defm PseudoVDOT       : pseudo_binary_arithmetic_int_v_v;
 
-defm PseudoVDIVU     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVDIV      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVREMU     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVREM      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULHU    : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMUL      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULHSU   : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULH     : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVREDSUM    : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDAND    : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDOR     : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDXOR    : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDMINU   : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDMIN    : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDMAXU   : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDMAX    : pseudo_binary_arithmetic_int_v_s;
 
-defm PseudoVWADDU    : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWADD     : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWSUBU    : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWSUB     : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVDIVU      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVDIV       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVREMU      : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVREM       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMULHU     : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMUL       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMULHSU    : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVMULH      : pseudo_binary_arithmetic_int_v_vx;
 
-defm PseudoVWMULU    : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWMULSU   : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWMUL     : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWADDU     : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWADD      : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWSUBU     : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWSUB      : pseudo_binary_arithmetic_int_w_vx;
 
-defm PseudoVFADD     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDSUM  : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFSUB     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDOSUM : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFMIN     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDMIN  : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFMAX     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDMAX  : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFSGNJ    : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFSGNJN   : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFSGNJX   : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVWMULU     : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWMULSU    : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWMUL      : pseudo_binary_arithmetic_int_w_vx;
 
-defm PseudoVFEQ      : pseudo_binary_relational_float_m_vf;
-defm PseudoVFLE      : pseudo_binary_relational_float_m_vf;
-defm PseudoVFORD     : pseudo_binary_relational_float_m_vf;
-defm PseudoVFLT      : pseudo_binary_relational_float_m_vf;
-defm PseudoVFNE      : pseudo_binary_relational_float_m_vf;
+defm PseudoVFADD      : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFREDSUM   : pseudo_binary_arithmetic_float_v_s;
+defm PseudoVFSUB      : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFREDOSUM  : pseudo_binary_arithmetic_float_v_s;
+defm PseudoVFMIN      : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFREDMIN   : pseudo_binary_arithmetic_float_v_s;
+defm PseudoVFMAX      : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFREDMAX   : pseudo_binary_arithmetic_float_v_s;
+defm PseudoVFSGNJ     : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFSGNJN    : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFSGNJX    : pseudo_binary_arithmetic_float_v_vf;
 
-defm PseudoVFGT      : pseudo_binary_relational_float_m_f;
-defm PseudoVFGE      : pseudo_binary_relational_float_m_f;
+defm PseudoVFEQ       : pseudo_binary_relational_float_m_vf;
+defm PseudoVFLE       : pseudo_binary_relational_float_m_vf;
+defm PseudoVFORD      : pseudo_binary_relational_float_m_vf;
+defm PseudoVFLT       : pseudo_binary_relational_float_m_vf;
+defm PseudoVFNE       : pseudo_binary_relational_float_m_vf;
 
-defm PseudoVFDIV     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFRDIV    : pseudo_binary_arithmetic_float_v_f;
-defm PseudoVFMUL     : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFGT       : pseudo_binary_relational_float_m_f;
+defm PseudoVFGE       : pseudo_binary_relational_float_m_f;
 
-defm PseudoVFMERGE   : pseudo_binary_arithmetic_float_v_f;
+defm PseudoVFDIV      : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFRDIV     : pseudo_binary_arithmetic_float_v_f;
+defm PseudoVFMUL      : pseudo_binary_arithmetic_float_v_vf;
 
-defm PseudoVFWADD    : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFWSUB    : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFWMUL    : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFDOT     : pseudo_binary_arithmetic_float_v_v;
+defm PseudoVFMERGE    : pseudo_binary_arithmetic_float_v_f;
+
+defm PseudoVFWADD     : pseudo_binary_arithmetic_float_w_vf;
+defm PseudoVFWSUB     : pseudo_binary_arithmetic_float_w_vf;
+defm PseudoVFWMUL     : pseudo_binary_arithmetic_float_w_vf;
+defm PseudoVFDOT      : pseudo_binary_arithmetic_float_v_v;
 
 // Load/store pseudo instructions
 
@@ -1845,6 +1897,20 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
                                 vti.SEW, vti.RegClass, simm5>;
+  }
+}
+
+multiclass pat_intrinsic_binary_relational_int_m_vx_vu<string intrinsic_name,
+                                                       string instruction_name>
+{
+  foreach vti = AllIntegerVectors.Values
+  in {
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
+                                vti.Mask, vti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass, GPR>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VU",
+                                vti.Mask, vti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass, uimm5>;
   }
 }
 
@@ -2264,12 +2330,19 @@ multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
 //  defm : pat_intrinsic_binary_any_and_int_vi<intrinsic_name, instruction_name>;
 //}
 
-//multiclass pat_intrinsic_binary_any_and_int_vx_vi<string intrinsic_name,
-//                                    string instruction_name>
-//{
-//  defm : pat_intrinsic_binary_any_and_int_vx<intrinsic_name, instruction_name>;
-//  defm : pat_intrinsic_binary_any_and_int_vi<intrinsic_name, instruction_name>;
-//}
+multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
+                                                    string instruction_name>
+{
+  foreach vti = AllVectors.Values
+  in {
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
+                                vti.Vector, vti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass, GPR>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VU",
+                                vti.Vector, vti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass, uimm5>;
+  }
+}
 
 
 //class ValueTypePair<ValueType ty1, ValueType ty2>
@@ -2359,10 +2432,9 @@ defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vand", "PseudoVAND">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vor", "PseudoVOR">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vxor", "PseudoVXOR">;
 
-//// These pattern are missing floats
 //defm "" : pat_intrinsic_binary_any_and_int_vv_vx_vi<"int_epi_vrgather", "VRGATHER">;
-//defm "" : pat_intrinsic_binary_any_and_int_vx_vi<"int_epi_vslideup", "VSLIDEUP">;
-//defm "" : pat_intrinsic_binary_any_and_int_vx_vi<"int_epi_vslidedown", "VSLIDEDOWN">;
+defm "" : pat_intrinsic_binary_any_and_int_v_vx_vu<"int_epi_vslideup", "PseudoVSLIDEUP">;
+defm "" : pat_intrinsic_binary_any_and_int_v_vx_vu<"int_epi_vslidedown", "PseudoVSLIDEDOWN">;
 
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_vi_nomask<"int_epi_vadc", "VADC">;
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_nomask<"int_epi_vsbc", "VSBC">;
@@ -2374,7 +2446,7 @@ defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vslt", "PseudoVSL
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsleu", "PseudoVSLEU">;
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsle", "PseudoVSLE">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgtu", "PseudoVSGTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vsgtu", "PseudoVSGTU">;
 defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVSGT">;
 //foreach vtp = AllIntegerVectors.Values in {
 //   def : Pat<(nxv1i1 (int_epi_vsgtu (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
