@@ -338,7 +338,7 @@ class InstrDesc:
 
             for (value, field) in encoding.defined_fields:
                 if isinstance(field, Immediate):
-                    field_render.append("imm[{}:0]".format(field.size - 1))
+                    field_render.append("{}[{}:0]".format(value, field.size - 1))
                 else:
                     field_render.append(str(value))
 

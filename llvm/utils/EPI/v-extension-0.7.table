@@ -26,9 +26,9 @@ VRGATHER.VV|vd,vs2,vs1,vm|001100|vm|vs2|vs1|000|vd|1010111
 VRGATHER.VX|vd,vs2,rs1,vm|001100|vm|vs2|rs1|100|vd|1010111
 VRGATHER.VI|vd,vs2,imm,vm|001100|vm|vs2|imm[4:0]|011|vd|1010111
 VSLIDEUP.VX|vd,vs2,rs1,vm|001110|vm|vs2|rs1|100|vd|1010111
-VSLIDEUP.VI|vd,vs2,uimm,vm|001110|vm|vs2|imm[4:0]|011|vd|1010111
+VSLIDEUP.VI|vd,vs2,uimm,vm|001110|vm|vs2|uimm[4:0]|011|vd|1010111
 VSLIDEDOWN.VX|vd,vs2,rs1,vm|001111|vm|vs2|rs1|100|vd|1010111
-VSLIDEDOWN.VI|vd,vs2,uimm,vm|001111|vm|vs2|imm[4:0]|011|vd|1010111
+VSLIDEDOWN.VI|vd,vs2,uimm,vm|001111|vm|vs2|uimm[4:0]|011|vd|1010111
 VADC.VV|vd,vs2,vs1|010000|1|vs2|vs1|000|vd|1010111
 VADC.VX|vd,vs2,rs1|010000|1|vs2|rs1|100|vd|1010111
 VADC.VI|vd,vs2,imm|010000|1|vs2|imm[4:0]|011|vd|1010111
@@ -54,7 +54,7 @@ VSLE.VV|vd,vs2,vs1,vm|011101|vm|vs2|vs1|000|vd|1010111
 VSLE.VX|vd,vs2,rs1,vm|011101|vm|vs2|rs1|100|vd|1010111
 VSLE.VI|vd,vs2,imm,vm|011101|vm|vs2|imm[4:0]|011|vd|1010111
 VSGTU.VX|vd,vs2,rs1,vm|011110|vm|vs2|rs1|100|vd|1010111
-VSGTU.VI|vd,vs2,imm,vm|011110|vm|vs2|imm[4:0]|011|vd|1010111
+VSGTU.VI|vd,vs2,uimm,vm|011110|vm|vs2|uimm[4:0]|011|vd|1010111
 VSGT.VX|vd,vs2,rs1,vm|011111|vm|vs2|rs1|100|vd|1010111
 VSGT.VI|vd,vs2,imm,vm|011111|vm|vs2|imm[4:0]|011|vd|1010111
 VSADDU.VV|vd,vs2,vs1,vm|100000|vm|vs2|vs1|000|vd|1010111

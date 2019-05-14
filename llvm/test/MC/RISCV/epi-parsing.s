@@ -271,10 +271,10 @@ vsgtu.vx v23, v22, s7
 # CHECK: vsgtu.vx v25, v24, s9, v0.t
 vsgtu.vx v25, v24, s9, v0.t
 
-# CHECK: vsgtu.vi v27, v26, -5
-vsgtu.vi v27, v26, -5
-# CHECK: vsgtu.vi v29, v28, -4, v0.t
-vsgtu.vi v29, v28, -4, v0.t
+# CHECK: vsgtu.vi v27, v26, 27
+vsgtu.vi v27, v26, 27
+# CHECK: vsgtu.vi v29, v28, 28, v0.t
+vsgtu.vi v29, v28, 28, v0.t
 
 # CHECK: vsgt.vx v31, v30, s11
 vsgt.vx v31, v30, s11

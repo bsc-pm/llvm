@@ -37,8 +37,9 @@ class VectorMask(Field):
         return "vm"
 
 class SlicedImmediate(Field):
-    def __init__(self, upper, lower):
+    def __init__(self, unsigned, upper, lower):
         assert(upper > lower)
+        self.unsigned = unsigned
         self._upper = upper
         self._lower = lower
         self.num_bits = upper - lower + 1
@@ -55,9 +56,17 @@ class SlicedImmediate(Field):
     @staticmethod
     def make(text):
         # imm[upper:lower]
+        # simm[upper:lower]
+        # uimm[upper:lower]
+        unsigned = False
+        if text[0] == 's':
+            text = text[1:]
+        elif text[0] == 'u':
+            text = text[1:]
+            unsigned = True
         t = text[4:][:-1].split(":")
         assert(len(t) == 2)
-        return SlicedImmediate(int(t[0]), int(t[1]))
+        return SlicedImmediate(unsigned, int(t[0]), int(t[1]))
 
     def __str__(self):
         return "imm[{}:{}]".format(self._upper, self._lower)
@@ -156,7 +165,7 @@ class InstructionParser:
     GPR = re.compile("^(rs[0-9]+)|(rd)$")
     FPR = re.compile("^(fs[0-9]+)|(fd)$")
     VR = re.compile("^(vs[0-9]+)|(vd)$")
-    IMM = re.compile("^imm\[[0-9]+:[0-9]+\]$")
+    IMM = re.compile("^[us]?imm\[[0-9]+:[0-9]+\]$")
     MASK = re.compile("^vm$")
 
     def __init__(self):
@@ -376,9 +385,12 @@ def generate_instruction_tests(i):
             if immediate is None:
                 op_idx = operand_index(f)
                 immediate = (op_idx, f)
-                def capture_ins(i):
-                    return lambda : Context.get_next_simm(i.immediate_width())
-                ops_generator.append((op_idx, capture_ins(i)))
+                def capture_ins_simm(i, get_imm):
+                    return lambda : get_imm(i.immediate_width())
+                if f.unsigned:
+                    ops_generator.append((op_idx, capture_ins_simm(i, Context.get_next_uimm)))
+                else:
+                    ops_generator.append((op_idx, capture_ins_simm(i, Context.get_next_simm)))
         elif isinstance(f, Register):
             op_idx = operand_index(f)
             if f.direction == Register.OUT:

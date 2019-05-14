@@ -87,7 +87,7 @@ vsle.vv vd, vs2, vs1, vm
 vsle.vx vd, vs2, rs1, vm
 vsle.vi vd, vs2, imm, vm
 vsgtu.vx vd, vs2, rs1, vm
-vsgtu.vi vd, vs2, imm, vm
+vsgtu.vi vd, vs2, uimm, vm
 vsgt.vx vd, vs2, rs1, vm
 vsgt.vi vd, vs2, imm, vm
 vminu.vv vd, vs2, vs1, vm
