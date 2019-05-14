@@ -545,7 +545,8 @@ multiclass unary_arithmetic_float_v<string opcodestr, bits<6> funct6,
 multiclass vector_store_unit_stride_width<string opcodestr, bits<3> width>
 {
   let nf=0b000, rs2 = 0b00000, width = width,
-      mayStore = 1, mayLoad = 0, hasSideEffects = 0 in {
+      mayStore = 1, mayLoad = 0, hasSideEffects = 0,
+      Uses = [VL, VTYPE] in {
     let vm = vmask_all_lanes.Value in
     def _V : RVInstStore<0b000,
                (outs),
@@ -553,6 +554,7 @@ multiclass vector_store_unit_stride_width<string opcodestr, bits<3> width>
                opcodestr # ".v",
                "${rd}, (${rs1})">;
 
+    let Uses = [VL, VTYPE, V0] in
     def _V_MASK : RVInstStore<0b000,
                     (outs),
                     (ins EPIVR:$rd, GPR:$rs1, vectormask:$vm),
@@ -573,7 +575,8 @@ multiclass vector_store_nonunit_stride_width<string opcodestr, bits<3> mop,
                                              RegisterClass rc, bits<3> width>
 {
   let nf=0b000, width = width,
-      mayStore = 1, mayLoad = 0, hasSideEffects = 0 in {
+      mayStore = 1, mayLoad = 0, hasSideEffects = 0,
+      Uses = [VL, VTYPE] in {
     let vm = vmask_all_lanes.Value in
     def _V : RVInstStore<mop,
                (outs),
@@ -581,6 +584,7 @@ multiclass vector_store_nonunit_stride_width<string opcodestr, bits<3> mop,
                opcodestr # ".v",
                "${rd}, (${rs1}), ${rs2}">;
 
+    let Uses = [VL, VTYPE, V0] in
     def _V_MASK : RVInstStore<mop,
                     (outs),
                     (ins EPIVR:$rd, GPR:$rs1, rc:$rs2, vectormask:$vm),
@@ -609,7 +613,8 @@ multiclass vector_load_unit_stride_width_sign<string opcodestr, bits<1> sign,
                                               bits<3> width>
 {
   let nf=0b000, rs2 = 0b00000, width = width,
-      mayStore = 0, mayLoad = 1, hasSideEffects = 0 in {
+      mayStore = 0, mayLoad = 1, hasSideEffects = 0,
+      Uses = [VL, VTYPE] in {
     let vm = vmask_all_lanes.Value in
     def _V : RVInstLoad<{sign, 0b00},
                (outs EPIVR:$rd),
@@ -617,6 +622,7 @@ multiclass vector_load_unit_stride_width_sign<string opcodestr, bits<1> sign,
                opcodestr # ".v",
                "${rd}, (${rs1})">;
 
+    let Uses = [VL, VTYPE, V0] in
     def _V_MASK : RVInstLoad<{sign, 0b00},
                     (outs EPIVR:$rd),
                     (ins GPR:$rs1, vectormask:$vm),
@@ -643,7 +649,8 @@ multiclass vector_load_nonunit_stride_width_sign<string opcodestr, bits<1> sign,
                                       bits<3> width>
 {
   let nf=0b000, width = width,
-      mayStore = 0, mayLoad = 1, hasSideEffects = 0 in {
+      mayStore = 0, mayLoad = 1, hasSideEffects = 0,
+      Uses = [VL, VTYPE] in {
     let vm = vmask_all_lanes.Value in
     def _V : RVInstLoad<{sign, mop},
                (outs EPIVR:$rd),
@@ -651,6 +658,7 @@ multiclass vector_load_nonunit_stride_width_sign<string opcodestr, bits<1> sign,
                opcodestr # ".v",
                "${rd}, (${rs1}), ${rs2}">;
 
+    let Uses = [VL, VTYPE, V0] in
     def _V_MASK : RVInstLoad<{sign, mop},
                     (outs EPIVR:$rd),
                     (ins GPR:$rs1, rc:$rs2, vectormask:$vm),
