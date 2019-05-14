@@ -1127,12 +1127,12 @@ intrinsics = [
 
         #BinaryIntrinsic("vcompress", type_generator = generate_binary_any_and_mask_types, variants = vm, mask = False),
 
-        #BinaryIntrinsic("vrgather", type_generator = generate_binary_any_and_integer_types, variants = vv_vx_vi),
+        BinaryIntrinsic("vrgather", type_generator = generate_binary_any_and_integer_types, variants = vv_vx_vi),
 
         BinaryIntrinsic("vslideup", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
         BinaryIntrinsic("vslidedown", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
-        #BinaryIntrinsic("vslide1up", type_generator = generate_binary_any_and_integer_types, variants = vx),
-        #BinaryIntrinsic("vslide1down", type_generator = generate_binary_any_and_integer_types, variants = vx),
+        BinaryIntrinsic("vslide1up", type_generator = generate_binary_any_and_integer_types, variants = vx),
+        BinaryIntrinsic("vslide1down", type_generator = generate_binary_any_and_integer_types, variants = vx),
 
         #TernaryIntrinsicSwap("vadc", type_generator = generate_ternary_integer_types, variants = vv_vx_vi, mask = False),
         #TernaryIntrinsicSwap("vsbc", type_generator = generate_ternary_integer_types, variants = vv_vx, mask = False),
