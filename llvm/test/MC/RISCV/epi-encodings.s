@@ -486,13 +486,13 @@ vsgtu.vx v23, v22, s7
 vsgtu.vx v25, v24, s9, v0.t
 
 # Encoding: |011110|1|11010|11011|011|11011|1010111|
-# CHECK: vsgtu.vi v27, v26, -5
+# CHECK: vsgtu.vi v27, v26, 27
 # CHECK-SAME: [0xd7,0xbd,0xad,0x7b]
-vsgtu.vi v27, v26, -5
+vsgtu.vi v27, v26, 27
 # Encoding: |011110|0|11100|11100|011|11101|1010111|
-# CHECK: vsgtu.vi v29, v28, -4, v0.t
+# CHECK: vsgtu.vi v29, v28, 28, v0.t
 # CHECK-SAME: [0xd7,0x3e,0xce,0x79]
-vsgtu.vi v29, v28, -4, v0.t
+vsgtu.vi v29, v28, 28, v0.t
 
 # Encoding: |011111|1|11110|11011|100|11111|1010111|
 # CHECK: vsgt.vx v31, v30, s11
