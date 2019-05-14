@@ -13,11 +13,16 @@ MAX_VLMUL = 8
 MAX_SEW = 64
 
 class SingleType(object):
-    def __init__(self, value_type, llvm_type, sew, is_mask_type):
+    def __init__(self, value_type, llvm_type, sew, is_mask_type, corr_integer_type = None):
         self.value_type = value_type
         self.llvm_type = llvm_type
         self.sew = sew
         self.is_mask_type = is_mask_type
+        # Corresponding integer type (ie. integer type with same SEW)
+        self.corr_integer_type = corr_integer_type
+
+        if self.corr_integer_type is None:
+            self.corr_integer_type = self
 
     def get_base_scale(self):
         return (MAX_SEW/self.sew)
@@ -90,8 +95,8 @@ def generate_ternary_integer_types_widened():
         yield IntrinsicType(integer_types[i + 1], \
                 [integer_types[i]] * 3)
 
-float_type_f32 = SingleType("f32", "float", 32, False)
-float_type_f64 = SingleType("f64", "double", 64, False)
+float_type_f32 = SingleType("f32", "float", 32, False, integer_type_i32)
+float_type_f64 = SingleType("f64", "double", 64, False, integer_type_i64)
 
 float_types = [
         float_type_f32,
@@ -156,9 +161,8 @@ def generate_binary_any_and_mask_types():
 
 def generate_binary_any_and_integer_types():
     for x in integer_types + float_types:
-        for i in integer_types:
-            assert(len(mask_types) == 1)
-            yield IntrinsicType(x, [x, i])
+        assert(len(mask_types) == 1)
+        yield IntrinsicType(x, [x, x.corr_integer_type])
 
 def generate_same_size_float_to_integer_types():
     yield IntrinsicType(integer_type_i32, [float_type_f32])
@@ -1125,8 +1129,8 @@ intrinsics = [
 
         #BinaryIntrinsic("vrgather", type_generator = generate_binary_any_and_integer_types, variants = vv_vx_vi),
 
-        #BinaryIntrinsic("vslideup", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
-        #BinaryIntrinsic("vslidedown", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
+        BinaryIntrinsic("vslideup", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
+        BinaryIntrinsic("vslidedown", type_generator = generate_binary_any_and_integer_types, variants = vx_vi),
         #BinaryIntrinsic("vslide1up", type_generator = generate_binary_any_and_integer_types, variants = vx),
         #BinaryIntrinsic("vslide1down", type_generator = generate_binary_any_and_integer_types, variants = vx),
 
