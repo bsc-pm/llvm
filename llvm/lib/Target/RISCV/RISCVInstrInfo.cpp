@@ -136,9 +136,40 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
   // EPIVR->EPIVR
   if (RISCV::EPIVRRegClass.contains(DstReg, SrcReg)) {
+    // readvl t0
+    // readvtype t1
+    // vsetvli x0, x0, ELEN, VLMUL
+    // vadd.vi dest, src, 0
+    // vsetvl x0, t0, t1
+    RegScavenger RS;
+
+    RS.enterBasicBlock(MBB);
+    RS.forward(*MBBI);
+
+    BitVector Available = RS.getRegsAvailable(&RISCV::GPRRegClass);
+    int Idx = Available.find_first();
+    if (Idx == -1)
+      report_fatal_error("We could not scavenge a register for VTYPE");
+    unsigned OldVTypeReg = Idx;
+    Idx = Available.find_next(Idx);
+    if (Idx == -1)
+      report_fatal_error("We could not scavenge a register for VL");
+    unsigned OldVLReg = Idx;
+
+    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVTYPE), OldVTypeReg);
+    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVL), OldVLReg);
+    BuildMI(MBB, MBBI, DL, get(RISCV::VSETVLI), RISCV::X0)
+        .addReg(RISCV::X0)
+        // FIXME - Hardcoded to SEW=64
+        .addImm(3)
+        .addImm(0); // VLMUL=1
+    // FIXME: Change this to vmerge.vv vdest, v0, vsrc (aka vmv.vv vdest, vsrc)
     BuildMI(MBB, MBBI, DL, get(RISCV::VADD_VI), DstReg)
         .addReg(SrcReg, getKillRegState(KillSrc))
         .addImm(0);
+    BuildMI(MBB, MBBI, DL, get(RISCV::VSETVL), RISCV::X0)
+        .addReg(OldVLReg)
+        .addReg(OldVTypeReg);
     return;
   }
 
