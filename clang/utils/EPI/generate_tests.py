@@ -182,10 +182,11 @@ ${store_decl}
 void test_${intrinsic}(unsigned long gvl)
 {
   ${c_result_type} result;
+  ${c_merge_type} merge;
   ${c_lhs_type} lhs;
   ${c_rhs_type} rhs;
   ${c_mask_type} mask;
-  result = __builtin_epi_${intrinsic}(lhs, rhs, mask, gvl);
+  result = __builtin_epi_${intrinsic}(merge, lhs, rhs, mask, gvl);
   ${store_stmt}
 }
 """
@@ -197,9 +198,10 @@ void test_${intrinsic}(unsigned long gvl)
         subs = {}
         subs["intrinsic"] = builtin_name
         subs["c_result_type"] = TypeRender(return_type).render()
-        subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
-        subs["c_rhs_type"] = TypeRender(argument_types[1]).render()
-        subs["c_mask_type"] = TypeRender(argument_types[2]).render()
+        subs["c_merge_type"] = TypeRender(argument_types[0]).render()
+        subs["c_lhs_type"] = TypeRender(argument_types[1]).render()
+        subs["c_rhs_type"] = TypeRender(argument_types[2]).render()
+        subs["c_mask_type"] = TypeRender(argument_types[3]).render()
         (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
 
         return string.Template(BinaryMaskTemplate.TEMPLATE).substitute(subs)
