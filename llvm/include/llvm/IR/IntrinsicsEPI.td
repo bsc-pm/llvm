@@ -31,8 +31,8 @@ def llvm_ptr_f64_ty : LLVMPointerType<llvm_double_ty>;
 
 class EPIIntrinsic {
   // These intrinsics may accept illegal integer values in their llvm_any_ty
-  // operand, so they have to be extended. If set to all zeros then the
-  // intrinsic does not have any operand that must be extended.
+  // operand, so they have to be extended. If set to zero then the intrinsic
+  // does not have any operand that must be extended.
   Intrinsic IntrinsicID = !cast<Intrinsic>(NAME);
   bits<4> ExtendOperand = 0;
 }
@@ -55,10 +55,11 @@ class EPIBinary : Intrinsic< [ llvm_anyvector_ty ],
   let ExtendOperand = 2;
 }
 class EPIBinaryMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ LLVMMatchType<0>, llvm_any_ty, llvm_anyvector_ty, llvm_i64_ty ],
+                      [ LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
+                        llvm_anyvector_ty, llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
-  let ExtendOperand = 2;
+  let ExtendOperand = 3;
 }
 multiclass epi_binary {
   def "int_epi_" # NAME : EPIBinary;
@@ -75,10 +76,11 @@ class EPIBinaryWide : Intrinsic< [ llvm_anyvector_ty ],
   let ExtendOperand = 2;
 }
 class EPIBinaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_anyvector_ty, llvm_any_ty, llvm_anyvector_ty, llvm_i64_ty ],
+                      [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
+                        llvm_anyvector_ty, llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
-  let ExtendOperand = 2;
+  let ExtendOperand = 3;
 }
 multiclass epi_binary_wide {
   def "int_epi_" # NAME : EPIBinaryWide;
@@ -92,10 +94,11 @@ class EPIBinaryRelational : Intrinsic< [ llvm_anyvector_ty ],
   let ExtendOperand = 2;
 }
 class EPIBinaryRelationalMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_anyvector_ty, llvm_any_ty, LLVMMatchType<0>, llvm_i64_ty ],
+                      [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
+                        LLVMMatchType<0>, llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
-  let ExtendOperand = 2;
+  let ExtendOperand = 3;
 }
 multiclass epi_relational {
   def "int_epi_" # NAME : EPIBinaryRelational;
@@ -108,7 +111,6 @@ class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
 {
   let ExtendOperand = 1;
 }
-let ExtendOperand = 1 in
 class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_any_ty, llvm_anyvector_ty, llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
@@ -435,15 +437,18 @@ multiclass epi_load {
                                     llvm_anyvector_ty, llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_mask"         : Intrinsic<[ llvm_anyvector_ty ],
-                                  [ LLVMPointerType<LLVMMatchType<0>>,
+                                  [ LLVMMatchType<0>,
+                                    LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_epi_i1_ty, llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_strided_mask" : Intrinsic<[ llvm_anyvector_ty ],
-                                  [ LLVMPointerType<LLVMMatchType<0>>,
+                                  [ LLVMMatchType<0>,
+                                    LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_i64_ty, llvm_epi_i1_ty, llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;
   def "_indexed_mask" : Intrinsic<[ llvm_anyvector_ty ],
-                                  [ LLVMPointerType<LLVMMatchType<0>>,
+                                  [ LLVMMatchType<0>,
+                                    LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_anyvector_ty, llvm_epi_i1_ty,
                                     llvm_i64_ty ],
                                   [ NoCapture<0>, IntrReadMem ]>;

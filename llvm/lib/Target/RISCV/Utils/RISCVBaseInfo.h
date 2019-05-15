@@ -368,6 +368,7 @@ struct EPIPseudoInfo {
   unsigned char VLIndex;
   unsigned char SEWIndex;
   unsigned char VLMul;
+  char MergeOpIndex;
 };
 
 #define GET_EPIPseudosTable_DECL

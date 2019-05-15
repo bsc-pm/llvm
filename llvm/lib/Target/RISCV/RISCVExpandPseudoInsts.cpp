@@ -61,7 +61,8 @@ private:
                          MachineBasicBlock::iterator MBBI,
                          MachineBasicBlock::iterator &NextMBBI);
   bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-                 unsigned BaseInstr, unsigned VLIndex, unsigned SEWIndex);
+                 unsigned BaseInstr, unsigned VLIndex, unsigned SEWIndex,
+                 char MergeOpIndex);
 };
 
 char RISCVExpandPseudo::ID = 0;
@@ -92,7 +93,8 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator &NextMBBI) {
   if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
           RISCVEPIPseudosTable::getEPIPseudoInfo(MBBI->getOpcode())) {
-    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->VLIndex, EPI->SEWIndex);
+    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->VLIndex, EPI->SEWIndex,
+                     EPI->MergeOpIndex);
   }
 
   switch (MBBI->getOpcode()) {
@@ -701,7 +703,7 @@ bool RISCVExpandPseudo::expandLoadAddress(
 bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator MBBI,
                                   unsigned BaseInstr, unsigned VLIndex,
-                                  unsigned SEWIndex) {
+                                  unsigned SEWIndex, char MergeOpIndex) {
   MachineInstr &MI = *MBBI;
   MachineFunction &MF = *MBB.getParent();
   DebugLoc DL = MI.getDebugLoc();
@@ -726,7 +728,10 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
 
   for (MachineInstr::const_mop_iterator Op = MI.operands_begin();
        Op != MI.operands_end(); Op++) {
-    if ((MI.getOperandNo(Op) == VLIndex) || (MI.getOperandNo(Op) == SEWIndex))
+    if ((MI.getOperandNo(Op) == VLIndex) || (MI.getOperandNo(Op) == SEWIndex) ||
+        // If the pseudo has a merge operand, skip it
+        ((MergeOpIndex >= 0) &&
+         (MI.getOperandNo(Op) == (unsigned)MergeOpIndex)))
       continue;
 
     if (Op->isReg()) {

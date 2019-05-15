@@ -1267,12 +1267,13 @@ class EPIPseudo {
   bits<3> VLIndex;
   bits<3> SEWIndex;
   bits<4> VLMul;
+  bits<4> MergeOpIndex;
 }
 
 def EPIPseudosTable : GenericTable {
   let FilterClass = "EPIPseudo";
   let CppTypeName = "EPIPseudoInfo";
-  let Fields = [ "Pseudo", "BaseInstr", "VLIndex", "SEWIndex", "VLMul" ];
+  let Fields = [ "Pseudo", "BaseInstr", "VLIndex", "SEWIndex", "VLMul", "MergeOpIndex" ];
   let PrimaryKey = [ "Pseudo" ];
   let PrimaryKeyName = "getEPIPseudoInfo";
 }
@@ -1281,18 +1282,21 @@ multiclass pseudo_binary<EPIVReg result_reg_class,
                          EPIVReg op1_reg_class,
                          RegisterClass op2_reg_class> { // FIXME dagoperand?
   let Uses = [VL, VTYPE],
-      VLIndex = 3, SEWIndex = 4,
+      VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_"#op1_reg_class : Pseudo<(outs result_reg_class:$rd),
-                                   (ins op1_reg_class:$rs2, op2_reg_class:$rs1, GPR:$vl, ixlenimm:$sew),
+                                   (ins op1_reg_class:$rs2, op2_reg_class:$rs1,
+                                        GPR:$vl, ixlenimm:$sew),
                                    []>,
                             EPIPseudo;
 
-  let Uses = [VL, VTYPE, V0],
-      VLIndex = 4, SEWIndex = 5,
+  let Constraints = "$rd = $merge",
+      Uses = [VL, VTYPE, V0], VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_"#op1_reg_class : Pseudo<(outs result_reg_class:$rd),
-                                        (ins op1_reg_class:$rs2, op2_reg_class:$rs1, vectormask:$vm, GPR:$vl, ixlenimm:$sew),
+                                        (ins result_reg_class:$merge,
+                                             op1_reg_class:$rs2, op2_reg_class:$rs1,
+                                             vectormask:$vm, GPR:$vl, ixlenimm:$sew),
                                         []>,
                                  EPIPseudo;
 }
@@ -1649,7 +1653,7 @@ foreach evr = AllEPIVRegs.Values in
       VLMul = evr.VLMul in
   {
     let Uses = [VL, VTYPE],
-        VLIndex = 2, SEWIndex = 3,
+        VLIndex = 2, SEWIndex = 3, MergeOpIndex = -1,
         BaseInstr = VLE_V in
       def PseudoVLE_V_#evr
           : Pseudo<(outs evr:$rd),
@@ -1657,12 +1661,12 @@ foreach evr = AllEPIVRegs.Values in
                    []>,
             EPIPseudo;
 
-    let Uses = [VL, VTYPE, V0],
-        VLIndex = 3, SEWIndex = 4,
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+        VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
         BaseInstr = VLE_V_MASK in
       def PseudoVLE_V_MASK_#evr
           : Pseudo<(outs evr:$rd),
-                   (ins GPR:$rs1, vectormask:$mask, GPR:$vl, ixlenimm:$sew),
+                   (ins evr:$merge, GPR:$rs1, vectormask:$mask, GPR:$vl, ixlenimm:$sew),
                    []>,
             EPIPseudo;
   }
@@ -1672,7 +1676,7 @@ foreach evr = AllEPIVRegs.Values in
       VLMul = evr.VLMul in
   {
     let Uses = [VL, VTYPE],
-        VLIndex = 2, SEWIndex = 3,
+        VLIndex = 2, SEWIndex = 3, MergeOpIndex = -1,
         BaseInstr = VSE_V in
       def PseudoVSE_V_#evr
           : Pseudo<(outs),
@@ -1680,8 +1684,9 @@ foreach evr = AllEPIVRegs.Values in
                    []>,
             EPIPseudo;
 
+    // Masked stores do not have a merge operand as merge is done in memory
     let Uses = [VL, VTYPE, V0],
-        VLIndex = 3, SEWIndex = 4,
+        VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
         BaseInstr = VSE_V_MASK in
       def PseudoVSE_V_MASK_#evr
           : Pseudo<(outs),
@@ -1822,6 +1827,7 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                                 ValueType op2_type,
                                 ValueType mask_type,
                                 int sew,
+                                EPIVReg result_reg_class,
                                 EPIVReg op1_reg_class,
                                 RegisterClass op2_reg_class> // FIXME dagoperand?
 {
@@ -1830,11 +1836,13 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                                      op1_reg_class, op2_reg_class>;
 
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
+                         (result_type result_reg_class:$merge),
                          (op1_type op1_reg_class:$rs1),
                          (op2_type op2_reg_class:$rs2),
                          (mask_type V0),
                          (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_MASK_"#op1_reg_class)
+             result_reg_class:$merge,
              op1_reg_class:$rs1,
              // Floating point instructions with a scalar operand expect such
              // operand to be in a register of class FPR64. When dealing with
@@ -1855,7 +1863,7 @@ multiclass pat_intrinsic_binary_int_v_vv<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.RegClass, vti.RegClass, vti.RegClass>;
   }
 }
 
@@ -1866,10 +1874,10 @@ multiclass pat_intrinsic_binary_int_v_vv_vx<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.RegClass, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
   }
 }
 
@@ -1880,10 +1888,10 @@ multiclass pat_intrinsic_binary_int_v_vx_vi<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, simm5>;
+                                vti.SEW, vti.RegClass, vti.RegClass, simm5>;
   }
 }
 
@@ -1894,13 +1902,13 @@ multiclass pat_intrinsic_binary_int_v_vv_vx_vi<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.RegClass, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, simm5>;
+                                vti.SEW, vti.RegClass, vti.RegClass, simm5>;
   }
 }
 
@@ -1911,7 +1919,7 @@ multiclass pat_intrinsic_binary_int_v_vs<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VS",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.RegClass, vti.RegClass, vti.RegClass>;
   }
 }
 
@@ -1922,10 +1930,10 @@ multiclass pat_intrinsic_binary_int_w_vv_vx<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Wide, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.WideRegClass, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Wide, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.WideRegClass, vti.RegClass, GPR>;
   }
 }
 
@@ -1936,13 +1944,13 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Mask, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, EPIVR, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, EPIVR, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, simm5>;
+                                vti.SEW, EPIVR, vti.RegClass, simm5>;
   }
 }
 
@@ -1953,10 +1961,10 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Mask, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, EPIVR, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, EPIVR, vti.RegClass, GPR>;
   }
 }
 
@@ -1967,10 +1975,10 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, EPIVR, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, simm5>;
+                                vti.SEW, EPIVR, vti.RegClass, simm5>;
   }
 }
 
@@ -1981,10 +1989,10 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vu<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, EPIVR, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VU",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, uimm5>;
+                                vti.SEW, EPIVR, vti.RegClass, uimm5>;
   }
 }
 
@@ -2046,7 +2054,7 @@ multiclass pat_intrinsic_binary_fp_v_vv<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Vector, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.RegClass>;
+                                fvti.SEW, fvti.RegClass, fvti.RegClass, fvti.RegClass>;
   }
 }
 
@@ -2057,7 +2065,7 @@ multiclass pat_intrinsic_binary_fp_v_vf<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Vector, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.ScalarRegClass>;
+                                fvti.SEW, fvti.RegClass, fvti.RegClass, fvti.ScalarRegClass>;
   }
 }
 
@@ -2068,7 +2076,7 @@ multiclass pat_intrinsic_binary_fp_v_vs<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VS",
                                 fvti.Vector, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.RegClass>;
+                                fvti.SEW, fvti.RegClass, fvti.RegClass, fvti.RegClass>;
   }
 }
 
@@ -2079,10 +2087,10 @@ multiclass pat_intrinsic_binary_fp_v_vv_vf<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Vector, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.RegClass>;
+                                fvti.SEW, fvti.RegClass, fvti.RegClass, fvti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Vector, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.ScalarRegClass>;
+                                fvti.SEW, fvti.RegClass, fvti.RegClass, fvti.ScalarRegClass>;
   }
 }
 
@@ -2093,10 +2101,10 @@ multiclass pat_intrinsic_binary_fp_w_vv_vf<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Wide, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.RegClass>;
+                                fvti.SEW, fvti.WideRegClass, fvti.RegClass, fvti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Wide, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.ScalarRegClass>;
+                                fvti.SEW, fvti.WideRegClass, fvti.RegClass, fvti.ScalarRegClass>;
   }
 }
 
@@ -2107,10 +2115,10 @@ multiclass pat_intrinsic_binary_relational_fp_m_vv_vf<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Mask, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.RegClass>;
+                                fvti.SEW, EPIVR, fvti.RegClass, fvti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Mask, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.ScalarRegClass>;
+                                fvti.SEW, EPIVR, fvti.RegClass, fvti.ScalarRegClass>;
   }
 }
 
@@ -2121,7 +2129,7 @@ multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Mask, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass, fvti.ScalarRegClass>;
+                                fvti.SEW, EPIVR, fvti.RegClass, fvti.ScalarRegClass>;
   }
 }
 
@@ -2350,7 +2358,7 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
   }
 }
 
@@ -2361,13 +2369,13 @@ multiclass pat_intrinsic_binary_any_and_int_v_vv_vx_vi<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.IntVector, vti.Mask,
-                                vti.SEW, vti.RegClass, vti.RegClass>;
+                                vti.SEW, vti.RegClass, vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, simm5>;
+                                vti.SEW, vti.RegClass, vti.RegClass, simm5>;
   }
 }
 
@@ -2378,10 +2386,10 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
   in {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, GPR>;
+                                vti.SEW, vti.RegClass, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VU",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass, uimm5>;
+                                vti.SEW, vti.RegClass, vti.RegClass, uimm5>;
   }
 }
 
