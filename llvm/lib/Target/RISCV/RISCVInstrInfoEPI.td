@@ -1078,23 +1078,37 @@ def PseudoVRELOAD : Pseudo<(outs EPIVR:$rs1), (ins GPR:$rs2), [], "">;
 // Pseudo instructions
 //===----------------------------------------------------------------------===//
 
-class VectorTypeInfo<ValueType Vec, ValueType Int, ValueType Wid, ValueType Mas,
-                     int Sew, EPIVReg Reg> {
+class VectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
+                     EPIVReg Reg> {
   ValueType Vector = Vec;
   ValueType IntVector = Int;
-  ValueType Wide = Wid;
   ValueType Mask = Mas;
   int SEW = Sew;
   EPIVReg RegClass = Reg;
 }
 
-class FloatVectorTypeInfo<ValueType Vec, ValueType Int, ValueType Wid,
-                          ValueType Mas, int Sew, EPIVReg Reg, ValueType Scal,
-                          RegisterClass ScalarReg>
-    : VectorTypeInfo<Vec, Int, Wid, Mas, Sew, Reg>
+class FloatVectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
+                          EPIVReg Reg, ValueType Scal, RegisterClass ScalarReg>
+    : VectorTypeInfo<Vec, Int, Mas, Sew, Reg>
 {
   ValueType Scalar = Scal;
   RegisterClass ScalarRegClass = ScalarReg;
+}
+
+class WideableVectorTypeInfo<VectorTypeInfo Vti, ValueType Wid, EPIVReg WideReg>
+    : VectorTypeInfo<Vti.Vector, Vti.IntVector, Vti.Mask, Vti.SEW, Vti.RegClass>
+{
+  ValueType Wide = Wid;
+  EPIVReg WideRegClass = WideReg;
+}
+
+class WideableFloatVectorTypeInfo<FloatVectorTypeInfo FVti, ValueType Wid,
+                                  EPIVReg WideReg>
+    : FloatVectorTypeInfo<FVti.Vector, FVti.IntVector, FVti.Mask, FVti.SEW,
+                          FVti.RegClass, FVti.Scalar, FVti.ScalarRegClass>
+{
+  ValueType Wide = Wid;
+  EPIVReg WideRegClass = WideReg;
 }
 
 class VectorTypeInfoList<list<VectorTypeInfo> Vti>
@@ -1107,81 +1121,103 @@ class FloatVectorTypeInfoList<list<FloatVectorTypeInfo> FVti>
   list<FloatVectorTypeInfo> Values = FVti;
 }
 
+class WideableVectorTypeInfoList<list<WideableVectorTypeInfo> WVti>
+{
+  list<WideableVectorTypeInfo> Values = WVti;
+}
+
+class WideableFloatVectorTypeInfoList<list<WideableFloatVectorTypeInfo> WFVti>
+{
+  list<WideableFloatVectorTypeInfo> Values = WFVti;
+}
+
+//  Vtype1xi8   : VectorTypeInfo<nxv1i8,   nxv1i8,   nxv1i1,  8,  EPIVR>; // FIXME illegal type
+//  Vtype2xi8   : VectorTypeInfo<nxv2i8,   nxv2i8,   nxv2i1,  8,  EPIVR>; // FIXME illegal type
+//  Vtype4xi8   : VectorTypeInfo<nxv4i8,   nxv4i8,   nxv4i1,  8,  EPIVR>; // FIXME illegal type
+def Vtype8xi8   : VectorTypeInfo<nxv8i8,   nxv8i8,   nxv8i1,  8,  EPIVR>;
+def Vtype16xi8  : VectorTypeInfo<nxv16i8,  nxv16i8,  nxv16i1, 8,  EPIVR2>;
+def Vtype32xi8  : VectorTypeInfo<nxv32i8,  nxv32i8,  nxv32i1, 8,  EPIVR4>;
+//  Vtype64xi8  : VectorTypeInfo<nxv64i8,  nxv64i8,  nxv64i1, 8,  EPIVR8>; // FIXME undefined type
+
+//  Vtype1xi16  : VectorTypeInfo<nxv1i16,  nxv1i16,  nxv1i1,  16, EPIVR>; // FIXME illegal type
+//  Vtype2xi16  : VectorTypeInfo<nxv2i16,  nxv2i16,  nxv2i1,  16, EPIVR>; // FIXME illegal type
+def Vtype4xi16  : VectorTypeInfo<nxv4i16,  nxv4i16,  nxv4i1,  16, EPIVR>;
+def Vtype8xi16  : VectorTypeInfo<nxv8i16,  nxv8i16,  nxv8i1,  16, EPIVR2>;
+def Vtype16xi16 : VectorTypeInfo<nxv16i16, nxv16i16, nxv16i1, 16, EPIVR4>;
+def Vtype32xi16 : VectorTypeInfo<nxv32i16, nxv32i16, nxv32i1, 16, EPIVR8>;
+
+//  Vtype1xi32  : VectorTypeInfo<nxv1i32,  nxv1i32,  nxv1i1,  32, EPIVR>; // FIXME illegal type
+def Vtype2xi32  : VectorTypeInfo<nxv2i32,  nxv2i32,  nxv2i1,  32, EPIVR>;
+def Vtype4xi32  : VectorTypeInfo<nxv4i32,  nxv4i32,  nxv4i1,  32, EPIVR2>;
+def Vtype8xi32  : VectorTypeInfo<nxv8i32,  nxv8i32,  nxv8i1,  32, EPIVR4>;
+def Vtype16xi32 : VectorTypeInfo<nxv16i32, nxv16i32, nxv16i1, 32, EPIVR8>;
+
+def Vtype1xi64  : VectorTypeInfo<nxv1i64,  nxv1i64,  nxv1i1,  64, EPIVR>;
+def Vtype2xi64  : VectorTypeInfo<nxv2i64,  nxv2i64,  nxv2i1,  64, EPIVR2>;
+def Vtype4xi64  : VectorTypeInfo<nxv4i64,  nxv4i64,  nxv4i1,  64, EPIVR4>;
+def Vtype8xi64  : VectorTypeInfo<nxv8i64,  nxv8i64,  nxv8i1,  64, EPIVR8>;
+
+//  Vtype1xf32  : FloatVectorTypeInfo<nxv1f32,  nxv1i32,  nxv1i1,  32, EPIVR,  f32, FPR32>; // FIXME illegal type
+def Vtype2xf32  : FloatVectorTypeInfo<nxv2f32,  nxv2i32,  nxv2i1,  32, EPIVR,  f32, FPR32>;
+def Vtype4xf32  : FloatVectorTypeInfo<nxv4f32,  nxv4i32,  nxv4i1,  32, EPIVR2, f32, FPR32>;
+def Vtype8xf32  : FloatVectorTypeInfo<nxv8f32,  nxv8i32,  nxv8i1,  32, EPIVR4, f32, FPR32>;
+def Vtype16xf32 : FloatVectorTypeInfo<nxv16f32, nxv16i32, nxv16i1, 32, EPIVR8, f32, FPR32>;
+
+def Vtype1xf64  : FloatVectorTypeInfo<nxv1f64,  nxv1i64,  nxv1i1,  64, EPIVR,  f64, FPR64>;
+def Vtype2xf64  : FloatVectorTypeInfo<nxv2f64,  nxv2i64,  nxv2i1,  64, EPIVR2, f64, FPR64>;
+def Vtype4xf64  : FloatVectorTypeInfo<nxv4f64,  nxv4i64,  nxv4i1,  64, EPIVR4, f64, FPR64>;
+def Vtype8xf64  : FloatVectorTypeInfo<nxv8f64,  nxv8i64,  nxv8i1,  64, EPIVR8, f64, FPR64>;
+
 def AllIntegerVectors
-    : VectorTypeInfoList<[//VectorTypeInfo<nxv1i8,   nxv1i8,   nxv1i16,  nxv1i1,  8,  EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv2i8,   nxv2i8,   nxv2i16,  nxv2i1,  8,  EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv4i8,   nxv4i8,   nxv4i16,  nxv4i1,  8,  EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv8i8,   nxv8i8,   nxv8i16,  nxv8i1,  8,  EPIVR>,
-                            VectorTypeInfo<nxv16i8,  nxv16i8,  nxv16i16, nxv16i1, 8,  EPIVR2>,
-                            VectorTypeInfo<nxv32i8,  nxv32i8,  nxv32i16, nxv32i1, 8,  EPIVR4>,
-                          //VectorTypeInfo<nxv64i8,  nxv64i8,  nxv64i16, nxv64i1, 8,  EPIVR8>, // FIXME undefined type
-
-                          //VectorTypeInfo<nxv1i16,  nxv1i16,  nxv1i32,  nxv1i1,  16, EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv2i16,  nxv2i16,  nxv2i32,  nxv2i1,  16, EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv4i16,  nxv4i16,  nxv4i32,  nxv4i1,  16, EPIVR>,
-                            VectorTypeInfo<nxv8i16,  nxv8i16,  nxv8i32,  nxv8i1,  16, EPIVR2>,
-                            VectorTypeInfo<nxv16i16, nxv16i16, nxv16i32, nxv16i1, 16, EPIVR4>,
-                            VectorTypeInfo<nxv32i16, nxv32i16, nxv32i32, nxv32i1, 16, EPIVR8>,
-
-                          //VectorTypeInfo<nxv1i32,  nxv1i32,  nxv1i64,  nxv1i1,  32, EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv2i32,  nxv2i32,  nxv2i64,  nxv2i1,  32, EPIVR>,
-                            VectorTypeInfo<nxv4i32,  nxv4i32,  nxv4i64,  nxv4i1,  32, EPIVR2>,
-                            VectorTypeInfo<nxv8i32,  nxv8i32,  nxv8i64,  nxv8i1,  32, EPIVR4>,
-                            VectorTypeInfo<nxv16i32, nxv16i32, nxv16i64, nxv16i1, 32, EPIVR8>,
-
-                            VectorTypeInfo<nxv1i64,  nxv1i64,  /* FIXME nxv1i128 */ i1, nxv1i1,  64, EPIVR>,
-                            VectorTypeInfo<nxv2i64,  nxv2i64,  /* FIXME nxv2i128 */ i1, nxv2i1,  64, EPIVR2>,
-                            VectorTypeInfo<nxv4i64,  nxv4i64,  /* FIXME nxv4i128 */ i1, nxv4i1,  64, EPIVR4>,
-                            VectorTypeInfo<nxv8i64,  nxv8i64,  /* FIXME nxv8i128 */ i1, nxv8i1,  64, EPIVR8>]>;
+    : VectorTypeInfoList<[
+        /*Vtype1xi8,    Vtype2xi8,    Vtype4xi8,*/ Vtype8xi8,  Vtype16xi8,  Vtype32xi8,  /*Vtype64xi8,*/
+        /*Vtype1xi16,   Vtype2xi16,*/ Vtype4xi16,  Vtype8xi16, Vtype16xi16, Vtype32xi16,
+        /*Vtype1xi32,*/ Vtype2xi32,   Vtype4xi32,  Vtype8xi32, Vtype16xi32,
+          Vtype1xi64,   Vtype2xi64,   Vtype4xi64,  Vtype8xi64]>;
 
 def AllFloatVectors
-    : FloatVectorTypeInfoList<[//FloatVectorTypeInfo<nxv1f32,  nxv1i32,  nxv1f64,  nxv1i1,  32, EPIVR,  f32, FPR32>, // FIXME illegal type
-                                 FloatVectorTypeInfo<nxv2f32,  nxv2i32,  nxv2f64,  nxv2i1,  32, EPIVR,  f32, FPR32>,
-                                 FloatVectorTypeInfo<nxv4f32,  nxv4i32,  nxv4f64,  nxv4i1,  32, EPIVR2, f32, FPR32>,
-                                 FloatVectorTypeInfo<nxv8f32,  nxv8i32,  nxv8f64,  nxv8i1,  32, EPIVR4, f32, FPR32>,
-                                 FloatVectorTypeInfo<nxv16f32, nxv16i32, /* FIXME: nxv16f64 */ i1, nxv16i1, 32, EPIVR8, f32, FPR32>,
-
-                                 FloatVectorTypeInfo<nxv1f64,  nxv1i64,  /* FIXME: nxv1f128 */ i1, nxv1i1,  64, EPIVR,  f64, FPR64>,
-                                 FloatVectorTypeInfo<nxv2f64,  nxv2i64,  /* FIXME: nxv2f128 */ i1, nxv2i1,  64, EPIVR2, f64, FPR64>,
-                                 FloatVectorTypeInfo<nxv4f64,  nxv4i64,  /* FIXME: nxv4f128 */ i1, nxv4i1,  64, EPIVR4, f64, FPR64>,
-                                 FloatVectorTypeInfo<nxv8f64,  nxv8i64,  /* FIXME: nxv8f128 */ i1, nxv8i1,  64, EPIVR8, f64, FPR64>]>;
-
-def AllWideableIntVectors
-    : VectorTypeInfoList<[//VectorTypeInfo<nxv1i8,   nxv1i8,   nxv1i16,  nxv1i1,  8,  EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv2i8,   nxv2i8,   nxv2i16,  nxv2i1,  8,  EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv4i8,   nxv4i8,   nxv4i16,  nxv4i1,  8,  EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv8i8,   nxv8i8,   nxv8i16,  nxv8i1,  8,  EPIVR>,
-                            VectorTypeInfo<nxv16i8,  nxv16i8,  nxv16i16, nxv16i1, 8,  EPIVR2>,
-                            VectorTypeInfo<nxv32i8,  nxv32i8,  nxv32i16, nxv32i1, 8,  EPIVR4>,
-
-                          //VectorTypeInfo<nxv1i16,  nxv1i16,  nxv1i32,  nxv1i1,  16, EPIVR>, // FIXME illegal type
-                          //VectorTypeInfo<nxv2i16,  nxv2i16,  nxv2i32,  nxv2i1,  16, EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv4i16,  nxv4i16,  nxv4i32,  nxv4i1,  16, EPIVR>,
-                            VectorTypeInfo<nxv8i16,  nxv8i16,  nxv8i32,  nxv8i1,  16, EPIVR2>,
-                            VectorTypeInfo<nxv16i16, nxv16i16, nxv16i32, nxv16i1, 16, EPIVR4>,
-
-                          //VectorTypeInfo<nxv1i32,  nxv1i32,  nxv1i64,  nxv1i1,  32, EPIVR>, // FIXME illegal type
-                            VectorTypeInfo<nxv2i32,  nxv2i32,  nxv2i64,  nxv2i1,  32, EPIVR>,
-                            VectorTypeInfo<nxv4i32,  nxv4i32,  nxv4i64,  nxv4i1,  32, EPIVR2>,
-                            VectorTypeInfo<nxv8i32,  nxv8i32,  nxv8i64,  nxv8i1,  32, EPIVR4>]>;
-                            // FIXME what about these?
-                          //VectorTypeInfo<nxv1i64,  nxv1i64,  /* FIXME nxv1i128 */ i1, nxv1i1,  64, EPIVR>,
-                          //VectorTypeInfo<nxv2i64,  nxv2i64,  /* FIXME nxv2i128 */ i1, nxv2i1,  64, EPIVR2>,
-                          //VectorTypeInfo<nxv4i64,  nxv4i64,  /* FIXME nxv4i128 */ i1, nxv4i1,  64, EPIVR4>]>;
-
-def AllWideableFloatVectors
-    : FloatVectorTypeInfoList<[//FloatVectorTypeInfo<nxv1f32,  nxv1i32,  nxv1f64,  nxv1i1,  32, EPIVR,  f32, FPR32>, // FIXME illegal type
-                                 FloatVectorTypeInfo<nxv2f32,  nxv2i32,  nxv2f64,  nxv2i1,  32, EPIVR,  f32, FPR32>,
-                                 FloatVectorTypeInfo<nxv4f32,  nxv4i32,  nxv4f64,  nxv4i1,  32, EPIVR2, f32, FPR32>,
-                                 FloatVectorTypeInfo<nxv8f32,  nxv8i32,  nxv8f64,  nxv8i1,  32, EPIVR4, f32, FPR32>]>;
-                                 // FIXME what about these?
-                               //FloatVectorTypeInfo<nxv1f64,  nxv1i64,  /* FIXME: nxv1f128 */ i1, nxv1i1,  64, EPIVR,  f64, FPR64>,
-                               //FloatVectorTypeInfo<nxv2f64,  nxv2i64,  /* FIXME: nxv2f128 */ i1, nxv2i1,  64, EPIVR2, f64, FPR64>,
-                               //FloatVectorTypeInfo<nxv4f64,  nxv4i64,  /* FIXME: nxv4f128 */ i1, nxv4i1,  64, EPIVR4, f64, FPR64>]>;
+    : FloatVectorTypeInfoList<[
+        /*Vtype1xf32,*/ Vtype2xf32, Vtype4xf32, Vtype8xf32, Vtype16xf32,
+          Vtype1xf64,   Vtype2xf64, Vtype4xf64, Vtype8xf64]>;
 
 def AllVectors
     : VectorTypeInfoList<!listconcat(AllIntegerVectors.Values,
                                      AllFloatVectors.Values)>;
+
+def AllWideableIntVectors
+    : WideableVectorTypeInfoList<[
+      //WideableVectorTypeInfo<Vtype1xi8,   nxv1i16,  EPIVR>, // FIXME illegal type
+      //WideableVectorTypeInfo<Vtype2xi8,   nxv2i16,  EPIVR>, // FIXME illegal type
+      //WideableVectorTypeInfo<Vtype4xi8,   nxv4i16,  EPIVR>, // FIXME illegal type
+        WideableVectorTypeInfo<Vtype8xi8,   nxv8i16,  EPIVR2>,
+        WideableVectorTypeInfo<Vtype16xi8,  nxv16i16, EPIVR4>,
+        WideableVectorTypeInfo<Vtype32xi8,  nxv32i16, EPIVR8>,
+
+      //WideableVectorTypeInfo<Vtype1xi16,  nxv1i32,  EPIVR>, // FIXME illegal type
+      //WideableVectorTypeInfo<Vtype2xi16,  nxv2i32,  EPIVR>, // FIXME illegal type
+        WideableVectorTypeInfo<Vtype4xi16,  nxv4i32,  EPIVR2>,
+        WideableVectorTypeInfo<Vtype8xi16,  nxv8i32,  EPIVR4>,
+        WideableVectorTypeInfo<Vtype16xi16, nxv16i32, EPIVR8>,
+
+      //WideableVectorTypeInfo<Vtype1xi32,  nxv1i64,  EPIVR>, // FIXME illegal type
+        WideableVectorTypeInfo<Vtype2xi32,  nxv2i64,  EPIVR2>,
+        WideableVectorTypeInfo<Vtype4xi32,  nxv4i64,  EPIVR4>,
+        WideableVectorTypeInfo<Vtype8xi32,  nxv8i64,  EPIVR8>]>;
+        // FIXME what about these?
+      //WideableVectorTypeInfo<Vtype1xi64,  /* FIXME nxv1i128 */ i1, EPIVR2>,
+      //WideableVectorTypeInfo<Vtype2xi64,  /* FIXME nxv2i128 */ i1, EPIVR4>,
+      //WideableVectorTypeInfo<Vtype4xi64,  /* FIXME nxv4i128 */ i1, EPIVR8>]>;
+
+def AllWideableFloatVectors
+    : FloatVectorTypeInfoList<[
+      //WideableFloatVectorTypeInfo<Vtype1xf32, nxv1f64, EPIVR>, // FIXME illegal type
+        WideableFloatVectorTypeInfo<Vtype2xf32, nxv2f64, EPIVR2>,
+        WideableFloatVectorTypeInfo<Vtype4xf32, nxv4f64, EPIVR4>,
+        WideableFloatVectorTypeInfo<Vtype8xf32, nxv8f64, EPIVR8>]>;
+        // FIXME what about these?
+      //WideableFloatVectorTypeInfo<Vtype1xf64, /* FIXME: nxv1f128 */ i1, EPIVR2>,
+      //WideableFloatVectorTypeInfo<Vtype2xf64, /* FIXME: nxv2f128 */ i1, EPIVR4>,
+      //WideableFloatVectorTypeInfo<Vtype4xf64, /* FIXME: nxv4f128 */ i1, EPIVR8>]>;
 
 class MaskTypeInfo<ValueType Mas, int Sew> {
   ValueType Mask = Mas;
