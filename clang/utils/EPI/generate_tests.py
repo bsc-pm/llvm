@@ -912,8 +912,12 @@ def emit_test(builtin_name, prototype):
         test_output.append(s)
 
 if __name__ == "__main__":
-    print "// RUN: %clang -mepi -O2 -S -emit-llvm -o - %s | FileCheck --check-prefix=CHECK-O2 %s"
-    print ""
+    print r"""// RUN: %clang_cc1 -triple riscv64-unknown-linux-gnu -emit-llvm -O2 -o - \
+// RUN:       -target-feature +m -target-feature +a -target-feature +f \
+// RUN:       -target-feature +d -target-feature +c \
+// RUN:       -target-feature +epi -target-abi lp64d %s \
+// RUN:       | FileCheck --check-prefix=CHECK-O2 %s
+"""
     for (builtin_name, prototype) in preprocess_builtins():
         emit_test(builtin_name, prototype)
 
