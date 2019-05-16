@@ -91,15 +91,30 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_shared operand bundle id drifted!");
   (void)OSSSharedEntry;
 
+  auto *OSSSharedVLAEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.SHARED.VLA");
+  assert(OSSSharedVLAEntry->second == LLVMContext::OB_oss_shared_vla &&
+         "oss_shared_vla operand bundle id drifted!");
+  (void)OSSSharedVLAEntry;
+
   auto *OSSPrivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.PRIVATE");
   assert(OSSPrivateEntry->second == LLVMContext::OB_oss_private &&
          "oss_private operand bundle id drifted!");
   (void)OSSPrivateEntry;
 
+  auto *OSSPrivateVLAEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.PRIVATE.VLA");
+  assert(OSSPrivateVLAEntry->second == LLVMContext::OB_oss_private_vla &&
+         "oss_private_vla operand bundle id drifted!");
+  (void)OSSPrivateVLAEntry;
+
   auto *OSSFirstPrivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE");
   assert(OSSFirstPrivateEntry->second == LLVMContext::OB_oss_firstprivate &&
          "oss_firstprivate operand bundle id drifted!");
   (void)OSSFirstPrivateEntry;
+
+  auto *OSSFirstPrivateVLAEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE.VLA");
+  assert(OSSFirstPrivateVLAEntry->second == LLVMContext::OB_oss_firstprivate_vla &&
+         "oss_firstprivate_vla operand bundle id drifted!");
+  (void)OSSFirstPrivateVLAEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

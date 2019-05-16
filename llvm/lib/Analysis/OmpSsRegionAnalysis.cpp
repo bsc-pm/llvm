@@ -127,6 +127,17 @@ static void getValueFromOperandBundlesWithID(const IntrinsicInst *I,
   }
 }
 
+// Gather Value list from each OperandBundle Id.
+static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
+                                              SetVector<Value *> &Values,
+                                              uint32_t Id) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  for (OperandBundleDef &OBDef : OpBundles) {
+    Values.insert(OBDef.input_begin(), OBDef.input_end());
+  }
+}
+
 void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
     Function &F, DominatorTree &DT, TaskFunctionInfo &FuncInfo,
     TaskFunctionAnalysisInfo &FuncAnalysisInfo,
@@ -166,6 +177,13 @@ void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
                                             LLVMContext::OB_oss_private);
           getValueFromOperandBundlesWithID(II, T.Info.DSAInfo.Firstprivate,
                                             LLVMContext::OB_oss_firstprivate);
+
+          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Shared,
+                                            LLVMContext::OB_oss_shared_vla);
+          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Private,
+                                            LLVMContext::OB_oss_private_vla);
+          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Firstprivate,
+                                            LLVMContext::OB_oss_firstprivate_vla);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
