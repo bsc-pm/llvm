@@ -191,6 +191,183 @@ unsigned long test_vsetvl__epi_e8__epi_m8(unsigned long rvl)
 }
 
 
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e64__epi_m1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 3, i64 0)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e64__epi_m1()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e64, __epi_m1);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e32__epi_m1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 2, i64 0)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e32__epi_m1()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e32, __epi_m1);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e16__epi_m1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 1, i64 0)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e16__epi_m1()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e16, __epi_m1);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e8__epi_m1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 0, i64 0)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e8__epi_m1()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e8, __epi_m1);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e64__epi_m2(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 3, i64 1)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e64__epi_m2()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e64, __epi_m2);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e32__epi_m2(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 2, i64 1)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e32__epi_m2()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e32, __epi_m2);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e16__epi_m2(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 1, i64 1)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e16__epi_m2()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e16, __epi_m2);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e8__epi_m2(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 0, i64 1)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e8__epi_m2()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e8, __epi_m2);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e64__epi_m4(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 3, i64 2)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e64__epi_m4()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e64, __epi_m4);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e32__epi_m4(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 2, i64 2)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e32__epi_m4()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e32, __epi_m4);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e16__epi_m4(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 1, i64 2)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e16__epi_m4()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e16, __epi_m4);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e8__epi_m4(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 0, i64 2)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e8__epi_m4()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e8, __epi_m4);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e64__epi_m8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 3, i64 3)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e64__epi_m8()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e64, __epi_m8);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e32__epi_m8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 2, i64 3)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e32__epi_m8()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e32, __epi_m8);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e16__epi_m8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 1, i64 3)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e16__epi_m8()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e16, __epi_m8);
+    return vlmax;
+}
+
+// CHECK-O2-LABEL: @test_vsetvlmax__epi_e8__epi_m8(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vsetvlmax(i64 0, i64 3)
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+unsigned long test_vsetvlmax__epi_e8__epi_m8()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(__epi_e8, __epi_m8);
+    return vlmax;
+}
+
+
 // CHECK-O2-LABEL: @test_vload_8xi8_vstore_8xi8(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = bitcast i8* [[ADDR:%.*]] to <vscale x 8 x i8>*
