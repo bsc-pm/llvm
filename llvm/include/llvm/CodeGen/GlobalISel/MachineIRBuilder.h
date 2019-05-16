@@ -797,6 +797,8 @@ public:
   /// \return a MachineInstrBuilder for the newly created instruction.
   MachineInstrBuilder buildIntrinsic(Intrinsic::ID ID, ArrayRef<unsigned> Res,
                                      bool HasSideEffects);
+  MachineInstrBuilder buildIntrinsic(Intrinsic::ID ID, ArrayRef<DstOp> Res,
+                                     bool HasSideEffects);
 
   /// Build and insert \p Res = G_FPTRUNC \p Op
   ///
@@ -1238,6 +1240,20 @@ public:
   MachineInstrBuilder buildOr(const DstOp &Dst, const SrcOp &Src0,
                               const SrcOp &Src1) {
     return buildInstr(TargetOpcode::G_OR, {Dst}, {Src0, Src1});
+  }
+
+  /// Build and insert \p Res = G_XOR \p Op0, \p Op1
+  MachineInstrBuilder buildXor(const DstOp &Dst, const SrcOp &Src0,
+                               const SrcOp &Src1) {
+    return buildInstr(TargetOpcode::G_XOR, {Dst}, {Src0, Src1});
+  }
+
+  /// Build and insert a bitwise not,
+  /// \p NegOne = G_CONSTANT -1
+  /// \p Res = G_OR \p Op0, NegOne
+  MachineInstrBuilder buildNot(const DstOp &Dst, const SrcOp &Src0) {
+    auto NegOne = buildConstant(Dst.getLLTTy(*getMRI()), -1);
+    return buildInstr(TargetOpcode::G_XOR, {Dst}, {Src0, NegOne});
   }
 
   /// Build and insert \p Res = G_FADD \p Op0, \p Op1
