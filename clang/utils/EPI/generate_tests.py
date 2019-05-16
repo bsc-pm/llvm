@@ -457,6 +457,28 @@ unsigned long test_vsetvl${sew}${lmul}(unsigned long rvl)
                 result += string.Template(SetVectorLengthTemplate.TEMPLATE).substitute(subs)
         return result
 
+class SetMaxVectorLengthTemplate(TestTemplate):
+    TEMPLATE = """
+unsigned long test_vsetvlmax${sew}${lmul}()
+{
+    unsigned long vlmax = __builtin_epi_vsetvlmax(${sew}, ${lmul});
+    return vlmax;
+}
+"""
+
+    def __init__(self):
+        super(SetMaxVectorLengthTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        result = ""
+        for lmul in [1, 2, 4, 8]:
+            for sew in [64, 32, 16, 8]:
+                subs = {}
+                subs["sew"] = "__epi_e{}".format(sew)
+                subs["lmul"] = "__epi_m{}".format(lmul)
+                result += string.Template(SetMaxVectorLengthTemplate.TEMPLATE).substitute(subs)
+        return result
+
 class ReadVectorLengthTemplate(TestTemplate):
     TEMPLATE = """
 unsigned long test_vreadvl()
@@ -862,6 +884,7 @@ EPI_SET_FIRST("vsetfirst")
 EPI_GET_FIRST("vgetfirst")
 
 template_dict["vsetvl"] = SetVectorLengthTemplate
+template_dict["vsetvlmax"] = SetMaxVectorLengthTemplate
 template_dict["vreadvl"] = ReadVectorLengthTemplate
 
 ################################################################################

@@ -13257,6 +13257,9 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   case RISCV::EPI_BI_vsetvl:
     ID = Intrinsic::epi_vsetvl;
     break;
+  case RISCV::EPI_BI_vsetvlmax:
+    ID = Intrinsic::epi_vsetvlmax;
+    break;
   }
 
 #undef EPI_INT

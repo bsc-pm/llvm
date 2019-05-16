@@ -23,6 +23,7 @@
 
 EPI_BUILTIN(vreadvl, "UWi", "")
 EPI_BUILTIN(vsetvl, "UWiUWiUWIiUWIi", "")
+EPI_BUILTIN(vsetvlmax, "UWiUWIiUWIi", "")
 
 //===----------------------------------------------------------------------===//
 // Load / store
