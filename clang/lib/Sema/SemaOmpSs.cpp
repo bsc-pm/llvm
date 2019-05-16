@@ -264,7 +264,23 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   Stmt *CS = nullptr;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
-  llvm::SmallSet<const ValueDecl *, 4> InnerDecls;
+  llvm::SmallSet<ValueDecl *, 4> InnerDecls;
+
+  // Walks over all array dimensions looking for VLA size Expr.
+  void GetTypeDSAs(QualType T) {
+    QualType TmpTy = T;
+    while (TmpTy->isArrayType()) {
+      if (const ConstantArrayType *BaseArrayTy = SemaRef.Context.getAsConstantArrayType(TmpTy)) {
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = SemaRef.Context.getAsVariableArrayType(TmpTy)) {
+        Expr *SizeExpr = BaseArrayTy->getSizeExpr();
+        Visit(SizeExpr);
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+  }
 
 public:
   void VisitDeclRefExpr(DeclRefExpr *E) {
@@ -306,7 +322,7 @@ public:
       } else {
 
         QualType Type = VD->getType();
-        if (!Type.isPODType(SemaRef.Context) || Type->isVariableArrayType()) {
+        if (!Type.isPODType(SemaRef.Context)) {
           return;
         }
 
@@ -354,6 +370,13 @@ public:
     }
   }
 
+  void VisitExpr(Expr *E) {
+    for (Stmt *Child : E->children()) {
+      if (Child)
+        Visit(Child);
+    }
+  }
+
   void VisitStmt(Stmt *S) {
     for (Stmt *C : S->children()) {
       if (C)
@@ -362,9 +385,15 @@ public:
   }
 
   void VisitDeclStmt(DeclStmt *S) {
-    for (const Decl *D : S->decls())
-      if (const auto *VD = dyn_cast_or_null<ValueDecl>(D))
+    for (Decl *D : S->decls()) {
+      if (auto *VD = dyn_cast_or_null<VarDecl>(D)) {
         InnerDecls.insert(VD);
+        if (VD->hasInit()) {
+          Visit(VD->getInit());
+        }
+        GetTypeDSAs(VD->getType());
+      }
+    }
   }
 
   bool isErrorFound() const { return ErrorFound; }

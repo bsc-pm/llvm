@@ -84,8 +84,8 @@ public:
         Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
         TmpTy = BaseArrayTy->getElementType();
       } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
-        llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
-        DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+        auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+        llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
         Dims.push_back(DimExpr);
         TmpTy = BaseArrayTy->getElementType();
       } else {
@@ -158,8 +158,8 @@ public:
             Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
             TmpTy = BaseArrayTy->getElementType();
           } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
-            llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
-            DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+            auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+            llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
             Dims.push_back(DimExpr);
             TmpTy = BaseArrayTy->getElementType();
           } else {
@@ -226,8 +226,8 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
           FirstTime = false;
           Basename += ".VLA";
         }
-        llvm::Value *DimExpr = CGF.EmitScalarExpr(BaseArrayTy->getSizeExpr());
-        DimExpr = CGF.Builder.CreateSExt(DimExpr, OSSArgTy);
+        auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+        llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
         DsaData.push_back(DimExpr);
         TmpTy = BaseArrayTy->getElementType();
       } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
