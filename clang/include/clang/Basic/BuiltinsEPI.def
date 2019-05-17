@@ -206,8 +206,8 @@ EPI_BUILTIN(vload_8xi1, "QV8bUc*", "n")
   EPI_BUILTIN(name##_2xf32, "QV2fQV2fUWi", "Un")                               \
   EPI_BUILTIN(name##_1xf64, "QV1dQV1dUWi", "Un")                               \
                                                                                \
-  EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2fQV2bUWi", "Un")                      \
-  EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1dQV1bUWi", "Un")
+  EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2fQV2fQV2bUWi", "Un")                  \
+  EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1dQV1dQV1bUWi", "Un")
 
 #define EPI_FP_TERNARY(name)                                                   \
   EPI_BUILTIN(name##_2xf32, "QV2fQV2fQV2fQV2fUWi", "Un")                       \
@@ -332,17 +332,17 @@ EPI_BUILTIN(vload_8xi1, "QV8bUc*", "n")
   EPI_BUILTIN(name##_2xi32, "QV2SiSiUWi", "Un")                                \
   EPI_BUILTIN(name##_1xi64, "QV1SWiSWiUWi", "Un")                              \
                                                                                \
-  EPI_BUILTIN(name##_8xi8_mask, "QV8ScScQV8bUWi", "Un")                        \
-  EPI_BUILTIN(name##_4xi16_mask, "QV4SsSsQV4bUWi", "Un")                       \
-  EPI_BUILTIN(name##_2xi32_mask, "QV2SiSiQV2bUWi", "Un")                       \
-  EPI_BUILTIN(name##_1xi64_mask, "QV1SWiSWiQV1bUWi", "Un")
+  EPI_BUILTIN(name##_8xi8_mask, "QV8ScQV8ScScQV8bUWi", "Un")                   \
+  EPI_BUILTIN(name##_4xi16_mask, "QV4SsQV4SsSsQV4bUWi", "Un")                  \
+  EPI_BUILTIN(name##_2xi32_mask, "QV2SiQV2SiSiQV2bUWi", "Un")                  \
+  EPI_BUILTIN(name##_1xi64_mask, "QV1SWiQV1SWiSWiQV1bUWi", "Un")
 
 #define EPI_SCALAR_FP_TO_FP_UNARY(name)                                        \
   EPI_BUILTIN(name##_2xf32, "QV2ffUWi", "Un")                                  \
   EPI_BUILTIN(name##_1xf64, "QV1ddUWi", "Un")                                  \
                                                                                \
-  EPI_BUILTIN(name##_2xf32_mask, "QV2ffQV2bUWi", "Un")                         \
-  EPI_BUILTIN(name##_1xf64_mask, "QV1ddQV1bUWi", "Un")
+  EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2ffQV2bUWi", "Un")                     \
+  EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1ddQV1bUWi", "Un")
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////

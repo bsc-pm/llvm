@@ -150,6 +150,34 @@ void test_${intrinsic}(unsigned long gvl)
 
         return string.Template(UnaryMaskTemplate.TEMPLATE).substitute(subs)
 
+class UnaryMaskWithMergeTemplate(TestTemplate):
+    TEMPLATE = """
+${store_decl}
+void test_${intrinsic}(unsigned long gvl)
+{
+  ${c_result_type} result;
+  ${c_merge_type} merge;
+  ${c_lhs_type} lhs;
+  ${c_mask_type} mask;
+  result = __builtin_epi_${intrinsic}(merge, lhs, mask, gvl);
+  ${store_stmt}
+}
+"""
+
+    def __init__(self):
+        super(UnaryMaskWithMergeTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["intrinsic"] = builtin_name
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_merge_type"] = TypeRender(argument_types[0]).render()
+        subs["c_lhs_type"] = TypeRender(argument_types[1]).render()
+        subs["c_mask_type"] = TypeRender(argument_types[2]).render()
+        (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
+
+        return string.Template(UnaryMaskWithMergeTemplate.TEMPLATE).substitute(subs)
+
 class BinaryTemplate(TestTemplate):
     TEMPLATE = """
 ${store_decl}
@@ -500,10 +528,10 @@ def EPI_FP_UNARY(string_name):
     template_dict[string_name + "_1xf64"] = UnaryTemplate
     template_dict[string_name + "_2xf32"] = UnaryTemplate
     template_dict[string_name + "_1xf64"] = UnaryTemplate
-    template_dict[string_name + "_2xf32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_1xf64_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_2xf32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_1xf64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_1xf64_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_2xf32_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_1xf64_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_FP_TO_INT_CONVERSION(string_name):
     global template_dict
@@ -539,6 +567,7 @@ def EPI_MASK_TO_SCALAR_INT_UNARY(string_name):
     template_dict[string_name + "_2xi1_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_4xi1_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_8xi1_mask"] = UnaryMaskTemplate
+EPI_MASK_UNARY = EPI_MASK_TO_SCALAR_INT_UNARY
 
 def EPI_INT_TO_MASK_UNARY(string_name):
     global template_dict
@@ -551,8 +580,16 @@ def EPI_INT_TO_MASK_UNARY(string_name):
     template_dict[string_name + "_2xi32_mask"] = UnaryMaskTemplate
     template_dict[string_name + "_1xi64_mask"] = UnaryMaskTemplate
 
-EPI_MASK_UNARY = EPI_MASK_TO_SCALAR_INT_UNARY
-EPI_INT_UNARY = EPI_INT_TO_MASK_UNARY
+def EPI_INT_UNARY(string_name): #FIXME merge with EPI_INT_TO_MASK_UNARY when updated
+    global template_dict
+    template_dict[string_name + "_8xi8"] = UnaryTemplate
+    template_dict[string_name + "_4xi16"] = UnaryTemplate
+    template_dict[string_name + "_2xi32"] = UnaryTemplate
+    template_dict[string_name + "_1xi64"] = UnaryTemplate
+    template_dict[string_name + "_8xi8_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_4xi16_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_2xi32_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_1xi64_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_INT_BINARY(string_name):
     global template_dict
