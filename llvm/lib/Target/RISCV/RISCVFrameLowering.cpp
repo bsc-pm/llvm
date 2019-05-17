@@ -407,7 +407,6 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   }
 
   // Add CFI directives for callee-saved registers.
-  const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   // Iterate over list of callee-saved registers and emit .cfi_restore
   // directives.
   for (const auto &Entry : CSI) {

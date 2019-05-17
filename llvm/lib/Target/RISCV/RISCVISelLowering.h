@@ -147,6 +147,10 @@ public:
   unsigned
   getExceptionSelectorRegister(const Constant *PersonalityFn) const override;
 
+  bool allowsMisalignedMemoryAccesses(EVT E, unsigned AddrSpace, unsigned Align,
+                                      MachineMemOperand::Flags Flags,
+                                      bool *Fast) const override;
+
 private:
   void analyzeInputArgs(MachineFunction &MF, CCState &CCInfo,
                         const SmallVectorImpl<ISD::InputArg> &Ins,

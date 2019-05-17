@@ -2964,3 +2964,19 @@ unsigned RISCVTargetLowering::getExceptionSelectorRegister(
     const Constant *PersonalityFn) const {
   return RISCV::X11;
 }
+
+bool RISCVTargetLowering::allowsMisalignedMemoryAccesses(
+    EVT E, unsigned AddrSpace, unsigned Align, MachineMemOperand::Flags Flags,
+    bool *Fast) const {
+  if (!E.isScalableVector())
+    return false;
+
+  // Scalable vectors enforce only the alignment of the element type.
+  // There is no reason to think these should be any slower.
+  if (Fast)
+    *Fast = true;
+
+  EVT ElementType = E.getVectorElementType();
+  return Align >= ElementType.getStoreSize();
+}
+>>>>>>> Allow a more relaxed alignment for load/store of vector types
