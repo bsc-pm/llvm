@@ -1474,14 +1474,12 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
         // require dynamic size.
         llvm::VectorType *VT = cast<llvm::VectorType>(allocaTy);
 
-        llvm::PointerType *ptrTy = VT->getElementType()->getPointerTo();
-
         auto *IntPtrTy = CGM.getDataLayout().getIntPtrType(CGM.getLLVMContext());
         llvm::Value *vscale = Builder.CreateCall(CGM.getIntrinsic(
             llvm::Intrinsic::experimental_vector_vscale, {IntPtrTy}));
 
-        address = CreateTempAlloca(ptrTy, allocaAlignment, D.getName(), vscale,
-                                   &AllocaAddr);
+        address = CreateTempAlloca(VT->getElementType(), allocaAlignment,
+                                   D.getName(), vscale, &AllocaAddr);
 
         address = Address(Builder.CreateBitCast(address.getPointer(),
                                                 allocaTy->getPointerTo()),
