@@ -1190,9 +1190,6 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
       setOperationAction(ISD::CTPOP,           VT, Custom);
       setOperationAction(ISD::CTLZ,            VT, Custom);
 
-      // TODO - remove this once 256-bit X86ISD::ANDNP correctly split.
-      setOperationAction(ISD::CTTZ,  VT, HasInt256 ? Expand : Custom);
-
       // The condition codes aren't legal in SSE/AVX and under AVX512 we use
       // setcc all the way to isel and prefer SETGT in some isel patterns.
       setCondCodeAction(ISD::SETLT, VT, Custom);
@@ -24018,10 +24015,6 @@ static SDValue LowerCTTZ(SDValue Op, const X86Subtarget &Subtarget,
   SDValue N0 = Op.getOperand(0);
   SDLoc dl(Op);
 
-  // Decompose 256-bit ops into smaller 128-bit ops.
-  if (VT.is256BitVector() && !Subtarget.hasInt256())
-    return Lower256IntUnary(Op, DAG);
-
   assert(!VT.isVector() && Op.getOpcode() == ISD::CTTZ &&
          "Only scalar CTTZ requires custom lowering");
 
@@ -37448,11 +37441,20 @@ static SDValue combineCompareEqual(SDNode *N, SelectionDAG &DAG,
 }
 
 // Match (xor X, -1) -> X.
+// Match extract_subvector(xor X, -1) -> extract_subvector(X).
 static SDValue IsNOT(SDValue V, SelectionDAG &DAG) {
   V = peekThroughBitcasts(V);
   if (V.getOpcode() == ISD::XOR &&
       ISD::isBuildVectorAllOnes(V.getOperand(1).getNode()))
     return V.getOperand(0);
+  if (V.getOpcode() == ISD::EXTRACT_SUBVECTOR &&
+      (isNullConstant(V.getOperand(1)) || V.getOperand(0).hasOneUse())) {
+    if (SDValue Not = IsNOT(V.getOperand(0), DAG)) {
+      Not = DAG.getBitcast(V.getOperand(0).getValueType(), Not);
+      return DAG.getNode(ISD::EXTRACT_SUBVECTOR, SDLoc(Not), V.getValueType(),
+                         Not, V.getOperand(1));
+    }
+  }
   return SDValue();
 }
 
