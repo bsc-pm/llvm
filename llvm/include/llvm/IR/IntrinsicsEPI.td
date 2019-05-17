@@ -356,10 +356,7 @@ defm vslide1down : epi_binary;
 
 def int_epi_vext_x_v : Intrinsic< [ llvm_anyint_ty ],
                       [ llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
-{
-  let ExtendOperand = 2;
-}
+                      [ IntrNoMem ] >, EPIIntrinsic;
 
 def int_epi_vmv_s_x : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyint_ty, llvm_i64_ty ],
