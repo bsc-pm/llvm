@@ -372,8 +372,7 @@ def int_epi_vfmv_f_s : Intrinsic< [ llvm_anyfloat_ty ],
                                   [ llvm_anyvector_ty ],
                                   [ IntrNoMem ]>, EPIIntrinsic;
 def int_epi_vfmv_s_f : Intrinsic< [ llvm_anyvector_ty ],
-                                  [ llvm_anyfloat_ty,
-                                    llvm_i64_ty ],
+                                  [ llvm_anyfloat_ty, llvm_i64_ty ],
                                   [ IntrNoMem ]>, EPIIntrinsic;
 
 defm vfsqrt : epi_unary;
