@@ -2603,3 +2603,19 @@ bool RISCVTargetLowering::isFMAFasterThanFMulAndFAdd(EVT VT) const {
 
   return false;
 }
+
+bool RISCVTargetLowering::allowsMisalignedMemoryAccesses(EVT E,
+                                                         unsigned AddrSpace,
+                                                         unsigned Align,
+                                                         bool *Fast) const {
+  if (!E.isScalableVector())
+    return false;
+
+  // Scalable vectors enforce only the alignment of the element type.
+  // There is no reason to think these should be any slower.
+  if (Fast)
+    *Fast = true;
+
+  EVT ElementType = E.getVectorElementType();
+  return Align >= ElementType.getStoreSize();
+}
