@@ -1624,6 +1624,24 @@ defm PseudoVREDMIN     : pseudo_binary_arithmetic_int_v_s;
 defm PseudoVREDMAXU    : pseudo_binary_arithmetic_int_v_s;
 defm PseudoVREDMAX     : pseudo_binary_arithmetic_int_v_s;
 
+let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+foreach evr = AllEPIVRegs.Values in
+{
+  let VLMul = evr.VLMul, Uses = [VL, VTYPE], MergeOpIndex = -1 in
+  {
+    let VLIndex = -1, SEWIndex = -1, BaseInstr = VEXT_X_V in
+      def PseudoVEXT_X_V_#evr : Pseudo<(outs GPR:$rd),
+                                       (ins evr:$rs2, GPR:$rs1),
+                                       []>,
+                                EPIPseudo;
+    let VLIndex = 2, SEWIndex = 3, BaseInstr = VMV_S_X in
+      def PseudoVMV_S_X_#evr  : Pseudo<(outs evr:$rd),
+                                       (ins GPR:$rs2, GPR:$vl, ixlenimm:$sew),
+                                       []>,
+                                EPIPseudo;
+  }
+}
+
 defm PseudoVSLIDE1UP   : pseudo_binary_arithmetic_any_and_int_v_x;
 defm PseudoVSLIDE1DOWN : pseudo_binary_arithmetic_any_and_int_v_x;
 
@@ -2685,14 +2703,14 @@ defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmin", "PseudoVREDMIN">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmaxu", "PseudoVREDMAXU">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmax", "PseudoVREDMAX">;
 
-//foreach vtp = AllIntegerVectors.Values in
-//def : Pat<(int_epi_vext_x_v (vtp.Vector EPIVR:$rs2), GPR:$rs1),
-//          (VEXT_X_V $rs2, $rs1)>;
+foreach vti = AllIntegerVectors.Values in
+  def : Pat<(int_epi_vext_x_v (vti.Vector vti.RegClass:$rs2), GPR:$rs1),
+            (!cast<Instruction>("PseudoVEXT_X_V_"#vti.RegClass) $rs2, $rs1)>;
 
-//foreach vtp = AllIntegerVectors.Values in
-//def : Pat<(vtp.Vector (int_epi_vmv_s_x GPR:$rs2)),
-//          (VMV_S_X $rs2)>;
-
+foreach vti = AllIntegerVectors.Values in
+  def : Pat<(vti.Vector (int_epi_vmv_s_x GPR:$rs2, GPR:$vl)),
+            (!cast<Instruction>("PseudoVMV_S_X_"#vti.RegClass) $rs2,
+             (NoX0 GPR:$vl), vti.SEW)>;
 
 defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1up", "PseudoVSLIDE1UP">;
 defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1down", "PseudoVSLIDE1DOWN">;
