@@ -1701,7 +1701,46 @@ foreach evr = AllEPIVRegs.Values in
         BaseInstr = VLE_V_MASK in
       def PseudoVLE_V_MASK_#evr
           : Pseudo<(outs evr:$rd),
-                   (ins evr:$merge, GPR:$rs1, vectormask:$mask, GPR:$vl, ixlenimm:$sew),
+                   (ins evr:$merge, GPR:$rs1, vectormask:$mask, GPR:$vl,
+                    ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Uses = [VL, VTYPE],
+        VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+        BaseInstr = VLSE_V in
+      def PseudoVLSE_V_#evr
+          : Pseudo<(outs evr:$rd),
+                   (ins GPR:$rs1, GPR:$rs2, GPR:$vl, ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+        VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
+        BaseInstr = VLSE_V_MASK in
+      def PseudoVLSE_V_MASK_#evr
+          : Pseudo<(outs evr:$rd),
+                   (ins evr:$merge, GPR:$rs1, GPR:$rs2, vectormask:$mask,
+                    GPR:$vl, ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Uses = [VL, VTYPE],
+        VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+        BaseInstr = VLXE_V in
+      def PseudoVLXE_V_#evr
+          : Pseudo<(outs evr:$rd),
+                   (ins GPR:$rs1, evr:$rs2, GPR:$vl, ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+        VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
+        BaseInstr = VLXE_V_MASK in
+      def PseudoVLXE_V_MASK_#evr
+          : Pseudo<(outs evr:$rd),
+                   (ins evr:$merge, GPR:$rs1, evr:$rs2, vectormask:$mask,
+                    GPR:$vl, ixlenimm:$sew),
                    []>,
             EPIPseudo;
   }
@@ -1725,7 +1764,48 @@ foreach evr = AllEPIVRegs.Values in
         BaseInstr = VSE_V_MASK in
       def PseudoVSE_V_MASK_#evr
           : Pseudo<(outs),
-                   (ins evr:$rd, GPR:$rs1, vectormask:$mask, GPR:$vl, ixlenimm:$sew),
+                   (ins evr:$rd, GPR:$rs1, vectormask:$mask, GPR:$vl,
+                        ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Uses = [VL, VTYPE],
+        VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+        BaseInstr = VSSE_V in
+      def PseudoVSSE_V_#evr
+          : Pseudo<(outs),
+                   (ins evr:$rd, GPR:$rs1, GPR:$rs2, GPR:$vl, ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    // Masked stores do not have a merge operand as merge is done in memory
+    let Uses = [VL, VTYPE, V0],
+        VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
+        BaseInstr = VSSE_V_MASK in
+      def PseudoVSSE_V_MASK_#evr
+          : Pseudo<(outs),
+                   (ins evr:$rd, GPR:$rs1, GPR:$rs2, vectormask:$mask, GPR:$vl,
+                        ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    let Uses = [VL, VTYPE],
+        VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+        BaseInstr = VSXE_V in
+      def PseudoVSXE_V_#evr
+          : Pseudo<(outs),
+                   (ins evr:$rd, GPR:$rs1, evr:$rs2, GPR:$vl, ixlenimm:$sew),
+                   []>,
+            EPIPseudo;
+
+    // Masked stores do not have a merge operand as merge is done in memory
+    let Uses = [VL, VTYPE, V0],
+        VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
+        BaseInstr = VSXE_V_MASK in
+      def PseudoVSXE_V_MASK_#evr
+          : Pseudo<(outs),
+                   (ins evr:$rd, GPR:$rs1, evr:$rs2, vectormask:$mask, GPR:$vl,
+                        ixlenimm:$sew),
                    []>,
             EPIPseudo;
   }
@@ -2864,67 +2944,84 @@ foreach fvti = AllFloatVectors.Values in {
 // Patterns. Load/store
 //===----------------------------------------------------------------------===//
 
-multiclass pat_load<string instruction_width> {
+multiclass pat_load<string width> {
   foreach vti = AllVectors.Values in
   {
     def : Pat<(vti.Vector (int_epi_vload GPR:$rs1, GPR:$vl)),
-              (!cast<Instruction>("PseudoVL"#instruction_width#"_V_"#vti.RegClass)
-               GPR:$rs1, (NoX0 GPR:$vl), vti.SEW)>;
+              (!cast<Instruction>("PseudoVL"#width#"_V_"#vti.RegClass) $rs1,
+               (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(vti.Vector (int_epi_vload_strided GPR:$rs1, GPR:$rs2, GPR:$vl)),
+              (!cast<Instruction>("PseudoVLS"#width#"_V_"#vti.RegClass) $rs1,
+               $rs2, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(vti.Vector (int_epi_vload_indexed GPR:$rs1,
+                           (vti.IntVector vti.RegClass:$rs2), GPR:$vl)),
+              (!cast<Instruction>("PseudoVLX"#width#"_V_"#vti.RegClass) $rs1,
+               $rs2, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(vti.Vector (int_epi_vload_mask (vti.Vector vti.RegClass:$merge),
+                           GPR:$rs1, (vti.Mask V0), GPR:$vl)),
+               (!cast<Instruction>("PseudoVL"#width#"_V_MASK_"#vti.RegClass)
+                $merge, $rs1, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(vti.Vector (int_epi_vload_strided_mask
+                           (vti.Vector vti.RegClass:$merge), GPR:$rs1, GPR:$rs2,
+                           (vti.Mask V0), GPR:$vl)),
+              (!cast<Instruction>("PseudoVLS"#width#"_V_MASK_"#vti.RegClass)
+               $merge, $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
+               vti.SEW)>;
+
+    def : Pat<(vti.Vector (int_epi_vload_indexed_mask
+                           (vti.Vector vti.RegClass:$merge), GPR:$rs1,
+                           (vti.IntVector vti.RegClass:$rs2), (vti.Mask V0),
+                           GPR:$vl)),
+              (!cast<Instruction>("PseudoVLX"#width#"_V_MASK_"#vti.RegClass)
+               $merge, $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
+               vti.SEW)>;
   }
-
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type) GPR:$rs1),
-//          (!cast<Instruction>("VL" # instruction_width # "_V") $rs1)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type # "_strided")
-//           GPR:$rs1, GPR:$rs2),
-//          (!cast<Instruction>("VLS" # instruction_width # "_V") $rs1, $rs2)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type # "_indexed")
-//           GPR:$rs1, EPIVR:$rs2),
-//          (!cast<Instruction>("VLX" # instruction_width # "_V") $rs1, $rs2)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type # "_mask")
-//           GPR:$rs1, V0),
-//           (!cast<Instruction>("VL" # instruction_width # "_V_MASK") $rs1, vmask_only_true.Value)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type # "_strided_mask")
-//           GPR:$rs1, GPR:$rs2, V0),
-//          (!cast<Instruction>("VLS" # instruction_width # "_V_MASK")
-//           $rs1, $rs2, vmask_only_true.Value)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vload_" # intrinsic_type # "_indexed_mask")
-//           GPR:$rs1, EPIVR:$rs2, V0),
-//          (!cast<Instruction>("VLX" # instruction_width # "_V_MASK")
-//           $rs1, $rs2, vmask_only_true.Value)>;
-
 }
 
 
-multiclass pat_store<string instruction_width> {
+multiclass pat_store<string width> {
   foreach vti = AllVectors.Values in
   {
     def : Pat<(int_epi_vstore (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
                GPR:$vl),
-              (!cast<Instruction>("PseudoVS"#instruction_width#"_V_"#vti.RegClass)
+              (!cast<Instruction>("PseudoVS"#width#"_V_"#vti.RegClass)
                vti.RegClass:$rs3, GPR:$rs1, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(int_epi_vstore_strided
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1, GPR:$rs2, GPR:$vl),
+              (!cast<Instruction>("PseudoVSS"#width#"_V_"#vti.RegClass) $rs3,
+               $rs1, $rs2, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(int_epi_vstore_indexed
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
+               (vti.IntVector vti.RegClass:$rs2), GPR:$vl),
+              (!cast<Instruction>("PseudoVSX"#width#"_V_"#vti.RegClass) $rs3,
+               $rs1, $rs2, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(int_epi_vstore_mask
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1, (vti.Mask V0),
+               GPR:$vl),
+              (!cast<Instruction>("PseudoVS"#width#"_V_MASK_"#vti.RegClass)
+               $rs3, $rs1, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(int_epi_vstore_strided_mask
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1, GPR:$rs2,
+               (vti.Mask V0), GPR:$vl),
+              (!cast<Instruction>("PseudoVSS"#width#"_V_MASK_"#vti.RegClass)
+               $rs3, $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
+               vti.SEW)>;
+
+    def : Pat<(int_epi_vstore_indexed_mask
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
+               (vti.IntVector vti.RegClass:$rs2), (vti.Mask V0), GPR:$vl),
+              (!cast<Instruction>("PseudoVSX"#width#"_V_MASK_"#vti.RegClass)
+               $rs3, $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
+               vti.SEW)>;
   }
-
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type)
-//           EPIVR:$rs3, GPR:$rs1),
-//          (!cast<Instruction>("VS" # instruction_width # "_V") $rs3, $rs1)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type # "_strided")
-//           EPIVR:$rs3, GPR:$rs1, GPR:$rs2),
-//          (!cast<Instruction>("VSS" # instruction_width # "_V") $rs3, $rs1, $rs2)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type # "_indexed")
-//           EPIVR:$rs3, GPR:$rs1, EPIVR:$rs2),
-//          (!cast<Instruction>("VSX" # instruction_width # "_V") $rs3, $rs1, $rs2)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type # "_mask")
-//           EPIVR:$rs3, GPR:$rs1, V0),
-//           (!cast<Instruction>("VS" # instruction_width # "_V_MASK") $rs3, $rs1, vmask_only_true.Value)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type # "_strided_mask")
-//           EPIVR:$rs3, GPR:$rs1, GPR:$rs2, V0),
-//          (!cast<Instruction>("VSS" # instruction_width # "_V_MASK")
-//           $rs3, $rs1, $rs2, vmask_only_true.Value)>;
-//def : Pat<(!cast<Intrinsic>("int_epi_vstore_" # intrinsic_type # "_indexed_mask")
-//           EPIVR:$rs3, GPR:$rs1, EPIVR:$rs2, V0),
-//          (!cast<Instruction>("VSX" # instruction_width # "_V_MASK")
-//           $rs3, $rs1, $rs2, vmask_only_true.Value)>;
-
 }
 
 let Predicates = [HasExtEPI] in {
