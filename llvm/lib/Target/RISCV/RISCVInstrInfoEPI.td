@@ -970,7 +970,7 @@ defm VFNCVT_F_XU : unary_arithmetic_float_v<"vfncvt.f.xu", 0b100010, 0b10010>;
 defm VFNCVT_F_X  : unary_arithmetic_float_v<"vfncvt.f.x",  0b100010, 0b10011>;
 defm VFNCVT_F_F  : unary_arithmetic_float_v<"vfncvt.f.f",  0b100010, 0b10100>;
 
-defm VFSQRT : unary_arithmetic_float_v<"vfsqrt", 0b100011, 0b00000>;
+defm VFSQRT  : unary_arithmetic_float_v<"vfsqrt", 0b100011, 0b00000>;
 defm VFCLASS : unary_arithmetic_float_v<"vfclass", 0b100011, 0b10000>;
 
 defm VFMUL   : binary_arithmetic_float_vf<"vfmul", 0b100100>;
@@ -1276,6 +1276,39 @@ def EPIPseudosTable : GenericTable {
   let Fields = [ "Pseudo", "BaseInstr", "VLIndex", "SEWIndex", "VLMul", "MergeOpIndex" ];
   let PrimaryKey = [ "Pseudo" ];
   let PrimaryKeyName = "getEPIPseudoInfo";
+}
+
+multiclass pseudo_unary<EPIVReg result_reg_class,
+                        EPIVReg op_reg_class> {
+  let Uses = [VL, VTYPE],
+      VLIndex = 2, SEWIndex = 3, MergeOpIndex = -1,
+      BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
+    def "_"#op_reg_class : Pseudo<(outs result_reg_class:$rd),
+                                  (ins op_reg_class:$rs2, GPR:$vl,
+                                       ixlenimm:$sew),
+                                  []>,
+                           EPIPseudo;
+
+  let Constraints = "$rd = $merge",
+      Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
+      BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
+    def "_MASK_"#op_reg_class : Pseudo<(outs result_reg_class:$rd),
+                                       (ins result_reg_class:$merge,
+                                            op_reg_class:$rs2, vectormask:$vm,
+                                            GPR:$vl, ixlenimm:$sew),
+                                       []>,
+                                EPIPseudo;
+}
+
+multiclass pseudo_unary_arithmetic_float_v_v {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs.Values in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _V : pseudo_unary<evr, evr>;
+    }
+  }
 }
 
 multiclass pseudo_binary<EPIVReg result_reg_class,
@@ -1644,6 +1677,8 @@ defm PseudoVFWSUB      : pseudo_binary_arithmetic_float_w_vf;
 defm PseudoVFWMUL      : pseudo_binary_arithmetic_float_w_vf;
 defm PseudoVFDOT       : pseudo_binary_arithmetic_float_v_v;
 
+defm PseudoVFSQRT      : pseudo_unary_arithmetic_float_v_v;
+
 // Load/store pseudo instructions
 
 foreach evr = AllEPIVRegs.Values in
@@ -1843,8 +1878,7 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                          (mask_type V0),
                          (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_MASK_"#op1_reg_class)
-             result_reg_class:$merge,
-             op1_reg_class:$rs1,
+             $merge, op1_reg_class:$rs1,
              // Floating point instructions with a scalar operand expect such
              // operand to be in a register of class FPR64. When dealing with
              // the f32 variant of such instructions we need to promote the
@@ -2721,12 +2755,18 @@ defm "" : pat_intrinsic_binary_fp_v_vv<"int_epi_vfdot", "PseudoVFDOT">;
 //defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfwmsac", "VFWMSAC">;
 //defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfwnmsac", "VFWNMSAC">;
 
-//foreach vtp = AllFloatVectors.Values in
-//def : Pat<(vtp.Vector (int_epi_vfsqrt (vtp.Vector EPIVR:$rs2))),
-//          (VFSQRT_V $rs2)>;
-//foreach vtp = AllFloatVectors.Values in
-//def : Pat<(vtp.Vector (int_epi_vfsqrt_mask (vtp.Vector EPIVR:$rs2), V0)),
-//          (VFSQRT_V_MASK $rs2, vmask_only_true.Value)>;
+foreach vti = AllFloatVectors.Values in
+  def : Pat<(vti.Vector (int_epi_vfsqrt (vti.Vector vti.RegClass:$rs2),
+                         GPR:$vl)),
+            (!cast<Instruction>("PseudoVFSQRT_V_"#vti.RegClass) $rs2,
+             (NoX0 GPR:$vl), vti.SEW)>;
+
+foreach vti = AllFloatVectors.Values in
+  def : Pat<(vti.Vector (int_epi_vfsqrt_mask (vti.Vector vti.RegClass:$merge),
+                         (vti.Vector vti.RegClass:$rs2), (vti.Mask V0),
+                         GPR:$vl)),
+            (!cast<Instruction>("PseudoVFSQRT_V_MASK_"#vti.RegClass) $merge,
+             $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
 
 //foreach itp = [ nxv1i32, nxv1i64 ] in
 //foreach vtp = AllFloatVectors.Values in
@@ -2766,24 +2806,57 @@ defm "" : pat_intrinsic_binary_fp_v_vv<"int_epi_vfdot", "PseudoVFDOT">;
 //            (VID_V_MASK vmask_only_true.Value)>;
 //}
 
-//foreach vtp = AllIntegerVectors.Values in {
-//def : Pat<(vtp.Vector (int_epi_vbroadcast GPR:$rs2)),
-//          (VMERGE_VX (vtp.Vector (IMPLICIT_DEF)), $rs2)>;
-//def : Pat<(vtp.Vector (int_epi_vbroadcast simm5:$imm5)),
-//          (VMERGE_VI (vtp.Vector (IMPLICIT_DEF)), $imm5)>;
+foreach vti = AllIntegerVectors.Values in {
+  def : Pat<(vti.Vector (int_epi_vbroadcast GPR:$rs2, GPR:$vl)),
+            (!cast<Instruction>("PseudoVMERGE_VX_"#vti.RegClass)
+             (vti.Vector (IMPLICIT_DEF)), $rs2, (NoX0 GPR:$vl), vti.SEW)>;
+  def : Pat<(vti.Vector (int_epi_vbroadcast simm5:$imm5, GPR:$vl)),
+            (!cast<Instruction>("PseudoVMERGE_VI_"#vti.RegClass)
+             (vti.Vector (IMPLICIT_DEF)), simm5:$imm5, (NoX0 GPR:$vl), vti.SEW)>;
+  def : Pat<(vti.Vector (int_epi_vbroadcast_mask
+                         (vti.Vector vti.RegClass:$merge), GPR:$rs2,
+                         (vti.Mask V0), GPR:$vl)),
+            (!cast<Instruction>("PseudoVMERGE_VX_MASK_"#vti.RegClass)
+             $merge, (vti.Vector (IMPLICIT_DEF)), $rs2, vmask_only_true.Value,
+             (NoX0 GPR:$vl), vti.SEW)>;
+  def : Pat<(vti.Vector (int_epi_vbroadcast_mask
+                         (vti.Vector vti.RegClass:$merge), simm5:$imm5,
+                         (vti.Mask V0), GPR:$vl)),
+            (!cast<Instruction>("PseudoVMERGE_VI_MASK_"#vti.RegClass)
+             $merge, (vti.Vector (IMPLICIT_DEF)), simm5:$imm5,
+             vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+}
+foreach fvti = AllFloatVectors.Values in {
+  def : Pat<(fvti.Vector (int_epi_vbroadcast
+                         (fvti.Scalar fvti.ScalarRegClass:$rs2), GPR:$vl)),
+            (!cast<Instruction>("PseudoVFMERGE_VF_"#fvti.RegClass)
+             (fvti.Vector (IMPLICIT_DEF)),
+             // Floating point instructions with a scalar operand expect such
+             // operand to be in a register of class FPR64. When dealing with
+             // the f32 variant of such instructions we need to promote the
+             // FPR32 subregister to the FPR64 base register
+             !if(!eq(!cast<string>(fvti.ScalarRegClass),
+                     !cast<string>(FPR32)),
+                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
+                 (fvti.Scalar fvti.ScalarRegClass:$rs2)),
+             $vl, fvti.SEW)>;
 
-//def : Pat<(vtp.Vector (int_epi_vbroadcast_mask GPR:$rs2, V0)),
-//          (VMERGE_VX_MASK (vtp.Vector (IMPLICIT_DEF)), $rs2, vmask_only_true.Value)>;
-//def : Pat<(vtp.Vector (int_epi_vbroadcast_mask simm5:$imm5, V0)),
-//          (VMERGE_VI_MASK (vtp.Vector (IMPLICIT_DEF)), $imm5, vmask_only_true.Value)>;
-//}
-//foreach vtp = AllFloatVectors.Values in {
-//def : Pat<(vtp.Vector (int_epi_vbroadcast (vtp.Scalar EPIFPR:$rs2))),
-//          (VFMERGE_VF (vtp.Vector (IMPLICIT_DEF)), $rs2)>;
-
-//def : Pat<(vtp.Vector (int_epi_vbroadcast_mask (vtp.Scalar EPIFPR:$rs2), V0)),
-//          (VFMERGE_VF_MASK (vtp.Vector (IMPLICIT_DEF)), $rs2, vmask_only_true.Value)>;
-//}
+  def : Pat<(fvti.Vector (int_epi_vbroadcast_mask
+                         (fvti.Vector fvti.RegClass:$merge),
+                         (fvti.Scalar fvti.ScalarRegClass:$rs2), (fvti.Mask V0),
+                         GPR:$vl)),
+            (!cast<Instruction>("PseudoVFMERGE_VF_MASK_"#fvti.RegClass)
+             $merge, (fvti.Vector (IMPLICIT_DEF)),
+             // Floating point instructions with a scalar operand expect such
+             // operand to be in a register of class FPR64. When dealing with
+             // the f32 variant of such instructions we need to promote the
+             // FPR32 subregister to the FPR64 base register
+             !if(!eq(!cast<string>(fvti.ScalarRegClass),
+                     !cast<string>(FPR32)),
+                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
+                 (fvti.Scalar fvti.ScalarRegClass:$rs2)),
+             vmask_only_true.Value, $vl, fvti.SEW)>;
+}
 
 }
 

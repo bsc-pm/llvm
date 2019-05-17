@@ -1381,8 +1381,8 @@ intrinsics = [
         # This is a very special one
         #UnaryIntrinsic("vfclass", type_generator = generate_unary_vfclass_types, variants = v),
 
-        #UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_integer_types, variants = vx, instruction = "vmerge", scalar_register = "a0"),
-        #UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_float_types, variants = vf, instruction = "vfmerge", scalar_register = "ft0"),
+        UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_integer_types, variants = vx, instruction = "vmerge", scalar_register = "a0"),
+        UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_float_types, variants = vf, instruction = "vfmerge", scalar_register = "ft0"),
 
         #UnaryIntrinsicMask("vmsbf", type_generator = generate_unary_mask_types, variants = m),
         #UnaryIntrinsicMask("vmsof", type_generator = generate_unary_mask_types, variants = m),

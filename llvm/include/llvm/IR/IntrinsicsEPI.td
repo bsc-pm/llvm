@@ -112,10 +112,11 @@ class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
   let ExtendOperand = 1;
 }
 class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_any_ty, llvm_anyvector_ty, llvm_i64_ty ],
+                      [ LLVMMatchType<0>, llvm_any_ty, llvm_anyvector_ty,
+                        llvm_i64_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
-  let ExtendOperand = 1;
+  let ExtendOperand = 2;
 }
 multiclass epi_unary {
   def "int_epi_" # NAME : EPIUnary;
