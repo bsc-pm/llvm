@@ -365,10 +365,10 @@ namespace RISCVEPIPseudosTable {
 struct EPIPseudoInfo {
   unsigned int Pseudo;
   unsigned int BaseInstr;
-  unsigned char VLIndex;
-  unsigned char SEWIndex;
+  signed char VLIndex;
+  signed char SEWIndex;
   unsigned char VLMul;
-  char MergeOpIndex;
+  signed char MergeOpIndex;
 };
 
 #define GET_EPIPseudosTable_DECL

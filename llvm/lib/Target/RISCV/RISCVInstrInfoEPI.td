@@ -1264,8 +1264,8 @@ def EPIIntrinsicsTable : GenericTable {
 class EPIPseudo {
   Pseudo Pseudo = !cast<Pseudo>(NAME);
   Instruction BaseInstr;
-  bits<3> VLIndex;
-  bits<3> SEWIndex;
+  bits<4> VLIndex;
+  bits<4> SEWIndex;
   bits<4> VLMul;
   bits<4> MergeOpIndex;
 }
