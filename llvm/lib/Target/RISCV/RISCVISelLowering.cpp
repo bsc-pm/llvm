@@ -1315,6 +1315,16 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                  MachineBasicBlock *BB) const {
   if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
           RISCVEPIPseudosTable::getEPIPseudoInfo(MI.getOpcode())) {
+    assert(!(EPI->VLIndex >> 4) &&
+           "Fix the following condition if VLIndex is no longer 4 bits wide");
+    // If VLIndex < 0, VL is not used and thus we needn't add any intruction
+    if (EPI->VLIndex & 0x08)
+      return BB;
+
+    assert(!(EPI->SEWIndex >> 4) &&
+           "Fix the following condition if SEWIndex is no longer 4 bits wide");
+    // SEWIndex must be >= 0
+    assert(!(EPI->SEWIndex & 0x08));
     return addEPISetVL(MI, BB, EPI->VLIndex, EPI->SEWIndex, EPI->VLMul);
   }
 

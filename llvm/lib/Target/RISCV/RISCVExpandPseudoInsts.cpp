@@ -62,7 +62,7 @@ private:
                          MachineBasicBlock::iterator &NextMBBI);
   bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                  unsigned BaseInstr, unsigned VLIndex, unsigned SEWIndex,
-                 char MergeOpIndex);
+                 signed char MergeOpIndex);
 };
 
 char RISCVExpandPseudo::ID = 0;
@@ -703,7 +703,7 @@ bool RISCVExpandPseudo::expandLoadAddress(
 bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator MBBI,
                                   unsigned BaseInstr, unsigned VLIndex,
-                                  unsigned SEWIndex, char MergeOpIndex) {
+                                  unsigned SEWIndex, signed char MergeOpIndex) {
   MachineInstr &MI = *MBBI;
   MachineFunction &MF = *MBB.getParent();
   DebugLoc DL = MI.getDebugLoc();
@@ -726,11 +726,15 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
     }
   }
 
+  assert(
+      !(MergeOpIndex >> 4) &&
+      "Fix the following condition if MergeOpIndex is no longer 4 bits wide");
+
   for (MachineInstr::const_mop_iterator Op = MI.operands_begin();
        Op != MI.operands_end(); Op++) {
     if ((MI.getOperandNo(Op) == VLIndex) || (MI.getOperandNo(Op) == SEWIndex) ||
-        // If the pseudo has a merge operand, skip it
-        ((MergeOpIndex >= 0) &&
+        // If the pseudo has a merge operand (MergeOpIndex >= 0), skip it
+        (!(MergeOpIndex & 0x08) &&
          (MI.getOperandNo(Op) == (unsigned)MergeOpIndex)))
       continue;
 
