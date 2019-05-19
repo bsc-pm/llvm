@@ -203,26 +203,38 @@ class Intrinsic(object):
 
 class NullaryIntrinsic(Intrinsic):
     pattern_v = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}();
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}();
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}()
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}()
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_v_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}(<vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+  <vscale x ${result_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}(<vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+    <vscale x ${result_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -258,26 +270,44 @@ entry:
 
 class UnaryIntrinsicMask(Intrinsic):
     pattern_m = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}(<vscale x 1 x ${llvm_lhs_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}(<vscale x 1 x ${llvm_lhs_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_m_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.mask(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -313,30 +343,79 @@ entry:
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
-                print template.substitute(subs)
+
+                subs["sew"] = "e" + str(lhs.sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class UnaryIntrinsic(Intrinsic):
     pattern_v = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}(<vscale x 1 x ${llvm_lhs_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}(<vscale x 1 x ${llvm_lhs_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_v_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -371,30 +450,77 @@ entry:
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
-                print template.substitute(subs)
+
+                subs["sew"] = "e" + str(lhs.sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class UnaryIntrinsicScalarResult(Intrinsic):
     pattern_v = """
-declare ${llvm_result_type} @llvm.epi.${intrinsic}(<vscale x 1 x ${llvm_lhs_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare ${llvm_result_type} @llvm.epi.${intrinsic}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} a0, v0
-  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}(<vscale x 1 x ${llvm_lhs_type}> undef)
+  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    i64 undef)
+
   %p = bitcast i8* @scratch to ${llvm_result_type}*
   store ${llvm_result_type} %a, ${llvm_result_type}* %p
+
   ret void
 }
 """
     pattern_v_mask = """
-declare ${llvm_result_type} @llvm.epi.${intrinsic}.mask(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare ${llvm_result_type} @llvm.epi.${intrinsic}.mask(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} a0, v0, v0.t
-  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x i1> undef)
+  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
   %p = bitcast i8* @scratch to ${llvm_result_type}*
   store ${llvm_result_type} %a, ${llvm_result_type}* %p
+
   ret void
 }
 """
@@ -429,30 +555,79 @@ entry:
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
-                print template.substitute(subs)
+
+                subs["sew"] = "e" + str(lhs.sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class UnaryIntrinsicScalarInput(Intrinsic):
     pattern_v = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_lhs_type}(${llvm_lhs_type});
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
+  ${llvm_lhs_type},
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}
-  %a = call <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_lhs_type}(${llvm_lhs_type} undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
+    ${llvm_lhs_type} undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_v_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.${value_lhs_type}(${llvm_lhs_type}, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  ${llvm_lhs_type},
+  <vscale x ${result_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}, v0.t
-  %a = call <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.${value_lhs_type}(${llvm_lhs_type} undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    ${llvm_lhs_type} undef,
+    <vscale x ${result_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -490,30 +665,77 @@ entry:
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
-                print template.substitute(subs)
+
+                subs["sew"] = "e" + str(lhs.sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class Conversion(Intrinsic):
     pattern_v = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv1${value_result_type}.nxv1${value_lhs_type}(<vscale x 1 x ${llvm_lhs_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix}.v v0, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv1${value_result_type}.nxv1${value_lhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_v_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv1${value_result_type}.nxv1${value_lhs_type}(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix}.v v0, v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv1${value_result_type}.nxv1${value_lhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -545,7 +767,36 @@ entry:
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
-                print template.substitute(subs)
+
+                subs["sew"] = "e" + str(lhs.sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class BinaryIntrinsic(Intrinsic):
     pattern_vv = """
@@ -724,6 +975,11 @@ entry:
                 subs["value_lhs_type"] = lhs.value_type
                 subs["value_rhs_type"] = rhs.value_type
 
+                if v in ["vf", "wf"]:
+                    subs["scalar_register"] = "ft0"
+                elif v in ["vx", "wx", "vm", "mm"]:
+                    subs["scalar_register"] = "a0"
+
                 subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
 
                 for vlmul in self.vlmul_values:
@@ -758,60 +1014,107 @@ entry:
                     subs["lhs_type_scale"] = max_scale*vlmul
                     subs["rhs_type_scale"] = max_scale*vlmul
 
-                    if v in ["vf", "wf"]:
-                        subs["scalar_register"] = "ft0"
-                    elif v in ["vx", "wx", "vm", "mm"]:
-                        subs["scalar_register"] = "a0"
-
                     print template.substitute(subs)
 
 
 class TernaryIntrinsic(Intrinsic):
     pattern_vv = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x ${llvm_rhs_type}>, <vscale x 1 x ${llvm_result_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x ${llvm_rhs_type}> undef, <vscale x 1 x ${llvm_result_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_vv_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x ${llvm_rhs_type}>, <vscale x 1 x ${llvm_result_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x ${llvm_rhs_type}> undef, <vscale x 1 x ${llvm_result_type}> undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_vx = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, ${llvm_rhs_type}, <vscale x 1 x ${llvm_result_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  ${llvm_rhs_type},
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, ${scalar_register}, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, ${llvm_rhs_type} undef, <vscale x 1 x ${llvm_result_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    ${llvm_rhs_type} undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_vx_mask = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, ${llvm_rhs_type}, <vscale x 1 x ${llvm_result_type}>, <vscale x 1 x i1>);
-define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  ${llvm_rhs_type},
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, ${scalar_register}, v0, v0.t
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, ${llvm_rhs_type} undef, <vscale x 1 x ${llvm_result_type}> undef, <vscale x 1 x i1> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    ${llvm_rhs_type} undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -859,41 +1162,106 @@ entry:
                 elif v in ["vx", "wx"]:
                     subs["scalar_register"] = "a0"
 
-                print template.substitute(subs)
+                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    rhs_scale = rhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale, rhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    if (not rhs.is_mask_type) and (rhs_scale != max_scale):
+                        rhs_vlmul = vlmul*(max_scale/rhs_scale)
+                        assert(rhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+                    subs["rhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 class TernaryIntrinsicSwap(Intrinsic):
     pattern_vv = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, <vscale x 1 x ${llvm_rhs_type}>, <vscale x 1 x ${llvm_result_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, v0
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.nxv1${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, <vscale x 1 x ${llvm_rhs_type}> undef, <vscale x 1 x ${llvm_result_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_vx = """
-declare <vscale x 1 x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}>, ${llvm_rhs_type}, <vscale x 1 x ${llvm_result_type}>);
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  ${llvm_rhs_type},
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, ${llvm_rhs_type} undef, <vscale x 1 x ${llvm_result_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    ${llvm_rhs_type} undef,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
     pattern_vi = """
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}() nounwind {
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
 entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_${value_lhs_type}_${value_rhs_type}
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0, 9
-  %a = call <vscale x 1 x  ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv1${value_result_type}.${value_rhs_type}(<vscale x 1 x ${llvm_lhs_type}> undef, ${llvm_rhs_type} 9, <vscale x 1 x ${llvm_result_type}> undef)
-  %p = bitcast i8* @scratch to <vscale x 1 x ${llvm_result_type}>*
-  store <vscale x 1 x ${llvm_result_type}> %a, <vscale x 1 x ${llvm_result_type}>* %p
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    ${llvm_rhs_type} 9,
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
   ret void
 }
 """
@@ -945,7 +1313,41 @@ entry:
                 elif v in ["vx", "wx"]:
                     subs["scalar_register"] = "a0"
 
-                print template.substitute(subs)
+                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    rhs_scale = rhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale, rhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    if (not rhs.is_mask_type) and (rhs_scale != max_scale):
+                        rhs_vlmul = vlmul*(max_scale/rhs_scale)
+                        assert(rhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+                    subs["rhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
 
 ################################################################################
 ################################################################################
