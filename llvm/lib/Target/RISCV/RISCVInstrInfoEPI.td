@@ -1850,7 +1850,7 @@ multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
              // FPR32 subregister to the FPR64 base register
              !if(!eq(!cast<string>(op2_reg_class),
                      !cast<string>(FPR32)),
-                 (SUBREG_TO_REG (i64 1), FPR32:$rs2, sub_32),
+                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
                  (op2_type op2_reg_class:$rs2)),
              (NoX0 GPR:$vl), sew)>;
 }
@@ -1885,7 +1885,7 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
              // FPR32 subregister to the FPR64 base register
              !if(!eq(!cast<string>(op2_reg_class),
                      !cast<string>(FPR32)),
-                 (SUBREG_TO_REG (i64 1), FPR32:$rs2, sub_32),
+                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
                  (op2_type op2_reg_class:$rs2)),
              vmask_only_true.Value,
              (NoX0 GPR:$vl), sew)>;
