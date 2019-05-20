@@ -1558,7 +1558,7 @@ intrinsics = [
         #UnaryIntrinsicScalarResult("vmpopc", type_generator = generate_mask_to_int_types, variants = m),
         #UnaryIntrinsicScalarResult("vmfirst", type_generator = generate_mask_to_int_types, variants = m),
 
-        #UnaryIntrinsic("vfsqrt", type_generator = generate_unary_float_types, variants = v),
+        UnaryIntrinsic("vfsqrt", type_generator = generate_unary_float_types, variants = v),
         # This is a very special one
         #UnaryIntrinsic("vfclass", type_generator = generate_unary_vfclass_types, variants = v),
 
