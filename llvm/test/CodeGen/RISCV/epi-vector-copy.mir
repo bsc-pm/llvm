@@ -7,7 +7,7 @@ body: |
   bb.0.entry:
     liveins: $v2, $x10
     $v1 = COPY $v2
-    VSE_V $v1, $x10
+    VSE_V $v1, $x10, implicit $vl, implicit $vtype
 ...
 
 # CHECK: rdvtype t0
