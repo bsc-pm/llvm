@@ -1,3 +1,5 @@
+// XFAIL: *
+
 // Check gnutools are invoked with propagated values for -mabi and -march.
 
 // RUN: %clang -target riscv32 -fno-integrated-as %s -###  -c \

@@ -1,3 +1,4 @@
+// UNSUPPORTED: riscv
 // Test that the C++ headers are found on Solaris with gcc toolchain detection
 //
 // Sparc, 32bit

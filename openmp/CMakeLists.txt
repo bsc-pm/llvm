@@ -52,7 +52,8 @@ set(OPENMP_TEST_FLAGS "" CACHE STRING
   "Extra compiler flags to send to the test compiler.")
 set(OPENMP_TEST_OPENMP_FLAGS ${OPENMP_TEST_COMPILER_OPENMP_FLAGS} CACHE STRING
   "OpenMP compiler flag to use for testing OpenMP runtime libraries.")
-
+set(OPENMP_TEST_RUNNER "%t" CACHE STRING
+  "Way to run a testcase in the lit testsuite. Needed for cross-compilation")
 
 # Build host runtime library.
 add_subdirectory(runtime)

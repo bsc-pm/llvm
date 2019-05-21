@@ -69,6 +69,7 @@
 
 // RUN: %clang %s -### -no-canonical-prefixes -fuse-ld=ld \
 // RUN:   -target riscv64-unknown-linux-gnu \
+// RUN:   -mabi=lp64 \
 // RUN:   --gcc-toolchain=%S/Inputs/multilib_riscv_linux_sdk \
 // RUN:   --sysroot=%S/Inputs/multilib_riscv_linux_sdk/sysroot 2>&1 \
 // RUN:   | FileCheck -check-prefix=C-RV64-LINUX-MULTI-LP64 %s
@@ -98,6 +99,7 @@
 // C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/lib/gcc/riscv64-unknown-linux-gnu/7.2.0/lib64/lp64d"
 // C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/lib64/lp64d"
 // C-RV64-LINUX-MULTI-LP64D: "-L{{.*}}/Inputs/multilib_riscv_linux_sdk/sysroot/usr/lib64/lp64d"
+// C-RV64-LINUX-MULTI-LP64D: "-latomic"
 
 // RUN: %clang -target riscv64 %s -emit-llvm -S -o - | FileCheck %s
 

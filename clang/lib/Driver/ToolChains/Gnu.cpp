@@ -680,18 +680,6 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
       ppc::getPPCAsmModeForCPU(getCPUName(Args, getToolChain().getTriple())));
     break;
   }
-  case llvm::Triple::riscv32:
-  case llvm::Triple::riscv64: {
-    StringRef ABIName = riscv::getRISCVABI(Args, getToolChain().getTriple());
-    CmdArgs.push_back("-mabi");
-    CmdArgs.push_back(ABIName.data());
-    if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
-      StringRef MArch = A->getValue();
-      CmdArgs.push_back("-march");
-      CmdArgs.push_back(MArch.data());
-    }
-    break;
-  }
   case llvm::Triple::sparc:
   case llvm::Triple::sparcel: {
     CmdArgs.push_back("-32");
@@ -1711,18 +1699,10 @@ Generic_GCC::GCCVersion Generic_GCC::GCCVersion::Parse(StringRef VersionText) {
   return GoodVersion;
 }
 
-static llvm::StringRef getGCCToolchainDir(const ArgList &Args,
-                                          llvm::StringRef SysRoot) {
+static llvm::StringRef getGCCToolchainDir(const ArgList &Args) {
   const Arg *A = Args.getLastArg(clang::driver::options::OPT_gcc_toolchain);
   if (A)
     return A->getValue();
-
-  // If we have a SysRoot, ignore GCC_INSTALL_PREFIX.
-  // GCC_INSTALL_PREFIX specifies the gcc installation for the default
-  // sysroot and is likely not valid with a different sysroot.
-  if (!SysRoot.empty())
-    return "";
-
   return GCC_INSTALL_PREFIX;
 }
 
@@ -1754,7 +1734,7 @@ void Generic_GCC::GCCInstallationDetector::init(
   SmallVector<std::string, 8> Prefixes(D.PrefixDirs.begin(),
                                        D.PrefixDirs.end());
 
-  StringRef GCCToolchainDir = getGCCToolchainDir(Args, D.SysRoot);
+  StringRef GCCToolchainDir = getGCCToolchainDir(Args);
   if (GCCToolchainDir != "") {
     if (GCCToolchainDir.back() == '/')
       GCCToolchainDir = GCCToolchainDir.drop_back(); // remove the /
@@ -1992,13 +1972,11 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
       "powerpc64le-suse-linux", "ppc64le-redhat-linux"};
 
   static const char *const RISCV32LibDirs[] = {"/lib32", "/lib"};
-  static const char *const RISCV32Triples[] = {"riscv32-unknown-linux-gnu",
-                                               "riscv32-linux-gnu",
-                                               "riscv32-unknown-elf"};
   static const char *const RISCV64LibDirs[] = {"/lib64", "/lib"};
-  static const char *const RISCV64Triples[] = {"riscv64-unknown-linux-gnu",
-                                               "riscv64-linux-gnu",
-                                               "riscv64-unknown-elf"};
+  static const char *const RISCVTriplesLinux[] = {"riscv32-unknown-linux-gnu",
+                                                  "riscv64-unknown-linux-gnu"};
+  static const char *const RISCVTriplesBaremetal[] = {"riscv32-unknown-elf",
+                                                      "riscv64-unknown-elf"};
 
   static const char *const SPARCv8LibDirs[] = {"/lib32", "/lib"};
   static const char *const SPARCv8Triples[] = {"sparc-linux-gnu",
@@ -2232,15 +2210,24 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
     break;
   case llvm::Triple::riscv32:
     LibDirs.append(begin(RISCV32LibDirs), end(RISCV32LibDirs));
-    TripleAliases.append(begin(RISCV32Triples), end(RISCV32Triples));
-    BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
-    BiarchTripleAliases.append(begin(RISCV64Triples), end(RISCV64Triples));
+    TripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+    TripleAliases.append(begin(RISCVTriplesBaremetal), end(RISCVTriplesBaremetal));
+    BiarchTripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+    BiarchTripleAliases.append(begin(RISCVTriplesBaremetal), end(RISCVTriplesBaremetal));
     break;
   case llvm::Triple::riscv64:
     LibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
-    TripleAliases.append(begin(RISCV64Triples), end(RISCV64Triples));
-    BiarchLibDirs.append(begin(RISCV32LibDirs), end(RISCV32LibDirs));
-    BiarchTripleAliases.append(begin(RISCV32Triples), end(RISCV32Triples));
+    BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
+    // Only search for Linux toolchains if the target says so
+    if (TargetTriple.getOS() == llvm::Triple::Linux) {
+      TripleAliases.append(begin(RISCVTriplesLinux), end(RISCVTriplesLinux));
+      BiarchTripleAliases.append(begin(RISCVTriplesLinux),
+                                 end(RISCVTriplesLinux));
+    }
+    TripleAliases.append(begin(RISCVTriplesBaremetal),
+                         end(RISCVTriplesBaremetal));
+    BiarchTripleAliases.append(begin(RISCVTriplesBaremetal),
+                               end(RISCVTriplesBaremetal));
     break;
   case llvm::Triple::sparc:
   case llvm::Triple::sparcel:

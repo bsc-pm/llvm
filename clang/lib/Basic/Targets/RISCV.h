@@ -33,15 +33,15 @@ protected:
 
 public:
   RISCVTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
-      : TargetInfo(Triple), HasM(false), HasA(false), HasF(false),
-        HasD(false), HasC(false) {
-    TLSSupported = false;
+      : TargetInfo(Triple), HasM(false), HasA(false), HasF(false), HasD(false),
+        HasC(false) {
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
     LongDoubleFormat = &llvm::APFloat::IEEEquad();
     SuitableAlign = 128;
     WCharType = SignedInt;
     WIntType = UnsignedInt;
+    MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 32;
   }
 
   StringRef getABI() const override { return ABI; }
@@ -74,6 +74,7 @@ class LLVM_LIBRARY_VISIBILITY RISCV32TargetInfo : public RISCVTargetInfo {
 public:
   RISCV32TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : RISCVTargetInfo(Triple, Opts) {
+    TLSSupported = false;
     IntPtrType = SignedInt;
     PtrDiffType = SignedInt;
     SizeType = UnsignedInt;
@@ -82,7 +83,7 @@ public:
 
   bool setABI(const std::string &Name) override {
     // TODO: support ilp32f and ilp32d ABIs.
-    if (Name == "ilp32") {
+    if (Name == "ilp32" || Name == "ilp32f" || Name == "ilp32d") {
       ABI = Name;
       return true;
     }
@@ -96,11 +97,11 @@ public:
     LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
     IntMaxType = Int64Type = SignedLong;
     resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
+    MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 64;
   }
 
   bool setABI(const std::string &Name) override {
-    // TODO: support lp64f and lp64d ABIs.
-    if (Name == "lp64") {
+    if (Name == "lp64" || Name == "lp64f" || Name == "lp64d") {
       ABI = Name;
       return true;
     }

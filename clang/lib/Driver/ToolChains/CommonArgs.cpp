@@ -1220,6 +1220,18 @@ static void AddLibgcc(const ToolChain &TC, const Driver &D,
     CmdArgs.push_back("-ldl");
 }
 
+static void AddLibatomic(const ToolChain &TC, const Driver &D,
+                          ArgStringList &CmdArgs, const ArgList &Args) {
+  const llvm::Triple::ArchType Arch = TC.getArch();
+
+  // RISC-V may need libatomic
+  if (Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64) {
+    CmdArgs.push_back("--as-needed");
+    CmdArgs.push_back("-latomic");
+    CmdArgs.push_back("--no-as-needed");
+  }
+}
+
 void tools::AddRunTimeLibs(const ToolChain &TC, const Driver &D,
                            ArgStringList &CmdArgs, const ArgList &Args) {
   // Make use of compiler-rt if --rtlib option is used
@@ -1243,6 +1255,8 @@ void tools::AddRunTimeLibs(const ToolChain &TC, const Driver &D,
       AddLibgcc(TC, D, CmdArgs, Args);
     break;
   }
+
+  AddLibatomic(TC, D, CmdArgs, Args);
 }
 
 /// Add OpenMP linker script arguments at the end of the argument list so that

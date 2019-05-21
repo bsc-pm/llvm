@@ -10362,9 +10362,6 @@
 // RUN:   | FileCheck -match-full-lines -check-prefix=RISCV32 %s
 // RUN: %clang_cc1 -E -dM -ffreestanding -triple=riscv32-unknown-linux < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV32,RISCV32-LINUX %s
-// RUN: %clang_cc1 -E -dM -ffreestanding -triple=riscv32 \
-// RUN: -fforce-enable-int128 < /dev/null | FileCheck -match-full-lines \
-// RUN: -check-prefixes=RISCV32,RISCV32-INT128 %s
 // RISCV32: #define _ILP32 1
 // RISCV32: #define __ATOMIC_ACQUIRE 2
 // RISCV32: #define __ATOMIC_ACQ_REL 4
@@ -10410,17 +10407,17 @@
 // RISCV32: #define __FLT_MIN_EXP__ (-125)
 // RISCV32: #define __FLT_MIN__ 1.17549435e-38F
 // RISCV32: #define __FLT_RADIX__ 2
-// RISCV32: #define __GCC_ATOMIC_BOOL_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_CHAR16_T_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_CHAR32_T_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_CHAR_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_INT_LOCK_FREE 1
+// RISCV32: #define __GCC_ATOMIC_BOOL_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_CHAR16_T_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_CHAR32_T_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_CHAR_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_INT_LOCK_FREE 2
 // RISCV32: #define __GCC_ATOMIC_LLONG_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_LONG_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_POINTER_LOCK_FREE 1
-// RISCV32: #define __GCC_ATOMIC_SHORT_LOCK_FREE 1
+// RISCV32: #define __GCC_ATOMIC_LONG_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_POINTER_LOCK_FREE 2
+// RISCV32: #define __GCC_ATOMIC_SHORT_LOCK_FREE 2
 // RISCV32: #define __GCC_ATOMIC_TEST_AND_SET_TRUEVAL 1
-// RISCV32: #define __GCC_ATOMIC_WCHAR_T_LOCK_FREE 1
+// RISCV32: #define __GCC_ATOMIC_WCHAR_T_LOCK_FREE 2
 // RISCV32: #define __GNUC_MINOR__ {{.*}}
 // RISCV32: #define __GNUC_PATCHLEVEL__ {{.*}}
 // RISCV32: #define __GNUC_STDC_INLINE__ 1
@@ -10494,7 +10491,6 @@
 // RISCV32: #define __SIG_ATOMIC_WIDTH__ 32
 // RISCV32: #define __SIZEOF_DOUBLE__ 8
 // RISCV32: #define __SIZEOF_FLOAT__ 4
-// RISCV32-INT128: #define __SIZEOF_INT128__ 16
 // RISCV32: #define __SIZEOF_INT__ 4
 // RISCV32: #define __SIZEOF_LONG_DOUBLE__ 16
 // RISCV32: #define __SIZEOF_LONG_LONG__ 8
@@ -10618,17 +10614,17 @@
 // RISCV64: #define __FLT_MIN_EXP__ (-125)
 // RISCV64: #define __FLT_MIN__ 1.17549435e-38F
 // RISCV64: #define __FLT_RADIX__ 2
-// RISCV64: #define __GCC_ATOMIC_BOOL_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_CHAR16_T_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_CHAR32_T_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_CHAR_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_INT_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_LLONG_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_LONG_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_POINTER_LOCK_FREE 1
-// RISCV64: #define __GCC_ATOMIC_SHORT_LOCK_FREE 1
+// RISCV64: #define __GCC_ATOMIC_BOOL_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_CHAR16_T_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_CHAR32_T_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_CHAR_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_INT_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_LLONG_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_LONG_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_POINTER_LOCK_FREE 2
+// RISCV64: #define __GCC_ATOMIC_SHORT_LOCK_FREE 2
 // RISCV64: #define __GCC_ATOMIC_TEST_AND_SET_TRUEVAL 1
-// RISCV64: #define __GCC_ATOMIC_WCHAR_T_LOCK_FREE 1
+// RISCV64: #define __GCC_ATOMIC_WCHAR_T_LOCK_FREE 2
 // RISCV64: #define __GNUC_MINOR__ {{.*}}
 // RISCV64: #define __GNUC_PATCHLEVEL__ {{.*}}
 // RISCV64: #define __GNUC_STDC_INLINE__ 1
@@ -10775,3 +10771,19 @@
 // RISCV64-LINUX: #define __unix__ 1
 // RISCV64-LINUX: #define linux 1
 // RISCV64-LINUX: #define unix 1
+
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32f < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV32-ILP32F %s
+// RISCV32-ILP32F: #define __riscv_float_abi_single 1
+
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv32 -target-abi ilp32d < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV32-ILP32D %s
+// RISCV32-ILP32D: #define __riscv_float_abi_double 1
+
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64f < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV64-LP64F %s
+// RISCV64-LP64F: #define __riscv_float_abi_single 1
+
+// RUN: %clang_cc1 -E -dM -ffreestanding -triple riscv64 -target-abi lp64d < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=RISCV64-LP64D %s
+// RISCV64-LP64D: #define __riscv_float_abi_double 1

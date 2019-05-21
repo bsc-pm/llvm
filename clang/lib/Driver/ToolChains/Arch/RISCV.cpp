@@ -199,7 +199,8 @@ static void getExtensionFeatures(const Driver &D,
   }
 }
 
-void riscv::getRISCVTargetFeatures(const Driver &D, const ArgList &Args,
+void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
+                                   const ArgList &Args,
                                    std::vector<StringRef> &Features) {
   if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
     StringRef MArch = A->getValue();
@@ -362,19 +363,38 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const ArgList &Args,
 
     // Handle all other types of extensions.
     getExtensionFeatures(D, Args, Features, MArch, OtherExts);
+  } else {
+    // GNU/Linux uses RV64GC
+    if (Triple.getArch() == llvm::Triple::riscv64 &&
+        Triple.getOS() == llvm::Triple::Linux) {
+      Features.push_back("+m");
+      Features.push_back("+a");
+      Features.push_back("+f");
+      Features.push_back("+d");
+      Features.push_back("+c");
+    }
+    // We should be using RV64GC here too but C may not be available in most
+    // baremetal environments for 64 bit.
+    else if (Triple.getArch() == llvm::Triple::riscv64 &&
+        Triple.getOS() == llvm::Triple::UnknownOS &&
+        Triple.getEnvironment() == llvm::Triple::UnknownEnvironment) {
+      Features.push_back("+m");
+      Features.push_back("+a");
+      Features.push_back("+f");
+      Features.push_back("+d");
+    }
   }
 
-  // -mrelax is default, unless -mno-relax is specified.
-  bool Relax = true;
+  // -mno-relax is default, unless -mrelax is specified.
+  bool Relax = false;
   if (auto *A = Args.getLastArg(options::OPT_mrelax, options::OPT_mno_relax)) {
-    if (A->getOption().matches(options::OPT_mno_relax)) {
-      Relax = false;
-      Features.push_back("-relax");
-    }
+    Relax = A->getOption().matches(options::OPT_mrelax);
   }
 
   if (Relax)
     Features.push_back("+relax");
+  else
+    Features.push_back("-relax");
 
   // Now add any that the user explicitly requested on the command line,
   // which may override the defaults.
@@ -382,8 +402,16 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const ArgList &Args,
 }
 
 StringRef riscv::getRISCVABI(const ArgList &Args, const llvm::Triple &Triple) {
-  if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
+  assert((Triple.getArch() == llvm::Triple::riscv32 ||
+          Triple.getArch() == llvm::Triple::riscv64) &&
+         "Unexpected triple");
+
+  if (const Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
     return A->getValue();
+
+  if (Triple.getArch() == llvm::Triple::riscv64)
+    // In riscv64 we always default to lp64d
+    return "lp64d";
 
   return Triple.getArch() == llvm::Triple::riscv32 ? "ilp32" : "lp64";
 }

@@ -9132,24 +9132,43 @@ namespace {
 class RISCVABIInfo : public DefaultABIInfo {
 private:
   unsigned XLen; // Size of the integer ('x') registers in bits.
+  unsigned FLen; // Size of the floating ('f') registers in bits.
   static const int NumArgGPRs = 8;
+  static const int NumArgFPRs = 8;
+
+  void flattenArray(QualType T, llvm::SmallVector<const Type *, 4> &TypeSeq,
+                    ASTContext &Context) const;
+  void flattenStruct(QualType T, llvm::SmallVector<const Type *, 4> &TypeSeq,
+                    ASTContext &Context) const;
+
+  bool isTwoFloatingStruct(QualType T, unsigned FLen,
+                           llvm::StructType *&CoercedType,
+                           ASTContext &Context) const;
+  bool isFloatingAndIntegerStruct(QualType T, unsigned XLen, unsigned FLen,
+                                  llvm::StructType *&CoercedType,
+                                  ASTContext &Context) const;
 
 public:
-  RISCVABIInfo(CodeGen::CodeGenTypes &CGT, unsigned XLen)
-      : DefaultABIInfo(CGT), XLen(XLen) {}
+  RISCVABIInfo(CodeGen::CodeGenTypes &CGT, unsigned XLen, unsigned FLen)
+      : DefaultABIInfo(CGT), XLen(XLen), FLen(FLen) {}
 
   // DefaultABIInfo's classifyReturnType and classifyArgumentType are
   // non-virtual, but computeInfo is virtual, so we overload it.
   void computeInfo(CGFunctionInfo &FI) const override;
 
   ABIArgInfo classifyArgumentType(QualType Ty, bool IsFixed,
-                                  int &ArgGPRsLeft) const;
+                                  int &ArgGPRsLeft,
+                                  int &ArgsFPRsLeft) const;
   ABIArgInfo classifyReturnType(QualType RetTy) const;
 
   Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                     QualType Ty) const override;
 
+  bool needsExtend(QualType Ty) const;
   ABIArgInfo extendType(QualType Ty) const;
+
+  bool isSoftFloat() const { return FLen == 0; }
+  bool isHardFloat() const { return !isSoftFloat(); }
 };
 } // end anonymous namespace
 
@@ -9171,18 +9190,20 @@ void RISCVABIInfo::computeInfo(CGFunctionInfo &FI) const {
   // different for variadic arguments, we must also track whether we are
   // examining a vararg or not.
   int ArgGPRsLeft = IsRetIndirect ? NumArgGPRs - 1 : NumArgGPRs;
+  int ArgsFPRsLeft = NumArgFPRs;
   int NumFixedArgs = FI.getNumRequiredArgs();
 
   int ArgNum = 0;
   for (auto &ArgInfo : FI.arguments()) {
     bool IsFixed = ArgNum < NumFixedArgs;
-    ArgInfo.info = classifyArgumentType(ArgInfo.type, IsFixed, ArgGPRsLeft);
+    ArgInfo.info = classifyArgumentType(ArgInfo.type, IsFixed, ArgGPRsLeft, ArgsFPRsLeft);
     ArgNum++;
   }
 }
 
 ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
-                                              int &ArgGPRsLeft) const {
+                                              int &ArgGPRsLeft,
+                                              int &ArgFPRsLeft) const {
   assert(ArgGPRsLeft <= NumArgGPRs && "Arg GPR tracking underflow");
   Ty = useFirstFieldIfTransparentUnion(Ty);
 
@@ -9195,6 +9216,14 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
                                            CGCXXABI::RAA_DirectInMemory);
   }
 
+  // In the HardFloat ABI a struct containing just one floating point real is
+  // passed as though it were a standalone floating-point real.
+  const Type *SingleElementTy = isSingleElementStruct(Ty, getContext());
+  if (IsFixed && isHardFloat() && SingleElementTy &&
+      SingleElementTy->isFloatingType()) {
+    Ty = QualType(SingleElementTy, 0);
+  }
+
   // Ignore empty structs/unions.
   if (isEmptyRecord(getContext(), Ty, true))
     return ABIArgInfo::getIgnore();
@@ -9202,6 +9231,57 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
   uint64_t Size = getContext().getTypeSize(Ty);
   uint64_t NeededAlign = getContext().getTypeAlign(Ty);
   bool MustUseStack = false;
+
+  // A real floating point argument is passed in a floating-point argument
+  // register if it is no more than FLEN bits wide and there are registers,
+  // otherwise it is passed as the integer convention.
+  if (IsFixed && isHardFloat() && Ty->isFloatingType() && Size <= FLen &&
+      ArgFPRsLeft > 0) {
+    ArgFPRsLeft -= 1;
+    return ABIArgInfo::getDirect();
+  }
+
+  llvm::StructType *CoercedType = nullptr;
+  // A struct containing two floating point reals is passed in two
+  // floating-point registers if neither is more than FLEN bits and at least
+  // two floating point arguments are available
+  if (IsFixed && isHardFloat() &&
+      isTwoFloatingStruct(Ty, FLen, CoercedType, getContext()) &&
+      ArgFPRsLeft >= 2) {
+    ArgFPRsLeft -= 2;
+    return ABIArgInfo::getCoerceAndExpand(CoercedType, CoercedType);
+  }
+
+  // A complex floating-point number is handled like a a pair of
+  // floats.
+  if (IsFixed && isHardFloat() && Ty->isComplexType() &&
+      getContext().getTypeSize(cast<ComplexType>(Ty)->getElementType()) <=
+          FLen &&
+      ArgFPRsLeft >= 2) {
+    ArgFPRsLeft -= 2;
+    llvm::Type *FloatTy =
+        CGT.ConvertType(cast<ComplexType>(Ty)->getElementType());
+    return ABIArgInfo::getDirect(llvm::ArrayType::get(FloatTy, 2));
+  }
+
+  // A struct containing one floating-point real and one integer (or bitfield),
+  // in either order, is passed in a floating-point register and an integer
+  // register, with the integer zero- or sign-extended as though it were a
+  // scalar, provided the floating-point real is no more than FLEN bits wide and
+  // the integer is no more than XLEN bits wide, and at least one floating-point
+  // argument register and at least one integer argument register is available,
+  // with the integer placed in its argument register **without extension** to
+  // XLEN bits. Otherwise, it is passed according to the integer calling
+  // convention.
+  if (IsFixed && isHardFloat() &&
+      isFloatingAndIntegerStruct(Ty, XLen, FLen, CoercedType,
+                                 getContext()) &&
+      ArgGPRsLeft >= 1 && ArgFPRsLeft >= 1) {
+    ArgGPRsLeft -= 1;
+    ArgFPRsLeft -= 1;
+    return ABIArgInfo::getCoerceAndExpand(CoercedType, CoercedType);
+  }
+
   // Determine the number of GPRs needed to pass the current argument
   // according to the ABI. 2*XLen-aligned varargs are passed in "aligned"
   // register pairs, so may consume 3 registers.
@@ -9258,10 +9338,12 @@ ABIArgInfo RISCVABIInfo::classifyReturnType(QualType RetTy) const {
     return ABIArgInfo::getIgnore();
 
   int ArgGPRsLeft = 2;
+  int ArgFPRsLeft = isHardFloat() ? 2 : 0;
 
   // The rules for return and argument types are the same, so defer to
   // classifyArgumentType.
-  return classifyArgumentType(RetTy, /*IsFixed=*/true, ArgGPRsLeft);
+  return classifyArgumentType(RetTy, /*IsFixed=*/true, ArgGPRsLeft,
+                              ArgFPRsLeft);
 }
 
 Address RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
@@ -9285,10 +9367,153 @@ Address RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                           SlotSize, /*AllowHigherAlign=*/true);
 }
 
-ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
+// Helper function that attempts to flatten an array but bails out
+// if the flattened element sequence is longer than 2.
+void RISCVABIInfo::flattenArray(QualType T,
+                                llvm::SmallVector<const Type *, 4> &TypeSeq,
+                                ASTContext &Context) const {
+  // See-through arrays of size 1.
+  while (const ConstantArrayType *AT = Context.getAsConstantArrayType(T)) {
+    if (AT->getSize().getZExtValue() != 1)
+      break;
+    T = AT->getElementType();
+  }
+  if (const ConstantArrayType *AT = Context.getAsConstantArrayType(T)) {
+    // Element type is an array of size != 1
+    QualType ElementType = AT->getElementType();
+
+    if (isAggregateTypeForABI(ElementType)) {
+      flattenStruct(ElementType, TypeSeq, Context);
+    } else {
+      unsigned Size = AT->getSize().getZExtValue();
+      // We just add up to three elements.
+      unsigned Min = std::min(3U, Size);
+      for (unsigned I = 0; I < Min; I++) {
+        TypeSeq.push_back(ElementType.getTypePtr());
+      }
+    }
+  } else {
+    // Element type is not an array.
+    if (isAggregateTypeForABI(T))
+      flattenStruct(T, TypeSeq, Context);
+    else
+      TypeSeq.push_back(T.getTypePtr());
+  }
+}
+
+// Helper function that attempts to flatten a struct but bails out
+// if it the flattened element sequence is longer than 2.
+void RISCVABIInfo::flattenStruct(QualType T,
+                                 llvm::SmallVector<const Type *, 4> &TypeSeq,
+                                 ASTContext &Context) const {
+  const RecordType *RT = T->getAs<RecordType>();
+  if (!RT)
+    return;
+
+  const RecordDecl *RD = RT->getDecl();
+  // Ignore structs with flexible members.
+  if (RD->hasFlexibleArrayMember())
+    return;
+
+  // If this is a C++ record, flatten the bases.
+  if (const CXXRecordDecl *CXXRD = dyn_cast<CXXRecordDecl>(RD)) {
+    for (const auto &I : CXXRD->bases()) {
+      // Ignore empty records.
+      if (isEmptyRecord(Context, I.getType(), true))
+        continue;
+
+      flattenStruct(I.getType(), TypeSeq, Context);
+
+      // Too many elements already. Bail out.
+      if (TypeSeq.size() > 2)
+        return;
+    }
+  }
+
+  // Flatten the fields.
+  for (const auto *FD : RD->fields()) {
+    QualType FT = FD->getType();
+
+    // Ignore empty fields.
+    if (isEmptyField(Context, FD, true))
+      continue;
+
+    if (Context.getAsConstantArrayType(FT))
+      flattenArray(FT, TypeSeq, Context);
+    else if (!isAggregateTypeForABI(FT))
+      TypeSeq.push_back(FT.getTypePtr());
+    else
+      flattenStruct(FT, TypeSeq, Context);
+
+    // Too many elements already. Bail out.
+    if (TypeSeq.size() > 2)
+      return;
+  }
+}
+
+bool RISCVABIInfo::isTwoFloatingStruct(QualType T, unsigned FLen,
+                                       llvm::StructType *&CoercedType,
+                                       ASTContext &Context) const {
+  // Unions are never flattened.
+  if (T->isUnionType())
+    return false;
+
+  llvm::SmallVector<const Type *, 4> TypeSeq;
+  flattenStruct(T, TypeSeq, Context);
+
+  bool ValidShape = (TypeSeq.size() == 2 && TypeSeq[0]->isFloatingType() &&
+          Context.getTypeSize(TypeSeq[0]) <= FLen &&
+          TypeSeq[1]->isFloatingType() &&
+          Context.getTypeSize(TypeSeq[1]) <= FLen);
+
+  if (!ValidShape)
+    return false;
+
+  CoercedType =
+      llvm::StructType::create({CGT.ConvertType(QualType(TypeSeq[0], 0)),
+                                CGT.ConvertType(QualType(TypeSeq[1], 0))});
+  return true;
+}
+
+bool RISCVABIInfo::isFloatingAndIntegerStruct(QualType T, unsigned XLen,
+                                              unsigned FLen,
+                                              llvm::StructType *&CoercedType,
+                                              ASTContext &Context) const {
+  // Unions are never flattened.
+  if (T->isUnionType())
+    return false;
+
+  llvm::SmallVector<const Type *, 4> TypeSeq;
+  flattenStruct(T, TypeSeq, Context);
+
+  bool ValidShape =
+      TypeSeq.size() == 2 && ((TypeSeq[0]->isFloatingType() &&
+                               Context.getTypeSize(TypeSeq[0]) <= FLen &&
+                               TypeSeq[1]->isIntegralOrEnumerationType() &&
+                               Context.getTypeSize(TypeSeq[1]) <= XLen) ||
+                              (TypeSeq[0]->isIntegralOrEnumerationType() &&
+                               Context.getTypeSize(TypeSeq[0]) <= XLen &&
+                               TypeSeq[1]->isFloatingType() &&
+                               Context.getTypeSize(TypeSeq[1]) <= FLen));
+  if (!ValidShape)
+    return false;
+
+  CoercedType =
+      llvm::StructType::create({CGT.ConvertType(QualType(TypeSeq[0], 0)),
+                                CGT.ConvertType(QualType(TypeSeq[1], 0))});
+  return true;
+}
+
+bool RISCVABIInfo::needsExtend(QualType Ty) const {
   int TySize = getContext().getTypeSize(Ty);
   // RV64 ABI requires unsigned 32 bit integers to be sign extended.
-  if (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() && TySize == 32)
+  return (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() &&
+          TySize == 32);
+}
+
+ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
+  // RV64 ABI requires unsigned 32 bit integers to be sign extended.
+  if (needsExtend(Ty))
     return ABIArgInfo::getSignExtend(Ty);
   return ABIArgInfo::getExtend(Ty);
 }
@@ -9296,8 +9521,9 @@ ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
 namespace {
 class RISCVTargetCodeGenInfo : public TargetCodeGenInfo {
 public:
-  RISCVTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT, unsigned XLen)
-      : TargetCodeGenInfo(new RISCVABIInfo(CGT, XLen)) {}
+  RISCVTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT, unsigned XLen,
+                         unsigned FLen)
+      : TargetCodeGenInfo(new RISCVABIInfo(CGT, XLen, FLen)) {}
 
   void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
                            CodeGen::CodeGenModule &CGM) const override {
@@ -9435,11 +9661,22 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
   case llvm::Triple::msp430:
     return SetCGInfo(new MSP430TargetCodeGenInfo(Types));
 
-  case llvm::Triple::riscv32:
-    return SetCGInfo(new RISCVTargetCodeGenInfo(Types, 32));
-  case llvm::Triple::riscv64:
-    return SetCGInfo(new RISCVTargetCodeGenInfo(Types, 64));
-
+  case llvm::Triple::riscv32: {
+    unsigned FLen = 0;
+    if (getTarget().getABI() == "ilp32f")
+      FLen = 32;
+    else if (getTarget().getABI() == "ilp32d")
+      FLen = 64;
+    return SetCGInfo(new RISCVTargetCodeGenInfo(Types, 32, FLen));
+  }
+  case llvm::Triple::riscv64: {
+    unsigned FLen = 0;
+    if (getTarget().getABI() == "lp64f")
+      FLen = 32;
+    else if (getTarget().getABI() == "lp64d")
+      FLen = 64;
+    return SetCGInfo(new RISCVTargetCodeGenInfo(Types, 64, FLen));
+  }
   case llvm::Triple::systemz: {
     bool HasVector = getTarget().getABI() == "vector";
     return SetCGInfo(new SystemZTargetCodeGenInfo(Types, HasVector));

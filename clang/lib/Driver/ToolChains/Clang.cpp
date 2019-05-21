@@ -335,7 +335,7 @@ static void getTargetFeatures(const ToolChain &TC, const llvm::Triple &Triple,
     break;
   case llvm::Triple::riscv32:
   case llvm::Triple::riscv64:
-    riscv::getRISCVTargetFeatures(D, Args, Features);
+    riscv::getRISCVTargetFeatures(D, Triple, Args, Features);
     break;
   case llvm::Triple::systemz:
     systemz::getSystemZTargetFeatures(Args, Features);
@@ -1844,21 +1844,11 @@ void Clang::AddPPCTargetArgs(const ArgList &Args,
 
 void Clang::AddRISCVTargetArgs(const ArgList &Args,
                                ArgStringList &CmdArgs) const {
-  // FIXME: currently defaults to the soft-float ABIs. Will need to be
-  // expanded to select ilp32f, ilp32d, lp64f, lp64d when appropriate.
-  const char *ABIName = nullptr;
   const llvm::Triple &Triple = getToolChain().getTriple();
-  if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
-    ABIName = A->getValue();
-  else if (Triple.getArch() == llvm::Triple::riscv32)
-    ABIName = "ilp32";
-  else if (Triple.getArch() == llvm::Triple::riscv64)
-    ABIName = "lp64";
-  else
-    llvm_unreachable("Unexpected triple!");
+  StringRef ABIName = riscv::getRISCVABI(Args, Triple);
 
   CmdArgs.push_back("-target-abi");
-  CmdArgs.push_back(ABIName);
+  CmdArgs.push_back(ABIName.data());
 }
 
 void Clang::AddSparcTargetArgs(const ArgList &Args,
@@ -3853,6 +3843,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back(PICLevel == 1 ? "1" : "2");
     if (IsPIE)
       CmdArgs.push_back("-pic-is-pie");
+  }
+
+  if (!PICLevel && Triple.getArch() == llvm::Triple::riscv64 &&
+      Triple.getOS() == llvm::Triple::Linux &&
+      Triple.getEnvironment() == llvm::Triple::GNU) {
+    // This is odd and seems to be a disagreement between GCC and LLVM
+    // when it comes to the TLS model use when -fno-PIC. For now fix it here.
+    // See EPI/llvm#12
+    CmdArgs.push_back("-ftls-model=local-exec");
   }
 
   if (RelocationModel == llvm::Reloc::ROPI ||

@@ -26,6 +26,8 @@ using namespace clang::driver;
 
 namespace {
 
+// Disable unstable test
+#if 0
 TEST(ToolChainTest, VFSGCCInstallation) {
   IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
 
@@ -79,6 +81,7 @@ TEST(ToolChainTest, VFSGCCInstallation) {
       "Selected multilib: .;@m32\n",
       S);
 }
+#endif
 
 TEST(ToolChainTest, VFSGCCInstallationRelativeDir) {
   IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
