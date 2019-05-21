@@ -1015,6 +1015,23 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
     Results.push_back(DAG.getNode(ISD::TRUNCATE, DL, MVT::i32, FPConv));
     break;
   }
+  case ISD::INTRINSIC_WO_CHAIN: {
+    unsigned IntNo = cast<ConstantSDNode>(N->getOperand(0))->getZExtValue();
+    if (IntNo == Intrinsic::epi_vext_x_v) {
+      EVT Ty = N->getValueType(0);
+      if (Ty == MVT::i32 || Ty == MVT::i16 || Ty == MVT::i8) {
+        SDValue Extract64 = SDValue(
+            DAG.getMachineNode(RISCV::PseudoVEXT_X_V_EPIVR, DL, MVT::i64,
+                               N->getOperand(1), N->getOperand(2)),
+            0);
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
+        Results.push_back(Trunc);
+        break;
+      }
+    }
+    llvm_unreachable("Don't know how to custom type legalize this intrinsic!");
+    break;
+  }
   }
 }
 

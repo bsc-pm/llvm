@@ -1798,6 +1798,291 @@ entry:
 }
 
 
+declare i8 @llvm.epi.vext.x.v.i8.nxv8i8(
+  <vscale x 8 x i8>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv8i8
+; CHECK:       vext.x.v a0, v0
+  %a = call i8 @llvm.epi.vext.x.v.i8.nxv8i8(
+    <vscale x 8 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i8*
+  store i8 %a, i8* %p
+
+  ret void
+}
+
+
+declare i8 @llvm.epi.vext.x.v.i8.nxv16i8(
+  <vscale x 16 x i8>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv16i8
+; CHECK:       vext.x.v a0, v0
+  %a = call i8 @llvm.epi.vext.x.v.i8.nxv16i8(
+    <vscale x 16 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i8*
+  store i8 %a, i8* %p
+
+  ret void
+}
+
+
+declare i8 @llvm.epi.vext.x.v.i8.nxv32i8(
+  <vscale x 32 x i8>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv32i8
+; CHECK:       vext.x.v a0, v0
+  %a = call i8 @llvm.epi.vext.x.v.i8.nxv32i8(
+    <vscale x 32 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i8*
+  store i8 %a, i8* %p
+
+  ret void
+}
+
+
+declare i16 @llvm.epi.vext.x.v.i16.nxv4i16(
+  <vscale x 4 x i16>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv4i16
+; CHECK:       vext.x.v a0, v0
+  %a = call i16 @llvm.epi.vext.x.v.i16.nxv4i16(
+    <vscale x 4 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i16*
+  store i16 %a, i16* %p
+
+  ret void
+}
+
+
+declare i16 @llvm.epi.vext.x.v.i16.nxv8i16(
+  <vscale x 8 x i16>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv8i16
+; CHECK:       vext.x.v a0, v0
+  %a = call i16 @llvm.epi.vext.x.v.i16.nxv8i16(
+    <vscale x 8 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i16*
+  store i16 %a, i16* %p
+
+  ret void
+}
+
+
+declare i16 @llvm.epi.vext.x.v.i16.nxv16i16(
+  <vscale x 16 x i16>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv16i16
+; CHECK:       vext.x.v a0, v0
+  %a = call i16 @llvm.epi.vext.x.v.i16.nxv16i16(
+    <vscale x 16 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i16*
+  store i16 %a, i16* %p
+
+  ret void
+}
+
+
+declare i16 @llvm.epi.vext.x.v.i16.nxv32i16(
+  <vscale x 32 x i16>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv32i16
+; CHECK:       vext.x.v a0, v0
+  %a = call i16 @llvm.epi.vext.x.v.i16.nxv32i16(
+    <vscale x 32 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i16*
+  store i16 %a, i16* %p
+
+  ret void
+}
+
+
+declare i32 @llvm.epi.vext.x.v.i32.nxv2i32(
+  <vscale x 2 x i32>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv2i32
+; CHECK:       vext.x.v a0, v0
+  %a = call i32 @llvm.epi.vext.x.v.i32.nxv2i32(
+    <vscale x 2 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i32*
+  store i32 %a, i32* %p
+
+  ret void
+}
+
+
+declare i32 @llvm.epi.vext.x.v.i32.nxv4i32(
+  <vscale x 4 x i32>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv4i32
+; CHECK:       vext.x.v a0, v0
+  %a = call i32 @llvm.epi.vext.x.v.i32.nxv4i32(
+    <vscale x 4 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i32*
+  store i32 %a, i32* %p
+
+  ret void
+}
+
+
+declare i32 @llvm.epi.vext.x.v.i32.nxv8i32(
+  <vscale x 8 x i32>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv8i32
+; CHECK:       vext.x.v a0, v0
+  %a = call i32 @llvm.epi.vext.x.v.i32.nxv8i32(
+    <vscale x 8 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i32*
+  store i32 %a, i32* %p
+
+  ret void
+}
+
+
+declare i32 @llvm.epi.vext.x.v.i32.nxv16i32(
+  <vscale x 16 x i32>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv16i32
+; CHECK:       vext.x.v a0, v0
+  %a = call i32 @llvm.epi.vext.x.v.i32.nxv16i32(
+    <vscale x 16 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i32*
+  store i32 %a, i32* %p
+
+  ret void
+}
+
+
+declare i64 @llvm.epi.vext.x.v.i64.nxv1i64(
+  <vscale x 1 x i64>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv1i64
+; CHECK:       vext.x.v a0, v0
+  %a = call i64 @llvm.epi.vext.x.v.i64.nxv1i64(
+    <vscale x 1 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i64*
+  store i64 %a, i64* %p
+
+  ret void
+}
+
+
+declare i64 @llvm.epi.vext.x.v.i64.nxv2i64(
+  <vscale x 2 x i64>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv2i64
+; CHECK:       vext.x.v a0, v0
+  %a = call i64 @llvm.epi.vext.x.v.i64.nxv2i64(
+    <vscale x 2 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i64*
+  store i64 %a, i64* %p
+
+  ret void
+}
+
+
+declare i64 @llvm.epi.vext.x.v.i64.nxv4i64(
+  <vscale x 4 x i64>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv4i64
+; CHECK:       vext.x.v a0, v0
+  %a = call i64 @llvm.epi.vext.x.v.i64.nxv4i64(
+    <vscale x 4 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i64*
+  store i64 %a, i64* %p
+
+  ret void
+}
+
+
+declare i64 @llvm.epi.vext.x.v.i64.nxv8i64(
+  <vscale x 8 x i64>,
+  i64);
+
+define void @intrinsic_vext.x.v_v_i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv8i64
+; CHECK:       vext.x.v a0, v0
+  %a = call i64 @llvm.epi.vext.x.v.i64.nxv8i64(
+    <vscale x 8 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to i64*
+  store i64 %a, i64* %p
+
+  ret void
+}
+
+
 declare float @llvm.epi.vfmv.f.s.f32.nxv2f32(
   <vscale x 2 x float>);
 

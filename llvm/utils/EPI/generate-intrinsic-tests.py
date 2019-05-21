@@ -1576,7 +1576,7 @@ intrinsics = [
 
         #UnaryIntrinsic("vmiota", type_generator = generate_unary_mask_to_integer_types, variants = m),
 
-        #VExt("vext.x.v", type_generator = generate_unary_integer_types, variants = v, instruction = "vext.x", mask = False),
+        VExt("vext.x.v", type_generator = generate_unary_integer_types, variants = v, instruction = "vext.x", mask = False),
 
         UnaryIntrinsicScalarResultIgnoreVL("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", mask = False),
 
