@@ -111,6 +111,8 @@ public:
 // information presented is correct.
 class JSONNodeDumper
     : public ConstAttrVisitor<JSONNodeDumper>,
+      public comments::ConstCommentVisitor<JSONNodeDumper, void,
+                                           const comments::FullComment *>,
       public ConstTemplateArgumentVisitor<JSONNodeDumper>,
       public ConstStmtVisitor<JSONNodeDumper>,
       public TypeVisitor<JSONNodeDumper>,
@@ -120,8 +122,12 @@ class JSONNodeDumper
 
   const SourceManager &SM;
   PrintingPolicy PrintPolicy;
+  const comments::CommandTraits *Traits;
 
   using InnerAttrVisitor = ConstAttrVisitor<JSONNodeDumper>;
+  using InnerCommentVisitor =
+      comments::ConstCommentVisitor<JSONNodeDumper, void,
+                                    const comments::FullComment *>;
   using InnerTemplateArgVisitor = ConstTemplateArgumentVisitor<JSONNodeDumper>;
   using InnerStmtVisitor = ConstStmtVisitor<JSONNodeDumper>;
   using InnerTypeVisitor = TypeVisitor<JSONNodeDumper>;
@@ -163,10 +169,14 @@ class JSONNodeDumper
   }
   void addPreviousDeclaration(const Decl *D);
 
+  StringRef getCommentCommandName(unsigned CommandID) const;
+
 public:
   JSONNodeDumper(raw_ostream &OS, const SourceManager &SrcMgr,
-                 const PrintingPolicy &PrintPolicy)
-      : NodeStreamer(OS), SM(SrcMgr), PrintPolicy(PrintPolicy) {}
+                 const PrintingPolicy &PrintPolicy,
+                 const comments::CommandTraits *Traits)
+      : NodeStreamer(OS), SM(SrcMgr), PrintPolicy(PrintPolicy), Traits(Traits) {
+  }
 
   void Visit(const Attr *A);
   void Visit(const Stmt *Node);
@@ -208,6 +218,19 @@ public:
   void VisitAccessSpecDecl(const AccessSpecDecl *ASD);
   void VisitFriendDecl(const FriendDecl *FD);
 
+  void VisitObjCIvarDecl(const ObjCIvarDecl *D);
+  void VisitObjCMethodDecl(const ObjCMethodDecl *D);
+  void VisitObjCTypeParamDecl(const ObjCTypeParamDecl *D);
+  void VisitObjCCategoryDecl(const ObjCCategoryDecl *D);
+  void VisitObjCCategoryImplDecl(const ObjCCategoryImplDecl *D);
+  void VisitObjCProtocolDecl(const ObjCProtocolDecl *D);
+  void VisitObjCInterfaceDecl(const ObjCInterfaceDecl *D);
+  void VisitObjCImplementationDecl(const ObjCImplementationDecl *D);
+  void VisitObjCCompatibleAliasDecl(const ObjCCompatibleAliasDecl *D);
+  void VisitObjCPropertyDecl(const ObjCPropertyDecl *D);
+  void VisitObjCPropertyImplDecl(const ObjCPropertyImplDecl *D);
+  void VisitBlockDecl(const BlockDecl *D);
+
   void VisitDeclRefExpr(const DeclRefExpr *DRE);
   void VisitPredefinedExpr(const PredefinedExpr *PE);
   void VisitUnaryOperator(const UnaryOperator *UO);
@@ -237,6 +260,29 @@ public:
   void VisitLabelStmt(const LabelStmt *LS);
   void VisitGotoStmt(const GotoStmt *GS);
   void VisitWhileStmt(const WhileStmt *WS);
+  void VisitObjCAtCatchStmt(const ObjCAtCatchStmt *OACS);
+
+  void visitTextComment(const comments::TextComment *C,
+                        const comments::FullComment *);
+  void visitInlineCommandComment(const comments::InlineCommandComment *C,
+                                 const comments::FullComment *);
+  void visitHTMLStartTagComment(const comments::HTMLStartTagComment *C,
+                                const comments::FullComment *);
+  void visitHTMLEndTagComment(const comments::HTMLEndTagComment *C,
+                              const comments::FullComment *);
+  void visitBlockCommandComment(const comments::BlockCommandComment *C,
+                                const comments::FullComment *);
+  void visitParamCommandComment(const comments::ParamCommandComment *C,
+                                const comments::FullComment *FC);
+  void visitTParamCommandComment(const comments::TParamCommandComment *C,
+                                 const comments::FullComment *FC);
+  void visitVerbatimBlockComment(const comments::VerbatimBlockComment *C,
+                                 const comments::FullComment *);
+  void
+  visitVerbatimBlockLineComment(const comments::VerbatimBlockLineComment *C,
+                                const comments::FullComment *);
+  void visitVerbatimLineComment(const comments::VerbatimLineComment *C,
+                                const comments::FullComment *);
 };
 
 class JSONDumper : public ASTNodeTraverser<JSONDumper, JSONNodeDumper> {
@@ -314,8 +360,9 @@ class JSONDumper : public ASTNodeTraverser<JSONDumper, JSONNodeDumper> {
 
 public:
   JSONDumper(raw_ostream &OS, const SourceManager &SrcMgr,
-             const PrintingPolicy &PrintPolicy)
-      : NodeDumper(OS, SrcMgr, PrintPolicy) {}
+             const PrintingPolicy &PrintPolicy,
+             const comments::CommandTraits *Traits)
+      : NodeDumper(OS, SrcMgr, PrintPolicy, Traits) {}
 
   JSONNodeDumper &doGetNodeDelegate() { return NodeDumper; }
 

@@ -37,6 +37,7 @@
 #include "llvm/Support/Path.h"
 #include <list>
 #include <map>
+#include <string>
 #include <vector>
 
 using namespace clang;
@@ -1828,19 +1829,6 @@ static void AddStaticAssertResult(CodeCompletionBuilder &Builder,
   Results.AddResult(CodeCompletionResult(Builder.TakeString()));
 }
 
-static void printOverrideString(llvm::raw_ostream &OS,
-                                CodeCompletionString *CCS) {
-  for (const auto &C : *CCS) {
-    if (C.Kind == CodeCompletionString::CK_Optional)
-      printOverrideString(OS, C.Optional);
-    else
-      OS << C.Text;
-    // Add a space after return type.
-    if (C.Kind == CodeCompletionString::CK_ResultType)
-      OS << ' ';
-  }
-}
-
 static void AddOverrideResults(ResultBuilder &Results,
                                const CodeCompletionContext &CCContext,
                                CodeCompletionBuilder &Builder) {
@@ -2180,23 +2168,38 @@ static void AddOrdinaryNameResults(Sema::ParserCompletionContext CCC, Scope *S,
       Results.AddResult(Result(Builder.TakeString()));
     }
 
-    // "return expression ;" or "return ;", depending on whether we
-    // know the function is void or not.
-    bool isVoid = false;
+    // "return expression ;" or "return ;", depending on the return type.
+    QualType ReturnType;
     if (const auto *Function = dyn_cast<FunctionDecl>(SemaRef.CurContext))
-      isVoid = Function->getReturnType()->isVoidType();
+      ReturnType = Function->getReturnType();
     else if (const auto *Method = dyn_cast<ObjCMethodDecl>(SemaRef.CurContext))
-      isVoid = Method->getReturnType()->isVoidType();
+      ReturnType = Method->getReturnType();
     else if (SemaRef.getCurBlock() &&
              !SemaRef.getCurBlock()->ReturnType.isNull())
-      isVoid = SemaRef.getCurBlock()->ReturnType->isVoidType();
-    Builder.AddTypedTextChunk("return");
-    if (!isVoid) {
-      Builder.AddChunk(CodeCompletionString::CK_HorizontalSpace);
+      ReturnType = SemaRef.getCurBlock()->ReturnType;;
+    if (ReturnType.isNull() || ReturnType->isVoidType()) {
+      Builder.AddTypedTextChunk("return");
+      Builder.AddChunk(CodeCompletionString::CK_SemiColon);
+      Results.AddResult(Result(Builder.TakeString()));
+    } else {
+      assert(!ReturnType.isNull());
+      // "return expression ;"
+      Builder.AddTypedTextChunk("return");
+      Builder.AddChunk(clang::CodeCompletionString::CK_HorizontalSpace);
       Builder.AddPlaceholderChunk("expression");
+      Builder.AddChunk(CodeCompletionString::CK_SemiColon);
+      Results.AddResult(Result(Builder.TakeString()));
+      // When boolean, also add 'return true;' and 'return false;'.
+      if (ReturnType->isBooleanType()) {
+        Builder.AddTypedTextChunk("return true");
+        Builder.AddChunk(CodeCompletionString::CK_SemiColon);
+        Results.AddResult(Result(Builder.TakeString()));
+
+        Builder.AddTypedTextChunk("return false");
+        Builder.AddChunk(CodeCompletionString::CK_SemiColon);
+        Results.AddResult(Result(Builder.TakeString()));
+      }
     }
-    Builder.AddChunk(CodeCompletionString::CK_SemiColon);
-    Results.AddResult(Result(Builder.TakeString()));
 
     // goto identifier ;
     Builder.AddTypedTextChunk("goto");
@@ -3162,19 +3165,42 @@ CodeCompletionString *CodeCompletionResult::CreateCodeCompletionString(
       PP, Ctx, Result, IncludeBriefComments, CCContext, Policy);
 }
 
+static void printOverrideString(const CodeCompletionString &CCS,
+                                std::string &BeforeName,
+                                std::string &NameAndSignature) {
+  bool SeenTypedChunk = false;
+  for (auto &Chunk : CCS) {
+    if (Chunk.Kind == CodeCompletionString::CK_Optional) {
+      assert(SeenTypedChunk && "optional parameter before name");
+      // Note that we put all chunks inside into NameAndSignature.
+      printOverrideString(*Chunk.Optional, NameAndSignature, NameAndSignature);
+      continue;
+    }
+    SeenTypedChunk |= Chunk.Kind == CodeCompletionString::CK_TypedText;
+    if (SeenTypedChunk)
+      NameAndSignature += Chunk.Text;
+    else
+      BeforeName += Chunk.Text;
+  }
+}
+
 CodeCompletionString *
 CodeCompletionResult::createCodeCompletionStringForOverride(
     Preprocessor &PP, ASTContext &Ctx, CodeCompletionBuilder &Result,
     bool IncludeBriefComments, const CodeCompletionContext &CCContext,
     PrintingPolicy &Policy) {
-  std::string OverrideSignature;
-  llvm::raw_string_ostream OS(OverrideSignature);
   auto *CCS = createCodeCompletionStringForDecl(PP, Ctx, Result,
                                                 /*IncludeBriefComments=*/false,
                                                 CCContext, Policy);
-  printOverrideString(OS, CCS);
-  OS << " override";
-  Result.AddTypedTextChunk(Result.getAllocator().CopyString(OS.str()));
+  std::string BeforeName;
+  std::string NameAndSignature;
+  // For overrides all chunks go into the result, none are informative.
+  printOverrideString(*CCS, BeforeName, NameAndSignature);
+  NameAndSignature += " override";
+
+  Result.AddTextChunk(Result.getAllocator().CopyString(BeforeName));
+  Result.AddChunk(CodeCompletionString::CK_HorizontalSpace);
+  Result.AddTypedTextChunk(Result.getAllocator().CopyString(NameAndSignature));
   return Result.TakeString();
 }
 
@@ -4108,6 +4134,74 @@ static void AddEnumerators(ResultBuilder &Results, ASTContext &Context,
   Results.ExitScope();
 }
 
+/// Try to find a corresponding FunctionProtoType for function-like types (e.g.
+/// function pointers, std::function, etc).
+static const FunctionProtoType *TryDeconstructFunctionLike(QualType T) {
+  assert(!T.isNull());
+  // Try to extract first template argument from std::function<> and similar.
+  // Note we only handle the sugared types, they closely match what users wrote.
+  // We explicitly choose to not handle ClassTemplateSpecializationDecl.
+  if (auto *Specialization = T->getAs<TemplateSpecializationType>()) {
+    if (Specialization->getNumArgs() != 1)
+      return nullptr;
+    const TemplateArgument &Argument = Specialization->getArg(0);
+    if (Argument.getKind() != TemplateArgument::Type)
+      return nullptr;
+    return Argument.getAsType()->getAs<FunctionProtoType>();
+  }
+  // Handle other cases.
+  if (T->isPointerType())
+    T = T->getPointeeType();
+  return T->getAs<FunctionProtoType>();
+}
+
+/// Adds a pattern completion for a lambda expression with the specified
+/// parameter types and placeholders for parameter names.
+static void AddLambdaCompletion(ResultBuilder &Results,
+                                llvm::ArrayRef<QualType> Parameters,
+                                const LangOptions &LangOpts) {
+  if (!Results.includeCodePatterns())
+    return;
+  CodeCompletionBuilder Completion(Results.getAllocator(),
+                                   Results.getCodeCompletionTUInfo());
+  // [](<parameters>) {}
+  Completion.AddChunk(CodeCompletionString::CK_LeftBracket);
+  Completion.AddPlaceholderChunk("=");
+  Completion.AddChunk(CodeCompletionString::CK_RightBracket);
+  if (!Parameters.empty()) {
+    Completion.AddChunk(CodeCompletionString::CK_LeftParen);
+    bool First = true;
+    for (auto Parameter : Parameters) {
+      if (!First)
+        Completion.AddChunk(CodeCompletionString::ChunkKind::CK_Comma);
+      else
+        First = false;
+
+      constexpr llvm::StringLiteral NamePlaceholder = "!#!NAME_GOES_HERE!#!";
+      std::string Type = NamePlaceholder;
+      Parameter.getAsStringInternal(Type, PrintingPolicy(LangOpts));
+      llvm::StringRef Prefix, Suffix;
+      std::tie(Prefix, Suffix) = llvm::StringRef(Type).split(NamePlaceholder);
+      Prefix = Prefix.rtrim();
+      Suffix = Suffix.ltrim();
+
+      Completion.AddTextChunk(Completion.getAllocator().CopyString(Prefix));
+      Completion.AddChunk(CodeCompletionString::CK_HorizontalSpace);
+      Completion.AddPlaceholderChunk("parameter");
+      Completion.AddTextChunk(Completion.getAllocator().CopyString(Suffix));
+    };
+    Completion.AddChunk(CodeCompletionString::CK_RightParen);
+  }
+  Completion.AddChunk(clang::CodeCompletionString::CK_HorizontalSpace);
+  Completion.AddChunk(CodeCompletionString::CK_LeftBrace);
+  Completion.AddChunk(CodeCompletionString::CK_HorizontalSpace);
+  Completion.AddPlaceholderChunk("body");
+  Completion.AddChunk(CodeCompletionString::CK_HorizontalSpace);
+  Completion.AddChunk(CodeCompletionString::CK_RightBrace);
+
+  Results.AddResult(Completion.TakeString());
+}
+
 /// Perform code-completion in an expression context when we know what
 /// type we're looking for.
 void Sema::CodeCompleteExpression(Scope *S,
@@ -4169,6 +4263,14 @@ void Sema::CodeCompleteExpression(Scope *S,
   if (CodeCompleter->includeMacros())
     AddMacroResults(PP, Results, CodeCompleter->loadExternal(), false,
                     PreferredTypeIsPointer);
+
+  // Complete a lambda expression when preferred type is a function.
+  if (!Data.PreferredType.isNull() && getLangOpts().CPlusPlus11) {
+    if (const FunctionProtoType *F =
+            TryDeconstructFunctionLike(Data.PreferredType))
+      AddLambdaCompletion(Results, F->getParamTypes(), getLangOpts());
+  }
+
   HandleCodeCompleteResults(this, CodeCompleter, Results.getCompletionContext(),
                             Results.data(), Results.size());
 }

@@ -129,7 +129,7 @@ void Writer::createCustomSections() {
     LLVM_DEBUG(dbgs() << "createCustomSection: " << Name << "\n");
 
     OutputSection *Sec = make<CustomSection>(Name, Pair.second);
-    if (Config->Relocatable) {
+    if (Config->Relocatable || Config->EmitRelocs) {
       auto *Sym = make<OutputSectionSymbol>(Sec);
       Out.LinkingSec->addToSymtab(Sym);
       Sec->SectionSym = Sym;
@@ -330,7 +330,7 @@ void Writer::addSections() {
   createCustomSections();
 
   addSection(Out.LinkingSec);
-  if (Config->Relocatable) {
+  if (Config->EmitRelocs || Config->Relocatable) {
     createRelocSections();
   }
 
@@ -457,7 +457,7 @@ void Writer::calculateExports() {
         WasmExport{FunctionTableName, WASM_EXTERNAL_TABLE, 0});
 
   unsigned FakeGlobalIndex =
-      Out.ImportSec->NumImportedGlobals + Out.GlobalSec->InputGlobals.size();
+      Out.ImportSec->numImportedGlobals() + Out.GlobalSec->InputGlobals.size();
 
   for (Symbol *Sym : Symtab->getSymbols()) {
     if (!Sym->isExported())
@@ -493,17 +493,17 @@ void Writer::calculateExports() {
 }
 
 void Writer::populateSymtab() {
-  if (!Config->Relocatable)
+  if (!Config->Relocatable && !Config->EmitRelocs)
     return;
 
   for (Symbol *Sym : Symtab->getSymbols())
-    if (Sym->IsUsedInRegularObj)
+    if (Sym->IsUsedInRegularObj && Sym->isLive())
       Out.LinkingSec->addToSymtab(Sym);
 
   for (ObjFile *File : Symtab->ObjectFiles) {
     LLVM_DEBUG(dbgs() << "Local symtab entries: " << File->getName() << "\n");
     for (Symbol *Sym : File->getSymbols())
-      if (Sym->isLocal() && !isa<SectionSymbol>(Sym))
+      if (Sym->isLocal() && !isa<SectionSymbol>(Sym) && Sym->isLive())
         Out.LinkingSec->addToSymtab(Sym);
   }
 }
@@ -550,7 +550,9 @@ static void scanRelocations() {
 }
 
 void Writer::assignIndexes() {
-  assert(Out.FunctionSec->InputFunctions.empty());
+  // Seal the import section, since other index spaces such as function and
+  // global are effected by the number of imports.
+  Out.ImportSec->seal();
 
   for (InputFunction *Func : Symtab->SyntheticFunctions)
     Out.FunctionSec->addFunction(Func);
@@ -751,10 +753,10 @@ void Writer::run() {
         addStartStopSymbols(S);
   }
 
-  log("-- assignIndexes");
-  assignIndexes();
   log("-- scanRelocations");
   scanRelocations();
+  log("-- assignIndexes");
+  assignIndexes();
   log("-- calculateInitFunctions");
   calculateInitFunctions();
 
@@ -787,9 +789,9 @@ void Writer::run() {
     log("Defined Functions: " + Twine(Out.FunctionSec->InputFunctions.size()));
     log("Defined Globals  : " + Twine(Out.GlobalSec->InputGlobals.size()));
     log("Defined Events   : " + Twine(Out.EventSec->InputEvents.size()));
-    log("Function Imports : " + Twine(Out.ImportSec->NumImportedFunctions));
-    log("Global Imports   : " + Twine(Out.ImportSec->NumImportedGlobals));
-    log("Event Imports    : " + Twine(Out.ImportSec->NumImportedEvents));
+    log("Function Imports : " + Twine(Out.ImportSec->numImportedFunctions()));
+    log("Global Imports   : " + Twine(Out.ImportSec->numImportedGlobals()));
+    log("Event Imports    : " + Twine(Out.ImportSec->numImportedEvents()));
     for (ObjFile *File : Symtab->ObjectFiles)
       File->dumpInfo();
   }

@@ -2130,7 +2130,7 @@ unsigned ASTContext::getTypeUnadjustedAlign(const Type *T) const {
     const ASTRecordLayout &Layout = getASTObjCInterfaceLayout(ObjCI->getDecl());
     UnadjustedAlign = toBits(Layout.getUnadjustedAlignment());
   } else {
-    UnadjustedAlign = getTypeAlign(T);
+    UnadjustedAlign = getTypeAlign(T->getUnqualifiedDesugaredType());
   }
 
   MemoizedUnadjustedAlign[T] = UnadjustedAlign;
@@ -4372,7 +4372,13 @@ QualType ASTContext::getPackExpansionType(QualType Pattern,
   llvm::FoldingSetNodeID ID;
   PackExpansionType::Profile(ID, Pattern, NumExpansions);
 
-  assert(Pattern->containsUnexpandedParameterPack() &&
+  // A deduced type can deduce to a pack, eg
+  //   auto ...x = some_pack;
+  // That declaration isn't (yet) valid, but is created as part of building an
+  // init-capture pack:
+  //   [...x = some_pack] {}
+  assert((Pattern->containsUnexpandedParameterPack() ||
+          Pattern->getContainedDeducedType()) &&
          "Pack expansions must expand one or more parameter packs");
   void *InsertPos = nullptr;
   PackExpansionType *T
@@ -4872,19 +4878,20 @@ QualType ASTContext::getUnaryTransformType(QualType BaseType,
 /// deduced to the given type, or to the canonical undeduced 'auto' type, or the
 /// canonical deduced-but-dependent 'auto' type.
 QualType ASTContext::getAutoType(QualType DeducedType, AutoTypeKeyword Keyword,
-                                 bool IsDependent) const {
+                                 bool IsDependent, bool IsPack) const {
+  assert((!IsPack || IsDependent) && "only use IsPack for a dependent pack");
   if (DeducedType.isNull() && Keyword == AutoTypeKeyword::Auto && !IsDependent)
     return getAutoDeductType();
 
   // Look in the folding set for an existing type.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  AutoType::Profile(ID, DeducedType, Keyword, IsDependent);
+  AutoType::Profile(ID, DeducedType, Keyword, IsDependent, IsPack);
   if (AutoType *AT = AutoTypes.FindNodeOrInsertPos(ID, InsertPos))
     return QualType(AT, 0);
 
   auto *AT = new (*this, TypeAlignment)
-      AutoType(DeducedType, Keyword, IsDependent);
+      AutoType(DeducedType, Keyword, IsDependent, IsPack);
   Types.push_back(AT);
   if (InsertPos)
     AutoTypes.InsertNode(AT, InsertPos);
@@ -4946,7 +4953,7 @@ QualType ASTContext::getAutoDeductType() const {
   if (AutoDeductTy.isNull())
     AutoDeductTy = QualType(
       new (*this, TypeAlignment) AutoType(QualType(), AutoTypeKeyword::Auto,
-                                          /*dependent*/false),
+                                          /*dependent*/false, /*pack*/false),
       0);
   return AutoDeductTy;
 }
@@ -9620,8 +9627,8 @@ QualType ASTContext::GetBuiltinType(unsigned Id,
 
   bool Variadic = (TypeStr[0] == '.');
 
-  FunctionType::ExtInfo EI(
-      getDefaultCallingConvention(Variadic, /*IsCXXMethod=*/false));
+  FunctionType::ExtInfo EI(getDefaultCallingConvention(
+      Variadic, /*IsCXXMethod=*/false, /*IsBuiltin=*/true));
   if (BuiltinInfo.isNoReturn(Id)) EI = EI.withNoReturn(true);
 
 
@@ -9998,34 +10005,39 @@ void ASTContext::forEachMultiversionedFunctionVersion(
 }
 
 CallingConv ASTContext::getDefaultCallingConvention(bool IsVariadic,
-                                                    bool IsCXXMethod) const {
+                                                    bool IsCXXMethod,
+                                                    bool IsBuiltin) const {
   // Pass through to the C++ ABI object
   if (IsCXXMethod)
     return ABI->getDefaultMethodCallConv(IsVariadic);
 
-  switch (LangOpts.getDefaultCallingConv()) {
-  case LangOptions::DCC_None:
-    break;
-  case LangOptions::DCC_CDecl:
-    return CC_C;
-  case LangOptions::DCC_FastCall:
-    if (getTargetInfo().hasFeature("sse2") && !IsVariadic)
-      return CC_X86FastCall;
-    break;
-  case LangOptions::DCC_StdCall:
-    if (!IsVariadic)
-      return CC_X86StdCall;
-    break;
-  case LangOptions::DCC_VectorCall:
-    // __vectorcall cannot be applied to variadic functions.
-    if (!IsVariadic)
-      return CC_X86VectorCall;
-    break;
-  case LangOptions::DCC_RegCall:
-    // __regcall cannot be applied to variadic functions.
-    if (!IsVariadic)
-      return CC_X86RegCall;
-    break;
+  // Builtins ignore user-specified default calling convention and remain the
+  // Target's default calling convention.
+  if (!IsBuiltin) {
+    switch (LangOpts.getDefaultCallingConv()) {
+    case LangOptions::DCC_None:
+      break;
+    case LangOptions::DCC_CDecl:
+      return CC_C;
+    case LangOptions::DCC_FastCall:
+      if (getTargetInfo().hasFeature("sse2") && !IsVariadic)
+        return CC_X86FastCall;
+      break;
+    case LangOptions::DCC_StdCall:
+      if (!IsVariadic)
+        return CC_X86StdCall;
+      break;
+    case LangOptions::DCC_VectorCall:
+      // __vectorcall cannot be applied to variadic functions.
+      if (!IsVariadic)
+        return CC_X86VectorCall;
+      break;
+    case LangOptions::DCC_RegCall:
+      // __regcall cannot be applied to variadic functions.
+      if (!IsVariadic)
+        return CC_X86RegCall;
+      break;
+    }
   }
   return Target->getDefaultCallingConv(TargetInfo::CCMT_Unknown);
 }

@@ -2219,6 +2219,10 @@ bool SIInstrInfo::FoldImmediate(MachineInstr &UseMI, MachineInstr &DefMI,
       // These come before src2.
       removeModOperands(UseMI);
       UseMI.setDesc(get(NewOpc));
+      // It might happen that UseMI was commuted
+      // and we now have SGPR as SRC1. If so 2 inlined
+      // constant and SGPR are illegal.
+      legalizeOperands(UseMI);
 
       bool DeleteDef = MRI->hasOneNonDBGUse(Reg);
       if (DeleteDef)
@@ -2513,6 +2517,10 @@ bool SIInstrInfo::mayReadEXEC(const MachineRegisterInfo &MRI,
     // Make sure this isn't copying exec as a normal operand
     return MI.readsRegister(AMDGPU::EXEC, &RI);
   }
+
+  // Make a conservative assumption about the callee.
+  if (MI.isCall())
+    return true;
 
   // Be conservative with any unhandled generic opcodes.
   if (!isTargetSpecificOpcode(MI.getOpcode()))
@@ -3909,7 +3917,7 @@ void SIInstrInfo::legalizeGenericOperand(MachineBasicBlock &InsertMBB,
     return;
 
   // Try to eliminate the copy if it is copying an immediate value.
-  if (Def->isMoveImmediate())
+  if (Def->isMoveImmediate() && DstRC != &AMDGPU::VReg_1RegClass)
     FoldImmediate(*Copy, *Def, OpReg, &MRI);
 }
 
@@ -4143,7 +4151,10 @@ void SIInstrInfo::legalizeOperands(MachineInstr &MI,
     if (VRC || !RI.isSGPRClass(getOpRegClass(MI, 0))) {
       if (!VRC) {
         assert(SRC);
-        VRC = RI.getEquivalentVGPRClass(SRC);
+       if (getOpRegClass(MI, 0) == &AMDGPU::VReg_1RegClass) {
+          VRC = &AMDGPU::VReg_1RegClass;
+        } else
+          VRC = RI.getEquivalentVGPRClass(SRC);
       }
       RC = VRC;
     } else {
@@ -5305,7 +5316,7 @@ const TargetRegisterClass *SIInstrInfo::getDestEquivalentVGPRClass(
   case AMDGPU::INSERT_SUBREG:
   case AMDGPU::WQM:
   case AMDGPU::WWM:
-    if (RI.hasVGPRs(NewDstRC))
+    if (RI.hasVGPRs(NewDstRC) || NewDstRC == &AMDGPU::VReg_1RegClass)
       return nullptr;
 
     NewDstRC = RI.getEquivalentVGPRClass(NewDstRC);
@@ -5574,7 +5585,8 @@ unsigned SIInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
   case TargetOpcode::INLINEASM_BR: {
     const MachineFunction *MF = MI.getParent()->getParent();
     const char *AsmStr = MI.getOperand(0).getSymbolName();
-    return getInlineAsmLength(AsmStr, *MF->getTarget().getMCAsmInfo());
+    return getInlineAsmLength(AsmStr, *MF->getTarget().getMCAsmInfo(),
+                              &MF->getSubtarget());
   }
   default:
     return DescSize;

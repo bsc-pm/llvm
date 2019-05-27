@@ -950,24 +950,19 @@ let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
 def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
                       "la", "$dst, $src">;
 
-// Thread local storage: Initial Exec
 let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
-    Size = 8 in
-def PseudoLATLSIE :
-    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
-           [(set GPR:$dst, (WrapperTLSIE tglobaltlsaddr:$src))],
-          "la.tls.ie", "$dst, $src">;
+    isAsmParserOnly = 1 in
+def PseudoLA_TLS_IE : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+            // Replace this with [] once codegen is implemented
+            [(set GPR:$dst, (WrapperTLSIE tglobaltlsaddr:$src))],
+                             "la.tls.ie", "$dst, $src">;
 
-// Thread local storage: General Dynamic
-// In contrast to la.tls.ie, this pseudo instruction does not expand to
-// anything that loads memory.
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
-    Size = 8 in
-def PseudoLATLSGD :
-    Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
-           [(set GPR:$dst, (WrapperTLSGD tglobaltlsaddr:$src))],
-          "la.tls.gd", "$dst, $src">;
-
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, isCodeGenOnly = 0,
+    isAsmParserOnly = 1 in
+def PseudoLA_TLS_GD : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src),
+            // Replace this with [] once codegen is implemented
+            [(set GPR:$dst, (WrapperTLSGD tglobaltlsaddr:$src))],
+                             "la.tls.gd", "$dst, $src">;
 /// Loads
 
 multiclass LdPat<PatFrag LoadOp, RVInst Inst> {

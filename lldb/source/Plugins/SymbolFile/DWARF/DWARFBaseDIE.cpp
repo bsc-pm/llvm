@@ -41,8 +41,7 @@ const char *DWARFBaseDIE::GetTagAsCString() const {
 const char *DWARFBaseDIE::GetAttributeValueAsString(const dw_attr_t attr,
                                                 const char *fail_value) const {
   if (IsValid())
-    return m_die->GetAttributeValueAsString(GetDWARF(), GetCU(), attr,
-                                            fail_value);
+    return m_die->GetAttributeValueAsString(GetCU(), attr, fail_value);
   else
     return fail_value;
 }
@@ -50,8 +49,7 @@ const char *DWARFBaseDIE::GetAttributeValueAsString(const dw_attr_t attr,
 uint64_t DWARFBaseDIE::GetAttributeValueAsUnsigned(const dw_attr_t attr,
                                                uint64_t fail_value) const {
   if (IsValid())
-    return m_die->GetAttributeValueAsUnsigned(GetDWARF(), GetCU(), attr,
-                                              fail_value);
+    return m_die->GetAttributeValueAsUnsigned(GetCU(), attr, fail_value);
   else
     return fail_value;
 }
@@ -59,8 +57,7 @@ uint64_t DWARFBaseDIE::GetAttributeValueAsUnsigned(const dw_attr_t attr,
 uint64_t DWARFBaseDIE::GetAttributeValueAsAddress(const dw_attr_t attr,
                                               uint64_t fail_value) const {
   if (IsValid())
-    return m_die->GetAttributeValueAsAddress(GetDWARF(), GetCU(), attr,
-                                             fail_value);
+    return m_die->GetAttributeValueAsAddress(GetCU(), attr, fail_value);
   else
     return fail_value;
 }
@@ -73,7 +70,7 @@ lldb::user_id_t DWARFBaseDIE::GetID() const {
 
 const char *DWARFBaseDIE::GetName() const {
   if (IsValid())
-    return m_die->GetName(GetDWARF(), m_cu);
+    return m_die->GetName(m_cu);
   else
     return nullptr;
 }
@@ -139,10 +136,8 @@ bool DWARFBaseDIE::Supports_DW_AT_APPLE_objc_complete_type() const {
 
 size_t DWARFBaseDIE::GetAttributes(DWARFAttributes &attributes,
                                uint32_t depth) const {
-  if (IsValid()) {
-    return m_die->GetAttributes(m_cu, m_cu->GetFixedFormSizes(), attributes,
-                                depth);
-  }
+  if (IsValid())
+    return m_die->GetAttributes(m_cu, attributes, depth);
   if (depth == 0)
     attributes.Clear();
   return 0;

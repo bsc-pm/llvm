@@ -48,6 +48,36 @@ std::vector<SharedFile *> elf::SharedFiles;
 
 std::unique_ptr<TarWriter> elf::Tar;
 
+static ELFKind getELFKind(MemoryBufferRef MB, StringRef ArchiveName) {
+  unsigned char Size;
+  unsigned char Endian;
+  std::tie(Size, Endian) = getElfArchType(MB.getBuffer());
+
+  auto Fatal = [&](StringRef Msg) {
+    StringRef Filename = MB.getBufferIdentifier();
+    if (ArchiveName.empty())
+      fatal(Filename + ": " + Msg);
+    else
+      fatal(ArchiveName + "(" + Filename + "): " + Msg);
+  };
+
+  if (!MB.getBuffer().startswith(ElfMagic))
+    Fatal("not an ELF file");
+  if (Endian != ELFDATA2LSB && Endian != ELFDATA2MSB)
+    Fatal("corrupted ELF file: invalid data encoding");
+  if (Size != ELFCLASS32 && Size != ELFCLASS64)
+    Fatal("corrupted ELF file: invalid file class");
+
+  size_t BufSize = MB.getBuffer().size();
+  if ((Size == ELFCLASS32 && BufSize < sizeof(Elf32_Ehdr)) ||
+      (Size == ELFCLASS64 && BufSize < sizeof(Elf64_Ehdr)))
+    Fatal("corrupted ELF file: file is too short");
+
+  if (Size == ELFCLASS32)
+    return (Endian == ELFDATA2LSB) ? ELF32LEKind : ELF32BEKind;
+  return (Endian == ELFDATA2LSB) ? ELF64LEKind : ELF64BEKind;
+}
+
 InputFile::InputFile(Kind K, MemoryBufferRef M)
     : MB(M), GroupId(NextGroupId), FileKind(K) {
   // All files within the same --{start,end}-group get the same group ID.
@@ -111,11 +141,6 @@ static bool isCompatible(InputFile *File) {
 }
 
 template <class ELFT> static void doParseFile(InputFile *File) {
-  // Comdat groups define "link once" sections. If two comdat groups have the
-  // same name, only one of them is linked, and the other is ignored. This set
-  // is used to uniquify them.
-  static llvm::DenseSet<llvm::CachedHashStringRef> ComdatGroups;
-
   if (!isCompatible(File))
     return;
 
@@ -151,13 +176,13 @@ template <class ELFT> static void doParseFile(InputFile *File) {
   // LLVM bitcode file
   if (auto *F = dyn_cast<BitcodeFile>(File)) {
     BitcodeFiles.push_back(F);
-    F->parse<ELFT>(ComdatGroups);
+    F->parse<ELFT>(Symtab->ComdatGroups);
     return;
   }
 
   // Regular object file
   ObjectFiles.push_back(File);
-  cast<ObjFile<ELFT>>(File)->parse(ComdatGroups);
+  cast<ObjFile<ELFT>>(File)->parse(Symtab->ComdatGroups);
 }
 
 // Add symbols in File to the symbol table.
@@ -396,7 +421,8 @@ template <class ELFT> ArrayRef<Symbol *> ObjFile<ELFT>::getGlobalSymbols() {
 }
 
 template <class ELFT>
-void ObjFile<ELFT>::parse(DenseSet<CachedHashStringRef> &ComdatGroups) {
+void ObjFile<ELFT>::parse(
+    DenseMap<CachedHashStringRef, const InputFile *> &ComdatGroups) {
   // Read a section table. JustSymbols is usually false.
   if (this->JustSymbols)
     initializeJustSymbols();
@@ -523,7 +549,7 @@ static void addDependentLibrary(StringRef Specifier, const InputFile *F) {
 
 template <class ELFT>
 void ObjFile<ELFT>::initializeSections(
-    DenseSet<CachedHashStringRef> &ComdatGroups) {
+    DenseMap<CachedHashStringRef, const InputFile *> &ComdatGroups) {
   const ELFFile<ELFT> &Obj = this->getObj();
 
   ArrayRef<Elf_Shdr> ObjSections = CHECK(Obj.sections(), this);
@@ -582,7 +608,8 @@ void ObjFile<ELFT>::initializeSections(
       if (Entries[0] != GRP_COMDAT)
         fatal(toString(this) + ": unsupported SHT_GROUP format");
 
-      bool IsNew = ComdatGroups.insert(CachedHashStringRef(Signature)).second;
+      bool IsNew =
+          ComdatGroups.try_emplace(CachedHashStringRef(Signature), this).second;
       if (IsNew) {
         if (Config->Relocatable)
           this->Sections[I] = createInputSection(Sec);
@@ -916,60 +943,90 @@ StringRef ObjFile<ELFT>::getSectionName(const Elf_Shdr &Sec) {
   return CHECK(getObj().getSectionName(&Sec, SectionStringTable), this);
 }
 
+// Initialize this->Symbols. this->Symbols is a parallel array as
+// its corresponding ELF symbol table.
 template <class ELFT> void ObjFile<ELFT>::initializeSymbols() {
-  this->Symbols.reserve(this->getELFSyms<ELFT>().size());
-  for (const Elf_Sym &Sym : this->getELFSyms<ELFT>())
-    this->Symbols.push_back(createSymbol(&Sym));
-}
+  ArrayRef<Elf_Sym> ESyms = this->getELFSyms<ELFT>();
+  this->Symbols.resize(ESyms.size());
 
-template <class ELFT> Symbol *ObjFile<ELFT>::createSymbol(const Elf_Sym *Sym) {
-  uint32_t SecIdx = getSectionIndex(*Sym);
-  if (SecIdx >= this->Sections.size())
-    fatal(toString(this) + ": invalid section index: " + Twine(SecIdx));
+  // Our symbol table may have already been partially initialized
+  // because of LazyObjFile.
+  for (size_t I = 0, End = ESyms.size(); I != End; ++I)
+    if (!this->Symbols[I] && ESyms[I].getBinding() != STB_LOCAL)
+      this->Symbols[I] =
+          Symtab->insert(CHECK(ESyms[I].getName(this->StringTable), this));
 
-  InputSectionBase *Sec = this->Sections[SecIdx];
-  uint8_t Binding = Sym->getBinding();
-  uint8_t StOther = Sym->st_other;
-  uint8_t Type = Sym->getType();
-  uint64_t Value = Sym->st_value;
-  uint64_t Size = Sym->st_size;
+  // Fill this->Symbols. A symbol is either local or global.
+  for (size_t I = 0, End = ESyms.size(); I != End; ++I) {
+    const Elf_Sym &ESym = ESyms[I];
 
-  if (Binding == STB_LOCAL) {
-    if (Sym->getType() == STT_FILE)
-      SourceFile = CHECK(Sym->getName(this->StringTable), this);
+    // Read symbol attributes.
+    uint32_t SecIdx = getSectionIndex(ESym);
+    if (SecIdx >= this->Sections.size())
+      fatal(toString(this) + ": invalid section index: " + Twine(SecIdx));
 
-    if (this->StringTable.size() <= Sym->st_name)
-      fatal(toString(this) + ": invalid symbol name offset");
+    InputSectionBase *Sec = this->Sections[SecIdx];
+    uint8_t Binding = ESym.getBinding();
+    uint8_t StOther = ESym.st_other;
+    uint8_t Type = ESym.getType();
+    uint64_t Value = ESym.st_value;
+    uint64_t Size = ESym.st_size;
+    StringRefZ Name = this->StringTable.data() + ESym.st_name;
 
-    StringRefZ Name = this->StringTable.data() + Sym->st_name;
-    if (Sym->st_shndx == SHN_UNDEF)
-      return make<Undefined>(this, Name, Binding, StOther, Type);
-    return make<Defined>(this, Name, Binding, StOther, Type, Value, Size, Sec);
-  }
+    // Handle local symbols. Local symbols are not added to the symbol
+    // table because they are not visible from other object files. We
+    // allocate symbol instances and add their pointers to Symbols.
+    if (Binding == STB_LOCAL) {
+      if (ESym.getType() == STT_FILE)
+        SourceFile = CHECK(ESym.getName(this->StringTable), this);
 
-  StringRef Name = CHECK(Sym->getName(this->StringTable), this);
+      if (this->StringTable.size() <= ESym.st_name)
+        fatal(toString(this) + ": invalid symbol name offset");
 
-  switch (Sym->st_shndx) {
-  case SHN_UNDEF:
-    return Symtab->addSymbol(Undefined{this, Name, Binding, StOther, Type});
-  case SHN_COMMON:
-    if (Value == 0 || Value >= UINT32_MAX)
-      fatal(toString(this) + ": common symbol '" + Name +
-            "' has invalid alignment: " + Twine(Value));
-    return Symtab->addSymbol(
-        CommonSymbol{this, Name, Binding, StOther, Type, Value, Size});
-  }
+      if (ESym.st_shndx == SHN_UNDEF)
+        this->Symbols[I] = make<Undefined>(this, Name, Binding, StOther, Type);
+      else
+        this->Symbols[I] =
+            make<Defined>(this, Name, Binding, StOther, Type, Value, Size, Sec);
+      continue;
+    }
 
-  switch (Binding) {
-  default:
+    // Handle global undefined symbols.
+    if (ESym.st_shndx == SHN_UNDEF) {
+      this->Symbols[I]->resolve(Undefined{this, Name, Binding, StOther, Type});
+      continue;
+    }
+
+    // Handle global common symbols.
+    if (ESym.st_shndx == SHN_COMMON) {
+      if (Value == 0 || Value >= UINT32_MAX)
+        fatal(toString(this) + ": common symbol '" + StringRef(Name.Data) +
+              "' has invalid alignment: " + Twine(Value));
+      this->Symbols[I]->resolve(
+          CommonSymbol{this, Name, Binding, StOther, Type, Value, Size});
+      continue;
+    }
+
+    // If a defined symbol is in a discarded section, handle it as if it
+    // were an undefined symbol. Such symbol doesn't comply with the
+    // standard, but in practice, a .eh_frame often directly refer
+    // COMDAT member sections, and if a comdat group is discarded, some
+    // defined symbol in a .eh_frame becomes dangling symbols.
+    if (Sec == &InputSection::Discarded) {
+      this->Symbols[I]->resolve(
+          Undefined{this, Name, Binding, StOther, Type, SecIdx});
+      continue;
+    }
+
+    // Handle global defined symbols.
+    if (Binding == STB_GLOBAL || Binding == STB_WEAK ||
+        Binding == STB_GNU_UNIQUE) {
+      this->Symbols[I]->resolve(
+          Defined{this, Name, Binding, StOther, Type, Value, Size, Sec});
+      continue;
+    }
+
     fatal(toString(this) + ": unexpected binding: " + Twine((int)Binding));
-  case STB_GLOBAL:
-  case STB_WEAK:
-  case STB_GNU_UNIQUE:
-    if (Sec == &InputSection::Discarded)
-      return Symtab->addSymbol(Undefined{this, Name, Binding, StOther, Type});
-    return Symtab->addSymbol(
-        Defined{this, Name, Binding, StOther, Type, Value, Size, Sec});
   }
 }
 
@@ -983,14 +1040,14 @@ void ArchiveFile::parse() {
 }
 
 // Returns a buffer pointing to a member file containing a given symbol.
-InputFile *ArchiveFile::fetch(const Archive::Symbol &Sym) {
+void ArchiveFile::fetch(const Archive::Symbol &Sym) {
   Archive::Child C =
       CHECK(Sym.getMember(), toString(this) +
                                  ": could not get the member for symbol " +
                                  Sym.getName());
 
   if (!Seen.insert(C.getChildOffset()).second)
-    return nullptr;
+    return;
 
   MemoryBufferRef MB =
       CHECK(C.getMemoryBufferRef(),
@@ -1004,14 +1061,31 @@ InputFile *ArchiveFile::fetch(const Archive::Symbol &Sym) {
   InputFile *File = createObjectFile(
       MB, getName(), C.getParent()->isThin() ? 0 : C.getChildOffset());
   File->GroupId = GroupId;
-  return File;
+  parseFile(File);
 }
 
 unsigned SharedFile::VernauxNum;
 
 SharedFile::SharedFile(MemoryBufferRef M, StringRef DefaultSoName)
     : ELFFileBase(SharedKind, M), SoName(DefaultSoName),
-      IsNeeded(!Config->AsNeeded) {}
+      IsNeeded(!Config->AsNeeded) {
+  switch (getELFKind(MB, "")) {
+  case ELF32LEKind:
+    parseHeader<ELF32LE>();
+    break;
+  case ELF32BEKind:
+    parseHeader<ELF32BE>();
+    break;
+  case ELF64LEKind:
+    parseHeader<ELF64LE>();
+    break;
+  case ELF64BEKind:
+    parseHeader<ELF64BE>();
+    break;
+  default:
+    llvm_unreachable("getELFKind");
+  }
+}
 
 // Parse the version definitions in the object file if present, and return a
 // vector whose nth element contains a pointer to the Elf_Verdef for version
@@ -1335,46 +1409,18 @@ static Symbol *createBitcodeSymbol(const std::vector<bool> &KeptComdats,
 }
 
 template <class ELFT>
-void BitcodeFile::parse(DenseSet<CachedHashStringRef> &ComdatGroups) {
+void BitcodeFile::parse(
+    DenseMap<CachedHashStringRef, const InputFile *> &ComdatGroups) {
   std::vector<bool> KeptComdats;
   for (StringRef S : Obj->getComdatTable())
-    KeptComdats.push_back(ComdatGroups.insert(CachedHashStringRef(S)).second);
+    KeptComdats.push_back(
+        ComdatGroups.try_emplace(CachedHashStringRef(S), this).second);
 
   for (const lto::InputFile::Symbol &ObjSym : Obj->symbols())
     Symbols.push_back(createBitcodeSymbol<ELFT>(KeptComdats, ObjSym, *this));
 
   for (auto L : Obj->getDependentLibraries())
     addDependentLibrary(L, this);
-}
-
-static ELFKind getELFKind(MemoryBufferRef MB, StringRef ArchiveName) {
-  unsigned char Size;
-  unsigned char Endian;
-  std::tie(Size, Endian) = getElfArchType(MB.getBuffer());
-
-  auto Fatal = [&](StringRef Msg) {
-    StringRef Filename = MB.getBufferIdentifier();
-    if (ArchiveName.empty())
-      fatal(Filename + ": " + Msg);
-    else
-      fatal(ArchiveName + "(" + Filename + "): " + Msg);
-  };
-
-  if (!MB.getBuffer().startswith(ElfMagic))
-    Fatal("not an ELF file");
-  if (Endian != ELFDATA2LSB && Endian != ELFDATA2MSB)
-    Fatal("corrupted ELF file: invalid data encoding");
-  if (Size != ELFCLASS32 && Size != ELFCLASS64)
-    Fatal("corrupted ELF file: invalid file class");
-
-  size_t BufSize = MB.getBuffer().size();
-  if ((Size == ELFCLASS32 && BufSize < sizeof(Elf32_Ehdr)) ||
-      (Size == ELFCLASS64 && BufSize < sizeof(Elf64_Ehdr)))
-    Fatal("corrupted ELF file: file is too short");
-
-  if (Size == ELFCLASS32)
-    return (Endian == ELFDATA2LSB) ? ELF32LEKind : ELF32BEKind;
-  return (Endian == ELFDATA2LSB) ? ELF64LEKind : ELF64BEKind;
 }
 
 void BinaryFile::parse() {
@@ -1419,45 +1465,25 @@ InputFile *elf::createObjectFile(MemoryBufferRef MB, StringRef ArchiveName,
   }
 }
 
-InputFile *elf::createSharedFile(MemoryBufferRef MB, StringRef DefaultSoName) {
-  auto *F = make<SharedFile>(MB, DefaultSoName);
-  switch (getELFKind(MB, "")) {
-  case ELF32LEKind:
-    F->parseHeader<ELF32LE>();
-    break;
-  case ELF32BEKind:
-    F->parseHeader<ELF32BE>();
-    break;
-  case ELF64LEKind:
-    F->parseHeader<ELF64LE>();
-    break;
-  case ELF64BEKind:
-    F->parseHeader<ELF64BE>();
-    break;
-  default:
-    llvm_unreachable("getELFKind");
-  }
-  return F;
-}
+void LazyObjFile::fetch() {
+  if (MB.getBuffer().empty())
+    return;
 
-MemoryBufferRef LazyObjFile::getBuffer() {
-  if (AddedToLink)
-    return MemoryBufferRef();
-  AddedToLink = true;
-  return MB;
-}
-
-InputFile *LazyObjFile::fetch() {
-  MemoryBufferRef MBRef = getBuffer();
-  if (MBRef.getBuffer().empty())
-    return nullptr;
-
-  InputFile *File = createObjectFile(MBRef, ArchiveName, OffsetInArchive);
+  InputFile *File = createObjectFile(MB, ArchiveName, OffsetInArchive);
   File->GroupId = GroupId;
-  return File;
+
+  MB = {};
+
+  // Copy symbol vector so that the new InputFile doesn't have to
+  // insert the same defined symbols to the symbol table again.
+  File->Symbols = std::move(Symbols);
+
+  parseFile(File);
 }
 
 template <class ELFT> void LazyObjFile::parse() {
+  using Elf_Sym = typename ELFT::Sym;
+
   // A lazy object file wraps either a bitcode file or an ELF file.
   if (isBitcode(this->MB)) {
     std::unique_ptr<lto::InputFile> Obj =
@@ -1475,6 +1501,7 @@ template <class ELFT> void LazyObjFile::parse() {
     return;
   }
 
+  // Find a symbol table.
   ELFFile<ELFT> Obj = check(ELFFile<ELFT>::create(MB.getBuffer()));
   ArrayRef<typename ELFT::Shdr> Sections = CHECK(Obj.sections(), this);
 
@@ -1482,16 +1509,30 @@ template <class ELFT> void LazyObjFile::parse() {
     if (Sec.sh_type != SHT_SYMTAB)
       continue;
 
-    typename ELFT::SymRange Syms = CHECK(Obj.symbols(&Sec), this);
+    // A symbol table is found.
+    ArrayRef<Elf_Sym> ESyms = CHECK(Obj.symbols(&Sec), this);
     uint32_t FirstGlobal = Sec.sh_info;
-    StringRef StringTable =
-        CHECK(Obj.getStringTableForSymtab(Sec, Sections), this);
+    StringRef Strtab = CHECK(Obj.getStringTableForSymtab(Sec, Sections), this);
+    this->Symbols.resize(ESyms.size());
 
-    for (const typename ELFT::Sym &Sym : Syms.slice(FirstGlobal)) {
-      if (Sym.st_shndx == SHN_UNDEF)
+    // Get existing symbols or insert placeholder symbols.
+    for (size_t I = FirstGlobal, End = ESyms.size(); I != End; ++I)
+      if (ESyms[I].st_shndx != SHN_UNDEF)
+        this->Symbols[I] = Symtab->insert(CHECK(ESyms[I].getName(Strtab), this));
+
+    // Replace existing symbols with LazyObject symbols.
+    //
+    // resolve() may trigger this->fetch() if an existing symbol is an
+    // undefined symbol. If that happens, this LazyObjFile has served
+    // its purpose, and we can exit from the loop early.
+    for (Symbol *Sym : this->Symbols) {
+      if (!Sym)
         continue;
-      Symtab->addSymbol(
-          LazyObject{*this, CHECK(Sym.getName(StringTable), this)});
+      Sym->resolve(LazyObject{*this, Sym->getName()});
+
+      // MemoryBuffer is emptied if this file is instantiated as ObjFile.
+      if (MB.getBuffer().empty())
+        return;
     }
     return;
   }
@@ -1506,10 +1547,14 @@ std::string elf::replaceThinLTOSuffix(StringRef Path) {
   return Path;
 }
 
-template void BitcodeFile::parse<ELF32LE>(DenseSet<CachedHashStringRef> &);
-template void BitcodeFile::parse<ELF32BE>(DenseSet<CachedHashStringRef> &);
-template void BitcodeFile::parse<ELF64LE>(DenseSet<CachedHashStringRef> &);
-template void BitcodeFile::parse<ELF64BE>(DenseSet<CachedHashStringRef> &);
+template void
+BitcodeFile::parse<ELF32LE>(DenseMap<CachedHashStringRef, const InputFile *> &);
+template void
+BitcodeFile::parse<ELF32BE>(DenseMap<CachedHashStringRef, const InputFile *> &);
+template void
+BitcodeFile::parse<ELF64LE>(DenseMap<CachedHashStringRef, const InputFile *> &);
+template void
+BitcodeFile::parse<ELF64BE>(DenseMap<CachedHashStringRef, const InputFile *> &);
 
 template void LazyObjFile::parse<ELF32LE>();
 template void LazyObjFile::parse<ELF32BE>();

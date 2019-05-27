@@ -26,7 +26,7 @@ sw	a1, %tprel_lo(a)(a0)
 # CHECK: auipc a0, 0
 # CHECK: R_RISCV_TLS_GD_HI20  b
 # CHECK: mv  a0, a0
-# CHECK: R_RISCV_PCREL_LO12_I .Ltls_gd_hi0
+# CHECK: R_RISCV_PCREL_LO12_I .Lpcrel_hi0
 
 # CHECK-ELF-LABEL: Name: b (
 # CHECK-ELF: Binding: Global (0x1)
@@ -37,7 +37,7 @@ la.tls.gd a0, b
 # CHECK: auipc a5, 0
 # CHECK: R_RISCV_TLS_GOT_HI20 c
 # CHECK: ld  a5, 0(a5)
-# CHECK: R_RISCV_PCREL_LO12_I .Ltls_got_hi0
+# CHECK: R_RISCV_PCREL_LO12_I .Lpcrel_hi1
 
 # CHECK-ELF-LABEL: Name: c (
 # CHECK-ELF: Binding: Global (0x1)

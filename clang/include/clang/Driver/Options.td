@@ -2143,6 +2143,9 @@ def mnocrc : Flag<["-"], "mnocrc">, Group<m_arm_Features_Group>,
   HelpText<"Disallow use of CRC instructions (ARM only)">;
 def mno_neg_immediates: Flag<["-"], "mno-neg-immediates">, Group<m_arm_Features_Group>,
   HelpText<"Disallow converting instructions with negative immediates to their negation or inversion.">;
+def mcmse : Flag<["-"], "mcmse">, Group<m_arm_Features_Group>,
+  Flags<[DriverOption,CC1Option]>,
+  HelpText<"Allow use of CMSE (Armv8-M Security Extensions)">;
 
 def mgeneral_regs_only : Flag<["-"], "mgeneral-regs-only">, Group<m_aarch64_Features_Group>,
   HelpText<"Generate code which only uses the general purpose registers (AArch64 only)">;
@@ -2182,6 +2185,10 @@ def mbulk_memory : Flag<["-"], "mbulk-memory">, Group<m_wasm_Features_Group>;
 def mno_bulk_memory : Flag<["-"], "mno-bulk-memory">, Group<m_wasm_Features_Group>;
 def mmutable_globals : Flag<["-"], "mmutable-globals">, Group<m_wasm_Features_Group>;
 def mno_mutable_globals : Flag<["-"], "mno-mutable-globals">, Group<m_wasm_Features_Group>;
+def mmultivalue : Flag<["-"], "mmultivalue">, Group<m_wasm_Features_Group>;
+def mno_multivalue : Flag<["-"], "mno-multivalue">, Group<m_wasm_Features_Group>;
+def mtail_call : Flag<["-"], "mtail-call">, Group<m_wasm_Features_Group>;
+def mno_tail_call : Flag<["-"], "mno-tail-call">, Group<m_wasm_Features_Group>;
 
 def mamdgpu_debugger_abi : Joined<["-"], "mamdgpu-debugger-abi=">,
   Flags<[HelpHidden]>,

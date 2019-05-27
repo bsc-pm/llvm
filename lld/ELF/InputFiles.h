@@ -90,7 +90,7 @@ public:
   // function on files of other types.
   ArrayRef<Symbol *> getSymbols() { return getMutableSymbols(); }
 
-  std::vector<Symbol *> &getMutableSymbols() {
+  MutableArrayRef<Symbol *> getMutableSymbols() {
     assert(FileKind == BinaryKind || FileKind == ObjKind ||
            FileKind == BitcodeKind);
     return Symbols;
@@ -139,10 +139,11 @@ public:
   // Index of MIPS GOT built for this file.
   llvm::Optional<size_t> MipsGotIndex;
 
+  std::vector<Symbol *> Symbols;
+
 protected:
   InputFile(Kind K, MemoryBufferRef M);
   std::vector<InputSectionBase *> Sections;
-  std::vector<Symbol *> Symbols;
 
 private:
   const Kind FileKind;
@@ -187,9 +188,6 @@ template <class ELFT> class ObjFile : public ELFFileBase {
   using Elf_Word = typename ELFT::Word;
   using Elf_CGProfile = typename ELFT::CGProfile;
 
-  StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> Sections,
-                                 const Elf_Shdr &Sec);
-
 public:
   static bool classof(const InputFile *F) { return F->kind() == ObjKind; }
 
@@ -201,7 +199,11 @@ public:
   ArrayRef<Symbol *> getGlobalSymbols();
 
   ObjFile(MemoryBufferRef M, StringRef ArchiveName);
-  void parse(llvm::DenseSet<llvm::CachedHashStringRef> &ComdatGroups);
+  void parse(llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>
+                 &ComdatGroups);
+
+  StringRef getShtGroupSignature(ArrayRef<Elf_Shdr> Sections,
+                                 const Elf_Shdr &Sec);
 
   Symbol &getSymbol(uint32_t SymbolIndex) const {
     if (SymbolIndex >= this->Symbols.size())
@@ -244,8 +246,8 @@ public:
   ArrayRef<Elf_CGProfile> CGProfile;
 
 private:
-  void
-  initializeSections(llvm::DenseSet<llvm::CachedHashStringRef> &ComdatGroups);
+  void initializeSections(llvm::DenseMap<llvm::CachedHashStringRef,
+                                         const InputFile *> &ComdatGroups);
   void initializeSymbols();
   void initializeJustSymbols();
   void initializeDwarf();
@@ -254,7 +256,6 @@ private:
   StringRef getSectionName(const Elf_Shdr &Sec);
 
   bool shouldMerge(const Elf_Shdr &Sec);
-  Symbol *createSymbol(const Elf_Sym *Sym);
 
   // Each ELF symbol contains a section index which the symbol belongs to.
   // However, because the number of bits dedicated for that is limited, a
@@ -306,9 +307,7 @@ public:
   static bool classof(const InputFile *F) { return F->kind() == LazyObjKind; }
 
   template <class ELFT> void parse();
-  MemoryBufferRef getBuffer();
-  InputFile *fetch();
-  bool AddedToLink = false;
+  void fetch();
 
 private:
   uint64_t OffsetInArchive;
@@ -323,9 +322,9 @@ public:
 
   // Pulls out an object file that contains a definition for Sym and
   // returns it. If the same file was instantiated before, this
-  // function returns a nullptr (so we don't instantiate the same file
+  // function does nothing (so we don't instantiate the same file
   // more than once.)
-  InputFile *fetch(const Archive::Symbol &Sym);
+  void fetch(const Archive::Symbol &Sym);
 
 private:
   std::unique_ptr<Archive> File;
@@ -338,7 +337,8 @@ public:
               uint64_t OffsetInArchive);
   static bool classof(const InputFile *F) { return F->kind() == BitcodeKind; }
   template <class ELFT>
-  void parse(llvm::DenseSet<llvm::CachedHashStringRef> &ComdatGroups);
+  void parse(llvm::DenseMap<llvm::CachedHashStringRef, const InputFile *>
+                 &ComdatGroups);
   std::unique_ptr<llvm::lto::InputFile> Obj;
 };
 
@@ -380,7 +380,6 @@ public:
 
 InputFile *createObjectFile(MemoryBufferRef MB, StringRef ArchiveName = "",
                             uint64_t OffsetInArchive = 0);
-InputFile *createSharedFile(MemoryBufferRef MB, StringRef DefaultSoName);
 
 inline bool isBitcode(MemoryBufferRef MB) {
   return identify_magic(MB.getBuffer()) == llvm::file_magic::bitcode;

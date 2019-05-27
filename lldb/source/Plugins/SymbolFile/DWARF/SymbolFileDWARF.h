@@ -62,7 +62,7 @@ public:
   friend class SymbolFileDWARFDwo;
   friend class DebugMapModule;
   friend struct DIERef;
-  friend class DWARFUnit;
+  friend class DWARFCompileUnit;
   friend class DWARFDIE;
   friend class DWARFASTParserClang;
 
@@ -239,9 +239,7 @@ public:
   bool
   HasForwardDeclForClangType(const lldb_private::CompilerType &compiler_type);
 
-  lldb_private::CompileUnit *
-  GetCompUnitForDWARFCompUnit(DWARFUnit *dwarf_cu,
-                              uint32_t cu_idx = UINT32_MAX);
+  lldb_private::CompileUnit *GetCompUnitForDWARFCompUnit(DWARFUnit *dwarf_cu);
 
   virtual size_t GetObjCMethodDIEOffsets(lldb_private::ConstString class_name,
                                          DIEArray &method_die_offsets);
@@ -252,8 +250,7 @@ public:
 
   static DWARFDIE GetParentSymbolContextDIE(const DWARFDIE &die);
 
-  virtual lldb::CompUnitSP ParseCompileUnit(DWARFUnit *dwarf_cu,
-                                            uint32_t cu_idx);
+  virtual lldb::CompUnitSP ParseCompileUnit(DWARFUnit *dwarf_cu);
 
   virtual lldb_private::DWARFExpression::LocationListFormat
   GetLocationListFormat() const;
@@ -364,7 +361,7 @@ protected:
                         const DWARFDIE &orig_die,
                         const lldb::addr_t func_low_pc, bool parse_siblings,
                         bool parse_children,
-                        lldb_private::VariableList *cc_variable_list = NULL);
+                        lldb_private::VariableList *cc_variable_list = nullptr);
 
   bool ClassOrStructIsVirtual(const DWARFDIE &die);
 

@@ -160,7 +160,7 @@ namespace llvm {
 
       /// CALL - A direct function call.
       /// CALL_NOP is a call with the special NOP which follows 64-bit
-      /// SVR4 calls.
+      /// SVR4 calls and 32-bit/64-bit AIX calls.
       CALL, CALL_NOP,
 
       /// CHAIN,FLAG = MTCTR(VAL, CHAIN[, INFLAG]) - Directly corresponds to a
@@ -660,17 +660,21 @@ namespace llvm {
                                    SelectionDAG &DAG) const override;
 
     /// SelectAddressRegReg - Given the specified addressed, check to see if it
-    /// can be represented as an indexed [r+r] operation.  Returns false if it
-    /// can be more efficiently represented with [r+imm].
+    /// can be more efficiently represented as [r+imm]. If \p EncodingAlignment
+    /// is non-zero, only accept displacement which is not suitable for [r+imm].
+    /// Returns false if it can be represented by [r+imm], which are preferred.
     bool SelectAddressRegReg(SDValue N, SDValue &Base, SDValue &Index,
-                             SelectionDAG &DAG) const;
+                             SelectionDAG &DAG,
+                             unsigned EncodingAlignment = 0) const;
 
     /// SelectAddressRegImm - Returns true if the address N can be represented
     /// by a base register plus a signed 16-bit displacement [r+imm], and if it
-    /// is not better represented as reg+reg.  If Aligned is true, only accept
-    /// displacements suitable for STD and friends, i.e. multiples of 4.
+    /// is not better represented as reg+reg. If \p EncodingAlignment is
+    /// non-zero, only accept displacements suitable for instruction encoding
+    /// requirement, i.e. multiples of 4 for DS form.
     bool SelectAddressRegImm(SDValue N, SDValue &Disp, SDValue &Base,
-                             SelectionDAG &DAG, unsigned Alignment) const;
+                             SelectionDAG &DAG,
+                             unsigned EncodingAlignment) const;
 
     /// SelectAddressRegRegOnly - Given the specified addressed, force it to be
     /// represented as an indexed [r+r] operation.
@@ -1116,6 +1120,15 @@ namespace llvm {
                              const SDLoc &dl, SelectionDAG &DAG,
                              SmallVectorImpl<SDValue> &InVals,
                              ImmutableCallSite CS) const;
+    SDValue LowerCall_AIX(SDValue Chain, SDValue Callee,
+                          CallingConv::ID CallConv, bool isVarArg,
+                          bool isTailCall, bool isPatchPoint,
+                          const SmallVectorImpl<ISD::OutputArg> &Outs,
+                          const SmallVectorImpl<SDValue> &OutVals,
+                          const SmallVectorImpl<ISD::InputArg> &Ins,
+                          const SDLoc &dl, SelectionDAG &DAG,
+                          SmallVectorImpl<SDValue> &InVals,
+                          ImmutableCallSite CS) const;
 
     SDValue lowerEH_SJLJ_SETJMP(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG) const;

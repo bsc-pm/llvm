@@ -14,17 +14,16 @@
 
 class DWARFCompileUnit : public DWARFUnit {
 public:
-  void Dump(lldb_private::Stream *s) const override;
+  void BuildAddressRangeTable(DWARFDebugAranges *debug_aranges) override;
 
-  DIERef::Section GetDebugSection() const override {
-    return DIERef::Section::DebugInfo;
-  }
+  void Dump(lldb_private::Stream *s) const override;
 
 private:
   DWARFCompileUnit(SymbolFileDWARF *dwarf, lldb::user_id_t uid,
                    const DWARFUnitHeader &header,
-                   const DWARFAbbreviationDeclarationSet &abbrevs)
-      : DWARFUnit(dwarf, uid, header, abbrevs) {}
+                   const DWARFAbbreviationDeclarationSet &abbrevs,
+                   DIERef::Section section)
+      : DWARFUnit(dwarf, uid, header, abbrevs, section) {}
 
   DISALLOW_COPY_AND_ASSIGN(DWARFCompileUnit);
 

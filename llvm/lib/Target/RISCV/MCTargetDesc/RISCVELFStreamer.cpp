@@ -148,7 +148,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
   //   EmitInstruction(Load, STI);
   //   break;
   // }
-  case RISCV::PseudoLATLSIE: {
+  case RISCV::PseudoLA_TLS_IE: {
     // GOT addressing
     MCContext &Ctx = getContext();
 
@@ -181,7 +181,7 @@ bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
     EmitInstruction(Load, STI);
     break;
   }
-  case RISCV::PseudoLATLSGD: {
+  case RISCV::PseudoLA_TLS_GD: {
     // PC-rel addressing for TLS General / Local Dynamic
     MCContext &Ctx = getContext();
 

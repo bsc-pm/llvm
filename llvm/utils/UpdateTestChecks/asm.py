@@ -29,7 +29,7 @@ ASM_FUNCTION_ARM_RE = re.compile(
 
 ASM_FUNCTION_AARCH64_RE = re.compile(
      r'^_?(?P<func>[^:]+):[ \t]*\/\/[ \t]*@(?P=func)\n'
-     r'(?:[ \t]+.cfi_startproc\n)?'  # drop optional cfi noise 
+     r'(?:[ \t]+.cfi_startproc\n)?'  # drop optional cfi noise
      r'(?P<body>.*?)\n'
      # This list is incomplete
      r'.Lfunc_end[0-9]+:\n',
@@ -78,6 +78,12 @@ ASM_FUNCTION_SPARC_RE = re.compile(
 ASM_FUNCTION_SYSTEMZ_RE = re.compile(
     r'^_?(?P<func>[^:]+):[ \t]*#+[ \t]*@(?P=func)\n'
     r'[ \t]+.cfi_startproc\n'
+    r'(?P<body>.*?)\n'
+    r'.Lfunc_end[0-9]+:\n',
+    flags=(re.M | re.S))
+
+ASM_FUNCTION_WASM32_RE = re.compile(
+    r'^_?(?P<func>[^:]+):[ \t]*#+[ \t]*@(?P=func)\n'
     r'(?P<body>.*?)\n'
     r'.Lfunc_end[0-9]+:\n',
     flags=(re.M | re.S))
@@ -148,7 +154,7 @@ def scrub_asm_arm_eabi(asm, args):
   asm = common.SCRUB_TRAILING_WHITESPACE_RE.sub(r'', asm)
   return asm
 
-def scrub_asm_powerpc64(asm, args):
+def scrub_asm_powerpc(asm, args):
   # Scrub runs of whitespace out of the assembly, but leave the leading
   # whitespace in place.
   asm = common.SCRUB_WHITESPACE_RE.sub(r' ', asm)
@@ -200,9 +206,21 @@ def scrub_asm_systemz(asm, args):
   asm = common.SCRUB_TRAILING_WHITESPACE_RE.sub(r'', asm)
   return asm
 
+def scrub_asm_wasm32(asm, args):
+  # Scrub runs of whitespace out of the assembly, but leave the leading
+  # whitespace in place.
+  asm = common.SCRUB_WHITESPACE_RE.sub(r' ', asm)
+  # Expand the tabs used for indentation.
+  asm = string.expandtabs(asm, 2)
+  # Strip trailing whitespace.
+  asm = common.SCRUB_TRAILING_WHITESPACE_RE.sub(r'', asm)
+  return asm
+
 def get_triple_from_march(march):
   triples = {
       'amdgcn': 'amdgcn',
+      'mips': 'mips',
+      'sparc': 'sparc',
   }
   for prefix, triple in triples.items():
     if march.startswith(prefix):
@@ -243,13 +261,15 @@ def build_function_body_dictionary_for_triple(args, raw_tool_output, triple, pre
       'armv7eb': (scrub_asm_arm_eabi, ASM_FUNCTION_ARM_RE),
       'armv8a': (scrub_asm_arm_eabi, ASM_FUNCTION_ARM_RE),
       'mips': (scrub_asm_mips, ASM_FUNCTION_MIPS_RE),
-      'powerpc64': (scrub_asm_powerpc64, ASM_FUNCTION_PPC_RE),
-      'powerpc64le': (scrub_asm_powerpc64, ASM_FUNCTION_PPC_RE),
+      'ppc32': (scrub_asm_powerpc, ASM_FUNCTION_PPC_RE),
+      'powerpc64': (scrub_asm_powerpc, ASM_FUNCTION_PPC_RE),
+      'powerpc64le': (scrub_asm_powerpc, ASM_FUNCTION_PPC_RE),
       'riscv32': (scrub_asm_riscv, ASM_FUNCTION_RISCV_RE),
       'riscv64': (scrub_asm_riscv, ASM_FUNCTION_RISCV_RE),
       'sparc': (scrub_asm_sparc, ASM_FUNCTION_SPARC_RE),
       'sparcv9': (scrub_asm_sparc, ASM_FUNCTION_SPARC_RE),
       's390x': (scrub_asm_systemz, ASM_FUNCTION_SYSTEMZ_RE),
+      'wasm32': (scrub_asm_wasm32, ASM_FUNCTION_WASM32_RE),
   }
   handlers = None
   for prefix, s in target_handlers.items():

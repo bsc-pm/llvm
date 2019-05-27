@@ -93,12 +93,6 @@ static cl::opt<bool> EnableVGPRIndexMode(
   cl::desc("Use GPR indexing mode instead of movrel for vector indexing"),
   cl::init(false));
 
-static cl::opt<unsigned> AssumeFrameIndexHighZeroBits(
-  "amdgpu-frame-index-zero-bits",
-  cl::desc("High bits of frame index assumed to be zero"),
-  cl::init(5),
-  cl::ReallyHidden);
-
 static cl::opt<bool> DisableLoopAlignment(
   "amdgpu-disable-loop-alignment",
   cl::desc("Do not align and prefetch loops"),
@@ -2059,13 +2053,14 @@ SDValue SITargetLowering::LowerFormalArguments(
     Reg = MF.addLiveIn(Reg, RC);
     SDValue Val = DAG.getCopyFromReg(Chain, DL, Reg, VT);
 
-    if (Arg.Flags.isSRet() && !getSubtarget()->enableHugePrivateBuffer()) {
+    if (Arg.Flags.isSRet()) {
       // The return object should be reasonably addressable.
 
       // FIXME: This helps when the return is a real sret. If it is a
       // automatically inserted sret (i.e. CanLowerReturn returns false), an
       // extra copy is inserted in SelectionDAGBuilder which obscures this.
-      unsigned NumBits = 32 - AssumeFrameIndexHighZeroBits;
+      unsigned NumBits
+        = 32 - getSubtarget()->getKnownHighZeroBitsForFrameIndex();
       Val = DAG.getNode(ISD::AssertZext, DL, VT, Val,
         DAG.getValueType(EVT::getIntegerVT(*DAG.getContext(), NumBits)));
     }
@@ -9642,7 +9637,8 @@ SDNode *SITargetLowering::PostISelFolding(MachineSDNode *Node,
       break;
 
     MVT VT = Src0.getValueType().getSimpleVT();
-    const TargetRegisterClass *RC = getRegClassFor(VT);
+    const TargetRegisterClass *RC =
+        getRegClassFor(VT, Src0.getNode()->isDivergent());
 
     MachineRegisterInfo &MRI = DAG.getMachineFunction().getRegInfo();
     SDValue UndefReg = DAG.getRegister(MRI.createVirtualRegister(RC), VT);
@@ -9970,14 +9966,10 @@ void SITargetLowering::computeKnownBitsForFrameIndex(const SDValue Op,
   TargetLowering::computeKnownBitsForFrameIndex(Op, Known, DemandedElts,
                                                 DAG, Depth);
 
-  if (getSubtarget()->enableHugePrivateBuffer())
-    return;
-
-  // Technically it may be possible to have a dispatch with a single workitem
-  // that uses the full private memory size, but that's not really useful. We
-  // can't use vaddr in MUBUF instructions if we don't know the address
+  // Set the high bits to zero based on the maximum allowed scratch size per
+  // wave. We can't use vaddr in MUBUF instructions if we don't know the address
   // calculation won't overflow, so assume the sign bit is never set.
-  Known.Zero.setHighBits(AssumeFrameIndexHighZeroBits);
+  Known.Zero.setHighBits(getSubtarget()->getKnownHighZeroBitsForFrameIndex());
 }
 
 unsigned SITargetLowering::getPrefLoopAlignment(MachineLoop *ML) const {
@@ -10179,4 +10171,92 @@ SITargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *RMW) const {
   }
 
   return AMDGPUTargetLowering::shouldExpandAtomicRMWInIR(RMW);
+}
+
+const TargetRegisterClass *
+SITargetLowering::getRegClassFor(MVT VT, bool isDivergent) const {
+  const TargetRegisterClass *RC = TargetLoweringBase::getRegClassFor(VT, false);
+  const SIRegisterInfo *TRI = Subtarget->getRegisterInfo();
+  if (RC == &AMDGPU::VReg_1RegClass && !isDivergent)
+    return &AMDGPU::SReg_64RegClass;
+  if (!TRI->isSGPRClass(RC) && !isDivergent)
+    return TRI->getEquivalentSGPRClass(RC);
+  else if (TRI->isSGPRClass(RC) && isDivergent)
+    return TRI->getEquivalentVGPRClass(RC);
+
+  return RC;
+}
+
+static bool hasIfBreakUser(const Value *V, SetVector<const Value *> &Visited) {
+  if (Visited.count(V))
+    return false;
+  Visited.insert(V);
+  bool Result = false;
+  for (auto U : V->users()) {
+    if (const IntrinsicInst *Intrinsic = dyn_cast<IntrinsicInst>(U)) {
+      if ((Intrinsic->getIntrinsicID() == Intrinsic::amdgcn_if_break) &&
+          (V == U->getOperand(1)))
+        Result = true;
+    } else {
+      Result = hasIfBreakUser(U, Visited);
+    }
+    if (Result)
+      break;
+  }
+  return Result;
+}
+
+bool SITargetLowering::requiresUniformRegister(MachineFunction &MF,
+                                               const Value *V) const {
+  if (const IntrinsicInst *Intrinsic = dyn_cast<IntrinsicInst>(V)) {
+    switch (Intrinsic->getIntrinsicID()) {
+    default:
+      return false;
+    case Intrinsic::amdgcn_if_break:
+      return true;
+    }
+  }
+  if (const ExtractValueInst *ExtValue = dyn_cast<ExtractValueInst>(V)) {
+    if (const IntrinsicInst *Intrinsic =
+            dyn_cast<IntrinsicInst>(ExtValue->getOperand(0))) {
+      switch (Intrinsic->getIntrinsicID()) {
+      default:
+        return false;
+      case Intrinsic::amdgcn_if:
+      case Intrinsic::amdgcn_else: {
+        ArrayRef<unsigned> Indices = ExtValue->getIndices();
+        if (Indices.size() == 1 && Indices[0] == 1) {
+          return true;
+        }
+      }
+      }
+    }
+  }
+  if (const CallInst *CI = dyn_cast<CallInst>(V)) {
+    if (isa<InlineAsm>(CI->getCalledValue())) {
+      const SIRegisterInfo *SIRI = Subtarget->getRegisterInfo();
+      ImmutableCallSite CS(CI);
+      TargetLowering::AsmOperandInfoVector TargetConstraints = ParseConstraints(
+          MF.getDataLayout(), Subtarget->getRegisterInfo(), CS);
+      for (auto &TC : TargetConstraints) {
+        if (TC.Type == InlineAsm::isOutput) {
+          ComputeConstraintToUse(TC, SDValue());
+          unsigned AssignedReg;
+          const TargetRegisterClass *RC;
+          std::tie(AssignedReg, RC) = getRegForInlineAsmConstraint(
+              SIRI, TC.ConstraintCode,
+              getSimpleValueType(MF.getDataLayout(), CS.getType()));
+          if (RC) {
+            MachineRegisterInfo &MRI = MF.getRegInfo();
+            if (AssignedReg != 0 && SIRI->isSGPRReg(MRI, AssignedReg))
+              return true;
+            else if (SIRI->isSGPRClass(RC))
+              return true;
+          }
+        }
+      }
+    }
+  }
+  SetVector<const Value *> Visited;
+  return hasIfBreakUser(V, Visited);
 }

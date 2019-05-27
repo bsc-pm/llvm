@@ -10,8 +10,6 @@
 
 #include "lldb/Core/Module.h"
 #include "lldb/Host/StringConvert.h"
-#include "lldb/Symbol/CompileUnit.h"
-#include "lldb/Symbol/LineTable.h"
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Utility/LLDBAssert.h"
 #include "lldb/Utility/StreamString.h"
@@ -21,8 +19,8 @@
 #include "DWARFCompileUnit.h"
 #include "DWARFDebugAranges.h"
 #include "DWARFDebugInfo.h"
+#include "DWARFTypeUnit.h"
 #include "LogChannelDWARF.h"
-#include "SymbolFileDWARFDebugMap.h"
 #include "SymbolFileDWARFDwo.h"
 
 using namespace lldb;
@@ -33,9 +31,10 @@ extern int g_verbose;
 
 DWARFUnit::DWARFUnit(SymbolFileDWARF *dwarf, lldb::user_id_t uid,
                      const DWARFUnitHeader &header,
-                     const DWARFAbbreviationDeclarationSet &abbrevs)
+                     const DWARFAbbreviationDeclarationSet &abbrevs,
+                     DIERef::Section section)
     : UserID(uid), m_dwarf(dwarf), m_header(header), m_abbrevs(&abbrevs),
-      m_cancel_scopes(false) {}
+      m_cancel_scopes(false), m_section(section) {}
 
 DWARFUnit::~DWARFUnit() = default;
 
@@ -61,10 +60,8 @@ void DWARFUnit::ExtractUnitDIEIfNeeded() {
   // We are in our compile unit, parse starting at the offset we were told to
   // parse
   const DWARFDataExtractor &data = GetData();
-  DWARFFormValue::FixedFormSizes fixed_form_sizes =
-      DWARFFormValue::GetFixedFormSizesForAddressSize(GetAddressByteSize());
   if (offset < GetNextUnitOffset() &&
-      m_first_die.FastExtract(data, this, fixed_form_sizes, &offset)) {
+      m_first_die.FastExtract(data, this, &offset)) {
     AddUnitDIE(m_first_die);
     return;
   }
@@ -168,10 +165,7 @@ void DWARFUnit::ExtractDIEsRWLocked() {
   die_index_stack.reserve(32);
   die_index_stack.push_back(0);
   bool prev_die_had_children = false;
-  DWARFFormValue::FixedFormSizes fixed_form_sizes =
-      DWARFFormValue::GetFixedFormSizesForAddressSize(GetAddressByteSize());
-  while (offset < next_cu_offset &&
-         die.FastExtract(data, this, fixed_form_sizes, &offset)) {
+  while (offset < next_cu_offset && die.FastExtract(data, this, &offset)) {
     const bool null_die = die.IsNULL();
     if (depth == 0) {
       assert(m_die_array.empty() && "Compile unit DIE already added");
@@ -279,23 +273,22 @@ static void SetDwoStrOffsetsBase(DWARFUnit *dwo_cu) {
 // m_die_array_mutex must be already held as read/write.
 void DWARFUnit::AddUnitDIE(const DWARFDebugInfoEntry &cu_die) {
   dw_addr_t addr_base = cu_die.GetAttributeValueAsUnsigned(
-      m_dwarf, this, DW_AT_addr_base, LLDB_INVALID_ADDRESS);
+      this, DW_AT_addr_base, LLDB_INVALID_ADDRESS);
   if (addr_base != LLDB_INVALID_ADDRESS)
     SetAddrBase(addr_base);
 
   dw_addr_t ranges_base = cu_die.GetAttributeValueAsUnsigned(
-      m_dwarf, this, DW_AT_rnglists_base, LLDB_INVALID_ADDRESS);
+      this, DW_AT_rnglists_base, LLDB_INVALID_ADDRESS);
   if (ranges_base != LLDB_INVALID_ADDRESS)
     SetRangesBase(ranges_base);
 
-  SetStrOffsetsBase(cu_die.GetAttributeValueAsUnsigned(
-      m_dwarf, this, DW_AT_str_offsets_base, 0));
+  SetStrOffsetsBase(
+      cu_die.GetAttributeValueAsUnsigned(this, DW_AT_str_offsets_base, 0));
 
-  uint64_t base_addr = cu_die.GetAttributeValueAsAddress(
-      m_dwarf, this, DW_AT_low_pc, LLDB_INVALID_ADDRESS);
+  uint64_t base_addr = cu_die.GetAttributeValueAsAddress(this, DW_AT_low_pc,
+                                                         LLDB_INVALID_ADDRESS);
   if (base_addr == LLDB_INVALID_ADDRESS)
-    base_addr = cu_die.GetAttributeValueAsAddress(
-        m_dwarf, this, DW_AT_entry_pc, 0);
+    base_addr = cu_die.GetAttributeValueAsAddress(this, DW_AT_entry_pc, 0);
   SetBaseAddress(base_addr);
 
   std::unique_ptr<SymbolFileDWARFDwo> dwo_symbol_file =
@@ -312,7 +305,7 @@ void DWARFUnit::AddUnitDIE(const DWARFDebugInfoEntry &cu_die) {
     return; // Can't fetch the compile unit DIE from the dwo file.
 
   uint64_t main_dwo_id =
-      cu_die.GetAttributeValueAsUnsigned(m_dwarf, this, DW_AT_GNU_dwo_id, 0);
+      cu_die.GetAttributeValueAsUnsigned(this, DW_AT_GNU_dwo_id, 0);
   uint64_t sub_dwo_id =
       dwo_cu_die.GetAttributeValueAsUnsigned(DW_AT_GNU_dwo_id, 0);
   if (main_dwo_id != sub_dwo_id)
@@ -328,13 +321,13 @@ void DWARFUnit::AddUnitDIE(const DWARFDebugInfoEntry &cu_die) {
   // DW_AT_* attributes standardized in DWARF v5 are also applicable to the main
   // unit in contrast.
   if (addr_base == LLDB_INVALID_ADDRESS)
-    addr_base = cu_die.GetAttributeValueAsUnsigned(m_dwarf, this,
-                                                   DW_AT_GNU_addr_base, 0);
+    addr_base =
+        cu_die.GetAttributeValueAsUnsigned(this, DW_AT_GNU_addr_base, 0);
   dwo_cu->SetAddrBase(addr_base);
 
   if (ranges_base == LLDB_INVALID_ADDRESS)
-    ranges_base = cu_die.GetAttributeValueAsUnsigned(m_dwarf, this,
-                                                     DW_AT_GNU_ranges_base, 0);
+    ranges_base =
+        cu_die.GetAttributeValueAsUnsigned(this, DW_AT_GNU_ranges_base, 0);
   dwo_cu->SetRangesBase(ranges_base);
 
   dwo_cu->SetBaseObjOffset(GetOffset());
@@ -406,99 +399,6 @@ void DWARFUnit::ClearDIEsRWLocked() {
     m_dwo_symbol_file->GetCompileUnit()->ClearDIEsRWLocked();
 }
 
-void DWARFUnit::BuildAddressRangeTable(SymbolFileDWARF *dwarf,
-                                       DWARFDebugAranges *debug_aranges) {
-  // This function is usually called if there in no .debug_aranges section in
-  // order to produce a compile unit level set of address ranges that is
-  // accurate.
-
-  size_t num_debug_aranges = debug_aranges->GetNumRanges();
-
-  // First get the compile unit DIE only and check if it has a DW_AT_ranges
-  const DWARFDebugInfoEntry *die = GetUnitDIEPtrOnly();
-
-  const dw_offset_t cu_offset = GetOffset();
-  if (die) {
-    DWARFRangeList ranges;
-    const size_t num_ranges =
-        die->GetAttributeAddressRanges(dwarf, this, ranges, false);
-    if (num_ranges > 0) {
-      // This compile unit has DW_AT_ranges, assume this is correct if it is
-      // present since clang no longer makes .debug_aranges by default and it
-      // emits DW_AT_ranges for DW_TAG_compile_units. GCC also does this with
-      // recent GCC builds.
-      for (size_t i = 0; i < num_ranges; ++i) {
-        const DWARFRangeList::Entry &range = ranges.GetEntryRef(i);
-        debug_aranges->AppendRange(cu_offset, range.GetRangeBase(),
-                                   range.GetRangeEnd());
-      }
-
-      return; // We got all of our ranges from the DW_AT_ranges attribute
-    }
-  }
-  // We don't have a DW_AT_ranges attribute, so we need to parse the DWARF
-
-  // If the DIEs weren't parsed, then we don't want all dies for all compile
-  // units to stay loaded when they weren't needed. So we can end up parsing
-  // the DWARF and then throwing them all away to keep memory usage down.
-  ScopedExtractDIEs clear_dies(ExtractDIEsScoped());
-
-  die = DIEPtr();
-  if (die)
-    die->BuildAddressRangeTable(dwarf, this, debug_aranges);
-
-  if (debug_aranges->GetNumRanges() == num_debug_aranges) {
-    // We got nothing from the functions, maybe we have a line tables only
-    // situation. Check the line tables and build the arange table from this.
-    SymbolContext sc;
-    sc.comp_unit = dwarf->GetCompUnitForDWARFCompUnit(this);
-    if (sc.comp_unit) {
-      SymbolFileDWARFDebugMap *debug_map_sym_file =
-          m_dwarf->GetDebugMapSymfile();
-      if (debug_map_sym_file == NULL) {
-        LineTable *line_table = sc.comp_unit->GetLineTable();
-
-        if (line_table) {
-          LineTable::FileAddressRanges file_ranges;
-          const bool append = true;
-          const size_t num_ranges =
-              line_table->GetContiguousFileAddressRanges(file_ranges, append);
-          for (uint32_t idx = 0; idx < num_ranges; ++idx) {
-            const LineTable::FileAddressRanges::Entry &range =
-                file_ranges.GetEntryRef(idx);
-            debug_aranges->AppendRange(cu_offset, range.GetRangeBase(),
-                                       range.GetRangeEnd());
-          }
-        }
-      } else
-        debug_map_sym_file->AddOSOARanges(dwarf, debug_aranges);
-    }
-  }
-
-  if (debug_aranges->GetNumRanges() == num_debug_aranges) {
-    // We got nothing from the functions, maybe we have a line tables only
-    // situation. Check the line tables and build the arange table from this.
-    SymbolContext sc;
-    sc.comp_unit = dwarf->GetCompUnitForDWARFCompUnit(this);
-    if (sc.comp_unit) {
-      LineTable *line_table = sc.comp_unit->GetLineTable();
-
-      if (line_table) {
-        LineTable::FileAddressRanges file_ranges;
-        const bool append = true;
-        const size_t num_ranges =
-            line_table->GetContiguousFileAddressRanges(file_ranges, append);
-        for (uint32_t idx = 0; idx < num_ranges; ++idx) {
-          const LineTable::FileAddressRanges::Entry &range =
-              file_ranges.GetEntryRef(idx);
-          debug_aranges->AppendRange(GetOffset(), range.GetRangeBase(),
-                                     range.GetRangeEnd());
-        }
-      }
-    }
-  }
-}
-
 lldb::ByteOrder DWARFUnit::GetByteOrder() const {
   return m_dwarf->GetObjectFile()->GetByteOrder();
 }
@@ -508,10 +408,6 @@ TypeSystem *DWARFUnit::GetTypeSystem() {
     return m_dwarf->GetTypeSystemForLanguage(GetLanguageType());
   else
     return nullptr;
-}
-
-DWARFFormValue::FixedFormSizes DWARFUnit::GetFixedFormSizes() {
-  return DWARFFormValue::GetFixedFormSizesForAddressSize(GetAddressByteSize());
 }
 
 void DWARFUnit::SetBaseAddress(dw_addr_t base_addr) { m_base_addr = base_addr; }
@@ -597,7 +493,7 @@ void DWARFUnit::ParseProducerInfo() {
   if (die) {
 
     const char *producer_cstr =
-        die->GetAttributeValueAsString(m_dwarf, this, DW_AT_producer, NULL);
+        die->GetAttributeValueAsString(this, DW_AT_producer, nullptr);
     if (producer_cstr) {
       RegularExpression llvm_gcc_regex(
           llvm::StringRef("^4\\.[012]\\.[01] \\(Based on Apple "
@@ -674,7 +570,7 @@ LanguageType DWARFUnit::GetLanguageType() {
   const DWARFDebugInfoEntry *die = GetUnitDIEPtrOnly();
   if (die)
     m_language_type = LanguageTypeFromDWARF(
-        die->GetAttributeValueAsUnsigned(m_dwarf, this, DW_AT_language, 0));
+        die->GetAttributeValueAsUnsigned(this, DW_AT_language, 0));
   return m_language_type;
 }
 
@@ -683,8 +579,8 @@ bool DWARFUnit::GetIsOptimized() {
     const DWARFDebugInfoEntry *die = GetUnitDIEPtrOnly();
     if (die) {
       m_is_optimized = eLazyBoolNo;
-      if (die->GetAttributeValueAsUnsigned(m_dwarf, this, DW_AT_APPLE_optimized,
-                                           0) == 1) {
+      if (die->GetAttributeValueAsUnsigned(this, DW_AT_APPLE_optimized, 0) ==
+          1) {
         m_is_optimized = eLazyBoolYes;
       }
     }
@@ -748,7 +644,7 @@ void DWARFUnit::ComputeCompDirAndGuessPathStyle() {
     return;
 
   llvm::StringRef comp_dir = removeHostnameFromPathname(
-      die->GetAttributeValueAsString(m_dwarf, this, DW_AT_comp_dir, NULL));
+      die->GetAttributeValueAsString(this, DW_AT_comp_dir, nullptr));
   if (!comp_dir.empty()) {
     FileSpec::Style comp_dir_style =
         FileSpec::GuessPathStyle(comp_dir).getValueOr(FileSpec::Style::native);
@@ -757,7 +653,7 @@ void DWARFUnit::ComputeCompDirAndGuessPathStyle() {
     // Try to detect the style based on the DW_AT_name attribute, but just store
     // the detected style in the m_comp_dir field.
     const char *name =
-        die->GetAttributeValueAsString(m_dwarf, this, DW_AT_name, NULL);
+        die->GetAttributeValueAsString(this, DW_AT_name, nullptr);
     m_comp_dir = FileSpec(
         "", FileSpec::GuessPathStyle(name).getValueOr(FileSpec::Style::native));
   }
@@ -770,18 +666,17 @@ SymbolFileDWARFDwo *DWARFUnit::GetDwoSymbolFile() const {
 dw_offset_t DWARFUnit::GetBaseObjOffset() const { return m_base_obj_offset; }
 
 const DWARFDebugAranges &DWARFUnit::GetFunctionAranges() {
-  if (m_func_aranges_up == NULL) {
+  if (m_func_aranges_up == nullptr) {
     m_func_aranges_up.reset(new DWARFDebugAranges());
     const DWARFDebugInfoEntry *die = DIEPtr();
     if (die)
-      die->BuildFunctionAddressRangeTable(m_dwarf, this,
-                                          m_func_aranges_up.get());
+      die->BuildFunctionAddressRangeTable(this, m_func_aranges_up.get());
 
     if (m_dwo_symbol_file) {
       DWARFUnit *dwo_cu = m_dwo_symbol_file->GetCompileUnit();
       const DWARFDebugInfoEntry *dwo_die = dwo_cu->DIEPtr();
       if (dwo_die)
-        dwo_die->BuildFunctionAddressRangeTable(m_dwo_symbol_file.get(), dwo_cu,
+        dwo_die->BuildFunctionAddressRangeTable(dwo_cu,
                                                 m_func_aranges_up.get());
     }
 
@@ -792,7 +687,7 @@ const DWARFDebugAranges &DWARFUnit::GetFunctionAranges() {
 }
 
 llvm::Expected<DWARFUnitHeader>
-DWARFUnitHeader::extract(const DWARFDataExtractor &data,
+DWARFUnitHeader::extract(const DWARFDataExtractor &data, DIERef::Section section,
                          lldb::offset_t *offset_ptr) {
   DWARFUnitHeader header;
   header.m_offset = *offset_ptr;
@@ -807,13 +702,20 @@ DWARFUnitHeader::extract(const DWARFDataExtractor &data,
   } else {
     header.m_abbr_offset = data.GetDWARFOffset(offset_ptr);
     header.m_addr_size = data.GetU8(offset_ptr);
-    // Only compile units supported so far.
-    header.m_unit_type = DW_UT_compile;
+    header.m_unit_type =
+        section == DIERef::Section::DebugTypes ? DW_UT_type : DW_UT_compile;
+  }
+
+  if (header.IsTypeUnit()) {
+    header.m_type_hash = data.GetU64(offset_ptr);
+    header.m_type_offset = data.GetDWARFOffset(offset_ptr);
   }
 
   bool length_OK = data.ValidOffset(header.GetNextUnitOffset() - 1);
   bool version_OK = SymbolFileDWARF::SupportedVersion(header.m_version);
   bool addr_size_OK = (header.m_addr_size == 4) || (header.m_addr_size == 8);
+  bool type_offset_OK =
+      !header.IsTypeUnit() || (header.m_type_offset <= header.GetLength());
 
   if (!length_OK)
     return llvm::make_error<llvm::object::GenericBinaryError>(
@@ -824,17 +726,21 @@ DWARFUnitHeader::extract(const DWARFDataExtractor &data,
   if (!addr_size_OK)
     return llvm::make_error<llvm::object::GenericBinaryError>(
         "Invalid unit address size");
+  if (!type_offset_OK)
+    return llvm::make_error<llvm::object::GenericBinaryError>(
+        "Type offset out of range");
 
   return header;
 }
 
 llvm::Expected<DWARFUnitSP>
 DWARFUnit::extract(SymbolFileDWARF *dwarf, user_id_t uid,
-                   const DWARFDataExtractor &debug_info,
+                   const DWARFDataExtractor &debug_info, DIERef::Section section,
                    lldb::offset_t *offset_ptr) {
   assert(debug_info.ValidOffset(*offset_ptr));
 
-  auto expected_header = DWARFUnitHeader::extract(debug_info, offset_ptr);
+  auto expected_header =
+      DWARFUnitHeader::extract(debug_info, section, offset_ptr);
   if (!expected_header)
     return expected_header.takeError();
 
@@ -856,14 +762,17 @@ DWARFUnit::extract(SymbolFileDWARF *dwarf, user_id_t uid,
     return llvm::make_error<llvm::object::GenericBinaryError>(
         "No abbrev exists at the specified offset.");
 
-  DWARFUnitSP unit_sp(
-      new DWARFCompileUnit(dwarf, uid, *expected_header, *abbrevs));
-
-  return unit_sp;
+  if (expected_header->IsTypeUnit())
+    return DWARFUnitSP(
+        new DWARFTypeUnit(dwarf, uid, *expected_header, *abbrevs, section));
+  return DWARFUnitSP(
+      new DWARFCompileUnit(dwarf, uid, *expected_header, *abbrevs, section));
 }
 
 const lldb_private::DWARFDataExtractor &DWARFUnit::GetData() const {
-  return m_dwarf->GetDWARFContext().getOrLoadDebugInfoData();
+  return m_section == DIERef::Section::DebugTypes
+             ? m_dwarf->GetDWARFContext().getOrLoadDebugTypesData()
+             : m_dwarf->GetDWARFContext().getOrLoadDebugInfoData();
 }
 
 uint32_t DWARFUnit::GetHeaderByteSize() const {
