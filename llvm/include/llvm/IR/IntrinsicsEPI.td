@@ -169,8 +169,8 @@ def int_epi_# NAME : Intrinsic<[ llvm_anyvector_ty ],
                                [ IntrNoMem ]>,
                      EPIIntrinsic;
 def int_epi_# NAME #_mask : Intrinsic<[ llvm_anyvector_ty ],
-                               [ llvm_anyvector_ty, llvm_anyvector_ty,
-                                 llvm_i64_ty ],
+                               [ LLVMMatchType<0>, llvm_anyvector_ty,
+                                 llvm_anyvector_ty, llvm_i64_ty ],
                                [ IntrNoMem ]>,
                      EPIIntrinsic;
 }

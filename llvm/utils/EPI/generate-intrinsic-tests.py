@@ -821,6 +821,7 @@ entry:
 """
     pattern_v_mask = """
 declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_result_type}>,
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   <vscale x ${lhs_type_scale} x i1>,
   i64);
@@ -831,6 +832,7 @@ entry:
 ; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix}.v v0, v0, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
@@ -1761,10 +1763,10 @@ intrinsics = [
         #TernaryIntrinsic("vwsmsacu", type_generator = generate_ternary_integer_types_widened, variants = vv_vx),
         #TernaryIntrinsic("vwsmsac", type_generator = generate_ternary_integer_types_widened, variants = vv_vx),
 
-        #Conversion("vfcvt", type_generator = generate_same_size_float_to_integer_types, variants = ["xu.f"]),
-        #Conversion("vfcvt", type_generator = generate_same_size_float_to_integer_types, variants = ["x.f"]),
-        #Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.xu"]),
-        #Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.x"]),
+        Conversion("vfcvt", type_generator = generate_same_size_float_to_integer_types, variants = ["xu.f"]),
+        Conversion("vfcvt", type_generator = generate_same_size_float_to_integer_types, variants = ["x.f"]),
+        Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.xu"]),
+        Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.x"]),
 
         #Conversion("vfwcvt.xu.f", type_generator = generate_widened_float_to_integer_types, variants = ["xu.f"],)
         #Conversion("vfwcvt.x.f", type_generator = generate_widened_float_to_integer_types, variants = ["x.f"], declare = False),

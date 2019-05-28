@@ -1300,7 +1300,7 @@ multiclass pseudo_unary<EPIVReg result_reg_class,
                                 EPIPseudo;
 }
 
-multiclass pseudo_unary_arithmetic_float_v_v {
+multiclass pseudo_unary_v_v {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1713,7 +1713,12 @@ defm PseudoVFWSUB      : pseudo_binary_arithmetic_float_w_vf;
 defm PseudoVFWMUL      : pseudo_binary_arithmetic_float_w_vf;
 defm PseudoVFDOT       : pseudo_binary_arithmetic_float_v_v;
 
-defm PseudoVFSQRT      : pseudo_unary_arithmetic_float_v_v;
+defm PseudoVFSQRT      : pseudo_unary_v_v;
+
+defm PseudoVFCVT_XU_F  : pseudo_unary_v_v;
+defm PseudoVFCVT_X_F   : pseudo_unary_v_v;
+defm PseudoVFCVT_F_XU  : pseudo_unary_v_v;
+defm PseudoVFCVT_F_X   : pseudo_unary_v_v;
 
 // Load/store pseudo instructions
 
@@ -2544,35 +2549,10 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
   }
 }
 
-
 //class ValueTypePair<ValueType ty1, ValueType ty2>
 //{
 //   ValueType First = ty1;
 //   ValueType Second = ty2;
-//}
-
-
-//multiclass pat_conversions_symmetrical<string first_instruction,
-//                           string first_intrinsic,
-//                           string second_instruction,
-//                           string second_intrinsic,
-//                           list<ValueTypePair> pairs>
-//{
-
-//foreach vtp = pairs in
-//{
-//def : Pat<(vtp.First (!cast<Intrinsic>("int_epi_" # first_intrinsic) (vtp.Second EPIVR:$rs1))),
-//          (!cast<Instruction>(first_instruction # "_V") EPIVR:$rs1)>;
-//def : Pat<(vtp.First (!cast<Intrinsic>("int_epi_" # first_intrinsic # "_mask") (vtp.Second EPIVR:$rs1), V0)),
-//          (!cast<Instruction>(first_instruction # "_V_MASK") EPIVR:$rs1, vmask_only_true.Value)>;
-
-//def : Pat<(vtp.Second (!cast<Intrinsic>("int_epi_" # second_intrinsic) (vtp.First EPIVR:$rs1))),
-//          (!cast<Instruction>(second_instruction # "_V") EPIVR:$rs1)>;
-//def : Pat<(vtp.Second (!cast<Intrinsic>("int_epi_" # second_intrinsic # "_mask") (vtp.First EPIVR:$rs1), V0)),
-//          (!cast<Instruction>(second_instruction # "_V_MASK") EPIVR:$rs1, vmask_only_true.Value)>;
-
-//}
-
 //}
 
 //class ValueTypeVarList<list<ValueTypePair> VList>
@@ -2913,13 +2893,46 @@ foreach vti = AllFloatVectors.Values in
 //def : Pat<(itp (int_epi_vfclass_mask (vtp.Vector EPIVR:$rs2), V0)),
 //          (VFCLASS_V_MASK $rs2, vmask_only_true.Value)>;
 
+multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
+                                    string instruction_float_to_int,
+                                    string intrinsic_int_to_float,
+                                    string instruction_int_to_float>
+{
+  foreach fvti = AllFloatVectors.Values
+  in {
+    def : Pat<(fvti.IntVector (!cast<Intrinsic>(intrinsic_float_to_int)
+                               (fvti.Vector fvti.RegClass:$rs2),
+                               GPR:$vl)),
+              (!cast<Instruction>(instruction_float_to_int#"_"#fvti.RegClass)
+               $rs2, (NoX0 GPR:$vl), fvti.SEW)>;
 
-//defm "" : pat_conversions_symmetrical<"VFCVT_XU_F", "vfcvt_xu_f", "VFCVT_F_XU", "vfcvt_f_xu", SameSizePairs.Value>;
-//defm "" : pat_conversions_symmetrical<"VFCVT_X_F", "vfcvt_x_f", "VFCVT_F_X", "vfcvt_f_x", SameSizePairs.Value>;
+    def : Pat<(fvti.IntVector (!cast<Intrinsic>(intrinsic_float_to_int#"_mask")
+                               (fvti.IntVector fvti.RegClass:$merge),
+                               (fvti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
+                               GPR:$vl)),
+              (!cast<Instruction>(instruction_float_to_int#"_MASK_"#fvti.RegClass)
+               $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
 
-//defm "" : pat_conversions_symmetrical<"VFWCVT_XU_F", "vfcvt_xu_f", "VFCVT_F_XU", "vfcvt_f_xu", SameSizePairs.Value>;
-//defm "" : pat_conversions_symmetrical<"VFWCVT_X_F", "vfcvt_x_f", "VFCVT_F_X", "vfcvt_f_x", SameSizePairs.Value>;
+    def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float)
+                            (fvti.IntVector fvti.RegClass:$rs2),
+                            GPR:$vl)),
+              (!cast<Instruction>(instruction_int_to_float#"_"#fvti.RegClass)
+               $rs2, (NoX0 GPR:$vl), fvti.SEW)>;
 
+    def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float#"_mask")
+                            (fvti.Vector fvti.RegClass:$merge),
+                            (fvti.IntVector fvti.RegClass:$rs2), (fvti.Mask V0),
+                            GPR:$vl)),
+              (!cast<Instruction>(instruction_int_to_float#"_MASK_"#fvti.RegClass)
+               $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
+  }
+}
+
+
+defm "" : pat_conversions_same_sew<"int_epi_vfcvt_xu_f", "PseudoVFCVT_XU_F_V",
+                                   "int_epi_vfcvt_f_xu", "PseudoVFCVT_F_XU_V">;
+defm "" : pat_conversions_same_sew<"int_epi_vfcvt_x_f", "PseudoVFCVT_X_F_V",
+                                   "int_epi_vfcvt_f_x", "PseudoVFCVT_F_X_V">;
 
 //defm "" : pat_conversions<"VFWCVT_XU_F", "vfwcvt_xu_f", WidenedSize.Value>;
 //defm "" : pat_conversions<"VFWCVT_F_XU", "vfwcvt_f_xu", WidenedSize.Value>;
