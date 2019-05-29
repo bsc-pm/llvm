@@ -164,6 +164,23 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
                                              MVT::i32, MVT::Other,
                                              Node->getOperand(0)));
     return;
+  case ISD::BITCAST: {
+    SDValue Op0 = Node->getOperand(0);
+    EVT VTOrig = Op0->getValueType(0);
+    if (VT.isScalableVector() && VTOrig.isScalableVector()) {
+      const TargetRegisterClass *RCDest = TLI->getRegClassFor(VT.getSimpleVT());
+      const TargetRegisterClass *RCOrig =
+          TLI->getRegClassFor(VTOrig.getSimpleVT());
+      bool BitcastIsTrivial = RCDest == RCOrig;
+
+      if (BitcastIsTrivial) {
+        ReplaceUses(SDValue(Node, 0), Op0);
+        CurDAG->RemoveDeadNode(Node);
+        return;
+      }
+    }
+    break;
+  }
   }
 
   // Select the default instruction.
