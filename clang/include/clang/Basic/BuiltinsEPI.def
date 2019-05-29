@@ -309,22 +309,22 @@ EPI_BUILTIN(vload_8xi1, "QV8bUc*", "n")
 #define EPI_FP_TO_INT_CONVERSION(name)                                         \
   EPI_BUILTIN(name##_2xi32_2xf32, "QV2SiQV2fUWi", "Un")                        \
   EPI_BUILTIN(name##_1xi64_1xf64, "QV1SWiQV1dUWi", "Un")                       \
-  EPI_BUILTIN(name##_2xi32_2xf32_mask, "QV2SiQV2fQV2bUWi", "Un")               \
-  EPI_BUILTIN(name##_1xi64_1xf64_mask, "QV1SWiQV1dQV1bUWi", "Un")
+  EPI_BUILTIN(name##_2xi32_2xf32_mask, "QV2SiQV2SiQV2fQV2bUWi", "Un")          \
+  EPI_BUILTIN(name##_1xi64_1xf64_mask, "QV1SWiQV1SWiQV1dQV1bUWi", "Un")
 
 #define EPI_INT_TO_FP_CONVERSION(name)                                         \
   EPI_BUILTIN(name##_2xf32_2xi32, "QV2fQV2SiUWi", "Un")                        \
   EPI_BUILTIN(name##_1xf64_1xi64, "QV1dQV1SWiUWi", "Un")                       \
-  EPI_BUILTIN(name##_2xf32_2xi32_mask, "QV2fQV2SiQV2bUWi", "Un")               \
-  EPI_BUILTIN(name##_1xf64_1xi64_mask, "QV1dQV1SWiQV1bUWi", "Un")
+  EPI_BUILTIN(name##_2xf32_2xi32_mask, "QV2fQV2fQV2SiQV2bUWi", "Un")           \
+  EPI_BUILTIN(name##_1xf64_1xi64_mask, "QV1dQV1dQV1SWiQV1bUWi", "Un")
 
 #define EPI_FP_TO_FP_NARROW_CONVERSION(name)                                   \
   EPI_BUILTIN(name##_2xf32_2xf64, "QV2fQV2dUWi", "Un")                         \
-  EPI_BUILTIN(name##_2xf32_2xf64_mask, "QV2fQV2dQV2bUWi", "Un")
+  EPI_BUILTIN(name##_2xf32_2xf64_mask, "QV2fQV2fQV2dQV2bUWi", "Un")
 
 #define EPI_FP_TO_FP_WIDEN_CONVERSION(name)                                    \
   EPI_BUILTIN(name##_2xf64_2xf32, "QV2dQV2fUWi", "Un")                         \
-  EPI_BUILTIN(name##_2xf64_2xf32_mask, "QV2dQV2fQV2bUWi", "Un")
+  EPI_BUILTIN(name##_2xf64_2xf32_mask, "QV2dQV2dQV2fQV2bUWi", "Un")
 
 #define EPI_SCALAR_INT_TO_INT_UNARY(name)                                      \
   EPI_BUILTIN(name##_8xi8, "QV8ScScUWi", "Un")                                 \

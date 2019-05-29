@@ -537,25 +537,25 @@ def EPI_FP_TO_INT_CONVERSION(string_name):
     global template_dict
     template_dict[string_name + "_2xi32_2xf32"] = UnaryTemplate
     template_dict[string_name + "_1xi64_1xf64"] = UnaryTemplate
-    template_dict[string_name + "_2xi32_2xf32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_1xi64_1xf64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xi32_2xf32_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_1xi64_1xf64_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_INT_TO_FP_CONVERSION(string_name):
     global template_dict
     template_dict[string_name + "_2xf32_2xi32"] = UnaryTemplate
     template_dict[string_name + "_1xf64_1xi64"] = UnaryTemplate
-    template_dict[string_name + "_2xf32_2xi32_mask"] = UnaryMaskTemplate
-    template_dict[string_name + "_1xf64_1xi64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_2xi32_mask"] = UnaryMaskWithMergeTemplate
+    template_dict[string_name + "_1xf64_1xi64_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_FP_TO_FP_WIDEN_CONVERSION(string_name):
     global template_dict
     template_dict[string_name + "_2xf64_2xf32"] = UnaryTemplate
-    template_dict[string_name + "_2xf64_2xf32_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf64_2xf32_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_FP_TO_FP_NARROW_CONVERSION(string_name):
     global template_dict
     template_dict[string_name + "_2xf32_2xf64"] = UnaryTemplate
-    template_dict[string_name + "_2xf32_2xf64_mask"] = UnaryMaskTemplate
+    template_dict[string_name + "_2xf32_2xf64_mask"] = UnaryMaskWithMergeTemplate
 
 def EPI_MASK_TO_SCALAR_INT_UNARY(string_name):
     global template_dict

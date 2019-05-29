@@ -12890,7 +12890,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_2xi32_2xf32_mask:                                 \
   case RISCV::EPI_BI_##ID_##_1xi64_1xf64_mask:                                 \
-    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
@@ -12902,7 +12902,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_2xf32_2xi32_mask:                                 \
   case RISCV::EPI_BI_##ID_##_1xf64_1xi64_mask:                                 \
-    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
@@ -12912,7 +12912,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_2xf32_2xf64_mask:                                 \
-    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
@@ -12922,7 +12922,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     ID = Intrinsic::epi_##ID_;                                                 \
     break;                                                                     \
   case RISCV::EPI_BI_##ID_##_2xf64_2xf32_mask:                                 \
-    IntrinsicTypes = {ResultType, Ops[0]->getType(), Ops[1]->getType()};       \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
