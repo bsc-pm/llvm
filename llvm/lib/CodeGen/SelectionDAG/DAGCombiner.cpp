@@ -2161,13 +2161,22 @@ SDValue DAGCombiner::visitADDLike(SDNode *N) {
     return N0;
 
   if (isConstantOrConstantVector(N1, /* NoOpaque */ true)) {
+    // fold ((A-c1)+c2) -> (A+(c2-c1))
+    if (N0.getOpcode() == ISD::SUB &&
+        isConstantOrConstantVector(N0.getOperand(1), /* NoOpaque */ true)) {
+      SDValue Sub = DAG.FoldConstantArithmetic(ISD::SUB, DL, VT, N1.getNode(),
+                                               N0.getOperand(1).getNode());
+      assert(Sub && "Constant folding failed");
+      return DAG.getNode(ISD::ADD, DL, VT, N0.getOperand(0), Sub);
+    }
+
     // fold ((c1-A)+c2) -> (c1+c2)-A
     if (N0.getOpcode() == ISD::SUB &&
         isConstantOrConstantVector(N0.getOperand(0), /* NoOpaque */ true)) {
-      // FIXME: Adding 2 constants should be handled by FoldConstantArithmetic.
-      return DAG.getNode(ISD::SUB, DL, VT,
-                         DAG.getNode(ISD::ADD, DL, VT, N1, N0.getOperand(0)),
-                         N0.getOperand(1));
+      SDValue Add = DAG.FoldConstantArithmetic(ISD::ADD, DL, VT, N1.getNode(),
+                                               N0.getOperand(0).getNode());
+      assert(Add && "Constant folding failed");
+      return DAG.getNode(ISD::SUB, DL, VT, Add, N0.getOperand(1));
     }
 
     // add (sext i1 X), 1 -> zext (not i1 X)
@@ -2854,14 +2863,46 @@ SDValue DAGCombiner::visitSUB(SDNode *N) {
   if (N0.getOpcode() == ISD::ADD && N0.getOperand(1) == N1)
     return N0.getOperand(0);
 
+  // fold (A+C1)-C2 -> A+(C1-C2)
+  if (N0.getOpcode() == ISD::ADD &&
+      isConstantOrConstantVector(N1, /* NoOpaques */ true) &&
+      isConstantOrConstantVector(N0.getOperand(1), /* NoOpaques */ true)) {
+    SDValue NewC = DAG.FoldConstantArithmetic(
+        ISD::SUB, DL, VT, N0.getOperand(1).getNode(), N1.getNode());
+    assert(NewC && "Constant folding failed");
+    return DAG.getNode(ISD::ADD, DL, VT, N0.getOperand(0), NewC);
+  }
+
   // fold C2-(A+C1) -> (C2-C1)-A
   if (N1.getOpcode() == ISD::ADD) {
     SDValue N11 = N1.getOperand(1);
     if (isConstantOrConstantVector(N0, /* NoOpaques */ true) &&
         isConstantOrConstantVector(N11, /* NoOpaques */ true)) {
-      SDValue NewC = DAG.getNode(ISD::SUB, DL, VT, N0, N11);
+      SDValue NewC = DAG.FoldConstantArithmetic(ISD::SUB, DL, VT, N0.getNode(),
+                                                N11.getNode());
+      assert(NewC && "Constant folding failed");
       return DAG.getNode(ISD::SUB, DL, VT, NewC, N1.getOperand(0));
     }
+  }
+
+  // fold (A-C1)-C2 -> A-(C1+C2)
+  if (N0.getOpcode() == ISD::SUB &&
+      isConstantOrConstantVector(N1, /* NoOpaques */ true) &&
+      isConstantOrConstantVector(N0.getOperand(1), /* NoOpaques */ true)) {
+    SDValue NewC = DAG.FoldConstantArithmetic(
+        ISD::ADD, DL, VT, N0.getOperand(1).getNode(), N1.getNode());
+    assert(NewC && "Constant folding failed");
+    return DAG.getNode(ISD::SUB, DL, VT, N0.getOperand(0), NewC);
+  }
+
+  // fold (c1-A)-c2 -> (c1-c2)-A
+  if (N0.getOpcode() == ISD::SUB &&
+      isConstantOrConstantVector(N1, /* NoOpaques */ true) &&
+      isConstantOrConstantVector(N0.getOperand(0), /* NoOpaques */ true)) {
+    SDValue NewC = DAG.FoldConstantArithmetic(
+        ISD::SUB, DL, VT, N0.getOperand(0).getNode(), N1.getNode());
+    assert(NewC && "Constant folding failed");
+    return DAG.getNode(ISD::SUB, DL, VT, NewC, N0.getOperand(1));
   }
 
   // fold ((A+(B+or-C))-B) -> A+or-C
