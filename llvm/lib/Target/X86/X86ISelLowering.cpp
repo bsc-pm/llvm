@@ -674,6 +674,8 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::FMA, MVT::f80, Expand);
     setOperationAction(ISD::LROUND, MVT::f80, Expand);
     setOperationAction(ISD::LLROUND, MVT::f80, Expand);
+    setOperationAction(ISD::LRINT, MVT::f80, Expand);
+    setOperationAction(ISD::LLRINT, MVT::f80, Expand);
   }
 
   // Always use a library call for pow.
@@ -1357,19 +1359,14 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
       setOperationAction(ISD::SSUBSAT,          VT, Custom);
 
       setOperationAction(ISD::BUILD_VECTOR,     VT, Custom);
+      setOperationAction(ISD::CONCAT_VECTORS,   VT, Custom);
       setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
+      setOperationAction(ISD::INSERT_SUBVECTOR, VT, Custom);
       setOperationAction(ISD::INSERT_VECTOR_ELT, VT, Custom);
       setOperationAction(ISD::VECTOR_SHUFFLE,   VT,  Custom);
       setOperationAction(ISD::VSELECT,          VT,  Expand);
     }
 
-    setOperationAction(ISD::CONCAT_VECTORS,     MVT::v16i1, Custom);
-    setOperationAction(ISD::CONCAT_VECTORS,     MVT::v8i1,  Custom);
-    setOperationAction(ISD::CONCAT_VECTORS,     MVT::v4i1,  Custom);
-    setOperationAction(ISD::INSERT_SUBVECTOR,   MVT::v2i1,  Custom);
-    setOperationAction(ISD::INSERT_SUBVECTOR,   MVT::v4i1,  Custom);
-    setOperationAction(ISD::INSERT_SUBVECTOR,   MVT::v8i1,  Custom);
-    setOperationAction(ISD::INSERT_SUBVECTOR,   MVT::v16i1, Custom);
     for (auto VT : { MVT::v1i1, MVT::v2i1, MVT::v4i1, MVT::v8i1 })
       setOperationAction(ISD::EXTRACT_SUBVECTOR, VT, Custom);
   }
@@ -21027,6 +21024,35 @@ static SDValue LowerSIGN_EXTEND(SDValue Op, const X86Subtarget &Subtarget,
   return DAG.getNode(ISD::CONCAT_VECTORS, dl, VT, OpLo, OpHi);
 }
 
+/// Change a 256-bit vector store into a pair of 128-bit vector stores.
+static SDValue split256BitStore(StoreSDNode *Store, SelectionDAG &DAG) {
+  SDValue StoredVal = Store->getValue();
+  assert(StoredVal.getValueType().is256BitVector() && "Expecting 256-bit op");
+
+  // Splitting volatile memory ops is not allowed unless the operation was not
+  // legal to begin with. We are assuming the input op is legal (this transform
+  // is only used for targets with AVX).
+  if (Store->isVolatile())
+    return SDValue();
+
+  MVT StoreVT = StoredVal.getSimpleValueType();
+  unsigned NumElems = StoreVT.getVectorNumElements();
+  SDLoc DL(Store);
+  SDValue Value0 = extract128BitVector(StoredVal, 0, DAG, DL);
+  SDValue Value1 = extract128BitVector(StoredVal, NumElems / 2, DAG, DL);
+  SDValue Ptr0 = Store->getBasePtr();
+  SDValue Ptr1 = DAG.getMemBasePlusOffset(Ptr0, 16, DL);
+  unsigned Alignment = Store->getAlignment();
+  SDValue Ch0 =
+      DAG.getStore(Store->getChain(), DL, Value0, Ptr0, Store->getPointerInfo(),
+                   Alignment, Store->getMemOperand()->getFlags());
+  SDValue Ch1 =
+      DAG.getStore(Store->getChain(), DL, Value1, Ptr1,
+                   Store->getPointerInfo().getWithOffset(16),
+                   MinAlign(Alignment, 16), Store->getMemOperand()->getFlags());
+  return DAG.getNode(ISD::TokenFactor, DL, MVT::Other, Ch0, Ch1);
+}
+
 static SDValue LowerStore(SDValue Op, const X86Subtarget &Subtarget,
                           SelectionDAG &DAG) {
   StoreSDNode *St = cast<StoreSDNode>(Op.getNode());
@@ -23261,6 +23287,27 @@ static SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, const X86Subtarget &Subtarget,
           DAG.getNode(Opcode, dl, VTs, Chain, Op->getOperand(2),
                       Op->getOperand(3), Op->getOperand(4));
       SDValue SetCC = getSETCC(X86::COND_B, Operation.getValue(0), dl, DAG);
+      return DAG.getNode(ISD::MERGE_VALUES, dl, Op->getVTList(), SetCC,
+                         Operation.getValue(1));
+    }
+    case Intrinsic::x86_enqcmd:
+    case Intrinsic::x86_enqcmds: {
+      SDLoc dl(Op);
+      SDValue Chain = Op.getOperand(0);
+      SDVTList VTs = DAG.getVTList(MVT::i32, MVT::Other);
+      unsigned Opcode;
+      switch (IntNo) {
+      default: llvm_unreachable("Impossible intrinsic!");
+      case Intrinsic::x86_enqcmd:
+        Opcode = X86ISD::ENQCMD;
+        break;
+      case Intrinsic::x86_enqcmds:
+        Opcode = X86ISD::ENQCMDS;
+        break;
+      }
+      SDValue Operation = DAG.getNode(Opcode, dl, VTs, Chain, Op.getOperand(2),
+                                      Op.getOperand(3));
+      SDValue SetCC = getSETCC(X86::COND_E, Operation.getValue(0), dl, DAG);
       return DAG.getNode(ISD::MERGE_VALUES, dl, Op->getVTList(), SetCC,
                          Operation.getValue(1));
     }
@@ -28244,6 +28291,8 @@ const char *X86TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case X86ISD::NT_BRIND:           return "X86ISD::NT_BRIND";
   case X86ISD::UMWAIT:             return "X86ISD::UMWAIT";
   case X86ISD::TPAUSE:             return "X86ISD::TPAUSE";
+  case X86ISD::ENQCMD:             return "X86ISD:ENQCMD";
+  case X86ISD::ENQCMDS:            return "X86ISD:ENQCMDS";
   }
   return nullptr;
 }
@@ -38874,6 +38923,21 @@ static SDValue combineLoad(SDNode *N, SelectionDAG &DAG,
     return DCI.CombineTo(N, NewVec, TF, true);
   }
 
+  // Bool vector load - attempt to cast to an integer, as we have good
+  // (vXiY *ext(vXi1 bitcast(iX))) handling.
+  if (Ext == ISD::NON_EXTLOAD && !Subtarget.hasAVX512() && RegVT.isVector() &&
+      RegVT.getScalarType() == MVT::i1 && DCI.isBeforeLegalize()) {
+    unsigned NumElts = RegVT.getVectorNumElements();
+    EVT IntVT = EVT::getIntegerVT(*DAG.getContext(), NumElts);
+    if (TLI.isTypeLegal(IntVT)) {
+      SDValue IntLoad = DAG.getLoad(IntVT, dl, Ld->getChain(), Ld->getBasePtr(),
+                                    Ld->getPointerInfo(), Alignment,
+                                    Ld->getMemOperand()->getFlags());
+      SDValue BoolVec = DAG.getBitcast(RegVT, IntLoad);
+      return DCI.CombineTo(N, BoolVec, IntLoad.getValue(1), true);
+    }
+  }
+
   return SDValue();
 }
 
@@ -39350,20 +39414,7 @@ static SDValue combineStore(SDNode *N, SelectionDAG &DAG,
     if (NumElems < 2)
       return SDValue();
 
-    SDValue Value0 = extract128BitVector(StoredVal, 0, DAG, dl);
-    SDValue Value1 = extract128BitVector(StoredVal, NumElems / 2, DAG, dl);
-
-    SDValue Ptr0 = St->getBasePtr();
-    SDValue Ptr1 = DAG.getMemBasePlusOffset(Ptr0, 16, dl);
-
-    SDValue Ch0 =
-        DAG.getStore(St->getChain(), dl, Value0, Ptr0, St->getPointerInfo(),
-                     Alignment, St->getMemOperand()->getFlags());
-    SDValue Ch1 =
-        DAG.getStore(St->getChain(), dl, Value1, Ptr1,
-                     St->getPointerInfo().getWithOffset(16),
-                     MinAlign(Alignment, 16U), St->getMemOperand()->getFlags());
-    return DAG.getNode(ISD::TokenFactor, dl, MVT::Other, Ch0, Ch1);
+    return split256BitStore(St, DAG);
   }
 
   // Optimize trunc store (of multiple scalars) to shuffle and store.

@@ -39,6 +39,7 @@ Defined *ElfSym::MipsGpDisp;
 Defined *ElfSym::MipsLocalGp;
 Defined *ElfSym::RelaIpltStart;
 Defined *ElfSym::RelaIpltEnd;
+Defined *ElfSym::TlsModuleBase;
 
 static uint64_t getSymVA(const Symbol &Sym, int64_t &Addend) {
   switch (Sym.kind()) {
@@ -333,7 +334,7 @@ void elf::maybeWarnUnorderableSymbol(const Symbol *Sym) {
     Warn(": unable to order absolute symbol: ");
   else if (D && isa<OutputSection>(D->Section))
     Warn(": unable to order synthetic symbol: ");
-  else if (D && !D->Section->Repl->Live)
+  else if (D && !D->Section->Repl->isLive())
     Warn(": unable to order discarded symbol: ");
 }
 

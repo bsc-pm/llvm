@@ -588,14 +588,18 @@ bool SIFixSGPRCopies::runOnMachineFunction(MachineFunction &MF) {
             }
 
             if (UseMI->isPHI()) {
-              if (!TRI->isSGPRReg(MRI, Use.getReg()))
+              const TargetRegisterClass *UseRC = MRI.getRegClass(Use.getReg());
+              if (!TRI->isSGPRReg(MRI, Use.getReg()) &&
+                  UseRC != &AMDGPU::VReg_1RegClass)
                 hasVGPRUses++;
               continue;
             }
 
             unsigned OpNo = UseMI->getOperandNo(&Use);
             const MCInstrDesc &Desc = TII->get(UseMI->getOpcode());
-            if (Desc.OpInfo && Desc.OpInfo[OpNo].RegClass != -1) {
+            if (!Desc.isPseudo() && Desc.OpInfo &&
+                OpNo < Desc.getNumOperands() &&
+                Desc.OpInfo[OpNo].RegClass != -1) {
               const TargetRegisterClass *OpRC =
                   TRI->getRegClass(Desc.OpInfo[OpNo].RegClass);
               if (!TRI->isSGPRClass(OpRC) && OpRC != &AMDGPU::VS_32RegClass &&
@@ -631,8 +635,10 @@ bool SIFixSGPRCopies::runOnMachineFunction(MachineFunction &MF) {
 
         if ((!TRI->isVGPR(MRI, PHIRes) && RC0 != &AMDGPU::VReg_1RegClass) &&
             (hasVGPRInput || hasVGPRUses > 1)) {
+          LLVM_DEBUG(dbgs() << "Fixing PHI: " << MI);
           TII->moveToVALU(MI);
         } else {
+          LLVM_DEBUG(dbgs() << "Legalizing PHI: " << MI);
           TII->legalizeOperands(MI, MDT);
         }
 
