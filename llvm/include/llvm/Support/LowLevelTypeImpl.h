@@ -42,32 +42,34 @@ public:
   static LLT scalar(unsigned SizeInBits) {
     assert(SizeInBits > 0 && "invalid scalar size");
     return LLT{/*isPointer=*/false, /*isVector=*/false, /*NumElements=*/0,
-               SizeInBits, /*AddressSpace=*/0};
+               SizeInBits, /*AddressSpace=*/0, /*isScalable=*/false};
   }
 
   /// Get a low-level pointer in the given address space.
   static LLT pointer(unsigned AddressSpace, unsigned SizeInBits) {
     assert(SizeInBits > 0 && "invalid pointer size");
     return LLT{/*isPointer=*/true, /*isVector=*/false, /*NumElements=*/0,
-               SizeInBits, AddressSpace};
+               SizeInBits, AddressSpace, /*isScalable=*/false};
   }
 
   /// Get a low-level vector of some number of elements and element width.
   /// \p NumElements must be at least 2.
-  static LLT vector(uint16_t NumElements, unsigned ScalarSizeInBits) {
+  static LLT vector(uint16_t NumElements, unsigned ScalarSizeInBits,
+                    bool Scalable = false) {
     assert(NumElements > 1 && "invalid number of vector elements");
     assert(ScalarSizeInBits > 0 && "invalid vector element size");
     return LLT{/*isPointer=*/false, /*isVector=*/true, NumElements,
-               ScalarSizeInBits, /*AddressSpace=*/0};
+               ScalarSizeInBits, /*AddressSpace=*/0, Scalable};
   }
 
   /// Get a low-level vector of some number of elements and element type.
-  static LLT vector(uint16_t NumElements, LLT ScalarTy) {
+  static LLT vector(uint16_t NumElements, LLT ScalarTy, bool Scalable = false) {
     assert(NumElements > 1 && "invalid number of vector elements");
     assert(!ScalarTy.isVector() && "invalid vector element type");
     return LLT{ScalarTy.isPointer(), /*isVector=*/true, NumElements,
                ScalarTy.getSizeInBits(),
-               ScalarTy.isPointer() ? ScalarTy.getAddressSpace() : 0};
+               ScalarTy.isPointer() ? ScalarTy.getAddressSpace() : 0,
+               Scalable};
   }
 
   static LLT scalarOrVector(uint16_t NumElements, LLT ScalarTy) {
@@ -79,8 +81,8 @@ public:
   }
 
   explicit LLT(bool isPointer, bool isVector, uint16_t NumElements,
-               unsigned SizeInBits, unsigned AddressSpace) {
-    init(isPointer, isVector, NumElements, SizeInBits, AddressSpace);
+               unsigned SizeInBits, unsigned AddressSpace, bool Scalable) {
+    init(isPointer, isVector, NumElements, SizeInBits, AddressSpace, Scalable);
   }
   explicit LLT() : IsPointer(false), IsVector(false), RawData(0) {}
 
@@ -170,6 +172,14 @@ public:
       return scalar(getScalarSizeInBits());
   }
 
+  bool isScalable() const {
+    assert(isVector() && "cannot get scalable property of non-vector");
+    if (IsPointer)
+      return (getFieldValue(PointerVectorScalableFieldInfo) != 0);
+    else
+      return (getFieldValue(VectorScalableFieldInfo) != 0);
+  }
+
   void print(raw_ostream &OS) const;
 
   bool operator==(const LLT &RHS) const {
@@ -210,19 +220,26 @@ private:
   /// * Vector-of-non-pointer (isPointer == 0 && isVector == 1):
   ///   NumElements: 16;
   ///   SizeOfElement: 32;
+  ///   Scalable: 1;
   static const constexpr BitFieldInfo VectorElementsFieldInfo{16, 0};
   static const constexpr BitFieldInfo VectorSizeFieldInfo{
       32, VectorElementsFieldInfo[0] + VectorElementsFieldInfo[1]};
+  static const constexpr BitFieldInfo VectorScalableFieldInfo{
+      1, VectorSizeFieldInfo[0] + VectorSizeFieldInfo[1]};
   /// * Vector-of-pointer (isPointer == 1 && isVector == 1):
   ///   NumElements: 16;
   ///   SizeOfElement: 16;
   ///   AddressSpace: 24;
+  ///   Scalable: 1;
   static const constexpr BitFieldInfo PointerVectorElementsFieldInfo{16, 0};
   static const constexpr BitFieldInfo PointerVectorSizeFieldInfo{
       16,
       PointerVectorElementsFieldInfo[1] + PointerVectorElementsFieldInfo[0]};
   static const constexpr BitFieldInfo PointerVectorAddressSpaceFieldInfo{
       24, PointerVectorSizeFieldInfo[1] + PointerVectorSizeFieldInfo[0]};
+  static const constexpr BitFieldInfo PointerVectorScalableFieldInfo{
+      1, PointerVectorAddressSpaceFieldInfo[0] +
+         PointerVectorAddressSpaceFieldInfo[1]};
 
   uint64_t IsPointer : 1;
   uint64_t IsVector : 1;
@@ -244,9 +261,10 @@ private:
   }
 
   void init(bool IsPointer, bool IsVector, uint16_t NumElements,
-            unsigned SizeInBits, unsigned AddressSpace) {
+            unsigned SizeInBits, unsigned AddressSpace, bool IsScalable) {
     this->IsPointer = IsPointer;
     this->IsVector = IsVector;
+    uint64_t Scalable = IsScalable ? 1 : 0;
     if (!IsVector) {
       if (!IsPointer)
         RawData = maskAndShift(SizeInBits, ScalarSizeFieldInfo);
@@ -257,12 +275,14 @@ private:
       assert(NumElements > 1 && "invalid number of vector elements");
       if (!IsPointer)
         RawData = maskAndShift(NumElements, VectorElementsFieldInfo) |
-                  maskAndShift(SizeInBits, VectorSizeFieldInfo);
+                  maskAndShift(SizeInBits, VectorSizeFieldInfo) |
+                  maskAndShift(Scalable, VectorScalableFieldInfo);
       else
         RawData =
             maskAndShift(NumElements, PointerVectorElementsFieldInfo) |
             maskAndShift(SizeInBits, PointerVectorSizeFieldInfo) |
-            maskAndShift(AddressSpace, PointerVectorAddressSpaceFieldInfo);
+            maskAndShift(AddressSpace, PointerVectorAddressSpaceFieldInfo) |
+            maskAndShift(Scalable, PointerVectorScalableFieldInfo);
     }
   }
 
