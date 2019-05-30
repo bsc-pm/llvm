@@ -612,6 +612,8 @@ static std::string getMangledTypeStr(Type* Ty) {
     // Ensure nested function types are distinguishable.
     Result += "f";
   } else if (isa<VectorType>(Ty)) {
+    if (Ty->getVectorIsScalable())
+      Result += "nx";
     Result += "v" + utostr(Ty->getVectorNumElements()) +
       getMangledTypeStr(Ty->getVectorElementType());
   } else if (Ty) {
