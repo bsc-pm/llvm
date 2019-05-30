@@ -416,6 +416,9 @@ defm vfncvt_f_f : epi_conversions;
 
 defm vbroadcast : epi_unary;
 
+def int_epi_mask_cast : Intrinsic< [ llvm_anyvector_ty ], [ llvm_anyvector_ty ],
+                                   [ IntrNoMem ]>;
+
 // Loads
 multiclass epi_load {
 

@@ -181,6 +181,29 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
     }
     break;
   }
+  case ISD::INTRINSIC_WO_CHAIN: {
+    unsigned IntNo = cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue();
+    switch (IntNo) {
+    default:
+      break;
+    case Intrinsic::epi_mask_cast: {
+      SDValue Op1 = Node->getOperand(1);
+      EVT VTOrig = Op1->getValueType(0);
+      assert(VT.isScalableVector() && VTOrig.isScalableVector() &&
+             ((VT.getVectorElementType() == MVT::i1) !=
+              (VTOrig.getVectorElementType() == MVT::i1)) &&
+             "Cast has to be from/to a mask type");
+      assert((TLI->getRegClassFor(VT.getSimpleVT()) == &RISCV::EPIVRRegClass) &&
+             (TLI->getRegClassFor(VTOrig.getSimpleVT()) ==
+              &RISCV::EPIVRRegClass) &&
+             "Cast can only happen between values that fit in EPIVR");
+      ReplaceUses(SDValue(Node, 0), Op1);
+      CurDAG->RemoveDeadNode(Node);
+      return;
+    }
+    }
+    break;
+  }
   }
 
   // Select the default instruction.
