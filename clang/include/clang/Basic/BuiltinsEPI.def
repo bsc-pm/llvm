@@ -582,6 +582,17 @@ EPI_FP_BINARY(vfdot)
 EPI_SCALAR_INT_TO_INT_UNARY(vbroadcast)
 EPI_SCALAR_FP_TO_FP_UNARY(vbroadcast)
 
+// Casts
+EPI_BUILTIN(cast_8xi1_8xi8, "QV8bQV8Sc", "Un")
+EPI_BUILTIN(cast_4xi1_4xi16, "QV4bQV4Ss", "Un")
+EPI_BUILTIN(cast_2xi1_2xi32, "QV2bQV2Si", "Un")
+EPI_BUILTIN(cast_1xi1_1xi64, "QV1bQV1SWi", "Un")
+
+EPI_BUILTIN(cast_8xi8_8xi1, "QV8ScQV8b", "Un")
+EPI_BUILTIN(cast_4xi16_4xi1, "QV4SsQV4b", "Un")
+EPI_BUILTIN(cast_2xi32_2xi1, "QV2SiQV2b", "Un")
+EPI_BUILTIN(cast_1xi64_1xi1, "QV1SWiQV1b", "Un")
+
 // Cleanup
 #undef BUILTIN
 #undef EPI_INT_BINARY

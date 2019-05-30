@@ -520,6 +520,30 @@ unsigned long test_vreadvl()
     def render(self, intrinsic_name, return_type, argument_types):
         return ReadVectorLengthTemplate.TEMPLATE
 
+class CastMaskTemplate(TestTemplate):
+    TEMPLATE = """
+${store_decl}
+void test_${intrinsic}(unsigned long gvl)
+{
+  ${c_result_type} result;
+  ${c_lhs_type} lhs;
+  result = __builtin_epi_${intrinsic}(lhs);
+  ${store_stmt}
+}
+"""
+
+    def __init__(self):
+        super(CastMaskTemplate, self).__init__()
+
+    def render(self, intrinsic_name, return_type, argument_types):
+        subs = {}
+        subs["intrinsic"] = builtin_name
+        subs["c_result_type"] = TypeRender(return_type).render()
+        subs["c_lhs_type"] = TypeRender(argument_types[0]).render()
+        (subs["store_decl"], subs["store_stmt"]) = self.store_code(return_type)
+
+        return string.Template(CastMaskTemplate.TEMPLATE).substitute(subs)
+
 template_dict = {}
 
 def EPI_FP_UNARY(string_name):
@@ -758,6 +782,18 @@ def EPI_GET_FIRST(string_name):
     template_dict[string_name + "_1xf64"] = GetFirstTemplate
     template_dict[string_name + "_2xf32"] = GetFirstTemplate
 
+def EPI_CAST_MASK(string_name):
+    global template_dict
+    template_dict[string_name + "_1xi64_1xi1"] = CastMaskTemplate
+    template_dict[string_name + "_2xi32_2xi1"] = CastMaskTemplate
+    template_dict[string_name + "_4xi16_4xi1"] = CastMaskTemplate
+    template_dict[string_name + "_8xi8_8xi1"] = CastMaskTemplate
+
+    template_dict[string_name + "_1xi1_1xi64"] = CastMaskTemplate
+    template_dict[string_name + "_2xi1_2xi32"] = CastMaskTemplate
+    template_dict[string_name + "_4xi1_4xi16"] = CastMaskTemplate
+    template_dict[string_name + "_8xi1_8xi8"] = CastMaskTemplate
+
 ################################################################################
 ################################################################################
 ################################################################################
@@ -919,6 +955,8 @@ EPI_LOAD_STORE_MASK("vload", "vstore")
 EPI_EXTRACT("vextract")
 EPI_SET_FIRST("vsetfirst")
 EPI_GET_FIRST("vgetfirst")
+
+EPI_CAST_MASK("cast")
 
 template_dict["vsetvl"] = SetVectorLengthTemplate
 template_dict["vsetvlmax"] = SetMaxVectorLengthTemplate

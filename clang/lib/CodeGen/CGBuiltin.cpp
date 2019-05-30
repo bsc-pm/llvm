@@ -13310,6 +13310,18 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   case RISCV::EPI_BI_vsetvlmax:
     ID = Intrinsic::epi_vsetvlmax;
     break;
+  case RISCV::EPI_BI_cast_8xi8_8xi1:
+  case RISCV::EPI_BI_cast_4xi16_4xi1:
+  case RISCV::EPI_BI_cast_2xi32_2xi1:
+  case RISCV::EPI_BI_cast_1xi64_1xi1:
+
+  case RISCV::EPI_BI_cast_8xi1_8xi8:
+  case RISCV::EPI_BI_cast_4xi1_4xi16:
+  case RISCV::EPI_BI_cast_2xi1_2xi32:
+  case RISCV::EPI_BI_cast_1xi1_1xi64:
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};
+    ID = Intrinsic::epi_mask_cast;
+    break;
   }
 
 #undef EPI_INT
