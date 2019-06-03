@@ -68,8 +68,8 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
     Instruction *I = it->first;
     int Depth = it->second.Depth;
     int Idx = it->second.Idx;
-    const TaskAnalysisInfo &AnalysisInfo = FuncAnalysisInfo.PostOrder[Idx];
-    const TaskInfo &Info = FuncInfo.PostOrder[Idx];
+    const TaskAnalysisInfo &AnalysisInfo = TaskFuncAnalysisInfo.PostOrder[Idx];
+    const TaskInfo &Info = TaskFuncInfo.PostOrder[Idx];
 
     dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
     I->printAsOperand(dbgs(), false);
@@ -101,7 +101,8 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
   }
 }
 
-TaskFunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return FuncInfo; }
+TaskFunctionInfo& OmpSsRegionAnalysisPass::getTaskFuncInfo() { return TaskFuncInfo; }
+TaskwaitFunctionInfo& OmpSsRegionAnalysisPass::getTaskwaitFuncInfo() { return TaskwaitFuncInfo; }
 
 static void getOperandBundlesAsDefsWithID(const IntrinsicInst *I,
                                           SmallVectorImpl<OperandBundleDef> &OpBundles,
@@ -138,10 +139,11 @@ static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
   }
 }
 
-void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
-    Function &F, DominatorTree &DT, TaskFunctionInfo &FuncInfo,
-    TaskFunctionAnalysisInfo &FuncAnalysisInfo,
-    MapVector<Instruction *, TaskPrintInfo> &TaskProgramOrder) {
+void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
+    Function &F, DominatorTree &DT, TaskFunctionInfo &TFI,
+    TaskFunctionAnalysisInfo &TFAI,
+    MapVector<Instruction *, TaskPrintInfo> &TPO,
+    TaskwaitFunctionInfo &TwFI) {
 
   OrderedInstructions OI(&DT);
 
@@ -160,7 +162,7 @@ void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
         if (II->getIntrinsicID() == Intrinsic::directive_region_entry) {
           assert(II->hasOneUse() && "Task entry has more than one user.");
 
-          TaskPrintInfo &TPI = TaskProgramOrder[II];
+          TaskPrintInfo &TPI = TPO[II];
           TPI.Depth = Stack.size();
 
           Instruction *Exit = dyn_cast<Instruction>(II->user_back());
@@ -193,13 +195,15 @@ void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
           Task &T = Stack.back();
           Instruction *Entry = T.Info.Entry;
 
-          TaskPrintInfo &TPI = TaskProgramOrder[&*Entry];
-          TPI.Idx = FuncInfo.PostOrder.size();
+          TaskPrintInfo &TPI = TPO[&*Entry];
+          TPI.Idx = TFI.PostOrder.size();
 
-          FuncAnalysisInfo.PostOrder.push_back(T.AnalysisInfo);
-          FuncInfo.PostOrder.push_back(T.Info);
+          TFAI.PostOrder.push_back(T.AnalysisInfo);
+          TFI.PostOrder.push_back(T.Info);
 
           Stack.pop_back();
+        } else if (II->getIntrinsicID() == Intrinsic::directive_marker) {
+          TwFI.PostOrder.push_back({II});
         }
       } else if (!Stack.empty()) {
         Task &T = Stack.back();
@@ -239,18 +243,20 @@ void OmpSsRegionAnalysisPass::getTaskFunctionUsesInfo(
 
 bool OmpSsRegionAnalysisPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  getTaskFunctionUsesInfo(F, DT, FuncInfo, FuncAnalysisInfo, TaskProgramOrder);
+  getOmpSsFunctionInfo(F, DT, TaskFuncInfo, TaskFuncAnalysisInfo, TaskProgramOrder, TaskwaitFuncInfo);
 
   return false;
 }
 
 void OmpSsRegionAnalysisPass::releaseMemory() {
-  FuncInfo = TaskFunctionInfo();
-  FuncAnalysisInfo = TaskFunctionAnalysisInfo();
+  TaskFuncInfo = TaskFunctionInfo();
+  TaskFuncAnalysisInfo = TaskFunctionAnalysisInfo();
   TaskProgramOrder.clear();
+  TaskwaitFuncInfo = TaskwaitFunctionInfo();
 }
 
 void OmpSsRegionAnalysisPass::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.setPreservesAll();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 

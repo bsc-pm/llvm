@@ -17,6 +17,7 @@
 
 namespace llvm {
 
+// Task data structures
 struct TaskDSAInfo {
   SetVector<Value *> Shared;
   SetVector<Value *> Private;
@@ -32,6 +33,17 @@ struct TaskInfo {
 struct TaskFunctionInfo {
   SmallVector<TaskInfo, 4> PostOrder;
 };
+// End Task data structures
+
+// Taskwait data structures
+struct TaskwaitInfo {
+  Instruction *I;
+};
+
+struct TaskwaitFunctionInfo {
+  SmallVector<TaskwaitInfo, 4> PostOrder;
+};
+// End Taskwait data structures
 
 class OmpSsRegionAnalysisPass : public FunctionPass {
 private:
@@ -52,21 +64,24 @@ private:
   };
 
   // AnalysisInfo only used in this pass
-  TaskFunctionAnalysisInfo FuncAnalysisInfo;
+  TaskFunctionAnalysisInfo TaskFuncAnalysisInfo;
   // Info used by the transform pass
-  TaskFunctionInfo FuncInfo;
+  TaskFunctionInfo TaskFuncInfo;
+  TaskwaitFunctionInfo TaskwaitFuncInfo;
   // Used to keep the task layout to print it properly, since
   // we save the tasks in post order
   MapVector<Instruction *, TaskPrintInfo> TaskProgramOrder;
 
   static const int PrintSpaceMultiplier = 2;
   // Walk over each task in RPO identifying uses before entry
-  // and after exit. Uses before entry are then matched with DSA info
+  // and after exit. Uses before task entry are then matched with DSA info
   // in OperandBundles
-  static void getTaskFunctionUsesInfo(
-      Function &F, DominatorTree &DT, TaskFunctionInfo &FuncInfo,
-      TaskFunctionAnalysisInfo &FuncAnalysisInfo,
-      MapVector<Instruction *, TaskPrintInfo> &TaskProgramOrder);
+  // Also, gathers all taskwait instructions
+  static void getOmpSsFunctionInfo(
+      Function &F, DominatorTree &DT, TaskFunctionInfo &FI,
+      TaskFunctionAnalysisInfo &FAI,
+      MapVector<Instruction *, TaskPrintInfo> &TPO,
+      TaskwaitFunctionInfo &TwFI);
 
 public:
   static char ID;
@@ -83,7 +98,8 @@ public:
 
   void releaseMemory() override;
 
-  TaskFunctionInfo& getFuncInfo();
+  TaskFunctionInfo& getTaskFuncInfo();
+  TaskwaitFunctionInfo& getTaskwaitFuncInfo();
 
 };
 

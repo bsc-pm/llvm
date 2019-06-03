@@ -243,6 +243,22 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs, DominatorTree *DT,
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, AllowAlloca)),
       Suffix(Suffix) {}
 
+CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
+                             std::function<Function*(BasicBlock *header,
+                                                     BasicBlock *newRootNode,
+                                                     BasicBlock *newHeader,
+                                                     Function *oldFunction,
+                                                     Module *M,
+                                                     const SetVector<BasicBlock *> &Blocks)> constructOmpSsFunctions,
+                             std::function<CallInst*(Function *newFunction,
+                                                     BasicBlock *codeReplacer,
+                                                     const SetVector<BasicBlock *> &Blocks)> emitCaptureAndCall)
+    : DT(nullptr), AggregateArgs(false), BFI(nullptr),
+      BPI(nullptr), AllowVarArgs(false),
+      Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
+      constructOmpSsFunctions(constructOmpSsFunctions),
+      emitCaptureAndCall(emitCaptureAndCall) {}
+
 CodeExtractor::CodeExtractor(DominatorTree &DT, Loop &L, bool AggregateArgs,
                              BlockFrequencyInfo *BFI,
                              BranchProbabilityInfo *BPI, std::string Suffix)
@@ -1368,9 +1384,14 @@ Function *CodeExtractor::extractCodeRegion() {
       eraseLifetimeMarkersOnInputs(Blocks, SinkingCands);
 
   // Construct new function based on inputs/outputs & add allocas for all defs.
-  Function *newFunction =
-      constructFunction(inputs, outputs, header, newFuncRoot, codeReplacer,
-                        oldFunction, oldFunction->getParent());
+  Function *newFunction;
+  if (constructOmpSsFunctions) {
+    newFunction = constructOmpSsFunctions(header, newFuncRoot, codeReplacer,
+                      oldFunction, oldFunction->getParent(), Blocks);
+  } else {
+    newFunction = constructFunction(inputs, outputs, header, newFuncRoot, codeReplacer,
+                      oldFunction, oldFunction->getParent());
+  }
 
   // Update the entry count of the function.
   if (BFI) {
@@ -1381,8 +1402,12 @@ Function *CodeExtractor::extractCodeRegion() {
     BFI->setBlockFreq(codeReplacer, EntryFreq.getFrequency());
   }
 
-  CallInst *TheCall =
-      emitCallAndSwitchStatement(newFunction, codeReplacer, inputs, outputs);
+  CallInst *TheCall;
+  if (emitCaptureAndCall) {
+    TheCall = emitCaptureAndCall(newFunction, codeReplacer, Blocks);
+  } else {
+    TheCall = emitCallAndSwitchStatement(newFunction, codeReplacer, inputs, outputs);
+  }
 
   moveCodeToFunction(newFunction);
 
