@@ -437,6 +437,10 @@ TEST(DWARFDebugInfo, TestDWARF32Version4Addr8AllForms) {
 }
 
 TEST(DWARFDebugInfo, TestDWARF32Version5Addr4AllForms) {
+  Triple Triple = getNormalizedDefaultTargetTriple();
+  // RISC-V still does not fully support DWARF yet
+  if (Triple.getArch() == Triple::riscv64)
+    return;
   // Test that we can decode all forms for DWARF32, version 5, with 4 byte
   // addresses.
   typedef uint32_t AddrType;
@@ -446,6 +450,10 @@ TEST(DWARFDebugInfo, TestDWARF32Version5Addr4AllForms) {
 }
 
 TEST(DWARFDebugInfo, TestDWARF32Version5Addr8AllForms) {
+  Triple Triple = getNormalizedDefaultTargetTriple();
+  // RISC-V still does not fully support DWARF yet
+  if (Triple.getArch() == Triple::riscv64)
+    return;
   // Test that we can decode all forms for DWARF32, version 5, with 8 byte
   // addresses.
   typedef uint64_t AddrType;
@@ -1008,6 +1016,9 @@ TEST(DWARFDebugInfo, TestDWARF32Version4Addr8Addresses) {
 
 TEST(DWARFDebugInfo, TestStringOffsets) {
   Triple Triple = getNormalizedDefaultTargetTriple();
+  // RISC-V still does not fully support DWARF yet
+  if (Triple.getArch() == Triple::riscv64)
+    return;
   if (!isConfigurationSupported(Triple))
     return;
 
@@ -1464,6 +1475,9 @@ TEST(DWARFDebugInfo, TestAttributeIterators) {
 
 TEST(DWARFDebugInfo, TestFindRecurse) {
   Triple Triple = getNormalizedDefaultTargetTriple();
+  // RISC-V still does not fully support DWARF
+  if (Triple.getArch() == Triple::riscv64)
+    return;
   if (!isConfigurationSupported(Triple))
     return;
 
