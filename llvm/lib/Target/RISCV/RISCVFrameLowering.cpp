@@ -21,6 +21,8 @@
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/MC/MCDwarf.h"
 
+#define DEBUG_TYPE "prologepilog"
+
 using namespace llvm;
 
 bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
@@ -48,8 +50,7 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   // Get the number of bytes to allocate from the FrameInfo.
   uint64_t FrameSize = MFI.getStackSize();
 
-  // Remove all EPIVR_SPILL from the FrameSize and replace them with the size of
-  // a pointer.
+  // Account all EPIVR_SPILL taking the size of a pointer.
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
     uint8_t StackID = MFI.getStackID(FI);
@@ -58,13 +59,26 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
 
     switch (StackID) {
     case RISCVStackID::EPIVR_SPILL:
-      FrameSize -= RegInfo->getSpillSize(RISCV::EPIVRRegClass);
+      FrameSize =
+          alignTo(FrameSize, RegInfo->getSpillAlignment(RISCV::GPRRegClass));
+      MFI.setObjectOffset(FI, -FrameSize);
       FrameSize += RegInfo->getSpillSize(RISCV::GPRRegClass);
       break;
     default:
       llvm_unreachable("Unexpected StackID");
     }
   }
+
+#ifndef NDEBUG
+  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
+       FI < EFI; FI++) {
+    // Skip those already printed in PrologEpilogEmitter
+    if (MFI.getStackID(FI) == RISCVStackID::DEFAULT)
+      continue;
+    LLVM_DEBUG(dbgs() << "alloc FI(" << FI << ") at SP["
+                      << MFI.getObjectOffset(FI) << "]\n");
+  }
+#endif
 
   // Get the alignment.
   uint64_t StackAlign = RI->needsStackRealignment(MF) ? MFI.getMaxAlignment()

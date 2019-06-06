@@ -54,8 +54,6 @@ declare void @llvm.epi.vstore.nxv2f32(
 define void @test_vsetvl_interleave_sew(<vscale x 1 x double>* %vd, <vscale x 2 x float>* %vf, i64 signext %avl)
 ; CHECK-O0-LABEL: test_vsetvl_interleave_sew:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    addi sp, sp, -32
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-O0-NEXT:    vsetvli a3, a2, e64, m1
 ; CHECK-O0-NEXT:    vsetvli a4, a2, e32, m1
 ; CHECK-O0-NEXT:    vsetvli a5, a3, e64, m1
@@ -70,10 +68,6 @@ define void @test_vsetvl_interleave_sew(<vscale x 1 x double>* %vd, <vscale x 2 
 ; CHECK-O0-NEXT:    vsetvli a3, a4, e32, m1
 ; CHECK-O0-NEXT:    vfadd.vv v0, v1, v1
 ; CHECK-O0-NEXT:    vse.v v0, (a5)
-; CHECK-O0-NEXT:    sd a2, 24(sp)
-; CHECK-O0-NEXT:    sd a1, 16(sp)
-; CHECK-O0-NEXT:    sd a0, 8(sp)
-; CHECK-O0-NEXT:    addi sp, sp, 32
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_interleave_sew:
@@ -136,8 +130,6 @@ define void @test_vsetvl_interleave_sew(<vscale x 1 x double>* %vd, <vscale x 2 
 define void @test_vsetvl_interleave_vlmul(<vscale x 1 x double>* %vm1, <vscale x 2 x double>* %vm2, i64 signext %avl)
 ; CHECK-O0-LABEL: test_vsetvl_interleave_vlmul:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    addi sp, sp, -32
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 32
 ; CHECK-O0-NEXT:    vsetvli a3, a2, e64, m1
 ; CHECK-O0-NEXT:    vsetvli a4, a2, e64, m2
 ; CHECK-O0-NEXT:    vsetvli a5, a3, e64, m1
@@ -152,10 +144,6 @@ define void @test_vsetvl_interleave_vlmul(<vscale x 1 x double>* %vm1, <vscale x
 ; CHECK-O0-NEXT:    vsetvli a3, a4, e64, m2
 ; CHECK-O0-NEXT:    vfadd.vv v2, v2, v2
 ; CHECK-O0-NEXT:    vse.v v2, (a5)
-; CHECK-O0-NEXT:    sd a2, 24(sp)
-; CHECK-O0-NEXT:    sd a1, 16(sp)
-; CHECK-O0-NEXT:    sd a0, 8(sp)
-; CHECK-O0-NEXT:    addi sp, sp, 32
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_interleave_vlmul:

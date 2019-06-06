@@ -28,8 +28,6 @@ declare void @llvm.epi.vstore.nxv1f64(
 define void @test_vsetvl_vtype(<vscale x 1 x double>* %v, i64 %avl)
 ; CHECK-O0-LABEL: test_vsetvl_vtype:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    addi sp, sp, -16
-; CHECK-O0-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
 ; CHECK-O0-NEXT:    srli a3, a2, 1
 ; CHECK-O0-NEXT:    #APP
@@ -41,9 +39,6 @@ define void @test_vsetvl_vtype(<vscale x 1 x double>* %v, i64 %avl)
 ; CHECK-O0-NEXT:    lui a3, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a3, a3, %lo(scratch)
 ; CHECK-O0-NEXT:    vse.v v0, (a3)
-; CHECK-O0-NEXT:    sd a1, 8(sp)
-; CHECK-O0-NEXT:    sd a0, 0(sp)
-; CHECK-O0-NEXT:    addi sp, sp, 16
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_vtype:
