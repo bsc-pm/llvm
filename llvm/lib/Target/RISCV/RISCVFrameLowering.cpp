@@ -345,8 +345,9 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
     BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
         .addReg(SPReg)
         .addReg(SizeOfVector);
-    // Align the stack
-    alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
+    // Align the stack. Vector registers should always be aligned more than
+    // the natural alignment of the stack (currently 16 bytes).
+    alignSP(MBB, MBBI, DL, RegInfo->getSpillAlignment(RISCV::EPIVRRegClass));
     // Now SP is the value we want to put in the stack slot.
     unsigned StoreOpcode =
         RegInfo->getSpillSize(RISCV::GPRRegClass) == 4 ? RISCV::SW : RISCV::SD;
@@ -558,7 +559,8 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
 // function contains variable size objects and let eliminateCallFramePseudoInstr
 // preserve stack space for it.
 bool RISCVFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
-  return !MF.getFrameInfo().hasVarSizedObjects();
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
+  return !(MF.getFrameInfo().hasVarSizedObjects() || RVFI->hasSpilledEPIVR());
 }
 
 // Eliminate ADJCALLSTACKDOWN, ADJCALLSTACKUP pseudo instructions.

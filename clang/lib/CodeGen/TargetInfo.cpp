@@ -21,6 +21,7 @@
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
@@ -9514,8 +9515,17 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
     }
   }
 
+  // An EPI vector is passed as an LLVM value. The backend will then determine
+  // how it will be actually passed.
+  if (const VectorType *VT = dyn_cast<VectorType>(Ty)) {
+    if (IsFixed && VT->getVectorKind() == VectorType::EPIVector) {
+      return ABIArgInfo::getDirect(CGT.ConvertType(Ty));
+    }
+  }
+
   uint64_t NeededAlign = getContext().getTypeAlign(Ty);
   bool MustUseStack = false;
+
   // Determine the number of GPRs needed to pass the current argument
   // according to the ABI. 2*XLen-aligned varargs are passed in "aligned"
   // register pairs, so may consume 3 registers.

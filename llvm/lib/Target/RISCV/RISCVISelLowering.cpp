@@ -18,6 +18,7 @@
 #include "RISCVSubtarget.h"
 #include "RISCVTargetMachine.h"
 #include "Utils/RISCVMatInt.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/CallingConvLower.h"
@@ -1591,6 +1592,18 @@ static const MCPhysReg ArgFPR64s[] = {
   RISCV::F14_64, RISCV::F15_64, RISCV::F16_64, RISCV::F17_64
 };
 
+static const MCPhysReg ArgEPIVRs[] = {RISCV::V16, RISCV::V17, RISCV::V18,
+                                      RISCV::V19, RISCV::V20, RISCV::V21,
+                                      RISCV::V22, RISCV::V23};
+static const MCPhysReg ArgEPIVR2s[] = {
+    RISCV::V16_2,
+    RISCV::V18_2,
+    RISCV::V20_2,
+    RISCV::V22_2,
+};
+static const MCPhysReg ArgEPIVR4s[] = {RISCV::V16_4, RISCV::V20_4};
+static const MCPhysReg ArgEPIVR8s[] = {RISCV::V16_8};
+
 // Pass a 2*XLEN argument that has been split into two XLEN values through
 // registers or the stack as necessary.
 static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
@@ -1633,7 +1646,8 @@ static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
 static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
                      MVT ValVT, MVT LocVT, CCValAssign::LocInfo LocInfo,
                      ISD::ArgFlagsTy ArgFlags, CCState &State, bool IsFixed,
-                     bool IsRet, Type *OrigTy) {
+                     bool IsRet, Type *OrigTy, const RISCVTargetLowering *TLI,
+                     Optional<unsigned> FirstMaskArgument) {
   unsigned XLen = DL.getLargestLegalIntTypeSizeInBits();
   assert(XLen == 32 || XLen == 64);
   MVT XLenVT = XLen == 32 ? MVT::i32 : MVT::i64;
@@ -1762,7 +1776,31 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
     Reg = State.AllocateReg(ArgFPR32s, ArgFPR64s);
   else if (ValVT == MVT::f64 && !UseGPRForF64)
     Reg = State.AllocateReg(ArgFPR64s, ArgFPR32s);
-  else
+  else if (ValVT.isScalableVector()) {
+    const TargetRegisterClass *RC = TLI->getRegClassFor(ValVT);
+    if (RC == &RISCV::EPIVRRegClass) {
+      if (FirstMaskArgument.hasValue() &&
+          ValNo == FirstMaskArgument.getValue()) {
+        Reg = RISCV::V0;
+      } else {
+        Reg = State.AllocateReg(ArgEPIVRs);
+      }
+    } else if (RC == &RISCV::EPIVR2RegClass) {
+      Reg = State.AllocateReg(ArgEPIVR2s);
+    } else if (RC == &RISCV::EPIVR4RegClass) {
+      Reg = State.AllocateReg(ArgEPIVR4s);
+    } else if (RC == &RISCV::EPIVR8RegClass) {
+      Reg = State.AllocateReg(ArgEPIVR8s);
+    } else {
+      llvm_unreachable("Unhandled class register for ValueType");
+    }
+    if (!Reg) {
+      LocInfo = CCValAssign::Indirect;
+      // Try using a GPR to pass the address
+      Reg = State.AllocateReg(ArgGPRs);
+      LocVT = XLenVT;
+    }
+  } else
     Reg = State.AllocateReg(ArgGPRs);
   unsigned StackOffset = Reg ? 0 : State.AllocateStack(XLen / 8, XLen / 8);
 
@@ -1784,7 +1822,9 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
     return false;
   }
 
-  assert((!UseGPRForF32 || !UseGPRForF64 || LocVT == XLenVT) &&
+  assert((!UseGPRForF32 || !UseGPRForF64 ||
+          (TLI->getSubtarget().hasExtEPI() && ValVT.isScalableVector()) ||
+          LocVT == XLenVT) &&
          "Expected an XLenVT at this stage");
 
   if (Reg) {
@@ -1801,11 +1841,33 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
   return false;
 }
 
+template <typename ArgTy>
+static void PreAssignMask(const ArgTy &Args,
+                          Optional<unsigned> &FirstMaskArgument,
+                          CCState &CCInfo) {
+  unsigned NumArgs = Args.size();
+  for (unsigned i = 0; i != NumArgs; ++i) {
+    MVT ArgVT = Args[i].VT;
+    if (!ArgVT.isScalableVector() ||
+        ArgVT.getVectorElementType().SimpleTy != MVT::i1)
+      continue;
+
+    FirstMaskArgument = i;
+    CCInfo.AllocateReg(RISCV::V0);
+    break;
+  }
+}
+
 void RISCVTargetLowering::analyzeInputArgs(
     MachineFunction &MF, CCState &CCInfo,
     const SmallVectorImpl<ISD::InputArg> &Ins, bool IsRet) const {
   unsigned NumArgs = Ins.size();
   FunctionType *FType = MF.getFunction().getFunctionType();
+
+  Optional<unsigned> FirstMaskArgument;
+  if (Subtarget.hasExtEPI()) {
+    PreAssignMask(Ins, FirstMaskArgument, CCInfo);
+  }
 
   for (unsigned i = 0; i != NumArgs; ++i) {
     MVT ArgVT = Ins[i].VT;
@@ -1819,7 +1881,8 @@ void RISCVTargetLowering::analyzeInputArgs(
 
     RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
     if (CC_RISCV(MF.getDataLayout(), ABI, i, ArgVT, ArgVT, CCValAssign::Full,
-                 ArgFlags, CCInfo, /*IsRet=*/true, IsRet, ArgTy)) {
+                 ArgFlags, CCInfo, /*IsRet=*/true, IsRet, ArgTy, this,
+                 FirstMaskArgument)) {
       LLVM_DEBUG(dbgs() << "InputArg #" << i << " has unhandled type "
                         << EVT(ArgVT).getEVTString() << '\n');
       llvm_unreachable(nullptr);
@@ -1833,6 +1896,11 @@ void RISCVTargetLowering::analyzeOutputArgs(
     CallLoweringInfo *CLI) const {
   unsigned NumArgs = Outs.size();
 
+  Optional<unsigned> FirstMaskArgument;
+  if (Subtarget.hasExtEPI()) {
+    PreAssignMask(Outs, FirstMaskArgument, CCInfo);
+  }
+
   for (unsigned i = 0; i != NumArgs; i++) {
     MVT ArgVT = Outs[i].VT;
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
@@ -1840,7 +1908,8 @@ void RISCVTargetLowering::analyzeOutputArgs(
 
     RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
     if (CC_RISCV(MF.getDataLayout(), ABI, i, ArgVT, ArgVT, CCValAssign::Full,
-                 ArgFlags, CCInfo, Outs[i].IsFixed, IsRet, OrigTy)) {
+                 ArgFlags, CCInfo, Outs[i].IsFixed, IsRet, OrigTy, this,
+                 FirstMaskArgument)) {
       LLVM_DEBUG(dbgs() << "OutputArg #" << i << " has unhandled type "
                         << EVT(ArgVT).getEVTString() << "\n");
       llvm_unreachable(nullptr);
@@ -1871,26 +1940,31 @@ static SDValue convertLocVTToValVT(SelectionDAG &DAG, SDValue Val,
 // The caller is responsible for loading the full value if the argument is
 // passed with CCValAssign::Indirect.
 static SDValue unpackFromRegLoc(SelectionDAG &DAG, SDValue Chain,
-                                const CCValAssign &VA, const SDLoc &DL) {
+                                const CCValAssign &VA, const SDLoc &DL,
+                                const RISCVTargetLowering *TLI) {
   MachineFunction &MF = DAG.getMachineFunction();
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
   EVT LocVT = VA.getLocVT();
   SDValue Val;
   const TargetRegisterClass *RC;
 
-  switch (LocVT.getSimpleVT().SimpleTy) {
-  default:
-    llvm_unreachable("Unexpected register type");
-  case MVT::i32:
-  case MVT::i64:
-    RC = &RISCV::GPRRegClass;
-    break;
-  case MVT::f32:
-    RC = &RISCV::FPR32RegClass;
-    break;
-  case MVT::f64:
-    RC = &RISCV::FPR64RegClass;
-    break;
+  if (LocVT.getSimpleVT().isScalableVector()) {
+    RC = TLI->getRegClassFor(LocVT.getSimpleVT());
+  } else {
+    switch (LocVT.getSimpleVT().SimpleTy) {
+    default:
+      llvm_unreachable("Unexpected register type");
+    case MVT::i32:
+    case MVT::i64:
+      RC = &RISCV::GPRRegClass;
+      break;
+    case MVT::f32:
+      RC = &RISCV::FPR32RegClass;
+      break;
+    case MVT::f64:
+      RC = &RISCV::FPR64RegClass;
+      break;
+    }
   }
 
   Register VReg = RegInfo.createVirtualRegister(RC);
@@ -1941,8 +2015,16 @@ static SDValue unpackFromMemLoc(SelectionDAG &DAG, SDValue Chain,
   switch (VA.getLocInfo()) {
   default:
     llvm_unreachable("Unexpected CCValAssign::LocInfo");
-  case CCValAssign::Full:
   case CCValAssign::Indirect:
+    if (ValVT.isScalableVector()) {
+      // Indirect load of the vector value
+      SDValue Ptr = DAG.getLoad(
+          LocVT, DL, Chain, FIN,
+          MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI));
+      return Ptr;
+    }
+    LLVM_FALLTHROUGH;
+  case CCValAssign::Full:
   case CCValAssign::BCvt:
     ExtType = ISD::NON_EXTLOAD;
     break;
@@ -2039,7 +2121,7 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
     if (VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64)
       ArgValue = unpackF64OnRV32DSoftABI(DAG, Chain, VA, DL);
     else if (VA.isRegLoc())
-      ArgValue = unpackFromRegLoc(DAG, Chain, VA, DL);
+      ArgValue = unpackFromRegLoc(DAG, Chain, VA, DL, this);
     else
       ArgValue = unpackFromMemLoc(DAG, Chain, VA, DL);
 
@@ -2320,27 +2402,47 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
     // Promote the value if needed.
     // For now, only handle fully promoted and indirect arguments.
     if (VA.getLocInfo() == CCValAssign::Indirect) {
-      // Store the argument in a stack slot and pass its address.
-      SDValue SpillSlot = DAG.CreateStackTemporary(Outs[i].ArgVT);
-      int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
-      MemOpChains.push_back(
-          DAG.getStore(Chain, DL, ArgValue, SpillSlot,
-                       MachinePointerInfo::getFixedStack(MF, FI)));
-      // If the original argument was split (e.g. i128), we need
-      // to store all parts of it here (and pass just one address).
-      unsigned ArgIndex = Outs[i].OrigArgIndex;
-      assert(Outs[i].PartOffset == 0);
-      while (i + 1 != e && Outs[i + 1].OrigArgIndex == ArgIndex) {
-        SDValue PartValue = OutVals[i + 1];
-        unsigned PartOffset = Outs[i + 1].PartOffset;
-        SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, SpillSlot,
-                                      DAG.getIntPtrConstant(PartOffset, DL));
+      if (VA.getValVT().isScalableVector()) {
+        // Create a stack slot for the EPI register.
+        SDValue SpillSlot = DAG.CreateStackTemporary(Outs[i].ArgVT);
+        int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
+
+        RISCVMachineFunctionInfo *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
+        // Let know FrameLowering that we're spilling vector registers.
+        RVFI->setHasSpilledEPIVR();
+        // Mark this spill as a vector spill.
+        MF.getFrameInfo().setStackID(FI, RISCVStackID::EPIVR_SPILL);
+
+        // We load an XLenVT from the spill slot because RISCVFrameLowering.cpp
+        // will replace this slot from a vector type to an XLenVT.
+        SDValue Ptr = DAG.getLoad(XLenVT, DL, Chain, SpillSlot,
+                                  MachinePointerInfo::getFixedStack(MF, FI));
         MemOpChains.push_back(
-            DAG.getStore(Chain, DL, PartValue, Address,
+            DAG.getStore(Chain, DL, ArgValue, Ptr, MachinePointerInfo()));
+        ArgValue = Ptr;
+      } else {
+        // Store the argument in a stack slot and pass its address.
+        SDValue SpillSlot = DAG.CreateStackTemporary(Outs[i].ArgVT);
+        int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
+        MemOpChains.push_back(
+            DAG.getStore(Chain, DL, ArgValue, SpillSlot,
                          MachinePointerInfo::getFixedStack(MF, FI)));
-        ++i;
+        // If the original argument was split (e.g. i128), we need
+        // to store all parts of it here (and pass just one address).
+        unsigned ArgIndex = Outs[i].OrigArgIndex;
+        assert(Outs[i].PartOffset == 0);
+        while (i + 1 != e && Outs[i + 1].OrigArgIndex == ArgIndex) {
+          SDValue PartValue = OutVals[i + 1];
+          unsigned PartOffset = Outs[i + 1].PartOffset;
+          SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, SpillSlot,
+                                        DAG.getIntPtrConstant(PartOffset, DL));
+          MemOpChains.push_back(
+              DAG.getStore(Chain, DL, PartValue, Address,
+                           MachinePointerInfo::getFixedStack(MF, FI)));
+          ++i;
+        }
+        ArgValue = SpillSlot;
       }
-      ArgValue = SpillSlot;
     } else {
       ArgValue = convertValVTToLocVT(DAG, ArgValue, VA, DL);
     }
@@ -2480,12 +2582,19 @@ bool RISCVTargetLowering::CanLowerReturn(
     const SmallVectorImpl<ISD::OutputArg> &Outs, LLVMContext &Context) const {
   SmallVector<CCValAssign, 16> RVLocs;
   CCState CCInfo(CallConv, IsVarArg, MF, RVLocs, Context);
+
+  Optional<unsigned> FirstMaskArgument;
+  if (Subtarget.hasExtEPI()) {
+    PreAssignMask(Outs, FirstMaskArgument, CCInfo);
+  }
+
   for (unsigned i = 0, e = Outs.size(); i != e; ++i) {
     MVT VT = Outs[i].VT;
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
     RISCVABI::ABI ABI = MF.getSubtarget<RISCVSubtarget>().getTargetABI();
     if (CC_RISCV(MF.getDataLayout(), ABI, i, VT, VT, CCValAssign::Full,
-                 ArgFlags, CCInfo, /*IsFixed=*/true, /*IsRet=*/true, nullptr))
+                 ArgFlags, CCInfo, /*IsFixed=*/true, /*IsRet=*/true, nullptr,
+                 this, FirstMaskArgument))
       return false;
   }
   return true;
@@ -3006,4 +3115,3 @@ bool RISCVTargetLowering::allowsMisalignedMemoryAccesses(
   EVT ElementType = E.getVectorElementType();
   return Align >= ElementType.getStoreSize();
 }
->>>>>>> Allow a more relaxed alignment for load/store of vector types

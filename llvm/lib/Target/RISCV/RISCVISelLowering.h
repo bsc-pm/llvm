@@ -151,6 +151,8 @@ public:
                                       MachineMemOperand::Flags Flags,
                                       bool *Fast) const override;
 
+  const RISCVSubtarget &getSubtarget() const { return Subtarget; }
+
 private:
   void analyzeInputArgs(MachineFunction &MF, CCState &CCInfo,
                         const SmallVectorImpl<ISD::InputArg> &Ins,
