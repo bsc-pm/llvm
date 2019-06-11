@@ -97,6 +97,10 @@ public:
   getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
                                StringRef Constraint, MVT VT) const override;
 
+  void LowerAsmOperandForConstraint(SDValue Op, std::string &Constraint,
+                                    std::vector<SDValue> &Ops,
+                                    SelectionDAG &DAG) const override;
+
   MachineBasicBlock *
   EmitInstrWithCustomInserter(MachineInstr &MI,
                               MachineBasicBlock *BB) const override;
@@ -157,10 +161,7 @@ private:
   }
 
   template <class NodeTy>
-  SDValue getAddr(NodeTy *N, SelectionDAG &DAG) const;
-
-  template <class NodeTy>
-  SDValue getPICAddr(NodeTy *N, SelectionDAG &DAG) const;
+  SDValue getAddr(NodeTy *N, SelectionDAG &DAG, bool IsLocal = true) const;
 
   SDValue lowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;

@@ -426,9 +426,24 @@ static SDValue getTargetNode(ConstantPoolSDNode *N, SDLoc DL, EVT Ty,
 }
 
 template <class NodeTy>
-SDValue RISCVTargetLowering::getAddr(NodeTy *N, SelectionDAG &DAG) const {
+SDValue RISCVTargetLowering::getAddr(NodeTy *N, SelectionDAG &DAG,
+                                     bool IsLocal) const {
   SDLoc DL(N);
   EVT Ty = getPointerTy(DAG.getDataLayout());
+
+  if (isPositionIndependent()) {
+    SDValue Addr = getTargetNode(N, DL, Ty, DAG, 0);
+    if (IsLocal)
+      // Use PC-relative addressing to access the symbol. This generates the
+      // pattern (PseudoLLA sym), which expands to (addi (auipc %pcrel_hi(sym))
+      // %pcrel_lo(auipc)).
+      return SDValue(DAG.getMachineNode(RISCV::PseudoLLA, DL, Ty, Addr), 0);
+
+    // Use PC-relative addressing to access the GOT for this symbol, then load
+    // the address from the GOT. This generates the pattern (PseudoLA sym),
+    // which expands to (ld (addi (auipc %got_pcrel_hi(sym)) %pcrel_lo(auipc))).
+    return SDValue(DAG.getMachineNode(RISCV::PseudoLA, DL, Ty, Addr), 0);
+  }
 
   switch (getTargetMachine().getCodeModel()) {
   default:
@@ -451,28 +466,6 @@ SDValue RISCVTargetLowering::getAddr(NodeTy *N, SelectionDAG &DAG) const {
   }
 }
 
-template <class NodeTy>
-SDValue RISCVTargetLowering::getPICAddr(NodeTy *N, SelectionDAG &DAG) const {
-  SDLoc DL(N);
-  EVT Ty = getPointerTy(DAG.getDataLayout());
-
-  // Generate a PIC sequence for accessing addresses within any 2GiB range
-  // within the address space. This generates the pattern (PseudoLA sym) which
-  // expands to (addi (auipc %pcrel_got_hi(sym)) %pcrel_lo(auipc)) or
-  // (PseudoLLA sym) which expands to (addi (auipc %pcrel_hi(sym))
-  // %pcrel_lo(auipc)).
-  auto Op = RISCV::PseudoLLA;
-  if (GlobalAddressSDNode *GN = dyn_cast<GlobalAddressSDNode>(N)) {
-    const GlobalValue *GV = GN->getGlobal();
-    const TargetMachine &TM = getTargetMachine();
-    if (!TM.shouldAssumeDSOLocal(*GV->getParent(), GV))
-      Op = RISCV::PseudoLA;
-  }
-  SDValue Addr = getTargetNode(N, DL, Ty, DAG, 0);
-  return SDValue(DAG.getMachineNode(Op, DL, Ty, Addr), 0);
-}
-
-
 SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
                                                 SelectionDAG &DAG) const {
   SDLoc DL(Op);
@@ -481,7 +474,9 @@ SDValue RISCVTargetLowering::lowerGlobalAddress(SDValue Op,
   int64_t Offset = N->getOffset();
   MVT XLenVT = Subtarget.getXLenVT();
 
-  SDValue Addr = isPositionIndependent() ? getPICAddr(N, DAG) : getAddr(N, DAG);
+  const GlobalValue *GV = N->getGlobal();
+  bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV);
+  SDValue Addr = getAddr(N, DAG, IsLocal);
 
   // In order to maximise the opportunity for common subexpression elimination,
   // emit a separate ADD node for the global address offset instead of folding
@@ -572,13 +567,15 @@ SDValue RISCVTargetLowering::lowerGlobalTLSAddress(SDValue Op,
 SDValue RISCVTargetLowering::lowerBlockAddress(SDValue Op,
                                                SelectionDAG &DAG) const {
   BlockAddressSDNode *N = cast<BlockAddressSDNode>(Op);
-  return isPositionIndependent() ? getPICAddr(N, DAG) : getAddr(N, DAG);
+
+  return getAddr(N, DAG);
 }
 
 SDValue RISCVTargetLowering::lowerConstantPool(SDValue Op,
                                                SelectionDAG &DAG) const {
   ConstantPoolSDNode *N = cast<ConstantPoolSDNode>(Op);
-  return isPositionIndependent() ? getPICAddr(N, DAG) : getAddr(N, DAG);
+
+  return getAddr(N, DAG);
 }
 
 SDValue RISCVTargetLowering::lowerSELECT(SDValue Op, SelectionDAG &DAG) const {
@@ -2272,6 +2269,44 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
   }
 
   return TargetLowering::getRegForInlineAsmConstraint(TRI, Constraint, VT);
+}
+
+void RISCVTargetLowering::LowerAsmOperandForConstraint(
+    SDValue Op, std::string &Constraint, std::vector<SDValue> &Ops,
+    SelectionDAG &DAG) const {
+  // Currently only support length 1 constraints.
+  if (Constraint.length() == 1) {
+    switch (Constraint[0]) {
+    case 'I':
+      // Validate & create a 12-bit signed immediate operand.
+      if (auto *C = dyn_cast<ConstantSDNode>(Op)) {
+        uint64_t CVal = C->getSExtValue();
+        if (isInt<12>(CVal))
+          Ops.push_back(
+              DAG.getTargetConstant(CVal, SDLoc(Op), Subtarget.getXLenVT()));
+      }
+      return;
+    case 'J':
+      // Validate & create an integer zero operand.
+      if (auto *C = dyn_cast<ConstantSDNode>(Op))
+        if (C->getZExtValue() == 0)
+          Ops.push_back(
+              DAG.getTargetConstant(0, SDLoc(Op), Subtarget.getXLenVT()));
+      return;
+    case 'K':
+      // Validate & create a 5-bit unsigned immediate operand.
+      if (auto *C = dyn_cast<ConstantSDNode>(Op)) {
+        uint64_t CVal = C->getZExtValue();
+        if (isUInt<5>(CVal))
+          Ops.push_back(
+              DAG.getTargetConstant(CVal, SDLoc(Op), Subtarget.getXLenVT()));
+      }
+      return;
+    default:
+      break;
+    }
+  }
+  TargetLowering::LowerAsmOperandForConstraint(Op, Constraint, Ops, DAG);
 }
 
 Instruction *RISCVTargetLowering::emitLeadingFence(IRBuilder<> &Builder,
