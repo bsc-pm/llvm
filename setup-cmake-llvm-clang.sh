@@ -231,6 +231,12 @@ fi
 # cmake
 ################################################################################
 
+if [ "$1" = "debug" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_BUILD_TYPE=Debug")
+  info "Build in Debug mode"
+fi
+
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DLLVM_ENABLE_PROJECTS="clang" \
