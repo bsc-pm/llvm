@@ -1616,7 +1616,9 @@ intrinsics = [
         BinaryIntrinsic("vslt", type_generator = generate_binary_integer_types_relational, variants = vv_vx),
         BinaryIntrinsic("vsleu", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
         BinaryIntrinsic("vsle", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
+        BinaryIntrinsic("vsgtu", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vsltu"),
         BinaryIntrinsic("vsgtu", type_generator = generate_binary_integer_types_relational, variants = vx_vi),
+        BinaryIntrinsic("vsgt", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vslt"),
         BinaryIntrinsic("vsgt", type_generator = generate_binary_integer_types_relational, variants = vx_vi),
 
         BinaryIntrinsic("vminu", type_generator = generate_binary_integer_types, variants = vv_vx),
@@ -1681,7 +1683,9 @@ intrinsics = [
         BinaryIntrinsic("vfne", type_generator = generate_binary_float_types_relational, variants = vv_vf),
         BinaryIntrinsic("vflt", type_generator = generate_binary_float_types_relational, variants = vv_vf),
         BinaryIntrinsic("vfle", type_generator = generate_binary_float_types_relational, variants = vv_vf),
+        BinaryIntrinsic("vfgt", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vflt"),
         BinaryIntrinsic("vfgt", type_generator = generate_binary_float_types_relational, variants = vf),
+        BinaryIntrinsic("vfge", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vfle"),
         BinaryIntrinsic("vfge", type_generator = generate_binary_float_types_relational, variants = vf),
         BinaryIntrinsic("vford", type_generator = generate_binary_float_types_relational, variants = vv_vf),
 

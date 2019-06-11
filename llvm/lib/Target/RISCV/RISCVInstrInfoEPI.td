@@ -1936,31 +1936,87 @@ def : Pat<(int_epi_vsetvlmax uimm5:$sew, uimm5:$vmul),
 // Patterns. Arithmetic
 //===----------------------------------------------------------------------===//
 
-multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
-                                       string instruction_name,
-                                       string kind,
+class swap_helper<dag Prefix,
+                  dag A,
+                  dag B,
+                  dag Suffix,
+                  bit swap> {
+   dag Value = !con(
+       Prefix,
+       !if(swap, B, A),
+       !if(swap, A, B),
+       Suffix);
+}
+
+multiclass pat_intrinsic_binary_nomask<Intrinsic intrinsic,
+                                       Instruction instruction,
                                        ValueType result_type,
                                        ValueType op1_type,
                                        ValueType op2_type,
                                        int sew,
                                        EPIVReg op1_reg_class,
-                                       RegisterClass op2_reg_class> // FIXME dagoperand?
+                                       RegisterClass op2_reg_class, // FIXME dagoperand?
+                                       bit swap>
 {
-  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
-                         (op1_type op1_reg_class:$rs1),
-                         (op2_type op2_reg_class:$rs2),
-                         (i64 GPR:$vl))),
-            (!cast<Instruction>(instruction_name#_#kind#_#op1_reg_class)
-             op1_reg_class:$rs1,
-             // Floating point instructions with a scalar operand expect such
-             // operand to be in a register of class FPR64. When dealing with
-             // the f32 variant of such instructions we need to promote the
-             // FPR32 subregister to the FPR64 base register
-             !if(!eq(!cast<string>(op2_reg_class),
-                     !cast<string>(FPR32)),
-                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
-                 (op2_type op2_reg_class:$rs2)),
-             (NoX0 GPR:$vl), sew)>;
+  def : Pat<(result_type (intrinsic
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (i64 GPR:$vl))),
+            swap_helper<
+              (instruction), // Empty prefix
+              (instruction
+               op1_reg_class:$rs1),
+              // Floating point instructions with a scalar operand expect such
+              // operand to be in a register of class FPR64. When dealing with
+              // the f32 variant of such instructions we need to promote the
+              // FPR32 subregister to the FPR64 base register
+              (instruction
+               !if(!eq(!cast<string>(op2_reg_class),
+                       !cast<string>(FPR32)),
+                   (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
+                   (op2_type op2_reg_class:$rs2))),
+              (instruction
+               (NoX0 GPR:$vl),
+               sew),
+              swap>.Value>;
+}
+
+multiclass pat_intrinsic_binary_mask<Intrinsic intrinsic,
+                                     Instruction instruction,
+                                     ValueType result_type,
+                                     ValueType op1_type,
+                                     ValueType op2_type,
+                                     ValueType mask_type,
+                                     int sew,
+                                     EPIVReg result_reg_class,
+                                     EPIVReg op1_reg_class,
+                                     RegisterClass op2_reg_class, // FIXME dagoperand?
+                                     bit swap>
+{
+  def : Pat<(result_type (intrinsic
+                          (result_type result_reg_class:$merge),
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (mask_type V0),
+                          (i64 GPR:$vl))),
+            swap_helper<
+              (instruction result_reg_class:$merge),
+              (instruction
+               op1_reg_class:$rs1),
+              // Floating point instructions with a scalar operand expect such
+              // operand to be in a register of class FPR64. When dealing with
+              // the f32 variant of such instructions we need to promote the
+              // FPR32 subregister to the FPR64 base register
+              (instruction
+               !if(!eq(!cast<string>(op2_reg_class),
+                       !cast<string>(FPR32)),
+                   (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
+                   (op2_type op2_reg_class:$rs2))),
+              (instruction
+               vmask_only_true.Value,
+               (NoX0 GPR:$vl),
+               sew),
+              swap>.Value>;
 }
 
 multiclass pat_intrinsic_binary<string intrinsic_name,
@@ -1973,30 +2029,20 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                                 int sew,
                                 EPIVReg result_reg_class,
                                 EPIVReg op1_reg_class,
-                                RegisterClass op2_reg_class> // FIXME dagoperand?
+                                RegisterClass op2_reg_class, // FIXME dagoperand?
+                                bit swap = 0>
 {
-  defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, kind,
-                                     result_type, op1_type, op2_type, sew,
-                                     op1_reg_class, op2_reg_class>;
+  defm : pat_intrinsic_binary_nomask<
+          !cast<Intrinsic>(intrinsic_name),
+          !cast<Instruction>(instruction_name#_#kind#_#op1_reg_class),
+          result_type, op1_type, op2_type, sew, op1_reg_class, op2_reg_class, swap>;
 
-  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
-                         (result_type result_reg_class:$merge),
-                         (op1_type op1_reg_class:$rs1),
-                         (op2_type op2_reg_class:$rs2),
-                         (mask_type V0),
-                         (i64 GPR:$vl))),
-            (!cast<Instruction>(instruction_name#_#kind#"_MASK_"#op1_reg_class)
-             $merge, op1_reg_class:$rs1,
-             // Floating point instructions with a scalar operand expect such
-             // operand to be in a register of class FPR64. When dealing with
-             // the f32 variant of such instructions we need to promote the
-             // FPR32 subregister to the FPR64 base register
-             !if(!eq(!cast<string>(op2_reg_class),
-                     !cast<string>(FPR32)),
-                 (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
-                 (op2_type op2_reg_class:$rs2)),
-             vmask_only_true.Value,
-             (NoX0 GPR:$vl), sew)>;
+  defm : pat_intrinsic_binary_mask<
+          !cast<Intrinsic>(intrinsic_name#"_mask"),
+          !cast<Instruction>(instruction_name#_#kind#"_MASK_"#op1_reg_class),
+          result_type, op1_type, op2_type, mask_type, sew, result_reg_class,
+          op1_reg_class, op2_reg_class, swap>;
+
 }
 
 multiclass pat_intrinsic_binary_int_v_vv<string intrinsic_name,
@@ -2139,6 +2185,18 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vu<string intrinsic_name,
   }
 }
 
+multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_name,
+                                                            string instruction_name>
+{
+  foreach vti = AllIntegerVectors.Values
+  in {
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
+                                vti.Mask, vti.Vector, vti.Vector, vti.Mask,
+                                vti.SEW, EPIVR, vti.RegClass, vti.RegClass,
+                                /* swapped */ 1>;
+  }
+}
+
 //multiclass pat_intrinsic_binary_with_mask_input_vv_nomask<string intrinsic_name,
 //                                   string instruction_name,
 //                                   ValueType op_type,
@@ -2273,6 +2331,18 @@ multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Mask, fvti.Vector, fvti.Scalar, fvti.Mask,
                                 fvti.SEW, EPIVR, fvti.RegClass, fvti.ScalarRegClass>;
+  }
+}
+
+multiclass pat_intrinsic_binary_relational_fp_m_vv_swapped<string intrinsic_name,
+                                                           string instruction_name>
+{
+  foreach fvti = AllFloatVectors.Values
+  in {
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
+                                fvti.Mask, fvti.Vector, fvti.Vector, fvti.Mask,
+                                fvti.SEW, EPIVR, fvti.RegClass, fvti.RegClass,
+                                /* swapped */ 1>;
   }
 }
 
@@ -2614,18 +2684,12 @@ defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsleu", "Pseud
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsle", "PseudoVSLE">;
 
 defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vsgtu", "PseudoVSGTU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVSGT">;
-//foreach vtp = AllIntegerVectors.Values in {
-//   def : Pat<(nxv1i1 (int_epi_vsgtu (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
-//             (VSLTU_VV $rs2, $rs1)>;
-//   def : Pat<(nxv1i1 (int_epi_vsgtu_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
-//             (VSLTU_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
+// Select (int_epi_vsgtu reg:$rs1, reg:$rs2) as (PseudoVSLTU reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgtu", "PseudoVSLTU">;
 
-//   def : Pat<(nxv1i1 (int_epi_vsgt (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
-//             (VSLT_VV $rs2, $rs1)>;
-//   def : Pat<(nxv1i1 (int_epi_vsgt_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
-//             (VSLT_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
-//}
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVSGT">;
+// Select (int_epi_vsgt reg:$rs1, reg:$rs2) as (PseudoVSLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgt", "PseudoVSLT">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsaddu", "PseudoVSADDU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsadd", "PseudoVSADD">;
@@ -2811,19 +2875,12 @@ defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vflt", "PseudoVFLT
 defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfne", "PseudoVFNE">;
 
 defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfgt", "PseudoVFGT">;
+// Select (int_epi_vfgt reg:$rs1, reg:$rs2) as (PseudoVFLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfgt", "PseudoVFLT">;
+
 defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfge", "PseudoVFGE">;
-
-//foreach vtp = AllFloatVectors.Values in {
-//   def : Pat<(nxv1i1 (int_epi_vfgt (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
-//             (VFLT_VV $rs2, $rs1)>;
-//   def : Pat<(nxv1i1 (int_epi_vfgt_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
-//             (VFLT_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
-
-//   def : Pat<(nxv1i1 (int_epi_vfge (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2))),
-//             (VFLE_VV $rs2, $rs1)>;
-//   def : Pat<(nxv1i1 (int_epi_vfge_mask (vtp.Vector EPIVR:$rs1), (vtp.Vector EPIVR:$rs2), V0)),
-//             (VFLE_VV_MASK $rs2, $rs1, vmask_only_true.Value)>;
-//}
+// Select (int_epi_vfge reg:$rs1, reg:$rs2) as (PseudoVFLE reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfge", "PseudoVFLE">;
 
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfdiv", "PseudoVFDIV">;
 defm "" : pat_intrinsic_binary_fp_v_vf<"int_epi_vfrdiv", "PseudoVFRDIV">;

@@ -2,7 +2,7 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+m,+f,+d,+a,+c,+epi -verify-machineinstrs < %s \
 ; RUN:    | FileCheck %s
 
-define void @test_vsetvl()
+define void @test_vsetvl() nounwind
 ; CHECK-LABEL: test_vsetvl:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a0, a0, e8, m1
@@ -29,7 +29,7 @@ entry:
 
 declare i64 @llvm.epi.vsetvl(i64, i64, i64)
 
-define i64 @test_vl()
+define i64 @test_vl() nounwind
 ; CHECK-LABEL: test_vl:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    rdvl a0
@@ -41,8 +41,7 @@ define i64 @test_vl()
 
 declare i64 @llvm.epi.vreadvl()
 
-
-define void @test_load_stores()
+define void @test_load_stores() nounwind
 ; CHECK-LABEL: test_load_stores:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a0, a0, e8, m1
@@ -109,4 +108,56 @@ declare void @llvm.epi.vstore.nxv1f32(<vscale x 2 x float>, <vscale x 2 x float>
 
 declare <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>*, i64)
 declare void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>*, i64)
+
+; Check that the operands are swapped in the instruction
+define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
+; CHECK-LABEL: test_greater_comparisons:
+; CHECK:       # %bb.0:
+; CHECK-NEXT:    vsetvli a6, a5, e64, m1
+; CHECK-NEXT:    vle.v v0, (a0)
+; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    vslt.vv v2, v1, v0
+; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vse.v v2, (a2)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsltu.vv v0, v1, v0
+; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vse.v v0, (a2)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vle.v v0, (a3)
+; CHECK-NEXT:    vle.v v1, (a4)
+; CHECK-NEXT:    vfle.vv v2, v1, v0
+; CHECK-NEXT:    vflt.vv v0, v1, v0
+; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vse.v v0, (a2)
+; CHECK-NEXT:    vse.v v2, (a2)
+; CHECK-NEXT:    ret
+                                      <vscale x 1 x i64>* %pib,
+                                      <vscale x 1 x i1>* %pm,
+                                      <vscale x 1 x double>* %pfa,
+                                      <vscale x 1 x double>* %pfb,
+                                      i64 %gvl) nounwind {
+   %ia = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* %pia, i64 %gvl)
+   %ib = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* %pib, i64 %gvl)
+
+   %ma.1 = call <vscale x 1 x i1> @llvm.epi.vsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
+   store volatile <vscale x 1 x i1> %ma.1, <vscale x 1 x i1> *%pm
+   %ma.2 = call <vscale x 1 x i1> @llvm.epi.vsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
+   store volatile <vscale x 1 x i1> %ma.2, <vscale x 1 x i1> *%pm
+
+   %fa = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfa, i64 %gvl)
+   %fb = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfb, i64 %gvl)
+
+   %mb.1 = call <vscale x 1 x i1> @llvm.epi.vfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
+   store volatile <vscale x 1 x i1> %mb.1, <vscale x 1 x i1> *%pm
+   %mb.2 = call <vscale x 1 x i1> @llvm.epi.vfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
+   store volatile <vscale x 1 x i1> %mb.2, <vscale x 1 x i1> *%pm
+
+   ret void
+}
+
+declare <vscale x 1 x i1> @llvm.epi.vsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
 
