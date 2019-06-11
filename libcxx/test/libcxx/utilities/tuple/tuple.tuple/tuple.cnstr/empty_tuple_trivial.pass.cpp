@@ -6,13 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// REQUIRES: verify-support
+// This test ensures that std::tuple<> is trivially constructible. That is not
+// required by the Standard, but libc++ provides that guarantee.
 
-// <experimental/chrono>
+// UNSUPPORTED: c++98, c++03
 
-#include <experimental/chrono>
+#include <tuple>
+#include <type_traits>
 
-// expected-error@experimental/chrono:* {{"<experimental/chrono> has been removed. Use <chrono> instead."}}
+
+static_assert(std::is_trivially_constructible<std::tuple<>>::value, "");
 
 int main(int, char**) {
   return 0;
