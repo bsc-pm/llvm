@@ -80,6 +80,8 @@ def parse_type(prototype):
             elif part_of_type == 3:
                 if c == '*':
                     built_type.set_pointer()
+                elif c == "C":
+                    built_type.set_constant_type()
                 else:
                     if built_type.has_basic_type():
                         done = True

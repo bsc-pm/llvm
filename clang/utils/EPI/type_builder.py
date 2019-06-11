@@ -19,6 +19,8 @@ class TypeBuilder:
         self.vector = False
         self.vector_length = -1
         self.pointer = False
+        self.constant_type = False
+        # The following one is for integer expressions, not the type
         self.must_be_constant = False
 
     def set_short(self):
@@ -76,6 +78,13 @@ class TypeBuilder:
         if self.pointer:
             raise Exception("Only one pointer supported")
         self.pointer = True
+
+    def set_constant_type(self):
+        if self.pointer:
+            # This would require a more powerful representation
+            # that for now seems unnecessary
+            raise Exception("Cannot make pointers constant")
+        self.constant_type = True
 
     def set_must_be_constant(self):
         if self.must_be_constant:

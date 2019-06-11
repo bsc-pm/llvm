@@ -27,6 +27,10 @@ class TypeRender:
         if self.type_builder.must_be_constant:
             rendered += "/* constant */ "
 
+        # Constant pointers are not supported, so this should be enough for now
+        if self.type_builder.constant_type:
+            rendered += "const "
+
         if self.type_builder.scalable_vector:
             if self.type_builder.basic_type == TypeBuilder.INT:
                 if self.type_builder.short:
