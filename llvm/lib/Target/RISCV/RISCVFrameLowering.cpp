@@ -158,7 +158,6 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const RISCVRegisterInfo *RI = STI.getRegisterInfo();
-  const RISCVInstrInfo *TII = STI.getInstrInfo();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   const RISCVInstrInfo *TII = STI.getInstrInfo();
   const RISCVRegisterInfo *RegInfo =
