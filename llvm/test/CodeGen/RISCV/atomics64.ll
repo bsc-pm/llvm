@@ -79,7 +79,7 @@ define void @atomic_store_i64_seq_cst(i64 *%a, i64 %b) nounwind {
   ret void
 }
 
-define i64 @atomicrmw_xchg_i64_monotonic(i64* %a, i64 %b) {
+define i64 @atomicrmw_xchg_i64_monotonic(i64* %a, i64 %b) nounwind {
 ; RV64A-LABEL: atomicrmw_xchg_i64_monotonic:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    amoswap.d a0, a1, (a0)
@@ -88,7 +88,7 @@ define i64 @atomicrmw_xchg_i64_monotonic(i64* %a, i64 %b) {
   ret i64 %1
 }
 
-define i64 @atomicrmw_xchg_i64_acquire(i64* %a, i64 %b) {
+define i64 @atomicrmw_xchg_i64_acquire(i64* %a, i64 %b) nounwind {
 ; RV64A-LABEL: atomicrmw_xchg_i64_acquire:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    amoswap.d.aq a0, a1, (a0)
@@ -97,7 +97,7 @@ define i64 @atomicrmw_xchg_i64_acquire(i64* %a, i64 %b) {
   ret i64 %1
 }
 
-define i64 @atomicrmw_xchg_i64_release(i64* %a, i64 %b) {
+define i64 @atomicrmw_xchg_i64_release(i64* %a, i64 %b) nounwind {
 ; RV64A-LABEL: atomicrmw_xchg_i64_release:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    amoswap.d.rl a0, a1, (a0)
@@ -106,7 +106,7 @@ define i64 @atomicrmw_xchg_i64_release(i64* %a, i64 %b) {
   ret i64 %1
 }
 
-define i64 @atomicrmw_xchg_i64_acq_rel(i64* %a, i64 %b) {
+define i64 @atomicrmw_xchg_i64_acq_rel(i64* %a, i64 %b) nounwind {
 ; RV64A-LABEL: atomicrmw_xchg_i64_acq_rel:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    amoswap.d.aqrl a0, a1, (a0)
@@ -115,7 +115,7 @@ define i64 @atomicrmw_xchg_i64_acq_rel(i64* %a, i64 %b) {
   ret i64 %1
 }
 
-define i64 @atomicrmw_xchg_i64_seq_cst(i64* %a, i64 %b) {
+define i64 @atomicrmw_xchg_i64_seq_cst(i64* %a, i64 %b) nounwind {
 ; RV64A-LABEL: atomicrmw_xchg_i64_seq_cst:
 ; RV64A:       # %bb.0:
 ; RV64A-NEXT:    amoswap.d.aqrl a0, a1, (a0)

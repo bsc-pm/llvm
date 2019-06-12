@@ -158,8 +158,8 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const RISCVRegisterInfo *RI = STI.getRegisterInfo();
-  MachineBasicBlock::iterator MBBI = MBB.begin();
   const RISCVInstrInfo *TII = STI.getInstrInfo();
+  MachineBasicBlock::iterator MBBI = MBB.begin();
   const RISCVRegisterInfo *RegInfo =
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
   bool NeedsStackRealignment = RegInfo->needsStackRealignment(MF);
@@ -190,7 +190,8 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   unsigned CFIIndex = MF.addFrameInst(
       MCCFIInstruction::createDefCfaOffset(nullptr, -StackSize));
   BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-      .addCFIIndex(CFIIndex);
+      .addCFIIndex(CFIIndex)
+      .setMIFlag(MachineInstr::FrameSetup);
 
   // The frame pointer is callee-saved, and code has been generated for us to
   // save it to the stack. We need to skip over the storing of callee-saved
@@ -209,19 +210,22 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
         nullptr, RI->getDwarfRegNum(Reg, true), Offset));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex);
+        .addCFIIndex(CFIIndex)
+        .setMIFlag(MachineInstr::FrameSetup);
   }
 
   // Generate new FP.
-  // This does
-  //   ADDI FP, SP, bytes_of_CSRs
-  if (hasFP(MF))
+  if (hasFP(MF)) {
     adjustReg(MBB, MBBI, DL, FPReg, SPReg,
-        StackSize - RVFI->getVarArgsSaveSize(),
-        MachineInstr::FrameSetup);
+              StackSize - RVFI->getVarArgsSaveSize(), MachineInstr::FrameSetup);
 
-  // Emit CFI records:
-  const MCRegisterInfo *MRI = MF.getMMI().getContext().getRegisterInfo();
+    // Emit ".cfi_def_cfa $fp, 0"
+    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
+        nullptr, RI->getDwarfRegNum(FPReg, true), 0));
+    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+        .addCFIIndex(CFIIndex)
+        .setMIFlag(MachineInstr::FrameSetup);
+  }
 
   if (NeedsStackRealignment) {
     // Realign the stack now.
@@ -233,34 +237,6 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
       // Set BP to be the current SP
       adjustReg(MBB, MBBI, DL, BPReg, SPReg, 0, MachineInstr::FrameSetup);
     }
-  }
-
-  if (!hasFP(MF)) {
-    // .cfi_def_cfa_offset -StackSize
-    unsigned CFIIndex = MF.addFrameInst(
-        MCCFIInstruction::createDefCfaOffset(nullptr, -StackSize));
-    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex)
-        .setMIFlags(MachineInstr::FrameSetup);
-  }
-  else {
-    // .cfi_def_cfa FP, 0
-    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
-        nullptr, MRI->getDwarfRegNum(FPReg, true), 0));
-    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex)
-        .setMIFlags(MachineInstr::FrameSetup);
-  }
-
-  // .cfi_offset DwarfRegNum, offset_of_CSI
-  for (const auto &Entry : CSI) {
-    unsigned Reg = Entry.getReg();
-    int FI = Entry.getFrameIdx();
-    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
-        nullptr, MRI->getDwarfRegNum(Reg, true), MFI.getObjectOffset(FI)));
-    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex)
-        .setMIFlags(MachineInstr::FrameSetup);
   }
 }
 
@@ -305,7 +281,8 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
               nullptr, RI->getDwarfRegNum(SPReg, true), -FPOffset));
           BuildMI(MBB, std::next(I), DL,
                   TII->get(TargetOpcode::CFI_INSTRUCTION))
-              .addCFIIndex(CFIIndex);
+              .addCFIIndex(CFIIndex)
+              .setMIFlag(MachineInstr::FrameSetup);
           break;
         }
       }
@@ -321,7 +298,8 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createRestore(
         nullptr, RI->getDwarfRegNum(Reg, true)));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex);
+        .addCFIIndex(CFIIndex)
+        .setMIFlag(MachineInstr::FrameSetup);
   }
 
   // Deallocate stack
@@ -332,7 +310,8 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   unsigned CFIIndex =
       MF.addFrameInst(MCCFIInstruction::createDefCfaOffset(nullptr, 0));
   BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-      .addCFIIndex(CFIIndex);
+      .addCFIIndex(CFIIndex)
+      .setMIFlag(MachineInstr::FrameSetup);
 }
 
 int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,

@@ -426,7 +426,7 @@ define void @atomic_store_i32_seq_cst(i32 *%a, i32 %b) nounwind {
   ret void
 }
 
-define i32 @atomicrmw_xchg_i32_monotonic(i32* %a, i32 %b) {
+define i32 @atomicrmw_xchg_i32_monotonic(i32* %a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_xchg_i32_monotonic:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    amoswap.w a0, a1, (a0)
@@ -440,7 +440,7 @@ define i32 @atomicrmw_xchg_i32_monotonic(i32* %a, i32 %b) {
   ret i32 %1
 }
 
-define i32 @atomicrmw_xchg_i32_acquire(i32* %a, i32 %b) {
+define i32 @atomicrmw_xchg_i32_acquire(i32* %a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_xchg_i32_acquire:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    amoswap.w.aq a0, a1, (a0)
@@ -454,7 +454,7 @@ define i32 @atomicrmw_xchg_i32_acquire(i32* %a, i32 %b) {
   ret i32 %1
 }
 
-define i32 @atomicrmw_xchg_i32_release(i32* %a, i32 %b) {
+define i32 @atomicrmw_xchg_i32_release(i32* %a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_xchg_i32_release:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    amoswap.w.rl a0, a1, (a0)
@@ -468,7 +468,7 @@ define i32 @atomicrmw_xchg_i32_release(i32* %a, i32 %b) {
   ret i32 %1
 }
 
-define i32 @atomicrmw_xchg_i32_acq_rel(i32* %a, i32 %b) {
+define i32 @atomicrmw_xchg_i32_acq_rel(i32* %a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_xchg_i32_acq_rel:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    amoswap.w.aqrl a0, a1, (a0)
@@ -482,7 +482,7 @@ define i32 @atomicrmw_xchg_i32_acq_rel(i32* %a, i32 %b) {
   ret i32 %1
 }
 
-define i32 @atomicrmw_xchg_i32_seq_cst(i32* %a, i32 %b) {
+define i32 @atomicrmw_xchg_i32_seq_cst(i32* %a, i32 %b) nounwind {
 ; RV32A-LABEL: atomicrmw_xchg_i32_seq_cst:
 ; RV32A:       # %bb.0:
 ; RV32A-NEXT:    amoswap.w.aqrl a0, a1, (a0)
