@@ -1345,6 +1345,17 @@ multiclass pseudo_binary_arithmetic_int_v_v {
   }
 }
 
+multiclass pseudo_binary_arithmetic_int_v_x {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs.Values in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VX : pseudo_binary<evr, evr, GPR>;
+    }
+  }
+}
+
 multiclass pseudo_binary_arithmetic_int_v_s {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
@@ -1376,6 +1387,18 @@ multiclass pseudo_binary_arithmetic_int_v_xi {
     {
       defm _VX : pseudo_binary<evr, evr, GPR>;
       defm _VI : pseudo_binary<evr, evr, simm5>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+    }
+  }
+}
+
+multiclass pseudo_binary_arithmetic_int_v_xu {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs.Values in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VX : pseudo_binary<evr, evr, GPR>;
+      defm _VU : pseudo_binary<evr, evr, uimm5>; // FIXME how can this work? uimm5 is not a RegisterClass but an Operand
     }
   }
 }
@@ -1534,42 +1557,6 @@ multiclass pseudo_binary_relational_float_m_vf {
   }
 }
 
-multiclass pseudo_binary_arithmetic_any_and_int_v_x {
-  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
-  foreach evr = AllEPIVRegs.Values in
-  {
-    let VLMul = evr.VLMul in
-    {
-      defm _VX : pseudo_binary<evr, evr, GPR>;
-    }
-  }
-}
-
-multiclass pseudo_binary_arithmetic_any_and_int_v_vxi {
-  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
-  foreach evr = AllEPIVRegs.Values in
-  {
-    let VLMul = evr.VLMul in
-    {
-      defm _VV : pseudo_binary<evr, evr, evr>;
-      defm _VX : pseudo_binary<evr, evr, GPR>;
-      defm _VI : pseudo_binary<evr, evr, simm5>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
-    }
-  }
-}
-
-multiclass pseudo_binary_arithmetic_any_and_int_v_xu {
-  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
-  foreach evr = AllEPIVRegs.Values in
-  {
-    let VLMul = evr.VLMul in
-    {
-      defm _VX : pseudo_binary<evr, evr, GPR>;
-      defm _VU : pseudo_binary<evr, evr, uimm5>; // FIXME how can this work? uimm5 is not a RegisterClass but an Operand
-    }
-  }
-}
-
 let Predicates = [HasExtEPI] in {
 
 defm PseudoVADD        : pseudo_binary_arithmetic_int_v_vxi;
@@ -1583,9 +1570,9 @@ defm PseudoVAND        : pseudo_binary_arithmetic_int_v_vxi;
 defm PseudoVOR         : pseudo_binary_arithmetic_int_v_vxi;
 defm PseudoVXOR        : pseudo_binary_arithmetic_int_v_vxi;
 
-defm PseudoVRGATHER    : pseudo_binary_arithmetic_any_and_int_v_vxi;
-defm PseudoVSLIDEUP    : pseudo_binary_arithmetic_any_and_int_v_xu;
-defm PseudoVSLIDEDOWN  : pseudo_binary_arithmetic_any_and_int_v_xu;
+defm PseudoVRGATHER    : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSLIDEUP    : pseudo_binary_arithmetic_int_v_xu;
+defm PseudoVSLIDEDOWN  : pseudo_binary_arithmetic_int_v_xu;
 
 defm PseudoVSEQ        : pseudo_binary_relational_int_m_vxi;
 defm PseudoVSNE        : pseudo_binary_relational_int_m_vxi;
@@ -1642,8 +1629,8 @@ foreach evr = AllEPIVRegs.Values in
   }
 }
 
-defm PseudoVSLIDE1UP   : pseudo_binary_arithmetic_any_and_int_v_x;
-defm PseudoVSLIDE1DOWN : pseudo_binary_arithmetic_any_and_int_v_x;
+defm PseudoVSLIDE1UP   : pseudo_binary_arithmetic_int_v_x;
+defm PseudoVSLIDE1DOWN : pseudo_binary_arithmetic_int_v_x;
 
 defm PseudoVDIVU       : pseudo_binary_arithmetic_int_v_vx;
 defm PseudoVDIV        : pseudo_binary_arithmetic_int_v_vx;
