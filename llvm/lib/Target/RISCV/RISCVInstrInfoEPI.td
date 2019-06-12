@@ -1334,7 +1334,7 @@ multiclass pseudo_binary<EPIVReg result_reg_class,
                                  EPIPseudo;
 }
 
-multiclass pseudo_binary_arithmetic_int_v_v {
+multiclass pseudo_binary_int_v_vv {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1345,7 +1345,7 @@ multiclass pseudo_binary_arithmetic_int_v_v {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_x {
+multiclass pseudo_binary_int_v_vx {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1356,7 +1356,7 @@ multiclass pseudo_binary_arithmetic_int_v_x {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_s {
+multiclass pseudo_binary_int_v_vs {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1367,7 +1367,7 @@ multiclass pseudo_binary_arithmetic_int_v_s {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_vx {
+multiclass pseudo_binary_int_v_vv_vx {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1379,7 +1379,7 @@ multiclass pseudo_binary_arithmetic_int_v_vx {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_xi {
+multiclass pseudo_binary_int_v_vx_vi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1391,7 +1391,7 @@ multiclass pseudo_binary_arithmetic_int_v_xi {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_xu {
+multiclass pseudo_binary_int_v_vx_vu {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1403,7 +1403,7 @@ multiclass pseudo_binary_arithmetic_int_v_xu {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_v_vxi {
+multiclass pseudo_binary_int_v_vv_vx_vi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1416,7 +1416,7 @@ multiclass pseudo_binary_arithmetic_int_v_vxi {
   }
 }
 
-multiclass pseudo_binary_arithmetic_int_w_vx {
+multiclass pseudo_binary_int_w_vv_vx {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegToWidePairs.Values in
   {
@@ -1428,7 +1428,7 @@ multiclass pseudo_binary_arithmetic_int_w_vx {
   }
 }
 
-multiclass pseudo_binary_relational_int_m_vx {
+multiclass pseudo_binary_int_m_vv_vx {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1440,7 +1440,7 @@ multiclass pseudo_binary_relational_int_m_vx {
   }
 }
 
-multiclass pseudo_binary_relational_int_m_xi {
+multiclass pseudo_binary_int_m_vx_vi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1452,7 +1452,7 @@ multiclass pseudo_binary_relational_int_m_xi {
   }
 }
 
-multiclass pseudo_binary_relational_int_m_xu {
+multiclass pseudo_binary_int_m_vx_vu {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1464,7 +1464,7 @@ multiclass pseudo_binary_relational_int_m_xu {
   }
 }
 
-multiclass pseudo_binary_relational_int_m_vxi {
+multiclass pseudo_binary_int_m_vv_vx_vi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1477,7 +1477,7 @@ multiclass pseudo_binary_relational_int_m_vxi {
   }
 }
 
-multiclass pseudo_binary_arithmetic_float_v_v {
+multiclass pseudo_binary_float_v_vv {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1488,7 +1488,7 @@ multiclass pseudo_binary_arithmetic_float_v_v {
   }
 }
 
-multiclass pseudo_binary_arithmetic_float_v_s {
+multiclass pseudo_binary_float_v_vs {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1499,7 +1499,7 @@ multiclass pseudo_binary_arithmetic_float_v_s {
   }
 }
 
-multiclass pseudo_binary_arithmetic_float_v_f {
+multiclass pseudo_binary_float_v_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1510,7 +1510,7 @@ multiclass pseudo_binary_arithmetic_float_v_f {
   }
 }
 
-multiclass pseudo_binary_arithmetic_float_v_vf {
+multiclass pseudo_binary_float_v_vv_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1522,7 +1522,7 @@ multiclass pseudo_binary_arithmetic_float_v_vf {
   }
 }
 
-multiclass pseudo_binary_arithmetic_float_w_vf {
+multiclass pseudo_binary_float_w_vv_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegToWidePairs.Values in
   {
@@ -1534,7 +1534,7 @@ multiclass pseudo_binary_arithmetic_float_w_vf {
   }
 }
 
-multiclass pseudo_binary_relational_float_m_f {
+multiclass pseudo_binary_float_m_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1545,7 +1545,7 @@ multiclass pseudo_binary_relational_float_m_f {
   }
 }
 
-multiclass pseudo_binary_relational_float_m_vf {
+multiclass pseudo_binary_float_m_vv_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs.Values in
   {
@@ -1559,57 +1559,57 @@ multiclass pseudo_binary_relational_float_m_vf {
 
 let Predicates = [HasExtEPI] in {
 
-defm PseudoVADD        : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSUB        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVRSUB       : pseudo_binary_arithmetic_int_v_xi;
-defm PseudoVMINU       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMIN        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMAXU       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMAX        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVAND        : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVOR         : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVXOR        : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVADD        : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSUB        : pseudo_binary_int_v_vv_vx;
+defm PseudoVRSUB       : pseudo_binary_int_v_vx_vi;
+defm PseudoVMINU       : pseudo_binary_int_v_vv_vx;
+defm PseudoVMIN        : pseudo_binary_int_v_vv_vx;
+defm PseudoVMAXU       : pseudo_binary_int_v_vv_vx;
+defm PseudoVMAX        : pseudo_binary_int_v_vv_vx;
+defm PseudoVAND        : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVOR         : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVXOR        : pseudo_binary_int_v_vv_vx_vi;
 
-defm PseudoVRGATHER    : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSLIDEUP    : pseudo_binary_arithmetic_int_v_xu;
-defm PseudoVSLIDEDOWN  : pseudo_binary_arithmetic_int_v_xu;
+defm PseudoVRGATHER    : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSLIDEUP    : pseudo_binary_int_v_vx_vu;
+defm PseudoVSLIDEDOWN  : pseudo_binary_int_v_vx_vu;
 
-defm PseudoVSEQ        : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSNE        : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSLTU       : pseudo_binary_relational_int_m_vx;
-defm PseudoVSLT        : pseudo_binary_relational_int_m_vx;
-defm PseudoVSLEU       : pseudo_binary_relational_int_m_vxi;
-defm PseudoVSLE        : pseudo_binary_relational_int_m_vxi;
+defm PseudoVSEQ        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVSNE        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVSLTU       : pseudo_binary_int_m_vv_vx;
+defm PseudoVSLT        : pseudo_binary_int_m_vv_vx;
+defm PseudoVSLEU       : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVSLE        : pseudo_binary_int_m_vv_vx_vi;
 
-defm PseudoVSGTU       : pseudo_binary_relational_int_m_xu;
-defm PseudoVSGT        : pseudo_binary_relational_int_m_xi;
+defm PseudoVSGTU       : pseudo_binary_int_m_vx_vu;
+defm PseudoVSGT        : pseudo_binary_int_m_vx_vi;
 
-defm PseudoVSADDU      : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSADD       : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSUBU      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSSUB       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVAADD       : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSLL        : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVASUB       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSMUL       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVSRL        : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSRA        : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSRL       : pseudo_binary_arithmetic_int_v_vxi;
-defm PseudoVSSRA       : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVSADDU      : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSADD       : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSSUBU      : pseudo_binary_int_v_vv_vx;
+defm PseudoVSSUB       : pseudo_binary_int_v_vv_vx;
+defm PseudoVAADD       : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSLL        : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVASUB       : pseudo_binary_int_v_vv_vx;
+defm PseudoVSMUL       : pseudo_binary_int_v_vv_vx;
+defm PseudoVSRL        : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSRA        : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSSRL       : pseudo_binary_int_v_vv_vx_vi;
+defm PseudoVSSRA       : pseudo_binary_int_v_vv_vx_vi;
 
-defm PseudoVMERGE      : pseudo_binary_arithmetic_int_v_vxi;
+defm PseudoVMERGE      : pseudo_binary_int_v_vv_vx_vi;
 
-defm PseudoVDOTU       : pseudo_binary_arithmetic_int_v_v;
-defm PseudoVDOT        : pseudo_binary_arithmetic_int_v_v;
+defm PseudoVDOTU       : pseudo_binary_int_v_vv;
+defm PseudoVDOT        : pseudo_binary_int_v_vv;
 
-defm PseudoVREDSUM     : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDAND     : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDOR      : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDXOR     : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMINU    : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMIN     : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMAXU    : pseudo_binary_arithmetic_int_v_s;
-defm PseudoVREDMAX     : pseudo_binary_arithmetic_int_v_s;
+defm PseudoVREDSUM     : pseudo_binary_int_v_vs;
+defm PseudoVREDAND     : pseudo_binary_int_v_vs;
+defm PseudoVREDOR      : pseudo_binary_int_v_vs;
+defm PseudoVREDXOR     : pseudo_binary_int_v_vs;
+defm PseudoVREDMINU    : pseudo_binary_int_v_vs;
+defm PseudoVREDMIN     : pseudo_binary_int_v_vs;
+defm PseudoVREDMAXU    : pseudo_binary_int_v_vs;
+defm PseudoVREDMAX     : pseudo_binary_int_v_vs;
 
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
 foreach evr = AllEPIVRegs.Values in
@@ -1629,38 +1629,38 @@ foreach evr = AllEPIVRegs.Values in
   }
 }
 
-defm PseudoVSLIDE1UP   : pseudo_binary_arithmetic_int_v_x;
-defm PseudoVSLIDE1DOWN : pseudo_binary_arithmetic_int_v_x;
+defm PseudoVSLIDE1UP   : pseudo_binary_int_v_vx;
+defm PseudoVSLIDE1DOWN : pseudo_binary_int_v_vx;
 
-defm PseudoVDIVU       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVDIV        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVREMU       : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVREM        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULHU      : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMUL        : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULHSU     : pseudo_binary_arithmetic_int_v_vx;
-defm PseudoVMULH       : pseudo_binary_arithmetic_int_v_vx;
+defm PseudoVDIVU       : pseudo_binary_int_v_vv_vx;
+defm PseudoVDIV        : pseudo_binary_int_v_vv_vx;
+defm PseudoVREMU       : pseudo_binary_int_v_vv_vx;
+defm PseudoVREM        : pseudo_binary_int_v_vv_vx;
+defm PseudoVMULHU      : pseudo_binary_int_v_vv_vx;
+defm PseudoVMUL        : pseudo_binary_int_v_vv_vx;
+defm PseudoVMULHSU     : pseudo_binary_int_v_vv_vx;
+defm PseudoVMULH       : pseudo_binary_int_v_vv_vx;
 
-defm PseudoVWADDU      : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWADD       : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWSUBU      : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWSUB       : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWADDU      : pseudo_binary_int_w_vv_vx;
+defm PseudoVWADD       : pseudo_binary_int_w_vv_vx;
+defm PseudoVWSUBU      : pseudo_binary_int_w_vv_vx;
+defm PseudoVWSUB       : pseudo_binary_int_w_vv_vx;
 
-defm PseudoVWMULU      : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWMULSU     : pseudo_binary_arithmetic_int_w_vx;
-defm PseudoVWMUL       : pseudo_binary_arithmetic_int_w_vx;
+defm PseudoVWMULU      : pseudo_binary_int_w_vv_vx;
+defm PseudoVWMULSU     : pseudo_binary_int_w_vv_vx;
+defm PseudoVWMUL       : pseudo_binary_int_w_vv_vx;
 
-defm PseudoVFADD       : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDSUM    : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFSUB       : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDOSUM   : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFMIN       : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDMIN    : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFMAX       : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFREDMAX    : pseudo_binary_arithmetic_float_v_s;
-defm PseudoVFSGNJ      : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFSGNJN     : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFSGNJX     : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFADD       : pseudo_binary_float_v_vv_vf;
+defm PseudoVFREDSUM    : pseudo_binary_float_v_vs;
+defm PseudoVFSUB       : pseudo_binary_float_v_vv_vf;
+defm PseudoVFREDOSUM   : pseudo_binary_float_v_vs;
+defm PseudoVFMIN       : pseudo_binary_float_v_vv_vf;
+defm PseudoVFREDMIN    : pseudo_binary_float_v_vs;
+defm PseudoVFMAX       : pseudo_binary_float_v_vv_vf;
+defm PseudoVFREDMAX    : pseudo_binary_float_v_vs;
+defm PseudoVFSGNJ      : pseudo_binary_float_v_vv_vf;
+defm PseudoVFSGNJN     : pseudo_binary_float_v_vv_vf;
+defm PseudoVFSGNJX     : pseudo_binary_float_v_vv_vf;
 
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
 foreach evr = AllEPIVRegs.Values in
@@ -1680,25 +1680,25 @@ foreach evr = AllEPIVRegs.Values in
   }
 }
 
-defm PseudoVFEQ        : pseudo_binary_relational_float_m_vf;
-defm PseudoVFLE        : pseudo_binary_relational_float_m_vf;
-defm PseudoVFORD       : pseudo_binary_relational_float_m_vf;
-defm PseudoVFLT        : pseudo_binary_relational_float_m_vf;
-defm PseudoVFNE        : pseudo_binary_relational_float_m_vf;
+defm PseudoVFEQ        : pseudo_binary_float_m_vv_vf;
+defm PseudoVFLE        : pseudo_binary_float_m_vv_vf;
+defm PseudoVFORD       : pseudo_binary_float_m_vv_vf;
+defm PseudoVFLT        : pseudo_binary_float_m_vv_vf;
+defm PseudoVFNE        : pseudo_binary_float_m_vv_vf;
 
-defm PseudoVFGT        : pseudo_binary_relational_float_m_f;
-defm PseudoVFGE        : pseudo_binary_relational_float_m_f;
+defm PseudoVFGT        : pseudo_binary_float_m_vf;
+defm PseudoVFGE        : pseudo_binary_float_m_vf;
 
-defm PseudoVFDIV       : pseudo_binary_arithmetic_float_v_vf;
-defm PseudoVFRDIV      : pseudo_binary_arithmetic_float_v_f;
-defm PseudoVFMUL       : pseudo_binary_arithmetic_float_v_vf;
+defm PseudoVFDIV       : pseudo_binary_float_v_vv_vf;
+defm PseudoVFRDIV      : pseudo_binary_float_v_vf;
+defm PseudoVFMUL       : pseudo_binary_float_v_vv_vf;
 
-defm PseudoVFMERGE     : pseudo_binary_arithmetic_float_v_f;
+defm PseudoVFMERGE     : pseudo_binary_float_v_vf;
 
-defm PseudoVFWADD      : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFWSUB      : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFWMUL      : pseudo_binary_arithmetic_float_w_vf;
-defm PseudoVFDOT       : pseudo_binary_arithmetic_float_v_v;
+defm PseudoVFWADD      : pseudo_binary_float_w_vv_vf;
+defm PseudoVFWSUB      : pseudo_binary_float_w_vv_vf;
+defm PseudoVFWMUL      : pseudo_binary_float_w_vv_vf;
+defm PseudoVFDOT       : pseudo_binary_float_v_vv;
 
 defm PseudoVFSQRT      : pseudo_unary_v_v;
 
