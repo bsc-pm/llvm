@@ -452,10 +452,11 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
   const auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
 
-  // Callee-saved registers should be referenced relative to the stack pointer
-  // (positive offset), otherwise use the frame pointer (negative offset)
-  // unless the offset from FP is not known at constant time, as it happens
-  // when we have to align the stack or we have variably sized data.
+  // Callee-saved registers in the default stack should be referenced relative
+  // to the stack pointer (positive offset), otherwise use the frame pointer
+  // (negative offset) unless the offset from FP is not known at compile time,
+  // as it happens when we have to align the stack or we have variably sized
+  // data.
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   int MinCSFI = 0;
   int MaxCSFI = -1;
@@ -470,7 +471,8 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
   bool IsCSR = FI >= MinCSFI && FI <= MaxCSFI;
   bool isFixed = !IsCSR && MFI.isFixedObjectIndex(FI);
 
-  if (IsCSR) {
+  if (IsCSR && MFI.getStackID(FI) == 0) {
+    // Only CSRs in the default stack can be accessed using SP
     FrameReg = getSPReg(STI);
     Offset += MF.getFrameInfo().getStackSize();
   } else {
