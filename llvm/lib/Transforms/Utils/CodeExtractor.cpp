@@ -249,15 +249,15 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      BasicBlock *newHeader,
                                                      Function *oldFunction,
                                                      Module *M,
-                                                     const SetVector<BasicBlock *> &Blocks)> constructOmpSsFunctions,
+                                                     const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc,
                              std::function<CallInst*(Function *newFunction,
                                                      BasicBlock *codeReplacer,
-                                                     const SetVector<BasicBlock *> &Blocks)> emitCaptureAndCall)
+                                                     const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
       BPI(nullptr), AllowVarArgs(false),
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
-      constructOmpSsFunctions(constructOmpSsFunctions),
-      emitCaptureAndCall(emitCaptureAndCall) {}
+      rewriteOutToInTaskBrAndGetOmpSsUnpackFunc(rewriteOutToInTaskBrAndGetOmpSsUnpackFunc),
+      emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {}
 
 CodeExtractor::CodeExtractor(DominatorTree &DT, Loop &L, bool AggregateArgs,
                              BlockFrequencyInfo *BFI,
@@ -1385,8 +1385,8 @@ Function *CodeExtractor::extractCodeRegion() {
 
   // Construct new function based on inputs/outputs & add allocas for all defs.
   Function *newFunction;
-  if (constructOmpSsFunctions) {
-    newFunction = constructOmpSsFunctions(header, newFuncRoot, codeReplacer,
+  if (rewriteOutToInTaskBrAndGetOmpSsUnpackFunc) {
+    newFunction = rewriteOutToInTaskBrAndGetOmpSsUnpackFunc(header, newFuncRoot, codeReplacer,
                       oldFunction, oldFunction->getParent(), Blocks);
   } else {
     newFunction = constructFunction(inputs, outputs, header, newFuncRoot, codeReplacer,
@@ -1403,8 +1403,8 @@ Function *CodeExtractor::extractCodeRegion() {
   }
 
   CallInst *TheCall;
-  if (emitCaptureAndCall) {
-    TheCall = emitCaptureAndCall(newFunction, codeReplacer, Blocks);
+  if (emitOmpSsCaptureAndSubmitTask) {
+    TheCall = emitOmpSsCaptureAndSubmitTask(newFunction, codeReplacer, Blocks);
   } else {
     TheCall = emitCallAndSwitchStatement(newFunction, codeReplacer, inputs, outputs);
   }
@@ -1413,8 +1413,10 @@ Function *CodeExtractor::extractCodeRegion() {
 
   // Replicate the effects of any lifetime start/end markers which referenced
   // input objects in the extraction region by placing markers around the call.
-  insertLifetimeMarkersSurroundingCall(oldFunction->getParent(),
-                                       InputObjectsWithLifetime, TheCall);
+  // FIXME OmpSs: For now lets ignore lifetimes
+  if (!rewriteOutToInTaskBrAndGetOmpSsUnpackFunc && !emitOmpSsCaptureAndSubmitTask)
+    insertLifetimeMarkersSurroundingCall(oldFunction->getParent(),
+                                         InputObjectsWithLifetime, TheCall);
 
   // Propagate personality info to the new function if there is one.
   if (oldFunction->hasPersonalityFn())

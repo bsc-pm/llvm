@@ -76,10 +76,10 @@ class Value;
                             BasicBlock *newHeader,
                             Function *oldFunction,
                             Module *M,
-                            const SetVector<BasicBlock *> &Blocks)> constructOmpSsFunctions;
+                            const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc;
     std::function<CallInst*(Function *newFunction,
                             BasicBlock *codeReplacer,
-                            const SetVector<BasicBlock *> &Blocks)> emitCaptureAndCall;
+                            const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask;
 
   public:
     /// Create a code extractor for a sequence of blocks.
@@ -113,10 +113,10 @@ class Value;
                                           BasicBlock *newHeader,
                                           Function *oldFunction,
                                           Module *M,
-                                          const SetVector<BasicBlock *> &Blocks)> constructOmpSsFunctions,
+                                          const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc,
                   std::function<CallInst*(Function *newFunction,
                                           BasicBlock *codeReplacer,
-                                          const SetVector<BasicBlock *> &Blocks)> emitCaptureAndCall);
+                                          const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask);
 
     /// Perform the extraction, returning the new function.
     ///

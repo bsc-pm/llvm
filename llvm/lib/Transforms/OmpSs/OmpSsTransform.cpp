@@ -45,6 +45,7 @@ struct OmpSs : public ModulePass {
     StructType *Ty = nullptr;
   };
   TaskConstraintsTy TskConstraintsTy;
+
   struct TaskInvInfoTy {
     struct Members {
       Type *InvSourceTy;
@@ -53,6 +54,7 @@ struct OmpSs : public ModulePass {
     Members Mmbers;
   };
   TaskInvInfoTy TskInvInfoTy;
+
   struct TaskImplInfoTy {
     struct Members {
       Type *DeviceTypeIdTy;
@@ -66,6 +68,7 @@ struct OmpSs : public ModulePass {
     Members Mmbers;
   };
   TaskImplInfoTy TskImplInfoTy;
+
   struct TaskInfoTy {
     struct Members {
         Type *NumSymbolsTy;
@@ -92,7 +95,7 @@ struct OmpSs : public ModulePass {
         "nanos6_taskwait", IRB.getVoidTy(), IRB.getInt8PtrTy()));
     // 2. Build String
     // TODO: add debug info (line:col)
-    Constant *Nanos6TaskwaitStr = IRB.CreateGlobalStringPtr(M.getModuleIdentifier());
+    Constant *Nanos6TaskwaitStr = IRB.CreateGlobalStringPtr(M.getSourceFileName());
 
     // 3. Insert the call
     IRB.CreateCall(Func, {Nanos6TaskwaitStr});
@@ -102,6 +105,7 @@ struct OmpSs : public ModulePass {
 
   void lowerTask(const TaskInfo &TI,
                  Function &F,
+                 size_t taskNum,
                  Module &M) {
     // 1. Split BB
     BasicBlock *EntryBB = TI.Entry->getParent();
@@ -135,7 +139,7 @@ struct OmpSs : public ModulePass {
     for (Value *V : TI.DSAInfo.Firstprivate) {
       TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
     }
-    StructType *TaskArgsTy = StructType::create(M.getContext(), TaskArgsMemberTy, ("nanos6_task_args_" + F.getName()).str());
+    StructType *TaskArgsTy = StructType::create(M.getContext(), TaskArgsMemberTy, ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
     // Create nanos6_task_args_* END
 
     // nanos6_unpacked_task_region_* START
@@ -155,7 +159,7 @@ struct OmpSs : public ModulePass {
 
     Function *unpackFuncVar = Function::Create(
         unpackFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_unpacked_task_region_" + F.getName(), &M);
+        "nanos6_unpacked_task_region_" + F.getName() + Twine(taskNum), &M);
 
     // Create an iterator to name all of the arguments we inserted.
     Function::arg_iterator AI = unpackFuncVar->arg_begin();
@@ -187,7 +191,7 @@ struct OmpSs : public ModulePass {
 
     Function *outlineFuncVar = Function::Create(
         outlineFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_ol_task_region_" + F.getName(), &M);
+        "nanos6_ol_task_region_" + F.getName() + Twine(taskNum), &M);
 
     BasicBlock *outlineEntryBB = BasicBlock::Create(M.getContext(), "entry", outlineFuncVar);
 
@@ -225,14 +229,15 @@ struct OmpSs : public ModulePass {
     }
     TaskUnpackParams.push_back(&*AI++);
     TaskUnpackParams.push_back(&*AI++);
-    Instruction *TaskUnpackCall =
-      BBBuilder.CreateCall(unpackFuncVar, TaskUnpackParams);
-    ReturnInst *TaskOlRet = BBBuilder.CreateRetVoid();
+    // Build TaskUnpackCall
+    BBBuilder.CreateCall(unpackFuncVar, TaskUnpackParams);
+    // Make BB legal with a terminator to task outline function
+    BBBuilder.CreateRetVoid();
 
     // nanos6_ol_task_region_* END
 
-    // 0.1 Create Nanos6 task data structures info
-    Constant *TaskInvInfoVar = M.getOrInsertGlobal(("task_invocation_info_" + F.getName()).str(),
+    // 3. Create Nanos6 task data structures info
+    Constant *TaskInvInfoVar = M.getOrInsertGlobal(("task_invocation_info_" + F.getName() + Twine(taskNum)).str(),
                                       TskInvInfoTy.Ty,
                                       [&] {
       GlobalVariable *GV = new GlobalVariable(M, TskInvInfoTy.Ty,
@@ -240,12 +245,12 @@ struct OmpSs : public ModulePass {
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(TskInvInfoTy.Ty,
                                                     ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))),
-                                ("task_invocation_info_" + F.getName()).str());
+                                ("task_invocation_info_" + F.getName() + Twine(taskNum)).str());
       GV->setAlignment(64);
       return GV;
     });
 
-    Constant *TaskImplInfoVar = M.getOrInsertGlobal(("implementations_var_" + F.getName()).str(),
+    Constant *TaskImplInfoVar = M.getOrInsertGlobal(("implementations_var_" + F.getName() + Twine(taskNum)).str(),
                                       ArrayType::get(TskImplInfoTy.Ty, 1),
                                       [&] {
       auto *outlineFuncCastTy = FunctionType::get(Type::getVoidTy(M.getContext()),
@@ -264,13 +269,13 @@ struct OmpSs : public ModulePass {
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.TaskLabelTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.DeclSourceTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()))),
-                                ("implementations_var_" + F.getName()).str());
+                                ("implementations_var_" + F.getName() + Twine(taskNum)).str());
 
       GV->setAlignment(64);
       return GV;
     });
 
-    Constant *TaskInfoVar = M.getOrInsertGlobal(("task_info_var_" + F.getName()).str(),
+    Constant *TaskInfoVar = M.getOrInsertGlobal(("task_info_var_" + F.getName() + Twine(taskNum)).str(),
                                       TskInfoTy.Ty,
                                       [&] {
       GlobalVariable *GV = new GlobalVariable(M, TskInfoTy.Ty,
@@ -287,12 +292,13 @@ struct OmpSs : public ModulePass {
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.DuplicateArgsBlockFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.ReductInitsFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.ReductCombsFuncTy->getPointerTo())),
-                                ("task_info_var_" + F.getName()).str());
+                                ("task_info_var_" + F.getName() + Twine(taskNum)).str());
 
       GV->setAlignment(64);
       return GV;
     });
 
+    // 4. Create nanos6_create_task nanos6_submit_task function types
     Function *CreateTaskFuncTy = cast<Function>(M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),
         TskInfoTy.Ty->getPointerTo(),
@@ -307,7 +313,7 @@ struct OmpSs : public ModulePass {
         Type::getVoidTy(M.getContext()),
         Type::getInt8PtrTy(M.getContext())));
 
-    auto constructOmpSsFunctions = [&](BasicBlock *header,
+    auto rewriteOutToInTaskBrAndGetOmpSsUnpackFunc = [&](BasicBlock *header,
                                               BasicBlock *newRootNode,
                                               BasicBlock *newHeader,
                                               Function *oldFunction,
@@ -316,11 +322,9 @@ struct OmpSs : public ModulePass {
 
       unpackFuncVar->getBasicBlockList().push_back(newRootNode);
 
-      // Rewrite branches to basic blocks outside of the loop to new dummy blocks
-      // within the new function. This must be done before we lose track of which
-      // blocks were originally in the code region.
-      // ?? FIXME: Parece que esto se usa para cambiar los branches al codigo que movemos
-      //           Por ej. br label %codeRepl
+      // Rewrite branches from basic blocks outside of the task region to blocks
+      // inside the region to use the new label (newHeader) since the task region
+      // will be outlined
       std::vector<User *> Users(header->user_begin(), header->user_end());
       for (unsigned i = 0, e = Users.size(); i != e; ++i)
         // The BasicBlock which contains the branch is not in the region
@@ -330,19 +334,20 @@ struct OmpSs : public ModulePass {
               I->getParent()->getParent() == oldFunction)
             I->replaceUsesOfWith(header, newHeader);
 
-
       return unpackFuncVar;
     };
-    auto emitCaptureAndCall = [&](Function *newFunction,
+    auto emitOmpSsCaptureAndSubmitTask = [&](Function *newFunction,
                                   BasicBlock *codeReplacer,
                                   const SetVector<BasicBlock *> &Blocks) {
 
       IRBuilder<> IRB(codeReplacer);
       Value *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
+      // TODO: For now TaskFlagsVar is hardcoded
       // Value *TaskFlagsVar = IRB.CreateAlloca(IRB.getInt64Ty());
       // IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), TaskFlagsVar);
       Value *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
+      // TODO: For now TaskNumDepsVar is hardcoded
       // Value *TaskNumDepsVar = IRB.CreateAlloca(IRB.getInt64Ty());
       // IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), TaskNumDepsVar);
       uint64_t TaskArgsSizeOf = M.getDataLayout().getTypeAllocSize(TaskArgsTy);
@@ -363,7 +368,7 @@ struct OmpSs : public ModulePass {
         Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsIdx);
         Value *GEP = IRB.CreateGEP(
             TaskArgsVarL, Idx, "gep_" + TI.DSAInfo.Shared[i]->getName());
-        Value *CaptureDSA = IRB.CreateStore(TI.DSAInfo.Shared[i], GEP);
+        IRB.CreateStore(TI.DSAInfo.Shared[i], GEP);
       }
       TaskArgsIdx += TI.DSAInfo.Private.size();
       for (unsigned i = 0; i < TI.DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
@@ -373,49 +378,42 @@ struct OmpSs : public ModulePass {
         Value *GEP = IRB.CreateGEP(
             TaskArgsVarL, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
         Value *FPValue = IRB.CreateLoad(TI.DSAInfo.Firstprivate[i]);
-        Value *CaptureDSA = IRB.CreateStore(FPValue, GEP);
+        IRB.CreateStore(FPValue, GEP);
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
-      IRB.CreateCall(TaskSubmitFuncTy, TaskPtrVarL);
+      CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncTy, TaskPtrVarL);
 
-      // Since there may be multiple exits from the original region, make the new
-      // function return an unsigned, switch on that number.  This loop iterates
-      // over all of the blocks in the extracted region, updating any terminator
-      // instructions in the to-be-extracted region that branch to blocks that are
-      // not in the region to be extracted.
-      std::map<BasicBlock *, BasicBlock *> ExitBlockMap;
-
-      unsigned switchVal = 0;
+      // Add a branch to the next basic block after the task region
+      // and replace the terminator that exits the task region
+      // Since this is a single entry single exit region this should
+      // be done once.
+      bool DoneOnce = false;
       for (BasicBlock *Block : Blocks) {
         Instruction *TI = Block->getTerminator();
         for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i)
           if (!Blocks.count(TI->getSuccessor(i))) {
+            assert(!DoneOnce && "More than one exit in task code");
+            DoneOnce = true;
+
             BasicBlock *OldTarget = TI->getSuccessor(i);
 
+            // Create branch to next BB after the task region
             IRB.CreateBr(OldTarget);
 
-            // add a new basic block which returns the appropriate value
-            BasicBlock *&NewTarget = ExitBlockMap[OldTarget];
-            if (!NewTarget) {
-              // If we don't already have an exit stub for this non-extracted
-              // destination, create one now!
-              NewTarget = BasicBlock::Create(M.getContext(),
-                                             OldTarget->getName() + ".exitStub",
-                                             newFunction);
-
-              ReturnInst::Create(M.getContext(), nullptr, NewTarget);
-            }
-            // rewrite the original branch instruction with this new target
-            TI->setSuccessor(i, NewTarget);
+            IRBuilder<> BNewTerminatorI(TI);
+            BNewTerminatorI.CreateRetVoid();
           }
+          if (DoneOnce)
+            TI->eraseFromParent();
       }
 
-      return nullptr;
+      return TaskSubmitFuncCall;
     };
-    CodeExtractor CE(TaskBBs.getArrayRef(), constructOmpSsFunctions, emitCaptureAndCall);
 
-    Function *OutF = CE.extractCodeRegion();
+    // 4. Extract region the way we want
+    CodeExtractor CE(TaskBBs.getArrayRef(), rewriteOutToInTaskBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
+    CE.extractCodeRegion();
   }
 
   bool runOnModule(Module &M) override {
@@ -521,8 +519,9 @@ struct OmpSs : public ModulePass {
       for (TaskwaitInfo& TwI : TwFI.PostOrder) {
         lowerTaskwait(TwI, M);
       }
+      size_t taskNum = 0;
       for (TaskInfo TI : TFI.PostOrder) {
-        lowerTask(TI, F, M);
+        lowerTask(TI, F, taskNum++, M);
       }
 
     }
