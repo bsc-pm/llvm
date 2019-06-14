@@ -157,6 +157,9 @@ class InstrDesc:
     SECTION_ASSEMBLER = 2
     SECTION_ENCODING = 3
 
+    # Allowed physical registers as redundant syntax
+    PHYSICAL_REGISTERS = ["v0"]
+
     def __init__(self, input_filename):
         self.input_filename = input_filename
         self.formats = collections.OrderedDict()
@@ -291,7 +294,11 @@ class InstrDesc:
                     defined_fields[i] = (op, field)
                     used = True
             if not used:
-                self.error_at(linenum, "operand '{}' does not participate in the encoding of the instruction '{}'".format(op, instruction_name))
+                if op in InstrDesc.PHYSICAL_REGISTERS:
+                    # Ignore this operand because it is redundant syntax
+                    pass
+                else:
+                    self.error_at(linenum, "operand '{}' does not participate in the encoding of the instruction '{}'".format(op, instruction_name))
 
         assignments = collections.OrderedDict()
         for assign in fields:

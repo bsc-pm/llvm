@@ -59,12 +59,23 @@ class EPIBinaryMask : Intrinsic< [ llvm_anyvector_ty ],
 {
   let ExtendOperand = 3;
 }
+class EPIBinaryMaskIn : Intrinsic< [ llvm_anyvector_ty ],
+                        [ LLVMMatchType<0>, llvm_any_ty,
+                          llvm_anyvector_ty, llvm_i64_ty ],
+                        [ IntrNoMem ] >, EPIIntrinsic
+{
+  let ExtendOperand = 2;
+}
 multiclass epi_binary {
   def "int_epi_" # NAME : EPIBinary;
   def "int_epi_" # NAME # "_mask" : EPIBinaryMask;
 }
 multiclass epi_binary_nomask {
   def "int_epi_" # NAME : EPIBinary;
+}
+
+multiclass epi_binary_mask_in {
+  def "int_epi_" # NAME : EPIBinaryMaskIn;
 }
 
 class EPIBinaryWide : Intrinsic< [ llvm_anyvector_ty ],
@@ -241,7 +252,7 @@ defm vdiv : epi_binary;
 defm vremu : epi_binary;
 defm vrem : epi_binary;
 
-defm vmerge : epi_binary;
+defm vmerge : epi_binary_mask_in;
 
 defm vsaddu : epi_binary;
 defm vsadd : epi_binary;
@@ -306,7 +317,7 @@ defm vfgt : epi_relational;
 defm vfge : epi_relational;
 defm vford : epi_relational;
 
-defm vfmerge : epi_binary;
+defm vfmerge : epi_binary_mask_in;
 
 defm vredsum : epi_binary;
 defm vredand : epi_binary;
@@ -414,7 +425,7 @@ defm vfncvt_f_xu : epi_conversions;
 defm vfncvt_f_x : epi_conversions;
 defm vfncvt_f_f : epi_conversions;
 
-defm vbroadcast : epi_unary;
+def int_epi_vbroadcast : EPIUnary;
 
 def int_epi_mask_cast : Intrinsic< [ llvm_anyvector_ty ], [ llvm_anyvector_ty ],
                                    [ IntrNoMem ]>;

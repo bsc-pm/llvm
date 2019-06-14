@@ -41,11 +41,11 @@ vwadd.wv vd, vs2, vs1, vm
 vwadd.wx vd, vs2, rs1, vm
 vwsub.wv vd, vs2, vs1, vm
 vwsub.wx vd, vs2, rs1, vm
-vadc.vv vd, vs2, vs1
-vadc.vx vd, vs2, rs1
-vadc.vi vd, vs2, imm
-vsbc.vv vd, vs2, vs1
-vsbc.vx vd, vs2, rs1
+vadc.vvm vd, vs2, vs1, v0
+vadc.vxm vd, vs2, rs1, v0
+vadc.vim vd, vs2, imm, v0
+vsbc.vvm vd, vs2, vs1, v0
+vsbc.vxm vd, vs2, rs1, v0
 vand.vv vd, vs2, vs1, vm
 vand.vx vd, vs2, rs1, vm
 vand.vi vd, vs2, imm, vm
@@ -136,9 +136,12 @@ vremu.vv vd, vs2, vs1, vm
 vremu.vx vd, vs2, rs1, vm
 vrem.vv vd, vs2, vs1, vm
 vrem.vx vd, vs2, rs1, vm
-vmerge.vv vd, vs2, vs1, vm
-vmerge.vx vd, vs2, rs1, vm
-vmerge.vi vd, vs2, imm, vm
+vmv.v.v vd, vs1
+vmv.v.x vd, rs1
+vmv.v.i vd, imm
+vmerge.vvm vd, vs2, vs1, v0
+vmerge.vxm vd, vs2, rs1, v0
+vmerge.vim vd, vs2, imm, v0
 vsaddu.vv vd, vs2, vs1, vm
 vsaddu.vx vd, vs2, rs1, vm
 vsaddu.vi vd, vs2, imm, vm
@@ -243,7 +246,8 @@ vfge.vf vd, vs2, rs1, vm
 vford.vv vd, vs2, vs1, vm
 vford.vf vd, vs2, rs1, vm
 vfclass.v vd, vs2, vm
-vfmerge.vf vd, vs2, rs1, vm
+vfmv.v.f vd, rs1
+vfmerge.vfm vd, vs2, rs1, v0
 vfcvt.xu.f.v vd, vs2, vm
 vfcvt.x.f.v vd, vs2, vm
 vfcvt.f.xu.v vd, vs2, vm
@@ -376,14 +380,17 @@ vslideup.vx|OPIVX|funct=001110
 vslideup.vi|OPIVI|funct=001110
 vslidedown.vx|OPIVX|funct=001111
 vslidedown.vi|OPIVI|funct=001111
-vadc.vv|OPIVV|funct=010000|vm=1
-vadc.vx|OPIVX|funct=010000|vm=1
-vadc.vi|OPIVI|funct=010000|vm=1
-vsbc.vv|OPIVV|funct=010010|vm=1
-vsbc.vx|OPIVX|funct=010010|vm=1
-vmerge.vv|OPIVV|funct=010111
-vmerge.vx|OPIVX|funct=010111
-vmerge.vi|OPIVI|funct=010111
+vadc.vvm|OPIVV|funct=010000|vm=1
+vadc.vxm|OPIVX|funct=010000|vm=1
+vadc.vim|OPIVI|funct=010000|vm=1
+vsbc.vvm|OPIVV|funct=010010|vm=1
+vsbc.vxm|OPIVX|funct=010010|vm=1
+vmv.v.v|OPIVV|funct=010111|vs2=00000|vm=1
+vmv.v.x|OPIVX|funct=010111|vs2=00000|vm=1
+vmv.v.i|OPIVI|funct=010111|vs2=00000|vm=1
+vmerge.vvm|OPIVV|funct=010111|vm=0
+vmerge.vxm|OPIVX|funct=010111|vm=0
+vmerge.vim|OPIVI|funct=010111|vm=0
 vseq.vv|OPIVV|funct=011000
 vseq.vx|OPIVX|funct=011000
 vseq.vi|OPIVI|funct=011000
@@ -557,7 +564,8 @@ vfsgnjx.vv|OPFVV|funct=001010
 vfsgnjx.vf|OPFVF|funct=001010
 vfmv.f.s|OPFVV|funct=001100|vs1=00000|vm=1
 vfmv.s.f|OPFVF|funct=001101|vs2=00000|vm=1
-vfmerge.vf|OPFVF|funct=010111
+vfmv.v.f|OPFVF|funct=010111|vs2=00000|vm=1
+vfmerge.vfm|OPFVF|funct=010111|vm=0
 vfeq.vv|OPFVV|funct=011000
 vfeq.vf|OPFVF|funct=011000
 vfle.vv|OPFVV|funct=011001

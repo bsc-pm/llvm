@@ -201,7 +201,8 @@ class InstructionParser:
 
         # Special case for floating registers that they may appear in the input
         # as rsX
-        if iname.endswith(".vf") or iname.endswith(".wf"):
+        if iname.endswith(".vf") or iname.endswith(".wf") \
+                or iname.endswith(".vfm"):
             for (i, op) in enumerate(instr.fields):
                 if isinstance(op, Register) and op.name == "rs1":
                     op.name = "fs1"
@@ -212,7 +213,7 @@ class InstructionParser:
                     instr.operand_order[i] = "fs1"
 
         # Special cases
-        if iname == "vfmv.s.f":
+        if iname in ["vfmv.s.f", "vfmv.v.f"]:
             for (i, op) in enumerate(instr.fields):
                 if isinstance(op, Register) and op.name == "rs1":
                     op.name = "fs1"
@@ -420,6 +421,22 @@ def generate_instruction_tests(i):
             pass
         else:
             raise Exception("Unhandled field kind {}".format(f))
+
+    # Handle the operands that are just pure syntax and have no influence in
+    # the instruction encoding
+    if len(ops_generator) < len(i.operand_order):
+        for idx_operand in range(0, len(i.operand_order)):
+            # FIXME: This is not great
+            found_as_field = False
+            for j in range(0, len(ops_generator)):
+                if ops_generator[j][0] == idx_operand:
+                    found_as_field = True
+                    break
+            if found_as_field:
+                continue
+            def capture_value(v):
+                return lambda : "{}".format(v)
+            ops_generator.append((idx_operand, capture_value(i.operand_order[idx_operand])))
 
     assert(isinstance(i.fields[-1], FixedBits))
     is_store = i.fields[-1].text == "0100111"

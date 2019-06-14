@@ -12698,6 +12698,15 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
+#define EPI_INT_BINARY_MASK_IN(ID_)                                            \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
+    ID = Intrinsic::epi_##ID_;                                                 \
+    break;
+
 #define EPI_INT_SCALAR_INT_BINARY(ID_)                                         \
   case RISCV::EPI_BI_##ID_##_8xi8:                                             \
   case RISCV::EPI_BI_##ID_##_4xi16:                                            \
@@ -12751,6 +12760,13 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     ID = Intrinsic::epi_##ID_##_mask;                                          \
     break;
 
+#define EPI_FP_BINARY_MASK_IN(ID_)                                             \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
+    IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
+    ID = Intrinsic::epi_##ID_;                                                 \
+    break;
+
 #define EPI_FP_RELATIONAL(ID_)                                                 \
   case RISCV::EPI_BI_##ID_##_2xf32:                                            \
   case RISCV::EPI_BI_##ID_##_1xf64:                                            \
@@ -12789,6 +12805,15 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   case RISCV::EPI_BI_##ID_##_1xi64_mask:                                       \
     IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
+    break;
+
+#define EPI_SCALAR_INT_TO_INT_UNARY(ID_)                                       \
+  case RISCV::EPI_BI_##ID_##_8xi8:                                             \
+  case RISCV::EPI_BI_##ID_##_4xi16:                                            \
+  case RISCV::EPI_BI_##ID_##_2xi32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xi64:                                            \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+    ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
 #define EPI_MASK_UNARY(ID_)                                                    \
@@ -12849,6 +12874,13 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
   case RISCV::EPI_BI_##ID_##_1xf64_mask:                                       \
     IntrinsicTypes = {ResultType, Ops[1]->getType(), Ops[2]->getType()};       \
     ID = Intrinsic::epi_##ID_##_mask;                                          \
+    break;
+
+#define EPI_SCALAR_FP_TO_FP_UNARY(ID_)                                         \
+  case RISCV::EPI_BI_##ID_##_2xf32:                                            \
+  case RISCV::EPI_BI_##ID_##_1xf64:                                            \
+    IntrinsicTypes = {ResultType, Ops[0]->getType()};                          \
+    ID = Intrinsic::epi_##ID_;                                                 \
     break;
 
 #define EPI_ANY_AND_SCALAR_INT_BINARY(ID_)                                     \
@@ -13130,7 +13162,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_INT_BINARY(vremu)
     EPI_INT_BINARY(vrem)
 
-    EPI_INT_BINARY(vmerge)
+    EPI_INT_BINARY_MASK_IN(vmerge)
 
     EPI_INT_BINARY(vsaddu)
     EPI_INT_BINARY(vsadd)
@@ -13203,7 +13235,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_FP_RELATIONAL(vfge)
     EPI_FP_RELATIONAL(vford)
 
-    EPI_FP_BINARY(vfmerge)
+    EPI_FP_BINARY_MASK_IN(vfmerge)
 
     EPI_INT_BINARY(vredsum)
     EPI_INT_BINARY(vredmaxu)
@@ -13271,8 +13303,8 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_FP_TO_FP_NARROW_CONVERSION(vfncvt_f_f)
     EPI_FP_TO_FP_WIDEN_CONVERSION(vfwcvt_f_f)
 
-    EPI_INT_UNARY(vbroadcast)
-    EPI_FP_UNARY(vbroadcast)
+    EPI_SCALAR_INT_TO_INT_UNARY(vbroadcast)
+    EPI_SCALAR_FP_TO_FP_UNARY(vbroadcast)
 
     EPI_MEM_LOAD(vload)
     EPI_MEM_STORE(vstore)

@@ -149,6 +149,12 @@ EPI_BUILTIN(vload_8xi1, "QV8bUcC*", "n")
   EPI_BUILTIN(name##_2xi32_mask, "QV2SiQV2SiQV2SiQV2SiQV2bUWi", "Un")          \
   EPI_BUILTIN(name##_1xi64_mask, "QV1SWiQV1SWiQV1SWiQV1SWiQV1bUWi", "Un")
 
+#define EPI_INT_BINARY_MASK_IN(name)                                           \
+  EPI_BUILTIN(name##_8xi8, "QV8ScQV8ScQV8ScQV8bUWi", "Un")                     \
+  EPI_BUILTIN(name##_4xi16, "QV4SsQV4SsQV4SsQV4bUWi", "Un")                    \
+  EPI_BUILTIN(name##_2xi32, "QV2SiQV2SiQV2SiQV2bUWi", "Un")                    \
+  EPI_BUILTIN(name##_1xi64, "QV1SWiQV1SWiQV1SWiQV1bUWi", "Un")
+
 #define EPI_INT_SCALAR_INT_BINARY(name)                                        \
   EPI_BUILTIN(name##_8xi8, "QV8ScQV8ScScUWi", "Un")                            \
   EPI_BUILTIN(name##_4xi16, "QV4SsQV4SsSsUWi", "Un")                           \
@@ -172,6 +178,10 @@ EPI_BUILTIN(vload_8xi1, "QV8bUcC*", "n")
                                                                                \
   EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2fQV2fQV2fQV2bUWi", "Un")              \
   EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1dQV1dQV1dQV1bUWi", "Un")
+
+#define EPI_FP_BINARY_MASK_IN(name)                                            \
+  EPI_BUILTIN(name##_2xf32, "QV2fQV2fQV2fQV2bUWi", "Un")                       \
+  EPI_BUILTIN(name##_1xf64, "QV1dQV1dQV1dQV1bUWi", "Un")
 
 #define EPI_INT_RELATIONAL(name)                                               \
   EPI_BUILTIN(name##_8xi8, "QV8bQV8ScQV8ScUWi", "Un")                          \
@@ -330,19 +340,11 @@ EPI_BUILTIN(vload_8xi1, "QV8bUcC*", "n")
   EPI_BUILTIN(name##_8xi8, "QV8ScScUWi", "Un")                                 \
   EPI_BUILTIN(name##_4xi16, "QV4SsSsUWi", "Un")                                \
   EPI_BUILTIN(name##_2xi32, "QV2SiSiUWi", "Un")                                \
-  EPI_BUILTIN(name##_1xi64, "QV1SWiSWiUWi", "Un")                              \
-                                                                               \
-  EPI_BUILTIN(name##_8xi8_mask, "QV8ScQV8ScScQV8bUWi", "Un")                   \
-  EPI_BUILTIN(name##_4xi16_mask, "QV4SsQV4SsSsQV4bUWi", "Un")                  \
-  EPI_BUILTIN(name##_2xi32_mask, "QV2SiQV2SiSiQV2bUWi", "Un")                  \
-  EPI_BUILTIN(name##_1xi64_mask, "QV1SWiQV1SWiSWiQV1bUWi", "Un")
+  EPI_BUILTIN(name##_1xi64, "QV1SWiSWiUWi", "Un")
 
 #define EPI_SCALAR_FP_TO_FP_UNARY(name)                                        \
   EPI_BUILTIN(name##_2xf32, "QV2ffUWi", "Un")                                  \
-  EPI_BUILTIN(name##_1xf64, "QV1ddUWi", "Un")                                  \
-                                                                               \
-  EPI_BUILTIN(name##_2xf32_mask, "QV2fQV2ffQV2bUWi", "Un")                     \
-  EPI_BUILTIN(name##_1xf64_mask, "QV1dQV1ddQV1bUWi", "Un")
+  EPI_BUILTIN(name##_1xf64, "QV1ddUWi", "Un")
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -365,9 +367,10 @@ EPI_INT_SCALAR_INT_BINARY(vrsub)
 // EPI_INT_WIDE_RESULT(vwadd_w)
 // EPI_INT_WIDE_RESULT(vwsub_w)
 
-// FIXME: These use V0, so it returns more stuff
-// EPI_INT_BINARY(vadc)
-// EPI_INT_BINARY(vsbc)
+// EPI_INT_BINARY_MASK_IN(vadc)
+// EPI_INT_BINARY_MASK_IN(vmadc)
+// EPI_INT_BINARY_MASK_IN(vsbc)
+// EPI_INT_BINARY_MASK_IN(vmsbc)
 
 EPI_INT_BINARY(vand)
 EPI_INT_BINARY(vor)
@@ -426,7 +429,7 @@ EPI_INT_BINARY(vdiv)
 EPI_INT_BINARY(vremu)
 EPI_INT_BINARY(vrem)
 
-EPI_INT_BINARY(vmerge)
+EPI_INT_BINARY_MASK_IN(vmerge)
 
 EPI_INT_BINARY(vsaddu)
 EPI_INT_BINARY(vsadd)
@@ -500,7 +503,7 @@ EPI_FP_RELATIONAL(vfgt)
 EPI_FP_RELATIONAL(vfge)
 EPI_FP_RELATIONAL(vford)
 
-EPI_FP_BINARY(vfmerge)
+EPI_FP_BINARY_MASK_IN(vfmerge)
 
 EPI_FP_TO_INT_CONVERSION(vfcvt_xu_f)
 EPI_FP_TO_INT_CONVERSION(vfcvt_x_f)
@@ -596,8 +599,10 @@ EPI_BUILTIN(cast_1xi64_1xi1, "QV1SWiQV1b", "Un")
 // Cleanup
 #undef BUILTIN
 #undef EPI_INT_BINARY
+#undef EPI_INT_BINARY_MASK_IN
 #undef EPI_MASK_BINARY
 #undef EPI_FP_BINARY
+#undef EPI_FP_BINARY_MASK_IN
 #undef EPI_INT_RELATIONAL
 #undef EPI_FP_RELATIONAL
 #undef EPI_INT_UNARY
@@ -613,5 +618,7 @@ EPI_BUILTIN(cast_1xi64_1xi1, "QV1SWiQV1b", "Un")
 #undef EPI_FP_TO_FP_NARROW_CONVERSION
 #undef EPI_FP_TO_FP_WIDEN_CONVERSION
 #undef EPI_INT_SCALAR_INT_BINARY
+#undef EPI_SCALAR_INT_TO_INT_UNARY
+#undef EPI_SCALAR_FP_TO_FP_UNARY
 
 // vim: ft=cpp
