@@ -71,8 +71,8 @@ private:
                               MachineBasicBlock::iterator MBBI,
                               MachineBasicBlock::iterator &NextMBBI);
   bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-                 unsigned BaseInstr, unsigned VLIndex, unsigned SEWIndex,
-                 signed char MergeOpIndex);
+                 unsigned BaseInstr, int VLIndex, int SEWIndex,
+                 int MergeOpIndex);
 };
 
 char RISCVExpandPseudo::ID = 0;
@@ -103,8 +103,8 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator &NextMBBI) {
   if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
           RISCVEPIPseudosTable::getEPIPseudoInfo(MBBI->getOpcode())) {
-    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->VLIndex, EPI->SEWIndex,
-                     EPI->MergeOpIndex);
+    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->getVLIndex(),
+                     EPI->getSEWIndex(), EPI->getMergeOpIndex());
   }
 
   switch (MBBI->getOpcode()) {
@@ -716,8 +716,8 @@ bool RISCVExpandPseudo::expandLoadTLSGDAddress(
 
 bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator MBBI,
-                                  unsigned BaseInstr, unsigned VLIndex,
-                                  unsigned SEWIndex, signed char MergeOpIndex) {
+                                  unsigned BaseInstr, int VLIndex, int SEWIndex,
+                                  int MergeOpIndex) {
   MachineInstr &MI = *MBBI;
   MachineFunction &MF = *MBB.getParent();
   DebugLoc DL = MI.getDebugLoc();
@@ -740,16 +740,13 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
     }
   }
 
-  assert(
-      !(MergeOpIndex >> 4) &&
-      "Fix the following condition if MergeOpIndex is no longer 4 bits wide");
-
   for (MachineInstr::const_mop_iterator Op = MI.operands_begin();
        Op != MI.operands_end(); Op++) {
-    if ((MI.getOperandNo(Op) == VLIndex) || (MI.getOperandNo(Op) == SEWIndex) ||
-        // If the pseudo has a merge operand (MergeOpIndex >= 0), skip it
-        (!(MergeOpIndex & 0x08) &&
-         (MI.getOperandNo(Op) == (unsigned)MergeOpIndex)))
+    int OpNo = (int)MI.getOperandNo(Op);
+    assert(OpNo >= 0 && "Operand number doesn't fit in an 'int' type");
+
+    // Skip VL, SEW and MergeOp operands
+    if (OpNo == VLIndex || OpNo == SEWIndex || OpNo == MergeOpIndex)
       continue;
 
     if (Op->isReg()) {
