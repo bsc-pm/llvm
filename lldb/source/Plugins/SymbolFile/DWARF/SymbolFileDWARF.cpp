@@ -589,10 +589,8 @@ DWARFDebugInfo *SymbolFileDWARF::DebugInfo() {
     static Timer::Category func_cat(LLVM_PRETTY_FUNCTION);
     Timer scoped_timer(func_cat, "%s this = %p", LLVM_PRETTY_FUNCTION,
                        static_cast<void *>(this));
-    if (m_context.getOrLoadDebugInfoData().GetByteSize() > 0) {
-      m_info = llvm::make_unique<DWARFDebugInfo>(m_context);
-      m_info->SetDwarfData(this);
-    }
+    if (m_context.getOrLoadDebugInfoData().GetByteSize() > 0)
+      m_info = llvm::make_unique<DWARFDebugInfo>(*this, m_context);
   }
   return m_info.get();
 }
@@ -654,8 +652,8 @@ lldb::CompUnitSP SymbolFileDWARF::ParseCompileUnit(DWARFCompileUnit &dwarf_cu) {
     // We already parsed this compile unit, had out a shared pointer to it
     cu_sp = comp_unit->shared_from_this();
   } else {
-    if (dwarf_cu.GetSymbolFileDWARF() != this) {
-      return dwarf_cu.GetSymbolFileDWARF()->ParseCompileUnit(dwarf_cu);
+    if (&dwarf_cu.GetSymbolFileDWARF() != this) {
+      return dwarf_cu.GetSymbolFileDWARF().ParseCompileUnit(dwarf_cu);
     } else if (dwarf_cu.GetOffset() == 0 && GetDebugMapSymfile()) {
       // Let the debug map create the compile unit
       cu_sp = m_debug_map_symfile->GetCompileUnit(this);
@@ -2064,8 +2062,7 @@ uint32_t SymbolFileDWARF::FindGlobalVariables(
         } break;
         }
       } else {
-        m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                        name.GetStringRef());
+        m_index->ReportInvalidDIERef(die_ref, name.GetStringRef());
       }
     }
   }
@@ -2128,7 +2125,7 @@ uint32_t SymbolFileDWARF::FindGlobalVariables(const RegularExpression &regex,
         if (variables.GetSize() - original_size >= max_matches)
           break;
       } else
-        m_index->ReportInvalidDIEOffset(die_ref.die_offset, regex.GetText());
+        m_index->ReportInvalidDIERef(die_ref, regex.GetText());
     }
   }
 
@@ -2312,7 +2309,7 @@ uint32_t SymbolFileDWARF::FindFunctions(const RegularExpression &regex,
   for (DIERef ref : offsets) {
     DWARFDIE die = info->GetDIE(ref);
     if (!die) {
-      m_index->ReportInvalidDIEOffset(ref.die_offset, regex.GetText());
+      m_index->ReportInvalidDIERef(ref, regex.GetText());
       continue;
     }
     if (resolved_dies.insert(die.GetDIE()).second)
@@ -2415,8 +2412,7 @@ uint32_t SymbolFileDWARF::FindTypes(
             break;
         }
       } else {
-        m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                        name.GetStringRef());
+        m_index->ReportInvalidDIERef(die_ref, name.GetStringRef());
       }
     }
     const uint32_t num_matches = types.GetSize() - initial_types_size;
@@ -2494,8 +2490,7 @@ size_t SymbolFileDWARF::FindTypes(const std::vector<CompilerContext> &context,
           ++num_matches;
         }
       } else {
-        m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                        name.GetStringRef());
+        m_index->ReportInvalidDIERef(die_ref, name.GetStringRef());
       }
     }
     return num_matches;
@@ -2540,8 +2535,7 @@ SymbolFileDWARF::FindNamespace(ConstString name,
               break;
           }
         } else {
-          m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                          name.GetStringRef());
+          m_index->ReportInvalidDIERef(die_ref, name.GetStringRef());
         }
       }
     }
@@ -2751,8 +2745,7 @@ TypeSP SymbolFileDWARF::FindCompleteObjCDefinitionTypeForDIE(
           }
         }
       } else {
-        m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                        type_name.GetStringRef());
+        m_index->ReportInvalidDIERef(die_ref, type_name.GetStringRef());
       }
     }
   }
@@ -2959,8 +2952,7 @@ TypeSP SymbolFileDWARF::FindDefinitionTypeForDWARFDeclContext(
               }
             }
           } else {
-            m_index->ReportInvalidDIEOffset(die_ref.die_offset,
-                                            type_name.GetStringRef());
+            m_index->ReportInvalidDIERef(die_ref, type_name.GetStringRef());
           }
         }
       }
@@ -3127,7 +3119,7 @@ size_t SymbolFileDWARF::ParseVariablesForContext(const SymbolContext &sc) {
                 ++vars_added;
               }
             } else
-              m_index->ReportInvalidDIEOffset(die_ref.die_offset, "");
+              m_index->ReportInvalidDIERef(die_ref, "");
           }
         }
       }
