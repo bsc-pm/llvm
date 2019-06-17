@@ -417,7 +417,9 @@ class AMDGPUDSAppendConsumedIntrinsic : Intrinsic<
   [llvm_i32_ty],
   [llvm_anyptr_ty, // LDS or GDS ptr
    llvm_i1_ty], // isVolatile
-   [IntrConvergent, IntrArgMemOnly, NoCapture<0>, ImmArg<1>]
+   [IntrConvergent, IntrArgMemOnly, NoCapture<0>, ImmArg<1>],
+   "",
+   [SDNPMemOperand]
 >;
 
 def int_amdgcn_ds_ordered_add : AMDGPUDSOrderedIntrinsic;
@@ -862,7 +864,7 @@ def int_amdgcn_s_buffer_load : Intrinsic <
   [llvm_any_ty],
   [llvm_v4i32_ty,     // rsrc(SGPR)
    llvm_i32_ty,       // byte offset(SGPR/imm)
-   llvm_i32_ty],      // cachepolicy(imm; bit 0 = glc)
+   llvm_i32_ty],      // cachepolicy(imm; bit 0 = glc, bit 2 = dlc)
   [IntrNoMem, ImmArg<2>]>,
   AMDGPURsrcIntrinsic<0>;
 
