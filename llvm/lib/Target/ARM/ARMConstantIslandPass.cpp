@@ -291,8 +291,8 @@ char ARMConstantIslands::ID = 0;
 
 /// verify - check BBOffsets, BBSizes, alignment of islands
 void ARMConstantIslands::verify() {
-  BBInfoVector &BBInfo = BBUtils->getBBInfo();
 #ifndef NDEBUG
+  BBInfoVector &BBInfo = BBUtils->getBBInfo();
   assert(std::is_sorted(MF->begin(), MF->end(),
                         [&BBInfo](const MachineBasicBlock &LHS,
                                   const MachineBasicBlock &RHS) {
@@ -1051,11 +1051,11 @@ bool ARMConstantIslands::isWaterInRange(unsigned UserOffset,
 bool ARMConstantIslands::isCPEntryInRange(MachineInstr *MI, unsigned UserOffset,
                                       MachineInstr *CPEMI, unsigned MaxDisp,
                                       bool NegOk, bool DoDump) {
-  BBInfoVector &BBInfo = BBUtils->getBBInfo();
   unsigned CPEOffset = BBUtils->getOffsetOf(CPEMI);
 
   if (DoDump) {
     LLVM_DEBUG({
+        BBInfoVector &BBInfo = BBUtils->getBBInfo();
       unsigned Block = MI->getParent()->getNumber();
       const BasicBlockInfo &BBI = BBInfo[Block];
       dbgs() << "User of CPE#" << CPEMI->getOperand(0).getImm()
