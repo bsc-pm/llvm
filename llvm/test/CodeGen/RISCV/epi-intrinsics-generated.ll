@@ -829,46 +829,6 @@ entry:
 }
 
 
-declare <vscale x 16 x i8> @llvm.epi.vmv.s.x.nxv16i8.i8(
-  i8,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv16i8_i8() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv16i8_i8
-; CHECK:       vsetvli {{.*}}, a0, e8, m2
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 16 x i8> @llvm.epi.vmv.s.x.nxv16i8.i8(
-    i8 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
-  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
-
-  ret void
-}
-
-
-declare <vscale x 32 x i8> @llvm.epi.vmv.s.x.nxv32i8.i8(
-  i8,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv32i8_i8() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv32i8_i8
-; CHECK:       vsetvli {{.*}}, a0, e8, m4
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 32 x i8> @llvm.epi.vmv.s.x.nxv32i8.i8(
-    i8 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
-  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
-
-  ret void
-}
-
-
 declare <vscale x 4 x i16> @llvm.epi.vmv.s.x.nxv4i16.i16(
   i16,
   i64);
@@ -884,66 +844,6 @@ entry:
 
   %p = bitcast i8* @scratch to <vscale x 4 x i16>*
   store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
-
-  ret void
-}
-
-
-declare <vscale x 8 x i16> @llvm.epi.vmv.s.x.nxv8i16.i16(
-  i16,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv8i16_i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv8i16_i16
-; CHECK:       vsetvli {{.*}}, a0, e16, m2
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 8 x i16> @llvm.epi.vmv.s.x.nxv8i16.i16(
-    i16 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
-  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
-
-  ret void
-}
-
-
-declare <vscale x 16 x i16> @llvm.epi.vmv.s.x.nxv16i16.i16(
-  i16,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv16i16_i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv16i16_i16
-; CHECK:       vsetvli {{.*}}, a0, e16, m4
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 16 x i16> @llvm.epi.vmv.s.x.nxv16i16.i16(
-    i16 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
-  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
-
-  ret void
-}
-
-
-declare <vscale x 32 x i16> @llvm.epi.vmv.s.x.nxv32i16.i16(
-  i16,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv32i16_i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv32i16_i16
-; CHECK:       vsetvli {{.*}}, a0, e16, m8
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 32 x i16> @llvm.epi.vmv.s.x.nxv32i16.i16(
-    i16 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
-  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
 
   ret void
 }
@@ -969,66 +869,6 @@ entry:
 }
 
 
-declare <vscale x 4 x i32> @llvm.epi.vmv.s.x.nxv4i32.i32(
-  i32,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv4i32_i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv4i32_i32
-; CHECK:       vsetvli {{.*}}, a0, e32, m2
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 4 x i32> @llvm.epi.vmv.s.x.nxv4i32.i32(
-    i32 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
-  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
-
-  ret void
-}
-
-
-declare <vscale x 8 x i32> @llvm.epi.vmv.s.x.nxv8i32.i32(
-  i32,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv8i32_i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv8i32_i32
-; CHECK:       vsetvli {{.*}}, a0, e32, m4
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 8 x i32> @llvm.epi.vmv.s.x.nxv8i32.i32(
-    i32 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
-  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
-
-  ret void
-}
-
-
-declare <vscale x 16 x i32> @llvm.epi.vmv.s.x.nxv16i32.i32(
-  i32,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv16i32_i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv16i32_i32
-; CHECK:       vsetvli {{.*}}, a0, e32, m8
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 16 x i32> @llvm.epi.vmv.s.x.nxv16i32.i32(
-    i32 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
-  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
-
-  ret void
-}
-
-
 declare <vscale x 1 x i64> @llvm.epi.vmv.s.x.nxv1i64.i64(
   i64,
   i64);
@@ -1044,66 +884,6 @@ entry:
 
   %p = bitcast i8* @scratch to <vscale x 1 x i64>*
   store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
-
-  ret void
-}
-
-
-declare <vscale x 2 x i64> @llvm.epi.vmv.s.x.nxv2i64.i64(
-  i64,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv2i64_i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv2i64_i64
-; CHECK:       vsetvli {{.*}}, a0, e64, m2
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 2 x i64> @llvm.epi.vmv.s.x.nxv2i64.i64(
-    i64 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
-  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
-
-  ret void
-}
-
-
-declare <vscale x 4 x i64> @llvm.epi.vmv.s.x.nxv4i64.i64(
-  i64,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv4i64_i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv4i64_i64
-; CHECK:       vsetvli {{.*}}, a0, e64, m4
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 4 x i64> @llvm.epi.vmv.s.x.nxv4i64.i64(
-    i64 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
-  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
-
-  ret void
-}
-
-
-declare <vscale x 8 x i64> @llvm.epi.vmv.s.x.nxv8i64.i64(
-  i64,
-  i64);
-
-define void @intrinsic_vmv.s.x_x_nxv8i64_i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vmv.s.x_x_nxv8i64_i64
-; CHECK:       vsetvli {{.*}}, a0, e64, m8
-; CHECK:       vmv.s.x v0, a0
-  %a = call <vscale x 8 x i64> @llvm.epi.vmv.s.x.nxv8i64.i64(
-    i64 undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
-  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
 
   ret void
 }
@@ -1129,66 +909,6 @@ entry:
 }
 
 
-declare <vscale x 4 x float> @llvm.epi.vfmv.s.f.nxv4f32.f32(
-  float,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv4f32_f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv4f32_f32
-; CHECK:       vsetvli {{.*}}, a0, e32, m2
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 4 x float> @llvm.epi.vfmv.s.f.nxv4f32.f32(
-    float undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 4 x float>*
-  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
-
-  ret void
-}
-
-
-declare <vscale x 8 x float> @llvm.epi.vfmv.s.f.nxv8f32.f32(
-  float,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv8f32_f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv8f32_f32
-; CHECK:       vsetvli {{.*}}, a0, e32, m4
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 8 x float> @llvm.epi.vfmv.s.f.nxv8f32.f32(
-    float undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 8 x float>*
-  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
-
-  ret void
-}
-
-
-declare <vscale x 16 x float> @llvm.epi.vfmv.s.f.nxv16f32.f32(
-  float,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv16f32_f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv16f32_f32
-; CHECK:       vsetvli {{.*}}, a0, e32, m8
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 16 x float> @llvm.epi.vfmv.s.f.nxv16f32.f32(
-    float undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 16 x float>*
-  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
-
-  ret void
-}
-
-
 declare <vscale x 1 x double> @llvm.epi.vfmv.s.f.nxv1f64.f64(
   double,
   i64);
@@ -1209,66 +929,6 @@ entry:
 }
 
 
-declare <vscale x 2 x double> @llvm.epi.vfmv.s.f.nxv2f64.f64(
-  double,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv2f64_f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv2f64_f64
-; CHECK:       vsetvli {{.*}}, a0, e64, m2
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 2 x double> @llvm.epi.vfmv.s.f.nxv2f64.f64(
-    double undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 2 x double>*
-  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
-
-  ret void
-}
-
-
-declare <vscale x 4 x double> @llvm.epi.vfmv.s.f.nxv4f64.f64(
-  double,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv4f64_f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv4f64_f64
-; CHECK:       vsetvli {{.*}}, a0, e64, m4
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 4 x double> @llvm.epi.vfmv.s.f.nxv4f64.f64(
-    double undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 4 x double>*
-  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
-
-  ret void
-}
-
-
-declare <vscale x 8 x double> @llvm.epi.vfmv.s.f.nxv8f64.f64(
-  double,
-  i64);
-
-define void @intrinsic_vfmv.s.f_f_nxv8f64_f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.s.f_f_nxv8f64_f64
-; CHECK:       vsetvli {{.*}}, a0, e64, m8
-; CHECK:       vfmv.s.f v0, ft0
-  %a = call <vscale x 8 x double> @llvm.epi.vfmv.s.f.nxv8f64.f64(
-    double undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x 8 x double>*
-  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
-
-  ret void
-}
-
-
 declare i8 @llvm.epi.vext.x.v.i8.nxv8i8(
   <vscale x 8 x i8>,
   i64);
@@ -1276,47 +936,10 @@ declare i8 @llvm.epi.vext.x.v.i8.nxv8i8(
 define void @intrinsic_vext.x.v_v_i8_nxv8i8() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, {{.*}}, e8, m1
 ; CHECK:       vext.x.v a0, v0
   %a = call i8 @llvm.epi.vext.x.v.i8.nxv8i8(
     <vscale x 8 x i8> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i8*
-  store i8 %a, i8* %p
-
-  ret void
-}
-
-
-declare i8 @llvm.epi.vext.x.v.i8.nxv16i8(
-  <vscale x 16 x i8>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i8_nxv16i8() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv16i8
-; CHECK:       vext.x.v a0, v0
-  %a = call i8 @llvm.epi.vext.x.v.i8.nxv16i8(
-    <vscale x 16 x i8> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i8*
-  store i8 %a, i8* %p
-
-  ret void
-}
-
-
-declare i8 @llvm.epi.vext.x.v.i8.nxv32i8(
-  <vscale x 32 x i8>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i8_nxv32i8() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i8_nxv32i8
-; CHECK:       vext.x.v a0, v0
-  %a = call i8 @llvm.epi.vext.x.v.i8.nxv32i8(
-    <vscale x 32 x i8> undef,
     i64 undef)
 
   %p = bitcast i8* @scratch to i8*
@@ -1333,66 +956,10 @@ declare i16 @llvm.epi.vext.x.v.i16.nxv4i16(
 define void @intrinsic_vext.x.v_v_i16_nxv4i16() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, {{.*}}, e16, m1
 ; CHECK:       vext.x.v a0, v0
   %a = call i16 @llvm.epi.vext.x.v.i16.nxv4i16(
     <vscale x 4 x i16> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i16*
-  store i16 %a, i16* %p
-
-  ret void
-}
-
-
-declare i16 @llvm.epi.vext.x.v.i16.nxv8i16(
-  <vscale x 8 x i16>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i16_nxv8i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv8i16
-; CHECK:       vext.x.v a0, v0
-  %a = call i16 @llvm.epi.vext.x.v.i16.nxv8i16(
-    <vscale x 8 x i16> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i16*
-  store i16 %a, i16* %p
-
-  ret void
-}
-
-
-declare i16 @llvm.epi.vext.x.v.i16.nxv16i16(
-  <vscale x 16 x i16>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i16_nxv16i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv16i16
-; CHECK:       vext.x.v a0, v0
-  %a = call i16 @llvm.epi.vext.x.v.i16.nxv16i16(
-    <vscale x 16 x i16> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i16*
-  store i16 %a, i16* %p
-
-  ret void
-}
-
-
-declare i16 @llvm.epi.vext.x.v.i16.nxv32i16(
-  <vscale x 32 x i16>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i16_nxv32i16() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i16_nxv32i16
-; CHECK:       vext.x.v a0, v0
-  %a = call i16 @llvm.epi.vext.x.v.i16.nxv32i16(
-    <vscale x 32 x i16> undef,
     i64 undef)
 
   %p = bitcast i8* @scratch to i16*
@@ -1409,66 +976,10 @@ declare i32 @llvm.epi.vext.x.v.i32.nxv2i32(
 define void @intrinsic_vext.x.v_v_i32_nxv2i32() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, {{.*}}, e32, m1
 ; CHECK:       vext.x.v a0, v0
   %a = call i32 @llvm.epi.vext.x.v.i32.nxv2i32(
     <vscale x 2 x i32> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i32*
-  store i32 %a, i32* %p
-
-  ret void
-}
-
-
-declare i32 @llvm.epi.vext.x.v.i32.nxv4i32(
-  <vscale x 4 x i32>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i32_nxv4i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv4i32
-; CHECK:       vext.x.v a0, v0
-  %a = call i32 @llvm.epi.vext.x.v.i32.nxv4i32(
-    <vscale x 4 x i32> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i32*
-  store i32 %a, i32* %p
-
-  ret void
-}
-
-
-declare i32 @llvm.epi.vext.x.v.i32.nxv8i32(
-  <vscale x 8 x i32>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i32_nxv8i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv8i32
-; CHECK:       vext.x.v a0, v0
-  %a = call i32 @llvm.epi.vext.x.v.i32.nxv8i32(
-    <vscale x 8 x i32> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i32*
-  store i32 %a, i32* %p
-
-  ret void
-}
-
-
-declare i32 @llvm.epi.vext.x.v.i32.nxv16i32(
-  <vscale x 16 x i32>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i32_nxv16i32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i32_nxv16i32
-; CHECK:       vext.x.v a0, v0
-  %a = call i32 @llvm.epi.vext.x.v.i32.nxv16i32(
-    <vscale x 16 x i32> undef,
     i64 undef)
 
   %p = bitcast i8* @scratch to i32*
@@ -1485,6 +996,7 @@ declare i64 @llvm.epi.vext.x.v.i64.nxv1i64(
 define void @intrinsic_vext.x.v_v_i64_nxv1i64() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, {{.*}}, e64, m1
 ; CHECK:       vext.x.v a0, v0
   %a = call i64 @llvm.epi.vext.x.v.i64.nxv1i64(
     <vscale x 1 x i64> undef,
@@ -1497,123 +1009,18 @@ entry:
 }
 
 
-declare i64 @llvm.epi.vext.x.v.i64.nxv2i64(
-  <vscale x 2 x i64>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i64_nxv2i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv2i64
-; CHECK:       vext.x.v a0, v0
-  %a = call i64 @llvm.epi.vext.x.v.i64.nxv2i64(
-    <vscale x 2 x i64> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i64*
-  store i64 %a, i64* %p
-
-  ret void
-}
-
-
-declare i64 @llvm.epi.vext.x.v.i64.nxv4i64(
-  <vscale x 4 x i64>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i64_nxv4i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv4i64
-; CHECK:       vext.x.v a0, v0
-  %a = call i64 @llvm.epi.vext.x.v.i64.nxv4i64(
-    <vscale x 4 x i64> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i64*
-  store i64 %a, i64* %p
-
-  ret void
-}
-
-
-declare i64 @llvm.epi.vext.x.v.i64.nxv8i64(
-  <vscale x 8 x i64>,
-  i64);
-
-define void @intrinsic_vext.x.v_v_i64_nxv8i64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vext.x.v_v_i64_nxv8i64
-; CHECK:       vext.x.v a0, v0
-  %a = call i64 @llvm.epi.vext.x.v.i64.nxv8i64(
-    <vscale x 8 x i64> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to i64*
-  store i64 %a, i64* %p
-
-  ret void
-}
-
-
 declare float @llvm.epi.vfmv.f.s.f32.nxv2f32(
-  <vscale x 2 x float>);
+  <vscale x 2 x float>,
+  i64);
 
 define void @intrinsic_vfmv.f.s_s_f32_nxv2f32() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vfmv.f.s_s_f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32, m1
 ; CHECK:       vfmv.f.s ft0, v0
   %a = call float @llvm.epi.vfmv.f.s.f32.nxv2f32(
-    <vscale x 2 x float> undef)
-
-  %p = bitcast i8* @scratch to float*
-  store float %a, float* %p
-
-  ret void
-}
-
-
-declare float @llvm.epi.vfmv.f.s.f32.nxv4f32(
-  <vscale x 4 x float>);
-
-define void @intrinsic_vfmv.f.s_s_f32_nxv4f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f32_nxv4f32
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call float @llvm.epi.vfmv.f.s.f32.nxv4f32(
-    <vscale x 4 x float> undef)
-
-  %p = bitcast i8* @scratch to float*
-  store float %a, float* %p
-
-  ret void
-}
-
-
-declare float @llvm.epi.vfmv.f.s.f32.nxv8f32(
-  <vscale x 8 x float>);
-
-define void @intrinsic_vfmv.f.s_s_f32_nxv8f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f32_nxv8f32
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call float @llvm.epi.vfmv.f.s.f32.nxv8f32(
-    <vscale x 8 x float> undef)
-
-  %p = bitcast i8* @scratch to float*
-  store float %a, float* %p
-
-  ret void
-}
-
-
-declare float @llvm.epi.vfmv.f.s.f32.nxv16f32(
-  <vscale x 16 x float>);
-
-define void @intrinsic_vfmv.f.s_s_f32_nxv16f32() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f32_nxv16f32
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call float @llvm.epi.vfmv.f.s.f32.nxv16f32(
-    <vscale x 16 x float> undef)
+    <vscale x 2 x float> undef,
+    i64 undef)
 
   %p = bitcast i8* @scratch to float*
   store float %a, float* %p
@@ -1623,65 +1030,17 @@ entry:
 
 
 declare double @llvm.epi.vfmv.f.s.f64.nxv1f64(
-  <vscale x 1 x double>);
+  <vscale x 1 x double>,
+  i64);
 
 define void @intrinsic_vfmv.f.s_s_f64_nxv1f64() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_vfmv.f.s_s_f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64, m1
 ; CHECK:       vfmv.f.s ft0, v0
   %a = call double @llvm.epi.vfmv.f.s.f64.nxv1f64(
-    <vscale x 1 x double> undef)
-
-  %p = bitcast i8* @scratch to double*
-  store double %a, double* %p
-
-  ret void
-}
-
-
-declare double @llvm.epi.vfmv.f.s.f64.nxv2f64(
-  <vscale x 2 x double>);
-
-define void @intrinsic_vfmv.f.s_s_f64_nxv2f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f64_nxv2f64
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call double @llvm.epi.vfmv.f.s.f64.nxv2f64(
-    <vscale x 2 x double> undef)
-
-  %p = bitcast i8* @scratch to double*
-  store double %a, double* %p
-
-  ret void
-}
-
-
-declare double @llvm.epi.vfmv.f.s.f64.nxv4f64(
-  <vscale x 4 x double>);
-
-define void @intrinsic_vfmv.f.s_s_f64_nxv4f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f64_nxv4f64
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call double @llvm.epi.vfmv.f.s.f64.nxv4f64(
-    <vscale x 4 x double> undef)
-
-  %p = bitcast i8* @scratch to double*
-  store double %a, double* %p
-
-  ret void
-}
-
-
-declare double @llvm.epi.vfmv.f.s.f64.nxv8f64(
-  <vscale x 8 x double>);
-
-define void @intrinsic_vfmv.f.s_s_f64_nxv8f64() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_vfmv.f.s_s_f64_nxv8f64
-; CHECK:       vfmv.f.s ft0, v0
-  %a = call double @llvm.epi.vfmv.f.s.f64.nxv8f64(
-    <vscale x 8 x double> undef)
+    <vscale x 1 x double> undef,
+    i64 undef)
 
   %p = bitcast i8* @scratch to double*
   store double %a, double* %p
