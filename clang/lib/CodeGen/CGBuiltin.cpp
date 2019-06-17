@@ -13273,13 +13273,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     // FIXME
     // EPI_UNARY(vmid)
 
-    // FIXME
-    // vext.x.v
-    // vmv.s.x
-    //
-    // vfmv.f.s
-    // vfmv.s.f
-
     EPI_ANY_AND_SCALAR_INT_BINARY(vslideup)
     EPI_ANY_AND_SCALAR_INT_BINARY(vslidedown)
     EPI_ANY_AND_SCALAR_INT_BINARY(vslide1up)

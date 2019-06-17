@@ -12152,28 +12152,28 @@ void test_vsetfirst_1xf64_(unsigned long int value, unsigned long gvl)
 
 // CHECK-O2-LABEL: @test_vgetfirst_2xf32_(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float> undef)
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    ret float [[TMP0]]
 //
-float test_vgetfirst_2xf32_(void)
+float test_vgetfirst_2xf32_(unsigned long gvl)
 {
   float result;
   __epi_2xf32 lhs;
-  result = __builtin_epi_vgetfirst_2xf32(lhs);
+  result = __builtin_epi_vgetfirst_2xf32(lhs, gvl);
   return result;
 }
 
 
 // CHECK-O2-LABEL: @test_vgetfirst_1xf64_(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call double @llvm.epi.vfmv.f.s.f64.nxv1f64(<vscale x 1 x double> undef)
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call double @llvm.epi.vfmv.f.s.f64.nxv1f64(<vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    ret double [[TMP0]]
 //
-double test_vgetfirst_1xf64_(void)
+double test_vgetfirst_1xf64_(unsigned long gvl)
 {
   double result;
   __epi_1xf64 lhs;
-  result = __builtin_epi_vgetfirst_1xf64(lhs);
+  result = __builtin_epi_vgetfirst_1xf64(lhs, gvl);
   return result;
 }
 

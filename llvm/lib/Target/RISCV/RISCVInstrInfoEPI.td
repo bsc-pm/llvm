@@ -1200,10 +1200,22 @@ def AllIntegerVectors
         /*Vtype1xi32,*/ Vtype2xi32,   Vtype4xi32,  Vtype8xi32, Vtype16xi32,
           Vtype1xi64,   Vtype2xi64,   Vtype4xi64,  Vtype8xi64]>;
 
+def NoGroupIntegerVectors
+    : VectorTypeInfoList<[
+        /*Vtype1xi8,    Vtype2xi8,    Vtype4xi8,*/ Vtype8xi8,
+        /*Vtype1xi16,   Vtype2xi16,*/ Vtype4xi16,
+        /*Vtype1xi32,*/ Vtype2xi32,
+          Vtype1xi64]>;
+
 def AllFloatVectors
     : FloatVectorTypeInfoList<[
         /*Vtype1xf32,*/ Vtype2xf32, Vtype4xf32, Vtype8xf32, Vtype16xf32,
           Vtype1xf64,   Vtype2xf64, Vtype4xf64, Vtype8xf64]>;
+
+def NoGroupFloatVectors
+    : FloatVectorTypeInfoList<[
+        /*Vtype1xf32,*/ Vtype2xf32,
+          Vtype1xf64]>;
 
 def AllVectors
     : VectorTypeInfoList<!listconcat(AllIntegerVectors.Values,
@@ -1706,22 +1718,19 @@ defm PseudoVREDMIN     : pseudo_binary_int_v_vs;
 defm PseudoVREDMAXU    : pseudo_binary_int_v_vs;
 defm PseudoVREDMAX     : pseudo_binary_int_v_vs;
 
-let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
-foreach evr = AllEPIVRegs.Values in
+let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
+    Uses = [VL, VTYPE], VLMul = EPIVR.VLMul, MergeOpIndex = -1 in
 {
-  let VLMul = evr.VLMul, Uses = [VL, VTYPE], MergeOpIndex = -1 in
-  {
-    let VLIndex = -1, SEWIndex = -1, BaseInstr = VEXT_X_V in
-      def PseudoVEXT_X_V_#evr : Pseudo<(outs GPR:$rd),
-                                       (ins evr:$rs2, GPR:$rs1),
-                                       []>,
-                                EPIPseudo;
-    let VLIndex = 2, SEWIndex = 3, BaseInstr = VMV_S_X in
-      def PseudoVMV_S_X_#evr  : Pseudo<(outs evr:$rd),
-                                       (ins GPR:$rs2, GPR:$vl, ixlenimm:$sew),
-                                       []>,
-                                EPIPseudo;
-  }
+  let VLIndex = -1, SEWIndex = 3, BaseInstr = VEXT_X_V in
+    def PseudoVEXT_X_V_EPIVR : Pseudo<(outs GPR:$rd),
+                                      (ins EPIVR:$rs2, GPR:$rs1, ixlenimm:$sew),
+                                      []>,
+                               EPIPseudo;
+  let VLIndex = 2, SEWIndex = 3, BaseInstr = VMV_S_X in
+    def PseudoVMV_S_X_EPIVR  : Pseudo<(outs EPIVR:$rd),
+                                      (ins GPR:$rs2, GPR:$vl, ixlenimm:$sew),
+                                      []>,
+                               EPIPseudo;
 }
 
 defm PseudoVSLIDE1UP   : pseudo_binary_int_v_vx;
@@ -1757,22 +1766,19 @@ defm PseudoVFSGNJ      : pseudo_binary_float_v_vv_vf;
 defm PseudoVFSGNJN     : pseudo_binary_float_v_vv_vf;
 defm PseudoVFSGNJX     : pseudo_binary_float_v_vv_vf;
 
-let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
-foreach evr = AllEPIVRegs.Values in
+let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
+    Uses = [VL, VTYPE], VLMul = EPIVR.VLMul, MergeOpIndex = -1 in
 {
-  let VLMul = evr.VLMul, Uses = [VL, VTYPE], MergeOpIndex = -1 in
-  {
-    let VLIndex = -1, SEWIndex = -1, BaseInstr = VFMV_F_S in
-      def PseudoVFMV_F_S_#evr : Pseudo<(outs FPR64:$rd),
-                                       (ins evr:$rs2),
-                                       []>,
-                                EPIPseudo;
-    let VLIndex = 2, SEWIndex = 3, BaseInstr = VFMV_S_F in
-      def PseudoVFMV_S_F_#evr : Pseudo<(outs evr:$rd),
-                                       (ins FPR64:$rs2, GPR:$vl, ixlenimm:$sew),
-                                       []>,
-                                EPIPseudo;
-  }
+  let VLIndex = 2, SEWIndex = 3, BaseInstr = VFMV_F_S in
+    def PseudoVFMV_F_S_EPIVR : Pseudo<(outs FPR64:$rd),
+                                      (ins EPIVR:$rs2, GPR:$vl, ixlenimm:$sew),
+                                      []>,
+                               EPIPseudo;
+  let VLIndex = 2, SEWIndex = 3, BaseInstr = VFMV_S_F in
+    def PseudoVFMV_S_F_EPIVR : Pseudo<(outs EPIVR:$rd),
+                                      (ins FPR64:$rs2, GPR:$vl, ixlenimm:$sew),
+                                      []>,
+                               EPIPseudo;
 }
 
 defm PseudoVFEQ        : pseudo_binary_float_m_vv_vf;
@@ -2880,11 +2886,14 @@ defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmin", "PseudoVREDMIN">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmaxu", "PseudoVREDMAXU">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmax", "PseudoVREDMAX">;
 
-foreach vti = AllIntegerVectors.Values in
+// We only handle nxv1i64 variant here, as nxv2i32, nxv4i16 and nxv8i8
+// intrinsics have an illegal result type (i8, i16, i32) and are handled
+// programatically
+foreach vti = [Vtype1xi64] in
   def : Pat<(int_epi_vext_x_v (vti.Vector vti.RegClass:$rs2), GPR:$rs1),
-            (!cast<Instruction>("PseudoVEXT_X_V_"#vti.RegClass) $rs2, $rs1)>;
+            (PseudoVEXT_X_V_EPIVR $rs2, $rs1, vti.SEW)>;
 
-foreach vti = AllIntegerVectors.Values in
+foreach vti = NoGroupIntegerVectors.Values in
   def : Pat<(vti.Vector (int_epi_vmv_s_x GPR:$rs2, GPR:$vl)),
             (!cast<Instruction>("PseudoVMV_S_X_"#vti.RegClass) $rs2,
              (NoX0 GPR:$vl), vti.SEW)>;
@@ -2987,8 +2996,10 @@ defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfsgnj", "PseudoVFSGNJ">;
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfsgnjn", "PseudoVFSGNJN">;
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfsgnjx", "PseudoVFSGNJX">;
 
-foreach fvti = AllFloatVectors.Values in
-  def : Pat<(fvti.Scalar (int_epi_vfmv_f_s (fvti.Vector fvti.RegClass:$rs2))),
+foreach fvti = NoGroupFloatVectors.Values in
+{
+  def : Pat<(fvti.Scalar (int_epi_vfmv_f_s (fvti.Vector fvti.RegClass:$rs2),
+                          GPR:$vl)),
              // Floating point instructions with a scalar result will always
              // generate the result in a register of class FPR64. When dealing
              // with the f32 variant of a pattern we need to extract the FPR32
@@ -2996,11 +3007,12 @@ foreach fvti = AllFloatVectors.Values in
              !if(!eq(!cast<string>(fvti.ScalarRegClass),
                      !cast<string>(FPR32)),
                  (EXTRACT_SUBREG (!cast<Instruction>(
-                                  "PseudoVFMV_F_S_"#fvti.RegClass) $rs2),
+                                   "PseudoVFMV_F_S_"#fvti.RegClass)
+                                  $rs2, (NoX0 GPR:$vl), fvti.SEW),
                   sub_32),
-                 (!cast<Instruction>("PseudoVFMV_F_S_"#fvti.RegClass) $rs2))>;
+                 (!cast<Instruction>("PseudoVFMV_F_S_"#fvti.RegClass)
+                  $rs2, (NoX0 GPR:$vl), fvti.SEW))>;
 
-foreach fvti = AllFloatVectors.Values in
   def : Pat<(fvti.Vector (int_epi_vfmv_s_f
                           (fvti.Scalar fvti.ScalarRegClass:$rs2), GPR:$vl)),
             (!cast<Instruction>("PseudoVFMV_S_F_"#fvti.RegClass)
@@ -3013,6 +3025,7 @@ foreach fvti = AllFloatVectors.Values in
                  (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
                  (fvti.Scalar fvti.ScalarRegClass:$rs2)),
              (NoX0 GPR:$vl), fvti.SEW)>;
+}
 
 defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfeq", "PseudoVFEQ">;
 defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfle", "PseudoVFLE">;

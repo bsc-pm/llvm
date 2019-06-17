@@ -470,11 +470,11 @@ void test_${intrinsic}_(${c_element_type} value, unsigned long gvl)
 
 class GetFirstTemplate(TestTemplate):
     TEMPLATE = """
-${c_result_type} test_${intrinsic}_(void)
+${c_result_type} test_${intrinsic}_(unsigned long gvl)
 {
   ${c_result_type} result;
   ${c_lhs_type} lhs;
-  result = __builtin_epi_${intrinsic}(lhs);
+  result = __builtin_epi_${intrinsic}(lhs, gvl);
   return result;
 }
 """
