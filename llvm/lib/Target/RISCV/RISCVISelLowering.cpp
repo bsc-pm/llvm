@@ -2020,18 +2020,22 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   // If the callee is a GlobalAddress/ExternalSymbol node, turn it into a
   // TargetGlobalAddress/TargetExternalSymbol node so that legalize won't
   // split it and then direct call can be matched by PseudoCALL.
-  unsigned Flags = RISCVII::MO_CALL;
   if (GlobalAddressSDNode *S = dyn_cast<GlobalAddressSDNode>(Callee)) {
     const GlobalValue *GV = S->getGlobal();
-    const TargetMachine &TM = getTargetMachine();
-    if (isPositionIndependent() &&
-        !TM.shouldAssumeDSOLocal(*GV->getParent(), GV))
-      Flags = RISCVII::MO_CALL_PLT;
-    Callee = DAG.getTargetGlobalAddress(S->getGlobal(), DL, PtrVT, 0, Flags);
+
+    unsigned OpFlags = RISCVII::MO_CALL;
+    if (!getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV))
+      OpFlags = RISCVII::MO_PLT;
+
+    Callee = DAG.getTargetGlobalAddress(GV, DL, PtrVT, 0, OpFlags);
   } else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
-    if (isPositionIndependent())
-      Flags = RISCVII::MO_CALL_PLT;
-    Callee = DAG.getTargetExternalSymbol(S->getSymbol(), PtrVT, Flags);
+    unsigned OpFlags = RISCVII::MO_CALL;
+
+    if (!getTargetMachine().shouldAssumeDSOLocal(*MF.getFunction().getParent(),
+                                                 nullptr))
+      OpFlags = RISCVII::MO_PLT;
+
+    Callee = DAG.getTargetExternalSymbol(S->getSymbol(), PtrVT, OpFlags);
   }
 
   // The first call operand is the chain and the second is the target address.

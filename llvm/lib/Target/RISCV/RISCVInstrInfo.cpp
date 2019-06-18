@@ -500,7 +500,7 @@ RISCVInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
       {MO_PCREL_HI, "riscv-pcrel-hi"},
       {MO_PCREL_LO, "riscv-pcrel-lo"},
       {MO_CALL, "riscv-call"},
-      {MO_CALL_PLT, "riscv-call-plt"},
+      {MO_PLT, "riscv-plt"},
       {MO_TPREL_HI, "riscv-tprel-hi"},
       {MO_TPREL_ADD, "riscv-tprel-add"},
       {MO_TPREL_LO, "riscv-tprel-lo"},
