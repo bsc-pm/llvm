@@ -131,6 +131,8 @@ public:
       return false;
     return true;
   }
+  bool isDesirableToCommuteWithShift(const SDNode *N,
+                                     CombineLevel Level) const override;
 
 private:
   void analyzeInputArgs(MachineFunction &MF, CCState &CCInfo,
