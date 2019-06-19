@@ -59,8 +59,8 @@ RISCVTargetELFStreamer::RISCVTargetELFStreamer(MCStreamer &S,
   MCA.setELFHeaderEFlags(EFlags);
 }
 
-RISCVELFStreamer &RISCVTargetELFStreamer::getStreamer() {
-  return static_cast<RISCVELFStreamer &>(Streamer);
+MCELFStreamer &RISCVTargetELFStreamer::getStreamer() {
+  return static_cast<MCELFStreamer&>(Streamer);
 }
 
 void RISCVTargetELFStreamer::emitDirectiveOptionPush() {}
@@ -71,88 +71,3 @@ void RISCVTargetELFStreamer::emitDirectiveOptionPIC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoPIC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionRelax() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoRelax() {}
-
-void RISCVELFStreamer::EmitInstruction(const MCInst &Inst,
-                                       const MCSubtargetInfo &STI) {
-  // Lower pseudo-instructions that we can't lower any later
-  // because they require labels.
-  if (EmitPseudoInstruction(Inst, STI))
-    return;
-
-  MCELFStreamer::EmitInstruction(Inst, STI);
-}
-
-bool RISCVELFStreamer::EmitPseudoInstruction(const MCInst &Inst,
-                                             const MCSubtargetInfo &STI) {
-  switch (Inst.getOpcode()) {
-  default:
-    return false;
-  // FIXME this should go away
-  case RISCV::PseudoLA_TLS_IE: {
-    // GOT addressing
-    MCContext &Ctx = getContext();
-
-    // TmpLabel: AUIPC rdest, %got_hi(symbol)
-    //         L{W,D} rdest, rdest, %pcrel_lo(TmpLabel)
-    // Note: there is not such thing as %got_hi, yet
-    MCSymbol *TmpLabel = Ctx.createTempSymbol(
-        "tls_got_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
-    EmitLabel(TmpLabel);
-
-    MCOperand DestReg = Inst.getOperand(0);
-    const RISCVMCExpr *Symbol =
-        RISCVMCExpr::create(Inst.getOperand(1).getExpr(),
-                            RISCVMCExpr::VK_RISCV_TLS_GOT_HI, Ctx);
-
-    MCInst AUIPC =
-        MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI);
-
-    const MCExpr *RefToLinkTmpLabel =
-        RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
-                            RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
-
-    bool is64Bit = STI.getTargetTriple().getArch() == Triple::riscv64;
-    unsigned int LoadOpCode = is64Bit ? RISCV::LD : RISCV::LW;
-    MCInst Load = MCInstBuilder(LoadOpCode)
-                      .addOperand(DestReg)
-                      .addOperand(DestReg)
-                      .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Load, STI);
-    break;
-  }
-  case RISCV::PseudoLA_TLS_GD: {
-    // PC-rel addressing for TLS General / Local Dynamic
-    MCContext &Ctx = getContext();
-
-    // TmpLabel: AUIPC rdest, %tls_gd_hi(symbol)
-    //           ADDI rdest, %pcrel_lo(TmpLabel)
-    // Note: there is not such thing as %tls_gd_hi, yet
-    MCSymbol *TmpLabel = Ctx.createTempSymbol(
-        "tls_gd_hi", /* AlwaysAddSuffix */ true, /* CanBeUnnamed */ false);
-    EmitLabel(TmpLabel);
-
-    MCOperand DestReg = Inst.getOperand(0);
-    const RISCVMCExpr *Symbol =
-        RISCVMCExpr::create(Inst.getOperand(1).getExpr(),
-                            RISCVMCExpr::VK_RISCV_TLS_GD_HI, Ctx);
-
-    MCInst AUIPC =
-        MCInstBuilder(RISCV::AUIPC).addOperand(DestReg).addExpr(Symbol);
-    EmitInstruction(AUIPC, STI);
-
-    const MCExpr *RefToLinkTmpLabel =
-        RISCVMCExpr::create(MCSymbolRefExpr::create(TmpLabel, Ctx),
-                            RISCVMCExpr::VK_RISCV_PCREL_LO, Ctx);
-
-    MCInst Addi = MCInstBuilder(RISCV::ADDI)
-                      .addOperand(DestReg)
-                      .addOperand(DestReg)
-                      .addExpr(RefToLinkTmpLabel);
-    EmitInstruction(Addi, STI);
-    break;
-  }
-  }
-
-  return true;
-}

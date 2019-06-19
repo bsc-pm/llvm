@@ -14,10 +14,9 @@
 
 namespace llvm {
 
-class RISCVELFStreamer;
 class RISCVTargetELFStreamer : public RISCVTargetStreamer {
 public:
-  RISCVELFStreamer &getStreamer();
+  MCELFStreamer &getStreamer();
   RISCVTargetELFStreamer(MCStreamer &S, const MCSubtargetInfo &STI);
 
   virtual void emitDirectiveOptionPush();
@@ -30,14 +29,5 @@ public:
   virtual void emitDirectiveOptionNoRelax();
 };
 
-class RISCVELFStreamer : public MCELFStreamer {
-private:
-  bool EmitPseudoInstruction(const MCInst &Inst, const MCSubtargetInfo &STI);
-
-public:
-  using MCELFStreamer::MCELFStreamer;
-
-  void EmitInstruction(const MCInst &Inst, const MCSubtargetInfo &STI) override;
-};
 }
 #endif
