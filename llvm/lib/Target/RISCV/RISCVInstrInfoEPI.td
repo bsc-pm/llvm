@@ -1321,10 +1321,10 @@ multiclass pseudo_unary_nomask<EPIVReg result_reg_class,
       VLIndex = 2, SEWIndex = 3, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_"#result_reg_class : Pseudo<(outs result_reg_class:$rd),
-                                  (ins op_reg_class:$rs2, GPR:$vl,
-                                       ixlenimm:$sew),
-                                  []>,
-                           EPIPseudo;
+                                      (ins op_reg_class:$rs2, GPR:$vl,
+                                           ixlenimm:$sew),
+                                      []>,
+                               EPIPseudo;
 }
 
 multiclass pseudo_unary<EPIVReg result_reg_class,
@@ -1336,11 +1336,12 @@ multiclass pseudo_unary<EPIVReg result_reg_class,
       Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_"#result_reg_class : Pseudo<(outs result_reg_class:$rd),
-                                       (ins result_reg_class:$merge,
-                                            op_reg_class:$rs2, vectormask:$vm,
-                                            GPR:$vl, ixlenimm:$sew),
-                                       []>,
-                                EPIPseudo;
+                                           (ins result_reg_class:$merge,
+                                                op_reg_class:$rs2,
+                                                vectormask:$vm, GPR:$vl,
+                                                ixlenimm:$sew),
+                                           []>,
+                                    EPIPseudo;
 }
 
 multiclass pseudo_unary_v_v {
