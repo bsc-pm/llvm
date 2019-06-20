@@ -4,6 +4,7 @@ from preprocess_builtins import *
 from builtin_parser import *
 from type_render import *
 
+import copy
 import string
 
 class NopTemplate(object):
@@ -326,7 +327,7 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned 
 {
   ${c_result_type} result;
   result = __builtin_epi_${load_intrinsic}(addr, gvl);
-  __builtin_epi_${store_intrinsic}(addr, result, gvl);
+  __builtin_epi_${store_intrinsic}((${c_address_type_noconst})addr, result, gvl);
 }
 """
 
@@ -342,6 +343,9 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned 
         # We use the load intrinsic
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
+        addr_noconst_type_builder = copy.deepcopy(argument_types[0])
+        addr_noconst_type_builder.constant_type = False
+        subs["c_address_type_noconst"] = TypeRender(addr_noconst_type_builder).render()
 
         return string.Template(LoadStoreTemplate.TEMPLATE).substitute(subs)
 
@@ -351,7 +355,7 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr)
 {
   ${c_result_type} result;
   result = __builtin_epi_${load_intrinsic}(addr);
-  __builtin_epi_${store_intrinsic}(addr, result);
+  __builtin_epi_${store_intrinsic}((${c_address_type_noconst})addr, result);
 }
 """
 
@@ -367,6 +371,10 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr)
         # We use the load intrinsic
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
+        addr_noconst_type_builder = copy.deepcopy(argument_types[0])
+        addr_noconst_type_builder.constant_type = False
+        subs["c_address_type_noconst"] = TypeRender(addr_noconst_type_builder).render()
+
         return string.Template(LoadStoreMaskTemplate.TEMPLATE).substitute(subs)
 
 class LoadStoreStridedTemplate(TestTemplate):
@@ -375,7 +383,7 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, signed lo
 {
   ${c_result_type} result;
   result = __builtin_epi_${load_intrinsic}(addr, stride, gvl);
-  __builtin_epi_${store_intrinsic}(addr, result, stride, gvl);
+  __builtin_epi_${store_intrinsic}((${c_address_type_noconst})addr, result, stride, gvl);
 }
 """
 
@@ -391,6 +399,9 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, signed lo
         # We use the load intrinsic
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
+        addr_noconst_type_builder = copy.deepcopy(argument_types[0])
+        addr_noconst_type_builder.constant_type = False
+        subs["c_address_type_noconst"] = TypeRender(addr_noconst_type_builder).render()
 
         return string.Template(LoadStoreStridedTemplate.TEMPLATE).substitute(subs)
 
@@ -401,7 +412,7 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned 
   ${c_result_type} result;
   ${c_index_type} index;
   result = __builtin_epi_${load_intrinsic}(addr, index, gvl);
-  __builtin_epi_${store_intrinsic}(addr, result, index, gvl);
+  __builtin_epi_${store_intrinsic}((${c_address_type_noconst})addr, result, index, gvl);
 }
 """
 
@@ -418,6 +429,9 @@ void test_${load_intrinsic}_${store_intrinsic}(${c_address_type} addr, unsigned 
         subs["c_result_type"] = TypeRender(return_type).render()
         subs["c_address_type"] = TypeRender(argument_types[0]).render()
         subs["c_index_type"] = TypeRender(argument_types[1]).render()
+        addr_noconst_type_builder = copy.deepcopy(argument_types[0])
+        addr_noconst_type_builder.constant_type = False
+        subs["c_address_type_noconst"] = TypeRender(addr_noconst_type_builder).render()
 
         return string.Template(LoadStoreIndexedTemplate.TEMPLATE).substitute(subs)
 

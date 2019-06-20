@@ -383,7 +383,7 @@ void test_vload_8xi8_vstore_8xi8(const signed char*  addr, unsigned long gvl)
 {
   __epi_8xi8 result;
   result = __builtin_epi_vload_8xi8(addr, gvl);
-  __builtin_epi_vstore_8xi8(addr, result, gvl);
+  __builtin_epi_vstore_8xi8((signed char* )addr, result, gvl);
 }
 
 
@@ -398,7 +398,7 @@ void test_vload_4xi16_vstore_4xi16(const signed short int*  addr, unsigned long 
 {
   __epi_4xi16 result;
   result = __builtin_epi_vload_4xi16(addr, gvl);
-  __builtin_epi_vstore_4xi16(addr, result, gvl);
+  __builtin_epi_vstore_4xi16((signed short int* )addr, result, gvl);
 }
 
 
@@ -413,7 +413,7 @@ void test_vload_2xi32_vstore_2xi32(const signed int*  addr, unsigned long gvl)
 {
   __epi_2xi32 result;
   result = __builtin_epi_vload_2xi32(addr, gvl);
-  __builtin_epi_vstore_2xi32(addr, result, gvl);
+  __builtin_epi_vstore_2xi32((signed int* )addr, result, gvl);
 }
 
 
@@ -428,7 +428,7 @@ void test_vload_1xi64_vstore_1xi64(const signed long int*  addr, unsigned long g
 {
   __epi_1xi64 result;
   result = __builtin_epi_vload_1xi64(addr, gvl);
-  __builtin_epi_vstore_1xi64(addr, result, gvl);
+  __builtin_epi_vstore_1xi64((signed long int* )addr, result, gvl);
 }
 
 
@@ -443,7 +443,7 @@ void test_vload_strided_8xi8_vstore_strided_8xi8(const signed char*  addr, signe
 {
   __epi_8xi8 result;
   result = __builtin_epi_vload_strided_8xi8(addr, stride, gvl);
-  __builtin_epi_vstore_strided_8xi8(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_8xi8((signed char* )addr, result, stride, gvl);
 }
 
 
@@ -458,7 +458,7 @@ void test_vload_strided_4xi16_vstore_strided_4xi16(const signed short int*  addr
 {
   __epi_4xi16 result;
   result = __builtin_epi_vload_strided_4xi16(addr, stride, gvl);
-  __builtin_epi_vstore_strided_4xi16(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_4xi16((signed short int* )addr, result, stride, gvl);
 }
 
 
@@ -473,7 +473,7 @@ void test_vload_strided_2xi32_vstore_strided_2xi32(const signed int*  addr, sign
 {
   __epi_2xi32 result;
   result = __builtin_epi_vload_strided_2xi32(addr, stride, gvl);
-  __builtin_epi_vstore_strided_2xi32(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_2xi32((signed int* )addr, result, stride, gvl);
 }
 
 
@@ -488,7 +488,7 @@ void test_vload_strided_1xi64_vstore_strided_1xi64(const signed long int*  addr,
 {
   __epi_1xi64 result;
   result = __builtin_epi_vload_strided_1xi64(addr, stride, gvl);
-  __builtin_epi_vstore_strided_1xi64(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_1xi64((signed long int* )addr, result, stride, gvl);
 }
 
 
@@ -504,7 +504,7 @@ void test_vload_indexed_8xi8_vstore_indexed_8xi8(const signed char*  addr, unsig
   __epi_8xi8 result;
   __epi_8xi8 index;
   result = __builtin_epi_vload_indexed_8xi8(addr, index, gvl);
-  __builtin_epi_vstore_indexed_8xi8(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_8xi8((signed char* )addr, result, index, gvl);
 }
 
 
@@ -520,7 +520,7 @@ void test_vload_indexed_4xi16_vstore_indexed_4xi16(const signed short int*  addr
   __epi_4xi16 result;
   __epi_4xi16 index;
   result = __builtin_epi_vload_indexed_4xi16(addr, index, gvl);
-  __builtin_epi_vstore_indexed_4xi16(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_4xi16((signed short int* )addr, result, index, gvl);
 }
 
 
@@ -536,7 +536,7 @@ void test_vload_indexed_2xi32_vstore_indexed_2xi32(const signed int*  addr, unsi
   __epi_2xi32 result;
   __epi_2xi32 index;
   result = __builtin_epi_vload_indexed_2xi32(addr, index, gvl);
-  __builtin_epi_vstore_indexed_2xi32(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_2xi32((signed int* )addr, result, index, gvl);
 }
 
 
@@ -552,7 +552,7 @@ void test_vload_indexed_1xi64_vstore_indexed_1xi64(const signed long int*  addr,
   __epi_1xi64 result;
   __epi_1xi64 index;
   result = __builtin_epi_vload_indexed_1xi64(addr, index, gvl);
-  __builtin_epi_vstore_indexed_1xi64(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_1xi64((signed long int* )addr, result, index, gvl);
 }
 
 
@@ -567,7 +567,7 @@ void test_vload_unsigned_8xi8_vstore_unsigned_8xi8(const unsigned char*  addr, u
 {
   __epi_8xi8 result;
   result = __builtin_epi_vload_unsigned_8xi8(addr, gvl);
-  __builtin_epi_vstore_unsigned_8xi8(addr, result, gvl);
+  __builtin_epi_vstore_unsigned_8xi8((unsigned char* )addr, result, gvl);
 }
 
 
@@ -582,7 +582,7 @@ void test_vload_unsigned_4xi16_vstore_unsigned_4xi16(const unsigned short int*  
 {
   __epi_4xi16 result;
   result = __builtin_epi_vload_unsigned_4xi16(addr, gvl);
-  __builtin_epi_vstore_unsigned_4xi16(addr, result, gvl);
+  __builtin_epi_vstore_unsigned_4xi16((unsigned short int* )addr, result, gvl);
 }
 
 
@@ -597,7 +597,7 @@ void test_vload_unsigned_2xi32_vstore_unsigned_2xi32(const unsigned int*  addr, 
 {
   __epi_2xi32 result;
   result = __builtin_epi_vload_unsigned_2xi32(addr, gvl);
-  __builtin_epi_vstore_unsigned_2xi32(addr, result, gvl);
+  __builtin_epi_vstore_unsigned_2xi32((unsigned int* )addr, result, gvl);
 }
 
 
@@ -612,7 +612,7 @@ void test_vload_unsigned_1xi64_vstore_unsigned_1xi64(const unsigned long int*  a
 {
   __epi_1xi64 result;
   result = __builtin_epi_vload_unsigned_1xi64(addr, gvl);
-  __builtin_epi_vstore_unsigned_1xi64(addr, result, gvl);
+  __builtin_epi_vstore_unsigned_1xi64((unsigned long int* )addr, result, gvl);
 }
 
 
@@ -627,7 +627,7 @@ void test_vload_strided_unsigned_8xi8_vstore_strided_unsigned_8xi8(const unsigne
 {
   __epi_8xi8 result;
   result = __builtin_epi_vload_strided_unsigned_8xi8(addr, stride, gvl);
-  __builtin_epi_vstore_strided_unsigned_8xi8(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_8xi8((unsigned char* )addr, result, stride, gvl);
 }
 
 
@@ -642,7 +642,7 @@ void test_vload_strided_unsigned_4xi16_vstore_strided_unsigned_4xi16(const unsig
 {
   __epi_4xi16 result;
   result = __builtin_epi_vload_strided_unsigned_4xi16(addr, stride, gvl);
-  __builtin_epi_vstore_strided_unsigned_4xi16(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_4xi16((unsigned short int* )addr, result, stride, gvl);
 }
 
 
@@ -657,7 +657,7 @@ void test_vload_strided_unsigned_2xi32_vstore_strided_unsigned_2xi32(const unsig
 {
   __epi_2xi32 result;
   result = __builtin_epi_vload_strided_unsigned_2xi32(addr, stride, gvl);
-  __builtin_epi_vstore_strided_unsigned_2xi32(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_2xi32((unsigned int* )addr, result, stride, gvl);
 }
 
 
@@ -672,7 +672,7 @@ void test_vload_strided_unsigned_1xi64_vstore_strided_unsigned_1xi64(const unsig
 {
   __epi_1xi64 result;
   result = __builtin_epi_vload_strided_unsigned_1xi64(addr, stride, gvl);
-  __builtin_epi_vstore_strided_unsigned_1xi64(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_unsigned_1xi64((unsigned long int* )addr, result, stride, gvl);
 }
 
 
@@ -688,7 +688,7 @@ void test_vload_indexed_unsigned_8xi8_vstore_indexed_unsigned_8xi8(const unsigne
   __epi_8xi8 result;
   __epi_8xi8 index;
   result = __builtin_epi_vload_indexed_unsigned_8xi8(addr, index, gvl);
-  __builtin_epi_vstore_indexed_unsigned_8xi8(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_8xi8((unsigned char* )addr, result, index, gvl);
 }
 
 
@@ -704,7 +704,7 @@ void test_vload_indexed_unsigned_4xi16_vstore_indexed_unsigned_4xi16(const unsig
   __epi_4xi16 result;
   __epi_4xi16 index;
   result = __builtin_epi_vload_indexed_unsigned_4xi16(addr, index, gvl);
-  __builtin_epi_vstore_indexed_unsigned_4xi16(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_4xi16((unsigned short int* )addr, result, index, gvl);
 }
 
 
@@ -720,7 +720,7 @@ void test_vload_indexed_unsigned_2xi32_vstore_indexed_unsigned_2xi32(const unsig
   __epi_2xi32 result;
   __epi_2xi32 index;
   result = __builtin_epi_vload_indexed_unsigned_2xi32(addr, index, gvl);
-  __builtin_epi_vstore_indexed_unsigned_2xi32(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_2xi32((unsigned int* )addr, result, index, gvl);
 }
 
 
@@ -736,7 +736,7 @@ void test_vload_indexed_unsigned_1xi64_vstore_indexed_unsigned_1xi64(const unsig
   __epi_1xi64 result;
   __epi_1xi64 index;
   result = __builtin_epi_vload_indexed_unsigned_1xi64(addr, index, gvl);
-  __builtin_epi_vstore_indexed_unsigned_1xi64(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_unsigned_1xi64((unsigned long int* )addr, result, index, gvl);
 }
 
 
@@ -751,7 +751,7 @@ void test_vload_2xf32_vstore_2xf32(const float*  addr, unsigned long gvl)
 {
   __epi_2xf32 result;
   result = __builtin_epi_vload_2xf32(addr, gvl);
-  __builtin_epi_vstore_2xf32(addr, result, gvl);
+  __builtin_epi_vstore_2xf32((float* )addr, result, gvl);
 }
 
 
@@ -766,7 +766,7 @@ void test_vload_1xf64_vstore_1xf64(const double*  addr, unsigned long gvl)
 {
   __epi_1xf64 result;
   result = __builtin_epi_vload_1xf64(addr, gvl);
-  __builtin_epi_vstore_1xf64(addr, result, gvl);
+  __builtin_epi_vstore_1xf64((double* )addr, result, gvl);
 }
 
 
@@ -781,7 +781,7 @@ void test_vload_2xf64_vstore_2xf64(const double*  addr, unsigned long gvl)
 {
   __epi_2xf64 result;
   result = __builtin_epi_vload_2xf64(addr, gvl);
-  __builtin_epi_vstore_2xf64(addr, result, gvl);
+  __builtin_epi_vstore_2xf64((double* )addr, result, gvl);
 }
 
 
@@ -796,7 +796,7 @@ void test_vload_strided_2xf32_vstore_strided_2xf32(const float*  addr, signed lo
 {
   __epi_2xf32 result;
   result = __builtin_epi_vload_strided_2xf32(addr, stride, gvl);
-  __builtin_epi_vstore_strided_2xf32(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_2xf32((float* )addr, result, stride, gvl);
 }
 
 
@@ -811,7 +811,7 @@ void test_vload_strided_1xf64_vstore_strided_1xf64(const double*  addr, signed l
 {
   __epi_1xf64 result;
   result = __builtin_epi_vload_strided_1xf64(addr, stride, gvl);
-  __builtin_epi_vstore_strided_1xf64(addr, result, stride, gvl);
+  __builtin_epi_vstore_strided_1xf64((double* )addr, result, stride, gvl);
 }
 
 
@@ -827,7 +827,7 @@ void test_vload_indexed_2xf32_vstore_indexed_2xf32(const float*  addr, unsigned 
   __epi_2xf32 result;
   __epi_2xi32 index;
   result = __builtin_epi_vload_indexed_2xf32(addr, index, gvl);
-  __builtin_epi_vstore_indexed_2xf32(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_2xf32((float* )addr, result, index, gvl);
 }
 
 
@@ -843,7 +843,7 @@ void test_vload_indexed_1xf64_vstore_indexed_1xf64(const double*  addr, unsigned
   __epi_1xf64 result;
   __epi_1xi64 index;
   result = __builtin_epi_vload_indexed_1xf64(addr, index, gvl);
-  __builtin_epi_vstore_indexed_1xf64(addr, result, index, gvl);
+  __builtin_epi_vstore_indexed_1xf64((double* )addr, result, index, gvl);
 }
 
 
@@ -855,7 +855,7 @@ void test_vload_1xi1_vstore_1xi1(const unsigned long int*  addr)
 {
   __epi_1xi1 result;
   result = __builtin_epi_vload_1xi1(addr);
-  __builtin_epi_vstore_1xi1(addr, result);
+  __builtin_epi_vstore_1xi1((unsigned long int* )addr, result);
 }
 
 
@@ -867,7 +867,7 @@ void test_vload_2xi1_vstore_2xi1(const unsigned int*  addr)
 {
   __epi_2xi1 result;
   result = __builtin_epi_vload_2xi1(addr);
-  __builtin_epi_vstore_2xi1(addr, result);
+  __builtin_epi_vstore_2xi1((unsigned int* )addr, result);
 }
 
 
@@ -879,7 +879,7 @@ void test_vload_4xi1_vstore_4xi1(const unsigned short int*  addr)
 {
   __epi_4xi1 result;
   result = __builtin_epi_vload_4xi1(addr);
-  __builtin_epi_vstore_4xi1(addr, result);
+  __builtin_epi_vstore_4xi1((unsigned short int* )addr, result);
 }
 
 
@@ -891,7 +891,7 @@ void test_vload_8xi1_vstore_8xi1(const unsigned char*  addr)
 {
   __epi_8xi1 result;
   result = __builtin_epi_vload_8xi1(addr);
-  __builtin_epi_vstore_8xi1(addr, result);
+  __builtin_epi_vstore_8xi1((unsigned char* )addr, result);
 }
 
 
