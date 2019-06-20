@@ -1289,16 +1289,16 @@ def EPIIntrinsicsTable : GenericTable {
 class EPIPseudo {
   Pseudo Pseudo = !cast<Pseudo>(NAME);
   Instruction BaseInstr;
-  bits<8> VLIndex;
-  bits<8> SEWIndex;
-  bits<8> MergeOpIndex;
-  bits<8> VLMul;
+  bits<4> VLIndex;
+  bits<4> SEWIndex;
+  bits<4> VLMul;
+  bits<4> MergeOpIndex;
 }
 
 def EPIPseudosTable : GenericTable {
   let FilterClass = "EPIPseudo";
   let CppTypeName = "EPIPseudoInfo";
-  let Fields = [ "Pseudo", "BaseInstr", "VLIndex", "SEWIndex", "MergeOpIndex", "VLMul" ];
+  let Fields = [ "Pseudo", "BaseInstr", "VLIndex", "SEWIndex", "VLMul", "MergeOpIndex" ];
   let PrimaryKey = [ "Pseudo" ];
   let PrimaryKeyName = "getEPIPseudoInfo";
 }

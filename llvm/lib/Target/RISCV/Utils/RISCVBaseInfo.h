@@ -369,16 +369,10 @@ namespace RISCVEPIPseudosTable {
 struct EPIPseudoInfo {
   unsigned int Pseudo;
   unsigned int BaseInstr;
-  uint8_t VLIndex;
-  uint8_t SEWIndex;
-  uint8_t MergeOpIndex;
-  uint8_t VLMul;
-
-  int getVLIndex() const { return static_cast<int8_t>(VLIndex); }
-
-  int getSEWIndex() const { return static_cast<int8_t>(SEWIndex); }
-
-  int getMergeOpIndex() const { return static_cast<int8_t>(MergeOpIndex); }
+  signed char VLIndex;
+  signed char SEWIndex;
+  unsigned char VLMul;
+  signed char MergeOpIndex;
 };
 
 #define GET_EPIPseudosTable_DECL
