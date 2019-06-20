@@ -664,8 +664,6 @@ void OSSClausePrinter::VisitOSSClauseList(T *Node, char StartSym) {
 
 void OSSClausePrinter::VisitOSSIfClause(OSSIfClause *Node) {
   OS << "if(";
-  if (Node->getNameModifier() != OSSD_unknown)
-    OS << getOmpSsDirectiveName(Node->getNameModifier()) << ": ";
   Node->getCondition()->printPretty(OS, nullptr, Policy, 0);
   OS << ")";
 }

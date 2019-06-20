@@ -233,11 +233,11 @@ public:
 /// This represents 'if' clause in the '#pragma omp ...' directive.
 ///
 /// \code
-/// #pragma omp parallel if(parallel:a > 5)
+/// #pragma omp task if(a > 5)
 /// \endcode
-/// In this example directive '#pragma omp parallel' has simple 'if' clause with
-/// condition 'a > 5' and directive name modifier 'parallel'.
-class OSSIfClause : public OSSClause, public OSSClauseWithPreInit {
+/// In this example directive '#pragma omp task' has simple 'if'
+/// clause with condition 'a > 5'.
+class OSSIfClause : public OSSClause {
   friend class OSSClauseReader;
 
   /// Location of '('.
@@ -246,54 +246,24 @@ class OSSIfClause : public OSSClause, public OSSClauseWithPreInit {
   /// Condition of the 'if' clause.
   Stmt *Condition = nullptr;
 
-  /// Location of ':' (if any).
-  SourceLocation ColonLoc;
-
-  /// Directive name modifier for the clause.
-  OmpSsDirectiveKind NameModifier = OSSD_unknown;
-
-  /// Name modifier location.
-  SourceLocation NameModifierLoc;
-
   /// Set condition.
   void setCondition(Expr *Cond) { Condition = Cond; }
-
-  /// Set directive name modifier for the clause.
-  void setNameModifier(OmpSsDirectiveKind NM) { NameModifier = NM; }
-
-  /// Set location of directive name modifier for the clause.
-  void setNameModifierLoc(SourceLocation Loc) { NameModifierLoc = Loc; }
-
-  /// Set location of ':'.
-  void setColonLoc(SourceLocation Loc) { ColonLoc = Loc; }
 
 public:
   /// Build 'if' clause with condition \a Cond.
   ///
-  /// \param NameModifier [OmpSs 4.1] Directive name modifier of clause.
-  /// \param Cond Condition of the clause.
-  /// \param HelperCond Helper condition for the clause.
-  /// \param CaptureRegion Innermost OmpSs region where expressions in this
-  /// clause must be captured.
   /// \param StartLoc Starting location of the clause.
   /// \param LParenLoc Location of '('.
-  /// \param NameModifierLoc Location of directive name modifier.
-  /// \param ColonLoc [OmpSs 4.1] Location of ':'.
+  /// \param Cond Condition of the clause.
   /// \param EndLoc Ending location of the clause.
-  OSSIfClause(OmpSsDirectiveKind NameModifier, Expr *Cond, Stmt *HelperCond,
-              OmpSsDirectiveKind CaptureRegion, SourceLocation StartLoc,
-              SourceLocation LParenLoc, SourceLocation NameModifierLoc,
-              SourceLocation ColonLoc, SourceLocation EndLoc)
-      : OSSClause(OSSC_if, StartLoc, EndLoc), OSSClauseWithPreInit(this),
-        LParenLoc(LParenLoc), Condition(Cond), ColonLoc(ColonLoc),
-        NameModifier(NameModifier), NameModifierLoc(NameModifierLoc) {
-    setPreInitStmt(HelperCond, CaptureRegion);
-  }
+  OSSIfClause(Expr *Cond, SourceLocation StartLoc, SourceLocation LParenLoc,
+                 SourceLocation EndLoc)
+      : OSSClause(OSSC_if, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Condition(Cond) {}
 
   /// Build an empty clause.
   OSSIfClause()
-      : OSSClause(OSSC_if, SourceLocation(), SourceLocation()),
-        OSSClauseWithPreInit(this) {}
+      : OSSClause(OSSC_if, SourceLocation(), SourceLocation()) {}
 
   /// Sets the location of '('.
   void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
@@ -301,17 +271,8 @@ public:
   /// Returns the location of '('.
   SourceLocation getLParenLoc() const { return LParenLoc; }
 
-  /// Return the location of ':'.
-  SourceLocation getColonLoc() const { return ColonLoc; }
-
   /// Returns condition.
   Expr *getCondition() const { return cast_or_null<Expr>(Condition); }
-
-  /// Return directive name modifier associated with the clause.
-  OmpSsDirectiveKind getNameModifier() const { return NameModifier; }
-
-  /// Return the location of directive name modifier.
-  SourceLocation getNameModifierLoc() const { return NameModifierLoc; }
 
   child_range children() { return child_range(&Condition, &Condition + 1); }
 
@@ -333,7 +294,7 @@ class OSSFinalClause : public OSSClause {
   /// Location of '('.
   SourceLocation LParenLoc;
 
-  /// Condition of the 'if' clause.
+  /// Condition of the 'final' clause.
   Stmt *Condition = nullptr;
 
   /// Set condition.

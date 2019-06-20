@@ -56,8 +56,6 @@ const OSSClauseWithPreInit *OSSClauseWithPreInit::get(const OSSClause *C) {
     return static_cast<const OSSInReductionClause *>(C);
   case OSSC_linear:
     return static_cast<const OSSLinearClause *>(C);
-  case OSSC_if:
-    return static_cast<const OSSIfClause *>(C);
   case OSSC_num_threads:
     return static_cast<const OSSNumThreadsClause *>(C);
   case OSSC_num_teams:

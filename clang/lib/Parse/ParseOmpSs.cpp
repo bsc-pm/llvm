@@ -119,7 +119,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   return Directive;
 }
 
-/// Parsing of OpenMP clauses.
+/// Parsing of OmpSs clauses.
 ///
 ///    clause:
 ///       task-depend-clause
@@ -139,7 +139,15 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
 
   switch (CKind) {
   case OSSC_grainsize:
-      break;
+  case OSSC_if:
+  case OSSC_final:
+    if (!FirstClause) {
+      Diag(Tok, diag::err_oss_more_one_clause)
+          << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
+      ErrorFound = true;
+    }
+    Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
+    break;
   case OSSC_default:
     // These clauses cannot appear more than once
     if (!FirstClause) {
@@ -279,6 +287,52 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
       Data.DepKinds, Data.DepLoc);
+}
+
+/// Parses simple expression in parens for single-expression clauses of OmpSs
+/// constructs.
+/// \param RLoc Returned location of right paren.
+ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
+                                         SourceLocation &RLoc) {
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_openmp_end);
+  if (T.expectAndConsume(diag::err_expected_lparen_after, ClauseName.data()))
+    return ExprError();
+
+  SourceLocation ELoc = Tok.getLocation();
+  ExprResult LHS(ParseCastExpression(
+      /*isUnaryExpression=*/false, /*isAddressOfOperand=*/false, NotTypeCast));
+  ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
+  Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
+
+  // Parse ')'.
+  RLoc = Tok.getLocation();
+  if (!T.consumeClose())
+    RLoc = T.getCloseLocation();
+
+  return Val;
+}
+
+/// Parsing of OmpSs clauses with single expressions like 'final' or 'if'
+///
+///    final-clause:
+///      'final' '(' expression ')'
+///
+///    if-clause:
+///      'if' '(' expression ')'
+OSSClause *Parser::ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
+                                              bool ParseOnly) {
+  SourceLocation Loc = ConsumeToken();
+  SourceLocation LLoc = Tok.getLocation();
+  SourceLocation RLoc;
+
+  ExprResult Val = ParseOmpSsParensExpr(getOmpSsClauseName(Kind), RLoc);
+
+  if (Val.isInvalid())
+    return nullptr;
+
+  if (ParseOnly)
+    return nullptr;
+  return Actions.ActOnOmpSsSingleExprClause(Kind, Val.get(), Loc, LLoc, RLoc);
 }
 
 /// Parsing of simple OmpSs clauses like 'default' or 'proc_bind'.

@@ -9467,6 +9467,21 @@ public:
                           SourceLocation StartLoc, SourceLocation LParenLoc,
                           SourceLocation EndLoc);
 
+  OSSClause *ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind,
+                                        Expr *Expr,
+                                        SourceLocation StartLoc,
+                                        SourceLocation LParenLoc,
+                                        SourceLocation EndLoc);
+
+  /// Called on well-formed 'if' clause.
+  OSSClause *ActOnOmpSsIfClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc);
+  /// Called on well-formed 'final' clause.
+  OSSClause *ActOnOmpSsFinalClause(Expr *Condition, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc);
+
   /// The kind of conversion being performed.
   enum CheckedConversionKind {
     /// An implicit conversion.

@@ -71,7 +71,7 @@ const char *clang::getOmpSsClauseName(OmpSsClauseKind Kind) {
 }
 
 unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
-                                          StringRef Str) {
+                                         StringRef Str) {
   switch (Kind) {
   case OSSC_default:
     return llvm::StringSwitch<OmpSsDefaultClauseKind>(Str)

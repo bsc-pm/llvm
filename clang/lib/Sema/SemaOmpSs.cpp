@@ -945,3 +945,57 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
 
   return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
 }
+
+OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+  Expr *ValExpr = Condition;
+  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
+      !Condition->isInstantiationDependent() &&
+      !Condition->containsUnexpandedParameterPack()) {
+    ExprResult Val = CheckBooleanCondition(StartLoc, Condition);
+    if (Val.isInvalid())
+      return nullptr;
+
+    ValExpr = MakeFullExpr(Val.get()).get();
+  }
+
+  return new (Context) OSSIfClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsFinalClause(Expr *Condition,
+                                       SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc) {
+  Expr *ValExpr = Condition;
+  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
+      !Condition->isInstantiationDependent() &&
+      !Condition->containsUnexpandedParameterPack()) {
+    ExprResult Val = CheckBooleanCondition(StartLoc, Condition);
+    if (Val.isInvalid())
+      return nullptr;
+
+    ValExpr = MakeFullExpr(Val.get()).get();
+  }
+
+  return new (Context) OSSFinalClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
+                                            SourceLocation StartLoc,
+                                            SourceLocation LParenLoc,
+                                            SourceLocation EndLoc) {
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_if:
+    Res = ActOnOmpSsIfClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_final:
+    Res = ActOnOmpSsFinalClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+  return Res;
+}

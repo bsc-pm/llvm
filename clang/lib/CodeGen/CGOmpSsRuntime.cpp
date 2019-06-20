@@ -366,33 +366,37 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
-  for (const Expr *E : Data.SharedVars) {
+  for (const Expr *E : Data.DSAs.Shareds) {
     EmitDSA("QUAL.OSS.SHARED", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.PrivateVars) {
+  for (const Expr *E : Data.DSAs.Privates) {
     EmitDSA("QUAL.OSS.PRIVATE", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.FirstprivateVars) {
+  for (const Expr *E : Data.DSAs.Firstprivates) {
     EmitDSA("QUAL.OSS.FIRSTPRIVATE", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependIn) {
+  for (const Expr *E : Data.Deps.Ins) {
     EmitDependency("QUAL.OSS.DEP.IN", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependOut) {
+  for (const Expr *E : Data.Deps.Outs) {
     EmitDependency("QUAL.OSS.DEP.OUT", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependInout) {
+  for (const Expr *E : Data.Deps.Inouts) {
     EmitDependency("QUAL.OSS.DEP.INOUT", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependWeakIn) {
+  for (const Expr *E : Data.Deps.WeakIns) {
     EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependWeakOut) {
+  for (const Expr *E : Data.Deps.WeakOuts) {
     EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.DependWeakInout) {
+  for (const Expr *E : Data.Deps.WeakInouts) {
     EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, E, TaskInfo);
   }
+  if (Data.If)
+    TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));
+  if (Data.Final)
+    TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));

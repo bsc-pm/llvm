@@ -2807,7 +2807,20 @@ private:
   /// nullptr.
   ///
   OSSClause *ParseOmpSsSimpleClause(OmpSsClauseKind Kind, bool ParseOnly);
+
+  /// Parses clause with a single expression of a kind \a Kind.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
+                                        bool ParseOnly);
 public:
+  /// Parses simple expression in parens for single-expression clauses of OmpSs
+  /// constructs.
+  /// \param RLoc Returned location of right paren.
+  ExprResult ParseOmpSsParensExpr(StringRef ClauseName, SourceLocation &RLoc);
 
   /// Data used for parsing list of variables in OmpSs clauses.
   struct OmpSsVarListDataTy {
@@ -2819,8 +2832,8 @@ public:
 
   /// Parses clauses with list.
   bool ParseOmpSsVarList(OmpSsDirectiveKind DKind, OmpSsClauseKind Kind,
-                          SmallVectorImpl<Expr *> &Vars,
-                          OmpSsVarListDataTy &Data);
+                         SmallVectorImpl<Expr *> &Vars,
+                         OmpSsVarListDataTy &Data);
 private:
   //===--------------------------------------------------------------------===//
   // OpenMP: Directives and clauses.

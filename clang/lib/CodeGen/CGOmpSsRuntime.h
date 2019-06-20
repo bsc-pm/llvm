@@ -32,16 +32,26 @@ class Address;
 class CodeGenFunction;
 class CodeGenModule;
 
+struct OSSDSADataTy final {
+  SmallVector<const Expr *, 4> Shareds;
+  SmallVector<const Expr *, 4> Privates;
+  SmallVector<const Expr *, 4> Firstprivates;
+};
+
+struct OSSDepDataTy final {
+  SmallVector<const Expr *, 4> WeakIns;
+  SmallVector<const Expr *, 4> WeakOuts;
+  SmallVector<const Expr *, 4> WeakInouts;
+  SmallVector<const Expr *, 4> Ins;
+  SmallVector<const Expr *, 4> Outs;
+  SmallVector<const Expr *, 4> Inouts;
+};
+
 struct OSSTaskDataTy final {
-  SmallVector<const Expr *, 4> SharedVars;
-  SmallVector<const Expr *, 4> PrivateVars;
-  SmallVector<const Expr *, 4> FirstprivateVars;
-  SmallVector<const Expr *, 4> DependWeakIn;
-  SmallVector<const Expr *, 4> DependWeakOut;
-  SmallVector<const Expr *, 4> DependWeakInout;
-  SmallVector<const Expr *, 4> DependIn;
-  SmallVector<const Expr *, 4> DependOut;
-  SmallVector<const Expr *, 4> DependInout;
+  OSSDSADataTy DSAs;
+  OSSDepDataTy Deps;
+  const Expr *If = nullptr;
+  const Expr *Final = nullptr;
 };
 
 class CGOmpSsRuntime {
