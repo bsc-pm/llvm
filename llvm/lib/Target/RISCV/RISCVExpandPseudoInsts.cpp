@@ -727,7 +727,7 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
 
   const MCInstrDesc *MCInstr = &TII.get(BaseInstr);
 
-  const MachineInstrBuilder &MIB = BuildMI(MBB, MI, DL, *MCInstr);
+  MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, *MCInstr);
   MachineInstr &MachineInstr = *MIB.getInstr();
 
   // Remove implicit operands

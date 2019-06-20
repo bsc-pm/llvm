@@ -1520,7 +1520,7 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
   MachineRegisterInfo &MRI = MF.getRegInfo();
   unsigned DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
 
-  const MachineInstrBuilder &MIB =
+  MachineInstrBuilder MIB =
       BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI))
           .addReg(DestReg, RegState::Define | RegState::Dead);
 
