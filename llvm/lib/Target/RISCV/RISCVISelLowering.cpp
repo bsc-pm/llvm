@@ -1020,27 +1020,15 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
     unsigned IntNo = cast<ConstantSDNode>(N->getOperand(0))->getZExtValue();
     if (IntNo == Intrinsic::epi_vext_x_v) {
       EVT Ty = N->getValueType(0);
-      int ElementWidth;
-      switch (Ty.getSimpleVT().SimpleTy) {
-      default:
-        llvm_unreachable("Unexpected result type to legalize");
-      case MVT::i8:
-        ElementWidth = 8;
-        break;
-      case MVT::i16:
-        ElementWidth = 16;
-        break;
-      case MVT::i32:
-        ElementWidth = 32;
-      }
-      SDValue SEW = DAG.getTargetConstant(ElementWidth, DL, MVT::i64);
-      SDValue Extract64 =
-        SDValue(DAG.getMachineNode(RISCV::PseudoVEXT_X_V_EPIVR, DL, MVT::i64,
-              N->getOperand(1), N->getOperand(2), SEW),
+      if (Ty == MVT::i32 || Ty == MVT::i16 || Ty == MVT::i8) {
+        SDValue Extract64 = SDValue(
+            DAG.getMachineNode(RISCV::PseudoVEXT_X_V_EPIVR, DL, MVT::i64,
+                               N->getOperand(1), N->getOperand(2)),
             0);
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
-      Results.push_back(Trunc);
-      break;
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
+        Results.push_back(Trunc);
+        break;
+      }
     }
     llvm_unreachable("Don't know how to custom type legalize this intrinsic!");
     break;
