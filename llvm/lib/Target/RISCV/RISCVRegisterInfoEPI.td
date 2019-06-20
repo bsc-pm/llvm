@@ -7,9 +7,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: In many places we use 128 but there isn't actually a minimum size
-// defined, so this must be generalised somehow.
-
 // Define V0-V31
 let RegAltNameIndices = [ABIRegAltName] in {
    foreach Index = 0-31 in {
@@ -58,7 +55,8 @@ let SubRegIndices = [epivr4even, epivr4odd] in
 class EPIVReg<list<ValueType> regTypes, dag regList, int Vlmul>
   : RegisterClass<"RISCV",
                   regTypes,
-                  128,
+                  // Spill alignment set to 64-bytes
+                  512,
                   regList> {
   int VLMul = Vlmul;
 }
