@@ -61,8 +61,8 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     case RISCVStackID::EPIVR_SPILL:
       FrameSize =
           alignTo(FrameSize, RegInfo->getSpillAlignment(RISCV::GPRRegClass));
-      MFI.setObjectOffset(FI, -FrameSize);
       FrameSize += RegInfo->getSpillSize(RISCV::GPRRegClass);
+      MFI.setObjectOffset(FI, -FrameSize);
       break;
     default:
       llvm_unreachable("Unexpected StackID");
