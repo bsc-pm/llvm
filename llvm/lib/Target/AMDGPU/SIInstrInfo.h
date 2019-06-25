@@ -496,6 +496,11 @@ public:
     return (Flags & SIInstrFlags::FLAT) && !(Flags & SIInstrFlags::LGKM_CNT);
   }
 
+  // FIXME: Make this more precise
+  static bool isFLATScratch(const MachineInstr &MI) {
+    return isSegmentSpecificFLAT(MI);
+  }
+
   // Any FLAT encoded instruction, including global_* and scratch_*.
   bool isFLAT(uint16_t Opcode) const {
     return get(Opcode).TSFlags & SIInstrFlags::FLAT;
@@ -629,6 +634,14 @@ public:
 
   bool usesFPDPRounding(uint16_t Opcode) const {
     return get(Opcode).TSFlags & SIInstrFlags::FPDPRounding;
+  }
+
+  static bool isFPAtomic(const MachineInstr &MI) {
+    return MI.getDesc().TSFlags & SIInstrFlags::FPAtomic;
+  }
+
+  bool isFPAtomic(uint16_t Opcode) const {
+    return get(Opcode).TSFlags & SIInstrFlags::FPAtomic;
   }
 
   bool isVGPRCopy(const MachineInstr &MI) const {
