@@ -33,6 +33,8 @@ class EPIIntrinsic {
   // does not have any operand that must be extended.
   Intrinsic IntrinsicID = !cast<Intrinsic>(NAME);
   bits<4> ExtendOperand = 0;
+  bits<4> MaskOperand = 0;
+  bits<4> GVLOperand = 0;
 }
 
 let TargetPrefix = "epi" in {
@@ -50,6 +52,7 @@ class EPIBinary : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let GVLOperand = 3;
 }
 class EPIBinaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
@@ -57,6 +60,8 @@ class EPIBinaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 3;
+  let MaskOperand = 4;
+  let GVLOperand = 5;
 }
 class EPIBinaryMaskIn : Intrinsic< [ llvm_anyvector_ty ],
                         [ LLVMMatchType<0>, llvm_any_ty,
@@ -64,6 +69,8 @@ class EPIBinaryMaskIn : Intrinsic< [ llvm_anyvector_ty ],
                         [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let MaskOperand = 3;
+  let GVLOperand = 4;
 }
 multiclass epi_binary {
   def "int_epi_" # NAME : EPIBinary;
@@ -82,6 +89,7 @@ class EPIBinaryWide : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let GVLOperand = 3;
 }
 class EPIBinaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
@@ -89,6 +97,8 @@ class EPIBinaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 3;
+  let MaskOperand = 4;
+  let GVLOperand = 5;
 }
 multiclass epi_binary_wide {
   def "int_epi_" # NAME : EPIBinaryWide;
@@ -100,6 +110,7 @@ class EPIBinaryRelational : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let GVLOperand = 3;
 }
 class EPIBinaryRelationalMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
@@ -107,6 +118,8 @@ class EPIBinaryRelationalMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 3;
+  let MaskOperand = 4;
+  let GVLOperand = 5;
 }
 multiclass epi_relational {
   def "int_epi_" # NAME : EPIBinaryRelational;
@@ -118,6 +131,7 @@ class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 1;
+  let GVLOperand = 2;
 }
 class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_any_ty, llvm_anyvector_ty,
@@ -125,6 +139,8 @@ class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let MaskOperand = 3;
+  let GVLOperand = 4;
 }
 multiclass epi_unary {
   def "int_epi_" # NAME : EPIUnary;
@@ -148,6 +164,7 @@ class EPITernary : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let GVLOperand = 4;
 }
 class EPITernaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_any_ty, LLVMMatchType<0>,
@@ -155,6 +172,8 @@ class EPITernaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ IntrNoMem ] >, EPIIntrinsic
 {
   let ExtendOperand = 2;
+  let MaskOperand = 4;
+  let GVLOperand = 5;
 }
 multiclass epi_ternary {
   def "int_epi_" # NAME : EPITernary;

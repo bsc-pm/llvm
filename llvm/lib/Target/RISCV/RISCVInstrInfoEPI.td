@@ -1327,7 +1327,7 @@ defset list<EPIVRegToWide> AllEPIVRegToWidePairs = {
 def EPIIntrinsicsTable : GenericTable {
   let FilterClass = "EPIIntrinsic";
   let CppTypeName = "EPIIntrinsicInfo";
-  let Fields = [ "IntrinsicID", "ExtendOperand" ];
+  let Fields = [ "IntrinsicID", "ExtendOperand", "MaskOperand", "GVLOperand" ];
   let PrimaryKey = [ "IntrinsicID" ];
   let PrimaryKeyName = "getEPIIntrinsicInfo";
 }

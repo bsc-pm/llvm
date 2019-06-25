@@ -351,6 +351,8 @@ namespace RISCVEPIIntrinsicsTable {
 struct EPIIntrinsicInfo {
   unsigned int IntrinsicID;
   unsigned int ExtendedOperand;
+  unsigned int MaskOperand;
+  unsigned int GVLOperand;
 };
 
 #define GET_EPIIntrinsicsTable_DECL
