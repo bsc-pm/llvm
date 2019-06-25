@@ -1415,6 +1415,13 @@ bool TargetLowering::SimplifyDemandedBits(
 
     // If none of the top bits are demanded, convert this into an any_extend.
     if (DemandedBits.getActiveBits() <= InBits) {
+      // If we only need the non-extended bits of the bottom element
+      // then we can just bitcast to the result.
+      if (IsVecInReg && DemandedElts == 1 &&
+          VT.getSizeInBits() == SrcVT.getSizeInBits() &&
+          TLO.DAG.getDataLayout().isLittleEndian())
+        return TLO.CombineTo(Op, TLO.DAG.getBitcast(VT, Src));
+
       unsigned Opc =
           IsVecInReg ? ISD::ANY_EXTEND_VECTOR_INREG : ISD::ANY_EXTEND;
       if (!TLO.LegalOperations() || isOperationLegal(Opc, VT))
@@ -1446,12 +1453,21 @@ bool TargetLowering::SimplifyDemandedBits(
     }
     break;
   }
-  case ISD::ANY_EXTEND: {
-    // TODO: Add ISD::ANY_EXTEND_VECTOR_INREG support.
+  case ISD::ANY_EXTEND:
+  case ISD::ANY_EXTEND_VECTOR_INREG: {
     SDValue Src = Op.getOperand(0);
     EVT SrcVT = Src.getValueType();
     unsigned InBits = SrcVT.getScalarSizeInBits();
     unsigned InElts = SrcVT.isVector() ? SrcVT.getVectorNumElements() : 1;
+    bool IsVecInReg = Op.getOpcode() == ISD::ANY_EXTEND_VECTOR_INREG;
+
+    // If we only need the bottom element then we can just bitcast.
+    // TODO: Handle ANY_EXTEND?
+    if (IsVecInReg && DemandedElts == 1 &&
+        VT.getSizeInBits() == SrcVT.getSizeInBits() &&
+        TLO.DAG.getDataLayout().isLittleEndian())
+      return TLO.CombineTo(Op, TLO.DAG.getBitcast(VT, Src));
+
     APInt InDemandedBits = DemandedBits.trunc(InBits);
     APInt InDemandedElts = DemandedElts.zextOrSelf(InElts);
     if (SimplifyDemandedBits(Src, InDemandedBits, InDemandedElts, Known, TLO,
@@ -2699,19 +2715,19 @@ SDValue TargetLowering::SimplifySetCC(EVT VT, SDValue N0, SDValue N1,
       }
 
       // If ctpop is not supported, expand a power-of-2 comparison based on it.
-      if (C1 == 1 && !isOperationLegalOrCustom(ISD::CTPOP, CTVT)) {
+      if (C1 == 1 && !isOperationLegalOrCustom(ISD::CTPOP, CTVT) &&
+          (Cond == ISD::SETEQ || Cond == ISD::SETNE)) {
         // (ctpop x) == 1 --> (x != 0) && ((x & x-1) == 0)
-        if (Cond == ISD::SETEQ) {
-          SDValue Zero = DAG.getConstant(0, dl, CTVT);
-          SDValue NegOne = DAG.getAllOnesConstant(dl, CTVT);
-          SDValue Add = DAG.getNode(ISD::ADD, dl, CTVT, CTOp, NegOne);
-          SDValue And = DAG.getNode(ISD::AND, dl, CTVT, CTOp, Add);
-          SDValue LHS = DAG.getSetCC(dl, VT, CTOp, Zero, ISD::SETNE);
-          SDValue RHS = DAG.getSetCC(dl, VT, And, Zero, ISD::SETEQ);
-          return DAG.getNode(ISD::AND, dl, VT, LHS, RHS);
-        }
-        // TODO:
         // (ctpop x) != 1 --> (x == 0) || ((x & x-1) != 0)
+        SDValue Zero = DAG.getConstant(0, dl, CTVT);
+        SDValue NegOne = DAG.getAllOnesConstant(dl, CTVT);
+        ISD::CondCode InvCond = ISD::getSetCCInverse(Cond, true);
+        SDValue Add = DAG.getNode(ISD::ADD, dl, CTVT, CTOp, NegOne);
+        SDValue And = DAG.getNode(ISD::AND, dl, CTVT, CTOp, Add);
+        SDValue LHS = DAG.getSetCC(dl, VT, CTOp, Zero, InvCond);
+        SDValue RHS = DAG.getSetCC(dl, VT, And, Zero, Cond);
+        unsigned LogicOpcode = Cond == ISD::SETEQ ? ISD::AND : ISD::OR;
+        return DAG.getNode(LogicOpcode, dl, VT, LHS, RHS);
       }
     }
 
