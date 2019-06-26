@@ -34,6 +34,7 @@ add_llvm_target(RISCVCodeGen
   RISCVTargetMachine.cpp
   RISCVTargetObjectFile.cpp
   RISCVTargetTransformInfo.cpp
+  EPIFoldBroadcast.cpp
   EPIRemoveRedundantVSETVL.cpp
   EPIRemoveRedundantVSETVLGlobal.cpp
   )

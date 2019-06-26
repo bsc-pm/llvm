@@ -148,8 +148,7 @@ define <vscale x 1 x double> @test4(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:    flw ft1, 0(a1)
 ; CHECK-NEXT:  .LBB3_3: # %if.end
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vfmv.v.f v1, ft1
-; CHECK-NEXT:    vfadd.vv v0, v0, v1
+; CHECK-NEXT:    vfadd.vf v0, v0, ft1
 ; CHECK-NEXT:    lui a1, %hi(scratch)
 ; CHECK-NEXT:    addi a1, a1, %lo(scratch)
 ; CHECK-NEXT:    vse.v v0, (a1)
@@ -272,8 +271,7 @@ define <vscale x 1 x double> @test6(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:    flw ft1, 0(a1)
 ; CHECK-NEXT:  .LBB5_5: # %if.end10
 ; CHECK-NEXT:    vfmv.v.f v1, ft0
-; CHECK-NEXT:    vfmv.v.f v2, ft1
-; CHECK-NEXT:    vfadd.vv v1, v1, v2
+; CHECK-NEXT:    vfadd.vf v1, v1, ft1
 ; CHECK-NEXT:    lui a1, %hi(scratch)
 ; CHECK-NEXT:    addi a1, a1, %lo(scratch)
 ; CHECK-NEXT:    vse.v v1, (a1)

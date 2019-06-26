@@ -1324,12 +1324,19 @@ defset list<EPIVRegToWide> AllEPIVRegToWidePairs = {
   def : EPIVRegToWide<EPIVR4, EPIVR8>;
 }
 
+def EPIIntrClassID : GenericEnum {
+  let FilterClass = "EPIIntrinsicClassID";
+}
+
 def EPIIntrinsicsTable : GenericTable {
   let FilterClass = "EPIIntrinsic";
   let CppTypeName = "EPIIntrinsicInfo";
-  let Fields = [ "IntrinsicID", "ExtendOperand", "MaskOperand", "GVLOperand" ];
+  let Fields = [ "IntrinsicID", "ClassID", "ExtendOperand", "MaskOperand",
+                 "GVLOperand" ];
   let PrimaryKey = [ "IntrinsicID" ];
   let PrimaryKeyName = "getEPIIntrinsicInfo";
+
+  GenericEnum TypeOf_ClassID = EPIIntrClassID;
 }
 
 class EPIPseudo {

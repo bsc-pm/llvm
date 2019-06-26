@@ -47,6 +47,9 @@ InstructionSelector *createRISCVInstructionSelector(const RISCVTargetMachine &,
                                                     RISCVSubtarget &,
                                                     RISCVRegisterBankInfo &);
 
+FunctionPass *createEPIFoldBroadcastPass();
+void initializeEPIFoldBroadcastPass(PassRegistry &);
+
 FunctionPass *createEPIRemoveRedundantVSETVLPass();
 void initializeEPIRemoveRedundantVSETVLPass(PassRegistry &);
 

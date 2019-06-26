@@ -44,6 +44,7 @@ extern "C" void LLVMInitializeRISCVTarget() {
   auto PR = PassRegistry::getPassRegistry();
   initializeGlobalISel(*PR);
   initializeRISCVExpandPseudoPass(*PR);
+  initializeEPIFoldBroadcastPass(*PR);
   initializeEPIRemoveRedundantVSETVLPass(*PR);
   initializeEPIRemoveRedundantVSETVLGlobalPass(*PR);
 }
@@ -124,6 +125,8 @@ void RISCVPassConfig::addIRPasses() {
     // invariant.
     addPass(createLICMPass());
   }
+
+  addPass(createEPIFoldBroadcastPass());
 
   TargetPassConfig::addIRPasses();
 }

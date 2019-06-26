@@ -11,10 +11,8 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; DISABLED-NEXT:    lui a1, %hi(.LCPI0_0)
 ; DISABLED-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; DISABLED-NEXT:    fld ft0, 0(a1)
-; DISABLED-NEXT:    vsetvli a1, a0, e64, m1
-; DISABLED-NEXT:    vfmv.v.f v0, ft0
 ; DISABLED-NEXT:    vsetvli a0, a0, e64, m1
-; DISABLED-NEXT:    vfadd.vv v16, v16, v0
+; DISABLED-NEXT:    vfadd.vf v16, v16, ft0
 ; DISABLED-NEXT:    ret
 ;
 ; CHECK-LABEL: add1:
@@ -23,8 +21,7 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; CHECK-NEXT:    fld ft0, 0(a1)
 ; CHECK-NEXT:    vsetvli a0, a0, e64, m1
-; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vfadd.vv v16, v16, v0
+; CHECK-NEXT:    vfadd.vf v16, v16, ft0
 ; CHECK-NEXT:    ret
   %3 = call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 1.0, i64 %1)
   %4 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %0, <vscale x 1 x double> %3, i64 %1)

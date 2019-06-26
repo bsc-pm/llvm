@@ -27,11 +27,46 @@ def llvm_ptr_i64_ty : LLVMPointerType<llvm_i64_ty>;
 def llvm_ptr_f32_ty : LLVMPointerType<llvm_float_ty>;
 def llvm_ptr_f64_ty : LLVMPointerType<llvm_double_ty>;
 
-class EPIIntrinsic {
+class EPIIntrinsicClassID;
+
+def EPICIDBinary : EPIIntrinsicClassID;
+def EPICIDBinaryMask : EPIIntrinsicClassID;
+def EPICIDBinaryMaskIn : EPIIntrinsicClassID;
+def EPICIDBinaryRelational : EPIIntrinsicClassID;
+def EPICIDBinaryRelationalMask : EPIIntrinsicClassID;
+def EPICIDBinaryWide : EPIIntrinsicClassID;
+def EPICIDBinaryWideMask : EPIIntrinsicClassID;
+def EPICIDConversion : EPIIntrinsicClassID;
+def EPICIDConversionMask : EPIIntrinsicClassID;
+def EPICIDMaskOpUnary : EPIIntrinsicClassID;
+def EPICIDMaskOpUnaryMask : EPIIntrinsicClassID;
+def EPICIDTernary : EPIIntrinsicClassID;
+def EPICIDTernaryMask : EPIIntrinsicClassID;
+def EPICIDTernaryWide : EPIIntrinsicClassID;
+def EPICIDTernaryWideMask : EPIIntrinsicClassID;
+def EPICIDUnary : EPIIntrinsicClassID;
+def EPICIDUnaryMask : EPIIntrinsicClassID;
+def EPICIDUnaryScalar : EPIIntrinsicClassID;
+def EPICIDUnaryScalarMask : EPIIntrinsicClassID;
+def EPICIDReduction : EPIIntrinsicClassID;
+def EPICIDReductionMask : EPIIntrinsicClassID;
+def EPICIDReductionWide : EPIIntrinsicClassID;
+def EPICIDReductionWideMask : EPIIntrinsicClassID;
+def EPICIDvext_x_v : EPIIntrinsicClassID;
+def EPICIDvfmv_f_s : EPIIntrinsicClassID;
+def EPICIDvfmv_s_f : EPIIntrinsicClassID;
+def EPICIDvid : EPIIntrinsicClassID;
+def EPICIDvid_mask : EPIIntrinsicClassID;
+def EPICIDvmiota : EPIIntrinsicClassID;
+def EPICIDvmiota_mask : EPIIntrinsicClassID;
+def EPICIDvmv_s_x : EPIIntrinsicClassID;
+
+class EPIIntrinsic<EPIIntrinsicClassID CID> {
   // These intrinsics may accept illegal integer values in their llvm_any_ty
   // operand, so they have to be extended. If set to zero then the intrinsic
   // does not have any operand that must be extended.
   Intrinsic IntrinsicID = !cast<Intrinsic>(NAME);
+  EPIIntrinsicClassID ClassID = CID;
   bits<4> ExtendOperand = 0;
   bits<4> MaskOperand = 0;
   bits<4> GVLOperand = 0;
@@ -47,67 +82,82 @@ def int_epi_vsetvlmax : Intrinsic<[llvm_i64_ty], [
     /* single element width */     llvm_i64_ty,
     /* vector length multiplier */ llvm_i64_ty], []>;
 
-class EPIBinary : Intrinsic< [ llvm_anyvector_ty ],
-                      [ LLVMMatchType<0>, llvm_any_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+class EPIBinaryCommon<EPIIntrinsicClassID EPICID>
+      : Intrinsic< [ llvm_anyvector_ty ],
+                   [ LLVMMatchType<0>, llvm_any_ty, llvm_i64_ty ],
+                   [ IntrNoMem ] >, EPIIntrinsic<EPICID>
 {
   let ExtendOperand = 2;
   let GVLOperand = 3;
 }
-class EPIBinaryMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
-                        llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+class EPIBinaryCommonMask<EPIIntrinsicClassID EPICID>
+     : Intrinsic< [ llvm_anyvector_ty ],
+                  [ LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
+                    llvm_anyvector_ty, llvm_i64_ty ],
+                  [ IntrNoMem ] >, EPIIntrinsic<EPICID>
 {
   let ExtendOperand = 3;
   let MaskOperand = 4;
   let GVLOperand = 5;
 }
+multiclass epi_binary {
+  def "int_epi_" # NAME : EPIBinaryCommon<EPICIDBinary>;
+  def "int_epi_" # NAME # "_mask" : EPIBinaryCommonMask<EPICIDBinaryMask>;
+}
+multiclass epi_binary_nomask {
+  def "int_epi_" # NAME : EPIBinaryCommon<EPICIDBinary>;
+}
+
+multiclass epi_reduction {
+  def "int_epi_" # NAME : EPIBinaryCommon<EPICIDReduction>;
+  def "int_epi_" # NAME # "_mask" : EPIBinaryCommonMask<EPICIDReductionMask>;
+}
+
 class EPIBinaryMaskIn : Intrinsic< [ llvm_anyvector_ty ],
-                        [ LLVMMatchType<0>, llvm_any_ty,
-                          llvm_anyvector_ty, llvm_i64_ty ],
-                        [ IntrNoMem ] >, EPIIntrinsic
+                                   [ LLVMMatchType<0>, llvm_any_ty,
+                                     llvm_anyvector_ty, llvm_i64_ty ],
+                                   [ IntrNoMem ] >,
+                        EPIIntrinsic<EPICIDBinaryMaskIn>
 {
   let ExtendOperand = 2;
   let MaskOperand = 3;
   let GVLOperand = 4;
 }
-multiclass epi_binary {
-  def "int_epi_" # NAME : EPIBinary;
-  def "int_epi_" # NAME # "_mask" : EPIBinaryMask;
-}
-multiclass epi_binary_nomask {
-  def "int_epi_" # NAME : EPIBinary;
-}
-
 multiclass epi_binary_mask_in {
   def "int_epi_" # NAME : EPIBinaryMaskIn;
 }
 
-class EPIBinaryWide : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_anyvector_ty, llvm_any_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+class EPIBinaryWideCommon<EPIIntrinsicClassID EPICID>
+      : Intrinsic< [ llvm_anyvector_ty ],
+                   [ llvm_anyvector_ty, llvm_any_ty, llvm_i64_ty ],
+                   [ IntrNoMem ] >, EPIIntrinsic<EPICID>
 {
   let ExtendOperand = 2;
   let GVLOperand = 3;
 }
-class EPIBinaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
-                      [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
-                        llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+class EPIBinaryWideCommonMask<EPIIntrinsicClassID EPICID>
+      : Intrinsic< [ llvm_anyvector_ty ],
+                   [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
+                     llvm_anyvector_ty, llvm_i64_ty ],
+                   [ IntrNoMem ] >, EPIIntrinsic<EPICID>
 {
   let ExtendOperand = 3;
   let MaskOperand = 4;
   let GVLOperand = 5;
 }
 multiclass epi_binary_wide {
-  def "int_epi_" # NAME : EPIBinaryWide;
-  def "int_epi_" # NAME # "_mask" : EPIBinaryWideMask;
+  def "int_epi_" # NAME : EPIBinaryWideCommon<EPICIDBinaryWide>;
+  def "int_epi_" # NAME # "_mask" : EPIBinaryWideCommonMask<EPICIDBinaryWideMask>;
+}
+
+multiclass epi_reduction_wide {
+  def "int_epi_" # NAME : EPIBinaryWideCommon<EPICIDReductionWide>;
+  def "int_epi_" # NAME # "_mask" : EPIBinaryWideCommonMask<EPICIDReductionWideMask>;
 }
 
 class EPIBinaryRelational : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyvector_ty, llvm_any_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDBinaryRelational>
 {
   let ExtendOperand = 2;
   let GVLOperand = 3;
@@ -115,7 +165,7 @@ class EPIBinaryRelational : Intrinsic< [ llvm_anyvector_ty ],
 class EPIBinaryRelationalMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
                         LLVMMatchType<0>, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDBinaryRelationalMask>
 {
   let ExtendOperand = 3;
   let MaskOperand = 4;
@@ -128,7 +178,7 @@ multiclass epi_relational {
 
 class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_any_ty, llvm_i64_ty],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDUnary>
 {
   let ExtendOperand = 1;
   let GVLOperand = 2;
@@ -136,7 +186,7 @@ class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
 class EPIUnaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_any_ty, llvm_anyvector_ty,
                         llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDUnaryMask>
 {
   let ExtendOperand = 2;
   let MaskOperand = 3;
@@ -149,10 +199,10 @@ multiclass epi_unary {
 
 class EPIUnaryScalar : Intrinsic< [ llvm_i64_ty ],
                       [ llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic;
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDUnaryScalar>;
 class EPIUnaryScalarMask : Intrinsic< [ llvm_i64_ty ],
                       [ llvm_anyvector_ty, LLVMMatchType<0>, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic;
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDUnaryScalarMask>;
 multiclass epi_unary_mask_to_scalar {
   def "int_epi_" # NAME : EPIUnaryScalar;
   def "int_epi_" # NAME # "_mask" : EPIUnaryScalarMask;
@@ -161,7 +211,7 @@ multiclass epi_unary_mask_to_scalar {
 class EPITernary : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_any_ty, LLVMMatchType<0>,
                         llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDTernary>
 {
   let ExtendOperand = 2;
   let GVLOperand = 4;
@@ -169,7 +219,7 @@ class EPITernary : Intrinsic< [ llvm_anyvector_ty ],
 class EPITernaryMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ LLVMMatchType<0>, llvm_any_ty, LLVMMatchType<0>,
                         llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDTernaryMask>
 {
   let ExtendOperand = 2;
   let MaskOperand = 4;
@@ -183,14 +233,14 @@ multiclass epi_ternary {
 class EPITernaryWide : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyvector_ty, llvm_any_ty, LLVMMatchType<0>,
                         llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDTernaryWide>
 {
   let ExtendOperand = 2;
 }
 class EPITernaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyvector_ty, llvm_any_ty, LLVMMatchType<0>,
                         llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDTernaryWideMask>
 {
   let ExtendOperand = 2;
 }
@@ -203,24 +253,24 @@ multiclass epi_unary_mask {
 def int_epi_# NAME : Intrinsic<[ llvm_anyvector_ty ],
                                [ LLVMMatchType<0>, llvm_i64_ty ],
                                [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDMaskOpUnary>;
 def int_epi_# NAME #_mask : Intrinsic<[ llvm_anyvector_ty ],
                                [ LLVMMatchType<0>, LLVMMatchType<0>,
                                  llvm_i64_ty ],
                                [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDMaskOpUnaryMask>;
 }
 
 multiclass epi_conversions {
 def int_epi_# NAME : Intrinsic<[ llvm_anyvector_ty ],
                                [ llvm_anyvector_ty, llvm_i64_ty ],
                                [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDConversion>;
 def int_epi_# NAME #_mask : Intrinsic<[ llvm_anyvector_ty ],
                                [ LLVMMatchType<0>, llvm_anyvector_ty,
                                  llvm_anyvector_ty, llvm_i64_ty ],
                                [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDConversionMask>;
 }
 
 
@@ -360,25 +410,25 @@ defm vmford : epi_relational;
 
 defm vfmerge : epi_binary_mask_in;
 
-defm vredsum : epi_binary;
-defm vredand : epi_binary;
-defm vredor : epi_binary;
-defm vredxor : epi_binary;
-defm vredminu : epi_binary;
-defm vredmin : epi_binary;
-defm vredmaxu : epi_binary;
-defm vredmax : epi_binary;
+defm vredsum : epi_reduction;
+defm vredand : epi_reduction;
+defm vredor : epi_reduction;
+defm vredxor : epi_reduction;
+defm vredminu : epi_reduction;
+defm vredmin : epi_reduction;
+defm vredmaxu : epi_reduction;
+defm vredmax : epi_reduction;
 
-defm vwredsumu : epi_binary_wide;
-defm vwredsum : epi_binary_wide;
+defm vwredsumu : epi_reduction_wide;
+defm vwredsum : epi_reduction_wide;
 
-defm vfredsum : epi_binary;
-defm vfredosum : epi_binary;
-defm vfredmin : epi_binary;
-defm vfredmax : epi_binary;
+defm vfredsum : epi_reduction;
+defm vfredosum : epi_reduction;
+defm vfredmin : epi_reduction;
+defm vfredmax : epi_reduction;
 
-defm vfwredsum : epi_binary_wide;
-defm vfwredosum : epi_binary_wide;
+defm vfwredsum : epi_reduction_wide;
+defm vfwredosum : epi_reduction_wide;
 
 defm vmandnot : epi_binary_nomask;
 defm vmand : epi_binary_nomask;
@@ -408,21 +458,21 @@ defm vslide1down : epi_binary;
 
 def int_epi_vext_x_v : Intrinsic< [ llvm_anyint_ty ],
                       [ llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic;
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDvext_x_v>;
 
 def int_epi_vmv_s_x : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyint_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic
+                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDvmv_s_x>
 {
   let ExtendOperand = 1;
 }
 
 def int_epi_vfmv_f_s : Intrinsic< [ llvm_anyfloat_ty ],
                                   [ llvm_anyvector_ty, llvm_i64_ty ],
-                                  [ IntrNoMem ]>, EPIIntrinsic;
+                                  [ IntrNoMem ]>, EPIIntrinsic<EPICIDvfmv_f_s>;
 def int_epi_vfmv_s_f : Intrinsic< [ llvm_anyvector_ty ],
                                   [ llvm_anyfloat_ty, llvm_i64_ty ],
-                                  [ IntrNoMem ]>, EPIIntrinsic;
+                                  [ IntrNoMem ]>, EPIIntrinsic<EPICIDvfmv_s_f>;
 
 defm vfsqrt : epi_unary;
 defm vfclass : epi_unary;
@@ -434,20 +484,20 @@ defm vmsif : epi_unary_mask;
 def int_epi_viota : Intrinsic<[ llvm_anyvector_ty ],
                               [ llvm_anyvector_ty, llvm_i64_ty ],
                               [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDvmiota>;
 def int_epi_viota_mask : Intrinsic<[ llvm_anyvector_ty ],
                                    [ llvm_anyvector_ty, LLVMMatchType<1>,
                                      llvm_i64_ty ],
                                    [ IntrNoMem ]>,
-                     EPIIntrinsic;
+                     EPIIntrinsic<EPICIDvmiota_mask>;
 
 def int_epi_vid : Intrinsic< [ llvm_anyvector_ty ],
                              [ llvm_i64_ty ], [ IntrNoMem ]>,
-                  EPIIntrinsic;
+                  EPIIntrinsic<EPICIDvid>;
 def int_epi_vid_mask : Intrinsic< [ llvm_anyvector_ty ],
                                   [ LLVMMatchType<0>, llvm_anyvector_ty,
                                     llvm_i64_ty ], [ IntrNoMem ]>,
-                  EPIIntrinsic;
+                  EPIIntrinsic<EPICIDvid_mask>;
 
 defm vfcvt_xu_f : epi_conversions;
 defm vfcvt_x_f : epi_conversions;
