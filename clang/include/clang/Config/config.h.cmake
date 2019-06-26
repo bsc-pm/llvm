@@ -32,6 +32,9 @@
 /* Default OpenMP runtime used by -fopenmp. */
 #define CLANG_DEFAULT_OPENMP_RUNTIME "${CLANG_DEFAULT_OPENMP_RUNTIME}"
 
+/* Nanos6 home directory. */
+#define CLANG_DEFAULT_NANOS6_HOME "${CLANG_DEFAULT_NANOS6_HOME}"
+
 /* Default architecture for OpenMP offloading to Nvidia GPUs. */
 #define CLANG_OPENMP_NVPTX_DEFAULT_ARCH "${CLANG_OPENMP_NVPTX_DEFAULT_ARCH}"
 

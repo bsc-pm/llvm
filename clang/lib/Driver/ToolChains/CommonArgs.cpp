@@ -533,6 +533,29 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   return true;
 }
 
+void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
+                            const ArgList &Args) {
+  std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  Optional<std::string> RuntimeHome =
+    llvm::sys::Process::GetEnv("NANOS6_HOME");
+  // First look at environment NANOS6_HOME,
+  // then CMAKE defined variable.
+  //
+  // Default to compiler lib dir. in case both are not defined.
+  if (RuntimeHome && !RuntimeHome->empty()) {
+    CmdArgs.push_back("-L");
+    CmdArgs.push_back(Args.MakeArgString(RuntimeHome.getValue() + "/lib"));
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(RuntimeHome.getValue() + "/lib"));
+  } else if (!RuntimeDefaultHome.empty()) {
+    CmdArgs.push_back("-L");
+    CmdArgs.push_back(Args.MakeArgString(RuntimeDefaultHome + "/lib"));
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(RuntimeDefaultHome + "/lib"));
+  }
+  CmdArgs.push_back("-lnanos6");
+}
+
 static void addSanitizerRuntime(const ToolChain &TC, const ArgList &Args,
                                 ArgStringList &CmdArgs, StringRef Sanitizer,
                                 bool IsShared, bool IsWhole) {

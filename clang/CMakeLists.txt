@@ -291,6 +291,9 @@ set(CLANG_DEFAULT_OBJCOPY "objcopy" CACHE STRING
 set(CLANG_DEFAULT_OPENMP_RUNTIME "libomp" CACHE STRING
   "Default OpenMP runtime used by -fopenmp.")
 
+set(CLANG_DEFAULT_NANOS6_HOME "" CACHE STRING
+  "Nanos6 home directory.")
+
 # OpenMP offloading requires at least sm_35 because we use shuffle instructions
 # to generate efficient code for reductions and the atomicMax instruction on
 # 64-bit integers in the implementation of conditional lastprivate.
