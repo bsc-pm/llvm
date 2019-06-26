@@ -1,9 +1,8 @@
 //===- ICF.cpp ------------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -52,7 +51,6 @@ private:
   bool equalsConstant(const SectionChunk *A, const SectionChunk *B);
   bool equalsVariable(const SectionChunk *A, const SectionChunk *B);
 
-  uint32_t getHash(SectionChunk *C);
   bool isEligible(SectionChunk *C);
 
   size_t findBoundary(size_t Begin, size_t End);
@@ -131,10 +129,10 @@ void ICF::segregate(size_t Begin, size_t End, bool Constant) {
 bool ICF::assocEquals(const SectionChunk *A, const SectionChunk *B) {
   auto ChildClasses = [&](const SectionChunk *SC) {
     std::vector<uint32_t> Classes;
-    for (const SectionChunk *C : SC->children())
-      if (!C->SectionName.startswith(".debug") &&
-          C->SectionName != ".gfids$y" && C->SectionName != ".gljmp$y")
-        Classes.push_back(C->Class[Cnt % 2]);
+    for (const SectionChunk &C : SC->children())
+      if (!C.getSectionName().startswith(".debug") &&
+          C.getSectionName() != ".gfids$y" && C.getSectionName() != ".gljmp$y")
+        Classes.push_back(C.Class[Cnt % 2]);
     return Classes;
   };
   return ChildClasses(A) == ChildClasses(B);
@@ -143,7 +141,7 @@ bool ICF::assocEquals(const SectionChunk *A, const SectionChunk *B) {
 // Compare "non-moving" part of two sections, namely everything
 // except relocation targets.
 bool ICF::equalsConstant(const SectionChunk *A, const SectionChunk *B) {
-  if (A->Relocs.size() != B->Relocs.size())
+  if (A->RelocsSize != B->RelocsSize)
     return false;
 
   // Compare relocations.
@@ -162,12 +160,13 @@ bool ICF::equalsConstant(const SectionChunk *A, const SectionChunk *B) {
                D1->getChunk()->Class[Cnt % 2] == D2->getChunk()->Class[Cnt % 2];
     return false;
   };
-  if (!std::equal(A->Relocs.begin(), A->Relocs.end(), B->Relocs.begin(), Eq))
+  if (!std::equal(A->getRelocs().begin(), A->getRelocs().end(),
+                  B->getRelocs().begin(), Eq))
     return false;
 
   // Compare section attributes and contents.
   return A->getOutputCharacteristics() == B->getOutputCharacteristics() &&
-         A->SectionName == B->SectionName &&
+         A->getSectionName() == B->getSectionName() &&
          A->Header->SizeOfRawData == B->Header->SizeOfRawData &&
          A->Checksum == B->Checksum && A->getContents() == B->getContents() &&
          assocEquals(A, B);
@@ -186,8 +185,8 @@ bool ICF::equalsVariable(const SectionChunk *A, const SectionChunk *B) {
         return D1->getChunk()->Class[Cnt % 2] == D2->getChunk()->Class[Cnt % 2];
     return false;
   };
-  return std::equal(A->Relocs.begin(), A->Relocs.end(), B->Relocs.begin(),
-                    Eq) &&
+  return std::equal(A->getRelocs().begin(), A->getRelocs().end(),
+                    B->getRelocs().begin(), Eq) &&
          assocEquals(A, B);
 }
 
@@ -257,32 +256,34 @@ void ICF::run(ArrayRef<Chunk *> Vec) {
 
   // Make sure that ICF doesn't merge sections that are being handled by string
   // tail merging.
-  for (auto &P : MergeChunk::Instances)
-    for (SectionChunk *SC : P.second->Sections)
-      SC->Class[0] = NextId++;
+  for (MergeChunk *MC : MergeChunk::Instances)
+    if (MC)
+      for (SectionChunk *SC : MC->Sections)
+        SC->Class[0] = NextId++;
 
   // Initially, we use hash values to partition sections.
   parallelForEach(Chunks, [&](SectionChunk *SC) {
-    SC->Class[1] = xxHash64(SC->getContents());
+    SC->Class[0] = xxHash64(SC->getContents());
   });
 
   // Combine the hashes of the sections referenced by each section into its
   // hash.
-  parallelForEach(Chunks, [&](SectionChunk *SC) {
-    uint32_t Hash = SC->Class[1];
-    for (Symbol *B : SC->symbols())
-      if (auto *Sym = dyn_cast_or_null<DefinedRegular>(B))
-        Hash ^= Sym->getChunk()->Class[1];
-    // Set MSB to 1 to avoid collisions with non-hash classs.
-    SC->Class[0] = Hash | (1U << 31);
-  });
+  for (unsigned Cnt = 0; Cnt != 2; ++Cnt) {
+    parallelForEach(Chunks, [&](SectionChunk *SC) {
+      uint32_t Hash = SC->Class[Cnt % 2];
+      for (Symbol *B : SC->symbols())
+        if (auto *Sym = dyn_cast_or_null<DefinedRegular>(B))
+          Hash += Sym->getChunk()->Class[Cnt % 2];
+      // Set MSB to 1 to avoid collisions with non-hash classs.
+      SC->Class[(Cnt + 1) % 2] = Hash | (1U << 31);
+    });
+  }
 
   // From now on, sections in Chunks are ordered so that sections in
   // the same group are consecutive in the vector.
-  std::stable_sort(Chunks.begin(), Chunks.end(),
-                   [](SectionChunk *A, SectionChunk *B) {
-                     return A->Class[0] < B->Class[0];
-                   });
+  llvm::stable_sort(Chunks, [](const SectionChunk *A, const SectionChunk *B) {
+    return A->Class[0] < B->Class[0];
+  });
 
   // Compare static contents and assign unique IDs for each static content.
   forEachClass([&](size_t Begin, size_t End) { segregate(Begin, End, true); });

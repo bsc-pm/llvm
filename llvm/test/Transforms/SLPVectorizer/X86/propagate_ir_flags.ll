@@ -88,7 +88,7 @@ define void @nsw(i32* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, <4 x i32>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <4 x i32> <i32 1, i32 1, i32 1, i32 1>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <4 x i32> [[TMP2]], <i32 1, i32 1, i32 1, i32 1>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], <4 x i32>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -124,7 +124,7 @@ define void @not_nsw(i32* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, <4 x i32>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> <i32 1, i32 1, i32 1, i32 1>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[TMP2]], <i32 1, i32 1, i32 1, i32 1>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], <4 x i32>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -160,7 +160,7 @@ define void @nuw(i32* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, <4 x i32>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw <4 x i32> <i32 1, i32 1, i32 1, i32 1>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw <4 x i32> [[TMP2]], <i32 1, i32 1, i32 1, i32 1>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], <4 x i32>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -196,7 +196,7 @@ define void @not_nuw(i32* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, <4 x i32>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> <i32 1, i32 1, i32 1, i32 1>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[TMP2]], <i32 1, i32 1, i32 1, i32 1>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], <4 x i32>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -224,6 +224,42 @@ define void @not_nuw(i32* %x) {
   ret void
 }
 
+define void @not_nsw_but_nuw(i32* %x) {
+; CHECK-LABEL: @not_nsw_but_nuw(
+; CHECK-NEXT:    [[IDX1:%.*]] = getelementptr inbounds i32, i32* [[X:%.*]], i64 0
+; CHECK-NEXT:    [[IDX2:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 1
+; CHECK-NEXT:    [[IDX3:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 2
+; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds i32, i32* [[X]], i64 3
+; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
+; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, <4 x i32>* [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw <4 x i32> [[TMP2]], <i32 1, i32 1, i32 1, i32 1>
+; CHECK-NEXT:    [[TMP4:%.*]] = bitcast i32* [[IDX1]] to <4 x i32>*
+; CHECK-NEXT:    store <4 x i32> [[TMP3]], <4 x i32>* [[TMP4]], align 4
+; CHECK-NEXT:    ret void
+;
+  %idx1 = getelementptr inbounds i32, i32* %x, i64 0
+  %idx2 = getelementptr inbounds i32, i32* %x, i64 1
+  %idx3 = getelementptr inbounds i32, i32* %x, i64 2
+  %idx4 = getelementptr inbounds i32, i32* %x, i64 3
+
+  %load1 = load i32, i32* %idx1, align 4
+  %load2 = load i32, i32* %idx2, align 4
+  %load3 = load i32, i32* %idx3, align 4
+  %load4 = load i32, i32* %idx4, align 4
+
+  %op1 = add nuw i32 %load1, 1
+  %op2 = add nuw nsw i32 %load2, 1
+  %op3 = add nuw nsw i32 %load3, 1
+  %op4 = add nuw i32 %load4, 1
+
+  store i32 %op1, i32* %idx1, align 4
+  store i32 %op2, i32* %idx2, align 4
+  store i32 %op3, i32* %idx3, align 4
+  store i32 %op4, i32* %idx4, align 4
+
+  ret void
+}
+
 define void @nnan(float* %x) {
 ; CHECK-LABEL: @nnan(
 ; CHECK-NEXT:    [[IDX1:%.*]] = getelementptr inbounds float, float* [[X:%.*]], i64 0
@@ -232,7 +268,7 @@ define void @nnan(float* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds float, float* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x float>, <4 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = fadd nnan <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fadd nnan <4 x float> [[TMP2]], <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    store <4 x float> [[TMP3]], <4 x float>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -268,7 +304,7 @@ define void @not_nnan(float* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds float, float* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x float>, <4 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = fadd <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fadd <4 x float> [[TMP2]], <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    store <4 x float> [[TMP3]], <4 x float>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -304,7 +340,7 @@ define void @only_fast(float* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds float, float* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x float>, <4 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = fadd fast <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fadd fast <4 x float> [[TMP2]], <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    store <4 x float> [[TMP3]], <4 x float>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void
@@ -340,7 +376,7 @@ define void @only_arcp(float* %x) {
 ; CHECK-NEXT:    [[IDX4:%.*]] = getelementptr inbounds float, float* [[X]], i64 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x float>, <4 x float>* [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = fadd arcp <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fadd arcp <4 x float> [[TMP2]], <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float* [[IDX1]] to <4 x float>*
 ; CHECK-NEXT:    store <4 x float> [[TMP3]], <4 x float>* [[TMP4]], align 4
 ; CHECK-NEXT:    ret void

@@ -1,9 +1,8 @@
 //===-- ItaniumABILanguageRuntime.h -----------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,9 +26,7 @@ class ItaniumABILanguageRuntime : public lldb_private::CPPLanguageRuntime {
 public:
   ~ItaniumABILanguageRuntime() override = default;
 
-  //------------------------------------------------------------------
   // Static Functions
-  //------------------------------------------------------------------
   static void Initialize();
 
   static void Terminate();
@@ -38,6 +35,16 @@ public:
   CreateInstance(Process *process, lldb::LanguageType language);
 
   static lldb_private::ConstString GetPluginNameStatic();
+
+  static char ID;
+
+  bool isA(const void *ClassID) const override {
+    return ClassID == &ID || CPPLanguageRuntime::isA(ClassID);
+  }
+
+  static bool classof(const LanguageRuntime *runtime) {
+    return runtime->isA(&ID);
+  }
 
   bool IsVTableName(const char *name) override;
 
@@ -69,9 +76,7 @@ public:
   lldb::ValueObjectSP GetExceptionObjectForThread(
       lldb::ThreadSP thread_sp) override;
 
-  //------------------------------------------------------------------
   // PluginInterface protocol
-  //------------------------------------------------------------------
   lldb_private::ConstString GetPluginName() override;
 
   uint32_t GetPluginVersion() override;
@@ -91,9 +96,8 @@ private:
 
   ItaniumABILanguageRuntime(Process *process)
       : // Call CreateInstance instead.
-        lldb_private::CPPLanguageRuntime(process),
-        m_cxx_exception_bp_sp(), m_dynamic_type_map(),
-        m_dynamic_type_map_mutex() {}
+        lldb_private::CPPLanguageRuntime(process), m_cxx_exception_bp_sp(),
+        m_dynamic_type_map(), m_dynamic_type_map_mutex() {}
 
   lldb::BreakpointSP m_cxx_exception_bp_sp;
   DynamicTypeCache m_dynamic_type_map;

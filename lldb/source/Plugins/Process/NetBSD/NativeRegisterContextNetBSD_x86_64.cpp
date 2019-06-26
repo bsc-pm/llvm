@@ -1,9 +1,8 @@
 //===-- NativeRegisterContextNetBSD_x86_64.cpp ---------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,9 +31,7 @@
 using namespace lldb_private;
 using namespace lldb_private::process_netbsd;
 
-// ----------------------------------------------------------------------------
 // Private namespace.
-// ----------------------------------------------------------------------------
 
 namespace {
 // x86 64-bit general purpose registers.
@@ -93,58 +90,6 @@ static const RegisterSet g_reg_sets_x86_64[k_num_register_sets] = {
 };
 
 #define REG_CONTEXT_SIZE (GetRegisterInfoInterface().GetGPRSize())
-
-const int fpu_present = []() -> int {
-  int mib[2];
-  int error;
-  size_t len;
-  int val;
-
-  len = sizeof(val);
-  mib[0] = CTL_MACHDEP;
-  mib[1] = CPU_FPU_PRESENT;
-
-  error = sysctl(mib, __arraycount(mib), &val, &len, NULL, 0);
-  if (error)
-    errx(EXIT_FAILURE, "sysctl");
-
-  return val;
-}();
-
-const int osfxsr = []() -> int {
-  int mib[2];
-  int error;
-  size_t len;
-  int val;
-
-  len = sizeof(val);
-  mib[0] = CTL_MACHDEP;
-  mib[1] = CPU_OSFXSR;
-
-  error = sysctl(mib, __arraycount(mib), &val, &len, NULL, 0);
-  if (error)
-    errx(EXIT_FAILURE, "sysctl");
-
-  return val;
-}();
-
-const int fpu_save = []() -> int {
-  int mib[2];
-  int error;
-  size_t len;
-  int val;
-
-  len = sizeof(val);
-  mib[0] = CTL_MACHDEP;
-  mib[1] = CPU_FPU_SAVE;
-
-  error = sysctl(mib, __arraycount(mib), &val, &len, NULL, 0);
-  if (error)
-    errx(EXIT_FAILURE, "sysctl");
-
-  return val;
-}();
-
 } // namespace
 
 NativeRegisterContextNetBSD *
@@ -153,9 +98,7 @@ NativeRegisterContextNetBSD::CreateHostNativeRegisterContextNetBSD(
   return new NativeRegisterContextNetBSD_x86_64(target_arch, native_thread);
 }
 
-// ----------------------------------------------------------------------------
 // NativeRegisterContextNetBSD_x86_64 members.
-// ----------------------------------------------------------------------------
 
 static RegisterInfoInterface *
 CreateRegisterInfoInterface(const ArchSpec &target_arch) {
@@ -202,7 +145,7 @@ int NativeRegisterContextNetBSD_x86_64::GetSetForNativeRegNum(
   if (reg_num <= k_last_gpr_x86_64)
     return GPRegSet;
   else if (reg_num <= k_last_fpr_x86_64)
-    return (fpu_present == 1 && osfxsr == 1 && fpu_save >= 1) ? FPRegSet : -1;
+    return FPRegSet;
   else if (reg_num <= k_last_avx_x86_64)
     return -1; // AVX
   else if (reg_num <= k_last_mpxr_x86_64)
@@ -215,37 +158,28 @@ int NativeRegisterContextNetBSD_x86_64::GetSetForNativeRegNum(
     return -1;
 }
 
-int NativeRegisterContextNetBSD_x86_64::ReadRegisterSet(uint32_t set) {
+Status NativeRegisterContextNetBSD_x86_64::ReadRegisterSet(uint32_t set) {
   switch (set) {
   case GPRegSet:
-    ReadGPR();
-    return 0;
+    return ReadGPR();
   case FPRegSet:
-    ReadFPR();
-    return 0;
+    return ReadFPR();
   case DBRegSet:
-    ReadDBR();
-    return 0;
-  default:
-    break;
+    return ReadDBR();
   }
-  return -1;
+  llvm_unreachable("NativeRegisterContextNetBSD_x86_64::ReadRegisterSet");
 }
-int NativeRegisterContextNetBSD_x86_64::WriteRegisterSet(uint32_t set) {
+
+Status NativeRegisterContextNetBSD_x86_64::WriteRegisterSet(uint32_t set) {
   switch (set) {
   case GPRegSet:
-    WriteGPR();
-    return 0;
+    return WriteGPR();
   case FPRegSet:
-    WriteFPR();
-    return 0;
+    return WriteFPR();
   case DBRegSet:
-    WriteDBR();
-    return 0;
-  default:
-    break;
+    return WriteDBR();
   }
-  return -1;
+  llvm_unreachable("NativeRegisterContextNetBSD_x86_64::WriteRegisterSet");
 }
 
 Status
@@ -277,13 +211,9 @@ NativeRegisterContextNetBSD_x86_64::ReadRegister(const RegisterInfo *reg_info,
     return error;
   }
 
-  if (ReadRegisterSet(set) != 0) {
-    // This is likely an internal register for lldb use only and should not be
-    // directly queried.
-    error.SetErrorStringWithFormat(
-        "reading register set for register \"%s\" failed", reg_info->name);
+  error = ReadRegisterSet(set);
+  if (error.Fail())
     return error;
-  }
 
   switch (reg) {
   case lldb_rax_x86_64:
@@ -407,7 +337,7 @@ NativeRegisterContextNetBSD_x86_64::ReadRegister(const RegisterInfo *reg_info,
   case lldb_mm5_x86_64:
   case lldb_mm6_x86_64:
   case lldb_mm7_x86_64:
-    reg_value.SetBytes(&m_fpr_x86_64.fxstate.fx_xmm[reg - lldb_mm0_x86_64],
+    reg_value.SetBytes(&m_fpr_x86_64.fxstate.fx_87_ac[reg - lldb_mm0_x86_64],
                        reg_info->byte_size, endian::InlHostByteOrder());
     break;
   case lldb_xmm0_x86_64:
@@ -473,13 +403,9 @@ Status NativeRegisterContextNetBSD_x86_64::WriteRegister(
     return error;
   }
 
-  if (ReadRegisterSet(set) != 0) {
-    // This is likely an internal register for lldb use only and should not be
-    // directly queried.
-    error.SetErrorStringWithFormat(
-        "reading register set for register \"%s\" failed", reg_info->name);
+  error = ReadRegisterSet(set);
+  if (error.Fail())
     return error;
-  }
 
   switch (reg) {
   case lldb_rax_x86_64:
@@ -603,7 +529,7 @@ Status NativeRegisterContextNetBSD_x86_64::WriteRegister(
   case lldb_mm5_x86_64:
   case lldb_mm6_x86_64:
   case lldb_mm7_x86_64:
-    ::memcpy(&m_fpr_x86_64.fxstate.fx_xmm[reg - lldb_mm0_x86_64],
+    ::memcpy(&m_fpr_x86_64.fxstate.fx_87_ac[reg - lldb_mm0_x86_64],
              reg_value.GetBytes(), reg_value.GetByteSize());
     break;
   case lldb_xmm0_x86_64:
@@ -637,10 +563,7 @@ Status NativeRegisterContextNetBSD_x86_64::WriteRegister(
     break;
   }
 
-  if (WriteRegisterSet(set) != 0)
-    error.SetErrorStringWithFormat("failed to write register set");
-
-  return error;
+  return WriteRegisterSet(set);
 }
 
 Status NativeRegisterContextNetBSD_x86_64::ReadAllRegisterValues(

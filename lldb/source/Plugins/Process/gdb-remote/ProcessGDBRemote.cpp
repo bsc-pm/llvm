@@ -1,9 +1,8 @@
 //===-- ProcessGDBRemote.cpp ------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,6 +23,7 @@
 #include <algorithm>
 #include <csignal>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <sstream>
 
@@ -41,7 +41,6 @@
 #include "lldb/Host/PosixApi.h"
 #include "lldb/Host/PseudoTerminal.h"
 #include "lldb/Host/StringConvert.h"
-#include "lldb/Host/Symbols.h"
 #include "lldb/Host/ThreadLauncher.h"
 #include "lldb/Host/XML.h"
 #include "lldb/Interpreter/CommandInterpreter.h"
@@ -54,6 +53,7 @@
 #include "lldb/Interpreter/OptionValueProperties.h"
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Interpreter/Property.h"
+#include "lldb/Symbol/LocateSymbolFile.h"
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Target/ABI.h"
 #include "lldb/Target/DynamicLoader.h"
@@ -111,9 +111,15 @@ void DumpProcessGDBRemotePacketHistory(void *p, const char *path) {
 namespace {
 
 static constexpr PropertyDefinition g_properties[] = {
-    {"packet-timeout", OptionValue::eTypeUInt64, true, 1, NULL, {},
+    {"packet-timeout", OptionValue::eTypeUInt64, true, 5
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+         * 2
+#endif
+#endif
+     , nullptr, {},
      "Specify the default packet timeout in seconds."},
-    {"target-definition-file", OptionValue::eTypeFileSpec, true, 0, NULL, {},
+    {"target-definition-file", OptionValue::eTypeFileSpec, true, 0, nullptr, {},
      "The file that provides the description for remote target registers."}};
 
 enum { ePropertyPacketTimeout, ePropertyTargetDefinitionFile };
@@ -125,26 +131,26 @@ public:
   }
 
   PluginProperties() : Properties() {
-    m_collection_sp.reset(new OptionValueProperties(GetSettingName()));
+    m_collection_sp = std::make_shared<OptionValueProperties>(GetSettingName());
     m_collection_sp->Initialize(g_properties);
   }
 
-  virtual ~PluginProperties() {}
+  ~PluginProperties() override {}
 
   uint64_t GetPacketTimeout() {
     const uint32_t idx = ePropertyPacketTimeout;
     return m_collection_sp->GetPropertyAtIndexAsUInt64(
-        NULL, idx, g_properties[idx].default_uint_value);
+        nullptr, idx, g_properties[idx].default_uint_value);
   }
 
   bool SetPacketTimeout(uint64_t timeout) {
     const uint32_t idx = ePropertyPacketTimeout;
-    return m_collection_sp->SetPropertyAtIndexAsUInt64(NULL, idx, timeout);
+    return m_collection_sp->SetPropertyAtIndexAsUInt64(nullptr, idx, timeout);
   }
 
   FileSpec GetTargetDefinitionFile() const {
     const uint32_t idx = ePropertyTargetDefinitionFile;
-    return m_collection_sp->GetPropertyAtIndexAsFileSpec(NULL, idx);
+    return m_collection_sp->GetPropertyAtIndexAsFileSpec(nullptr, idx);
   }
 };
 
@@ -153,25 +159,27 @@ typedef std::shared_ptr<PluginProperties> ProcessKDPPropertiesSP;
 static const ProcessKDPPropertiesSP &GetGlobalPluginProperties() {
   static ProcessKDPPropertiesSP g_settings_sp;
   if (!g_settings_sp)
-    g_settings_sp.reset(new PluginProperties());
+    g_settings_sp = std::make_shared<PluginProperties>();
   return g_settings_sp;
 }
 
 class ProcessGDBRemoteProvider
     : public repro::Provider<ProcessGDBRemoteProvider> {
 public:
+  struct Info {
+    static const char *name;
+    static const char *file;
+  };
+
   ProcessGDBRemoteProvider(const FileSpec &directory) : Provider(directory) {
-    m_info.name = "gdb-remote";
-    m_info.files.push_back("gdb-remote.yaml");
   }
 
   raw_ostream *GetHistoryStream() {
-    FileSpec history_file =
-        GetRoot().CopyByAppendingPathComponent("gdb-remote.yaml");
+    FileSpec history_file = GetRoot().CopyByAppendingPathComponent(Info::file);
 
     std::error_code EC;
     m_stream_up = llvm::make_unique<raw_fd_ostream>(history_file.GetPath(), EC,
-                                                    sys::fs::OpenFlags::F_None);
+                                                    sys::fs::OpenFlags::F_Text);
     return m_stream_up.get();
   }
 
@@ -191,6 +199,8 @@ private:
 };
 
 char ProcessGDBRemoteProvider::ID = 0;
+const char *ProcessGDBRemoteProvider::Info::name = "gdb-remote";
+const char *ProcessGDBRemoteProvider::Info::file = "gdb-remote.yaml";
 
 } // namespace
 
@@ -239,8 +249,8 @@ ProcessGDBRemote::CreateInstance(lldb::TargetSP target_sp,
                                  ListenerSP listener_sp,
                                  const FileSpec *crash_file_path) {
   lldb::ProcessSP process_sp;
-  if (crash_file_path == NULL)
-    process_sp.reset(new ProcessGDBRemote(target_sp, listener_sp));
+  if (crash_file_path == nullptr)
+    process_sp = std::make_shared<ProcessGDBRemote>(target_sp, listener_sp);
   return process_sp;
 }
 
@@ -275,15 +285,13 @@ bool ProcessGDBRemote::CanDebug(lldb::TargetSP target_sp,
   return true;
 }
 
-//----------------------------------------------------------------------
 // ProcessGDBRemote constructor
-//----------------------------------------------------------------------
 ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
                                    ListenerSP listener_sp)
     : Process(target_sp, listener_sp),
       m_debugserver_pid(LLDB_INVALID_PROCESS_ID), m_last_stop_packet_mutex(),
       m_register_info(),
-      m_async_broadcaster(NULL, "lldb.process.gdb-remote.async-broadcaster"),
+      m_async_broadcaster(nullptr, "lldb.process.gdb-remote.async-broadcaster"),
       m_async_listener_sp(
           Listener::MakeListener("lldb.process.gdb-remote.async-listener")),
       m_async_thread_state_mutex(), m_thread_ids(), m_thread_pcs(),
@@ -340,9 +348,7 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
     m_gdb_comm.SetPacketTimeout(std::chrono::seconds(timeout_seconds));
 }
 
-//----------------------------------------------------------------------
 // Destructor
-//----------------------------------------------------------------------
 ProcessGDBRemote::~ProcessGDBRemote() {
   //  m_mach_process.UnregisterNotificationCallbacks (this);
   Clear();
@@ -360,9 +366,7 @@ ProcessGDBRemote::~ProcessGDBRemote() {
   KillDebugserverProcess();
 }
 
-//----------------------------------------------------------------------
 // PluginInterface
-//----------------------------------------------------------------------
 ConstString ProcessGDBRemote::GetPluginName() { return GetPluginNameStatic(); }
 
 uint32_t ProcessGDBRemote::GetPluginVersion() { return 1; }
@@ -370,7 +374,7 @@ uint32_t ProcessGDBRemote::GetPluginVersion() { return 1; }
 bool ProcessGDBRemote::ParsePythonTargetDefinition(
     const FileSpec &target_definition_fspec) {
   ScriptInterpreter *interpreter =
-      GetTarget().GetDebugger().GetCommandInterpreter().GetScriptInterpreter();
+      GetTarget().GetDebugger().GetScriptInterpreter();
   Status error;
   StructuredData::ObjectSP module_object_sp(
       interpreter->LoadPluginModule(target_definition_fspec, error));
@@ -540,8 +544,8 @@ void ProcessGDBRemote::BuildDynamicRegisterInfo(bool force) {
         std::vector<uint32_t> invalidate_regs;
         std::vector<uint8_t> dwarf_opcode_bytes;
         RegisterInfo reg_info = {
-            NULL,          // Name
-            NULL,          // Alt name
+            nullptr,       // Name
+            nullptr,       // Alt name
             0,             // byte size
             reg_offset,    // offset
             eEncodingUint, // encoding
@@ -553,10 +557,10 @@ void ProcessGDBRemote::BuildDynamicRegisterInfo(bool force) {
                 reg_num,             // process plugin reg num
                 reg_num              // native register number
             },
-            NULL,
-            NULL,
-            NULL, // Dwarf expression opcode bytes pointer
-            0     // Dwarf expression opcode bytes length
+            nullptr,
+            nullptr,
+            nullptr, // Dwarf expression opcode bytes pointer
+            0        // Dwarf expression opcode bytes length
         };
 
         while (response.GetNameColonValue(name, value)) {
@@ -576,7 +580,7 @@ void ProcessGDBRemote::BuildDynamicRegisterInfo(bool force) {
               reg_info.encoding = encoding;
           } else if (name.equals("format")) {
             Format format = eFormatInvalid;
-            if (OptionArgParser::ToFormat(value.str().c_str(), format, NULL)
+            if (OptionArgParser::ToFormat(value.str().c_str(), format, nullptr)
                     .Success())
               reg_info.format = format;
             else {
@@ -796,9 +800,7 @@ Status ProcessGDBRemote::WillLaunchOrAttach() {
   return error;
 }
 
-//----------------------------------------------------------------------
 // Process Control
-//----------------------------------------------------------------------
 Status ProcessGDBRemote::DoLaunch(lldb_private::Module *exe_module,
                                   ProcessLaunchInfo &launch_info) {
   Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PROCESS));
@@ -883,8 +885,8 @@ Status ProcessGDBRemote::DoLaunch(lldb_private::Module *exe_module,
         // since 'O' packets can really slow down debugging if the inferior
         // does a lot of output.
         if ((!stdin_file_spec || !stdout_file_spec || !stderr_file_spec) &&
-            pty.OpenFirstAvailableMaster(O_RDWR | O_NOCTTY, NULL, 0)) {
-          FileSpec slave_name{pty.GetSlaveName(NULL, 0)};
+            pty.OpenFirstAvailableMaster(O_RDWR | O_NOCTTY, nullptr, 0)) {
+          FileSpec slave_name{pty.GetSlaveName(nullptr, 0)};
 
           if (!stdin_file_spec)
             stdin_file_spec = slave_name;
@@ -928,7 +930,7 @@ Status ProcessGDBRemote::DoLaunch(lldb_private::Module *exe_module,
           GetTarget().GetArchitecture().GetArchitectureName());
 
       const char *launch_event_data = launch_info.GetLaunchEventData();
-      if (launch_event_data != NULL && *launch_event_data != '\0')
+      if (launch_event_data != nullptr && *launch_event_data != '\0')
         m_gdb_comm.SendLaunchEventDataPacket(launch_event_data);
 
       if (working_dir) {
@@ -1013,14 +1015,14 @@ Status ProcessGDBRemote::ConnectToDebugserver(llvm::StringRef connect_url) {
     if (log)
       log->Printf("ProcessGDBRemote::%s Connecting to %s", __FUNCTION__,
                   connect_url.str().c_str());
-    std::unique_ptr<ConnectionFileDescriptor> conn_ap(
+    std::unique_ptr<ConnectionFileDescriptor> conn_up(
         new ConnectionFileDescriptor());
-    if (conn_ap.get()) {
+    if (conn_up) {
       const uint32_t max_retry_count = 50;
       uint32_t retry_count = 0;
       while (!m_gdb_comm.IsConnected()) {
-        if (conn_ap->Connect(connect_url, &error) == eConnectionStatusSuccess) {
-          m_gdb_comm.SetConnection(conn_ap.release());
+        if (conn_up->Connect(connect_url, &error) == eConnectionStatusSuccess) {
+          m_gdb_comm.SetConnection(conn_up.release());
           break;
         } else if (error.WasInterrupted()) {
           // If we were interrupted, don't keep retrying.
@@ -1702,7 +1704,7 @@ bool ProcessGDBRemote::UpdateThreadList(ThreadList &old_thread_list,
       ThreadSP thread_sp(
           old_thread_list_copy.RemoveThreadByProtocolID(tid, false));
       if (!thread_sp) {
-        thread_sp.reset(new ThreadGDBRemote(*this, tid));
+        thread_sp = std::make_shared<ThreadGDBRemote>(*this, tid);
         LLDB_LOGV(log, "Making new thread: {0} for thread ID: {1:x}.",
                   thread_sp.get(), thread_sp->GetID());
       } else {
@@ -1818,7 +1820,7 @@ ThreadSP ProcessGDBRemote::SetThreadStopInfo(
 
       if (!thread_sp) {
         // Create the thread if we need to
-        thread_sp.reset(new ThreadGDBRemote(*this, tid));
+        thread_sp = std::make_shared<ThreadGDBRemote>(*this, tid);
         m_thread_list_real.AddThread(thread_sp);
       }
     }
@@ -1842,7 +1844,7 @@ ThreadSP ProcessGDBRemote::SetThreadStopInfo(
         gdb_thread->PrivateSetRegisterValue(pair.first, buffer_sp->GetData());
       }
 
-      thread_sp->SetName(thread_name.empty() ? NULL : thread_name.c_str());
+      thread_sp->SetName(thread_name.empty() ? nullptr : thread_name.c_str());
 
       gdb_thread->SetThreadDispatchQAddr(thread_dispatch_qaddr);
       // Check if the GDB server was able to provide the queue name, kind and
@@ -2711,9 +2713,7 @@ void ProcessGDBRemote::SetUnixSignals(const UnixSignalsSP &signals_sp) {
   Process::SetUnixSignals(std::make_shared<GDBRemoteSignals>(signals_sp));
 }
 
-//------------------------------------------------------------------
 // Process Queries
-//------------------------------------------------------------------
 
 bool ProcessGDBRemote::IsAlive() {
   return m_gdb_comm.IsConnected() && Process::IsAlive();
@@ -2757,9 +2757,7 @@ void ProcessGDBRemote::WillPublicStop() {
   }
 }
 
-//------------------------------------------------------------------
 // Process Memory
-//------------------------------------------------------------------
 size_t ProcessGDBRemote::DoReadMemory(addr_t addr, void *buf, size_t size,
                                       Status &error) {
   GetMaxMemorySize();
@@ -3120,14 +3118,12 @@ Status ProcessGDBRemote::DoDeallocateMemory(lldb::addr_t addr) {
   return error;
 }
 
-//------------------------------------------------------------------
 // Process STDIO
-//------------------------------------------------------------------
 size_t ProcessGDBRemote::PutSTDIN(const char *src, size_t src_len,
                                   Status &error) {
   if (m_stdio_communication.IsConnected()) {
     ConnectionStatus status;
-    m_stdio_communication.Write(src, src_len, status, NULL);
+    m_stdio_communication.Write(src, src_len, status, nullptr);
   } else if (m_stdin_forward) {
     m_gdb_comm.SendStdinNotification(src, src_len);
   }
@@ -3136,7 +3132,7 @@ size_t ProcessGDBRemote::PutSTDIN(const char *src, size_t src_len,
 
 Status ProcessGDBRemote::EnableBreakpointSite(BreakpointSite *bp_site) {
   Status error;
-  assert(bp_site != NULL);
+  assert(bp_site != nullptr);
 
   // Get logging info
   Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_BREAKPOINTS));
@@ -3262,7 +3258,7 @@ Status ProcessGDBRemote::EnableBreakpointSite(BreakpointSite *bp_site) {
 
 Status ProcessGDBRemote::DisableBreakpointSite(BreakpointSite *bp_site) {
   Status error;
-  assert(bp_site != NULL);
+  assert(bp_site != nullptr);
   addr_t addr = bp_site->GetLoadAddress();
   user_id_t site_id = bp_site->GetID();
   Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_BREAKPOINTS));
@@ -3432,16 +3428,10 @@ Status ProcessGDBRemote::ConnectToReplayServer(repro::Loader *loader) {
   if (!loader)
     return Status("No loader provided.");
 
-  auto provider_info = loader->GetProviderInfo("gdb-remote");
-  if (!provider_info)
-    return Status("No provider for gdb-remote.");
-
-  if (provider_info->files.empty())
-    return Status("Provider for  gdb-remote contains no files.");
-
   // Construct replay history path.
-  FileSpec history_file = loader->GetRoot().CopyByAppendingPathComponent(
-      provider_info->files.front());
+  FileSpec history_file = loader->GetFile<ProcessGDBRemoteProvider::Info>();
+  if (!history_file)
+    return Status("No provider for gdb-remote.");
 
   // Enable replay mode.
   m_replay_mode = true;
@@ -3679,9 +3669,9 @@ bool ProcessGDBRemote::StartAsyncThread() {
     // Create a thread that watches our internal state and controls which
     // events make it to clients (into the DCProcess event queue).
 
-    m_async_thread =
-        ThreadLauncher::LaunchThread("<lldb.process.gdb-remote.async>",
-                                     ProcessGDBRemote::AsyncThread, this, NULL);
+    m_async_thread = ThreadLauncher::LaunchThread(
+        "<lldb.process.gdb-remote.async>", ProcessGDBRemote::AsyncThread, this,
+        nullptr);
   } else if (log)
     log->Printf("ProcessGDBRemote::%s () - Called when Async thread was "
                 "already running.",
@@ -3775,7 +3765,7 @@ thread_result_t ProcessGDBRemote::AsyncThread(void *arg) {
                           ") got eBroadcastBitAsyncContinue: %s",
                           __FUNCTION__, arg, process->GetID(), continue_cstr);
 
-            if (::strstr(continue_cstr, "vAttach") == NULL)
+            if (::strstr(continue_cstr, "vAttach") == nullptr)
               process->SetPrivateState(eStateRunning);
             StringExtractorGDBRemote response;
 
@@ -3841,11 +3831,11 @@ thread_result_t ProcessGDBRemote::AsyncThread(void *arg) {
                 // the "E87" error code from debugserver -- this indicates that
                 // the process is not debuggable.  Return a slightly more
                 // helpful error message about why the attach failed.
-                if (::strstr(continue_cstr, "vAttach") != NULL &&
+                if (::strstr(continue_cstr, "vAttach") != nullptr &&
                     response.GetError() == 0x87) {
                   process->SetExitStatus(-1, "cannot attach to process due to "
                                              "System Integrity Protection");
-                } else if (::strstr(continue_cstr, "vAttach") != NULL &&
+                } else if (::strstr(continue_cstr, "vAttach") != nullptr &&
                            response.GetStatus().Fail()) {
                   process->SetExitStatus(-1, response.GetStatus().AsCString());
                 } else {
@@ -3920,7 +3910,7 @@ thread_result_t ProcessGDBRemote::AsyncThread(void *arg) {
                 ") thread exiting...",
                 __FUNCTION__, arg, process->GetID());
 
-  return NULL;
+  return {};
 }
 
 // uint32_t
@@ -4016,7 +4006,7 @@ bool ProcessGDBRemote::StartNoticingNewThreads() {
       }
     }
   }
-  return m_thread_create_bp_sp.get() != NULL;
+  return m_thread_create_bp_sp.get() != nullptr;
 }
 
 bool ProcessGDBRemote::StopNoticingNewThreads() {
@@ -4031,9 +4021,9 @@ bool ProcessGDBRemote::StopNoticingNewThreads() {
 }
 
 DynamicLoader *ProcessGDBRemote::GetDynamicLoader() {
-  if (m_dyld_ap.get() == NULL)
-    m_dyld_ap.reset(DynamicLoader::FindPlugin(this, NULL));
-  return m_dyld_ap.get();
+  if (m_dyld_up.get() == nullptr)
+    m_dyld_up.reset(DynamicLoader::FindPlugin(this, nullptr));
+  return m_dyld_up.get();
 }
 
 Status ProcessGDBRemote::SendEventData(const char *data) {
@@ -4053,17 +4043,17 @@ Status ProcessGDBRemote::SendEventData(const char *data) {
   return error;
 }
 
-const DataBufferSP ProcessGDBRemote::GetAuxvData() {
+DataExtractor ProcessGDBRemote::GetAuxvData() {
   DataBufferSP buf;
   if (m_gdb_comm.GetQXferAuxvReadSupported()) {
     std::string response_string;
     if (m_gdb_comm.SendPacketsAndConcatenateResponses("qXfer:auxv:read::",
                                                       response_string) ==
         GDBRemoteCommunication::PacketResult::Success)
-      buf.reset(new DataBufferHeap(response_string.c_str(),
-                                   response_string.length()));
+      buf = std::make_shared<DataBufferHeap>(response_string.c_str(),
+                                             response_string.length());
   }
-  return buf;
+  return DataExtractor(buf, GetByteOrder(), GetAddressByteSize());
 }
 
 StructuredData::ObjectSP
@@ -4212,7 +4202,7 @@ StructuredData::ObjectSP ProcessGDBRemote::GetSharedCacheInfo() {
 }
 
 Status ProcessGDBRemote::ConfigureStructuredData(
-    const ConstString &type_name, const StructuredData::ObjectSP &config_sp) {
+    ConstString type_name, const StructuredData::ObjectSP &config_sp) {
   return m_gdb_comm.ConfigureRemoteStructuredData(type_name, config_sp);
 }
 
@@ -4373,8 +4363,8 @@ bool ParseRegisters(XMLNode feature_node, GdbServerTargetInfo &target_info,
         bool encoding_set = false;
         bool format_set = false;
         RegisterInfo reg_info = {
-            NULL,          // Name
-            NULL,          // Alt name
+            nullptr,       // Name
+            nullptr,       // Alt name
             0,             // byte size
             reg_offset,    // offset
             eEncodingUint, // encoding
@@ -4386,10 +4376,10 @@ bool ParseRegisters(XMLNode feature_node, GdbServerTargetInfo &target_info,
                 cur_reg_num,         // process plugin reg num
                 cur_reg_num          // native register number
             },
-            NULL,
-            NULL,
-            NULL, // Dwarf Expression opcode bytes pointer
-            0     // Dwarf Expression opcode bytes length
+            nullptr,
+            nullptr,
+            nullptr, // Dwarf Expression opcode bytes pointer
+            0        // Dwarf Expression opcode bytes length
         };
 
         reg_node.ForEachAttribute([&target_info, &gdb_group, &gdb_type,
@@ -4423,7 +4413,8 @@ bool ParseRegisters(XMLNode feature_node, GdbServerTargetInfo &target_info,
           } else if (name == "format") {
             format_set = true;
             Format format = eFormatInvalid;
-            if (OptionArgParser::ToFormat(value.data(), format, NULL).Success())
+            if (OptionArgParser::ToFormat(value.data(), format, nullptr)
+                    .Success())
               reg_info.format = format;
             else if (value == "vector-sint8")
               reg_info.format = eFormatVectorOfSInt8;
@@ -4929,7 +4920,7 @@ Status ProcessGDBRemote::GetFileLoadAddress(const FileSpec &file,
 
   StreamString packet;
   packet.PutCString("qFileLoadAddress:");
-  packet.PutCStringAsRawHex8(file_path.c_str());
+  packet.PutStringAsRawHex8(file_path);
 
   StringExtractorGDBRemote response;
   if (m_gdb_comm.SendPacketAndWaitForResponse(packet.GetString(), response,
@@ -5140,7 +5131,7 @@ public:
                             "Tests packet speeds of various sizes to determine "
                             "the performance characteristics of the GDB remote "
                             "connection. ",
-                            NULL),
+                            nullptr),
         m_option_group(),
         m_num_packets(LLDB_OPT_SET_1, false, "count", 'c', 0, eArgTypeCount,
                       "The number of packets to send of each varying size "
@@ -5165,7 +5156,7 @@ public:
     m_option_group.Finalize();
   }
 
-  ~CommandObjectProcessGDBRemoteSpeedTest() {}
+  ~CommandObjectProcessGDBRemoteSpeedTest() override {}
 
   Options *GetOptions() override { return &m_option_group; }
 
@@ -5214,9 +5205,9 @@ private:
 public:
   CommandObjectProcessGDBRemotePacketHistory(CommandInterpreter &interpreter)
       : CommandObjectParsed(interpreter, "process plugin packet history",
-                            "Dumps the packet history buffer. ", NULL) {}
+                            "Dumps the packet history buffer. ", nullptr) {}
 
-  ~CommandObjectProcessGDBRemotePacketHistory() {}
+  ~CommandObjectProcessGDBRemotePacketHistory() override {}
 
   bool DoExecute(Args &command, CommandReturnObject &result) override {
     const size_t argc = command.GetArgumentCount();
@@ -5245,9 +5236,9 @@ public:
       : CommandObjectParsed(
             interpreter, "process plugin packet xfer-size",
             "Maximum size that lldb will try to read/write one one chunk.",
-            NULL) {}
+            nullptr) {}
 
-  ~CommandObjectProcessGDBRemotePacketXferSize() {}
+  ~CommandObjectProcessGDBRemotePacketXferSize() override {}
 
   bool DoExecute(Args &command, CommandReturnObject &result) override {
     const size_t argc = command.GetArgumentCount();
@@ -5265,7 +5256,7 @@ public:
     if (process) {
       const char *packet_size = command.GetArgumentAtIndex(0);
       errno = 0;
-      uint64_t user_specified_max = strtoul(packet_size, NULL, 10);
+      uint64_t user_specified_max = strtoul(packet_size, nullptr, 10);
       if (errno == 0 && user_specified_max != 0) {
         process->SetUserSpecifiedMaxMemoryTransferSize(user_specified_max);
         result.SetStatus(eReturnStatusSuccessFinishResult);
@@ -5287,9 +5278,9 @@ public:
                             "The packet header and footer will automatically "
                             "be added to the packet prior to sending and "
                             "stripped from the result.",
-                            NULL) {}
+                            nullptr) {}
 
-  ~CommandObjectProcessGDBRemotePacketSend() {}
+  ~CommandObjectProcessGDBRemotePacketSend() override {}
 
   bool DoExecute(Args &command, CommandReturnObject &result) override {
     const size_t argc = command.GetArgumentCount();
@@ -5315,7 +5306,7 @@ public:
         output_strm.Printf("  packet: %s\n", packet_cstr);
         std::string &response_str = response.GetStringRef();
 
-        if (strstr(packet_cstr, "qGetProfileData") != NULL) {
+        if (strstr(packet_cstr, "qGetProfileData") != nullptr) {
           response_str = process->HarmonizeThreadIdsForProfileData(response);
         }
 
@@ -5340,7 +5331,7 @@ public:
                          "encoded into a valid 'qRcmd' packet, sent and the "
                          "response will be printed.") {}
 
-  ~CommandObjectProcessGDBRemotePacketMonitor() {}
+  ~CommandObjectProcessGDBRemotePacketMonitor() override {}
 
   bool DoExecute(llvm::StringRef command,
                  CommandReturnObject &result) override {
@@ -5383,7 +5374,7 @@ public:
   CommandObjectProcessGDBRemotePacket(CommandInterpreter &interpreter)
       : CommandObjectMultiword(interpreter, "process plugin packet",
                                "Commands that deal with GDB remote packets.",
-                               NULL) {
+                               nullptr) {
     LoadSubCommand(
         "history",
         CommandObjectSP(
@@ -5404,7 +5395,7 @@ public:
                        interpreter)));
   }
 
-  ~CommandObjectProcessGDBRemotePacket() {}
+  ~CommandObjectProcessGDBRemotePacket() override {}
 };
 
 class CommandObjectMultiwordProcessGDBRemote : public CommandObjectMultiword {
@@ -5419,12 +5410,12 @@ public:
         CommandObjectSP(new CommandObjectProcessGDBRemotePacket(interpreter)));
   }
 
-  ~CommandObjectMultiwordProcessGDBRemote() {}
+  ~CommandObjectMultiwordProcessGDBRemote() override {}
 };
 
 CommandObject *ProcessGDBRemote::GetPluginCommandObject() {
   if (!m_command_sp)
-    m_command_sp.reset(new CommandObjectMultiwordProcessGDBRemote(
-        GetTarget().GetDebugger().GetCommandInterpreter()));
+    m_command_sp = std::make_shared<CommandObjectMultiwordProcessGDBRemote>(
+        GetTarget().GetDebugger().GetCommandInterpreter());
   return m_command_sp.get();
 }

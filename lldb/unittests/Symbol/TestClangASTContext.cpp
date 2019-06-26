@@ -2,10 +2,9 @@
 //-*-===//
 
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,12 +34,12 @@ public:
     FileSystem::Terminate();
   }
 
-  virtual void SetUp() override {
+  void SetUp() override {
     std::string triple = HostInfo::GetTargetTriple();
     m_ast.reset(new ClangASTContext(triple.c_str()));
   }
 
-  virtual void TearDown() override { m_ast.reset(); }
+  void TearDown() override { m_ast.reset(); }
 
 protected:
   std::unique_ptr<ClangASTContext> m_ast;

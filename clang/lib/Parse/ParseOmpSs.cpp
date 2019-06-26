@@ -44,7 +44,7 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
 ///         annot_pragma_ompss_end
 ///
 StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
-    AllowedConstructsKind Allowed) {
+    ParsedStmtContext Allowed) {
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
   unsigned ScopeFlags = Scope::FnScope | Scope::DeclScope |

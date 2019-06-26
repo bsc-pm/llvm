@@ -4,10 +4,9 @@
 
 //===----------------------------------------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.txt for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -50,9 +49,9 @@
 #define KMP_COMPILER "Intel(R) C++ Compiler 17.0"
 #elif __INTEL_COMPILER == 1800
 #define KMP_COMPILER "Intel(R) C++ Compiler 18.0"
-#elif __INTEL_COMPILER == 9998
-#define KMP_COMPILER "Intel(R) C++ Compiler mainline"
-#elif __INTEL_COMPILER == 9999
+#elif __INTEL_COMPILER == 1900
+#define KMP_COMPILER "Intel(R) C++ Compiler 19.0"
+#elif __INTEL_COMPILER >= 9900
 #define KMP_COMPILER "Intel(R) C++ Compiler mainline"
 #endif
 #elif KMP_COMPILER_CLANG

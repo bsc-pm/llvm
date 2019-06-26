@@ -1,9 +1,8 @@
 //= CStringChecker.cpp - Checks calls to C string functions --------*- C++ -*-//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +17,7 @@
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
+#include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/ProgramStateTrait.h"
 #include "llvm/ADT/STLExtras.h"
@@ -58,7 +58,7 @@ public:
 
   static void *getTag() { static int tag; return &tag; }
 
-  bool evalCall(const CallExpr *CE, CheckerContext &C) const;
+  bool evalCall(const CallEvent &Call, CheckerContext &C) const;
   void checkPreStmt(const DeclStmt *DS, CheckerContext &C) const;
   void checkLiveSymbols(ProgramStateRef state, SymbolReaper &SR) const;
   void checkDeadSymbols(SymbolReaper &SR, CheckerContext &C) const;
@@ -1529,6 +1529,10 @@ void CStringChecker::evalStrlcat(CheckerContext &C, const CallExpr *CE) const {
   if (CE->getNumArgs() < 3)
     return;
 
+  // FIXME: strlcat() uses a different rule for bound checking, i.e. 'n' means
+  // a different thing as compared to strncat(). This currently causes
+  // false positives in the alpha string bound checker.
+
   //char *strlcat(char *s1, const char *s2, size_t n);
   evalStrcpyCommon(C, CE,
                    /* returnEnd = */ false,
@@ -2331,8 +2335,8 @@ static CStringChecker::FnCheck identifyCall(const CallExpr *CE,
   return nullptr;
 }
 
-bool CStringChecker::evalCall(const CallExpr *CE, CheckerContext &C) const {
-
+bool CStringChecker::evalCall(const CallEvent &Call, CheckerContext &C) const {
+  const auto *CE = dyn_cast_or_null<CallExpr>(Call.getOriginExpr());
   FnCheck evalFunction = identifyCall(CE, C);
 
   // If the callee isn't a string function, let another checker handle it.
@@ -2476,18 +2480,26 @@ void CStringChecker::checkDeadSymbols(SymbolReaper &SR,
   C.addTransition(state);
 }
 
+void ento::registerCStringModeling(CheckerManager &Mgr) {
+  Mgr.registerChecker<CStringChecker>();
+}
+
+bool ento::shouldRegisterCStringModeling(const LangOptions &LO) {
+  return true;
+}
+
 #define REGISTER_CHECKER(name)                                                 \
   void ento::register##name(CheckerManager &mgr) {                             \
-    CStringChecker *checker = mgr.registerChecker<CStringChecker>();           \
+    CStringChecker *checker = mgr.getChecker<CStringChecker>();                \
     checker->Filter.Check##name = true;                                        \
     checker->Filter.CheckName##name = mgr.getCurrentCheckName();               \
+  }                                                                            \
+                                                                               \
+  bool ento::shouldRegister##name(const LangOptions &LO) {                     \
+    return true;                                                               \
   }
 
   REGISTER_CHECKER(CStringNullArg)
   REGISTER_CHECKER(CStringOutOfBounds)
   REGISTER_CHECKER(CStringBufferOverlap)
 REGISTER_CHECKER(CStringNotNullTerm)
-
-  void ento::registerCStringCheckerBasic(CheckerManager &Mgr) {
-    Mgr.registerChecker<CStringChecker>();
-  }

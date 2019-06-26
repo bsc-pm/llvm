@@ -1,9 +1,8 @@
 //===- InstrumentationMap.cpp - XRay Instrumentation Map ------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -79,9 +78,10 @@ loadObj(StringRef Filename, object::OwningBinary<object::ObjectFile> &ObjFile,
         "Failed to find XRay instrumentation map.",
         std::make_error_code(std::errc::executable_format_error));
 
-  if (I->getContents(Contents))
-    return errorCodeToError(
-        std::make_error_code(std::errc::executable_format_error));
+  if (Expected<StringRef> E = I->getContents())
+    Contents = *E;
+  else
+    return E.takeError();
 
   RelocMap Relocs;
   if (ObjFile.getBinary()->isELF()) {

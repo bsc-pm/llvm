@@ -1,9 +1,8 @@
 //===- EhFrame.cpp -------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -97,7 +96,7 @@ void EhReader::skipBytes(size_t Count) {
 
 // Read a null-terminated string.
 StringRef EhReader::readString() {
-  const uint8_t *End = std::find(D.begin(), D.end(), '\0');
+  const uint8_t *End = llvm::find(D, '\0');
   if (End == D.end())
     failOn(D.data(), "corrupted CIE (failed to read string)");
   StringRef S = toStringRef(D.slice(0, End - D.begin()));

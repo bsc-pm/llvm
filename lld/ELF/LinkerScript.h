@@ -1,9 +1,8 @@
 //===- LinkerScript.h -------------------------------------------*- C++ -*-===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,7 +30,6 @@ namespace elf {
 
 class Defined;
 class InputSection;
-class InputSectionBase;
 class InputSectionBase;
 class OutputSection;
 class SectionBase;
@@ -68,7 +66,7 @@ struct ExprValue {
 // This represents an expression in the linker script.
 // ScriptParser::readExpr reads an expression and returns an Expr.
 // Later, we evaluate the expression by calling the function.
-typedef std::function<ExprValue()> Expr;
+using Expr = std::function<ExprValue()>;
 
 // This enum is used to implement linker script SECTIONS command.
 // https://sourceware.org/binutils/docs/ld/SECTIONS.html#SECTIONS

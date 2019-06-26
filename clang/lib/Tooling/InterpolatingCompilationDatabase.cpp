@@ -1,9 +1,8 @@
 //===- InterpolatingCompilationDatabase.cpp ---------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -206,10 +205,13 @@ struct TransferableCommand {
     bool TypeCertain;
     auto TargetType = guessType(Filename, &TypeCertain);
     // If the filename doesn't determine the language (.h), transfer with -x.
-    if (TargetType != types::TY_INVALID && !TypeCertain && Type) {
-      TargetType = types::onlyPrecompileType(TargetType) // header?
-                       ? types::lookupHeaderTypeForSourceType(*Type)
-                       : *Type;
+    if ((!TargetType || !TypeCertain) && Type) {
+      // Use *Type, or its header variant if the file is a header.
+      // Treat no/invalid extension as header (e.g. C++ standard library).
+      TargetType =
+          (!TargetType || types::onlyPrecompileType(TargetType)) // header?
+              ? types::lookupHeaderTypeForSourceType(*Type)
+              : *Type;
       if (ClangCLMode) {
         const StringRef Flag = toCLFlag(TargetType);
         if (!Flag.empty())
@@ -227,6 +229,7 @@ struct TransferableCommand {
           LangStandard::getLangStandardForKind(Std).getName()).str());
     }
     Result.CommandLine.push_back(Filename);
+    Result.Heuristic = "inferred from " + Cmd.Filename;
     return Result;
   }
 

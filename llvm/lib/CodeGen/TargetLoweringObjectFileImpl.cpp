@@ -1,9 +1,8 @@
 //===- llvm/CodeGen/TargetLoweringObjectFileImpl.cpp - Object File Info ---===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -269,6 +268,19 @@ void TargetLoweringObjectFileELF::emitModuleMetadata(MCStreamer &Streamer,
         Streamer.EmitBytes(cast<MDString>(Option)->getString());
         Streamer.EmitIntValue(0, 1);
       }
+    }
+  }
+
+  if (NamedMDNode *DependentLibraries = M.getNamedMetadata("llvm.dependent-libraries")) {
+    auto *S = C.getELFSection(".deplibs", ELF::SHT_LLVM_DEPENDENT_LIBRARIES,
+                              ELF::SHF_MERGE | ELF::SHF_STRINGS, 1, "");
+
+    Streamer.SwitchSection(S);
+
+    for (const auto &Operand : DependentLibraries->operands()) {
+      Streamer.EmitBytes(
+          cast<MDString>(cast<MDNode>(Operand)->getOperand(0))->getString());
+      Streamer.EmitIntValue(0, 1);
     }
   }
 
@@ -1694,8 +1706,11 @@ MCSection *TargetLoweringObjectFileWasm::getExplicitSectionGlobal(
     Group = C->getName();
   }
 
-  return getContext().getWasmSection(Name, Kind, Group,
-                                     MCContext::GenericSectionID);
+  MCSectionWasm* Section =
+      getContext().getWasmSection(Name, Kind, Group,
+                                  MCContext::GenericSectionID);
+
+  return Section;
 }
 
 static MCSectionWasm *selectWasmSectionForGlobal(
@@ -1724,6 +1739,7 @@ static MCSectionWasm *selectWasmSectionForGlobal(
     UniqueID = *NextUniqueID;
     (*NextUniqueID)++;
   }
+
   return Ctx.getWasmSection(Name, Kind, Group, UniqueID);
 }
 

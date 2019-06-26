@@ -1,9 +1,8 @@
 //===-- AppleDWARFIndex.cpp ------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -75,8 +74,8 @@ void AppleDWARFIndex::GetGlobalVariables(const DWARFUnit &cu,
     return;
 
   DWARFMappedHash::DIEInfoArray hash_data;
-  if (m_apple_names_up->AppendAllDIEsInRange(
-          cu.GetOffset(), cu.GetNextCompileUnitOffset(), hash_data))
+  if (m_apple_names_up->AppendAllDIEsInRange(cu.GetOffset(),
+                                             cu.GetNextUnitOffset(), hash_data))
     DWARFMappedHash::ExtractDIEArray(hash_data, offsets);
 }
 
@@ -156,12 +155,12 @@ void AppleDWARFIndex::GetFunctions(const RegularExpression &regex,
     DWARFMappedHash::ExtractDIEArray(hash_data, offsets);
 }
 
-void AppleDWARFIndex::ReportInvalidDIEOffset(dw_offset_t offset,
-                                             llvm::StringRef name) {
+void AppleDWARFIndex::ReportInvalidDIERef(const DIERef &ref,
+                                          llvm::StringRef name) {
   m_module.ReportErrorIfModifyDetected(
       "the DWARF debug information has been modified (accelerator table had "
       "bad die 0x%8.8x for '%s')\n",
-      offset, name.str().c_str());
+      ref.die_offset, name.str().c_str());
 }
 
 void AppleDWARFIndex::Dump(Stream &s) {

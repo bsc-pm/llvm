@@ -1,9 +1,8 @@
 //===--- OSTargets.h - Declare OS target feature support --------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -133,6 +132,37 @@ public:
   /// is very similar to ELF's "protected";  Darwin requires a "weak"
   /// attribute on declarations that can be dynamically replaced.
   bool hasProtectedVisibility() const override { return false; }
+
+  unsigned getExnObjectAlignment() const override {
+    // Older versions of libc++abi guarantee an alignment of only 8-bytes for
+    // exception objects because of a bug in __cxa_exception that was
+    // eventually fixed in r319123.
+    llvm::VersionTuple MinVersion;
+    const llvm::Triple &T = this->getTriple();
+
+    // Compute the earliest OS versions that have the fix to libc++abi.
+    switch (T.getOS()) {
+    case llvm::Triple::Darwin:
+    case llvm::Triple::MacOSX: // Earliest supporting version is 10.14.
+      MinVersion = llvm::VersionTuple(10U, 14U);
+      break;
+    case llvm::Triple::IOS:
+    case llvm::Triple::TvOS: // Earliest supporting version is 12.0.0.
+      MinVersion = llvm::VersionTuple(12U);
+      break;
+    case llvm::Triple::WatchOS: // Earliest supporting version is 5.0.0.
+      MinVersion = llvm::VersionTuple(5U);
+      break;
+    default:
+      llvm_unreachable("Unexpected OS");
+    }
+
+    unsigned Major, Minor, Micro;
+    T.getOSVersion(Major, Minor, Micro);
+    if (llvm::VersionTuple(Major, Minor, Micro) < MinVersion)
+      return 64;
+    return OSTargetInfo<Target>::getExnObjectAlignment();
+  }
 
   TargetInfo::IntType getLeastIntTypeByWidth(unsigned BitWidth,
                                              bool IsSigned) const final {
@@ -602,7 +632,11 @@ protected:
 public:
   SolarisTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : OSTargetInfo<Target>(Triple, Opts) {
-    // FIXME: WIntType should be SignedLong
+    if (this->PointerWidth == 64) {
+      this->WCharType = this->WIntType = this->SignedInt;
+    } else {
+      this->WCharType = this->WIntType = this->SignedLong;
+    }
     switch (Triple.getArch()) {
     default:
       break;
@@ -612,6 +646,69 @@ public:
       break;
     }
   }
+};
+
+// AIX Target
+template <typename Target>
+class AIXTargetInfo : public OSTargetInfo<Target> {
+protected:
+  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                    MacroBuilder &Builder) const override {
+    DefineStd(Builder, "unix", Opts);
+    Builder.defineMacro("_IBMR2");
+    Builder.defineMacro("_POWER");
+
+    Builder.defineMacro("_AIX");
+
+    unsigned Major, Minor, Micro;
+    Triple.getOSVersion(Major, Minor, Micro);
+
+    // Define AIX OS-Version Macros.
+    // Includes logic for legacy versions of AIX; no specific intent to support.
+    std::pair<int, int> OsVersion = {Major, Minor};
+    if (OsVersion >= std::make_pair(3, 2)) Builder.defineMacro("_AIX32");
+    if (OsVersion >= std::make_pair(4, 1)) Builder.defineMacro("_AIX41");
+    if (OsVersion >= std::make_pair(4, 3)) Builder.defineMacro("_AIX43");
+    if (OsVersion >= std::make_pair(5, 0)) Builder.defineMacro("_AIX50");
+    if (OsVersion >= std::make_pair(5, 1)) Builder.defineMacro("_AIX51");
+    if (OsVersion >= std::make_pair(5, 2)) Builder.defineMacro("_AIX52");
+    if (OsVersion >= std::make_pair(5, 3)) Builder.defineMacro("_AIX53");
+    if (OsVersion >= std::make_pair(6, 1)) Builder.defineMacro("_AIX61");
+    if (OsVersion >= std::make_pair(7, 1)) Builder.defineMacro("_AIX71");
+    if (OsVersion >= std::make_pair(7, 2)) Builder.defineMacro("_AIX72");
+
+    // FIXME: Do not define _LONG_LONG when -fno-long-long is specified.
+    Builder.defineMacro("_LONG_LONG");
+
+    if (Opts.POSIXThreads) {
+      Builder.defineMacro("_THREAD_SAFE");
+    }
+
+    if (this->PointerWidth == 64) {
+      Builder.defineMacro("__64BIT__");
+    }
+
+    // Define _WCHAR_T when it is a fundamental type
+    // (i.e., for C++ without -fno-wchar).
+    if (Opts.CPlusPlus && Opts.WChar) {
+      Builder.defineMacro("_WCHAR_T");
+    }
+  }
+
+public:
+  AIXTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : OSTargetInfo<Target>(Triple, Opts) {
+    if (this->PointerWidth == 64) {
+      this->WCharType = this->UnsignedInt;
+    } else {
+      this->WCharType = this->UnsignedShort;
+    }
+    this->UseZeroLengthBitfieldAlignment = true;
+  }
+
+  // AIX sets FLT_EVAL_METHOD to be 1.
+  unsigned getFloatEvalMethod() const override { return 1; }
+  bool hasInt128Type() const override { return false; }
 };
 
 // Windows target
@@ -764,14 +861,17 @@ public:
 template <typename Target>
 class LLVM_LIBRARY_VISIBILITY WebAssemblyOSTargetInfo
     : public OSTargetInfo<Target> {
+protected:
   void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
-                    MacroBuilder &Builder) const final {
+                    MacroBuilder &Builder) const {
     // A common platform macro.
     if (Opts.POSIXThreads)
       Builder.defineMacro("_REENTRANT");
     // Follow g++ convention and predefine _GNU_SOURCE for C++.
     if (Opts.CPlusPlus)
       Builder.defineMacro("_GNU_SOURCE");
+    // Indicate that we have __float128.
+    Builder.defineMacro("__FLOAT128__");
   }
 
 public:
@@ -780,7 +880,38 @@ public:
       : OSTargetInfo<Target>(Triple, Opts) {
     this->MCountName = "__mcount";
     this->TheCXXABI.set(TargetCXXABI::WebAssembly);
+    this->HasFloat128 = true;
   }
+};
+
+// WASI target
+template <typename Target>
+class LLVM_LIBRARY_VISIBILITY WASITargetInfo
+    : public WebAssemblyOSTargetInfo<Target> {
+  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                    MacroBuilder &Builder) const final {
+    WebAssemblyOSTargetInfo<Target>::getOSDefines(Opts, Triple, Builder);
+    Builder.defineMacro("__wasi__");
+  }
+
+public:
+  explicit WASITargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : WebAssemblyOSTargetInfo<Target>(Triple, Opts) {}
+};
+
+// Emscripten target
+template <typename Target>
+class LLVM_LIBRARY_VISIBILITY EmscriptenTargetInfo
+    : public WebAssemblyOSTargetInfo<Target> {
+  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                    MacroBuilder &Builder) const final {
+    WebAssemblyOSTargetInfo<Target>::getOSDefines(Opts, Triple, Builder);
+    Builder.defineMacro("__EMSCRIPTEN__");
+  }
+
+public:
+  explicit EmscriptenTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : WebAssemblyOSTargetInfo<Target>(Triple, Opts) {}
 };
 
 } // namespace targets

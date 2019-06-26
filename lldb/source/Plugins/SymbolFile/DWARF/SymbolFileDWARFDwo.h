@@ -1,9 +1,8 @@
 //===-- SymbolFileDWARFDwo.h ------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,12 +13,11 @@
 
 class SymbolFileDWARFDwo : public SymbolFileDWARF {
 public:
-  SymbolFileDWARFDwo(lldb::ObjectFileSP objfile, DWARFUnit *dwarf_cu);
+  SymbolFileDWARFDwo(lldb::ObjectFileSP objfile, DWARFCompileUnit &dwarf_cu);
 
   ~SymbolFileDWARFDwo() override = default;
 
-  lldb::CompUnitSP ParseCompileUnit(DWARFUnit *dwarf_cu,
-                                    uint32_t cu_idx) override;
+  lldb::CompUnitSP ParseCompileUnit(DWARFCompileUnit &dwarf_cu) override;
 
   DWARFUnit *GetCompileUnit();
 
@@ -44,13 +42,7 @@ public:
     return nullptr;
   }
 
-  DWARFUnit *GetBaseCompileUnit() override;
-
-  const lldb_private::DWARFDataExtractor &get_debug_abbrev_data() override;
-  const lldb_private::DWARFDataExtractor &get_debug_addr_data() override;
-  const lldb_private::DWARFDataExtractor &get_debug_info_data() override;
-  const lldb_private::DWARFDataExtractor &get_debug_str_data() override;
-  const lldb_private::DWARFDataExtractor &get_debug_str_offsets_data() override;
+  DWARFCompileUnit *GetBaseCompileUnit() override { return &m_base_dwarf_cu; }
 
 protected:
   void LoadSectionData(lldb::SectionType sect_type,
@@ -70,13 +62,13 @@ protected:
       const DWARFDeclContext &die_decl_ctx) override;
 
   lldb::TypeSP FindCompleteObjCDefinitionTypeForDIE(
-      const DWARFDIE &die, const lldb_private::ConstString &type_name,
+      const DWARFDIE &die, lldb_private::ConstString type_name,
       bool must_be_implementation) override;
 
-  SymbolFileDWARF *GetBaseSymbolFile();
+  SymbolFileDWARF &GetBaseSymbolFile();
 
   lldb::ObjectFileSP m_obj_file_sp;
-  DWARFUnit *m_base_dwarf_cu;
+  DWARFCompileUnit &m_base_dwarf_cu;
 };
 
 #endif // SymbolFileDWARFDwo_SymbolFileDWARFDwo_h_

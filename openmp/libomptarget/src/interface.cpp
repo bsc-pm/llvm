@@ -1,9 +1,8 @@
 //===-------- interface.cpp - Target independent OpenMP target RTL --------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.txt for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -58,7 +57,7 @@ static void HandleTargetOutcome(bool success) {
       }
       break;
     case tgt_default:
-        FATAL_MESSAGE0(1, "default offloading policy must switched to " 
+        FATAL_MESSAGE0(1, "default offloading policy must switched to "
             "mandatory or disabled");
       break;
     case tgt_mandatory:
@@ -67,6 +66,12 @@ static void HandleTargetOutcome(bool success) {
       }
       break;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// adds requires flags
+EXTERN void __tgt_register_requires(int64_t flags) {
+  RTLs.RegisterRequires(flags);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

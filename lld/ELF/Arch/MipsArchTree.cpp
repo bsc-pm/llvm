@@ -1,9 +1,8 @@
 //===- MipsArchTree.cpp --------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===---------------------------------------------------------------------===//
 //
@@ -357,8 +356,8 @@ uint8_t elf::getMipsFpAbiFlag(uint8_t OldFlag, uint8_t NewFlag,
 }
 
 template <class ELFT> static bool isN32Abi(const InputFile *F) {
-  if (auto *EF = dyn_cast<ELFFileBase<ELFT>>(F))
-    return EF->getObj().getHeader()->e_flags & EF_MIPS_ABI2;
+  if (auto *EF = dyn_cast<ELFFileBase>(F))
+    return EF->template getObj<ELFT>().getHeader()->e_flags & EF_MIPS_ABI2;
   return false;
 }
 

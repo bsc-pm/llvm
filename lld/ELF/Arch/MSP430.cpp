@@ -1,9 +1,8 @@
 //===- MSP430.cpp ---------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -84,7 +83,7 @@ void MSP430::relocateOne(uint8_t *Loc, RelType Type, uint64_t Val) const {
     break;
   }
   default:
-    error(getErrorLocation(Loc) + "unrecognized reloc " + toString(Type));
+    error(getErrorLocation(Loc) + "unrecognized relocation " + toString(Type));
   }
 }
 

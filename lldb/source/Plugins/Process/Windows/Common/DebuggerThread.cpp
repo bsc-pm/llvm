@@ -1,9 +1,8 @@
 //===-- DebuggerThread.cpp --------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -12,12 +11,12 @@
 #include "IDebugDelegate.h"
 
 #include "lldb/Core/ModuleSpec.h"
+#include "lldb/Host/ProcessLaunchInfo.h"
 #include "lldb/Host/ThreadLauncher.h"
 #include "lldb/Host/windows/HostProcessWindows.h"
 #include "lldb/Host/windows/HostThreadWindows.h"
 #include "lldb/Host/windows/ProcessLauncherWindows.h"
 #include "lldb/Target/Process.h"
-#include "lldb/Target/ProcessLaunchInfo.h"
 #include "lldb/Utility/FileSpec.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Predicate.h"
@@ -133,7 +132,7 @@ lldb::thread_result_t DebuggerThread::DebuggerThreadLaunchRoutine(
   else
     m_debug_delegate->OnDebuggerError(error, 0);
 
-  return 0;
+  return {};
 }
 
 lldb::thread_result_t DebuggerThread::DebuggerThreadAttachRoutine(
@@ -149,7 +148,7 @@ lldb::thread_result_t DebuggerThread::DebuggerThreadAttachRoutine(
   if (!DebugActiveProcess((DWORD)pid)) {
     Status error(::GetLastError(), eErrorTypeWin32);
     m_debug_delegate->OnDebuggerError(error, 0);
-    return 0;
+    return {};
   }
 
   // The attach was successful, enter the debug loop.  From here on out, this
@@ -157,7 +156,7 @@ lldb::thread_result_t DebuggerThread::DebuggerThreadAttachRoutine(
   // in DebugLaunch should apply from this point out.
   DebugLoop();
 
-  return 0;
+  return {};
 }
 
 Status DebuggerThread::StopDebugging(bool terminate) {

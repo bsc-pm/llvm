@@ -1,9 +1,8 @@
 //===- Thunks.h --------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,9 +46,12 @@ public:
   // a branch and fall through to the first Symbol in the Target.
   virtual InputSection *getTargetInputSection() const { return nullptr; }
 
-  // To reuse a Thunk the caller as identified by the Type must be
-  // compatible with it.
-  virtual bool isCompatibleWith(RelType Type) const { return true; }
+  // To reuse a Thunk the InputSection and the relocation must be compatible
+  // with it.
+  virtual bool isCompatibleWith(const InputSection &,
+                                const Relocation &) const {
+    return true;
+  }
 
   Defined *getThunkTargetSym() const { return Syms[0]; }
 
@@ -62,8 +64,8 @@ public:
 };
 
 // For a Relocation to symbol S create a Thunk to be added to a synthetic
-// ThunkSection. At present there are implementations for ARM and Mips Thunks.
-Thunk *addThunk(RelType Type, Symbol &S);
+// ThunkSection.
+Thunk *addThunk(const InputSection &IS, Relocation &Rel);
 
 } // namespace elf
 } // namespace lld

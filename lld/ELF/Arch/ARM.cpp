@@ -1,9 +1,8 @@
 //===- ARM.cpp ------------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -53,12 +52,11 @@ ARM::ARM() {
   GotRel = R_ARM_GLOB_DAT;
   NoneRel = R_ARM_NONE;
   PltRel = R_ARM_JUMP_SLOT;
+  SymbolicRel = R_ARM_ABS32;
   TlsGotRel = R_ARM_TLS_TPOFF32;
   TlsModuleIndexRel = R_ARM_TLS_DTPMOD32;
   TlsOffsetRel = R_ARM_TLS_DTPOFF32;
   GotBaseSymInGotPlt = false;
-  GotEntrySize = 4;
-  GotPltEntrySize = 4;
   PltEntrySize = 16;
   PltHeaderSize = 32;
   TrapInstr = {0xd4, 0xd4, 0xd4, 0xd4};
@@ -380,7 +378,6 @@ void ARM::relocateOne(uint8_t *Loc, RelType Type, uint64_t Val) const {
   switch (Type) {
   case R_ARM_ABS32:
   case R_ARM_BASE_PREL:
-  case R_ARM_GLOB_DAT:
   case R_ARM_GOTOFF32:
   case R_ARM_GOT_BREL:
   case R_ARM_GOT_PREL:
@@ -519,7 +516,7 @@ void ARM::relocateOne(uint8_t *Loc, RelType Type, uint64_t Val) const {
                   (Val & 0x00ff));           // imm8
     break;
   default:
-    error(getErrorLocation(Loc) + "unrecognized reloc " + Twine(Type));
+    error(getErrorLocation(Loc) + "unrecognized relocation " + toString(Type));
   }
 }
 

@@ -1,9 +1,8 @@
 //===- ASTReader.h - AST File Reader ----------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -98,7 +97,7 @@ class HeaderSearchOptions;
 class LangOptions;
 class LazyASTUnresolvedSet;
 class MacroInfo;
-class MemoryBufferCache;
+class InMemoryModuleCache;
 class NamedDecl;
 class NamespaceDecl;
 class ObjCCategoryDecl;
@@ -440,9 +439,6 @@ private:
 
   /// The module manager which manages modules and their dependencies
   ModuleManager ModuleMgr;
-
-  /// The cache that manages memory buffers for PCM files.
-  MemoryBufferCache &PCMCache;
 
   /// A dummy identifier resolver used to merge TU-scope declarations in
   /// C, for the cases where we don't have a Sema object to provide a real
@@ -1482,8 +1478,8 @@ public:
   ///
   /// \param ReadTimer If non-null, a timer used to track the time spent
   /// deserializing.
-  ASTReader(Preprocessor &PP, ASTContext *Context,
-            const PCHContainerReader &PCHContainerRdr,
+  ASTReader(Preprocessor &PP, InMemoryModuleCache &ModuleCache,
+            ASTContext *Context, const PCHContainerReader &PCHContainerRdr,
             ArrayRef<std::shared_ptr<ModuleFileExtension>> Extensions,
             StringRef isysroot = "", bool DisableValidation = false,
             bool AllowASTWithCompilerErrors = false,
@@ -2224,6 +2220,9 @@ public:
   llvm::APFloat ReadAPFloat(const RecordData &Record,
                             const llvm::fltSemantics &Sem, unsigned &Idx);
 
+  /// Read an APValue
+  APValue ReadAPValue(const RecordData &Record, unsigned &Idx);
+
   // Read a string
   static std::string ReadString(const RecordData &Record, unsigned &Idx);
 
@@ -2234,6 +2233,10 @@ public:
 
   // Read a path
   std::string ReadPath(ModuleFile &F, const RecordData &Record, unsigned &Idx);
+
+  // Read a path
+  std::string ReadPath(StringRef BaseDirectory, const RecordData &Record,
+                       unsigned &Idx);
 
   // Skip a path
   static void SkipPath(const RecordData &Record, unsigned &Idx) {
@@ -2430,6 +2433,14 @@ public:
                                                  ID);
   }
 
+  ExplicitSpecifier readExplicitSpec() {
+    uint64_t Kind = readInt();
+    bool HasExpr = Kind & 0x1;
+    Kind = Kind >> 1;
+    return ExplicitSpecifier(HasExpr ? readExpr() : nullptr,
+                             static_cast<ExplicitSpecKind>(Kind));
+  }
+
   void readExceptionSpec(SmallVectorImpl<QualType> &ExceptionStorage,
                          FunctionProtoType::ExceptionSpecInfo &ESI) {
     return Reader->readExceptionSpec(*F, ExceptionStorage, ESI, Record, Idx);
@@ -2603,6 +2614,8 @@ public:
   SourceRange readSourceRange() {
     return Reader->ReadSourceRange(*F, Record, Idx);
   }
+
+  APValue readAPValue() { return Reader->ReadAPValue(Record, Idx); }
 
   /// Read an integral value, advancing Idx.
   llvm::APInt readAPInt() {
