@@ -1,9 +1,8 @@
 //===-- DebugNamesDWARFIndex.cpp -------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -51,14 +50,15 @@ DebugNamesDWARFIndex::GetUnits(const DebugNames &debug_names) {
   return result;
 }
 
-DIERef DebugNamesDWARFIndex::ToDIERef(const DebugNames::Entry &entry) {
+llvm::Optional<DIERef>
+DebugNamesDWARFIndex::ToDIERef(const DebugNames::Entry &entry) {
   llvm::Optional<uint64_t> cu_offset = entry.getCUOffset();
   if (!cu_offset)
-    return DIERef();
+    return llvm::None;
 
-  DWARFUnit *cu = m_debug_info.GetCompileUnit(*cu_offset);
+  DWARFUnit *cu = m_debug_info.GetUnitAtOffset(DIERef::Section::DebugInfo, *cu_offset);
   if (!cu)
-    return DIERef();
+    return llvm::None;
 
   // This initializes the DWO symbol file. It's not possible for
   // GetDwoSymbolFile to call this automatically because of mutual recursion
@@ -67,15 +67,15 @@ DIERef DebugNamesDWARFIndex::ToDIERef(const DebugNames::Entry &entry) {
   uint64_t die_bias = cu->GetDwoSymbolFile() ? 0 : *cu_offset;
 
   if (llvm::Optional<uint64_t> die_offset = entry.getDIEUnitOffset())
-    return DIERef(*cu_offset, die_bias + *die_offset);
+    return DIERef(DIERef::Section::DebugInfo, *cu_offset, die_bias + *die_offset);
 
-  return DIERef();
+  return llvm::None;
 }
 
 void DebugNamesDWARFIndex::Append(const DebugNames::Entry &entry,
                                   DIEArray &offsets) {
-  if (DIERef ref = ToDIERef(entry))
-    offsets.push_back(ref);
+  if (llvm::Optional<DIERef> ref = ToDIERef(entry))
+    offsets.push_back(*ref);
 }
 
 void DebugNamesDWARFIndex::MaybeLogLookupError(llvm::Error error,
@@ -161,27 +161,28 @@ void DebugNamesDWARFIndex::GetCompleteObjCClass(ConstString class_name,
         entry.tag() != DW_TAG_class_type)
       continue;
 
-    DIERef ref = ToDIERef(entry);
+    llvm::Optional<DIERef> ref = ToDIERef(entry);
     if (!ref)
       continue;
 
-    DWARFUnit *cu = m_debug_info.GetCompileUnit(ref.cu_offset);
+    DWARFUnit *cu = m_debug_info.GetUnitAtOffset(DIERef::Section::DebugInfo,
+                                                 *ref->unit_offset());
     if (!cu || !cu->Supports_DW_AT_APPLE_objc_complete_type()) {
-      incomplete_types.push_back(ref);
+      incomplete_types.push_back(*ref);
       continue;
     }
 
     // FIXME: We should return DWARFDIEs so we don't have to resolve it twice.
-    DWARFDIE die = m_debug_info.GetDIE(ref);
+    DWARFDIE die = m_debug_info.GetDIE(*ref);
     if (!die)
       continue;
 
     if (die.GetAttributeValueAsUnsigned(DW_AT_APPLE_objc_complete_type, 0)) {
       // If we find the complete version we're done.
-      offsets.push_back(ref);
+      offsets.push_back(*ref);
       return;
     } else {
-      incomplete_types.push_back(ref);
+      incomplete_types.push_back(*ref);
     }
   }
 
@@ -234,8 +235,8 @@ void DebugNamesDWARFIndex::GetFunctions(
     if (tag != DW_TAG_subprogram && tag != DW_TAG_inlined_subroutine)
       continue;
 
-    if (DIERef ref = ToDIERef(entry))
-      ProcessFunctionDIE(name.GetStringRef(), ref, info, parent_decl_ctx,
+    if (llvm::Optional<DIERef> ref = ToDIERef(entry))
+      ProcessFunctionDIE(name.GetStringRef(), *ref, info, parent_decl_ctx,
                          name_type_mask, v);
   }
 

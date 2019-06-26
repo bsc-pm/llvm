@@ -1,9 +1,8 @@
 //===-- ObjectContainerBSDArchive.cpp ---------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -122,7 +121,7 @@ ObjectContainerBSDArchive::Object::Extract(const DataExtractor &data,
     if (ar_name_len > 0) {
       const void *ar_name_ptr = data.GetData(&offset, ar_name_len);
       // Make sure there was enough data for the string value and bail if not
-      if (ar_name_ptr == NULL)
+      if (ar_name_ptr == nullptr)
         return LLDB_INVALID_OFFSET;
       str.assign((const char *)ar_name_ptr, ar_name_len);
       ar_name.SetCString(str.c_str());
@@ -170,7 +169,7 @@ size_t ObjectContainerBSDArchive::Archive::ParseObjects() {
 
 ObjectContainerBSDArchive::Object *
 ObjectContainerBSDArchive::Archive::FindObject(
-    const ConstString &object_name,
+    ConstString object_name,
     const llvm::sys::TimePoint<> &object_mod_time) {
   const ObjectNameToIndexMap::Entry *match =
       m_object_name_to_index_map.FindFirstValueForName(object_name);
@@ -191,7 +190,7 @@ ObjectContainerBSDArchive::Archive::FindObject(
       return &m_objects[match->value];
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 ObjectContainerBSDArchive::Archive::shared_ptr
@@ -321,18 +320,18 @@ ObjectContainer *ObjectContainerBSDArchive::CreateInstance(
       Archive::shared_ptr archive_sp(Archive::FindCachedArchive(
           *file, module_sp->GetArchitecture(), module_sp->GetModificationTime(),
           file_offset));
-      std::unique_ptr<ObjectContainerBSDArchive> container_ap(
+      std::unique_ptr<ObjectContainerBSDArchive> container_up(
           new ObjectContainerBSDArchive(module_sp, archive_data_sp,
                                         archive_data_offset, file, file_offset,
                                         length));
 
-      if (container_ap.get()) {
+      if (container_up) {
         if (archive_sp) {
           // We already have this archive in our cache, use it
-          container_ap->SetArchive(archive_sp);
-          return container_ap.release();
-        } else if (container_ap->ParseHeader())
-          return container_ap.release();
+          container_up->SetArchive(archive_sp);
+          return container_up.release();
+        } else if (container_up->ParseHeader())
+          return container_up.release();
       }
     }
   } else {
@@ -341,18 +340,18 @@ ObjectContainer *ObjectContainerBSDArchive::CreateInstance(
         *file, module_sp->GetArchitecture(), module_sp->GetModificationTime(),
         file_offset));
     if (archive_sp) {
-      std::unique_ptr<ObjectContainerBSDArchive> container_ap(
+      std::unique_ptr<ObjectContainerBSDArchive> container_up(
           new ObjectContainerBSDArchive(module_sp, data_sp, data_offset, file,
                                         file_offset, length));
 
-      if (container_ap.get()) {
+      if (container_up) {
         // We already have this archive in our cache, use it
-        container_ap->SetArchive(archive_sp);
-        return container_ap.release();
+        container_up->SetArchive(archive_sp);
+        return container_up.release();
       }
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 bool ObjectContainerBSDArchive::MagicBytesMatch(const DataExtractor &data) {
@@ -379,7 +378,7 @@ void ObjectContainerBSDArchive::SetArchive(Archive::shared_ptr &archive_sp) {
 ObjectContainerBSDArchive::~ObjectContainerBSDArchive() {}
 
 bool ObjectContainerBSDArchive::ParseHeader() {
-  if (m_archive_sp.get() == NULL) {
+  if (m_archive_sp.get() == nullptr) {
     if (m_data.GetByteSize() > 0) {
       ModuleSP module_sp(GetModule());
       if (module_sp) {
@@ -392,7 +391,7 @@ bool ObjectContainerBSDArchive::ParseHeader() {
       m_data.Clear();
     }
   }
-  return m_archive_sp.get() != NULL;
+  return m_archive_sp.get() != nullptr;
 }
 
 void ObjectContainerBSDArchive::Dump(Stream *s) const {
@@ -437,9 +436,7 @@ ObjectFileSP ObjectContainerBSDArchive::GetObjectFile(const FileSpec *file) {
   return ObjectFileSP();
 }
 
-//------------------------------------------------------------------
 // PluginInterface protocol
-//------------------------------------------------------------------
 lldb_private::ConstString ObjectContainerBSDArchive::GetPluginName() {
   return GetPluginNameStatic();
 }

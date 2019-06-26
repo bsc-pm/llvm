@@ -1,9 +1,8 @@
 //===-- IRForTarget.cpp -----------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -61,7 +60,7 @@ IRForTarget::FunctionValueCache::GetValue(llvm::Function *function) {
 
 static llvm::Value *FindEntryInstruction(llvm::Function *function) {
   if (function->empty())
-    return NULL;
+    return nullptr;
 
   return function->getEntryBlock().getFirstNonPHIOrDbg();
 }
@@ -72,11 +71,12 @@ IRForTarget::IRForTarget(lldb_private::ClangExpressionDeclMap *decl_map,
                          lldb_private::Stream &error_stream,
                          const char *func_name)
     : ModulePass(ID), m_resolve_vars(resolve_vars), m_func_name(func_name),
-      m_module(NULL), m_decl_map(decl_map), m_CFStringCreateWithBytes(NULL),
-      m_sel_registerName(NULL), m_objc_getClass(NULL), m_intptr_ty(NULL),
-      m_error_stream(error_stream),
-      m_execution_unit(execution_unit), m_result_store(NULL),
-      m_result_is_pointer(false), m_reloc_placeholder(NULL),
+      m_module(nullptr), m_decl_map(decl_map),
+      m_CFStringCreateWithBytes(nullptr), m_sel_registerName(nullptr),
+      m_objc_getClass(nullptr), m_intptr_ty(nullptr),
+      m_error_stream(error_stream), m_execution_unit(execution_unit),
+      m_result_store(nullptr), m_result_is_pointer(false),
+      m_reloc_placeholder(nullptr),
       m_entry_instruction_finder(FindEntryInstruction) {}
 
 /* Handy utility functions used at several places in the code */
@@ -117,7 +117,7 @@ clang::NamedDecl *IRForTarget::DeclForGlobal(const GlobalValue *global_val,
       module->getNamedMetadata("clang.global.decl.ptrs");
 
   if (!named_metadata)
-    return NULL;
+    return nullptr;
 
   unsigned num_nodes = named_metadata->getNumOperands();
   unsigned node_index;
@@ -126,7 +126,7 @@ clang::NamedDecl *IRForTarget::DeclForGlobal(const GlobalValue *global_val,
     llvm::MDNode *metadata_node =
         dyn_cast<llvm::MDNode>(named_metadata->getOperand(node_index));
     if (!metadata_node)
-      return NULL;
+      return nullptr;
 
     if (metadata_node->getNumOperands() != 2)
       continue;
@@ -139,14 +139,14 @@ clang::NamedDecl *IRForTarget::DeclForGlobal(const GlobalValue *global_val,
         mdconst::dyn_extract<ConstantInt>(metadata_node->getOperand(1));
 
     if (!constant_int)
-      return NULL;
+      return nullptr;
 
     uintptr_t ptr = constant_int->getZExtValue();
 
     return reinterpret_cast<clang::NamedDecl *>(ptr);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 clang::NamedDecl *IRForTarget::DeclForGlobal(GlobalValue *global_val) {
@@ -165,7 +165,7 @@ bool IRForTarget::CreateResultVariable(llvm::Function &llvm_function) {
   ValueSymbolTable &value_symbol_table = m_module->getValueSymbolTable();
 
   std::string result_name_str;
-  const char *result_name = NULL;
+  const char *result_name = nullptr;
 
   for (ValueSymbolTable::iterator vi = value_symbol_table.begin(),
                                   ve = value_symbol_table.end();
@@ -343,8 +343,8 @@ bool IRForTarget::CreateResultVariable(llvm::Function &llvm_function) {
 
   GlobalVariable *new_result_global = new GlobalVariable(
       (*m_module), result_global->getType()->getElementType(),
-      false,                              /* not constant */
-      GlobalValue::ExternalLinkage, NULL, /* no initializer */
+      false,                                 /* not constant */
+      GlobalValue::ExternalLinkage, nullptr, /* no initializer */
       m_result_name.GetCString());
 
   // It's too late in compilation to create a new VarDecl for this, but we
@@ -478,18 +478,18 @@ bool IRForTarget::RewriteObjCConstString(llvm::GlobalVariable *ns_str,
 
     ArrayRef<Type *> CFSCWB_arg_types(arg_type_array, 5);
 
-    llvm::Type *CFSCWB_ty =
+    llvm::FunctionType *CFSCWB_ty =
         FunctionType::get(ns_str_ty, CFSCWB_arg_types, false);
 
     // Build the constant containing the pointer to the function
     PointerType *CFSCWB_ptr_ty = PointerType::getUnqual(CFSCWB_ty);
     Constant *CFSCWB_addr_int =
         ConstantInt::get(m_intptr_ty, CFStringCreateWithBytes_addr, false);
-    m_CFStringCreateWithBytes =
-        ConstantExpr::getIntToPtr(CFSCWB_addr_int, CFSCWB_ptr_ty);
+    m_CFStringCreateWithBytes = {
+        CFSCWB_ty, ConstantExpr::getIntToPtr(CFSCWB_addr_int, CFSCWB_ptr_ty)};
   }
 
-  ConstantDataSequential *string_array = NULL;
+  ConstantDataSequential *string_array = nullptr;
 
   if (cstr)
     string_array = dyn_cast<ConstantDataSequential>(cstr->getInitializer());
@@ -734,7 +734,7 @@ bool IRForTarget::RewriteObjCConstStrings() {
       }
 
       if (!cstr_array)
-        cstr_global = NULL;
+        cstr_global = nullptr;
 
       if (!RewriteObjCConstString(nsstring_global, cstr_global)) {
         if (log)
@@ -881,14 +881,15 @@ bool IRForTarget::RewriteObjCSelector(Instruction *selector_load) {
 
     ArrayRef<Type *> srN_arg_types(type_array, 1);
 
-    llvm::Type *srN_type =
+    llvm::FunctionType *srN_type =
         FunctionType::get(sel_ptr_type, srN_arg_types, false);
 
     // Build the constant containing the pointer to the function
     PointerType *srN_ptr_ty = PointerType::getUnqual(srN_type);
     Constant *srN_addr_int =
         ConstantInt::get(m_intptr_ty, sel_registerName_addr, false);
-    m_sel_registerName = ConstantExpr::getIntToPtr(srN_addr_int, srN_ptr_ty);
+    m_sel_registerName = {srN_type,
+                          ConstantExpr::getIntToPtr(srN_addr_int, srN_ptr_ty)};
   }
 
   Value *argument_array[1];
@@ -1043,14 +1044,15 @@ bool IRForTarget::RewriteObjCClassReference(Instruction *class_load) {
 
     ArrayRef<Type *> ogC_arg_types(type_array, 1);
 
-    llvm::Type *ogC_type =
+    llvm::FunctionType *ogC_type =
         FunctionType::get(class_type, ogC_arg_types, false);
 
     // Build the constant containing the pointer to the function
     PointerType *ogC_ptr_ty = PointerType::getUnqual(ogC_type);
     Constant *ogC_addr_int =
         ConstantInt::get(m_intptr_ty, objc_getClass_addr, false);
-    m_objc_getClass = ConstantExpr::getIntToPtr(ogC_addr_int, ogC_ptr_ty);
+    m_objc_getClass = {ogC_type,
+                       ConstantExpr::getIntToPtr(ogC_addr_int, ogC_ptr_ty)};
   }
 
   Value *argument_array[1];
@@ -1148,8 +1150,8 @@ bool IRForTarget::RewritePersistentAlloc(llvm::Instruction *persistent_alloc) {
     return false;
 
   GlobalVariable *persistent_global = new GlobalVariable(
-      (*m_module), alloc->getType(), false, /* not constant */
-      GlobalValue::ExternalLinkage, NULL,   /* no initializer */
+      (*m_module), alloc->getType(), false,  /* not constant */
+      GlobalValue::ExternalLinkage, nullptr, /* no initializer */
       alloc->getName().str());
 
   // What we're going to do here is make believe this was a regular old
@@ -1345,13 +1347,13 @@ bool IRForTarget::MaybeHandleVariable(Value *llvm_value_ptr) {
     std::string name(named_decl->getName().str());
 
     clang::ValueDecl *value_decl = dyn_cast<clang::ValueDecl>(named_decl);
-    if (value_decl == NULL)
+    if (value_decl == nullptr)
       return false;
 
     lldb_private::CompilerType compiler_type(&value_decl->getASTContext(),
                                              value_decl->getType());
 
-    const Type *value_type = NULL;
+    const Type *value_type = nullptr;
 
     if (name[0] == '$') {
       // The $__lldb_expr_result name indicates the return value has allocated
@@ -1629,12 +1631,12 @@ bool IRForTarget::ResolveExternals(Function &llvm_function) {
 }
 
 static bool isGuardVariableRef(Value *V) {
-  Constant *Old = NULL;
+  Constant *Old = nullptr;
 
   if (!(Old = dyn_cast<Constant>(V)))
     return false;
 
-  ConstantExpr *CE = NULL;
+  ConstantExpr *CE = nullptr;
 
   if ((CE = dyn_cast<ConstantExpr>(V))) {
     if (CE->getOpcode() != Instruction::BitCast)
@@ -1929,8 +1931,8 @@ bool IRForTarget::ReplaceVariables(Function &llvm_function) {
   }
 
   for (element_index = 0; element_index < num_elements; ++element_index) {
-    const clang::NamedDecl *decl = NULL;
-    Value *value = NULL;
+    const clang::NamedDecl *decl = nullptr;
+    Value *value = nullptr;
     lldb::offset_t offset;
     lldb_private::ConstString name;
 
@@ -2050,7 +2052,7 @@ bool IRForTarget::runOnModule(Module &llvm_module) {
     std::string s;
     raw_string_ostream oss(s);
 
-    m_module->print(oss, NULL);
+    m_module->print(oss, nullptr);
 
     oss.flush();
 
@@ -2087,7 +2089,7 @@ bool IRForTarget::runOnModule(Module &llvm_module) {
   m_reloc_placeholder = new llvm::GlobalVariable(
       (*m_module), int8_ty, false /* IsConstant */,
       GlobalVariable::InternalLinkage, Constant::getNullValue(int8_ty),
-      "reloc_placeholder", NULL /* InsertBefore */,
+      "reloc_placeholder", nullptr /* InsertBefore */,
       GlobalVariable::NotThreadLocal /* ThreadLocal */, 0 /* AddressSpace */);
 
   ////////////////////////////////////////////////////////////
@@ -2109,7 +2111,7 @@ bool IRForTarget::runOnModule(Module &llvm_module) {
     std::string s;
     raw_string_ostream oss(s);
 
-    m_module->print(oss, NULL);
+    m_module->print(oss, nullptr);
 
     oss.flush();
 
@@ -2244,7 +2246,7 @@ bool IRForTarget::runOnModule(Module &llvm_module) {
     std::string s;
     raw_string_ostream oss(s);
 
-    m_module->print(oss, NULL);
+    m_module->print(oss, nullptr);
 
     oss.flush();
 

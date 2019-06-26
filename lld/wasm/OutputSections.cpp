@@ -1,9 +1,8 @@
 //===- OutputSections.cpp -------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -52,6 +51,8 @@ static StringRef sectionTypeToString(uint32_t SectionType) {
     return "CODE";
   case WASM_SEC_DATA:
     return "DATA";
+  case WASM_SEC_DATACOUNT:
+    return "DATACOUNT";
   default:
     fatal("invalid section type");
   }
@@ -78,10 +79,7 @@ void OutputSection::createHeader(size_t BodySize) {
       " total=" + Twine(getSize()));
 }
 
-CodeSection::CodeSection(ArrayRef<InputFunction *> Functions)
-    : OutputSection(WASM_SEC_CODE), Functions(Functions) {
-  assert(Functions.size() > 0);
-
+void CodeSection::finalizeContents() {
   raw_string_ostream OS(CodeSectionHeader);
   writeUleb128(OS, Functions.size(), "function count");
   OS.flush();
@@ -111,8 +109,8 @@ void CodeSection::writeTo(uint8_t *Buf) {
   memcpy(Buf, CodeSectionHeader.data(), CodeSectionHeader.size());
 
   // Write code section bodies
-  parallelForEach(Functions,
-                  [&](const InputChunk *Chunk) { Chunk->writeTo(Buf); });
+  for (const InputChunk *Chunk : Functions)
+    Chunk->writeTo(Buf);
 }
 
 uint32_t CodeSection::numRelocations() const {
@@ -127,8 +125,7 @@ void CodeSection::writeRelocations(raw_ostream &OS) const {
     C->writeRelocations(OS);
 }
 
-DataSection::DataSection(ArrayRef<OutputSegment *> Segments)
-    : OutputSection(WASM_SEC_DATA), Segments(Segments) {
+void DataSection::finalizeContents() {
   raw_string_ostream OS(DataSectionHeader);
 
   writeUleb128(OS, Segments.size(), "data segment count");
@@ -154,7 +151,8 @@ DataSection::DataSection(ArrayRef<OutputSegment *> Segments)
 
     Segment->SectionOffset = BodySize;
     BodySize += Segment->Header.size() + Segment->Size;
-    log("Data segment: size=" + Twine(Segment->Size));
+    log("Data segment: size=" + Twine(Segment->Size) + ", startVA=" +
+        Twine::utohexstr(Segment->StartVA) + ", name=" + Segment->Name);
 
     for (InputSegment *InputSeg : Segment->InputSegments)
       InputSeg->OutputOffset = Segment->SectionOffset + Segment->Header.size() +
@@ -176,7 +174,7 @@ void DataSection::writeTo(uint8_t *Buf) {
   // Write data section headers
   memcpy(Buf, DataSectionHeader.data(), DataSectionHeader.size());
 
-  parallelForEach(Segments, [&](const OutputSegment *Segment) {
+  for (const OutputSegment *Segment : Segments) {
     // Write data segment header
     uint8_t *SegStart = Buf + Segment->SectionOffset;
     memcpy(SegStart, Segment->Header.data(), Segment->Header.size());
@@ -184,7 +182,7 @@ void DataSection::writeTo(uint8_t *Buf) {
     // Write segment data payload
     for (const InputChunk *Chunk : Segment->InputSegments)
       Chunk->writeTo(Buf);
-  });
+  }
 }
 
 uint32_t DataSection::numRelocations() const {
@@ -201,10 +199,7 @@ void DataSection::writeRelocations(raw_ostream &OS) const {
       C->writeRelocations(OS);
 }
 
-CustomSection::CustomSection(std::string Name,
-                             ArrayRef<InputSection *> InputSections)
-    : OutputSection(WASM_SEC_CUSTOM, Name), PayloadSize(0),
-      InputSections(InputSections) {
+void CustomSection::finalizeContents() {
   raw_string_ostream OS(NameData);
   encodeULEB128(Name.size(), OS);
   OS << Name;
@@ -212,6 +207,7 @@ CustomSection::CustomSection(std::string Name,
 
   for (InputSection *Section : InputSections) {
     Section->OutputOffset = PayloadSize;
+    Section->OutputSec = this;
     PayloadSize += Section->getSize();
   }
 
@@ -232,8 +228,8 @@ void CustomSection::writeTo(uint8_t *Buf) {
   Buf += NameData.size();
 
   // Write custom sections payload
-  parallelForEach(InputSections,
-                  [&](const InputSection *Section) { Section->writeTo(Buf); });
+  for (const InputSection *Section : InputSections)
+    Section->writeTo(Buf);
 }
 
 uint32_t CustomSection::numRelocations() const {

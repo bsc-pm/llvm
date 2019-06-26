@@ -91,8 +91,8 @@ struct OmpSs : public ModulePass {
                      Module &M) {
     // 1. Create Taskwait function Type
     IRBuilder<> IRB(TwI.I);
-    Function *Func = cast<Function>(M.getOrInsertFunction(
-        "nanos6_taskwait", IRB.getVoidTy(), IRB.getInt8PtrTy()));
+    FunctionCallee Func = M.getOrInsertFunction(
+        "nanos6_taskwait", IRB.getVoidTy(), IRB.getInt8PtrTy());
     // 2. Build String
     // TODO: add debug info (line:col)
     Constant *Nanos6TaskwaitStr = IRB.CreateGlobalStringPtr(M.getSourceFileName());
@@ -299,7 +299,7 @@ struct OmpSs : public ModulePass {
     });
 
     // 4. Create nanos6_create_task nanos6_submit_task function types
-    Function *CreateTaskFuncTy = cast<Function>(M.getOrInsertFunction("nanos6_create_task",
+    FunctionCallee CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),
         TskInfoTy.Ty->getPointerTo(),
         TskInvInfoTy.Ty->getPointerTo(),
@@ -307,11 +307,11 @@ struct OmpSs : public ModulePass {
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt8PtrTy(M.getContext())->getPointerTo(),
         Type::getInt64Ty(M.getContext()), /* size_t flags */
-        Type::getInt64Ty(M.getContext()))); /* size_t num_deps */
+        Type::getInt64Ty(M.getContext())); /* size_t num_deps */
 
-    Function *TaskSubmitFuncTy = cast<Function>(M.getOrInsertFunction("nanos6_submit_task",
+    FunctionCallee TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
         Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext())));
+        Type::getInt8PtrTy(M.getContext()));
 
     auto rewriteOutToInTaskBrAndGetOmpSsUnpackFunc = [&](BasicBlock *header,
                                               BasicBlock *newRootNode,

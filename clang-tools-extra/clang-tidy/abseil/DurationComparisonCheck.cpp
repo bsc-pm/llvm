@@ -1,9 +1,8 @@
 //===--- DurationComparisonCheck.cpp - clang-tidy -------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,14 +19,10 @@ namespace tidy {
 namespace abseil {
 
 void DurationComparisonCheck::registerMatchers(MatchFinder *Finder) {
-  auto Matcher =
-      binaryOperator(anyOf(hasOperatorName(">"), hasOperatorName(">="),
-                           hasOperatorName("=="), hasOperatorName("<="),
-                           hasOperatorName("<")),
-                     hasEitherOperand(ignoringImpCasts(callExpr(
-                         callee(functionDecl(DurationConversionFunction())
-                                    .bind("function_decl"))))))
-          .bind("binop");
+  auto Matcher = expr(comparisonOperatorWithCallee(functionDecl(
+                          functionDecl(DurationConversionFunction())
+                              .bind("function_decl"))))
+                     .bind("binop");
 
   Finder->addMatcher(Matcher, this);
 }
@@ -35,7 +30,7 @@ void DurationComparisonCheck::registerMatchers(MatchFinder *Finder) {
 void DurationComparisonCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *Binop = Result.Nodes.getNodeAs<BinaryOperator>("binop");
 
-  llvm::Optional<DurationScale> Scale = getScaleForInverse(
+  llvm::Optional<DurationScale> Scale = getScaleForDurationInverse(
       Result.Nodes.getNodeAs<FunctionDecl>("function_decl")->getName());
   if (!Scale)
     return;
@@ -44,8 +39,7 @@ void DurationComparisonCheck::check(const MatchFinder::MatchResult &Result) {
   // want to handle the case of rewriting both sides. This is much simpler if
   // we unconditionally try and rewrite both, and let the rewriter determine
   // if nothing needs to be done.
-  if (!isNotInMacro(Result, Binop->getLHS()) ||
-      !isNotInMacro(Result, Binop->getRHS()))
+  if (isInMacro(Result, Binop->getLHS()) || isInMacro(Result, Binop->getRHS()))
     return;
   std::string LhsReplacement =
       rewriteExprFromNumberToDuration(Result, *Scale, Binop->getLHS());

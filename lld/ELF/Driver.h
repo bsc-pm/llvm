@@ -1,15 +1,15 @@
 //===- Driver.h -------------------------------------------------*- C++ -*-===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef LLD_ELF_DRIVER_H
 #define LLD_ELF_DRIVER_H
 
+#include "LTO.h"
 #include "SymbolTable.h"
 #include "lld/Common/LLVM.h"
 #include "lld/Common/Reproduce.h"
@@ -31,16 +31,19 @@ public:
   void addLibrary(StringRef Name);
 
 private:
-  void readConfigs(llvm::opt::InputArgList &Args);
   void createFiles(llvm::opt::InputArgList &Args);
   void inferMachineType();
   template <class ELFT> void link(llvm::opt::InputArgList &Args);
+  template <class ELFT> void compileBitcodeFiles();
 
   // True if we are in --whole-archive and --no-whole-archive.
   bool InWholeArchive = false;
 
   // True if we are in --start-lib and --end-lib.
   bool InLib = false;
+
+  // For LTO.
+  std::unique_ptr<BitcodeCompiler> LTO;
 
   std::vector<InputFile *> Files;
 };
@@ -65,6 +68,7 @@ std::string createResponseFile(const llvm::opt::InputArgList &Args);
 
 llvm::Optional<std::string> findFromSearchPaths(StringRef Path);
 llvm::Optional<std::string> searchScript(StringRef Path);
+llvm::Optional<std::string> searchLibraryBaseName(StringRef Path);
 llvm::Optional<std::string> searchLibrary(StringRef Path);
 
 } // namespace elf

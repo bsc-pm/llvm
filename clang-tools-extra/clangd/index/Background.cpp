@@ -1,9 +1,8 @@
 //===-- Background.cpp - Build an index in a background thread ------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -12,6 +11,7 @@
 #include "Compiler.h"
 #include "Logger.h"
 #include "SourceCode.h"
+#include "Symbol.h"
 #include "Threading.h"
 #include "Trace.h"
 #include "URI.h"
@@ -26,7 +26,9 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SHA1.h"
+#include "llvm/Support/Threading.h"
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <numeric>
@@ -38,6 +40,9 @@
 namespace clang {
 namespace clangd {
 namespace {
+
+static std::atomic<bool> PreventStarvation = {false};
+
 // Resolves URI to file paths with cache.
 class URIToFileCache {
 public:
@@ -121,19 +126,19 @@ llvm::SmallString<128> getAbsolutePath(const tooling::CompileCommand &Cmd) {
   } else {
     AbsolutePath = Cmd.Directory;
     llvm::sys::path::append(AbsolutePath, Cmd.Filename);
+    llvm::sys::path::remove_dots(AbsolutePath, true);
   }
   return AbsolutePath;
 }
 } // namespace
 
 BackgroundIndex::BackgroundIndex(
-    Context BackgroundContext, llvm::StringRef ResourceDir,
-    const FileSystemProvider &FSProvider, const GlobalCompilationDatabase &CDB,
+    Context BackgroundContext, const FileSystemProvider &FSProvider,
+    const GlobalCompilationDatabase &CDB,
     BackgroundIndexStorage::Factory IndexStorageFactory,
     size_t BuildIndexPeriodMs, size_t ThreadPoolSize)
-    : SwapIndex(llvm::make_unique<MemIndex>()), ResourceDir(ResourceDir),
-      FSProvider(FSProvider), CDB(CDB),
-      BackgroundContext(std::move(BackgroundContext)),
+    : SwapIndex(llvm::make_unique<MemIndex>()), FSProvider(FSProvider),
+      CDB(CDB), BackgroundContext(std::move(BackgroundContext)),
       BuildIndexPeriodMs(BuildIndexPeriodMs),
       SymbolsUpdatedSinceLastIndex(false),
       IndexStorageFactory(std::move(IndexStorageFactory)),
@@ -143,19 +148,20 @@ BackgroundIndex::BackgroundIndex(
           })) {
   assert(ThreadPoolSize > 0 && "Thread pool size can't be zero.");
   assert(this->IndexStorageFactory && "Storage factory can not be null!");
-  while (ThreadPoolSize--)
-    ThreadPool.emplace_back([this] { run(); });
+  for (unsigned I = 0; I < ThreadPoolSize; ++I) {
+    ThreadPool.runAsync("background-worker-" + llvm::Twine(I + 1),
+                        [this] { run(); });
+  }
   if (BuildIndexPeriodMs > 0) {
     log("BackgroundIndex: build symbol index periodically every {0} ms.",
         BuildIndexPeriodMs);
-    ThreadPool.emplace_back([this] { buildIndex(); });
+    ThreadPool.runAsync("background-index-builder", [this] { buildIndex(); });
   }
 }
 
 BackgroundIndex::~BackgroundIndex() {
   stop();
-  for (auto &Thread : ThreadPool)
-    Thread.join();
+  ThreadPool.wait();
 }
 
 void BackgroundIndex::stop() {
@@ -172,7 +178,7 @@ void BackgroundIndex::run() {
   WithContext Background(BackgroundContext.clone());
   while (true) {
     llvm::Optional<Task> Task;
-    ThreadPriority Priority;
+    llvm::ThreadPriority Priority;
     {
       std::unique_lock<std::mutex> Lock(QueueMu);
       QueueCV.wait(Lock, [&] { return ShouldStop || !Queue.empty(); });
@@ -186,11 +192,11 @@ void BackgroundIndex::run() {
       Queue.pop_front();
     }
 
-    if (Priority != ThreadPriority::Normal)
-      setCurrentThreadPriority(Priority);
+    if (Priority != llvm::ThreadPriority::Default && !PreventStarvation.load())
+      llvm::set_thread_priority(Priority);
     (*Task)();
-    if (Priority != ThreadPriority::Normal)
-      setCurrentThreadPriority(ThreadPriority::Normal);
+    if (Priority != llvm::ThreadPriority::Default)
+      llvm::set_thread_priority(llvm::ThreadPriority::Default);
 
     {
       std::unique_lock<std::mutex> Lock(QueueMu);
@@ -223,14 +229,13 @@ void BackgroundIndex::enqueue(const std::vector<std::string> &ChangedFiles) {
         for (auto &Elem : NeedsReIndexing)
           enqueue(std::move(Elem.first), Elem.second);
       },
-      ThreadPriority::Normal);
+      llvm::ThreadPriority::Default);
 }
 
 void BackgroundIndex::enqueue(tooling::CompileCommand Cmd,
                               BackgroundIndexStorage *Storage) {
   enqueueTask(Bind(
                   [this, Storage](tooling::CompileCommand Cmd) {
-                    Cmd.CommandLine.push_back("-resource-dir=" + ResourceDir);
                     // We can't use llvm::StringRef here since we are going to
                     // move from Cmd during the call below.
                     const std::string FileName = Cmd.Filename;
@@ -239,10 +244,10 @@ void BackgroundIndex::enqueue(tooling::CompileCommand Cmd,
                            std::move(Error));
                   },
                   std::move(Cmd)),
-              ThreadPriority::Low);
+              llvm::ThreadPriority::Background);
 }
 
-void BackgroundIndex::enqueueTask(Task T, ThreadPriority Priority) {
+void BackgroundIndex::enqueueTask(Task T, llvm::ThreadPriority Priority) {
   {
     std::lock_guard<std::mutex> Lock(QueueMu);
     auto I = Queue.end();
@@ -250,10 +255,11 @@ void BackgroundIndex::enqueueTask(Task T, ThreadPriority Priority) {
     // Then we store low priority tasks. Normal priority tasks are pretty rare,
     // they should not grow beyond single-digit numbers, so it is OK to do
     // linear search and insert after that.
-    if (Priority == ThreadPriority::Normal) {
-      I = llvm::find_if(Queue, [](const std::pair<Task, ThreadPriority> &Elem) {
-        return Elem.second == ThreadPriority::Low;
-      });
+    if (Priority == llvm::ThreadPriority::Default) {
+      I = llvm::find_if(
+          Queue, [](const std::pair<Task, llvm::ThreadPriority> &Elem) {
+            return Elem.second == llvm::ThreadPriority::Background;
+          });
     }
     Queue.insert(I, {std::move(T), Priority});
   }
@@ -270,6 +276,7 @@ void BackgroundIndex::update(llvm::StringRef MainFile, IndexFileIn Index,
   struct File {
     llvm::DenseSet<const Symbol *> Symbols;
     llvm::DenseSet<const Ref *> Refs;
+    llvm::DenseSet<const Relation *> Relations;
     FileDigest Digest;
   };
   llvm::StringMap<File> Files;
@@ -282,12 +289,16 @@ void BackgroundIndex::update(llvm::StringRef MainFile, IndexFileIn Index,
     if (DigestIt == DigestsSnapshot.end() || DigestIt->getValue() != IGN.Digest)
       Files.try_emplace(AbsPath).first->getValue().Digest = IGN.Digest;
   }
+  // This map is used to figure out where to store relations.
+  llvm::DenseMap<SymbolID, File *> SymbolIDToFile;
   for (const auto &Sym : *Index.Symbols) {
     if (Sym.CanonicalDeclaration) {
       auto DeclPath = URICache.resolve(Sym.CanonicalDeclaration.FileURI);
       const auto FileIt = Files.find(DeclPath);
-      if (FileIt != Files.end())
+      if (FileIt != Files.end()) {
         FileIt->second.Symbols.insert(&Sym);
+        SymbolIDToFile[Sym.ID] = &FileIt->second;
+      }
     }
     // For symbols with different declaration and definition locations, we store
     // the full symbol in both the header file and the implementation file, so
@@ -313,18 +324,27 @@ void BackgroundIndex::update(llvm::StringRef MainFile, IndexFileIn Index,
       }
     }
   }
+  for (const auto &Rel : *Index.Relations) {
+    const auto FileIt = SymbolIDToFile.find(Rel.Subject);
+    if (FileIt != SymbolIDToFile.end())
+      FileIt->second->Relations.insert(&Rel);
+  }
 
   // Build and store new slabs for each updated file.
   for (const auto &FileIt : Files) {
     llvm::StringRef Path = FileIt.getKey();
     SymbolSlab::Builder Syms;
     RefSlab::Builder Refs;
+    RelationSlab::Builder Relations;
     for (const auto *S : FileIt.second.Symbols)
       Syms.insert(*S);
     for (const auto *R : FileIt.second.Refs)
       Refs.insert(RefToIDs[R], *R);
+    for (const auto *Rel : FileIt.second.Relations)
+      Relations.insert(*Rel);
     auto SS = llvm::make_unique<SymbolSlab>(std::move(Syms).build());
     auto RS = llvm::make_unique<RefSlab>(std::move(Refs).build());
+    auto RelS = llvm::make_unique<RelationSlab>(std::move(Relations).build());
     auto IG = llvm::make_unique<IncludeGraph>(
         getSubGraph(URI::create(Path), Index.Sources.getValue()));
     // We need to store shards before updating the index, since the latter
@@ -333,6 +353,7 @@ void BackgroundIndex::update(llvm::StringRef MainFile, IndexFileIn Index,
       IndexFileOut Shard;
       Shard.Symbols = SS.get();
       Shard.Refs = RS.get();
+      Shard.Relations = RelS.get();
       Shard.Sources = IG.get();
 
       if (auto Error = IndexStorage->storeShard(Path, Shard))
@@ -350,7 +371,8 @@ void BackgroundIndex::update(llvm::StringRef MainFile, IndexFileIn Index,
       // This can override a newer version that is added in another thread, if
       // this thread sees the older version but finishes later. This should be
       // rare in practice.
-      IndexedSymbols.update(Path, std::move(SS), std::move(RS));
+      IndexedSymbols.update(Path, std::move(SS), std::move(RS), std::move(RelS),
+                            Path == MainFile);
     }
   }
 }
@@ -375,7 +397,9 @@ void BackgroundIndex::buildIndex() {
     // extra index build.
     reset(
         IndexedSymbols.buildIndex(IndexType::Heavy, DuplicateHandling::Merge));
-    log("BackgroundIndex: rebuilt symbol index.");
+    log("BackgroundIndex: rebuilt symbol index with estimated memory {0} "
+        "bytes.",
+        estimateMemoryUsage());
   }
 }
 
@@ -398,7 +422,7 @@ llvm::Error BackgroundIndex::index(tooling::CompileCommand Cmd,
     DigestsSnapshot = IndexedFileDigests;
   }
 
-  log("Indexing {0} (digest:={1})", Cmd.Filename, llvm::toHex(Hash));
+  vlog("Indexing {0} (digest:={1})", Cmd.Filename, llvm::toHex(Hash));
   ParseInputs Inputs;
   Inputs.FS = std::move(FS);
   Inputs.FS->setCurrentWorkingDirectory(Cmd.Directory);
@@ -408,9 +432,8 @@ llvm::Error BackgroundIndex::index(tooling::CompileCommand Cmd,
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "Couldn't build compiler invocation");
   IgnoreDiagnostics IgnoreDiags;
-  auto Clang = prepareCompilerInstance(
-      std::move(CI), /*Preamble=*/nullptr, std::move(*Buf),
-      std::make_shared<PCHContainerOperations>(), Inputs.FS, IgnoreDiags);
+  auto Clang = prepareCompilerInstance(std::move(CI), /*Preamble=*/nullptr,
+                                       std::move(*Buf), Inputs.FS, IgnoreDiags);
   if (!Clang)
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "Couldn't build compiler instance");
@@ -421,6 +444,7 @@ llvm::Error BackgroundIndex::index(tooling::CompileCommand Cmd,
   auto Action = createStaticIndexingAction(
       IndexOpts, [&](SymbolSlab S) { Index.Symbols = std::move(S); },
       [&](RefSlab R) { Index.Refs = std::move(R); },
+      [&](RelationSlab R) { Index.Relations = std::move(R); },
       [&](IncludeGraph IG) { Index.Sources = std::move(IG); });
 
   // We're going to run clang here, and it could potentially crash.
@@ -471,7 +495,8 @@ BackgroundIndex::loadShard(const tooling::CompileCommand &Cmd,
   struct ShardInfo {
     std::string AbsolutePath;
     std::unique_ptr<IndexFileIn> Shard;
-    FileDigest Digest;
+    FileDigest Digest = {};
+    bool CountReferences = false;
   };
   std::vector<ShardInfo> IntermediateSymbols;
   // Make sure we don't have duplicate elements in the queue. Keys are absolute
@@ -532,6 +557,7 @@ BackgroundIndex::loadShard(const tooling::CompileCommand &Cmd,
       SI.AbsolutePath = CurDependency.Path;
       SI.Shard = std::move(Shard);
       SI.Digest = I.getValue().Digest;
+      SI.CountReferences = I.getValue().IsTU;
       IntermediateSymbols.push_back(std::move(SI));
       // Check if the source needs re-indexing.
       // Get the digest, skip it if file doesn't exist.
@@ -560,8 +586,13 @@ BackgroundIndex::loadShard(const tooling::CompileCommand &Cmd,
       auto RS = SI.Shard->Refs
                     ? llvm::make_unique<RefSlab>(std::move(*SI.Shard->Refs))
                     : nullptr;
+      auto RelS =
+          SI.Shard->Relations
+              ? llvm::make_unique<RelationSlab>(std::move(*SI.Shard->Relations))
+              : nullptr;
       IndexedFileDigests[SI.AbsolutePath] = SI.Digest;
-      IndexedSymbols.update(SI.AbsolutePath, std::move(SS), std::move(RS));
+      IndexedSymbols.update(SI.AbsolutePath, std::move(SS), std::move(RS),
+                            std::move(RelS), SI.CountReferences);
     }
   }
 
@@ -604,9 +635,15 @@ BackgroundIndex::loadShards(std::vector<std::string> ChangedFiles) {
     }
   }
   vlog("Loaded all shards");
-  reset(IndexedSymbols.buildIndex(IndexType::Light, DuplicateHandling::Merge));
-
+  reset(IndexedSymbols.buildIndex(IndexType::Heavy, DuplicateHandling::Merge));
+  vlog("BackgroundIndex: built symbol index with estimated memory {0} "
+       "bytes.",
+       estimateMemoryUsage());
   return NeedsReIndexing;
+}
+
+void BackgroundIndex::preventThreadStarvationInTests() {
+  PreventStarvation.store(true);
 }
 
 } // namespace clangd

@@ -1,9 +1,8 @@
 //===- ASTReaderDecl.cpp - Decl Deserialization ---------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -445,7 +444,9 @@ namespace clang {
     void VisitObjCPropertyDecl(ObjCPropertyDecl *D);
     void VisitObjCPropertyImplDecl(ObjCPropertyImplDecl *D);
     void VisitOMPThreadPrivateDecl(OMPThreadPrivateDecl *D);
+    void VisitOMPAllocateDecl(OMPAllocateDecl *D);
     void VisitOMPDeclareReductionDecl(OMPDeclareReductionDecl *D);
+    void VisitOMPDeclareMapperDecl(OMPDeclareMapperDecl *D);
     void VisitOMPRequiresDecl(OMPRequiresDecl *D);
     void VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D);
   };
@@ -857,7 +858,6 @@ void ASTDeclReader::VisitFunctionDecl(FunctionDecl *FD) {
   FD->setStorageClass(static_cast<StorageClass>(Record.readInt()));
   FD->setInlineSpecified(Record.readInt());
   FD->setImplicitlyInline(Record.readInt());
-  FD->setExplicitSpecified(Record.readInt());
   FD->setVirtualAsWritten(Record.readInt());
   FD->setPure(Record.readInt());
   FD->setHasInheritedPrototype(Record.readInt());
@@ -868,7 +868,7 @@ void ASTDeclReader::VisitFunctionDecl(FunctionDecl *FD) {
   FD->setDefaulted(Record.readInt());
   FD->setExplicitlyDefaulted(Record.readInt());
   FD->setHasImplicitReturnZero(Record.readInt());
-  FD->setConstexpr(Record.readInt());
+  FD->setConstexprKind(static_cast<ConstexprSpecKind>(Record.readInt()));
   FD->setUsesSEHTry(Record.readInt());
   FD->setHasSkippedBody(Record.readInt());
   FD->setIsMultiVersion(Record.readInt());
@@ -927,12 +927,22 @@ void ASTDeclReader::VisitFunctionDecl(FunctionDecl *FD) {
     TemplateArgumentListInfo TemplArgsInfo(LAngleLoc, RAngleLoc);
     for (unsigned i = 0, e = TemplArgLocs.size(); i != e; ++i)
       TemplArgsInfo.addArgument(TemplArgLocs[i]);
-    FunctionTemplateSpecializationInfo *FTInfo
-        = FunctionTemplateSpecializationInfo::Create(C, FD, Template, TSK,
-                                                     TemplArgList,
-                             HasTemplateArgumentsAsWritten ? &TemplArgsInfo
-                                                           : nullptr,
-                                                     POI);
+
+    MemberSpecializationInfo *MSInfo = nullptr;
+    if (Record.readInt()) {
+      auto *FD = ReadDeclAs<FunctionDecl>();
+      auto TSK = (TemplateSpecializationKind)Record.readInt();
+      SourceLocation POI = ReadSourceLocation();
+
+      MSInfo = new (C) MemberSpecializationInfo(FD, TSK);
+      MSInfo->setPointOfInstantiation(POI);
+    }
+
+    FunctionTemplateSpecializationInfo *FTInfo =
+        FunctionTemplateSpecializationInfo::Create(
+            C, FD, Template, TSK, TemplArgList,
+            HasTemplateArgumentsAsWritten ? &TemplArgsInfo : nullptr, POI,
+            MSInfo);
     FD->TemplateOrSpecialization = FTInfo;
 
     if (FD->isCanonicalDecl()) { // if canonical add to template's set.
@@ -955,7 +965,7 @@ void ASTDeclReader::VisitFunctionDecl(FunctionDecl *FD) {
       else {
         assert(Reader.getContext().getLangOpts().Modules &&
                "already deserialized this template specialization");
-        mergeRedeclarable(FD, ExistingInfo->Function, Redecl);
+        mergeRedeclarable(FD, ExistingInfo->getFunction(), Redecl);
       }
     }
     break;
@@ -1449,8 +1459,10 @@ void ASTDeclReader::VisitParmVarDecl(ParmVarDecl *PD) {
 void ASTDeclReader::VisitDecompositionDecl(DecompositionDecl *DD) {
   VisitVarDecl(DD);
   auto **BDs = DD->getTrailingObjects<BindingDecl *>();
-  for (unsigned I = 0; I != DD->NumBindings; ++I)
+  for (unsigned I = 0; I != DD->NumBindings; ++I) {
     BDs[I] = ReadDeclAs<BindingDecl>();
+    BDs[I]->setDecomposedDecl(DD);
+  }
 }
 
 void ASTDeclReader::VisitBindingDecl(BindingDecl *BD) {
@@ -1479,6 +1491,7 @@ void ASTDeclReader::VisitBlockDecl(BlockDecl *BD) {
   BD->setBlockMissingReturnType(Record.readInt());
   BD->setIsConversionFromLambda(Record.readInt());
   BD->setDoesNotEscape(Record.readInt());
+  BD->setCanAvoidCopyToHeap(Record.readInt());
 
   bool capturesCXXThis = Record.readInt();
   unsigned numCaptures = Record.readInt();
@@ -1965,6 +1978,7 @@ ASTDeclReader::VisitCXXRecordDeclImpl(CXXRecordDecl *D) {
 }
 
 void ASTDeclReader::VisitCXXDeductionGuideDecl(CXXDeductionGuideDecl *D) {
+  D->setExplicitSpecifier(Record.readExplicitSpec());
   VisitFunctionDecl(D);
   D->setIsCopyDeductionCandidate(Record.readInt());
 }
@@ -1990,6 +2004,7 @@ void ASTDeclReader::VisitCXXMethodDecl(CXXMethodDecl *D) {
 void ASTDeclReader::VisitCXXConstructorDecl(CXXConstructorDecl *D) {
   // We need the inherited constructor information to merge the declaration,
   // so we have to read it before we call VisitCXXMethodDecl.
+  D->setExplicitSpecifier(Record.readExplicitSpec());
   if (D->isInheritingConstructor()) {
     auto *Shadow = ReadDeclAs<ConstructorUsingShadowDecl>();
     auto *Ctor = ReadDeclAs<CXXConstructorDecl>();
@@ -2015,6 +2030,7 @@ void ASTDeclReader::VisitCXXDestructorDecl(CXXDestructorDecl *D) {
 }
 
 void ASTDeclReader::VisitCXXConversionDecl(CXXConversionDecl *D) {
+  D->setExplicitSpecifier(Record.readExplicitSpec());
   VisitCXXMethodDecl(D);
 }
 
@@ -2242,6 +2258,8 @@ void ASTDeclReader::VisitClassScopeFunctionSpecializationDecl(
                                     ClassScopeFunctionSpecializationDecl *D) {
   VisitDecl(D);
   D->Specialization = ReadDeclAs<CXXMethodDecl>();
+  if (Record.readInt())
+    D->TemplateArgs = Record.readASTTemplateArgumentListInfo();
 }
 
 void ASTDeclReader::VisitFunctionTemplateDecl(FunctionTemplateDecl *D) {
@@ -2632,6 +2650,24 @@ void ASTDeclReader::VisitOMPThreadPrivateDecl(OMPThreadPrivateDecl *D) {
   D->setVars(Vars);
 }
 
+void ASTDeclReader::VisitOMPAllocateDecl(OMPAllocateDecl *D) {
+  VisitDecl(D);
+  unsigned NumVars = D->varlist_size();
+  unsigned NumClauses = D->clauselist_size();
+  SmallVector<Expr *, 16> Vars;
+  Vars.reserve(NumVars);
+  for (unsigned i = 0; i != NumVars; ++i) {
+    Vars.push_back(Record.readExpr());
+  }
+  D->setVars(Vars);
+  SmallVector<OMPClause *, 8> Clauses;
+  Clauses.reserve(NumClauses);
+  OMPClauseReader ClauseReader(Record);
+  for (unsigned I = 0; I != NumClauses; ++I)
+    Clauses.push_back(ClauseReader.readClause());
+  D->setClauses(Clauses);
+}
+
 void ASTDeclReader::VisitOMPRequiresDecl(OMPRequiresDecl * D) {
   VisitDecl(D);
   unsigned NumClauses = D->clauselist_size();
@@ -2658,6 +2694,22 @@ void ASTDeclReader::VisitOMPDeclareReductionDecl(OMPDeclareReductionDecl *D) {
   auto IK = static_cast<OMPDeclareReductionDecl::InitKind>(Record.readInt());
   D->setInitializer(Init, IK);
   D->PrevDeclInScope = ReadDeclID();
+}
+
+void ASTDeclReader::VisitOMPDeclareMapperDecl(OMPDeclareMapperDecl *D) {
+  VisitValueDecl(D);
+  D->setLocation(ReadSourceLocation());
+  Expr *MapperVarRefE = Record.readExpr();
+  D->setMapperVarRef(MapperVarRefE);
+  D->VarName = Record.readDeclarationName();
+  D->PrevDeclInScope = ReadDeclID();
+  unsigned NumClauses = D->clauselist_size();
+  SmallVector<OMPClause *, 8> Clauses;
+  Clauses.reserve(NumClauses);
+  OMPClauseReader ClauseReader(Record);
+  for (unsigned I = 0; I != NumClauses; ++I)
+    Clauses.push_back(ClauseReader.readClause());
+  D->setClauses(Clauses);
 }
 
 void ASTDeclReader::VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D) {
@@ -2763,7 +2815,7 @@ static bool isConsumerInterestedIn(ASTContext &Ctx, Decl *D, bool HasBody) {
 
   // An ImportDecl or VarDecl imported from a module map module will get
   // emitted when we import the relevant module.
-  if (isa<ImportDecl>(D) || isa<VarDecl>(D)) {
+  if (isPartOfPerModuleInitializer(D)) {
     auto *M = D->getImportedOwningModule();
     if (M && M->Kind == Module::ModuleMapModule &&
         Ctx.DeclMustBeEmitted(D))
@@ -2777,7 +2829,8 @@ static bool isConsumerInterestedIn(ASTContext &Ctx, Decl *D, bool HasBody) {
       isa<PragmaCommentDecl>(D) ||
       isa<PragmaDetectMismatchDecl>(D))
     return true;
-  if (isa<OMPThreadPrivateDecl>(D) || isa<OMPDeclareReductionDecl>(D))
+  if (isa<OMPThreadPrivateDecl>(D) || isa<OMPDeclareReductionDecl>(D) ||
+      isa<OMPDeclareMapperDecl>(D) || isa<OMPAllocateDecl>(D))
     return !D->getDeclContext()->isFunctionOrMethod();
   if (const auto *Var = dyn_cast<VarDecl>(D))
     return Var->isFileVarDecl() &&
@@ -3701,10 +3754,7 @@ Decl *ASTReader::ReadDeclRecord(DeclID ID) {
     D = CXXMethodDecl::CreateDeserialized(Context, ID);
     break;
   case DECL_CXX_CONSTRUCTOR:
-    D = CXXConstructorDecl::CreateDeserialized(Context, ID, false);
-    break;
-  case DECL_CXX_INHERITED_CONSTRUCTOR:
-    D = CXXConstructorDecl::CreateDeserialized(Context, ID, true);
+    D = CXXConstructorDecl::CreateDeserialized(Context, ID, Record.readInt());
     break;
   case DECL_CXX_DESTRUCTOR:
     D = CXXDestructorDecl::CreateDeserialized(Context, ID);
@@ -3848,11 +3898,20 @@ Decl *ASTReader::ReadDeclRecord(DeclID ID) {
   case DECL_OMP_THREADPRIVATE:
     D = OMPThreadPrivateDecl::CreateDeserialized(Context, ID, Record.readInt());
     break;
+  case DECL_OMP_ALLOCATE: {
+    unsigned NumVars = Record.readInt();
+    unsigned NumClauses = Record.readInt();
+    D = OMPAllocateDecl::CreateDeserialized(Context, ID, NumVars, NumClauses);
+    break;
+  }
   case DECL_OMP_REQUIRES:
     D = OMPRequiresDecl::CreateDeserialized(Context, ID, Record.readInt());
     break;
   case DECL_OMP_DECLARE_REDUCTION:
     D = OMPDeclareReductionDecl::CreateDeserialized(Context, ID);
+    break;
+  case DECL_OMP_DECLARE_MAPPER:
+    D = OMPDeclareMapperDecl::CreateDeserialized(Context, ID, Record.readInt());
     break;
   case DECL_OMP_CAPTUREDEXPR:
     D = OMPCapturedExprDecl::CreateDeserialized(Context, ID);
@@ -4443,6 +4502,16 @@ void ASTDeclReader::UpdateDecl(Decl *D,
       D->addAttr(OMPThreadPrivateDeclAttr::CreateImplicit(Reader.getContext(),
                                                           ReadSourceRange()));
       break;
+
+    case UPD_DECL_MARKED_OPENMP_ALLOCATE: {
+      auto AllocatorKind =
+          static_cast<OMPAllocateDeclAttr::AllocatorTypeTy>(Record.readInt());
+      Expr *Allocator = Record.readExpr();
+      SourceRange SR = ReadSourceRange();
+      D->addAttr(OMPAllocateDeclAttr::CreateImplicit(
+          Reader.getContext(), AllocatorKind, Allocator, SR));
+      break;
+    }
 
     case UPD_DECL_EXPORTED: {
       unsigned SubmoduleID = readSubmoduleID();

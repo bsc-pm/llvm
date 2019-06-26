@@ -1,9 +1,8 @@
 //===-- NameToDIE.cpp -------------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,11 +25,12 @@ void NameToDIE::Finalize() {
   m_map.SizeToFit();
 }
 
-void NameToDIE::Insert(const ConstString &name, const DIERef &die_ref) {
+void NameToDIE::Insert(ConstString name, const DIERef &die_ref) {
+  assert(die_ref.unit_offset().hasValue());
   m_map.Append(name, die_ref);
 }
 
-size_t NameToDIE::Find(const ConstString &name, DIEArray &info_array) const {
+size_t NameToDIE::Find(ConstString name, DIEArray &info_array) const {
   return m_map.GetValues(name, info_array);
 }
 
@@ -45,7 +45,7 @@ size_t NameToDIE::FindAllEntriesForCompileUnit(dw_offset_t cu_offset,
   const uint32_t size = m_map.GetSize();
   for (uint32_t i = 0; i < size; ++i) {
     const DIERef &die_ref = m_map.GetValueAtIndexUnchecked(i);
-    if (cu_offset == die_ref.cu_offset)
+    if (cu_offset == *die_ref.unit_offset())
       info_array.push_back(die_ref);
   }
   return info_array.size() - initial_size;
@@ -54,10 +54,8 @@ size_t NameToDIE::FindAllEntriesForCompileUnit(dw_offset_t cu_offset,
 void NameToDIE::Dump(Stream *s) {
   const uint32_t size = m_map.GetSize();
   for (uint32_t i = 0; i < size; ++i) {
-    ConstString cstr = m_map.GetCStringAtIndex(i);
-    const DIERef &die_ref = m_map.GetValueAtIndexUnchecked(i);
-    s->Printf("%p: {0x%8.8x/0x%8.8x} \"%s\"\n", (const void *)cstr.GetCString(),
-              die_ref.cu_offset, die_ref.die_offset, cstr.GetCString());
+    s->Format("{0} \"{1}\"\n", m_map.GetValueAtIndexUnchecked(i),
+              m_map.GetCStringAtIndexUnchecked(i));
   }
 }
 

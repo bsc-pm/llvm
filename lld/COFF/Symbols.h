@@ -1,9 +1,8 @@
 //===- Symbols.h ------------------------------------------------*- C++ -*-===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -80,7 +79,8 @@ protected:
   explicit Symbol(Kind K, StringRef N = "")
       : SymbolKind(K), IsExternal(true), IsCOMDAT(false),
         WrittenToSymtab(false), PendingArchiveLoad(false), IsGCRoot(false),
-        IsRuntimePseudoReloc(false), Name(N) {}
+        IsRuntimePseudoReloc(false), NameSize(N.size()),
+        NameData(N.empty() ? nullptr : N.data()) {}
 
   const unsigned SymbolKind : 8;
   unsigned IsExternal : 1;
@@ -107,7 +107,10 @@ public:
   unsigned IsRuntimePseudoReloc : 1;
 
 protected:
-  StringRef Name;
+  // Symbol name length. Assume symbol lengths fit in a 32-bit integer.
+  uint32_t NameSize;
+
+  const char *NameData;
 };
 
 // The base class for any defined symbols, including absolute symbols,
@@ -130,7 +133,7 @@ public:
 // Symbols defined via a COFF object file or bitcode file.  For COFF files, this
 // stores a coff_symbol_generic*, and names of internal symbols are lazily
 // loaded through that. For bitcode files, Sym is nullptr and the name is stored
-// as a StringRef.
+// as a decomposed StringRef.
 class DefinedCOFF : public Defined {
   friend Symbol;
 

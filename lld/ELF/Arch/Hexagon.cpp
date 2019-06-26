@@ -1,9 +1,8 @@
 //===-- Hexagon.cpp -------------------------------------------------------===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -41,11 +40,11 @@ Hexagon::Hexagon() {
   PltRel = R_HEX_JMP_SLOT;
   RelativeRel = R_HEX_RELATIVE;
   GotRel = R_HEX_GLOB_DAT;
-  GotEntrySize = 4;
+  SymbolicRel = R_HEX_32;
+
   // The zero'th GOT entry is reserved for the address of _DYNAMIC.  The
   // next 3 are reserved for the dynamic loader.
   GotPltHeaderEntriesNum = 4;
-  GotPltEntrySize = 4;
 
   PltEntrySize = 16;
   PltHeaderSize = 32;
@@ -247,7 +246,7 @@ void Hexagon::relocateOne(uint8_t *Loc, RelType Type, uint64_t Val) const {
     or32le(Loc, applyMask(0x00c03fff, Val));
     break;
   default:
-    error(getErrorLocation(Loc) + "unrecognized reloc " + toString(Type));
+    error(getErrorLocation(Loc) + "unrecognized relocation " + toString(Type));
     break;
   }
 }

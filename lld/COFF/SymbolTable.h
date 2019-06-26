@@ -1,9 +1,8 @@
 //===- SymbolTable.h --------------------------------------------*- C++ -*-===//
 //
-//                             The LLVM Linker
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,6 +27,7 @@ class Chunk;
 class CommonChunk;
 class Defined;
 class DefinedAbsolute;
+class DefinedRegular;
 class DefinedRelative;
 class Lazy;
 class SectionChunk;
@@ -68,8 +68,7 @@ public:
   // mangled symbol. This function tries to find a mangled name
   // for U from the symbol table, and if found, set the symbol as
   // a weak alias for U.
-  void mangleMaybe(Symbol *B);
-  StringRef findMangle(StringRef Name);
+  Symbol *findMangle(StringRef Name);
 
   // Build a set of COFF objects representing the combined contents of
   // BitcodeFiles and add them to the symbol table. Called after all files are
@@ -89,7 +88,7 @@ public:
   Symbol *addRegular(InputFile *F, StringRef N,
                      const llvm::object::coff_symbol_generic *S = nullptr,
                      SectionChunk *C = nullptr);
-  std::pair<Symbol *, bool>
+  std::pair<DefinedRegular *, bool>
   addComdat(InputFile *F, StringRef N,
             const llvm::object::coff_symbol_generic *S = nullptr);
   Symbol *addCommon(InputFile *F, StringRef N, uint64_t Size,
@@ -115,7 +114,8 @@ private:
   std::pair<Symbol *, bool> insert(StringRef Name);
   /// Same as insert(Name), but also sets IsUsedInRegularObj.
   std::pair<Symbol *, bool> insert(StringRef Name, InputFile *F);
-  StringRef findByPrefix(StringRef Prefix);
+
+  std::vector<Symbol *> getSymsWithPrefix(StringRef Prefix);
 
   llvm::DenseMap<llvm::CachedHashStringRef, Symbol *> SymMap;
   std::unique_ptr<BitcodeCompiler> LTO;

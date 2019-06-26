@@ -1,9 +1,8 @@
 //===-- DIERef.h ------------------------------------------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -11,48 +10,51 @@
 #define SymbolFileDWARF_DIERef_h_
 
 #include "lldb/Core/dwarf.h"
-#include "lldb/lldb-defines.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/Support/FormatProviders.h"
+#include <vector>
 
-class DWARFFormValue;
-class SymbolFileDWARF;
+/// Identifies a DWARF debug info entry within a given Module. It contains three
+/// "coordinates":
+/// - section: identifies the section of the debug info entry: debug_info or
+///   debug_types
+/// - unit_offset: the offset of the unit containing the debug info entry. For
+///   regular (unsplit) units, this field is optional, as the die_offset is
+///   enough to uniquely identify the containing unit. For split units, this
+///   field must contain the offset of the skeleton unit in the main object
+///   file.
+/// - die_offset: The offset of te debug info entry as an absolute offset from
+///   the beginning of the section specified in the section field.
+class DIERef {
+public:
+  enum Section : uint8_t { DebugInfo, DebugTypes };
 
-struct DIERef {
-  DIERef() = default;
+  DIERef(Section s, llvm::Optional<dw_offset_t> u, dw_offset_t d)
+      : m_section(s), m_unit_offset(u.getValueOr(DW_INVALID_OFFSET)),
+        m_die_offset(d) {}
 
-  DIERef(dw_offset_t c, dw_offset_t d) : cu_offset(c), die_offset(d) {}
+  Section section() const { return static_cast<Section>(m_section); }
 
-  //----------------------------------------------------------------------
-  // In order to properly decode a lldb::user_id_t back into a DIERef we
-  // need the DWARF file since it knows if DWARF in .o files is being used
-  // (MacOSX) or if DWO files are being used. The encoding of the user ID
-  // differs between the two types of DWARF.
-  //----------------------------------------------------------------------
-  explicit DIERef(lldb::user_id_t uid, SymbolFileDWARF *dwarf);
-
-  explicit DIERef(const DWARFFormValue &form_value);
-
-  //----------------------------------------------------------------------
-  // In order to properly encode a DIERef unto a lldb::user_id_t we need
-  // the DWARF file since it knows if DWARF in .o files is being used
-  // (MacOSX) or if DWO files are being used. The encoding of the user ID
-  // differs between the two types of DWARF.
-  //----------------------------------------------------------------------
-  lldb::user_id_t GetUID(SymbolFileDWARF *dwarf) const;
-
-  bool operator<(const DIERef &ref) const {
-    return die_offset < ref.die_offset;
+  llvm::Optional<dw_offset_t> unit_offset() const {
+    if (m_unit_offset != DW_INVALID_OFFSET)
+      return m_unit_offset;
+    return llvm::None;
   }
 
-  bool operator<(const DIERef &ref) { return die_offset < ref.die_offset; }
+  dw_offset_t die_offset() const { return m_die_offset; }
 
-  explicit operator bool() const {
-    return cu_offset != DW_INVALID_OFFSET || die_offset != DW_INVALID_OFFSET;
-  }
-
-  dw_offset_t cu_offset = DW_INVALID_OFFSET;
-  dw_offset_t die_offset = DW_INVALID_OFFSET;
+private:
+  unsigned m_section : 1;
+  dw_offset_t m_unit_offset;
+  dw_offset_t m_die_offset;
 };
 
 typedef std::vector<DIERef> DIEArray;
+
+namespace llvm {
+template<> struct format_provider<DIERef> {
+  static void format(const DIERef &ref, raw_ostream &OS, StringRef Style);
+};
+} // namespace llvm
 
 #endif // SymbolFileDWARF_DIERef_h_

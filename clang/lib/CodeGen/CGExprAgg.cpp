@@ -1,9 +1,8 @@
 //===--- CGExprAgg.cpp - Emit LLVM Code from Aggregate Expressions --------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -166,10 +165,11 @@ public:
   void VisitImplicitValueInitExpr(ImplicitValueInitExpr *E);
   void VisitNoInitExpr(NoInitExpr *E) { } // Do nothing.
   void VisitCXXDefaultArgExpr(CXXDefaultArgExpr *DAE) {
+    CodeGenFunction::CXXDefaultArgExprScope Scope(CGF, DAE);
     Visit(DAE->getExpr());
   }
   void VisitCXXDefaultInitExpr(CXXDefaultInitExpr *DIE) {
-    CodeGenFunction::CXXDefaultInitExprScope Scope(CGF);
+    CodeGenFunction::CXXDefaultInitExprScope Scope(CGF, DIE);
     Visit(DIE->getExpr());
   }
   void VisitCXXBindTemporaryExpr(CXXBindTemporaryExpr *E);
@@ -760,8 +760,7 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
 
         // Build a GEP to refer to the subobject.
         Address valueAddr =
-            CGF.Builder.CreateStructGEP(valueDest.getAddress(), 0,
-                                        CharUnits());
+            CGF.Builder.CreateStructGEP(valueDest.getAddress(), 0);
         valueDest = AggValueSlot::forAddr(valueAddr,
                                           valueDest.getQualifiers(),
                                           valueDest.isExternallyDestructed(),
@@ -781,11 +780,12 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
       CGF.CreateAggTemp(atomicType, "atomic-to-nonatomic.temp");
     CGF.EmitAggExpr(E->getSubExpr(), atomicSlot);
 
-    Address valueAddr =
-      Builder.CreateStructGEP(atomicSlot.getAddress(), 0, CharUnits());
+    Address valueAddr = Builder.CreateStructGEP(atomicSlot.getAddress(), 0);
     RValue rvalue = RValue::getAggregate(valueAddr, atomicSlot.isVolatile());
     return EmitFinalDestCopy(valueType, rvalue);
   }
+  case CK_AddressSpaceConversion:
+     return Visit(E->getSubExpr());
 
   case CK_LValueToRValue:
     // If we're loading from a volatile type, force the destination
@@ -796,6 +796,7 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
     }
 
     LLVM_FALLTHROUGH;
+
 
   case CK_NoOp:
   case CK_UserDefinedConversion:
@@ -852,10 +853,12 @@ void AggExprEmitter::VisitCastExpr(CastExpr *E) {
   case CK_CopyAndAutoreleaseBlockObject:
   case CK_BuiltinFnToFnPtr:
   case CK_ZeroToOCLOpaqueType:
-  case CK_AddressSpaceConversion:
+
   case CK_IntToOCLSampler:
   case CK_FixedPointCast:
   case CK_FixedPointToBoolean:
+  case CK_FixedPointToIntegral:
+  case CK_IntegralToFixedPoint:
     llvm_unreachable("cast kind invalid for aggregate types");
   }
 }
@@ -1264,7 +1267,52 @@ void AggExprEmitter::VisitCXXInheritedCtorInitExpr(
 void
 AggExprEmitter::VisitLambdaExpr(LambdaExpr *E) {
   AggValueSlot Slot = EnsureSlot(E->getType());
-  CGF.EmitLambdaExpr(E, Slot);
+  LValue SlotLV = CGF.MakeAddrLValue(Slot.getAddress(), E->getType());
+
+  // We'll need to enter cleanup scopes in case any of the element
+  // initializers throws an exception.
+  SmallVector<EHScopeStack::stable_iterator, 16> Cleanups;
+  llvm::Instruction *CleanupDominator = nullptr;
+
+  CXXRecordDecl::field_iterator CurField = E->getLambdaClass()->field_begin();
+  for (LambdaExpr::const_capture_init_iterator i = E->capture_init_begin(),
+                                               e = E->capture_init_end();
+       i != e; ++i, ++CurField) {
+    // Emit initialization
+    LValue LV = CGF.EmitLValueForFieldInitialization(SlotLV, *CurField);
+    if (CurField->hasCapturedVLAType()) {
+      CGF.EmitLambdaVLACapture(CurField->getCapturedVLAType(), LV);
+      continue;
+    }
+
+    EmitInitializationToLValue(*i, LV);
+
+    // Push a destructor if necessary.
+    if (QualType::DestructionKind DtorKind =
+            CurField->getType().isDestructedType()) {
+      assert(LV.isSimple());
+      if (CGF.needsEHCleanup(DtorKind)) {
+        if (!CleanupDominator)
+          CleanupDominator = CGF.Builder.CreateAlignedLoad(
+              CGF.Int8Ty,
+              llvm::Constant::getNullValue(CGF.Int8PtrTy),
+              CharUnits::One()); // placeholder
+
+        CGF.pushDestroy(EHCleanup, LV.getAddress(), CurField->getType(),
+                        CGF.getDestroyer(DtorKind), false);
+        Cleanups.push_back(CGF.EHStack.stable_begin());
+      }
+    }
+  }
+
+  // Deactivate all the partial cleanups in reverse order, which
+  // generally means popping them.
+  for (unsigned i = Cleanups.size(); i != 0; --i)
+    CGF.DeactivateCleanupBlock(Cleanups[i-1], CleanupDominator);
+
+  // Destroy the placeholder if we made one.
+  if (CleanupDominator)
+    CleanupDominator->eraseFromParent();
 }
 
 void AggExprEmitter::VisitExprWithCleanups(ExprWithCleanups *E) {
@@ -1304,7 +1352,8 @@ static bool isSimpleZero(const Expr *E, CodeGenFunction &CGF) {
   // (int*)0 - Null pointer expressions.
   if (const CastExpr *ICE = dyn_cast<CastExpr>(E))
     return ICE->getCastKind() == CK_NullToPointer &&
-        CGF.getTypes().isPointerZeroInitializable(E->getType());
+           CGF.getTypes().isPointerZeroInitializable(E->getType()) &&
+           !E->HasSideEffects(CGF.getContext());
   // '\0'
   if (const CharacterLiteral *CL = dyn_cast<CharacterLiteral>(E))
     return CL->getValue() == 0;

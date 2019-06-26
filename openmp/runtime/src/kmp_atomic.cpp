@@ -4,10 +4,9 @@
 
 //===----------------------------------------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.txt for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -2566,6 +2565,8 @@ ATOMIC_CMPX_L_CPT(fixed8, orl_cpt, kmp_int64, 64, ||,
       new_value = rhs;                                                         \
     else                                                                       \
       new_value = old_value;                                                   \
+  } else {                                                                     \
+    new_value = *lhs;                                                          \
   }                                                                            \
   __kmp_release_atomic_lock(&ATOMIC_LOCK##LCK_ID, gtid);                       \
   return new_value;
