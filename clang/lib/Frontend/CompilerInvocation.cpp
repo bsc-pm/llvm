@@ -3381,7 +3381,8 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
       getLastArgIntValue(Args, OPT_function_alignment, 0, Diags);
 
   // OmpSs, force line debug info
-  if (LangOpts.OmpSs) {
+  if (LangOpts.OmpSs
+      && Res.getCodeGenOpts().getDebugInfo() == codegenoptions::NoDebugInfo) {
     Res.getCodeGenOpts().setDebugInfo(codegenoptions::LocTrackingOnly);
   }
 
