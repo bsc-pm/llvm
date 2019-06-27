@@ -278,8 +278,8 @@ struct OmpSs : public ModulePass {
                                                                        ConstantInt::get(TskImplInfoTy.Mmbers.DeviceTypeIdTy, 0),
                                                                        ConstantExpr::getPointerCast(outlineFuncVar, outlineFuncCastTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo()),
+                                                                       ConstantPointerNull::get(cast<PointerType>(TskImplInfoTy.Mmbers.TaskLabelTy)), /* const char *task_label */
                                                                        Nanos6TaskLocStr,
-                                                                       ConstantPointerNull::get(TskImplInfoTy.Mmbers.DeclSourceTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()))),
                                 ("implementations_var_" + F.getName() + Twine(taskNum)).str());
 
@@ -477,7 +477,7 @@ struct OmpSs : public ModulePass {
                                  TskImplInfoTy.Mmbers.RunFuncTy->getPointerTo(),
                                  TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo(),
                                  TskImplInfoTy.Mmbers.TaskLabelTy, /* const char *task_label */
-                                 TskImplInfoTy.Mmbers.DeclSourceTy->getPointerTo(), /* const char *declaration_source*/
+                                 TskImplInfoTy.Mmbers.DeclSourceTy, /* const char *declaration_source*/
                                  TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()
                                 });
       }

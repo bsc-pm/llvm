@@ -36,7 +36,7 @@ define void @foo(i32 %x, i32 %y) {
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i8*, i8** [[TMP5]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP8]])
 ; CHECK-NEXT:    br label [[TMP9:%.*]]
-; CHECK:         call void @nanos6_taskwait(i8* getelementptr inbounds ([29 x i8], [29 x i8]* @0, i32 0, i32 0))
+; CHECK:         call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0))
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -56,7 +56,7 @@ entry:
   %2 = load i32, i32* %z_orig, align 4
   store i32 %2, i32* %z, align 4
 
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x.addr), "QUAL.OSS.PRIVATE"(i32* %z), "QUAL.OSS.FIRSTPRIVATE"(i32* %y.addr) ]
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x.addr), "QUAL.OSS.PRIVATE"(i32* %z), "QUAL.OSS.FIRSTPRIVATE"(i32* %y.addr) ], !dbg !8
   %4 = load i32, i32* %x.addr, align 4
   %inc = add nsw i32 %4, 1
   store i32 %inc, i32* %x.addr, align 4
@@ -66,9 +66,9 @@ entry:
   %6 = load i32, i32* %z, align 4
   %inc2 = add nsw i32 %6, 1
   store i32 %inc2, i32* %z, align 4
-  call void @llvm.directive.region.exit(token %3)
+  call void @llvm.directive.region.exit(token %3), !dbg !9
 
-  %7 = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ]
+  %7 = call i1 @llvm.directive.marker() [ "DIR.OSS"([9 x i8] c"TASKWAIT\00") ], !dbg !10
   ret void
 }
 
@@ -76,3 +76,13 @@ declare token @llvm.directive.region.entry()
 declare void @llvm.directive.region.exit(token)
 declare i1 @llvm.directive.marker()
 
+!llvm.module.flags = !{!3}
+
+!0 = distinct !DICompileUnit(language: DW_LANG_C99, file: !1, producer: "human", isOptimized: false, runtimeVersion: 0, emissionKind: NoDebug, enums: !2, nameTableKind: None)
+!1 = !DIFile(filename: "simple_task_with_taskwait.c", directory: "")!2 = !{}
+!3 = !{i32 2, !"Debug Info Version", i32 3}
+!6 = distinct !DISubprogram(name: "foo", scope: !1, file: !1, line: 4, type: !7, scopeLine: 4, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !0, retainedNodes: !2)
+!7 = !DISubroutineType(types: !2)
+!8 = !DILocation(line: 5, column: 9, scope: !6)
+!9 = !DILocation(line: 5, column: 9, scope: !6)
+!10 = !DILocation(line: 5, column: 9, scope: !6)
