@@ -553,6 +553,10 @@ void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
     CmdArgs.push_back("-rpath");
     CmdArgs.push_back(Args.MakeArgString(RuntimeDefaultHome + "/lib"));
   }
+  else {
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib"));
+  }
   CmdArgs.push_back("-lnanos6");
 }
 
