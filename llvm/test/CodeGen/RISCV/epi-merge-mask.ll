@@ -52,7 +52,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    vsetvli a4, a0, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a3)
 ; CHECK-O0-NEXT:    vle.v v1, (a2)
-; CHECK-O0-NEXT:    vflt.vv v2, v1, v0
+; CHECK-O0-NEXT:    vmflt.vv v2, v1, v0
 ; CHECK-O0-NEXT:    rdvtype a2
 ; CHECK-O0-NEXT:    rdvl a0
 ; CHECK-O0-NEXT:    ld a3, 56(s1)
@@ -84,7 +84,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O2-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-O2-NEXT:    vle.v v1, (a3)
 ; CHECK-O2-NEXT:    vle.v v2, (a2)
-; CHECK-O2-NEXT:    vflt.vv v0, v2, v1
+; CHECK-O2-NEXT:    vmflt.vv v0, v2, v1
 ; CHECK-O2-NEXT:    vfsub.vv v1, v1, v2, v0.t
 ; CHECK-O2-NEXT:    vse.v v1, (a1)
 ; CHECK-O2-NEXT:    ret

@@ -967,13 +967,13 @@ def VFMERGE_VFM : RVInstEPIOPV_FVF<0b010111,
            "vfmerge.vfm",
            "${rd}, ${rs2}, ${rs1}, v0">;
 
-defm VFEQ    : binary_arithmetic_float_vf<"vfeq",  0b011000>;
-defm VFLE   : binary_arithmetic_float_vf<"vfle", 0b011001>;
-defm VFORD   : binary_arithmetic_float_vf<"vford", 0b011010>;
-defm VFLT    : binary_arithmetic_float_vf<"vflt",  0b011011>;
-defm VFNE    : binary_arithmetic_float_vf<"vfne",  0b011100>;
-defm VFGT    : binary_arithmetic_float_f<"vfgt",  0b011101>;
-defm VFGE   : binary_arithmetic_float_f<"vfge", 0b011111>;
+defm VMFEQ   : binary_arithmetic_float_vf<"vmfeq",  0b011000>;
+defm VMFLE   : binary_arithmetic_float_vf<"vmfle",  0b011001>;
+defm VMFORD  : binary_arithmetic_float_vf<"vmford", 0b011010>;
+defm VMFLT   : binary_arithmetic_float_vf<"vmflt",  0b011011>;
+defm VMFNE   : binary_arithmetic_float_vf<"vmfne",  0b011100>;
+defm VMFGT   : binary_arithmetic_float_f<"vmfgt",   0b011101>;
+defm VMFGE   : binary_arithmetic_float_f<"vmfge",   0b011111>;
 
 defm VFDIV   : binary_arithmetic_float_vf<"vfdiv",  0b100000>;
 defm VFRDIV  : binary_arithmetic_float_vf<"vfrdiv", 0b100001>;
@@ -1781,14 +1781,14 @@ let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
                                EPIPseudo;
 }
 
-defm PseudoVFEQ        : pseudo_binary_float_m_vv_vf;
-defm PseudoVFLE        : pseudo_binary_float_m_vv_vf;
-defm PseudoVFORD       : pseudo_binary_float_m_vv_vf;
-defm PseudoVFLT        : pseudo_binary_float_m_vv_vf;
-defm PseudoVFNE        : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFEQ        : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFLE        : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFORD       : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFLT        : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFNE        : pseudo_binary_float_m_vv_vf;
 
-defm PseudoVFGT        : pseudo_binary_float_m_vf;
-defm PseudoVFGE        : pseudo_binary_float_m_vf;
+defm PseudoVMFGT        : pseudo_binary_float_m_vf;
+defm PseudoVMFGE        : pseudo_binary_float_m_vf;
 
 defm PseudoVFDIV       : pseudo_binary_float_v_vv_vf;
 defm PseudoVFRDIV      : pseudo_binary_float_v_vf;
@@ -3027,19 +3027,19 @@ foreach fvti = NoGroupFloatVectors.Values in
              (NoX0 GPR:$vl), fvti.SEW)>;
 }
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfeq", "PseudoVFEQ">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfle", "PseudoVFLE">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vford", "PseudoVFORD">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vflt", "PseudoVFLT">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfne", "PseudoVFNE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfeq", "PseudoVMFEQ">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfle", "PseudoVMFLE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vford", "PseudoVMFORD">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vflt", "PseudoVMFLT">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfne", "PseudoVMFNE">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfgt", "PseudoVFGT">;
-// Select (int_epi_vfgt reg:$rs1, reg:$rs2) as (PseudoVFLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfgt", "PseudoVFLT">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfgt", "PseudoVMFGT">;
+// Select (int_epi_vfgt reg:$rs1, reg:$rs2) as (PseudoVMFLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfgt", "PseudoVMFLT">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfge", "PseudoVFGE">;
-// Select (int_epi_vfge reg:$rs1, reg:$rs2) as (PseudoVFLE reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfge", "PseudoVFLE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfge", "PseudoVMFGE">;
+// Select (int_epi_vfge reg:$rs1, reg:$rs2) as (PseudoVMFLE reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfge", "PseudoVMFLE">;
 
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfdiv", "PseudoVFDIV">;
 defm "" : pat_intrinsic_binary_fp_v_vf<"int_epi_vfrdiv", "PseudoVFRDIV">;

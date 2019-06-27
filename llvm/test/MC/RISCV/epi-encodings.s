@@ -1851,112 +1851,112 @@ vfmv.v.f v26, fa6
 vfmerge.vfm v28, v27, fa7, v0
 
 # Encoding: |011000|1|11101|11110|001|11111|1010111|
-# CHECK: vfeq.vv v31, v29, v30
+# CHECK: vmfeq.vv v31, v29, v30
 # CHECK-SAME: [0xd7,0x1f,0xdf,0x63]
-vfeq.vv v31, v29, v30
+vmfeq.vv v31, v29, v30
 # Encoding: |011000|0|00000|00001|001|00010|1010111|
-# CHECK: vfeq.vv v2, v0, v1, v0.t
+# CHECK: vmfeq.vv v2, v0, v1, v0.t
 # CHECK-SAME: [0x57,0x91,0x00,0x60]
-vfeq.vv v2, v0, v1, v0.t
+vmfeq.vv v2, v0, v1, v0.t
 
 # Encoding: |011000|1|00011|10010|101|00100|1010111|
-# CHECK: vfeq.vf v4, v3, fs2
+# CHECK: vmfeq.vf v4, v3, fs2
 # CHECK-SAME: [0x57,0x52,0x39,0x62]
-vfeq.vf v4, v3, fs2
+vmfeq.vf v4, v3, fs2
 # Encoding: |011000|0|00101|10011|101|00110|1010111|
-# CHECK: vfeq.vf v6, v5, fs3, v0.t
+# CHECK: vmfeq.vf v6, v5, fs3, v0.t
 # CHECK-SAME: [0x57,0xd3,0x59,0x60]
-vfeq.vf v6, v5, fs3, v0.t
+vmfeq.vf v6, v5, fs3, v0.t
 
 # Encoding: |011001|1|00111|01000|001|01001|1010111|
-# CHECK: vfle.vv v9, v7, v8
+# CHECK: vmfle.vv v9, v7, v8
 # CHECK-SAME: [0xd7,0x14,0x74,0x66]
-vfle.vv v9, v7, v8
+vmfle.vv v9, v7, v8
 # Encoding: |011001|0|01010|01011|001|01100|1010111|
-# CHECK: vfle.vv v12, v10, v11, v0.t
+# CHECK: vmfle.vv v12, v10, v11, v0.t
 # CHECK-SAME: [0x57,0x96,0xa5,0x64]
-vfle.vv v12, v10, v11, v0.t
+vmfle.vv v12, v10, v11, v0.t
 
 # Encoding: |011001|1|01101|10100|101|01110|1010111|
-# CHECK: vfle.vf v14, v13, fs4
+# CHECK: vmfle.vf v14, v13, fs4
 # CHECK-SAME: [0x57,0x57,0xda,0x66]
-vfle.vf v14, v13, fs4
+vmfle.vf v14, v13, fs4
 # Encoding: |011001|0|01111|10101|101|10000|1010111|
-# CHECK: vfle.vf v16, v15, fs5, v0.t
+# CHECK: vmfle.vf v16, v15, fs5, v0.t
 # CHECK-SAME: [0x57,0xd8,0xfa,0x64]
-vfle.vf v16, v15, fs5, v0.t
+vmfle.vf v16, v15, fs5, v0.t
 
 # Encoding: |011010|1|10001|10010|001|10011|1010111|
-# CHECK: vford.vv v19, v17, v18
+# CHECK: vmford.vv v19, v17, v18
 # CHECK-SAME: [0xd7,0x19,0x19,0x6b]
-vford.vv v19, v17, v18
+vmford.vv v19, v17, v18
 # Encoding: |011010|0|10100|10101|001|10110|1010111|
-# CHECK: vford.vv v22, v20, v21, v0.t
+# CHECK: vmford.vv v22, v20, v21, v0.t
 # CHECK-SAME: [0x57,0x9b,0x4a,0x69]
-vford.vv v22, v20, v21, v0.t
+vmford.vv v22, v20, v21, v0.t
 
 # Encoding: |011010|1|10111|10110|101|11000|1010111|
-# CHECK: vford.vf v24, v23, fs6
+# CHECK: vmford.vf v24, v23, fs6
 # CHECK-SAME: [0x57,0x5c,0x7b,0x6b]
-vford.vf v24, v23, fs6
+vmford.vf v24, v23, fs6
 # Encoding: |011010|0|11001|10111|101|11010|1010111|
-# CHECK: vford.vf v26, v25, fs7, v0.t
+# CHECK: vmford.vf v26, v25, fs7, v0.t
 # CHECK-SAME: [0x57,0xdd,0x9b,0x69]
-vford.vf v26, v25, fs7, v0.t
+vmford.vf v26, v25, fs7, v0.t
 
 # Encoding: |011011|1|11011|11100|001|11101|1010111|
-# CHECK: vflt.vv v29, v27, v28
+# CHECK: vmflt.vv v29, v27, v28
 # CHECK-SAME: [0xd7,0x1e,0xbe,0x6f]
-vflt.vv v29, v27, v28
+vmflt.vv v29, v27, v28
 # Encoding: |011011|0|11110|11111|001|00000|1010111|
-# CHECK: vflt.vv v0, v30, v31, v0.t
+# CHECK: vmflt.vv v0, v30, v31, v0.t
 # CHECK-SAME: [0x57,0x90,0xef,0x6d]
-vflt.vv v0, v30, v31, v0.t
+vmflt.vv v0, v30, v31, v0.t
 
 # Encoding: |011011|1|00001|11000|101|00010|1010111|
-# CHECK: vflt.vf v2, v1, fs8
+# CHECK: vmflt.vf v2, v1, fs8
 # CHECK-SAME: [0x57,0x51,0x1c,0x6e]
-vflt.vf v2, v1, fs8
+vmflt.vf v2, v1, fs8
 # Encoding: |011011|0|00011|11001|101|00100|1010111|
-# CHECK: vflt.vf v4, v3, fs9, v0.t
+# CHECK: vmflt.vf v4, v3, fs9, v0.t
 # CHECK-SAME: [0x57,0xd2,0x3c,0x6c]
-vflt.vf v4, v3, fs9, v0.t
+vmflt.vf v4, v3, fs9, v0.t
 
 # Encoding: |011100|1|00101|00110|001|00111|1010111|
-# CHECK: vfne.vv v7, v5, v6
+# CHECK: vmfne.vv v7, v5, v6
 # CHECK-SAME: [0xd7,0x13,0x53,0x72]
-vfne.vv v7, v5, v6
+vmfne.vv v7, v5, v6
 # Encoding: |011100|0|01000|01001|001|01010|1010111|
-# CHECK: vfne.vv v10, v8, v9, v0.t
+# CHECK: vmfne.vv v10, v8, v9, v0.t
 # CHECK-SAME: [0x57,0x95,0x84,0x70]
-vfne.vv v10, v8, v9, v0.t
+vmfne.vv v10, v8, v9, v0.t
 
 # Encoding: |011100|1|01011|11010|101|01100|1010111|
-# CHECK: vfne.vf v12, v11, fs10
+# CHECK: vmfne.vf v12, v11, fs10
 # CHECK-SAME: [0x57,0x56,0xbd,0x72]
-vfne.vf v12, v11, fs10
+vmfne.vf v12, v11, fs10
 # Encoding: |011100|0|01101|11011|101|01110|1010111|
-# CHECK: vfne.vf v14, v13, fs11, v0.t
+# CHECK: vmfne.vf v14, v13, fs11, v0.t
 # CHECK-SAME: [0x57,0xd7,0xdd,0x70]
-vfne.vf v14, v13, fs11, v0.t
+vmfne.vf v14, v13, fs11, v0.t
 
 # Encoding: |011101|1|01111|11100|101|10000|1010111|
-# CHECK: vfgt.vf v16, v15, ft8
+# CHECK: vmfgt.vf v16, v15, ft8
 # CHECK-SAME: [0x57,0x58,0xfe,0x76]
-vfgt.vf v16, v15, ft8
+vmfgt.vf v16, v15, ft8
 # Encoding: |011101|0|10001|11101|101|10010|1010111|
-# CHECK: vfgt.vf v18, v17, ft9, v0.t
+# CHECK: vmfgt.vf v18, v17, ft9, v0.t
 # CHECK-SAME: [0x57,0xd9,0x1e,0x75]
-vfgt.vf v18, v17, ft9, v0.t
+vmfgt.vf v18, v17, ft9, v0.t
 
 # Encoding: |011111|1|10011|11110|101|10100|1010111|
-# CHECK: vfge.vf v20, v19, ft10
+# CHECK: vmfge.vf v20, v19, ft10
 # CHECK-SAME: [0x57,0x5a,0x3f,0x7f]
-vfge.vf v20, v19, ft10
+vmfge.vf v20, v19, ft10
 # Encoding: |011111|0|10101|00000|101|10110|1010111|
-# CHECK: vfge.vf v22, v21, ft0, v0.t
+# CHECK: vmfge.vf v22, v21, ft0, v0.t
 # CHECK-SAME: [0x57,0x5b,0x50,0x7d]
-vfge.vf v22, v21, ft0, v0.t
+vmfge.vf v22, v21, ft0, v0.t
 
 # Encoding: |100000|1|10111|11000|001|11001|1010111|
 # CHECK: vfdiv.vv v25, v23, v24
