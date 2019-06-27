@@ -189,105 +189,105 @@ vmerge.vxm v4, v3, t3, v0
 # CHECK: vmerge.vim v6, v5, -14, v0
 vmerge.vim v6, v5, -14, v0
 
-# CHECK: vseq.vv v9, v7, v8
-vseq.vv v9, v7, v8
-# CHECK: vseq.vv v12, v10, v11, v0.t
-vseq.vv v12, v10, v11, v0.t
+# CHECK: vmseq.vv v9, v7, v8
+vmseq.vv v9, v7, v8
+# CHECK: vmseq.vv v12, v10, v11, v0.t
+vmseq.vv v12, v10, v11, v0.t
 
-# CHECK: vseq.vx v14, v13, t5
-vseq.vx v14, v13, t5
-# CHECK: vseq.vx v16, v15, ra, v0.t
-vseq.vx v16, v15, ra, v0.t
+# CHECK: vmseq.vx v14, v13, t5
+vmseq.vx v14, v13, t5
+# CHECK: vmseq.vx v16, v15, ra, v0.t
+vmseq.vx v16, v15, ra, v0.t
 
-# CHECK: vseq.vi v18, v17, -13
-vseq.vi v18, v17, -13
-# CHECK: vseq.vi v20, v19, -12, v0.t
-vseq.vi v20, v19, -12, v0.t
+# CHECK: vmseq.vi v18, v17, -13
+vmseq.vi v18, v17, -13
+# CHECK: vmseq.vi v20, v19, -12, v0.t
+vmseq.vi v20, v19, -12, v0.t
 
-# CHECK: vsne.vv v23, v21, v22
-vsne.vv v23, v21, v22
-# CHECK: vsne.vv v26, v24, v25, v0.t
-vsne.vv v26, v24, v25, v0.t
+# CHECK: vmsne.vv v23, v21, v22
+vmsne.vv v23, v21, v22
+# CHECK: vmsne.vv v26, v24, v25, v0.t
+vmsne.vv v26, v24, v25, v0.t
 
-# CHECK: vsne.vx v28, v27, gp
-vsne.vx v28, v27, gp
-# CHECK: vsne.vx v30, v29, t0, v0.t
-vsne.vx v30, v29, t0, v0.t
+# CHECK: vmsne.vx v28, v27, gp
+vmsne.vx v28, v27, gp
+# CHECK: vmsne.vx v30, v29, t0, v0.t
+vmsne.vx v30, v29, t0, v0.t
 
-# CHECK: vsne.vi v0, v31, -11
-vsne.vi v0, v31, -11
-# CHECK: vsne.vi v2, v1, -10, v0.t
-vsne.vi v2, v1, -10, v0.t
+# CHECK: vmsne.vi v0, v31, -11
+vmsne.vi v0, v31, -11
+# CHECK: vmsne.vi v2, v1, -10, v0.t
+vmsne.vi v2, v1, -10, v0.t
 
-# CHECK: vsltu.vv v5, v3, v4
-vsltu.vv v5, v3, v4
-# CHECK: vsltu.vv v8, v6, v7, v0.t
-vsltu.vv v8, v6, v7, v0.t
+# CHECK: vmsltu.vv v5, v3, v4
+vmsltu.vv v5, v3, v4
+# CHECK: vmsltu.vv v8, v6, v7, v0.t
+vmsltu.vv v8, v6, v7, v0.t
 
-# CHECK: vsltu.vx v10, v9, t2
-vsltu.vx v10, v9, t2
-# CHECK: vsltu.vx v12, v11, s1, v0.t
-vsltu.vx v12, v11, s1, v0.t
+# CHECK: vmsltu.vx v10, v9, t2
+vmsltu.vx v10, v9, t2
+# CHECK: vmsltu.vx v12, v11, s1, v0.t
+vmsltu.vx v12, v11, s1, v0.t
 
-# CHECK: vslt.vv v15, v13, v14
-vslt.vv v15, v13, v14
-# CHECK: vslt.vv v18, v16, v17, v0.t
-vslt.vv v18, v16, v17, v0.t
+# CHECK: vmslt.vv v15, v13, v14
+vmslt.vv v15, v13, v14
+# CHECK: vmslt.vv v18, v16, v17, v0.t
+vmslt.vv v18, v16, v17, v0.t
 
-# CHECK: vslt.vx v20, v19, a1
-vslt.vx v20, v19, a1
-# CHECK: vslt.vx v22, v21, a3, v0.t
-vslt.vx v22, v21, a3, v0.t
+# CHECK: vmslt.vx v20, v19, a1
+vmslt.vx v20, v19, a1
+# CHECK: vmslt.vx v22, v21, a3, v0.t
+vmslt.vx v22, v21, a3, v0.t
 
-# CHECK: vsleu.vv v25, v23, v24
-vsleu.vv v25, v23, v24
-# CHECK: vsleu.vv v28, v26, v27, v0.t
-vsleu.vv v28, v26, v27, v0.t
+# CHECK: vmsleu.vv v25, v23, v24
+vmsleu.vv v25, v23, v24
+# CHECK: vmsleu.vv v28, v26, v27, v0.t
+vmsleu.vv v28, v26, v27, v0.t
 
-# CHECK: vsleu.vx v30, v29, a5
-vsleu.vx v30, v29, a5
-# CHECK: vsleu.vx v0, v31, a7, v0.t
-vsleu.vx v0, v31, a7, v0.t
+# CHECK: vmsleu.vx v30, v29, a5
+vmsleu.vx v30, v29, a5
+# CHECK: vmsleu.vx v0, v31, a7, v0.t
+vmsleu.vx v0, v31, a7, v0.t
 
-# CHECK: vsleu.vi v2, v1, -9
-vsleu.vi v2, v1, -9
-# CHECK: vsleu.vi v4, v3, -8, v0.t
-vsleu.vi v4, v3, -8, v0.t
+# CHECK: vmsleu.vi v2, v1, -9
+vmsleu.vi v2, v1, -9
+# CHECK: vmsleu.vi v4, v3, -8, v0.t
+vmsleu.vi v4, v3, -8, v0.t
 
-# CHECK: vsle.vv v7, v5, v6
-vsle.vv v7, v5, v6
-# CHECK: vsle.vv v10, v8, v9, v0.t
-vsle.vv v10, v8, v9, v0.t
+# CHECK: vmsle.vv v7, v5, v6
+vmsle.vv v7, v5, v6
+# CHECK: vmsle.vv v10, v8, v9, v0.t
+vmsle.vv v10, v8, v9, v0.t
 
-# CHECK: vsle.vx v12, v11, s3
-vsle.vx v12, v11, s3
-# CHECK: vsle.vx v14, v13, s5, v0.t
-vsle.vx v14, v13, s5, v0.t
+# CHECK: vmsle.vx v12, v11, s3
+vmsle.vx v12, v11, s3
+# CHECK: vmsle.vx v14, v13, s5, v0.t
+vmsle.vx v14, v13, s5, v0.t
 
-# CHECK: vsle.vi v16, v15, -7
-vsle.vi v16, v15, -7
-# CHECK: vsle.vi v18, v17, -6, v0.t
-vsle.vi v18, v17, -6, v0.t
+# CHECK: vmsle.vi v16, v15, -7
+vmsle.vi v16, v15, -7
+# CHECK: vmsle.vi v18, v17, -6, v0.t
+vmsle.vi v18, v17, -6, v0.t
 
-# CHECK: vsgtu.vx v20, v19, s7
-vsgtu.vx v20, v19, s7
-# CHECK: vsgtu.vx v22, v21, s9, v0.t
-vsgtu.vx v22, v21, s9, v0.t
+# CHECK: vmsgtu.vx v20, v19, s7
+vmsgtu.vx v20, v19, s7
+# CHECK: vmsgtu.vx v22, v21, s9, v0.t
+vmsgtu.vx v22, v21, s9, v0.t
 
-# CHECK: vsgtu.vi v24, v23, 27
-vsgtu.vi v24, v23, 27
-# CHECK: vsgtu.vi v26, v25, 28, v0.t
-vsgtu.vi v26, v25, 28, v0.t
+# CHECK: vmsgtu.vi v24, v23, 27
+vmsgtu.vi v24, v23, 27
+# CHECK: vmsgtu.vi v26, v25, 28, v0.t
+vmsgtu.vi v26, v25, 28, v0.t
 
-# CHECK: vsgt.vx v28, v27, s11
-vsgt.vx v28, v27, s11
-# CHECK: vsgt.vx v30, v29, t4, v0.t
-vsgt.vx v30, v29, t4, v0.t
+# CHECK: vmsgt.vx v28, v27, s11
+vmsgt.vx v28, v27, s11
+# CHECK: vmsgt.vx v30, v29, t4, v0.t
+vmsgt.vx v30, v29, t4, v0.t
 
-# CHECK: vsgt.vi v0, v31, -3
-vsgt.vi v0, v31, -3
-# CHECK: vsgt.vi v2, v1, -2, v0.t
-vsgt.vi v2, v1, -2, v0.t
+# CHECK: vmsgt.vi v0, v31, -3
+vmsgt.vi v0, v31, -3
+# CHECK: vmsgt.vi v2, v1, -2, v0.t
+vmsgt.vi v2, v1, -2, v0.t
 
 # CHECK: vsaddu.vv v5, v3, v4
 vsaddu.vv v5, v3, v4

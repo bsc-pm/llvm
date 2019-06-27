@@ -116,11 +116,11 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
 ; CHECK-NEXT:    vsetvli a6, a5, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (a1)
-; CHECK-NEXT:    vslt.vv v2, v1, v0
+; CHECK-NEXT:    vmslt.vv v2, v1, v0
 ; CHECK-NEXT:    vsetvli a0, zero, e8, m1
 ; CHECK-NEXT:    vse.v v2, (a2)
 ; CHECK-NEXT:    vsetvli a0, a5, e64, m1
-; CHECK-NEXT:    vsltu.vv v0, v1, v0
+; CHECK-NEXT:    vmsltu.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a0, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    vsetvli a0, a5, e64, m1

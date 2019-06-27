@@ -70,26 +70,26 @@ vnsrl.vi vd, vs2, imm, vm
 vnsra.vv vd, vs2, vs1, vm
 vnsra.vx vd, vs2, rs1, vm
 vnsra.vi vd, vs2, imm, vm
-vseq.vv vd, vs2, vs1, vm
-vseq.vx vd, vs2, rs1, vm
-vseq.vi vd, vs2, imm, vm
-vsne.vv vd, vs2, vs1, vm
-vsne.vx vd, vs2, rs1, vm
-vsne.vi vd, vs2, imm, vm
-vsltu.vv vd, vs2, vs1, vm
-vsltu.vx vd, vs2, rs1, vm
-vslt.vv vd, vs2, vs1, vm
-vslt.vx vd, vs2, rs1, vm
-vsleu.vv vd, vs2, vs1, vm
-vsleu.vx vd, vs2, rs1, vm
-vsleu.vi vd, vs2, imm, vm
-vsle.vv vd, vs2, vs1, vm
-vsle.vx vd, vs2, rs1, vm
-vsle.vi vd, vs2, imm, vm
-vsgtu.vx vd, vs2, rs1, vm
-vsgtu.vi vd, vs2, uimm, vm
-vsgt.vx vd, vs2, rs1, vm
-vsgt.vi vd, vs2, imm, vm
+vmseq.vv vd, vs2, vs1, vm
+vmseq.vx vd, vs2, rs1, vm
+vmseq.vi vd, vs2, imm, vm
+vmsne.vv vd, vs2, vs1, vm
+vmsne.vx vd, vs2, rs1, vm
+vmsne.vi vd, vs2, imm, vm
+vmsltu.vv vd, vs2, vs1, vm
+vmsltu.vx vd, vs2, rs1, vm
+vmslt.vv vd, vs2, vs1, vm
+vmslt.vx vd, vs2, rs1, vm
+vmsleu.vv vd, vs2, vs1, vm
+vmsleu.vx vd, vs2, rs1, vm
+vmsleu.vi vd, vs2, imm, vm
+vmsle.vv vd, vs2, vs1, vm
+vmsle.vx vd, vs2, rs1, vm
+vmsle.vi vd, vs2, imm, vm
+vmsgtu.vx vd, vs2, rs1, vm
+vmsgtu.vi vd, vs2, uimm, vm
+vmsgt.vx vd, vs2, rs1, vm
+vmsgt.vi vd, vs2, imm, vm
 vminu.vv vd, vs2, vs1, vm
 vminu.vx vd, vs2, rs1, vm
 vmin.vv vd, vs2, vs1, vm
@@ -391,26 +391,26 @@ vmv.v.i|OPIVI|funct=010111|vs2=00000|vm=1
 vmerge.vvm|OPIVV|funct=010111|vm=0
 vmerge.vxm|OPIVX|funct=010111|vm=0
 vmerge.vim|OPIVI|funct=010111|vm=0
-vseq.vv|OPIVV|funct=011000
-vseq.vx|OPIVX|funct=011000
-vseq.vi|OPIVI|funct=011000
-vsne.vv|OPIVV|funct=011001
-vsne.vx|OPIVX|funct=011001
-vsne.vi|OPIVI|funct=011001
-vsltu.vv|OPIVV|funct=011010
-vsltu.vx|OPIVX|funct=011010
-vslt.vv|OPIVV|funct=011011
-vslt.vx|OPIVX|funct=011011
-vsleu.vv|OPIVV|funct=011100
-vsleu.vx|OPIVX|funct=011100
-vsleu.vi|OPIVI|funct=011100
-vsle.vv|OPIVV|funct=011101
-vsle.vx|OPIVX|funct=011101
-vsle.vi|OPIVI|funct=011101
-vsgtu.vx|OPIVX|funct=011110
-vsgtu.vi|OPIVI|funct=011110
-vsgt.vx|OPIVX|funct=011111
-vsgt.vi|OPIVI|funct=011111
+vmseq.vv|OPIVV|funct=011000
+vmseq.vx|OPIVX|funct=011000
+vmseq.vi|OPIVI|funct=011000
+vmsne.vv|OPIVV|funct=011001
+vmsne.vx|OPIVX|funct=011001
+vmsne.vi|OPIVI|funct=011001
+vmsltu.vv|OPIVV|funct=011010
+vmsltu.vx|OPIVX|funct=011010
+vmslt.vv|OPIVV|funct=011011
+vmslt.vx|OPIVX|funct=011011
+vmsleu.vv|OPIVV|funct=011100
+vmsleu.vx|OPIVX|funct=011100
+vmsleu.vi|OPIVI|funct=011100
+vmsle.vv|OPIVV|funct=011101
+vmsle.vx|OPIVX|funct=011101
+vmsle.vi|OPIVI|funct=011101
+vmsgtu.vx|OPIVX|funct=011110
+vmsgtu.vi|OPIVI|funct=011110
+vmsgt.vx|OPIVX|funct=011111
+vmsgt.vi|OPIVI|funct=011111
 vsaddu.vv|OPIVV|funct=100000
 vsaddu.vx|OPIVX|funct=100000
 vsaddu.vi|OPIVI|funct=100000

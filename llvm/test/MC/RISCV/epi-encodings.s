@@ -336,184 +336,184 @@ vmerge.vxm v4, v3, t3, v0
 vmerge.vim v6, v5, -14, v0
 
 # Encoding: |011000|1|00111|01000|000|01001|1010111|
-# CHECK: vseq.vv v9, v7, v8
+# CHECK: vmseq.vv v9, v7, v8
 # CHECK-SAME: [0xd7,0x04,0x74,0x62]
-vseq.vv v9, v7, v8
+vmseq.vv v9, v7, v8
 # Encoding: |011000|0|01010|01011|000|01100|1010111|
-# CHECK: vseq.vv v12, v10, v11, v0.t
+# CHECK: vmseq.vv v12, v10, v11, v0.t
 # CHECK-SAME: [0x57,0x86,0xa5,0x60]
-vseq.vv v12, v10, v11, v0.t
+vmseq.vv v12, v10, v11, v0.t
 
 # Encoding: |011000|1|01101|11110|100|01110|1010111|
-# CHECK: vseq.vx v14, v13, t5
+# CHECK: vmseq.vx v14, v13, t5
 # CHECK-SAME: [0x57,0x47,0xdf,0x62]
-vseq.vx v14, v13, t5
+vmseq.vx v14, v13, t5
 # Encoding: |011000|0|01111|00001|100|10000|1010111|
-# CHECK: vseq.vx v16, v15, ra, v0.t
+# CHECK: vmseq.vx v16, v15, ra, v0.t
 # CHECK-SAME: [0x57,0xc8,0xf0,0x60]
-vseq.vx v16, v15, ra, v0.t
+vmseq.vx v16, v15, ra, v0.t
 
 # Encoding: |011000|1|10001|10011|011|10010|1010111|
-# CHECK: vseq.vi v18, v17, -13
+# CHECK: vmseq.vi v18, v17, -13
 # CHECK-SAME: [0x57,0xb9,0x19,0x63]
-vseq.vi v18, v17, -13
+vmseq.vi v18, v17, -13
 # Encoding: |011000|0|10011|10100|011|10100|1010111|
-# CHECK: vseq.vi v20, v19, -12, v0.t
+# CHECK: vmseq.vi v20, v19, -12, v0.t
 # CHECK-SAME: [0x57,0x3a,0x3a,0x61]
-vseq.vi v20, v19, -12, v0.t
+vmseq.vi v20, v19, -12, v0.t
 
 # Encoding: |011001|1|10101|10110|000|10111|1010111|
-# CHECK: vsne.vv v23, v21, v22
+# CHECK: vmsne.vv v23, v21, v22
 # CHECK-SAME: [0xd7,0x0b,0x5b,0x67]
-vsne.vv v23, v21, v22
+vmsne.vv v23, v21, v22
 # Encoding: |011001|0|11000|11001|000|11010|1010111|
-# CHECK: vsne.vv v26, v24, v25, v0.t
+# CHECK: vmsne.vv v26, v24, v25, v0.t
 # CHECK-SAME: [0x57,0x8d,0x8c,0x65]
-vsne.vv v26, v24, v25, v0.t
+vmsne.vv v26, v24, v25, v0.t
 
 # Encoding: |011001|1|11011|00011|100|11100|1010111|
-# CHECK: vsne.vx v28, v27, gp
+# CHECK: vmsne.vx v28, v27, gp
 # CHECK-SAME: [0x57,0xce,0xb1,0x67]
-vsne.vx v28, v27, gp
+vmsne.vx v28, v27, gp
 # Encoding: |011001|0|11101|00101|100|11110|1010111|
-# CHECK: vsne.vx v30, v29, t0, v0.t
+# CHECK: vmsne.vx v30, v29, t0, v0.t
 # CHECK-SAME: [0x57,0xcf,0xd2,0x65]
-vsne.vx v30, v29, t0, v0.t
+vmsne.vx v30, v29, t0, v0.t
 
 # Encoding: |011001|1|11111|10101|011|00000|1010111|
-# CHECK: vsne.vi v0, v31, -11
+# CHECK: vmsne.vi v0, v31, -11
 # CHECK-SAME: [0x57,0xb0,0xfa,0x67]
-vsne.vi v0, v31, -11
+vmsne.vi v0, v31, -11
 # Encoding: |011001|0|00001|10110|011|00010|1010111|
-# CHECK: vsne.vi v2, v1, -10, v0.t
+# CHECK: vmsne.vi v2, v1, -10, v0.t
 # CHECK-SAME: [0x57,0x31,0x1b,0x64]
-vsne.vi v2, v1, -10, v0.t
+vmsne.vi v2, v1, -10, v0.t
 
 # Encoding: |011010|1|00011|00100|000|00101|1010111|
-# CHECK: vsltu.vv v5, v3, v4
+# CHECK: vmsltu.vv v5, v3, v4
 # CHECK-SAME: [0xd7,0x02,0x32,0x6a]
-vsltu.vv v5, v3, v4
+vmsltu.vv v5, v3, v4
 # Encoding: |011010|0|00110|00111|000|01000|1010111|
-# CHECK: vsltu.vv v8, v6, v7, v0.t
+# CHECK: vmsltu.vv v8, v6, v7, v0.t
 # CHECK-SAME: [0x57,0x84,0x63,0x68]
-vsltu.vv v8, v6, v7, v0.t
+vmsltu.vv v8, v6, v7, v0.t
 
 # Encoding: |011010|1|01001|00111|100|01010|1010111|
-# CHECK: vsltu.vx v10, v9, t2
+# CHECK: vmsltu.vx v10, v9, t2
 # CHECK-SAME: [0x57,0xc5,0x93,0x6a]
-vsltu.vx v10, v9, t2
+vmsltu.vx v10, v9, t2
 # Encoding: |011010|0|01011|01001|100|01100|1010111|
-# CHECK: vsltu.vx v12, v11, s1, v0.t
+# CHECK: vmsltu.vx v12, v11, s1, v0.t
 # CHECK-SAME: [0x57,0xc6,0xb4,0x68]
-vsltu.vx v12, v11, s1, v0.t
+vmsltu.vx v12, v11, s1, v0.t
 
 # Encoding: |011011|1|01101|01110|000|01111|1010111|
-# CHECK: vslt.vv v15, v13, v14
+# CHECK: vmslt.vv v15, v13, v14
 # CHECK-SAME: [0xd7,0x07,0xd7,0x6e]
-vslt.vv v15, v13, v14
+vmslt.vv v15, v13, v14
 # Encoding: |011011|0|10000|10001|000|10010|1010111|
-# CHECK: vslt.vv v18, v16, v17, v0.t
+# CHECK: vmslt.vv v18, v16, v17, v0.t
 # CHECK-SAME: [0x57,0x89,0x08,0x6d]
-vslt.vv v18, v16, v17, v0.t
+vmslt.vv v18, v16, v17, v0.t
 
 # Encoding: |011011|1|10011|01011|100|10100|1010111|
-# CHECK: vslt.vx v20, v19, a1
+# CHECK: vmslt.vx v20, v19, a1
 # CHECK-SAME: [0x57,0xca,0x35,0x6f]
-vslt.vx v20, v19, a1
+vmslt.vx v20, v19, a1
 # Encoding: |011011|0|10101|01101|100|10110|1010111|
-# CHECK: vslt.vx v22, v21, a3, v0.t
+# CHECK: vmslt.vx v22, v21, a3, v0.t
 # CHECK-SAME: [0x57,0xcb,0x56,0x6d]
-vslt.vx v22, v21, a3, v0.t
+vmslt.vx v22, v21, a3, v0.t
 
 # Encoding: |011100|1|10111|11000|000|11001|1010111|
-# CHECK: vsleu.vv v25, v23, v24
+# CHECK: vmsleu.vv v25, v23, v24
 # CHECK-SAME: [0xd7,0x0c,0x7c,0x73]
-vsleu.vv v25, v23, v24
+vmsleu.vv v25, v23, v24
 # Encoding: |011100|0|11010|11011|000|11100|1010111|
-# CHECK: vsleu.vv v28, v26, v27, v0.t
+# CHECK: vmsleu.vv v28, v26, v27, v0.t
 # CHECK-SAME: [0x57,0x8e,0xad,0x71]
-vsleu.vv v28, v26, v27, v0.t
+vmsleu.vv v28, v26, v27, v0.t
 
 # Encoding: |011100|1|11101|01111|100|11110|1010111|
-# CHECK: vsleu.vx v30, v29, a5
+# CHECK: vmsleu.vx v30, v29, a5
 # CHECK-SAME: [0x57,0xcf,0xd7,0x73]
-vsleu.vx v30, v29, a5
+vmsleu.vx v30, v29, a5
 # Encoding: |011100|0|11111|10001|100|00000|1010111|
-# CHECK: vsleu.vx v0, v31, a7, v0.t
+# CHECK: vmsleu.vx v0, v31, a7, v0.t
 # CHECK-SAME: [0x57,0xc0,0xf8,0x71]
-vsleu.vx v0, v31, a7, v0.t
+vmsleu.vx v0, v31, a7, v0.t
 
 # Encoding: |011100|1|00001|10111|011|00010|1010111|
-# CHECK: vsleu.vi v2, v1, -9
+# CHECK: vmsleu.vi v2, v1, -9
 # CHECK-SAME: [0x57,0xb1,0x1b,0x72]
-vsleu.vi v2, v1, -9
+vmsleu.vi v2, v1, -9
 # Encoding: |011100|0|00011|11000|011|00100|1010111|
-# CHECK: vsleu.vi v4, v3, -8, v0.t
+# CHECK: vmsleu.vi v4, v3, -8, v0.t
 # CHECK-SAME: [0x57,0x32,0x3c,0x70]
-vsleu.vi v4, v3, -8, v0.t
+vmsleu.vi v4, v3, -8, v0.t
 
 # Encoding: |011101|1|00101|00110|000|00111|1010111|
-# CHECK: vsle.vv v7, v5, v6
+# CHECK: vmsle.vv v7, v5, v6
 # CHECK-SAME: [0xd7,0x03,0x53,0x76]
-vsle.vv v7, v5, v6
+vmsle.vv v7, v5, v6
 # Encoding: |011101|0|01000|01001|000|01010|1010111|
-# CHECK: vsle.vv v10, v8, v9, v0.t
+# CHECK: vmsle.vv v10, v8, v9, v0.t
 # CHECK-SAME: [0x57,0x85,0x84,0x74]
-vsle.vv v10, v8, v9, v0.t
+vmsle.vv v10, v8, v9, v0.t
 
 # Encoding: |011101|1|01011|10011|100|01100|1010111|
-# CHECK: vsle.vx v12, v11, s3
+# CHECK: vmsle.vx v12, v11, s3
 # CHECK-SAME: [0x57,0xc6,0xb9,0x76]
-vsle.vx v12, v11, s3
+vmsle.vx v12, v11, s3
 # Encoding: |011101|0|01101|10101|100|01110|1010111|
-# CHECK: vsle.vx v14, v13, s5, v0.t
+# CHECK: vmsle.vx v14, v13, s5, v0.t
 # CHECK-SAME: [0x57,0xc7,0xda,0x74]
-vsle.vx v14, v13, s5, v0.t
+vmsle.vx v14, v13, s5, v0.t
 
 # Encoding: |011101|1|01111|11001|011|10000|1010111|
-# CHECK: vsle.vi v16, v15, -7
+# CHECK: vmsle.vi v16, v15, -7
 # CHECK-SAME: [0x57,0xb8,0xfc,0x76]
-vsle.vi v16, v15, -7
+vmsle.vi v16, v15, -7
 # Encoding: |011101|0|10001|11010|011|10010|1010111|
-# CHECK: vsle.vi v18, v17, -6, v0.t
+# CHECK: vmsle.vi v18, v17, -6, v0.t
 # CHECK-SAME: [0x57,0x39,0x1d,0x75]
-vsle.vi v18, v17, -6, v0.t
+vmsle.vi v18, v17, -6, v0.t
 
 # Encoding: |011110|1|10011|10111|100|10100|1010111|
-# CHECK: vsgtu.vx v20, v19, s7
+# CHECK: vmsgtu.vx v20, v19, s7
 # CHECK-SAME: [0x57,0xca,0x3b,0x7b]
-vsgtu.vx v20, v19, s7
+vmsgtu.vx v20, v19, s7
 # Encoding: |011110|0|10101|11001|100|10110|1010111|
-# CHECK: vsgtu.vx v22, v21, s9, v0.t
+# CHECK: vmsgtu.vx v22, v21, s9, v0.t
 # CHECK-SAME: [0x57,0xcb,0x5c,0x79]
-vsgtu.vx v22, v21, s9, v0.t
+vmsgtu.vx v22, v21, s9, v0.t
 
 # Encoding: |011110|1|10111|11011|011|11000|1010111|
-# CHECK: vsgtu.vi v24, v23, 27
+# CHECK: vmsgtu.vi v24, v23, 27
 # CHECK-SAME: [0x57,0xbc,0x7d,0x7b]
-vsgtu.vi v24, v23, 27
+vmsgtu.vi v24, v23, 27
 # Encoding: |011110|0|11001|11100|011|11010|1010111|
-# CHECK: vsgtu.vi v26, v25, 28, v0.t
+# CHECK: vmsgtu.vi v26, v25, 28, v0.t
 # CHECK-SAME: [0x57,0x3d,0x9e,0x79]
-vsgtu.vi v26, v25, 28, v0.t
+vmsgtu.vi v26, v25, 28, v0.t
 
 # Encoding: |011111|1|11011|11011|100|11100|1010111|
-# CHECK: vsgt.vx v28, v27, s11
+# CHECK: vmsgt.vx v28, v27, s11
 # CHECK-SAME: [0x57,0xce,0xbd,0x7f]
-vsgt.vx v28, v27, s11
+vmsgt.vx v28, v27, s11
 # Encoding: |011111|0|11101|11101|100|11110|1010111|
-# CHECK: vsgt.vx v30, v29, t4, v0.t
+# CHECK: vmsgt.vx v30, v29, t4, v0.t
 # CHECK-SAME: [0x57,0xcf,0xde,0x7d]
-vsgt.vx v30, v29, t4, v0.t
+vmsgt.vx v30, v29, t4, v0.t
 
 # Encoding: |011111|1|11111|11101|011|00000|1010111|
-# CHECK: vsgt.vi v0, v31, -3
+# CHECK: vmsgt.vi v0, v31, -3
 # CHECK-SAME: [0x57,0xb0,0xfe,0x7f]
-vsgt.vi v0, v31, -3
+vmsgt.vi v0, v31, -3
 # Encoding: |011111|0|00001|11110|011|00010|1010111|
-# CHECK: vsgt.vi v2, v1, -2, v0.t
+# CHECK: vmsgt.vi v2, v1, -2, v0.t
 # CHECK-SAME: [0x57,0x31,0x1f,0x7c]
-vsgt.vi v2, v1, -2, v0.t
+vmsgt.vi v2, v1, -2, v0.t
 
 # Encoding: |100000|1|00011|00100|000|00101|1010111|
 # CHECK: vsaddu.vv v5, v3, v4

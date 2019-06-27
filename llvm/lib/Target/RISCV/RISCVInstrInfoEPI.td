@@ -743,14 +743,14 @@ defm VMV_V : unary_arithmetic_nomask_integer_vxi<"vmv.v", 0b010111>;
 defm VMERGE : binary_arithmetic_integer_vxi_mask_in<"vmerge", 0b010111,
                                                     vmask_only_true>;
 
-defm VSEQ   : binary_arithmetic_integer_vxi<"vseq",  0b011000>;
-defm VSNE   : binary_arithmetic_integer_vxi<"vsne",  0b011001>;
-defm VSLTU  : binary_arithmetic_integer_vx<"vsltu",  0b011010>;
-defm VSLT   : binary_arithmetic_integer_vx<"vslt",   0b011011>;
-defm VSLEU  : binary_arithmetic_integer_vxi<"vsleu", 0b011100>;
-defm VSLE   : binary_arithmetic_integer_vxi<"vsle",  0b011101>;
-defm VSGTU  : binary_arithmetic_integer_xu<"vsgtu",  0b011110>;
-defm VSGT   : binary_arithmetic_integer_xi<"vsgt",   0b011111>;
+defm VMSEQ   : binary_arithmetic_integer_vxi<"vmseq",  0b011000>;
+defm VMSNE   : binary_arithmetic_integer_vxi<"vmsne",  0b011001>;
+defm VMSLTU  : binary_arithmetic_integer_vx<"vmsltu",  0b011010>;
+defm VMSLT   : binary_arithmetic_integer_vx<"vmslt",   0b011011>;
+defm VMSLEU  : binary_arithmetic_integer_vxi<"vmsleu", 0b011100>;
+defm VMSLE   : binary_arithmetic_integer_vxi<"vmsle",  0b011101>;
+defm VMSGTU  : binary_arithmetic_integer_xu<"vmsgtu",  0b011110>;
+defm VMSGT   : binary_arithmetic_integer_xi<"vmsgt",   0b011111>;
 
 defm VSADDU : binary_arithmetic_integer_vxi<"vsaddu", 0b100000>;
 defm VSADD  : binary_arithmetic_integer_vxi<"vsadd",  0b100001>;
@@ -1680,15 +1680,15 @@ defm PseudoVRGATHER    : pseudo_binary_int_v_vv_vx_vi;
 defm PseudoVSLIDEUP    : pseudo_binary_int_v_vx_vu;
 defm PseudoVSLIDEDOWN  : pseudo_binary_int_v_vx_vu;
 
-defm PseudoVSEQ        : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVSNE        : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVSLTU       : pseudo_binary_int_m_vv_vx;
-defm PseudoVSLT        : pseudo_binary_int_m_vv_vx;
-defm PseudoVSLEU       : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVSLE        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSEQ        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSNE        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSLTU       : pseudo_binary_int_m_vv_vx;
+defm PseudoVMSLT        : pseudo_binary_int_m_vv_vx;
+defm PseudoVMSLEU       : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSLE        : pseudo_binary_int_m_vv_vx_vi;
 
-defm PseudoVSGTU       : pseudo_binary_int_m_vx_vu;
-defm PseudoVSGT        : pseudo_binary_int_m_vx_vi;
+defm PseudoVMSGTU       : pseudo_binary_int_m_vx_vu;
+defm PseudoVMSGT        : pseudo_binary_int_m_vx_vi;
 
 defm PseudoVSADDU      : pseudo_binary_int_v_vv_vx_vi;
 defm PseudoVSADD       : pseudo_binary_int_v_vv_vx_vi;
@@ -2828,20 +2828,20 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vx_vu<"int_epi_vslidedown", "Pseudo
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_vi_nomask<"int_epi_vadc", "VADC">;
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_nomask<"int_epi_vsbc", "VSBC">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vseq", "PseudoVSEQ">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsne", "PseudoVSNE">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vsltu", "PseudoVSLTU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vslt", "PseudoVSLT">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsleu", "PseudoVSLEU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsle", "PseudoVSLE">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vseq", "PseudoVMSEQ">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsne", "PseudoVMSNE">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vsltu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vslt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsleu", "PseudoVMSLEU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsle", "PseudoVMSLE">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vsgtu", "PseudoVSGTU">;
-// Select (int_epi_vsgtu reg:$rs1, reg:$rs2) as (PseudoVSLTU reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgtu", "PseudoVSLTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vsgtu", "PseudoVMSGTU">;
+// Select (int_epi_vsgtu reg:$rs1, reg:$rs2) as (PseudoVMSLTU reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgtu", "PseudoVMSLTU">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVSGT">;
-// Select (int_epi_vsgt reg:$rs1, reg:$rs2) as (PseudoVSLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgt", "PseudoVSLT">;
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVMSGT">;
+// Select (int_epi_vsgt reg:$rs1, reg:$rs2) as (PseudoVMSLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgt", "PseudoVMSLT">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsaddu", "PseudoVSADDU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsadd", "PseudoVSADD">;
