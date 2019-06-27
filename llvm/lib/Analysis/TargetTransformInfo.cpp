@@ -1376,6 +1376,11 @@ TargetTransformInfoWrapperPass::TargetTransformInfoWrapperPass(
       *PassRegistry::getPassRegistry());
 }
 
+/* NOTE/VK
+ * This Function &F is the function in the user input, that contains the loop to
+ * be vectorized. So in our case, if the input is vecadd.c, this is the
+ * fucnction vec_add defined in it.
+ */
 TargetTransformInfo &TargetTransformInfoWrapperPass::getTTI(const Function &F) {
   FunctionAnalysisManager DummyFAM;
   TTI = TIRA.run(F, DummyFAM);

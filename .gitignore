@@ -35,6 +35,7 @@
 /GSYMS
 /GTAGS
 .gitusers
+.gdb_history
 autom4te.cache
 cscope.files
 cscope.out
