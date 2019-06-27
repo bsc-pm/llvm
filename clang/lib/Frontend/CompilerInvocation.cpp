@@ -3380,6 +3380,11 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
   LangOpts.FunctionAlignment =
       getLastArgIntValue(Args, OPT_function_alignment, 0, Diags);
 
+  // OmpSs, force line debug info
+  if (LangOpts.OmpSs) {
+    Res.getCodeGenOpts().setDebugInfo(codegenoptions::LocTrackingOnly);
+  }
+
   if (LangOpts.CUDA) {
     // During CUDA device-side compilation, the aux triple is the
     // triple used for host compilation.
