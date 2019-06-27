@@ -94,11 +94,16 @@ struct OmpSs : public ModulePass {
     FunctionCallee Func = M.getOrInsertFunction(
         "nanos6_taskwait", IRB.getVoidTy(), IRB.getInt8PtrTy());
     // 2. Build String
-    // TODO: add debug info (line:col)
-    Constant *Nanos6TaskwaitStr = IRB.CreateGlobalStringPtr(M.getSourceFileName());
+    unsigned Line = TwI.I->getDebugLoc().getLine();
+    unsigned Col = TwI.I->getDebugLoc().getCol();
+
+    std::string FileNamePlusLoc = (M.getSourceFileName()
+                                   + ":" + Twine(Line)
+                                   + ":" + Twine(Col)).str();
+    Constant *Nanos6TaskwaitLocStr = IRB.CreateGlobalStringPtr(FileNamePlusLoc);
 
     // 3. Insert the call
-    IRB.CreateCall(Func, {Nanos6TaskwaitStr});
+    IRB.CreateCall(Func, {Nanos6TaskwaitLocStr});
     // 4. Remove the intrinsic
     TwI.I->eraseFromParent();
   }
@@ -107,6 +112,15 @@ struct OmpSs : public ModulePass {
                  Function &F,
                  size_t taskNum,
                  Module &M) {
+
+    unsigned Line = TI.Entry->getDebugLoc().getLine();
+    unsigned Col = TI.Entry->getDebugLoc().getCol();
+    std::string FileNamePlusLoc = (M.getSourceFileName()
+                                   + ":" + Twine(Line)
+                                   + ":" + Twine(Col)).str();
+
+    Constant *Nanos6TaskLocStr = IRBuilder<>(TI.Entry).CreateGlobalStringPtr(FileNamePlusLoc);
+
     // 1. Split BB
     BasicBlock *EntryBB = TI.Entry->getParent();
     EntryBB = EntryBB->splitBasicBlock(TI.Entry);
@@ -123,9 +137,6 @@ struct OmpSs : public ModulePass {
         break;
       TaskBBs.insert(BB);
     }
-
-    TI.Exit->eraseFromParent();
-    TI.Entry->eraseFromParent();
 
     // Create nanos6_task_args_* START
     // Private and Firstprivate must be stored in the struct
@@ -244,7 +255,7 @@ struct OmpSs : public ModulePass {
                                 false,
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(TskInvInfoTy.Ty,
-                                                    ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))),
+                                                    Nanos6TaskLocStr),
                                 ("task_invocation_info_" + F.getName() + Twine(taskNum)).str());
       GV->setAlignment(64);
       return GV;
@@ -258,6 +269,7 @@ struct OmpSs : public ModulePass {
                                                Type::getInt8PtrTy(M.getContext()), /* void * */
                                                TskAddrTranslationEntryTy.Ty->getPointerTo()
                                                }, false);
+
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(TskImplInfoTy.Ty, 1),
                                 false,
                                 GlobalVariable::InternalLinkage,
@@ -266,7 +278,7 @@ struct OmpSs : public ModulePass {
                                                                        ConstantInt::get(TskImplInfoTy.Mmbers.DeviceTypeIdTy, 0),
                                                                        ConstantExpr::getPointerCast(outlineFuncVar, outlineFuncCastTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo()),
-                                                                       ConstantPointerNull::get(TskImplInfoTy.Mmbers.TaskLabelTy->getPointerTo()),
+                                                                       Nanos6TaskLocStr,
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.DeclSourceTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()))),
                                 ("implementations_var_" + F.getName() + Twine(taskNum)).str());
@@ -414,6 +426,9 @@ struct OmpSs : public ModulePass {
     // 4. Extract region the way we want
     CodeExtractor CE(TaskBBs.getArrayRef(), rewriteOutToInTaskBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
     CE.extractCodeRegion();
+
+    TI.Exit->eraseFromParent();
+    TI.Entry->eraseFromParent();
   }
 
   bool runOnModule(Module &M) override {
@@ -461,7 +476,7 @@ struct OmpSs : public ModulePass {
         TskImplInfoTy.Ty->setBody({TskImplInfoTy.Mmbers.DeviceTypeIdTy, /* int device_type_id */
                                  TskImplInfoTy.Mmbers.RunFuncTy->getPointerTo(),
                                  TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo(),
-                                 TskImplInfoTy.Mmbers.TaskLabelTy->getPointerTo(), /* const char *task_label */
+                                 TskImplInfoTy.Mmbers.TaskLabelTy, /* const char *task_label */
                                  TskImplInfoTy.Mmbers.DeclSourceTy->getPointerTo(), /* const char *declaration_source*/
                                  TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()
                                 });
