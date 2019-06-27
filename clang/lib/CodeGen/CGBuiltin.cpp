@@ -12675,10 +12675,6 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
 
   Intrinsic::ID ID = Intrinsic::not_intrinsic;
 
-  // #define EPI_BUILTIN(ID_, TYPE, ATTRS)
-  // #define BUILTIN(ID_, TYPE, ATTRS) case RISCV::BI__builtin_epi_##ID_:
-  // #include "clang/Basic/BuiltinsEPI.def"
-  
   // Required for overloaded intrinsics.
   llvm::SmallVector<llvm::Type*, 2> IntrinsicTypes;
 
@@ -13348,10 +13344,30 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     ID = Intrinsic::epi_mask_cast;
     break;
   }
-
-#undef EPI_INT
-#undef EPI_FP
-#undef EPI_INT_FP
+#undef EPI_ANY_AND_MASK_BINARY
+#undef EPI_ANY_AND_SCALAR_INT_BINARY
+#undef EPI_FP_BINARY
+#undef EPI_FP_BINARY_MASK_IN
+#undef EPI_FP_RELATIONAL
+#undef EPI_FP_TERNARY
+#undef EPI_FP_TO_FP_NARROW_CONVERSION
+#undef EPI_FP_TO_FP_WIDEN_CONVERSION
+#undef EPI_FP_TO_INT_CONVERSION
+#undef EPI_FP_UNARY
+#undef EPI_INT_BINARY
+#undef EPI_INT_BINARY_MASK_IN
+#undef EPI_INT_RELATIONAL
+#undef EPI_INT_SCALAR_INT_BINARY
+#undef EPI_INT_TO_FP_CONVERSION
+#undef EPI_INT_UNARY
+#undef EPI_MASK_BINARY
+#undef EPI_MASK_TO_INT_UNARY
+#undef EPI_MASK_TO_SCALAR_INT_UNARY
+#undef EPI_MASK_UNARY
+#undef EPI_MEM_LOAD
+#undef EPI_MEM_STORE
+#undef EPI_SCALAR_FP_TO_FP_UNARY
+#undef EPI_SCALAR_INT_TO_INT_UNARY
 
   assert(ID != Intrinsic::not_intrinsic);
 
