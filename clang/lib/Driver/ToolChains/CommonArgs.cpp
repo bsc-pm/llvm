@@ -538,26 +538,36 @@ void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
   Optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
+
   // First look at environment NANOS6_HOME,
   // then CMAKE defined variable.
   //
   // Default to compiler lib dir. in case both are not defined.
+  std::string HomePath;
   if (RuntimeHome && !RuntimeHome->empty()) {
-    CmdArgs.push_back("-L");
-    CmdArgs.push_back(Args.MakeArgString(RuntimeHome.getValue() + "/lib"));
-    CmdArgs.push_back("-rpath");
-    CmdArgs.push_back(Args.MakeArgString(RuntimeHome.getValue() + "/lib"));
+    HomePath = RuntimeHome.getValue();
   } else if (!RuntimeDefaultHome.empty()) {
-    CmdArgs.push_back("-L");
-    CmdArgs.push_back(Args.MakeArgString(RuntimeDefaultHome + "/lib"));
-    CmdArgs.push_back("-rpath");
-    CmdArgs.push_back(Args.MakeArgString(RuntimeDefaultHome + "/lib"));
+    HomePath = RuntimeDefaultHome;
   }
-  else {
+
+  if (!HomePath.empty()) {
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib/nanos6-main-wrapper.o"));
+    CmdArgs.push_back("-z");
+    CmdArgs.push_back("lazy");
+    CmdArgs.push_back("-L");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib"));
+    CmdArgs.push_back("-rpath");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/lib"));
+  } else {
+    // Fallback to compiler installed dir.
+    CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib/nanos6-main-wrapper.o"));
+    CmdArgs.push_back("-z");
+    CmdArgs.push_back("lazy");
     CmdArgs.push_back("-rpath");
     CmdArgs.push_back(Args.MakeArgString(std::string(TC.getDriver().getInstalledDir()) + "/../lib"));
   }
   CmdArgs.push_back("-lnanos6");
+  CmdArgs.push_back("-ldl");
 }
 
 static void addSanitizerRuntime(const ToolChain &TC, const ArgList &Args,
