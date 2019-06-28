@@ -24,8 +24,21 @@ struct TaskDSAInfo {
   SetVector<Value *> Firstprivate;
 };
 
+struct DependInfo {
+  int SymbolIndex;
+  std::string RegionText;
+  Value *Base;
+  SmallVector<Value *, 4> Dims;
+};
+
+struct TaskDependsInfo {
+  SmallVector<DependInfo, 4> Ins;
+  // IN OUT WEAKIN...
+};
+
 struct TaskInfo {
   TaskDSAInfo DSAInfo;
+  TaskDependsInfo DependsInfo;
   Instruction *Entry;
   Instruction *Exit;
 };

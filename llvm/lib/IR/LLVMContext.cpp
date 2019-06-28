@@ -116,6 +116,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSFirstPrivateVLAEntry->second == LLVMContext::OB_oss_firstprivate_vla &&
          "oss_firstprivate_vla operand bundle id drifted!");
   (void)OSSFirstPrivateVLAEntry;
+
+  auto *OSSDepInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.IN");
+  assert(OSSDepInEntry->second == LLVMContext::OB_oss_dep_in &&
+         "oss_dep_in operand bundle id drifted!");
+  (void)OSSDepInEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

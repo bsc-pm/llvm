@@ -294,6 +294,7 @@ struct OmpSs : public ModulePass {
                                 false,
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(TskInfoTy.Ty,
+                                                    // TODO: Add support for devices
                                                     ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, -1),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo()),
@@ -369,7 +370,8 @@ struct OmpSs : public ModulePass {
                                   TaskArgsVarCast,
                                   TaskPtrVar,
                                   ConstantInt::get(IRB.getInt64Ty(), 0), // TaskFlagsVar,
-                                  ConstantInt::get(IRB.getInt64Ty(), 0)}); // TaskNumDepsVar});
+                                  ConstantInt::get(IRB.getInt64Ty(),
+                                                   TI.DependsInfo.Ins.size())}); // TaskNumDepsVar;
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);

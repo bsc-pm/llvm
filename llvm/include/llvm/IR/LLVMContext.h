@@ -116,6 +116,7 @@ public:
     OB_oss_private_vla = 6,      // "oss_private_vla"
     OB_oss_firstprivate = 7,     // "oss_firstprivate"
     OB_oss_firstprivate_vla = 8, // "oss_firstprivate_vla"
+    OB_oss_dep_in = 9,           // "OB_oss_dep_in"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

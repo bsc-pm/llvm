@@ -139,6 +139,42 @@ static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
   }
 }
 
+static void gatherDSAInfo(const IntrinsicInst *I, TaskDSAInfo &DSAInfo) {
+  getValueFromOperandBundlesWithID(I, DSAInfo.Shared,
+                                    LLVMContext::OB_oss_shared);
+  getValueFromOperandBundlesWithID(I, DSAInfo.Private,
+                                    LLVMContext::OB_oss_private);
+  getValueFromOperandBundlesWithID(I, DSAInfo.Firstprivate,
+                                    LLVMContext::OB_oss_firstprivate);
+
+  getValueListFromOperandBundlesWithID(I, DSAInfo.Shared,
+                                    LLVMContext::OB_oss_shared_vla);
+  getValueListFromOperandBundlesWithID(I, DSAInfo.Private,
+                                    LLVMContext::OB_oss_private_vla);
+  getValueListFromOperandBundlesWithID(I, DSAInfo.Firstprivate,
+                                    LLVMContext::OB_oss_firstprivate_vla);
+}
+
+static void gatherDependsInfo(const IntrinsicInst *I, TaskDependsInfo &DependsInfo) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  SetVector<Value *> DepSymbolsToId;
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_in);
+  for (OperandBundleDef &OBDef : OpBundles) {
+    DependInfo DI;
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+
+    // TODO: Support Symbol index used by devices
+    DI.SymbolIndex = -1;
+    // TODO: Support RegionText stringifying clause content
+    DI.RegionText = "";
+    DI.Base = OBArgs[0];
+    for (size_t i = 1; i < OBArgs.size(); ++i) {
+      DI.Dims.push_back(OBArgs[i]);
+    }
+    DependsInfo.Ins.push_back(DI);
+  }
+}
+
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
     Function &F, DominatorTree &DT, TaskFunctionInfo &TFI,
     TaskFunctionAnalysisInfo &TFAI,
@@ -173,19 +209,8 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           T.Info.Entry = II;
           T.Info.Exit = Exit;
 
-          getValueFromOperandBundlesWithID(II, T.Info.DSAInfo.Shared,
-                                            LLVMContext::OB_oss_shared);
-          getValueFromOperandBundlesWithID(II, T.Info.DSAInfo.Private,
-                                            LLVMContext::OB_oss_private);
-          getValueFromOperandBundlesWithID(II, T.Info.DSAInfo.Firstprivate,
-                                            LLVMContext::OB_oss_firstprivate);
-
-          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Shared,
-                                            LLVMContext::OB_oss_shared_vla);
-          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Private,
-                                            LLVMContext::OB_oss_private_vla);
-          getValueListFromOperandBundlesWithID(II, T.Info.DSAInfo.Firstprivate,
-                                            LLVMContext::OB_oss_firstprivate_vla);
+          gatherDSAInfo(II, T.Info.DSAInfo);
+          gatherDependsInfo(II, T.Info.DependsInfo);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
