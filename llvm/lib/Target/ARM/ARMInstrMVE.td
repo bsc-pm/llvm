@@ -2310,8 +2310,22 @@ def MVE_VFMSf16 : MVE_VADDSUBFMA_fp<"vfms", "f16", 0b1, 0b1, 0b0, 0b1,
 def MVE_VADDf32 : MVE_VADDSUBFMA_fp<"vadd", "f32", 0b0, 0b0, 0b1, 0b0>;
 def MVE_VADDf16 : MVE_VADDSUBFMA_fp<"vadd", "f16", 0b1, 0b0, 0b1, 0b0>;
 
+let Predicates = [HasMVEFloat] in {
+  def : Pat<(v4f32 (fadd (v4f32 MQPR:$val1), (v4f32 MQPR:$val2))),
+            (v4f32 (MVE_VADDf32 (v4f32 MQPR:$val1), (v4f32 MQPR:$val2)))>;
+  def : Pat<(v8f16 (fadd (v8f16 MQPR:$val1), (v8f16 MQPR:$val2))),
+            (v8f16 (MVE_VADDf16 (v8f16 MQPR:$val1), (v8f16 MQPR:$val2)))>;
+}
+
 def MVE_VSUBf32 : MVE_VADDSUBFMA_fp<"vsub", "f32", 0b0, 0b0, 0b1, 0b1>;
 def MVE_VSUBf16 : MVE_VADDSUBFMA_fp<"vsub", "f16", 0b1, 0b0, 0b1, 0b1>;
+
+let Predicates = [HasMVEFloat] in {
+  def : Pat<(v4f32 (fsub (v4f32 MQPR:$val1), (v4f32 MQPR:$val2))),
+            (v4f32 (MVE_VSUBf32 (v4f32 MQPR:$val1), (v4f32 MQPR:$val2)))>;
+  def : Pat<(v8f16 (fsub (v8f16 MQPR:$val1), (v8f16 MQPR:$val2))),
+            (v8f16 (MVE_VSUBf16 (v8f16 MQPR:$val1), (v8f16 MQPR:$val2)))>;
+}
 
 class MVE_VCADD<string suffix, bit size, list<dag> pattern=[]>
   : MVEFloatArithNeon<"vcadd", suffix, size, (outs MQPR:$Qd),
@@ -4137,12 +4151,14 @@ multiclass MVE_unpred_vector_store<Instruction RegImmInst, PatFrag StoreKind,
   def : MVE_unpred_vector_store_typed<v4i32, RegImmInst, StoreKind, shift>;
   def : MVE_unpred_vector_store_typed<v4f32, RegImmInst, StoreKind, shift>;
   def : MVE_unpred_vector_store_typed<v2i64, RegImmInst, StoreKind, shift>;
+  def : MVE_unpred_vector_store_typed<v2f64, RegImmInst, StoreKind, shift>;
 }
 
 class MVE_unpred_vector_load_typed<ValueType Ty, Instruction RegImmInst,
                                    PatFrag LoadKind, int shift>
       : Pat<(Ty (LoadKind t2addrmode_imm7<shift>:$addr)),
           (Ty (RegImmInst t2addrmode_imm7<shift>:$addr))>;
+
 multiclass MVE_unpred_vector_load<Instruction RegImmInst, PatFrag LoadKind,
                                   int shift> {
   def : MVE_unpred_vector_load_typed<v16i8, RegImmInst, LoadKind, shift>;
@@ -4151,6 +4167,7 @@ multiclass MVE_unpred_vector_load<Instruction RegImmInst, PatFrag LoadKind,
   def : MVE_unpred_vector_load_typed<v4i32, RegImmInst, LoadKind, shift>;
   def : MVE_unpred_vector_load_typed<v4f32, RegImmInst, LoadKind, shift>;
   def : MVE_unpred_vector_load_typed<v2i64, RegImmInst, LoadKind, shift>;
+  def : MVE_unpred_vector_load_typed<v2f64, RegImmInst, LoadKind, shift>;
 }
 
 let Predicates = [HasMVEInt, IsLE] in {
@@ -4183,6 +4200,42 @@ let Predicates = [HasMVEInt, IsBE] in {
   def : MVE_unpred_vector_load_typed<v4i32, MVE_VLDRWU32, alignedload32, 2>;
   def : MVE_unpred_vector_load_typed<v4f32, MVE_VLDRWU32, alignedload32, 2>;
 }
+
+
+// Widening/Narrowing Loads/Stores
+
+let Predicates = [HasMVEInt] in {
+  def : Pat<(truncstorevi8  (v8i16 MQPR:$val), t2addrmode_imm7<1>:$addr),
+             (MVE_VSTRB16 MQPR:$val, t2addrmode_imm7<1>:$addr)>;
+  def : Pat<(truncstorevi8  (v4i32 MQPR:$val), t2addrmode_imm7<1>:$addr),
+             (MVE_VSTRB32 MQPR:$val, t2addrmode_imm7<1>:$addr)>;
+  def : Pat<(truncstorevi16 (v4i32 MQPR:$val), t2addrmode_imm7<2>:$addr),
+             (MVE_VSTRH32 MQPR:$val, t2addrmode_imm7<2>:$addr)>;
+}
+
+multiclass MVEExtLoad<string DestLanes, string DestElemBits,
+                      string SrcElemBits, string SrcElemType,
+                      Operand am> {
+  def _Any : Pat<(!cast<ValueType>("v" # DestLanes # "i" # DestElemBits)
+                   (!cast<PatFrag>("extloadvi"  # SrcElemBits) am:$addr)),
+                 (!cast<Instruction>("MVE_VLDR" # SrcElemType # "U" # DestElemBits)
+                   am:$addr)>;
+  def _Z   : Pat<(!cast<ValueType>("v" # DestLanes # "i" # DestElemBits)
+                   (!cast<PatFrag>("zextloadvi"  # SrcElemBits) am:$addr)),
+                 (!cast<Instruction>("MVE_VLDR" # SrcElemType # "U" # DestElemBits)
+                   am:$addr)>;
+  def _S   : Pat<(!cast<ValueType>("v" # DestLanes # "i" # DestElemBits)
+                   (!cast<PatFrag>("sextloadvi"  # SrcElemBits) am:$addr)),
+                 (!cast<Instruction>("MVE_VLDR" # SrcElemType # "S" # DestElemBits)
+                   am:$addr)>;
+}
+
+let Predicates = [HasMVEInt] in {
+  defm : MVEExtLoad<"4", "32", "8",  "B", t2addrmode_imm7<1>>;
+  defm : MVEExtLoad<"8", "16", "8",  "B", t2addrmode_imm7<1>>;
+  defm : MVEExtLoad<"4", "32", "16", "H", t2addrmode_imm7<2>>;
+}
+
 
 // Bit convert patterns
 

@@ -226,6 +226,13 @@ void ARMTargetLowering::setAllExpand(MVT VT) {
     setOperationAction(Opc, VT, Expand);
 }
 
+void ARMTargetLowering::addAllExtLoads(const MVT From, const MVT To,
+                                       LegalizeAction Action) {
+  setLoadExtAction(ISD::EXTLOAD,  From, To, Action);
+  setLoadExtAction(ISD::ZEXTLOAD, From, To, Action);
+  setLoadExtAction(ISD::SEXTLOAD, From, To, Action);
+}
+
 void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
   const MVT IntTypes[] = { MVT::v16i8, MVT::v8i16, MVT::v4i32 };
 
@@ -235,6 +242,12 @@ void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
     setOperationAction(ISD::INSERT_VECTOR_ELT, VT, Custom);
     setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
     setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
+
+    // No native support for these.
+    setOperationAction(ISD::UDIV, VT, Expand);
+    setOperationAction(ISD::SDIV, VT, Expand);
+    setOperationAction(ISD::UREM, VT, Expand);
+    setOperationAction(ISD::SREM, VT, Expand);
   }
 
   const MVT FloatTypes[] = { MVT::v8f16, MVT::v4f32 };
@@ -252,6 +265,12 @@ void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
     setOperationAction(ISD::BITCAST, VT, Legal);
     setOperationAction(ISD::LOAD, VT, Legal);
     setOperationAction(ISD::STORE, VT, Legal);
+
+    if (HasMVEFP) {
+      // No native support for these.
+      setOperationAction(ISD::FDIV, VT, Expand);
+      setOperationAction(ISD::FREM, VT, Expand);
+    }
   }
 
   // We 'support' these types up to bitcast/load/store level, regardless of
@@ -265,6 +284,16 @@ void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
     setOperationAction(ISD::LOAD, VT, Legal);
     setOperationAction(ISD::STORE, VT, Legal);
   }
+
+  // It is legal to extload from v4i8 to v4i16 or v4i32.
+  addAllExtLoads(MVT::v8i16, MVT::v8i8, Legal);
+  addAllExtLoads(MVT::v4i32, MVT::v4i16, Legal);
+  addAllExtLoads(MVT::v4i32, MVT::v4i8, Legal);
+
+  // Some truncating stores are legal too.
+  setTruncStoreAction(MVT::v4i32, MVT::v4i16, Legal);
+  setTruncStoreAction(MVT::v4i32, MVT::v4i8,  Legal);
+  setTruncStoreAction(MVT::v8i16, MVT::v8i8,  Legal);
 }
 
 ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
@@ -575,9 +604,7 @@ ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
   for (MVT VT : MVT::vector_valuetypes()) {
     for (MVT InnerVT : MVT::vector_valuetypes()) {
       setTruncStoreAction(VT, InnerVT, Expand);
-      setLoadExtAction(ISD::SEXTLOAD, VT, InnerVT, Expand);
-      setLoadExtAction(ISD::ZEXTLOAD, VT, InnerVT, Expand);
-      setLoadExtAction(ISD::EXTLOAD, VT, InnerVT, Expand);
+      addAllExtLoads(VT, InnerVT, Expand);
     }
 
     setOperationAction(ISD::MULHS, VT, Expand);
@@ -13150,7 +13177,7 @@ bool ARMTargetLowering::isDesirableToTransformToIntegerOp(unsigned Opc,
 }
 
 bool ARMTargetLowering::allowsMisalignedMemoryAccesses(EVT VT, unsigned,
-                                                       unsigned,
+                                                       unsigned Alignment,
                                                        MachineMemOperand::Flags,
                                                        bool *Fast) const {
   // Depends what it gets converted into if the type is weird.
@@ -13159,23 +13186,18 @@ bool ARMTargetLowering::allowsMisalignedMemoryAccesses(EVT VT, unsigned,
 
   // The AllowsUnaliged flag models the SCTLR.A setting in ARM cpus
   bool AllowsUnaligned = Subtarget->allowsUnalignedMem();
+  auto Ty = VT.getSimpleVT().SimpleTy;
 
-  switch (VT.getSimpleVT().SimpleTy) {
-  default:
-    return false;
-  case MVT::i8:
-  case MVT::i16:
-  case MVT::i32: {
+  if (Ty == MVT::i8 || Ty == MVT::i16 || Ty == MVT::i32) {
     // Unaligned access can use (for example) LRDB, LRDH, LDR
     if (AllowsUnaligned) {
       if (Fast)
         *Fast = Subtarget->hasV7Ops();
       return true;
     }
-    return false;
   }
-  case MVT::f64:
-  case MVT::v2f64: {
+
+  if (Ty == MVT::f64 || Ty == MVT::v2f64) {
     // For any little-endian targets with neon, we can support unaligned ld/st
     // of D and Q (e.g. {D0,D1}) registers by using vld1.i8/vst1.i8.
     // A big-endian target may also explicitly support unaligned accesses
@@ -13184,9 +13206,54 @@ bool ARMTargetLowering::allowsMisalignedMemoryAccesses(EVT VT, unsigned,
         *Fast = true;
       return true;
     }
+  }
+
+  if (!Subtarget->hasMVEIntegerOps())
     return false;
+  if (Ty != MVT::v16i8 && Ty != MVT::v8i16 && Ty != MVT::v8f16 &&
+      Ty != MVT::v4i32 && Ty != MVT::v4f32 && Ty != MVT::v2i64 &&
+      Ty != MVT::v2f64 &&
+      // These are for truncated stores
+      Ty != MVT::v4i8 && Ty != MVT::v8i8 && Ty != MVT::v4i16)
+    return false;
+
+  if (Subtarget->isLittle()) {
+    // In little-endian MVE, the store instructions VSTRB.U8,
+    // VSTRH.U16 and VSTRW.U32 all store the vector register in
+    // exactly the same format, and differ only in the range of
+    // their immediate offset field and the required alignment.
+    //
+    // In particular, VSTRB.U8 can store a vector at byte alignment.
+    // So at this stage we can simply say that loads/stores of all
+    // 128-bit wide vector types are permitted at any alignment,
+    // because we know at least _one_ instruction can manage that.
+    //
+    // Later on we might find that some of those loads are better
+    // generated as VLDRW.U32 if alignment permits, to take
+    // advantage of the larger immediate range. But for the moment,
+    // all that matters is that if we don't lower the load then
+    // _some_ instruction can handle it.
+    if (Fast)
+      *Fast = true;
+    return true;
+  } else {
+    // In big-endian MVE, those instructions aren't so similar
+    // after all, because they reorder the bytes of the vector
+    // differently. So this time we can only store a particular
+    // kind of vector if its alignment is at least the element
+    // type. And we can't store vectors of i64 or f64 at all
+    // without having to do some postprocessing, because there's
+    // no VSTRD.U64.
+    if (Ty == MVT::v16i8 ||
+        ((Ty == MVT::v8i16 || Ty == MVT::v8f16) && Alignment >= 2) ||
+        ((Ty == MVT::v4i32 || Ty == MVT::v4f32) && Alignment >= 4)) {
+      if (Fast)
+        *Fast = true;
+      return true;
+    }
   }
-  }
+
+  return false;
 }
 
 static bool memOpAlign(unsigned DstAlign, unsigned SrcAlign,
