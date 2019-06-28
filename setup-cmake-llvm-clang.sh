@@ -153,6 +153,10 @@ fi
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${CC}")
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${CXX}")
 
+# Use C++ 14. 
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_CXX_STD=c++14")
+
+
 ################################################################################
 # Detection of the linker
 ################################################################################

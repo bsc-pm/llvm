@@ -15,18 +15,29 @@ using namespace llvm;
 
 #define DEBUG_TYPE "riscvtti"
 
+// TODO: VK june 27, 18:15
+// This method calls `getIntMatCost` which is defined in upstream master commit
+// # 9f155bc6e592f7491eeb8af90558ad9048d5c988. Patching this commit might cause
+// more than simple conflicts with changes in the EPI branch. We don't really
+// need it as of now, so it's easier to just comment out the main logic and just
+// return a zero always. We can change it before EPI rebase.
+//
 int RISCVTTIImpl::getIntImmCost(const APInt &Imm, Type *Ty) {
   assert(Ty->isIntegerTy() &&
          "getIntImmCost can only estimate cost of materialising integers");
 
-  // We have a Zero register, so 0 is always free.
-  if (Imm == 0)
-    return TTI::TCC_Free;
-
-  // Otherwise, we check how many instructions it will take to materialise.
-  const DataLayout &DL = getDataLayout();
-  return RISCVMatInt::getIntMatCost(Imm, DL.getTypeSizeInBits(Ty),
-                                    getST()->is64Bit());
+  return TTI::TCC_Free;
+  /*
+   *
+   *  // We have a Zero register, so 0 is always free.
+   *  if (Imm == 0)
+   *    return TTI::TCC_Free;
+   *
+   *  // Otherwise, we check how many instructions it will take to materialise.
+   *  const DataLayout &DL = getDataLayout();
+   *  return RISCVMatInt::getIntMatCost(Imm, DL.getTypeSizeInBits(Ty),
+   *                                    getST()->is64Bit());
+   */
 }
 
 int RISCVTTIImpl::getIntImmCost(unsigned Opcode, unsigned Idx, const APInt &Imm,
@@ -89,4 +100,11 @@ int RISCVTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx,
                                 const APInt &Imm, Type *Ty) {
   // Prevent hoisting in unknown cases.
   return TTI::TCC_Free;
+}
+
+unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) {
+  // FIXME: VK Jun 28
+  // For the time being we just return a fixed 32 number of vector registers.
+  //
+  return Vector ? 32 : 1;
 }
