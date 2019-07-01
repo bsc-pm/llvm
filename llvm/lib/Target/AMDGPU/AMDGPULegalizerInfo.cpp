@@ -147,6 +147,14 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
     LocalPtr, PrivatePtr
   };
 
+  const std::initializer_list<LLT> FPTypesBase = {
+    S32, S64
+  };
+
+  const std::initializer_list<LLT> FPTypes16 = {
+    S32, S64, S16
+  };
+
   setAction({G_BRCOND, S1}, Legal);
 
   // TODO: All multiples of 32, vectors of pointers, all v2s16 pairs, more
@@ -325,7 +333,7 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
     .legalIf(all(typeIs(0, S1), isPointer(1)));
 
   getActionDefinitionsBuilder(G_FCMP)
-    .legalFor({{S1, S32}, {S1, S64}})
+    .legalForCartesianProduct({S1}, ST.has16BitInsts() ? FPTypes16 : FPTypesBase)
     .widenScalarToNextPow2(1)
     .clampScalar(1, S32, S64)
     .scalarize(0);
@@ -515,10 +523,10 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST,
 
   // TODO: Pointer types, any 32-bit or 64-bit vector
   getActionDefinitionsBuilder(G_SELECT)
-    .legalForCartesianProduct({S32, S64, V2S32, V2S16, V4S16,
+    .legalForCartesianProduct({S32, S64, S16, V2S32, V2S16, V4S16,
           GlobalPtr, LocalPtr, FlatPtr, PrivatePtr,
           LLT::vector(2, LocalPtr), LLT::vector(2, PrivatePtr)}, {S1})
-    .clampScalar(0, S32, S64)
+    .clampScalar(0, S16, S64)
     .moreElementsIf(isSmallOddVector(0), oneMoreElement(0))
     .fewerElementsIf(numElementsNotEven(0), scalarize(0))
     .scalarize(1)
