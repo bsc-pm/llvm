@@ -743,14 +743,14 @@ defm VMV_V : unary_arithmetic_nomask_integer_vxi<"vmv.v", 0b010111>;
 defm VMERGE : binary_arithmetic_integer_vxi_mask_in<"vmerge", 0b010111,
                                                     vmask_only_true>;
 
-defm VMSEQ   : binary_arithmetic_integer_vxi<"vmseq",  0b011000>;
-defm VMSNE   : binary_arithmetic_integer_vxi<"vmsne",  0b011001>;
-defm VMSLTU  : binary_arithmetic_integer_vx<"vmsltu",  0b011010>;
-defm VMSLT   : binary_arithmetic_integer_vx<"vmslt",   0b011011>;
-defm VMSLEU  : binary_arithmetic_integer_vxi<"vmsleu", 0b011100>;
-defm VMSLE   : binary_arithmetic_integer_vxi<"vmsle",  0b011101>;
-defm VMSGTU  : binary_arithmetic_integer_xu<"vmsgtu",  0b011110>;
-defm VMSGT   : binary_arithmetic_integer_xi<"vmsgt",   0b011111>;
+defm VMSEQ  : binary_arithmetic_integer_vxi<"vmseq",  0b011000>;
+defm VMSNE  : binary_arithmetic_integer_vxi<"vmsne",  0b011001>;
+defm VMSLTU : binary_arithmetic_integer_vx<"vmsltu",  0b011010>;
+defm VMSLT  : binary_arithmetic_integer_vx<"vmslt",   0b011011>;
+defm VMSLEU : binary_arithmetic_integer_vxi<"vmsleu", 0b011100>;
+defm VMSLE  : binary_arithmetic_integer_vxi<"vmsle",  0b011101>;
+defm VMSGTU : binary_arithmetic_integer_xu<"vmsgtu",  0b011110>;
+defm VMSGT  : binary_arithmetic_integer_xi<"vmsgt",   0b011111>;
 
 defm VSADDU : binary_arithmetic_integer_vxi<"vsaddu", 0b100000>;
 defm VSADD  : binary_arithmetic_integer_vxi<"vsadd",  0b100001>;
@@ -967,16 +967,16 @@ def VFMERGE_VFM : RVInstEPIOPV_FVF<0b010111,
            "vfmerge.vfm",
            "${rd}, ${rs2}, ${rs1}, v0">;
 
-defm VMFEQ   : binary_arithmetic_float_vf<"vmfeq",  0b011000>;
-defm VMFLE   : binary_arithmetic_float_vf<"vmfle",  0b011001>;
-defm VMFORD  : binary_arithmetic_float_vf<"vmford", 0b011010>;
-defm VMFLT   : binary_arithmetic_float_vf<"vmflt",  0b011011>;
-defm VMFNE   : binary_arithmetic_float_vf<"vmfne",  0b011100>;
-defm VMFGT   : binary_arithmetic_float_f<"vmfgt",   0b011101>;
-defm VMFGE   : binary_arithmetic_float_f<"vmfge",   0b011111>;
+defm VMFEQ  : binary_arithmetic_float_vf<"vmfeq",  0b011000>;
+defm VMFLE  : binary_arithmetic_float_vf<"vmfle",  0b011001>;
+defm VMFORD : binary_arithmetic_float_vf<"vmford", 0b011010>;
+defm VMFLT  : binary_arithmetic_float_vf<"vmflt",  0b011011>;
+defm VMFNE  : binary_arithmetic_float_vf<"vmfne",  0b011100>;
+defm VMFGT  : binary_arithmetic_float_f<"vmfgt",   0b011101>;
+defm VMFGE  : binary_arithmetic_float_f<"vmfge",   0b011111>;
 
-defm VFDIV   : binary_arithmetic_float_vf<"vfdiv",  0b100000>;
-defm VFRDIV  : binary_arithmetic_float_vf<"vfrdiv", 0b100001>;
+defm VFDIV  : binary_arithmetic_float_vf<"vfdiv",  0b100000>;
+defm VFRDIV : binary_arithmetic_float_vf<"vfrdiv", 0b100001>;
 
 defm VFCVT_XU_F : unary_arithmetic_float_v<"vfcvt.xu.f", 0b100010, 0b00000>;
 defm VFCVT_X_F  : unary_arithmetic_float_v<"vfcvt.x.f",  0b100010, 0b00001>;
@@ -1680,15 +1680,15 @@ defm PseudoVRGATHER    : pseudo_binary_int_v_vv_vx_vi;
 defm PseudoVSLIDEUP    : pseudo_binary_int_v_vx_vu;
 defm PseudoVSLIDEDOWN  : pseudo_binary_int_v_vx_vu;
 
-defm PseudoVMSEQ        : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVMSNE        : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVMSLTU       : pseudo_binary_int_m_vv_vx;
-defm PseudoVMSLT        : pseudo_binary_int_m_vv_vx;
-defm PseudoVMSLEU       : pseudo_binary_int_m_vv_vx_vi;
-defm PseudoVMSLE        : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSEQ       : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSNE       : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSLTU      : pseudo_binary_int_m_vv_vx;
+defm PseudoVMSLT       : pseudo_binary_int_m_vv_vx;
+defm PseudoVMSLEU      : pseudo_binary_int_m_vv_vx_vi;
+defm PseudoVMSLE       : pseudo_binary_int_m_vv_vx_vi;
 
-defm PseudoVMSGTU       : pseudo_binary_int_m_vx_vu;
-defm PseudoVMSGT        : pseudo_binary_int_m_vx_vi;
+defm PseudoVMSGTU      : pseudo_binary_int_m_vx_vu;
+defm PseudoVMSGT       : pseudo_binary_int_m_vx_vi;
 
 defm PseudoVSADDU      : pseudo_binary_int_v_vv_vx_vi;
 defm PseudoVSADD       : pseudo_binary_int_v_vv_vx_vi;
@@ -1781,14 +1781,14 @@ let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
                                EPIPseudo;
 }
 
-defm PseudoVMFEQ        : pseudo_binary_float_m_vv_vf;
-defm PseudoVMFLE        : pseudo_binary_float_m_vv_vf;
-defm PseudoVMFORD       : pseudo_binary_float_m_vv_vf;
-defm PseudoVMFLT        : pseudo_binary_float_m_vv_vf;
-defm PseudoVMFNE        : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFEQ       : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFLE       : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFORD      : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFLT       : pseudo_binary_float_m_vv_vf;
+defm PseudoVMFNE       : pseudo_binary_float_m_vv_vf;
 
-defm PseudoVMFGT        : pseudo_binary_float_m_vf;
-defm PseudoVMFGE        : pseudo_binary_float_m_vf;
+defm PseudoVMFGT       : pseudo_binary_float_m_vf;
+defm PseudoVMFGE       : pseudo_binary_float_m_vf;
 
 defm PseudoVFDIV       : pseudo_binary_float_v_vv_vf;
 defm PseudoVFRDIV      : pseudo_binary_float_v_vf;
