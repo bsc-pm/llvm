@@ -105,6 +105,12 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
           }
         }
 
+        // VL may be changed within functions, we can't reuse defs through calls
+        if (MI.isCall()) {
+          RefInstr = nullptr;
+          continue;
+        }
+
         continue;
       }
 
