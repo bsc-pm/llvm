@@ -1792,6 +1792,7 @@ bool RISCVAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
   case RISCV::PseudoAddTPRel:
     if (checkPseudoAddTPRel(Inst, Operands))
       return true;
+    break;
   }
 
   emitToStreamer(Out, Inst);
