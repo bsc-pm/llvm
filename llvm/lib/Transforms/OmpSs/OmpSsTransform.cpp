@@ -247,6 +247,25 @@ struct OmpSs : public ModulePass {
 
     // nanos6_ol_task_region_* END
 
+    // nanos6_unpacked_deps_* START
+
+    // paramTy.clear();
+    // for (const DependInfo &DI : TI.DependsInfo.Ins) {
+    //   paramTy.push_back(DI.Base->getType());
+    // }
+    // paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
+    // FunctionType *unpackDepsFuncType =
+    //                 FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+
+    // Function *unpackDepsFuncVar = Function::Create(
+    //     unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+    //     "nanos6_unpacked_deps_" + F.getName() + Twine(taskNum), &M);
+
+    // nanos6_unpacked_deps_* END
+
+    // nanos6_ol_deps_* START
+    // nanos6_ol_deps_* END
+
     // 3. Create Nanos6 task data structures info
     Constant *TaskInvInfoVar = M.getOrInsertGlobal(("task_invocation_info_" + F.getName() + Twine(taskNum)).str(),
                                       TskInvInfoTy.Ty,

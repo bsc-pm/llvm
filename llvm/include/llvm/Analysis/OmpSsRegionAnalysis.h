@@ -29,6 +29,7 @@ struct DependInfo {
   std::string RegionText;
   Value *Base;
   SmallVector<Value *, 4> Dims;
+  SmallVector<Instruction *, 4> UnpackInstructions;
 };
 
 struct TaskDependsInfo {
