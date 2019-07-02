@@ -10,7 +10,7 @@ declare <vscale x 1 x double> @llvm.epi.vload.v1f64(
   <vscale x 1 x double>*,
   i64)
 
-declare <vscale x 1 x i1> @llvm.epi.vflt.v1i1.v1f64.v1f64(
+declare <vscale x 1 x i1> @llvm.epi.vmflt.v1i1.v1f64.v1f64(
   <vscale x 1 x double>,
   <vscale x 1 x double>,
   i64)
@@ -102,7 +102,7 @@ entry:
     <vscale x 1 x double>* %addr_b,
     i64 %gvl)
 
-  %cmp = call <vscale x 1 x i1> @llvm.epi.vflt.v1i1.v1f64.v1f64(
+  %cmp = call <vscale x 1 x i1> @llvm.epi.vmflt.v1i1.v1f64.v1f64(
     <vscale x 1 x double> %vec_a,
     <vscale x 1 x double> %vec_b,
     i64 %gvl)

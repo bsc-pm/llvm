@@ -2843,20 +2843,20 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vx_vu<"int_epi_vslidedown", "Pseudo
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_vi_nomask<"int_epi_vadc", "VADC">;
 //defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_nomask<"int_epi_vsbc", "VSBC">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vseq", "PseudoVMSEQ">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsne", "PseudoVMSNE">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vsltu", "PseudoVMSLTU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vslt", "PseudoVMSLT">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsleu", "PseudoVMSLEU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vsle", "PseudoVMSLE">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmseq", "PseudoVMSEQ">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsne", "PseudoVMSNE">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmsltu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmslt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsleu", "PseudoVMSLEU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsle", "PseudoVMSLE">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vsgtu", "PseudoVMSGTU">;
-// Select (int_epi_vsgtu reg:$rs1, reg:$rs2) as (PseudoVMSLTU reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgtu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vmsgtu", "PseudoVMSGTU">;
+// Select (int_epi_vmsgtu reg:$rs1, reg:$rs2) as (PseudoVMSLTU reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vmsgtu", "PseudoVMSLTU">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vsgt", "PseudoVMSGT">;
-// Select (int_epi_vsgt reg:$rs1, reg:$rs2) as (PseudoVMSLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vsgt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vmsgt", "PseudoVMSGT">;
+// Select (int_epi_vmsgt reg:$rs1, reg:$rs2) as (PseudoVMSLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vmsgt", "PseudoVMSLT">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsaddu", "PseudoVSADDU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsadd", "PseudoVSADD">;
@@ -3042,19 +3042,19 @@ foreach fvti = NoGroupFloatVectors.Values in
              (NoX0 GPR:$vl), fvti.SEW)>;
 }
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfeq", "PseudoVMFEQ">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfle", "PseudoVMFLE">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vford", "PseudoVMFORD">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vflt", "PseudoVMFLT">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vfne", "PseudoVMFNE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfeq", "PseudoVMFEQ">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfle", "PseudoVMFLE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmford", "PseudoVMFORD">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmflt", "PseudoVMFLT">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfne", "PseudoVMFNE">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfgt", "PseudoVMFGT">;
-// Select (int_epi_vfgt reg:$rs1, reg:$rs2) as (PseudoVMFLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfgt", "PseudoVMFLT">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vmfgt", "PseudoVMFGT">;
+// Select (int_epi_vmfgt reg:$rs1, reg:$rs2) as (PseudoVMFLT reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vmfgt", "PseudoVMFLT">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vfge", "PseudoVMFGE">;
-// Select (int_epi_vfge reg:$rs1, reg:$rs2) as (PseudoVMFLE reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vfge", "PseudoVMFLE">;
+defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vmfge", "PseudoVMFGE">;
+// Select (int_epi_vmfge reg:$rs1, reg:$rs2) as (PseudoVMFLE reg:$rs2, reg:$rs1)
+defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vmfge", "PseudoVMFLE">;
 
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfdiv", "PseudoVFDIV">;
 defm "" : pat_intrinsic_binary_fp_v_vf<"int_epi_vfrdiv", "PseudoVFRDIV">;

@@ -2264,1217 +2264,1217 @@ void test_vsra_1xi64_mask(unsigned long gvl)
 
 
 unsigned char* p72;
-// CHECK-O2-LABEL: @test_vseq_8xi8(
+// CHECK-O2-LABEL: @test_vmseq_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vseq.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmseq.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p72 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_8xi8(unsigned long gvl)
+void test_vmseq_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vseq_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmseq_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p72, result);
 }
 
 
 unsigned short* p73;
-// CHECK-O2-LABEL: @test_vseq_4xi16(
+// CHECK-O2-LABEL: @test_vmseq_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vseq.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmseq.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p73 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_4xi16(unsigned long gvl)
+void test_vmseq_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vseq_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmseq_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p73, result);
 }
 
 
 unsigned int* p74;
-// CHECK-O2-LABEL: @test_vseq_2xi32(
+// CHECK-O2-LABEL: @test_vmseq_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vseq.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmseq.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p74 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_2xi32(unsigned long gvl)
+void test_vmseq_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vseq_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmseq_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p74, result);
 }
 
 
 unsigned long* p75;
-// CHECK-O2-LABEL: @test_vseq_1xi64(
+// CHECK-O2-LABEL: @test_vmseq_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vseq.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmseq.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p75 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_1xi64(unsigned long gvl)
+void test_vmseq_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vseq_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmseq_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p75, result);
 }
 
 
 unsigned char* p76;
-// CHECK-O2-LABEL: @test_vseq_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmseq_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vseq.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmseq.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p76 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_8xi8_mask(unsigned long gvl)
+void test_vmseq_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vseq_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmseq_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p76, result);
 }
 
 
 unsigned short* p77;
-// CHECK-O2-LABEL: @test_vseq_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmseq_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vseq.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmseq.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p77 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_4xi16_mask(unsigned long gvl)
+void test_vmseq_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vseq_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmseq_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p77, result);
 }
 
 
 unsigned int* p78;
-// CHECK-O2-LABEL: @test_vseq_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmseq_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vseq.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmseq.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p78 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_2xi32_mask(unsigned long gvl)
+void test_vmseq_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vseq_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmseq_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p78, result);
 }
 
 
 unsigned long* p79;
-// CHECK-O2-LABEL: @test_vseq_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmseq_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vseq.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmseq.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p79 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vseq_1xi64_mask(unsigned long gvl)
+void test_vmseq_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vseq_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmseq_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p79, result);
 }
 
 
 unsigned char* p80;
-// CHECK-O2-LABEL: @test_vsne_8xi8(
+// CHECK-O2-LABEL: @test_vmsne_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsne.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsne.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p80 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_8xi8(unsigned long gvl)
+void test_vmsne_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsne_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsne_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p80, result);
 }
 
 
 unsigned short* p81;
-// CHECK-O2-LABEL: @test_vsne_4xi16(
+// CHECK-O2-LABEL: @test_vmsne_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsne.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsne.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p81 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_4xi16(unsigned long gvl)
+void test_vmsne_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsne_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsne_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p81, result);
 }
 
 
 unsigned int* p82;
-// CHECK-O2-LABEL: @test_vsne_2xi32(
+// CHECK-O2-LABEL: @test_vmsne_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsne.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsne.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p82 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_2xi32(unsigned long gvl)
+void test_vmsne_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsne_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsne_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p82, result);
 }
 
 
 unsigned long* p83;
-// CHECK-O2-LABEL: @test_vsne_1xi64(
+// CHECK-O2-LABEL: @test_vmsne_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsne.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsne.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p83 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_1xi64(unsigned long gvl)
+void test_vmsne_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsne_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsne_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p83, result);
 }
 
 
 unsigned char* p84;
-// CHECK-O2-LABEL: @test_vsne_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsne_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsne.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsne.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p84 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_8xi8_mask(unsigned long gvl)
+void test_vmsne_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsne_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsne_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p84, result);
 }
 
 
 unsigned short* p85;
-// CHECK-O2-LABEL: @test_vsne_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsne_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsne.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsne.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p85 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_4xi16_mask(unsigned long gvl)
+void test_vmsne_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsne_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsne_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p85, result);
 }
 
 
 unsigned int* p86;
-// CHECK-O2-LABEL: @test_vsne_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsne_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsne.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsne.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p86 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_2xi32_mask(unsigned long gvl)
+void test_vmsne_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsne_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsne_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p86, result);
 }
 
 
 unsigned long* p87;
-// CHECK-O2-LABEL: @test_vsne_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsne_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsne.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsne.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p87 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsne_1xi64_mask(unsigned long gvl)
+void test_vmsne_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsne_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsne_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p87, result);
 }
 
 
 unsigned char* p88;
-// CHECK-O2-LABEL: @test_vsltu_8xi8(
+// CHECK-O2-LABEL: @test_vmsltu_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsltu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsltu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p88 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_8xi8(unsigned long gvl)
+void test_vmsltu_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsltu_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsltu_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p88, result);
 }
 
 
 unsigned short* p89;
-// CHECK-O2-LABEL: @test_vsltu_4xi16(
+// CHECK-O2-LABEL: @test_vmsltu_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsltu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsltu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p89 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_4xi16(unsigned long gvl)
+void test_vmsltu_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsltu_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsltu_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p89, result);
 }
 
 
 unsigned int* p90;
-// CHECK-O2-LABEL: @test_vsltu_2xi32(
+// CHECK-O2-LABEL: @test_vmsltu_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsltu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsltu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p90 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_2xi32(unsigned long gvl)
+void test_vmsltu_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsltu_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsltu_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p90, result);
 }
 
 
 unsigned long* p91;
-// CHECK-O2-LABEL: @test_vsltu_1xi64(
+// CHECK-O2-LABEL: @test_vmsltu_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsltu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsltu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p91 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_1xi64(unsigned long gvl)
+void test_vmsltu_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsltu_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsltu_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p91, result);
 }
 
 
 unsigned char* p92;
-// CHECK-O2-LABEL: @test_vsltu_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsltu_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsltu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsltu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p92 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_8xi8_mask(unsigned long gvl)
+void test_vmsltu_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsltu_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsltu_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p92, result);
 }
 
 
 unsigned short* p93;
-// CHECK-O2-LABEL: @test_vsltu_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsltu_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsltu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsltu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p93 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_4xi16_mask(unsigned long gvl)
+void test_vmsltu_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsltu_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsltu_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p93, result);
 }
 
 
 unsigned int* p94;
-// CHECK-O2-LABEL: @test_vsltu_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsltu_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsltu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsltu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p94 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_2xi32_mask(unsigned long gvl)
+void test_vmsltu_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsltu_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsltu_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p94, result);
 }
 
 
 unsigned long* p95;
-// CHECK-O2-LABEL: @test_vsltu_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsltu_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsltu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsltu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p95 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsltu_1xi64_mask(unsigned long gvl)
+void test_vmsltu_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsltu_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsltu_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p95, result);
 }
 
 
 unsigned char* p96;
-// CHECK-O2-LABEL: @test_vslt_8xi8(
+// CHECK-O2-LABEL: @test_vmslt_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vslt.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmslt.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p96 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_8xi8(unsigned long gvl)
+void test_vmslt_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vslt_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmslt_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p96, result);
 }
 
 
 unsigned short* p97;
-// CHECK-O2-LABEL: @test_vslt_4xi16(
+// CHECK-O2-LABEL: @test_vmslt_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vslt.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmslt.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p97 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_4xi16(unsigned long gvl)
+void test_vmslt_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vslt_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmslt_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p97, result);
 }
 
 
 unsigned int* p98;
-// CHECK-O2-LABEL: @test_vslt_2xi32(
+// CHECK-O2-LABEL: @test_vmslt_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vslt.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmslt.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p98 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_2xi32(unsigned long gvl)
+void test_vmslt_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vslt_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmslt_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p98, result);
 }
 
 
 unsigned long* p99;
-// CHECK-O2-LABEL: @test_vslt_1xi64(
+// CHECK-O2-LABEL: @test_vmslt_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vslt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmslt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p99 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_1xi64(unsigned long gvl)
+void test_vmslt_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vslt_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmslt_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p99, result);
 }
 
 
 unsigned char* p100;
-// CHECK-O2-LABEL: @test_vslt_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmslt_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vslt.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmslt.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p100 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_8xi8_mask(unsigned long gvl)
+void test_vmslt_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vslt_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmslt_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p100, result);
 }
 
 
 unsigned short* p101;
-// CHECK-O2-LABEL: @test_vslt_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmslt_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vslt.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmslt.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p101 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_4xi16_mask(unsigned long gvl)
+void test_vmslt_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vslt_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmslt_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p101, result);
 }
 
 
 unsigned int* p102;
-// CHECK-O2-LABEL: @test_vslt_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmslt_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vslt.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmslt.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p102 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_2xi32_mask(unsigned long gvl)
+void test_vmslt_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vslt_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmslt_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p102, result);
 }
 
 
 unsigned long* p103;
-// CHECK-O2-LABEL: @test_vslt_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmslt_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vslt.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmslt.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p103 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vslt_1xi64_mask(unsigned long gvl)
+void test_vmslt_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vslt_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmslt_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p103, result);
 }
 
 
 unsigned char* p104;
-// CHECK-O2-LABEL: @test_vsleu_8xi8(
+// CHECK-O2-LABEL: @test_vmsleu_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsleu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsleu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p104 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_8xi8(unsigned long gvl)
+void test_vmsleu_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsleu_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsleu_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p104, result);
 }
 
 
 unsigned short* p105;
-// CHECK-O2-LABEL: @test_vsleu_4xi16(
+// CHECK-O2-LABEL: @test_vmsleu_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsleu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsleu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p105 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_4xi16(unsigned long gvl)
+void test_vmsleu_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsleu_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsleu_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p105, result);
 }
 
 
 unsigned int* p106;
-// CHECK-O2-LABEL: @test_vsleu_2xi32(
+// CHECK-O2-LABEL: @test_vmsleu_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsleu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsleu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p106 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_2xi32(unsigned long gvl)
+void test_vmsleu_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsleu_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsleu_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p106, result);
 }
 
 
 unsigned long* p107;
-// CHECK-O2-LABEL: @test_vsleu_1xi64(
+// CHECK-O2-LABEL: @test_vmsleu_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsleu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsleu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p107 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_1xi64(unsigned long gvl)
+void test_vmsleu_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsleu_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsleu_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p107, result);
 }
 
 
 unsigned char* p108;
-// CHECK-O2-LABEL: @test_vsleu_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsleu_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsleu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsleu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p108 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_8xi8_mask(unsigned long gvl)
+void test_vmsleu_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsleu_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsleu_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p108, result);
 }
 
 
 unsigned short* p109;
-// CHECK-O2-LABEL: @test_vsleu_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsleu_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsleu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsleu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p109 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_4xi16_mask(unsigned long gvl)
+void test_vmsleu_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsleu_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsleu_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p109, result);
 }
 
 
 unsigned int* p110;
-// CHECK-O2-LABEL: @test_vsleu_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsleu_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsleu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsleu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p110 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_2xi32_mask(unsigned long gvl)
+void test_vmsleu_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsleu_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsleu_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p110, result);
 }
 
 
 unsigned long* p111;
-// CHECK-O2-LABEL: @test_vsleu_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsleu_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsleu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsleu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p111 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsleu_1xi64_mask(unsigned long gvl)
+void test_vmsleu_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsleu_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsleu_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p111, result);
 }
 
 
 unsigned char* p112;
-// CHECK-O2-LABEL: @test_vsle_8xi8(
+// CHECK-O2-LABEL: @test_vmsle_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsle.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsle.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p112 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_8xi8(unsigned long gvl)
+void test_vmsle_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsle_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsle_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p112, result);
 }
 
 
 unsigned short* p113;
-// CHECK-O2-LABEL: @test_vsle_4xi16(
+// CHECK-O2-LABEL: @test_vmsle_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsle.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsle.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p113 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_4xi16(unsigned long gvl)
+void test_vmsle_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsle_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsle_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p113, result);
 }
 
 
 unsigned int* p114;
-// CHECK-O2-LABEL: @test_vsle_2xi32(
+// CHECK-O2-LABEL: @test_vmsle_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsle.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsle.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p114 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_2xi32(unsigned long gvl)
+void test_vmsle_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsle_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsle_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p114, result);
 }
 
 
 unsigned long* p115;
-// CHECK-O2-LABEL: @test_vsle_1xi64(
+// CHECK-O2-LABEL: @test_vmsle_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsle.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsle.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p115 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_1xi64(unsigned long gvl)
+void test_vmsle_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsle_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsle_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p115, result);
 }
 
 
 unsigned char* p116;
-// CHECK-O2-LABEL: @test_vsle_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsle_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsle.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsle.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p116 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_8xi8_mask(unsigned long gvl)
+void test_vmsle_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsle_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsle_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p116, result);
 }
 
 
 unsigned short* p117;
-// CHECK-O2-LABEL: @test_vsle_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsle_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsle.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsle.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p117 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_4xi16_mask(unsigned long gvl)
+void test_vmsle_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsle_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsle_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p117, result);
 }
 
 
 unsigned int* p118;
-// CHECK-O2-LABEL: @test_vsle_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsle_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsle.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsle.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p118 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_2xi32_mask(unsigned long gvl)
+void test_vmsle_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsle_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsle_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p118, result);
 }
 
 
 unsigned long* p119;
-// CHECK-O2-LABEL: @test_vsle_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsle_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsle.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsle.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p119 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsle_1xi64_mask(unsigned long gvl)
+void test_vmsle_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsle_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsle_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p119, result);
 }
 
 
 unsigned char* p120;
-// CHECK-O2-LABEL: @test_vsgtu_8xi8(
+// CHECK-O2-LABEL: @test_vmsgtu_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsgtu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsgtu.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p120 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_8xi8(unsigned long gvl)
+void test_vmsgtu_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsgtu_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgtu_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p120, result);
 }
 
 
 unsigned short* p121;
-// CHECK-O2-LABEL: @test_vsgtu_4xi16(
+// CHECK-O2-LABEL: @test_vmsgtu_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsgtu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsgtu.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p121 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_4xi16(unsigned long gvl)
+void test_vmsgtu_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsgtu_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgtu_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p121, result);
 }
 
 
 unsigned int* p122;
-// CHECK-O2-LABEL: @test_vsgtu_2xi32(
+// CHECK-O2-LABEL: @test_vmsgtu_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsgtu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsgtu.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p122 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_2xi32(unsigned long gvl)
+void test_vmsgtu_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsgtu_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgtu_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p122, result);
 }
 
 
 unsigned long* p123;
-// CHECK-O2-LABEL: @test_vsgtu_1xi64(
+// CHECK-O2-LABEL: @test_vmsgtu_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p123 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_1xi64(unsigned long gvl)
+void test_vmsgtu_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsgtu_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgtu_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p123, result);
 }
 
 
 unsigned char* p124;
-// CHECK-O2-LABEL: @test_vsgtu_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsgtu_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsgtu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsgtu.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p124 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_8xi8_mask(unsigned long gvl)
+void test_vmsgtu_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsgtu_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgtu_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p124, result);
 }
 
 
 unsigned short* p125;
-// CHECK-O2-LABEL: @test_vsgtu_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsgtu_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsgtu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsgtu.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p125 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_4xi16_mask(unsigned long gvl)
+void test_vmsgtu_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsgtu_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgtu_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p125, result);
 }
 
 
 unsigned int* p126;
-// CHECK-O2-LABEL: @test_vsgtu_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsgtu_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsgtu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsgtu.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p126 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_2xi32_mask(unsigned long gvl)
+void test_vmsgtu_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsgtu_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgtu_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p126, result);
 }
 
 
 unsigned long* p127;
-// CHECK-O2-LABEL: @test_vsgtu_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsgtu_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsgtu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsgtu.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p127 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgtu_1xi64_mask(unsigned long gvl)
+void test_vmsgtu_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsgtu_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgtu_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p127, result);
 }
 
 
 unsigned char* p128;
-// CHECK-O2-LABEL: @test_vsgt_8xi8(
+// CHECK-O2-LABEL: @test_vmsgt_8xi8(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsgt.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsgt.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i8> undef, <vscale x 8 x i8> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p128 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_8xi8(unsigned long gvl)
+void test_vmsgt_8xi8(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
-  result = __builtin_epi_vsgt_8xi8(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgt_8xi8(lhs, rhs, gvl);
   __builtin_epi_vstore_8xi1(p128, result);
 }
 
 
 unsigned short* p129;
-// CHECK-O2-LABEL: @test_vsgt_4xi16(
+// CHECK-O2-LABEL: @test_vmsgt_4xi16(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsgt.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsgt.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i16> undef, <vscale x 4 x i16> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p129 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_4xi16(unsigned long gvl)
+void test_vmsgt_4xi16(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
-  result = __builtin_epi_vsgt_4xi16(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgt_4xi16(lhs, rhs, gvl);
   __builtin_epi_vstore_4xi1(p129, result);
 }
 
 
 unsigned int* p130;
-// CHECK-O2-LABEL: @test_vsgt_2xi32(
+// CHECK-O2-LABEL: @test_vmsgt_2xi32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsgt.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsgt.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i32> undef, <vscale x 2 x i32> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p130 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_2xi32(unsigned long gvl)
+void test_vmsgt_2xi32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
-  result = __builtin_epi_vsgt_2xi32(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgt_2xi32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p130, result);
 }
 
 
 unsigned long* p131;
-// CHECK-O2-LABEL: @test_vsgt_1xi64(
+// CHECK-O2-LABEL: @test_vmsgt_1xi64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> undef, <vscale x 1 x i64> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p131 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_1xi64(unsigned long gvl)
+void test_vmsgt_1xi64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
-  result = __builtin_epi_vsgt_1xi64(lhs, rhs, gvl);
+  result = __builtin_epi_vmsgt_1xi64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p131, result);
 }
 
 
 unsigned char* p132;
-// CHECK-O2-LABEL: @test_vsgt_8xi8_mask(
+// CHECK-O2-LABEL: @test_vmsgt_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vsgt.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i1> @llvm.epi.vmsgt.mask.nxv8i1.nxv8i8.nxv8i8(<vscale x 8 x i1> undef, <vscale x 8 x i8> undef, <vscale x 8 x i8> undef, <vscale x 8 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 8 x i1>*, <vscale x 8 x i1>** bitcast (i8** @p132 to <vscale x 8 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 8 x i1> [[TMP0]], <vscale x 8 x i1>* [[TMP1]], align 1
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_8xi8_mask(unsigned long gvl)
+void test_vmsgt_8xi8_mask(unsigned long gvl)
 {
   __epi_8xi1 result;
   __epi_8xi1 merge;
   __epi_8xi8 lhs;
   __epi_8xi8 rhs;
   __epi_8xi1 mask;
-  result = __builtin_epi_vsgt_8xi8_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgt_8xi8_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_8xi1(p132, result);
 }
 
 
 unsigned short* p133;
-// CHECK-O2-LABEL: @test_vsgt_4xi16_mask(
+// CHECK-O2-LABEL: @test_vmsgt_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vsgt.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i1> @llvm.epi.vmsgt.mask.nxv4i1.nxv4i16.nxv4i16(<vscale x 4 x i1> undef, <vscale x 4 x i16> undef, <vscale x 4 x i16> undef, <vscale x 4 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 4 x i1>*, <vscale x 4 x i1>** bitcast (i16** @p133 to <vscale x 4 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 4 x i1> [[TMP0]], <vscale x 4 x i1>* [[TMP1]], align 2
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_4xi16_mask(unsigned long gvl)
+void test_vmsgt_4xi16_mask(unsigned long gvl)
 {
   __epi_4xi1 result;
   __epi_4xi1 merge;
   __epi_4xi16 lhs;
   __epi_4xi16 rhs;
   __epi_4xi1 mask;
-  result = __builtin_epi_vsgt_4xi16_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgt_4xi16_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_4xi1(p133, result);
 }
 
 
 unsigned int* p134;
-// CHECK-O2-LABEL: @test_vsgt_2xi32_mask(
+// CHECK-O2-LABEL: @test_vmsgt_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vsgt.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmsgt.mask.nxv2i1.nxv2i32.nxv2i32(<vscale x 2 x i1> undef, <vscale x 2 x i32> undef, <vscale x 2 x i32> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p134 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_2xi32_mask(unsigned long gvl)
+void test_vmsgt_2xi32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xi32 lhs;
   __epi_2xi32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vsgt_2xi32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgt_2xi32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p134, result);
 }
 
 
 unsigned long* p135;
-// CHECK-O2-LABEL: @test_vsgt_1xi64_mask(
+// CHECK-O2-LABEL: @test_vmsgt_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vsgt.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmsgt.mask.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i1> undef, <vscale x 1 x i64> undef, <vscale x 1 x i64> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p135 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vsgt_1xi64_mask(unsigned long gvl)
+void test_vmsgt_1xi64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xi64 lhs;
   __epi_1xi64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vsgt_1xi64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmsgt_1xi64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p135, result);
 }
 
@@ -8128,533 +8128,533 @@ void test_vfsgnjx_1xf64_mask(unsigned long gvl)
 
 
 unsigned int* p380;
-// CHECK-O2-LABEL: @test_vfeq_2xf32(
+// CHECK-O2-LABEL: @test_vmfeq_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfeq.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfeq.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p380 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfeq_2xf32(unsigned long gvl)
+void test_vmfeq_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vfeq_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmfeq_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p380, result);
 }
 
 
 unsigned long* p381;
-// CHECK-O2-LABEL: @test_vfeq_1xf64(
+// CHECK-O2-LABEL: @test_vmfeq_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfeq.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfeq.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p381 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfeq_1xf64(unsigned long gvl)
+void test_vmfeq_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vfeq_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmfeq_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p381, result);
 }
 
 
 unsigned int* p382;
-// CHECK-O2-LABEL: @test_vfeq_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmfeq_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfeq.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfeq.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p382 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfeq_2xf32_mask(unsigned long gvl)
+void test_vmfeq_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vfeq_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfeq_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p382, result);
 }
 
 
 unsigned long* p383;
-// CHECK-O2-LABEL: @test_vfeq_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmfeq_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfeq.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfeq.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p383 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfeq_1xf64_mask(unsigned long gvl)
+void test_vmfeq_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vfeq_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfeq_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p383, result);
 }
 
 
 unsigned int* p384;
-// CHECK-O2-LABEL: @test_vfne_2xf32(
+// CHECK-O2-LABEL: @test_vmfne_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfne.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfne.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p384 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfne_2xf32(unsigned long gvl)
+void test_vmfne_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vfne_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmfne_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p384, result);
 }
 
 
 unsigned long* p385;
-// CHECK-O2-LABEL: @test_vfne_1xf64(
+// CHECK-O2-LABEL: @test_vmfne_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfne.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfne.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p385 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfne_1xf64(unsigned long gvl)
+void test_vmfne_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vfne_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmfne_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p385, result);
 }
 
 
 unsigned int* p386;
-// CHECK-O2-LABEL: @test_vfne_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmfne_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfne.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfne.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p386 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfne_2xf32_mask(unsigned long gvl)
+void test_vmfne_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vfne_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfne_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p386, result);
 }
 
 
 unsigned long* p387;
-// CHECK-O2-LABEL: @test_vfne_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmfne_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfne.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfne.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p387 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfne_1xf64_mask(unsigned long gvl)
+void test_vmfne_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vfne_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfne_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p387, result);
 }
 
 
 unsigned int* p388;
-// CHECK-O2-LABEL: @test_vflt_2xf32(
+// CHECK-O2-LABEL: @test_vmflt_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vflt.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmflt.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p388 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vflt_2xf32(unsigned long gvl)
+void test_vmflt_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vflt_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmflt_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p388, result);
 }
 
 
 unsigned long* p389;
-// CHECK-O2-LABEL: @test_vflt_1xf64(
+// CHECK-O2-LABEL: @test_vmflt_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vflt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmflt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p389 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vflt_1xf64(unsigned long gvl)
+void test_vmflt_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vflt_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmflt_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p389, result);
 }
 
 
 unsigned int* p390;
-// CHECK-O2-LABEL: @test_vflt_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmflt_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vflt.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmflt.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p390 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vflt_2xf32_mask(unsigned long gvl)
+void test_vmflt_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vflt_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmflt_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p390, result);
 }
 
 
 unsigned long* p391;
-// CHECK-O2-LABEL: @test_vflt_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmflt_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vflt.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmflt.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p391 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vflt_1xf64_mask(unsigned long gvl)
+void test_vmflt_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vflt_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmflt_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p391, result);
 }
 
 
 unsigned int* p392;
-// CHECK-O2-LABEL: @test_vfle_2xf32(
+// CHECK-O2-LABEL: @test_vmfle_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfle.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfle.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p392 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfle_2xf32(unsigned long gvl)
+void test_vmfle_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vfle_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmfle_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p392, result);
 }
 
 
 unsigned long* p393;
-// CHECK-O2-LABEL: @test_vfle_1xf64(
+// CHECK-O2-LABEL: @test_vmfle_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfle.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfle.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p393 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfle_1xf64(unsigned long gvl)
+void test_vmfle_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vfle_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmfle_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p393, result);
 }
 
 
 unsigned int* p394;
-// CHECK-O2-LABEL: @test_vfle_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmfle_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfle.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfle.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p394 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfle_2xf32_mask(unsigned long gvl)
+void test_vmfle_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vfle_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfle_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p394, result);
 }
 
 
 unsigned long* p395;
-// CHECK-O2-LABEL: @test_vfle_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmfle_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfle.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfle.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p395 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfle_1xf64_mask(unsigned long gvl)
+void test_vmfle_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vfle_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfle_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p395, result);
 }
 
 
 unsigned int* p396;
-// CHECK-O2-LABEL: @test_vfgt_2xf32(
+// CHECK-O2-LABEL: @test_vmfgt_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfgt.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfgt.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p396 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfgt_2xf32(unsigned long gvl)
+void test_vmfgt_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vfgt_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmfgt_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p396, result);
 }
 
 
 unsigned long* p397;
-// CHECK-O2-LABEL: @test_vfgt_1xf64(
+// CHECK-O2-LABEL: @test_vmfgt_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p397 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfgt_1xf64(unsigned long gvl)
+void test_vmfgt_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vfgt_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmfgt_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p397, result);
 }
 
 
 unsigned int* p398;
-// CHECK-O2-LABEL: @test_vfgt_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmfgt_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfgt.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfgt.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p398 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfgt_2xf32_mask(unsigned long gvl)
+void test_vmfgt_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vfgt_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfgt_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p398, result);
 }
 
 
 unsigned long* p399;
-// CHECK-O2-LABEL: @test_vfgt_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmfgt_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfgt.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfgt.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p399 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfgt_1xf64_mask(unsigned long gvl)
+void test_vmfgt_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vfgt_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfgt_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p399, result);
 }
 
 
 unsigned int* p400;
-// CHECK-O2-LABEL: @test_vfge_2xf32(
+// CHECK-O2-LABEL: @test_vmfge_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfge.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfge.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p400 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfge_2xf32(unsigned long gvl)
+void test_vmfge_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vfge_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmfge_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p400, result);
 }
 
 
 unsigned long* p401;
-// CHECK-O2-LABEL: @test_vfge_1xf64(
+// CHECK-O2-LABEL: @test_vmfge_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p401 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfge_1xf64(unsigned long gvl)
+void test_vmfge_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vfge_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmfge_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p401, result);
 }
 
 
 unsigned int* p402;
-// CHECK-O2-LABEL: @test_vfge_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmfge_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vfge.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfge.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p402 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfge_2xf32_mask(unsigned long gvl)
+void test_vmfge_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vfge_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfge_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p402, result);
 }
 
 
 unsigned long* p403;
-// CHECK-O2-LABEL: @test_vfge_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmfge_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vfge.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmfge.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p403 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vfge_1xf64_mask(unsigned long gvl)
+void test_vmfge_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vfge_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmfge_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p403, result);
 }
 
 
 unsigned int* p404;
-// CHECK-O2-LABEL: @test_vford_2xf32(
+// CHECK-O2-LABEL: @test_vmford_2xf32(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vford.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmford.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> undef, <vscale x 2 x float> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p404 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vford_2xf32(unsigned long gvl)
+void test_vmford_2xf32(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
-  result = __builtin_epi_vford_2xf32(lhs, rhs, gvl);
+  result = __builtin_epi_vmford_2xf32(lhs, rhs, gvl);
   __builtin_epi_vstore_2xi1(p404, result);
 }
 
 
 unsigned long* p405;
-// CHECK-O2-LABEL: @test_vford_1xf64(
+// CHECK-O2-LABEL: @test_vmford_1xf64(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vford.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmford.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> undef, <vscale x 1 x double> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p405 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vford_1xf64(unsigned long gvl)
+void test_vmford_1xf64(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
-  result = __builtin_epi_vford_1xf64(lhs, rhs, gvl);
+  result = __builtin_epi_vmford_1xf64(lhs, rhs, gvl);
   __builtin_epi_vstore_1xi1(p405, result);
 }
 
 
 unsigned int* p406;
-// CHECK-O2-LABEL: @test_vford_2xf32_mask(
+// CHECK-O2-LABEL: @test_vmford_2xf32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vford.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmford.mask.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x i1> undef, <vscale x 2 x float> undef, <vscale x 2 x float> undef, <vscale x 2 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 2 x i1>*, <vscale x 2 x i1>** bitcast (i32** @p406 to <vscale x 2 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 2 x i1> [[TMP0]], <vscale x 2 x i1>* [[TMP1]], align 4
 // CHECK-O2-NEXT:    ret void
 //
-void test_vford_2xf32_mask(unsigned long gvl)
+void test_vmford_2xf32_mask(unsigned long gvl)
 {
   __epi_2xi1 result;
   __epi_2xi1 merge;
   __epi_2xf32 lhs;
   __epi_2xf32 rhs;
   __epi_2xi1 mask;
-  result = __builtin_epi_vford_2xf32_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmford_2xf32_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_2xi1(p406, result);
 }
 
 
 unsigned long* p407;
-// CHECK-O2-LABEL: @test_vford_1xf64_mask(
+// CHECK-O2-LABEL: @test_vmford_1xf64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vford.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i1> @llvm.epi.vmford.mask.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x i1> undef, <vscale x 1 x double> undef, <vscale x 1 x double> undef, <vscale x 1 x i1> undef, i64 [[GVL:%.*]])
 // CHECK-O2-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x i1>*, <vscale x 1 x i1>** bitcast (i64** @p407 to <vscale x 1 x i1>**), align 8, !tbaa !2
 // CHECK-O2-NEXT:    store <vscale x 1 x i1> [[TMP0]], <vscale x 1 x i1>* [[TMP1]], align 8
 // CHECK-O2-NEXT:    ret void
 //
-void test_vford_1xf64_mask(unsigned long gvl)
+void test_vmford_1xf64_mask(unsigned long gvl)
 {
   __epi_1xi1 result;
   __epi_1xi1 merge;
   __epi_1xf64 lhs;
   __epi_1xf64 rhs;
   __epi_1xi1 mask;
-  result = __builtin_epi_vford_1xf64_mask(merge, lhs, rhs, mask, gvl);
+  result = __builtin_epi_vmford_1xf64_mask(merge, lhs, rhs, mask, gvl);
   __builtin_epi_vstore_1xi1(p407, result);
 }
 

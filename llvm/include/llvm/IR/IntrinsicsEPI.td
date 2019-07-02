@@ -214,14 +214,14 @@ defm vsra : epi_binary;
 defm vnsrl : epi_binary;
 defm vnsra : epi_binary;
 
-defm vseq : epi_relational;
-defm vsne : epi_relational;
-defm vsltu : epi_relational;
-defm vslt : epi_relational;
-defm vsleu : epi_relational;
-defm vsle : epi_relational;
-defm vsgtu : epi_relational;
-defm vsgt : epi_relational;
+defm vmseq : epi_relational;
+defm vmsne : epi_relational;
+defm vmsltu : epi_relational;
+defm vmslt : epi_relational;
+defm vmsleu : epi_relational;
+defm vmsle : epi_relational;
+defm vmsgtu : epi_relational;
+defm vmsgt : epi_relational;
 
 defm vminu : epi_binary;
 defm vmin : epi_binary;
@@ -309,13 +309,13 @@ defm vfsgnj : epi_binary;
 defm vfsgnjn : epi_binary;
 defm vfsgnjx : epi_binary;
 
-defm vfeq : epi_relational;
-defm vfne : epi_relational;
-defm vflt : epi_relational;
-defm vfle : epi_relational;
-defm vfgt : epi_relational;
-defm vfge : epi_relational;
-defm vford : epi_relational;
+defm vmfeq : epi_relational;
+defm vmfne : epi_relational;
+defm vmflt : epi_relational;
+defm vmfle : epi_relational;
+defm vmfgt : epi_relational;
+defm vmfge : epi_relational;
+defm vmford : epi_relational;
 
 defm vfmerge : epi_binary_mask_in;
 

@@ -140,24 +140,24 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
    %ia = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* %pia, i64 %gvl)
    %ib = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* %pib, i64 %gvl)
 
-   %ma.1 = call <vscale x 1 x i1> @llvm.epi.vsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
+   %ma.1 = call <vscale x 1 x i1> @llvm.epi.vmsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
    store volatile <vscale x 1 x i1> %ma.1, <vscale x 1 x i1> *%pm
-   %ma.2 = call <vscale x 1 x i1> @llvm.epi.vsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
+   %ma.2 = call <vscale x 1 x i1> @llvm.epi.vmsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
    store volatile <vscale x 1 x i1> %ma.2, <vscale x 1 x i1> *%pm
 
    %fa = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfa, i64 %gvl)
    %fb = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfb, i64 %gvl)
 
-   %mb.1 = call <vscale x 1 x i1> @llvm.epi.vfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
+   %mb.1 = call <vscale x 1 x i1> @llvm.epi.vmfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
    store volatile <vscale x 1 x i1> %mb.1, <vscale x 1 x i1> *%pm
-   %mb.2 = call <vscale x 1 x i1> @llvm.epi.vfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
+   %mb.2 = call <vscale x 1 x i1> @llvm.epi.vmfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
    store volatile <vscale x 1 x i1> %mb.2, <vscale x 1 x i1> *%pm
 
    ret void
 }
 
-declare <vscale x 1 x i1> @llvm.epi.vsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
-declare <vscale x 1 x i1> @llvm.epi.vsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
-declare <vscale x 1 x i1> @llvm.epi.vfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
-declare <vscale x 1 x i1> @llvm.epi.vfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vmsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vmsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vmfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
+declare <vscale x 1 x i1> @llvm.epi.vmfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64);
 
