@@ -13235,7 +13235,7 @@ static SDValue lowerV8I16GeneralSingleInputShuffle(
     // a half by taking the sum of the half with three inputs and subtracting
     // the sum of the actual three inputs. The difference is the remaining
     // slot.
-    int ADWord, BDWord;
+    int ADWord = 0, BDWord = 0;
     int &TripleDWord = ThreeAInputs ? ADWord : BDWord;
     int &OneInputDWord = ThreeAInputs ? BDWord : ADWord;
     int TripleInputOffset = ThreeAInputs ? AOffset : BOffset;
@@ -17094,7 +17094,8 @@ SDValue X86TargetLowering::LowerINSERT_VECTOR_ELT(SDValue Op,
   if (!isa<ConstantSDNode>(N2))
     return SDValue();
   auto *N2C = cast<ConstantSDNode>(N2);
-  unsigned IdxVal = N2C->getZExtValue();
+  assert(N2C->getAPIntValue().ult(NumElts) && "Out of range element index");
+  uint64_t IdxVal = N2C->getZExtValue();
 
   bool IsZeroElt = X86::isZeroNode(N1);
   bool IsAllOnesElt = VT.isInteger() && llvm::isAllOnesConstant(N1);
@@ -17831,7 +17832,7 @@ static SDValue LowerFunnelShift(SDValue Op, const X86Subtarget &Subtarget,
 
     APInt APIntShiftAmt;
     if (isConstantSplat(Amt, APIntShiftAmt)) {
-      uint64_t ShiftAmt = APIntShiftAmt.getZExtValue();
+      uint64_t ShiftAmt = APIntShiftAmt.urem(VT.getScalarSizeInBits());
       return DAG.getNode(IsFSHR ? X86ISD::VSHRD : X86ISD::VSHLD, DL, VT,
                          Op0, Op1, DAG.getConstant(ShiftAmt, DL, MVT::i8));
     }
@@ -25016,6 +25017,8 @@ static SDValue LowerScalarImmediateShift(SDValue Op, SelectionDAG &DAG,
   APInt APIntShiftAmt;
   if (!isConstantSplat(Amt, APIntShiftAmt))
     return SDValue();
+  assert(APIntShiftAmt.ult(VT.getScalarSizeInBits()) &&
+         "Out of range shift amount");
   uint64_t ShiftAmt = APIntShiftAmt.getZExtValue();
 
   if (SupportedVectorShiftWithImm(VT, Subtarget, Op.getOpcode()))
@@ -25057,8 +25060,8 @@ static SDValue LowerScalarImmediateShift(SDValue Op, SelectionDAG &DAG,
                                                ShiftAmt, DAG);
       SHL = DAG.getBitcast(VT, SHL);
       // Zero out the rightmost bits.
-      return DAG.getNode(ISD::AND, dl, VT, SHL,
-                         DAG.getConstant(uint8_t(-1U << ShiftAmt), dl, VT));
+      APInt Mask = APInt::getHighBitsSet(8, 8 - ShiftAmt);
+      return DAG.getNode(ISD::AND, dl, VT, SHL, DAG.getConstant(Mask, dl, VT));
     }
     if (Op.getOpcode() == ISD::SRL) {
       // Make a large shift.
