@@ -107,20 +107,45 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_private_vla operand bundle id drifted!");
   (void)OSSPrivateVLAEntry;
 
-  auto *OSSFirstPrivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE");
-  assert(OSSFirstPrivateEntry->second == LLVMContext::OB_oss_firstprivate &&
+  auto *OSSFirstprivateEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE");
+  assert(OSSFirstprivateEntry->second == LLVMContext::OB_oss_firstprivate &&
          "oss_firstprivate operand bundle id drifted!");
-  (void)OSSFirstPrivateEntry;
+  (void)OSSFirstprivateEntry;
 
-  auto *OSSFirstPrivateVLAEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE.VLA");
-  assert(OSSFirstPrivateVLAEntry->second == LLVMContext::OB_oss_firstprivate_vla &&
+  auto *OSSFirstprivateVLAEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FIRSTPRIVATE.VLA");
+  assert(OSSFirstprivateVLAEntry->second == LLVMContext::OB_oss_firstprivate_vla &&
          "oss_firstprivate_vla operand bundle id drifted!");
-  (void)OSSFirstPrivateVLAEntry;
+  (void)OSSFirstprivateVLAEntry;
 
   auto *OSSDepInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.IN");
   assert(OSSDepInEntry->second == LLVMContext::OB_oss_dep_in &&
          "oss_dep_in operand bundle id drifted!");
   (void)OSSDepInEntry;
+
+  auto *OSSDepOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.OUT");
+  assert(OSSDepOutEntry->second == LLVMContext::OB_oss_dep_out &&
+         "oss_dep_out operand bundle id drifted!");
+  (void)OSSDepOutEntry;
+
+  auto *OSSDepInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.INOUT");
+  assert(OSSDepInoutEntry->second == LLVMContext::OB_oss_dep_inout &&
+         "oss_dep_inout operand bundle id drifted!");
+  (void)OSSDepInoutEntry;
+
+  auto *OSSDepWeakInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKIN");
+  assert(OSSDepWeakInEntry->second == LLVMContext::OB_oss_dep_weakin &&
+         "oss_dep_weakin operand bundle id drifted!");
+  (void)OSSDepWeakInEntry;
+
+  auto *OSSDepWeakOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKOUT");
+  assert(OSSDepWeakOutEntry->second == LLVMContext::OB_oss_dep_weakout &&
+         "oss_dep_weakout operand bundle id drifted!");
+  (void)OSSDepWeakOutEntry;
+
+  auto *OSSDepWeakInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKINOUT");
+  assert(OSSDepWeakInoutEntry->second == LLVMContext::OB_oss_dep_weakinout &&
+         "oss_dep_weakinout operand bundle id drifted!");
+  (void)OSSDepWeakInoutEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

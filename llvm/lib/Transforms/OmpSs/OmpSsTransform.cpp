@@ -461,6 +461,7 @@ struct OmpSs : public ModulePass {
       if (F.isDeclaration() || F.empty())
         continue;
 
+      // FIXME: all the analysis is computed on every call
       TaskFunctionInfo &TFI = getAnalysis<OmpSsRegionAnalysisPass>(F).getTaskFuncInfo();
       TaskwaitFunctionInfo &TwFI = getAnalysis<OmpSsRegionAnalysisPass>(F).getTaskwaitFuncInfo();
 

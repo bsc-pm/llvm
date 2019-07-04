@@ -34,7 +34,11 @@ struct DependInfo {
 
 struct TaskDependsInfo {
   SmallVector<DependInfo, 4> Ins;
-  // IN OUT WEAKIN...
+  SmallVector<DependInfo, 4> Outs;
+  SmallVector<DependInfo, 4> Inouts;
+  SmallVector<DependInfo, 4> WeakIns;
+  SmallVector<DependInfo, 4> WeakOuts;
+  SmallVector<DependInfo, 4> WeakInouts;
 };
 
 struct TaskInfo {

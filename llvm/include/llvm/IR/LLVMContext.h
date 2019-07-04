@@ -117,6 +117,11 @@ public:
     OB_oss_firstprivate = 7,     // "oss_firstprivate"
     OB_oss_firstprivate_vla = 8, // "oss_firstprivate_vla"
     OB_oss_dep_in = 9,           // "OB_oss_dep_in"
+    OB_oss_dep_out = 10,         // "OB_oss_dep_out"
+    OB_oss_dep_inout = 11,       // "OB_oss_dep_inout"
+    OB_oss_dep_weakin = 12,      // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 13,     // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 14,   // "OB_oss_dep_weakinout"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

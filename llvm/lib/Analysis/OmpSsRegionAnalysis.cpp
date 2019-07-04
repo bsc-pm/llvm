@@ -155,26 +155,42 @@ static void gatherDSAInfo(const IntrinsicInst *I, TaskInfo &TI) {
                                     LLVMContext::OB_oss_firstprivate_vla);
 }
 
-static void gatherUnpackInstructions(TaskInfo &TI) {
-  // TODO: generalize this
-  SmallVectorImpl<Instruction *> &UnpackIns = TI.DependsInfo.Ins[0].UnpackInstructions;
+// Inserts I into InstList ensuring program order if I it's not already in the list
+static bool insertInstructionInProgramOrder(SmallVectorImpl<Instruction *> &InstList,
+                                            Instruction *I,
+                                            const OrderedInstructions &OI) {
+
+  auto It = InstList.begin();
+  while (It != InstList.end() && OI.dominates(I, *It))
+    ++It;
+
+  if (*It == I)
+    return false;
+  InstList.insert(It, I);
+  return true;
+}
+
+static void gatherUnpackInstructions(DependInfo &DI,
+                                     const TaskDSAInfo &DSAInfo,
+                                     const OrderedInstructions &OI) {
+  SmallVectorImpl<Instruction *> &UnpackIns = DI.UnpackInstructions;
   SmallPtrSet<Value *, 4> DSAMerge;
 
-  DSAMerge.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
-  DSAMerge.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
-  DSAMerge.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
+  DSAMerge.insert(DSAInfo.Shared.begin(), DSAInfo.Shared.end());
+  DSAMerge.insert(DSAInfo.Private.begin(), DSAInfo.Private.end());
+  DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
   SmallVector<Value *, 4> WorkList;
-  // TODO: do this for all dep kinds
-  WorkList.push_back(TI.DependsInfo.Ins[0].Base);
-  UnpackIns.push_back(cast<Instruction>(TI.DependsInfo.Ins[0].Base));
-  for (Value *V : TI.DependsInfo.Ins[0].Dims) {
+  WorkList.push_back(DI.Base);
+  UnpackIns.push_back(cast<Instruction>(DI.Base));
+  for (Value *V : DI.Dims) {
     // TODO: what about global variables? arguments cannot be in a bundle right?
     // TODO: should we check the order properly? yes, for example dimensions may use
     // the same value as operand
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       WorkList.push_back(I);
-      UnpackIns.push_back(I);
+
+      insertInstructionInProgramOrder(UnpackIns, I, OI);
     }
   }
   while (!WorkList.empty()) {
@@ -185,26 +201,21 @@ static void gatherUnpackInstructions(TaskInfo &TI) {
 
     for (Use &U : I->operands()) {
       if (Instruction *II = dyn_cast<Instruction>(U.get())) {
-        // TODO: assert comment
         if (DSAMerge.find(II) == DSAMerge.end()) {
-          // TODO: order insertion
           WorkList.push_back(II);
 
-          UnpackIns.push_back(II);
+          insertInstructionInProgramOrder(UnpackIns, II, OI);
         }
       }
     }
   }
-  for (Instruction *I : UnpackIns) {
-    I->dump();
-  }
 }
 
-static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  SetVector<Value *> DepSymbolsToId;
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_in);
-  for (OperandBundleDef &OBDef : OpBundles) {
+static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef> &OpBundles,
+                                    const OrderedInstructions &OI,
+                                    const TaskDSAInfo &DSAInfo,
+                                    SmallVectorImpl<DependInfo> &DependsList) {
+  for (const OperandBundleDef &OBDef : OpBundles) {
     DependInfo DI;
     ArrayRef<Value *> OBArgs = OBDef.inputs();
 
@@ -216,10 +227,30 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI) {
     for (size_t i = 1; i < OBArgs.size(); ++i) {
       DI.Dims.push_back(OBArgs[i]);
     }
-    TI.DependsInfo.Ins.push_back(DI);
 
-    gatherUnpackInstructions(TI);
+    gatherUnpackInstructions(DI, DSAInfo, OI);
+
+    DependsList.push_back(DI);
   }
+}
+
+static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
+                              const OrderedInstructions &OI) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  SetVector<Value *> DepSymbolsToId;
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_in);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Ins);
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_out);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Outs);
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_inout);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Inouts);
+
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakin);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakIns);
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakout);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakOuts);
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakinout);
+  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakInouts);
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
@@ -257,7 +288,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           T.Info.Exit = Exit;
 
           gatherDSAInfo(II, T.Info);
-          gatherDependsInfo(II, T.Info);
+          gatherDependsInfo(II, T.Info, OI);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
