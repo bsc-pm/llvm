@@ -37,6 +37,11 @@ using namespace llvm;
 
 #define DEBUG_TYPE "EPIRemoveRedundantVSETVL"
 
+static cl::opt<bool>
+    DisableRemoveVSETVL("no-epi-remove-redundant-vsetvl", cl::init(false),
+                        cl::Hidden,
+                        cl::desc("Disable removing redundant vsetvl"));
+
 namespace {
 
 class EPIRemoveRedundantVSETVL : public MachineFunctionPass {
@@ -64,6 +69,9 @@ private:
 char EPIRemoveRedundantVSETVL::ID = 0;
 
 bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
+  if (skipFunction(F.getFunction()) || DisableRemoveVSETVL)
+    return false;
+
   bool IsFunctionModified = false;
 
   // This map binds the output operand of an instruction to the output operand

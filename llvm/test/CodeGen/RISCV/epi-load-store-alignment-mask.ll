@@ -17,8 +17,11 @@ define void @foo(i32* %p, i64 %gvl) nounwind optnone noinline
 ; CHECK-NEXT:    mv sp, a1
 ; CHECK-NEXT:    vsetvli a2, zero, e8, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
+; CHECK-NEXT:    vsetvli a2, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a1)
+; CHECK-NEXT:    vsetvli a2, zero, e8, m1
 ; CHECK-NEXT:    vle.v v0, (a1)
+; CHECK-NEXT:    vsetvli a1, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    addi sp, s0, -16
 ; CHECK-NEXT:    ld s0, 0(sp)
