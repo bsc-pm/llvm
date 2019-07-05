@@ -181,6 +181,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
   setOperationAction(ISD::GlobalTLSAddress, XLenVT, Custom);
 
+  // TODO: On M-mode only targets, the cycle[h] CSR may not be present.
+  // Unfortunately this can't be determined just from the ISA naming string.
+  setOperationAction(ISD::READCYCLECOUNTER, MVT::i64,
+                     Subtarget.is64Bit() ? Legal : Custom);
+
   if (Subtarget.hasStdExtA()) {
     setMaxAtomicSizeInBitsSupported(Subtarget.getXLen());
     setMinCmpXchgSizeInBits(32);
@@ -857,6 +862,19 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
   switch (N->getOpcode()) {
   default:
     llvm_unreachable("Don't know how to custom type legalize this operation!");
+  case ISD::READCYCLECOUNTER: {
+    assert(!Subtarget.is64Bit() &&
+           "READCYCLECOUNTER only has custom type legalization on riscv32");
+
+    SDVTList VTs = DAG.getVTList(MVT::i32, MVT::i32, MVT::Other);
+    SDValue RCW =
+        DAG.getNode(RISCVISD::READ_CYCLE_WIDE, DL, VTs, N->getOperand(0));
+
+    Results.push_back(RCW);
+    Results.push_back(RCW.getValue(1));
+    Results.push_back(RCW.getValue(2));
+    break;
+  }
   case ISD::SHL:
   case ISD::SRA:
   case ISD::SRL:
@@ -1053,6 +1071,68 @@ unsigned RISCVTargetLowering::ComputeNumSignBitsForTargetNode(
   }
 
   return 1;
+}
+
+MachineBasicBlock *emitReadCycleWidePseudo(MachineInstr &MI,
+                                           MachineBasicBlock *BB) {
+  assert(MI.getOpcode() == RISCV::ReadCycleWide && "Unexpected instruction");
+
+  // To read the 64-bit cycle CSR on a 32-bit target, we read the two halves.
+  // Should the count have wrapped while it was being read, we need to try
+  // again.
+  // ...
+  // read:
+  // rdcycleh x3 # load high word of cycle
+  // rdcycle  x2 # load low word of cycle
+  // rdcycleh x4 # load high word of cycle
+  // bne x3, x4, read # check if high word reads match, otherwise try again
+  // ...
+
+  MachineFunction &MF = *BB->getParent();
+  const BasicBlock *LLVM_BB = BB->getBasicBlock();
+  MachineFunction::iterator It = ++BB->getIterator();
+
+  MachineBasicBlock *LoopMBB = MF.CreateMachineBasicBlock(LLVM_BB);
+  MF.insert(It, LoopMBB);
+
+  MachineBasicBlock *DoneMBB = MF.CreateMachineBasicBlock(LLVM_BB);
+  MF.insert(It, DoneMBB);
+
+  // Transfer the remainder of BB and its successor edges to DoneMBB.
+  DoneMBB->splice(DoneMBB->begin(), BB,
+                  std::next(MachineBasicBlock::iterator(MI)), BB->end());
+  DoneMBB->transferSuccessorsAndUpdatePHIs(BB);
+
+  BB->addSuccessor(LoopMBB);
+
+  MachineRegisterInfo &RegInfo = MF.getRegInfo();
+  unsigned ReadAgainReg = RegInfo.createVirtualRegister(&RISCV::GPRRegClass);
+  unsigned LoReg = MI.getOperand(0).getReg();
+  unsigned HiReg = MI.getOperand(1).getReg();
+  DebugLoc DL = MI.getDebugLoc();
+
+  const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
+  BuildMI(LoopMBB, DL, TII->get(RISCV::CSRRS), HiReg)
+      .addImm(RISCVSysReg::lookupSysRegByName("CYCLEH")->Encoding)
+      .addReg(RISCV::X0);
+  BuildMI(LoopMBB, DL, TII->get(RISCV::CSRRS), LoReg)
+      .addImm(RISCVSysReg::lookupSysRegByName("CYCLE")->Encoding)
+      .addReg(RISCV::X0);
+  BuildMI(LoopMBB, DL, TII->get(RISCV::CSRRS), ReadAgainReg)
+      .addImm(RISCVSysReg::lookupSysRegByName("CYCLEH")->Encoding)
+      .addReg(RISCV::X0);
+
+  BuildMI(LoopMBB, DL, TII->get(RISCV::BNE))
+      .addReg(HiReg)
+      .addReg(ReadAgainReg)
+      .addMBB(LoopMBB);
+
+  LoopMBB->addSuccessor(LoopMBB);
+  LoopMBB->addSuccessor(DoneMBB);
+
+  MI.eraseFromParent();
+
+  return DoneMBB;
 }
 
 static MachineBasicBlock *emitSplitF64Pseudo(MachineInstr &MI,
@@ -1258,6 +1338,10 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");
+  case RISCV::ReadCycleWide:
+    assert(!Subtarget.is64Bit() &&
+           "ReadCycleWrite is only to be used on riscv32");
+    return emitReadCycleWidePseudo(MI, BB);
   case RISCV::Select_GPR_Using_CC_GPR:
   case RISCV::Select_FPR32_Using_CC_GPR:
   case RISCV::Select_FPR64_Using_CC_GPR:
@@ -2328,12 +2412,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::FMV_W_X_RV64";
   case RISCVISD::FMV_X_ANYEXTW_RV64:
     return "RISCVISD::FMV_X_ANYEXTW_RV64";
-  case RISCVISD::WRAPPER_PIC:
-    return "RISCVISD::WRAPPER_PIC";
-  case RISCVISD::WRAPPER_TLS_IE:
-    return "RISCVISD::WRAPPER_TLS_IE";
-  case RISCVISD::WRAPPER_TLS_GD:
-    return "RISCVISD::WRAPPER_TLS_GD";
+  case RISCVISD::READ_CYCLE_WIDE:
+    return "RISCVISD::READ_CYCLE_WIDE";
   }
   return nullptr;
 }
