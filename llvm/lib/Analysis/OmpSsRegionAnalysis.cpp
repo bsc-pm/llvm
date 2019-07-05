@@ -69,7 +69,7 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
     int Depth = it->second.Depth;
     int Idx = it->second.Idx;
     const TaskAnalysisInfo &AnalysisInfo = TaskFuncAnalysisInfo.PostOrder[Idx];
-    const TaskInfo &Info = TaskFuncInfo.PostOrder[Idx];
+    const TaskInfo &Info = FuncInfo.TaskFuncInfo.PostOrder[Idx];
 
     dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
     I->printAsOperand(dbgs(), false);
@@ -101,8 +101,7 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
   }
 }
 
-TaskFunctionInfo& OmpSsRegionAnalysisPass::getTaskFuncInfo() { return TaskFuncInfo; }
-TaskwaitFunctionInfo& OmpSsRegionAnalysisPass::getTaskwaitFuncInfo() { return TaskwaitFuncInfo; }
+FunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return FuncInfo; }
 
 static void getOperandBundlesAsDefsWithID(const IntrinsicInst *I,
                                           SmallVectorImpl<OperandBundleDef> &OpBundles,
@@ -181,12 +180,13 @@ static void gatherUnpackInstructions(DependInfo &DI,
   DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
   SmallVector<Value *, 4> WorkList;
-  WorkList.push_back(DI.Base);
-  UnpackIns.push_back(cast<Instruction>(DI.Base));
+  // Only add Base if it's an instruction
+  if (Instruction *I = dyn_cast<Instruction>(DI.Base)) {
+    WorkList.push_back(DI.Base);
+
+    UnpackIns.push_back(I);
+  }
   for (Value *V : DI.Dims) {
-    // TODO: what about global variables? arguments cannot be in a bundle right?
-    // TODO: should we check the order properly? yes, for example dimensions may use
-    // the same value as operand
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       WorkList.push_back(I);
 
@@ -195,7 +195,7 @@ static void gatherUnpackInstructions(DependInfo &DI,
   }
   while (!WorkList.empty()) {
     auto It = WorkList.begin();
-    assert(!isa<AllocaInst>(*It) && !isa<Argument>(*It));
+    assert(!isa<AllocaInst>(*It) && !isa<Argument>(*It) && !isa<Constant>(*It));
     Instruction *I = cast<Instruction>(*It);
     WorkList.erase(It);
 
@@ -209,8 +209,12 @@ static void gatherUnpackInstructions(DependInfo &DI,
       }
     }
   }
+  // for (auto It = UnpackIns.rbegin(); It != UnpackIns.rend(); ++It) {
+  //   (*It)->dump();
+  // }
 }
 
+// Process each OpBundle gathering dependency information
 static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef> &OpBundles,
                                     const OrderedInstructions &OI,
                                     const TaskDSAInfo &DSAInfo,
@@ -234,30 +238,33 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
   }
 }
 
+// Gathers dependencies needed information of type Id
+static void gatherDependsInfoWithID(const IntrinsicInst *I,
+                                    const OrderedInstructions &OI,
+                                    const TaskDSAInfo &DSAInfo,
+                                    SmallVectorImpl<DependInfo> &DependsList,
+                                    uint64_t Id) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, DependsList);
+}
+
+// Gathers all dependencies needed information
 static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                               const OrderedInstructions &OI) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  SetVector<Value *> DepSymbolsToId;
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_in);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Ins);
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_out);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Outs);
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_inout);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.Inouts);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Ins, LLVMContext::OB_oss_dep_in);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Outs, LLVMContext::OB_oss_dep_out);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Inouts, LLVMContext::OB_oss_dep_inout);
 
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakin);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakIns);
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakout);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakOuts);
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_dep_weakinout);
-  gatherDependsInfoFromBundles(OpBundles, OI, TI.DSAInfo, TI.DependsInfo.WeakInouts);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakIns, LLVMContext::OB_oss_dep_weakin);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakOuts, LLVMContext::OB_oss_dep_weakout);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakInouts, LLVMContext::OB_oss_dep_weakinout);
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
-    Function &F, DominatorTree &DT, TaskFunctionInfo &TFI,
+    Function &F, DominatorTree &DT, FunctionInfo &FI,
     TaskFunctionAnalysisInfo &TFAI,
-    MapVector<Instruction *, TaskPrintInfo> &TPO,
-    TaskwaitFunctionInfo &TwFI) {
+    MapVector<Instruction *, TaskPrintInfo> &TPO) {
 
   OrderedInstructions OI(&DT);
 
@@ -270,9 +277,8 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
   ReversePostOrderTraversal<BasicBlock *> RPOT(&F.getEntryBlock());
   for (BasicBlock *BB : RPOT) {
-    for (BasicBlock::iterator II = BB->begin(), IE = BB->end(); II != IE; ++II) {
-      Instruction *I = &*II;
-      if (auto *II = dyn_cast<IntrinsicInst>(I)) {
+    for (Instruction &I : *BB) {
+      if (auto *II = dyn_cast<IntrinsicInst>(&I)) {
         if (II->getIntrinsicID() == Intrinsic::directive_region_entry) {
           assert(II->hasOneUse() && "Task entry has more than one user.");
 
@@ -299,20 +305,20 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           Instruction *Entry = T.Info.Entry;
 
           TaskPrintInfo &TPI = TPO[&*Entry];
-          TPI.Idx = TFI.PostOrder.size();
+          TPI.Idx = FI.TaskFuncInfo.PostOrder.size();
 
           TFAI.PostOrder.push_back(T.AnalysisInfo);
-          TFI.PostOrder.push_back(T.Info);
+          FI.TaskFuncInfo.PostOrder.push_back(T.Info);
 
           Stack.pop_back();
         } else if (II->getIntrinsicID() == Intrinsic::directive_marker) {
-          TwFI.PostOrder.push_back({II});
+          FI.TaskwaitFuncInfo.PostOrder.push_back({II});
         }
       } else if (!Stack.empty()) {
         Task &T = Stack.back();
         Instruction *Entry = T.Info.Entry;
         Instruction *Exit = T.Info.Exit;
-        for (Use &U : I->operands()) {
+        for (Use &U : I.operands()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U.get())) {
             if (OI.dominates(I2, Entry)) {
               T.AnalysisInfo.UsesBeforeEntry.insert(I2);
@@ -329,10 +335,10 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
             }
           }
         }
-        for (User *U : I->users()) {
+        for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {
             if (OI.dominates(Exit, I2)) {
-              T.AnalysisInfo.UsesAfterExit.insert(I);
+              T.AnalysisInfo.UsesAfterExit.insert(&I);
               if (!DisableChecks) {
                 llvm_unreachable("Value inside the task body used after it.");
               }
@@ -346,16 +352,15 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
 bool OmpSsRegionAnalysisPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  getOmpSsFunctionInfo(F, DT, TaskFuncInfo, TaskFuncAnalysisInfo, TaskProgramOrder, TaskwaitFuncInfo);
+  getOmpSsFunctionInfo(F, DT, FuncInfo, TaskFuncAnalysisInfo, TaskProgramOrder);
 
   return false;
 }
 
 void OmpSsRegionAnalysisPass::releaseMemory() {
-  TaskFuncInfo = TaskFunctionInfo();
+  FuncInfo = FunctionInfo();
   TaskFuncAnalysisInfo = TaskFunctionAnalysisInfo();
   TaskProgramOrder.clear();
-  TaskwaitFuncInfo = TaskwaitFunctionInfo();
 }
 
 void OmpSsRegionAnalysisPass::getAnalysisUsage(AnalysisUsage &AU) const {

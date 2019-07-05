@@ -29,6 +29,9 @@ struct DependInfo {
   std::string RegionText;
   Value *Base;
   SmallVector<Value *, 4> Dims;
+  // Instructions needed as a bridge between task args structure and
+  // the call to nanos6 register dependency
+  // Later instructions go first
   SmallVector<Instruction *, 4> UnpackInstructions;
 };
 
@@ -63,6 +66,11 @@ struct TaskwaitFunctionInfo {
 };
 // End Taskwait data structures
 
+struct FunctionInfo {
+  TaskFunctionInfo TaskFuncInfo;
+  TaskwaitFunctionInfo TaskwaitFuncInfo;
+};
+
 class OmpSsRegionAnalysisPass : public FunctionPass {
 private:
 
@@ -84,8 +92,7 @@ private:
   // AnalysisInfo only used in this pass
   TaskFunctionAnalysisInfo TaskFuncAnalysisInfo;
   // Info used by the transform pass
-  TaskFunctionInfo TaskFuncInfo;
-  TaskwaitFunctionInfo TaskwaitFuncInfo;
+  FunctionInfo FuncInfo;
   // Used to keep the task layout to print it properly, since
   // we save the tasks in post order
   MapVector<Instruction *, TaskPrintInfo> TaskProgramOrder;
@@ -96,10 +103,9 @@ private:
   // in OperandBundles
   // Also, gathers all taskwait instructions
   static void getOmpSsFunctionInfo(
-      Function &F, DominatorTree &DT, TaskFunctionInfo &FI,
-      TaskFunctionAnalysisInfo &FAI,
-      MapVector<Instruction *, TaskPrintInfo> &TPO,
-      TaskwaitFunctionInfo &TwFI);
+      Function &F, DominatorTree &DT, FunctionInfo &FI,
+      TaskFunctionAnalysisInfo &TFAI,
+      MapVector<Instruction *, TaskPrintInfo> &TPO);
 
 public:
   static char ID;
@@ -116,8 +122,7 @@ public:
 
   void releaseMemory() override;
 
-  TaskFunctionInfo& getTaskFuncInfo();
-  TaskwaitFunctionInfo& getTaskwaitFuncInfo();
+  FunctionInfo& getFuncInfo();
 
 };
 

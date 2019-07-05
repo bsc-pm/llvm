@@ -456,14 +456,21 @@ struct OmpSs : public ModulePass {
     if (skipModule(M))
       return false;
 
+    // Keep all the functions before start outlining
+    // to avoid analize them.
+    SmallVector<Function *, 4> Functs;
     for (auto &F : M) {
       // Nothing to do for declarations.
       if (F.isDeclaration() || F.empty())
         continue;
 
-      // FIXME: all the analysis is computed on every call
-      TaskFunctionInfo &TFI = getAnalysis<OmpSsRegionAnalysisPass>(F).getTaskFuncInfo();
-      TaskwaitFunctionInfo &TwFI = getAnalysis<OmpSsRegionAnalysisPass>(F).getTaskwaitFuncInfo();
+      Functs.push_back(&F);
+    }
+
+    for (auto *F : Functs) {
+      FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
+      TaskFunctionInfo &TFI = FI.TaskFuncInfo;
+      TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
 
       if (!TskAddrTranslationEntryTy.Ty) {
         TskAddrTranslationEntryTy.Ty = StructType::create(M.getContext(), "nanos6_address_translation_entry_t");
@@ -558,7 +565,7 @@ struct OmpSs : public ModulePass {
       }
       size_t taskNum = 0;
       for (TaskInfo TI : TFI.PostOrder) {
-        lowerTask(TI, F, taskNum++, M);
+        lowerTask(TI, *F, taskNum++, M);
       }
 
     }
