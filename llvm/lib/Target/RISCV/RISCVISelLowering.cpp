@@ -2647,3 +2647,13 @@ bool RISCVTargetLowering::isFMAFasterThanFMulAndFAdd(EVT VT) const {
 
   return false;
 }
+
+unsigned RISCVTargetLowering::getExceptionPointerRegister(
+    const Constant *PersonalityFn) const {
+  return RISCV::X10;
+}
+
+unsigned RISCVTargetLowering::getExceptionSelectorRegister(
+    const Constant *PersonalityFn) const {
+  return RISCV::X11;
+}
