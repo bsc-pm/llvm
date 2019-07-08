@@ -31,7 +31,7 @@ struct DependInfo {
   SmallVector<Value *, 4> Dims;
   // Instructions needed as a bridge between task args structure and
   // the call to nanos6 register dependency
-  // Later instructions go first
+  // Stored in program order
   SmallVector<Instruction *, 4> UnpackInstructions;
 };
 

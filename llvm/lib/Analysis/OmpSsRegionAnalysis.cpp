@@ -32,6 +32,7 @@ DisableChecks("disable-checks",
 enum PrintVerbosity {
   PV_Task,
   PV_Uses,
+  PV_Unpack,
   PV_DsaMissing
 };
 
@@ -42,6 +43,7 @@ PrintVerboseLevel("print-verbosity",
   cl::values(
   clEnumValN(PV_Task, "task", "Print task layout only"),
   clEnumValN(PV_Uses, "uses", "Print task layout with uses"),
+  clEnumValN(PV_Unpack, "unpack-ins", "Print task layout with unpack instructions needed in dependencies"),
   clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA")));
 
 char OmpSsRegionAnalysisPass::ID = 0;
@@ -61,6 +63,22 @@ static bool valueInDSABundles(const TaskDSAInfo& DSAInfo,
     return false;
 
   return true;
+}
+
+static void dump_dependency(int Depth, int PrintSpaceMultiplier, std::string DepType,
+                            const SmallVectorImpl<DependInfo> &DepList) {
+  for (const DependInfo &DI : DepList) {
+    dbgs() << "\n";
+    dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+                          << "[" << DepType << "] ";
+    dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+    DI.Base->printAsOperand(dbgs(), false);
+    for (Instruction * const &I : DI.UnpackInstructions) {
+      dbgs() << "\n";
+      dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+      I->printAsOperand(dbgs(), false);
+    }
+  }
 }
 
 void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
@@ -88,7 +106,7 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
         AnalysisInfo.UsesAfterExit[j]->printAsOperand(dbgs(), false);
       }
     }
-    if (PrintVerboseLevel == PV_DsaMissing) {
+    else if (PrintVerboseLevel == PV_DsaMissing) {
       for (size_t j = 0; j < AnalysisInfo.UsesBeforeEntry.size(); ++j) {
         if (!valueInDSABundles(Info.DSAInfo, AnalysisInfo.UsesBeforeEntry[j])) {
           dbgs() << "\n";
@@ -96,6 +114,16 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
           AnalysisInfo.UsesBeforeEntry[j]->printAsOperand(dbgs(), false);
         }
       }
+    }
+    else if (PrintVerboseLevel == PV_Unpack) {
+      const TaskDependsInfo &TDI = Info.DependsInfo;
+      dump_dependency(Depth, PrintSpaceMultiplier, "In", TDI.Ins);
+      dump_dependency(Depth, PrintSpaceMultiplier, "Out", TDI.Outs);
+      dump_dependency(Depth, PrintSpaceMultiplier, "Inout", TDI.Inouts);
+
+      dump_dependency(Depth, PrintSpaceMultiplier, "WeakIn", TDI.WeakIns);
+      dump_dependency(Depth, PrintSpaceMultiplier, "WeakOut", TDI.WeakOuts);
+      dump_dependency(Depth, PrintSpaceMultiplier, "WeakInout", TDI.WeakInouts);
     }
     dbgs() << "\n";
   }
@@ -160,7 +188,7 @@ static bool insertInstructionInProgramOrder(SmallVectorImpl<Instruction *> &Inst
                                             const OrderedInstructions &OI) {
 
   auto It = InstList.begin();
-  while (It != InstList.end() && OI.dominates(I, *It))
+  while (It != InstList.end() && OI.dominates(*It, I))
     ++It;
 
   if (*It == I)
@@ -182,15 +210,19 @@ static void gatherUnpackInstructions(DependInfo &DI,
   SmallVector<Value *, 4> WorkList;
   // Only add Base if it's an instruction
   if (Instruction *I = dyn_cast<Instruction>(DI.Base)) {
-    WorkList.push_back(DI.Base);
+    if (DSAMerge.find(I) == DSAMerge.end()) {
+      WorkList.push_back(I);
 
-    UnpackIns.push_back(I);
+      UnpackIns.push_back(I);
+    }
   }
   for (Value *V : DI.Dims) {
     if (Instruction *I = dyn_cast<Instruction>(V)) {
-      WorkList.push_back(I);
+      if (DSAMerge.find(I) == DSAMerge.end()) {
+        WorkList.push_back(I);
 
-      insertInstructionInProgramOrder(UnpackIns, I, OI);
+        insertInstructionInProgramOrder(UnpackIns, I, OI);
+      }
     }
   }
   while (!WorkList.empty()) {
@@ -209,9 +241,6 @@ static void gatherUnpackInstructions(DependInfo &DI,
       }
     }
   }
-  // for (auto It = UnpackIns.rbegin(); It != UnpackIns.rend(); ++It) {
-  //   (*It)->dump();
-  // }
 }
 
 // Process each OpBundle gathering dependency information
