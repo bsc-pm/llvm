@@ -2238,6 +2238,7 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
     TripleAliases.append(begin(RISCV32TriplesLinux), end(RISCV32TriplesLinux));
     TripleAliases.append(begin(RISCV32TriplesBaremetal),
                          end(RISCV32TriplesBaremetal));
+    BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
     BiarchTripleAliases.append(begin(RISCV64TriplesLinux),
                                end(RISCV64TriplesLinux));
     BiarchTripleAliases.append(begin(RISCV64TriplesBaremetal),
@@ -2245,7 +2246,7 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
     break;
   case llvm::Triple::riscv64:
     LibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
-    BiarchLibDirs.append(begin(RISCV64LibDirs), end(RISCV64LibDirs));
+    BiarchLibDirs.append(begin(RISCV32LibDirs), end(RISCV32LibDirs));
     // Only search for Linux toolchains if the target says so
     if (TargetTriple.getOS() == llvm::Triple::Linux) {
       TripleAliases.append(begin(RISCV64TriplesLinux),
