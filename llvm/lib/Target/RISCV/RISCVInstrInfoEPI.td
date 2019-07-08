@@ -1103,23 +1103,20 @@ def PseudoVRELOAD : Pseudo<(outs EPIVR:$rs1), (ins GPR:$rs2), [], "">;
 // Pseudo instructions
 //===----------------------------------------------------------------------===//
 
-class VectorTypeInfo<ValueType Vec, ValueType Mas, int Sew,
-                     EPIVReg Reg> {
+class VectorTypeInfo<ValueType Vec, ValueType Mas, int Sew, EPIVReg Reg>
+{
   ValueType Vector = Vec;
-  ValueType IntVector = Vec;
   ValueType Mask = Mas;
   int SEW = Sew;
   EPIVReg RegClass = Reg;
 }
 
-class FloatVectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
-                          EPIVReg Reg, ValueType Scal, RegisterClass ScalarReg>
+class FloatVectorTypeInfo<ValueType Vec, ValueType Mas, int Sew, EPIVReg Reg,
+                          ValueType Scal, RegisterClass ScalarReg>
     : VectorTypeInfo<Vec, Mas, Sew, Reg>
 {
   ValueType Scalar = Scal;
   RegisterClass ScalarRegClass = ScalarReg;
-
-  let IntVector = Int;
 }
 
 class VectorTypeInfoToWide<VectorTypeInfo vti, VectorTypeInfo wti>
@@ -1172,20 +1169,46 @@ defset list<VectorTypeInfo> AllVectors = {
 
   defset list<FloatVectorTypeInfo> AllFloatVectors = {
     defset list<FloatVectorTypeInfo> NoGroupFloatVectors = {
-//    def Vtype1xf32 : FloatVectorTypeInfo<nxv1f32, nxv1i32, nxv1i1, 32, EPIVR, f32, FPR32>; // FIXME illegal type
-      def Vtype2xf32 : FloatVectorTypeInfo<nxv2f32, nxv2i32, nxv2i1, 32, EPIVR, f32, FPR32>;
+//    def Vtype1xf32 : FloatVectorTypeInfo<nxv1f32, nxv1i1, 32, EPIVR, f32, FPR32>; // FIXME illegal type
+      def Vtype2xf32 : FloatVectorTypeInfo<nxv2f32, nxv2i1, 32, EPIVR, f32, FPR32>;
 
-      def Vtype1xf64 : FloatVectorTypeInfo<nxv1f64, nxv1i64, nxv1i1, 64, EPIVR, f64, FPR64>;
+      def Vtype1xf64 : FloatVectorTypeInfo<nxv1f64, nxv1i1, 64, EPIVR, f64, FPR64>;
     }
 
-    def Vtype4xf32  : FloatVectorTypeInfo<nxv4f32,  nxv4i32,  nxv4i1,  32, EPIVR2, f32, FPR32>;
-    def Vtype8xf32  : FloatVectorTypeInfo<nxv8f32,  nxv8i32,  nxv8i1,  32, EPIVR4, f32, FPR32>;
-    def Vtype16xf32 : FloatVectorTypeInfo<nxv16f32, nxv16i32, nxv16i1, 32, EPIVR8, f32, FPR32>;
+    def Vtype4xf32  : FloatVectorTypeInfo<nxv4f32,  nxv4i1,  32, EPIVR2, f32, FPR32>;
+    def Vtype8xf32  : FloatVectorTypeInfo<nxv8f32,  nxv8i1,  32, EPIVR4, f32, FPR32>;
+    def Vtype16xf32 : FloatVectorTypeInfo<nxv16f32, nxv16i1, 32, EPIVR8, f32, FPR32>;
 
-    def Vtype2xf64  : FloatVectorTypeInfo<nxv2f64,  nxv2i64,  nxv2i1,  64, EPIVR2, f64, FPR64>;
-    def Vtype4xf64  : FloatVectorTypeInfo<nxv4f64,  nxv4i64,  nxv4i1,  64, EPIVR4, f64, FPR64>;
-    def Vtype8xf64  : FloatVectorTypeInfo<nxv8f64,  nxv8i64,  nxv8i1,  64, EPIVR8, f64, FPR64>;
+    def Vtype2xf64  : FloatVectorTypeInfo<nxv2f64,  nxv2i1,  64, EPIVR2, f64, FPR64>;
+    def Vtype4xf64  : FloatVectorTypeInfo<nxv4f64,  nxv4i1,  64, EPIVR4, f64, FPR64>;
+    def Vtype8xf64  : FloatVectorTypeInfo<nxv8f64,  nxv8i1,  64, EPIVR8, f64, FPR64>;
   }
+}
+
+// This functor is used to obtain the int vector type that has the same SEW and
+// multiplier as the input parameter type
+class GetIntVectorTypeInfo<VectorTypeInfo vti>
+{
+  // Equivalent integer vector type. Eg.
+  //   Vtype8xi8 → Vtype8xi8 (identity)
+  //   Vtype4xf64 → Vtype4xi64
+  VectorTypeInfo Vti =
+    !cast<VectorTypeInfo>(
+      !subst("f", "i", !cast<string>(vti))
+    );
+}
+
+// This functor is used to obtain the float vector type that has the same SEW
+// and multiplier as the input parameter type
+class GetFloatVectorTypeInfo<VectorTypeInfo vti>
+{
+  // Equivalent float vector type. Eg.
+  //   Vtype32xi16 → Vtype32xf16
+  //   Vtype2xf32 → Vtype2xf32 (identity)
+  VectorTypeInfo FVti =
+    !cast<VectorTypeInfo>(
+      !subst("i", "f", !cast<string>(vti))
+    );
 }
 
 defset list<VectorTypeInfoToWide> AllWideableIntVectors = {
@@ -2750,9 +2773,10 @@ multiclass pat_intrinsic_binary_any_and_int_v_vv_vx_vi<string intrinsic_name,
                                                      string instruction_name>
 {
   foreach vti = AllVectors in
+  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
   {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
-                                vti.Vector, vti.Vector, vti.IntVector, vti.Mask,
+                                vti.Vector, vti.Vector, ivti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
                                 vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
@@ -3122,30 +3146,31 @@ multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
                                     string instruction_int_to_float>
 {
   foreach fvti = AllFloatVectors in
+  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
   foreach vlmul = [fvti.RegClass.VLMul] in
   {
-    def : Pat<(fvti.IntVector (!cast<Intrinsic>(intrinsic_float_to_int)
-                               (fvti.Vector fvti.RegClass:$rs2),
-                               GPR:$vl)),
+    def : Pat<(ivti.Vector (!cast<Intrinsic>(intrinsic_float_to_int)
+                            (fvti.Vector fvti.RegClass:$rs2),
+                            GPR:$vl)),
               (!cast<Instruction>(instruction_float_to_int#"_M"#vlmul)
                $rs2, (NoX0 GPR:$vl), fvti.SEW)>;
 
-    def : Pat<(fvti.IntVector (!cast<Intrinsic>(intrinsic_float_to_int#"_mask")
-                               (fvti.IntVector fvti.RegClass:$merge),
-                               (fvti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
-                               GPR:$vl)),
+    def : Pat<(ivti.Vector (!cast<Intrinsic>(intrinsic_float_to_int#"_mask")
+                            (ivti.Vector fvti.RegClass:$merge),
+                            (fvti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
+                            GPR:$vl)),
               (!cast<Instruction>(instruction_float_to_int#"_MASK_M"#vlmul)
                $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
 
     def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float)
-                            (fvti.IntVector fvti.RegClass:$rs2),
+                            (ivti.Vector fvti.RegClass:$rs2),
                             GPR:$vl)),
               (!cast<Instruction>(instruction_int_to_float#"_M"#vlmul)
                $rs2, (NoX0 GPR:$vl), fvti.SEW)>;
 
     def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float#"_mask")
                             (fvti.Vector fvti.RegClass:$merge),
-                            (fvti.IntVector fvti.RegClass:$rs2), (fvti.Mask V0),
+                            (ivti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
                             GPR:$vl)),
               (!cast<Instruction>(instruction_int_to_float#"_MASK_M"#vlmul)
                $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
@@ -3208,6 +3233,7 @@ foreach fvti = AllFloatVectors in {
 
 multiclass pat_load<string width> {
   foreach vti = AllVectors in
+  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
   foreach vlmul = [vti.RegClass.VLMul] in
   {
     def : Pat<(vti.Vector (int_epi_vload GPR:$rs1, GPR:$vl)),
@@ -3219,7 +3245,7 @@ multiclass pat_load<string width> {
                (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(vti.Vector (int_epi_vload_indexed GPR:$rs1,
-                           (vti.IntVector vti.RegClass:$rs2), GPR:$vl)),
+                           (ivti.Vector vti.RegClass:$rs2), GPR:$vl)),
               (!cast<Instruction>("PseudoVLX"#width#"_V_M"#vlmul) $rs1, $rs2,
                (NoX0 GPR:$vl), vti.SEW)>;
 
@@ -3236,7 +3262,7 @@ multiclass pat_load<string width> {
 
     def : Pat<(vti.Vector (int_epi_vload_indexed_mask
                            (vti.Vector vti.RegClass:$merge), GPR:$rs1,
-                           (vti.IntVector vti.RegClass:$rs2), (vti.Mask V0),
+                           (ivti.Vector vti.RegClass:$rs2), (vti.Mask V0),
                            GPR:$vl)),
               (!cast<Instruction>("PseudoVLX"#width#"_V_MASK_M"#vlmul) $merge,
                $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
@@ -3246,6 +3272,7 @@ multiclass pat_load<string width> {
 
 multiclass pat_store<string width> {
   foreach vti = AllVectors in
+  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
   foreach vlmul = [vti.RegClass.VLMul] in
   {
     def : Pat<(int_epi_vstore (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
@@ -3260,7 +3287,7 @@ multiclass pat_store<string width> {
 
     def : Pat<(int_epi_vstore_indexed
                (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
-               (vti.IntVector vti.RegClass:$rs2), GPR:$vl),
+               (ivti.Vector vti.RegClass:$rs2), GPR:$vl),
               (!cast<Instruction>("PseudoVSX"#width#"_V_M"#vlmul) $rs3, $rs1,
                $rs2, (NoX0 GPR:$vl), vti.SEW)>;
 
@@ -3278,7 +3305,7 @@ multiclass pat_store<string width> {
 
     def : Pat<(int_epi_vstore_indexed_mask
                (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
-               (vti.IntVector vti.RegClass:$rs2), (vti.Mask V0), GPR:$vl),
+               (ivti.Vector vti.RegClass:$rs2), (vti.Mask V0), GPR:$vl),
               (!cast<Instruction>("PseudoVSX"#width#"_V_MASK_M"#vlmul) $rs3,
                $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
                vti.SEW)>;
