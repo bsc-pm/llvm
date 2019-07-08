@@ -1103,10 +1103,10 @@ def PseudoVRELOAD : Pseudo<(outs EPIVR:$rs1), (ins GPR:$rs2), [], "">;
 // Pseudo instructions
 //===----------------------------------------------------------------------===//
 
-class VectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
+class VectorTypeInfo<ValueType Vec, ValueType Mas, int Sew,
                      EPIVReg Reg> {
   ValueType Vector = Vec;
-  ValueType IntVector = Int;
+  ValueType IntVector = Vec;
   ValueType Mask = Mas;
   int SEW = Sew;
   EPIVReg RegClass = Reg;
@@ -1114,70 +1114,68 @@ class VectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
 
 class FloatVectorTypeInfo<ValueType Vec, ValueType Int, ValueType Mas, int Sew,
                           EPIVReg Reg, ValueType Scal, RegisterClass ScalarReg>
-    : VectorTypeInfo<Vec, Int, Mas, Sew, Reg>
+    : VectorTypeInfo<Vec, Mas, Sew, Reg>
 {
   ValueType Scalar = Scal;
   RegisterClass ScalarRegClass = ScalarReg;
+
+  let IntVector = Int;
 }
 
-class WideableVectorTypeInfo<VectorTypeInfo Vti, ValueType Wid, EPIVReg WideReg>
-    : VectorTypeInfo<Vti.Vector, Vti.IntVector, Vti.Mask, Vti.SEW, Vti.RegClass>
+class VectorTypeInfoToWide<VectorTypeInfo vti, VectorTypeInfo wti>
 {
-  ValueType Wide = Wid;
-  EPIVReg WideRegClass = WideReg;
+  VectorTypeInfo Vti = vti;
+  VectorTypeInfo Wti = wti;
 }
 
-class WideableFloatVectorTypeInfo<FloatVectorTypeInfo FVti, ValueType Wid,
-                                  EPIVReg WideReg>
-    : FloatVectorTypeInfo<FVti.Vector, FVti.IntVector, FVti.Mask, FVti.SEW,
-                          FVti.RegClass, FVti.Scalar, FVti.ScalarRegClass>
+class FloatVectorTypeInfoToWide<FloatVectorTypeInfo fvti, FloatVectorTypeInfo fwti>
 {
-  ValueType Wide = Wid;
-  EPIVReg WideRegClass = WideReg;
+  FloatVectorTypeInfo FVti = fvti;
+  FloatVectorTypeInfo FWti = fwti;
 }
 
 defset list<VectorTypeInfo> AllVectors = {
 
   defset list<VectorTypeInfo> AllIntegerVectors = {
     defset list<VectorTypeInfo> NoGroupIntegerVectors = {
-//    def Vtype1xi8  : VectorTypeInfo<nxv1i8,   nxv1i8,   nxv1i1,  8,  EPIVR>; // FIXME illegal type
-//    def Vtype2xi8  : VectorTypeInfo<nxv2i8,   nxv2i8,   nxv2i1,  8,  EPIVR>; // FIXME illegal type
-//    def Vtype4xi8  : VectorTypeInfo<nxv4i8,   nxv4i8,   nxv4i1,  8,  EPIVR>; // FIXME illegal type
-      def Vtype8xi8  : VectorTypeInfo<nxv8i8,   nxv8i8,   nxv8i1,  8,  EPIVR>;
+//    def Vtype1xi8  : VectorTypeInfo<nxv1i8,  nxv1i1, 8,  EPIVR>; // FIXME illegal type
+//    def Vtype2xi8  : VectorTypeInfo<nxv2i8,  nxv2i1, 8,  EPIVR>; // FIXME illegal type
+//    def Vtype4xi8  : VectorTypeInfo<nxv4i8,  nxv4i1, 8,  EPIVR>; // FIXME illegal type
+      def Vtype8xi8  : VectorTypeInfo<nxv8i8,  nxv8i1, 8,  EPIVR>;
 
-//    def Vtype1xi16 : VectorTypeInfo<nxv1i16,  nxv1i16,  nxv1i1,  16, EPIVR>; // FIXME illegal type
-//    def Vtype2xi16 : VectorTypeInfo<nxv2i16,  nxv2i16,  nxv2i1,  16, EPIVR>; // FIXME illegal type
-      def Vtype4xi16 : VectorTypeInfo<nxv4i16,  nxv4i16,  nxv4i1,  16, EPIVR>;
+//    def Vtype1xi16 : VectorTypeInfo<nxv1i16, nxv1i1, 16, EPIVR>; // FIXME illegal type
+//    def Vtype2xi16 : VectorTypeInfo<nxv2i16, nxv2i1, 16, EPIVR>; // FIXME illegal type
+      def Vtype4xi16 : VectorTypeInfo<nxv4i16, nxv4i1, 16, EPIVR>;
 
-//    def Vtype1xi32 : VectorTypeInfo<nxv1i32,  nxv1i32,  nxv1i1,  32, EPIVR>; // FIXME illegal type
-      def Vtype2xi32 : VectorTypeInfo<nxv2i32,  nxv2i32,  nxv2i1,  32, EPIVR>;
+//    def Vtype1xi32 : VectorTypeInfo<nxv1i32, nxv1i1, 32, EPIVR>; // FIXME illegal type
+      def Vtype2xi32 : VectorTypeInfo<nxv2i32, nxv2i1, 32, EPIVR>;
 
-      def Vtype1xi64 : VectorTypeInfo<nxv1i64,  nxv1i64,  nxv1i1,  64, EPIVR>;
+      def Vtype1xi64 : VectorTypeInfo<nxv1i64, nxv1i1, 64, EPIVR>;
     }
 
-    def Vtype16xi8  : VectorTypeInfo<nxv16i8,  nxv16i8,  nxv16i1, 8,  EPIVR2>;
-    def Vtype32xi8  : VectorTypeInfo<nxv32i8,  nxv32i8,  nxv32i1, 8,  EPIVR4>;
-//  def Vtype64xi8  : VectorTypeInfo<nxv64i8,  nxv64i8,  nxv64i1, 8,  EPIVR8>; // FIXME undefined type
+    def Vtype16xi8  : VectorTypeInfo<nxv16i8,  nxv16i1, 8,  EPIVR2>;
+    def Vtype32xi8  : VectorTypeInfo<nxv32i8,  nxv32i1, 8,  EPIVR4>;
+//  def Vtype64xi8  : VectorTypeInfo<nxv64i8,  nxv64i1, 8,  EPIVR8>; // FIXME undefined type
 
-    def Vtype8xi16  : VectorTypeInfo<nxv8i16,  nxv8i16,  nxv8i1,  16, EPIVR2>;
-    def Vtype16xi16 : VectorTypeInfo<nxv16i16, nxv16i16, nxv16i1, 16, EPIVR4>;
-    def Vtype32xi16 : VectorTypeInfo<nxv32i16, nxv32i16, nxv32i1, 16, EPIVR8>;
+    def Vtype8xi16  : VectorTypeInfo<nxv8i16,  nxv8i1,  16, EPIVR2>;
+    def Vtype16xi16 : VectorTypeInfo<nxv16i16, nxv16i1, 16, EPIVR4>;
+    def Vtype32xi16 : VectorTypeInfo<nxv32i16, nxv32i1, 16, EPIVR8>;
 
-    def Vtype4xi32  : VectorTypeInfo<nxv4i32,  nxv4i32,  nxv4i1,  32, EPIVR2>;
-    def Vtype8xi32  : VectorTypeInfo<nxv8i32,  nxv8i32,  nxv8i1,  32, EPIVR4>;
-    def Vtype16xi32 : VectorTypeInfo<nxv16i32, nxv16i32, nxv16i1, 32, EPIVR8>;
+    def Vtype4xi32  : VectorTypeInfo<nxv4i32,  nxv4i1,  32, EPIVR2>;
+    def Vtype8xi32  : VectorTypeInfo<nxv8i32,  nxv8i1,  32, EPIVR4>;
+    def Vtype16xi32 : VectorTypeInfo<nxv16i32, nxv16i1, 32, EPIVR8>;
 
-    def Vtype2xi64  : VectorTypeInfo<nxv2i64,  nxv2i64,  nxv2i1,  64, EPIVR2>;
-    def Vtype4xi64  : VectorTypeInfo<nxv4i64,  nxv4i64,  nxv4i1,  64, EPIVR4>;
-    def Vtype8xi64  : VectorTypeInfo<nxv8i64,  nxv8i64,  nxv8i1,  64, EPIVR8>;
+    def Vtype2xi64  : VectorTypeInfo<nxv2i64,  nxv2i1,  64, EPIVR2>;
+    def Vtype4xi64  : VectorTypeInfo<nxv4i64,  nxv4i1,  64, EPIVR4>;
+    def Vtype8xi64  : VectorTypeInfo<nxv8i64,  nxv8i1,  64, EPIVR8>;
   }
 
   defset list<FloatVectorTypeInfo> AllFloatVectors = {
     defset list<FloatVectorTypeInfo> NoGroupFloatVectors = {
-//    def Vtype1xf32 : FloatVectorTypeInfo<nxv1f32,  nxv1i32,  nxv1i1,  32, EPIVR,  f32, FPR32>; // FIXME illegal type
-      def Vtype2xf32 : FloatVectorTypeInfo<nxv2f32,  nxv2i32,  nxv2i1,  32, EPIVR,  f32, FPR32>;
+//    def Vtype1xf32 : FloatVectorTypeInfo<nxv1f32, nxv1i32, nxv1i1, 32, EPIVR, f32, FPR32>; // FIXME illegal type
+      def Vtype2xf32 : FloatVectorTypeInfo<nxv2f32, nxv2i32, nxv2i1, 32, EPIVR, f32, FPR32>;
 
-      def Vtype1xf64 : FloatVectorTypeInfo<nxv1f64,  nxv1i64,  nxv1i1,  64, EPIVR,  f64, FPR64>;
+      def Vtype1xf64 : FloatVectorTypeInfo<nxv1f64, nxv1i64, nxv1i1, 64, EPIVR, f64, FPR64>;
     }
 
     def Vtype4xf32  : FloatVectorTypeInfo<nxv4f32,  nxv4i32,  nxv4i1,  32, EPIVR2, f32, FPR32>;
@@ -1190,39 +1188,39 @@ defset list<VectorTypeInfo> AllVectors = {
   }
 }
 
-defset list<WideableVectorTypeInfo> AllWideableIntVectors = {
-//def : WideableVectorTypeInfo<Vtype1xi8,   nxv1i16,  EPIVR>; // FIXME illegal type
-//def : WideableVectorTypeInfo<Vtype2xi8,   nxv2i16,  EPIVR>; // FIXME illegal type
-//def : WideableVectorTypeInfo<Vtype4xi8,   nxv4i16,  EPIVR>; // FIXME illegal type
-  def : WideableVectorTypeInfo<Vtype8xi8,   nxv8i16,  EPIVR2>;
-  def : WideableVectorTypeInfo<Vtype16xi8,  nxv16i16, EPIVR4>;
-  def : WideableVectorTypeInfo<Vtype32xi8,  nxv32i16, EPIVR8>;
+defset list<VectorTypeInfoToWide> AllWideableIntVectors = {
+//def : VectorTypeInfoToWide<Vtype1xi8,   Vtype1xi16>; // FIXME illegal type
+//def : VectorTypeInfoToWide<Vtype2xi8,   Vtype2xi16>; // FIXME illegal type
+//def : VectorTypeInfoToWide<Vtype4xi8,   Vtype4xi16>; // FIXME illegal type
+  def : VectorTypeInfoToWide<Vtype8xi8,   Vtype8xi16>;
+  def : VectorTypeInfoToWide<Vtype16xi8,  Vtype16xi16>;
+  def : VectorTypeInfoToWide<Vtype32xi8,  Vtype32xi16>;
 
-//def : WideableVectorTypeInfo<Vtype1xi16,  nxv1i32,  EPIVR>; // FIXME illegal type
-//def : WideableVectorTypeInfo<Vtype2xi16,  nxv2i32,  EPIVR>; // FIXME illegal type
-  def : WideableVectorTypeInfo<Vtype4xi16,  nxv4i32,  EPIVR2>;
-  def : WideableVectorTypeInfo<Vtype8xi16,  nxv8i32,  EPIVR4>;
-  def : WideableVectorTypeInfo<Vtype16xi16, nxv16i32, EPIVR8>;
+//def : VectorTypeInfoToWide<Vtype1xi16,  Vtype1xi32>; // FIXME illegal type
+//def : VectorTypeInfoToWide<Vtype2xi16,  Vtype2xi32>; // FIXME illegal type
+  def : VectorTypeInfoToWide<Vtype4xi16,  Vtype4xi32>;
+  def : VectorTypeInfoToWide<Vtype8xi16,  Vtype8xi32>;
+  def : VectorTypeInfoToWide<Vtype16xi16, Vtype16xi32>;
 
-//def : WideableVectorTypeInfo<Vtype1xi32,  nxv1i64,  EPIVR>; // FIXME illegal type
-  def : WideableVectorTypeInfo<Vtype2xi32,  nxv2i64,  EPIVR2>;
-  def : WideableVectorTypeInfo<Vtype4xi32,  nxv4i64,  EPIVR4>;
-  def : WideableVectorTypeInfo<Vtype8xi32,  nxv8i64,  EPIVR8>;
+//def : VectorTypeInfoToWide<Vtype1xi32,  Vtype1xi64>; // FIXME illegal type
+  def : VectorTypeInfoToWide<Vtype2xi32,  Vtype2xi64>;
+  def : VectorTypeInfoToWide<Vtype4xi32,  Vtype4xi64>;
+  def : VectorTypeInfoToWide<Vtype8xi32,  Vtype8xi64>;
 // FIXME what about these?
-//def : WideableVectorTypeInfo<Vtype1xi64,  /* FIXME nxv1i128 */ i1, EPIVR2>;
-//def : WideableVectorTypeInfo<Vtype2xi64,  /* FIXME nxv2i128 */ i1, EPIVR4>;
-//def : WideableVectorTypeInfo<Vtype4xi64,  /* FIXME nxv4i128 */ i1, EPIVR8>;
+//def : VectorTypeInfoToWide<Vtype1xi64,  /* FIXME Vtype1xi128 */ i1>;
+//def : VectorTypeInfoToWide<Vtype2xi64,  /* FIXME Vtype2xi128 */ i1>;
+//def : VectorTypeInfoToWide<Vtype4xi64,  /* FIXME Vtype4xi128 */ i1>;
 }
 
-defset list<WideableFloatVectorTypeInfo> AllWideableFloatVectors = {
-//def : WideableFloatVectorTypeInfo<Vtype1xf32, nxv1f64, EPIVR>; // FIXME illegal type
-  def : WideableFloatVectorTypeInfo<Vtype2xf32, nxv2f64, EPIVR2>;
-  def : WideableFloatVectorTypeInfo<Vtype4xf32, nxv4f64, EPIVR4>;
-  def : WideableFloatVectorTypeInfo<Vtype8xf32, nxv8f64, EPIVR8>;
+defset list<FloatVectorTypeInfoToWide> AllWideableFloatVectors = {
+//def : FloatVectorTypeInfoToWide<Vtype1xf32, Vtype1xf64>; // FIXME illegal type
+  def : FloatVectorTypeInfoToWide<Vtype2xf32, Vtype2xf64>;
+  def : FloatVectorTypeInfoToWide<Vtype4xf32, Vtype4xf64>;
+  def : FloatVectorTypeInfoToWide<Vtype8xf32, Vtype8xf64>;
 // FIXME what about these?
-//def : WideableFloatVectorTypeInfo<Vtype1xf64, /* FIXME: nxv1f128 */ i1, EPIVR2>;
-//def : WideableFloatVectorTypeInfo<Vtype2xf64, /* FIXME: nxv2f128 */ i1, EPIVR4>;
-//def : WideableFloatVectorTypeInfo<Vtype4xf64, /* FIXME: nxv4f128 */ i1, EPIVR8>;
+//def : FloatVectorTypeInfoToWide<Vtype1xf64, /* FIXME: Vtype1xf128 */ i1>;
+//def : FloatVectorTypeInfoToWide<Vtype2xf64, /* FIXME: Vtype2xf128 */ i1>;
+//def : FloatVectorTypeInfoToWide<Vtype4xf64, /* FIXME: Vtype4xf128 */ i1>;
 }
 
 class MaskTypeInfo<ValueType Mas, int Sew> {
@@ -2164,8 +2162,8 @@ multiclass pat_intrinsic_binary_mask_in<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vv<string intrinsic_name,
                                          string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2176,8 +2174,8 @@ multiclass pat_intrinsic_binary_int_v_vv<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vv_vx<string intrinsic_name,
                                             string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2192,8 +2190,8 @@ multiclass pat_intrinsic_binary_int_v_vv_vx<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vx_vi<string intrinsic_name,
                                             string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2208,8 +2206,8 @@ multiclass pat_intrinsic_binary_int_v_vx_vi<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vv_vx_vi<string intrinsic_name,
                                                string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2228,8 +2226,8 @@ multiclass pat_intrinsic_binary_int_v_vv_vx_vi<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vvm_vxm_vim<string intrinsic_name,
                                                   string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VVM",
                                         vti.Vector, vti.Vector, vti.Vector,
                                         vti.Mask, vti.SEW, vti.RegClass.VLMul,
@@ -2250,8 +2248,8 @@ multiclass pat_intrinsic_binary_int_v_vvm_vxm_vim<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_v_vs<string intrinsic_name,
                                          string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VS",
                                 vti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2262,15 +2260,17 @@ multiclass pat_intrinsic_binary_int_v_vs<string intrinsic_name,
 multiclass pat_intrinsic_binary_int_w_vv_vx<string intrinsic_name,
                                             string instruction_name>
 {
-  foreach vti = AllWideableIntVectors
-  in {
+  foreach vtiToWti = AllWideableIntVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach wti = [vtiToWti.Wti] in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
-                                vti.Wide, vti.Vector, vti.Vector, vti.Mask,
-                                vti.SEW, vti.RegClass.VLMul, vti.WideRegClass,
+                                wti.Vector, vti.Vector, vti.Vector, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, wti.RegClass,
                                 vti.RegClass, vti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
-                                vti.Wide, vti.Vector, XLenVT, vti.Mask,
-                                vti.SEW, vti.RegClass.VLMul, vti.WideRegClass,
+                                wti.Vector, vti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, wti.RegClass,
                                 vti.RegClass, GPR>;
   }
 }
@@ -2278,8 +2278,8 @@ multiclass pat_intrinsic_binary_int_w_vv_vx<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
                                                           string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Mask, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, EPIVR,
@@ -2296,8 +2296,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_int_m_vv_vx<string intrinsic_name,
                                                        string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Mask, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, EPIVR,
@@ -2311,8 +2311,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
                                                        string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
                                 vti.RegClass.VLMul, EPIVR, vti.RegClass, GPR>;
@@ -2325,8 +2325,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_int_m_vx_vu<string intrinsic_name,
                                                        string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
                                 vti.RegClass.VLMul, EPIVR, vti.RegClass, GPR>;
@@ -2339,8 +2339,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vu<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_name,
                                                             string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Mask, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, EPIVR,
@@ -2402,8 +2402,8 @@ multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_nam
 multiclass pat_intrinsic_binary_fp_v_vv<string intrinsic_name,
                                         string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Vector, fvti.Vector, fvti.Vector,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -2414,8 +2414,8 @@ multiclass pat_intrinsic_binary_fp_v_vv<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_v_vf<string intrinsic_name,
                                         string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Vector, fvti.Vector, fvti.Scalar,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -2427,8 +2427,8 @@ multiclass pat_intrinsic_binary_fp_v_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_v_vs<string intrinsic_name,
                                         string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VS",
                                 fvti.Vector, fvti.Vector, fvti.Vector,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -2439,8 +2439,8 @@ multiclass pat_intrinsic_binary_fp_v_vs<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_v_vv_vf<string intrinsic_name,
                                            string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Vector, fvti.Vector, fvti.Vector,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -2456,8 +2456,8 @@ multiclass pat_intrinsic_binary_fp_v_vv_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_v_vvm<string intrinsic_name,
                                          string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VVM",
                                         fvti.Vector, fvti.Vector, fvti.Vector,
                                         fvti.Mask, fvti.SEW,
@@ -2469,8 +2469,8 @@ multiclass pat_intrinsic_binary_fp_v_vvm<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_v_vfm<string intrinsic_name,
                                          string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VFM",
                                         fvti.Vector, fvti.Vector, fvti.Scalar,
                                         fvti.Mask, fvti.SEW,
@@ -2482,17 +2482,18 @@ multiclass pat_intrinsic_binary_fp_v_vfm<string intrinsic_name,
 multiclass pat_intrinsic_binary_fp_w_vv_vf<string intrinsic_name,
                                            string instruction_name>
 {
-  foreach fvti = AllWideableFloatVectors
-  in {
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  foreach fvti = [fvtiToFWti.FVti] in
+  foreach fwti = [fvtiToFWti.FWti] in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
-                                fvti.Wide, fvti.Vector, fvti.Vector, fvti.Mask,
-                                fvti.SEW, fvti.RegClass.VLMul,
-                                fvti.WideRegClass, fvti.RegClass,
-                                fvti.RegClass>;
+                                fwti.Vector, fvti.Vector, fvti.Vector,
+                                fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
+                                fwti.RegClass, fvti.RegClass, fvti.RegClass>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
-                                fvti.Wide, fvti.Vector, fvti.Scalar, fvti.Mask,
-                                fvti.SEW, fvti.RegClass.VLMul,
-                                fvti.WideRegClass, fvti.RegClass,
+                                fwti.Vector, fvti.Vector, fvti.Scalar,
+                                fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
+                                fwti.RegClass, fvti.RegClass,
                                 fvti.ScalarRegClass>;
   }
 }
@@ -2500,8 +2501,8 @@ multiclass pat_intrinsic_binary_fp_w_vv_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_fp_m_vv_vf<string intrinsic_name,
                                                       string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Mask, fvti.Vector, fvti.Vector, fvti.Mask,
                                 fvti.SEW, fvti.RegClass.VLMul, EPIVR,
@@ -2516,8 +2517,8 @@ multiclass pat_intrinsic_binary_relational_fp_m_vv_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
                                                    string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VF",
                                 fvti.Mask, fvti.Vector, fvti.Scalar, fvti.Mask,
                                 fvti.SEW, fvti.RegClass.VLMul, EPIVR,
@@ -2528,8 +2529,8 @@ multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_relational_fp_m_vv_swapped<string intrinsic_name,
                                                            string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fvti.Mask, fvti.Vector, fvti.Vector, fvti.Mask,
                                 fvti.SEW, fvti.RegClass.VLMul, EPIVR,
@@ -2603,8 +2604,8 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
 multiclass pat_intrinsic_ternary_int_v_vv_vx<string intrinsic_name,
                                              string instruction_name>
 {
-  foreach vti = AllIntegerVectors
-  in {
+  foreach vti = AllIntegerVectors in
+  {
     defm : pat_intrinsic_ternary<intrinsic_name, instruction_name, "VV",
                                  vti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                  vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2619,8 +2620,8 @@ multiclass pat_intrinsic_ternary_int_v_vv_vx<string intrinsic_name,
 multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
                                             string instruction_name>
 {
-  foreach fvti = AllFloatVectors
-  in {
+  foreach fvti = AllFloatVectors in
+  {
     defm : pat_intrinsic_ternary<intrinsic_name, instruction_name, "VV",
                                  fvti.Vector, fvti.Vector, fvti.Vector,
                                  fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -2736,8 +2737,8 @@ multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
 multiclass pat_intrinsic_binary_any_and_int_v_vx<string intrinsic_name,
                                                  string instruction_name>
 {
-  foreach vti = AllVectors
-  in {
+  foreach vti = AllVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2748,8 +2749,8 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx<string intrinsic_name,
 multiclass pat_intrinsic_binary_any_and_int_v_vv_vx_vi<string intrinsic_name,
                                                      string instruction_name>
 {
-  foreach vti = AllVectors
-  in {
+  foreach vti = AllVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, vti.IntVector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2768,8 +2769,8 @@ multiclass pat_intrinsic_binary_any_and_int_v_vv_vx_vi<string intrinsic_name,
 multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
                                                     string instruction_name>
 {
-  foreach vti = AllVectors
-  in {
+  foreach vti = AllVectors in
+  {
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
                                 vti.Vector, vti.Vector, XLenVT, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
