@@ -65,6 +65,20 @@ def vectormultiplier : Operand<XLenVT> {
 }
 
 //===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+// Join strings in list using separator and ignoring empty elements
+class Join<list<string> strings, string separator> {
+  string ret = !foldl(!head(strings), !tail(strings), a, b,
+                      !cond(
+                        !and(!empty(a), !empty(b)) : "",
+                        !empty(a) : b,
+                        !empty(b) : a,
+                        1 : a#separator#b));
+}
+
+//===----------------------------------------------------------------------===//
 // Common definitions
 //===----------------------------------------------------------------------===//
 
@@ -1235,6 +1249,19 @@ defset list<VectorTypeInfoToWide> AllWideableIntVectors = {
 //def : VectorTypeInfoToWide<Vtype4xi64,  /* FIXME Vtype4xi128 */ i1>;
 }
 
+defset list<VectorTypeInfoToWide> AllWideableIntToFloatVectors = {
+//def : VectorTypeInfoToWide<Vtype1xi16,  Vtype1xi32>; // FIXME illegal type
+//def : VectorTypeInfoToWide<Vtype2xi16,  Vtype2xi32>; // FIXME illegal type
+  def : VectorTypeInfoToWide<Vtype4xi16,  Vtype4xi32>;
+  def : VectorTypeInfoToWide<Vtype8xi16,  Vtype8xi32>;
+  def : VectorTypeInfoToWide<Vtype16xi16, Vtype16xi32>;
+
+//def : VectorTypeInfoToWide<Vtype1xi32,  Vtype1xi64>; // FIXME illegal type
+  def : VectorTypeInfoToWide<Vtype2xi32,  Vtype2xi64>;
+  def : VectorTypeInfoToWide<Vtype4xi32,  Vtype4xi64>;
+  def : VectorTypeInfoToWide<Vtype8xi32,  Vtype8xi64>;
+}
+
 defset list<FloatVectorTypeInfoToWide> AllWideableFloatVectors = {
 //def : FloatVectorTypeInfoToWide<Vtype1xf32, Vtype1xf64>; // FIXME illegal type
   def : FloatVectorTypeInfoToWide<Vtype2xf32, Vtype2xf64>;
@@ -1311,12 +1338,14 @@ multiclass pseudo_unary_nomask<EPIVReg result_reg_class,
 
 multiclass pseudo_unary<EPIVReg result_reg_class,
                         EPIVReg op_reg_class,
-                        int vlmul> {
+                        int vlmul,
+                        string constraints = ""> {
 
+  let Constraints = constraints in
   defm "" : pseudo_unary_nomask<result_reg_class, op_reg_class, vlmul>;
 
-  let Constraints = "$rd = $merge",
-      Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
+  let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
+    Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins result_reg_class:$merge,
@@ -1358,6 +1387,18 @@ multiclass pseudo_unary_v_f_nomask {
     let VLMul = evr.VLMul in
     {
       defm _F : pseudo_unary_nomask<evr, FPR64, evr.VLMul>;
+    }
+  }
+}
+
+multiclass pseudo_unary_w_v {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegToWidePairs in
+  {
+    let VLMul = evr.RegClass.VLMul in
+    {
+      defm _V : pseudo_unary<evr.WideRegClass, evr.RegClass,
+                             evr.RegClass.VLMul, "@earlyclobber $rd">;
     }
   }
 }
@@ -1835,6 +1876,12 @@ defm PseudoVFCVT_XU_F  : pseudo_unary_v_v;
 defm PseudoVFCVT_X_F   : pseudo_unary_v_v;
 defm PseudoVFCVT_F_XU  : pseudo_unary_v_v;
 defm PseudoVFCVT_F_X   : pseudo_unary_v_v;
+
+defm PseudoVFWCVT_XU_F : pseudo_unary_w_v;
+defm PseudoVFWCVT_X_F  : pseudo_unary_w_v;
+defm PseudoVFWCVT_F_XU : pseudo_unary_w_v;
+defm PseudoVFWCVT_F_X  : pseudo_unary_w_v;
+defm PseudoVFWCVT_F_F  : pseudo_unary_w_v;
 
 // Load/store pseudo instructions
 
@@ -2837,6 +2884,77 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
 
 //}
 
+multiclass pat_intrinsic_unary<string intrinsic_name,
+                               string instruction_name,
+                               string kind,
+                               ValueType result_type,
+                               ValueType op1_type,
+                               ValueType mask_type,
+                               int sew,
+                               int vlmul,
+                               EPIVReg result_reg_class,
+                               EPIVReg op1_reg_class> // FIXME Registerclass, dagoperand?
+{
+  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
+                          (op1_type op1_reg_class:$rs1),
+                          (i64 GPR:$vl))),
+            (!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)
+             op1_reg_class:$rs1,
+             (NoX0 GPR:$vl), sew)>;
+
+  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
+                          (result_type result_reg_class:$merge),
+                          (op1_type op1_reg_class:$rs1),
+                          (mask_type V0),
+                          (i64 GPR:$vl))),
+            (!cast<Instruction>(instruction_name#_#kind#"_MASK_M"#vlmul)
+             result_reg_class:$merge,
+             op1_reg_class:$rs1,
+             vmask_only_true.Value,
+             (NoX0 GPR:$vl), sew)>;
+}
+
+multiclass pat_intrinsic_unary_fp_w_v<string intrinsic_name,
+                                      string instruction_name>
+{
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  foreach fvti = [fvtiToFWti.FVti] in
+  foreach fwti = [fvtiToFWti.FWti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               fwti.Vector, fvti.Vector, fwti.Mask, fvti.SEW,
+                               fvti.RegClass.VLMul, fwti.RegClass,
+                               fvti.RegClass>;
+  }
+}
+
+multiclass pat_intrinsic_unary_int_w_fp_v<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  foreach fvti = [fvtiToFWti.FVti] in
+  foreach iwti = [GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               iwti.Vector, fvti.Vector, iwti.Mask, fvti.SEW,
+                               fvti.RegClass.VLMul, iwti.RegClass,
+                               fvti.RegClass>;
+  }
+}
+
+multiclass pat_intrinsic_unary_fp_w_int_v<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntToFloatVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach fwti = [GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               fwti.Vector, vti.Vector, fwti.Mask, vti.SEW,
+                               vti.RegClass.VLMul, fwti.RegClass, vti.RegClass>;
+  }
+}
+
 //// We are missing cases but are of sizes that won't work
 //def WidenedSize : ValueTypeVarList<
 //  [ ValueTypePair<nxv1i64, nxv1f32>,
@@ -3183,11 +3301,13 @@ defm "" : pat_conversions_same_sew<"int_epi_vfcvt_xu_f", "PseudoVFCVT_XU_F_V",
 defm "" : pat_conversions_same_sew<"int_epi_vfcvt_x_f", "PseudoVFCVT_X_F_V",
                                    "int_epi_vfcvt_f_x", "PseudoVFCVT_F_X_V">;
 
-//defm "" : pat_conversions<"VFWCVT_XU_F", "vfwcvt_xu_f", WidenedSize.Value>;
-//defm "" : pat_conversions<"VFWCVT_F_XU", "vfwcvt_f_xu", WidenedSize.Value>;
-//defm "" : pat_conversions<"VFWCVT_X_F", "vfwcvt_x_f", WidenedSize.Value>;
-//defm "" : pat_conversions<"VFWCVT_F_X", "vfwcvt_f_x", WidenedSize.Value>;
-//defm "" : pat_conversions<"VFWCVT_F_F", "vfwcvt_f_f", FloatWidenedSize.Value>;
+defm : pat_intrinsic_unary_int_w_fp_v<"int_epi_vfwcvt_xu_f", "PseudoVFWCVT_XU_F">;
+defm : pat_intrinsic_unary_int_w_fp_v<"int_epi_vfwcvt_x_f", "PseudoVFWCVT_X_F">;
+
+defm : pat_intrinsic_unary_fp_w_int_v<"int_epi_vfwcvt_f_xu", "PseudoVFWCVT_F_XU">;
+defm : pat_intrinsic_unary_fp_w_int_v<"int_epi_vfwcvt_f_x", "PseudoVFWCVT_F_X">;
+
+defm : pat_intrinsic_unary_fp_w_v<"int_epi_vfwcvt_f_f", "PseudoVFWCVT_F_F">;
 
 //defm "" : pat_conversions<"VFNCVT_XU_F", "vfncvt_xu_f", NarrowedSize.Value>;
 //defm "" : pat_conversions<"VFNCVT_F_XU", "vfncvt_f_xu", NarrowedSize.Value>;
