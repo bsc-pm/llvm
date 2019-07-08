@@ -563,8 +563,8 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
 
   bool ErrorFound = false;
 
-  OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
+    OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
     if (isa<OSSDependClause>(Clause)) {
       OSSDependChecker.VisitOSSDepend(cast<OSSDependClause> (Clause));
 
