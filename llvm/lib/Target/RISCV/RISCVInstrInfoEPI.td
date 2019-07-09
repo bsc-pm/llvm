@@ -1403,6 +1403,18 @@ multiclass pseudo_unary_w_v {
   }
 }
 
+multiclass pseudo_unary_v_w {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegToWidePairs in
+  {
+    let VLMul = evr.RegClass.VLMul in
+    {
+      defm _V : pseudo_unary<evr.RegClass, evr.WideRegClass,
+                             evr.RegClass.VLMul, "@earlyclobber $rd">;
+    }
+  }
+}
+
 multiclass pseudo_binary<EPIVReg result_reg_class,
                          EPIVReg op1_reg_class,
                          RegisterClass op2_reg_class, // FIXME dagoperand
@@ -1882,6 +1894,12 @@ defm PseudoVFWCVT_X_F  : pseudo_unary_w_v;
 defm PseudoVFWCVT_F_XU : pseudo_unary_w_v;
 defm PseudoVFWCVT_F_X  : pseudo_unary_w_v;
 defm PseudoVFWCVT_F_F  : pseudo_unary_w_v;
+
+defm PseudoVFNCVT_XU_F : pseudo_unary_v_w;
+defm PseudoVFNCVT_X_F  : pseudo_unary_v_w;
+defm PseudoVFNCVT_F_XU : pseudo_unary_v_w;
+defm PseudoVFNCVT_F_X  : pseudo_unary_v_w;
+defm PseudoVFNCVT_F_F  : pseudo_unary_v_w;
 
 // Load/store pseudo instructions
 
@@ -2955,6 +2973,47 @@ multiclass pat_intrinsic_unary_fp_w_int_v<string intrinsic_name,
   }
 }
 
+multiclass pat_intrinsic_unary_fp_v_w<string intrinsic_name,
+                                      string instruction_name>
+{
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  foreach fvti = [fvtiToFWti.FVti] in
+  foreach fwti = [fvtiToFWti.FWti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               fvti.Vector, fwti.Vector, fvti.Mask, fvti.SEW,
+                               fvti.RegClass.VLMul, fvti.RegClass,
+                               fwti.RegClass>;
+  }
+}
+
+multiclass pat_intrinsic_unary_int_v_fp_w<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntToFloatVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach fwti = [GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               vti.Vector, fwti.Vector, vti.Mask, vti.SEW,
+                               vti.RegClass.VLMul, vti.RegClass, fwti.RegClass>;
+  }
+}
+
+multiclass pat_intrinsic_unary_fp_v_int_w<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  foreach fvti = [fvtiToFWti.FVti] in
+  foreach iwti = [GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               fvti.Vector, iwti.Vector, fvti.Mask, fvti.SEW,
+                               fvti.RegClass.VLMul, fvti.RegClass,
+                               iwti.RegClass>;
+  }
+}
+
 //// We are missing cases but are of sizes that won't work
 //def WidenedSize : ValueTypeVarList<
 //  [ ValueTypePair<nxv1i64, nxv1f32>,
@@ -3310,10 +3369,15 @@ defm : pat_intrinsic_unary_fp_w_int_v<"int_epi_vfwcvt_f_x", "PseudoVFWCVT_F_X">;
 defm : pat_intrinsic_unary_fp_w_v<"int_epi_vfwcvt_f_f", "PseudoVFWCVT_F_F">;
 
 //defm "" : pat_conversions<"VFNCVT_XU_F", "vfncvt_xu_f", NarrowedSize.Value>;
-//defm "" : pat_conversions<"VFNCVT_F_XU", "vfncvt_f_xu", NarrowedSize.Value>;
 //defm "" : pat_conversions<"VFNCVT_X_F", "vfncvt_x_f", NarrowedSize.Value>;
-//defm "" : pat_conversions<"VFNCVT_F_X", "vfncvt_f_x", NarrowedSize.Value>;
-//defm "" : pat_conversions<"VFNCVT_F_F", "vfncvt_f_f", FloatNarrowedSize.Value>;
+
+defm : pat_intrinsic_unary_int_v_fp_w<"int_epi_vfncvt_xu_f", "PseudoVFNCVT_XU_F">;
+defm : pat_intrinsic_unary_int_v_fp_w<"int_epi_vfncvt_x_f", "PseudoVFNCVT_X_F">;
+
+defm : pat_intrinsic_unary_fp_v_int_w<"int_epi_vfncvt_f_xu", "PseudoVFNCVT_F_XU">;
+defm : pat_intrinsic_unary_fp_v_int_w<"int_epi_vfncvt_f_x", "PseudoVFNCVT_F_X">;
+
+defm : pat_intrinsic_unary_fp_v_w<"int_epi_vfncvt_f_f", "PseudoVFNCVT_F_F">;
 
 //foreach vtp = AllIntegerVectors in
 //{
