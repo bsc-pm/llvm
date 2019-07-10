@@ -2585,10 +2585,10 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
                                  EPIVReg op2_reg_class> // FIXME Registerclass, dagoperand?
 {
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
-                         (result_type result_reg_class:$rs3),
-                         (op1_type op1_reg_class:$rs1),
-                         (op2_type op2_reg_class:$rs2),
-                         (i64 GPR:$vl))),
+                          (result_type result_reg_class:$rs3),
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)
              result_reg_class:$rs3,
              // Floating point instructions with a scalar operand expect such
@@ -2604,11 +2604,11 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
              sew)>;
 
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
-                         (result_type result_reg_class:$rs3),
-                         (op1_type op1_reg_class:$rs1),
-                         (op2_type op2_reg_class:$rs2),
-                         (mask_type V0),
-                         (i64 GPR:$vl))),
+                          (result_type result_reg_class:$rs3),
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (mask_type V0),
+                          (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_MASK_M"#vlmul)
              result_reg_class:$rs3,
              // Floating point instructions with a scalar operand expect such
