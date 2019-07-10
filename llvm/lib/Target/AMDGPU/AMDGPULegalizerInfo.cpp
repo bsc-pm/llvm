@@ -298,9 +298,8 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     .lowerFor({{S64, S16}}) // FIXME: Implement
     .scalarize(0);
 
-  getActionDefinitionsBuilder(G_FCOPYSIGN)
-    .legalForCartesianProduct({S16, S32, S64}, {S16, S32, S64})
-    .scalarize(0);
+  // TODO: Verify V_BFI_B32 is generated from expanded bit ops.
+  getActionDefinitionsBuilder(G_FCOPYSIGN).lower();
 
   getActionDefinitionsBuilder(G_FSUB)
       // Use actual fsub instruction
@@ -518,7 +517,14 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
 
         case 256:
         case 512:
-          // TODO: constant loads
+          // TODO: Possibly support loads of i256 and i512 .  This will require
+          // adding i256 and i512 types to MVT in order for to be able to use
+          // TableGen.
+          // TODO: Add support for other vector types, this will require
+          //       defining more value mappings for the new types.
+          return Ty0.isVector() && (Ty0.getScalarType().getSizeInBits() == 32 ||
+                                    Ty0.getScalarType().getSizeInBits() == 64);
+
         default:
           return false;
         }
