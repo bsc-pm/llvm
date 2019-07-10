@@ -76,7 +76,7 @@ public:
   void PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
                             raw_ostream &OS,
                             const MCExpr *Subsection) const override;
-  bool isCodeSection() const override;
+  bool UseCodeAlign() const override;
   bool isVirtualSection() const override;
 
   unsigned getOrAssignWinCFISectionID(unsigned *NextID) const {

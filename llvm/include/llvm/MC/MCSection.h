@@ -179,9 +179,9 @@ public:
                                     raw_ostream &OS,
                                     const MCExpr *Subsection) const = 0;
 
-  /// Return true if this is a code section. Often used to tell whether a .align
-  /// directive should use "optimized nops" to fill instead of 0s.
-  virtual bool isCodeSection() const = 0;
+  /// Return true if a .align directive should use "optimized nops" to fill
+  /// instead of 0s.
+  virtual bool UseCodeAlign() const = 0;
 
   /// Check whether this section is "virtual", that is has no actual object
   /// file contents.

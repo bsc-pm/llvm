@@ -64,7 +64,9 @@ bool MCSymbol::isInCodeSection() const {
   MCSection *S = F->getParent();
   if (!S)
     return false;
-  return S->isCodeSection();
+  // This actually means "is this a code section?"
+  // TODO: Rename UseCodeAlign.
+  return S->UseCodeAlign();
 }
 
 void MCSymbol::print(raw_ostream &OS, const MCAsmInfo *MAI) const {

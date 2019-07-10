@@ -89,6 +89,6 @@ void MCSectionWasm::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
   }
 }
 
-bool MCSectionWasm::isCodeSection() const { return false; }
+bool MCSectionWasm::UseCodeAlign() const { return false; }
 
 bool MCSectionWasm::isVirtualSection() const { return false; }
