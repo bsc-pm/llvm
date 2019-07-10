@@ -199,6 +199,7 @@ static bool insertInstructionInProgramOrder(SmallVectorImpl<Instruction *> &Inst
 
 static void gatherUnpackInstructions(DependInfo &DI,
                                      const TaskDSAInfo &DSAInfo,
+                                     TaskAnalysisInfo &TAI,
                                      const OrderedInstructions &OI) {
   SmallVectorImpl<Instruction *> &UnpackIns = DI.UnpackInstructions;
   SmallPtrSet<Value *, 4> DSAMerge;
@@ -207,19 +208,27 @@ static void gatherUnpackInstructions(DependInfo &DI,
   DSAMerge.insert(DSAInfo.Private.begin(), DSAInfo.Private.end());
   DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
-  SmallVector<Value *, 4> WorkList;
-  // Only add Base if it's an instruction
-  if (Instruction *I = dyn_cast<Instruction>(DI.Base)) {
-    if (DSAMerge.find(I) == DSAMerge.end()) {
-      WorkList.push_back(I);
+  // First element is the current instruction, second is
+  // the Instruction where we come from (the dependency)
+  SmallVector<std::pair<Value *, Value *>, 4> WorkList;
+  if (DSAMerge.find(DI.Base) == DSAMerge.end()) {
+    // If it's not a DSA it must be an instruction
+    // that leads to a DSA
+    Instruction *I = dyn_cast<Instruction>(DI.Base);
+    WorkList.emplace_back(I, I);
 
-      UnpackIns.push_back(I);
+    UnpackIns.push_back(I);
+  } else {
+    if (!TAI.DepSymToIdx.count(DI.Base)) {
+      TAI.DepSymToIdx[DI.Base] = TAI.TaskDepSymIdx++;
     }
+    DI.SymbolIndex = TAI.DepSymToIdx[DI.Base];
   }
   for (Value *V : DI.Dims) {
+    // TODO: check condition order
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       if (DSAMerge.find(I) == DSAMerge.end()) {
-        WorkList.push_back(I);
+        WorkList.emplace_back(I, I);
 
         insertInstructionInProgramOrder(UnpackIns, I, OI);
       }
@@ -227,16 +236,24 @@ static void gatherUnpackInstructions(DependInfo &DI,
   }
   while (!WorkList.empty()) {
     auto It = WorkList.begin();
-    assert(!isa<AllocaInst>(*It) && !isa<Argument>(*It) && !isa<Constant>(*It));
-    Instruction *I = cast<Instruction>(*It);
+    assert(!isa<AllocaInst>(It->first) && !isa<Argument>(It->first) && !isa<Constant>(It->first));
+    Instruction *CurI = cast<Instruction>(It->first);
+    Instruction *DepI = cast<Instruction>(It->second);
     WorkList.erase(It);
 
-    for (Use &U : I->operands()) {
+    for (Use &U : CurI->operands()) {
       if (Instruction *II = dyn_cast<Instruction>(U.get())) {
         if (DSAMerge.find(II) == DSAMerge.end()) {
-          WorkList.push_back(II);
+          WorkList.emplace_back(II, DepI);
 
           insertInstructionInProgramOrder(UnpackIns, II, OI);
+        } else if (DepI == DI.Base) {
+          // Found DSA associated with Dependency, assign SymbolIndex
+          // assert(CutI->getNumOperands() == 1);
+          if (!TAI.DepSymToIdx.count(II)) {
+            TAI.DepSymToIdx[II] = TAI.TaskDepSymIdx++;
+          }
+          DI.SymbolIndex = TAI.DepSymToIdx[II];
         }
       }
     }
@@ -247,6 +264,7 @@ static void gatherUnpackInstructions(DependInfo &DI,
 static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef> &OpBundles,
                                     const OrderedInstructions &OI,
                                     const TaskDSAInfo &DSAInfo,
+                                    TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList) {
   for (const OperandBundleDef &OBDef : OpBundles) {
     DependInfo DI;
@@ -261,7 +279,7 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
       DI.Dims.push_back(OBArgs[i]);
     }
 
-    gatherUnpackInstructions(DI, DSAInfo, OI);
+    gatherUnpackInstructions(DI, DSAInfo, TAI, OI);
 
     DependsList.push_back(DI);
   }
@@ -271,23 +289,25 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
 static void gatherDependsInfoWithID(const IntrinsicInst *I,
                                     const OrderedInstructions &OI,
                                     const TaskDSAInfo &DSAInfo,
+                                    TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList,
                                     uint64_t Id) {
   SmallVector<OperandBundleDef, 4> OpBundles;
   getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, DependsList);
+  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, TAI, DependsList);
 }
 
 // Gathers all dependencies needed information
 static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
+                              TaskAnalysisInfo &TAI,
                               const OrderedInstructions &OI) {
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Ins, LLVMContext::OB_oss_dep_in);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Outs, LLVMContext::OB_oss_dep_out);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.Inouts, LLVMContext::OB_oss_dep_inout);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.Ins, LLVMContext::OB_oss_dep_in);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.Outs, LLVMContext::OB_oss_dep_out);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.Inouts, LLVMContext::OB_oss_dep_inout);
 
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakIns, LLVMContext::OB_oss_dep_weakin);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakOuts, LLVMContext::OB_oss_dep_weakout);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.DependsInfo.WeakInouts, LLVMContext::OB_oss_dep_weakinout);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakIns, LLVMContext::OB_oss_dep_weakin);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakOuts, LLVMContext::OB_oss_dep_weakout);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakInouts, LLVMContext::OB_oss_dep_weakinout);
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
@@ -323,7 +343,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           T.Info.Exit = Exit;
 
           gatherDSAInfo(II, T.Info);
-          gatherDependsInfo(II, T.Info, OI);
+          gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {

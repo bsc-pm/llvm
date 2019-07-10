@@ -113,6 +113,46 @@ struct OmpSs : public ModulePass {
                  size_t taskNum,
                  Module &M) {
 
+    // 4. Create function types
+    // nanos6_create_task
+    // nanos6_submit_task
+    // nanos6_register_region_write_depinfo1
+    // nanos6_register_region_write_depinfo1
+
+    FunctionCallee CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
+        Type::getVoidTy(M.getContext()),
+        TskInfoTy.Ty->getPointerTo(),
+        TskInvInfoTy.Ty->getPointerTo(),
+        Type::getInt64Ty(M.getContext()), /* size_t args_lock_size */
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt64Ty(M.getContext()), /* size_t flags */
+        Type::getInt64Ty(M.getContext())); /* size_t num_deps */
+
+    FunctionCallee TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()));
+
+    FunctionCallee RegisterRegionRead1Ty = M.getOrInsertFunction("nanos6_register_region_read_depinfo1",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
+        Type::getInt32Ty(M.getContext()), // int symbol_index, Argument identifier
+        Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
+        Type::getInt8PtrTy(M.getContext()), // void *base_address
+        Type::getInt64Ty(M.getContext()), // long dim1size
+        Type::getInt64Ty(M.getContext()), // long dim1start
+        Type::getInt64Ty(M.getContext())); // long dim1end
+
+    FunctionCallee RegisterRegionWrite1Ty = M.getOrInsertFunction("nanos6_register_region_write_depinfo1",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
+        Type::getInt32Ty(M.getContext()), // int symbol_index, Argument identifier
+        Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
+        Type::getInt8PtrTy(M.getContext()), // void *base_address
+        Type::getInt64Ty(M.getContext()), // long dim1size
+        Type::getInt64Ty(M.getContext()), // long dim1start
+        Type::getInt64Ty(M.getContext())); // long dim1end
+
     unsigned Line = TI.Entry->getDebugLoc().getLine();
     unsigned Col = TI.Entry->getDebugLoc().getCol();
     std::string FileNamePlusLoc = (M.getSourceFileName()
@@ -249,21 +289,120 @@ struct OmpSs : public ModulePass {
 
     // nanos6_unpacked_deps_* START
 
-    // paramTy.clear();
-    // for (const DependInfo &DI : TI.DependsInfo.Ins) {
-    //   paramTy.push_back(DI.Base->getType());
-    // }
-    // paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
-    // FunctionType *unpackDepsFuncType =
-    //                 FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+    paramTy.clear();
+    for (Value *value : DSAMerge) {
+      paramTy.push_back(value->getType());
+    }
+    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
+    FunctionType *unpackDepsFuncType =
+                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
 
-    // Function *unpackDepsFuncVar = Function::Create(
-    //     unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-    //     "nanos6_unpacked_deps_" + F.getName() + Twine(taskNum), &M);
+    Function *unpackDepsFuncVar = Function::Create(
+        unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_unpacked_deps_" + F.getName() + Twine(taskNum), &M);
+
+    BasicBlock *unpackDepsEntryBB = BasicBlock::Create(M.getContext(), "entry", unpackDepsFuncVar);
+    Value *Handler = &*(unpackDepsFuncVar->arg_end() - 1);
+    for (const DependInfo &DI : TI.DependsInfo.Ins) {
+      for (Instruction * const &I : DI.UnpackInstructions) {
+        I->removeFromParent();
+        AI = unpackDepsFuncVar->arg_begin();
+        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
+          I->replaceUsesOfWith(DSAMerge[i], &*AI);
+        }
+        unpackDepsEntryBB->getInstList().push_back(I);
+      }
+    }
+    unpackDepsEntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
+    for (const DependInfo &DI : TI.DependsInfo.Ins) {
+      IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
+
+      // Dependency Base rewrite:
+      //   GlobalValue
+      //     replace by task argument 
+      //   DSA 
+      //     replace by task argument 
+      //   No DSA
+      //     do nothing since it's in unpack instructions
+      Value *NewBase = DI.Base;
+      bool Found = false;
+      AI = unpackDepsFuncVar->arg_begin();
+      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
+        if (DSAMerge[i] == NewBase)
+          Found = true;
+        else
+          ++AI;
+      }
+      if (Found)
+        NewBase = &*AI;
+
+      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      SmallVector<Value *, 4> TaskDepAPICall;
+      TaskDepAPICall.push_back(Handler);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
+      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+      TaskDepAPICall.push_back(BaseCast);
+      assert(DI.Dims.size() == 3);
+      for (Value *V : DI.Dims) {
+        TaskDepAPICall.push_back(V);
+      }
+      BBBuilder.CreateCall(RegisterRegionRead1Ty, TaskDepAPICall);
+    }
 
     // nanos6_unpacked_deps_* END
 
     // nanos6_ol_deps_* START
+
+    paramTy.clear();
+    paramTy.push_back(TaskArgsTy->getPointerTo());
+    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
+    FunctionType *outlineDepsFuncType =
+                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+
+    Function *outlineDepsFuncVar = Function::Create(
+        outlineDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_ol_deps_" + F.getName() + Twine(taskNum), &M);
+
+    BasicBlock *outlineDepsEntryBB = BasicBlock::Create(M.getContext(), "entry", outlineDepsFuncVar);
+
+    IRBuilder<> BBBuilder1(outlineDepsEntryBB);
+
+    // First arg is the nanos_task_args
+    AI = outlineDepsFuncVar->arg_begin();
+    Value *outlineDepsFuncTaskArgs = &*AI++;
+    SmallVector<Value *, 4> TaskDepsUnpackParams;
+    TaskArgsIdx = 0;;
+    for (unsigned i = 0; i < TI.DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder1.CreateGEP(
+          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Shared[i]->getName());
+      Value *LGEP = BBBuilder1.CreateLoad(GEP, "load_" + GEP->getName());
+      TaskDepsUnpackParams.push_back(LGEP);
+    }
+    for (unsigned i = 0; i < TI.DSAInfo.Private.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder1.CreateGEP(
+          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Private[i]->getName());
+      TaskDepsUnpackParams.push_back(GEP);
+    }
+    for (unsigned i = 0; i < TI.DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder1.CreateGEP(
+          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
+      TaskDepsUnpackParams.push_back(GEP);
+    }
+    TaskDepsUnpackParams.push_back(&*AI++);
+    // Build TaskUnpackCall
+    BBBuilder1.CreateCall(unpackDepsFuncVar, TaskDepsUnpackParams);
+    // Make BB legal with a terminator to task outline function
+    BBBuilder1.CreateRetVoid();
+
     // nanos6_ol_deps_* END
 
     // 3. Create Nanos6 task data structures info
@@ -292,7 +431,7 @@ struct OmpSs : public ModulePass {
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(TskImplInfoTy.Ty, 1),
                                 false,
                                 GlobalVariable::InternalLinkage,
-                                ConstantArray::get(ArrayType::get(TskImplInfoTy.Ty, 1),
+                                ConstantArray::get(ArrayType::get(TskImplInfoTy.Ty, 1), // TODO: More than one implementations?
                                                    ConstantStruct::get(TskImplInfoTy.Ty,
                                                                        ConstantInt::get(TskImplInfoTy.Mmbers.DeviceTypeIdTy, 0),
                                                                        ConstantExpr::getPointerCast(outlineFuncVar, outlineFuncCastTy->getPointerTo()),
@@ -329,21 +468,6 @@ struct OmpSs : public ModulePass {
       GV->setAlignment(64);
       return GV;
     });
-
-    // 4. Create nanos6_create_task nanos6_submit_task function types
-    FunctionCallee CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
-        Type::getVoidTy(M.getContext()),
-        TskInfoTy.Ty->getPointerTo(),
-        TskInvInfoTy.Ty->getPointerTo(),
-        Type::getInt64Ty(M.getContext()), /* size_t args_lock_size */
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
-        Type::getInt64Ty(M.getContext()), /* size_t flags */
-        Type::getInt64Ty(M.getContext())); /* size_t num_deps */
-
-    FunctionCallee TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
-        Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()));
 
     auto rewriteOutToInTaskBrAndGetOmpSsUnpackFunc = [&](BasicBlock *header,
                                               BasicBlock *newRootNode,

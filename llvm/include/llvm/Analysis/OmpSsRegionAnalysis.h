@@ -71,23 +71,30 @@ struct FunctionInfo {
   TaskwaitFunctionInfo TaskwaitFuncInfo;
 };
 
+// Start Analysis data structures. this info is not passed to transformation phase
+struct TaskPrintInfo {
+  // Task nesting level
+  size_t Depth;
+  size_t Idx;
+};
+
+struct TaskAnalysisInfo {
+  SetVector<Value *> UsesBeforeEntry;
+  SetVector<Value *> UsesAfterExit;
+  // Map of Dependency symbols to Index
+  std::map<Value *, int> DepSymToIdx;
+  int TaskDepSymIdx = 0;
+};
+
+struct TaskFunctionAnalysisInfo {
+  SmallVector<TaskAnalysisInfo, 4> PostOrder;
+};
+
+// End Analysis data structures
+
 class OmpSsRegionAnalysisPass : public FunctionPass {
 private:
 
-  struct TaskPrintInfo {
-    // Task nesting level
-    size_t Depth;
-    size_t Idx;
-  };
-
-  struct TaskAnalysisInfo {
-    SetVector<Value *> UsesBeforeEntry;
-    SetVector<Value *> UsesAfterExit;
-  };
-
-  struct TaskFunctionAnalysisInfo {
-    SmallVector<TaskAnalysisInfo, 4> PostOrder;
-  };
 
   // AnalysisInfo only used in this pass
   TaskFunctionAnalysisInfo TaskFuncAnalysisInfo;
