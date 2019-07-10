@@ -15,28 +15,23 @@ namespace {
 class FileCheckTest : public ::testing::Test {};
 
 TEST_F(FileCheckTest, NumericVariable) {
-  // Undefined variable: getValue and clearValue fails, setValue works.
+  // Undefined variable: getValue fails, setValue does not trigger assert.
   FileCheckNumericVariable FooVar = FileCheckNumericVariable(1, "FOO");
   EXPECT_EQ("FOO", FooVar.getName());
   llvm::Optional<uint64_t> Value = FooVar.getValue();
   EXPECT_FALSE(Value);
-  EXPECT_TRUE(FooVar.clearValue());
-  EXPECT_FALSE(FooVar.setValue(42));
+  FooVar.clearValue();
+  FooVar.setValue(42);
 
-  // Defined variable: getValue returns value set, setValue fails.
-  Value = FooVar.getValue();
-  EXPECT_TRUE(Value);
-  EXPECT_EQ(42U, *Value);
-  EXPECT_TRUE(FooVar.setValue(43));
+  // Defined variable: getValue returns value set.
   Value = FooVar.getValue();
   EXPECT_TRUE(Value);
   EXPECT_EQ(42U, *Value);
 
-  // Clearing variable: getValue fails, clearValue again fails.
-  EXPECT_FALSE(FooVar.clearValue());
+  // Clearing variable: getValue fails.
+  FooVar.clearValue();
   Value = FooVar.getValue();
   EXPECT_FALSE(Value);
-  EXPECT_TRUE(FooVar.clearValue());
 }
 
 uint64_t doAdd(uint64_t OpL, uint64_t OpR) { return OpL + OpR; }
@@ -334,6 +329,21 @@ TEST_F(FileCheckTest, Match) {
   EXPECT_TRUE(Tester.matchExpect("19 21"));
   EXPECT_TRUE(Tester.matchExpect("18 21"));
   EXPECT_FALSE(Tester.matchExpect("18 20"));
+
+  // Check matching a numeric expression using @LINE after match failure uses
+  // the correct value for @LINE.
+  Tester.initNextPattern();
+  EXPECT_FALSE(Tester.parsePatternExpect("[[#@LINE]]"));
+  // Ok, @LINE is 4 now.
+  EXPECT_FALSE(Tester.matchExpect("4"));
+  Tester.initNextPattern();
+  // @LINE is now 5, match with substitution failure.
+  EXPECT_FALSE(Tester.parsePatternExpect("[[#UNKNOWN]]"));
+  EXPECT_TRUE(Tester.matchExpect("FOO"));
+  Tester.initNextPattern();
+  // Check that @LINE is 6 as expected.
+  EXPECT_FALSE(Tester.parsePatternExpect("[[#@LINE]]"));
+  EXPECT_FALSE(Tester.matchExpect("6"));
 }
 
 TEST_F(FileCheckTest, Substitution) {
