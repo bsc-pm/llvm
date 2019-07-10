@@ -427,6 +427,11 @@ defm vfncvt_f_xu : epi_conversions;
 defm vfncvt_f_x : epi_conversions;
 defm vfncvt_f_f : epi_conversions;
 
+defm vwcvt_xu_x : epi_conversions;
+defm vwcvt_x_x : epi_conversions;
+
+defm vncvt_x_x : epi_conversions;
+
 def int_epi_vbroadcast : EPIUnary;
 
 def int_epi_mask_cast : Intrinsic< [ llvm_anyvector_ty ], [ llvm_anyvector_ty ],

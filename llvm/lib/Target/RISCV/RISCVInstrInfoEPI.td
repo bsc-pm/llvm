@@ -1418,8 +1418,8 @@ multiclass pseudo_unary_v_w {
 multiclass pseudo_binary<EPIVReg result_reg_class,
                          EPIVReg op1_reg_class,
                          RegisterClass op2_reg_class, // FIXME dagoperand
-                         int vlmul> {
-  let Uses = [VL, VTYPE],
+                         int vlmul, string constraints = ""> {
+  let Constraints = constraints, Uses = [VL, VTYPE],
       VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
@@ -1428,7 +1428,7 @@ multiclass pseudo_binary<EPIVReg result_reg_class,
                             []>,
                      EPIPseudo;
 
-  let Constraints = "$rd = $merge",
+  let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
       Uses = [VL, VTYPE, V0], VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
@@ -1530,6 +1530,26 @@ multiclass pseudo_binary_v_vv_vx_vi {
       defm _VV : pseudo_binary<evr, evr, evr, evr.VLMul>;
       defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
       defm _VI : pseudo_binary<evr, evr, simm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+    }
+  }
+}
+
+// FIXME:  VV, VX and VI are used here instead of WV, WX and WI because of how
+// binary narrowing instructions are named in the spec. We have enquired them
+// about this issue (https://github.com/riscv/riscv-v-spec/issues/246) but we
+// haven't received any response yet
+multiclass pseudo_binary_v_wv_wx_wi {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegToWidePairs in
+  {
+    let VLMul = evr.RegClass.VLMul in
+    {
+      defm _VV : pseudo_binary<evr.RegClass, evr.WideRegClass, evr.RegClass,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+      defm _VX : pseudo_binary<evr.RegClass, evr.WideRegClass, GPR,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+      defm _VI : pseudo_binary<evr.RegClass, evr.WideRegClass, simm5,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
     }
   }
 }
@@ -1771,6 +1791,8 @@ defm PseudoVSRL        : pseudo_binary_v_vv_vx_vi;
 defm PseudoVSRA        : pseudo_binary_v_vv_vx_vi;
 defm PseudoVSSRL       : pseudo_binary_v_vv_vx_vi;
 defm PseudoVSSRA       : pseudo_binary_v_vv_vx_vi;
+
+defm PseudoVNSRL       : pseudo_binary_v_wv_wx_wi;
 
 defm PseudoVMV_V       : pseudo_unary_v_v_x_i_nomask;
 defm PseudoVMERGE      : pseudo_binary_v_vvm_vxm_vim;
@@ -2932,6 +2954,33 @@ multiclass pat_intrinsic_unary<string intrinsic_name,
              (NoX0 GPR:$vl), sew)>;
 }
 
+multiclass pat_intrinsic_unary_int_w_v<string intrinsic_name,
+                                       string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach wti = [vtiToWti.Wti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               wti.Vector, vti.Vector, wti.Mask, vti.SEW,
+                               vti.RegClass.VLMul, wti.RegClass, vti.RegClass>;
+  }
+}
+
+multiclass pat_intrinsic_unary_int_v_w<string intrinsic_name,
+                                       string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach wti = [vtiToWti.Wti] in
+  {
+    defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
+                               vti.Vector, wti.Vector, vti.Mask, vti.SEW,
+                               vti.RegClass.VLMul, vti.RegClass, wti.RegClass>;
+  }
+}
+
+
 multiclass pat_intrinsic_unary_fp_w_v<string intrinsic_name,
                                       string instruction_name>
 {
@@ -3368,9 +3417,6 @@ defm : pat_intrinsic_unary_fp_w_int_v<"int_epi_vfwcvt_f_x", "PseudoVFWCVT_F_X">;
 
 defm : pat_intrinsic_unary_fp_w_v<"int_epi_vfwcvt_f_f", "PseudoVFWCVT_F_F">;
 
-//defm "" : pat_conversions<"VFNCVT_XU_F", "vfncvt_xu_f", NarrowedSize.Value>;
-//defm "" : pat_conversions<"VFNCVT_X_F", "vfncvt_x_f", NarrowedSize.Value>;
-
 defm : pat_intrinsic_unary_int_v_fp_w<"int_epi_vfncvt_xu_f", "PseudoVFNCVT_XU_F">;
 defm : pat_intrinsic_unary_int_v_fp_w<"int_epi_vfncvt_x_f", "PseudoVFNCVT_X_F">;
 
@@ -3378,6 +3424,71 @@ defm : pat_intrinsic_unary_fp_v_int_w<"int_epi_vfncvt_f_xu", "PseudoVFNCVT_F_XU"
 defm : pat_intrinsic_unary_fp_v_int_w<"int_epi_vfncvt_f_x", "PseudoVFNCVT_F_X">;
 
 defm : pat_intrinsic_unary_fp_v_w<"int_epi_vfncvt_f_f", "PseudoVFNCVT_F_F">;
+
+multiclass pat_intrinsic_binary_int_w_vX0<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach wti = [vtiToWti.Wti] in
+  foreach vlmul = [vti.RegClass.VLMul] in
+  {
+    def : Pat<(wti.Vector (!cast<Intrinsic>(intrinsic_name)
+                           (vti.Vector vti.RegClass:$rs1),
+                           (i64 GPR:$vl))),
+              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+               vti.RegClass:$rs1,
+               /* rs2 */ X0,
+               (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(wti.Vector (!cast<Intrinsic>(intrinsic_name#"_mask")
+                           (wti.Vector wti.RegClass:$merge),
+                           (vti.Vector vti.RegClass:$rs1),
+                           (wti.Mask V0),
+                           (i64 GPR:$vl))),
+              (!cast<Instruction>(instruction_name#"_MASK_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+               wti.RegClass:$merge,
+               vti.RegClass:$rs1,
+               /* rs2 */ X0,
+               vmask_only_true.Value,
+               (NoX0 GPR:$vl), vti.SEW)>;
+  }
+}
+
+multiclass pat_intrinsic_binary_int_v_wX0<string intrinsic_name,
+                                          string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  foreach vti = [vtiToWti.Vti] in
+  foreach wti = [vtiToWti.Wti] in
+  foreach vlmul = [vti.RegClass.VLMul] in
+  {
+    def : Pat<(vti.Vector (!cast<Intrinsic>(intrinsic_name)
+                           (wti.Vector wti.RegClass:$rs1),
+                           (i64 GPR:$vl))),
+              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+               wti.RegClass:$rs1,
+               /* rs2 */ X0,
+               (NoX0 GPR:$vl), vti.SEW)>;
+
+    def : Pat<(vti.Vector (!cast<Intrinsic>(intrinsic_name#"_mask")
+                           (vti.Vector vti.RegClass:$merge),
+                           (wti.Vector wti.RegClass:$rs1),
+                           (vti.Mask V0),
+                           (i64 GPR:$vl))),
+              (!cast<Instruction>(instruction_name#"_MASK_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+               vti.RegClass:$merge,
+               wti.RegClass:$rs1,
+               /* rs2 */ X0,
+               vmask_only_true.Value,
+               (NoX0 GPR:$vl), vti.SEW)>;
+  }
+}
+
+defm : pat_intrinsic_binary_int_w_vX0<"int_epi_vwcvt_xu_x", "PseudoVWADDU_VX">;
+defm : pat_intrinsic_binary_int_w_vX0<"int_epi_vwcvt_x_x", "PseudoVWADD_VX">;
+
+defm : pat_intrinsic_binary_int_v_wX0<"int_epi_vncvt_x_x", "PseudoVNSRL_VX">;
 
 //foreach vtp = AllIntegerVectors in
 //{
