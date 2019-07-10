@@ -313,9 +313,22 @@ struct OmpSs : public ModulePass {
         unpackDepsEntryBB->getInstList().push_back(I);
       }
     }
+    for (const DependInfo &DI : TI.DependsInfo.Outs) {
+      for (Instruction * const &I : DI.UnpackInstructions) {
+        I->removeFromParent();
+        AI = unpackDepsFuncVar->arg_begin();
+        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
+          I->replaceUsesOfWith(DSAMerge[i], &*AI);
+        }
+        unpackDepsEntryBB->getInstList().push_back(I);
+      }
+    }
     unpackDepsEntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
+    int NumSymbols = 0;
     for (const DependInfo &DI : TI.DependsInfo.Ins) {
       IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
+
+      NumSymbols = std::max(NumSymbols, DI.SymbolIndex + 1);
 
       // Dependency Base rewrite:
       //   GlobalValue
@@ -347,6 +360,43 @@ struct OmpSs : public ModulePass {
         TaskDepAPICall.push_back(V);
       }
       BBBuilder.CreateCall(RegisterRegionRead1Ty, TaskDepAPICall);
+    }
+
+    for (const DependInfo &DI : TI.DependsInfo.Outs) {
+      IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
+
+      NumSymbols = std::max(NumSymbols, DI.SymbolIndex + 1);
+
+      // Dependency Base rewrite:
+      //   GlobalValue
+      //     replace by task argument 
+      //   DSA 
+      //     replace by task argument 
+      //   No DSA
+      //     do nothing since it's in unpack instructions
+      Value *NewBase = DI.Base;
+      bool Found = false;
+      AI = unpackDepsFuncVar->arg_begin();
+      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
+        if (DSAMerge[i] == NewBase)
+          Found = true;
+        else
+          ++AI;
+      }
+      if (Found)
+        NewBase = &*AI;
+
+      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      SmallVector<Value *, 4> TaskDepAPICall;
+      TaskDepAPICall.push_back(Handler);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
+      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+      TaskDepAPICall.push_back(BaseCast);
+      assert(DI.Dims.size() == 3);
+      for (Value *V : DI.Dims) {
+        TaskDepAPICall.push_back(V);
+      }
+      BBBuilder.CreateCall(RegisterRegionWrite1Ty, TaskDepAPICall);
     }
 
     // nanos6_unpacked_deps_* END
@@ -453,8 +503,8 @@ struct OmpSs : public ModulePass {
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(TskInfoTy.Ty,
                                                     // TODO: Add support for devices
-                                                    ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, -1),
-                                                    ConstantPointerNull::get(TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
+                                                    ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, NumSymbols),
+                                                    ConstantExpr::getPointerCast(outlineDepsFuncVar, TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(cast<PointerType>(TskInfoTy.Mmbers.TypeIdTy)),
                                                     ConstantInt::get(TskInfoTy.Mmbers.ImplCountTy, 1),
@@ -514,7 +564,8 @@ struct OmpSs : public ModulePass {
                                   TaskPtrVar,
                                   ConstantInt::get(IRB.getInt64Ty(), 0), // TaskFlagsVar,
                                   ConstantInt::get(IRB.getInt64Ty(),
-                                                   TI.DependsInfo.Ins.size())}); // TaskNumDepsVar;
+                                                   TI.DependsInfo.Ins.size()
+                                                   + TI.DependsInfo.Outs.size())}); // TaskNumDepsVar;
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);
