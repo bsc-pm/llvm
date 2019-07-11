@@ -36,13 +36,15 @@ struct OmpSs : public ModulePass {
     initializeOmpSsPass(*PassRegistry::getPassRegistry());
   }
 
+  bool Initialized = false;
+
   struct TaskAddrTranslationEntryTy {
-    StructType *Ty = nullptr;
+    StructType *Ty;
   };
   TaskAddrTranslationEntryTy TskAddrTranslationEntryTy;
 
   struct TaskConstraintsTy {
-    StructType *Ty = nullptr;
+    StructType *Ty;
   };
   TaskConstraintsTy TskConstraintsTy;
 
@@ -50,7 +52,7 @@ struct OmpSs : public ModulePass {
     struct Members {
       Type *InvSourceTy;
     };
-    StructType *Ty = nullptr;
+    StructType *Ty;
     Members Mmbers;
   };
   TaskInvInfoTy TskInvInfoTy;
@@ -64,7 +66,7 @@ struct OmpSs : public ModulePass {
       Type *DeclSourceTy;
       Type *RunWrapperFuncTy;
     };
-    StructType *Ty = nullptr;
+    StructType *Ty;
     Members Mmbers;
   };
   TaskImplInfoTy TskImplInfoTy;
@@ -82,10 +84,126 @@ struct OmpSs : public ModulePass {
         Type *ReductInitsFuncTy;
         Type *ReductCombsFuncTy;
     };
-    StructType *Ty = nullptr;
+    StructType *Ty;
     Members Mmbers;
   };
   TaskInfoTy TskInfoTy;
+
+  FunctionCallee CreateTaskFuncTy;
+  FunctionCallee TaskSubmitFuncTy;
+  enum {
+    DEP_IN,
+    DEP_OUT,
+    DEP_INOUT,
+    DEP_WEAKIN,
+    DEP_WEAKOUT,
+    DEP_WEAKINOUT,
+    DEP_ENUM_SIZE,
+  };
+
+  static const int MAX_DEP_DIMS = 8;
+  // TODO: Use Map and a function to look up if it exists already
+  SmallVector<SmallVector<FunctionCallee, DEP_ENUM_SIZE>, MAX_DEP_DIMS> RegisterRegionsTypes;
+
+  void unpackDepsOfType(const SmallVectorImpl<DependInfo> &DependList, Function *F) {
+    BasicBlock &Entry = F->getEntryBlock();
+    for (const DependInfo &DI : DependList) {
+      for (Instruction * const &I : DI.UnpackInstructions) {
+        I->removeFromParent();
+        Entry.getInstList().push_back(I);
+      }
+    }
+  }
+
+  void unpackDeps(const TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
+    unpackDepsOfType(TDI.Ins, F);
+    unpackDepsOfType(TDI.Outs, F);
+    unpackDepsOfType(TDI.Inouts, F);
+    unpackDepsOfType(TDI.WeakIns, F);
+    unpackDepsOfType(TDI.WeakOuts, F);
+    unpackDepsOfType(TDI.WeakInouts, F);
+    // Rewrite instructions to use arguments
+    Function::arg_iterator AI = F->arg_begin();
+    for (Instruction &I : F->getEntryBlock()) {
+      for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
+        I.replaceUsesOfWith(DSAMerge[i], &*AI);
+      }
+    }
+  }
+
+  void unpackCallToRTOfType(Module &M,
+                            const SmallVectorImpl<DependInfo> &DependList,
+                            Function *F,
+                            ArrayRef<Value *> DSAMerge,
+                            int DepType) {
+    for (const DependInfo &DI : DependList) {
+      IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+
+      // Dependency Base rewrite:
+      //   GlobalValue
+      //     replace by task argument
+      //   DSA
+      //     replace by task argument
+      //   No DSA
+      //     do nothing since it's in unpack instructions
+      Value *NewBase = DI.Base;
+      bool Found = false;
+      Function::arg_iterator AI = F->arg_begin();
+      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
+        if (DSAMerge[i] == NewBase)
+          Found = true;
+        else
+          ++AI;
+      }
+      if (Found)
+        NewBase = &*AI;
+
+      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      SmallVector<Value *, 4> TaskDepAPICall;
+      Value *Handler = &*(F->arg_end() - 1);
+      TaskDepAPICall.push_back(Handler);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
+      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+      TaskDepAPICall.push_back(BaseCast);
+      assert(!(DI.Dims.size()%3));
+      int NumDims = DI.Dims.size()/3 - 1;
+      for (Value *V : DI.Dims) {
+        TaskDepAPICall.push_back(V);
+      }
+      BBBuilder.CreateCall(RegisterRegionsTypes[NumDims][DepType], TaskDepAPICall);
+    }
+  }
+
+  void unpackCallToRT(Module &M,
+                      const TaskDependsInfo &TDI,
+                      Function *F,
+                      ArrayRef<Value *> DSAMerge) {
+    unpackCallToRTOfType(M, TDI.Ins, F, DSAMerge, DEP_IN);
+    unpackCallToRTOfType(M, TDI.Outs, F, DSAMerge, DEP_OUT);
+    unpackCallToRTOfType(M, TDI.Inouts, F, DSAMerge, DEP_INOUT);
+    unpackCallToRTOfType(M, TDI.WeakIns, F, DSAMerge, DEP_WEAKIN);
+    unpackCallToRTOfType(M, TDI.WeakOuts, F, DSAMerge, DEP_WEAKOUT);
+    unpackCallToRTOfType(M, TDI.WeakInouts, F, DSAMerge, DEP_WEAKINOUT);
+  }
+
+  Function *createUnpackDepsFunction(Module &M, Function &F, std::string Suffix, ArrayRef<Value *> DSAMerge) {
+    Type *RetTy = Type::getVoidTy(M.getContext());
+    std::vector<Type *> ParamsTy;
+    for (Value *value : DSAMerge) {
+      ParamsTy.push_back(value->getType());
+    }
+    ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
+    FunctionType *unpackDepsFuncType =
+      FunctionType::get(RetTy, ParamsTy, /*IsVarArgs */ false);
+
+    Function *unpackDepsFuncVar = Function::Create(
+        unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_unpacked_deps_" + F.getName() + Suffix, &M);
+
+    BasicBlock::Create(M.getContext(), "entry", unpackDepsFuncVar);
+    return unpackDepsFuncVar;
+  }
+
 
   void lowerTaskwait(const TaskwaitInfo &TwI,
                      Module &M) {
@@ -113,45 +231,6 @@ struct OmpSs : public ModulePass {
                  size_t taskNum,
                  Module &M) {
 
-    // 4. Create function types
-    // nanos6_create_task
-    // nanos6_submit_task
-    // nanos6_register_region_write_depinfo1
-    // nanos6_register_region_write_depinfo1
-
-    FunctionCallee CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
-        Type::getVoidTy(M.getContext()),
-        TskInfoTy.Ty->getPointerTo(),
-        TskInvInfoTy.Ty->getPointerTo(),
-        Type::getInt64Ty(M.getContext()), /* size_t args_lock_size */
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
-        Type::getInt64Ty(M.getContext()), /* size_t flags */
-        Type::getInt64Ty(M.getContext())); /* size_t num_deps */
-
-    FunctionCallee TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
-        Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()));
-
-    FunctionCallee RegisterRegionRead1Ty = M.getOrInsertFunction("nanos6_register_region_read_depinfo1",
-        Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
-        Type::getInt32Ty(M.getContext()), // int symbol_index, Argument identifier
-        Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
-        Type::getInt8PtrTy(M.getContext()), // void *base_address
-        Type::getInt64Ty(M.getContext()), // long dim1size
-        Type::getInt64Ty(M.getContext()), // long dim1start
-        Type::getInt64Ty(M.getContext())); // long dim1end
-
-    FunctionCallee RegisterRegionWrite1Ty = M.getOrInsertFunction("nanos6_register_region_write_depinfo1",
-        Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
-        Type::getInt32Ty(M.getContext()), // int symbol_index, Argument identifier
-        Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
-        Type::getInt8PtrTy(M.getContext()), // void *base_address
-        Type::getInt64Ty(M.getContext()), // long dim1size
-        Type::getInt64Ty(M.getContext()), // long dim1start
-        Type::getInt64Ty(M.getContext())); // long dim1end
 
     unsigned Line = TI.Entry->getDebugLoc().getLine();
     unsigned Col = TI.Entry->getDebugLoc().getCol();
@@ -289,110 +368,13 @@ struct OmpSs : public ModulePass {
 
     // nanos6_unpacked_deps_* START
 
-    paramTy.clear();
-    for (Value *value : DSAMerge) {
-      paramTy.push_back(value->getType());
-    }
-    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
-    FunctionType *unpackDepsFuncType =
-                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+    Function *unpackDepsFuncVar
+      = createUnpackDepsFunction(M, F, Twine(taskNum).str(), DSAMerge.getArrayRef());
 
-    Function *unpackDepsFuncVar = Function::Create(
-        unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_unpacked_deps_" + F.getName() + Twine(taskNum), &M);
+    unpackDeps(TI.DependsInfo, unpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    BasicBlock *unpackDepsEntryBB = BasicBlock::Create(M.getContext(), "entry", unpackDepsFuncVar);
-    Value *Handler = &*(unpackDepsFuncVar->arg_end() - 1);
-    for (const DependInfo &DI : TI.DependsInfo.Ins) {
-      for (Instruction * const &I : DI.UnpackInstructions) {
-        I->removeFromParent();
-        AI = unpackDepsFuncVar->arg_begin();
-        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
-          I->replaceUsesOfWith(DSAMerge[i], &*AI);
-        }
-        unpackDepsEntryBB->getInstList().push_back(I);
-      }
-    }
-    for (const DependInfo &DI : TI.DependsInfo.Outs) {
-      for (Instruction * const &I : DI.UnpackInstructions) {
-        I->removeFromParent();
-        AI = unpackDepsFuncVar->arg_begin();
-        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
-          I->replaceUsesOfWith(DSAMerge[i], &*AI);
-        }
-        unpackDepsEntryBB->getInstList().push_back(I);
-      }
-    }
-    unpackDepsEntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
-    for (const DependInfo &DI : TI.DependsInfo.Ins) {
-      IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
-
-      // Dependency Base rewrite:
-      //   GlobalValue
-      //     replace by task argument 
-      //   DSA 
-      //     replace by task argument 
-      //   No DSA
-      //     do nothing since it's in unpack instructions
-      Value *NewBase = DI.Base;
-      bool Found = false;
-      AI = unpackDepsFuncVar->arg_begin();
-      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
-        if (DSAMerge[i] == NewBase)
-          Found = true;
-        else
-          ++AI;
-      }
-      if (Found)
-        NewBase = &*AI;
-
-      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
-      SmallVector<Value *, 4> TaskDepAPICall;
-      TaskDepAPICall.push_back(Handler);
-      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
-      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
-      TaskDepAPICall.push_back(BaseCast);
-      assert(DI.Dims.size() == 3);
-      for (Value *V : DI.Dims) {
-        TaskDepAPICall.push_back(V);
-      }
-      BBBuilder.CreateCall(RegisterRegionRead1Ty, TaskDepAPICall);
-    }
-
-    for (const DependInfo &DI : TI.DependsInfo.Outs) {
-      IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
-
-      // Dependency Base rewrite:
-      //   GlobalValue
-      //     replace by task argument 
-      //   DSA 
-      //     replace by task argument 
-      //   No DSA
-      //     do nothing since it's in unpack instructions
-      Value *NewBase = DI.Base;
-      bool Found = false;
-      AI = unpackDepsFuncVar->arg_begin();
-      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
-        if (DSAMerge[i] == NewBase)
-          Found = true;
-        else
-          ++AI;
-      }
-      if (Found)
-        NewBase = &*AI;
-
-      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
-      SmallVector<Value *, 4> TaskDepAPICall;
-      TaskDepAPICall.push_back(Handler);
-      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
-      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
-      TaskDepAPICall.push_back(BaseCast);
-      assert(DI.Dims.size() == 3);
-      for (Value *V : DI.Dims) {
-        TaskDepAPICall.push_back(V);
-      }
-      BBBuilder.CreateCall(RegisterRegionWrite1Ty, TaskDepAPICall);
-    }
+    unpackCallToRT(M, TI.DependsInfo, unpackDepsFuncVar, DSAMerge.getArrayRef());
 
     // nanos6_unpacked_deps_* END
 
@@ -622,6 +604,173 @@ struct OmpSs : public ModulePass {
     TI.Entry->eraseFromParent();
   }
 
+  void buildNanos6Types(Module &M) {
+    TskAddrTranslationEntryTy.Ty = StructType::create(M.getContext(), "nanos6_address_translation_entry_t");
+
+    TskConstraintsTy.Ty = StructType::create(M.getContext(), "nanos6_task_constraints_t");
+
+    TskInvInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_invocation_info_t");
+    TskInvInfoTy.Mmbers.InvSourceTy = Type::getInt8PtrTy(M.getContext());
+    TskInvInfoTy.Ty->setBody(TskInvInfoTy.Mmbers.InvSourceTy); /* const char *invocation_source */
+
+    TskImplInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_implementation_info_t");
+    TskImplInfoTy.Mmbers.DeviceTypeIdTy = Type::getInt32Ty(M.getContext());
+    TskImplInfoTy.Mmbers.RunFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    TskAddrTranslationEntryTy.Ty->getPointerTo()},
+                                   /*IsVarArgs=*/false);
+    TskImplInfoTy.Mmbers.GetConstraintsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    TskConstraintsTy.Ty->getPointerTo()},
+                                   /*IsVarArgs=*/false);
+    TskImplInfoTy.Mmbers.TaskLabelTy = Type::getInt8PtrTy(M.getContext());
+    TskImplInfoTy.Mmbers.DeclSourceTy = Type::getInt8PtrTy(M.getContext());
+    TskImplInfoTy.Mmbers.RunWrapperFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    TskAddrTranslationEntryTy.Ty->getPointerTo()},
+                                   /*IsVarArgs=*/false);
+    TskImplInfoTy.Ty->setBody({TskImplInfoTy.Mmbers.DeviceTypeIdTy, /* int device_type_id */
+                             TskImplInfoTy.Mmbers.RunFuncTy->getPointerTo(),
+                             TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo(),
+                             TskImplInfoTy.Mmbers.TaskLabelTy, /* const char *task_label */
+                             TskImplInfoTy.Mmbers.DeclSourceTy, /* const char *declaration_source*/
+                             TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()
+                            });
+
+    TskInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_info_t");
+    TskInfoTy.Mmbers.NumSymbolsTy = Type::getInt32Ty(M.getContext());;
+    TskInfoTy.Mmbers.RegisterInfoFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                        Type::getInt8PtrTy(M.getContext()), /* void * */
+                                       },
+                                       /*IsVarArgs=*/false);
+    TskInfoTy.Mmbers.GetPriorityFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt64PtrTy(M.getContext()), /* nanos6_priority_t = long int * */
+                                   },
+                                   /*IsVarArgs=*/false);
+    TskInfoTy.Mmbers.TypeIdTy = Type::getInt8PtrTy(M.getContext());
+    TskInfoTy.Mmbers.ImplCountTy = Type::getInt32Ty(M.getContext());
+    TskInfoTy.Mmbers.TskImplInfoTy = TskImplInfoTy.Ty->getPointerTo();
+    TskInfoTy.Mmbers.DestroyArgsBlockFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                   },
+                                   /*IsVarArgs=*/false);
+    TskInfoTy.Mmbers.DuplicateArgsBlockFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* const void * */
+                                    Type::getInt8PtrTy(M.getContext())->getPointerTo(), /* void ** */
+                                   },
+                                   /*IsVarArgs=*/false);
+    TskInfoTy.Mmbers.ReductInitsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt64Ty(M.getContext()), /* size_t */
+                                   },
+                                   /*IsVarArgs=*/false);
+    TskInfoTy.Mmbers.ReductCombsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+                                   {Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt8PtrTy(M.getContext()), /* void * */
+                                    Type::getInt64Ty(M.getContext()), /* size_t */
+                                   },
+                                   /*IsVarArgs=*/false);
+    TskInfoTy.Ty->setBody({TskInfoTy.Mmbers.NumSymbolsTy,
+                           TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo(),
+                           TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo(),
+                           TskInfoTy.Mmbers.TypeIdTy, /* const char *type_identifier */
+                           TskInfoTy.Mmbers.ImplCountTy, /* int implementation_count */
+                           TskInfoTy.Mmbers.TskImplInfoTy->getPointerTo(),
+                           TskInfoTy.Mmbers.DestroyArgsBlockFuncTy->getPointerTo(),
+                           TskInfoTy.Mmbers.DuplicateArgsBlockFuncTy->getPointerTo(),
+                           TskInfoTy.Mmbers.ReductInitsFuncTy->getPointerTo(),
+                           TskInfoTy.Mmbers.ReductCombsFuncTy->getPointerTo(),
+                          });
+
+    // Create function types
+    // nanos6_create_task
+    // nanos6_submit_task
+    // nanos6_register_region_write_depinfo1
+    // nanos6_register_region_write_depinfo1
+
+    CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
+        Type::getVoidTy(M.getContext()),
+        TskInfoTy.Ty->getPointerTo(),                       // nanos6_task_info_t *task_info
+        TskInvInfoTy.Ty->getPointerTo(),                    // nanos6_task_invocation_info_t *task_invocation_info
+        Type::getInt64Ty(M.getContext()),                   // size_t args_lock_size
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(), // void **args_block_pointer
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(), // void **task_pointer
+        Type::getInt64Ty(M.getContext()),                   // size_t flags
+        Type::getInt64Ty(M.getContext())                    // size_t num_deps
+    );
+
+    TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()) // void *task
+    );
+
+    SmallVector<Type *, 8> RegisterRegionParams;
+    static const char *DepFuncNames[] = {
+      "read",
+      "write",
+      "readwrite",
+      "weak_read",
+      "weak_write",
+      "weak_readwrite"
+    };
+
+    // void *handler, Task handler
+    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
+    // int symbol_index, Argument identifier
+    RegisterRegionParams.push_back(Type::getInt32Ty(M.getContext()));
+    // char const *region_text, Stringified contents of the dependency clause
+    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
+    // void *base_address
+    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
+    for (int i = 0; i < MAX_DEP_DIMS; ++i) {
+      // long dimsize
+      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
+      // long dimstart
+      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
+      // long dimend
+      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
+      SmallVector<FunctionCallee, DEP_ENUM_SIZE> RegisterRegionsOfDim;
+      for (int j = 0; j < DEP_ENUM_SIZE; ++j) {
+        FunctionType *RegisterRegionFuncType =
+                        FunctionType::get(Type::getVoidTy(M.getContext()),
+                                          RegisterRegionParams,
+                                          /*IsVarArgs */ false);
+        RegisterRegionsOfDim.push_back(
+          M.getOrInsertFunction(
+            ("nanos6_register_region_" + Twine(DepFuncNames[j]) + "_depinfo" + Twine(i + 1)).str(),
+            RegisterRegionFuncType));
+      }
+      RegisterRegionsTypes.push_back(RegisterRegionsOfDim);
+    }
+
+    // RegisterRegionRead1Ty = M.getOrInsertFunction("nanos6_register_region_read_depinfo1",
+    //     Type::getVoidTy(M.getContext()),
+    //     Type::getInt8PtrTy(M.getContext()),
+    //     Type::getInt32Ty(M.getContext()),
+    //     Type::getInt8PtrTy(M.getContext()),
+    //     Type::getInt8PtrTy(M.getContext()),
+    //     Type::getInt64Ty(M.getContext()),   // long dim1size
+    //     Type::getInt64Ty(M.getContext()),   // long dim1start
+    //     Type::getInt64Ty(M.getContext())    // long dim1end
+    // );
+
+    // RegisterRegionWrite1Ty = M.getOrInsertFunction("nanos6_register_region_write_depinfo1",
+    //     Type::getVoidTy(M.getContext()),
+    //     Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
+    //     Type::getInt32Ty(M.getContext()),   // int symbol_index, Argument identifier
+    //     Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
+    //     Type::getInt8PtrTy(M.getContext()), // void *base_address
+    //     Type::getInt64Ty(M.getContext()),   // long dim1size
+    //     Type::getInt64Ty(M.getContext()),   // long dim1start
+    //     Type::getInt64Ty(M.getContext()));  // long dim1end
+  }
+
+
   bool runOnModule(Module &M) override {
     if (skipModule(M))
       return false;
@@ -637,98 +786,15 @@ struct OmpSs : public ModulePass {
       Functs.push_back(&F);
     }
 
+    if (!Initialized) {
+      Initialized = true;
+      buildNanos6Types(M);
+    }
+
     for (auto *F : Functs) {
       FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
       TaskFunctionInfo &TFI = FI.TaskFuncInfo;
       TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
-
-      if (!TskAddrTranslationEntryTy.Ty) {
-        TskAddrTranslationEntryTy.Ty = StructType::create(M.getContext(), "nanos6_address_translation_entry_t");
-      }
-      if (!TskConstraintsTy.Ty) {
-        TskConstraintsTy.Ty = StructType::create(M.getContext(), "nanos6_task_constraints_t");
-      }
-      if (!TskInvInfoTy.Ty) {
-        TskInvInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_invocation_info_t");
-        TskInvInfoTy.Mmbers.InvSourceTy = Type::getInt8PtrTy(M.getContext());
-        TskInvInfoTy.Ty->setBody(TskInvInfoTy.Mmbers.InvSourceTy); /* const char *invocation_source */
-      }
-      if (!TskImplInfoTy.Ty) {
-        TskImplInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_implementation_info_t");
-        TskImplInfoTy.Mmbers.DeviceTypeIdTy = Type::getInt32Ty(M.getContext());
-        TskImplInfoTy.Mmbers.RunFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        TskAddrTranslationEntryTy.Ty->getPointerTo()},
-                                       /*IsVarArgs=*/false);
-        TskImplInfoTy.Mmbers.GetConstraintsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        TskConstraintsTy.Ty->getPointerTo()},
-                                       /*IsVarArgs=*/false);
-        TskImplInfoTy.Mmbers.TaskLabelTy = Type::getInt8PtrTy(M.getContext());
-        TskImplInfoTy.Mmbers.DeclSourceTy = Type::getInt8PtrTy(M.getContext());
-        TskImplInfoTy.Mmbers.RunWrapperFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        TskAddrTranslationEntryTy.Ty->getPointerTo()},
-                                       /*IsVarArgs=*/false);
-        TskImplInfoTy.Ty->setBody({TskImplInfoTy.Mmbers.DeviceTypeIdTy, /* int device_type_id */
-                                 TskImplInfoTy.Mmbers.RunFuncTy->getPointerTo(),
-                                 TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo(),
-                                 TskImplInfoTy.Mmbers.TaskLabelTy, /* const char *task_label */
-                                 TskImplInfoTy.Mmbers.DeclSourceTy, /* const char *declaration_source*/
-                                 TskImplInfoTy.Mmbers.RunWrapperFuncTy->getPointerTo()
-                                });
-      }
-      if (!TskInfoTy.Ty) {
-        TskInfoTy.Ty = StructType::create(M.getContext(), "nanos6_task_info_t");
-        TskInfoTy.Mmbers.NumSymbolsTy = Type::getInt32Ty(M.getContext());;
-        TskInfoTy.Mmbers.RegisterInfoFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                           {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                            Type::getInt8PtrTy(M.getContext()), /* void * */
-                                           },
-                                           /*IsVarArgs=*/false);
-        TskInfoTy.Mmbers.GetPriorityFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt64PtrTy(M.getContext()), /* nanos6_priority_t = long int * */
-                                       },
-                                       /*IsVarArgs=*/false);
-        TskInfoTy.Mmbers.TypeIdTy = Type::getInt8PtrTy(M.getContext());
-        TskInfoTy.Mmbers.ImplCountTy = Type::getInt32Ty(M.getContext());
-        TskInfoTy.Mmbers.TskImplInfoTy = TskImplInfoTy.Ty->getPointerTo();
-        TskInfoTy.Mmbers.DestroyArgsBlockFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                       },
-                                       /*IsVarArgs=*/false);
-        TskInfoTy.Mmbers.DuplicateArgsBlockFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* const void * */
-                                        Type::getInt8PtrTy(M.getContext())->getPointerTo(), /* void ** */
-                                       },
-                                       /*IsVarArgs=*/false);
-        TskInfoTy.Mmbers.ReductInitsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt64Ty(M.getContext()), /* size_t */
-                                       },
-                                       /*IsVarArgs=*/false);
-        TskInfoTy.Mmbers.ReductCombsFuncTy = FunctionType::get(Type::getVoidTy(M.getContext()),
-                                       {Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt8PtrTy(M.getContext()), /* void * */
-                                        Type::getInt64Ty(M.getContext()), /* size_t */
-                                       },
-                                       /*IsVarArgs=*/false);
-        TskInfoTy.Ty->setBody({TskInfoTy.Mmbers.NumSymbolsTy,
-                               TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo(),
-                               TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo(),
-                               TskInfoTy.Mmbers.TypeIdTy, /* const char *type_identifier */
-                               TskInfoTy.Mmbers.ImplCountTy, /* int implementation_count */
-                               TskInfoTy.Mmbers.TskImplInfoTy->getPointerTo(),
-                               TskInfoTy.Mmbers.DestroyArgsBlockFuncTy->getPointerTo(),
-                               TskInfoTy.Mmbers.DuplicateArgsBlockFuncTy->getPointerTo(),
-                               TskInfoTy.Mmbers.ReductInitsFuncTy->getPointerTo(),
-                               TskInfoTy.Mmbers.ReductCombsFuncTy->getPointerTo(),
-                              });
-      }
 
       for (TaskwaitInfo& TwI : TwFI.PostOrder) {
         lowerTaskwait(TwI, M);
