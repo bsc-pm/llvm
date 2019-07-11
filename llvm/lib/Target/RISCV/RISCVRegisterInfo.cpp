@@ -116,14 +116,14 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int OffsetIndex = -1;
   // FIXME: Improve this to make it more robust.
   switch (MI.getOpcode()) {
-  case RISCV::PseudoVLE_V_EPIVR:
-  case RISCV::PseudoVLE_V_EPIVR2:
-  case RISCV::PseudoVLE_V_EPIVR4:
-  case RISCV::PseudoVLE_V_EPIVR8:
-  case RISCV::PseudoVSE_V_EPIVR:
-  case RISCV::PseudoVSE_V_EPIVR2:
-  case RISCV::PseudoVSE_V_EPIVR4:
-  case RISCV::PseudoVSE_V_EPIVR8:
+  case RISCV::PseudoVLE_V_M1:
+  case RISCV::PseudoVLE_V_M2:
+  case RISCV::PseudoVLE_V_M4:
+  case RISCV::PseudoVLE_V_M8:
+  case RISCV::PseudoVSE_V_M1:
+  case RISCV::PseudoVSE_V_M2:
+  case RISCV::PseudoVSE_V_M4:
+  case RISCV::PseudoVSE_V_M8:
     // FIXME: Are the following two needed now?
   case RISCV::VLE_V:
   case RISCV::VSE_V:

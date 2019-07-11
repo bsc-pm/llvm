@@ -1035,9 +1035,9 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
       }
       SDValue SEW = DAG.getTargetConstant(ElementWidth, DL, MVT::i64);
       SDValue Extract64 =
-        SDValue(DAG.getMachineNode(RISCV::PseudoVEXT_X_V_EPIVR, DL, MVT::i64,
-              N->getOperand(1), N->getOperand(2), SEW),
-            0);
+          SDValue(DAG.getMachineNode(RISCV::PseudoVEXT_X_V, DL, MVT::i64,
+                                     N->getOperand(1), N->getOperand(2), SEW),
+                  0);
       SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
       Results.push_back(Trunc);
       break;
