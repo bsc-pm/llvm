@@ -42,6 +42,7 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakIns;
   SmallVector<DependInfo, 4> WeakOuts;
   SmallVector<DependInfo, 4> WeakInouts;
+  int NumSymbols;
 };
 
 struct TaskInfo {
@@ -83,7 +84,6 @@ struct TaskAnalysisInfo {
   SetVector<Value *> UsesAfterExit;
   // Map of Dependency symbols to Index
   std::map<Value *, int> DepSymToIdx;
-  int TaskDepSymIdx = 0;
 };
 
 struct TaskFunctionAnalysisInfo {

@@ -214,18 +214,17 @@ static void gatherUnpackInstructions(DependInfo &DI,
   if (DSAMerge.find(DI.Base) == DSAMerge.end()) {
     // If it's not a DSA it must be an instruction
     // that leads to a DSA
-    Instruction *I = dyn_cast<Instruction>(DI.Base);
+    Instruction *I = cast<Instruction>(DI.Base);
     WorkList.emplace_back(I, I);
 
     UnpackIns.push_back(I);
   } else {
     if (!TAI.DepSymToIdx.count(DI.Base)) {
-      TAI.DepSymToIdx[DI.Base] = TAI.TaskDepSymIdx++;
+      TAI.DepSymToIdx[DI.Base] = TAI.DepSymToIdx.size();
     }
     DI.SymbolIndex = TAI.DepSymToIdx[DI.Base];
   }
   for (Value *V : DI.Dims) {
-    // TODO: check condition order
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       if (DSAMerge.find(I) == DSAMerge.end()) {
         WorkList.emplace_back(I, I);
@@ -249,9 +248,8 @@ static void gatherUnpackInstructions(DependInfo &DI,
           insertInstructionInProgramOrder(UnpackIns, II, OI);
         } else if (DepI == DI.Base) {
           // Found DSA associated with Dependency, assign SymbolIndex
-          // assert(CutI->getNumOperands() == 1);
           if (!TAI.DepSymToIdx.count(II)) {
-            TAI.DepSymToIdx[II] = TAI.TaskDepSymIdx++;
+            TAI.DepSymToIdx[II] = TAI.DepSymToIdx.size();
           }
           DI.SymbolIndex = TAI.DepSymToIdx[II];
         }
@@ -270,7 +268,6 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
     DependInfo DI;
     ArrayRef<Value *> OBArgs = OBDef.inputs();
 
-    // TODO: Support Symbol index used by devices
     DI.SymbolIndex = -1;
     // TODO: Support RegionText stringifying clause content
     DI.RegionText = "";
@@ -308,6 +305,7 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
   gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakIns, LLVMContext::OB_oss_dep_weakin);
   gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakOuts, LLVMContext::OB_oss_dep_weakout);
   gatherDependsInfoWithID(I, OI, TI.DSAInfo, TAI, TI.DependsInfo.WeakInouts, LLVMContext::OB_oss_dep_weakinout);
+  TI.DependsInfo.NumSymbols = TAI.DepSymToIdx.size();
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(

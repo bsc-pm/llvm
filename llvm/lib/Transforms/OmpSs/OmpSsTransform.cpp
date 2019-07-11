@@ -324,11 +324,8 @@ struct OmpSs : public ModulePass {
       }
     }
     unpackDepsEntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
-    int NumSymbols = 0;
     for (const DependInfo &DI : TI.DependsInfo.Ins) {
       IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
-
-      NumSymbols = std::max(NumSymbols, DI.SymbolIndex + 1);
 
       // Dependency Base rewrite:
       //   GlobalValue
@@ -364,8 +361,6 @@ struct OmpSs : public ModulePass {
 
     for (const DependInfo &DI : TI.DependsInfo.Outs) {
       IRBuilder<> BBBuilder(&unpackDepsEntryBB->back());
-
-      NumSymbols = std::max(NumSymbols, DI.SymbolIndex + 1);
 
       // Dependency Base rewrite:
       //   GlobalValue
@@ -503,7 +498,7 @@ struct OmpSs : public ModulePass {
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(TskInfoTy.Ty,
                                                     // TODO: Add support for devices
-                                                    ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, NumSymbols),
+                                                    ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, TI.DependsInfo.NumSymbols),
                                                     ConstantExpr::getPointerCast(outlineDepsFuncVar, TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(cast<PointerType>(TskInfoTy.Mmbers.TypeIdTy)),
