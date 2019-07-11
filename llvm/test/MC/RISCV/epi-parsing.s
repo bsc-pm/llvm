@@ -1399,10 +1399,10 @@ vmsif.m v20, v19
 # CHECK: vmsif.m v22, v21, v0.t
 vmsif.m v22, v21, v0.t
 
-# CHECK: vmiota.m v24, v23
-vmiota.m v24, v23
-# CHECK: vmiota.m v26, v25, v0.t
-vmiota.m v26, v25, v0.t
+# CHECK: viota.m v24, v23
+viota.m v24, v23
+# CHECK: viota.m v26, v25, v0.t
+viota.m v26, v25, v0.t
 
 # CHECK: vid.v v27
 vid.v v27

@@ -869,16 +869,16 @@ def VMSIF_M_MASK : RVInstEPIOPV_MVV<0b010110,
 
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask_all_lanes.Value,
     Uses = [VL, VTYPE], rs1 = 0b10000 in
-def VMIOTA_M : RVInstEPIOPV_MVV<0b010110,
+def VIOTA_M : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2),
-  "vmiota.m", "${rd}, ${rs2}">;
+  "viota.m", "${rd}, ${rs2}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
     Uses = [VL, VTYPE, V0], rs1 = 0b10000 in
-def VMIOTA_M_MASK : RVInstEPIOPV_MVV<0b010110,
+def VIOTA_M_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2, vectormask:$vm),
-  "vmiota.m", "${rd}, ${rs2}, ${vm}">;
+  "viota.m", "${rd}, ${rs2}, ${vm}">;
 
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask_all_lanes.Value,
     Uses = [VL, VTYPE], rs1 = 0b10001, rs2 = 0b00000 in
@@ -2906,10 +2906,10 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1down", "PseudoVS
 
 //foreach vtp = AllIntegerVectors in
 //{
-//def : Pat<(vtp.Vector (int_epi_vmiota EPIVR:$rs1)),
-//        (VMIOTA_M $rs1)>;
-//def : Pat<(vtp.Vector (int_epi_vmiota_mask EPIVR:$rs1, V0)),
-//        (VMIOTA_M_MASK $rs1, vmask_only_true.Value)>;
+//def : Pat<(vtp.Vector (int_epi_viota EPIVR:$rs1)),
+//        (VIOTA_M $rs1)>;
+//def : Pat<(vtp.Vector (int_epi_viota_mask EPIVR:$rs1, V0)),
+//        (VIOTA_M_MASK $rs1, vmask_only_true.Value)>;
 //}
 
 //foreach vtp = AllVectors in

@@ -2508,13 +2508,13 @@ vmsif.m v20, v19
 vmsif.m v22, v21, v0.t
 
 # Encoding: |010110|1|10111|10000|010|11000|1010111|
-# CHECK: vmiota.m v24, v23
+# CHECK: viota.m v24, v23
 # CHECK-SAME: [0x57,0x2c,0x78,0x5b]
-vmiota.m v24, v23
+viota.m v24, v23
 # Encoding: |010110|0|11001|10000|010|11010|1010111|
-# CHECK: vmiota.m v26, v25, v0.t
+# CHECK: viota.m v26, v25, v0.t
 # CHECK-SAME: [0x57,0x2d,0x98,0x59]
-vmiota.m v26, v25, v0.t
+viota.m v26, v25, v0.t
 
 # Encoding: |010110|1|00000|10001|010|11011|1010111|
 # CHECK: vid.v v27

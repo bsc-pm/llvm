@@ -13264,7 +13264,7 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
     EPI_MASK_UNARY(vmsif)
     EPI_MASK_UNARY(vmsof)
 
-    EPI_MASK_TO_INT_UNARY(vmiota)
+    EPI_MASK_TO_INT_UNARY(viota)
 
     // FIXME
     // EPI_UNARY(vmid)

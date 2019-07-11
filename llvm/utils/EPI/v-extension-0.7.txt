@@ -291,7 +291,7 @@ vmfirst.m rd, vs2, vm
 vmsbf.m vd, vs2, vm
 vmsif.m vd, vs2, vm
 vmsof.m vd, vs2, vm
-vmiota.m vd, vs2, vm
+viota.m vd, vs2, vm
 vid.v vd, vm
 vext.x.v rd, vs2, rs1
 vmv.s.x vd, rs1
@@ -639,7 +639,7 @@ vfncvt.f.f.v|OPFVV|funct=100010|vs1=10100
 vmsbf.m|OPMVV|funct=010110|vs1=00001
 vmsof.m|OPMVV|funct=010110|vs1=00010
 vmsif.m|OPMVV|funct=010110|vs1=00011
-vmiota.m|OPMVV|funct=010110|vs1=10000
+viota.m|OPMVV|funct=010110|vs1=10000
 vid.v|OPMVV|funct=010110|vs1=10001|vs2=00000
 vlb.v|VLUNIT|nf=000|mop=100|lumop=00000|width=000
 vlh.v|VLUNIT|nf=000|mop=100|lumop=00000|width=101

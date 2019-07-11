@@ -390,14 +390,14 @@ defm vmsbf : epi_unary_mask;
 defm vmsof : epi_unary_mask;
 defm vmsif : epi_unary_mask;
 
-def int_epi_vmiota : Intrinsic<[ llvm_anyvector_ty ],
-                               [ llvm_anyvector_ty, llvm_i64_ty ],
-                               [ IntrNoMem ]>,
+def int_epi_viota : Intrinsic<[ llvm_anyvector_ty ],
+                              [ llvm_anyvector_ty, llvm_i64_ty ],
+                              [ IntrNoMem ]>,
                      EPIIntrinsic;
-def int_epi_vmiota_mask : Intrinsic<[ llvm_anyvector_ty ],
-                               [ llvm_anyvector_ty, LLVMMatchType<1>,
-                                 llvm_i64_ty ],
-                               [ IntrNoMem ]>,
+def int_epi_viota_mask : Intrinsic<[ llvm_anyvector_ty ],
+                                   [ llvm_anyvector_ty, LLVMMatchType<1>,
+                                     llvm_i64_ty ],
+                                   [ IntrNoMem ]>,
                      EPIIntrinsic;
 
 def int_epi_vid : Intrinsic< [ llvm_anyvector_ty ],

@@ -1635,7 +1635,7 @@ intrinsics = [
         #UnaryIntrinsicMask("vmsof", type_generator = generate_unary_mask_types, variants = m),
         #UnaryIntrinsicMask("vmsif", type_generator = generate_unary_mask_types, variants = m),
 
-        #UnaryIntrinsic("vmiota", type_generator = generate_unary_mask_to_integer_types, variants = m),
+        #UnaryIntrinsic("viota", type_generator = generate_unary_mask_to_integer_types, variants = m),
 
         VExt("vext.x.v", type_generator = generate_unary_integer_types, variants = v, instruction = "vext.x", mask = False, vlmul_values = [1]),
 

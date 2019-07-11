@@ -984,7 +984,7 @@ EPI_MASK_UNARY("vmsbf")
 EPI_MASK_UNARY("vmsif")
 EPI_MASK_UNARY("vmsof")
 
-EPI_INT_TO_MASK_UNARY("vmiota")
+EPI_INT_TO_MASK_UNARY("viota")
 
 EPI_ANY_AND_INT_BINARY("vslideup")
 EPI_ANY_AND_INT_BINARY("vslidedown")
