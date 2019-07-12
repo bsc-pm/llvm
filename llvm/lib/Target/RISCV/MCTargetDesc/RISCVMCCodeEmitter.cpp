@@ -61,6 +61,10 @@ public:
                       SmallVectorImpl<MCFixup> &Fixups,
                       const MCSubtargetInfo &STI) const;
 
+  void expandEPIReadCSR(const MCInst &MI, raw_ostream &OS,
+                        SmallVectorImpl<MCFixup> &Fixups,
+                        const MCSubtargetInfo &STI, int64_t CSRNum) const;
+
   /// TableGen'erated function for getting the binary encoding for an
   /// instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
@@ -173,6 +177,18 @@ void RISCVMCCodeEmitter::expandAddTPRel(const MCInst &MI, raw_ostream &OS,
   support::endian::write(OS, Binary, support::little);
 }
 
+void RISCVMCCodeEmitter::expandEPIReadCSR(const MCInst &MI, raw_ostream &OS,
+                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          const MCSubtargetInfo &STI,
+                                          int64_t CSRNum) const {
+  MCInst TmpInst = MCInstBuilder(RISCV::CSRRS)
+                       .addOperand(MI.getOperand(0))
+                       .addImm(CSRNum)
+                       .addReg(RISCV::X0);
+  uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(OS, Binary, support::little);
+}
+
 void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
                                            SmallVectorImpl<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
@@ -190,6 +206,15 @@ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
 
   if (MI.getOpcode() == RISCV::PseudoAddTPRel) {
     expandAddTPRel(MI, OS, Fixups, STI);
+    MCNumEmitted += 1;
+    return;
+  }
+
+  if (MI.getOpcode() == RISCV::PseudoReadVL ||
+      MI.getOpcode() == RISCV::PseudoReadVTYPE) {
+    expandEPIReadCSR(MI, OS, Fixups, STI,
+                     MI.getOpcode() == RISCV::PseudoReadVL ? EPICSR::VL
+                                                           : EPICSR::VTYPE);
     MCNumEmitted += 1;
     return;
   }
