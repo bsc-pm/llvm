@@ -33,7 +33,7 @@ class IntrinsicType(object):
         self.operands = operands
 
 mask_types = [
-    # Mask types do not scale according to a SEW, and thus it is set to 0
+    # Mask types do not scale according to a SEW, and thus it is set to -1
     SingleType("i1", "i1", -1, True),
 ]
 
@@ -172,11 +172,35 @@ def generate_same_size_integer_to_float_types():
     yield IntrinsicType(float_type_f32, [integer_type_i32])
     yield IntrinsicType(float_type_f64, [integer_type_i64])
 
-def generate_widened_float_to_float_types():
+def generate_integer_to_widened_integer_types():
+    for i in range(0, len(integer_types) - 1):
+        yield IntrinsicType(integer_types[i + 1], \
+                [integer_types[i]])
+
+def generate_float_to_widened_float_types():
     yield IntrinsicType(float_type_f64, [float_type_f32])
 
-def generate_narrow_float_to_float_types():
+def generate_integer_to_widened_float_types():
+    yield IntrinsicType(float_type_f32, [integer_type_i16])
+    yield IntrinsicType(float_type_f64, [integer_type_i32])
+
+def generate_float_to_widened_integer_types():
+    yield IntrinsicType(integer_type_i64, [float_type_f32])
+
+def generate_integer_to_narrowed_integer_types():
+    for i in range(0, len(integer_types) - 1):
+        yield IntrinsicType(integer_types[i], \
+                [integer_types[i + 1]])
+
+def generate_float_to_narrowed_float_types():
     yield IntrinsicType(float_type_f32, [float_type_f64])
+
+def generate_integer_to_narrowed_float_types():
+    yield IntrinsicType(float_type_f32, [integer_type_i64])
+
+def generate_float_to_narrowed_integer_types():
+    yield IntrinsicType(integer_type_i32, [float_type_f64])
+    yield IntrinsicType(integer_type_i16, [float_type_f32])
 
 def generate_nullary_integer_types():
     for x in integer_types:
@@ -345,7 +369,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -452,7 +481,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -560,7 +594,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -675,7 +714,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -779,7 +823,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -991,7 +1040,14 @@ entry:
                 elif v in ["vx", "wx", "vm", "mm"]:
                     subs["scalar_register"] = "a0"
 
-                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                if not rhs.is_mask_type:
+                    sew = min(sew, rhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -1137,7 +1193,14 @@ entry:
                 elif v == "vfm":
                     subs["scalar_register"] = "ft0"
 
-                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                if not rhs.is_mask_type:
+                    sew = min(sew, rhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -1318,7 +1381,14 @@ entry:
                 elif v in ["vx", "wx"]:
                     subs["scalar_register"] = "a0"
 
-                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                if not rhs.is_mask_type:
+                    sew = min(sew, rhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -1469,7 +1539,14 @@ entry:
                 elif v in ["vx", "wx"]:
                     subs["scalar_register"] = "a0"
 
-                subs["sew"] = "e" + str(min(lhs.sew, rhs.sew))
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                if not rhs.is_mask_type:
+                    sew = min(sew, rhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -1558,7 +1635,12 @@ entry:
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
 
-                subs["sew"] = "e" + str(lhs.sew)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
 
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
@@ -1832,17 +1914,17 @@ intrinsics = [
         Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.xu"]),
         Conversion("vfcvt", type_generator = generate_same_size_integer_to_float_types, variants = ["f.x"]),
 
-        #Conversion("vfwcvt.xu.f", type_generator = generate_widened_float_to_integer_types, variants = ["xu.f"],)
-        #Conversion("vfwcvt.x.f", type_generator = generate_widened_float_to_integer_types, variants = ["x.f"], declare = False),
-        #Conversion("vfwcvt.f.xu", type_generator = generate_widened_integer_to_float_types, variants = ["f.xu"]),
-        #Conversion("vfwcvt.f.x", type_generator = generate_widened_integer_to_float_types, variants = ["f.x"], declare = False),
-        #Conversion("vfwcvt", type_generator = generate_widened_float_to_float_types, variants = ["f.f"]),
+        Conversion("vfwcvt", type_generator = generate_float_to_widened_integer_types, variants = ["xu.f"], vlmul_values = [1, 2, 4]),
+        Conversion("vfwcvt", type_generator = generate_float_to_widened_integer_types, variants = ["x.f"], vlmul_values = [1, 2, 4]),
+        Conversion("vfwcvt", type_generator = generate_integer_to_widened_float_types, variants = ["f.xu"], vlmul_values = [1, 2, 4]),
+        Conversion("vfwcvt", type_generator = generate_integer_to_widened_float_types, variants = ["f.x"], vlmul_values = [1, 2, 4]),
+        Conversion("vfwcvt", type_generator = generate_float_to_widened_float_types, variants = ["f.f"], vlmul_values = [1, 2, 4]),
 
-        #Conversion("vfncvt.xu.f", type_generator = generate_narrow_float_to_integer_types, variants = [""]),
-        #Conversion("vfncvt.x.f", type_generator = generate_narrow_float_to_integer_types, variants = [""]),
-        #Conversion("vfncvt.f.xu", type_generator = generate_narrow_integer_to_float_types, variants = [""]),
-        #Conversion("vfncvt.f.x", type_generator = generate_narrow_integer_to_float_types, variants = [""]),
-        #Conversion("vfncvt", type_generator = generate_narrow_float_to_float_types, variants = ["f.f"])
+        Conversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["xu.f"], vlmul_values = [1, 2, 4]),
+        Conversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["x.f"], vlmul_values = [1, 2, 4]),
+        Conversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.xu"], vlmul_values = [1, 2, 4]),
+        Conversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.x"], vlmul_values = [1, 2, 4]),
+        Conversion("vfncvt", type_generator = generate_float_to_narrowed_float_types, variants = ["f.f"], vlmul_values = [1, 2, 4])
 ]
 
 for intr in intrinsics:
