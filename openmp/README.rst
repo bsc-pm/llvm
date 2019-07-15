@@ -141,10 +141,6 @@ Options for ``libomp``
   Intel(R) Many Integrated Core Architecture (Intel(R) MIC Architecture) to
   build for.  This value is ignored if **LIBOMP_ARCH** does not equal ``mic``.
 
-**LIBOMP_OMP_VERSION** = ``50|45|40|30``
-  OpenMP version to build for.  Older versions will disable certain
-  functionality and entry points.
-
 **LIBOMP_LIB_TYPE** = ``normal|profile|stubs``
   Library type can be ``normal``, ``profile``, or ``stubs``.
 
@@ -194,7 +190,7 @@ Optional Features
 **LIBOMP_OMPT_SUPPORT** = ``ON|OFF``
   Include support for the OpenMP Tools Interface (OMPT).
   This option is supported and ``ON`` by default for x86, x86_64, AArch64,
-  PPC64 and RISCV64 on Linux* and macOS*.
+  PPC64, and RISCV64 on Linux* and macOS*.
   This option is ``OFF`` if this feature is not supported for the platform.
 
 **LIBOMP_OMPT_OPTIONAL** = ``ON|OFF``
