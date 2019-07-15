@@ -1543,10 +1543,6 @@ __kmp_invoke_microtask:
 //
 //   (*pkfn)(&gtid, &tid, argv[0], ...);
 //
-// #if OMPT_SUPPORT
-//   *exit_frame_ptr = 0;
-// #endif
-//
 //   return 1;
 // }
 //
@@ -1559,8 +1555,6 @@ __kmp_invoke_microtask:
 //   a5: exit_frame_ptr
 //
 // Locals:
-//   __exit_frame: exit_frame_ptr param pushed on stack so it can be restored
-//                 after the call to pkfn
 //   __gtid: gtid param pushed on stack so can pass &gtid to pkfn
 //   __tid: tid param pushed on stack so can pass &tid to pkfn
 //
@@ -1575,16 +1569,8 @@ __kmp_invoke_microtask:
 // return: a0 (always 1/TRUE)
 //
 
-// When OMPT is to be used we need to reserve 8 extra bytes on the stack to
-// save a5, so the offsets from the fp defined here are shifted 8 bytes
-#if OMPT_SUPPORT
-__exit_frame = 24
-__gtid = 28
-__tid = 32
-#else
-__gtid = 20
-__tid = 24
-#endif
+__gtid = -20
+__tid = -24
 
 // -- Begin __kmp_invoke_microtask
 // mark_begin;
@@ -1612,10 +1598,8 @@ __kmp_invoke_microtask:
 	//   function by register. Given that we have 8 of such registers (a[0-7])
 	//   and two + 'argc' arguments (consider &gtid and &tid), we need to
 	//   reserve max(0, argc - 6)*8 extra bytes
-	// - If OMPT is enabled we need 8 extra bytes for saving a5 register
-	// (caller-saved) before the function call
 	//
-	// The total number of bytes is then max(0, argc - 6)*8 + 8 + OMPT? 8:0
+	// The total number of bytes is then max(0, argc - 6)*8 + 8
 
 	// Compute max(0, argc - 6) using the following bithack:
 	// max(0, x) = x - (x & (x >> 31)), where x := argc - 6
@@ -1625,12 +1609,7 @@ __kmp_invoke_microtask:
 	and	t1, t0, t1
 	sub	t0, t0, t1
 
-#if OMPT_SUPPORT
-	// Reserve 8 extra bytes for saving a5 register when OMPT is enabled
-	addi	t0, t0, 2
-#else
 	addi	t0, t0, 1
-#endif
 
 	slli	t0, t0, 3
 	sub	sp, sp, t0
@@ -1645,17 +1624,15 @@ __kmp_invoke_microtask:
 #if OMPT_SUPPORT
 	// Save frame pointer into exit_frame
 	sd	fp, 0(a5)
-	// Save exit_frame address in the stack
-	sd	a5, -__exit_frame(fp)
 #endif
 
 	// Prepare arguments for the pkfn function (first 8 using a0-a7 registers)
 
-	sw	a1, -__gtid(fp)
-	sw	a2, -__tid(fp)
+	sw	a1, __gtid(fp)
+	sw	a2, __tid(fp)
 
-	addi	a0, fp, -__gtid
-	addi	a1, fp, -__tid
+	addi	a0, fp, __gtid
+	addi	a1, fp, __tid
 
 	beqz	t3, .L_kmp_3
 	ld	a2, 0(t4)
@@ -1696,12 +1673,6 @@ __kmp_invoke_microtask:
 .L_kmp_3:
 	// Call pkfn function
 	jalr	t0
-
-#if OMPT_SUPPORT
-	// Restore exit_frame address and clear exit_frame
-	ld	t0, -__exit_frame(fp)
-	sd	zero, 0(t0)
-#endif
 
 	// Restore stack and return
 
