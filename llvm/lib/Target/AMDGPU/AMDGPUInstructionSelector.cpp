@@ -341,6 +341,9 @@ bool AMDGPUInstructionSelector::selectG_MERGE_VALUES(MachineInstr &MI) const {
   LLT SrcTy = MRI.getType(MI.getOperand(1).getReg());
 
   const unsigned SrcSize = SrcTy.getSizeInBits();
+  if (SrcSize < 32)
+    return false;
+
   const DebugLoc &DL = MI.getDebugLoc();
   const RegisterBank *DstBank = RBI.getRegBank(DstReg, MRI, TRI);
   const unsigned DstSize = DstTy.getSizeInBits();
@@ -472,6 +475,31 @@ bool AMDGPUInstructionSelector::selectG_INTRINSIC(
   case Intrinsic::minnum:
   case Intrinsic::amdgcn_cvt_pkrtz:
     return selectImpl(I, CoverageInfo);
+  case Intrinsic::amdgcn_if_break: {
+    MachineBasicBlock *BB = I.getParent();
+    MachineFunction *MF = BB->getParent();
+    MachineRegisterInfo &MRI = MF->getRegInfo();
+
+    // FIXME: Manually selecting to avoid dealiing with the SReg_1 trick
+    // SelectionDAG uses for wave32 vs wave64.
+    BuildMI(*BB, &I, I.getDebugLoc(), TII.get(AMDGPU::SI_IF_BREAK))
+      .add(I.getOperand(0))
+      .add(I.getOperand(2))
+      .add(I.getOperand(3));
+
+    Register DstReg = I.getOperand(0).getReg();
+    Register Src0Reg = I.getOperand(2).getReg();
+    Register Src1Reg = I.getOperand(3).getReg();
+
+    I.eraseFromParent();
+
+    for (Register Reg : { DstReg, Src0Reg, Src1Reg }) {
+      if (!MRI.getRegClassOrNull(Reg))
+        MRI.setRegClass(Reg, TRI.getWaveMaskRegClass());
+    }
+
+    return true;
+  }
   default:
     return selectImpl(I, CoverageInfo);
   }
@@ -651,6 +679,20 @@ bool AMDGPUInstructionSelector::selectG_INTRINSIC_W_SIDE_EFFECTS(
 
     I.eraseFromParent();
     return constrainSelectedInstRegOperands(*Exp, TII, TRI, RBI);
+  }
+  case Intrinsic::amdgcn_end_cf: {
+    // FIXME: Manually selecting to avoid dealiing with the SReg_1 trick
+    // SelectionDAG uses for wave32 vs wave64.
+    BuildMI(*BB, &I, I.getDebugLoc(),
+            TII.get(AMDGPU::SI_END_CF))
+      .add(I.getOperand(1));
+
+    Register Reg = I.getOperand(1).getReg();
+    I.eraseFromParent();
+
+    if (!MRI.getRegClassOrNull(Reg))
+      MRI.setRegClass(Reg, TRI.getWaveMaskRegClass());
+    return true;
   }
   default:
     return selectImpl(I, CoverageInfo);
@@ -1235,6 +1277,7 @@ bool AMDGPUInstructionSelector::select(MachineInstr &I,
   case TargetOpcode::G_EXTRACT:
     return selectG_EXTRACT(I);
   case TargetOpcode::G_MERGE_VALUES:
+  case TargetOpcode::G_BUILD_VECTOR:
   case TargetOpcode::G_CONCAT_VECTORS:
     return selectG_MERGE_VALUES(I);
   case TargetOpcode::G_UNMERGE_VALUES:

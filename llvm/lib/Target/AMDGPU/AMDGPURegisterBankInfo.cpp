@@ -1653,7 +1653,8 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
     break;
   }
   case AMDGPU::G_MERGE_VALUES:
-  case AMDGPU::G_BUILD_VECTOR: {
+  case AMDGPU::G_BUILD_VECTOR:
+  case AMDGPU::G_CONCAT_VECTORS: {
     unsigned Bank = isSALUMapping(MI) ?
       AMDGPU::SGPRRegBankID : AMDGPU::VGPRRegBankID;
     unsigned DstSize = MRI.getType(MI.getOperand(0).getReg()).getSizeInBits();
@@ -1984,6 +1985,13 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
       OpdsMapping[4] = AMDGPU::getValueMapping(AMDGPU::VGPRRegBankID, SrcSize);
       break;
     }
+    case Intrinsic::amdgcn_if_break: {
+      unsigned Size = getSizeInBits(MI.getOperand(0).getReg(), MRI, *TRI);
+      OpdsMapping[0] = AMDGPU::getValueMapping(AMDGPU::SGPRRegBankID, Size);
+      OpdsMapping[2] = AMDGPU::getValueMapping(AMDGPU::VCCRegBankID, 1);
+      OpdsMapping[3] = AMDGPU::getValueMapping(AMDGPU::SGPRRegBankID, Size);
+      break;
+    }
     }
     break;
   }
@@ -2074,6 +2082,11 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
       unsigned Bank = getRegBankID(MI.getOperand(2).getReg(), MRI, *TRI,
                                    AMDGPU::SGPRRegBankID);
       OpdsMapping[2] = AMDGPU::getValueMapping(Bank, 32);
+      break;
+    }
+    case Intrinsic::amdgcn_end_cf: {
+      unsigned Size = getSizeInBits(MI.getOperand(1).getReg(), MRI, *TRI);
+      OpdsMapping[1] = AMDGPU::getValueMapping(AMDGPU::SGPRRegBankID, Size);
       break;
     }
     }
