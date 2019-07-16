@@ -189,19 +189,76 @@ struct OmpSs : public ModulePass {
   Function *createUnpackDepsFunction(Module &M, Function &F, std::string Suffix, ArrayRef<Value *> DSAMerge) {
     Type *RetTy = Type::getVoidTy(M.getContext());
     std::vector<Type *> ParamsTy;
-    for (Value *value : DSAMerge) {
-      ParamsTy.push_back(value->getType());
+    for (Value *V : DSAMerge) {
+      ParamsTy.push_back(V->getType());
     }
     ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
-    FunctionType *unpackDepsFuncType =
+    FunctionType *UnpackDepsFuncType =
       FunctionType::get(RetTy, ParamsTy, /*IsVarArgs */ false);
 
-    Function *unpackDepsFuncVar = Function::Create(
-        unpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+    Function *UnpackDepsFuncVar = Function::Create(
+        UnpackDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
         "nanos6_unpacked_deps_" + F.getName() + Suffix, &M);
 
-    BasicBlock::Create(M.getContext(), "entry", unpackDepsFuncVar);
-    return unpackDepsFuncVar;
+    BasicBlock::Create(M.getContext(), "entry", UnpackDepsFuncVar);
+    return UnpackDepsFuncVar;
+  }
+
+  Function *createOlDepsFunction(Module &M, Function &F, std::string Suffix, Type *TaskArgsTy) {
+    Type *RetTy = Type::getVoidTy(M.getContext());
+    std::vector<Type *> ParamsTy;
+    ParamsTy.push_back(TaskArgsTy->getPointerTo());
+    ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
+    FunctionType *OlDepsFuncType =
+                    FunctionType::get(RetTy, ParamsTy, /*IsVarArgs */ false);
+
+    Function *OlDepsFuncVar = Function::Create(
+        OlDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_ol_deps_" + F.getName() + Suffix, &M);
+
+    BasicBlock::Create(M.getContext(), "entry", OlDepsFuncVar);
+    return OlDepsFuncVar;
+  }
+
+  void OlCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                      Function *OlFunc, Function *UnpackFunc) {
+    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
+
+    // First arg is the nanos_task_args
+    Function::arg_iterator AI = OlFunc->arg_begin();
+    Value *OlDepsFuncTaskArgs = &*AI++;
+    SmallVector<Value *, 4> TaskDepsUnpackParams;
+    unsigned TaskArgsIdx = 0;
+    for (unsigned i = 0; i < DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Shared[i]->getName());
+      Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+      TaskDepsUnpackParams.push_back(LGEP);
+    }
+    for (unsigned i = 0; i < DSAInfo.Private.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Private[i]->getName());
+      TaskDepsUnpackParams.push_back(GEP);
+    }
+    for (unsigned i = 0; i < DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+      Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Firstprivate[i]->getName());
+      TaskDepsUnpackParams.push_back(GEP);
+    }
+    TaskDepsUnpackParams.push_back(&*AI++);
+    // Build TaskUnpackCall
+    BBBuilder.CreateCall(UnpackFunc, TaskDepsUnpackParams);
+    // Make BB legal with a terminator to task outline function
+    BBBuilder.CreateRetVoid();
   }
 
 
@@ -368,67 +425,22 @@ struct OmpSs : public ModulePass {
 
     // nanos6_unpacked_deps_* START
 
-    Function *unpackDepsFuncVar
+    Function *UnpackDepsFuncVar
       = createUnpackDepsFunction(M, F, Twine(taskNum).str(), DSAMerge.getArrayRef());
 
-    unpackDeps(TI.DependsInfo, unpackDepsFuncVar, DSAMerge.getArrayRef());
-    unpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+    unpackDeps(TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
+    UnpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    unpackCallToRT(M, TI.DependsInfo, unpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
 
     // nanos6_unpacked_deps_* END
 
     // nanos6_ol_deps_* START
 
-    paramTy.clear();
-    paramTy.push_back(TaskArgsTy->getPointerTo());
-    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
-    FunctionType *outlineDepsFuncType =
-                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+    Function *OlDepsFuncVar
+      = createOlDepsFunction(M, F, Twine(taskNum).str(), TaskArgsTy);
 
-    Function *outlineDepsFuncVar = Function::Create(
-        outlineDepsFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_ol_deps_" + F.getName() + Twine(taskNum), &M);
-
-    BasicBlock *outlineDepsEntryBB = BasicBlock::Create(M.getContext(), "entry", outlineDepsFuncVar);
-
-    IRBuilder<> BBBuilder1(outlineDepsEntryBB);
-
-    // First arg is the nanos_task_args
-    AI = outlineDepsFuncVar->arg_begin();
-    Value *outlineDepsFuncTaskArgs = &*AI++;
-    SmallVector<Value *, 4> TaskDepsUnpackParams;
-    TaskArgsIdx = 0;;
-    for (unsigned i = 0; i < TI.DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder1.CreateGEP(
-          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Shared[i]->getName());
-      Value *LGEP = BBBuilder1.CreateLoad(GEP, "load_" + GEP->getName());
-      TaskDepsUnpackParams.push_back(LGEP);
-    }
-    for (unsigned i = 0; i < TI.DSAInfo.Private.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder1.CreateGEP(
-          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Private[i]->getName());
-      TaskDepsUnpackParams.push_back(GEP);
-    }
-    for (unsigned i = 0; i < TI.DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder1.CreateGEP(
-          outlineDepsFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
-      TaskDepsUnpackParams.push_back(GEP);
-    }
-    TaskDepsUnpackParams.push_back(&*AI++);
-    // Build TaskUnpackCall
-    BBBuilder1.CreateCall(unpackDepsFuncVar, TaskDepsUnpackParams);
-    // Make BB legal with a terminator to task outline function
-    BBBuilder1.CreateRetVoid();
+    OlCallToUnpack(M, TI.DSAInfo, OlDepsFuncVar, UnpackDepsFuncVar);
 
     // nanos6_ol_deps_* END
 
@@ -481,7 +493,7 @@ struct OmpSs : public ModulePass {
                                 ConstantStruct::get(TskInfoTy.Ty,
                                                     // TODO: Add support for devices
                                                     ConstantInt::get(TskInfoTy.Mmbers.NumSymbolsTy, TI.DependsInfo.NumSymbols),
-                                                    ConstantExpr::getPointerCast(outlineDepsFuncVar, TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
+                                                    ConstantExpr::getPointerCast(OlDepsFuncVar, TskInfoTy.Mmbers.RegisterInfoFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(TskInfoTy.Mmbers.GetPriorityFuncTy->getPointerTo()),
                                                     ConstantPointerNull::get(cast<PointerType>(TskInfoTy.Mmbers.TypeIdTy)),
                                                     ConstantInt::get(TskInfoTy.Mmbers.ImplCountTy, 1),
