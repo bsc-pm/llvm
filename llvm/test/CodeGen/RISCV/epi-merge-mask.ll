@@ -27,7 +27,7 @@ declare void @llvm.epi.vstore.v1f64(
   <vscale x 1 x double>*,
   i64)
 
-define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
+define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-LABEL: merge_mask:
 ; CHECK-O0:       # %bb.0: # %entry
 ; CHECK-O0-NEXT:    addi sp, sp, -128
@@ -37,10 +37,6 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    addi s0, sp, 128
 ; CHECK-O0-NEXT:    andi sp, sp, -64
 ; CHECK-O0-NEXT:    mv s1, sp
-; CHECK-O0-NEXT:    .cfi_def_cfa s0, 0
-; CHECK-O0-NEXT:    .cfi_offset ra, -8
-; CHECK-O0-NEXT:    .cfi_offset s0, -16
-; CHECK-O0-NEXT:    .cfi_offset s1, -24
 ; CHECK-O0-NEXT:    rdvtype a5
 ; CHECK-O0-NEXT:    rdvl a4
 ; CHECK-O0-NEXT:    vsetvli a6, zero, e64, m1
@@ -49,27 +45,27 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) {
 ; CHECK-O0-NEXT:    andi sp, sp, -64
 ; CHECK-O0-NEXT:    sd sp, 56(s1)
 ; CHECK-O0-NEXT:    vsetvl zero, a4, a5
-; CHECK-O0-NEXT:    vsetvli a4, a0, e64, m1
+; CHECK-O0-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a3)
 ; CHECK-O0-NEXT:    vle.v v1, (a2)
 ; CHECK-O0-NEXT:    vmflt.vv v2, v1, v0
-; CHECK-O0-NEXT:    rdvtype a2
-; CHECK-O0-NEXT:    rdvl a0
-; CHECK-O0-NEXT:    ld a3, 56(s1)
+; CHECK-O0-NEXT:    rdvtype a3
+; CHECK-O0-NEXT:    rdvl a2
+; CHECK-O0-NEXT:    ld a4, 56(s1)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
-; CHECK-O0-NEXT:    vse.v v0, (a3)
-; CHECK-O0-NEXT:    vsetvl zero, a0, a2
+; CHECK-O0-NEXT:    vse.v v0, (a4)
+; CHECK-O0-NEXT:    vsetvl zero, a2, a3
 ; CHECK-O0-NEXT:    rdvtype t0
 ; CHECK-O0-NEXT:    rdvl t1
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-O0-NEXT:    vadd.vi v0, v2, 0
 ; CHECK-O0-NEXT:    vsetvl zero, t1, t0
-; CHECK-O0-NEXT:    rdvtype a2
-; CHECK-O0-NEXT:    rdvl a0
-; CHECK-O0-NEXT:    ld a3, 56(s1)
+; CHECK-O0-NEXT:    rdvtype a3
+; CHECK-O0-NEXT:    rdvl a2
+; CHECK-O0-NEXT:    ld a4, 56(s1)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
-; CHECK-O0-NEXT:    vle.v v2, (a3)
-; CHECK-O0-NEXT:    vsetvl zero, a0, a2
+; CHECK-O0-NEXT:    vle.v v2, (a4)
+; CHECK-O0-NEXT:    vsetvl zero, a2, a3
 ; CHECK-O0-NEXT:    vfsub.vv v2, v2, v1, v0.t
 ; CHECK-O0-NEXT:    vse.v v2, (a1)
 ; CHECK-O0-NEXT:    addi sp, s0, -128

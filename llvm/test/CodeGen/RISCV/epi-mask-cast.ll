@@ -2,7 +2,7 @@
 ; RUN: llc -mtriple riscv64 -mattr=+epi < %s | FileCheck %s
 
 ; We do not want loads and stores be optimized, hence optnone and noinline
-define dso_local void @to_mask(i8* %p) optnone noinline {
+define dso_local void @to_mask(i8* %p) optnone noinline nounwind {
 ; CHECK-LABEL: to_mask:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m1
@@ -20,7 +20,7 @@ entry:
 }
 declare <vscale x 2 x i1> @llvm.epi.mask.cast.nxv2i1.nxv2i32(<vscale x 2 x i32>)
 
-define dso_local void @from_mask(i8* %p) optnone noinline {
+define dso_local void @from_mask(i8* %p) optnone noinline nounwind {
 ; CHECK-LABEL: from_mask:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a1, zero, e8, m1

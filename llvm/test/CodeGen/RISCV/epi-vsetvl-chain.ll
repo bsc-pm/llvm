@@ -23,15 +23,15 @@ declare void @llvm.epi.vstore.nxv1f64(
   <vscale x 1 x double>*,
   i64);
 
-define void @test_vsetvl_chain(<vscale x 1 x double>* %v, i64 %avl)
+define void @test_vsetvl_chain(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O0-LABEL: test_vsetvl_chain:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
-; CHECK-O0-NEXT:    lui a3, %hi(scratch)
-; CHECK-O0-NEXT:    addi a3, a3, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a1, a1, e64, m1
+; CHECK-O0-NEXT:    lui a2, %hi(scratch)
+; CHECK-O0-NEXT:    addi a2, a2, %lo(scratch)
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
-; CHECK-O0-NEXT:    vse.v v0, (a3)
+; CHECK-O0-NEXT:    vse.v v0, (a2)
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_chain:
@@ -74,15 +74,15 @@ define void @test_vsetvl_chain(<vscale x 1 x double>* %v, i64 %avl)
   ret void
 }
 
-define void @test_vsetvl_chain_2(<vscale x 1 x double>* %v, i64 %avl)
+define void @test_vsetvl_chain_2(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O0-LABEL: test_vsetvl_chain_2:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
-; CHECK-O0-NEXT:    lui a3, %hi(scratch)
-; CHECK-O0-NEXT:    addi a3, a3, %lo(scratch)
+; CHECK-O0-NEXT:    vsetvli a1, a1, e64, m1
+; CHECK-O0-NEXT:    lui a2, %hi(scratch)
+; CHECK-O0-NEXT:    addi a2, a2, %lo(scratch)
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
-; CHECK-O0-NEXT:    vse.v v0, (a3)
+; CHECK-O0-NEXT:    vse.v v0, (a2)
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_chain_2:

@@ -15,7 +15,7 @@ define <vscale x 1 x double> @basic_callee(
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v1,
                                  <vscale x 1 x double> %v2,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %v3 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
       <vscale x 1 x double> %v1,
@@ -44,7 +44,7 @@ define <vscale x 1 x double> @max_registers(
                                  <vscale x 1 x double> %v5,
                                  <vscale x 1 x double> %v6,
                                  <vscale x 1 x double> %v7,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %vt1 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
       <vscale x 1 x double> %v0,
@@ -92,7 +92,7 @@ define <vscale x 1 x double> @too_many_registers_1(
                                  <vscale x 1 x double> %v6,
                                  <vscale x 1 x double> %v7,
                                  <vscale x 1 x double> %v8,
-                                 <vscale x 1 x double> %v9)
+                                 <vscale x 1 x double> %v9) nounwind
 {
   %vt = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
       <vscale x 1 x double> %v8,
@@ -120,7 +120,7 @@ define <vscale x 1 x double> @too_many_registers_2(
                                  <vscale x 1 x double> %v7,
                                  <vscale x 1 x double> %v8,
                                  <vscale x 1 x double> %v9,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %vt = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
       <vscale x 1 x double> %v8,
@@ -157,7 +157,7 @@ define <vscale x 1 x double> @too_many_registers_3(
                                  <vscale x 1 x double> %v6,
                                  <vscale x 1 x double> %v7,
                                  <vscale x 1 x double> %v8,
-                                 <vscale x 1 x double> %v9)
+                                 <vscale x 1 x double> %v9) nounwind
 {
   %vt = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
       <vscale x 1 x double> %v8,
@@ -182,7 +182,7 @@ define <vscale x 1 x double> @first_mask_0(
                                  <vscale x 1 x i1> %mask,
                                  <vscale x 1 x double> %v1,
                                  <vscale x 1 x double> %v2,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %v3 = call <vscale x 1 x double> @llvm.epi.vfadd.mask.nxv1f64.nxv1f64.nxv1i1(
       <vscale x 1 x double> %v1,
@@ -202,7 +202,7 @@ define <vscale x 1 x double> @first_mask_2(
                                  <vscale x 1 x double> %v1,
                                  <vscale x 1 x double> %v2,
                                  <vscale x 1 x i1> %mask,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %v3 = call <vscale x 1 x double> @llvm.epi.vfadd.mask.nxv1f64.nxv1f64.nxv1i1(
       <vscale x 1 x double> %v1,
@@ -228,7 +228,7 @@ define <vscale x 1 x double> @second_mask_1(
                                  <vscale x 1 x double> %v2,
                                  <vscale x 1 x i1> %mask1,
                                  <vscale x 1 x i1> %mask2,
-                                 i64 %gvl)
+                                 i64 %gvl) nounwind
 {
   %v3 = call <vscale x 1 x double> @llvm.epi.vfadd.mask.nxv1f64.nxv1f64.nxv1i1(
       <vscale x 1 x double> %v1,
@@ -239,7 +239,7 @@ define <vscale x 1 x double> @second_mask_1(
   ret <vscale x 1 x double> %v3
 }
 
-define <vscale x 1 x i1> @return_mask_1(<vscale x 1 x i1> %mask1)
+define <vscale x 1 x i1> @return_mask_1(<vscale x 1 x i1> %mask1) nounwind
 ; CHECK-LABEL: return_mask_1:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    ret
@@ -256,7 +256,7 @@ define <vscale x 1 x i1> @return_mask_2(<vscale x 1 x i1> %mask1,
 ; CHECK-NEXT:    vadd.vi v0, v16, 0
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    ret
-                                      <vscale x 1 x i1> %mask2)
+                                      <vscale x 1 x i1> %mask2) nounwind
 {
   ret <vscale x 1 x i1> %mask2
 }

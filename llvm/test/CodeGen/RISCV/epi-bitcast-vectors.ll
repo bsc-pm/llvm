@@ -9,7 +9,7 @@ declare void @llvm.epi.vstore.v1f64(<vscale x 1 x double>, <vscale x 1 x double>
 declare void @llvm.epi.vstore.v4f32(<vscale x 4 x float>, <vscale x 4 x float>* nocapture, i64)
 declare <vscale x 4 x i32> @llvm.epi.vload.v4i32(<vscale x 4 x i32>* nocapture, i64)
 
-define void @foo_1(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 1 x double>* %dst) {
+define void @foo_1(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 1 x double>* %dst) nounwind {
 ; CHECK-LABEL: foo_1:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a3, a0, e32, m1
@@ -24,7 +24,7 @@ define void @foo_1(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 1 x double>* %d
 }
 
 
-define void @foo_2(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 2 x float>* %dst) {
+define void @foo_2(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 2 x float>* %dst) nounwind {
 ; CHECK-LABEL: foo_2:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a3, a0, e32, m1
@@ -37,7 +37,7 @@ define void @foo_2(i64 %gvl, <vscale x 2 x i32>* %src, <vscale x 2 x float>* %ds
   ret void
 }
 
-define void @foo_3(i64 %gvl, <vscale x 4 x i32>* %src, <vscale x 4 x float>* %dst) {
+define void @foo_3(i64 %gvl, <vscale x 4 x i32>* %src, <vscale x 4 x float>* %dst) nounwind {
 ; CHECK-LABEL: foo_3:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a3, a0, e32, m2
@@ -53,7 +53,7 @@ define void @foo_3(i64 %gvl, <vscale x 4 x i32>* %src, <vscale x 4 x float>* %ds
 ; Use LLVM IR load/store
 ; Note that LLVM has updated the store to be of the same type as the load
 ; one. This is correct though a bit surprising.
-define void @foo_5(<vscale x 2 x i32>* %src, <vscale x 1 x double>* %dst) {
+define void @foo_5(<vscale x 2 x i32>* %src, <vscale x 1 x double>* %dst) nounwind {
 ; CHECK-LABEL: foo_5:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a2, zero, e32, m1
