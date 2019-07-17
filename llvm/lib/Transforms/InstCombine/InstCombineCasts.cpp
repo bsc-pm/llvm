@@ -2006,6 +2006,9 @@ static bool collectInsertionElements(Value *V, unsigned Shift,
 static Value *optimizeIntegerToVectorInsertions(BitCastInst &CI,
                                                 InstCombiner &IC) {
   VectorType *DestVecTy = cast<VectorType>(CI.getType());
+  if (DestVecTy->isScalable())
+    return nullptr;
+
   Value *IntInput = CI.getOperand(0);
 
   SmallVector<Value*, 8> Elements(DestVecTy->getNumElements());
@@ -2344,7 +2347,8 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   }
 
   if (VectorType *DestVTy = dyn_cast<VectorType>(DestTy)) {
-    if (DestVTy->getNumElements() == 1 && !SrcTy->isVectorTy()) {
+    if (DestVTy->getNumElements() == 1 && !DestVTy->isScalable() &&
+        !SrcTy->isVectorTy()) {
       Value *Elem = Builder.CreateBitCast(Src, DestVTy->getElementType());
       return InsertElementInst::Create(UndefValue::get(DestTy), Elem,
                      Constant::getNullValue(Type::getInt32Ty(CI.getContext())));
@@ -2373,7 +2377,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   }
 
   if (VectorType *SrcVTy = dyn_cast<VectorType>(SrcTy)) {
-    if (SrcVTy->getNumElements() == 1) {
+    if (SrcVTy->getNumElements() == 1 && !SrcVTy->isScalable()) {
       // If our destination is not a vector, then make this a straight
       // scalar-scalar cast.
       if (!DestTy->isVectorTy()) {
