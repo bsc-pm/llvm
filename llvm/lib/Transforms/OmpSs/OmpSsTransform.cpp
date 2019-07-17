@@ -174,7 +174,7 @@ struct OmpSs : public ModulePass {
     }
   }
 
-  void unpackCallToRT(Module &M,
+  void unpackDepsCallToRT(Module &M,
                       const TaskDependsInfo &TDI,
                       Function *F,
                       ArrayRef<Value *> DSAMerge) {
@@ -186,6 +186,7 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, TDI.WeakInouts, F, DSAMerge, DEP_WEAKINOUT);
   }
 
+  // Creates an empty UnpackDeps Function with entry BB.
   Function *createUnpackDepsFunction(Module &M, Function &F, std::string Suffix, ArrayRef<Value *> DSAMerge) {
     Type *RetTy = Type::getVoidTy(M.getContext());
     std::vector<Type *> ParamsTy;
@@ -204,6 +205,47 @@ struct OmpSs : public ModulePass {
     return UnpackDepsFuncVar;
   }
 
+  // Creates an empty UnpackTask Function without entry BB.
+  // CodeExtractor will create it for us
+  Function *createUnpackTaskFunction(Module &M, Function &F, std::string Suffix,
+                                     ArrayRef<Value *> DSAMerge, SetVector<BasicBlock *> &TaskBBs,
+                                     Type *TaskAddrTranslationEntryTy) {
+    Type *RetTy = Type::getVoidTy(M.getContext());
+    std::vector<Type *> ParamsTy;
+    for (Value *V : DSAMerge) {
+      ParamsTy.push_back(V->getType());
+    }
+    ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * device_env */
+    ParamsTy.push_back(TaskAddrTranslationEntryTy->getPointerTo()); /* nanos6_address_translation_entry_t *address_translation_table */
+    FunctionType *UnpackTaskFuncType =
+      FunctionType::get(RetTy, ParamsTy, /*IsVarArgs */ false);
+
+    Function *UnpackTaskFuncVar = Function::Create(
+        UnpackTaskFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_unpacked_task_region_" + F.getName() + Suffix, &M);
+
+    // Create an iterator to name all of the arguments we inserted.
+    Function::arg_iterator AI = UnpackTaskFuncVar->arg_begin();
+    // Rewrite all users of the DSAMerge in the extracted region to use the
+    // arguments (or appropriate addressing into struct) instead.
+    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i) {
+      Value *RewriteVal = &*AI++;
+
+      std::vector<User *> Users(DSAMerge[i]->user_begin(), DSAMerge[i]->user_end());
+      for (User *use : Users)
+        if (Instruction *inst = dyn_cast<Instruction>(use))
+          if (TaskBBs.count(inst->getParent()))
+            inst->replaceUsesOfWith(DSAMerge[i], RewriteVal);
+    }
+    // Set names for arguments.
+    AI = UnpackTaskFuncVar->arg_begin();
+    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI)
+      AI->setName(DSAMerge[i]->getName());
+
+    return UnpackTaskFuncVar;
+  }
+
+  // Create an OutlineDeps Function with entry BB
   Function *createOlDepsFunction(Module &M, Function &F, std::string Suffix, Type *TaskArgsTy) {
     Type *RetTy = Type::getVoidTy(M.getContext());
     std::vector<Type *> ParamsTy;
@@ -220,14 +262,35 @@ struct OmpSs : public ModulePass {
     return OlDepsFuncVar;
   }
 
-  void OlCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
-                      Function *OlFunc, Function *UnpackFunc) {
-    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
+  // Create an OutlineTask Function with entry BB
+  Function *createOlTaskFunction(Module &M, Function &F, std::string Suffix, Type *TaskArgsTy,
+                                 Type *TaskAddrTranslationEntryTy) {
+    Type *RetTy = Type::getVoidTy(M.getContext());
+    std::vector<Type *> ParamsTy;
+    ParamsTy.push_back(TaskArgsTy->getPointerTo());
+    ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * device_env */
+    ParamsTy.push_back(TaskAddrTranslationEntryTy->getPointerTo()); /* nanos6_address_translation_entry_t *address_translation_table */
+    FunctionType *OlTaskFuncType =
+                    FunctionType::get(RetTy, ParamsTy, /*IsVarArgs */ false);
 
-    // First arg is the nanos_task_args
+    Function *OlTaskFuncVar = Function::Create(
+        OlTaskFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
+        "nanos6_ol_task_region_" + F.getName() + Suffix, &M);
+
+    BasicBlock::Create(M.getContext(), "entry", OlTaskFuncVar);
+    return OlTaskFuncVar;
+  }
+
+  // Given a Outline Function assuming that task args are the first parameter, and
+  // DSAInfo, it unpacks task args in Outline and fills UnpackedList with those Values,
+  // used to call Unpack Functions
+  void unpackDSAs(Module &M, const TaskDSAInfo &DSAInfo, Function *OlFunc,
+                  SmallVectorImpl<Value *> &UnpackedList) {
+    UnpackedList.clear();
+
+    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
-    SmallVector<Value *, 4> TaskDepsUnpackParams;
     unsigned TaskArgsIdx = 0;
     for (unsigned i = 0; i < DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
       Value *Idx[2];
@@ -236,7 +299,7 @@ struct OmpSs : public ModulePass {
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Shared[i]->getName());
       Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
-      TaskDepsUnpackParams.push_back(LGEP);
+      UnpackedList.push_back(LGEP);
     }
     for (unsigned i = 0; i < DSAInfo.Private.size(); ++i, ++TaskArgsIdx) {
       Value *Idx[2];
@@ -244,7 +307,7 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Private[i]->getName());
-      TaskDepsUnpackParams.push_back(GEP);
+      UnpackedList.push_back(GEP);
     }
     for (unsigned i = 0; i < DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
       Value *Idx[2];
@@ -252,11 +315,43 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Firstprivate[i]->getName());
-      TaskDepsUnpackParams.push_back(GEP);
+      UnpackedList.push_back(GEP);
     }
+  }
+
+  // Given an OutlineDeps and UnpackDeps Functions it unpacks DSAs in Outline
+  // and builds a call to Unpack
+  void olDepsCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          Function *OlFunc, Function *UnpackFunc) {
+    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
+
+    // First arg is the nanos_task_args
+    Function::arg_iterator AI = OlFunc->arg_begin();
+    AI++;
+    SmallVector<Value *, 4> TaskDepsUnpackParams;
+    unpackDSAs(M, DSAInfo, OlFunc, TaskDepsUnpackParams);
     TaskDepsUnpackParams.push_back(&*AI++);
     // Build TaskUnpackCall
     BBBuilder.CreateCall(UnpackFunc, TaskDepsUnpackParams);
+    // Make BB legal with a terminator to task outline function
+    BBBuilder.CreateRetVoid();
+  }
+
+  // Given an OutlineTask and UnpackTask Functions it unpacks DSAs in Outline
+  // and builds a call to Unpack
+  void olTaskCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          Function *OlFunc, Function *UnpackFunc) {
+    IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
+
+    // First arg is the nanos_task_args
+    Function::arg_iterator AI = OlFunc->arg_begin();
+    AI++;
+    SmallVector<Value *, 4> TaskUnpackParams;
+    unpackDSAs(M, DSAInfo, OlFunc, TaskUnpackParams);
+    TaskUnpackParams.push_back(&*AI++);
+    TaskUnpackParams.push_back(&*AI++);
+    // Build TaskUnpackCall
+    BBBuilder.CreateCall(UnpackFunc, TaskUnpackParams);
     // Make BB legal with a terminator to task outline function
     BBBuilder.CreateRetVoid();
   }
@@ -329,97 +424,24 @@ struct OmpSs : public ModulePass {
     StructType *TaskArgsTy = StructType::create(M.getContext(), TaskArgsMemberTy, ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
     // Create nanos6_task_args_* END
 
-    // nanos6_unpacked_task_region_* START
-    Type *RetTy = Type::getVoidTy(M.getContext());
-    std::vector<Type *> paramTy;
     SetVector<Value *> DSAMerge;
     DSAMerge.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
     DSAMerge.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
     DSAMerge.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
-    for (Value *value : DSAMerge) {
-      paramTy.push_back(value->getType());
-    }
-    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * device_env */
-    paramTy.push_back(TskAddrTranslationEntryTy.Ty->getPointerTo()); /* nanos6_address_translation_entry_t *address_translation_table */
-    FunctionType *unpackFuncType =
-                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
 
-    Function *unpackFuncVar = Function::Create(
-        unpackFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_unpacked_task_region_" + F.getName() + Twine(taskNum), &M);
-
-    // Create an iterator to name all of the arguments we inserted.
-    Function::arg_iterator AI = unpackFuncVar->arg_begin();
-    // Rewrite all users of the DSAMerge in the extracted region to use the
-    // arguments (or appropriate addressing into struct) instead.
-    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i) {
-      Value *RewriteVal = &*AI++;
-
-      std::vector<User *> Users(DSAMerge[i]->user_begin(), DSAMerge[i]->user_end());
-      for (User *use : Users)
-        if (Instruction *inst = dyn_cast<Instruction>(use))
-          if (TaskBBs.count(inst->getParent()))
-            inst->replaceUsesOfWith(DSAMerge[i], RewriteVal);
-    }
-    // Set names for arguments.
-    AI = unpackFuncVar->arg_begin();
-    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI)
-      AI->setName(DSAMerge[i]->getName());
+    // nanos6_unpacked_task_region_* START
+    Function *UnpackTaskFuncVar
+      = createUnpackTaskFunction(M, F, Twine(taskNum).str(),
+                                 DSAMerge.getArrayRef(), TaskBBs,
+                                 TskAddrTranslationEntryTy.Ty);
 
     // nanos6_unpacked_task_region_* END
 
     // nanos6_ol_task_region_* START
-    paramTy.clear();
-    paramTy.push_back(TaskArgsTy->getPointerTo());
-    paramTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * device_env */
-    paramTy.push_back(TskAddrTranslationEntryTy.Ty->getPointerTo()); /* nanos6_address_translation_entry_t *address_translation_table */
-    FunctionType *outlineFuncType =
-                    FunctionType::get(RetTy, paramTy, /*IsVarArgs */ false);
+    Function *OlTaskFuncVar
+      = createOlTaskFunction(M, F, Twine(taskNum).str(), TaskArgsTy, TskAddrTranslationEntryTy.Ty);
 
-    Function *outlineFuncVar = Function::Create(
-        outlineFuncType, GlobalValue::InternalLinkage, F.getAddressSpace(),
-        "nanos6_ol_task_region_" + F.getName() + Twine(taskNum), &M);
-
-    BasicBlock *outlineEntryBB = BasicBlock::Create(M.getContext(), "entry", outlineFuncVar);
-
-    IRBuilder<> BBBuilder(outlineEntryBB);
-
-    // First arg is the nanos_task_args
-    AI = outlineFuncVar->arg_begin();
-    Value *outlineFuncTaskArgs = &*AI++;
-    SmallVector<Value *, 4> TaskUnpackParams;
-    size_t TaskArgsIdx = 0;;
-    for (unsigned i = 0; i < TI.DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder.CreateGEP(
-          outlineFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Shared[i]->getName());
-      Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
-      TaskUnpackParams.push_back(LGEP);
-    }
-    for (unsigned i = 0; i < TI.DSAInfo.Private.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder.CreateGEP(
-          outlineFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Private[i]->getName());
-      TaskUnpackParams.push_back(GEP);
-    }
-    for (unsigned i = 0; i < TI.DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
-      Value *Idx[2];
-      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
-      Value *GEP = BBBuilder.CreateGEP(
-          outlineFuncTaskArgs, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
-      TaskUnpackParams.push_back(GEP);
-    }
-    TaskUnpackParams.push_back(&*AI++);
-    TaskUnpackParams.push_back(&*AI++);
-    // Build TaskUnpackCall
-    BBBuilder.CreateCall(unpackFuncVar, TaskUnpackParams);
-    // Make BB legal with a terminator to task outline function
-    BBBuilder.CreateRetVoid();
+    olTaskCallToUnpack(M, TI.DSAInfo, OlTaskFuncVar, UnpackTaskFuncVar);
 
     // nanos6_ol_task_region_* END
 
@@ -431,7 +453,7 @@ struct OmpSs : public ModulePass {
     unpackDeps(TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
     UnpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    unpackCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackDepsCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
 
     // nanos6_unpacked_deps_* END
 
@@ -440,7 +462,7 @@ struct OmpSs : public ModulePass {
     Function *OlDepsFuncVar
       = createOlDepsFunction(M, F, Twine(taskNum).str(), TaskArgsTy);
 
-    OlCallToUnpack(M, TI.DSAInfo, OlDepsFuncVar, UnpackDepsFuncVar);
+    olDepsCallToUnpack(M, TI.DSAInfo, OlDepsFuncVar, UnpackDepsFuncVar);
 
     // nanos6_ol_deps_* END
 
@@ -461,7 +483,7 @@ struct OmpSs : public ModulePass {
     Constant *TaskImplInfoVar = M.getOrInsertGlobal(("implementations_var_" + F.getName() + Twine(taskNum)).str(),
                                       ArrayType::get(TskImplInfoTy.Ty, 1),
                                       [&] {
-      auto *outlineFuncCastTy = FunctionType::get(Type::getVoidTy(M.getContext()),
+      auto *OlTaskFuncCastTy = FunctionType::get(Type::getVoidTy(M.getContext()),
                                               {Type::getInt8PtrTy(M.getContext()), /* void * */
                                                Type::getInt8PtrTy(M.getContext()), /* void * */
                                                TskAddrTranslationEntryTy.Ty->getPointerTo()
@@ -473,7 +495,7 @@ struct OmpSs : public ModulePass {
                                 ConstantArray::get(ArrayType::get(TskImplInfoTy.Ty, 1), // TODO: More than one implementations?
                                                    ConstantStruct::get(TskImplInfoTy.Ty,
                                                                        ConstantInt::get(TskImplInfoTy.Mmbers.DeviceTypeIdTy, 0),
-                                                                       ConstantExpr::getPointerCast(outlineFuncVar, outlineFuncCastTy->getPointerTo()),
+                                                                       ConstantExpr::getPointerCast(OlTaskFuncVar, OlTaskFuncCastTy->getPointerTo()),
                                                                        ConstantPointerNull::get(TskImplInfoTy.Mmbers.GetConstraintsFuncTy->getPointerTo()),
                                                                        ConstantPointerNull::get(cast<PointerType>(TskImplInfoTy.Mmbers.TaskLabelTy)), /* const char *task_label */
                                                                        Nanos6TaskLocStr,
@@ -515,7 +537,7 @@ struct OmpSs : public ModulePass {
                                               Module *M,
                                               const SetVector<BasicBlock *> &Blocks) {
 
-      unpackFuncVar->getBasicBlockList().push_back(newRootNode);
+      UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
 
       // Rewrite branches from basic blocks outside of the task region to blocks
       // inside the region to use the new label (newHeader) since the task region
@@ -529,7 +551,7 @@ struct OmpSs : public ModulePass {
               I->getParent()->getParent() == oldFunction)
             I->replaceUsesOfWith(header, newHeader);
 
-      return unpackFuncVar;
+      return UnpackTaskFuncVar;
     };
     auto emitOmpSsCaptureAndSubmitTask = [&](Function *newFunction,
                                   BasicBlock *codeReplacer,
