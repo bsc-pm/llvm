@@ -1165,6 +1165,8 @@ def err_oss_unexpected_directive : Error<
   "unexpected OmpSs-2 directive %select{|'#pragma oss %1'}0">;
 def err_oss_unknown_directive : Error<
   "unknown OmpSs-2 directive">;
+def err_oss_unsupported_declarative_and_ol_task : Error<
+  "declarative directives and outlined tasks are not supported yet">;
 def err_oss_unexpected_clause : Error<
   "unexpected OmpSs-2 clause '%0' in directive '#pragma oss %1'">;
 def warn_oss_extra_tokens_at_eol : Warning<

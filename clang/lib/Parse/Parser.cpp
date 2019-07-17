@@ -758,6 +758,11 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
   case tok::annot_pragma_opencl_extension:
     HandlePragmaOpenCLExtension();
     return nullptr;
+  case tok::annot_pragma_ompss:
+    Diag(Tok, diag::err_oss_unsupported_declarative_and_ol_task);
+    ConsumeAnnotationToken();
+    SkipUntil(tok::annot_pragma_ompss_end);
+    return nullptr;
   case tok::annot_pragma_openmp: {
     AccessSpecifier AS = AS_none;
     return ParseOpenMPDeclarativeDirectiveWithExtDecl(AS, attrs);

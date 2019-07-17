@@ -3132,6 +3132,12 @@ Parser::DeclGroupPtrTy Parser::ParseCXXClassMemberDeclarationWithPragmas(
   case tok::annot_pragma_openmp:
     return ParseOpenMPDeclarativeDirectiveWithExtDecl(AS, AccessAttrs, TagType,
                                                       TagDecl);
+  case tok::annot_pragma_ompss: {
+    Diag(Tok, diag::err_oss_unsupported_declarative_and_ol_task);
+    ConsumeAnnotationToken();
+    SkipUntil(tok::annot_pragma_ompss_end);
+    return nullptr;
+  }
 
   default:
     return ParseCXXClassMemberDeclaration(AS, AccessAttrs);

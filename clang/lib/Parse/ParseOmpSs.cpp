@@ -88,7 +88,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     // End location of the directive.
     EndLoc = Tok.getLocation();
-    // Consume final annot_pragma_openmp_end.
+    // Consume final annot_pragma_ompss_end.
     ConsumeAnnotationToken();
 
     Actions.ActOnOmpSsAfterClauseGathering(Clauses);
@@ -166,7 +166,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_unknown:
     Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
         << getOmpSsDirectiveName(DKind);
-    SkipUntil(tok::annot_pragma_openmp_end, StopBeforeMatch);
+    SkipUntil(tok::annot_pragma_ompss_end, StopBeforeMatch);
     break;
   }
   return ErrorFound ? nullptr : Clause;
@@ -294,7 +294,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
 /// \param RLoc Returned location of right paren.
 ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
                                          SourceLocation &RLoc) {
-  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_openmp_end);
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
   if (T.expectAndConsume(diag::err_expected_lparen_after, ClauseName.data()))
     return ExprError();
 

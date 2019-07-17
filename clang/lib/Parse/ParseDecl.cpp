@@ -4122,6 +4122,13 @@ void Parser::ParseStructUnionBody(SourceLocation RecordLoc,
       continue;
     }
 
+    if (Tok.is(tok::annot_pragma_ompss)) {
+      Diag(Tok, diag::err_oss_unsupported_declarative_and_ol_task);
+      ConsumeAnnotationToken();
+      SkipUntil(tok::annot_pragma_ompss_end);
+      continue;
+    }
+
     if (Tok.is(tok::annot_pragma_openmp)) {
       // Result can be ignored, because it must be always empty.
       AccessSpecifier AS = AS_none;
