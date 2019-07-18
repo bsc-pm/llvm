@@ -55,8 +55,8 @@ let SubRegIndices = [epivr4even, epivr4odd] in
 class EPIVReg<list<ValueType> regTypes, dag regList, int Vlmul>
   : RegisterClass<"RISCV",
                   regTypes,
-                  // Spill alignment set to 64-bytes
-                  512,
+                  // Alignment set to 16 bytes
+                  128,
                   regList> {
   int VLMul = Vlmul;
 }

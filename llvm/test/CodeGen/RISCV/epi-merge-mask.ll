@@ -30,20 +30,17 @@ declare void @llvm.epi.vstore.v1f64(
 define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-LABEL: merge_mask:
 ; CHECK-O0:       # %bb.0: # %entry
-; CHECK-O0-NEXT:    addi sp, sp, -128
-; CHECK-O0-NEXT:    sd ra, 120(sp)
-; CHECK-O0-NEXT:    sd s0, 112(sp)
-; CHECK-O0-NEXT:    sd s1, 104(sp)
-; CHECK-O0-NEXT:    addi s0, sp, 128
-; CHECK-O0-NEXT:    andi sp, sp, -64
-; CHECK-O0-NEXT:    mv s1, sp
+; CHECK-O0-NEXT:    addi sp, sp, -48
+; CHECK-O0-NEXT:    sd ra, 40(sp)
+; CHECK-O0-NEXT:    sd s0, 32(sp)
+; CHECK-O0-NEXT:    addi s0, sp, 48
 ; CHECK-O0-NEXT:    rdvtype a5
 ; CHECK-O0-NEXT:    rdvl a4
 ; CHECK-O0-NEXT:    vsetvli a6, zero, e64, m1
 ; CHECK-O0-NEXT:    slli a6, a6, 3
 ; CHECK-O0-NEXT:    sub sp, sp, a6
-; CHECK-O0-NEXT:    andi sp, sp, -64
-; CHECK-O0-NEXT:    sd sp, 56(s1)
+; CHECK-O0-NEXT:    andi sp, sp, -16
+; CHECK-O0-NEXT:    sd sp, -40(s0)
 ; CHECK-O0-NEXT:    vsetvl zero, a4, a5
 ; CHECK-O0-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a3)
@@ -51,7 +48,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    vmflt.vv v2, v1, v0
 ; CHECK-O0-NEXT:    rdvtype a3
 ; CHECK-O0-NEXT:    rdvl a2
-; CHECK-O0-NEXT:    ld a4, 56(s1)
+; CHECK-O0-NEXT:    ld a4, -40(s0)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-O0-NEXT:    vse.v v0, (a4)
 ; CHECK-O0-NEXT:    vsetvl zero, a2, a3
@@ -62,17 +59,16 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    vsetvl zero, t1, t0
 ; CHECK-O0-NEXT:    rdvtype a3
 ; CHECK-O0-NEXT:    rdvl a2
-; CHECK-O0-NEXT:    ld a4, 56(s1)
+; CHECK-O0-NEXT:    ld a4, -40(s0)
 ; CHECK-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-O0-NEXT:    vle.v v2, (a4)
 ; CHECK-O0-NEXT:    vsetvl zero, a2, a3
 ; CHECK-O0-NEXT:    vfsub.vv v2, v2, v1, v0.t
 ; CHECK-O0-NEXT:    vse.v v2, (a1)
-; CHECK-O0-NEXT:    addi sp, s0, -128
-; CHECK-O0-NEXT:    ld s1, 104(sp)
-; CHECK-O0-NEXT:    ld s0, 112(sp)
-; CHECK-O0-NEXT:    ld ra, 120(sp)
-; CHECK-O0-NEXT:    addi sp, sp, 128
+; CHECK-O0-NEXT:    addi sp, s0, -48
+; CHECK-O0-NEXT:    ld s0, 32(sp)
+; CHECK-O0-NEXT:    ld ra, 40(sp)
+; CHECK-O0-NEXT:    addi sp, sp, 48
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: merge_mask:
