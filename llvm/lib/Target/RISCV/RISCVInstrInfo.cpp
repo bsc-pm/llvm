@@ -322,9 +322,9 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
     return 0;
 
   // Remove the branch.
-  I->eraseFromParent();
   if (BytesRemoved)
     *BytesRemoved += getInstSizeInBytes(*I);
+  I->eraseFromParent();
 
   I = MBB.end();
 
@@ -335,9 +335,9 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
     return 1;
 
   // Remove the branch.
-  I->eraseFromParent();
   if (BytesRemoved)
     *BytesRemoved += getInstSizeInBytes(*I);
+  I->eraseFromParent();
   return 2;
 }
 
