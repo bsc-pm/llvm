@@ -13,18 +13,14 @@ func:
 # relaxation enabled. This test is written to capture current behaviour, in
 # preparation for follow-on patches to fix it.
 
-# RELAX-RELOC:   Section (4) .rela.eh_frame {
-# RELAX-RELOC-NEXT:   0x0 R_RISCV_ADD32 - 0xFFFFFFFC
-# RELAX-RELOC-NEXT:   0x0 R_RISCV_SUB32 - 0x0
-# RELAX-RELOC-NEXT:   0x14 R_RISCV_ADD32 - 0x0
-# RELAX-RELOC-NEXT:   0x14 R_RISCV_SUB32 - 0x0
-# RELAX-RELOC-NEXT:   0x18 R_RISCV_ADD32 - 0x0
-# RELAX-RELOC-NEXT:   0x18 R_RISCV_SUB32 - 0x0
-# RELAX-RELOC-NEXT:   0x1C R_RISCV_ADD32 - 0x0
-# RELAX-RELOC-NEXT:   0x1C R_RISCV_SUB32 - 0x0
-# RELAX-RELOC-NEXT:   0x20 R_RISCV_ADD32 - 0x0
-# RELAX-RELOC-NEXT:   0x20 R_RISCV_SUB32 - 0x0
-# RELAX-RELOC-NEXT: }
+# rferrer: we are already emitting PCREL so change this so it conflicts
+# when upstream finally fixes this.
+
+# RELAX-RELOC:        Section (4) .rela.eh_frame {
+# RELAX-RELOC-NEXT:    0x1C R_RISCV_32_PCREL - 0x0
+# RELAX-RELOC-NEXT:    0x20 R_RISCV_ADD32 - 0x0
+# RELAX-RELOC-NEXT:    0x20 R_RISCV_SUB32 - 0x0
+# RELAX-RELOC-NEXT:  }
 
 # NORELAX-RELOC:        Section (4) .rela.eh_frame {
 # NORELAX-RELOC-NEXT:    0x1C R_RISCV_32_PCREL - 0x0
