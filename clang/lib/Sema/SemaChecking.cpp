@@ -12871,6 +12871,13 @@ void Sema::CheckArrayAccess(const Expr *expr) {
                            /*ASE=*/nullptr, AllowOnePastEnd > 0);
         return;
       }
+      case Stmt::OSSArraySectionExprClass: {
+        const OSSArraySectionExpr *ASE = cast<OSSArraySectionExpr>(expr);
+        if (ASE->getLowerBound())
+          CheckArrayAccess(ASE->getBase(), ASE->getLowerBound(),
+                           /*ASE=*/nullptr, AllowOnePastEnd > 0);
+        return;
+      }
       case Stmt::UnaryOperatorClass: {
         // Only unwrap the * and & unary operators
         const UnaryOperator *UO = cast<UnaryOperator>(expr);

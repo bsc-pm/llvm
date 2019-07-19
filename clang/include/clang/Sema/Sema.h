@@ -4470,6 +4470,11 @@ public:
                                       Expr *LowerBound, SourceLocation ColonLoc,
                                       Expr *Length, SourceLocation RBLoc);
 
+  // OmpSs
+  ExprResult ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
+                                      Expr *LowerBound, SourceLocation ColonLoc,
+                                      Expr *Length, SourceLocation RBLoc);
+
   // This struct is for use by ActOnMemberAccess to allow
   // BuildMemberReferenceExpr to be able to reinvoke ActOnMemberAccess after
   // changing the access operator from a '.' to a '->' (to see if that is the
@@ -9006,6 +9011,8 @@ public:
 
   ExprResult PerformOpenMPImplicitIntegerConversion(SourceLocation OpLoc,
                                                     Expr *Op);
+  ExprResult PerformOmpSsImplicitIntegerConversion(SourceLocation OpLoc,
+                                                   Expr *Op);
   /// Called on start of new data sharing attribute block.
   void StartOpenMPDSABlock(OpenMPDirectiveKind K,
                            const DeclarationNameInfo &DirName, Scope *CurScope,

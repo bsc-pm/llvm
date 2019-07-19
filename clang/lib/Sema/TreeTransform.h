@@ -22,6 +22,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOpenMP.h"
+#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
@@ -2286,6 +2287,18 @@ public:
                                         SourceLocation ColonLoc, Expr *Length,
                                         SourceLocation RBracketLoc) {
     return getSema().ActOnOMPArraySectionExpr(Base, LBracketLoc, LowerBound,
+                                              ColonLoc, Length, RBracketLoc);
+  }
+
+  /// Build a new array section expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildOSSArraySectionExpr(Expr *Base, SourceLocation LBracketLoc,
+                                        Expr *LowerBound,
+                                        SourceLocation ColonLoc, Expr *Length,
+                                        SourceLocation RBracketLoc) {
+    return getSema().ActOnOSSArraySectionExpr(Base, LBracketLoc, LowerBound,
                                               ColonLoc, Length, RBracketLoc);
   }
 
@@ -9591,6 +9604,37 @@ TreeTransform<Derived>::TransformOMPArraySectionExpr(OMPArraySectionExpr *E) {
     return E;
 
   return getDerived().RebuildOMPArraySectionExpr(
+      Base.get(), E->getBase()->getEndLoc(), LowerBound.get(), E->getColonLoc(),
+      Length.get(), E->getRBracketLoc());
+}
+
+// OmpSs
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformOSSArraySectionExpr(OSSArraySectionExpr *E) {
+  ExprResult Base = getDerived().TransformExpr(E->getBase());
+  if (Base.isInvalid())
+    return ExprError();
+
+  ExprResult LowerBound;
+  if (E->getLowerBound()) {
+    LowerBound = getDerived().TransformExpr(E->getLowerBound());
+    if (LowerBound.isInvalid())
+      return ExprError();
+  }
+
+  ExprResult Length;
+  if (E->getLength()) {
+    Length = getDerived().TransformExpr(E->getLength());
+    if (Length.isInvalid())
+      return ExprError();
+  }
+
+  if (!getDerived().AlwaysRebuild() && Base.get() == E->getBase() &&
+      LowerBound.get() == E->getLowerBound() && Length.get() == E->getLength())
+    return E;
+
+  return getDerived().RebuildOSSArraySectionExpr(
       Base.get(), E->getBase()->getEndLoc(), LowerBound.get(), E->getColonLoc(),
       Length.get(), E->getRBracketLoc());
 }

@@ -853,6 +853,51 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   return getCanonicalDecl(VD);
 }
 
+ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,
+                                                       Expr *Op) {
+  if (!Op)
+    return ExprError();
+
+  class IntConvertDiagnoser : public ICEConvertDiagnoser {
+  public:
+    IntConvertDiagnoser()
+        : ICEConvertDiagnoser(/*AllowScopedEnumerations*/ false, false, true) {}
+    SemaDiagnosticBuilder diagnoseNotInt(Sema &S, SourceLocation Loc,
+                                         QualType T) override {
+      return S.Diag(Loc, diag::err_oss_not_integral) << T;
+    }
+    SemaDiagnosticBuilder diagnoseIncomplete(Sema &S, SourceLocation Loc,
+                                             QualType T) override {
+      return S.Diag(Loc, diag::err_oss_incomplete_type) << T;
+    }
+    SemaDiagnosticBuilder diagnoseExplicitConv(Sema &S, SourceLocation Loc,
+                                               QualType T,
+                                               QualType ConvTy) override {
+      return S.Diag(Loc, diag::err_oss_explicit_conversion) << T << ConvTy;
+    }
+    SemaDiagnosticBuilder noteExplicitConv(Sema &S, CXXConversionDecl *Conv,
+                                           QualType ConvTy) override {
+      return S.Diag(Conv->getLocation(), diag::note_oss_conversion_here)
+             << ConvTy->isEnumeralType() << ConvTy;
+    }
+    SemaDiagnosticBuilder diagnoseAmbiguous(Sema &S, SourceLocation Loc,
+                                            QualType T) override {
+      return S.Diag(Loc, diag::err_oss_ambiguous_conversion) << T;
+    }
+    SemaDiagnosticBuilder noteAmbiguous(Sema &S, CXXConversionDecl *Conv,
+                                        QualType ConvTy) override {
+      return S.Diag(Conv->getLocation(), diag::note_oss_conversion_here)
+             << ConvTy->isEnumeralType() << ConvTy;
+    }
+    SemaDiagnosticBuilder diagnoseConversion(Sema &, SourceLocation, QualType,
+                                             QualType) override {
+      llvm_unreachable("conversion functions are permitted");
+    }
+  } ConvertDiagnoser;
+  return PerformContextualImplicitConversion(Loc, Op, ConvertDiagnoser);
+}
+
+
 OSSClause *
 Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                        SourceLocation StartLoc,

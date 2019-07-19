@@ -1272,6 +1272,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   if (LangOpts.OpenMP)
     InitBuiltinType(OMPArraySectionTy, BuiltinType::OMPArraySection);
 
+  // Placeholder type for OSS array sections.
+  if (LangOpts.OmpSs)
+    InitBuiltinType(OSSArraySectionTy, BuiltinType::OSSArraySection);
+
   // C99 6.2.5p11.
   FloatComplexTy      = getComplexType(FloatTy);
   DoubleComplexTy     = getComplexType(DoubleTy);

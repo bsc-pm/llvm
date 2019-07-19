@@ -1051,6 +1051,8 @@ public:
   CanQualType OCLSamplerTy, OCLEventTy, OCLClkEventTy;
   CanQualType OCLQueueTy, OCLReserveIDTy;
   CanQualType OMPArraySectionTy;
+  // OmpSs
+  CanQualType OSSArraySectionTy;
 #define EXT_OPAQUE_TYPE(ExtType, Id, Ext) \
   CanQualType Id##Ty;
 #include "clang/Basic/OpenCLExtensionTypes.def"

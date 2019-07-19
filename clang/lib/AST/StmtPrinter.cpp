@@ -23,6 +23,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOpenMP.h"
+#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/OmpSsClause.h"
@@ -1766,6 +1767,20 @@ void StmtPrinter::VisitArraySubscriptExpr(ArraySubscriptExpr *Node) {
 }
 
 void StmtPrinter::VisitOMPArraySectionExpr(OMPArraySectionExpr *Node) {
+  PrintExpr(Node->getBase());
+  OS << "[";
+  if (Node->getLowerBound())
+    PrintExpr(Node->getLowerBound());
+  if (Node->getColonLoc().isValid()) {
+    OS << ":";
+    if (Node->getLength())
+      PrintExpr(Node->getLength());
+  }
+  OS << "]";
+}
+
+// OmpSs
+void StmtPrinter::VisitOSSArraySectionExpr(OSSArraySectionExpr *Node) {
   PrintExpr(Node->getBase());
   OS << "[";
   if (Node->getLowerBound())

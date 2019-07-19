@@ -1585,6 +1585,19 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
           if (Tok.isNot(tok::r_square))
             Length = ParseExpression();
         }
+      } else if (getLangOpts().OmpSs) {
+        ColonProtectionRAIIObject RAII(*this);
+        // Parse [: or [ expr or [ expr :
+        if (!Tok.is(tok::colon)) {
+          // [ expr
+          Idx = ParseExpression();
+        }
+        if (Tok.is(tok::colon)) {
+          // Consume ':'
+          ColonLoc = ConsumeToken();
+          if (Tok.isNot(tok::r_square))
+            Length = ParseExpression();
+        }
       } else
         Idx = ParseExpression();
 
@@ -1596,8 +1609,14 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       if (!LHS.isInvalid() && !Idx.isInvalid() && !Length.isInvalid() &&
           Tok.is(tok::r_square)) {
         if (ColonLoc.isValid()) {
-          LHS = Actions.ActOnOMPArraySectionExpr(LHS.get(), Loc, Idx.get(),
-                                                 ColonLoc, Length.get(), RLoc);
+          if (getLangOpts().OpenMP)
+            LHS = Actions.ActOnOMPArraySectionExpr(LHS.get(), Loc, Idx.get(),
+                                                   ColonLoc, Length.get(), RLoc);
+          else if (getLangOpts().OmpSs)
+            LHS = Actions.ActOnOSSArraySectionExpr(LHS.get(), Loc, Idx.get(),
+                                                   ColonLoc, Length.get(), RLoc);
+          else
+            llvm_unreachable("Parsed Array Section without OpenMP or OmpSs");
         } else {
           LHS = Actions.ActOnArraySubscriptExpr(getCurScope(), LHS.get(), Loc,
                                                 Idx.get(), RLoc);

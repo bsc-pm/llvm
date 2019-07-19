@@ -750,6 +750,16 @@ void ASTStmtReader::VisitOMPArraySectionExpr(OMPArraySectionExpr *E) {
   E->setRBracketLoc(ReadSourceLocation());
 }
 
+// OmpSs
+void ASTStmtReader::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
+  VisitExpr(E);
+  E->setBase(Record.readSubExpr());
+  E->setLowerBound(Record.readSubExpr());
+  E->setLength(Record.readSubExpr());
+  E->setColonLoc(ReadSourceLocation());
+  E->setRBracketLoc(ReadSourceLocation());
+}
+
 void ASTStmtReader::VisitCallExpr(CallExpr *E) {
   VisitExpr(E);
   unsigned NumArgs = Record.readInt();

@@ -18,6 +18,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprObjC.h"
 #include "clang/AST/ExprOpenMP.h"
+#include "clang/AST/ExprOmpSs.h"
 #include "clang/AST/ODRHash.h"
 #include "clang/AST/StmtVisitor.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -1136,6 +1137,11 @@ void StmtProfiler::VisitArraySubscriptExpr(const ArraySubscriptExpr *S) {
 }
 
 void StmtProfiler::VisitOMPArraySectionExpr(const OMPArraySectionExpr *S) {
+  VisitExpr(S);
+}
+
+// OmpSs
+void StmtProfiler::VisitOSSArraySectionExpr(const OSSArraySectionExpr *S) {
   VisitExpr(S);
 }
 

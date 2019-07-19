@@ -9623,6 +9623,58 @@ def err_objc_type_args_wrong_arity : Error<
   "too %select{many|few}0 type arguments for class %1 (have %2, expected %3)">;
 }
 
+let CategoryName = "OmpSs Issue" in {
+// OmpSs support.
+def err_oss_unexpected_clause_value : Error<
+  "expected %0 in OmpSs-2 clause '%1'">;
+def err_oss_depend_weak_required : Error<
+ "expected 'weak' clause">;
+def err_oss_wrong_dsa : Error<
+  "%0 variable cannot be %1">;
+def err_oss_array_section_use : Error<"OmpSs-2 array section is not allowed here">;
+def err_oss_mismatch_depend_dsa : Error<
+  "the data-sharing '%0' conflicts with '%1' required by the dependency">;
+def err_oss_not_defined_dsa_when_default_none : Error<
+  "expected explicit data-sharing for %0">;
+
+def err_oss_expected_addressable_lvalue_or_array_item : Error<
+  "expected addressable lvalue expression, array element or array section">;
+def err_oss_expected_var_name: Error<
+  "expected variable name">;
+def err_oss_non_pod_not_supported: Error<
+  "Non-POD structs are not supported">;
+
+def err_oss_not_integral : Error<
+  "expression must have integral or unscoped enumeration "
+  "type, not %0">;
+def err_oss_incomplete_type : Error<
+  "expression has incomplete class type %0">;
+def err_oss_explicit_conversion : Error<
+  "expression requires explicit conversion from %0 to %1">;
+def note_oss_conversion_here : Note<
+  "conversion to %select{integral|enumeration}0 type %1 declared here">;
+def err_oss_ambiguous_conversion : Error<
+  "ambiguous conversion from type %0 to an integral or unscoped "
+  "enumeration type">;
+def err_oss_typecheck_section_value : Error<
+  "subscripted value is not an array or pointer">;
+def err_oss_section_function_type : Error<
+  "section of pointer to function type %0">;
+def err_oss_section_incomplete_type : Error<
+  "section of pointer to incomplete type %0">;
+def err_oss_typecheck_section_not_integer : Error<
+  "array section %select{lower bound|length}0 is not an integer">;
+def err_oss_section_not_subset_of_array : Error<
+  "array section must be a subset of the original array">;
+def err_oss_section_length_negative : Error<
+  "section length is evaluated to a negative value %0">;
+def err_oss_section_length_undefined : Error<
+  "section length is unspecified and cannot be inferred because subscripted value is %select{not an array|an array of unknown bound}0">;
+def warn_oss_section_is_char : Warning<"array section %select{lower bound|length}0 is of type 'char'">,
+  InGroup<CharSubscript>, DefaultIgnore;
+} // end of OmpSs component.
+
+
 def err_objc_type_arg_not_id_compatible : Error<
   "type argument %0 is neither an Objective-C object nor a block type">;
 
@@ -9729,24 +9781,5 @@ def warn_noderef_to_dereferenceable_pointer : Warning<
 def err_builtin_launder_invalid_arg : Error<
   "%select{non-pointer|function pointer|void pointer}0 argument to "
   "'__builtin_launder' is not allowed">;
-
-// OmpSs errors
-def err_oss_unexpected_clause_value : Error<
-  "expected %0 in OmpSs-2 clause '%1'">;
-def err_oss_depend_weak_required : Error<
- "expected 'weak' clause">;
-def err_oss_wrong_dsa : Error<
-  "%0 variable cannot be %1">;
-def err_oss_mismatch_depend_dsa : Error<
-  "the data-sharing '%0' conflicts with '%1' required by the dependency">;
-def err_oss_not_defined_dsa_when_default_none : Error<
-  "expected explicit data-sharing for %0">;
-
-def err_oss_expected_addressable_lvalue_or_array_item : Error<
-  "expected addressable lvalue expression, array element or array section">;
-def err_oss_expected_var_name: Error<
-  "expected variable name">;
-def err_oss_non_pod_not_supported: Error<
-  "Non-POD structs are not supported">;
 
 } // end of sema component.

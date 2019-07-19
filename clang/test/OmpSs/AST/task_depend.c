@@ -169,3 +169,62 @@ void foo3() {
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int [10]' lvalue Var {{[a-z0-9]+}} 'index' 'int [10]'
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'i' 'int'
 // CHECK-NEXT: CompoundStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
+void foo4() {
+    int array[10][10];
+    int a;
+    #pragma oss task depend(out : array[0 : 5])
+    {}
+    #pragma oss task depend(out : array[ : a])
+    {}
+    #pragma oss task depend(out : array[ : ])
+    {}
+    #pragma oss task depend(out : array[ : ][ : ])
+    {}
+}
+
+// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:175:13, col:48>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:47>
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:35, col:46> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int (*)[10]' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:41> 'int' 0
+// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:45> 'int' 5
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: CompoundStmt 0x{{[^ ]*}} <line:176:5, col:6>
+// CHECK-NEXT: OSSTaskDirective 0x{{[^ ]*}} <line:177:13, col:47>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:46>
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:35, col:45> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int (*)[10]' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:44> 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:44> 'int' lvalue Var 0x{{[^ ]*}} 'a' 'int'
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:44> 'int' lvalue Var 0x{{[^ ]*}} 'a' 'int'
+// CHECK-NEXT: CompoundStmt 0x{{[^ ]*}} <line:178:5, col:6>
+// CHECK-NEXT: OSSTaskDirective 0x{{[^ ]*}} <line:179:13, col:46>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:45>
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:35, col:44> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int (*)[10]' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: CompoundStmt 0x{{[^ ]*}} <line:180:5, col:6>
+// CHECK-NEXT: OSSTaskDirective 0x{{[^ ]*}} <line:181:13, col:51>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:50>
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:35, col:49> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:35, col:44> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int (*)[10]' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: <<<NULL>>>
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: CompoundStmt 0x{{[^ ]*}} <line:182:5, col:6>
+
