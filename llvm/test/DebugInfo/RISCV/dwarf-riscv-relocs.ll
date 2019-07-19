@@ -1,3 +1,4 @@
+; XFAIL: *
 ; RUN: llc -filetype=obj -mtriple=riscv32 -mattr=+relax %s -o %t.o
 ; RUN: llvm-readobj -r %t.o | FileCheck -check-prefix=READOBJ-RELOCS %s
 ; RUN: llvm-objdump --source %t.o | FileCheck -check-prefix=OBJDUMP-SOURCE %s

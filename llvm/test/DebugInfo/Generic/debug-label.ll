@@ -1,5 +1,4 @@
 ; RUN: llc -O0 -filetype=obj -o - %s | llvm-dwarfdump -v - | FileCheck %s
-; XFAIL: riscv
 ;
 ; CHECK: .debug_info contents:
 ; CHECK: DW_TAG_label

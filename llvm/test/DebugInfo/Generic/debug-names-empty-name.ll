@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: object-emission
 ; RUN: %llc_dwarf -debugger-tune=lldb -accel-tables=Dwarf -filetype=obj -o %t < %s
 ; RUN: llvm-dwarfdump -find=_GLOBAL__sub_I__ %t | FileCheck --check-prefix=INFO %s

@@ -88,7 +88,6 @@ public:
   }
 
   bool setABI(const std::string &Name) override {
-    // TODO: support ilp32f and ilp32d ABIs.
     if (Name == "ilp32" || Name == "ilp32f" || Name == "ilp32d") {
       ABI = Name;
       return true;

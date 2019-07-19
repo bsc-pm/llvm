@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: default_triple, object-emission
 ;
 ; RUN: llvm-link %s %p/type-unique-odr-b.ll -S -o - \

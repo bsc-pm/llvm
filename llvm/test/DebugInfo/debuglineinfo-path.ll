@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; Make sure that absolute source dir is detected correctly regardless of the platform.
 ; REQUIRES: object-emission, default_triple
 

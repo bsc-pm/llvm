@@ -1,4 +1,3 @@
-# XFAIL: riscv
 # REQUIRES: default_triple
 # RUN: llvm-mc -dwarf-version 4 %s -filetype=obj -o - | llvm-dwarfdump -debug-line - | FileCheck %s --check-prefixes=CHECK,CHECK-4
 # RUN: llvm-mc -dwarf-version 4 %s -filetype=asm -o - | FileCheck %s --check-prefixes=ASM,ASM-4

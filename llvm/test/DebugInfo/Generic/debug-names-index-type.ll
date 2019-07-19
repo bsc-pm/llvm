@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: object-emission
 ; RUN: %llc_dwarf -accel-tables=Dwarf -filetype=obj -o %t < %s
 ; RUN: llvm-dwarfdump -debug-names %t | FileCheck %s

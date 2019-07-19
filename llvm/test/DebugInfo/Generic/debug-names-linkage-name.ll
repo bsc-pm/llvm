@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: object-emission
 
 ; Generate one file with all linkage names, and another with only abstract ones.

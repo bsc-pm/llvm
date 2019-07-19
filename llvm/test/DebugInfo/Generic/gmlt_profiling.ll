@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: object-emission
 ; RUN: %llc_dwarf -O0 -filetype=obj < %S/gmlt_profiling.ll | llvm-dwarfdump -v - | FileCheck %S/gmlt_profiling.ll
 

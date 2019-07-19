@@ -69,14 +69,15 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
   // TODO: modify when more code models are supported.
   Builder.defineMacro("__riscv_cmodel_medlow");
 
-  // We enforce the consistency between ABI and the corresponding target
-  // feature in handleTargetFeatures.
-  if (ABI == "ilp32f" || ABI == "lp64f")
-      Builder.defineMacro("__riscv_float_abi_single");
-  else if (ABI == "ilp32d" || ABI == "lp64d")
-      Builder.defineMacro("__riscv_float_abi_double");
+  StringRef ABIName = getABI();
+  if (ABIName == "ilp32f" || ABIName == "lp64f")
+    Builder.defineMacro("__riscv_float_abi_single");
+  else if (ABIName == "ilp32d" || ABIName == "lp64d")
+    Builder.defineMacro("__riscv_float_abi_double");
+  else if (ABIName == "ilp32e")
+    Builder.defineMacro("__riscv_abi_rve");
   else
-      Builder.defineMacro("__riscv_float_abi_soft");
+    Builder.defineMacro("__riscv_float_abi_soft");
 
   if (HasM) {
     Builder.defineMacro("__riscv_mul");

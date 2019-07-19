@@ -1,5 +1,4 @@
 ; REQUIRES: object-emission
-; XFAIL: riscv
 
 ; Test for DISPFlagPure, DISPFlagElement and DISPFlagRecursive.  These
 ; three DISPFlags are used to attach DW_AT_pure, DW_AT_element, and
