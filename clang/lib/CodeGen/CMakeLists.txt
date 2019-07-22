@@ -97,6 +97,7 @@ add_clang_library(clangCodeGen
 
   DEPENDS
   ${codegen_deps}
+  builtins_codegen_epi
 
   LINK_LIBS
   clangAnalysis
