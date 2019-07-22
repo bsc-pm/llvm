@@ -48,3 +48,19 @@ clang_tablegen(arm_neon.inc -gen-arm-neon-sema
 clang_tablegen(arm_fp16.inc -gen-arm-neon-sema
   SOURCE arm_fp16.td
   TARGET ClangARMFP16)
+
+# EPI
+# FIXME: Do this better
+add_custom_command(
+  OUTPUT BuiltinsEPI.def
+  COMMAND ${PYTHON_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../utils/EPI/generate-epi-builtins-def.py
+    --mode builtins-def
+    --tablegen ${${project}_TABLEGEN_EXE}
+    --output-file BuiltinsEPI.def
+    ${CMAKE_CURRENT_SOURCE_DIR}/epi_builtins.td
+   DEPENDS epi_builtins.td
+     ${${project}_TABLEGEN_TARGET}
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../../utils/EPI/generate-epi-builtins-def.py
+   VERBATIM)
+add_custom_target(builtins_epi ALL DEPENDS BuiltinsEPI.def)

@@ -201,7 +201,9 @@ defm vwsubu_w : epi_binary;
 defm vwsub_w : epi_binary;
 
 defm vadc : epi_ternary;
+defm vmadc : epi_ternary;
 defm vsbc : epi_ternary;
+defm vmsbc : epi_ternary;
 
 defm vand : epi_binary;
 defm vor : epi_binary;

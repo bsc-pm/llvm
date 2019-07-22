@@ -107,3 +107,19 @@ add_clang_library(clangCodeGen
   clangLex
   clangSerialization
   )
+
+# EPI
+# FIXME: Do this better
+add_custom_command(
+  OUTPUT EPIBuiltinCodegen.inc
+  COMMAND ${PYTHON_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../utils/EPI/generate-epi-builtins-def.py
+    --mode codegen
+    --tablegen ${${project}_TABLEGEN_EXE}
+    --output-file EPIBuiltinCodegen.inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/clang/Basic/epi_builtins.td
+   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../include/clang/Basic/epi_builtins.td
+     ${${project}_TABLEGEN_TARGET}
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../utils/EPI/generate-epi-builtins-def.py
+   VERBATIM)
+add_custom_target(builtins_codegen_epi ALL DEPENDS EPIBuiltinCodegen.inc)
