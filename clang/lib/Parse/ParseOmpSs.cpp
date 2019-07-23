@@ -247,7 +247,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
       ConsumeToken();
     else if (Tok.isNot(tok::r_paren) &&
              Tok.isNot(tok::annot_pragma_ompss_end))
-      Diag(Tok, diag::err_omp_expected_punc)
+      Diag(Tok, diag::err_oss_expected_punc)
           << getOmpSsClauseName(Kind);
   }
 

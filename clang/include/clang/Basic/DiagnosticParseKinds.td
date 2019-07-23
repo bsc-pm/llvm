@@ -1163,6 +1163,8 @@ def warn_pragma_oss_ignored : Warning<
   "unexpected '#pragma oss ...' in program">, InGroup<SourceUsesOmpSs>, DefaultIgnore;
 def err_oss_unexpected_directive : Error<
   "unexpected OmpSs-2 directive %select{|'#pragma oss %1'}0">;
+def err_oss_expected_punc : Error<
+  "expected ',' or ')' in '%0' clause">;
 def err_oss_unknown_directive : Error<
   "unknown OmpSs-2 directive">;
 def err_oss_unsupported_declarative_and_ol_task : Error<
