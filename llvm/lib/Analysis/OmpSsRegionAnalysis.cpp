@@ -271,7 +271,7 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
     DI.SymbolIndex = -1;
     // TODO: Support RegionText stringifying clause content
     DI.RegionText = "";
-    DI.Base = OBArgs[0];
+    DI.Base = OBArgs[0]->stripPointerCastsNoFollowAliases();
     for (size_t i = 1; i < OBArgs.size(); ++i) {
       DI.Dims.push_back(OBArgs[i]);
     }
