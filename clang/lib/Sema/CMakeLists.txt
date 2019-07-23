@@ -66,6 +66,7 @@ add_clang_library(clangSema
 
   DEPENDS
   ClangOpenCLBuiltinsImpl
+  builtins_epi
 
   LINK_LIBS
   clangAST

@@ -91,5 +91,8 @@ add_clang_library(clangBasic
   XRayInstr.cpp
   XRayLists.cpp
   ${version_inc}
+
+  DEPENDS
+  builtins_epi
   )
 
