@@ -111,12 +111,18 @@ add_clang_library(clangCodeGen
 
 # EPI
 # FIXME: Do this better
+if( ${CLANG_TABLEGEN} STREQUAL "clang-tblgen" )
+  set(REAL_CLANG_TABLEGEN $<TARGET_FILE:clang-tblgen>)
+else()
+  set(REAL_CLANG_TABLEGEN ${CLANG_TABLEGEN_EXE})
+endif()
+
 add_custom_command(
   OUTPUT EPIBuiltinCodegen.inc
   COMMAND ${PYTHON_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../utils/EPI/generate-epi-builtins-def.py
     --mode codegen
-    --tablegen $<TARGET_FILE:clang-tblgen>
+    --tablegen ${REAL_CLANG_TABLEGEN}
     --output-file EPIBuiltinCodegen.inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include/clang/Basic/epi_builtins.td
    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../include/clang/Basic/epi_builtins.td

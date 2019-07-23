@@ -51,12 +51,18 @@ clang_tablegen(arm_fp16.inc -gen-arm-neon-sema
 
 # EPI
 # FIXME: Do this better
+if( ${CLANG_TABLEGEN} STREQUAL "clang-tblgen" )
+  set(REAL_CLANG_TABLEGEN $<TARGET_FILE:clang-tblgen>)
+else()
+  set(REAL_CLANG_TABLEGEN ${CLANG_TABLEGEN_EXE})
+endif()
+
 add_custom_command(
   OUTPUT BuiltinsEPI.def
   COMMAND ${PYTHON_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../utils/EPI/generate-epi-builtins-def.py
     --mode builtins-def
-    --tablegen $<TARGET_FILE:clang-tblgen>
+    --tablegen ${REAL_CLANG_TABLEGEN}
     --output-file BuiltinsEPI.def
     ${CMAKE_CURRENT_SOURCE_DIR}/epi_builtins.td
    DEPENDS epi_builtins.td
