@@ -60,22 +60,54 @@ public:
   //                               Utilities
   //===--------------------------------------------------------------------===//
 
-  void FillBaseExprDimsAndType(const Expr *E) {
-    BaseElementTy = E->getType();
-    if (BaseElementTy->isArrayType()) {
-      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
-      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
+  QualType GetInnermostElementType(const QualType &Q) {
+    if (Q->isArrayType()) {
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(Q)) {
+        return CGF.getContext().getBaseElementType(Q);
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(Q)) {
+        return CGF.getContext().getBaseElementType(Q);
       } else {
         llvm_unreachable("Unhandled array type");
       }
     }
+    return Q;
+  }
+
+  void FillBaseExprDimsAndType(const Expr *E) {
+    BaseElementTy = GetInnermostElementType(E->getType());
     QualType TmpTy = E->getType();
     // Add Dimensions
     if (TmpTy->isPointerType() || !TmpTy->isArrayType()) {
       // T * || T
       Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
+    }
+    while (TmpTy->isArrayType()) {
+      // T []
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+        uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
+        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+        auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+        llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
+        Dims.push_back(DimExpr);
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+  }
+
+  // This is used in the innermost Expr * in ArraySubscripts and OSSArraySection
+  void FillDimsFromInnermostExpr(const Expr *E) {
+    // Go through the expression which may be a DeclRefExpr or MemberExpr
+    E = E->IgnoreParenImpCasts();
+    QualType TmpTy = E->getType();
+    // Add Dimensions
+    if (TmpTy->isPointerType()) {
+      // T *
+      Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
+      TmpTy = TmpTy->getPointeeType();
     }
     while (TmpTy->isArrayType()) {
       // T []
@@ -119,18 +151,9 @@ public:
   void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
     // Get Base Type
     // An array section is considered a built-in type
-    BaseElementTy = OSSArraySectionExpr::getBaseOriginalType(
-                          E->getBase()->IgnoreParenImpCasts())
-                          .getCanonicalType();
-    if (BaseElementTy->isArrayType()) {
-      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
-      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
-      } else {
-        llvm_unreachable("Unhandled array type");
-      }
-    }
+    BaseElementTy = GetInnermostElementType(
+        OSSArraySectionExpr::getBaseOriginalType(
+                          E->getBase()));
     // Get the inner expr
     const Expr *TmpE = E;
     // First come OSSArraySection
@@ -143,7 +166,7 @@ public:
       if (LowerB)
         Idx = CGF.EmitScalarExpr(LowerB);
       else
-      // OpenMP 5.0 2.1.5 When the lower-bound is absent it defaults to 0.
+        // OpenMP 5.0 2.1.5 When the lower-bound is absent it defaults to 0.
         Idx = llvm::ConstantInt::getSigned(OSSArgTy, 0);
       Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
 
@@ -190,93 +213,35 @@ public:
       llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       Starts.push_back(Idx);
       Ends.push_back(IdxEnd);
+      // Stop in the innermost ArrayToPointerDecay
       if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType())
         break;
     }
 
     Ptr = CGF.EmitScalarExpr(TmpE);
-
-    TmpE = TmpE->IgnoreParenImpCasts();
-
-    QualType TmpTy = TmpE->getType();
-    // Add Dimensions
-    if (TmpTy->isPointerType()) {
-      // T *
-      Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
-    } else {
-      while (TmpTy->isArrayType()) {
-        // T []
-        if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
-          uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-          Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
-          TmpTy = BaseArrayTy->getElementType();
-        } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
-          auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
-          llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
-          Dims.push_back(DimExpr);
-          TmpTy = BaseArrayTy->getElementType();
-        } else {
-          llvm_unreachable("Unhandled array type");
-        }
-      }
-    }
+    FillDimsFromInnermostExpr(TmpE);
   }
 
   void VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
     // Get Base Type
-    BaseElementTy = E->getType();
-    if (BaseElementTy->isArrayType()) {
-      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
-      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(BaseElementTy)){
-        BaseElementTy = CGF.getContext().getBaseElementType(BaseElementTy);
-      } else {
-        llvm_unreachable("Unhandled array type");
-      }
-    }
+    BaseElementTy = GetInnermostElementType(E->getType());
     // Get the inner expr
-    const Expr *Expr = E;
-    while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(Expr->IgnoreParenImpCasts())) {
-      Expr = ASE->getBase();
+    const Expr *TmpE = E;
+    while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+      TmpE = ASE->getBase();
       // Add indexes
       llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
       Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
       llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       Starts.push_back(Idx);
       Ends.push_back(IdxEnd);
-      if (Expr->IgnoreParenImpCasts()->getType()->isPointerType())
+      // Stop in the innermost ArrayToPointerDecay
+      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType())
         break;
     }
 
-    Ptr = CGF.EmitScalarExpr(Expr);
-
-    if (const CastExpr *CE = dyn_cast<CastExpr>(Expr)) {
-      QualType TmpTy = CE->getType();
-      // Add Dimensions
-      if (TmpTy->isPointerType()) {
-        // T (*)[]
-        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
-        TmpTy = cast<PointerType>(TmpTy)->getPointeeType();
-        while (TmpTy->isArrayType()) {
-          // T []
-          if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
-            uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-            Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
-            TmpTy = BaseArrayTy->getElementType();
-          } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
-            auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
-            llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
-            Dims.push_back(DimExpr);
-            TmpTy = BaseArrayTy->getElementType();
-          } else {
-            llvm_unreachable("Unhandled array type");
-          }
-        }
-      } else {
-        // T *
-        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
-      }
-    }
+    Ptr = CGF.EmitScalarExpr(TmpE);
+    FillDimsFromInnermostExpr(TmpE);
   }
 
   void VisitMemberExpr(const MemberExpr *E) {

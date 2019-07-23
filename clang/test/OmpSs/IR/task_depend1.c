@@ -10,7 +10,7 @@ void foo(void) {
 }
 
 // CHECK: %arraydecay = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 0
-// CHECK-NEXT: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %i), "QUAL.OSS.SHARED"([5 x i32]* %ai), "QUAL.OSS.FIRSTPRIVATE"(i32** %pi), "QUAL.OSS.DEP.IN"(i32* %i, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32** %pi, i64 8, i64 0, i64 8), "QUAL.OSS.DEP.IN"(i32* %arraydecay, i64 4, i64 12, i64 16) ]
+// CHECK-NEXT: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %i), "QUAL.OSS.SHARED"([5 x i32]* %ai), "QUAL.OSS.FIRSTPRIVATE"(i32** %pi), "QUAL.OSS.DEP.IN"(i32* %i, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32** %pi, i64 8, i64 0, i64 8), "QUAL.OSS.DEP.IN"(i32* %arraydecay, i64 20, i64 12, i64 16) ]
 // CHECK-NEXT: %arrayidx = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 2
 // CHECK-NEXT: %1 = load i32, i32* %arrayidx, align 8
 // CHECK-NEXT: %2 = load i32*, i32** %pi, align 8
@@ -31,7 +31,7 @@ void foo1(void) {
   { foo1_var = *foo1_ptr = foo1_array[3] = foo1_s.x; }
 }
 
-// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* @foo1_var), "QUAL.OSS.SHARED"([5 x i32]* @foo1_array), "QUAL.OSS.SHARED"(%struct.Foo1_struct* @foo1_s), "QUAL.OSS.FIRSTPRIVATE"(i32** @foo1_ptr), "QUAL.OSS.DEP.IN"(i32* @foo1_var, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32* %0, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds ([5 x i32], [5 x i32]* @foo1_array, i64 0, i64 0), i64 4, i64 12, i64 16), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds ([5 x i32], [5 x i32]* @foo1_array, i64 0, i64 0), i64 4, i64 -8, i64 -4), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds (%struct.Foo1_struct, %struct.Foo1_struct* @foo1_s, i32 0, i32 0), i64 4, i64 0, i64 4) ]
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* @foo1_var), "QUAL.OSS.SHARED"([5 x i32]* @foo1_array), "QUAL.OSS.SHARED"(%struct.Foo1_struct* @foo1_s), "QUAL.OSS.FIRSTPRIVATE"(i32** @foo1_ptr), "QUAL.OSS.DEP.IN"(i32* @foo1_var, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32* %0, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds ([5 x i32], [5 x i32]* @foo1_array, i64 0, i64 0), i64 20, i64 12, i64 16), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds ([5 x i32], [5 x i32]* @foo1_array, i64 0, i64 0), i64 20, i64 -8, i64 -4), "QUAL.OSS.DEP.IN"(i32* getelementptr inbounds (%struct.Foo1_struct, %struct.Foo1_struct* @foo1_s, i32 0, i32 0), i64 4, i64 0, i64 4) ]
 // CHECK-NEXT: %2 = load i32, i32* getelementptr inbounds (%struct.Foo1_struct, %struct.Foo1_struct* @foo1_s, i32 0, i32 0), align 4
 // CHECK-NEXT: store i32 %2, i32* getelementptr inbounds ([5 x i32], [5 x i32]* @foo1_array, i64 0, i64 3), align 4
 // CHECK-NEXT: %3 = load i32*, i32** @foo1_ptr, align 8
