@@ -13,6 +13,6 @@ body: |
 # CHECK: rdvtype t0
 # CHECK-NEXT: rdvl t1
 # CHECK-NEXT: vsetvli zero, zero, e64, m1
-# CHECK-NEXT: vadd.vi v1, v2, 0
+# CHECK-NEXT: vmv.v.v v1, v2
 # CHECK-NEXT: vsetvl  zero, t1, t0
 # CHECK-NEXT: vse.v v1, (a0)
