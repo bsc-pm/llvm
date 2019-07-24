@@ -1574,9 +1574,9 @@ multiclass pseudo_binary_w_vv_vx {
     let VLMul = evr.RegClass.VLMul in
     {
       defm _VV : pseudo_binary<evr.WideRegClass, evr.RegClass, evr.RegClass,
-                               evr.RegClass.VLMul>;
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
       defm _VX : pseudo_binary<evr.WideRegClass, evr.RegClass, GPR,
-                               evr.RegClass.VLMul>;
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
     }
   }
 }
@@ -1671,9 +1671,9 @@ multiclass pseudo_binary_w_vv_vf {
     let VLMul = evr.RegClass.VLMul in
     {
       defm _VV : pseudo_binary<evr.WideRegClass, evr.RegClass, evr.RegClass,
-                               evr.RegClass.VLMul>;
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
       defm _VF : pseudo_binary<evr.WideRegClass, evr.RegClass, FPR64,
-                               evr.RegClass.VLMul>;
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
     }
   }
 }
