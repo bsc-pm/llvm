@@ -35,6 +35,7 @@ public:
     TAG_UL,
     TAG_LI,
     TAG_A,
+    TAG_LINK,
   };
 
   HTMLTag() = default;
@@ -103,6 +104,7 @@ struct HTMLFile {
 bool HTMLTag::IsSelfClosing() const {
   switch (Value) {
   case HTMLTag::TAG_META:
+  case HTMLTag::TAG_LINK:
     return true;
   case HTMLTag::TAG_TITLE:
   case HTMLTag::TAG_DIV:
@@ -140,6 +142,8 @@ llvm::SmallString<16> HTMLTag::ToString() const {
     return llvm::SmallString<16>("li");
   case HTMLTag::TAG_A:
     return llvm::SmallString<16>("a");
+  case HTMLTag::TAG_LINK:
+    return llvm::SmallString<16>("link");
   }
   llvm_unreachable("Unhandled HTMLTag::TagType");
 }
@@ -217,6 +221,21 @@ static SmallString<128> computeRelativePath(StringRef FilePath,
 }
 
 // HTML generation
+
+std::vector<std::unique_ptr<TagNode>>
+genStylesheetsHTML(StringRef InfoPath, const ClangDocContext &CDCtx) {
+  std::vector<std::unique_ptr<TagNode>> Out;
+  for (const auto &FilePath : CDCtx.UserStylesheets) {
+    auto LinkNode = llvm::make_unique<TagNode>(HTMLTag::TAG_LINK);
+    LinkNode->Attributes.try_emplace("rel", "stylesheet");
+    SmallString<128> StylesheetPath = computeRelativePath("", InfoPath);
+    llvm::sys::path::append(StylesheetPath,
+                            llvm::sys::path::filename(FilePath));
+    LinkNode->Attributes.try_emplace("href", StylesheetPath);
+    Out.emplace_back(std::move(LinkNode));
+  }
+  return Out;
+}
 
 static std::unique_ptr<TagNode> genLink(const Twine &Text, const Twine &Link) {
   auto LinkNode = llvm::make_unique<TagNode>(HTMLTag::TAG_A, Text);
@@ -525,12 +544,15 @@ class HTMLGenerator : public Generator {
 public:
   static const char *Format;
 
-  llvm::Error generateDocForInfo(Info *I, llvm::raw_ostream &OS) override;
+  llvm::Error generateDocForInfo(Info *I, llvm::raw_ostream &OS,
+                                 const ClangDocContext &CDCtx) override;
+  bool createResources(ClangDocContext CDCtx) override;
 };
 
 const char *HTMLGenerator::Format = "html";
 
-llvm::Error HTMLGenerator::generateDocForInfo(Info *I, llvm::raw_ostream &OS) {
+llvm::Error HTMLGenerator::generateDocForInfo(Info *I, llvm::raw_ostream &OS,
+                                              const ClangDocContext &CDCtx) {
   HTMLFile F;
 
   auto MetaNode = llvm::make_unique<TagNode>(HTMLTag::TAG_META);
@@ -572,10 +594,35 @@ llvm::Error HTMLGenerator::generateDocForInfo(Info *I, llvm::raw_ostream &OS) {
 
   F.Children.emplace_back(
       llvm::make_unique<TagNode>(HTMLTag::TAG_TITLE, InfoTitle));
+  std::vector<std::unique_ptr<TagNode>> StylesheetsNodes =
+      genStylesheetsHTML(I->Path, CDCtx);
+  AppendVector(std::move(StylesheetsNodes), F.Children);
   F.Children.emplace_back(std::move(MainContentNode));
   F.Render(OS);
 
   return llvm::Error::success();
+}
+
+bool HTMLGenerator::createResources(ClangDocContext CDCtx) {
+  llvm::outs() << "Generating stylesheet for docs...\n";
+  for (const auto &FilePath : CDCtx.UserStylesheets) {
+    llvm::SmallString<128> StylesheetPathWrite;
+    llvm::sys::path::native(CDCtx.OutDirectory, StylesheetPathWrite);
+    llvm::sys::path::append(StylesheetPathWrite,
+                            llvm::sys::path::filename(FilePath));
+    llvm::SmallString<128> StylesheetPathRead;
+    llvm::sys::path::native(FilePath, StylesheetPathRead);
+    std::error_code OK;
+    std::error_code FileErr =
+        llvm::sys::fs::copy_file(StylesheetPathRead, StylesheetPathWrite);
+    if (FileErr != OK) {
+      llvm::errs() << "Error creating stylesheet file "
+                   << llvm::sys::path::filename(FilePath) << ": "
+                   << FileErr.message() << "\n";
+      return false;
+    }
+  }
+  return true;
 }
 
 static GeneratorRegistry::Add<HTMLGenerator> HTML(HTMLGenerator::Format,
