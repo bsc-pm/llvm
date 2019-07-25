@@ -202,6 +202,7 @@ static void gatherUnpackInstructions(DependInfo &DI,
                                      TaskAnalysisInfo &TAI,
                                      const OrderedInstructions &OI) {
   SmallVectorImpl<Instruction *> &UnpackIns = DI.UnpackInstructions;
+  SmallPtrSet<ConstantExpr *, 4> &UnpackConsts = DI.UnpackConstants;
   SmallPtrSet<Value *, 4> DSAMerge;
 
   DSAMerge.insert(DSAInfo.Shared.begin(), DSAInfo.Shared.end());
@@ -209,63 +210,40 @@ static void gatherUnpackInstructions(DependInfo &DI,
   DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
   Value *Base = DI.Base;
-  // Skip constant expressions
-  if (isa<Constant>(Base))
-    Base = Base->stripInBoundsConstantOffsets();
 
   // First element is the current instruction, second is
   // the Instruction where we come from (the dependency)
   SmallVector<std::pair<Value *, Value *>, 4> WorkList;
-  if (DSAMerge.find(Base) == DSAMerge.end()) {
-    // If it's not a DSA it must be an instruction
-    // that leads to a DSA
-    Instruction *I = cast<Instruction>(Base);
-    WorkList.emplace_back(I, I);
+  WorkList.emplace_back(Base, Base);
+  for (Value *V : DI.Dims)
+    WorkList.emplace_back(V, V);
 
-    UnpackIns.push_back(I);
-  } else {
-    if (!TAI.DepSymToIdx.count(Base)) {
-      TAI.DepSymToIdx[Base] = TAI.DepSymToIdx.size();
-    }
-    DI.SymbolIndex = TAI.DepSymToIdx[Base];
-  }
-  for (Value *V : DI.Dims) {
-    if (isa<Constant>(V))
-      V = V->stripInBoundsConstantOffsets();
-
-    if (Instruction *I = dyn_cast<Instruction>(V)) {
-      if (DSAMerge.find(I) == DSAMerge.end()) {
-        WorkList.emplace_back(I, I);
-
-        insertInstructionInProgramOrder(UnpackIns, I, OI);
-      }
-    }
-  }
   while (!WorkList.empty()) {
     auto It = WorkList.begin();
-    assert(!isa<AllocaInst>(It->first) && !isa<Argument>(It->first) && !isa<Constant>(It->first));
-    Instruction *CurI = cast<Instruction>(It->first);
-    Instruction *DepI = cast<Instruction>(It->second);
+    Value *Cur = It->first;
+    Value *Dep = It->second;
     WorkList.erase(It);
 
-    for (Use &U : CurI->operands()) {
-      Value *V = U.get();
-      if (isa<Constant>(V))
-        V = V->stripInBoundsConstantOffsets();
-
-      if (Instruction *I = dyn_cast<Instruction>(V)) {
-        if (DSAMerge.find(I) == DSAMerge.end()) {
-          WorkList.emplace_back(I, DepI);
-
-          insertInstructionInProgramOrder(UnpackIns, I, OI);
-        } else if (DepI == Base) {
-          // Found DSA associated with Dependency, assign SymbolIndex
-          if (!TAI.DepSymToIdx.count(I)) {
-            TAI.DepSymToIdx[I] = TAI.DepSymToIdx.size();
-          }
-          DI.SymbolIndex = TAI.DepSymToIdx[I];
+    if (DSAMerge.find(Cur) == DSAMerge.end()) {
+      if (ConstantExpr *CE = dyn_cast<ConstantExpr>(Cur)) {
+        for (Use &U : CE->operands()) {
+          WorkList.emplace_back(U.get(), Dep);
         }
+        UnpackConsts.insert(CE);
       }
+
+      if (Instruction *I = dyn_cast<Instruction>(Cur)) {
+        for (Use &U : I->operands()) {
+          WorkList.emplace_back(U.get(), Dep);
+        }
+        insertInstructionInProgramOrder(UnpackIns, I, OI);
+      }
+    } else if (Dep == Base) {
+      // Found DSA associated with Dependency, assign SymbolIndex
+      if (!TAI.DepSymToIdx.count(Base)) {
+        TAI.DepSymToIdx[Base] = TAI.DepSymToIdx.size();
+      }
+      DI.SymbolIndex = TAI.DepSymToIdx[Base];
     }
   }
 }
