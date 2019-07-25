@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-import sys
-import json
 import collections
+import json
 import logging
+import subprocess
+import sys
 
 IMPLEMENTED_LMULS = [1, 2, 4, 8]
 
@@ -11,6 +12,7 @@ IMPLEMENTED_LMULS = [1, 2, 4, 8]
 PRIMARIES = "evwm0us"
 MODIFIERS = "PKCUIF"
 
+runtime_error = False
 
 # Types can be rendered in several ways
 class Type:
@@ -276,9 +278,12 @@ class PrototypeModifier(Prototype):
             return TypeVector(new_element_type, t.scale)
 
 
-def process_tblgen_file(tablegen, input_tablegen):
-    import subprocess
-    t = subprocess.check_output([tablegen, "--dump-json", input_tablegen])
+def process_tblgen_file(tablegen, input_tablegen, include_paths):
+    inc_paths = []
+    for i in include_paths:
+        inc_paths.append("-I")
+        inc_paths.append(i)
+    t = subprocess.check_output([tablegen, "--dump-json", input_tablegen] + inc_paths)
     return json.loads(t.decode("utf-8"))
 
 
@@ -353,6 +358,39 @@ class InstantiatedBuiltin:
         return "EPI_BUILTIN({}, \"{}\", \"{}\")".format(self.full_name, \
             self.type_description, self.flags)
 
+    def c_prototype(self, parameter_names):
+        import builtin_parser
+        import type_render
+        (return_type, parameter_types) = builtin_parser.parse_type(self.type_description)
+        return_type_str = type_render.TypeRender(return_type).render()
+        parameter_types_str = map(lambda x : type_render.TypeRender(x).render(), parameter_types)
+
+        # Now add names to the parameters
+        # FIXME: This won't work for C declarators that need parentheses.
+        # Luckily we don't need any yet.
+        letter = ord('a')
+        for i in range(len(parameter_types_str)):
+            adjusted_i = i
+            if self.masked and self.builtin["HasMergeOperand"]:
+                adjusted_i -= 1
+
+            if i == 0 and self.masked and self.builtin["HasMergeOperand"]:
+                parameter_types_str[i] += " merge";
+            elif self.index_of_mask is not None and \
+                    self.index_of_mask - 1 == i and self.masked:
+                parameter_types_str[i] += " mask";
+            elif i + 1 == len(parameter_types) and self.builtin["HasVL"]:
+                parameter_types_str[i] += " gvl";
+            elif adjusted_i >= len(parameter_names):
+                if letter == ord('z'):
+                    raise Exception("Too many unnamed parameters")
+                parameter_types_str[i] += " {}".format(chr(letter))
+                letter += 1
+            else:
+                parameter_types_str[i] += " {}".format(parameter_names[adjusted_i])
+
+        return "{} __builtin_epi_{}({});".format(return_type_str, \
+            self.full_name, ", ".join(parameter_types_str))
 
 def compute_builtin_name(builtin, prototype, type_spec, lmul):
     res = "{}".format(builtin["Name"])
@@ -514,28 +552,168 @@ def emit_codegen(out_file, j):
             out_file.write("case RISCV::EPI_BI_{}:\n".format(case))
         out_file.write(code)
 
+def adjust_text(text):
+    text = text.strip("\n")
+    text = text.rstrip()
+    lines = text.splitlines()
+    min_leading_spaces = None
+    for l in lines:
+        # Blank lines are handled like newlines
+        if l.strip() == "":
+            continue
+
+        leading_spaces = 0
+        for c in l:
+            if c == ' ':
+                leading_spaces += 1
+            else:
+                break
+        if min_leading_spaces is None:
+            min_leading_spaces = leading_spaces
+        else:
+            min_leading_spaces = min(min_leading_spaces, leading_spaces)
+
+    # Remove leading spaces
+    if min_leading_spaces is not None:
+        new_lines = []
+        for l in lines:
+            if l.strip() == "":
+                new_lines.append("")
+            else:
+                new_lines.append(l[min_leading_spaces:])
+        text = "\n".join(new_lines)
+
+    return text
+
+
+def format_code(source, clang_format):
+    format_pipe = subprocess.Popen([clang_format, "--style=LLVM"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    format_pipe.stdin.write(source)
+    (outdata, errdata) = format_pipe.communicate()
+    if format_pipe.returncode != 0:
+        raise Exception("Call to clang-format failed\n{}".format(errdata))
+    return outdata
+
+
+def emit_markdown_document(out_file, j, clang_format):
+    inst_builtins = instantiate_builtins(j)
+
+    all_docs = j["!instanceof"]["DocEPIBuiltin"]
+    documented = set([])
+    categories = {}
+    for doc_record_name in all_docs:
+        doc = j[doc_record_name]
+        if doc["Undocumented"] != 0:
+            builtin_record_name = doc["Builtin"]["printable"]
+            documented.add(builtin_record_name)
+            continue
+        category_id = doc["Category"]["printable"]
+        if category_id not in categories:
+            categories[category_id] = [doc]
+        else:
+            categories[category_id].append(doc)
+
+    sorted_categories = list(categories.keys())
+    sorted_categories.sort(key = lambda x : j[x]["Index"])
+
+    for category_id in sorted_categories:
+        category_name = j[category_id]["Name"]
+        out_file.write("## {}\n\n".format(category_name))
+        sorted_docs = categories[category_id]
+        sorted_docs.sort(key = lambda x : x["Builtin"]["printable"])
+        for doc in sorted_docs:
+            builtin_record_name = doc["Builtin"]["printable"]
+            builtin_record = j[builtin_record_name]
+
+            if builtin_record_name in documented:
+                logging.error("Builtin {} documented more than once".format(builtin_record_name))
+                runtime_error = True
+            documented.add(builtin_record_name)
+
+            out_file.write("### {}\n\n".format(doc["Title"]))
+            out_file.write("**Description:**\n\n{}\n\n".format(doc["Description"]))
+
+            if doc["Instruction"]:
+                out_file.write("**Instruction:**\n\n")
+                out_file.write("```\n")
+                out_file.write(doc["Instruction"] + "\n")
+                out_file.write("```\n")
+                out_file.write("\n")
+
+            # Unmasked
+            # FIXME - Build an index instead of traversing all the builtins
+            prototypes = ""
+            for inst in inst_builtins:
+                if inst.builtin is builtin_record and not inst.masked:
+                    prototypes += inst.c_prototype(doc["ParameterNames"]) + "\n";
+            formatted_prototypes = format_code(prototypes, clang_format)
+
+            out_file.write("**Prototypes**:\n\n")
+            out_file.write("```cpp\n");
+            out_file.write(formatted_prototypes)
+            out_file.write("```\n");
+
+            if doc["Operation"]:
+                out_file.write("**Operation:**\n\n")
+                out_file.write("```\n")
+                out_file.write(adjust_text(doc["Operation"]) + "\n")
+                out_file.write("```\n\n")
+
+            # Masked
+            if builtin_record["HasMask"] != 0:
+                out_file.write("**Masked prototypes**:\n\n")
+                prototypes = ""
+                for inst in inst_builtins:
+                    if inst.builtin is builtin_record and inst.masked:
+                        prototypes += inst.c_prototype(doc["ParameterNames"]) + "\n";
+                formatted_prototypes = format_code(prototypes, clang_format)
+
+                out_file.write("```cpp\n");
+                out_file.write(formatted_prototypes)
+                out_file.write("```\n");
+
+                if doc["OperationMask"]:
+                    out_file.write("**Masked operation**:\n\n")
+                    out_file.write("```\n")
+                    out_file.write(adjust_text(doc["OperationMask"]) + "\n")
+                    out_file.write("```\n\n")
+
+    for builtin in j["!instanceof"]["EPIBuiltin"]:
+        if builtin not in documented:
+            logging.warning("Builtin '{}' has not been documented".format(builtin));
+
+
 if __name__ == "__main__":
     import argparse
-    args = argparse.ArgumentParser(description="Generate instruction table")
-    args.add_argument("--mode", required=True,
-            choices=["builtins-def", "codegen"], help="Mode of operation")
-    args.add_argument("--tablegen", required=True, help="Path of tablegen")
-    args.add_argument("--output-file", required=False, help="Output file. stdout otherwise")
-    args.add_argument("input_tblgen",
-                      help="File with the tablegen description")
-    args = args.parse_args()
+    parser = argparse.ArgumentParser(description="Generate instruction table")
+    parser.add_argument("--mode", required=True,
+            choices=["builtins-def", "codegen", "docs"], help="Mode of operation")
+    parser.add_argument("--tablegen", required=True, help="Path of tablegen")
+    parser.add_argument("--output-file", required=False, help="Output file. stdout otherwise")
+    parser.add_argument("--clang-format", required=False, help="Path of clang-format")
+    parser.add_argument("-I", dest="include_paths", required=False,
+                      help="Include path", action="append")
+    parser.add_argument("input_tblgen", help="File with the tablegen description")
+    args = parser.parse_args()
 
     out_file = sys.stdout
     if args.output_file:
         out_file = open(args.output_file, "w")
 
-    j = process_tblgen_file(args.tablegen, args.input_tblgen)
+    j = process_tblgen_file(args.tablegen, args.input_tblgen, args.include_paths)
 
     if args.mode == "builtins-def":
         emit_builtins_def(out_file, j)
     elif args.mode == "codegen":
         emit_codegen(out_file, j)
+    elif args.mode == "docs":
+        if not args.clang_format:
+            parser.error("You have to pass --clang-format when generating documentation")
+        emit_markdown_document(out_file, j, args.clang_format)
     else:
         raise Exception("Unexpected mode '{}".format(args.mode))
 
     out_file.close()
+    if runtime_error:
+        sys.exit(1)

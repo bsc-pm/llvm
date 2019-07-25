@@ -153,25 +153,6 @@ class EPIBuiltin<string suffix, string prototype,
 }
 
 //===----------------------------------------------------------------------===//
-// Still unused, will be used for documentation.
-//===----------------------------------------------------------------------===//
-class DocEPIBuiltinCategory {
-  string Name = "";
-}
-
-def DocEPICategoryNone : DocEPIBuiltinCategory;
-
-class DocEPIBuiltin<EPIBuiltin builtin>
-{
-  EPIBuiltin Builtin = builtin;
-  DocEPIBuiltinCategory Category = DocEPICategoryNone;
-  string Title = "";
-  string Operation = "";
-  string Description = "";
-  string Instruction = "";
-}
-
-//===----------------------------------------------------------------------===//
 // Basic classes with automatic codegen.
 //===----------------------------------------------------------------------===//
 class EPIBinBuiltin<string suffix, string prototype, string type_range>
@@ -610,4 +591,3 @@ let HasMask = 0, HasVL = 0, Name = "cast", IntrinsicName = "mask_cast" in
   def cast_to_mask : EPIUnaBuiltin<"mv", "mv", "csil">;
   def cast_from_mask : EPIUnaBuiltin<"vm", "vm", "csil">;
 }
-
