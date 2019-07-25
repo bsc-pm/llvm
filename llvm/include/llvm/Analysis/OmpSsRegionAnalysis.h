@@ -33,6 +33,8 @@ struct DependInfo {
   // the call to nanos6 register dependency
   // Stored in program order
   SmallVector<Instruction *, 4> UnpackInstructions;
+  // All the constants needed between dependency and DSAs
+  SmallVector<Constant *, 4> UnpackConstants;
 };
 
 struct TaskDependsInfo {

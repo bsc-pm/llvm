@@ -123,8 +123,8 @@ struct OmpSs : public ModulePass {
     unpackDepsOfType(TDI.WeakOuts, F);
     unpackDepsOfType(TDI.WeakInouts, F);
     // Rewrite instructions to use arguments
-    Function::arg_iterator AI = F->arg_begin();
     for (Instruction &I : F->getEntryBlock()) {
+      Function::arg_iterator AI = F->arg_begin();
       for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
         I.replaceUsesOfWith(DSAMerge[i], &*AI);
       }

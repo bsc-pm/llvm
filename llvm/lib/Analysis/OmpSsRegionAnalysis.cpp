@@ -208,23 +208,31 @@ static void gatherUnpackInstructions(DependInfo &DI,
   DSAMerge.insert(DSAInfo.Private.begin(), DSAInfo.Private.end());
   DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
+  Value *Base = DI.Base;
+  // Skip constant expressions
+  if (isa<Constant>(Base))
+    Base = Base->stripInBoundsConstantOffsets();
+
   // First element is the current instruction, second is
   // the Instruction where we come from (the dependency)
   SmallVector<std::pair<Value *, Value *>, 4> WorkList;
-  if (DSAMerge.find(DI.Base) == DSAMerge.end()) {
+  if (DSAMerge.find(Base) == DSAMerge.end()) {
     // If it's not a DSA it must be an instruction
     // that leads to a DSA
-    Instruction *I = cast<Instruction>(DI.Base);
+    Instruction *I = cast<Instruction>(Base);
     WorkList.emplace_back(I, I);
 
     UnpackIns.push_back(I);
   } else {
-    if (!TAI.DepSymToIdx.count(DI.Base)) {
-      TAI.DepSymToIdx[DI.Base] = TAI.DepSymToIdx.size();
+    if (!TAI.DepSymToIdx.count(Base)) {
+      TAI.DepSymToIdx[Base] = TAI.DepSymToIdx.size();
     }
-    DI.SymbolIndex = TAI.DepSymToIdx[DI.Base];
+    DI.SymbolIndex = TAI.DepSymToIdx[Base];
   }
   for (Value *V : DI.Dims) {
+    if (isa<Constant>(V))
+      V = V->stripInBoundsConstantOffsets();
+
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       if (DSAMerge.find(I) == DSAMerge.end()) {
         WorkList.emplace_back(I, I);
@@ -241,17 +249,21 @@ static void gatherUnpackInstructions(DependInfo &DI,
     WorkList.erase(It);
 
     for (Use &U : CurI->operands()) {
-      if (Instruction *II = dyn_cast<Instruction>(U.get())) {
-        if (DSAMerge.find(II) == DSAMerge.end()) {
-          WorkList.emplace_back(II, DepI);
+      Value *V = U.get();
+      if (isa<Constant>(V))
+        V = V->stripInBoundsConstantOffsets();
 
-          insertInstructionInProgramOrder(UnpackIns, II, OI);
-        } else if (DepI == DI.Base) {
+      if (Instruction *I = dyn_cast<Instruction>(V)) {
+        if (DSAMerge.find(I) == DSAMerge.end()) {
+          WorkList.emplace_back(I, DepI);
+
+          insertInstructionInProgramOrder(UnpackIns, I, OI);
+        } else if (DepI == Base) {
           // Found DSA associated with Dependency, assign SymbolIndex
-          if (!TAI.DepSymToIdx.count(II)) {
-            TAI.DepSymToIdx[II] = TAI.DepSymToIdx.size();
+          if (!TAI.DepSymToIdx.count(I)) {
+            TAI.DepSymToIdx[I] = TAI.DepSymToIdx.size();
           }
-          DI.SymbolIndex = TAI.DepSymToIdx[II];
+          DI.SymbolIndex = TAI.DepSymToIdx[I];
         }
       }
     }
@@ -271,7 +283,7 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
     DI.SymbolIndex = -1;
     // TODO: Support RegionText stringifying clause content
     DI.RegionText = "";
-    DI.Base = OBArgs[0]->stripPointerCastsNoFollowAliases();
+    DI.Base = OBArgs[0];
     for (size_t i = 1; i < OBArgs.size(); ++i) {
       DI.Dims.push_back(OBArgs[i]);
     }
