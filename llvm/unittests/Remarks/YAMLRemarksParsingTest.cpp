@@ -71,7 +71,10 @@ void parseExpectErrorMeta(StringRef Buf, const char *Error) {
       remarks::createRemarkParserFromMeta(remarks::Format::YAML, Buf);
   handleAllErrors(MaybeParser.takeError(),
                   [&](const ErrorInfoBase &EIB) { EIB.log(Stream); });
-  EXPECT_EQ(Stream.str(), Error);
+
+  // Use a case insensitive comparision due to case differences in error strings
+  // for different OSs.
+  EXPECT_EQ(StringRef(Stream.str()).lower(), StringRef(Error).lower());
 }
 
 TEST(YAMLRemarks, ParsingEmpty) {
