@@ -105,7 +105,26 @@ struct OmpSs : public ModulePass {
   // TODO: Use Map and a function to look up if it exists already
   SmallVector<SmallVector<FunctionCallee, DEP_ENUM_SIZE>, MAX_DEP_DIMS> RegisterRegionsTypes;
 
-  void unpackDeps(const TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
+  void rewriteDepBase(ArrayRef<Value *> DSAMerge,
+                      Function *F,
+                      DenseMap<Value *, Value *> &ConstExprToInst,
+                      SmallVectorImpl<DependInfo> &DependList) {
+    for (DependInfo &DI : DependList) {
+      if (ConstExprToInst.count(DI.Base)) {
+        DI.Base = ConstExprToInst[DI.Base];
+      } else {
+        Function::arg_iterator AI = F->arg_begin();
+        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
+          if (DSAMerge[i] == DI.Base) {
+            DI.Base = &*AI;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  void unpackDepsAndRewrite(TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
     BasicBlock &Entry = F->getEntryBlock();
     DenseMap<Value *, Value *> ConstExprToInst;
     for (ConstantExpr * const &CE : TDI.UnpackConstants) {
@@ -127,6 +146,12 @@ struct OmpSs : public ModulePass {
         I.replaceUsesOfWith(p.first, p.second);
       }
     }
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Ins);
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Outs);
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Inouts);
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakIns);
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakOuts);
+    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakInouts);
   }
 
   void unpackCallToRTOfType(Module &M,
@@ -137,26 +162,7 @@ struct OmpSs : public ModulePass {
     for (const DependInfo &DI : DependList) {
       IRBuilder<> BBBuilder(&F->getEntryBlock().back());
 
-      // Dependency Base rewrite:
-      //   GlobalValue
-      //     replace by task argument
-      //   DSA
-      //     replace by task argument
-      //   No DSA
-      //     do nothing since it's in unpack instructions
-      Value *NewBase = DI.Base;
-      bool Found = false;
-      Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = DSAMerge.size(); i != e && !Found; ++i) {
-        if (DSAMerge[i] == NewBase)
-          Found = true;
-        else
-          ++AI;
-      }
-      if (Found)
-        NewBase = &*AI;
-
-      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      Value *BaseCast = BBBuilder.CreateBitCast(DI.Base, Type::getInt8PtrTy(M.getContext()));
       SmallVector<Value *, 4> TaskDepAPICall;
       Value *Handler = &*(F->arg_end() - 1);
       TaskDepAPICall.push_back(Handler);
@@ -376,7 +382,7 @@ struct OmpSs : public ModulePass {
     TwI.I->eraseFromParent();
   }
 
-  void lowerTask(const TaskInfo &TI,
+  void lowerTask(TaskInfo &TI,
                  Function &F,
                  size_t taskNum,
                  Module &M) {
@@ -448,7 +454,7 @@ struct OmpSs : public ModulePass {
     Function *UnpackDepsFuncVar
       = createUnpackDepsFunction(M, F, Twine(taskNum).str(), DSAMerge.getArrayRef());
 
-    unpackDeps(TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackDepsAndRewrite(TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
     UnpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
     unpackDepsCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());

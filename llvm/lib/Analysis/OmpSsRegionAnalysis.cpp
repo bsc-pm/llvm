@@ -200,12 +200,10 @@ static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
   DSAMerge.insert(DSAInfo.Private.begin(), DSAInfo.Private.end());
   DSAMerge.insert(DSAInfo.Firstprivate.begin(), DSAInfo.Firstprivate.end());
 
-  Value *Base = DI.Base;
-
   // First element is the current instruction, second is
-  // the Instruction where we come from (the dependency)
+  // the Instruction where we come from (origin of the dependency)
   SmallVector<std::pair<Value *, Value *>, 4> WorkList;
-  WorkList.emplace_back(Base, Base);
+  WorkList.emplace_back(DI.Base, DI.Base);
   for (Value *V : DI.Dims)
     WorkList.emplace_back(V, V);
 
@@ -229,12 +227,13 @@ static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
         }
         insertUniqInstInProgramOrder(UnpackInsts, I, OI);
       }
-    } else if (Dep == Base) {
+    } else if (Dep == DI.Base) {
       // Found DSA associated with Dependency, assign SymbolIndex
-      if (!TAI.DepSymToIdx.count(Base)) {
-        TAI.DepSymToIdx[Base] = TAI.DepSymToIdx.size();
+      // Cur is the DSA Value
+      if (!TAI.DepSymToIdx.count(Cur)) {
+        TAI.DepSymToIdx[Cur] = TAI.DepSymToIdx.size();
       }
-      DI.SymbolIndex = TAI.DepSymToIdx[Base];
+      DI.SymbolIndex = TAI.DepSymToIdx[Cur];
     }
   }
 }
