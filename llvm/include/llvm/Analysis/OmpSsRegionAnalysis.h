@@ -29,12 +29,6 @@ struct DependInfo {
   std::string RegionText;
   Value *Base;
   SmallVector<Value *, 4> Dims;
-  // Instructions needed as a bridge between task args structure and
-  // the call to nanos6 register dependency
-  // Stored in program order
-  SmallVector<Instruction *, 4> UnpackInstructions;
-  // All the constants needed between dependency and DSAs
-  SmallPtrSet<ConstantExpr *, 4> UnpackConstants;
 };
 
 struct TaskDependsInfo {
@@ -44,6 +38,12 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakIns;
   SmallVector<DependInfo, 4> WeakOuts;
   SmallVector<DependInfo, 4> WeakInouts;
+
+  // Unique Instructions needed as a bridge between dependency and DSAs
+  // Stored in program order
+  SmallVector<Instruction *, 4> UnpackInstructions;
+  // Unique ConstantExpr needed between dependency and DSAs
+  SetVector<ConstantExpr *> UnpackConstants;
   int NumSymbols;
 };
 

@@ -105,43 +105,28 @@ struct OmpSs : public ModulePass {
   // TODO: Use Map and a function to look up if it exists already
   SmallVector<SmallVector<FunctionCallee, DEP_ENUM_SIZE>, MAX_DEP_DIMS> RegisterRegionsTypes;
 
-  void unpackDepsOfType(const SmallVectorImpl<DependInfo> &DependList, Function *F, ArrayRef<Value *> DSAMerge) {
+  void unpackDeps(const TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
     BasicBlock &Entry = F->getEntryBlock();
     DenseMap<Value *, Value *> ConstExprToInst;
-    SmallVector<Instruction *, 4> InstrToUpdate;
-    for (const DependInfo &DI : DependList) {
-      for (ConstantExpr * const &CE : DI.UnpackConstants) {
-        Instruction *I = CE->getAsInstruction();
-        Entry.getInstList().push_back(I);
+    for (ConstantExpr * const &CE : TDI.UnpackConstants) {
+      Instruction *I = CE->getAsInstruction();
+      Entry.getInstList().push_back(I);
 
-        ConstExprToInst[CE] = I;
-        InstrToUpdate.push_back(I);
-      }
-      for (Instruction * const &I : DI.UnpackInstructions) {
-        I->removeFromParent();
-        Entry.getInstList().push_back(I);
-
-        InstrToUpdate.push_back(I);
-      }
+      ConstExprToInst[CE] = I;
     }
-    for (Instruction *I : InstrToUpdate) {
+    for (Instruction * const &I : TDI.UnpackInstructions) {
+      I->removeFromParent();
+      Entry.getInstList().push_back(I);
+    }
+    for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
       for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
-        I->replaceUsesOfWith(DSAMerge[i], &*AI);
+        I.replaceUsesOfWith(DSAMerge[i], &*AI);
       }
       for (auto &p : ConstExprToInst) {
-        I->replaceUsesOfWith(p.first, p.second);
+        I.replaceUsesOfWith(p.first, p.second);
       }
     }
-  }
-
-  void unpackDeps(const TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
-    unpackDepsOfType(TDI.Ins, F, DSAMerge);
-    unpackDepsOfType(TDI.Outs, F, DSAMerge);
-    unpackDepsOfType(TDI.Inouts, F, DSAMerge);
-    unpackDepsOfType(TDI.WeakIns, F, DSAMerge);
-    unpackDepsOfType(TDI.WeakOuts, F, DSAMerge);
-    unpackDepsOfType(TDI.WeakInouts, F, DSAMerge);
   }
 
   void unpackCallToRTOfType(Module &M,
