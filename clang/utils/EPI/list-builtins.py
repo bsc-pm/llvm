@@ -12,5 +12,11 @@ def emit_declaration(builtin_name, prototype):
             builtin_name, ", ".join(argument_types_str))
 
 if __name__ == "__main__":
-    for (builtin_name, prototype) in preprocess_builtins():
+    import argparse
+    args = argparse.ArgumentParser(description="Generate instruction table")
+    args.add_argument("--builtins-epi", required=True, help="Path of BuiltinsEPI.def file")
+
+    args = args.parse_args()
+
+    for (builtin_name, prototype) in preprocess_builtins(args.builtins_epi):
         emit_declaration(builtin_name, prototype)

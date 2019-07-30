@@ -1049,13 +1049,19 @@ def emit_test(builtin_name, prototype):
         test_output.append(s)
 
 if __name__ == "__main__":
+    import argparse
+    args = argparse.ArgumentParser(description="Generate instruction table")
+    args.add_argument("--builtins-epi", required=True, help="Path of BuiltinsEPI.def file")
+
+    args = args.parse_args()
+
     print r"""// RUN: %clang_cc1 -triple riscv64-unknown-linux-gnu -emit-llvm -O2 -o - \
 // RUN:       -target-feature +m -target-feature +a -target-feature +f \
 // RUN:       -target-feature +d -target-feature +c \
 // RUN:       -target-feature +epi -target-abi lp64d %s \
 // RUN:       | FileCheck --check-prefix=CHECK-O2 %s
 """
-    for (builtin_name, prototype) in preprocess_builtins():
+    for (builtin_name, prototype) in preprocess_builtins(args.builtins_epi):
         emit_test(builtin_name, prototype)
 
     for u in untested:
