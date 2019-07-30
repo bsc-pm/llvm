@@ -838,10 +838,15 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   RefExpr = RefExpr->IgnoreParenImpCasts();
   auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
   auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-  if (!DE || !isa<VarDecl>(DE->getDecl())) {
 
-      S.Diag(ELoc, diag::err_oss_expected_var_name) << ERange;
-      return nullptr;
+  if ((!DE || !isa<VarDecl>(DE->getDecl())) &&
+      (S.getCurrentThisType().isNull() || !ME ||
+       !isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()) ||
+       !isa<FieldDecl>(ME->getMemberDecl()))) {
+
+    S.Diag(ELoc, diag::err_oss_expected_var_name_member_expr)
+        << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
+    return nullptr;
   }
 
   auto *VD = dyn_cast<VarDecl>(DE->getDecl());
