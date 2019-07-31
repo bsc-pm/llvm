@@ -9,8 +9,6 @@
 declare i64 @llvm.epi.vsetvl(
   i64, i64, i64);
 
-declare i64 @llvm.epi.vreadvl();
-
 declare <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
   <vscale x 1 x double>,
   <vscale x 1 x double>,

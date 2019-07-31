@@ -198,3 +198,36 @@ define void @test_vsetvl_interleave_vlmul(<vscale x 1 x double>* %vm1, <vscale x
 
     ret void
 }
+
+define i64 @test_vsetvl_interleave_avl(i64 %avl, i64 %avl2, i64 %avl3, i64 %avl4) nounwind
+; CHECK-O0-LABEL: test_vsetvl_interleave_avl:
+; CHECK-O0:       # %bb.0:
+; CHECK-O0-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-O0-NEXT:    vsetvli a1, a1, e64, m1
+; CHECK-O0-NEXT:    add a0, a1, a0
+; CHECK-O0-NEXT:    vsetvli a1, a2, e64, m1
+; CHECK-O0-NEXT:    add a0, a0, a1
+; CHECK-O0-NEXT:    vsetvli a1, a3, e64, m1
+; CHECK-O0-NEXT:    add a0, a0, a1
+; CHECK-O0-NEXT:    ret
+;
+; CHECK-O2-LABEL: test_vsetvl_interleave_avl:
+; CHECK-O2:       # %bb.0:
+; CHECK-O2-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
+; CHECK-O2-NEXT:    add a0, a1, a0
+; CHECK-O2-NEXT:    vsetvli a1, a2, e64, m1
+; CHECK-O2-NEXT:    add a0, a0, a1
+; CHECK-O2-NEXT:    vsetvli a1, a3, e64, m1
+; CHECK-O2-NEXT:    add a0, a0, a1
+; CHECK-O2-NEXT:    ret
+{
+  %1 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)
+  %2 = tail call i64 @llvm.epi.vsetvl(i64 %avl2, i64 3, i64 0)
+  %3 = tail call i64 @llvm.epi.vsetvl(i64 %avl3, i64 3, i64 0)
+  %4 = tail call i64 @llvm.epi.vsetvl(i64 %avl4, i64 3, i64 0)
+  %add = add nsw i64 %2, %1
+  %add1 = add nsw i64 %add, %3
+  %add2 = add nsw i64 %add1, %4
+  ret i64 %add2
+}
