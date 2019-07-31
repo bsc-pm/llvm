@@ -692,7 +692,7 @@ if __name__ == "__main__":
     parser.add_argument("--tablegen", required=True, help="Path of tablegen")
     parser.add_argument("--output-file", required=False, help="Output file. stdout otherwise")
     parser.add_argument("--clang-format", required=False, help="Path of clang-format")
-    parser.add_argument("-I", dest="include_paths", required=False,
+    parser.add_argument("-I", dest="include_paths", required=False, default=[],
                       help="Include path", action="append")
     parser.add_argument("input_tblgen", help="File with the tablegen description")
     args = parser.parse_args()
