@@ -9741,10 +9741,12 @@ public:
                                       SourceLocation EndLoc);
 
   /// Called on well-formed 'shared' clause.
+  /// isImplicit is used to handle CXXThisExpr generated from the compiler
   OSSClause *ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
-                                    SourceLocation EndLoc);
+                                    SourceLocation EndLoc,
+                                    bool isImplicit=false);
 
   /// Called on well-formed 'private' clause.
   OSSClause *ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
