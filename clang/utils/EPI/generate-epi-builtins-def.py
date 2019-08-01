@@ -601,6 +601,7 @@ def format_code(source, clang_format):
         raise Exception("Call to clang-format failed\n{}".format(errdata))
     return outdata
 
+LETTERS = [ chr(x) for x in range(ord('A'), ord('Z') + 1) ]
 
 def emit_markdown_document(out_file, j, clang_format):
     inst_builtins = instantiate_builtins(j)
@@ -623,11 +624,13 @@ def emit_markdown_document(out_file, j, clang_format):
     sorted_categories = list(categories.keys())
     sorted_categories.sort(key = lambda x : j[x]["Index"])
 
+    category_number = 0
     for category_id in sorted_categories:
         category_name = j[category_id]["Name"]
-        out_file.write("## {}\n\n".format(category_name))
+        out_file.write("## {}. {}\n\n".format(LETTERS[category_number], category_name))
         sorted_docs = categories[category_id]
         sorted_docs.sort(key = lambda x : x["Builtin"]["printable"])
+        builtin_number = 0
         for doc in sorted_docs:
             builtin_record_name = doc["Builtin"]["printable"]
             builtin_record = j[builtin_record_name]
@@ -637,7 +640,8 @@ def emit_markdown_document(out_file, j, clang_format):
                 runtime_error = True
             documented.add(builtin_record_name)
 
-            out_file.write("### {}\n\n".format(doc["Title"]))
+            builtin_number += 1
+            out_file.write("### {}.{}. {}\n\n".format(LETTERS[category_number], builtin_number, doc["Title"]))
             out_file.write("**Description:**\n\n{}\n\n".format(doc["Description"]))
 
             if doc["Instruction"]:
@@ -684,6 +688,7 @@ def emit_markdown_document(out_file, j, clang_format):
                     out_file.write("```\n")
                     out_file.write(adjust_text(doc["OperationMask"]) + "\n")
                     out_file.write("```\n\n")
+        category_number = 0
 
     for builtin in j["!instanceof"]["EPIBuiltin"]:
         if builtin not in documented:
