@@ -842,56 +842,8 @@ bool AMDGPUInstructionSelector::selectG_SELECT(MachineInstr &I) const {
 
 bool AMDGPUInstructionSelector::selectG_STORE(
   MachineInstr &I, CodeGenCoverage &CoverageInfo) const {
-  MachineBasicBlock *BB = I.getParent();
-  MachineFunction *MF = BB->getParent();
-  MachineRegisterInfo &MRI = MF->getRegInfo();
-  const DebugLoc &DL = I.getDebugLoc();
-
-  LLT PtrTy = MRI.getType(I.getOperand(1).getReg());
-  if (PtrTy.getSizeInBits() != 64) {
-    initM0(I);
-    return selectImpl(I, CoverageInfo);
-  }
-
-  if (selectImpl(I, CoverageInfo))
-    return true;
-
-  unsigned StoreSize = RBI.getSizeInBits(I.getOperand(0).getReg(), MRI, TRI);
-  unsigned Opcode;
-
-  // FIXME: Remove this when integers > s32 naturally selected.
-  switch (StoreSize) {
-  default:
-    return false;
-  case 32:
-    Opcode = AMDGPU::FLAT_STORE_DWORD;
-    break;
-  case 64:
-    Opcode = AMDGPU::FLAT_STORE_DWORDX2;
-    break;
-  case 96:
-    Opcode = AMDGPU::FLAT_STORE_DWORDX3;
-    break;
-  case 128:
-    Opcode = AMDGPU::FLAT_STORE_DWORDX4;
-    break;
-  }
-
-  MachineInstr *Flat = BuildMI(*BB, &I, DL, TII.get(Opcode))
-          .add(I.getOperand(1))
-          .add(I.getOperand(0))
-          .addImm(0)  // offset
-          .addImm(0)  // glc
-          .addImm(0)  // slc
-          .addImm(0); // dlc
-
-
-  // Now that we selected an opcode, we need to constrain the register
-  // operands to use appropriate classes.
-  bool Ret = constrainSelectedInstRegOperands(*Flat, TII, TRI, RBI);
-
-  I.eraseFromParent();
-  return Ret;
+  initM0(I);
+  return selectImpl(I, CoverageInfo);
 }
 
 static int sizeToSubRegIndex(unsigned Size) {
@@ -1263,8 +1215,8 @@ void AMDGPUInstructionSelector::initM0(MachineInstr &I) const {
   }
 }
 
-bool AMDGPUInstructionSelector::selectG_LOAD(MachineInstr &I,
-                                             CodeGenCoverage &CoverageInfo) const {
+bool AMDGPUInstructionSelector::selectG_LOAD_ATOMICRMW(MachineInstr &I,
+                                                       CodeGenCoverage &CoverageInfo) const {
   initM0(I);
   return selectImpl(I, CoverageInfo);
 }
@@ -1384,8 +1336,19 @@ bool AMDGPUInstructionSelector::select(MachineInstr &I,
       return true;
     return selectImpl(I, CoverageInfo);
   case TargetOpcode::G_LOAD:
-    return selectG_LOAD(I, CoverageInfo);
-
+  case TargetOpcode::G_ATOMIC_CMPXCHG:
+  case TargetOpcode::G_ATOMICRMW_XCHG:
+  case TargetOpcode::G_ATOMICRMW_ADD:
+  case TargetOpcode::G_ATOMICRMW_SUB:
+  case TargetOpcode::G_ATOMICRMW_AND:
+  case TargetOpcode::G_ATOMICRMW_OR:
+  case TargetOpcode::G_ATOMICRMW_XOR:
+  case TargetOpcode::G_ATOMICRMW_MIN:
+  case TargetOpcode::G_ATOMICRMW_MAX:
+  case TargetOpcode::G_ATOMICRMW_UMIN:
+  case TargetOpcode::G_ATOMICRMW_UMAX:
+  case TargetOpcode::G_ATOMICRMW_FADD:
+    return selectG_LOAD_ATOMICRMW(I, CoverageInfo);
   case TargetOpcode::G_SELECT:
     return selectG_SELECT(I);
   case TargetOpcode::G_STORE:
