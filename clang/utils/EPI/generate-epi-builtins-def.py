@@ -385,7 +385,7 @@ class InstantiatedBuiltin:
             elif self.index_of_mask is not None and \
                     self.index_of_mask - 1 == i and self.masked:
                 parameter_types_str[i] += " mask";
-            elif i + 1 == len(parameter_types) and self.builtin["HasVL"]:
+            elif i + 1 == len(parameter_types_str) and self.builtin["HasVL"]:
                 parameter_types_str[i] += " gvl";
             elif adjusted_i >= len(parameter_names):
                 if letter == ord('z'):
