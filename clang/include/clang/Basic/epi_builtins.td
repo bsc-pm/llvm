@@ -596,10 +596,9 @@ def vslidedown : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 def vslide1up : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 def vslide1down : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 
-// FIXME this is bogus, see #4, the right definition is "vvIv".
-def vrgather : EPIVecScalarBuiltin<"v", "vvs", "csilfd">;
-// FIXME: Not implemented as an intrinsic yet.
-// def vsplat : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
+def vrgather : EPIVecScalarBuiltin<"v", "vvIv", "csilfd">;
+let IntrinsicName = "vrgather", IntrinsicNameMask = "vrgather_mask" in
+def vsplat : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 
 let HasMask = 0 in
 def vcompress : EPIBinBuiltin<"v", "vvm", "csilfd">;

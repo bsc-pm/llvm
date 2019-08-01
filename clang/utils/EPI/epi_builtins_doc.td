@@ -3511,6 +3511,38 @@ based on a vector of indices.}];
   }];
 }
 
+def : DocEPIBuiltin<vsplat>
+{
+  let Category = DocEPILaneManipulation;
+  let Title = "Broadcast the element of a vector to all the elements of a vector";
+  let Description = [{Use these builtins to create a vector where all the
+elements have the value of an element of another vector}];
+  let Instruction = "vrgather.vx / vrgather.vi";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       if b > VLMAX then
+         result[element] = 0
+       else
+         result[element] = a[b]
+
+    result[gvl : VLMAX] = 0
+  }];
+
+  let OperationMask = [{
+    for element = 0 to gvl - 1
+       if mask[element] then
+         if b > VLMAX then
+           result[element] = 0
+         else
+           result[element] = a[b]
+       else
+         result[element] = merge[element]
+
+    result[gvl : VLMAX] = 0
+  }];
+}
+
 def : DocEPIBuiltin<vsetfirst_int>
 {
   let Category = DocEPILaneManipulation;
