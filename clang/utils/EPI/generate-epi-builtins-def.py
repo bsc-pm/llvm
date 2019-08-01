@@ -344,8 +344,9 @@ def compute_builtin_type_clang(builtin, prototype, type_spec, lmul):
 
 
 class InstantiatedBuiltin:
-    def __init__(self, full_name, type_description, flags, builtin, prototype,
-            masked = False, index_of_mask = None):
+    def __init__(self, lmul, full_name, type_description, flags, builtin,
+            prototype, masked = False, index_of_mask = None):
+        self.lmul = lmul
         self.full_name = full_name
         self.type_description = type_description
         self.flags = flags
@@ -358,12 +359,17 @@ class InstantiatedBuiltin:
         return "EPI_BUILTIN({}, \"{}\", \"{}\")".format(self.full_name, \
             self.type_description, self.flags)
 
-    def c_prototype(self, parameter_names):
+    def c_prototoype_items(self):
         import builtin_parser
         import type_render
         (return_type, parameter_types) = builtin_parser.parse_type(self.type_description)
         return_type_str = type_render.TypeRender(return_type).render()
         parameter_types_str = map(lambda x : type_render.TypeRender(x).render(), parameter_types)
+
+        return (return_type_str, parameter_types_str)
+
+    def c_prototype(self, parameter_names):
+        (return_type_str, parameter_types_str) = self.c_prototoype_items()
 
         # Now add names to the parameters
         # FIXME: This won't work for C declarators that need parentheses.
@@ -416,7 +422,7 @@ def compute_single_builtin_defs(builtin, orig_prototype, type_spec, lmul):
     if builtin["HasSideEffects"] == 0:
         flags = "n"
 
-    builtin_list.append(InstantiatedBuiltin(full_name, type_description,
+    builtin_list.append(InstantiatedBuiltin(lmul, full_name, type_description,
         flags, builtin, prototype))
 
     if builtin["HasMask"] != 0:
@@ -436,7 +442,7 @@ def compute_single_builtin_defs(builtin, orig_prototype, type_spec, lmul):
 
         type_description = compute_builtin_type_clang(builtin, prototype_mask,
                                                       type_spec, lmul)
-        builtin_list.append(InstantiatedBuiltin(full_name + "_mask",
+        builtin_list.append(InstantiatedBuiltin(lmul, full_name + "_mask",
             type_description, flags, builtin, prototype_mask,
             masked = True, index_of_mask = index_of_mask))
 
@@ -683,12 +689,61 @@ def emit_markdown_document(out_file, j, clang_format):
         if builtin not in documented:
             logging.warning("Builtin '{}' has not been documented".format(builtin));
 
+def emit_tests(out_file, j):
+    out_file.write(r"""// RUN: %clang --target=riscv64-unknown-linux-gnu -mepi -S -emit-llvm -O2 -o - %s \
+// RUN:       | FileCheck --check-prefix=CHECK-O2 %s
+
+""")
+    inst_builtins = instantiate_builtins(j)
+    already_emitted = set([])
+    for b in inst_builtins:
+        # FIXME:
+        if b.lmul not in [1, 2, 4]:
+            continue
+
+        # The current strategy does not work for builtins that expect
+        # constant expressions. So skip these ones and let them be tested
+        # elsewhere
+        if "K" in b.builtin["Prototype"]:
+            continue
+
+        # This is a bit of stupid heuristic to skip builtins we know
+        # don't work.
+        if b.builtin["HasManualCodegen"] != 0:
+            codegen = b.builtin["ManualCodegen"] \
+                    if not b.masked else b.builtin["ManualCodegenMask"]
+            if "ErrorUnsupported" in codegen:
+                continue
+
+        if b.full_name in already_emitted:
+            continue
+
+        already_emitted.add(b.full_name)
+
+        (return_type, parameter_types) = b.c_prototoype_items()
+
+        parameters = []
+        arguments = []
+        i = 0
+        for p in parameter_types:
+            arg = "arg_{}".format(i)
+            i += 1
+            parameters.append("{} {}".format(p, arg))
+            arguments.append(arg)
+
+        out_file.write("{} test_{}({})\n{{\n    return __builtin_epi_{}({});\n}}\n\n".format(
+            return_type,
+            b.full_name,
+            ", ".join(parameters),
+            b.full_name,
+            ", ".join(arguments)))
+
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate instruction table")
     parser.add_argument("--mode", required=True,
-            choices=["builtins-def", "codegen", "docs"], help="Mode of operation")
+            choices=["builtins-def", "codegen", "tests", "docs"], help="Mode of operation")
     parser.add_argument("--tablegen", required=True, help="Path of tablegen")
     parser.add_argument("--output-file", required=False, help="Output file. stdout otherwise")
     parser.add_argument("--clang-format", required=False, help="Path of clang-format")
@@ -711,6 +766,8 @@ if __name__ == "__main__":
         if not args.clang_format:
             parser.error("You have to pass --clang-format when generating documentation")
         emit_markdown_document(out_file, j, args.clang_format)
+    elif args.mode == "tests":
+        emit_tests(out_file, j)
     else:
         raise Exception("Unexpected mode '{}".format(args.mode))
 
