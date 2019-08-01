@@ -596,7 +596,7 @@ def vslidedown : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 def vslide1up : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 def vslide1down : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 
-def vrgather : EPIVecScalarBuiltin<"v", "vvIv", "csilfd">;
+def vrgather : EPIBinBuiltin<"v", "vvIv", "csilfd">;
 let IntrinsicName = "vrgather", IntrinsicNameMask = "vrgather_mask" in
 def vsplat : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 
