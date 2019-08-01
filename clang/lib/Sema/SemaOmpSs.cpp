@@ -80,8 +80,7 @@ private:
   using StackTy = SmallVector<SharingMapTy, 4>;
 
   /// Stack of used declaration and their data-sharing attributes.
-  const FunctionScopeInfo *CurrentNonCapturingFunctionScope = nullptr;
-  SmallVector<std::pair<StackTy, const FunctionScopeInfo *>, 4> Stack;
+  StackTy Stack;
   Sema &SemaRef;
 
   using iterator = StackTy::const_reverse_iterator;
@@ -89,9 +88,7 @@ private:
   DSAVarData getDSA(iterator &Iter, ValueDecl *D) const;
 
   bool isStackEmpty() const {
-    return Stack.empty() ||
-           Stack.back().second != CurrentNonCapturingFunctionScope ||
-           Stack.back().first.empty();
+    return Stack.empty();
   }
 
 public:
@@ -99,16 +96,12 @@ public:
 
   void push(OmpSsDirectiveKind DKind,
             Scope *CurScope, SourceLocation Loc) {
-    if (Stack.empty() ||
-        Stack.back().second != CurrentNonCapturingFunctionScope)
-      Stack.emplace_back(StackTy(), CurrentNonCapturingFunctionScope);
-    Stack.back().first.emplace_back(DKind, CurScope, Loc);
+    Stack.emplace_back(DKind, CurScope, Loc);
   }
 
   void pop() {
-    assert(!Stack.back().first.empty() &&
-           "Data-sharing attributes stack is empty!");
-    Stack.back().first.pop_back();
+    assert(!Stack.empty() && "Data-sharing attributes stack is empty!");
+    Stack.pop_back();
   }
 
   /// Adds explicit data sharing attribute to the specified declaration.
@@ -131,21 +124,21 @@ public:
   /// Set default data sharing attribute to none.
   void setDefaultDSANone(SourceLocation Loc) {
     assert(!isStackEmpty());
-    Stack.back().first.back().DefaultAttr = DSA_none;
-    Stack.back().first.back().DefaultAttrLoc = Loc;
+    Stack.back().DefaultAttr = DSA_none;
+    Stack.back().DefaultAttrLoc = Loc;
   }
   /// Set default data sharing attribute to shared.
   void setDefaultDSAShared(SourceLocation Loc) {
     assert(!isStackEmpty());
-    Stack.back().first.back().DefaultAttr = DSA_shared;
-    Stack.back().first.back().DefaultAttrLoc = Loc;
+    Stack.back().DefaultAttr = DSA_shared;
+    Stack.back().DefaultAttrLoc = Loc;
   }
   /// Returns currently analyzed directive.
   OmpSsDirectiveKind getCurrentDirective() const {
-    return isStackEmpty() ? OSSD_unknown : Stack.back().first.back().Directive;
+    return isStackEmpty() ? OSSD_unknown : Stack.back().Directive;
   }
   DefaultDataSharingAttributes getCurrentDefaultDataSharingAttributtes() const {
-    return isStackEmpty() ? DSA_unspecified : Stack.back().first.back().DefaultAttr;
+    return isStackEmpty() ? DSA_unspecified : Stack.back().DefaultAttr;
   }
 };
 
@@ -190,7 +183,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
 void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool Ignore) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
-  DSAInfo &Data = Stack.back().first.back().SharingMap[D];
+  DSAInfo &Data = Stack.back().SharingMap[D];
   Data.Attributes = A;
   Data.RefExpr = E;
   Data.Ignore = Ignore;
@@ -222,8 +215,8 @@ const DSAStackTy::DSAVarData DSAStackTy::getCurrentDSA(ValueDecl *D) {
 
   auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return Dir == OSSD_task; };
   auto &&AnyClause = [](OmpSsClauseKind Clause) { return true; };
-  iterator I = Stack.back().first.rbegin();
-  iterator EndI = Stack.back().first.rend();
+  iterator I = Stack.rbegin();
+  iterator EndI = Stack.rend();
   if (VD){
     if (I != EndI) {
       if (IsTaskDir(I->Directive)) {
@@ -242,8 +235,8 @@ DSAStackTy::hasDSA(ValueDecl *D,
                    const llvm::function_ref<bool(OmpSsDirectiveKind)> DPred,
                    bool FromParent) const {
   D = getCanonicalDecl(D);
-  iterator I = Stack.back().first.rbegin();
-  iterator EndI = Stack.back().first.rend();
+  iterator I = Stack.rbegin();
+  iterator EndI = Stack.rend();
   if (FromParent && I != EndI)
     std::advance(I, 1);
   for (; I != EndI; std::advance(I, 1)) {
