@@ -459,7 +459,24 @@ def instantiate_builtins(j):
             if lmul in builtin["LMUL"]:
                 for type_spec in builtin["TypeRange"]:
                     result += compute_single_builtin_defs(builtin, prototype, type_spec, lmul)
-    return result;
+    # Remove legitimate repeated instances do not have to do this every time
+    builtin_set = {}
+    error = False
+
+    unique_result = []
+    for b in result:
+        if b.full_name in builtin_set :
+            if builtin_set[b.full_name] != str(b):
+                logging.error("Builtin '{}' has already been defined as '{}' but this one is '{}'".format(b.full_name, str(builtin_names[b.full_name]), str(b)))
+                error = True
+        else:
+            builtin_set[b.full_name] = str(b)
+            unique_result.append(b)
+
+    if error:
+        raise Exception("Errors found while instantiating the builtins")
+
+    return unique_result
 
 
 def emit_builtins_def(out_file, j):
@@ -469,22 +486,10 @@ def emit_builtins_def(out_file, j):
     # We use an OrderedDict as a form of OrderedSet. This is not great
     # but avoids using external packages or having to roll our own
     # data-structure.
-    builtin_set = collections.OrderedDict()
-    builtin_names = {}
 
     error = False
 
     inst_builtins = instantiate_builtins(j)
-
-    for b in inst_builtins:
-        if b.full_name in builtin_names and str(b) not in builtin_set:
-            logging.error("Builtin '{}' has already been defined as '{}' but this one is '{}'".format(b.full_name, str(builtin_names[b.full_name]), str(b)))
-            error = True
-        builtin_set[str(b)] = None
-        builtin_names[b.full_name] = b
-
-    if error:
-        raise Exception("Errors found while emitting the builtins")
 
     out_file.write("""\
 #if defined(BUILTIN) && !defined(EPI_BUILTIN)
@@ -493,8 +498,8 @@ def emit_builtins_def(out_file, j):
 
 """)
 
-    for b in builtin_set.keys():
-        out_file.write(b + "\n")
+    for b in inst_builtins:
+        out_file.write("{}\n".format(b))
 
     out_file.write("""
 #undef BUILTIN
@@ -548,10 +553,9 @@ def emit_codegen(out_file, j):
         code_case += "  break;\n"
 
         if code_case not in code_set:
-            # Sometimes we may have repeated cases here (e.g. masks) so use a set
-            code_set[code_case] = set([b.full_name])
+            code_set[code_case] = [b.full_name]
         else:
-            code_set[code_case].add(b.full_name)
+            code_set[code_case].append(b.full_name)
 
     for (code, cases) in code_set.items():
         for case in cases:
