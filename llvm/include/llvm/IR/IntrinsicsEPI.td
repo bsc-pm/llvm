@@ -162,6 +162,25 @@ multiclass epi_ternary {
   def "int_epi_" # NAME # "_mask" : EPITernaryMask;
 }
 
+class EPITernaryWide : Intrinsic< [ llvm_anyvector_ty ],
+                      [ llvm_anyvector_ty, llvm_any_ty, LLVMMatchType<0>,
+                        llvm_i64_ty ],
+                      [ IntrNoMem ] >, EPIIntrinsic
+{
+  let ExtendOperand = 2;
+}
+class EPITernaryWideMask : Intrinsic< [ llvm_anyvector_ty ],
+                      [ llvm_anyvector_ty, llvm_any_ty, LLVMMatchType<0>,
+                        llvm_anyvector_ty, llvm_i64_ty ],
+                      [ IntrNoMem ] >, EPIIntrinsic
+{
+  let ExtendOperand = 2;
+}
+multiclass epi_ternary_wide {
+  def "int_epi_" # NAME : EPITernaryWide;
+  def "int_epi_" # NAME # "_mask" : EPITernaryWideMask;
+}
+
 multiclass epi_unary_mask {
 def int_epi_# NAME : Intrinsic<[ llvm_anyvector_ty ],
                                [ LLVMMatchType<0>, llvm_i64_ty ],
@@ -213,8 +232,10 @@ defm vsll : epi_binary;
 defm vsrl : epi_binary;
 defm vsra : epi_binary;
 
-defm vnsrl : epi_binary;
-defm vnsra : epi_binary;
+// These actually do narrowing but type-wise they
+// are like their widening counterparts
+defm vnsrl : epi_binary_wide;
+defm vnsra : epi_binary_wide;
 
 defm vmseq : epi_relational;
 defm vmsne : epi_relational;
@@ -244,10 +265,10 @@ defm vmsac : epi_ternary;
 defm vmadd : epi_ternary;
 defm vmsub : epi_ternary;
 
-defm vwmaccu : epi_binary;
-defm vwmacc : epi_binary;
-defm vwmsacu : epi_binary;
-defm vwmsac : epi_binary;
+defm vwmaccu : epi_ternary_wide;
+defm vwmacc : epi_ternary_wide;
+defm vwmsacu : epi_ternary_wide;
+defm vwmsac : epi_ternary_wide;
 
 defm vdivu : epi_binary;
 defm vdiv : epi_binary;
@@ -266,10 +287,10 @@ defm vasub : epi_binary;
 
 defm vsmul : epi_binary;
 
-defm vwsmaccu : epi_binary;
-defm vwsmacc : epi_binary;
-defm vwsmsacu : epi_binary;
-defm vwsmsac : epi_binary;
+defm vwsmaccu : epi_ternary_wide;
+defm vwsmacc : epi_ternary_wide;
+defm vwsmsacu : epi_ternary_wide;
+defm vwsmsac : epi_ternary_wide;
 
 defm vssrl : epi_binary;
 defm vssra : epi_binary;
@@ -299,10 +320,10 @@ defm vfnmacc : epi_ternary;
 defm vfmsac : epi_ternary;
 defm vfnmsac : epi_ternary;
 
-defm vfwmacc : epi_ternary;
-defm vfwnmacc : epi_ternary;
-defm vfwmsac : epi_ternary;
-defm vfwnmsac : epi_ternary;
+defm vfwmacc : epi_ternary_wide;
+defm vfwnmacc : epi_ternary_wide;
+defm vfwmsac : epi_ternary_wide;
+defm vfwnmsac : epi_ternary_wide;
 
 defm vfmin : epi_binary;
 defm vfmax : epi_binary;
@@ -330,16 +351,16 @@ defm vredmin : epi_binary;
 defm vredmaxu : epi_binary;
 defm vredmax : epi_binary;
 
-defm vwredsumu : epi_binary;
-defm vwredsum : epi_binary;
+defm vwredsumu : epi_binary_wide;
+defm vwredsum : epi_binary_wide;
 
 defm vfredsum : epi_binary;
 defm vfredosum : epi_binary;
 defm vfredmin : epi_binary;
 defm vfredmax : epi_binary;
 
-defm vfwredsum : epi_binary;
-defm vfwredosum : epi_binary;
+defm vfwredsum : epi_binary_wide;
+defm vfwredosum : epi_binary_wide;
 
 defm vmandnot : epi_binary_nomask;
 defm vmand : epi_binary_nomask;

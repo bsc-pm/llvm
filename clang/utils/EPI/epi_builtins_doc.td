@@ -558,7 +558,7 @@ be overwritten by the `vfmacc` instruction.}];
        if mask[element] then
          result[element] = a[element] * b[element] + c[element]
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -575,7 +575,7 @@ There is semantically no difference to `__builtin_epi_vfmacc`
 except for the instruction used which determines the destructive nature
 of this instruction.
 
-At low level, the parameter `b` will be located in a vector register that will
+At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmadd` instruction.}];
   let Instruction = "vfmadd.vv";
 
@@ -591,7 +591,7 @@ be overwritten by the `vfmadd` instruction.}];
        if mask[element] then
          result[element] = a[element] * b[element] + c[element]
        else
-         result[element] = merge[element]
+         result[element] = a[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -692,7 +692,7 @@ be overwritten by the `vfmsac` instruction.}];
        if mask[element] then
          result[element] = a[element] * b[element] - c[element]
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -709,7 +709,7 @@ There is semantically no difference to `__builtin_epi_vfmsac`
 except for the instruction used which determines the destructive nature
 of this instruction.
 
-At low level, the parameter `b` will be located in a vector register that will
+At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmsub` instruction.}];
   let Instruction = "vfmsub.vv";
 
@@ -725,7 +725,7 @@ be overwritten by the `vfmsub` instruction.}];
        if mask[element] then
          result[element] = a[element] * b[element] - c[element]
        else
-         result[element] = merge[element]
+         result[element] = a[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -918,7 +918,7 @@ be overwritten by the `vfnmacc` instruction.}];
        if mask[element] then
          result[element] = -( a[element] * b[element] ) - c[element]
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -935,7 +935,7 @@ There is semantically no difference to `__builtin_epi_vfnmacc`
 except for the instruction used which determines the destructive nature
 of this instruction.
 
-At low level, the parameter `b` will be located in a vector register that will
+At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmadd` instruction.}];
   let Instruction = "vfnmadd.vv";
 
@@ -951,7 +951,7 @@ be overwritten by the `vfnmadd` instruction.}];
        if mask[element] then
          result[element] = -( a[element] * b[element] ) - c[element]
        else
-         result[element] = merge[element]
+         result[element] = a[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -984,7 +984,7 @@ be overwritten by the `vfnmsac` instruction.}];
        if mask[element] then
          result[element] = -( a[element] * b[element] ) + c[element]
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -1001,7 +1001,7 @@ There is semantically no difference to `__builtin_epi_vfnmsac`
 except for the instruction used which determines the destructive nature
 of this instruction.
 
-At low level, the parameter `b` will be located in a vector register that will
+At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmsub` instruction.}];
   let Instruction = "vfnmsub.vv";
 
@@ -1017,7 +1017,7 @@ be overwritten by the `vfnmsub` instruction.}];
        if mask[element] then
          result[element] = a[element] * b[element] - c[element]
        else
-         result[element] = merge[element]
+         result[element] = a[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -1552,7 +1552,7 @@ with twice the number of bits as the original elements.
        if mask[element] then
          result[element] = widen_fp(a[element]) * widen_fp(b[element]) + widen_fp(c[element])
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -1582,7 +1582,7 @@ with twice the number of bits as the original elements.
        if mask[element] then
          result[element] = widen_fp(a[element]) * widen_fp(b[element]) - widen_fp(c[element])
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];
@@ -1612,7 +1612,7 @@ with twice the number of bits as the original elements.
        if mask[element] then
          result[element] = -( widen_fp(a[element]) * widen_fp(b[element]) ) - widen_fp(c[element])
        else
-         result[element] = merge[element]
+         result[element] = c[element]
 
     result[gvl : VLMAX] = 0
   }];

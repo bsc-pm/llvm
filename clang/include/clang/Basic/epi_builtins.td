@@ -162,6 +162,13 @@ class EPIBinBuiltin<string suffix, string prototype, string type_range>
   let IntrinsicTypes = [-1, 1, -2];
 }
 
+class EPIWidenBinBuiltin<string suffix, string prototype, string type_range>
+                       : EPIBuiltin<suffix, prototype, type_range>
+{
+  let HasManualCodegen = 0;
+  let IntrinsicTypes = [-1, 0, 1, -2];
+}
+
 class EPIBinMaskInBuiltin<string suffix, string prototype, string type_range>
                          : EPIBuiltin<suffix, prototype, type_range>
 {
@@ -182,6 +189,14 @@ class EPITerBuiltin<string suffix, string prototype, string type_range>
   let HasManualCodegen = 0;
   let IntrinsicTypes = [-1, 1, -2];
 }
+
+class EPIWidenTerBuiltin<string suffix, string prototype, string type_range>
+                   : EPIBuiltin<suffix, prototype, type_range>
+{
+  let HasManualCodegen = 0;
+  let IntrinsicTypes = [-1, 0, 1, -2];
+}
+
 
 class EPIUnaBuiltin<string suffix, string prototype, string type_range>
                    : EPIBuiltin<suffix, prototype, type_range>
@@ -342,11 +357,11 @@ def vsub : EPIBinBuiltin<"v", "vvv", "csil">;
 
 def vrsub : EPIBinBuiltin<"v", "vve", "csil">;
 
-def vwaddu : EPIBinBuiltin<"w", "wvv", "csi">;
-def vwsubu : EPIBinBuiltin<"w", "wvv", "csi">;
+def vwaddu : EPIWidenBinBuiltin<"w", "wvv", "csi">;
+def vwsubu : EPIWidenBinBuiltin<"w", "wvv", "csi">;
 
-def vwadd : EPIBinBuiltin<"w", "wvv", "csi">;
-def vwsub : EPIBinBuiltin<"w", "wvv", "csi">;
+def vwadd : EPIWidenBinBuiltin<"w", "wvv", "csi">;
+def vwsub : EPIWidenBinBuiltin<"w", "wvv", "csi">;
 
 def vwaddu_w : EPIBinBuiltin<"w", "wwv", "csi">;
 def vwsubu_w : EPIBinBuiltin<"w", "wwv", "csi">;
@@ -367,8 +382,9 @@ def vsll : EPIBinBuiltin<"v", "vvv", "csil">;
 def vsrl : EPIBinBuiltin<"v", "vvv", "csil">;
 def vsra : EPIBinBuiltin<"v", "vvv", "csil">;
 
-def vnsrl : EPIBinBuiltin<"v", "vwv", "csi">;
-def vnsra : EPIBinBuiltin<"v", "vwv", "csi">;
+// These do narrowing but typewise they are like their widen counterparts
+def vnsrl : EPIWidenBinBuiltin<"v", "vwv", "csi">;
+def vnsra : EPIWidenBinBuiltin<"v", "vwv", "csi">;
 
 def vmseq : EPIRelBuiltin<"v", "mvv", "csil">;
 def vmsne : EPIRelBuiltin<"v", "mvv", "csil">;
@@ -390,19 +406,27 @@ def vmulh : EPIBinBuiltin<"v", "vvv", "csil">;
 def vmulhu : EPIBinBuiltin<"v", "vvv", "csil">;
 def vmulhsu : EPIBinBuiltin<"v", "vvv", "csil">;
 
-def vwmul : EPIBinBuiltin<"w", "wvv", "csi">;
-def vwmulu : EPIBinBuiltin<"w", "wvv", "csi">;
-def vwmulsu : EPIBinBuiltin<"w", "wvv", "csi">;
+def vwmul : EPIWidenBinBuiltin<"w", "wvv", "csi">;
+def vwmulu : EPIWidenBinBuiltin<"w", "wvv", "csi">;
+def vwmulsu : EPIWidenBinBuiltin<"w", "wvv", "csi">;
 
-def vmacc : EPIBinBuiltin<"v", "vvvv", "csil">;
-def vmsac : EPIBinBuiltin<"v", "vvvv", "csil">;
-def vmadd : EPIBinBuiltin<"v", "vvvv", "csil">;
-def vmsub : EPIBinBuiltin<"v", "vvvv", "csil">;
+let HasMergeOperand = 0 in
+{
+  def vmacc : EPIBinBuiltin<"v", "vvvv", "csil">;
+  def vmsac : EPIBinBuiltin<"v", "vvvv", "csil">;
+  def vmadd : EPIBinBuiltin<"v", "vvvv", "csil">;
+  def vmsub : EPIBinBuiltin<"v", "vvvv", "csil">;
 
-def vwmaccu : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwmacc : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwmsacu : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwmsac : EPIBinBuiltin<"w", "wwvv", "csi">;
+  def vwmaccu : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwmacc : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwmsacu : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwmsac : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+
+  def vwsmaccu : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwsmacc : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwsmsacu : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+  def vwsmsac : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
+}
 
 def vdivu : EPIBinBuiltin<"v", "vvv", "csil">;
 def vdiv : EPIBinBuiltin<"v", "vvv", "csil">;
@@ -422,10 +446,6 @@ def vasub : EPIBinBuiltin<"v", "vvv", "csil">;
 
 def vsmul : EPIBinBuiltin<"v", "vvv", "csil">;
 
-def vwsmaccu : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwsmacc : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwsmsacu : EPIBinBuiltin<"w", "wwvv", "csi">;
-def vwsmsac : EPIBinBuiltin<"w", "wwvv", "csi">;
 
 def vssrl : EPIBinBuiltin<"v", "vvv", "csil">;
 def vssra : EPIBinBuiltin<"v", "vvv", "csil">;
@@ -436,15 +456,15 @@ def vnclip : EPIBuiltin<"v", "vww", "csi">;
 def vfadd : EPIBinBuiltin<"v", "vvv", "fd">;
 def vfsub : EPIBinBuiltin<"v", "vvv", "fd">;
 
-def vfwadd : EPIBinBuiltin<"w", "wvv", "f">;
-def vfwsub : EPIBinBuiltin<"w", "wvv", "f">;
+def vfwadd : EPIWidenBinBuiltin<"w", "wvv", "f">;
+def vfwsub : EPIWidenBinBuiltin<"w", "wvv", "f">;
 def vfwadd_w : EPIBinBuiltin<"w", "wwv", "f">;
 def vfwsub_w : EPIBinBuiltin<"w", "wwv", "f">;
 
 def vfmul : EPIBinBuiltin<"v", "vvv", "fd">;
 def vfdiv : EPIBinBuiltin<"v", "vvv", "fd">;
 
-def vfwmul : EPIBinBuiltin<"w", "wvv", "f">;
+def vfwmul : EPIWidenBinBuiltin<"w", "wvv", "f">;
 
 let HasMergeOperand = 0 in
 {
@@ -457,10 +477,10 @@ let HasMergeOperand = 0 in
   def vfmsac : EPITerBuiltin<"v", "vvvv", "fd">;
   def vfnmsac : EPITerBuiltin<"v", "vvvv", "fd">;
 
-  def vfwmacc : EPITerBuiltin<"v", "wwvv", "f">;
-  def vfwnmacc : EPITerBuiltin<"v", "wwvv", "f">;
-  def vfwmsac : EPITerBuiltin<"v", "wwvv", "f">;
-  def vfwnmsac : EPITerBuiltin<"v", "wwvv", "f">;
+  def vfwmacc : EPIWidenTerBuiltin<"w", "wvvw", "f">;
+  def vfwnmacc : EPIWidenTerBuiltin<"w", "wvvw", "f">;
+  def vfwmsac : EPIWidenTerBuiltin<"w", "wvvw", "f">;
+  def vfwnmsac : EPIWidenTerBuiltin<"w", "wvvw", "f">;
 }
 
 def vfsqrt : EPIUnaBuiltin<"v", "vv", "fd">;
@@ -515,13 +535,17 @@ def vredand : EPIBinBuiltin<"v", "vvv", "csil">;
 def vredor : EPIBinBuiltin<"v", "vvv", "csil">;
 def vredxor : EPIBinBuiltin<"v", "vvv", "csil">;
 
+// FIXME: we forgot these ones
+// def vwredsum : EPIWidenBinBuiltin<"w", "wvw", "csi">;
+// def vwredsumu : EPIWidenBinBuiltin<"w", "wvw", "csi">;
+
 def vfredosum : EPIBinBuiltin<"v", "vvv", "fd">;
 def vfredsum : EPIBinBuiltin<"v", "vvv", "fd">;
 def vfredmax : EPIBinBuiltin<"v", "vvv", "fd">;
 def vfredmin : EPIBinBuiltin<"v", "vvv", "fd">;
 
-def vfwredosum : EPIBinBuiltin<"w", "wvv", "f">;
-def vfwredsum : EPIBinBuiltin<"w", "wvv", "f">;
+def vfwredosum : EPIWidenBinBuiltin<"w", "wvw", "f">;
+def vfwredsum : EPIWidenBinBuiltin<"w", "wvw", "f">;
 
 let HasMask = 0 in
 {
@@ -552,6 +576,7 @@ def vmsof : EPIMaskUnaBuiltin<"m", "mm", "csil">;
 let HasMergeOperand = 0 in
 def viota : EPIMaskToIntBuiltin<"v", "vm", "csil">;
 
+let HasMergeOperand = 0 in
 def vid : EPINulBuiltin<"v", "v", "csil">;
 
 let LMUL = [1], HasVL = 0, HasMask = 0, IntrinsicName = "vext_x_v" in
@@ -586,7 +611,8 @@ def vfdot : EPIBinBuiltin<"v", "vvv", "fd">;
 let HasMask = 0 in
 def vbroadcast : EPIScalarToVecBuiltin<"v", "ve", "csilfd">;
 
-let HasMask = 0, HasVL = 0, Name = "cast", IntrinsicName = "mask_cast" in
+let LMUL = [1], HasMask = 0, HasVL = 0, Name = "cast",
+    IntrinsicName = "mask_cast" in
 {
   def cast_to_mask : EPIUnaBuiltin<"mv", "mv", "csil">;
   def cast_from_mask : EPIUnaBuiltin<"vm", "vm", "csil">;
