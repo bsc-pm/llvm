@@ -688,7 +688,7 @@ def emit_markdown_document(out_file, j, clang_format):
                     out_file.write("```\n")
                     out_file.write(adjust_text(doc["OperationMask"]) + "\n")
                     out_file.write("```\n\n")
-        category_number = 0
+        category_number += 1
 
     for builtin in j["!instanceof"]["EPIBuiltin"]:
         if builtin not in documented:
