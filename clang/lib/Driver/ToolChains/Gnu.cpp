@@ -1996,7 +1996,8 @@ void Generic_GCC::GCCInstallationDetector::AddDefaultGCCPrefixes(
 
   static const char *const RISCV64LibDirs[] = {"/lib64", "/lib"};
   static const char *const RISCV64TriplesLinux[] = {"riscv64-unknown-linux-gnu",
-                                                    "riscv64-redhat-linux"};
+                                                    "riscv64-redhat-linux",
+                                                    "riscv64-suse-linux"};
   static const char *const RISCV64TriplesBaremetal[] = {"riscv64-unknown-elf"};
 
   static const char *const SPARCv8LibDirs[] = {"/lib32", "/lib"};
