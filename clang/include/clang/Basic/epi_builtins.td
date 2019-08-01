@@ -326,7 +326,6 @@ let HasMergeOperand = 0 in
   }
 
   // Store mask.
-  // FIXME: Name clash with LMUL > 1.
   let Name = "vstore", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
   ManualCodegen = [{ {
     assert(Ops.size() >= 2);
@@ -341,7 +340,6 @@ let HasMergeOperand = 0 in
 }
 
 // Load mask.
-// FIXME: Name clash with LMUL > 1.
 let Name = "vload", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
     ManualCodegen = [{ {
         Ops[0] = Builder.CreateBitCast(Ops[0],
@@ -559,8 +557,7 @@ let HasMask = 0 in
   def vmxnor : EPIBinBuiltin<"m", "mmm", "csil">;
 }
 
-// FIXME: name clash with LMUL > 1.
-let LMUL = [1], HasMergeOperand = 0 in
+let HasMergeOperand = 0 in
 {
   def vmpopc : EPIMaskToScalarBuiltin<"m", "sm", "csil">;
   def vmfirst : EPIMaskToScalarBuiltin<"m", "sm", "csil">;

@@ -10416,6 +10416,46 @@ signed long int test_vmfirst_1xi1_mask(__epi_1xi1 arg_0, __epi_1xi1 arg_1, unsig
     return __builtin_epi_vmfirst_1xi1_mask(arg_0, arg_1, arg_2);
 }
 
+// CHECK-O2-LABEL: @test_vmfirst_16xi1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmfirst.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmfirst_16xi1(__epi_16xi1 arg_0, unsigned long int arg_1)
+{
+    return __builtin_epi_vmfirst_16xi1(arg_0, arg_1);
+}
+
+// CHECK-O2-LABEL: @test_vmfirst_16xi1_mask(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmfirst.mask.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmfirst_16xi1_mask(__epi_16xi1 arg_0, __epi_16xi1 arg_1, unsigned long int arg_2)
+{
+    return __builtin_epi_vmfirst_16xi1_mask(arg_0, arg_1, arg_2);
+}
+
+// CHECK-O2-LABEL: @test_vmfirst_32xi1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmfirst.nxv32i1(<vscale x 32 x i1> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmfirst_32xi1(__epi_32xi1 arg_0, unsigned long int arg_1)
+{
+    return __builtin_epi_vmfirst_32xi1(arg_0, arg_1);
+}
+
+// CHECK-O2-LABEL: @test_vmfirst_32xi1_mask(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmfirst.mask.nxv32i1(<vscale x 32 x i1> [[ARG_0:%.*]], <vscale x 32 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmfirst_32xi1_mask(__epi_32xi1 arg_0, __epi_32xi1 arg_1, unsigned long int arg_2)
+{
+    return __builtin_epi_vmfirst_32xi1_mask(arg_0, arg_1, arg_2);
+}
+
 // CHECK-O2-LABEL: @test_vmfle_2xf32(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i1> @llvm.epi.vmfle.nxv2i1.nxv2f32.nxv2f32(<vscale x 2 x float> [[ARG_0:%.*]], <vscale x 2 x float> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
@@ -11694,6 +11734,46 @@ signed long int test_vmpopc_1xi1(__epi_1xi1 arg_0, unsigned long int arg_1)
 signed long int test_vmpopc_1xi1_mask(__epi_1xi1 arg_0, __epi_1xi1 arg_1, unsigned long int arg_2)
 {
     return __builtin_epi_vmpopc_1xi1_mask(arg_0, arg_1, arg_2);
+}
+
+// CHECK-O2-LABEL: @test_vmpopc_16xi1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmpopc.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmpopc_16xi1(__epi_16xi1 arg_0, unsigned long int arg_1)
+{
+    return __builtin_epi_vmpopc_16xi1(arg_0, arg_1);
+}
+
+// CHECK-O2-LABEL: @test_vmpopc_16xi1_mask(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmpopc.mask.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmpopc_16xi1_mask(__epi_16xi1 arg_0, __epi_16xi1 arg_1, unsigned long int arg_2)
+{
+    return __builtin_epi_vmpopc_16xi1_mask(arg_0, arg_1, arg_2);
+}
+
+// CHECK-O2-LABEL: @test_vmpopc_32xi1(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmpopc.nxv32i1(<vscale x 32 x i1> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmpopc_32xi1(__epi_32xi1 arg_0, unsigned long int arg_1)
+{
+    return __builtin_epi_vmpopc_32xi1(arg_0, arg_1);
+}
+
+// CHECK-O2-LABEL: @test_vmpopc_32xi1_mask(
+// CHECK-O2-NEXT:  entry:
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vmpopc.mask.nxv32i1(<vscale x 32 x i1> [[ARG_0:%.*]], <vscale x 32 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    ret i64 [[TMP0]]
+//
+signed long int test_vmpopc_32xi1_mask(__epi_32xi1 arg_0, __epi_32xi1 arg_1, unsigned long int arg_2)
+{
+    return __builtin_epi_vmpopc_32xi1_mask(arg_0, arg_1, arg_2);
 }
 
 // CHECK-O2-LABEL: @test_vmsac_8xi8(
