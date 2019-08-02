@@ -311,11 +311,12 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
     }
     if (!FirstTime) // We have seen a vla, save dimensions
       DsaData.append(TmpDsaData.begin(), TmpDsaData.end());
-    TaskInfo.emplace_back(Basename, DsaData);
-  }
-  else {
+  } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
+    DsaData.push_back(CGF.EmitScalarExpr(ThisE));
+  } else {
     llvm_unreachable("Unhandled expression");
   }
+  TaskInfo.emplace_back(Basename, DsaData);
 }
 
 static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const Expr *E,
