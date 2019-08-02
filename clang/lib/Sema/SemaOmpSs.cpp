@@ -853,17 +853,20 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
   auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
 
+  // Only allow VarDecl from DeclRefExpr
+  // and VarDecl implicits from MemberExpr // (i.e. static members without 'this')
   if ((!DE || !isa<VarDecl>(DE->getDecl())) &&
       (S.getCurrentThisType().isNull() || !ME ||
        !isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()) ||
-       !isa<FieldDecl>(ME->getMemberDecl()))) {
+       !cast<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts())->isImplicit() ||
+       !isa<VarDecl>(ME->getMemberDecl()))) {
 
     S.Diag(ELoc, diag::err_oss_expected_var_name_member_expr)
         << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
     return nullptr;
   }
 
-  auto *VD = dyn_cast<VarDecl>(DE->getDecl());
+  auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
   QualType Type = VD->getType();
   if (!Type.isPODType(S.Context)) {
       S.Diag(ELoc, diag::err_oss_non_pod_not_supported) << ERange;
