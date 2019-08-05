@@ -2244,7 +2244,7 @@ TypeIndex CodeViewDebug::lowerCompleteTypeClass(const DICompositeType *Ty) {
 
   // MSVC appears to set this flag by searching any destructor or method with
   // FunctionOptions::Constructor among the emitted members. Clang AST has all
-  // the members, however special member functions are not yet emitted into 
+  // the members, however special member functions are not yet emitted into
   // debug information. For now checking a class's non-triviality seems enough.
   // FIXME: not true for a nested unnamed struct.
   if (isNonTrivial(Ty))
