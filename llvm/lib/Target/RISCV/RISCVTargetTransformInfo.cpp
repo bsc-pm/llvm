@@ -122,3 +122,7 @@ unsigned RISCVTTIImpl::getRegisterBitWidth(bool Vector) const {
   unsigned VLEN = 256 * 8 * 8;
   return VLEN;
 }
+
+bool RISCVTTIImpl::useScalableVectorType() const {
+  return true;
+}

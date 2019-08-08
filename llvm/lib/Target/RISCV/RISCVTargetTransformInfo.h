@@ -47,6 +47,7 @@ public:
                     Type *Ty);
   unsigned getNumberOfRegisters(bool Vector);
   unsigned getRegisterBitWidth(bool Vector) const;
+  bool useScalableVectorType() const;
 
 };
 

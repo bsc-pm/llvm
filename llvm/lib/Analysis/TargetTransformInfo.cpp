@@ -850,6 +850,10 @@ int TargetTransformInfo::getInstructionLatency(const Instruction *I) const {
   return TTIImpl->getInstructionLatency(I);
 }
 
+bool TargetTransformInfo::useScalableVectorType() const {
+  return TTIImpl->useScalableVectorType();
+}
+
 static bool matchPairwiseShuffleMask(ShuffleVectorInst *SI, bool IsLeft,
                                      unsigned Level) {
   // We don't need a shuffle if we just want to have element 0 in position 0 of

@@ -255,5 +255,5 @@ then
   echo ""
   echo "cmake finished successfully, you may want to tune the configuration in CMakeCache.txt or using a GUI tool like ccmake"
   echo ""
-  echo "Now run '${COMMAND_TO_BUILD}' to build. Use '${COMMAND_TO_BUILD}' install to build and install."
+  echo "Now run '${COMMAND_TO_BUILD}' to build. Use '${COMMAND_TO_BUILD} install' to build and install."
 fi

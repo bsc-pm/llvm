@@ -1123,6 +1123,9 @@ public:
   /// \returns the size cost of rematerializing a GlobalValue address relative
   /// to a stack reload.
   unsigned getGISelRematGlobalCost() const;
+  
+  /// \returns True if the target wants to use Scalable vectors.
+  bool useScalableVectorType() const;
 
   /// @}
 
@@ -1350,6 +1353,7 @@ public:
   virtual bool shouldExpandReduction(const IntrinsicInst *II) const = 0;
   virtual unsigned getGISelRematGlobalCost() const = 0;
   virtual int getInstructionLatency(const Instruction *I) = 0;
+  virtual bool useScalableVectorType() const = 0;
 };
 
 template <typename T>
@@ -1807,6 +1811,10 @@ public:
 
   int getInstructionLatency(const Instruction *I) override {
     return Impl.getInstructionLatency(I);
+  }
+
+  bool useScalableVectorType() const override {
+    return Impl.useScalableVectorType();
   }
 };
 

@@ -1689,6 +1689,8 @@ public:
 
   unsigned getVectorSplitCost() { return 1; }
 
+  bool useScalableVectorType() const { return false; }
+
   /// @}
 };
 
