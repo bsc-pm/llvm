@@ -265,6 +265,7 @@ void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
     setOperationAction(ISD::SDIV, VT, Expand);
     setOperationAction(ISD::UREM, VT, Expand);
     setOperationAction(ISD::SREM, VT, Expand);
+    setOperationAction(ISD::CTPOP, VT, Expand);
 
     if (!HasMVEFP) {
       setOperationAction(ISD::SINT_TO_FP, VT, Expand);
@@ -919,9 +920,10 @@ ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_ROUND,   MVT::f32, Custom);
   }
 
-  if (!Subtarget->hasFP64() || !Subtarget->hasFPARMv8Base()){
+  if (!Subtarget->hasFP64() || !Subtarget->hasFPARMv8Base()) {
     setOperationAction(ISD::FP_EXTEND,  MVT::f64, Custom);
-    setOperationAction(ISD::FP_ROUND,  MVT::f16, Custom);
+    if (Subtarget->hasFullFP16())
+      setOperationAction(ISD::FP_ROUND,  MVT::f16, Custom);
   }
 
   if (!Subtarget->hasFP16())
@@ -14064,11 +14066,18 @@ bool ARMTargetLowering::allowsMisalignedMemoryAccesses(EVT VT, unsigned,
     return true;
   }
 
+  // These are for truncated stores/narrowing loads. They are fine so long as
+  // the alignment is at least the size of the item being loaded
+  if ((Ty == MVT::v4i8 || Ty == MVT::v8i8 || Ty == MVT::v4i16) &&
+      Alignment >= VT.getScalarSizeInBits() / 8) {
+    if (Fast)
+      *Fast = true;
+    return true;
+  }
+
   if (Ty != MVT::v16i8 && Ty != MVT::v8i16 && Ty != MVT::v8f16 &&
       Ty != MVT::v4i32 && Ty != MVT::v4f32 && Ty != MVT::v2i64 &&
-      Ty != MVT::v2f64 &&
-      // These are for truncated stores
-      Ty != MVT::v4i8 && Ty != MVT::v8i8 && Ty != MVT::v4i16)
+      Ty != MVT::v2f64)
     return false;
 
   if (Subtarget->isLittle()) {

@@ -400,9 +400,8 @@ StringRef riscv::getRISCVABI(const ArgList &Args, const llvm::Triple &Triple) {
   if (const Arg *A = Args.getLastArg(options::OPT_mabi_EQ))
     return A->getValue();
 
+  // EPI specific: In riscv64 we always default to lp64d
   if (Triple.getArch() == llvm::Triple::riscv64)
-    // In riscv64 we always default to lp64d
     return "lp64d";
-
   return Triple.getArch() == llvm::Triple::riscv32 ? "ilp32" : "lp64";
 }
