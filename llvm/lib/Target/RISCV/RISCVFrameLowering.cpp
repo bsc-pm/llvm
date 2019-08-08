@@ -48,10 +48,23 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   // Get the alignment.
   uint64_t StackAlign = RI->needsStackRealignment(MF) ? MFI.getMaxAlignment()
                                                       : getStackAlignment();
+#if 0
+  // Get the alignment.
+  unsigned StackAlign = getStackAlignment();
+  if (RI->needsStackRealignment(MF)) {
+    unsigned MaxStackAlign = std::max(StackAlign, MFI.getMaxAlignment());
+    FrameSize += (MaxStackAlign - StackAlign);
+    StackAlign = MaxStackAlign;
+  }
 
-  // rferrer: This seems not used at the moment and makes a test fail
-  //          because the stack is overaligned.
-  #if 0
+  // Set Max Call Frame Size
+  uint64_t MaxCallSize = alignTo(MFI.getMaxCallFrameSize(), StackAlign);
+  MFI.setMaxCallFrameSize(MaxCallSize);
+#endif
+
+// rferrer: This seems not used at the moment and makes a test fail
+//          because the stack is overaligned.
+#if 0
   // Get the maximum call frame size of all the calls.
   uint64_t MaxCallFrameSize = MFI.getMaxCallFrameSize();
 
@@ -66,7 +79,7 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   // Include call frame size in total.
   if (!(hasReservedCallFrame(MF) && MFI.adjustsStack()))
     FrameSize += MaxCallFrameSize;
-  #endif
+#endif
 
   // Make sure the frame is aligned.
   FrameSize = alignTo(FrameSize, StackAlign);
