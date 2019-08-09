@@ -1130,8 +1130,8 @@ public:
       return false;
 
     // Get the source and destination types of the truncate.
-    Type *SrcTy = ToVectorTy(cast<CastInst>(I)->getSrcTy(), VF, Scalable);
-    Type *DestTy = ToVectorTy(cast<CastInst>(I)->getDestTy(), VF, Scalable);
+    Type *SrcTy = ToVectorTy(cast<CastInst>(I)->getSrcTy(), VF, isScalable());
+    Type *DestTy = ToVectorTy(cast<CastInst>(I)->getDestTy(), VF, isScalable());
 
     // If the truncate is free for the given types, return false. Replacing a
     // free truncate with an induction variable would add an induction variable
@@ -1268,6 +1268,9 @@ public:
   /// scalarized -
   /// i.e. either vector version isn't available, or is too expensive.
   unsigned getVectorCallCost(CallInst *CI, unsigned VF, bool &NeedToScalarize);
+
+  /// Returns true if the target uses scalable vector type.
+  bool isScalable() { return TTI.useScalableVectorType(); }
 
 private:
   unsigned NumPredStores = 0;
@@ -1475,9 +1478,6 @@ public:
 
   /// Values to ignore in the cost model when VF > 1.
   SmallPtrSet<const Value *, 16> VecValuesToIgnore;
-
-  ///
-  bool Scalable;
 };
 
 } // end namespace llvm
@@ -3195,9 +3195,9 @@ unsigned LoopVectorizationCostModel::getVectorCallCost(CallInst *CI,
     return ScalarCallCost;
 
   // Compute corresponding vector type for return value and arguments.
-  Type *RetTy = ToVectorTy(ScalarRetTy, VF, Scalable);
+  Type *RetTy = ToVectorTy(ScalarRetTy, VF, isScalable());
   for (Type *ScalarTy : ScalarTys)
-    Tys.push_back(ToVectorTy(ScalarTy, VF, Scalable));
+    Tys.push_back(ToVectorTy(ScalarTy, VF, isScalable()));
 
   // Compute costs of unpacking argument values for the scalar calls and
   // packing the return values to a vector.
@@ -4202,10 +4202,10 @@ void InnerLoopVectorizer::widenInstruction(Instruction &I) {
 
     StringRef FnName = CI->getCalledFunction()->getName();
     Function *F = CI->getCalledFunction();
-    Type *RetTy = ToVectorTy(CI->getType(), VF, Cost->Scalable);
+    Type *RetTy = ToVectorTy(CI->getType(), VF, Cost->isScalable());
     SmallVector<Type *, 4> Tys;
     for (Value *ArgOperand : CI->arg_operands())
-      Tys.push_back(ToVectorTy(ArgOperand->getType(), VF, Cost->Scalable));
+      Tys.push_back(ToVectorTy(ArgOperand->getType(), VF, Cost->isScalable()));
 
     Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, TLI);
 
@@ -5493,7 +5493,7 @@ int LoopVectorizationCostModel::computePredInstDiscount(
     // and phi nodes.
     if (isScalarWithPredication(I) && !I->getType()->isVoidTy()) {
       ScalarCost += TTI.getScalarizationOverhead(
-          ToVectorTy(I->getType(), VF, Scalable), true, false);
+          ToVectorTy(I->getType(), VF, isScalable()), true, false);
       ScalarCost += VF * TTI.getCFInstrCost(Instruction::PHI);
     }
 
@@ -5509,7 +5509,7 @@ int LoopVectorizationCostModel::computePredInstDiscount(
           Worklist.push_back(J);
         else if (needsExtract(J, VF))
           ScalarCost += TTI.getScalarizationOverhead(
-              ToVectorTy(J->getType(), VF, Scalable), false, true);
+              ToVectorTy(J->getType(), VF, isScalable()), false, true);
       }
 
     // Scale the total scalar cost by block probability.
@@ -5611,7 +5611,7 @@ unsigned LoopVectorizationCostModel::getMemInstScalarizationCost(Instruction *I,
   unsigned Alignment = getLoadStoreAlignment(I);
   unsigned AS = getLoadStoreAddressSpace(I);
   Value *Ptr = getLoadStorePointerOperand(I);
-  Type *PtrTy = ToVectorTy(Ptr->getType(), VF, Scalable);
+  Type *PtrTy = ToVectorTy(Ptr->getType(), VF, isScalable());
 
   // Figure out whether the access is strided and get the stride value
   // if it's known in compile time
@@ -5647,7 +5647,7 @@ unsigned LoopVectorizationCostModel::getMemInstScalarizationCost(Instruction *I,
 unsigned LoopVectorizationCostModel::getConsecutiveMemOpCost(Instruction *I,
                                                              unsigned VF) {
   Type *ValTy = getMemInstValueType(I);
-  Type *VectorTy = ToVectorTy(ValTy, VF, Scalable);
+  Type *VectorTy = ToVectorTy(ValTy, VF, isScalable());
   unsigned Alignment = getLoadStoreAlignment(I);
   Value *Ptr = getLoadStorePointerOperand(I);
   unsigned AS = getLoadStoreAddressSpace(I);
@@ -5670,7 +5670,7 @@ unsigned LoopVectorizationCostModel::getConsecutiveMemOpCost(Instruction *I,
 unsigned LoopVectorizationCostModel::getUniformMemOpCost(Instruction *I,
                                                          unsigned VF) {
   Type *ValTy = getMemInstValueType(I);
-  Type *VectorTy = ToVectorTy(ValTy, VF, Scalable);
+  Type *VectorTy = ToVectorTy(ValTy, VF, isScalable());
   unsigned Alignment = getLoadStoreAlignment(I);
   unsigned AS = getLoadStoreAddressSpace(I);
   if (isa<LoadInst>(I)) {
@@ -5692,7 +5692,7 @@ unsigned LoopVectorizationCostModel::getUniformMemOpCost(Instruction *I,
 unsigned LoopVectorizationCostModel::getGatherScatterCost(Instruction *I,
                                                           unsigned VF) {
   Type *ValTy = getMemInstValueType(I);
-  Type *VectorTy = ToVectorTy(ValTy, VF, Scalable);
+  Type *VectorTy = ToVectorTy(ValTy, VF, isScalable());
   unsigned Alignment = getLoadStoreAlignment(I);
   Value *Ptr = getLoadStorePointerOperand(I);
 
@@ -5704,7 +5704,7 @@ unsigned LoopVectorizationCostModel::getGatherScatterCost(Instruction *I,
 unsigned LoopVectorizationCostModel::getInterleaveGroupCost(Instruction *I,
                                                             unsigned VF) {
   Type *ValTy = getMemInstValueType(I);
-  Type *VectorTy = ToVectorTy(ValTy, VF, Scalable);
+  Type *VectorTy = ToVectorTy(ValTy, VF, isScalable());
   unsigned AS = getLoadStoreAddressSpace(I);
 
   auto Group = getInterleavedAccessGroup(I);
@@ -5787,7 +5787,7 @@ unsigned LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
     return 0;
 
   unsigned Cost = 0;
-  Type *RetTy = ToVectorTy(I->getType(), VF, Scalable);
+  Type *RetTy = ToVectorTy(I->getType(), VF, isScalable());
   if (!RetTy->isVoidTy() &&
       (!isa<LoadInst>(I) || !TTI.supportsEfficientVectorElementLoadStore()))
     Cost += TTI.getScalarizationOverhead(RetTy, true, false);
@@ -5970,7 +5970,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     RetTy = IntegerType::get(RetTy->getContext(), MinBWs[I]);
   VectorTy = isScalarAfterVectorization(I, VF)
                  ? RetTy
-                 : ToVectorTy(RetTy, VF, Scalable);
+                 : ToVectorTy(RetTy, VF, isScalable());
   auto SE = PSE.getSE();
 
   // TODO: We need to estimate the cost of intrinsic calls.
@@ -6025,8 +6025,10 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     if (VF > 1 && Phi->getParent() != TheLoop->getHeader())
       return (Phi->getNumIncomingValues() - 1) *
              TTI.getCmpSelInstrCost(
-                 Instruction::Select, ToVectorTy(Phi->getType(), VF, Scalable),
-                 ToVectorTy(Type::getInt1Ty(Phi->getContext()), VF, Scalable));
+                 Instruction::Select,
+                 ToVectorTy(Phi->getType(), VF, isScalable()),
+                 ToVectorTy(Type::getInt1Ty(Phi->getContext()), VF,
+                            isScalable()));
 
     return TTI.getCFInstrCost(Instruction::PHI);
   }
@@ -6116,7 +6118,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     Instruction *Op0AsInstruction = dyn_cast<Instruction>(I->getOperand(0));
     if (canTruncateToMinimalBitwidth(Op0AsInstruction, VF))
       ValTy = IntegerType::get(ValTy->getContext(), MinBWs[Op0AsInstruction]);
-    VectorTy = ToVectorTy(ValTy, VF, Scalable);
+    VectorTy = ToVectorTy(ValTy, VF, isScalable());
     return TTI.getCmpSelInstrCost(I->getOpcode(), VectorTy, nullptr, I);
   }
   case Instruction::Store:
@@ -6129,7 +6131,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       if (Decision == CM_Scalarize)
         Width = 1;
     }
-    VectorTy = ToVectorTy(getMemInstValueType(I), Width, Scalable);
+    VectorTy = ToVectorTy(getMemInstValueType(I), Width, isScalable());
     return getMemoryInstructionCost(I, VF);
   }
   case Instruction::ZExt:
@@ -6155,7 +6157,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
 
     Type *SrcScalarTy = I->getOperand(0)->getType();
     Type *SrcVecTy = VectorTy->isVectorTy()
-                         ? ToVectorTy(SrcScalarTy, VF, Scalable)
+                         ? ToVectorTy(SrcScalarTy, VF, isScalable())
                          : SrcScalarTy;
     if (canTruncateToMinimalBitwidth(I, VF)) {
       // This cast is going to be shrunk. This may remove the cast or it might
@@ -6167,12 +6169,12 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       if (I->getOpcode() == Instruction::Trunc) {
         SrcVecTy = smallestIntegerVectorType(SrcVecTy, MinVecTy);
         VectorTy = largestIntegerVectorType(
-            ToVectorTy(I->getType(), VF, Scalable), MinVecTy);
+            ToVectorTy(I->getType(), VF, isScalable()), MinVecTy);
       } else if (I->getOpcode() == Instruction::ZExt ||
                  I->getOpcode() == Instruction::SExt) {
         SrcVecTy = largestIntegerVectorType(SrcVecTy, MinVecTy);
         VectorTy = smallestIntegerVectorType(
-            ToVectorTy(I->getType(), VF, Scalable), MinVecTy);
+            ToVectorTy(I->getType(), VF, isScalable()), MinVecTy);
       }
     }
 
