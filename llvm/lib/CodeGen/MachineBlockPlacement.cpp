@@ -2775,7 +2775,7 @@ void MachineBlockPlacement::optimizeBranches() {
         TII->removeBranch(*ChainBB);
         TII->insertBranch(*ChainBB, FBB, TBB, Cond, dl);
         ChainBB->updateTerminator();
-      } else if (Cond.empty() && TBB && ChainBB != TBB &&
+      } else if (Cond.empty() && TBB && ChainBB != TBB && !TBB->empty() &&
                  !TBB->canFallThrough()) {
         // When ChainBB is unconditional branch to the TBB, and TBB has no
         // fallthrough predecessor and fallthrough successor, try to merge
