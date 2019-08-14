@@ -4873,6 +4873,30 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   return None;
 }
 
+// The MaxVF calculated here works for fixed vectors but not for scalable
+// vectors. MaxVF for fixed size vectors are represented by a constant value (2,
+// 4, 8 ... 256 ) depending on the vector register width that is fixed for an
+// architecture. For scalable vectors, where vector register width is not fixed,
+// vector width is represented as `<vscale x k x simpleType>`, where k is a
+// multiple of 2 and is known at the compile time (k can range from 1 to 8 for
+// current RISC-V vector specification). vscale is not known at compile time
+// (vscale = VLEN / (k * ELEN)). simpleType is a scalr type like f64, f32, etc.
+//
+// For mixed width operations we can either use n registers for both wide and
+// narrow types, in which case the narrow type will waste half the register, or
+// we can use n*w registers for the wider type and n registers for the narrow
+// type, where wider type is wider by a factor of w. 
+//
+// For the time being we make the following assumptions:
+// 1. Assuming f64 to be the largest type we would need, we use 
+// <vscale x 1 x f64> as our base type.
+// 2. If the only involved scalar type is f64, we use MaxVectorSize to be 
+// vscale x 1. (Eventually we will add support for higher values of k. That
+// would need further analysis to optimize for register pressure.)
+// 2a. If the only involved scalar type is f32, we use MaxVectorSize of 
+// vscale x 2. Similar for other narrower types. 
+// 3. For mixed width, we will use the full register for the narrower type and
+// register grouping for the wider type. 
 unsigned
 LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
@@ -4943,6 +4967,80 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   }
   return MaxVF;
 }
+ 
+/*
+ *unsigned
+ *LoopVectorizationCostModel::computeFeasibleMaxVF(bool OptForSize,
+ *                                                 unsigned ConstTripCount) {
+ *  MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
+ *  unsigned SmallestType, WidestType;
+ *  std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
+ *  unsigned WidestRegister = TTI.getRegisterBitWidth(true);
+ *
+ *  // Get the maximum safe dependence distance in bits computed by LAA.
+ *  // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
+ *  // the memory accesses that is most restrictive (involved in the smallest
+ *  // dependence distance).
+ *  unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
+ *
+ *  WidestRegister = std::min(WidestRegister, MaxSafeRegisterWidth);
+ *
+ *  unsigned MaxVectorSize = WidestRegister / WidestType;
+ *
+ *  LLVM_DEBUG(dbgs() << "LV: The Smallest and Widest types: " << SmallestType
+ *                    << " / " << WidestType << " bits.\n");
+ *  LLVM_DEBUG(dbgs() << "LV: The Widest register safe to use is: "
+ *                    << WidestRegister << " bits.\n");
+ *
+ *  assert(MaxVectorSize <= 256 && "Did not expect to pack so many elements"
+ *                                 " into one vector!");
+ *  if (MaxVectorSize == 0) {
+ *    LLVM_DEBUG(dbgs() << "LV: The target has no vector registers.\n");
+ *    MaxVectorSize = 1;
+ *    return MaxVectorSize;
+ *  } else if (ConstTripCount && ConstTripCount < MaxVectorSize &&
+ *             isPowerOf2_32(ConstTripCount)) {
+ *    // We need to clamp the VF to be the ConstTripCount. There is no point in
+ *    // choosing a higher viable VF as done in the loop below.
+ *    LLVM_DEBUG(dbgs() << "LV: Clamping the MaxVF to the constant trip count: "
+ *                      << ConstTripCount << "\n");
+ *    MaxVectorSize = ConstTripCount;
+ *    return MaxVectorSize;
+ *  }
+ *
+ *  unsigned MaxVF = MaxVectorSize;
+ *  if (TTI.shouldMaximizeVectorBandwidth(OptForSize) ||
+ *      (MaximizeBandwidth && !OptForSize)) {
+ *    // Collect all viable vectorization factors larger than the default MaxVF
+ *    // (i.e. MaxVectorSize).
+ *    SmallVector<unsigned, 8> VFs;
+ *    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
+ *    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
+ *      VFs.push_back(VS);
+ *
+ *    // For each VF calculate its register usage.
+ *    auto RUs = calculateRegisterUsage(VFs);
+ *
+ *    // Select the largest VF which doesn't require more registers than existing
+ *    // ones.
+ *    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
+ *    for (int i = RUs.size() - 1; i >= 0; --i) {
+ *      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
+ *        MaxVF = VFs[i];
+ *        break;
+ *      }
+ *    }
+ *    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
+ *      if (MaxVF < MinVF) {
+ *        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
+ *                          << ") with target's minimum: " << MinVF << '\n');
+ *        MaxVF = MinVF;
+ *      }
+ *    }
+ *  }
+ *  return MaxVF;
+ *}
+ */
 
 VectorizationFactor
 LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
