@@ -65,7 +65,7 @@ RISCVTargetMachine::RISCVTargetMachine(const Target &T, const Triple &TT,
     : LLVMTargetMachine(T, computeDataLayout(TT), TT, CPU, FS, Options,
                         getEffectiveRelocModel(TT, RM),
                         getEffectiveCodeModel(CM, CodeModel::Small), OL),
-      TLOF(make_unique<RISCVELFTargetObjectFile>()),
+      TLOF(std::make_unique<RISCVELFTargetObjectFile>()),
       Subtarget(TT, CPU, FS, Options.MCOptions.getABIName(), *this) {
   initAsmInfo();
 }
