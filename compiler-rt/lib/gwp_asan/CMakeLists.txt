@@ -101,7 +101,7 @@ if (COMPILER_RT_HAS_GWP_ASAN)
 
   # Build the stack trace compressor fuzzer.
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    add_llvm_executable(stack_trace_compressor_fuzzer
+    add_executable(stack_trace_compressor_fuzzer
       stack_trace_compressor_fuzzer.cpp
       ${GWP_ASAN_SOURCES}
       ${GWP_ASAN_HEADERS})
@@ -109,7 +109,8 @@ if (COMPILER_RT_HAS_GWP_ASAN)
       PROPERTIES FOLDER "Fuzzers")
     target_compile_options(stack_trace_compressor_fuzzer
       PRIVATE -fsanitize=fuzzer-no-link)
-    target_link_options(stack_trace_compressor_fuzzer PRIVATE -fsanitize=fuzzer)
+    set_target_properties(
+      stack_trace_compressor_fuzzer PROPERTIES LINK_FLAGS -fsanitize=fuzzer)
     add_dependencies(gwp_asan stack_trace_compressor_fuzzer)
   endif()
 endif()
