@@ -109,18 +109,12 @@ unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) {
   return Vector ? 32 : 1;
 }
 
-unsigned RISCVTTIImpl::getRegisterBitWidth(bool Vector) const {
-  if (!Vector)
-    return 32;
-  // TODO: VK Jul 4
-  // For EPI, since the current (tentative?) VLEN value is defined to be 256*8*8
-  // bits, we will use this as the vector register bit width for now. This
-  // assumes LMUL = 1.
-  // We need to handle Register grouping semantics for RISC-V, i.e when LMUL
-  // > 1.
-  //
-  unsigned VLEN = 256 * 8 * 8;
-  return VLEN;
+unsigned RISCVTTIImpl::getScalableRegisterBitWidth() const {
+  // We assume our base type to be <vscale x k x 64> with k = 1.
+  // This is the value we return for now. We will handle LMUL calculations in
+  // the loop vectorizer.
+  // TODO: This may change in future to offload more calculations here.
+  return 1;
 }
 
 bool RISCVTTIImpl::useScalableVectorType() const {

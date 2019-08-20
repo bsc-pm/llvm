@@ -4885,29 +4885,34 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
 // For mixed width operations we can either use n registers for both wide and
 // narrow types, in which case the narrow type will waste half the register, or
 // we can use n*w registers for the wider type and n registers for the narrow
-// type, where wider type is wider by a factor of w. 
+// type, where wider type is wider by a factor of w.
 //
 // For the time being we make the following assumptions:
-// 1. Assuming f64 to be the largest type we would need, we use 
+// 1. Assuming f64 to be the largest type we would need, we use
 // <vscale x 1 x f64> as our base type.
-// 2. If the only involved scalar type is f64, we use MaxVectorSize to be 
+// 2. If the only involved scalar type is f64, we use MaxVectorSize to be
 // vscale x 1. (Eventually we will add support for higher values of k. That
 // would need further analysis to optimize for register pressure.)
-// 2a. If the only involved scalar type is f32, we use MaxVectorSize of 
-// vscale x 2. Similar for other narrower types. 
+// 2a. If the only involved scalar type is f32, we use MaxVectorSize of
+// vscale x 2. Similar for other narrower types.
 // 3. For mixed width, we will use the full register for the narrower type and
-// register grouping for the wider type. 
+// register grouping for the wider type.
 unsigned
 LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
-  unsigned WidestRegister = TTI.getRegisterBitWidth(true);
+  unsigned WidestRegister = TTI.getScalableRegisterBitWidth();
 
   // Get the maximum safe dependence distance in bits computed by LAA.
   // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
   // the memory accesses that is most restrictive (involved in the smallest
   // dependence distance).
+
+  // Note/VK/Aug192019
+  // We are ignoring MaxSafeRegisterWidth calculationn based on dependence
+  // distance for now. This is another issue that would be needed to handled
+  // separately for scalable vectors.
   unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
 
   WidestRegister = std::min(WidestRegister, MaxSafeRegisterWidth);
@@ -4967,7 +4972,7 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   }
   return MaxVF;
 }
- 
+
 /*
  *unsigned
  *LoopVectorizationCostModel::computeFeasibleMaxVF(bool OptForSize,
@@ -5021,7 +5026,8 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
  *    // For each VF calculate its register usage.
  *    auto RUs = calculateRegisterUsage(VFs);
  *
- *    // Select the largest VF which doesn't require more registers than existing
+ *    // Select the largest VF which doesn't require more registers than
+ *existing
  *    // ones.
  *    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
  *    for (int i = RUs.size() - 1; i >= 0; --i) {

@@ -46,7 +46,7 @@ public:
   int getIntImmCost(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
                     Type *Ty);
   unsigned getNumberOfRegisters(bool Vector);
-  unsigned getRegisterBitWidth(bool Vector) const;
+  unsigned getScalableRegisterBitWidth() const;
   bool useScalableVectorType() const;
 
 };
