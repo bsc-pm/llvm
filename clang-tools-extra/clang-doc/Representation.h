@@ -61,7 +61,7 @@ struct CommentInfo {
       return false;
 
     return std::equal(Children.begin(), Children.end(), Other.Children.begin(),
-                      llvm::deref<llvm::equal>{});
+                      llvm::deref<std::equal_to<>>{});
   }
 
   // This operator is used to sort a vector of CommentInfos.
@@ -82,7 +82,7 @@ struct CommentInfo {
     if (FirstCI == SecondCI) {
       return std::lexicographical_compare(
           Children.begin(), Children.end(), Other.Children.begin(),
-          Other.Children.end(), llvm::deref<llvm::less>());
+          Other.Children.end(), llvm::deref<std::less<>>());
     }
 
     return false;
@@ -413,12 +413,13 @@ mergeInfos(std::vector<std::unique_ptr<Info>> &Values);
 
 struct ClangDocContext {
   ClangDocContext() = default;
-  ClangDocContext(tooling::ExecutionContext *ECtx, bool PublicOnly,
-                  StringRef OutDirectory, StringRef SourceRoot,
+  ClangDocContext(tooling::ExecutionContext *ECtx, StringRef ProjectName,
+                  bool PublicOnly, StringRef OutDirectory, StringRef SourceRoot,
                   StringRef RepositoryUrl,
                   std::vector<std::string> UserStylesheets,
                   std::vector<std::string> JsScripts);
   tooling::ExecutionContext *ECtx;
+  std::string ProjectName; // Name of project clang-doc is documenting.
   bool PublicOnly; // Indicates if only public declarations are documented.
   std::string OutDirectory; // Directory for outputting generated files.
   std::string SourceRoot;   // Directory where processed files are stored. Links

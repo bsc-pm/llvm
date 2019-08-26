@@ -664,7 +664,7 @@ inline static bool isTruncatedShiftCountForLEA(unsigned ShAmt) {
 }
 
 bool X86InstrInfo::classifyLEAReg(MachineInstr &MI, const MachineOperand &Src,
-                                  unsigned Opc, bool AllowSP, unsigned &NewSrc,
+                                  unsigned Opc, bool AllowSP, Register &NewSrc,
                                   bool &isKill, MachineOperand &ImplicitOp,
                                   LiveVariables *LV) const {
   MachineFunction &MF = *MI.getParent()->getParent();
@@ -911,7 +911,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
 
     // LEA can't handle ESP.
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ false,
                         SrcReg, isKill, ImplicitOp, LV))
@@ -947,7 +947,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
     unsigned Opc = MIOpc == X86::INC64r ? X86::LEA64r :
         (Is64Bit ? X86::LEA64_32r : X86::LEA32r);
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ false, SrcReg, isKill,
                         ImplicitOp, LV))
@@ -970,7 +970,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
         : (Is64Bit ? X86::LEA64_32r : X86::LEA32r);
 
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ false, SrcReg, isKill,
                         ImplicitOp, LV))
@@ -1005,7 +1005,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
       Opc = Is64Bit ? X86::LEA64_32r : X86::LEA32r;
 
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ true,
                         SrcReg, isKill, ImplicitOp, LV))
@@ -1013,7 +1013,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
 
     const MachineOperand &Src2 = MI.getOperand(2);
     bool isKill2;
-    unsigned SrcReg2;
+    Register SrcReg2;
     MachineOperand ImplicitOp2 = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src2, Opc, /*AllowSP=*/ false,
                         SrcReg2, isKill2, ImplicitOp2, LV))
@@ -1054,7 +1054,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
     unsigned Opc = Is64Bit ? X86::LEA64_32r : X86::LEA32r;
 
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ true,
                         SrcReg, isKill, ImplicitOp, LV))
@@ -1093,7 +1093,7 @@ X86InstrInfo::convertToThreeAddress(MachineFunction::iterator &MFI,
     unsigned Opc = Is64Bit ? X86::LEA64_32r : X86::LEA32r;
 
     bool isKill;
-    unsigned SrcReg;
+    Register SrcReg;
     MachineOperand ImplicitOp = MachineOperand::CreateReg(0, false);
     if (!classifyLEAReg(MI, Src, Opc, /*AllowSP=*/ true,
                         SrcReg, isKill, ImplicitOp, LV))
@@ -1990,6 +1990,24 @@ bool X86InstrInfo::findCommutedOpIndices(MachineInstr &MI, unsigned &SrcOpIdx1,
   case X86::VPTERNLOGQZ256rmbikz:
   case X86::VPTERNLOGQZrmbikz:
     return findThreeSrcCommutedOpIndices(MI, SrcOpIdx1, SrcOpIdx2);
+  case X86::VPDPWSSDZ128r:
+  case X86::VPDPWSSDZ128rk:
+  case X86::VPDPWSSDZ128rkz:
+  case X86::VPDPWSSDZ256r:
+  case X86::VPDPWSSDZ256rk:
+  case X86::VPDPWSSDZ256rkz:
+  case X86::VPDPWSSDZr:
+  case X86::VPDPWSSDZrk:
+  case X86::VPDPWSSDZrkz:
+  case X86::VPDPWSSDSZ128r:
+  case X86::VPDPWSSDSZ128rk:
+  case X86::VPDPWSSDSZ128rkz:
+  case X86::VPDPWSSDSZ256r:
+  case X86::VPDPWSSDSZ256rk:
+  case X86::VPDPWSSDSZ256rkz:
+  case X86::VPDPWSSDSZr:
+  case X86::VPDPWSSDSZrk:
+  case X86::VPDPWSSDSZrkz:
   case X86::VPMADD52HUQZ128r:
   case X86::VPMADD52HUQZ128rk:
   case X86::VPMADD52HUQZ128rkz:

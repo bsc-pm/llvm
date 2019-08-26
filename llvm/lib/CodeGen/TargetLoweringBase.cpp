@@ -578,8 +578,6 @@ TargetLoweringBase::TargetLoweringBase(const TargetMachine &tm) : TM(tm) {
   BooleanFloatContents = UndefinedBooleanContent;
   BooleanVectorContents = UndefinedBooleanContent;
   SchedPreferenceInfo = Sched::ILP;
-  JumpBufSize = 0;
-  JumpBufAlignment = 0;
   MinFunctionAlignment = 0;
   PrefFunctionAlignment = 0;
   PrefLoopAlignment = 0;
@@ -1282,21 +1280,33 @@ void TargetLoweringBase::computeRegisterProperties(
       LLVM_FALLTHROUGH;
 
     case TypeWidenVector:
-      // Try to widen the vector.
-      for (unsigned nVT = i + 1; nVT <= MVT::LAST_VECTOR_VALUETYPE; ++nVT) {
-        MVT SVT = (MVT::SimpleValueType) nVT;
-        if (SVT.getVectorElementType() == EltVT
-            && SVT.getVectorNumElements() > NElts && isTypeLegal(SVT)) {
-          TransformToType[i] = SVT;
-          RegisterTypeForVT[i] = SVT;
-          NumRegistersForVT[i] = 1;
+      if (isPowerOf2_32(NElts)) {
+        // Try to widen the vector.
+        for (unsigned nVT = i + 1; nVT <= MVT::LAST_VECTOR_VALUETYPE; ++nVT) {
+          MVT SVT = (MVT::SimpleValueType) nVT;
+          if (SVT.getVectorElementType() == EltVT
+              && SVT.getVectorNumElements() > NElts && isTypeLegal(SVT)) {
+            TransformToType[i] = SVT;
+            RegisterTypeForVT[i] = SVT;
+            NumRegistersForVT[i] = 1;
+            ValueTypeActions.setTypeAction(VT, TypeWidenVector);
+            IsLegalWiderType = true;
+            break;
+          }
+        }
+        if (IsLegalWiderType)
+          break;
+      } else {
+        // Only widen to the next power of 2 to keep consistency with EVT.
+        MVT NVT = VT.getPow2VectorType();
+        if (isTypeLegal(NVT)) {
+          TransformToType[i] = NVT;
           ValueTypeActions.setTypeAction(VT, TypeWidenVector);
-          IsLegalWiderType = true;
+          RegisterTypeForVT[i] = NVT;
+          NumRegistersForVT[i] = 1;
           break;
         }
       }
-      if (IsLegalWiderType)
-        break;
       LLVM_FALLTHROUGH;
 
     case TypeSplitVector:

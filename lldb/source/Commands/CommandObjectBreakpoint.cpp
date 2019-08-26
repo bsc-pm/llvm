@@ -141,9 +141,7 @@ public:
     }
     break;
     default:
-      error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                     short_option);
-      break;
+      llvm_unreachable("Unimplemented option");
     }
 
     return error;
@@ -206,9 +204,7 @@ public:
         m_use_dummy = true;
         break;
     default:
-      error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                     short_option);
-      break;
+      llvm_unreachable("Unimplemented option");
     }
 
     return error;
@@ -486,9 +482,7 @@ public:
         break;
 
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -682,12 +676,10 @@ protected:
                                  // name
       {
         RegularExpression regexp(m_options.m_func_regexp);
-        if (!regexp.IsValid()) {
-          char err_str[1024];
-          regexp.GetErrorAsCString(err_str, sizeof(err_str));
+        if (llvm::Error err = regexp.GetError()) {
           result.AppendErrorWithFormat(
               "Function name regular expression could not be compiled: \"%s\"",
-              err_str);
+              llvm::toString(std::move(err)).c_str());
           result.SetStatus(eReturnStatusFailed);
           return false;
         }
@@ -718,12 +710,10 @@ protected:
       }
 
       RegularExpression regexp(m_options.m_source_text_regexp);
-      if (!regexp.IsValid()) {
-        char err_str[1024];
-        regexp.GetErrorAsCString(err_str, sizeof(err_str));
+      if (llvm::Error err = regexp.GetError()) {
         result.AppendErrorWithFormat(
             "Source text regular expression could not be compiled: \"%s\"",
-            err_str);
+            llvm::toString(std::move(err)).c_str());
         result.SetStatus(eReturnStatusFailed);
         return false;
       }
@@ -1212,9 +1202,7 @@ public:
         m_internal = true;
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1346,9 +1334,7 @@ public:
         break;
 
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1500,9 +1486,7 @@ public:
         break;
 
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1647,9 +1631,7 @@ public:
       break;
 
     default:
-      error.SetErrorStringWithFormat("unrecognized short option '%c'",
-                                     short_option);
-      break;
+      llvm_unreachable("Unimplemented option");
     }
     return error;
   }
@@ -1717,7 +1699,8 @@ public:
               "invalid boolean value '%s' passed for -L option",
               option_arg.str().c_str());
       } break;
-
+      default:
+        llvm_unreachable("Unimplemented option");
     }
     
     return error;
@@ -2179,9 +2162,7 @@ public:
         break;
       }
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -2297,9 +2278,7 @@ public:
         m_append = true;
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
