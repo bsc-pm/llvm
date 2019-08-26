@@ -3,6 +3,12 @@
 // RUN: %clang -w -target x86_64-linux-gnu -S -emit-llvm -o - -fno-exceptions -O0 \
 // RUN:     -fsanitize=address -fsanitize-address-use-after-scope %s | \
 // RUN:     FileCheck %s -check-prefixes=CHECK,LIFETIME
+// RUN: %clang -w -target x86_64-linux-gnu -S -emit-llvm -o - -fno-exceptions -O0 \
+// RUN:     -fsanitize=memory %s | \
+// RUN:     FileCheck %s -check-prefixes=CHECK,LIFETIME
+// RUN: %clang -w -target aarch64-linux-gnu -S -emit-llvm -o - -fno-exceptions -O0 \
+// RUN:     -fsanitize=hwaddress %s | \
+// RUN:     FileCheck %s -check-prefixes=CHECK,LIFETIME
 
 extern int bar(char *A, int n);
 
