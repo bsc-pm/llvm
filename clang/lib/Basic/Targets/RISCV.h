@@ -94,6 +94,13 @@ public:
     }
     return false;
   }
+
+  void setMaxAtomicWidth() override {
+    MaxAtomicPromoteWidth = 128;
+
+    if (HasA)
+      MaxAtomicInlineWidth = 32;
+  }
 };
 class LLVM_LIBRARY_VISIBILITY RISCV64TargetInfo : public RISCVTargetInfo {
 public:
@@ -111,6 +118,13 @@ public:
       return true;
     }
     return false;
+  }
+
+  void setMaxAtomicWidth() override {
+    MaxAtomicPromoteWidth = 128;
+
+    if (HasA)
+      MaxAtomicInlineWidth = 64;
   }
 };
 } // namespace targets
