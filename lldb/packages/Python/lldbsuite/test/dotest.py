@@ -252,7 +252,7 @@ def parseOptionsAndInitTestdirs():
     if args.set_inferior_env_vars:
         lldbtest_config.inferior_env = ' '.join(args.set_inferior_env_vars)
 
-    # only print the args if being verbose (and parsable is off)
+    # Only print the args if being verbose.
     if args.v and not args.q:
         print(sys.argv)
 
@@ -295,13 +295,6 @@ def parseOptionsAndInitTestdirs():
         # target. However, when invoking dotest.py directly, a valid --filecheck
         # option needs to be given.
         configuration.filecheck = os.path.abspath(args.filecheck)
-    else:
-        outputPaths = get_llvm_bin_dirs()
-        for outputPath in outputPaths:
-            candidatePath = os.path.join(outputPath, 'FileCheck')
-            if is_exe(candidatePath):
-                configuration.filecheck = candidatePath
-                break
 
     if not configuration.get_filecheck_path():
         logging.warning('No valid FileCheck executable; some tests may fail...')
@@ -392,9 +385,6 @@ def parseOptionsAndInitTestdirs():
         if args.p.startswith('-'):
             usage(parser)
         configuration.regexp = args.p
-
-    if args.q:
-        configuration.parsable = True
 
     if args.s:
         if args.s.startswith('-'):
@@ -555,34 +545,6 @@ def getOutputPaths(lldbRootDirectory):
 
     return result
 
-def get_llvm_bin_dirs():
-    """
-    Returns an array of paths that may have the llvm/clang/etc binaries
-    in them, relative to this current file.
-    Returns an empty array if none are found.
-    """
-    result = []
-
-    lldb_root_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..")
-    paths_to_try = [
-        "llvm-build/Release+Asserts/x86_64/bin",
-        "llvm-build/Debug+Asserts/x86_64/bin",
-        "llvm-build/Release/x86_64/bin",
-        "llvm-build/Debug/x86_64/bin",
-        "llvm-build/Ninja-DebugAssert/llvm-macosx-x86_64/bin",
-        "llvm-build/Ninja-DebugAssert+asan/llvm-macosx-x86_64/bin",
-        "llvm-build/Ninja-ReleaseAssert/llvm-macosx-x86_64/bin",
-        "llvm-build/Ninja-ReleaseAssert+asan/llvm-macosx-x86_64/bin",
-        "llvm-build/Ninja-RelWithDebInfoAssert/llvm-macosx-x86_64/bin",
-        "llvm-build/Ninja-RelWithDebInfoAssert+asan/llvm-macosx-x86_64/bin",
-    ]
-    for p in paths_to_try:
-        path = os.path.join(lldb_root_path, p)
-        if os.path.exists(path):
-            result.append(path)
-
-    return result
 
 def setupSysPath():
     """
@@ -1268,7 +1230,7 @@ def run_suite():
     #
     checkCompiler()
 
-    if not configuration.parsable:
+    if configuration.verbose:
         print("compiler=%s" % configuration.compiler)
 
     # Iterating over all possible architecture and compiler combinations.
@@ -1277,36 +1239,23 @@ def run_suite():
     configString = "arch=%s compiler=%s" % (configuration.arch,
                                             configuration.compiler)
 
-    # Translate ' ' to '-' for pathname component.
-    if six.PY2:
-        import string
-        tbl = string.maketrans(' ', '-')
-    else:
-        tbl = str.maketrans(' ', '-')
-    configPostfix = configString.translate(tbl)
-
     # Output the configuration.
-    if not configuration.parsable:
+    if configuration.verbose:
         sys.stderr.write("\nConfiguration: " + configString + "\n")
 
     # First, write out the number of collected test cases.
-    if not configuration.parsable:
+    if configuration.verbose:
         sys.stderr.write(configuration.separator + "\n")
         sys.stderr.write(
             "Collected %d test%s\n\n" %
             (configuration.suite.countTestCases(),
              configuration.suite.countTestCases() != 1 and "s" or ""))
 
-    if configuration.parsable:
-        v = 0
-    else:
-        v = configuration.verbose
-
     # Invoke the test runner.
     if configuration.count == 1:
         result = unittest2.TextTestRunner(
             stream=sys.stderr,
-            verbosity=v,
+            verbosity=configuration.verbose,
             resultclass=test_result.LLDBTestResult).run(
             configuration.suite)
     else:
@@ -1318,13 +1267,13 @@ def run_suite():
 
             result = unittest2.TextTestRunner(
                 stream=sys.stderr,
-                verbosity=v,
+                verbosity=configuration.verbose,
                 resultclass=test_result.LLDBTestResult).run(
                 configuration.suite)
 
     configuration.failed = not result.wasSuccessful()
 
-    if configuration.sdir_has_content and not configuration.parsable:
+    if configuration.sdir_has_content and configuration.verbose:
         sys.stderr.write(
             "Session logs for test failures/errors/unexpected successes"
             " can be found in directory '%s'\n" %
