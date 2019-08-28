@@ -23,9 +23,10 @@ from __future__ import print_function
 
 # System modules
 import atexit
-import os
+import datetime
 import errno
 import logging
+import os
 import platform
 import re
 import signal
@@ -387,9 +388,11 @@ def parseOptionsAndInitTestdirs():
         configuration.regexp = args.p
 
     if args.s:
-        if args.s.startswith('-'):
-            usage(parser)
         configuration.sdir_name = args.s
+    else:
+        timestamp_started = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M_%S")
+        configuration.sdir_name = os.path.join(os.getcwd(), timestamp_started)
+
     configuration.session_file_format = args.session_file_format
 
     if args.t:
@@ -431,7 +434,6 @@ def parseOptionsAndInitTestdirs():
 
     # rerun-related arguments
     configuration.rerun_all_issues = args.rerun_all_issues
-    configuration.rerun_max_file_threshold = args.rerun_max_file_threshold
 
     if args.lldb_platform_name:
         configuration.lldb_platform_name = args.lldb_platform_name
@@ -1019,6 +1021,9 @@ def run_suite():
     # lldb.SBDebugger.Initialize()/Terminate() pair.
     import lldb
 
+    # Now we can also import lldbutil
+    from lldbsuite.test import lldbutil
+
     # Create a singleton SBDebugger in the lldb namespace.
     lldb.DBG = lldb.SBDebugger.Create()
 
@@ -1078,7 +1083,6 @@ def run_suite():
 
     # Set up the working directory.
     # Note that it's not dotest's job to clean this directory.
-    import lldbsuite.test.lldbutil as lldbutil
     build_dir = configuration.test_build_dir
     lldbutil.mkdir_p(build_dir)
 
@@ -1120,32 +1124,14 @@ def run_suite():
     # Install the control-c handler.
     unittest2.signals.installHandler()
 
-    # If sdir_name is not specified through the '-s sdir_name' option, get a
-    # timestamp string and export it as LLDB_SESSION_DIR environment var.  This will
-    # be used when/if we want to dump the session info of individual test cases
-    # later on.
-    #
-    # See also TestBase.dumpSessionInfo() in lldbtest.py.
-    import datetime
-    # The windows platforms don't like ':' in the pathname.
-    timestamp_started = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M_%S")
-    if not configuration.sdir_name:
-        configuration.sdir_name = timestamp_started
-    os.environ["LLDB_SESSION_DIRNAME"] = os.path.join(
-        os.getcwd(), configuration.sdir_name)
+    lldbutil.mkdir_p(configuration.sdir_name)
+    os.environ["LLDB_SESSION_DIRNAME"] = configuration.sdir_name
 
     sys.stderr.write(
         "\nSession logs for test failures/errors/unexpected successes"
         " will go into directory '%s'\n" %
         configuration.sdir_name)
     sys.stderr.write("Command invoked: %s\n" % getMyCommandLine())
-
-    if not os.path.isdir(configuration.sdir_name):
-        try:
-            os.mkdir(configuration.sdir_name)
-        except OSError as exception:
-            if exception.errno != errno.EEXIST:
-                raise
 
     #
     # Invoke the default TextTestRunner to run the test suite
