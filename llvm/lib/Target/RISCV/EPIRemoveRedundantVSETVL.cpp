@@ -17,7 +17,7 @@
 //   found in the same virtual register in both instructions.
 //
 // - If we detect that the value passed as the requested vector length (AVL)
-//   for the posterior 'vsetvli' instruction is actually defined by the prior
+//   for the later 'vsetvli' instruction is actually defined by the prior
 //   'vsetvli' (i.e. it is a granted vector length (GVL)).
 //
 // Currently, this phase requires SSA form, and the analysis is limited within
@@ -31,11 +31,13 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/LiveVariables.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
-#define DEBUG_TYPE "EPIRemoveRedundantVSETVL"
+#define DEBUG_TYPE "epi-remove-redundant-vsetvl"
 
 static cl::opt<bool>
     DisableRemoveVSETVL("no-epi-remove-redundant-vsetvl", cl::init(false),
@@ -60,6 +62,7 @@ public:
   // This pass modifies the program, but does not modify the CFG
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesCFG();
+    AU.addRequired<LiveVariables>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -69,6 +72,11 @@ private:
 char EPIRemoveRedundantVSETVL::ID = 0;
 
 bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
+
+  LLVM_DEBUG(
+      dbgs() << "********** Begin remove redundant VSETVLI phase on function '"
+             << F.getName() << "' **********\n");
+
   if (skipFunction(F.getFunction()) || DisableRemoveVSETVL)
     return false;
 
@@ -81,21 +89,21 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
   // This map is used to replace all uses of the redundant 'vsetvli's
   // definition with the corresponding definition of a (non-removable)
   // 'vsetvli' that preceedes it.
-  typedef llvm::DenseMap<unsigned, unsigned> OutputOpMap_t;
+  typedef DenseMap<unsigned, unsigned> OutputOpMap_t;
   OutputOpMap_t OutputOpMap;
 
   for (MachineBasicBlock &MBB : F) {
-    const MachineInstr *RefInstr = nullptr;
+    MachineInstr *RefInstr = nullptr;
     for (MachineBasicBlock::instr_iterator II = MBB.instr_begin(),
                                            IIEnd = MBB.instr_end();
          II != IIEnd;) {
       MachineInstr &MI(*II++);
 
       if (MI.getOpcode() != RISCV::VSETVLI) {
-        // Check if the current intruction defines VL (e.g. 'vsetvl').
-        // If it does, we should not remove a posterior 'vsetvli', even when
-        // its operands match the reference 'vsetvli's. To force this we clear
-        // 'RefInstr'.
+        // Check if the current intruction defines VL (e.g. 'vsetvl', (but not
+        // 'vsetvli')). If it does, we should not remove a subsequent 'vsetvli',
+        // even when its operands match the reference 'vsetvli's. To force this
+        // we clear 'RefInstr'.
         for (auto const &Def : MI.defs()) {
           assert(Def.isReg());
           if (Def.getReg() == RISCV::VL) {
@@ -123,6 +131,7 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
       }
 
       assert(MI.getNumExplicitOperands() == 4);
+      assert(MI.getNumOperands() == 6);
 
       if (RefInstr == nullptr) {
         RefInstr = &MI;
@@ -131,15 +140,35 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
 
       assert(&MI != RefInstr);
 
-      const MachineOperand &GVLOp = MI.getOperand(0);
       const MachineOperand &RefInstrGVLOp = RefInstr->getOperand(0);
+      assert(RefInstrGVLOp.isReg());
 
-      assert(GVLOp.isReg() && RefInstrGVLOp.isReg());
+      const MachineOperand &RefInstrAVLOp = RefInstr->getOperand(1);
+      assert(RefInstrAVLOp.isReg());
+
+      const MachineOperand &RefInstrImplVLOp = RefInstr->getOperand(4);
+      const MachineOperand &RefInstrImplVTypeOp = RefInstr->getOperand(5);
+
+      assert(RefInstrImplVLOp.isImplicit() && RefInstrImplVLOp.isReg());
+      assert(RefInstrImplVTypeOp.isImplicit() && RefInstrImplVTypeOp.isReg());
+
+      if (RefInstrGVLOp.isDead() && RefInstrImplVLOp.isDead() &&
+          RefInstrImplVTypeOp.isDead()) {
+        LLVM_DEBUG(dbgs() << "Erase trivially dead VSETVLI instruction: ";
+                   RefInstr->dump());
+        RefInstr->eraseFromParent();
+        RefInstr = &MI;
+        LLVM_DEBUG(dbgs() << "Reference VSETVLI instruction set to: ";
+                   RefInstr->dump());
+        IsFunctionModified = true;
+        continue;
+      }
+
+      const MachineOperand &GVLOp = MI.getOperand(0);
+      assert(GVLOp.isReg());
 
       const MachineOperand &AVLOp = MI.getOperand(1);
-      const MachineOperand &RefInstrAVLOp = RefInstr->getOperand(1);
-
-      assert(AVLOp.isReg() && RefInstrAVLOp.isReg());
+      assert(AVLOp.isReg());
 
       // If a mapping exists, get the mapped operand
       unsigned AVLOpReg = AVLOp.getReg();
@@ -152,6 +181,8 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
       if ((AVLOpReg != RefInstrGVLOp.getReg()) &&
           (AVLOpReg != RefInstrAVLOp.getReg())) {
         RefInstr = &MI;
+        LLVM_DEBUG(dbgs() << "Reference VSETVLI instruction set to: ";
+                   RefInstr->dump());
         continue;
       }
 
@@ -162,6 +193,8 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
 
       if (SEWOp.getImm() != RefInstrSEWOp.getImm()) {
         RefInstr = &MI;
+        LLVM_DEBUG(dbgs() << "Reference VSETVLI instruction set to: ";
+                   RefInstr->dump());
         continue;
       }
 
@@ -172,6 +205,8 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
 
       if (VLMulOp.getImm() != RefInstrVLMulOp.getImm()) {
         RefInstr = &MI;
+        LLVM_DEBUG(dbgs() << "Reference VSETVLI instruction set to: ";
+                   RefInstr->dump());
         continue;
       }
 
@@ -185,6 +220,7 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
           OutputOpMap[GVLOp.getReg()] = RefInstrGVLOp.getReg();
       }
 
+      LLVM_DEBUG(dbgs() << "Erase redundant VSETVLI instruction: "; MI.dump());
       MI.eraseFromParent();
       IsFunctionModified = true;
     }
@@ -215,6 +251,10 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
       }
     }
   }
+
+  LLVM_DEBUG(
+      dbgs() << "*********** End remove redundant VSETVLI phase on function '"
+             << F.getName() << "' ***********\n");
 
   return IsFunctionModified;
 }
