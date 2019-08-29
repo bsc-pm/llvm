@@ -5323,19 +5323,6 @@ let ExeDomain = SSEPackedSingle in {
     defm INSERTPS : SS41I_insertf32<0x21, "insertps", 1>;
 }
 
-let Predicates = [UseAVX] in {
-  // If we're inserting an element from a vbroadcast of a load, fold the
-  // load into the X86insertps instruction.
-  // FIXME: Why are these here? This looks like a demanded bits issue.
-  // FIXME: Missing AVX512 equivalents.
-  def : Pat<(v4f32 (X86insertps (v4f32 VR128:$src1),
-                (X86VBroadcast (loadf32 addr:$src2)), imm:$src3)),
-            (VINSERTPSrm VR128:$src1, addr:$src2, imm:$src3)>;
-  def : Pat<(v4f32 (X86insertps (v4f32 VR128:$src1),
-                (X86VBroadcast (v4f32 (nonvolatile_load addr:$src2))), imm:$src3)),
-            (VINSERTPSrm VR128:$src1, addr:$src2, imm:$src3)>;
-}
-
 //===----------------------------------------------------------------------===//
 // SSE4.1 - Round Instructions
 //===----------------------------------------------------------------------===//
@@ -7485,17 +7472,6 @@ let Predicates = [HasAVX2, NoVLX_Or_NoBWI] in {
   def : Pat<(v16i16 (X86VBroadcast
               (i16 (trunc (i32 (zextloadi16 addr:$src)))))),
             (VPBROADCASTWYrm addr:$src)>;
-}
-
-let Predicates = [HasAVX2, NoVLX] in {
-  // Provide aliases for broadcast from the same register class that
-  // automatically does the extract.
-  def : Pat<(v8f32 (X86VBroadcast (v8f32 VR256:$src))),
-            (VBROADCASTSSYrr (v4f32 (EXTRACT_SUBREG (v8f32 VR256:$src),
-                                                    sub_xmm)))>;
-  def : Pat<(v4f64 (X86VBroadcast (v4f64 VR256:$src))),
-            (VBROADCASTSDYrr (v2f64 (EXTRACT_SUBREG (v4f64 VR256:$src),
-                                                    sub_xmm)))>;
 }
 
 let Predicates = [HasAVX2, NoVLX] in {
