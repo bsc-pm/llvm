@@ -1,10 +1,13 @@
 #!/usr/bin/env python
+# coding=utf-8
 
 import collections
 import json
 import logging
 import subprocess
 import sys
+import tempfile
+import os
 
 IMPLEMENTED_LMULS = [1, 2, 4, 8]
 
@@ -747,14 +750,90 @@ def emit_tests(out_file, j):
             b.full_name,
             ", ".join(arguments)))
 
+def single_test_clang(clang, tmp_file, extra_flags = []):
+    DEVNULL = open(os.devnull, 'wb')
+    try:
+        subprocess.check_call([clang,
+            "-fno-crash-diagnostics",
+            "-mepi",
+            "-S",
+            "-o", "/dev/null",
+            "-x", "c",
+            tmp_file.name] + extra_flags,
+            stdout=DEVNULL,
+            stderr=DEVNULL)
+    except Exception as e:
+        # print "ERROR: {}".format(e.output)
+        return False
+    return True
+
+def run_builtin_tester(out_file, j, clang):
+    inst_builtins = instantiate_builtins(j)
+    already_emitted = set([])
+    num_builtins_tested = 0
+    num_builtins_succeeded = 0
+    for b in inst_builtins:
+        # FIXME:
+        if b.lmul not in [1, 2, 4]:
+            continue
+
+        num_builtins_tested += 1
+
+        # The current strategy does not work for builtins that expect
+        # constant expressions. So skip these ones and let them be tested
+        # elsewhere
+        if "K" in b.builtin["Prototype"]:
+            continue
+
+        if b.full_name in already_emitted:
+            continue
+
+        already_emitted.add(b.full_name)
+
+        (return_type, parameter_types) = b.c_prototoype_items()
+
+        parameters = []
+        arguments = []
+        i = 0
+        for p in parameter_types:
+            arg = "arg_{}".format(i)
+            i += 1
+            parameters.append("{} {}".format(p, arg))
+            arguments.append(arg)
+
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            tmp_file.write("{} test_{}({})\n{{\n    return __builtin_epi_{}({});\n}}\n\n".format(
+                return_type,
+                b.full_name,
+                ", ".join(parameters),
+                b.full_name,
+                ", ".join(arguments)))
+            tmp_file.flush()
+            if not single_test_clang(clang, tmp_file, ["-emit-llvm"]):
+                out_file.write("❌Builtin {} not supported (fails in clang codegen)\n".format(b.full_name))
+                continue
+            if not single_test_clang(clang, tmp_file):
+                out_file.write("❌Builtin {} not supported (fails at -O0)\n".format(b.full_name))
+                continue
+            if not single_test_clang(clang, tmp_file, ["-O2"]):
+                out_file.write("❌Builtin {} not supported (fails at -O2)\n".format(b.full_name))
+                continue
+            # out_file.write("✔️ Builtin {} seems to work fine\n".format(b.full_name))
+            num_builtins_succeeded += 1
+    num_builtins_failed = num_builtins_tested - num_builtins_succeeded
+    out_file.write("Tested {} builtins. Failed {} ({:.2%})\n".format(
+        num_builtins_tested,
+        num_builtins_failed,
+        float(num_builtins_failed) / num_builtins_tested))
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate instruction table")
     parser.add_argument("--mode", required=True,
-            choices=["builtins-def", "codegen", "tests", "docs"], help="Mode of operation")
+            choices=["builtins-def", "codegen", "tests", "docs", "builtin-tester"], help="Mode of operation")
     parser.add_argument("--tablegen", required=True, help="Path of tablegen")
     parser.add_argument("--output-file", required=False, help="Output file. stdout otherwise")
+    parser.add_argument("--clang", required=False, help="Path of clang")
     parser.add_argument("--clang-format", required=False, help="Path of clang-format")
     parser.add_argument("-I", dest="include_paths", required=False, default=[],
                       help="Include path", action="append")
@@ -777,6 +856,10 @@ if __name__ == "__main__":
         emit_markdown_document(out_file, j, args.clang_format)
     elif args.mode == "tests":
         emit_tests(out_file, j)
+    elif args.mode == "builtin-tester":
+        if not args.clang:
+            parser.error("You have to pass --clang when running the builtin tester")
+        run_builtin_tester(out_file, j, args.clang)
     else:
         raise Exception("Unexpected mode '{}".format(args.mode))
 
