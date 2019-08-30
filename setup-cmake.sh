@@ -232,8 +232,9 @@ fi
 ################################################################################
 
 info "Running cmake..."
-run cmake -G "${BUILD_SYSTEM}" ${SRCDIR} \
+run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
+   -DLLVM_ENABLE_PROJECTS=clang \
    -DLLVM_INSTALL_UTILS=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
