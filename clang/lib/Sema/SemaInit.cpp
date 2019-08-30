@@ -6882,8 +6882,9 @@ static void visitLocalsRetainedByReferenceBinding(IndirectLocalPath &Path,
   }
 
   case Stmt::OSSArraySectionExprClass: {
-    visitLocalsRetainedByInitializer(
-        Path, cast<OSSArraySectionExpr>(Init)->getBase(), Visit, true);
+    visitLocalsRetainedByInitializer(Path,
+                                     cast<OSSArraySectionExpr>(Init)->getBase(),
+                                     Visit, true, EnableLifetimeWarnings);
     break;
   }
 
