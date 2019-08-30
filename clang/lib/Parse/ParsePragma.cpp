@@ -2261,7 +2261,7 @@ PragmaOmpSsHandler::HandlePragma(Preprocessor &PP,
   Tok.setLocation(EodLoc);
   Pragma.push_back(Tok);
 
-  auto Toks = llvm::make_unique<Token[]>(Pragma.size());
+  auto Toks = std::make_unique<Token[]>(Pragma.size());
   std::copy(Pragma.begin(), Pragma.end(), Toks.get());
   PP.EnterTokenStream(std::move(Toks), Pragma.size(),
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
