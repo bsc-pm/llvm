@@ -106,7 +106,7 @@ public:
 
       std::unique_ptr<ASTConsumer>
       CreateASTConsumer(CompilerInstance &CI, StringRef InFile) override {
-        return llvm::make_unique<ASTConsumer>();
+        return std::make_unique<ASTConsumer>();
       }
 
     private:
@@ -298,6 +298,21 @@ file './input.cpp'
   spelled tokens:
     <empty>
   no mappings.
+)"},
+      // Should not crash on errors inside '#define' directives. Error is that
+      // stringification (#B) does not refer to a macro parameter.
+      {
+          R"cpp(
+a
+#define MACRO() A #B
+)cpp",
+          R"(expanded tokens:
+  a
+file './input.cpp'
+  spelled tokens:
+    a # define MACRO ( ) A # B
+  mappings:
+    ['#'_1, '<eof>'_9) => ['<eof>'_1, '<eof>'_1)
 )"}};
   for (auto &Test : TestCases)
     EXPECT_EQ(collectAndDump(Test.first), Test.second)
@@ -424,6 +439,7 @@ file './input.cpp'
        "    ['#'_0, 'int'_22) => ['int'_0, 'int'_0)\n"
        "    ['ADD'_25, ';'_46) => ['1'_3, ';'_12)\n"},
       // Empty macro replacement.
+      // FIXME: the #define directives should not be glued together.
       {R"cpp(
     #define EMPTY
     #define EMPTY_FUNC(X)
@@ -436,7 +452,9 @@ file './input.cpp'
   spelled tokens:
     # define EMPTY # define EMPTY_FUNC ( X ) EMPTY EMPTY_FUNC ( 1 + 2 + 3 )
   mappings:
-    ['#'_0, '<eof>'_18) => ['<eof>'_0, '<eof>'_0)
+    ['#'_0, 'EMPTY'_9) => ['<eof>'_0, '<eof>'_0)
+    ['EMPTY'_9, 'EMPTY_FUNC'_10) => ['<eof>'_0, '<eof>'_0)
+    ['EMPTY_FUNC'_10, '<eof>'_18) => ['<eof>'_0, '<eof>'_0)
 )"},
       // File ends with a macro replacement.
       {R"cpp(
@@ -737,4 +755,27 @@ TEST_F(TokenBufferTest, TokensToFileRange) {
   // We don't test assertion failures because death tests are slow.
 }
 
+TEST_F(TokenBufferTest, macroExpansions) {
+  llvm::Annotations Code(R"cpp(
+    #define FOO B
+    #define FOO2 BA
+    #define CALL(X) int X
+    #define G CALL(FOO2)
+    int B;
+    $macro[[FOO]];
+    $macro[[CALL]](A);
+    $macro[[G]];
+  )cpp");
+  recordTokens(Code.code());
+  auto &SM = *SourceMgr;
+  auto Expansions = Buffer.macroExpansions(SM.getMainFileID());
+  std::vector<FileRange> ExpectedMacroRanges;
+  for (auto Range : Code.ranges("macro"))
+    ExpectedMacroRanges.push_back(
+        FileRange(SM.getMainFileID(), Range.Begin, Range.End));
+  std::vector<FileRange> ActualMacroRanges;
+  for (auto Expansion : Expansions)
+    ActualMacroRanges.push_back(Expansion->range(SM));
+  EXPECT_EQ(ExpectedMacroRanges, ActualMacroRanges);
+}
 } // namespace

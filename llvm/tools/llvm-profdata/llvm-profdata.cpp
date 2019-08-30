@@ -37,6 +37,7 @@ enum ProfileFormat {
   PF_None = 0,
   PF_Text,
   PF_Compact_Binary,
+  PF_Ext_Binary,
   PF_GCC,
   PF_Binary
 };
@@ -136,7 +137,7 @@ public:
     if (!BufOrError)
       exitWithErrorCode(BufOrError.getError(), InputFile);
 
-    auto Remapper = llvm::make_unique<SymbolRemapper>();
+    auto Remapper = std::make_unique<SymbolRemapper>();
     Remapper->File = std::move(BufOrError.get());
 
     for (line_iterator LineIt(*Remapper->File, /*SkipBlanks=*/true, '#');
@@ -314,13 +315,8 @@ static void mergeInstrProfile(const WeightedFileVector &Inputs,
     exitWithError("Cannot write indexed profdata format to stdout.");
 
   if (OutputFormat != PF_Binary && OutputFormat != PF_Compact_Binary &&
-      OutputFormat != PF_Text)
+      OutputFormat != PF_Ext_Binary && OutputFormat != PF_Text)
     exitWithError("Unknown format is specified.");
-
-  std::error_code EC;
-  raw_fd_ostream Output(OutputFilename.data(), EC, sys::fs::F_None);
-  if (EC)
-    exitWithErrorCode(EC, OutputFilename);
 
   std::mutex ErrorLock;
   SmallSet<instrprof_error, 4> WriterErrorCodes;
@@ -333,7 +329,7 @@ static void mergeInstrProfile(const WeightedFileVector &Inputs,
   // Initialize the writer contexts.
   SmallVector<std::unique_ptr<WriterContext>, 4> Contexts;
   for (unsigned I = 0; I < NumThreads; ++I)
-    Contexts.emplace_back(llvm::make_unique<WriterContext>(
+    Contexts.emplace_back(std::make_unique<WriterContext>(
         OutputSparse, ErrorLock, WriterErrorCodes));
 
   if (NumThreads == 1) {
@@ -384,6 +380,11 @@ static void mergeInstrProfile(const WeightedFileVector &Inputs,
            WC->ErrWhence);
   }
 
+  std::error_code EC;
+  raw_fd_ostream Output(OutputFilename.data(), EC, sys::fs::OF_None);
+  if (EC)
+    exitWithErrorCode(EC, OutputFilename);
+
   InstrProfWriter &Writer = Contexts[0]->Writer;
   if (OutputFormat == PF_Text) {
     if (Error E = Writer.writeText(Output))
@@ -425,20 +426,18 @@ remapSamples(const sampleprof::FunctionSamples &Samples,
 }
 
 static sampleprof::SampleProfileFormat FormatMap[] = {
-    sampleprof::SPF_None, sampleprof::SPF_Text, sampleprof::SPF_Compact_Binary,
-    sampleprof::SPF_GCC, sampleprof::SPF_Binary};
+    sampleprof::SPF_None,
+    sampleprof::SPF_Text,
+    sampleprof::SPF_Compact_Binary,
+    sampleprof::SPF_Ext_Binary,
+    sampleprof::SPF_GCC,
+    sampleprof::SPF_Binary};
 
 static void mergeSampleProfile(const WeightedFileVector &Inputs,
                                SymbolRemapper *Remapper,
                                StringRef OutputFilename,
                                ProfileFormat OutputFormat) {
   using namespace sampleprof;
-  auto WriterOrErr =
-      SampleProfileWriter::create(OutputFilename, FormatMap[OutputFormat]);
-  if (std::error_code EC = WriterOrErr.getError())
-    exitWithErrorCode(EC, OutputFilename);
-
-  auto Writer = std::move(WriterOrErr.get());
   StringMap<FunctionSamples> ProfileMap;
   SmallVector<std::unique_ptr<sampleprof::SampleProfileReader>, 5> Readers;
   LLVMContext Context;
@@ -473,6 +472,12 @@ static void mergeSampleProfile(const WeightedFileVector &Inputs,
       }
     }
   }
+  auto WriterOrErr =
+      SampleProfileWriter::create(OutputFilename, FormatMap[OutputFormat]);
+  if (std::error_code EC = WriterOrErr.getError())
+    exitWithErrorCode(EC, OutputFilename);
+
+  auto Writer = std::move(WriterOrErr.get());
   Writer->write(ProfileMap);
 }
 
@@ -583,12 +588,14 @@ static int merge_main(int argc, const char *argv[]) {
                  clEnumVal(sample, "Sample profile")));
   cl::opt<ProfileFormat> OutputFormat(
       cl::desc("Format of output profile"), cl::init(PF_Binary),
-      cl::values(clEnumValN(PF_Binary, "binary", "Binary encoding (default)"),
-                 clEnumValN(PF_Compact_Binary, "compbinary",
-                            "Compact binary encoding"),
-                 clEnumValN(PF_Text, "text", "Text encoding"),
-                 clEnumValN(PF_GCC, "gcc",
-                            "GCC encoding (only meaningful for -sample)")));
+      cl::values(
+          clEnumValN(PF_Binary, "binary", "Binary encoding (default)"),
+          clEnumValN(PF_Compact_Binary, "compbinary",
+                     "Compact binary encoding"),
+          clEnumValN(PF_Ext_Binary, "extbinary", "Extensible binary encoding"),
+          clEnumValN(PF_Text, "text", "Text encoding"),
+          clEnumValN(PF_GCC, "gcc",
+                     "GCC encoding (only meaningful for -sample)")));
   cl::opt<bool> OutputSparse("sparse", cl::init(false),
       cl::desc("Generate a sparse profile (only meaningful for -instr)"));
   cl::opt<unsigned> NumThreads(
@@ -682,7 +689,7 @@ static int overlap_main(int argc, const char *argv[]) {
   cl::ParseCommandLineOptions(argc, argv, "LLVM profile data overlap tool\n");
 
   std::error_code EC;
-  raw_fd_ostream OS(Output.data(), EC, sys::fs::F_Text);
+  raw_fd_ostream OS(Output.data(), EC, sys::fs::OF_Text);
   if (EC)
     exitWithErrorCode(EC, Output);
 
@@ -1020,8 +1027,14 @@ static int show_main(int argc, const char *argv[]) {
   if (OutputFilename.empty())
     OutputFilename = "-";
 
+  if (!Filename.compare(OutputFilename)) {
+    errs() << sys::path::filename(argv[0])
+           << ": Input file name cannot be the same as the output file name!\n";
+    return 1;
+  }
+
   std::error_code EC;
-  raw_fd_ostream OS(OutputFilename.data(), EC, sys::fs::F_Text);
+  raw_fd_ostream OS(OutputFilename.data(), EC, sys::fs::OF_Text);
   if (EC)
     exitWithErrorCode(EC, OutputFilename);
 

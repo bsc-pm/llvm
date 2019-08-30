@@ -2184,13 +2184,12 @@ public:
   ExprResult RebuildDeclRefExpr(NestedNameSpecifierLoc QualifierLoc,
                                 ValueDecl *VD,
                                 const DeclarationNameInfo &NameInfo,
+                                NamedDecl *Found,
                                 TemplateArgumentListInfo *TemplateArgs) {
     CXXScopeSpec SS;
     SS.Adopt(QualifierLoc);
-
-    // FIXME: loses template args.
-
-    return getSema().BuildDeclarationNameExpr(SS, NameInfo, VD);
+    return getSema().BuildDeclarationNameExpr(SS, NameInfo, VD, Found,
+                                              TemplateArgs);
   }
 
   /// Build a new expression in parentheses.
@@ -2679,6 +2678,16 @@ public:
     return getSema().BuildCXXTypeConstructExpr(TInfo, LParenLoc,
                                                MultiExprArg(&Sub, 1), RParenLoc,
                                                ListInitialization);
+  }
+
+  /// Build a new C++ __builtin_bit_cast expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildBuiltinBitCastExpr(SourceLocation KWLoc,
+                                       TypeSourceInfo *TSI, Expr *Sub,
+                                       SourceLocation RParenLoc) {
+    return getSema().BuildBuiltinBitCastExpr(KWLoc, TSI, Sub, RParenLoc);
   }
 
   /// Build a new C++ typeid(type) expression.
@@ -3974,10 +3983,6 @@ template<typename Derived>
 bool TreeTransform<Derived>::TransformTemplateArgument(
                                          const TemplateArgumentLoc &Input,
                                          TemplateArgumentLoc &Output, bool Uneval) {
-  EnterExpressionEvaluationContext EEEC(
-      SemaRef, Sema::ExpressionEvaluationContext::ConstantEvaluated,
-      /*LambdaContextDecl=*/nullptr, /*ExprContext=*/
-      Sema::ExpressionEvaluationContextRecord::EK_TemplateArgument);
   const TemplateArgument &Arg = Input.getArgument();
   switch (Arg.getKind()) {
   case TemplateArgument::Null:
@@ -4026,9 +4031,11 @@ bool TreeTransform<Derived>::TransformTemplateArgument(
   case TemplateArgument::Expression: {
     // Template argument expressions are constant expressions.
     EnterExpressionEvaluationContext Unevaluated(
-        getSema(), Uneval
-                       ? Sema::ExpressionEvaluationContext::Unevaluated
-                       : Sema::ExpressionEvaluationContext::ConstantEvaluated);
+        getSema(),
+        Uneval ? Sema::ExpressionEvaluationContext::Unevaluated
+               : Sema::ExpressionEvaluationContext::ConstantEvaluated,
+        /*LambdaContextDecl=*/nullptr, /*ExprContext=*/
+        Sema::ExpressionEvaluationContextRecord::EK_TemplateArgument);
 
     Expr *InputExpr = Input.getSourceExpression();
     if (!InputExpr) InputExpr = Input.getArgument().getAsExpr();
@@ -4557,6 +4564,14 @@ QualType TreeTransform<Derived>::TransformDecayedType(TypeLocBuilder &TLB,
   return Result;
 }
 
+/// Helper to deduce addr space of a pointee type in OpenCL mode.
+/// If the type is updated it will be overwritten in PointeeType param.
+static void deduceOpenCLPointeeAddrSpace(Sema &SemaRef, QualType &PointeeType) {
+  if (PointeeType.getAddressSpace() == LangAS::Default)
+    PointeeType = SemaRef.Context.getAddrSpaceQualType(PointeeType,
+                                                       LangAS::opencl_generic);
+}
+
 template<typename Derived>
 QualType TreeTransform<Derived>::TransformPointerType(TypeLocBuilder &TLB,
                                                       PointerTypeLoc TL) {
@@ -4564,6 +4579,9 @@ QualType TreeTransform<Derived>::TransformPointerType(TypeLocBuilder &TLB,
     = getDerived().TransformType(TLB, TL.getPointeeLoc());
   if (PointeeType.isNull())
     return QualType();
+
+  if (SemaRef.getLangOpts().OpenCL)
+    deduceOpenCLPointeeAddrSpace(SemaRef, PointeeType);
 
   QualType Result = TL.getType();
   if (PointeeType->getAs<ObjCObjectType>()) {
@@ -4603,6 +4621,9 @@ TreeTransform<Derived>::TransformBlockPointerType(TypeLocBuilder &TLB,
   if (PointeeType.isNull())
     return QualType();
 
+  if (SemaRef.getLangOpts().OpenCL)
+    deduceOpenCLPointeeAddrSpace(SemaRef, PointeeType);
+
   QualType Result = TL.getType();
   if (getDerived().AlwaysRebuild() ||
       PointeeType != TL.getPointeeLoc().getType()) {
@@ -4631,6 +4652,9 @@ TreeTransform<Derived>::TransformReferenceType(TypeLocBuilder &TLB,
   QualType PointeeType = getDerived().TransformType(TLB, TL.getPointeeLoc());
   if (PointeeType.isNull())
     return QualType();
+
+  if (SemaRef.getLangOpts().OpenCL)
+    deduceOpenCLPointeeAddrSpace(SemaRef, PointeeType);
 
   QualType Result = TL.getType();
   if (getDerived().AlwaysRebuild() ||
@@ -5395,13 +5419,6 @@ QualType TreeTransform<Derived>::TransformFunctionProtoType(
     ResultType = getDerived().TransformType(TLB, TL.getReturnLoc());
     if (ResultType.isNull())
       return QualType();
-
-    // Return type can not be qualified with an address space.
-    if (ResultType.getAddressSpace() != LangAS::Default) {
-      SemaRef.Diag(TL.getReturnLoc().getBeginLoc(),
-                   diag::err_attribute_address_function_type);
-      return QualType();
-    }
 
     if (getDerived().TransformFunctionTypeParams(
             TL.getBeginLoc(), TL.getParams(),
@@ -6633,13 +6650,13 @@ TreeTransform<Derived>::TransformCompoundStmt(CompoundStmt *S,
                                               bool IsStmtExpr) {
   Sema::CompoundScopeRAII CompoundScope(getSema());
 
+  const Stmt *ExprResult = S->getStmtExprResult();
   bool SubStmtInvalid = false;
   bool SubStmtChanged = false;
   SmallVector<Stmt*, 8> Statements;
   for (auto *B : S->body()) {
     StmtResult Result = getDerived().TransformStmt(
-        B,
-        IsStmtExpr && B == S->body_back() ? SDK_StmtExprResult : SDK_Discarded);
+        B, IsStmtExpr && B == ExprResult ? SDK_StmtExprResult : SDK_Discarded);
 
     if (Result.isInvalid()) {
       // Immediately fail if this was a DeclStmt, since it's very
@@ -9243,6 +9260,14 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
   if (!ND)
     return ExprError();
 
+  NamedDecl *Found = ND;
+  if (E->getFoundDecl() != E->getDecl()) {
+    Found = cast_or_null<NamedDecl>(
+        getDerived().TransformDecl(E->getLocation(), E->getFoundDecl()));
+    if (!Found)
+      return ExprError();
+  }
+
   DeclarationNameInfo NameInfo = E->getNameInfo();
   if (NameInfo.getName()) {
     NameInfo = getDerived().TransformDeclarationNameInfo(NameInfo);
@@ -9275,7 +9300,7 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
   }
 
   return getDerived().RebuildDeclRefExpr(QualifierLoc, ND, NameInfo,
-                                         TemplateArgs);
+                                         Found, TemplateArgs);
 }
 
 template<typename Derived>
@@ -10333,6 +10358,22 @@ TreeTransform<Derived>::TransformCXXNamedCastExpr(CXXNamedCastExpr *E) {
       Type, E->getAngleBrackets().getEnd(),
       // FIXME. this should be '(' location
       E->getAngleBrackets().getEnd(), SubExpr.get(), E->getRParenLoc());
+}
+
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformBuiltinBitCastExpr(BuiltinBitCastExpr *BCE) {
+  TypeSourceInfo *TSI =
+      getDerived().TransformType(BCE->getTypeInfoAsWritten());
+  if (!TSI)
+    return ExprError();
+
+  ExprResult Sub = getDerived().TransformExpr(BCE->getSubExpr());
+  if (Sub.isInvalid())
+    return ExprError();
+
+  return getDerived().RebuildBuiltinBitCastExpr(BCE->getBeginLoc(), TSI,
+                                                Sub.get(), BCE->getEndLoc());
 }
 
 template<typename Derived>

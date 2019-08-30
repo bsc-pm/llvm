@@ -239,6 +239,7 @@ ConstantExpr::ResultStorageKind
 ConstantExpr::getStorageKind(const APValue &Value) {
   switch (Value.getKind()) {
   case APValue::None:
+  case APValue::Indeterminate:
     return ConstantExpr::RSK_None;
   case APValue::Int:
     if (!Value.getInt().needsCleanup())
@@ -249,9 +250,18 @@ ConstantExpr::getStorageKind(const APValue &Value) {
   }
 }
 
+ConstantExpr::ResultStorageKind
+ConstantExpr::getStorageKind(const Type *T, const ASTContext &Context) {
+  if (T->isIntegralOrEnumerationType() && Context.getTypeInfo(T).Width <= 64)
+    return ConstantExpr::RSK_Int64;
+  return ConstantExpr::RSK_APValue;
+}
+
 void ConstantExpr::DefaultInit(ResultStorageKind StorageKind) {
   ConstantExprBits.ResultKind = StorageKind;
-  if (StorageKind == RSK_APValue)
+  ConstantExprBits.APValueKind = APValue::None;
+  ConstantExprBits.HasCleanup = false;
+  if (StorageKind == ConstantExpr::RSK_APValue)
     ::new (getTrailingObjects<APValue>()) APValue();
 }
 
@@ -269,8 +279,6 @@ ConstantExpr *ConstantExpr::Create(const ASTContext &Context, Expr *E,
       StorageKind == ConstantExpr::RSK_Int64);
   void *Mem = Context.Allocate(Size, alignof(ConstantExpr));
   ConstantExpr *Self = new (Mem) ConstantExpr(E, StorageKind);
-  if (StorageKind == ConstantExpr::RSK_APValue)
-    Context.AddAPValueCleanup(&Self->APValueResult());
   return Self;
 }
 
@@ -278,7 +286,7 @@ ConstantExpr *ConstantExpr::Create(const ASTContext &Context, Expr *E,
                                    const APValue &Result) {
   ResultStorageKind StorageKind = getStorageKind(Result);
   ConstantExpr *Self = Create(Context, E, StorageKind);
-  Self->SetResult(Result);
+  Self->SetResult(Result, Context);
   return Self;
 }
 
@@ -296,14 +304,13 @@ ConstantExpr *ConstantExpr::CreateEmpty(const ASTContext &Context,
       StorageKind == ConstantExpr::RSK_Int64);
   void *Mem = Context.Allocate(Size, alignof(ConstantExpr));
   ConstantExpr *Self = new (Mem) ConstantExpr(StorageKind, Empty);
-  if (StorageKind == ConstantExpr::RSK_APValue)
-    Context.AddAPValueCleanup(&Self->APValueResult());
   return Self;
 }
 
-void ConstantExpr::MoveIntoResult(APValue &Value) {
+void ConstantExpr::MoveIntoResult(APValue &Value, const ASTContext &Context) {
   assert(getStorageKind(Value) == ConstantExprBits.ResultKind &&
          "Invalid storage for this value kind");
+  ConstantExprBits.APValueKind = Value.getKind();
   switch (ConstantExprBits.ResultKind) {
   case RSK_None:
     return;
@@ -313,10 +320,26 @@ void ConstantExpr::MoveIntoResult(APValue &Value) {
     ConstantExprBits.IsUnsigned = Value.getInt().isUnsigned();
     return;
   case RSK_APValue:
+    if (!ConstantExprBits.HasCleanup && Value.needsCleanup()) {
+      ConstantExprBits.HasCleanup = true;
+      Context.addDestruction(&APValueResult());
+    }
     APValueResult() = std::move(Value);
     return;
   }
   llvm_unreachable("Invalid ResultKind Bits");
+}
+
+llvm::APSInt ConstantExpr::getResultAsAPSInt() const {
+  switch (ConstantExprBits.ResultKind) {
+  case ConstantExpr::RSK_APValue:
+    return APValueResult().getInt();
+  case ConstantExpr::RSK_Int64:
+    return llvm::APSInt(llvm::APInt(ConstantExprBits.BitWidth, Int64Result()),
+                        ConstantExprBits.IsUnsigned);
+  default:
+    llvm_unreachable("invalid Accessor");
+  }
 }
 
 APValue ConstantExpr::getAPValueResult() const {
@@ -1839,6 +1862,7 @@ bool CastExpr::CastConsistency() const {
   case CK_FloatingComplexToBoolean:
   case CK_IntegralComplexToBoolean:
   case CK_LValueBitCast:            // -> bool&
+  case CK_LValueToRValueBitCast:
   case CK_UserDefinedConversion:    // operator bool()
   case CK_BuiltinFnToFnPtr:
   case CK_FixedPointToBoolean:
@@ -2177,7 +2201,7 @@ APValue SourceLocExpr::EvaluateInContext(const ASTContext &Ctx,
   case SourceLocExpr::Line:
   case SourceLocExpr::Column: {
     llvm::APSInt IntVal(Ctx.getIntWidth(Ctx.UnsignedIntTy),
-                        /*IsUnsigned=*/true);
+                        /*isUnsigned=*/true);
     IntVal = getIdentKind() == SourceLocExpr::Line ? PLoc.getLine()
                                                    : PLoc.getColumn();
     return APValue(IntVal);
@@ -2279,11 +2303,11 @@ bool InitListExpr::isTransparent() const {
 bool InitListExpr::isIdiomaticZeroInitializer(const LangOptions &LangOpts) const {
   assert(isSyntacticForm() && "only test syntactic form as zero initializer");
 
-  if (LangOpts.CPlusPlus || getNumInits() != 1) {
+  if (LangOpts.CPlusPlus || getNumInits() != 1 || !getInit(0)) {
     return false;
   }
 
-  const IntegerLiteral *Lit = dyn_cast<IntegerLiteral>(getInit(0));
+  const IntegerLiteral *Lit = dyn_cast<IntegerLiteral>(getInit(0)->IgnoreImplicit());
   return Lit && Lit->getValue() == 0;
 }
 
@@ -2539,13 +2563,31 @@ bool Expr::isUnusedResultAWarning(const Expr *&WarnE, SourceLocation &Loc,
   case CXXTemporaryObjectExprClass:
   case CXXConstructExprClass: {
     if (const CXXRecordDecl *Type = getType()->getAsCXXRecordDecl()) {
-      if (Type->hasAttr<WarnUnusedAttr>()) {
+      const auto *WarnURAttr = Type->getAttr<WarnUnusedResultAttr>();
+      if (Type->hasAttr<WarnUnusedAttr>() ||
+          (WarnURAttr && WarnURAttr->IsCXX11NoDiscard())) {
         WarnE = this;
         Loc = getBeginLoc();
         R1 = getSourceRange();
         return true;
       }
     }
+
+    const auto *CE = cast<CXXConstructExpr>(this);
+    if (const CXXConstructorDecl *Ctor = CE->getConstructor()) {
+      const auto *WarnURAttr = Ctor->getAttr<WarnUnusedResultAttr>();
+      if (WarnURAttr && WarnURAttr->IsCXX11NoDiscard()) {
+        WarnE = this;
+        Loc = getBeginLoc();
+        R1 = getSourceRange();
+
+        if (unsigned NumArgs = CE->getNumArgs())
+          R2 = SourceRange(CE->getArg(0)->getBeginLoc(),
+                           CE->getArg(NumArgs - 1)->getEndLoc());
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -3484,7 +3526,8 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case CXXStaticCastExprClass:
   case CXXReinterpretCastExprClass:
   case CXXConstCastExprClass:
-  case CXXFunctionalCastExprClass: {
+  case CXXFunctionalCastExprClass:
+  case BuiltinBitCastExprClass: {
     // While volatile reads are side-effecting in both C and C++, we treat them
     // as having possible (not definite) side-effects. This allows idiomatic
     // code to behave without warning, such as sizeof(*v) for a volatile-

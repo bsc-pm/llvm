@@ -146,14 +146,8 @@ bool CommandObjectMultiwordWatchpoint::VerifyWatchpointIDs(
 
 // CommandObjectWatchpointList::Options
 #pragma mark List::CommandOptions
-
-static constexpr OptionDefinition g_watchpoint_list_options[] = {
-    // clang-format off
-  { LLDB_OPT_SET_1, false, "brief",   'b', OptionParser::eNoArgument, nullptr, {}, 0, eArgTypeNone, "Give a brief description of the watchpoint (no location info)." },
-  { LLDB_OPT_SET_2, false, "full",    'f', OptionParser::eNoArgument, nullptr, {}, 0, eArgTypeNone, "Give a full description of the watchpoint and its locations." },
-  { LLDB_OPT_SET_3, false, "verbose", 'v', OptionParser::eNoArgument, nullptr, {}, 0, eArgTypeNone, "Explain everything we know about the watchpoint (for debugging debugger bugs)." }
-    // clang-format on
-};
+#define LLDB_OPTIONS_watchpoint_list
+#include "CommandOptions.inc"
 
 #pragma mark List
 
@@ -202,9 +196,7 @@ public:
         m_level = lldb::eDescriptionLevelVerbose;
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -510,11 +502,8 @@ protected:
 // CommandObjectWatchpointIgnore
 
 #pragma mark Ignore::CommandOptions
-static constexpr OptionDefinition g_watchpoint_ignore_options[] = {
-    // clang-format off
-  { LLDB_OPT_SET_ALL, true, "ignore-count", 'i', OptionParser::eRequiredArgument, nullptr, {}, 0, eArgTypeCount, "Set the number of times this watchpoint is skipped before stopping." }
-    // clang-format on
-};
+#define LLDB_OPTIONS_watchpoint_ignore
+#include "CommandOptions.inc"
 
 class CommandObjectWatchpointIgnore : public CommandObjectParsed {
 public:
@@ -554,9 +543,7 @@ public:
                                          option_arg.str().c_str());
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -629,12 +616,8 @@ private:
 // CommandObjectWatchpointModify
 
 #pragma mark Modify::CommandOptions
-
-static constexpr OptionDefinition g_watchpoint_modify_options[] = {
-    // clang-format off
-  { LLDB_OPT_SET_ALL, false, "condition", 'c', OptionParser::eRequiredArgument, nullptr, {}, 0, eArgTypeExpression, "The watchpoint stops only if this condition expression evaluates to true." }
-    // clang-format on
-};
+#define LLDB_OPTIONS_watchpoint_modify
+#include "CommandOptions.inc"
 
 #pragma mark Modify
 
@@ -679,9 +662,7 @@ public:
         m_condition_passed = true;
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;

@@ -81,15 +81,15 @@ define amdgpu_kernel void @test_call_external_void_func_i1_imm() #0 {
 ; MESA: s_mov_b32 s33, s3{{$}}
 ; HSA: s_mov_b32 s33, s9{{$}}
 
+; HSA: buffer_load_ubyte [[VAR:v[0-9]+]]
+; HSA: s_mov_b32 s32, s33
+; MESA-DAG: buffer_load_ubyte [[VAR:v[0-9]+]]
+; MESA-DAG: s_mov_b32 s32, s33{{$}}
+
+
 ; GCN: s_getpc_b64 s{{\[}}[[PC_LO:[0-9]+]]:[[PC_HI:[0-9]+]]{{\]}}
 ; GCN-NEXT: s_add_u32 s[[PC_LO]], s[[PC_LO]], external_void_func_i1_signext@rel32@lo+4
 ; GCN-NEXT: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i1_signext@rel32@hi+4
-; GCN-NEXT: buffer_load_ubyte [[VAR:v[0-9]+]]
-; HSA-NEXT: s_mov_b32 s4, s33
-; HSA-NEXT: s_mov_b32 s32, s33
-
-; MESA-DAG: s_mov_b32 s4, s33{{$}}
-; MESA-DAG: s_mov_b32 s32, s33{{$}}
 
 ; GCN: s_waitcnt vmcnt(0)
 ; GCN-NEXT: v_bfe_i32 v0, v0, 0, 1
@@ -105,13 +105,16 @@ define amdgpu_kernel void @test_call_external_void_func_i1_signext(i32) #0 {
 ; GCN-LABEL: {{^}}test_call_external_void_func_i1_zeroext:
 ; MESA: s_mov_b32 s33, s3{{$}}
 
+; HSA: buffer_load_ubyte v0
+; HSA-DAG: s_mov_b32 s32, s33{{$}}
+
+; MESA: buffer_load_ubyte v0
+; MESA-DAG: s_mov_b32 s32, s33{{$}}
+
 ; GCN: s_getpc_b64 s{{\[}}[[PC_LO:[0-9]+]]:[[PC_HI:[0-9]+]]{{\]}}
 ; GCN-NEXT: s_add_u32 s[[PC_LO]], s[[PC_LO]], external_void_func_i1_zeroext@rel32@lo+4
 ; GCN-NEXT: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i1_zeroext@rel32@hi+4
-; GCN-NEXT: buffer_load_ubyte v0
 
-; GCN-DAG: s_mov_b32 s4, s33{{$}}
-; GCN-DAG: s_mov_b32 s32, s33{{$}}
 
 ; GCN: s_waitcnt vmcnt(0)
 ; GCN-NEXT: v_and_b32_e32 v0, 1, v0
@@ -131,7 +134,6 @@ define amdgpu_kernel void @test_call_external_void_func_i1_zeroext(i32) #0 {
 ; GCN-DAG: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i8@rel32@hi+4
 ; GCN-DAG: v_mov_b32_e32 v0, 0x7b
 
-; HSA-DAG: s_mov_b32 s4, s33{{$}}
 ; GCN-DAG: s_mov_b32 s32, s33{{$}}
 
 ; GCN: s_swappc_b64 s[30:31], s{{\[}}[[PC_LO]]:[[PC_HI]]{{\]}}
@@ -151,7 +153,6 @@ define amdgpu_kernel void @test_call_external_void_func_i8_imm(i32) #0 {
 ; GCN-DAG: s_add_u32 s[[PC_LO]], s[[PC_LO]], external_void_func_i8_signext@rel32@lo+4
 ; GCN-DAG: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i8_signext@rel32@hi+4
 
-; GCN-DAG: s_mov_b32 s4, s33
 ; GCN-DAG: s_mov_b32 s32, s3
 
 ; GCN-NOT: s_waitcnt
@@ -186,7 +187,6 @@ define amdgpu_kernel void @test_call_external_void_func_i8_zeroext(i32) #0 {
 ; GCN-LABEL: {{^}}test_call_external_void_func_i16_imm:
 ; GCN-DAG: v_mov_b32_e32 v0, 0x7b{{$}}
 
-; GCN-DAG: s_mov_b32 s4, s33
 ; GCN-DAG: s_mov_b32 s32, s33
 
 ; GCN: s_swappc_b64
@@ -240,7 +240,6 @@ define amdgpu_kernel void @test_call_external_void_func_i16_zeroext(i32) #0 {
 ; GCN-DAG: s_add_u32 s[[PC_LO]], s[[PC_LO]], external_void_func_i32@rel32@lo+4
 ; GCN-DAG: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i32@rel32@hi+4
 ; GCN-DAG: v_mov_b32_e32 v0, 42
-; GCN-DAG: s_mov_b32 s4, s33
 ; GCN-DAG: s_mov_b32 s32, s33
 
 ; GCN: s_swappc_b64 s[30:31], s{{\[}}[[PC_LO]]:[[PC_HI]]{{\]}}
@@ -251,13 +250,11 @@ define amdgpu_kernel void @test_call_external_void_func_i32_imm(i32) #0 {
 }
 
 ; GCN-LABEL: {{^}}test_call_external_void_func_i64_imm:
-; GCN-DAG: s_movk_i32 [[K0:s[0-9]+]], 0x7b{{$}}
-; GCN-DAG: s_mov_b32 [[K1:s[0-9]+]], 0{{$}}
-; GCN-DAG: v_mov_b32_e32 v0, [[K0]]
+; GCN-DAG: v_mov_b32_e32 v0, 0x7b{{$}}
+; GCN-DAG: v_mov_b32_e32 v1, 0{{$}}
 ; GCN-DAG: s_getpc_b64 s{{\[}}[[PC_LO:[0-9]+]]:[[PC_HI:[0-9]+]]{{\]}}
 ; GCN-DAG: s_add_u32 s[[PC_LO]], s[[PC_LO]], external_void_func_i64@rel32@lo+4
 ; GCN-DAG: s_addc_u32 s[[PC_HI]], s[[PC_HI]], external_void_func_i64@rel32@hi+4
-; GCN-DAG: v_mov_b32_e32 v1, [[K1]]
 ; GCN: s_swappc_b64 s[30:31], s{{\[}}[[PC_LO]]:[[PC_HI]]{{\]}}
 ; GCN-NEXT: s_endpgm
 define amdgpu_kernel void @test_call_external_void_func_i64_imm() #0 {
@@ -757,8 +754,8 @@ define amdgpu_kernel void @test_call_external_void_func_v16i8() #0 {
 }
 
 ; GCN-LABEL: {{^}}stack_passed_arg_alignment_v32i32_f64:
-; GCN: buffer_store_dword v{{[0-9]+}}, off, s{{\[[0-9]+:[0-9]+\]}}, s32 offset:4
 ; GCN: buffer_store_dword v{{[0-9]+}}, off, s{{\[[0-9]+:[0-9]+\]}}, s32{{$}}
+; GCN: buffer_store_dword v{{[0-9]+}}, off, s{{\[[0-9]+:[0-9]+\]}}, s32 offset:4
 ; GCN: s_swappc_b64
 define amdgpu_kernel void @stack_passed_arg_alignment_v32i32_f64(<32 x i32> %val, double %tmp) #0 {
 entry:
@@ -772,9 +769,11 @@ entry:
 ; GCN: buffer_store_dword v33, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
 ; GCN: buffer_load_dword v32, off, s[0:3], s32 offset:16
 ; GCN: buffer_load_dword v33, off, s[0:3], s32 offset:20
+
+; GCN: s_getpc_b64
+
 ; GCN: buffer_store_dword v33, off, s[0:3], s32 offset:4
 ; GCN: buffer_store_dword v32, off, s[0:3], s32{{$}}
-; GCN: s_getpc_b64
 ; GCN: buffer_load_dword v33, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
 ; GCN: buffer_load_dword v32, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
 ; GCN-NOT: s32
@@ -790,11 +789,11 @@ entry:
 ; GCN-NOT: s32
 ; GCN: buffer_store_dword v32, off, s[0:3], s32 offset:12 ; 4-byte Folded Spill
 ; GCN: buffer_store_dword v33, off, s[0:3], s32 offset:8 ; 4-byte Folded Spill
-; GCN: buffer_load_dword v32, off, s[0:3], s32{{$}}
-; GCN: buffer_load_dword v33, off, s[0:3], s32 offset:4
-; GCN: buffer_store_dword v32, off, s[0:3], s32{{$}}
-; GCN: buffer_store_dword v33, off, s[0:3], s32 offset:4
+; GCN: buffer_load_dword v32, off, s[0:3], s32 offset:4
+; GCN: buffer_load_dword v33, off, s[0:3], s32{{$}}
 ; GCN: s_getpc_b64
+; GCN: buffer_store_dword v33, off, s[0:3], s32{{$}}
+; GCN: buffer_store_dword v32, off, s[0:3], s32 offset:4
 ; GCN: buffer_load_dword v33, off, s[0:3], s32 offset:8 ; 4-byte Folded Reload
 ; GCN: buffer_load_dword v32, off, s[0:3], s32 offset:12 ; 4-byte Folded Reload
 ; GCN-NOT: s32

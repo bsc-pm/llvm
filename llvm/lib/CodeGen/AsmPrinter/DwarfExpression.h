@@ -119,6 +119,9 @@ protected:
   /// The kind of location description being produced.
   enum { Unknown = 0, Register, Memory, Implicit };
 
+  /// The flags of location description being produced.
+  enum { EntryValue = 1, CallSiteParamValue };
+
   unsigned LocationKind : 3;
   unsigned LocationFlags : 2;
   unsigned DwarfVersion : 4;
@@ -138,6 +141,14 @@ public:
 
   bool isImplicitLocation() const {
     return LocationKind == Implicit;
+  }
+
+  bool isEntryValue() const {
+    return LocationFlags & EntryValue;
+  }
+
+  bool isParameterValue() {
+    return LocationFlags & CallSiteParamValue;
   }
 
   Optional<uint8_t> TagOffset;
@@ -252,6 +263,16 @@ public:
     LocationKind = Memory;
   }
 
+  /// Lock this down to become an entry value location.
+  void setEntryValueFlag() {
+    LocationFlags |= EntryValue;
+  }
+
+  /// Lock this down to become a call site parameter location.
+  void setCallSiteParamValueFlag() {
+    LocationFlags |= CallSiteParamValue;
+  }
+
   /// Emit a machine register location. As an optimization this may also consume
   /// the prefix of a DwarfExpression if a more efficient representation for
   /// combining the register location and the first operation exists.
@@ -265,6 +286,9 @@ public:
   bool addMachineRegExpression(const TargetRegisterInfo &TRI,
                                DIExpressionCursor &Expr, unsigned MachineReg,
                                unsigned FragmentOffsetInBits = 0);
+
+  /// Emit entry value dwarf operation.
+  void addEntryValueExpression(DIExpressionCursor &ExprCursor);
 
   /// Emit all remaining operations in the DIExpressionCursor.
   ///

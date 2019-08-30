@@ -12,7 +12,6 @@
 #include "llvm/CodeGen/GlobalISel/Localizer.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/Support/Debug.h"
 
@@ -76,10 +75,11 @@ bool Localizer::shouldLocalize(const MachineInstr &MI) {
   case TargetOpcode::G_CONSTANT:
   case TargetOpcode::G_FCONSTANT:
   case TargetOpcode::G_FRAME_INDEX:
+  case TargetOpcode::G_INTTOPTR:
     return true;
   case TargetOpcode::G_GLOBAL_VALUE: {
     unsigned RematCost = TTI->getGISelRematGlobalCost();
-    unsigned Reg = MI.getOperand(0).getReg();
+    Register Reg = MI.getOperand(0).getReg();
     unsigned MaxUses = maxUses(RematCost);
     if (MaxUses == UINT_MAX)
       return true; // Remats are "free" so always localize.
@@ -104,8 +104,8 @@ bool Localizer::isLocalUse(MachineOperand &MOUse, const MachineInstr &Def,
   return InsertMBB == Def.getParent();
 }
 
-bool Localizer::localizeInterBlock(
-    MachineFunction &MF, SmallPtrSetImpl<MachineInstr *> &LocalizedInstrs) {
+bool Localizer::localizeInterBlock(MachineFunction &MF,
+                                   LocalizedSetVecT &LocalizedInstrs) {
   bool Changed = false;
   DenseMap<std::pair<MachineBasicBlock *, unsigned>, unsigned> MBBWithLocalDef;
 
@@ -114,13 +114,14 @@ bool Localizer::localizeInterBlock(
   // we only localize instructions in the entry block here. This might change if
   // we start doing CSE across blocks.
   auto &MBB = MF.front();
-  for (MachineInstr &MI : MBB) {
+  for (auto RI = MBB.rbegin(), RE = MBB.rend(); RI != RE; ++RI) {
+    MachineInstr &MI = *RI;
     if (!shouldLocalize(MI))
       continue;
     LLVM_DEBUG(dbgs() << "Should localize: " << MI);
     assert(MI.getDesc().getNumDefs() == 1 &&
            "More than one definition not supported yet");
-    unsigned Reg = MI.getOperand(0).getReg();
+    Register Reg = MI.getOperand(0).getReg();
     // Check if all the users of MI are local.
     // We are going to invalidation the list of use operands, so we
     // can't use range iterator.
@@ -150,7 +151,7 @@ bool Localizer::localizeInterBlock(
                             LocalizedMI);
 
         // Set a new register for the definition.
-        unsigned NewReg = MRI->createGenericVirtualRegister(MRI->getType(Reg));
+        Register NewReg = MRI->createGenericVirtualRegister(MRI->getType(Reg));
         MRI->setRegClassOrRegBank(NewReg, MRI->getRegClassOrRegBank(Reg));
         LocalizedMI->getOperand(0).setReg(NewReg);
         NewVRegIt =
@@ -166,8 +167,7 @@ bool Localizer::localizeInterBlock(
   return Changed;
 }
 
-bool Localizer::localizeIntraBlock(
-    SmallPtrSetImpl<MachineInstr *> &LocalizedInstrs) {
+bool Localizer::localizeIntraBlock(LocalizedSetVecT &LocalizedInstrs) {
   bool Changed = false;
 
   // For each already-localized instruction which has multiple users, then we
@@ -177,17 +177,18 @@ bool Localizer::localizeIntraBlock(
   // many users, but this case may be better served by regalloc improvements.
 
   for (MachineInstr *MI : LocalizedInstrs) {
-    unsigned Reg = MI->getOperand(0).getReg();
+    Register Reg = MI->getOperand(0).getReg();
     MachineBasicBlock &MBB = *MI->getParent();
-    // If the instruction has a single use, we would have already moved it right
-    // before its user in localizeInterBlock().
-    if (MRI->hasOneUse(Reg))
-      continue;
-
     // All of the user MIs of this reg.
     SmallPtrSet<MachineInstr *, 32> Users;
-    for (MachineInstr &UseMI : MRI->use_nodbg_instructions(Reg))
-      Users.insert(&UseMI);
+    for (MachineInstr &UseMI : MRI->use_nodbg_instructions(Reg)) {
+      if (!UseMI.isPHI())
+        Users.insert(&UseMI);
+    }
+    // If all the users were PHIs then they're not going to be in our block,
+    // don't try to move this instruction.
+    if (Users.empty())
+      continue;
 
     MachineBasicBlock::iterator II(MI);
     ++II;
@@ -216,7 +217,7 @@ bool Localizer::runOnMachineFunction(MachineFunction &MF) {
 
   // Keep track of the instructions we localized. We'll do a second pass of
   // intra-block localization to further reduce live ranges.
-  SmallPtrSet<MachineInstr *, 32> LocalizedInstrs;
+  LocalizedSetVecT LocalizedInstrs;
 
   bool Changed = localizeInterBlock(MF, LocalizedInstrs);
   return Changed |= localizeIntraBlock(LocalizedInstrs);

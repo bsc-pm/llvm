@@ -467,12 +467,6 @@ void TextNodeDumper::dumpAccessSpecifier(AccessSpecifier AS) {
   }
 }
 
-void TextNodeDumper::dumpCXXTemporary(const CXXTemporary *Temporary) {
-  OS << "(CXXTemporary";
-  dumpPointer(Temporary);
-  OS << ")";
-}
-
 void TextNodeDumper::dumpDeclRef(const Decl *D, StringRef Label) {
   if (!D)
     return;
@@ -933,8 +927,9 @@ void TextNodeDumper::VisitCXXConstructExpr(const CXXConstructExpr *Node) {
 
 void TextNodeDumper::VisitCXXBindTemporaryExpr(
     const CXXBindTemporaryExpr *Node) {
-  OS << " ";
-  dumpCXXTemporary(Node->getTemporary());
+  OS << " (CXXTemporary";
+  dumpPointer(Node);
+  OS << ")";
 }
 
 void TextNodeDumper::VisitCXXNewExpr(const CXXNewExpr *Node) {
@@ -1561,6 +1556,7 @@ void TextNodeDumper::VisitCXXRecordDecl(const CXXRecordDecl *D) {
     FLAG(isGenericLambda, generic);
     FLAG(isLambda, lambda);
 
+    FLAG(isAnonymousStructOrUnion, is_anonymous);
     FLAG(canPassInRegisters, pass_in_registers);
     FLAG(isEmpty, empty);
     FLAG(isAggregate, aggregate);
@@ -1959,4 +1955,8 @@ void TextNodeDumper::VisitBlockDecl(const BlockDecl *D) {
 
   if (D->capturesCXXThis())
     OS << " captures_this";
+}
+
+void TextNodeDumper::VisitConceptDecl(const ConceptDecl *D) {
+  dumpName(D);
 }

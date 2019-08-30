@@ -52,6 +52,7 @@ class ByteStreamer;
 class DebugLocEntry;
 class DIE;
 class DwarfCompileUnit;
+class DwarfExpression;
 class DwarfTypeUnit;
 class DwarfUnit;
 class LexicalScope;
@@ -152,7 +153,7 @@ public:
     assert(!ValueLoc && "Already initialized?");
     assert(!Value.getExpression()->isFragment() && "Fragments not supported.");
 
-    ValueLoc = llvm::make_unique<DbgValueLoc>(Value);
+    ValueLoc = std::make_unique<DbgValueLoc>(Value);
     if (auto *E = ValueLoc->getExpression())
       if (E->getNumElements())
         FrameIndexExprs.push_back({0, E});
@@ -252,6 +253,25 @@ public:
     return N->getDbgEntityID() == DbgLabelKind;
   }
 };
+
+/// Used for tracking debug info about call site parameters.
+class DbgCallSiteParam {
+private:
+  unsigned Register; ///< Parameter register at the callee entry point.
+  DbgValueLoc Value; ///< Corresponding location for the parameter value at
+                     ///< the call site.
+public:
+  DbgCallSiteParam(unsigned Reg, DbgValueLoc Val)
+      : Register(Reg), Value(Val) {
+    assert(Reg && "Parameter register cannot be undef");
+  }
+
+  unsigned getRegister() const { return Register; }
+  DbgValueLoc getValue() const { return Value; }
+};
+
+/// Collection used for storing debug call site parameters.
+using ParamSet = SmallVector<DbgCallSiteParam, 4>;
 
 /// Helper used to pair up a symbol and its DWARF compile unit.
 struct SymbolCU {
@@ -735,6 +755,10 @@ public:
 
   void addSectionLabel(const MCSymbol *Sym);
   const MCSymbol *getSectionLabel(const MCSection *S);
+
+  static void emitDebugLocValue(const AsmPrinter &AP, const DIBasicType *BT,
+                                const DbgValueLoc &Value,
+                                DwarfExpression &DwarfExpr);
 };
 
 } // end namespace llvm

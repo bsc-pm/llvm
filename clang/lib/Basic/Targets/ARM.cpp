@@ -309,8 +309,9 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
   setAtomic();
 
   // Maximum alignment for ARM NEON data types should be 64-bits (AAPCS)
+  // as well the default alignment
   if (IsAAPCS && (Triple.getEnvironment() != llvm::Triple::Android))
-    MaxVectorAlign = 64;
+    DefaultAlignForAttributeAligned = MaxVectorAlign = 64;
 
   // Do force alignment of members that follow zero length bitfields.  If
   // the alignment of the zero-length bitfield is greater than the member
@@ -321,7 +322,7 @@ ARMTargetInfo::ARMTargetInfo(const llvm::Triple &Triple,
   if (Triple.getOS() == llvm::Triple::Linux ||
       Triple.getOS() == llvm::Triple::UnknownOS)
     this->MCountName = Opts.EABIVersion == llvm::EABI::GNU
-                           ? "\01__gnu_mcount_nc"
+                           ? "llvm.arm.gnu.eabi.mcount"
                            : "\01mcount";
 
   SoftFloatABI = llvm::is_contained(Opts.FeaturesAsWritten, "+soft-float-abi");
@@ -900,6 +901,17 @@ bool ARMTargetInfo::validateAsmConstraint(
   case 'Q': // A memory address that is a single base register.
     Info.setAllowsMemory();
     return true;
+  case 'T':
+    switch (Name[1]) {
+    default:
+      break;
+    case 'e': // Even general-purpose register
+    case 'o': // Odd general-purpose register
+      Info.setAllowsRegister();
+      Name++;
+      return true;
+    }
+    break;
   case 'U': // a memory reference...
     switch (Name[1]) {
     case 'q': // ...ARMV4 ldrsb
@@ -915,6 +927,7 @@ bool ARMTargetInfo::validateAsmConstraint(
       Name++;
       return true;
     }
+    break;
   }
   return false;
 }
@@ -923,6 +936,7 @@ std::string ARMTargetInfo::convertConstraint(const char *&Constraint) const {
   std::string R;
   switch (*Constraint) {
   case 'U': // Two-character constraint; add "^" hint for later parsing.
+  case 'T':
     R = std::string("^") + std::string(Constraint, 2);
     Constraint++;
     break;
@@ -1017,8 +1031,6 @@ WindowsARMTargetInfo::WindowsARMTargetInfo(const llvm::Triple &Triple,
 
 void WindowsARMTargetInfo::getVisualStudioDefines(const LangOptions &Opts,
                                                   MacroBuilder &Builder) const {
-  WindowsTargetInfo<ARMleTargetInfo>::getVisualStudioDefines(Opts, Builder);
-
   // FIXME: this is invalid for WindowsCE
   Builder.defineMacro("_M_ARM_NT", "1");
   Builder.defineMacro("_M_ARMT", "_M_ARM");

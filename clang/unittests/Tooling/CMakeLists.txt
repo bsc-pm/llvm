@@ -15,6 +15,7 @@ add_clang_unittest(ToolingTests
   CastExprTest.cpp
   CommentHandlerTest.cpp
   CompilationDatabaseTest.cpp
+  DependencyScannerTest.cpp
   DiagnosticsYamlTest.cpp
   ExecutionTest.cpp
   FixItTest.cpp
@@ -28,9 +29,11 @@ add_clang_unittest(ToolingTests
   RecursiveASTVisitorTests/ConstructExpr.cpp
   RecursiveASTVisitorTests/CXXBoolLiteralExpr.cpp
   RecursiveASTVisitorTests/CXXMemberCall.cpp
+  RecursiveASTVisitorTests/CXXMethodDecl.cpp
   RecursiveASTVisitorTests/CXXOperatorCallExprTraverser.cpp
   RecursiveASTVisitorTests/DeclRefExpr.cpp
   RecursiveASTVisitorTests/ImplicitCtor.cpp
+  RecursiveASTVisitorTests/ImplicitCtorInitializer.cpp
   RecursiveASTVisitorTests/InitListExprPostOrder.cpp
   RecursiveASTVisitorTests/InitListExprPostOrderNoQueue.cpp
   RecursiveASTVisitorTests/InitListExprPreOrder.cpp
@@ -57,7 +60,7 @@ add_clang_unittest(ToolingTests
   TransformerTest.cpp
   )
 
-target_link_libraries(ToolingTests
+clang_target_link_libraries(ToolingTests
   PRIVATE
   clangAST
   clangASTMatchers
@@ -71,8 +74,11 @@ target_link_libraries(ToolingTests
   clangToolingCore
   clangToolingInclusions
   clangToolingRefactoring
-  LLVMTestingSupport
   )
 
+target_link_libraries(ToolingTests
+  PRIVATE
+  LLVMTestingSupport
+)
 
 add_subdirectory(Syntax)

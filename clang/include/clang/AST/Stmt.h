@@ -332,6 +332,9 @@ protected:
     /// The kind of result that is trail-allocated.
     unsigned ResultKind : 2;
 
+    /// Kind of Result as defined by APValue::Kind
+    unsigned APValueKind : 4;
+
     /// When ResultKind == RSK_Int64. whether the trail-allocated integer is
     /// signed.
     unsigned IsUnsigned : 1;
@@ -340,6 +343,10 @@ protected:
     /// integer. 7 bits because it is the minimal number of bit to represent a
     /// value from 0 to 64 (the size of the trail-allocated number).
     unsigned BitWidth : 7;
+
+    /// When ResultKind == RSK_APValue. Wether the ASTContext will cleanup the
+    /// destructor on the trail-allocated APValue.
+    unsigned HasCleanup : 1;
   };
 
   class PredefinedExprBitfields {
@@ -1342,11 +1349,6 @@ public:
     return !body_empty() ? body_begin()[size() - 1] : nullptr;
   }
 
-  void setLastStmt(Stmt *S) {
-    assert(!body_empty() && "setLastStmt");
-    body_begin()[size() - 1] = S;
-  }
-
   using const_body_iterator = Stmt *const *;
   using body_const_range = llvm::iterator_range<const_body_iterator>;
 
@@ -1387,6 +1389,26 @@ public:
 
   const_reverse_body_iterator body_rend() const {
     return const_reverse_body_iterator(body_begin());
+  }
+
+  // Get the Stmt that StmtExpr would consider to be the result of this
+  // compound statement. This is used by StmtExpr to properly emulate the GCC
+  // compound expression extension, which ignores trailing NullStmts when
+  // getting the result of the expression.
+  // i.e. ({ 5;;; })
+  //           ^^ ignored
+  // If we don't find something that isn't a NullStmt, just return the last
+  // Stmt.
+  Stmt *getStmtExprResult() {
+    for (auto *B : llvm::reverse(body())) {
+      if (!isa<NullStmt>(B))
+        return B;
+    }
+    return body_back();
+  }
+
+  const Stmt *getStmtExprResult() const {
+    return const_cast<CompoundStmt *>(this)->getStmtExprResult();
   }
 
   SourceLocation getBeginLoc() const { return CompoundStmtBits.LBraceLoc; }

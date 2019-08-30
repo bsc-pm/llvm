@@ -463,7 +463,7 @@ RegInterval WaitcntBrackets::getRegInterval(const MachineInstr *MI,
                                             unsigned OpNo, bool Def) const {
   const MachineOperand &Op = MI->getOperand(OpNo);
   if (!Op.isReg() || !TRI->isInAllocatableClass(Op.getReg()) ||
-      (Def && !Op.isDef()))
+      (Def && !Op.isDef()) || TRI->isAGPR(*MRI, Op.getReg()))
     return {-1, -1};
 
   // A use via a PW operand does not need a waitcnt.
@@ -542,11 +542,6 @@ void WaitcntBrackets::updateByEvent(const SIInstrInfo *TII,
       // export.)
       if (AddrOpIdx != -1) {
         setExpScore(&Inst, TII, TRI, MRI, AddrOpIdx, CurrScore);
-      } else {
-        assert(Inst.getOpcode() == AMDGPU::DS_APPEND ||
-               Inst.getOpcode() == AMDGPU::DS_CONSUME ||
-               Inst.getOpcode() == AMDGPU::DS_GWS_INIT ||
-               Inst.getOpcode() == AMDGPU::DS_GWS_BARRIER);
       }
 
       if (Inst.mayStore()) {
@@ -1362,7 +1357,8 @@ bool SIInsertWaitcnts::insertWaitcntInBlock(MachineFunction &MF,
   // Walk over the instructions.
   MachineInstr *OldWaitcntInstr = nullptr;
 
-  for (MachineBasicBlock::iterator Iter = Block.begin(), E = Block.end();
+  for (MachineBasicBlock::instr_iterator Iter = Block.instr_begin(),
+                                         E = Block.instr_end();
        Iter != E;) {
     MachineInstr &Inst = *Iter;
 
@@ -1487,12 +1483,12 @@ bool SIInsertWaitcnts::runOnMachineFunction(MachineFunction &MF) {
 
       if (BI.Incoming) {
         if (!Brackets)
-          Brackets = llvm::make_unique<WaitcntBrackets>(*BI.Incoming);
+          Brackets = std::make_unique<WaitcntBrackets>(*BI.Incoming);
         else
           *Brackets = *BI.Incoming;
       } else {
         if (!Brackets)
-          Brackets = llvm::make_unique<WaitcntBrackets>(ST);
+          Brackets = std::make_unique<WaitcntBrackets>(ST);
         else
           Brackets->clear();
       }
@@ -1512,7 +1508,7 @@ bool SIInsertWaitcnts::runOnMachineFunction(MachineFunction &MF) {
             if (!MoveBracketsToSucc) {
               MoveBracketsToSucc = &SuccBI;
             } else {
-              SuccBI.Incoming = llvm::make_unique<WaitcntBrackets>(*Brackets);
+              SuccBI.Incoming = std::make_unique<WaitcntBrackets>(*Brackets);
             }
           } else if (SuccBI.Incoming->merge(*Brackets)) {
             SuccBI.Dirty = true;

@@ -521,9 +521,11 @@ private:
 //                                AtomicCmpXchgInst Class
 //===----------------------------------------------------------------------===//
 
-/// an instruction that atomically checks whether a
+/// An instruction that atomically checks whether a
 /// specified value is in a memory location, and, if it is, stores a new value
-/// there.  Returns the value that was loaded.
+/// there. The value returned by this instruction is a pair containing the
+/// original value as first element, and an i1 indicating success (true) or
+/// failure (false) as second element.
 ///
 class AtomicCmpXchgInst : public Instruction {
   void Init(Value *Ptr, Value *Cmp, Value *NewVal,
@@ -1761,6 +1763,10 @@ public:
   void setCondition(Value *V) { Op<0>() = V; }
   void setTrueValue(Value *V) { Op<1>() = V; }
   void setFalseValue(Value *V) { Op<2>() = V; }
+
+  /// Swap the true and false values of the select instruction.
+  /// This doesn't swap prof metadata.
+  void swapValues() { Op<1>().swap(Op<2>()); }
 
   /// Return a string if the specified operands are invalid
   /// for a select operation, otherwise return null.

@@ -225,10 +225,6 @@ ExprEngine::ExprEngine(cross_tu::CrossTranslationUnitContext &CTU,
   }
 }
 
-ExprEngine::~ExprEngine() {
-  BR.FlushReports();
-}
-
 //===----------------------------------------------------------------------===//
 // Utility methods.
 //===----------------------------------------------------------------------===//
@@ -981,8 +977,8 @@ void ExprEngine::ProcessAutomaticObjDtor(const CFGAutomaticObjDtor Dtor,
   Region = makeZeroElementRegion(state, loc::MemRegionVal(Region), varType,
                                  CallOpts.IsArrayCtorOrDtor).getAsRegion();
 
-  VisitCXXDestructor(varType, Region, Dtor.getTriggerStmt(), /*IsBase=*/ false,
-                     Pred, Dst, CallOpts);
+  VisitCXXDestructor(varType, Region, Dtor.getTriggerStmt(),
+                     /*IsBase=*/false, Pred, Dst, CallOpts);
 }
 
 void ExprEngine::ProcessDeleteDtor(const CFGDeleteDtor Dtor,
@@ -1040,8 +1036,9 @@ void ExprEngine::ProcessBaseDtor(const CFGBaseDtor D,
   SVal BaseVal = getStoreManager().evalDerivedToBase(ThisVal, BaseTy,
                                                      Base->isVirtual());
 
-  VisitCXXDestructor(BaseTy, BaseVal.castAs<loc::MemRegionVal>().getRegion(),
-                     CurDtor->getBody(), /*IsBase=*/ true, Pred, Dst, {});
+  EvalCallOptions CallOpts;
+  VisitCXXDestructor(BaseTy, BaseVal.getAsRegion(), CurDtor->getBody(),
+                     /*IsBase=*/true, Pred, Dst, CallOpts);
 }
 
 void ExprEngine::ProcessMemberDtor(const CFGMemberDtor D,
@@ -1052,10 +1049,10 @@ void ExprEngine::ProcessMemberDtor(const CFGMemberDtor D,
   const LocationContext *LCtx = Pred->getLocationContext();
 
   const auto *CurDtor = cast<CXXDestructorDecl>(LCtx->getDecl());
-  Loc ThisVal = getSValBuilder().getCXXThis(CurDtor,
-                                            LCtx->getStackFrame());
-  SVal FieldVal =
-      State->getLValue(Member, State->getSVal(ThisVal).castAs<Loc>());
+  Loc ThisStorageLoc =
+      getSValBuilder().getCXXThis(CurDtor, LCtx->getStackFrame());
+  Loc ThisLoc = State->getSVal(ThisStorageLoc).castAs<Loc>();
+  SVal FieldVal = State->getLValue(Member, ThisLoc);
 
   // FIXME: We need to run the same destructor on every element of the array.
   // This workaround will just run the first destructor (which will still
@@ -1064,8 +1061,8 @@ void ExprEngine::ProcessMemberDtor(const CFGMemberDtor D,
   FieldVal = makeZeroElementRegion(State, FieldVal, T,
                                    CallOpts.IsArrayCtorOrDtor);
 
-  VisitCXXDestructor(T, FieldVal.castAs<loc::MemRegionVal>().getRegion(),
-                     CurDtor->getBody(), /*IsBase=*/false, Pred, Dst, CallOpts);
+  VisitCXXDestructor(T, FieldVal.getAsRegion(), CurDtor->getBody(),
+                     /*IsBase=*/false, Pred, Dst, CallOpts);
 }
 
 void ExprEngine::ProcessTemporaryDtor(const CFGTemporaryDtor D,
@@ -1113,8 +1110,6 @@ void ExprEngine::ProcessTemporaryDtor(const CFGTemporaryDtor D,
   EvalCallOptions CallOpts;
   CallOpts.IsTemporaryCtorOrDtor = true;
   if (!MR) {
-    CallOpts.IsCtorOrDtorWithImproperlyModeledTargetRegion = true;
-
     // If we have no MR, we still need to unwrap the array to avoid destroying
     // the whole array at once. Regardless, we'd eventually need to model array
     // destructors properly, element-by-element.
@@ -1573,7 +1568,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
           ProgramStateRef NewState =
             createTemporaryRegionIfNeeded(State, LCtx, OCE->getArg(0));
           if (NewState != State) {
-            Pred = Bldr.generateNode(OCE, Pred, NewState, /*Tag=*/nullptr,
+            Pred = Bldr.generateNode(OCE, Pred, NewState, /*tag=*/nullptr,
                                      ProgramPoint::PreStmtKind);
             // Did we cache out?
             if (!Pred)
@@ -1692,6 +1687,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::CXXReinterpretCastExprClass:
     case Stmt::CXXConstCastExprClass:
     case Stmt::CXXFunctionalCastExprClass:
+    case Stmt::BuiltinBitCastExprClass:
     case Stmt::ObjCBridgedCastExprClass: {
       Bldr.takeNodes(Pred);
       const auto *C = cast<CastExpr>(S);
@@ -3010,7 +3006,8 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
 
     for (const auto &EQ : EQClasses) {
       for (const BugReport &Report : EQ) {
-        if (Report.getErrorNode() == N)
+        if (Report.getErrorNode()->getState() == N->getState() &&
+            Report.getErrorNode()->getLocation() == N->getLocation())
           return true;
       }
     }
@@ -3046,21 +3043,6 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
     return false;
   }
 
-  static std::string getNodeAttributes(const ExplodedNode *N,
-                                       ExplodedGraph *) {
-    SmallVector<StringRef, 10> Out;
-    auto Noop = [](const ExplodedNode*){};
-    if (traverseHiddenNodes(N, Noop, Noop, &nodeHasBugReport)) {
-      Out.push_back("style=filled");
-      Out.push_back("fillcolor=red");
-    }
-
-    if (traverseHiddenNodes(N, Noop, Noop,
-                            [](const ExplodedNode *C) { return C->isSink(); }))
-      Out.push_back("color=blue");
-    return llvm::join(Out, ",");
-  }
-
   static bool isNodeHidden(const ExplodedNode *N) {
     return N->isTrivial();
   }
@@ -3073,9 +3055,16 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
     const unsigned int Space = 1;
     ProgramStateRef State = N->getState();
 
+    auto Noop = [](const ExplodedNode*){};
+    bool HasReport = traverseHiddenNodes(
+        N, Noop, Noop, &nodeHasBugReport);
+    bool IsSink = traverseHiddenNodes(
+        N, Noop, Noop, [](const ExplodedNode *N) { return N->isSink(); });
+
     Out << "{ \"node_id\": " << N->getID(G) << ", \"pointer\": \""
         << (const void *)N << "\", \"state_id\": " << State->getID()
-        << ", \"has_report\": " << (nodeHasBugReport(N) ? "true" : "false")
+        << ", \"has_report\": " << (HasReport ? "true" : "false")
+        << ", \"is_sink\": " << (IsSink ? "true" : "false")
         << ",\\l";
 
     Indent(Out, Space, IsDot) << "\"program_points\": [\\l";
@@ -3110,11 +3099,7 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
       Indent(Out, Space, IsDot) << "\"program_state\": null";
     }
 
-    Out << "\\l}";
-    if (!N->succ_empty())
-      Out << ',';
-    Out << "\\l";
-
+    Out << "\\l}\\l";
     return Out.str();
   }
 };

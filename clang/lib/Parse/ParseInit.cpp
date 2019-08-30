@@ -39,12 +39,14 @@ bool Parser::MayBeDesignationStart() {
     // cases here, and fall back to tentative parsing if those fail.
     switch (PP.LookAhead(0).getKind()) {
     case tok::equal:
+    case tok::ellipsis:
     case tok::r_square:
       // Definitely starts a lambda expression.
       return false;
 
     case tok::amp:
     case tok::kw_this:
+    case tok::star:
     case tok::identifier:
       // We have to do additional analysis, because these could be the
       // start of a constant expression or a lambda capture list.

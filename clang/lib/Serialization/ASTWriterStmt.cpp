@@ -18,7 +18,7 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Lex/Token.h"
-#include "llvm/Bitcode/BitstreamWriter.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -1462,6 +1462,12 @@ void ASTStmtWriter::VisitCXXFunctionalCastExpr(CXXFunctionalCastExpr *E) {
   Code = serialization::EXPR_CXX_FUNCTIONAL_CAST;
 }
 
+void ASTStmtWriter::VisitBuiltinBitCastExpr(BuiltinBitCastExpr *E) {
+  VisitExplicitCastExpr(E);
+  Record.AddSourceLocation(E->getBeginLoc());
+  Record.AddSourceLocation(E->getEndLoc());
+}
+
 void ASTStmtWriter::VisitUserDefinedLiteral(UserDefinedLiteral *E) {
   VisitCallExpr(E);
   Record.AddSourceLocation(E->UDSuffixLoc);
@@ -2000,6 +2006,12 @@ void ASTStmtWriter::VisitOMPLoopDirective(OMPLoopDirective *D) {
   for (auto I : D->finals()) {
     Record.AddStmt(I);
   }
+  for (Stmt *S : D->dependent_counters())
+    Record.AddStmt(S);
+  for (Stmt *S : D->dependent_inits())
+    Record.AddStmt(S);
+  for (Stmt *S : D->finals_conditions())
+    Record.AddStmt(S);
 }
 
 void ASTStmtWriter::VisitOMPParallelDirective(OMPParallelDirective *D) {

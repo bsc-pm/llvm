@@ -397,7 +397,7 @@ void SectionWriter::visit(const OwnedDataSection &Sec) {
   llvm::copy(Sec.Data, Out.getBufferStart() + Sec.Offset);
 }
 
-static const std::vector<uint8_t> ZlibGnuMagic = {'Z', 'L', 'I', 'B'};
+static constexpr std::array<uint8_t, 4> ZlibGnuMagic = {'Z', 'L', 'I', 'B'};
 
 static bool isDataGnuCompressed(ArrayRef<uint8_t> Data) {
   return Data.size() > ZlibGnuMagic.size() &&
@@ -597,6 +597,11 @@ static bool isValidReservedSectionIndex(uint16_t Index, uint16_t Machine) {
   case SHN_COMMON:
     return true;
   }
+
+  if (Machine == EM_AMDGPU) {
+    return Index == SHN_AMDGPU_LDS;
+  }
+
   if (Machine == EM_HEXAGON) {
     switch (Index) {
     case SHN_HEXAGON_SCOMMON:
@@ -618,21 +623,17 @@ uint16_t Symbol::getShndx() const {
       return SHN_XINDEX;
     return DefinedIn->Index;
   }
-  switch (ShndxType) {
-  // This means that we don't have a defined section but we do need to
-  // output a legitimate section index.
-  case SYMBOL_SIMPLE_INDEX:
+
+  if (ShndxType == SYMBOL_SIMPLE_INDEX) {
+    // This means that we don't have a defined section but we do need to
+    // output a legitimate section index.
     return SHN_UNDEF;
-  case SYMBOL_ABS:
-  case SYMBOL_COMMON:
-  case SYMBOL_HEXAGON_SCOMMON:
-  case SYMBOL_HEXAGON_SCOMMON_2:
-  case SYMBOL_HEXAGON_SCOMMON_4:
-  case SYMBOL_HEXAGON_SCOMMON_8:
-  case SYMBOL_XINDEX:
-    return static_cast<uint16_t>(ShndxType);
   }
-  llvm_unreachable("Symbol with invalid ShndxType encountered");
+
+  assert(ShndxType == SYMBOL_ABS || ShndxType == SYMBOL_COMMON ||
+         (ShndxType >= SYMBOL_LOPROC && ShndxType <= SYMBOL_HIPROC) ||
+         (ShndxType >= SYMBOL_LOOS && ShndxType <= SYMBOL_HIOS));
+  return static_cast<uint16_t>(ShndxType);
 }
 
 bool Symbol::isCommon() const { return getShndx() == SHN_COMMON; }
@@ -664,7 +665,7 @@ void SymbolTableSection::addSymbol(Twine Name, uint8_t Bind, uint8_t Type,
   Sym.Visibility = Visibility;
   Sym.Size = SymbolSize;
   Sym.Index = Symbols.size();
-  Symbols.emplace_back(llvm::make_unique<Symbol>(Sym));
+  Symbols.emplace_back(std::make_unique<Symbol>(Sym));
   Size += this->EntrySize;
 }
 
@@ -1160,11 +1161,12 @@ void BinaryELFBuilder::addData(SymbolTableSection *SymTab) {
   Twine Prefix = Twine("_binary_") + SanitizedFilename;
 
   SymTab->addSymbol(Prefix + "_start", STB_GLOBAL, STT_NOTYPE, &DataSection,
-                    /*Value=*/0, STV_DEFAULT, 0, 0);
+                    /*Value=*/0, NewSymbolVisibility, 0, 0);
   SymTab->addSymbol(Prefix + "_end", STB_GLOBAL, STT_NOTYPE, &DataSection,
-                    /*Value=*/DataSection.Size, STV_DEFAULT, 0, 0);
+                    /*Value=*/DataSection.Size, NewSymbolVisibility, 0, 0);
   SymTab->addSymbol(Prefix + "_size", STB_GLOBAL, STT_NOTYPE, nullptr,
-                    /*Value=*/DataSection.Size, STV_DEFAULT, SHN_ABS, 0);
+                    /*Value=*/DataSection.Size, NewSymbolVisibility, SHN_ABS,
+                    0);
 }
 
 std::unique_ptr<Object> BinaryELFBuilder::build() {
@@ -1609,7 +1611,7 @@ Writer::~Writer() {}
 Reader::~Reader() {}
 
 std::unique_ptr<Object> BinaryReader::create() const {
-  return BinaryELFBuilder(MInfo.EMachine, MemBuf).build();
+  return BinaryELFBuilder(MInfo.EMachine, MemBuf, NewSymbolVisibility).build();
 }
 
 Expected<std::vector<IHexRecord>> IHexReader::parse() const {
@@ -1644,7 +1646,7 @@ std::unique_ptr<Object> IHexReader::create() const {
 }
 
 std::unique_ptr<Object> ELFReader::create() const {
-  auto Obj = llvm::make_unique<Object>();
+  auto Obj = std::make_unique<Object>();
   if (auto *O = dyn_cast<ELFObjectFile<ELF32LE>>(Bin)) {
     ELFBuilder<ELF32LE> Builder(*O, *Obj, ExtractPartition);
     Builder.build();
@@ -1994,6 +1996,25 @@ template <class ELFT> Error ELFWriter<ELFT>::write() {
   return Buf.commit();
 }
 
+static Error removeUnneededSections(Object &Obj) {
+  // We can remove an empty symbol table from non-relocatable objects.
+  // Relocatable objects typically have relocation sections whose
+  // sh_link field points to .symtab, so we can't remove .symtab
+  // even if it is empty.
+  if (Obj.isRelocatable() || Obj.SymbolTable == nullptr ||
+      !Obj.SymbolTable->empty())
+    return Error::success();
+
+  // .strtab can be used for section names. In such a case we shouldn't
+  // remove it.
+  auto *StrTab = Obj.SymbolTable->getStrTab() == Obj.SectionNames
+                     ? nullptr
+                     : Obj.SymbolTable->getStrTab();
+  return Obj.removeSections(false, [&](const SectionBase &Sec) {
+    return &Sec == Obj.SymbolTable || &Sec == StrTab;
+  });
+}
+
 template <class ELFT> Error ELFWriter<ELFT>::finalize() {
   // It could happen that SectionNames has been removed and yet the user wants
   // a section header table output. We need to throw an error if a user tries
@@ -2003,6 +2024,8 @@ template <class ELFT> Error ELFWriter<ELFT>::finalize() {
                              "cannot write section header table because "
                              "section header string table was removed");
 
+  if (Error E = removeUnneededSections(Obj))
+    return E;
   Obj.sortSections();
 
   // We need to assign indexes before we perform layout because we need to know
@@ -2054,7 +2077,7 @@ template <class ELFT> Error ELFWriter<ELFT>::finalize() {
   // Also, the output arch may not be the same as the input arch, so fix up
   // size-related fields before doing layout calculations.
   uint64_t Index = 0;
-  auto SecSizer = llvm::make_unique<ELFSectionSizer<ELFT>>();
+  auto SecSizer = std::make_unique<ELFSectionSizer<ELFT>>();
   for (auto &Sec : Obj.sections()) {
     Sec.Index = Index++;
     Sec.accept(*SecSizer);
@@ -2092,7 +2115,7 @@ template <class ELFT> Error ELFWriter<ELFT>::finalize() {
 
   if (Error E = Buf.allocate(totalSize()))
     return E;
-  SecWriter = llvm::make_unique<ELFSectionWriter<ELFT>>(Buf);
+  SecWriter = std::make_unique<ELFSectionWriter<ELFT>>(Buf);
   return Error::success();
 }
 
@@ -2178,7 +2201,7 @@ Error BinaryWriter::finalize() {
 
   if (Error E = Buf.allocate(TotalSize))
     return E;
-  SecWriter = llvm::make_unique<BinarySectionWriter>(Buf);
+  SecWriter = std::make_unique<BinarySectionWriter>(Buf);
   return Error::success();
 }
 

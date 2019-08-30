@@ -1060,7 +1060,7 @@ Value *InstCombiner::simplifyMaskedLoad(IntrinsicInst &II) {
 
   // If we can unconditionally load from this address, replace with a
   // load/select idiom. TODO: use DT for context sensitive query
-  if (isDereferenceableAndAlignedPointer(LoadPtr, Alignment,
+  if (isDereferenceableAndAlignedPointer(LoadPtr, II.getType(), Alignment,
                                          II.getModule()->getDataLayout(),
                                          &II, nullptr)) {
     Value *LI = Builder.CreateAlignedLoad(II.getType(), LoadPtr, Alignment,
@@ -1192,6 +1192,23 @@ static Instruction *foldCttzCtlz(IntrinsicInst &II, InstCombiner &IC) {
     Intrinsic::ID ID = IsTZ ? Intrinsic::ctlz : Intrinsic::cttz;
     Function *F = Intrinsic::getDeclaration(II.getModule(), ID, II.getType());
     return CallInst::Create(F, {X, II.getArgOperand(1)});
+  }
+
+  if (IsTZ) {
+    // cttz(-x) -> cttz(x)
+    if (match(Op0, m_Neg(m_Value(X)))) {
+      II.setOperand(0, X);
+      return &II;
+    }
+
+    // cttz(abs(x)) -> cttz(x)
+    // cttz(nabs(x)) -> cttz(x)
+    Value *Y;
+    SelectPatternFlavor SPF = matchSelectPattern(Op0, X, Y).Flavor;
+    if (SPF == SPF_ABS || SPF == SPF_NABS) {
+      II.setOperand(0, X);
+      return &II;
+    }
   }
 
   KnownBits Known = IC.computeKnownBits(Op0, 0, &II);
@@ -1966,6 +1983,13 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
       if (match(Op0, m_ZeroInt()) || match(Op0, m_Undef()))
         return BinaryOperator::CreateLShr(Op1,
                                           ConstantExpr::getSub(WidthC, ShAmtC));
+
+      // fshl i16 X, X, 8 --> bswap i16 X (reduce to more-specific form)
+      if (Op0 == Op1 && BitWidth == 16 && match(ShAmtC, m_SpecificInt(8))) {
+        Module *Mod = II->getModule();
+        Function *Bswap = Intrinsic::getDeclaration(Mod, Intrinsic::bswap, Ty);
+        return CallInst::Create(Bswap, { Op0 });
+      }
     }
 
     // Left or right might be masked.
@@ -3861,6 +3885,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     // Asan needs to poison memory to detect invalid access which is possible
     // even for empty lifetime range.
     if (II->getFunction()->hasFnAttribute(Attribute::SanitizeAddress) ||
+        II->getFunction()->hasFnAttribute(Attribute::SanitizeMemory) ||
         II->getFunction()->hasFnAttribute(Attribute::SanitizeHWAddress))
       break;
 
@@ -4153,8 +4178,43 @@ static IntrinsicInst *findInitTrampoline(Value *Callee) {
   return nullptr;
 }
 
+static void annotateAnyAllocSite(CallBase &Call, const TargetLibraryInfo *TLI) {
+  ConstantInt *Op0C = dyn_cast<ConstantInt>(Call.getOperand(0));
+  ConstantInt *Op1C = (Call.getNumArgOperands() == 1)
+                          ? nullptr
+                          : dyn_cast<ConstantInt>(Call.getOperand(1));
+  // Bail out if the allocation size is zero.
+  if ((Op0C && Op0C->isNullValue()) || (Op1C && Op1C->isNullValue()))
+    return;
+
+  if (isMallocLikeFn(&Call, TLI) && Op0C) {
+    Call.addAttribute(AttributeList::ReturnIndex,
+                      Attribute::getWithDereferenceableOrNullBytes(
+                          Call.getContext(), Op0C->getZExtValue()));
+  } else if (isOpNewLikeFn(&Call, TLI) && Op0C) {
+    Call.addAttribute(AttributeList::ReturnIndex,
+                      Attribute::getWithDereferenceableBytes(
+                          Call.getContext(), Op0C->getZExtValue()));
+  } else if (isReallocLikeFn(&Call, TLI) && Op1C) {
+    Call.addAttribute(AttributeList::ReturnIndex,
+                      Attribute::getWithDereferenceableOrNullBytes(
+                          Call.getContext(), Op1C->getZExtValue()));
+  } else if (isCallocLikeFn(&Call, TLI) && Op0C && Op1C) {
+    bool Overflow;
+    const APInt &N = Op0C->getValue();
+    APInt Size = N.umul_ov(Op1C->getValue(), Overflow);
+    if (!Overflow)
+      Call.addAttribute(AttributeList::ReturnIndex,
+                        Attribute::getWithDereferenceableOrNullBytes(
+                            Call.getContext(), Size.getZExtValue()));
+  }
+}
+
 /// Improvements for call, callbr and invoke instructions.
 Instruction *InstCombiner::visitCallBase(CallBase &Call) {
+  if (isAllocationFn(&Call, &TLI))
+    annotateAnyAllocSite(Call, &TLI);
+
   if (isAllocLikeFn(&Call, &TLI))
     return visitAllocSite(Call);
 

@@ -26,7 +26,8 @@ llvm_canonicalize_cmake_booleans(
   ENABLE_EXPERIMENTAL_NEW_PASS_MANAGER
   HAVE_LIBZ
   LLVM_ENABLE_PER_TARGET_RUNTIME_DIR
-  LLVM_ENABLE_PLUGINS)
+  LLVM_ENABLE_PLUGINS
+  LLVM_ENABLE_THREADS)
 
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
@@ -106,11 +107,14 @@ if( NOT CLANG_BUILT_STANDALONE )
     llvm-cat
     llvm-cxxfilt
     llvm-dis
+    llvm-dwarfdump
     llvm-lto2
     llvm-modextract
     llvm-nm
+    llvm-objcopy
     llvm-objdump
     llvm-profdata
+    llvm-readelf
     llvm-readobj
     llvm-symbolizer
     opt

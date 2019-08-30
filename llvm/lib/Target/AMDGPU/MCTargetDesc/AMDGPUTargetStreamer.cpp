@@ -91,6 +91,7 @@ StringRef AMDGPUTargetStreamer::getArchNameFromElfMach(unsigned ElfMach) {
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX902:  AK = GK_GFX902;  break;
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX904:  AK = GK_GFX904;  break;
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX906:  AK = GK_GFX906;  break;
+  case ELF::EF_AMDGPU_MACH_AMDGCN_GFX908:  AK = GK_GFX908;  break;
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX909:  AK = GK_GFX909;  break;
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX1010: AK = GK_GFX1010; break;
   case ELF::EF_AMDGPU_MACH_AMDGCN_GFX1011: AK = GK_GFX1011; break;
@@ -141,6 +142,7 @@ unsigned AMDGPUTargetStreamer::getElfMach(StringRef GPU) {
   case GK_GFX902:  return ELF::EF_AMDGPU_MACH_AMDGCN_GFX902;
   case GK_GFX904:  return ELF::EF_AMDGPU_MACH_AMDGCN_GFX904;
   case GK_GFX906:  return ELF::EF_AMDGPU_MACH_AMDGCN_GFX906;
+  case GK_GFX908:  return ELF::EF_AMDGPU_MACH_AMDGCN_GFX908;
   case GK_GFX909:  return ELF::EF_AMDGPU_MACH_AMDGCN_GFX909;
   case GK_GFX1010: return ELF::EF_AMDGPU_MACH_AMDGCN_GFX1010;
   case GK_GFX1011: return ELF::EF_AMDGPU_MACH_AMDGCN_GFX1011;
@@ -206,6 +208,12 @@ void AMDGPUTargetAsmStreamer::EmitAMDGPUSymbolType(StringRef SymbolName,
   }
 }
 
+void AMDGPUTargetAsmStreamer::emitAMDGPULDS(MCSymbol *Symbol, unsigned Size,
+                                            unsigned Align) {
+  OS << "\t.amdgpu_lds " << Symbol->getName() << ", " << Size << ", " << Align
+     << '\n';
+}
+
 bool AMDGPUTargetAsmStreamer::EmitISAVersion(StringRef IsaVersionString) {
   OS << "\t.amd_amdgpu_isa \"" << IsaVersionString << "\"\n";
   return true;
@@ -242,7 +250,7 @@ bool AMDGPUTargetAsmStreamer::EmitHSAMetadata(
 bool AMDGPUTargetAsmStreamer::EmitCodeEnd() {
   const uint32_t Encoded_s_code_end = 0xbf9f0000;
   OS << "\t.p2alignl 6, " << Encoded_s_code_end << '\n';
-  OS << "\t.fill 32, 4, " << Encoded_s_code_end << '\n';
+  OS << "\t.fill 48, 4, " << Encoded_s_code_end << '\n';
   return true;
 }
 
@@ -497,6 +505,27 @@ void AMDGPUTargetELFStreamer::EmitAMDGPUSymbolType(StringRef SymbolName,
   Symbol->setType(Type);
 }
 
+void AMDGPUTargetELFStreamer::emitAMDGPULDS(MCSymbol *Symbol, unsigned Size,
+                                            unsigned Align) {
+  assert(isPowerOf2_32(Align));
+
+  MCSymbolELF *SymbolELF = cast<MCSymbolELF>(Symbol);
+  SymbolELF->setType(ELF::STT_OBJECT);
+
+  if (!SymbolELF->isBindingSet()) {
+    SymbolELF->setBinding(ELF::STB_GLOBAL);
+    SymbolELF->setExternal(true);
+  }
+
+  if (SymbolELF->declareCommon(Size, Align, true)) {
+    report_fatal_error("Symbol: " + Symbol->getName() +
+                       " redeclared as different type");
+  }
+
+  SymbolELF->setIndex(ELF::SHN_AMDGPU_LDS);
+  SymbolELF->setSize(MCConstantExpr::create(Size, getContext()));
+}
+
 bool AMDGPUTargetELFStreamer::EmitISAVersion(StringRef IsaVersionString) {
   // Create two labels to mark the beginning and end of the desc field
   // and a MCExpr to calculate the size of the desc field.
@@ -573,7 +602,7 @@ bool AMDGPUTargetELFStreamer::EmitCodeEnd() {
   MCStreamer &OS = getStreamer();
   OS.PushSection();
   OS.EmitValueToAlignment(64, Encoded_s_code_end, 4);
-  for (unsigned I = 0; I < 32; ++I)
+  for (unsigned I = 0; I < 48; ++I)
     OS.EmitIntValue(Encoded_s_code_end, 4);
   OS.PopSection();
   return true;

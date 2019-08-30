@@ -421,8 +421,7 @@ GDBRemoteCommunicationServerCommon::Handle_qUserName(
     StringExtractorGDBRemote &packet) {
 #if !defined(LLDB_DISABLE_POSIX)
   Log *log(GetLogIfAnyCategoriesSet(LIBLLDB_LOG_PROCESS));
-  if (log)
-    log->Printf("GDBRemoteCommunicationServerCommon::%s begin", __FUNCTION__);
+  LLDB_LOGF(log, "GDBRemoteCommunicationServerCommon::%s begin", __FUNCTION__);
 
   // Packet format: "qUserName:%i" where %i is the uid
   packet.SetFilePos(::strlen("qUserName:"));
@@ -435,8 +434,7 @@ GDBRemoteCommunicationServerCommon::Handle_qUserName(
       return SendPacketNoLock(response.GetString());
     }
   }
-  if (log)
-    log->Printf("GDBRemoteCommunicationServerCommon::%s end", __FUNCTION__);
+  LLDB_LOGF(log, "GDBRemoteCommunicationServerCommon::%s end", __FUNCTION__);
 #endif
   return SendErrorResponse(5);
 }
@@ -552,10 +550,10 @@ GDBRemoteCommunicationServerCommon::Handle_vFile_pRead(
   packet.SetFilePos(::strlen("vFile:pread:"));
   int fd = packet.GetS32(-1);
   if (packet.GetChar() == ',') {
-    size_t count = packet.GetU64(UINT64_MAX);
+    size_t count = packet.GetU64(SIZE_MAX);
     if (packet.GetChar() == ',') {
       off_t offset = packet.GetU64(UINT32_MAX);
-      if (count == UINT64_MAX) {
+      if (count == SIZE_MAX) {
         response.Printf("F-1:%i", EINVAL);
         return SendPacketNoLock(response.GetString());
       }
@@ -1017,9 +1015,8 @@ GDBRemoteCommunicationServerCommon::Handle_A(StringExtractorGDBRemote &packet) {
                   m_process_launch_info.GetExecutableFile().SetFile(
                       arg, FileSpec::Style::native);
                 m_process_launch_info.GetArguments().AppendArgument(arg);
-                if (log)
-                  log->Printf("LLGSPacketHandler::%s added arg %d: \"%s\"",
-                              __FUNCTION__, actual_arg_index, arg.c_str());
+                LLDB_LOGF(log, "LLGSPacketHandler::%s added arg %d: \"%s\"",
+                          __FUNCTION__, actual_arg_index, arg.c_str());
                 ++actual_arg_index;
               }
             }

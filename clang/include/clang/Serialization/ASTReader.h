@@ -56,7 +56,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -1437,6 +1437,7 @@ private:
   void Error(StringRef Msg) const;
   void Error(unsigned DiagID, StringRef Arg1 = StringRef(),
              StringRef Arg2 = StringRef()) const;
+  void Error(llvm::Error &&Err) const;
 
 public:
   /// Load the AST file and validate its contents against the given
@@ -1577,7 +1578,7 @@ public:
   /// Takes ownership of \p L.
   void addListener(std::unique_ptr<ASTReaderListener> L) {
     if (Listener)
-      L = llvm::make_unique<ChainedASTReaderListener>(std::move(L),
+      L = std::make_unique<ChainedASTReaderListener>(std::move(L),
                                                       std::move(Listener));
     Listener = std::move(L);
   }
@@ -1593,7 +1594,7 @@ public:
       auto Old = Reader.takeListener();
       if (Old) {
         Chained = true;
-        L = llvm::make_unique<ChainedASTReaderListener>(std::move(L),
+        L = std::make_unique<ChainedASTReaderListener>(std::move(L),
                                                         std::move(Old));
       }
       Reader.setListener(std::move(L));
@@ -2379,7 +2380,8 @@ public:
 
   /// Reads a record with id AbbrevID from Cursor, resetting the
   /// internal state.
-  unsigned readRecord(llvm::BitstreamCursor &Cursor, unsigned AbbrevID);
+  Expected<unsigned> readRecord(llvm::BitstreamCursor &Cursor,
+                                unsigned AbbrevID);
 
   /// Is this a module file for a module (rather than a PCH or similar).
   bool isModule() const { return F->isModule(); }
@@ -2679,7 +2681,10 @@ struct SavedStreamPosition {
       : Cursor(Cursor), Offset(Cursor.GetCurrentBitNo()) {}
 
   ~SavedStreamPosition() {
-    Cursor.JumpToBit(Offset);
+    if (llvm::Error Err = Cursor.JumpToBit(Offset))
+      llvm::report_fatal_error(
+          "Cursor should always be able to go back, failed: " +
+          toString(std::move(Err)));
   }
 
 private:

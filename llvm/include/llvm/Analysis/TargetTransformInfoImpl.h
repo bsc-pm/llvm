@@ -140,6 +140,8 @@ public:
 
   unsigned getInliningThresholdMultiplier() { return 1; }
 
+  int getInlinerVectorBonusPercent() { return 150; }
+
   unsigned getMemcpyCost(const Instruction *I) {
     return TTI::TCC_Expensive;
   }
@@ -152,6 +154,16 @@ public:
 
   unsigned getFlatAddressSpace () {
     return -1;
+  }
+
+  bool collectFlatAddressOperands(SmallVectorImpl<int> &OpIndexes,
+                                  Intrinsic::ID IID) const {
+    return false;
+  }
+
+  bool rewriteIntrinsicWithAddressSpace(IntrinsicInst *II,
+                                        Value *OldV, Value *NewV) const {
+    return false;
   }
 
   bool isLoweredToCall(const Function *F) {
@@ -220,6 +232,12 @@ public:
   }
 
   bool canMacroFuseCmp() { return false; }
+
+  bool canSaveCmp(Loop *L, BranchInst **BI, ScalarEvolution *SE, LoopInfo *LI,
+                  DominatorTree *DT, AssumptionCache *AC,
+                  TargetLibraryInfo *LibInfo) {
+    return false;
+  }
 
   bool shouldFavorPostInc() const { return false; }
 
@@ -296,9 +314,9 @@ public:
 
   bool enableAggressiveInterleaving(bool LoopHasReductions) { return false; }
 
-  const TTI::MemCmpExpansionOptions *enableMemCmpExpansion(
-      bool IsZeroCmp) const {
-    return nullptr;
+  TTI::MemCmpExpansionOptions enableMemCmpExpansion(bool OptSize,
+                                                    bool IsZeroCmp) const {
+    return {};
   }
 
   bool enableInterleavedAccessVectorization() { return false; }
@@ -821,6 +839,9 @@ public:
   unsigned getUserCost(const User *U, ArrayRef<const Value *> Operands) {
     if (isa<PHINode>(U))
       return TTI::TCC_Free; // Model all PHI nodes as free.
+
+    if (isa<ExtractValueInst>(U))
+      return TTI::TCC_Free; // Model all ExtractValue nodes as free.
 
     // Static alloca doesn't generate target instructions.
     if (auto *A = dyn_cast<AllocaInst>(U))

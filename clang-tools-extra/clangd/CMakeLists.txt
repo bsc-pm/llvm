@@ -21,6 +21,7 @@ configure_file(
 
 set(LLVM_LINK_COMPONENTS
   Support
+  AllTargetsInfos
   )
 
 if(CLANG_BUILT_STANDALONE)
@@ -62,7 +63,9 @@ add_clang_library(clangDaemon
   Quality.cpp
   RIFF.cpp
   Selection.cpp
+  SemanticHighlighting.cpp
   SourceCode.cpp
+  QueryDriverDatabase.cpp
   Threading.cpp
   Trace.cpp
   TUScheduler.cpp
@@ -70,7 +73,10 @@ add_clang_library(clangDaemon
   XRefs.cpp
 
   index/Background.cpp
+  index/BackgroundIndexLoader.cpp
   index/BackgroundIndexStorage.cpp
+  index/BackgroundQueue.cpp
+  index/BackgroundRebuild.cpp
   index/CanonicalIncludes.cpp
   index/FileIndex.cpp
   index/Index.cpp
@@ -116,10 +122,12 @@ add_clang_library(clangDaemon
   clangTidyFuchsiaModule
   clangTidyGoogleModule
   clangTidyHICPPModule
+  clangTidyLinuxKernelModule
   clangTidyLLVMModule
   clangTidyMiscModule
   clangTidyModernizeModule
   clangTidyObjCModule
+  clangTidyOpenMPModule
   clangTidyPerformanceModule
   clangTidyPortabilityModule
   clangTidyReadabilityModule

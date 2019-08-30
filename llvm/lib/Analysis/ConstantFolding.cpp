@@ -25,6 +25,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
@@ -543,7 +544,7 @@ Constant *FoldReinterpretLoadFromConstPtr(Constant *C, Type *LoadTy,
   int64_t InitializerSize = DL.getTypeAllocSize(GV->getInitializer()->getType());
 
   // If we're not accessing anything in this constant, the result is undefined.
-  if (Offset + BytesLoaded <= 0)
+  if (Offset <= -1 * static_cast<int64_t>(BytesLoaded))
     return UndefValue::get(IntType);
 
   // If we're not accessing anything in this constant, the result is undefined.
@@ -780,10 +781,10 @@ Constant *CastGEPIndices(Type *SrcElemTy, ArrayRef<Constant *> Ops,
 }
 
 /// Strip the pointer casts, but preserve the address space information.
-Constant* StripPtrCastKeepAS(Constant* Ptr, Type *&ElemTy) {
+Constant *StripPtrCastKeepAS(Constant *Ptr, Type *&ElemTy) {
   assert(Ptr->getType()->isPointerTy() && "Not a pointer type");
   auto *OldPtrTy = cast<PointerType>(Ptr->getType());
-  Ptr = Ptr->stripPointerCasts();
+  Ptr = cast<Constant>(Ptr->stripPointerCasts());
   auto *NewPtrTy = cast<PointerType>(Ptr->getType());
 
   ElemTy = NewPtrTy->getPointerElementType();
@@ -1035,6 +1036,9 @@ Constant *ConstantFoldInstOperandsImpl(const Value *InstOrCE, unsigned Opcode,
     return ConstantExpr::getSelect(Ops[0], Ops[1], Ops[2]);
   case Instruction::ExtractElement:
     return ConstantExpr::getExtractElement(Ops[0], Ops[1]);
+  case Instruction::ExtractValue:
+    return ConstantExpr::getExtractValue(
+        Ops[0], dyn_cast<ExtractValueInst>(InstOrCE)->getIndices());
   case Instruction::InsertElement:
     return ConstantExpr::getInsertElement(Ops[0], Ops[1], Ops[2]);
   case Instruction::ShuffleVector:
@@ -1649,7 +1653,8 @@ static bool getConstIntOrUndef(Value *Op, const APInt *&C) {
   return false;
 }
 
-static Constant *ConstantFoldScalarCall1(StringRef Name, unsigned IntrinsicID,
+static Constant *ConstantFoldScalarCall1(StringRef Name,
+                                         Intrinsic::ID IntrinsicID,
                                          Type *Ty,
                                          ArrayRef<Constant *> Operands,
                                          const TargetLibraryInfo *TLI,
@@ -1943,7 +1948,8 @@ static Constant *ConstantFoldScalarCall1(StringRef Name, unsigned IntrinsicID,
   return nullptr;
 }
 
-static Constant *ConstantFoldScalarCall2(StringRef Name, unsigned IntrinsicID,
+static Constant *ConstantFoldScalarCall2(StringRef Name,
+                                         Intrinsic::ID IntrinsicID,
                                          Type *Ty,
                                          ArrayRef<Constant *> Operands,
                                          const TargetLibraryInfo *TLI,
@@ -2172,7 +2178,8 @@ static Constant *ConstantFoldScalarCall2(StringRef Name, unsigned IntrinsicID,
   return nullptr;
 }
 
-static Constant *ConstantFoldScalarCall3(StringRef Name, unsigned IntrinsicID,
+static Constant *ConstantFoldScalarCall3(StringRef Name,
+                                         Intrinsic::ID IntrinsicID,
                                          Type *Ty,
                                          ArrayRef<Constant *> Operands,
                                          const TargetLibraryInfo *TLI,
@@ -2270,7 +2277,8 @@ static Constant *ConstantFoldScalarCall3(StringRef Name, unsigned IntrinsicID,
   return nullptr;
 }
 
-static Constant *ConstantFoldScalarCall(StringRef Name, unsigned IntrinsicID,
+static Constant *ConstantFoldScalarCall(StringRef Name,
+                                        Intrinsic::ID IntrinsicID,
                                         Type *Ty,
                                         ArrayRef<Constant *> Operands,
                                         const TargetLibraryInfo *TLI,
@@ -2287,7 +2295,8 @@ static Constant *ConstantFoldScalarCall(StringRef Name, unsigned IntrinsicID,
   return nullptr;
 }
 
-static Constant *ConstantFoldVectorCall(StringRef Name, unsigned IntrinsicID,
+static Constant *ConstantFoldVectorCall(StringRef Name,
+                                        Intrinsic::ID IntrinsicID,
                                         VectorType *VTy,
                                         ArrayRef<Constant *> Operands,
                                         const DataLayout &DL,
@@ -2339,17 +2348,8 @@ static Constant *ConstantFoldVectorCall(StringRef Name, unsigned IntrinsicID,
   for (unsigned I = 0, E = VTy->getNumElements(); I != E; ++I) {
     // Gather a column of constants.
     for (unsigned J = 0, JE = Operands.size(); J != JE; ++J) {
-      // These intrinsics use a scalar type for their second argument.
-      if (J == 1 &&
-          (IntrinsicID == Intrinsic::cttz || IntrinsicID == Intrinsic::ctlz ||
-           IntrinsicID == Intrinsic::powi)) {
-        Lane[J] = Operands[J];
-        continue;
-      }
-      // These intrinsics use a scalar type for their third argument.
-      if (J == 2 &&
-          (IntrinsicID == Intrinsic::smul_fix ||
-           IntrinsicID == Intrinsic::smul_fix_sat)) {
+      // Some intrinsics use a scalar type for certain arguments.
+      if (hasVectorInstrinsicScalarOpd(IntrinsicID, J)) {
         Lane[J] = Operands[J];
         continue;
       }

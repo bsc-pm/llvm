@@ -30,6 +30,7 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangOptions.h"
+#include "clang/Basic/LangStandard.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
@@ -75,7 +76,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Bitcode/BitstreamWriter.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -84,7 +85,6 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
@@ -95,6 +95,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -435,7 +436,6 @@ void ASTUnit::CacheCodeCompletionResults() {
           | (1LL << CodeCompletionContext::CCC_UnionTag)
           | (1LL << CodeCompletionContext::CCC_ClassOrStructTag)
           | (1LL << CodeCompletionContext::CCC_Type)
-          | (1LL << CodeCompletionContext::CCC_Symbol)
           | (1LL << CodeCompletionContext::CCC_SymbolOrNewName)
           | (1LL << CodeCompletionContext::CCC_ParenthesizedExpression);
 
@@ -819,7 +819,7 @@ std::unique_ptr<ASTUnit> ASTUnit::LoadFromASTFile(
       /*isysroot=*/"",
       /*DisableValidation=*/disableValid, AllowPCHWithCompilerErrors);
 
-  AST->Reader->setListener(llvm::make_unique<ASTInfoCollector>(
+  AST->Reader->setListener(std::make_unique<ASTInfoCollector>(
       *AST->PP, AST->Ctx.get(), *AST->HSOpts, *AST->PPOpts, *AST->LangOpts,
       AST->TargetOpts, AST->Target, Counter));
 
@@ -999,9 +999,9 @@ public:
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
                                                  StringRef InFile) override {
     CI.getPreprocessor().addPPCallbacks(
-        llvm::make_unique<MacroDefinitionTrackerPPCallbacks>(
+        std::make_unique<MacroDefinitionTrackerPPCallbacks>(
                                            Unit.getCurrentTopLevelHashValue()));
-    return llvm::make_unique<TopLevelDeclTrackerConsumer>(
+    return std::make_unique<TopLevelDeclTrackerConsumer>(
         Unit, Unit.getCurrentTopLevelHashValue());
   }
 
@@ -1049,7 +1049,7 @@ public:
   }
 
   std::unique_ptr<PPCallbacks> createPPCallbacks() override {
-    return llvm::make_unique<MacroDefinitionTrackerPPCallbacks>(Hash);
+    return std::make_unique<MacroDefinitionTrackerPPCallbacks>(Hash);
   }
 
 private:
@@ -1154,7 +1154,7 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
              InputKind::Source &&
          "FIXME: AST inputs not yet supported here!");
   assert(Clang->getFrontendOpts().Inputs[0].getKind().getLanguage() !=
-             InputKind::LLVM_IR &&
+             Language::LLVM_IR &&
          "IR inputs not support here!");
 
   // Configure the various subsystems.
@@ -1206,8 +1206,10 @@ bool ASTUnit::Parse(std::shared_ptr<PCHContainerOperations> PCHContainerOps,
   else
     PreambleSrcLocCache.clear();
 
-  if (!Act->Execute())
+  if (llvm::Error Err = Act->Execute()) {
+    consumeError(std::move(Err)); // FIXME this drops errors on the floor.
     goto error;
+  }
 
   transferASTDataFromCompilerInstance(*Clang);
 
@@ -1585,7 +1587,7 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
              InputKind::Source &&
          "FIXME: AST inputs not yet supported here!");
   assert(Clang->getFrontendOpts().Inputs[0].getKind().getLanguage() !=
-             InputKind::LLVM_IR &&
+             Language::LLVM_IR &&
          "IR inputs not support here!");
 
   // Configure the various subsystems.
@@ -1622,17 +1624,18 @@ ASTUnit *ASTUnit::LoadFromCompilerInvocationAction(
 
   if (Persistent && !TrackerAct) {
     Clang->getPreprocessor().addPPCallbacks(
-        llvm::make_unique<MacroDefinitionTrackerPPCallbacks>(
+        std::make_unique<MacroDefinitionTrackerPPCallbacks>(
                                            AST->getCurrentTopLevelHashValue()));
     std::vector<std::unique_ptr<ASTConsumer>> Consumers;
     if (Clang->hasASTConsumer())
       Consumers.push_back(Clang->takeASTConsumer());
-    Consumers.push_back(llvm::make_unique<TopLevelDeclTrackerConsumer>(
+    Consumers.push_back(std::make_unique<TopLevelDeclTrackerConsumer>(
         *AST, AST->getCurrentTopLevelHashValue()));
     Clang->setASTConsumer(
-        llvm::make_unique<MultiplexConsumer>(std::move(Consumers)));
+        std::make_unique<MultiplexConsumer>(std::move(Consumers)));
   }
-  if (!Act->Execute()) {
+  if (llvm::Error Err = Act->Execute()) {
+    consumeError(std::move(Err)); // FIXME this drops errors on the floor.
     AST->transferASTDataFromCompilerInstance(*Clang);
     if (OwnAST && ErrAST)
       ErrAST->swap(OwnAST);
@@ -1732,6 +1735,7 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
     bool CacheCodeCompletionResults, bool IncludeBriefCommentsInCodeCompletion,
     bool AllowPCHWithCompilerErrors, SkipFunctionBodiesScope SkipFunctionBodies,
     bool SingleFileParse, bool UserFilesAreVolatile, bool ForSerialization,
+    bool RetainExcludedConditionalBlocks,
     llvm::Optional<StringRef> ModuleFormat, std::unique_ptr<ASTUnit> *ErrAST,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS) {
   assert(Diags.get() && "no DiagnosticsEngine was provided");
@@ -1759,6 +1763,7 @@ ASTUnit *ASTUnit::LoadFromCommandLine(
   PPOpts.RemappedFilesKeepOriginalName = RemappedFilesKeepOriginalName;
   PPOpts.AllowPCHWithCompilerErrors = AllowPCHWithCompilerErrors;
   PPOpts.SingleFileParseMode = SingleFileParse;
+  PPOpts.RetainExcludedConditionalBlocks = RetainExcludedConditionalBlocks;
 
   // Override the resources path.
   CI->getHeaderSearchOpts().ResourceDir = ResourceFilesPath;
@@ -2208,7 +2213,7 @@ void ASTUnit::CodeComplete(
              InputKind::Source &&
          "FIXME: AST inputs not yet supported here!");
   assert(Clang->getFrontendOpts().Inputs[0].getKind().getLanguage() !=
-             InputKind::LLVM_IR &&
+             Language::LLVM_IR &&
          "IR inputs not support here!");
 
   // Use the source and file managers that we were given.
@@ -2280,7 +2285,9 @@ void ASTUnit::CodeComplete(
   std::unique_ptr<SyntaxOnlyAction> Act;
   Act.reset(new SyntaxOnlyAction);
   if (Act->BeginSourceFile(*Clang.get(), Clang->getFrontendOpts().Inputs[0])) {
-    Act->Execute();
+    if (llvm::Error Err = Act->Execute()) {
+      consumeError(std::move(Err)); // FIXME this drops errors on the floor.
+    }
     Act->EndSourceFile();
   }
 }
@@ -2364,13 +2371,13 @@ void ASTUnit::TranslateStoredDiagnostics(
     // Rebuild the StoredDiagnostic.
     if (SD.Filename.empty())
       continue;
-    const FileEntry *FE = FileMgr.getFile(SD.Filename);
+    auto FE = FileMgr.getFile(SD.Filename);
     if (!FE)
       continue;
     SourceLocation FileLoc;
     auto ItFileID = PreambleSrcLocCache.find(SD.Filename);
     if (ItFileID == PreambleSrcLocCache.end()) {
-      FileID FID = SrcMgr.translateFile(FE);
+      FileID FID = SrcMgr.translateFile(*FE);
       FileLoc = SrcMgr.getLocForStartOfFile(FID);
       PreambleSrcLocCache[SD.Filename] = FileLoc;
     } else {
@@ -2442,8 +2449,8 @@ void ASTUnit::addFileLevelDecl(Decl *D) {
     return;
   }
 
-  LocDeclsTy::iterator I = std::upper_bound(Decls->begin(), Decls->end(),
-                                            LocDecl, llvm::less_first());
+  LocDeclsTy::iterator I =
+      llvm::upper_bound(*Decls, LocDecl, llvm::less_first());
 
   Decls->insert(I, LocDecl);
 }
@@ -2468,9 +2475,9 @@ void ASTUnit::findFileRegionDecls(FileID File, unsigned Offset, unsigned Length,
     return;
 
   LocDeclsTy::iterator BeginIt =
-      std::lower_bound(LocDecls.begin(), LocDecls.end(),
-                       std::make_pair(Offset, (Decl *)nullptr),
-                       llvm::less_first());
+      llvm::partition_point(LocDecls, [=](std::pair<unsigned, Decl *> LD) {
+        return LD.first < Offset;
+      });
   if (BeginIt != LocDecls.begin())
     --BeginIt;
 
@@ -2481,9 +2488,9 @@ void ASTUnit::findFileRegionDecls(FileID File, unsigned Offset, unsigned Length,
          BeginIt->second->isTopLevelDeclInObjCContainer())
     --BeginIt;
 
-  LocDeclsTy::iterator EndIt = std::upper_bound(
-      LocDecls.begin(), LocDecls.end(),
-      std::make_pair(Offset + Length, (Decl *)nullptr), llvm::less_first());
+  LocDeclsTy::iterator EndIt = llvm::upper_bound(
+      LocDecls, std::make_pair(Offset + Length, (Decl *)nullptr),
+      llvm::less_first());
   if (EndIt != LocDecls.end())
     ++EndIt;
 
@@ -2663,17 +2670,17 @@ bool ASTUnit::isModuleFile() const {
 InputKind ASTUnit::getInputKind() const {
   auto &LangOpts = getLangOpts();
 
-  InputKind::Language Lang;
+  Language Lang;
   if (LangOpts.OpenCL)
-    Lang = InputKind::OpenCL;
+    Lang = Language::OpenCL;
   else if (LangOpts.CUDA)
-    Lang = InputKind::CUDA;
+    Lang = Language::CUDA;
   else if (LangOpts.RenderScript)
-    Lang = InputKind::RenderScript;
+    Lang = Language::RenderScript;
   else if (LangOpts.CPlusPlus)
-    Lang = LangOpts.ObjC ? InputKind::ObjCXX : InputKind::CXX;
+    Lang = LangOpts.ObjC ? Language::ObjCXX : Language::CXX;
   else
-    Lang = LangOpts.ObjC ? InputKind::ObjC : InputKind::C;
+    Lang = LangOpts.ObjC ? Language::ObjC : Language::C;
 
   InputKind::Format Fmt = InputKind::Source;
   if (LangOpts.getCompilingModule() == LangOptions::CMK_ModuleMap)
@@ -2687,20 +2694,20 @@ InputKind ASTUnit::getInputKind() const {
 
 #ifndef NDEBUG
 ASTUnit::ConcurrencyState::ConcurrencyState() {
-  Mutex = new llvm::sys::MutexImpl(/*recursive=*/true);
+  Mutex = new std::recursive_mutex;
 }
 
 ASTUnit::ConcurrencyState::~ConcurrencyState() {
-  delete static_cast<llvm::sys::MutexImpl *>(Mutex);
+  delete static_cast<std::recursive_mutex *>(Mutex);
 }
 
 void ASTUnit::ConcurrencyState::start() {
-  bool acquired = static_cast<llvm::sys::MutexImpl *>(Mutex)->tryacquire();
+  bool acquired = static_cast<std::recursive_mutex *>(Mutex)->try_lock();
   assert(acquired && "Concurrent access to ASTUnit!");
 }
 
 void ASTUnit::ConcurrencyState::finish() {
-  static_cast<llvm::sys::MutexImpl *>(Mutex)->release();
+  static_cast<std::recursive_mutex *>(Mutex)->unlock();
 }
 
 #else // NDEBUG

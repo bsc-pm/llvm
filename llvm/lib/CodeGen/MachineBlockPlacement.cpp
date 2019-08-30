@@ -2981,7 +2981,7 @@ bool MachineBlockPlacement::runOnMachineFunction(MachineFunction &MF) {
 
   F = &MF;
   MBPI = &getAnalysis<MachineBranchProbabilityInfo>();
-  MBFI = llvm::make_unique<BranchFolder::MBFIWrapper>(
+  MBFI = std::make_unique<BranchFolder::MBFIWrapper>(
       getAnalysis<MachineBlockFrequencyInfo>());
   MLI = &getAnalysis<MachineLoopInfo>();
   TII = MF.getSubtarget().getInstrInfo();
@@ -3040,7 +3040,7 @@ bool MachineBlockPlacement::runOnMachineFunction(MachineFunction &MF) {
 
     if (BF.OptimizeFunction(MF, TII, MF.getSubtarget().getRegisterInfo(),
                             getAnalysisIfAvailable<MachineModuleInfo>(), MLI,
-                            /*AfterBlockPlacement=*/true)) {
+                            /*AfterPlacement=*/true)) {
       // Redo the layout if tail merging creates/removes/moves blocks.
       BlockToChain.clear();
       ComputedEdges.clear();

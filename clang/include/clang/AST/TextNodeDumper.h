@@ -350,9 +350,7 @@ public:
   void VisitObjCPropertyDecl(const ObjCPropertyDecl *D);
   void VisitObjCPropertyImplDecl(const ObjCPropertyImplDecl *D);
   void VisitBlockDecl(const BlockDecl *D);
-
-private:
-  void dumpCXXTemporary(const CXXTemporary *Temporary);
+  void VisitConceptDecl(const ConceptDecl *D);
 };
 
 } // namespace clang

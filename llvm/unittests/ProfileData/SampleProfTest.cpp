@@ -44,7 +44,7 @@ struct SampleProfTest : ::testing::Test {
   void createWriter(SampleProfileFormat Format, StringRef Profile) {
     std::error_code EC;
     std::unique_ptr<raw_ostream> OS(
-        new raw_fd_ostream(Profile, EC, sys::fs::F_None));
+        new raw_fd_ostream(Profile, EC, sys::fs::OF_None));
     auto WriterOrErr = SampleProfileWriter::create(OS, Format);
     ASSERT_TRUE(NoError(WriterOrErr.getError()));
     Writer = std::move(WriterOrErr.get());
@@ -285,6 +285,10 @@ TEST_F(SampleProfTest, roundtrip_compact_binary_profile) {
   testRoundTrip(SampleProfileFormat::SPF_Compact_Binary, false);
 }
 
+TEST_F(SampleProfTest, roundtrip_ext_binary_profile) {
+  testRoundTrip(SampleProfileFormat::SPF_Ext_Binary, false);
+}
+
 TEST_F(SampleProfTest, remap_text_profile) {
   testRoundTrip(SampleProfileFormat::SPF_Text, true);
 }
@@ -293,11 +297,14 @@ TEST_F(SampleProfTest, remap_raw_binary_profile) {
   testRoundTrip(SampleProfileFormat::SPF_Binary, true);
 }
 
+TEST_F(SampleProfTest, remap_ext_binary_profile) {
+  testRoundTrip(SampleProfileFormat::SPF_Ext_Binary, true);
+}
+
 TEST_F(SampleProfTest, sample_overflow_saturation) {
   const uint64_t Max = std::numeric_limits<uint64_t>::max();
   sampleprof_error Result;
 
-  StringRef FooName("_Z3fooi");
   FunctionSamples FooSamples;
   Result = FooSamples.addTotalSamples(1);
   ASSERT_EQ(Result, sampleprof_error::success);

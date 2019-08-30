@@ -180,7 +180,7 @@ def Q15 : ARMReg<15, "q15", [D30, D31]>;
 // models the APSR when it's accessed by some special instructions. In such cases
 // it has the same encoding as PC.
 def CPSR       : ARMReg<0,  "cpsr">;
-def APSR       : ARMReg<1,  "apsr">;
+def APSR       : ARMReg<15, "apsr">;
 def APSR_NZCV  : ARMReg<15, "apsr_nzcv">;
 def SPSR       : ARMReg<2,  "spsr">;
 def FPSCR      : ARMReg<3,  "fpscr">;
@@ -227,9 +227,10 @@ def GPR : RegisterClass<"ARM", [i32], 32, (add (sequence "R%u", 0, 12),
   // know how to spill them. If we make our prologue/epilogue code smarter at
   // some point, we can go back to using the above allocation orders for the
   // Thumb1 instructions that know how to use hi regs.
-  let AltOrders = [(add LR, GPR), (trunc GPR, 8)];
+  let AltOrders = [(add LR, GPR), (trunc GPR, 8),
+                   (add (trunc GPR, 8), R12, LR, (shl GPR, 8))];
   let AltOrderSelect = [{
-      return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
+      return MF.getSubtarget<ARMSubtarget>().getGPRAllocationOrder(MF);
   }];
   let DiagnosticString = "operand must be a register in range [r0, r15]";
 }
@@ -238,9 +239,10 @@ def GPR : RegisterClass<"ARM", [i32], 32, (add (sequence "R%u", 0, 12),
 // certain operand slots, particularly as the destination.  Primarily
 // useful for disassembly.
 def GPRnopc : RegisterClass<"ARM", [i32], 32, (sub GPR, PC)> {
-  let AltOrders = [(add LR, GPRnopc), (trunc GPRnopc, 8)];
+  let AltOrders = [(add LR, GPRnopc), (trunc GPRnopc, 8),
+                   (add (trunc GPRnopc, 8), R12, LR, (shl GPRnopc, 8))];
   let AltOrderSelect = [{
-      return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
+      return MF.getSubtarget<ARMSubtarget>().getGPRAllocationOrder(MF);
   }];
   let DiagnosticString = "operand must be a register in range [r0, r14]";
 }
@@ -261,10 +263,16 @@ def GPRwithAPSRnosp : RegisterClass<"ARM", [i32], 32, (add (sequence "R%u", 0, 1
   let isAllocatable = 0;
 }
 
-def GPRwithZR : RegisterClass<"ARM", [i32], 32, (add (sequence "R%u", 0, 12),
-                                              LR, ZR)> {
-
+def GPRwithZR : RegisterClass<"ARM", [i32], 32, (add (sub GPR, PC), ZR)> {
   let AltOrders = [(add LR, GPRwithZR), (trunc GPRwithZR, 8)];
+  let AltOrderSelect = [{
+      return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
+  }];
+  let DiagnosticString = "operand must be a register in range [r0, r14] or zr";
+}
+
+def GPRwithZRnosp : RegisterClass<"ARM", [i32], 32, (sub GPRwithZR, SP)> {
+  let AltOrders = [(add LR, GPRwithZRnosp), (trunc GPRwithZRnosp, 8)];
   let AltOrderSelect = [{
       return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
   }];
@@ -289,18 +297,10 @@ def GPRlr : RegisterClass<"ARM", [i32], 32, (add LR)>;
 // or SP (R13 or R15) are used. The ARM ISA refers to these operands
 // via the BadReg() pseudo-code description.
 def rGPR : RegisterClass<"ARM", [i32], 32, (sub GPR, SP, PC)> {
-  let AltOrders = [(add LR, rGPR), (trunc rGPR, 8)];
+  let AltOrders = [(add LR, rGPR), (trunc rGPR, 8),
+                   (add (trunc rGPR, 8), R12, LR, (shl rGPR, 8))];
   let AltOrderSelect = [{
-      return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
-  }];
-  let DiagnosticType = "rGPR";
-}
-
-// t2rGPR : All Thumb 2 registers with the exception of SP and PC.
-def t2rGPR : RegisterClass<"ARM", [i32], 32, (sub GPR, SP, PC)> {
-  let AltOrders = [(add LR, t2rGPR), (trunc t2rGPR, 8)];
-  let AltOrderSelect = [{
-      return 1 + MF.getSubtarget<ARMSubtarget>().isThumb1Only();
+      return MF.getSubtarget<ARMSubtarget>().getGPRAllocationOrder(MF);
   }];
   let DiagnosticType = "rGPR";
 }
@@ -336,6 +336,8 @@ def tGPROdd : RegisterClass<"ARM", [i32], 32, (add R1, R3, R5, R7, R9, R11)> {
   let AltOrderSelect = [{
       return MF.getSubtarget<ARMSubtarget>().isThumb1Only();
   }];
+  let DiagnosticString =
+    "operand must be an odd-numbered register in range [r1,r11]";
 }
 
 def tGPREven : RegisterClass<"ARM", [i32], 32, (add R0, R2, R4, R6, R8, R10, R12, LR)> {
@@ -343,6 +345,7 @@ def tGPREven : RegisterClass<"ARM", [i32], 32, (add R0, R2, R4, R6, R8, R10, R12
   let AltOrderSelect = [{
       return MF.getSubtarget<ARMSubtarget>().isThumb1Only();
   }];
+  let DiagnosticString = "operand must be an even-numbered register";
 }
 
 // Condition code registers.
@@ -474,8 +477,11 @@ def DPair : RegisterClass<"ARM", [v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
                           128, (interleave QPR, TuplesOE2D)> {
   // Allocate starting at non-VFP2 registers D16-D31 first.
   // Prefer even-odd pairs as they are easier to copy.
-  let AltOrders = [(add (rotl QPR, 8), (rotl DPair, 16))];
-  let AltOrderSelect = [{ return 1; }];
+  let AltOrders = [(add (rotl QPR, 8),  (rotl DPair, 16)),
+                   (add (trunc QPR, 8), (trunc DPair, 16))];
+  let AltOrderSelect = [{
+    return 1 + MF.getSubtarget<ARMSubtarget>().hasMVEIntegerOps();
+  }];
 }
 
 // Pseudo-registers representing even-odd pairs of GPRs from R1 to R13/SP.

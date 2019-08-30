@@ -131,7 +131,6 @@ protected:
   bool HasPartwordAtomics;
   bool HasDirectMove;
   bool HasHTM;
-  bool HasFusion;
   bool HasFloat128;
   bool IsISA3_0;
   bool UseLongCalls;
@@ -211,7 +210,11 @@ public:
   /// instructions, regardless of whether we are in 32-bit or 64-bit mode.
   bool has64BitSupport() const { return Has64BitSupport; }
   // useSoftFloat - Return true if soft-float option is turned on.
-  bool useSoftFloat() const { return !HasHardFloat; }
+  bool useSoftFloat() const {
+    if (isAIXABI() && !HasHardFloat)
+      report_fatal_error("soft-float is not yet supported on AIX.");
+    return !HasHardFloat;
+  }
 
   /// use64BitRegs - Return true if in 64-bit mode or if we should use 64-bit
   /// registers in 32-bit mode when possible.  This can only true if
@@ -292,7 +295,6 @@ public:
   }
 
   bool hasHTM() const { return HasHTM; }
-  bool hasFusion() const { return HasFusion; }
   bool hasFloat128() const { return HasFloat128; }
   bool isISA3_0() const { return IsISA3_0; }
   bool useLongCalls() const { return UseLongCalls; }
@@ -317,6 +319,9 @@ public:
   bool isAIXABI() const { return TargetTriple.isOSAIX(); }
   bool isSVR4ABI() const { return !isDarwinABI() && !isAIXABI(); }
   bool isELFv2ABI() const;
+
+  bool is64BitELFABI() const { return  isSVR4ABI() && isPPC64(); }
+  bool is32BitELFABI() const { return  isSVR4ABI() && !isPPC64(); }
 
   /// Originally, this function return hasISEL(). Now we always enable it,
   /// but may expand the ISEL instruction later.

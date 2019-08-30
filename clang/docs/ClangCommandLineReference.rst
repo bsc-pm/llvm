@@ -346,6 +346,8 @@ Disable builtin #include directories
 
 .. option:: -noprebind
 
+.. option:: -noprofilelib
+
 .. option:: -noseglinkedit
 
 .. option:: -nostartfiles
@@ -1145,8 +1147,6 @@ Flags allowing the state of the preprocessor to be dumped in various ways.
 .. option:: -d<arg>
 .. program:: clang
 
-.. option:: -dA
-
 .. option:: -dD
 
 Print macro definitions in -E mode in addition to normal output
@@ -1942,6 +1942,14 @@ Perform ThinLTO importing using provided function summary index
 
 .. option:: -ftime-report
 
+.. option:: -ftime-trace
+
+Turn on time profiler
+
+.. option:: -ftime-trace-granularity=<arg>
+
+Minimum time granularity (in microseconds) traced by time profiler
+
 .. option:: -ftls-model=<arg>
 
 .. option:: -ftrap-function=<arg>
@@ -2002,7 +2010,7 @@ Use the given vector functions library
 
 Enable the loop vectorization passes
 
-.. option:: -fverbose-asm, -fno-verbose-asm
+.. option:: -fverbose-asm, -fno-verbose-asm, -dA
 
 .. option:: -fvisibility-inlines-hidden
 
@@ -2168,6 +2176,8 @@ Link stack frames through backchain on System Z
 
 .. option:: -mcpu=<arg>, -mv5 (equivalent to -mcpu=hexagonv5), -mv55 (equivalent to -mcpu=hexagonv55), -mv60 (equivalent to -mcpu=hexagonv60), -mv62 (equivalent to -mcpu=hexagonv62), -mv65 (equivalent to -mcpu=hexagonv65)
 
+Use -mcpu=? to see a list of supported cpu models.
+
 .. option:: -mcrc, -mno-crc
 
 Allow use of CRC instructions (ARM/Mips only)
@@ -2301,6 +2311,8 @@ The thread model to use, e.g. posix, single (posix by default)
 .. option:: -mthumb, -mno-thumb
 
 .. option:: -mtune=<arg>
+
+Use -mtune=? to see a list of supported cpu models.
 
 .. option:: -mtvos-version-min=<arg>, -mappletvos-version-min=<arg>
 

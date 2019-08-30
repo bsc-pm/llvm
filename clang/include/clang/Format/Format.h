@@ -79,6 +79,19 @@ struct FormatStyle {
   /// brackets.
   BracketAlignmentStyle AlignAfterOpenBracket;
 
+  /// \brief If ``true``, aligns consecutive C/C++ preprocessor macros.
+  ///
+  /// This will align C/C++ preprocessor macros of consecutive lines.
+  /// Will result in formattings like
+  /// \code
+  ///   #define SHORT_NAME       42
+  ///   #define LONGER_NAME      0x007f
+  ///   #define EVEN_LONGER_NAME (2)
+  ///   #define foo(x)           (x * x)
+  ///   #define bar(y, z)        (y + z)
+  /// \endcode
+  bool AlignConsecutiveMacros;
+
   /// If ``true``, aligns consecutive assignments.
   ///
   /// This will align the assignment operators of consecutive lines. This
@@ -203,10 +216,37 @@ struct FormatStyle {
   /// \endcode
   bool AllowAllParametersOfDeclarationOnNextLine;
 
-  /// Allows contracting simple braced statements to a single line.
-  ///
-  /// E.g., this allows ``if (a) { return; }`` to be put on a single line.
-  bool AllowShortBlocksOnASingleLine;
+  /// Different styles for merging short blocks containing at most one
+  /// statement.
+  enum ShortBlockStyle {
+    /// Never merge blocks into a single line.
+    /// \code
+    ///   while (true) {
+    ///   }
+    ///   while (true) {
+    ///     continue;
+    ///   }
+    /// \endcode
+    SBS_Never,
+    /// Only merge empty blocks.
+    /// \code
+    ///   while (true) {}
+    ///   while (true) {
+    ///     continue;
+    ///   }
+    /// \endcode
+    SBS_Empty,
+    /// Always merge short blocks into a single line.
+    /// \code
+    ///   while (true) {}
+    ///   while (true) { continue; }
+    /// \endcode
+    SBS_Always,
+  };
+
+  /// Dependent on the value, ``while (true) { continue; }`` can be put on a
+  /// single line.
+  ShortBlockStyle AllowShortBlocksOnASingleLine;
 
   /// If ``true``, short case labels will be contracted to a single line.
   /// \code
@@ -1698,8 +1738,8 @@ struct FormatStyle {
   /// If ``false``, spaces will be removed before assignment operators.
   /// \code
   ///    true:                                  false:
-  ///    int a = 5;                     vs.     int a=5;
-  ///    a += 42                                a+=42;
+  ///    int a = 5;                     vs.     int a= 5;
+  ///    a += 42;                               a+= 42;
   /// \endcode
   bool SpaceBeforeAssignmentOperators;
 
@@ -1785,6 +1825,14 @@ struct FormatStyle {
   ///    for (auto v : values) {}       vs.     for(auto v: values) {}
   /// \endcode
   bool SpaceBeforeRangeBasedForLoopColon;
+
+  /// If ``true``, spaces will be inserted into ``{}``.
+  /// \code
+  ///    true:                                false:
+  ///    void f() { }                   vs.   void f() {}
+  ///    while (true) { }                     while (true) {}
+  /// \endcode
+  bool SpaceInEmptyBlock;
 
   /// If ``true``, spaces may be inserted into ``()``.
   /// \code
@@ -1982,6 +2030,7 @@ struct FormatStyle {
            SpaceBeforeParens == R.SpaceBeforeParens &&
            SpaceBeforeRangeBasedForLoopColon ==
                R.SpaceBeforeRangeBasedForLoopColon &&
+           SpaceInEmptyBlock == R.SpaceInEmptyBlock &&
            SpaceInEmptyParentheses == R.SpaceInEmptyParentheses &&
            SpacesBeforeTrailingComments == R.SpacesBeforeTrailingComments &&
            SpacesInAngles == R.SpacesInAngles &&

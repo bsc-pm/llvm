@@ -16,6 +16,7 @@
 #include "lldb/Core/Value.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/LLVMUserExpression.h"
+#include "lldb/Symbol/DeclVendor.h"
 #include "lldb/Target/ExecutionContextScope.h"
 #include "lldb/lldb-private.h"
 #include "lldb/lldb-public.h"
@@ -115,9 +116,8 @@ public:
                             bool catch_bp, bool throw_bp,
                             bool is_internal = false);
 
-  static Breakpoint::BreakpointPreconditionSP
-  CreateExceptionPrecondition(lldb::LanguageType language, bool catch_bp,
-                              bool throw_bp);
+  static lldb::BreakpointPreconditionSP
+  GetExceptionPrecondition(lldb::LanguageType language, bool throw_bp);
 
   virtual lldb::ValueObjectSP GetExceptionObjectForThread(
       lldb::ThreadSP thread_sp) {
@@ -132,6 +132,8 @@ public:
   Process *GetProcess() { return m_process; }
 
   Target &GetTargetRef() { return m_process->GetTarget(); }
+
+  virtual DeclVendor *GetDeclVendor() { return nullptr; }
 
   virtual lldb::BreakpointResolverSP
   CreateExceptionResolver(Breakpoint *bkpt, bool catch_bp, bool throw_bp) = 0;
@@ -150,9 +152,13 @@ public:
   virtual lldb::ThreadPlanSP GetStepThroughTrampolinePlan(Thread &thread,
                                                           bool stop_others) = 0;
 
-  /// Identify whether a value is a language implementation detaul
-  /// that should be hidden from the user interface by default.
-  virtual bool IsRuntimeSupportValue(ValueObject &valobj) { return false; }
+  /// Identify whether a name is a runtime value that should not be hidden by
+  /// from the user interface.
+  virtual bool IsWhitelistedRuntimeValue(ConstString name) { return false; }
+
+  virtual llvm::Optional<CompilerType> GetRuntimeType(CompilerType base_type) {
+    return llvm::None;
+  }
 
   virtual void ModulesDidLoad(const ModuleList &module_list) {}
 

@@ -1,6 +1,8 @@
 llvm-cov - emit coverage information
 ====================================
 
+.. program:: llvm-cov
+
 SYNOPSIS
 --------
 
@@ -160,7 +162,6 @@ EXIT STATUS
 
 :program:`llvm-cov gcov` returns 1 if it cannot read input files.  Otherwise,
 it exits with zero.
-
 
 .. program:: llvm-cov show
 

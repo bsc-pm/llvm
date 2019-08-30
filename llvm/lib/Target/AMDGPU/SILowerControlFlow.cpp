@@ -144,7 +144,7 @@ char &llvm::SILowerControlFlowID = SILowerControlFlow::ID;
 
 static bool isSimpleIf(const MachineInstr &MI, const MachineRegisterInfo *MRI,
                        const SIInstrInfo *TII) {
-  unsigned SaveExecReg = MI.getOperand(0).getReg();
+  Register SaveExecReg = MI.getOperand(0).getReg();
   auto U = MRI->use_instr_nodbg_begin(SaveExecReg);
 
   if (U == MRI->use_instr_nodbg_end() ||
@@ -185,7 +185,7 @@ void SILowerControlFlow::emitIf(MachineInstr &MI) {
   assert(SaveExec.getSubReg() == AMDGPU::NoSubRegister &&
          Cond.getSubReg() == AMDGPU::NoSubRegister);
 
-  unsigned SaveExecReg = SaveExec.getReg();
+  Register SaveExecReg = SaveExec.getReg();
 
   MachineOperand &ImpDefSCC = MI.getOperand(4);
   assert(ImpDefSCC.getReg() == AMDGPU::SCC && ImpDefSCC.isDef());
@@ -197,14 +197,14 @@ void SILowerControlFlow::emitIf(MachineInstr &MI) {
 
   // Add an implicit def of exec to discourage scheduling VALU after this which
   // will interfere with trying to form s_and_saveexec_b64 later.
-  unsigned CopyReg = SimpleIf ? SaveExecReg
+  Register CopyReg = SimpleIf ? SaveExecReg
                        : MRI->createVirtualRegister(BoolRC);
   MachineInstr *CopyExec =
     BuildMI(MBB, I, DL, TII->get(AMDGPU::COPY), CopyReg)
     .addReg(Exec)
     .addReg(Exec, RegState::ImplicitDefine);
 
-  unsigned Tmp = MRI->createVirtualRegister(BoolRC);
+  Register Tmp = MRI->createVirtualRegister(BoolRC);
 
   MachineInstr *And =
     BuildMI(MBB, I, DL, TII->get(AndOpc), Tmp)
@@ -266,7 +266,7 @@ void SILowerControlFlow::emitElse(MachineInstr &MI) {
   MachineBasicBlock &MBB = *MI.getParent();
   const DebugLoc &DL = MI.getDebugLoc();
 
-  unsigned DstReg = MI.getOperand(0).getReg();
+  Register DstReg = MI.getOperand(0).getReg();
   assert(MI.getOperand(0).getSubReg() == AMDGPU::NoSubRegister);
 
   bool ExecModified = MI.getOperand(3).getImm() != 0;
@@ -275,14 +275,14 @@ void SILowerControlFlow::emitElse(MachineInstr &MI) {
   // We are running before TwoAddressInstructions, and si_else's operands are
   // tied. In order to correctly tie the registers, split this into a copy of
   // the src like it does.
-  unsigned CopyReg = MRI->createVirtualRegister(BoolRC);
+  Register CopyReg = MRI->createVirtualRegister(BoolRC);
   MachineInstr *CopyExec =
     BuildMI(MBB, Start, DL, TII->get(AMDGPU::COPY), CopyReg)
       .add(MI.getOperand(1)); // Saved EXEC
 
   // This must be inserted before phis and any spill code inserted before the
   // else.
-  unsigned SaveReg = ExecModified ?
+  Register SaveReg = ExecModified ?
     MRI->createVirtualRegister(BoolRC) : DstReg;
   MachineInstr *OrSaveExec =
     BuildMI(MBB, Start, DL, TII->get(OrSaveExecOpc), SaveReg)
@@ -422,7 +422,7 @@ void SILowerControlFlow::emitEndCf(MachineInstr &MI) {
 void SILowerControlFlow::findMaskOperands(MachineInstr &MI, unsigned OpNo,
        SmallVectorImpl<MachineOperand> &Src) const {
   MachineOperand &Op = MI.getOperand(OpNo);
-  if (!Op.isReg() || !TargetRegisterInfo::isVirtualRegister(Op.getReg())) {
+  if (!Op.isReg() || !Register::isVirtualRegister(Op.getReg())) {
     Src.push_back(Op);
     return;
   }
@@ -442,8 +442,7 @@ void SILowerControlFlow::findMaskOperands(MachineInstr &MI, unsigned OpNo,
 
   for (const auto &SrcOp : Def->explicit_operands())
     if (SrcOp.isReg() && SrcOp.isUse() &&
-        (TargetRegisterInfo::isVirtualRegister(SrcOp.getReg()) ||
-        SrcOp.getReg() == Exec))
+        (Register::isVirtualRegister(SrcOp.getReg()) || SrcOp.getReg() == Exec))
       Src.push_back(SrcOp);
 }
 
@@ -466,7 +465,7 @@ void SILowerControlFlow::combineMasks(MachineInstr &MI) {
   else if (Ops[1].isIdenticalTo(Ops[2])) UniqueOpndIdx = 1;
   else return;
 
-  unsigned Reg = MI.getOperand(OpToReplace).getReg();
+  Register Reg = MI.getOperand(OpToReplace).getReg();
   MI.RemoveOperand(OpToReplace);
   MI.addOperand(Ops[UniqueOpndIdx]);
   if (MRI->use_empty(Reg))

@@ -131,7 +131,7 @@ static bool usesExtendedRegister(const MachineInstr &MI) {
     if (!MO.isReg())
       continue;
 
-    unsigned Reg = MO.getReg();
+    Register Reg = MO.getReg();
 
     assert(!(Reg >= X86::ZMM0 && Reg <= X86::ZMM31) &&
            "ZMM instructions should not be in the EVEX->VEX tables");
@@ -252,7 +252,7 @@ bool EvexToVexInstPass::CompressEvexToVexImpl(MachineInstr &MI) const {
     (Desc.TSFlags & X86II::VEX_L) ? makeArrayRef(X86EvexToVex256CompressTable)
                                   : makeArrayRef(X86EvexToVex128CompressTable);
 
-  auto I = std::lower_bound(Table.begin(), Table.end(), MI.getOpcode());
+  auto I = llvm::lower_bound(Table, MI.getOpcode());
   if (I == Table.end() || I->EvexOpcode != MI.getOpcode())
     return false;
 

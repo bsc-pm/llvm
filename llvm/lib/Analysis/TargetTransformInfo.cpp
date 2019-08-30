@@ -18,6 +18,8 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Analysis/CFG.h"
+#include "llvm/Analysis/LoopIterator.h"
 #include <utility>
 
 using namespace llvm;
@@ -38,6 +40,16 @@ struct NoTTIImpl : TargetTransformInfoImplCRTPBase<NoTTIImpl> {
   explicit NoTTIImpl(const DataLayout &DL)
       : TargetTransformInfoImplCRTPBase<NoTTIImpl>(DL) {}
 };
+}
+
+bool HardwareLoopInfo::canAnalyze(LoopInfo &LI) {
+  // If the loop has irreducible control flow, it can not be converted to
+  // Hardware loop.
+  LoopBlocksRPO RPOT(L);  
+  RPOT.perform(&LI);
+  if (containsIrreducibleCFG<const BasicBlock *>(RPOT, LI))
+    return false;
+  return true;
 }
 
 bool HardwareLoopInfo::isHardwareLoopCandidate(ScalarEvolution &SE,
@@ -164,6 +176,10 @@ unsigned TargetTransformInfo::getInliningThresholdMultiplier() const {
   return TTIImpl->getInliningThresholdMultiplier();
 }
 
+int TargetTransformInfo::getInlinerVectorBonusPercent() const {
+  return TTIImpl->getInlinerVectorBonusPercent();
+}
+
 int TargetTransformInfo::getGEPCost(Type *PointeeType, const Value *Ptr,
                                     ArrayRef<const Value *> Operands) const {
   return TTIImpl->getGEPCost(PointeeType, Ptr, Operands);
@@ -211,6 +227,16 @@ unsigned TargetTransformInfo::getFlatAddressSpace() const {
   return TTIImpl->getFlatAddressSpace();
 }
 
+bool TargetTransformInfo::collectFlatAddressOperands(
+  SmallVectorImpl<int> &OpIndexes, Intrinsic::ID IID) const  {
+  return TTIImpl->collectFlatAddressOperands(OpIndexes, IID);
+}
+
+bool TargetTransformInfo::rewriteIntrinsicWithAddressSpace(
+  IntrinsicInst *II, Value *OldV, Value *NewV) const {
+  return TTIImpl->rewriteIntrinsicWithAddressSpace(II, OldV, NewV);
+}
+
 bool TargetTransformInfo::isLoweredToCall(const Function *F) const {
   return TTIImpl->isLoweredToCall(F);
 }
@@ -250,6 +276,13 @@ bool TargetTransformInfo::isLSRCostLess(LSRCost &C1, LSRCost &C2) const {
 
 bool TargetTransformInfo::canMacroFuseCmp() const {
   return TTIImpl->canMacroFuseCmp();
+}
+
+bool TargetTransformInfo::canSaveCmp(Loop *L, BranchInst **BI,
+                                     ScalarEvolution *SE, LoopInfo *LI,
+                                     DominatorTree *DT, AssumptionCache *AC,
+                                     TargetLibraryInfo *LibInfo) const {
+  return TTIImpl->canSaveCmp(L, BI, SE, LI, DT, AC, LibInfo);
 }
 
 bool TargetTransformInfo::shouldFavorPostInc() const {
@@ -374,9 +407,9 @@ bool TargetTransformInfo::enableAggressiveInterleaving(bool LoopHasReductions) c
   return TTIImpl->enableAggressiveInterleaving(LoopHasReductions);
 }
 
-const TargetTransformInfo::MemCmpExpansionOptions *
-TargetTransformInfo::enableMemCmpExpansion(bool IsZeroCmp) const {
-  return TTIImpl->enableMemCmpExpansion(IsZeroCmp);
+TargetTransformInfo::MemCmpExpansionOptions
+TargetTransformInfo::enableMemCmpExpansion(bool OptSize, bool IsZeroCmp) const {
+  return TTIImpl->enableMemCmpExpansion(OptSize, IsZeroCmp);
 }
 
 bool TargetTransformInfo::enableInterleavedAccessVectorization() const {
@@ -1253,6 +1286,8 @@ int TargetTransformInfo::getInstructionThroughput(const Instruction *I) const {
     return getVectorInstrCost(I->getOpcode(),
                                    IE->getType(), Idx);
   }
+  case Instruction::ExtractValue:
+    return 0; // Model all ExtractValue nodes as free.
   case Instruction::ShuffleVector: {
     const ShuffleVectorInst *Shuffle = cast<ShuffleVectorInst>(I);
     Type *Ty = Shuffle->getType();
