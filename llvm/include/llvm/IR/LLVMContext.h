@@ -109,6 +109,19 @@ public:
     OB_deopt = 0,         // "deopt"
     OB_funclet = 1,       // "funclet"
     OB_gc_transition = 2, // "gc-transition"
+    // OmpSs IDs
+    OB_oss_shared = 3,           // "oss_shared"
+    OB_oss_shared_vla = 4,       // "oss_shared_vla"
+    OB_oss_private = 5,          // "oss_private"
+    OB_oss_private_vla = 6,      // "oss_private_vla"
+    OB_oss_firstprivate = 7,     // "oss_firstprivate"
+    OB_oss_firstprivate_vla = 8, // "oss_firstprivate_vla"
+    OB_oss_dep_in = 9,           // "OB_oss_dep_in"
+    OB_oss_dep_out = 10,         // "OB_oss_dep_out"
+    OB_oss_dep_inout = 11,       // "OB_oss_dep_inout"
+    OB_oss_dep_weakin = 12,      // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 13,     // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 14,   // "OB_oss_dep_weakinout"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

@@ -19,6 +19,7 @@ set(LLVM_LINK_COMPONENTS
   Target
   TransformUtils
   Vectorize
+  OmpSs
   )
 
 # Support plugins.

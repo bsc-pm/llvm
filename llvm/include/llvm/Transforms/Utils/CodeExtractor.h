@@ -72,6 +72,16 @@ class Value;
     // label, if non-empty, otherwise "extracted".
     std::string Suffix;
 
+    std::function<Function*(BasicBlock *header,
+                            BasicBlock *newRootNode,
+                            BasicBlock *newHeader,
+                            Function *oldFunction,
+                            Module *M,
+                            const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc;
+    std::function<CallInst*(Function *newFunction,
+                            BasicBlock *codeReplacer,
+                            const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask;
+
   public:
     /// Create a code extractor for a sequence of blocks.
     ///
@@ -99,6 +109,17 @@ class Value;
                   BranchProbabilityInfo *BPI = nullptr,
                   AssumptionCache *AC = nullptr,
                   std::string Suffix = "");
+
+    CodeExtractor(ArrayRef<BasicBlock *> BBs,
+                  std::function<Function*(BasicBlock *header,
+                                          BasicBlock *newRootNode,
+                                          BasicBlock *newHeader,
+                                          Function *oldFunction,
+                                          Module *M,
+                                          const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc,
+                  std::function<CallInst*(Function *newFunction,
+                                          BasicBlock *codeReplacer,
+                                          const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask);
 
     /// Perform the extraction, returning the new function.
     ///

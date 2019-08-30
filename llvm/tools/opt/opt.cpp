@@ -500,6 +500,7 @@ int main(int argc, char **argv) {
 
   // Initialize passes
   PassRegistry &Registry = *PassRegistry::getPassRegistry();
+  initializeOmpSsPass(Registry);
   initializeCore(Registry);
   initializeCoroutines(Registry);
   initializeScalarOpts(Registry);
