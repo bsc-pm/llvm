@@ -12,7 +12,7 @@ entry:
   ret i32 0, !dbg !8
 }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]*, i8*) {
+; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %0, i8* %1) {
 ; CHECK-NEXT:   entry:
 ; CHECK-NEXT:   %2 = getelementptr inbounds [7 x [3 x i32]], [7 x [3 x i32]]* %0, i64 0, i64 0
 ; CHECK-NEXT:   %3 = bitcast [3 x i32]* %2 to i8*
@@ -22,7 +22,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0*, i8*) {
+; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0* %0, i8* %1) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_mat = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %0, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_mat = load [7 x [3 x i32]]*, [7 x [3 x i32]]** %gep_mat
@@ -42,7 +42,7 @@ entry:
   ret i32 0, !dbg !12
 }
 
-; CHECK: define internal void @nanos6_unpacked_deps_foo10(%struct.S*, i8*) {
+; CHECK: define internal void @nanos6_unpacked_deps_foo10(%struct.S* %0, i8* %1) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %2 = getelementptr inbounds %struct.S, %struct.S* %0, i32 0, i32 0
 ; CHECK-NEXT:   %3 = getelementptr inbounds %struct.S, %struct.S* %0, i32 0, i32 1
@@ -53,7 +53,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_foo10(%nanos6_task_args_foo10*, i8*) {
+; CHECK: define internal void @nanos6_ol_deps_foo10(%nanos6_task_args_foo10* %0, i8* %1) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_s = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %0, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_s = load %struct.S*, %struct.S** %gep_s
