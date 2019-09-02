@@ -109,12 +109,10 @@ unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) {
   return Vector ? 32 : 1;
 }
 
-unsigned RISCVTTIImpl::getScalableRegisterBitWidth() const {
-  // We assume our base type to be <vscale x k x 64> with k = 1.
-  // This is the value we return for now. We will handle LMUL calculations in
-  // the loop vectorizer.
-  // TODO: This may change in future to offload more calculations here.
-  return 1;
+unsigned RISCVTTIImpl::getMaxElementWidth() const {
+  // Returns ELEN. This is the value for which k-scale-factor would be one.
+  // Current EPI implementation plans this to be 64. 
+  return 64;
 }
 
 bool RISCVTTIImpl::useScalableVectorType() const {

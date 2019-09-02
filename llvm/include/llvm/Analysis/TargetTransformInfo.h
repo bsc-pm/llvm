@@ -804,7 +804,7 @@ public:
 
   /// \return The compile-time constant factor of the scalable vector register
   /// type
-  unsigned getScalableRegisterBitWidth() const;
+  unsigned getMaxElementWidth() const;
 
   /// \return The width of the smallest vector register type.
   unsigned getMinVectorRegisterBitWidth() const;
@@ -1260,7 +1260,7 @@ public:
                             Type *Ty) = 0;
   virtual unsigned getNumberOfRegisters(bool Vector) = 0;
   virtual unsigned getRegisterBitWidth(bool Vector) const = 0;
-  virtual unsigned getScalableRegisterBitWidth() const = 0;
+  virtual unsigned getMaxElementWidth() const = 0;
   virtual unsigned getMinVectorRegisterBitWidth() = 0;
   virtual bool shouldMaximizeVectorBandwidth(bool OptSize) const = 0;
   virtual unsigned getMinimumVF(unsigned ElemWidth) const = 0;
@@ -1599,8 +1599,8 @@ public:
   unsigned getRegisterBitWidth(bool Vector) const override {
     return Impl.getRegisterBitWidth(Vector);
   }
-  unsigned getScalableRegisterBitWidth() const override {
-    return Impl.getScalableRegisterBitWidth();
+  unsigned getMaxElementWidth() const override {
+    return Impl.getMaxElementWidth();
   }
   unsigned getMinVectorRegisterBitWidth() override {
     return Impl.getMinVectorRegisterBitWidth();

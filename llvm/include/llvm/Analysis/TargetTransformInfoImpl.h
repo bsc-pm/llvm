@@ -361,7 +361,7 @@ public:
 
   unsigned getRegisterBitWidth(bool Vector) const { return 32; }
 
-  unsigned getScalableRegisterBitWidth() const { return 1; }
+  unsigned getMaxElementWidth() const { return 64; }
 
   unsigned getMinVectorRegisterBitWidth() { return 128; }
 

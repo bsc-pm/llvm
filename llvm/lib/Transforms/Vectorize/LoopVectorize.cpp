@@ -4902,7 +4902,23 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
-  unsigned WidestRegister = TTI.getScalableRegisterBitWidth();
+
+  // TODO: This should be offloaded to TTI
+  // NOTE/VK
+  // Should we pass in SmallestType and WidestType to offload the VF computation
+  // to TTI?
+  // For now, let's do it here.
+  //
+  // Get the scale width factor k for the base type from the TTI. For our
+  // implementation this is 1xF64, i.e. widest type is F64 and corresponding
+  // scale width factor is 1.
+  unsigned TargetWidestType = TTI.getMaxElementWidth();
+  unsigned MinKScaleFactor = TargetWidestType / WidestType;
+  unsigned MaxKScaleFactor = TargetWidestType / SmallestType;
+
+  assert(MinKScaleFactor == MaxKScaleFactor &&
+         "Support for mixed width computations is not supported yet.");
+  assert(MaxKScaleFactor <= 8 && "Cannot group so many registers together!");
 
   // Get the maximum safe dependence distance in bits computed by LAA.
   // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
@@ -4913,64 +4929,49 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   // We are ignoring MaxSafeRegisterWidth calculationn based on dependence
   // distance for now. This is another issue that would be needed to handled
   // separately for scalable vectors.
+  // TODO: Fix association between MaxSafeRegisterWidth and WidestRegister
+  // For now we just ensure that the MaxSafeRegisterWidth is >= 256*8*8, which
+  // is the tentative VLEN for EPI usecase.
   unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
+  assert(MaxSafeRegisterWidth >= 256 * 8 * 8 &&
+         "Safe dependency distance is less than tentative VLEN");
 
-  WidestRegister = std::min(WidestRegister, MaxSafeRegisterWidth);
-
-  unsigned MaxVectorSize = WidestRegister / WidestType;
-
-  LLVM_DEBUG(dbgs() << "LV: The Smallest and Widest types: " << SmallestType
-                    << " / " << WidestType << " bits.\n");
-  LLVM_DEBUG(dbgs() << "LV: The Widest register safe to use is: "
-                    << WidestRegister << " bits.\n");
-
-  assert(MaxVectorSize <= 256 && "Did not expect to pack so many elements"
-                                 " into one vector!");
-  if (MaxVectorSize == 0) {
-    LLVM_DEBUG(dbgs() << "LV: The target has no vector registers.\n");
-    MaxVectorSize = 1;
-    return MaxVectorSize;
-  } else if (ConstTripCount && ConstTripCount < MaxVectorSize &&
-             isPowerOf2_32(ConstTripCount)) {
-    // We need to clamp the VF to be the ConstTripCount. There is no point in
-    // choosing a higher viable VF as done in the loop below.
-    LLVM_DEBUG(dbgs() << "LV: Clamping the MaxVF to the constant trip count: "
-                      << ConstTripCount << "\n");
-    MaxVectorSize = ConstTripCount;
-    return MaxVectorSize;
-  }
-
-  unsigned MaxVF = MaxVectorSize;
-  if (TTI.shouldMaximizeVectorBandwidth(!isScalarEpilogueAllowed()) ||
-      (MaximizeBandwidth && isScalarEpilogueAllowed())) {
-    // Collect all viable vectorization factors larger than the default MaxVF
-    // (i.e. MaxVectorSize).
-    SmallVector<unsigned, 8> VFs;
-    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
-    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
-      VFs.push_back(VS);
-
-    // For each VF calculate its register usage.
-    auto RUs = calculateRegisterUsage(VFs);
-
-    // Select the largest VF which doesn't require more registers than existing
-    // ones.
-    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
-    for (int i = RUs.size() - 1; i >= 0; --i) {
-      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
-        MaxVF = VFs[i];
-        break;
-      }
-    }
-    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
-      if (MaxVF < MinVF) {
-        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
-                          << ") with target's minimum: " << MinVF << '\n');
-        MaxVF = MinVF;
-      }
-    }
-  }
-  return MaxVF;
+  return MaxKScaleFactor;
+  /*
+   *  unsigned MaxVF = MaxVectorSize;
+   *  if (TTI.shouldMaximizeVectorBandwidth(OptForSize) ||
+   *      (MaximizeBandwidth && !OptForSize)) {
+   *    // Collect all viable vectorization factors larger than the default
+   * MaxVF
+   *    // (i.e. MaxVectorSize).
+   *    SmallVector<unsigned, 8> VFs;
+   *    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
+   *    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
+   *      VFs.push_back(VS);
+   *
+   *    // For each VF calculate its register usage.
+   *    auto RUs = calculateRegisterUsage(VFs);
+   *
+   *    // Select the largest VF which doesn't require more registers than
+   * existing
+   *    // ones.
+   *    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
+   *    for (int i = RUs.size() - 1; i >= 0; --i) {
+   *      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
+   *        MaxVF = VFs[i];
+   *        break;
+   *      }
+   *    }
+   *    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
+   *      if (MaxVF < MinVF) {
+   *        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
+   *                          << ") with target's minimum: " << MinVF << '\n');
+   *        MaxVF = MinVF;
+   *      }
+   *    }
+   *  }
+   *  return MaxVF;
+   */
 }
 
 /*

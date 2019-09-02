@@ -523,7 +523,7 @@ public:
 
   unsigned getRegisterBitWidth(bool Vector) const { return 32; }
 
-  unsigned getScalableRegisterBitWidth() const { return 1; }
+  unsigned getMaxElementWidth() const { return 64; }
 
   /// Estimate the overhead of scalarizing an instruction. Insert and Extract
   /// are set if the result needs to be inserted and/or extracted from vectors.

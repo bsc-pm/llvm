@@ -487,8 +487,8 @@ unsigned TargetTransformInfo::getRegisterBitWidth(bool Vector) const {
   return TTIImpl->getRegisterBitWidth(Vector);
 }
 
-unsigned TargetTransformInfo::getScalableRegisterBitWidth() const {
-  return TTIImpl->getScalableRegisterBitWidth();
+unsigned TargetTransformInfo::getMaxElementWidth() const {
+  return TTIImpl->getMaxElementWidth();
 }
 
 unsigned TargetTransformInfo::getMinVectorRegisterBitWidth() const {
