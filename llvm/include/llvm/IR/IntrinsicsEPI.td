@@ -427,9 +427,9 @@ def int_epi_vid : Intrinsic< [ llvm_anyvector_ty ],
                              [ llvm_i64_ty ], [ IntrNoMem ]>,
                   EPIIntrinsic;
 def int_epi_vid_mask : Intrinsic< [ llvm_anyvector_ty ],
-                             [ llvm_anyvector_ty, llvm_i64_ty ], [ IntrNoMem ]>,
+                                  [ LLVMMatchType<0>, llvm_anyvector_ty,
+                                    llvm_i64_ty ], [ IntrNoMem ]>,
                   EPIIntrinsic;
-
 
 defm vfcvt_xu_f : epi_conversions;
 defm vfcvt_x_f : epi_conversions;

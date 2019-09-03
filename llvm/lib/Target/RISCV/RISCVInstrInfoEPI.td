@@ -1324,6 +1324,40 @@ def EPIPseudosTable : GenericTable {
   let PrimaryKeyName = "getEPIPseudoInfo";
 }
 
+
+multiclass pseudo_nullary<EPIVReg result_reg_class,
+                          int vlmul,
+                          string constraints = ""> {
+  let Uses = [VL, VTYPE],
+      VLIndex = 1, SEWIndex = 2, MergeOpIndex = -1,
+      BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
+    def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
+                            (ins GPR:$vl, ixlenimm:$sew),
+                            []>,
+                     EPIPseudo;
+
+  let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
+      Uses = [VL, VTYPE, V0], VLIndex = 3, SEWIndex = 4, MergeOpIndex = 1,
+      BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
+    def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
+                                 (ins result_reg_class:$merge,
+                                      vectormask:$vm,
+                                      GPR:$vl, ixlenimm:$sew),
+                                 []>,
+                          EPIPseudo;
+}
+
+multiclass pseudo_nullary_v {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _V : pseudo_nullary<evr, evr.VLMul>;
+    }
+  }
+}
+
 multiclass pseudo_unary_nomask<EPIVReg result_reg_class,
                                EPIVReg op_reg_class,
                                int vlmul> {
@@ -1345,7 +1379,7 @@ multiclass pseudo_unary<EPIVReg result_reg_class,
   defm "" : pseudo_unary_nomask<result_reg_class, op_reg_class, vlmul>;
 
   let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
-    Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
+      Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins result_reg_class:$merge,
@@ -1922,6 +1956,8 @@ defm PseudoVFNCVT_X_F  : pseudo_unary_v_w;
 defm PseudoVFNCVT_F_XU : pseudo_unary_v_w;
 defm PseudoVFNCVT_F_X  : pseudo_unary_v_w;
 defm PseudoVFNCVT_F_F  : pseudo_unary_v_w;
+
+defm PseudoVID         : pseudo_nullary_v;
 
 // Load/store pseudo instructions
 
@@ -3490,13 +3526,15 @@ defm : pat_intrinsic_binary_int_w_vX0<"int_epi_vwcvt_x_x", "PseudoVWADD_VX">;
 
 defm : pat_intrinsic_binary_int_v_wX0<"int_epi_vncvt_x_x", "PseudoVNSRL_VX">;
 
-//foreach vtp = AllIntegerVectors in
-//{
-// def : Pat<(vtp.Vector (int_epi_vid)),
-//            (VID_V)>;
-// def : Pat<(vtp.Vector (int_epi_vid_mask V0)),
-//            (VID_V_MASK vmask_only_true.Value)>;
-//}
+foreach vti = AllIntegerVectors in {
+  def : Pat<(vti.Vector (int_epi_vid GPR:$vl)),
+            (!cast<Instruction>("PseudoVID_V_M"#vti.RegClass.VLMul)
+             (NoX0 GPR:$vl), vti.SEW)>;
+  def : Pat<(vti.Vector (int_epi_vid_mask (vti.Vector vti.RegClass:$merge),
+                         (vti.Mask V0), GPR:$vl)),
+            (!cast<Instruction>("PseudoVID_V_MASK_M"#vti.RegClass.VLMul)
+             $merge, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+}
 
 foreach vti = AllIntegerVectors in {
   def : Pat<(vti.Vector (int_epi_vbroadcast GPR:$rs2, GPR:$vl)),

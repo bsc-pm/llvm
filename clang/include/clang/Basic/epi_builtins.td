@@ -573,7 +573,6 @@ def vmsof : EPIMaskUnaBuiltin<"m", "mm", "csil">;
 let HasMergeOperand = 0 in
 def viota : EPIMaskToIntBuiltin<"v", "vm", "csil">;
 
-let HasMergeOperand = 0 in
 def vid : EPINulBuiltin<"v", "v", "csil">;
 
 let LMUL = [1], HasVL = 0, HasMask = 0, IntrinsicName = "vext_x_v" in

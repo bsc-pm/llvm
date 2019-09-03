@@ -228,14 +228,16 @@ class Intrinsic(object):
 
 class NullaryIntrinsic(Intrinsic):
     pattern_v = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}();
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
+  i64);
 
 define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}() nounwind {
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}()
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
+    i64 undef)
 
   %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
   store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
@@ -245,6 +247,7 @@ entry:
 """
     pattern_v_mask = """
 declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+  <vscale x ${result_type_scale} x ${llvm_result_type}>,
   <vscale x ${result_type_scale} x i1>,
   i64);
 
@@ -254,6 +257,7 @@ entry:
 ; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} v0, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
+    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${result_type_scale} x i1> undef,
     i64 undef)
 
@@ -291,7 +295,23 @@ entry:
                 subs["value_result_type"] = result.value_type
                 subs["llvm_result_type"] = result.llvm_type
 
-                print template.substitute(subs)
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                subs["sew"] = "e" + str(sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    result_scale = result.get_base_scale()
+                    subs["result_type_scale"] = result_scale*vlmul
+
+                    if result_scale*vlmul >= 64:
+                        continue
+
+                    print template.substitute(subs)
 
 class UnaryIntrinsicMask(Intrinsic):
     pattern_m = """
@@ -1723,7 +1743,7 @@ intrinsics = [
 
         UnaryIntrinsicScalarResult("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", scalar_register = "ft0", mask = False, vlmul_values = [1]),
 
-        #NullaryIntrinsic("vid", type_generator = generate_nullary_integer_types, variants = v),
+        NullaryIntrinsic("vid", type_generator = generate_nullary_integer_types, variants = v),
 
         BinaryIntrinsic("vadd", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
         BinaryIntrinsic("vsub", type_generator = generate_binary_integer_types, variants = vv_vx),
