@@ -277,6 +277,23 @@ public:
 };
 } // namespace
 
+static LValue EmitRefAsIs(CodeGenFunction &CGF, const VarDecl *VD) {
+  Address addr = Address::invalid();
+  //                                hasLocalStorage()     hasLinkage()
+  // (global) int &rx;                     0                  1
+  // struct { static int &rx; };           0                  1
+  // int main() { static int &rx; }        0                  0
+  if (!VD->hasLocalStorage()) {
+    llvm::Value *V = CGF.CGM.GetAddrOfGlobalVar(VD);
+    CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
+    addr = Address(V, Alignment);
+  } else {
+    addr = CGF.GetAddrOfLocalVar(VD);
+  }
+
+  return CGF.MakeAddrLValue(addr, VD->getType(), AlignmentSource::Decl);
+}
+
 static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
                     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
   // C long -> LLVM long
@@ -287,7 +304,13 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
   SmallVector<llvm::Value*, 4> DsaData;
   SmallVector<llvm::Value*, 4> TmpDsaData; // save all dimensions always. if vla add all of them
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    DsaData.push_back(CGF.EmitDeclRefLValue(DRE).getPointer());
+    const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
+    if (VD->getType()->isReferenceType()) {
+      // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
+      DsaData.push_back(EmitRefAsIs(CGF, VD).getPointer());
+    } else {
+      DsaData.push_back(CGF.EmitDeclRefLValue(DRE).getPointer());
+    }
     QualType TmpTy = DRE->getType();
     bool FirstTime = true;
     while (TmpTy->isArrayType()) {
@@ -423,7 +446,7 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
 }
 
 bool CGOmpSsRuntime::inTask() {
-  return !TaskEntryStack.empty();
+  return !TaskEntryStack.empty() || InTaskEntryEmission;
 }
 
 llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getCurrentTask() {
@@ -434,6 +457,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   const OSSExecutableDirective &D,
                                   SourceLocation Loc,
                                   const OSSTaskDataTy &Data) {
+  InTaskEntryEmission = true;
+
   llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
@@ -470,8 +495,11 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   if (Data.Final)
     TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
 
+
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+
+  InTaskEntryEmission = false;
 
   // Push Task Stack
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);

@@ -2532,7 +2532,11 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
     // we're not permitted to emit a reference to it in general, and it might
     // not be captured if capture would be necessary for a use. Emit the
     // constant value directly instead.
-    if (E->isNonOdrUse() == NOUR_Constant &&
+    //
+    // OmpSs-2: Skip this because of we want to access the storage through
+    // the reference, not directly
+    if (!(getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTask()) &&
+        E->isNonOdrUse() == NOUR_Constant &&
         (VD->getType()->isReferenceType() ||
          !canEmitSpuriousReferenceToVariable(*this, E, VD, true))) {
       VD->getAnyInitializer(VD);

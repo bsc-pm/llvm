@@ -60,6 +60,8 @@ protected:
 
 private:
   SmallVector<llvm::AssertingVH<llvm::Instruction>, 2> TaskEntryStack;
+  // This is used to extend the inTask scope including the intrinsic too
+  bool InTaskEntryEmission = false;
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
