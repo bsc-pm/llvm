@@ -411,11 +411,11 @@ then
 fi
 
 # Find the directory at the top of the enclosing LLVM source tree.
-if ! LLVM_SRC_ROOT=$(llvm_src_root && pwd)
-then
-  printf >&2 '%s: Run from within the LLVM source tree.\n' "$SELF"
-  exit 3
-fi
+# if ! LLVM_SRC_ROOT=$(llvm_src_root && pwd)
+# then
+#   printf >&2 '%s: Run from within the LLVM source tree.\n' "$SELF"
+#   exit 3
+# fi
 
 # Select canned actions.
 RECIPE="$1"

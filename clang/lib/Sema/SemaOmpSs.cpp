@@ -534,7 +534,7 @@ void Sema::InitDataSharingAttributesStackOmpSs() {
 #define DSAStack static_cast<DSAStackTy *>(VarDataSharingAttributesStackOmpSs)
 
 void Sema::StartOmpSsDSABlock(OmpSsDirectiveKind DKind,
-                               Scope *CurScope, SourceLocation Loc) {
+                              Scope *CurScope, SourceLocation Loc) {
   DSAStack->push(DKind, CurScope, Loc);
   PushExpressionEvaluationContext(
       ExpressionEvaluationContext::PotentiallyEvaluated);
@@ -623,7 +623,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
 
   llvm::SmallVector<OSSClause *, 8> ClausesWithImplicit;
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
-  if (AStmt) {
+  if (AStmt && !CurContext->isDependentContext()) {
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this, AStmt);
     Stmt *S = AStmt;
@@ -834,12 +834,13 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
 }
 
-static ValueDecl *
+// the boolean marks if it's a template
+static std::pair<ValueDecl *, bool>
 getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
                SourceRange &ERange) {
   if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
       RefExpr->containsUnexpandedParameterPack())
-    return nullptr;
+    return std::make_pair(nullptr, true);
 
   RefExpr = RefExpr->IgnoreParens();
   ELoc = RefExpr->getExprLoc();
@@ -858,11 +859,11 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
 
     S.Diag(ELoc, diag::err_oss_expected_var_name_member_expr)
         << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
-    return nullptr;
+    return std::make_pair(nullptr, false);
   }
 
   auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
-  return getCanonicalDecl(VD);
+  return std::make_pair(getCanonicalDecl(VD), false);
 }
 
 ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,
@@ -926,10 +927,17 @@ Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
       ClauseVars.push_back(RefExpr);
       continue;
     }
-    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (Res.second) {
+      // It will be analyzed later.
+      ClauseVars.push_back(RefExpr);
+    }
+    ValueDecl *D = Res.first;
     if (!D) {
       continue;
     }
+
     DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
     if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_shared &&
         DVar.RefExpr) {
@@ -957,10 +965,17 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
 
     SourceLocation ELoc;
     SourceRange ERange;
-    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (Res.second) {
+      // It will be analyzed later.
+      ClauseVars.push_back(RefExpr);
+    }
+    ValueDecl *D = Res.first;
     if (!D) {
       continue;
     }
+
     DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
     if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_private &&
         DVar.RefExpr) {
@@ -988,10 +1003,17 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
 
     SourceLocation ELoc;
     SourceRange ERange;
-    ValueDecl *D = getPrivateItem(*this, RefExpr, ELoc, ERange);
+
+    auto Res = getPrivateItem(*this, RefExpr, ELoc, ERange);
+    if (Res.second) {
+      // It will be analyzed later.
+      ClauseVars.push_back(RefExpr);
+    }
+    ValueDecl *D = Res.first;
     if (!D) {
       continue;
     }
+
     DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
     if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_firstprivate &&
         DVar.RefExpr) {

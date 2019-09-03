@@ -353,6 +353,16 @@ public:
   /// \returns the transformed OpenMP clause.
   OMPClause *TransformOMPClause(OMPClause *S);
 
+  /// Transform the given statement.
+  ///
+  /// By default, this routine transforms a statement by delegating to the
+  /// appropriate TransformOSSXXXClause function to transform a specific kind
+  /// of clause. Subclasses may override this function to transform statements
+  /// using some other mechanism.
+  ///
+  /// \returns the transformed OmpSs clause.
+  OSSClause *TransformOSSClause(OSSClause *S);
+
   /// Transform the given attribute.
   ///
   /// By default, this routine transforms a statement by delegating to the
@@ -710,6 +720,11 @@ public:
   LLVM_ATTRIBUTE_NOINLINE \
   OMPClause *Transform ## Class(Class *S);
 #include "clang/Basic/OpenMPKinds.def"
+
+#define OMPSS_CLAUSE(Name, Class)                        \
+  LLVM_ATTRIBUTE_NOINLINE \
+  OSSClause *Transform ## Class(Class *S);
+#include "clang/Basic/OmpSsKinds.def"
 
   /// Build a new qualified type given its unqualified type and type location.
   ///
@@ -1511,12 +1526,64 @@ public:
   ///
   /// By default, performs semantic analysis to build the new statement.
   /// Subclasses may override this routine to provide different behavior.
-  StmtResult RebuildOSSExecutableDirective(OmpSsDirectiveKind Kind,
+  StmtResult RebuildOSSExecutableDirective(ArrayRef<OSSClause *> Clauses,
+                                           OmpSsDirectiveKind Kind,
+                                           Stmt *AStmt,
                                            SourceLocation StartLoc,
-                                           SourceLocation EndLoc,
-                                           ArrayRef<OSSClause *> Clauses) {
+                                           SourceLocation EndLoc) {
     return getSema().ActOnOmpSsExecutableDirective(Clauses,
-        Kind, StartLoc, EndLoc);
+        Kind, AStmt, StartLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'shared' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSSharedClause(ArrayRef<Expr *> VarList,
+                                    SourceLocation StartLoc,
+                                    SourceLocation LParenLoc,
+                                    SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsSharedClause(VarList, StartLoc, LParenLoc,
+                                            EndLoc);
+  }
+
+  /// Build a new OmpSs 'private' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSPrivateClause(ArrayRef<Expr *> VarList,
+                                     SourceLocation StartLoc,
+                                     SourceLocation LParenLoc,
+                                     SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsPrivateClause(VarList, StartLoc, LParenLoc,
+                                             EndLoc);
+  }
+
+  /// Build a new OmpSs 'firstprivate' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSFirstprivateClause(ArrayRef<Expr *> VarList,
+                                          SourceLocation StartLoc,
+                                          SourceLocation LParenLoc,
+                                          SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsFirstprivateClause(VarList, StartLoc, LParenLoc,
+                                                  EndLoc);
+  }
+
+  /// Build a new OmpSs 'depend' pseudo clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *
+  RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
+                         SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                         SourceLocation StartLoc, SourceLocation LParenLoc,
+                         SourceLocation EndLoc) {
+    // return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
+    //                                         StartLoc, LParenLoc, EndLoc);
+    llvm_unreachable("unsupported yet");
+    return nullptr;
   }
 
   /// Build a new OpenMP executable directive.
@@ -3417,6 +3484,23 @@ OMPClause *TreeTransform<Derived>::TransformOMPClause(OMPClause *S) {
   case OMPC_ ## Name :                                                         \
     return getDerived().Transform ## Class(cast<Class>(S));
 #include "clang/Basic/OpenMPKinds.def"
+  }
+
+  return S;
+}
+
+template<typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSClause(OSSClause *S) {
+  if (!S)
+    return S;
+
+  switch (S->getClauseKind()) {
+  default: break;
+  // Transform individual clause nodes
+#define OMPSS_CLAUSE(Name, Class)                                             \
+  case OSSC_ ## Name :                                                         \
+    return getDerived().Transform ## Class(cast<Class>(S));
+#include "clang/Basic/OmpSsKinds.def"
   }
 
   return S;
@@ -9204,24 +9288,441 @@ template <typename Derived>
 StmtResult TreeTransform<Derived>::TransformOSSExecutableDirective(
     OSSExecutableDirective *D) {
 
-  llvm_unreachable("Not implemented yet");
-  return StmtError();
+  // Transform the clauses
+  llvm::SmallVector<OSSClause *, 16> TClauses;
+  ArrayRef<OSSClause *> Clauses = D->clauses();
+  TClauses.reserve(Clauses.size());
+  for (ArrayRef<OSSClause *>::iterator I = Clauses.begin(), E = Clauses.end();
+       I != E; ++I) {
+    if (*I) {
+      OSSClause *Clause = getDerived().TransformOSSClause(*I);
+      if (Clause)
+        TClauses.push_back(Clause);
+    } else {
+      TClauses.push_back(nullptr);
+    }
+  }
+  StmtResult AssociatedStmt;
+  if (D->hasAssociatedStmt()) {
+    {
+      Sema::CompoundScopeRAII CompoundScope(getSema());
+      Stmt *CS = D->getAssociatedStmt();
+      AssociatedStmt = getDerived().TransformStmt(CS);
+    }
+    if (AssociatedStmt.isInvalid()) {
+      return StmtError();
+    }
+  }
+  if (TClauses.size() != Clauses.size()) {
+    return StmtError();
+  }
+
+  return getDerived().RebuildOSSExecutableDirective(
+      TClauses, D->getDirectiveKind(), AssociatedStmt.get(),
+      D->getBeginLoc(), D->getEndLoc());
 }
 
 template <typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
-  StmtResult Res = StmtError();
-  Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_taskwait, nullptr,
+                                            D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
   return Res;
 }
 
 template <typename Derived>
 StmtResult
 TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
-  StmtResult Res = StmtError();
-  Res = getDerived().TransformOSSExecutableDirective(D);
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_task, nullptr,
+                                            D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
   return Res;
+}
+
+//===----------------------------------------------------------------------===//
+// OmpSs clause transformation
+//===----------------------------------------------------------------------===//
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSLastprivateClause(OSSLastprivateClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSIfClause(OSSIfClause *C) {
+  // ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  // if (Cond.isInvalid())
+  //   return nullptr;
+  // return getDerived().RebuildOSSIfClause(Cond.get(), C->getBeginLoc(),
+  //                                        C->getLParenLoc(), C->getEndLoc());
+  llvm_unreachable("unsupported yet");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSFinalClause(OSSFinalClause *C) {
+  // ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  // if (Cond.isInvalid())
+  //   return nullptr;
+  // return getDerived().RebuildOSSFinalClause(Cond.get(), C->getBeginLoc(),
+  //                                           C->getLParenLoc(), C->getEndLoc());
+  llvm_unreachable("unsupported yet");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSNumThreadsClause(OSSNumThreadsClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSSafelenClause(OSSSafelenClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSSimdlenClause(OSSSimdlenClause *C) {
+  llvm_unreachable("unsupported clause");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCollapseClause(OSSCollapseClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSDefaultClause(OSSDefaultClause *C) {
+  // return getDerived().RebuildOSSDefaultClause(
+  //     C->getDefaultKind(), C->getDefaultKindKwLoc(), C->getBeginLoc(),
+  //     C->getLParenLoc(), C->getEndLoc());
+  llvm_unreachable("unsupported yet");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSProcBindClause(OSSProcBindClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSScheduleClause(OSSScheduleClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSOrderedClause(OSSOrderedClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSNowaitClause(OSSNowaitClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSUntiedClause(OSSUntiedClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSMergeableClause(OSSMergeableClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSReadClause(OSSReadClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSWriteClause(OSSWriteClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSUpdateClause(OSSUpdateClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCaptureClause(OSSCaptureClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSSeqCstClause(OSSSeqCstClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSThreadsClause(OSSThreadsClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSSIMDClause(OSSSIMDClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSNogroupClause(OSSNogroupClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSReductionClause(OSSReductionClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSTaskReductionClause(
+    OSSTaskReductionClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSInReductionClause(OSSInReductionClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSLinearClause(OSSLinearClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSAlignedClause(OSSAlignedClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCopyinClause(OSSCopyinClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSCopyprivateClause(OSSCopyprivateClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSFlushClause(OSSFlushClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSDeviceClause(OSSDeviceClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSMapClause(OSSMapClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSNumTeamsClause(OSSNumTeamsClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSThreadLimitClause(OSSThreadLimitClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSGrainsizeClause(OSSGrainsizeClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSNumTasksClause(OSSNumTasksClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSHintClause(OSSHintClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSDistScheduleClause(
+    OSSDistScheduleClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSDefaultmapClause(OSSDefaultmapClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSToClause(OSSToClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSFromClause(OSSFromClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSUseDevicePtrClause(
+    OSSUseDevicePtrClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSIsDevicePtrClause(OSSIsDevicePtrClause *C) {
+  llvm_unreachable("OpenMP clause...");
+  return nullptr;
+}
+
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSDependClause(
+      C->getDependencyKind(), C->getDependencyLoc(), C->getColonLoc(), Vars,
+      C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSSharedClause(OSSSharedClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSSharedClause(Vars, C->getBeginLoc(),
+                                             C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSPrivateClause(OSSPrivateClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSPrivateClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSFirstprivateClause(
+    OSSFirstprivateClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  return getDerived().RebuildOSSFirstprivateClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 //===----------------------------------------------------------------------===//
