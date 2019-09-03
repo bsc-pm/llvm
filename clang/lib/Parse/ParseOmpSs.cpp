@@ -228,7 +228,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                              OSSC_DEPEND_unknown);
 
   bool IsComma = (Kind != OSSC_depend)
-                 || (Kind == OSSC_depend && *DepKindIt != OSSC_DEPEND_unknown);
+                 || (Kind == OSSC_depend && DepKindIt == Data.DepKinds.end());
 
   while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
@@ -256,7 +256,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   if (!T.consumeClose())
     Data.RLoc = T.getCloseLocation();
   return (Kind == OSSC_depend
-          && *DepKindIt != OSSC_DEPEND_unknown
+          && DepKindIt == Data.DepKinds.end()
           && Vars.empty());
 }
 
