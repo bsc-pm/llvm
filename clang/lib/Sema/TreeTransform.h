@@ -1540,6 +1540,41 @@ public:
         Kind, AStmt, StartLoc, EndLoc);
   }
 
+  /// Build a new OmpSs 'if' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSIfClause(Expr *Condition, SourceLocation StartLoc,
+                                SourceLocation LParenLoc,
+                                SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsIfClause(Condition, StartLoc, LParenLoc,
+                                        EndLoc);
+  }
+
+  /// Build a new OmpSs 'final' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSFinalClause(Expr *Condition, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsFinalClause(Condition, StartLoc, LParenLoc,
+                                           EndLoc);
+  }
+
+  /// Build a new OmpSs 'depend' pseudo clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *
+  RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
+                         SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                         SourceLocation StartLoc, SourceLocation LParenLoc,
+                         SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
+                                            StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OmpSs 'shared' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -1574,19 +1609,6 @@ public:
                                           SourceLocation EndLoc) {
     return getSema().ActOnOmpSsFirstprivateClause(VarList, StartLoc, LParenLoc,
                                                   EndLoc);
-  }
-
-  /// Build a new OmpSs 'depend' pseudo clause.
-  ///
-  /// By default, performs semantic analysis to build the new OmpSs clause.
-  /// Subclasses may override this routine to provide different behavior.
-  OSSClause *
-  RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
-                         SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
-                         SourceLocation StartLoc, SourceLocation LParenLoc,
-                         SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
-                                            StartLoc, LParenLoc, EndLoc);
   }
 
   /// Build a new OpenMP executable directive.
@@ -9359,24 +9381,20 @@ TreeTransform<Derived>::TransformOSSLastprivateClause(OSSLastprivateClause *C) {
 
 template <typename Derived>
 OSSClause *TreeTransform<Derived>::TransformOSSIfClause(OSSIfClause *C) {
-  // ExprResult Cond = getDerived().TransformExpr(C->getCondition());
-  // if (Cond.isInvalid())
-  //   return nullptr;
-  // return getDerived().RebuildOSSIfClause(Cond.get(), C->getBeginLoc(),
-  //                                        C->getLParenLoc(), C->getEndLoc());
-  llvm_unreachable("unsupported yet");
-  return nullptr;
+  ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  if (Cond.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSIfClause(Cond.get(), C->getBeginLoc(),
+                                         C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>
 OSSClause *TreeTransform<Derived>::TransformOSSFinalClause(OSSFinalClause *C) {
-  // ExprResult Cond = getDerived().TransformExpr(C->getCondition());
-  // if (Cond.isInvalid())
-  //   return nullptr;
-  // return getDerived().RebuildOSSFinalClause(Cond.get(), C->getBeginLoc(),
-  //                                           C->getLParenLoc(), C->getEndLoc());
-  llvm_unreachable("unsupported yet");
-  return nullptr;
+  ExprResult Cond = getDerived().TransformExpr(C->getCondition());
+  if (Cond.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSFinalClause(Cond.get(), C->getBeginLoc(),
+                                            C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>
@@ -9410,11 +9428,8 @@ TreeTransform<Derived>::TransformOSSCollapseClause(OSSCollapseClause *C) {
 template <typename Derived>
 OSSClause *
 TreeTransform<Derived>::TransformOSSDefaultClause(OSSDefaultClause *C) {
-  // return getDerived().RebuildOSSDefaultClause(
-  //     C->getDefaultKind(), C->getDefaultKindKwLoc(), C->getBeginLoc(),
-  //     C->getLParenLoc(), C->getEndLoc());
-  llvm_unreachable("unsupported yet");
-  return nullptr;
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
 }
 
 template <typename Derived>
