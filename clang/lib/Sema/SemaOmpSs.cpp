@@ -697,7 +697,7 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
 }
 
 OSSClause *
-Sema::ActOnOmpSsDependClause(const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLoc,
+Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                              SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                              SourceLocation StartLoc,
                              SourceLocation LParenLoc, SourceLocation EndLoc) {
@@ -767,7 +767,7 @@ Sema::ActOnOmpSsVarListClause(
   OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
   SourceLocation StartLoc, SourceLocation LParenLoc,
   SourceLocation ColonLoc, SourceLocation EndLoc,
-  const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLoc) {
+  ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc) {
 
   OSSClause *Res = nullptr;
   switch (Kind) {

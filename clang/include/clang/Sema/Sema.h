@@ -9805,7 +9805,7 @@ public:
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
       SourceLocation StartLoc, SourceLocation LParenLoc,
       SourceLocation ColonLoc, SourceLocation EndLoc,
-      const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
+      ArrayRef<OmpSsDependClauseKind> DepKinds,
       SourceLocation DepLoc);
 
   OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
@@ -9844,7 +9844,7 @@ public:
 
   /// Called on well-formed 'depend' clause.
   OSSClause *
-  ActOnOmpSsDependClause(const SmallVector<OmpSsDependClauseKind, 2>& DepKind, SourceLocation DepLoc,
+  ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                           SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                           SourceLocation StartLoc, SourceLocation LParenLoc,
                           SourceLocation EndLoc);

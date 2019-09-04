@@ -3004,7 +3004,11 @@ class OSSDependClause final
                                           {}
 
   /// Set dependency kind.
-  void setDependencyKinds(const SmallVector<OmpSsDependClauseKind, 2>& K) { DepKinds = K; }
+  void setDependencyKinds(ArrayRef<OmpSsDependClauseKind> K) {
+    for (const OmpSsDependClauseKind& CK : K) {
+      DepKinds.push_back(CK);
+    }
+  }
 
   /// Set dependency kind and its location.
   void setDependencyLoc(SourceLocation Loc) { DepLoc = Loc; }
@@ -3027,7 +3031,7 @@ public:
   static OSSDependClause *Create(const ASTContext &C, SourceLocation StartLoc,
                                  SourceLocation LParenLoc,
                                  SourceLocation EndLoc,
-                                 const SmallVector<OmpSsDependClauseKind, 2>& DepKinds,
+                                 ArrayRef<OmpSsDependClauseKind> DepKinds,
                                  SourceLocation DepLoc, SourceLocation ColonLoc,
                                  ArrayRef<Expr *> VL);
 

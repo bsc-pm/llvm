@@ -679,7 +679,7 @@ OSSFlushClause *OSSFlushClause::CreateEmpty(const ASTContext &C, unsigned N) {
 OSSDependClause *
 OSSDependClause::Create(const ASTContext &C, SourceLocation StartLoc,
                         SourceLocation LParenLoc, SourceLocation EndLoc,
-                        const SmallVector<OmpSsDependClauseKind, 2>& DepKinds, SourceLocation DepLoc,
+                        ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                         SourceLocation ColonLoc, ArrayRef<Expr *> VL) {
   void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
   OSSDependClause *Clause = new (Mem)
