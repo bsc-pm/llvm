@@ -1,0 +1,61 @@
+// RUN: %clang_cc1 -x c++ -verify -fompss-2 -ast-dump -ferror-limit 100 %s | FileCheck %s
+// expected-no-diagnostics
+
+template<typename T>
+T *foo(T *t) {
+    #pragma oss task depend(in: *t)
+    {
+        #pragma oss task depend(in: t)
+        {}
+    }
+    return t;
+}
+struct S {
+    static int x;
+};
+
+template<typename T>
+void kk() {
+    #pragma oss task depend(in: T::x)
+    { T::x++; }
+}
+
+void bar()
+{
+    int *pi;
+    int *pi1 = foo(pi);
+    kk<S>();
+}
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:13, col:36>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:22, col:35>
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:33, col:34> '<dependent type>' prefix '*' cannot overflow
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'T *' lvalue ParmVar {{[a-z0-9]+}} 't' 'T *'
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:8:17, col:39>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:26, col:38>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:37> 'T *' lvalue ParmVar {{[a-z0-9]+}} 't' 'T *'
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:6:13, col:36>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:22, col:35>
+// CHECK-NEXT: UnaryOperator {{[a-z0-9]+}} <col:33, col:34> 'int':'int' lvalue prefix '*' cannot overflow
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int *' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
+// CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:8:17, col:39>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:26, col:38>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:37> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
+// CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:37> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:19:13, col:38>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:22, col:37>
+// CHECK-NEXT: DependentScopeDeclRefExpr {{[a-z0-9]+}} <col:33, col:36> '<dependent type>' lvalue
+
+// CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:19:13, col:38>
+// CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:22, col:37>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:33, col:36> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'
+// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:33, col:36> 'int' lvalue Var {{[a-z0-9]+}} 'x' 'int'

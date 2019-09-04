@@ -696,6 +696,39 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
   return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt);
 }
 
+// the boolean marks if it's a template
+static std::pair<ValueDecl *, bool>
+getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
+               SourceRange &ERange) {
+  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
+      RefExpr->containsUnexpandedParameterPack())
+    return std::make_pair(nullptr, true);
+
+  RefExpr = RefExpr->IgnoreParens();
+  ELoc = RefExpr->getExprLoc();
+  ERange = RefExpr->getSourceRange();
+  RefExpr = RefExpr->IgnoreParenImpCasts();
+  auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
+  auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
+
+  // Only allow VarDecl from DeclRefExpr
+  // and VarDecl implicits from MemberExpr // (i.e. static members without 'this')
+  if ((!DE || !isa<VarDecl>(DE->getDecl())) &&
+      (S.getCurrentThisType().isNull() || !ME ||
+       !isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()) ||
+       !cast<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts())->isImplicit() ||
+       !isa<VarDecl>(ME->getMemberDecl()))) {
+
+    S.Diag(ELoc, diag::err_oss_expected_var_name_member_expr)
+        << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
+    return std::make_pair(nullptr, false);
+  }
+
+  auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
+  return std::make_pair(getCanonicalDecl(VD), false);
+}
+
+
 OSSClause *
 Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                              SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
@@ -747,7 +780,11 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
   for (Expr *RefExpr : VarList) {
     SourceLocation ELoc = RefExpr->getExprLoc();
     Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
-
+    if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
+        RefExpr->containsUnexpandedParameterPack()) {
+      // It will be analyzed later.
+      continue;
+    }
     auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
     if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
         (ASE &&
@@ -832,38 +869,6 @@ OSSClause *Sema::ActOnOmpSsDefaultClause(OmpSsDefaultClauseKind Kind,
   }
   return new (Context)
       OSSDefaultClause(Kind, KindKwLoc, StartLoc, LParenLoc, EndLoc);
-}
-
-// the boolean marks if it's a template
-static std::pair<ValueDecl *, bool>
-getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
-               SourceRange &ERange) {
-  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
-      RefExpr->containsUnexpandedParameterPack())
-    return std::make_pair(nullptr, true);
-
-  RefExpr = RefExpr->IgnoreParens();
-  ELoc = RefExpr->getExprLoc();
-  ERange = RefExpr->getSourceRange();
-  RefExpr = RefExpr->IgnoreParenImpCasts();
-  auto *DE = dyn_cast_or_null<DeclRefExpr>(RefExpr);
-  auto *ME = dyn_cast_or_null<MemberExpr>(RefExpr);
-
-  // Only allow VarDecl from DeclRefExpr
-  // and VarDecl implicits from MemberExpr // (i.e. static members without 'this')
-  if ((!DE || !isa<VarDecl>(DE->getDecl())) &&
-      (S.getCurrentThisType().isNull() || !ME ||
-       !isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()) ||
-       !cast<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts())->isImplicit() ||
-       !isa<VarDecl>(ME->getMemberDecl()))) {
-
-    S.Diag(ELoc, diag::err_oss_expected_var_name_member_expr)
-        << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
-    return std::make_pair(nullptr, false);
-  }
-
-  auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
-  return std::make_pair(getCanonicalDecl(VD), false);
 }
 
 ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,

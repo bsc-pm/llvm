@@ -1531,7 +1531,12 @@ public:
                                            Stmt *AStmt,
                                            SourceLocation StartLoc,
                                            SourceLocation EndLoc) {
-    return getSema().ActOnOmpSsExecutableDirective(Clauses,
+    SmallVector<OSSClause *, 2> RebuiltClauses;
+    for (OSSClause *const& C : Clauses) {
+      RebuiltClauses.push_back(C);
+    }
+    getSema().ActOnOmpSsAfterClauseGathering(RebuiltClauses);
+    return getSema().ActOnOmpSsExecutableDirective(RebuiltClauses,
         Kind, AStmt, StartLoc, EndLoc);
   }
 
@@ -1580,10 +1585,8 @@ public:
                          SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                          SourceLocation StartLoc, SourceLocation LParenLoc,
                          SourceLocation EndLoc) {
-    // return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
-    //                                         StartLoc, LParenLoc, EndLoc);
-    llvm_unreachable("unsupported yet");
-    return nullptr;
+    return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
+                                            StartLoc, LParenLoc, EndLoc);
   }
 
   /// Build a new OpenMP executable directive.
