@@ -751,15 +751,14 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
         Diag(DepLoc, diag::err_oss_depend_weak_required);
         return nullptr;
       } else if (numUnk == 2) {
-        unsigned Except[] = {OSSC_DEPEND_source, OSSC_DEPEND_sink};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown, Except)
+                                       /*Last=*/OSSC_DEPEND_unknown)
             << getOmpSsClauseName(OSSC_depend);
       }
     } else if ((numWeaks == 1 && numUnk == 1)
                || (numWeaks == 2 && numUnk == 0)) {
-        unsigned Except[] = {OSSC_DEPEND_source, OSSC_DEPEND_sink, OSSC_DEPEND_weak};
+        unsigned Except[] = {OSSC_DEPEND_weak};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                        /*Last=*/OSSC_DEPEND_unknown, Except)
@@ -768,7 +767,7 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
   } else {
     if (DepKinds[0] == OSSC_DEPEND_unknown
         || DepKinds[0] == OSSC_DEPEND_weak) {
-      unsigned Except[] = {OSSC_DEPEND_source, OSSC_DEPEND_weak, OSSC_DEPEND_sink};
+      unsigned Except[] = {OSSC_DEPEND_weak};
       Diag(DepLoc, diag::err_oss_unexpected_clause_value)
           << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                      /*Last=*/OSSC_DEPEND_unknown, Except)

@@ -138,7 +138,6 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   }
 
   switch (CKind) {
-  case OSSC_grainsize:
   case OSSC_if:
   case OSSC_final:
     if (!FirstClause) {
