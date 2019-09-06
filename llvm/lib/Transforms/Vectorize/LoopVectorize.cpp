@@ -6443,17 +6443,21 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
   unsigned MaxVF = MaybeMaxVF.getValue();
   assert(MaxVF != 0 && "MaxVF is zero.");
 
-  if (TTI->useScalableVectorType()) {
     // Most of the VF selection code for fixed length vectors does not make
     // sense for scalable vectors. So as a starting point we assume that if we
     // are using scalable vectors we are going to vectorize based on the
     // computed MaxVF (max K factor). 
-    CM.selectUserVectorizationFactor(MaxVF);
-    buildVPlansWithVPRecipes(MaxVF, MaxVF);
+  if (TTI->useScalableVectorType()) {
+    //CM.selectUserVectorizationFactor(MaxVF);
+    // Compute the optimum scalable vector factor based
+    // on the MaxVF.
+    // Note: call collect mehtods in in and return MaxVF
+    unsigned VF = computeScalableVF(MaxVF);
+    buildVPlansWithVPRecipes(VF, VF);
     LLVM_DEBUG(printPlans(dbgs()));
-    return {{MaxVF, 0}};
+    // implement selectVectorizationfactor without the looping overhead.
+    return CM.selectScalableVectorizationFactor(VF);
   }
-
 
   for (unsigned VF = 1; VF <= MaxVF; VF *= 2) {
     // Collect Uniform and Scalar instructions after vectorization with VF.
@@ -6486,7 +6490,6 @@ void LoopVectorizationPlanner::setBestPlan(unsigned VF, unsigned UF) {
 
 void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
                                            DominatorTree *DT) {
-  // Perform the actual loop transformation.
 
   // 1. Create a new empty loop. Unlink the old loop and connect the new one.
   VPCallbackILV CallbackILV(ILV);
@@ -7661,7 +7664,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     return false;
   }
 
-  if (VF.Width == 1) {
+  if (VF.Width == 1 && !TTI->useScalableVectorType()) {
     LLVM_DEBUG(dbgs() << "LV: Vectorization is possible but not beneficial.\n");
     VecDiagMsg = std::make_pair(
         "VectorizationNotBeneficial",
@@ -7868,6 +7871,7 @@ bool LoopVectorizePass::runImpl(
 PreservedAnalyses LoopVectorizePass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
   auto &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
+  auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
