@@ -6443,6 +6443,18 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
   unsigned MaxVF = MaybeMaxVF.getValue();
   assert(MaxVF != 0 && "MaxVF is zero.");
 
+  if (TTI->useScalableVectorType()) {
+    // Most of the VF selection code for fixed length vectors does not make
+    // sense for scalable vectors. So as a starting point we assume that if we
+    // are using scalable vectors we are going to vectorize based on the
+    // computed MaxVF (max K factor). 
+    CM.selectUserVectorizationFactor(MaxVF);
+    buildVPlansWithVPRecipes(MaxVF, MaxVF);
+    LLVM_DEBUG(printPlans(dbgs()));
+    return {{MaxVF, 0}};
+  }
+
+
   for (unsigned VF = 1; VF <= MaxVF; VF *= 2) {
     // Collect Uniform and Scalar instructions after vectorization with VF.
     CM.collectUniformsAndScalars(VF);
