@@ -43,18 +43,18 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    call puts
 ; SPILL-O0-NEXT:    ld a1, -32(s0)
 ; SPILL-O0-NEXT:    vsetvli a2, a1, e64, m1
-; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
-; SPILL-O0-NEXT:    ld a3, -48(s0)
+; SPILL-O0-NEXT:    ld a2, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vle.v v0, (a3)
-; SPILL-O0-NEXT:    vsetvl zero, a0, a2
-; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    vle.v v0, (a2)
+; SPILL-O0-NEXT:    vsetvl zero, a0, a1
+; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
-; SPILL-O0-NEXT:    ld a3, -40(s0)
+; SPILL-O0-NEXT:    ld a2, -40(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vle.v v1, (a3)
-; SPILL-O0-NEXT:    vsetvl zero, a0, a2
+; SPILL-O0-NEXT:    vle.v v1, (a2)
+; SPILL-O0-NEXT:    vsetvl zero, a0, a1
 ; SPILL-O0-NEXT:    vfadd.vv v2, v0, v1
 ; SPILL-O0-NEXT:    vfadd.vv v16, v0, v2
 ; SPILL-O0-NEXT:    addi sp, s0, -48

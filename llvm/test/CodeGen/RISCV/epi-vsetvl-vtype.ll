@@ -33,7 +33,7 @@ define void @test_vsetvl_vtype(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O0-NEXT:    #APP
 ; CHECK-O0-NEXT:    rdvtype t0; vsetvl x0, a2, t0
 ; CHECK-O0-NEXT:    #NO_APP
-; CHECK-O0-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-O0-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a0)
 ; CHECK-O0-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O0-NEXT:    lui a0, %hi(scratch)
@@ -48,7 +48,7 @@ define void @test_vsetvl_vtype(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O2-NEXT:    #APP
 ; CHECK-O2-NEXT:    rdvtype t0; vsetvl x0, a2, t0
 ; CHECK-O2-NEXT:    #NO_APP
-; CHECK-O2-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)

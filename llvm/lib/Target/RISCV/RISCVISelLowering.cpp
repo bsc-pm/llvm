@@ -1528,12 +1528,20 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
     MIB.addReg(MI.getOperand(VLIndex).getReg());
   } else {
     // If there is no VL present in the pseudoinstruction, use undef value
+
+    // FIXME if we switch to 0.8 we will probably want to pass 'X0' here to
+    // change the VType but do not modify VL
     unsigned VLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
     BuildMI(*BB, MI, DL, TII.get(TargetOpcode::IMPLICIT_DEF), VLReg);
     MIB.addReg(VLReg, RegState::Kill);
   }
 
   MIB.addImm(ElementWidth).addImm(Multiplier);
+
+  // Remove (now) redundant operands from pseudo
+  MI.getOperand(SEWIndex).setImm(-1);
+  if (VLIndex >= 0)
+    MI.getOperand(VLIndex).setReg(RISCV::NoRegister);
 
   return BB;
 }

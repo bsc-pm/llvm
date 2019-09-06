@@ -37,11 +37,11 @@ define void @test_vsetvl_chain(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O2-LABEL: test_vsetvl_chain:
 ; CHECK-O2:       # %bb.0:
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
-; CHECK-O2-NEXT:    lui a2, %hi(scratch)
-; CHECK-O2-NEXT:    addi a2, a2, %lo(scratch)
+; CHECK-O2-NEXT:    lui a1, %hi(scratch)
+; CHECK-O2-NEXT:    addi a1, a1, %lo(scratch)
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
-; CHECK-O2-NEXT:    vse.v v0, (a2)
+; CHECK-O2-NEXT:    vse.v v0, (a1)
 ; CHECK-O2-NEXT:    ret
 {
   %gvl1 = call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)
@@ -88,11 +88,11 @@ define void @test_vsetvl_chain_2(<vscale x 1 x double>* %v, i64 %avl) nounwind
 ; CHECK-O2-LABEL: test_vsetvl_chain_2:
 ; CHECK-O2:       # %bb.0:
 ; CHECK-O2-NEXT:    vsetvli a1, a1, e64, m1
-; CHECK-O2-NEXT:    lui a2, %hi(scratch)
-; CHECK-O2-NEXT:    addi a2, a2, %lo(scratch)
+; CHECK-O2-NEXT:    lui a1, %hi(scratch)
+; CHECK-O2-NEXT:    addi a1, a1, %lo(scratch)
 ; CHECK-O2-NEXT:    vle.v v0, (a0)
 ; CHECK-O2-NEXT:    vfadd.vv v0, v0, v0
-; CHECK-O2-NEXT:    vse.v v0, (a2)
+; CHECK-O2-NEXT:    vse.v v0, (a1)
 ; CHECK-O2-NEXT:    ret
 {
   %gvl1 = call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)

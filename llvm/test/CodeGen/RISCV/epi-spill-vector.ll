@@ -25,7 +25,7 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    vsetvli a1, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v0, (a0)
 ; SPILL-O0-NEXT:    mv a1, zero
-; SPILL-O0-NEXT:    vsetvli a2, a1, e64, m1
+; SPILL-O0-NEXT:    vsetvli a1, a1, e64, m1
 ; SPILL-O0-NEXT:    vfadd.vv v1, v0, v0
 ; SPILL-O0-NEXT:    vfadd.vv v2, v1, v1
 ; SPILL-O0-NEXT:    vfadd.vv v3, v2, v2
@@ -57,12 +57,12 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    vfadd.vv v29, v28, v28
 ; SPILL-O0-NEXT:    vfadd.vv v30, v29, v29
 ; SPILL-O0-NEXT:    vfadd.vv v31, v30, v30
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    ld a4, -40(s0)
+; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvl a1
+; SPILL-O0-NEXT:    ld a3, -40(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vse.v v0, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    vse.v v0, (a3)
+; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    vfadd.vv v0, v31, v31
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
@@ -92,25 +92,25 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    ld a4, -48(s0)
+; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvl a1
+; SPILL-O0-NEXT:    ld a3, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vse.v v1, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    ld a4, -40(s0)
+; SPILL-O0-NEXT:    vse.v v1, (a3)
+; SPILL-O0-NEXT:    vsetvl zero, a1, a2
+; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvl a1
+; SPILL-O0-NEXT:    ld a3, -40(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vle.v v1, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    vle.v v1, (a3)
+; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v1
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    ld a4, -48(s0)
+; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvl a1
+; SPILL-O0-NEXT:    ld a3, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vle.v v1, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    vle.v v1, (a3)
+; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v1
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v2
 ; SPILL-O0-NEXT:    vfadd.vv v0, v0, v3
@@ -176,14 +176,14 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O2-NEXT:    vse.v v0, (a3)
 ; SPILL-O2-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O2-NEXT:    mv a1, zero
-; SPILL-O2-NEXT:    vsetvli a2, a1, e64, m1
+; SPILL-O2-NEXT:    vsetvli a1, a1, e64, m1
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    rdvtype a3
-; SPILL-O2-NEXT:    rdvl a2
-; SPILL-O2-NEXT:    ld a4, -48(s0)
+; SPILL-O2-NEXT:    rdvtype a2
+; SPILL-O2-NEXT:    rdvl a1
+; SPILL-O2-NEXT:    ld a3, -48(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O2-NEXT:    vse.v v0, (a4)
-; SPILL-O2-NEXT:    vsetvl zero, a2, a3
+; SPILL-O2-NEXT:    vse.v v0, (a3)
+; SPILL-O2-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O2-NEXT:    vfadd.vv v2, v0, v0
 ; SPILL-O2-NEXT:    vfadd.vv v3, v2, v2
 ; SPILL-O2-NEXT:    vfadd.vv v4, v3, v3
@@ -243,19 +243,19 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    rdvtype a3
-; SPILL-O2-NEXT:    rdvl a2
-; SPILL-O2-NEXT:    ld a4, -40(s0)
+; SPILL-O2-NEXT:    rdvtype a2
+; SPILL-O2-NEXT:    rdvl a1
+; SPILL-O2-NEXT:    ld a3, -40(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O2-NEXT:    vle.v v1, (a4)
-; SPILL-O2-NEXT:    vsetvl zero, a2, a3
+; SPILL-O2-NEXT:    vle.v v1, (a3)
+; SPILL-O2-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v1
-; SPILL-O2-NEXT:    rdvtype a3
-; SPILL-O2-NEXT:    rdvl a2
-; SPILL-O2-NEXT:    ld a4, -48(s0)
+; SPILL-O2-NEXT:    rdvtype a2
+; SPILL-O2-NEXT:    rdvl a1
+; SPILL-O2-NEXT:    ld a3, -48(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O2-NEXT:    vle.v v1, (a4)
-; SPILL-O2-NEXT:    vsetvl zero, a2, a3
+; SPILL-O2-NEXT:    vle.v v1, (a3)
+; SPILL-O2-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v1
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v2
 ; SPILL-O2-NEXT:    vfadd.vv v0, v0, v3

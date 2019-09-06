@@ -10,7 +10,7 @@ declare <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(
 define <vscale x 1 x double> @basic_callee(
 ; CHECK-LABEL: basic_callee:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v1,
@@ -28,7 +28,7 @@ define <vscale x 1 x double> @basic_callee(
 define <vscale x 1 x double> @max_registers(
 ; CHECK-LABEL: max_registers:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v16, v17
 ; CHECK-NEXT:    vfadd.vv v0, v0, v19
 ; CHECK-NEXT:    vfadd.vv v0, v0, v20
@@ -79,7 +79,7 @@ define <vscale x 1 x double> @too_many_registers_1(
 ; CHECK-NEXT:    vsetvli a3, zero, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a2)
 ; CHECK-NEXT:    vle.v v1, (a1)
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v16, v1, v0
 ; CHECK-NEXT:    ret
                                  i64 %gvl,
@@ -176,7 +176,7 @@ declare <vscale x 1 x double> @llvm.epi.vfadd.mask.nxv1f64.nxv1f64.nxv1i1(
 define <vscale x 1 x double> @first_mask_0(
 ; CHECK-LABEL: first_mask_0:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17, v0.t
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x i1> %mask,
@@ -196,7 +196,7 @@ define <vscale x 1 x double> @first_mask_0(
 define <vscale x 1 x double> @first_mask_2(
 ; CHECK-LABEL: first_mask_2:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17, v0.t
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v1,
@@ -221,7 +221,7 @@ define <vscale x 1 x double> @second_mask_1(
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vmv.v.v v0, v18
 ; CHECK-NEXT:    vsetvl zero, t1, t0
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17, v0.t
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v1,

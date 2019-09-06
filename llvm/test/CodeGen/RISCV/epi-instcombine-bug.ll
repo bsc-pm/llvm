@@ -49,7 +49,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; CHECK-NEXT:    fld ft0, 0(a1)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s2)
@@ -57,14 +57,14 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_1)
 ; CHECK-NEXT:    fld ft0, 0(a1)
 ; CHECK-NEXT:    sub a1, sp, a0
-; CHECK-NEXT:    andi a3, a1, -64
-; CHECK-NEXT:    sd a3, 56(s1)
-; CHECK-NEXT:    add sp, zero, a3
+; CHECK-NEXT:    andi a2, a1, -64
+; CHECK-NEXT:    sd a2, 56(s1)
+; CHECK-NEXT:    add sp, zero, a2
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
-; CHECK-NEXT:    vse.v v0, (a3)
+; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    lui a1, %hi(.LCPI0_2)
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_2)
 ; CHECK-NEXT:    fld ft0, 0(a1)
@@ -72,7 +72,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi a7, a1, -64
 ; CHECK-NEXT:    add sp, zero, a7
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a7)
@@ -83,7 +83,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t0, a1, -64
 ; CHECK-NEXT:    add sp, zero, t0
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t0)
@@ -94,7 +94,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t1, a1, -64
 ; CHECK-NEXT:    add sp, zero, t1
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t1)
@@ -105,7 +105,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t2, a1, -64
 ; CHECK-NEXT:    add sp, zero, t2
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t2)
@@ -116,7 +116,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t3, a1, -64
 ; CHECK-NEXT:    add sp, zero, t3
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t3)
@@ -127,7 +127,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t4, a1, -64
 ; CHECK-NEXT:    add sp, zero, t4
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t4)
@@ -138,7 +138,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t5, a1, -64
 ; CHECK-NEXT:    add sp, zero, t5
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t5)
@@ -149,7 +149,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi t6, a1, -64
 ; CHECK-NEXT:    add sp, zero, t6
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (t6)
@@ -159,7 +159,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi a2, a2, -64
 ; CHECK-NEXT:    add sp, zero, a2
 ; CHECK-NEXT:    ld a3, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a3, e64, m1
+; CHECK-NEXT:    vsetvli a3, a3, e64, m1
 ; CHECK-NEXT:    vmv.v.x v0, a1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
@@ -178,7 +178,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi s11, a2, -64
 ; CHECK-NEXT:    add sp, zero, s11
 ; CHECK-NEXT:    ld a4, 72(s1)
-; CHECK-NEXT:    vsetvli a5, a4, e64, m1
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
 ; CHECK-NEXT:    vmv.v.x v0, a3
 ; CHECK-NEXT:    vsetvli a3, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s11)
@@ -187,7 +187,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    add sp, zero, s9
 ; CHECK-NEXT:    addi a3, zero, 1023
 ; CHECK-NEXT:    ld a4, 72(s1)
-; CHECK-NEXT:    vsetvli a5, a4, e64, m1
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
 ; CHECK-NEXT:    vmv.v.x v0, a3
 ; CHECK-NEXT:    vsetvli a3, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s9)
@@ -201,48 +201,48 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi a3, a3, -64
 ; CHECK-NEXT:    add sp, zero, a3
 ; CHECK-NEXT:    ld a4, 72(s1)
-; CHECK-NEXT:    vsetvli a1, a4, e64, m1
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vsetvli a1, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a3)
-; CHECK-NEXT:    lui a1, %hi(.LCPI0_11)
-; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_11)
-; CHECK-NEXT:    fld ft0, 0(a1)
-; CHECK-NEXT:    sub a1, sp, a0
-; CHECK-NEXT:    andi s6, a1, -64
-; CHECK-NEXT:    add sp, zero, s6
-; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
-; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vsetvli a1, zero, e64, m1
-; CHECK-NEXT:    vse.v v0, (s6)
-; CHECK-NEXT:    lui a1, %hi(.LCPI0_12)
-; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_12)
-; CHECK-NEXT:    fld ft0, 0(a1)
-; CHECK-NEXT:    sub a1, sp, a0
-; CHECK-NEXT:    andi s5, a1, -64
-; CHECK-NEXT:    add sp, zero, s5
-; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
-; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vsetvli a1, zero, e64, m1
-; CHECK-NEXT:    vse.v v0, (s5)
-; CHECK-NEXT:    lui a1, %hi(.LCPI0_13)
-; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_13)
-; CHECK-NEXT:    fld ft0, 0(a1)
-; CHECK-NEXT:    sub a1, sp, a0
-; CHECK-NEXT:    andi s3, a1, -64
-; CHECK-NEXT:    add sp, zero, s3
-; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
-; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    vsetvli a1, zero, e64, m1
-; CHECK-NEXT:    vse.v v0, (s3)
-; CHECK-NEXT:    addi a1, s4, 15
-; CHECK-NEXT:    lui a4, %hi(.LCPI0_14)
-; CHECK-NEXT:    addi a4, a4, %lo(.LCPI0_14)
+; CHECK-NEXT:    lui a4, %hi(.LCPI0_11)
+; CHECK-NEXT:    addi a4, a4, %lo(.LCPI0_11)
 ; CHECK-NEXT:    fld ft0, 0(a4)
-; CHECK-NEXT:    andi a6, a1, -16
+; CHECK-NEXT:    sub a4, sp, a0
+; CHECK-NEXT:    andi s6, a4, -64
+; CHECK-NEXT:    add sp, zero, s6
+; CHECK-NEXT:    ld a4, 72(s1)
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
+; CHECK-NEXT:    vfmv.v.f v0, ft0
+; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vse.v v0, (s6)
+; CHECK-NEXT:    lui a4, %hi(.LCPI0_12)
+; CHECK-NEXT:    addi a4, a4, %lo(.LCPI0_12)
+; CHECK-NEXT:    fld ft0, 0(a4)
+; CHECK-NEXT:    sub a4, sp, a0
+; CHECK-NEXT:    andi s5, a4, -64
+; CHECK-NEXT:    add sp, zero, s5
+; CHECK-NEXT:    ld a4, 72(s1)
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
+; CHECK-NEXT:    vfmv.v.f v0, ft0
+; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vse.v v0, (s5)
+; CHECK-NEXT:    lui a4, %hi(.LCPI0_13)
+; CHECK-NEXT:    addi a4, a4, %lo(.LCPI0_13)
+; CHECK-NEXT:    fld ft0, 0(a4)
+; CHECK-NEXT:    sub a4, sp, a0
+; CHECK-NEXT:    andi s3, a4, -64
+; CHECK-NEXT:    add sp, zero, s3
+; CHECK-NEXT:    ld a4, 72(s1)
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
+; CHECK-NEXT:    vfmv.v.f v0, ft0
+; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vse.v v0, (s3)
+; CHECK-NEXT:    addi a4, s4, 15
+; CHECK-NEXT:    lui a1, %hi(.LCPI0_14)
+; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_14)
+; CHECK-NEXT:    fld ft0, 0(a1)
+; CHECK-NEXT:    andi a6, a4, -16
 ; CHECK-NEXT:    sub a1, sp, a0
 ; CHECK-NEXT:    andi s8, a1, -64
 ; CHECK-NEXT:    add sp, zero, s8
@@ -256,7 +256,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a2, a2, 80
 ; CHECK-NEXT:    add a2, a2, s1
 ; CHECK-NEXT:    vle.v v1, (a2)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vmfle.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (s4)
@@ -282,7 +282,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a2, a2, 80
 ; CHECK-NEXT:    add a2, a2, s1
 ; CHECK-NEXT:    vle.v v1, (a2)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vsrl.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a5)
@@ -292,13 +292,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a2, a2, 80
 ; CHECK-NEXT:    add a2, a2, s1
 ; CHECK-NEXT:    vle.v v1, (a2)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vand.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s7)
 ; CHECK-NEXT:    vle.v v1, (s6)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vor.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s7)
@@ -309,18 +309,18 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    vle.v v0, (s9)
 ; CHECK-NEXT:    vle.v v1, (a5)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vsub.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a5)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfcvt.f.x.v v0, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s8)
 ; CHECK-NEXT:    vle.v v1, (a3)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a2, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (s8)
@@ -332,7 +332,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a2, e64, m1
+; CHECK-NEXT:    vsetvli a2, a2, e64, m1
 ; CHECK-NEXT:    vmflt.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a2, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a1)
@@ -349,7 +349,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a5, a5, 80
 ; CHECK-NEXT:    add a5, a5, s1
 ; CHECK-NEXT:    vle.v v2, (a5)
-; CHECK-NEXT:    vsetvli a5, a4, e64, m1
+; CHECK-NEXT:    vsetvli a4, a4, e64, m1
 ; CHECK-NEXT:    vmerge.vvm v0, v1, v2, v0
 ; CHECK-NEXT:    vsetvli a4, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
@@ -386,7 +386,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a3, a3, 80
 ; CHECK-NEXT:    add a3, a3, s1
 ; CHECK-NEXT:    vle.v v1, (a3)
-; CHECK-NEXT:    vsetvli a3, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    lui a1, 0
@@ -401,7 +401,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v0, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a3)
@@ -416,13 +416,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (a7)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -431,13 +431,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t0)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -446,13 +446,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t1)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -461,13 +461,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t2)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -476,13 +476,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t3)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -491,13 +491,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t4)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -506,13 +506,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t5)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -521,13 +521,13 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (t6)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
@@ -536,46 +536,46 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    addi a4, a4, 80
 ; CHECK-NEXT:    add a4, a4, s1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v1, (a3)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v0, v1
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v0, (s5)
 ; CHECK-NEXT:    vle.v v1, (s8)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    vle.v v1, (a0)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a4, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v0, (s6)
 ; CHECK-NEXT:    vle.v v1, (a3)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a3, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    vle.v v1, (a0)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a3, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfsub.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vle.v v0, (s3)
 ; CHECK-NEXT:    vle.v v1, (s8)
 ; CHECK-NEXT:    ld a1, 72(s1)
-; CHECK-NEXT:    vsetvli a3, a1, e64, m1
+; CHECK-NEXT:    vsetvli a1, a1, e64, m1
 ; CHECK-NEXT:    vfmul.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
@@ -602,7 +602,7 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    vse.v v1, (a1)
 ; CHECK-NEXT:    vsetvli a1, zero, e8, m1
 ; CHECK-NEXT:    vle.v v0, (s4)
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vmv.v.i v2, -1
 ; CHECK-NEXT:    vmerge.vvm v16, v1, v2, v0
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m1

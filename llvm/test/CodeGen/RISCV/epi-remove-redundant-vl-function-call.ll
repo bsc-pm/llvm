@@ -13,7 +13,7 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; DISABLED-NEXT:    fld ft0, 0(a1)
 ; DISABLED-NEXT:    vsetvli a1, a0, e64, m1
 ; DISABLED-NEXT:    vfmv.v.f v0, ft0
-; DISABLED-NEXT:    vsetvli a1, a0, e64, m1
+; DISABLED-NEXT:    vsetvli a0, a0, e64, m1
 ; DISABLED-NEXT:    vfadd.vv v16, v16, v0
 ; DISABLED-NEXT:    ret
 ;
@@ -22,7 +22,7 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; CHECK-NEXT:    lui a1, %hi(.LCPI0_0)
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; CHECK-NEXT:    fld ft0, 0(a1)
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    vfadd.vv v16, v16, v0
 ; CHECK-NEXT:    ret
