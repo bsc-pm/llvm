@@ -176,7 +176,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
       BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVL), OldVLReg);
 
-      // Make sure we spill/reload all the bits
+      // Make sure we spill/reload all the bits.
+      // Note: VL and VTYPE are alive here.
       BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
           .addReg(RISCV::X0)
           // FIXME - Hardcoded to SEW=64

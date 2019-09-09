@@ -1520,6 +1520,7 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
   MachineRegisterInfo &MRI = MF.getRegInfo();
   unsigned DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
 
+  // Note: VL and VTYPE are alive here.
   MachineInstrBuilder MIB =
       BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI))
           .addReg(DestReg, RegState::Define | RegState::Dead);
@@ -1565,12 +1566,16 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
   BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoReadVL), OldVLReg);
   // VSCALE can be computed as VLMAX of ELEN, given that the scaling factor for
   // ELEN is '1'.
-  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), DestReg)
-      .addReg(RISCV::X0)
-      // FIXME - ELEN hardcoded to SEW=64.
-      .addImm(3)
-      // LMUL=1.
-      .addImm(0);
+  MachineInstr &I = *BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), DestReg)
+                         .addReg(RISCV::X0)
+                         // FIXME - ELEN hardcoded to SEW=64.
+                         .addImm(3)
+                         // LMUL=1.
+                         .addImm(0);
+  // Set VTYPE and VL as dead.
+  I.getOperand(4).setIsDead();
+  I.getOperand(5).setIsDead();
+
   // Restore old VTYPE and VL.
   BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
       .addReg(OldVLReg, RegState::Kill)

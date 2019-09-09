@@ -213,6 +213,7 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
     BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVTYPE), OldVTypeReg);
     BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVL), OldVLReg);
+    // Note: VL and VTYPE are alive here.
     BuildMI(MBB, MBBI, DL, get(RISCV::VSETVLI), RISCV::X0)
         .addReg(RISCV::X0)
         // FIXME - Hardcoded to SEW=64

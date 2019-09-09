@@ -43,7 +43,7 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    call puts
 ; SPILL-O0-NEXT:    # kill: def $x10 killed $x10
 ; SPILL-O0-NEXT:    ld a0, -48(s0)
-; SPILL-O0-NEXT:    vsetvli a1, a0, e64, m1
+; SPILL-O0-NEXT:    vsetvli a0, a0, e64, m1
 ; SPILL-O0-NEXT:    ld a2, -64(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0

@@ -13,12 +13,11 @@ declare i64 @llvm.epi.vsetvl(i64, i64, i64);
 define void @test_vsetvl_single_1(i64 %avl) nounwind
 ; CHECK-O0-LABEL: test_vsetvl_single_1:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    vsetvli a0, a0, e8, m1
+; CHECK-O0-NEXT:    # kill: def $x10 killed $x10
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_single_1:
 ; CHECK-O2:       # %bb.0:
-; CHECK-O2-NEXT:    vsetvli a0, a0, e8, m1
 ; CHECK-O2-NEXT:    ret
 {
   call i64 @llvm.epi.vsetvl(i64 %avl, i64 0, i64 0)

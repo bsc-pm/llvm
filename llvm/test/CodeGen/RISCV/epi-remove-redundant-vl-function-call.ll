@@ -58,21 +58,19 @@ define void @foo(double*) nounwind {
 ;
 ; CHECK-LABEL: foo:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    addi sp, sp, -32
-; CHECK-NEXT:    sd ra, 24(sp)
-; CHECK-NEXT:    sd s1, 16(sp)
-; CHECK-NEXT:    sd s2, 8(sp)
-; CHECK-NEXT:    add s2, zero, a0
-; CHECK-NEXT:    vsetvli s1, zero, e64, m1
-; CHECK-NEXT:    vle.v v16, (a0)
-; CHECK-NEXT:    srli a0, s1, 1
+; CHECK-NEXT:    addi sp, sp, -16
+; CHECK-NEXT:    sd ra, 8(sp)
+; CHECK-NEXT:    sd s1, 0(sp)
+; CHECK-NEXT:    add s1, zero, a0
+; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vle.v v16, (s1)
+; CHECK-NEXT:    srli a0, a0, 1
 ; CHECK-NEXT:    call add1
-; CHECK-NEXT:    vsetvli a0, s1, e64, m1
-; CHECK-NEXT:    vse.v v16, (s2)
-; CHECK-NEXT:    ld s2, 8(sp)
-; CHECK-NEXT:    ld s1, 16(sp)
-; CHECK-NEXT:    ld ra, 24(sp)
-; CHECK-NEXT:    addi sp, sp, 32
+; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vse.v v16, (s1)
+; CHECK-NEXT:    ld s1, 0(sp)
+; CHECK-NEXT:    ld ra, 8(sp)
+; CHECK-NEXT:    addi sp, sp, 16
 ; CHECK-NEXT:    ret
   %2 = call i64 @llvm.epi.vsetvlmax(i64 3, i64 0)
   %3 = bitcast double* %0 to <vscale x 1 x double>*
