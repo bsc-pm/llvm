@@ -1087,6 +1087,10 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
 def PseudoReadVL : Pseudo<(outs GPR:$rd),
                           (ins), [], "rdvl $rd">;
 
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 1,
+     usesCustomInserter = 1 in
+def PseudoVSCALE : Pseudo<(outs GPR:$rd), (ins), [], "">;
+
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     Uses = [VTYPE] in
 def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
@@ -2168,9 +2172,7 @@ def NoX0 : SDNodeXForm<undef,
 
 let Predicates = [HasExtEPI] in {
 
-// FIXME: I think we better map this one to VLEN (i.e. the maximum vector
-// length in bits)
-def : Pat<(int_experimental_vector_vscale), (PseudoReadVL)>;
+def : Pat<(int_experimental_vector_vscale), (PseudoVSCALE)>;
 
 def : Pat<(int_epi_vreadvl), (PseudoReadVL)>;
 

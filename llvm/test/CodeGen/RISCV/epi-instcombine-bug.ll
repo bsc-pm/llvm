@@ -33,12 +33,14 @@ define dso_local <vscale x 1 x double> @_Z10log_vectorDv1_dm(<vscale x 1 x doubl
 ; CHECK-NEXT:    andi sp, sp, -64
 ; CHECK-NEXT:    add s1, zero, sp
 ; CHECK-NEXT:    sd a0, 72(s1)
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli s4, zero, e64, m1
 ; CHECK-NEXT:    lui a0, 0
 ; CHECK-NEXT:    addi a0, a0, 80
 ; CHECK-NEXT:    add a0, a0, s1
 ; CHECK-NEXT:    vse.v v16, (a0)
-; CHECK-NEXT:    rdvl s4
+; CHECK-NEXT:    rdvtype a0
+; CHECK-NEXT:    rdvl a1
+; CHECK-NEXT:    vsetvl zero, a1, a0
 ; CHECK-NEXT:    slli a0, s4, 3
 ; CHECK-NEXT:    addi a0, a0, 15
 ; CHECK-NEXT:    andi a0, a0, -16

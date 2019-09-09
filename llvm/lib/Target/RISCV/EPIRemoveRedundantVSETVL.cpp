@@ -191,6 +191,7 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
   }
 
   // Now replace the removed output operands according to the map
+  const MachineRegisterInfo &MRI = F.getRegInfo();
   for (MachineBasicBlock &MBB : F) {
     for (MachineBasicBlock::instr_iterator II = MBB.instr_begin(),
                                            IIEnd = MBB.instr_end();
@@ -199,8 +200,17 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
       for (auto &Use : MI.uses()) {
         if (Use.isReg()) {
           OutputOpMap_t::iterator Op = OutputOpMap.find(Use.getReg());
-          if (Op != OutputOpMap.end())
+          if (Op != OutputOpMap.end()) {
             Use.setReg(Op->getSecond());
+            assert(Register::isVirtualRegister(Op->getSecond()) &&
+                   "Must be a virtual register");
+            assert(MRI.hasOneDef(Op->getSecond()) && "We need one def");
+            MachineOperand &DefOperand = *MRI.def_begin(Op->getSecond());
+            if (DefOperand.isDead()) {
+              // Now it has become alive.
+              DefOperand.setIsDead(false);
+            }
+          }
         }
       }
     }

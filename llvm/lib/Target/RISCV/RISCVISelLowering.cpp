@@ -1546,6 +1546,39 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
   return BB;
 }
 
+static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
+                                            MachineBasicBlock *BB) {
+  MachineFunction &MF = *BB->getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  Register DestReg = MI.getOperand(0).getReg();
+
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  Register OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  Register OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+
+  // Keep the old VTYPE and VL
+  BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoReadVTYPE), OldVTypeReg);
+  BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoReadVL), OldVLReg);
+  // VSCALE can be computed as VLMAX of ELEN, given that the scaling factor for
+  // ELEN is '1'.
+  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), DestReg)
+      .addReg(RISCV::X0)
+      // FIXME - ELEN hardcoded to SEW=64.
+      .addImm(3)
+      // LMUL=1.
+      .addImm(0);
+  // Restore old VTYPE and VL.
+  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
+      .addReg(OldVLReg)
+      .addReg(OldVTypeReg);
+
+  // The pseudo instruction is gone now.
+  MI.eraseFromParent();
+  return BB;
+}
+
 MachineBasicBlock *
 RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                  MachineBasicBlock *BB) const {
@@ -1558,6 +1591,14 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     assert(SEWIndex >= 0);
 
     return addEPISetVL(MI, BB, VLIndex, SEWIndex, EPI->VLMul);
+  }
+
+  // Other EPI pseudo-instructions.
+  switch (MI.getOpcode()) {
+  default:
+    break;
+  case RISCV::PseudoVSCALE:
+    return emitComputeVSCALE(MI, BB);
   }
 
   switch (MI.getOpcode()) {
