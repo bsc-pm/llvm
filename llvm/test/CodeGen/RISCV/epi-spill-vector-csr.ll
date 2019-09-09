@@ -41,8 +41,9 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    vse.v v16, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    call puts
-; SPILL-O0-NEXT:    ld a1, -32(s0)
-; SPILL-O0-NEXT:    vsetvli a2, a1, e64, m1
+; SPILL-O0-NEXT:    # kill: def $x10 killed $x10
+; SPILL-O0-NEXT:    ld a0, -32(s0)
+; SPILL-O0-NEXT:    vsetvli a1, a0, e64, m1
 ; SPILL-O0-NEXT:    ld a2, -48(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
@@ -55,8 +56,8 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v1, (a2)
 ; SPILL-O0-NEXT:    vsetvl zero, a0, a1
-; SPILL-O0-NEXT:    vfadd.vv v2, v0, v1
-; SPILL-O0-NEXT:    vfadd.vv v16, v0, v2
+; SPILL-O0-NEXT:    vfadd.vv v1, v0, v1
+; SPILL-O0-NEXT:    vfadd.vv v16, v0, v1
 ; SPILL-O0-NEXT:    addi sp, s0, -48
 ; SPILL-O0-NEXT:    ld s0, 32(sp)
 ; SPILL-O0-NEXT:    ld ra, 40(sp)
