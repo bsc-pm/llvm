@@ -103,6 +103,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
+  MachineFrameInfo &MFI = MF.getFrameInfo();
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const RISCVInstrInfo *TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
   DebugLoc DL = MI.getDebugLoc();
@@ -112,6 +113,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int Offset =
       getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg);
 
+  bool NeedsIndirectAddressing = false;
   bool OffsetFits = false;
   int OffsetIndex = -1;
   // FIXME: Improve this to make it more robust.
@@ -130,6 +132,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // The following two are handled later in this function
   case RISCV::PseudoVSPILL:
   case RISCV::PseudoVRELOAD:
+    NeedsIndirectAddressing = true;
     break;
   default:
     OffsetIndex = FIOperandNum + 1;
@@ -145,62 +148,73 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MachineBasicBlock &MBB = *MI.getParent();
 
-  // Handle vector spills here
-  if (MI.getOpcode() == RISCV::PseudoVSPILL ||
-      MI.getOpcode() == RISCV::PseudoVRELOAD) {
-    MachineOperand SlotAddr = MI.getOperand(FIOperandNum);
+  if (NeedsIndirectAddressing) {
+    assert(OffsetIndex == -1 && "There must not be offset");
+    assert(MFI.getStackID(FrameIndex) == RISCVStackID::EPIVR_SPILL &&
+           "Unexpected stack ID");
 
-    // Save VTYPE and VL
-    unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVTYPE), OldVTypeReg);
-    unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVL), OldVLReg);
+    MachineOperand SlotAddr = MI.getOperand(FIOperandNum);
 
     // TODO: Consider using loadRegFromStackSlot but this has to be before
     // replacing the FI above.
     unsigned LoadHandleOpcode =
         getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
     unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    BuildMI(MBB, II, DL, TII->get(LoadHandleOpcode), HandleReg)
-        .add(SlotAddr)
-        .addImm(0);
-    MachineBasicBlock::iterator RemoveFI = std::prev(II);
+    MachineInstr *LoadHandle =
+        BuildMI(MBB, II, DL, TII->get(LoadHandleOpcode), HandleReg)
+            .add(SlotAddr)
+            .addImm(0);
 
-    // Make sure we spill/reload all the bits
-    BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
-        .addReg(RISCV::X0)
-        // FIXME - Hardcoded to SEW=64
-        .addImm(3)
-        // VLMUL=1
-        .addImm(0);
+    // Handle vector spills here
+    if (MI.getOpcode() == RISCV::PseudoVSPILL ||
+        MI.getOpcode() == RISCV::PseudoVRELOAD) {
 
-    MachineOperand &OpReg = MI.getOperand(0);
-    switch (MI.getOpcode()) {
-    default:
-      llvm_unreachable("Unexpected instruction");
-    case RISCV::PseudoVSPILL: {
-      BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
-          .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-          .addReg(HandleReg);
-      break;
+      // Save VTYPE and VL
+      unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+      BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVTYPE), OldVTypeReg);
+      unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+      BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVL), OldVLReg);
+
+      // Make sure we spill/reload all the bits
+      BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
+          .addReg(RISCV::X0)
+          // FIXME - Hardcoded to SEW=64
+          .addImm(3)
+          // VLMUL=1
+          .addImm(0);
+
+      MachineOperand &OpReg = MI.getOperand(0);
+      switch (MI.getOpcode()) {
+      default:
+        llvm_unreachable("Unexpected instruction");
+      case RISCV::PseudoVSPILL: {
+        BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
+            .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
+            .addReg(HandleReg);
+        break;
+      }
+      case RISCV::PseudoVRELOAD: {
+        BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
+            .addReg(HandleReg);
+        break;
+      }
+      }
+
+      // Restore VTYPE and VL
+      BuildMI(MBB, II, DL, TII->get(RISCV::VSETVL), RISCV::X0)
+          .addReg(OldVLReg)
+          .addReg(OldVTypeReg);
+
+      // Remove the pseudo
+      MI.eraseFromParent();
+    } else {
+      // Use the handle as address
+      MI.getOperand(FIOperandNum)
+          .ChangeToRegister(HandleReg, false, false, /* isKill */ true);
     }
-    case RISCV::PseudoVRELOAD: {
-      BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
-          .addReg(HandleReg);
-      break;
-    }
-    }
-
-    // Restore VTYPE and VL
-    BuildMI(MBB, II, DL, TII->get(RISCV::VSETVL), RISCV::X0)
-        .addReg(OldVLReg)
-        .addReg(OldVTypeReg);
-
-    // Remove the pseudo
-    MI.eraseFromParent();
 
     // Now remove the FI of the handle load
-    return eliminateFrameIndex(RemoveFI, /* SPAdj */ 0, 1, RS);
+    return eliminateFrameIndex(LoadHandle, /* SPAdj */ 0, 1, RS);
   }
 
   bool FrameRegIsKill = false;

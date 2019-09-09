@@ -6,19 +6,13 @@ void basic_test_callee(__epi_1xf64 a, __epi_1xf64 b, __epi_1xi1 mask);
 
 // CHECK-LABEL: @basic_test_caller(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
-// CHECK-NEXT:    [[A:%.*]] = alloca double, i64 [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = bitcast double* [[A]] to <vscale x 1 x double>*
-// CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
-// CHECK-NEXT:    [[B:%.*]] = alloca double, i64 [[TMP2]], align 8
-// CHECK-NEXT:    [[TMP3:%.*]] = bitcast double* [[B]] to <vscale x 1 x double>*
-// CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
-// CHECK-NEXT:    [[MASK:%.*]] = alloca i1, i64 [[TMP4]], align 1
-// CHECK-NEXT:    [[TMP5:%.*]] = bitcast i1* [[MASK]] to <vscale x 1 x i1>*
-// CHECK-NEXT:    [[TMP6:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[TMP1]], align 8
-// CHECK-NEXT:    [[TMP7:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[TMP3]], align 8
-// CHECK-NEXT:    [[TMP8:%.*]] = load <vscale x 1 x i1>, <vscale x 1 x i1>* [[TMP5]], align 1
-// CHECK-NEXT:    call void @basic_test_callee(<vscale x 1 x double> [[TMP6]], <vscale x 1 x double> [[TMP7]], <vscale x 1 x i1> [[TMP8]])
+// CHECK-NEXT:    [[A:%.*]] = alloca <vscale x 1 x double>, align 8
+// CHECK-NEXT:    [[B:%.*]] = alloca <vscale x 1 x double>, align 8
+// CHECK-NEXT:    [[MASK:%.*]] = alloca <vscale x 1 x i1>, align 1
+// CHECK-NEXT:    [[TMP0:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[A]], align 8
+// CHECK-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[B]], align 8
+// CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 1 x i1>, <vscale x 1 x i1>* [[MASK]], align 1
+// CHECK-NEXT:    call void @basic_test_callee(<vscale x 1 x double> [[TMP0]], <vscale x 1 x double> [[TMP1]], <vscale x 1 x i1> [[TMP2]])
 // CHECK-NEXT:    ret void
 //
 void basic_test_caller(void)

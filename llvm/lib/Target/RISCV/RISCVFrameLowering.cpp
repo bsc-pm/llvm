@@ -56,6 +56,8 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     uint8_t StackID = MFI.getStackID(FI);
     if (StackID == RISCVStackID::DEFAULT)
       continue;
+    if (MFI.isDeadObjectIndex(FI))
+      continue;
 
     switch (StackID) {
     case RISCVStackID::EPIVR_SPILL:
@@ -75,8 +77,10 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     // Skip those already printed in PrologEpilogEmitter
     if (MFI.getStackID(FI) == RISCVStackID::DEFAULT)
       continue;
+    assert(MFI.getStackID(FI) == RISCVStackID::EPIVR_SPILL &&
+           "Unexpected Stack ID!");
     LLVM_DEBUG(dbgs() << "alloc FI(" << FI << ") at SP["
-                      << MFI.getObjectOffset(FI) << "]\n");
+                      << MFI.getObjectOffset(FI) << "] StackID: EPIVR_SPILL\n");
   }
 #endif
 
@@ -554,6 +558,23 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
     int RegScavFI = MFI.CreateStackObject(
         RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
     RS->addScavengingFrameIndex(RegScavFI);
+  }
+
+  // Go through all Stackslots coming from an alloca and make them EPIVR_SPILL.
+  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
+       FI < EFI; FI++) {
+    // Get the (LLVM IR) allocation instruction
+    const AllocaInst *Alloca = MFI.getObjectAllocation(FI);
+
+    if (!Alloca)
+      continue;
+
+    const VectorType *VT =
+        dyn_cast<const VectorType>(Alloca->getType()->getElementType());
+    if (VT && VT->isScalable()) {
+      MFI.setStackID(FI, RISCVStackID::EPIVR_SPILL);
+      RVFI->setHasSpilledEPIVR();
+    }
   }
 }
 

@@ -4,11 +4,9 @@
 
 // CHECK-LABEL: @foo(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
-// CHECK-NEXT:    [[A:%.*]] = alloca double, i64 [[TMP0]], align 8
-// CHECK-NEXT:    [[TMP1:%.*]] = bitcast double* [[A]] to <vscale x 1 x double>*
-// CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[TMP1]], align 8
-// CHECK-NEXT:    store <vscale x 1 x double> [[TMP2]], <vscale x 1 x double>* [[TMP1]], align 8
+// CHECK-NEXT:    [[A:%.*]] = alloca <vscale x 1 x double>, align 8
+// CHECK-NEXT:    [[TMP0:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[A]], align 8
+// CHECK-NEXT:    store <vscale x 1 x double> [[TMP0]], <vscale x 1 x double>* [[A]], align 8
 // CHECK-NEXT:    ret void
 //
 void foo(void) {

@@ -28,30 +28,30 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(.L.str)
 ; SPILL-O0-NEXT:    sd a0, -32(s0)
 ; SPILL-O0-NEXT:    mv a0, a1
+; SPILL-O0-NEXT:    ld a3, -40(s0)
 ; SPILL-O0-NEXT:    rdvtype a2
 ; SPILL-O0-NEXT:    rdvl a1
-; SPILL-O0-NEXT:    ld a3, -40(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vse.v v17, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
+; SPILL-O0-NEXT:    ld a3, -48(s0)
 ; SPILL-O0-NEXT:    rdvtype a2
 ; SPILL-O0-NEXT:    rdvl a1
-; SPILL-O0-NEXT:    ld a3, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vse.v v16, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    call puts
 ; SPILL-O0-NEXT:    ld a1, -32(s0)
 ; SPILL-O0-NEXT:    vsetvli a2, a1, e64, m1
+; SPILL-O0-NEXT:    ld a2, -48(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
-; SPILL-O0-NEXT:    ld a2, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v0, (a2)
 ; SPILL-O0-NEXT:    vsetvl zero, a0, a1
+; SPILL-O0-NEXT:    ld a2, -40(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
-; SPILL-O0-NEXT:    ld a2, -40(s0)
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v1, (a2)
 ; SPILL-O0-NEXT:    vsetvl zero, a0, a1
@@ -82,15 +82,15 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O2-NEXT:    sd sp, -48(s0)
 ; SPILL-O2-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O2-NEXT:    mv s1, a0
+; SPILL-O2-NEXT:    ld a2, -40(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    ld a2, -40(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vse.v v17, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
+; SPILL-O2-NEXT:    ld a2, -48(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    ld a2, -48(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vse.v v16, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
@@ -98,15 +98,15 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O2-NEXT:    addi a0, a0, %lo(.L.str)
 ; SPILL-O2-NEXT:    call puts
 ; SPILL-O2-NEXT:    vsetvli a0, s1, e64, m1
+; SPILL-O2-NEXT:    ld a2, -48(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    ld a2, -48(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vle.v v1, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
+; SPILL-O2-NEXT:    ld a2, -40(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    ld a2, -40(s0)
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vle.v v0, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
