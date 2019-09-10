@@ -266,6 +266,9 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   for (const auto &Entry : CSI) {
     int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx());
     Register Reg = Entry.getReg();
+    // We don't have sensible DWARF for EPI registers yet
+    if (RISCV::EPIVRRegClass.contains(Reg))
+      continue;
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
         nullptr, RI->getDwarfRegNum(Reg, true), Offset));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
@@ -429,6 +432,9 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // directives.
   for (const auto &Entry : CSI) {
     Register Reg = Entry.getReg();
+    // We don't have sensible DWARF for EPI registers yet
+    if (RISCV::EPIVRRegClass.contains(Reg))
+      continue;
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createRestore(
         nullptr, RI->getDwarfRegNum(Reg, true)));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
