@@ -19,19 +19,19 @@ body: |
 # CHECK-NEXT:	vsetvli	zero, zero, e64, m1
 # CHECK-NEXT:	vmv.v.v	v3, v2
 # CHECK-NEXT:	vsetvl	zero, t1, t0
-# CHECK-NEXT:	rdvtype t2
-# CHECK-NEXT:	rdvl a1
+# CHECK-NEXT:	rdvtype t0
+# CHECK-NEXT:	rdvl t1
 # CHECK-NEXT:	vsetvli	zero, zero, e64, m1
 # CHECK-NEXT:	vmv.v.v	v4, v3
-# CHECK-NEXT:	vsetvl	zero, a1, t2
-# CHECK-NEXT:	rdvtype a2
-# CHECK-NEXT:	rdvl a3
+# CHECK-NEXT:	vsetvl	zero, t1, t0
+# CHECK-NEXT:	rdvtype t0
+# CHECK-NEXT:	rdvl t1
 # CHECK-NEXT:	vsetvli	zero, zero, e64, m1
 # CHECK-NEXT:	vmv.v.v	v5, v4
-# CHECK-NEXT:	vsetvl	zero, a3, a2
-# CHECK-NEXT:	rdvtype a4
-# CHECK-NEXT:	rdvl a5
+# CHECK-NEXT:	vsetvl	zero, t1, t0
+# CHECK-NEXT:	rdvtype t0
+# CHECK-NEXT:	rdvl t1
 # CHECK-NEXT:	vsetvli	zero, zero, e64, m1
 # CHECK-NEXT:	vmv.v.v	v6, v5
-# CHECK-NEXT:	vsetvl	zero, a5, a4
+# CHECK-NEXT:	vsetvl	zero, t1, t0
 # CHECK-NEXT:	vse.v	v6, (a0)

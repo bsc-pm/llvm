@@ -1,0 +1,56 @@
+# RUN: llc -o - -mtriple=riscv64-unknown-linux-gnu -mattr=+epi \
+# RUN:     -verify-machineinstrs %s | FileCheck %s
+---
+name:            test
+tracksRegLiveness: true
+body: |
+  bb.0.entry:
+    liveins: $v2, $x10
+    $x1 = COPY $x10
+    $x2 = COPY $x10
+    $x3 = COPY $x10
+    $x4 = COPY $x10
+    $x5 = COPY $x10
+    $x6 = COPY $x10
+    $x7 = COPY $x10
+    $x8 = COPY $x10
+    $x9 = COPY $x10
+    $x11 = COPY $x10
+    $x12 = COPY $x10
+    $x13 = COPY $x10
+    $x14 = COPY $x10
+    $x15 = COPY $x10
+    $x16 = COPY $x10
+    $x17 = COPY $x10
+    $x18 = COPY $x10
+    $x19 = COPY $x10
+    $x20 = COPY $x10
+    $x21 = COPY $x10
+    $x22 = COPY $x10
+    $x23 = COPY $x10
+    $x24 = COPY $x10
+    $x25 = COPY $x10
+    $x26 = COPY $x10
+    $x27 = COPY $x10
+    $x28 = COPY $x10
+    $x29 = COPY $x10
+    $x30 = COPY $x10
+    $x31 = COPY $x10
+    $v1 = COPY $v2
+    INLINEASM &nop, 1, 131081, killed $x0, 131081, killed $x1, 131081, killed $x2, 131081, killed $x3, 131081, killed $x4, 131081, killed $x5, 131081, killed $x6, 131081, killed $x7, 131081, killed $x8, 131081, killed $x9, 131081, killed $x11, 131081, killed $x12, 131081, killed $x13, 131081, killed $x14, 131081, killed $x15, 131081, killed $x16, 131081, killed $x17, 131081, killed $x18, 131081, killed $x19, 131081, killed $x20, 131081, killed $x21, 131081, killed $x22, 131081, killed $x23, 131081, killed $x24, 131081, killed $x25, 131081, killed $x26, 131081, killed $x27, 131081, killed $x28, 131081, killed $x29, 131081, killed $x30, 131081, killed $x31
+    VSE_V $v1, $x10, implicit $vl, implicit $vtype
+
+...
+
+# CHECK:  addi  sp, sp, -16
+# CHECK-NEXT:  sd  t0, 0(sp)
+# CHECK-NEXT:  sd  t1, 8(sp)
+# CHECK-NEXT:  rdvtype t0
+# CHECK-NEXT:  rdvl t1
+# CHECK-NEXT:  vsetvli zero, zero, e64, m1
+# CHECK-NEXT:  vmv.v.v v1, v2
+# CHECK-NEXT:  vsetvl  zero, t1, t0
+# CHECK-NEXT:  ld  t0, 0(sp)
+# CHECK-NEXT:  ld  t1, 8(sp)
+# CHECK-NEXT:  addi  sp, sp, 16
+
