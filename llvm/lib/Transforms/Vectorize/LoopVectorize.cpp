@@ -315,11 +315,11 @@ static Type *getMemInstValueType(Value *I) {
 /// A helper function that returns true if the given type is irregular. The
 /// type is irregular if its allocated size doesn't equal the store size of an
 /// element of the corresponding vector type at the given vectorization factor.
-static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF) {
+static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF, bool Scalable=false) {
   // Determine if an array of VF elements of type Ty is "bitcast compatible"
   // with a <VF x Ty> vector.
   if (VF > 1) {
-    auto *VectorTy = VectorType::get(Ty, VF);
+    auto *VectorTy = VectorType::get(Ty, VF, Scalable);
     return VF * DL.getTypeAllocSize(Ty) != DL.getTypeStoreSize(VectorTy);
   }
 
@@ -383,6 +383,7 @@ public:
                       LoopVectorizationCostModel *CM)
       : OrigLoop(OrigLoop), PSE(PSE), LI(LI), DT(DT), TLI(TLI), TTI(TTI),
         AC(AC), ORE(ORE), VF(VecWidth), UF(UnrollFactor),
+        Scalable(TTI->useScalableVectorType()),
         Builder(PSE.getSE()->getContext()),
         VectorLoopValueMap(UnrollFactor, VecWidth), Legal(LVL), Cost(CM) {}
   virtual ~InnerLoopVectorizer() = default;
@@ -679,6 +680,9 @@ protected:
   /// many different vector instructions.
   unsigned UF;
 
+  /// Use scalable Vector Types
+  bool Scalable;
+
   /// The builder that we use
   IRBuilder<> Builder;
 
@@ -950,6 +954,10 @@ public:
   /// then this vectorization factor will be selected if vectorization is
   /// possible.
   VectorizationFactor selectVectorizationFactor(unsigned MaxVF);
+
+  /// \return The vectorization factor for scalable vectors after processing the
+  /// types.
+  VectorizationFactor selectScalableVectorizationFactor(unsigned MaxVF);
 
   /// Setup cost-based decisions for user vectorization factor.
   void selectUserVectorizationFactor(unsigned UserVF) {
@@ -2329,7 +2337,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     return vectorizeInterleaveGroup(Instr);
 
   Type *ScalarDataTy = getMemInstValueType(Instr);
-  Type *DataTy = VectorType::get(ScalarDataTy, VF);
+  Type *DataTy = VectorType::get(ScalarDataTy, VF, Scalable);
   Value *Ptr = getLoadStorePointerOperand(Instr);
   unsigned Alignment = getLoadStoreAlignment(Instr);
   // An alignment of 0 means target abi alignment. We need to use the scalar's
@@ -5100,6 +5108,55 @@ LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
   return Factor;
 }
 
+VectorizationFactor
+LoopVectorizationCostModel::selectScalableVectorizationFactor(unsigned VF) {
+  float Cost = expectedCost(1).first;
+  const float ScalarCost = Cost;
+  unsigned Width = 1;
+  LLVM_DEBUG(dbgs() << "LV: Scalar loop costs: " << (int)ScalarCost << ".\n");
+
+  bool ForceVectorization = Hints->getForce() == LoopVectorizeHints::FK_Enabled;
+  if (ForceVectorization) {
+    // Ignore scalar width, because the user explicitly wants vectorization.
+    // Initialize cost to max so that VF = 2 is, at least, chosen during cost
+    // evaluation.
+    Cost = std::numeric_limits<float>::max();
+  }
+
+  // Notice that the vector loop needs to be executed less times, so
+  // we need to divide the cost of the vector loops by the width of
+  // the vector elements.
+  VectorizationCostTy C = expectedCost(VF);
+  float VectorCost = C.first / (float)VF;
+  LLVM_DEBUG(dbgs() << "LV: Vector loop of width " << VF
+                    << " costs: " << (int)VectorCost << ".\n");
+  if (!C.second && !ForceVectorization) {
+    LLVM_DEBUG(
+        dbgs() << "LV: Not considering vector loop of width " << VF
+               << " because it will not generate any vector instructions.\n");
+  }
+  if (VectorCost < Cost) {
+    Cost = VectorCost;
+    Width = VF;
+  }
+
+  if (!EnableCondStoresVectorization && NumPredStores) {
+    ORE->emit(createMissedAnalysis("ConditionalStore")
+              << "store that is conditionally executed prevents vectorization");
+    LLVM_DEBUG(
+        dbgs() << "LV: No vectorization. There are conditional stores.\n");
+    Width = 1;
+    Cost = ScalarCost;
+  }
+
+  LLVM_DEBUG(if (ForceVectorization && Width > 1 && Cost >= ScalarCost) dbgs()
+             << "LV: Vectorization seems to be not beneficial, "
+             << "but was forced by a user.\n");
+  LLVM_DEBUG(dbgs() << "LV: Selecting VF: " << Width << ".\n");
+  VectorizationFactor Factor = {Width, (unsigned)(Width * Cost)};
+  return Factor;
+}
+
 std::pair<unsigned, unsigned>
 LoopVectorizationCostModel::getSmallestAndWidestTypes() {
   unsigned MinWidth = -1U;
@@ -6440,25 +6497,21 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
     return {{UserVF, 0}};
   }
 
-  unsigned MaxVF = MaybeMaxVF.getValue();
-  assert(MaxVF != 0 && "MaxVF is zero.");
-
-    // Most of the VF selection code for fixed length vectors does not make
-    // sense for scalable vectors. So as a starting point we assume that if we
-    // are using scalable vectors we are going to vectorize based on the
-    // computed MaxVF (max K factor). 
+  // Most of the VF selection code for fixed length vectors does not make
+  // sense for scalable vectors. So as a starting point we assume that if we
+  // are using scalable vectors we are going to vectorize based on the
+  // computed MaxVF (max K factor).
   if (TTI->useScalableVectorType()) {
-    //CM.selectUserVectorizationFactor(MaxVF);
-    // Compute the optimum scalable vector factor based
-    // on the MaxVF.
-    // Note: call collect mehtods in in and return MaxVF
-    unsigned VF = computeScalableVF(MaxVF);
+    unsigned VF = MaybeMaxVF.getValue();
+    CM.collectUniformsAndScalars(VF);
+    CM.collectInstsToScalarize(VF);
     buildVPlansWithVPRecipes(VF, VF);
     LLVM_DEBUG(printPlans(dbgs()));
-    // implement selectVectorizationfactor without the looping overhead.
     return CM.selectScalableVectorizationFactor(VF);
   }
 
+  unsigned MaxVF = MaybeMaxVF.getValue();
+  assert(MaxVF != 0 && "MaxVF is zero.");
   for (unsigned VF = 1; VF <= MaxVF; VF *= 2) {
     // Collect Uniform and Scalar instructions after vectorization with VF.
     CM.collectUniformsAndScalars(VF);
@@ -7871,7 +7924,6 @@ bool LoopVectorizePass::runImpl(
 PreservedAnalyses LoopVectorizePass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
   auto &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
-  auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
