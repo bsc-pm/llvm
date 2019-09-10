@@ -1571,8 +1571,8 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
       .addImm(0);
   // Restore old VTYPE and VL.
   BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
-      .addReg(OldVLReg)
-      .addReg(OldVTypeReg);
+      .addReg(OldVLReg, RegState::Kill)
+      .addReg(OldVTypeReg, RegState::Kill);
 
   // The pseudo instruction is gone now.
   MI.eraseFromParent();

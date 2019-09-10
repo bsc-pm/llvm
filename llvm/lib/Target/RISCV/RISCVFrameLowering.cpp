@@ -333,13 +333,17 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
     // FIXME - Hardcoded to SEW=64
     .addImm(3)
     .addImm(0); // VLMUL=1
+  // Restore VTYPE.
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
+      .addReg(OldVLReg, RegState::Kill)
+      .addReg(OldVTypeReg, RegState::Kill);
   // Compute the size in bytes (3)
   BuildMI(MBB, MBBI, DL, TII.get(RISCV::SLLI), SizeOfVector)
       .addReg(SizeOfVector)
       .addImm(3); // 2^3 = 8 bytes
 
+  // Do the actual allocation.
   unsigned SPReg = getSPReg(STI);
-
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
     int8_t StackID = MFI.getStackID(FI);
@@ -363,11 +367,6 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
         .addFrameIndex(FI)
         .addImm(0);
   }
-
-  // Restore VTYPE
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
-      .addReg(OldVLReg)
-      .addReg(OldVTypeReg);
 }
 
 void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,

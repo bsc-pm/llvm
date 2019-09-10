@@ -34,14 +34,14 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    sd ra, 40(sp)
 ; CHECK-O0-NEXT:    sd s0, 32(sp)
 ; CHECK-O0-NEXT:    addi s0, sp, 48
-; CHECK-O0-NEXT:    rdvtype a5
-; CHECK-O0-NEXT:    rdvl a4
-; CHECK-O0-NEXT:    vsetvli a6, zero, e64, m1
-; CHECK-O0-NEXT:    slli a6, a6, 3
-; CHECK-O0-NEXT:    sub sp, sp, a6
+; CHECK-O0-NEXT:    rdvtype a6
+; CHECK-O0-NEXT:    rdvl a5
+; CHECK-O0-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-O0-NEXT:    vsetvl zero, a5, a6
+; CHECK-O0-NEXT:    slli a4, a4, 3
+; CHECK-O0-NEXT:    sub sp, sp, a4
 ; CHECK-O0-NEXT:    andi sp, sp, -16
 ; CHECK-O0-NEXT:    sd sp, -40(s0)
-; CHECK-O0-NEXT:    vsetvl zero, a4, a5
 ; CHECK-O0-NEXT:    vsetvli a0, a0, e64, m1
 ; CHECK-O0-NEXT:    vle.v v0, (a3)
 ; CHECK-O0-NEXT:    vle.v v1, (a2)

@@ -190,20 +190,20 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       case RISCV::PseudoVSPILL: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
             .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg);
+            .addReg(HandleReg, RegState::Kill);
         break;
       }
       case RISCV::PseudoVRELOAD: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
-            .addReg(HandleReg);
+            .addReg(HandleReg, RegState::Kill);
         break;
       }
       }
 
       // Restore VTYPE and VL
       BuildMI(MBB, II, DL, TII->get(RISCV::VSETVL), RISCV::X0)
-          .addReg(OldVLReg)
-          .addReg(OldVTypeReg);
+          .addReg(OldVLReg, RegState::Kill)
+          .addReg(OldVTypeReg, RegState::Kill);
 
       // Remove the pseudo
       MI.eraseFromParent();
