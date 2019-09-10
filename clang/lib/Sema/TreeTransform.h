@@ -2393,6 +2393,16 @@ public:
                                               ColonLoc, Length, RBracketLoc);
   }
 
+  /// Build a new array shaping expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
+                                        SourceLocation LBLoc,
+                                        SourceLocation RBLoc) {
+    return getSema().ActOnOSSArrayShapingExpr(Base, Shapes, LBLoc, RBLoc);
+  }
+
   /// Build a new call expression.
   ///
   /// By default, performs semantic analysis to build the new expression.
@@ -9403,12 +9413,19 @@ OSSClause *
 TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
   llvm::SmallVector<Expr *, 16> Vars;
   Vars.reserve(C->varlist_size());
+
+  // We need to enable Shapings here since we're in a depend clause
+  getSema().AllowShapings = true;
+
   for (auto *VE : C->varlists()) {
     ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
     if (EVar.isInvalid())
       return nullptr;
     Vars.push_back(EVar.get());
   }
+
+  getSema().AllowShapings = false;
+
   return getDerived().RebuildOSSDependClause(
       C->getDependencyKind(), C->getDependencyLoc(), C->getColonLoc(), Vars,
       C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
@@ -9897,6 +9914,35 @@ TreeTransform<Derived>::TransformOSSArraySectionExpr(OSSArraySectionExpr *E) {
   return getDerived().RebuildOSSArraySectionExpr(
       Base.get(), E->getBase()->getEndLoc(), LowerBound.get(), E->getColonLoc(),
       Length.get(), E->getRBracketLoc());
+}
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+  ExprResult Base = getDerived().TransformExpr(E->getBase());
+  if (Base.isInvalid())
+    return ExprError();
+
+  bool ExprHasChanged = (Base.get() != E->getBase());
+
+  SmallVector<Expr *, 2> ShapeList;
+  for (Stmt *S : E->getShapes()) {
+    ExprResult Shape = getDerived().TransformExpr(cast<Expr>(S));
+    if (Shape.isInvalid())
+      return ExprError();
+
+    if (Shape.get() != S)
+      ExprHasChanged = true;
+
+    ShapeList.push_back(Shape.get());
+  }
+
+  if (!getDerived().AlwaysRebuild() && !ExprHasChanged)
+    return E;
+
+  return getDerived().RebuildOSSArrayShapingExpr(
+      Base.get(), ShapeList,
+      E->getBeginLoc(), E->getEndLoc());
 }
 
 template<typename Derived>

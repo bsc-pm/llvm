@@ -1450,6 +1450,12 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
   }
   case tok::l_square:
     if (getLangOpts().CPlusPlus11) {
+      if (getLangOpts().OmpSs) {
+        Res = TryParseOSSArrayShaping();
+        // When we've guessed it's an array shape parse it and done
+        if (!Res.isInvalid())
+          return ParseOSSArrayShaping();
+      }
       if (getLangOpts().ObjC) {
         // C++11 lambda expressions and Objective-C message sends both start with a
         // square bracket.  There are three possibilities here:
@@ -1464,6 +1470,8 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
       Res = ParseLambdaExpression();
       break;
     }
+    if (getLangOpts().OmpSs)
+      return ParseOSSArrayShaping();
     if (getLangOpts().ObjC) {
       Res = ParseObjCMessageExpression();
       break;
@@ -3241,4 +3249,93 @@ ExprResult Parser::ParseAvailabilityCheckExpr(SourceLocation BeginLoc) {
 
   return Actions.ActOnObjCAvailabilityCheckExpr(AvailSpecs, BeginLoc,
                                                 Parens.getCloseLocation());
+}
+
+ExprResult Parser::TryParseOSSArrayShaping() {
+  TentativeParsingAction TPA(*this);
+  bool First = true;
+
+  while (Tok.is(tok::l_square)) {
+    // More than one shape means shaping expr.
+    if (!First) {
+      TPA.Revert();
+      return ExprEmpty();
+    }
+    First = false;
+
+    ConsumeBracket();
+
+    // Parsing [] means lambda
+    if (Tok.is(tok::r_square)) {
+      TPA.Revert();
+      return ExprError();
+    }
+
+    // Parse whatever between []
+    Diags.setSuppressAllDiagnostics();
+    Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+    Diags.setSuppressAllDiagnostics(false);
+
+    // After that we're supposed to be at ]
+    if (Tok.isNot(tok::r_square)) {
+      TPA.Revert();
+      return ExprError();
+    }
+
+    ConsumeBracket();
+  }
+  // Not having a '(' after shapes means shaping expr.
+  if (Tok.isNot(tok::l_paren)) {
+    TPA.Revert();
+    return ExprEmpty();
+  }
+
+  ConsumeParen();
+
+  // Lambdas have ParameterDeclarationClause
+  TPResult TPR = TryParseParameterDeclarationClause();
+  if (TPR == TPResult::True
+      || TPR == TPResult::Ambiguous) {
+    TPA.Revert();
+    return ExprError();
+  }
+
+  // At this point let's assume it's a shaping expression
+  TPA.Revert();
+  return ExprEmpty();
+}
+
+/// FIXME comment
+/// '[' constant-expression[opt] ']'
+///
+ExprResult Parser::ParseOSSArrayShaping() {
+  SourceLocation Loc, RLoc;
+  SmallVector<Expr *, 2> ShapeList;
+
+  bool First = true;
+
+  while (Tok.is(tok::l_square)) {
+    BalancedDelimiterTracker T(*this, tok::l_square);
+    if (T.consumeOpen())
+      return ExprError();
+
+    if (First)
+      Loc = T.getOpenLocation();
+    First = false;
+
+    ExprResult ShapeExpr = Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+
+    ShapeList.push_back(ShapeExpr.get());
+
+    // Match the ']'.
+    if (T.consumeClose())
+      return ExprError();
+  }
+
+  // Use ParseAssignmentExpression because we want to stop at comma
+  ExprResult Base = Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+
+  RLoc = Base.isInvalid() ? Tok.getLocation() : Base.get()->getEndLoc();
+
+  return Actions.ActOnOSSArrayShapingExpr(Base.get(), ShapeList, Loc, RLoc);
 }

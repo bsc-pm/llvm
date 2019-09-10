@@ -1774,6 +1774,8 @@ private:
   // [...] () -> type {...}
   ExprResult ParseLambdaExpression();
   ExprResult TryParseLambdaExpression();
+  ExprResult TryParseOSSArrayShaping();
+  ExprResult ParseOSSArrayShaping();
   bool
   ParseLambdaIntroducer(LambdaIntroducer &Intro,
                         LambdaIntroducerTentativeParse *Tentative = nullptr);

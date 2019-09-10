@@ -4736,6 +4736,76 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
                           VK_LValue, OK_Ordinary, ColonLoc, RBLoc);
 }
 
+ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
+                                          SourceLocation LBLoc,
+                                          SourceLocation RBLoc) {
+  bool ErrorFound = false;
+  if (!AllowShapings) {
+    Diag(LBLoc, diag::err_oss_array_shaping_use);
+    ErrorFound = true;
+  }
+
+  if (!Base) {
+    ErrorFound = true;
+  } else if (auto *OASE = dyn_cast<OSSArraySectionExpr>(Base)) {
+    Diag(OASE->getBeginLoc(), diag::err_oss_array_shaping_use_section)
+      << OASE->getSourceRange();
+    ErrorFound = true;
+  }
+
+  for (Expr *const &E : Shapes) {
+    if (!E) {
+      ErrorFound = true;
+    } else if (auto *OASE = dyn_cast<OSSArrayShapingExpr>(E)) {
+      Diag(OASE->getBeginLoc(), diag::err_oss_array_shaping_use)
+        << OASE->getSourceRange();
+      ErrorFound = true;
+    }
+  }
+
+  if (ErrorFound)
+    return ExprError();
+
+  bool IsDependent = Base->isTypeDependent();
+  for (Expr *const &E : Shapes) {
+    IsDependent = IsDependent || E->isTypeDependent() || E->isValueDependent();
+    if (IsDependent)
+      break;
+  }
+  if (IsDependent) {
+    return OSSArrayShapingExpr::Create(
+      Context, Context.DependentTy,
+      VK_LValue, OK_Ordinary, Base, Shapes, LBLoc, RBLoc);
+  }
+
+  QualType Type = Base->getType();
+  if (Type->isPointerType())
+    Type = Type->getPointeeType();
+  else if (Type->isArrayType())
+    Type = Type->getAsArrayTypeUnsafe()->getElementType();
+
+  for (int i = Shapes.size() - 1 ; i >= 0; --i) {
+    auto Res = PerformOmpSsImplicitIntegerConversion(Shapes[i]->getExprLoc(),
+                                                     Shapes[i]);
+    if (Res.isInvalid()) {
+      ErrorFound = true;
+      Diag(Shapes[i]->getExprLoc(), diag::err_oss_typecheck_section_not_integer)
+                       << 0 << Shapes[i]->getSourceRange();
+      continue;
+    }
+
+    Type = BuildArrayType(Type, ArrayType::Normal, Res.get(), /*Quals=*/0,
+                          SourceRange(SourceLocation(), SourceLocation()),
+                          DeclarationName());
+  }
+
+  if (ErrorFound)
+    return ExprError();
+
+  return OSSArrayShapingExpr::Create(Context, Type,
+                                     VK_LValue, OK_Ordinary, Base, Shapes, LBLoc, RBLoc);
+}
+
 ExprResult
 Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
                                       Expr *Idx, SourceLocation RLoc) {

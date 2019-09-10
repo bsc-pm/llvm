@@ -529,6 +529,8 @@ public:
 
 void Sema::InitDataSharingAttributesStackOmpSs() {
   VarDataSharingAttributesStackOmpSs = new DSAStackTy(*this);
+  // TODO: use another function
+  AllowShapings = false;
 }
 
 #define DSAStack static_cast<DSAStackTy *>(VarDataSharingAttributesStackOmpSs)

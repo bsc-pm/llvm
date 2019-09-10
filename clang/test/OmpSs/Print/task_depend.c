@@ -14,6 +14,8 @@ int main(void) {
     {}
     #pragma oss task depend(out : array[ : ][ : ])
     {}
+    #pragma oss task depend(in : [1][2][3]array)
+    {}
 }
 
 // CHECK:       #pragma oss task depend(out : a)
@@ -29,6 +31,9 @@ int main(void) {
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 // CHECK-NEXT: #pragma oss task depend(out : array[:][:])
+// CHECK-NEXT: {
+// CHECK-NEXT: }
+// CHECK-NEXT: #pragma oss task depend(in : [1][2][3]array)
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 

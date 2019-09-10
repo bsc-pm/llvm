@@ -1145,6 +1145,10 @@ void StmtProfiler::VisitOSSArraySectionExpr(const OSSArraySectionExpr *S) {
   VisitExpr(S);
 }
 
+void StmtProfiler::VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *S) {
+  llvm_unreachable("OSS shaping");
+}
+
 void StmtProfiler::VisitCallExpr(const CallExpr *S) {
   VisitExpr(S);
 }

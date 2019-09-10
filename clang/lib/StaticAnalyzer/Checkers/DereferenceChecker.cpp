@@ -159,6 +159,10 @@ void DereferenceChecker::reportBug(ProgramStateRef State, const Stmt *S,
     os << " results in a null pointer dereference";
     break;
   }
+  case Stmt::OSSArrayShapingExprClass: {
+    llvm_unreachable("OSS shaping");
+    break;
+  }
   case Stmt::UnaryOperatorClass: {
     os << "Dereference of null pointer";
     const UnaryOperator *U = cast<UnaryOperator>(S);

@@ -278,11 +278,17 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   SmallVector<Expr *, 4> Vars;
   OmpSsVarListDataTy Data;
 
-  if (ParseOmpSsVarList(DKind, Kind, Vars, Data))
-    return nullptr;
+  Actions.AllowShapings = (Kind == OSSC_depend);
 
-  if (ParseOnly)
+  if (ParseOmpSsVarList(DKind, Kind, Vars, Data)) {
+    Actions.AllowShapings = false;
     return nullptr;
+  }
+  Actions.AllowShapings = false;
+
+  if (ParseOnly) {
+    return nullptr;
+  }
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
       Data.DepKinds, Data.DepLoc);

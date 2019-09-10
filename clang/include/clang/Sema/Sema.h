@@ -4507,6 +4507,9 @@ public:
   ExprResult ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
                                       Expr *LowerBound, SourceLocation ColonLoc,
                                       Expr *Length, SourceLocation RBLoc);
+  ExprResult ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
+                                      SourceLocation LBLoc,
+                                      SourceLocation RBLoc);
 
   // This struct is for use by ActOnMemberAccess to allow
   // BuildMemberReferenceExpr to be able to reinvoke ActOnMemberAccess after
@@ -9770,7 +9773,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // OmpSs directives and clauses.
-  //
+  bool AllowShapings;
   void *VarDataSharingAttributesStackOmpSs;
   /// Initialization of data-sharing attributes stack.
   void InitDataSharingAttributesStackOmpSs();

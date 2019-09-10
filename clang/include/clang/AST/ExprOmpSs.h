@@ -14,6 +14,7 @@
 #define LLVM_CLANG_AST_EXPROMPSS_H
 
 #include "clang/AST/Expr.h"
+#include "clang/AST/ASTContext.h"
 
 namespace clang {
 /// OmpSs 4.0 [2.4, Array Sections].
@@ -125,6 +126,93 @@ public:
 
   const_child_range children() const {
     return const_child_range(&SubExprs[BASE], &SubExprs[END_EXPR]);
+  }
+};
+
+class OSSArrayShapingExpr final
+  : public Expr,
+    private llvm::TrailingObjects<OSSArrayShapingExpr, Stmt *> {
+
+  friend TrailingObjects;
+
+  unsigned NumShapes;
+
+  SourceLocation BeginLoc;
+  SourceLocation EndLoc;
+
+  size_t numTrailingObjects(OverloadToken<Stmt *>) const {
+    return NumShapes;
+  }
+
+  OSSArrayShapingExpr(QualType Type,
+                      ExprValueKind VK, ExprObjectKind OK, unsigned N,
+                      SourceLocation BeginLoc, SourceLocation EndLoc)
+      : Expr( OSSArrayShapingExprClass, Type, VK, OK,
+            false, false, false, false),
+            NumShapes(N), BeginLoc(BeginLoc), EndLoc(EndLoc)
+      {}
+
+  /// Create an empty array section expression.
+  explicit OSSArrayShapingExpr(EmptyShell Shell, unsigned N)
+      : Expr(OSSArrayShapingExprClass, Shell), NumShapes(N) {}
+
+public:
+
+  static OSSArrayShapingExpr *Create(const ASTContext &C,
+                                 QualType Type,
+                                 ExprValueKind VK,
+                                 ExprObjectKind OK,
+                                 Expr *Base,
+                                 ArrayRef<Expr *> ShapeList,
+                                 SourceLocation BeginLoc,
+                                 SourceLocation EndLoc) {
+    void *Mem = C.Allocate(totalSizeToAlloc<Stmt *>(ShapeList.size() + 1));
+    OSSArrayShapingExpr *Clause = new (Mem)
+        OSSArrayShapingExpr(Type, VK, OK, ShapeList.size(), BeginLoc, EndLoc);
+    Clause->setBase(Base);
+    Clause->setShapes(ShapeList);
+    return Clause;
+  }
+
+  /// Get base of the array section.
+  Expr *getBase() { return cast<Expr>(getTrailingObjects<Stmt *>()[0]); }
+  const Expr *getBase() const { return cast<Expr>(getTrailingObjects<Stmt *>()[0]); }
+  /// Set base of the array section.
+  void setBase(Expr *E) { getTrailingObjects<Stmt *>()[0] = E; }
+
+  /// Get the shape of array shaping.
+  MutableArrayRef<Stmt *> getShapes() {
+    return MutableArrayRef<Stmt *>(
+        getTrailingObjects<Stmt *>() + 1, NumShapes);
+  }
+  ArrayRef<const Stmt *> getShapes() const {
+    return ArrayRef<Stmt *>(
+        getTrailingObjects<Stmt *>() + 1, NumShapes);
+  }
+  /// Set the shape of the array shaping.
+  void setShapes(ArrayRef<Expr *> VL) {
+    std::copy(VL.begin(), VL.end(),
+              getTrailingObjects<Stmt *>() + 1);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return EndLoc; }
+  SourceRange getSourceRange() const LLVM_READONLY { return SourceRange(BeginLoc, EndLoc); }
+
+  SourceLocation getExprLoc() const LLVM_READONLY {
+    return getBase()->getBeginLoc();
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSArrayShapingExprClass;
+  }
+
+  child_range children() {
+    return child_range(getTrailingObjects<Stmt *>(), getTrailingObjects<Stmt *>() + NumShapes + 1);
+  }
+
+  const_child_range children() const {
+    return const_child_range(getTrailingObjects<Stmt *>(), getTrailingObjects<Stmt *>() + NumShapes + 1);
   }
 };
 } // end namespace clang

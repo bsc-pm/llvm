@@ -3457,6 +3457,7 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case ArraySubscriptExprClass:
   case OMPArraySectionExprClass:
   case OSSArraySectionExprClass:
+  case OSSArrayShapingExprClass:
   case MemberExprClass:
   case ConditionalOperatorClass:
   case BinaryConditionalOperatorClass:
@@ -4588,3 +4589,4 @@ QualType OSSArraySectionExpr::getBaseOriginalType(const Expr *Base) {
   }
   return OriginalTy;
 }
+

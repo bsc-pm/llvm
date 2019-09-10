@@ -1456,6 +1456,15 @@ void StmtPrinter::VisitOSSArraySectionExpr(OSSArraySectionExpr *Node) {
   OS << "]";
 }
 
+void StmtPrinter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *Node) {
+  for (auto *S : Node->getShapes()) {
+    OS << "[";
+    PrintExpr(cast<Expr>(S));
+    OS << "]";
+  }
+  PrintExpr(Node->getBase());
+}
+
 void StmtPrinter::PrintCallArgs(CallExpr *Call) {
   for (unsigned i = 0, e = Call->getNumArgs(); i != e; ++i) {
     if (isa<CXXDefaultArgExpr>(Call->getArg(i))) {

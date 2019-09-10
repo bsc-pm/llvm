@@ -142,6 +142,15 @@ public:
     llvm_unreachable("Unhandled expr");
   }
 
+  void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+    BaseElementTy = GetInnermostElementType(E->getType());
+    Ptr = CGF.EmitLValue(E).getPointer();
+    if (E->getType()->isVariablyModifiedType()) {
+      CGF.EmitVariablyModifiedType(E->getType());
+    }
+    FillDimsFromInnermostExpr(E);
+  }
+
   // l-values.
   void VisitDeclRefExpr(const DeclRefExpr *E) {
     Ptr = CGF.EmitDeclRefLValue(E).getPointer();

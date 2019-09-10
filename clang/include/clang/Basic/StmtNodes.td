@@ -73,6 +73,7 @@ def UnaryExprOrTypeTraitExpr : DStmt<Expr>;
 def ArraySubscriptExpr : DStmt<Expr>;
 def OMPArraySectionExpr : DStmt<Expr>;
 def OSSArraySectionExpr : DStmt<Expr>;
+def OSSArrayShapingExpr : DStmt<Expr>;
 def CallExpr : DStmt<Expr>;
 def MemberExpr : DStmt<Expr>;
 def CastExpr : DStmt<Expr, 1>;

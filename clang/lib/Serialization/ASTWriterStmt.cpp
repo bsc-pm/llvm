@@ -670,6 +670,10 @@ void ASTStmtWriter::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
   Code = serialization::EXPR_OSS_ARRAY_SECTION;
 }
 
+void ASTStmtWriter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+  llvm_unreachable("OSS shaping");
+}
+
 void ASTStmtWriter::VisitCallExpr(CallExpr *E) {
   VisitExpr(E);
   Record.push_back(E->getNumArgs());

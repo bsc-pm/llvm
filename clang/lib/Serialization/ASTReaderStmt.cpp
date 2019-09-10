@@ -760,6 +760,10 @@ void ASTStmtReader::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
   E->setRBracketLoc(ReadSourceLocation());
 }
 
+void ASTStmtReader::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+  llvm_unreachable("OSS shaping");
+}
+
 void ASTStmtReader::VisitCallExpr(CallExpr *E) {
   VisitExpr(E);
   unsigned NumArgs = Record.readInt();
@@ -2655,6 +2659,10 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
 
     case EXPR_OMP_ARRAY_SECTION:
       S = new (Context) OMPArraySectionExpr(Empty);
+      break;
+
+    case EXPR_OSS_ARRAY_SECTION:
+      S = new (Context) OSSArraySectionExpr(Empty);
       break;
 
     case EXPR_CALL:
