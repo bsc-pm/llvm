@@ -315,7 +315,8 @@ static Type *getMemInstValueType(Value *I) {
 /// A helper function that returns true if the given type is irregular. The
 /// type is irregular if its allocated size doesn't equal the store size of an
 /// element of the corresponding vector type at the given vectorization factor.
-static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF, bool Scalable=false) {
+static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF,
+                             bool Scalable = false) {
   // Determine if an array of VF elements of type Ty is "bitcast compatible"
   // with a <VF x Ty> vector.
   if (VF > 1) {
@@ -2517,7 +2518,16 @@ PHINode *InnerLoopVectorizer::createInductionVariable(Loop *L, Value *Start,
   setDebugLocFromInst(Builder, OldInst);
 
   // Create i+1 and fill the PHINode.
-  Value *Next = Builder.CreateAdd(Induction, Step, "index.next");
+  // If using scalable vectors, multiply step size by vscale.
+  Value *ScaleStep = Step;
+  if (TTI->useScalableVectorType()) {
+    Function *VscaleFunc = Intrinsic::getDeclaration(
+        Header->getModule(), Intrinsic::experimental_vector_vscale,
+        Step->getType());
+    CallInst *VscaleFuncCall = Builder.CreateCall(VscaleFunc, {});
+    ScaleStep = Builder.CreateMul(VscaleFuncCall, Step, "index.vscale");
+  }
+  Value *Next = Builder.CreateAdd(Induction, ScaleStep, "index.next");
   Induction->addIncoming(Start, L->getLoopPreheader());
   Induction->addIncoming(Next, Latch);
   // Create the compare.
@@ -4533,7 +4543,7 @@ bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(Instruction *I,
   // requires padding and will be scalarized.
   auto &DL = I->getModule()->getDataLayout();
   auto *ScalarTy = getMemInstValueType(I);
-  if (hasIrregularType(ScalarTy, DL, VF))
+  if (hasIrregularType(ScalarTy, DL, VF, TTI.useScalableVectorType()))
     return false;
 
   // Check if masking is required.
@@ -4579,7 +4589,7 @@ bool LoopVectorizationCostModel::memoryInstructionCanBeWidened(Instruction *I,
   // requires padding and will be scalarized.
   auto &DL = I->getModule()->getDataLayout();
   auto *ScalarTy = LI ? LI->getType() : SI->getValueOperand()->getType();
-  if (hasIrregularType(ScalarTy, DL, VF))
+  if (hasIrregularType(ScalarTy, DL, VF, TTI.useScalableVectorType()))
     return false;
 
   return true;
