@@ -555,17 +555,16 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const TargetRegisterClass *RC = &RISCV::GPRRegClass;
-  // estimateStackSize has been observed to under-estimate the final stack
-  // size, so give ourselves wiggle-room by checking for stack size
-  // representable an 11-bit signed field rather than 12-bits.
-  // FIXME: It may be possible to craft a function with a small stack that
-  // still needs an emergency spill slot for branch relaxation. This case
-  // would currently be missed.
-  // EPI vectors require more complicated sequences for frames with them so
-  // always have an emergency spill slot.
-  if (!isInt<11>(MFI.estimateStackSize(MF)) || RVFI->hasSpilledEPIVR()) {
+
+  if (RVFI->hasSpilledEPIVR()) {
+    // We conservatively add two emergency slots if we have seen PseudoVSPILL
+    // or PseudoVRELOAD already. They are used for the virtual registers needed
+    // for vtype and vscale.
     int RegScavFI = MFI.CreateStackObject(
         RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
+    RS->addScavengingFrameIndex(RegScavFI);
+    RegScavFI = MFI.CreateStackObject(RegInfo->getSpillSize(*RC),
+                                      RegInfo->getSpillAlignment(*RC), false);
     RS->addScavengingFrameIndex(RegScavFI);
   }
 
@@ -584,6 +583,21 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
       MFI.setStackID(FI, RISCVStackID::EPIVR_SPILL);
       RVFI->setHasSpilledEPIVR();
     }
+  }
+
+  // estimateStackSize has been observed to under-estimate the final stack
+  // size, so give ourselves wiggle-room by checking for stack size
+  // representable an 11-bit signed field rather than 12-bits.
+  // FIXME: It may be possible to craft a function with a small stack that
+  // still needs an emergency spill slot for branch relaxation. This case
+  // would currently be missed.
+  // EPI: frames that store vectors on the stack usually need large offsets
+  // so make sure there is an emergency spill for them in case computing
+  // them needs an extra register.
+  if (!isInt<11>(MFI.estimateStackSize(MF)) || RVFI->hasSpilledEPIVR()) {
+    int RegScavFI = MFI.CreateStackObject(
+        RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
+    RS->addScavengingFrameIndex(RegScavFI);
   }
 }
 
