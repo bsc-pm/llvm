@@ -77,6 +77,8 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     // Skip those already printed in PrologEpilogEmitter
     if (MFI.getStackID(FI) == RISCVStackID::DEFAULT)
       continue;
+    if (MFI.isDeadObjectIndex(FI))
+      continue;
     assert(MFI.getStackID(FI) == RISCVStackID::EPIVR_SPILL &&
            "Unexpected Stack ID!");
     LLVM_DEBUG(dbgs() << "alloc FI(" << FI << ") at SP["
@@ -348,6 +350,8 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
        FI < EFI; FI++) {
     int8_t StackID = MFI.getStackID(FI);
     if (StackID == RISCVStackID::DEFAULT)
+      continue;
+    if (MFI.isDeadObjectIndex(FI))
       continue;
     assert(StackID == RISCVStackID::EPIVR_SPILL &&
            "Unexpected StackID");
