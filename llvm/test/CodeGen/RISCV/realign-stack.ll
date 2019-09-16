@@ -146,7 +146,6 @@ define dso_local void @test4() nounwind {
 ; RV32-LABEL: test4:
 ; RV32:       # %bb.0: # %entry
 ; RV32-NEXT:    lui a0, 2
-; RV32-NEXT:    mv a0, a0
 ; RV32-NEXT:    sub sp, sp, a0
 ; RV32-NEXT:    lui a0, 2
 ; RV32-NEXT:    addi a0, a0, -4
@@ -157,21 +156,17 @@ define dso_local void @test4() nounwind {
 ; RV32-NEXT:    add a0, sp, a0
 ; RV32-NEXT:    sw s0, 0(a0)
 ; RV32-NEXT:    lui a0, 2
-; RV32-NEXT:    mv a0, a0
 ; RV32-NEXT:    add s0, sp, a0
 ; RV32-NEXT:    srli sp, sp, 12
 ; RV32-NEXT:    slli sp, sp, 12
 ; RV32-NEXT:    lui a0, 1
-; RV32-NEXT:    mv a0, a0
 ; RV32-NEXT:    add a0, sp, a0
 ; RV32-NEXT:    lw a0, 0(a0)
 ; RV32-NEXT:    addi a0, a0, 1
 ; RV32-NEXT:    lui a1, 1
-; RV32-NEXT:    mv a1, a1
 ; RV32-NEXT:    add a1, sp, a1
 ; RV32-NEXT:    sw a0, 0(a1)
 ; RV32-NEXT:    lui a0, 2
-; RV32-NEXT:    mv a0, a0
 ; RV32-NEXT:    sub sp, s0, a0
 ; RV32-NEXT:    lui a0, 2
 ; RV32-NEXT:    addi a0, a0, -8
@@ -182,50 +177,43 @@ define dso_local void @test4() nounwind {
 ; RV32-NEXT:    add a0, sp, a0
 ; RV32-NEXT:    lw ra, 0(a0)
 ; RV32-NEXT:    lui a0, 2
-; RV32-NEXT:    mv a0, a0
 ; RV32-NEXT:    add sp, sp, a0
 ; RV32-NEXT:    ret
 ;
 ; RV64-LABEL: test4:
 ; RV64:       # %bb.0: # %entry
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    mv a0, a0
 ; RV64-NEXT:    sub sp, sp, a0
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    addi a0, a0, -8
+; RV64-NEXT:    addiw a0, a0, -8
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    sd ra, 0(a0)
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    addi a0, a0, -16
+; RV64-NEXT:    addiw a0, a0, -16
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    sd s0, 0(a0)
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    mv a0, a0
 ; RV64-NEXT:    add s0, sp, a0
 ; RV64-NEXT:    srli sp, sp, 12
 ; RV64-NEXT:    slli sp, sp, 12
 ; RV64-NEXT:    lui a0, 1
-; RV64-NEXT:    mv a0, a0
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    lw a0, 0(a0)
 ; RV64-NEXT:    addi a0, a0, 1
 ; RV64-NEXT:    lui a1, 1
-; RV64-NEXT:    mv a1, a1
 ; RV64-NEXT:    add a1, sp, a1
 ; RV64-NEXT:    sw a0, 0(a1)
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    mv a0, a0
 ; RV64-NEXT:    sub sp, s0, a0
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    addi a0, a0, -16
+; RV64-NEXT:    addiw a0, a0, -16
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    ld s0, 0(a0)
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    addi a0, a0, -8
+; RV64-NEXT:    addiw a0, a0, -8
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    ld ra, 0(a0)
 ; RV64-NEXT:    lui a0, 2
-; RV64-NEXT:    mv a0, a0
 ; RV64-NEXT:    add sp, sp, a0
 ; RV64-NEXT:    ret
 entry:
