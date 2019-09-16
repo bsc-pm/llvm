@@ -5425,6 +5425,12 @@ const SCEV *ScalarEvolution::createNodeForGEP(GEPOperator *GEP) {
   if (!GEP->getSourceElementType()->isSized())
     return getUnknown(GEP);
 
+  // Don't attempt to analyze GEPs over scalable vectors.
+  if (VectorType *VT = dyn_cast<VectorType>(GEP->getSourceElementType())) {
+    if (VT->isScalable())
+      return getUnknown(GEP);
+  }
+
   SmallVector<const SCEV *, 4> IndexExprs;
   for (auto Index = GEP->idx_begin(); Index != GEP->idx_end(); ++Index)
     IndexExprs.push_back(getSCEV(*Index));
