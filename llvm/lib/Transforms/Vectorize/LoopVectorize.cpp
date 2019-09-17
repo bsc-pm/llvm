@@ -5151,10 +5151,9 @@ LoopVectorizationCostModel::selectScalableVectorizationFactor(unsigned VF) {
   }
 
   if (!EnableCondStoresVectorization && NumPredStores) {
-    ORE->emit(createMissedAnalysis("ConditionalStore")
-              << "store that is conditionally executed prevents vectorization");
-    LLVM_DEBUG(
-        dbgs() << "LV: No vectorization. There are conditional stores.\n");
+    reportVectorizationFailure("There are conditional stores.",
+        "store that is conditionally executed prevents vectorization",
+        "ConditionalStore", ORE, TheLoop);
     Width = 1;
     Cost = ScalarCost;
   }
