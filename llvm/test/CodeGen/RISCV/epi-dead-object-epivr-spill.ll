@@ -5,21 +5,15 @@
 define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is, i64 %os, i64 %v, i64 %ivs, i64 %ovs) nounwind {
 ; CHECK-LABEL: n1fv_32:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    addi sp, sp, -192
-; CHECK-NEXT:    sd ra, 184(sp)
-; CHECK-NEXT:    sd s0, 176(sp)
-; CHECK-NEXT:    addi s0, sp, 192
+; CHECK-NEXT:    addi sp, sp, -208
+; CHECK-NEXT:    sd ra, 200(sp)
+; CHECK-NEXT:    sd s0, 192(sp)
+; CHECK-NEXT:    addi s0, sp, 208
 ; CHECK-NEXT:    rdvtype a6
 ; CHECK-NEXT:    rdvl a3
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m1
 ; CHECK-NEXT:    vsetvl zero, a3, a6
 ; CHECK-NEXT:    slli a1, a1, 3
-; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -40(s0)
-; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -48(s0)
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -56(s0)
@@ -71,97 +65,103 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -184(s0)
-; CHECK-NEXT:    ld a6, -64(s0)
+; CHECK-NEXT:    sub sp, sp, a1
+; CHECK-NEXT:    andi sp, sp, -16
+; CHECK-NEXT:    sd sp, -192(s0)
+; CHECK-NEXT:    sub sp, sp, a1
+; CHECK-NEXT:    andi sp, sp, -16
+; CHECK-NEXT:    sd sp, -200(s0)
+; CHECK-NEXT:    ld a6, -80(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v8, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -72(s0)
+; CHECK-NEXT:    ld a6, -88(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v9, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -80(s0)
+; CHECK-NEXT:    ld a6, -96(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v10, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -88(s0)
+; CHECK-NEXT:    ld a6, -104(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v11, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -96(s0)
+; CHECK-NEXT:    ld a6, -112(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v12, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -104(s0)
+; CHECK-NEXT:    ld a6, -120(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v13, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -112(s0)
+; CHECK-NEXT:    ld a6, -128(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v14, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -120(s0)
+; CHECK-NEXT:    ld a6, -136(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v15, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -128(s0)
+; CHECK-NEXT:    ld a6, -144(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v24, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -136(s0)
+; CHECK-NEXT:    ld a6, -152(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v25, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -144(s0)
+; CHECK-NEXT:    ld a6, -160(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v26, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -152(s0)
+; CHECK-NEXT:    ld a6, -168(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v27, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -160(s0)
+; CHECK-NEXT:    ld a6, -176(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v28, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -168(s0)
+; CHECK-NEXT:    ld a6, -184(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v29, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -176(s0)
+; CHECK-NEXT:    ld a6, -192(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vse.v v30, (a6)
 ; CHECK-NEXT:    vsetvl zero, a1, a3
-; CHECK-NEXT:    ld a6, -184(s0)
+; CHECK-NEXT:    ld a6, -200(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -172,7 +172,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vmv.v.i v5, 1
 ; CHECK-NEXT:    vid.v v6
 ; CHECK-NEXT:    vsrl.vv v1, v6, v5
-; CHECK-NEXT:    ld a6, -48(s0)
+; CHECK-NEXT:    ld a6, -64(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -240,7 +240,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vmv.v.v v1, v3
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vfmsac.vv v1, v14, v19
-; CHECK-NEXT:    ld a7, -40(s0)
+; CHECK-NEXT:    ld a7, -56(s0)
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a1
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -289,7 +289,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vlxe.v v30, (t1), v23
 ; CHECK-NEXT:    vlxe.v v31, (t2), v23
 ; CHECK-NEXT:    vxor.vv v6, v6, v5
-; CHECK-NEXT:    ld a3, -48(s0)
+; CHECK-NEXT:    ld a3, -64(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -298,7 +298,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vmul.vv v5, v1, v0
 ; CHECK-NEXT:    vadd.vv v5, v5, v21
 ; CHECK-NEXT:    vfadd.vv v1, v13, v17
-; CHECK-NEXT:    ld a3, -56(s0)
+; CHECK-NEXT:    ld a3, -72(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -307,7 +307,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vfsub.vv v21, v0, v14
 ; CHECK-NEXT:    vfsub.vv v2, v21, v0
 ; CHECK-NEXT:    vfadd.vv v21, v9, v0
-; CHECK-NEXT:    ld a3, -48(s0)
+; CHECK-NEXT:    ld a3, -64(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -408,7 +408,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vsxe.v v1, (a0), v5
 ; CHECK-NEXT:    vsxe.v v0, (a0), v5
 ; CHECK-NEXT:    vsxe.v v1, (a0), v5
-; CHECK-NEXT:    ld a3, -40(s0)
+; CHECK-NEXT:    ld a3, -56(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
@@ -418,13 +418,13 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vfsgnjn.vv v2, v4, v4
 ; CHECK-NEXT:    vfadd.vv v1, v1, v2
 ; CHECK-NEXT:    vfsub.vv v2, v23, v9
-; CHECK-NEXT:    ld a3, -48(s0)
+; CHECK-NEXT:    ld a3, -64(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1
 ; CHECK-NEXT:    vle.v v4, (a3)
 ; CHECK-NEXT:    vsetvl zero, a0, a1
-; CHECK-NEXT:    ld a3, -56(s0)
+; CHECK-NEXT:    ld a3, -72(s0)
 ; CHECK-NEXT:    rdvtype a1
 ; CHECK-NEXT:    rdvl a0
 ; CHECK-NEXT:    vsetvli zero, zero, e64, m1

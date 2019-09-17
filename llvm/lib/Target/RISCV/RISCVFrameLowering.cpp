@@ -559,7 +559,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   if (RVFI->hasSpilledEPIVR()) {
     // We conservatively add two emergency slots if we have seen PseudoVSPILL
     // or PseudoVRELOAD already. They are used for the virtual registers needed
-    // for vtype and vscale.
+    // for vtype and vl.
     int RegScavFI = MFI.CreateStackObject(
         RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
     RS->addScavengingFrameIndex(RegScavFI);
