@@ -205,6 +205,16 @@ void RISCVFrameLowering::alignSP(MachineBasicBlock &MBB,
   }
 }
 
+bool RISCVFrameLowering::isSupportedStackID(TargetStackID::Value ID) const {
+  switch (ID) {
+  case TargetStackID::Default:
+  case TargetStackID::NoAlloc:
+  case TargetStackID::SGPRSpill:
+    return true;
+  }
+  llvm_unreachable("Invalid TargetStackID::Value");
+}
+
 void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
                                       MachineBasicBlock &MBB) const {
   assert(&MF.front() == &MBB && "Shrink-wrapping not yet supported");

@@ -26,6 +26,8 @@ public:
                             /*LocalAreaOffset=*/0),
         STI(STI) {}
 
+  bool isSupportedStackID(TargetStackID::Value ID) const override;
+
   void emitPrologue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
   void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
 
