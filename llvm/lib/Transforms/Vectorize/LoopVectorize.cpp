@@ -298,7 +298,7 @@ cl::opt<bool> llvm::EnableLoopVectorization(
 /// If the incoming type is void, we return void. If the VF is 1, we return
 /// the scalar type.
 static Type *ToVectorTy(Type *Scalar, unsigned VF, bool Scalable = false) {
-  if (Scalar->isVoidTy() || VF == 1)
+  if (Scalar->isVoidTy() || (VF == 1 && !Scalable))
     return Scalar;
   return VectorType::get(Scalar, VF, Scalable);
 }
@@ -1013,7 +1013,8 @@ public:
   /// \returns True if it is more profitable to scalarize instruction \p I for
   /// vectorization factor \p VF.
   bool isProfitableToScalarize(Instruction *I, unsigned VF) const {
-    assert(VF > 1 && "Profitable to scalarize relevant only for VF > 1.");
+    bool ValidVF = VF > 1 || (isScalable() && VF == 1);
+    assert(ValidVF && "Profitable to scalarize relevant only for VF > 1 or when using scalable vectors");
 
     // Cost model is not run in the VPlan-native path - return conservative
     // result until this changes.
@@ -1044,7 +1045,7 @@ public:
 
   /// Returns true if \p I is known to be scalar after vectorization.
   bool isScalarAfterVectorization(Instruction *I, unsigned VF) const {
-    if (VF == 1)
+    if (!isScalable() && VF == 1)
       return true;
 
     // Cost model is not run in the VPlan-native path - return conservative
@@ -1080,7 +1081,8 @@ public:
   /// instruction \p I and vector width \p VF.
   void setWideningDecision(Instruction *I, unsigned VF, InstWidening W,
                            unsigned Cost) {
-    assert(VF >= 2 && "Expected VF >=2");
+    bool ValidVF = VF >=2 || (VF == 1 && isScalable());
+    assert(ValidVF && "Expected VF >=2 or VF = 1 for scalable vectors");
     WideningDecisions[std::make_pair(I, VF)] = std::make_pair(W, Cost);
   }
 
@@ -1105,7 +1107,8 @@ public:
   /// width \p VF. Return CM_Unknown if this instruction did not pass
   /// through the cost modeling.
   InstWidening getWideningDecision(Instruction *I, unsigned VF) {
-    assert(VF >= 2 && "Expected VF >=2");
+    bool ValidVF = VF >= 2 || (isScalable() && VF == 1);
+    assert(ValidVF && "Expected VF >=2 or scalable vectors");
 
     // Cost model is not run in the VPlan-native path - return conservative
     // result until this changes.
@@ -1164,7 +1167,7 @@ public:
   /// that may be vectorized as interleave, gather-scatter or scalarized.
   void collectUniformsAndScalars(unsigned VF) {
     // Do the analysis once.
-    if (VF == 1 || Uniforms.find(VF) != Uniforms.end())
+    if ((!isScalable() && VF == 1) || Uniforms.find(VF) != Uniforms.end())
       return;
     setCostBasedWideningDecision(VF);
     collectLoopUniforms(VF);
@@ -1279,7 +1282,7 @@ public:
   unsigned getVectorCallCost(CallInst *CI, unsigned VF, bool &NeedToScalarize);
 
   /// Returns true if the target uses scalable vector type.
-  bool isScalable() { return TTI.useScalableVectorType(); }
+  bool isScalable() const { return TTI.useScalableVectorType(); }
 
 private:
   unsigned NumPredStores = 0;
@@ -1460,6 +1463,9 @@ public:
 
   /// Vector target information.
   const TargetTransformInfo &TTI;
+
+  /// Whether we use scalable vectors
+  bool Scalable;
 
   /// Target Library Info.
   const TargetLibraryInfo *TLI;
@@ -4315,7 +4321,8 @@ void LoopVectorizationCostModel::collectLoopScalars(unsigned VF) {
   // We should not collect Scalars more than once per VF. Right now, this
   // function is called from collectUniformsAndScalars(), which already does
   // this check. Collecting Scalars for VF=1 does not make any sense.
-  assert(VF >= 2 && Scalars.find(VF) == Scalars.end() &&
+  bool ValidVF = VF >=2 || (isScalable() && VF == 1);
+  assert(ValidVF && Scalars.find(VF) == Scalars.end() &&
          "This function should not be visited twice for the same VF");
 
   SmallSetVector<Instruction *, 8> Worklist;
@@ -4600,8 +4607,8 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   // this function is called from collectUniformsAndScalars(), which
   // already does this check. Collecting Uniforms for VF=1 does not make any
   // sense.
-
-  assert(VF >= 2 && Uniforms.find(VF) == Uniforms.end() &&
+  bool ValidVF = VF >=2 || (isScalable() && VF == 1);
+  assert(ValidVF && Uniforms.find(VF) == Uniforms.end() &&
          "This function should not be visited twice for the same VF");
 
   // Visit the list of Uniforms. If we'll not find any uniform value, we'll
@@ -5250,7 +5257,7 @@ unsigned LoopVectorizationCostModel::selectInterleaveCount(unsigned VF,
   if (TC > 1 && TC < TinyTripCountInterleaveThreshold)
     return 1;
 
-  unsigned TargetNumRegisters = TTI.getNumberOfRegisters(VF > 1);
+  unsigned TargetNumRegisters = TTI.getNumberOfRegisters(VF > 1);//--//
   LLVM_DEBUG(dbgs() << "LV: The target has " << TargetNumRegisters
                     << " registers\n");
 
@@ -5561,7 +5568,8 @@ void LoopVectorizationCostModel::collectInstsToScalarize(unsigned VF) {
   // instructions to scalarize, there's nothing to do. Collection may already
   // have occurred if we have a user-selected VF and are now computing the
   // expected cost for interleaving.
-  if (VF < 2 || InstsToScalarize.find(VF) != InstsToScalarize.end())
+  bool InvalidVF = VF < 2 && !isScalable();
+  if (InvalidVF || InstsToScalarize.find(VF) != InstsToScalarize.end())
     return;
 
   // Initialize a mapping for VF in InstsToScalalarize. If we find that it's
@@ -5707,7 +5715,7 @@ LoopVectorizationCostModel::expectedCost(unsigned VF) {
     for (Instruction &I : BB->instructionsWithoutDebug()) {
       // Skip ignored values.
       if (ValuesToIgnore.find(&I) != ValuesToIgnore.end() ||
-          (VF > 1 && VecValuesToIgnore.find(&I) != VecValuesToIgnore.end()))
+          (VF > 1 && VecValuesToIgnore.find(&I) != VecValuesToIgnore.end())) //--//
         continue;
 
       VectorizationCostTy C = getInstructionCost(&I, VF);
@@ -5946,7 +5954,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, unsigned VF) {
   Type *VectorTy;
   unsigned C = getInstructionCost(I, VF, VectorTy);
 
-  bool TypeNotScalarized =
+  bool TypeNotScalarized =   //--//
       VF > 1 && VectorTy->isVectorTy() && TTI.getNumberOfParts(VectorTy) < VF;
   return VectorizationCostTy(C, TypeNotScalarized);
 }
@@ -5982,7 +5990,7 @@ unsigned LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
 }
 
 void LoopVectorizationCostModel::setCostBasedWideningDecision(unsigned VF) {
-  if (VF == 1)
+  if (!isScalable() && VF == 1)
     return;
   NumPredStores = 0;
   for (BasicBlock *BB : TheLoop->blocks()) {
@@ -6805,11 +6813,13 @@ VPInterleaveRecipe *VPRecipeBuilder::tryToInterleaveMemory(Instruction *I,
 VPWidenMemoryInstructionRecipe *
 VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
                                   VPlanPtr &Plan) {
+  //-NOTE/VK-//
+  //If it is a load or store instruction, WidenMemory recipe is created. 
   if (!isa<LoadInst>(I) && !isa<StoreInst>(I))
     return nullptr;
 
   auto willWiden = [&](unsigned VF) -> bool {
-    if (VF == 1)
+    if (!CM.isScalable() && VF == 1)
       return false;
     if (CM.isScalarAfterVectorization(I, VF) ||
         CM.isProfitableToScalarize(I, VF))
@@ -7062,7 +7072,10 @@ VPRegionBlock *VPRecipeBuilder::createReplicateRegion(Instruction *Instr,
 
   return Region;
 }
-
+//-NOTE/VK-// 
+//This is where widening recipe is created for each instruction in the for loop.
+//During the plan execution phase widening is done by simply executing these
+//recipes.
 bool VPRecipeBuilder::tryToCreateRecipe(Instruction *Instr, VFRange &Range,
                                         VPlanPtr &Plan, VPBasicBlock *VPBB) {
   VPRecipeBase *Recipe = nullptr;
