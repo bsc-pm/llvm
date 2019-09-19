@@ -132,7 +132,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // The following two are handled later in this function
   case RISCV::PseudoVSPILL:
   case RISCV::PseudoVRELOAD:
-    NeedsIndirectAddressing = true;
+    NeedsIndirectAddressing =
+        MFI.getStackID(FrameIndex) == RISCVStackID::EPIVR_SPILL;
     break;
   default:
     OffsetIndex = FIOperandNum + 1;
