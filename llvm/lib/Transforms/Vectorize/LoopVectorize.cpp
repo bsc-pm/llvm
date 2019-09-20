@@ -813,7 +813,7 @@ void InnerLoopVectorizer::setDebugLocFromInst(IRBuilder<> &B,
 /// vectorization.
 #ifndef NDEBUG
 static void debugVectorizationFailure(const StringRef DebugMsg,
-    Instruction *I) {
+                                      Instruction *I) {
   dbgs() << "LV: Not vectorizing: " << DebugMsg;
   if (I != nullptr)
     dbgs() << " " << *I;
@@ -831,7 +831,9 @@ static void debugVectorizationFailure(const StringRef DebugMsg,
 /// the location of the remark.  \return the remark object that can be
 /// streamed to.
 static OptimizationRemarkAnalysis createLVAnalysis(const char *PassName,
-    StringRef RemarkName, Loop *TheLoop, Instruction *I) {
+                                                   StringRef RemarkName,
+                                                   Loop *TheLoop,
+                                                   Instruction *I) {
   Value *CodeRegion = TheLoop->getHeader();
   DebugLoc DL = TheLoop->getStartLoc();
 
@@ -851,12 +853,14 @@ static OptimizationRemarkAnalysis createLVAnalysis(const char *PassName,
 namespace llvm {
 
 void reportVectorizationFailure(const StringRef DebugMsg,
-    const StringRef OREMsg, const StringRef ORETag,
-    OptimizationRemarkEmitter *ORE, Loop *TheLoop, Instruction *I) {
+                                const StringRef OREMsg, const StringRef ORETag,
+                                OptimizationRemarkEmitter *ORE, Loop *TheLoop,
+                                Instruction *I) {
   LLVM_DEBUG(debugVectorizationFailure(DebugMsg, I));
   LoopVectorizeHints Hints(TheLoop, true /* doesn't matter */, *ORE);
-  ORE->emit(createLVAnalysis(Hints.vectorizeAnalysisPassName(),
-                ORETag, TheLoop, I) << OREMsg);
+  ORE->emit(
+      createLVAnalysis(Hints.vectorizeAnalysisPassName(), ORETag, TheLoop, I)
+      << OREMsg);
 }
 
 } // end namespace llvm
@@ -1014,7 +1018,8 @@ public:
   /// vectorization factor \p VF.
   bool isProfitableToScalarize(Instruction *I, unsigned VF) const {
     bool ValidVF = VF > 1 || (isScalable() && VF == 1);
-    assert(ValidVF && "Profitable to scalarize relevant only for VF > 1 or when using scalable vectors");
+    assert(ValidVF && "Profitable to scalarize relevant only for VF > 1 or "
+                      "when using scalable vectors");
 
     // Cost model is not run in the VPlan-native path - return conservative
     // result until this changes.
@@ -1029,7 +1034,7 @@ public:
 
   /// Returns true if \p I is known to be uniform after vectorization.
   bool isUniformAfterVectorization(Instruction *I, unsigned VF) const {
-    if (VF == 1)
+    if (VF == 1 && !isScalable())
       return true;
 
     // Cost model is not run in the VPlan-native path - return conservative
@@ -1045,7 +1050,7 @@ public:
 
   /// Returns true if \p I is known to be scalar after vectorization.
   bool isScalarAfterVectorization(Instruction *I, unsigned VF) const {
-    if (!isScalable() && VF == 1)
+    if (VF == 1 && !isScalable())
       return true;
 
     // Cost model is not run in the VPlan-native path - return conservative
@@ -1081,7 +1086,7 @@ public:
   /// instruction \p I and vector width \p VF.
   void setWideningDecision(Instruction *I, unsigned VF, InstWidening W,
                            unsigned Cost) {
-    bool ValidVF = VF >=2 || (VF == 1 && isScalable());
+    bool ValidVF = VF >= 2 || (VF == 1 && isScalable());
     assert(ValidVF && "Expected VF >=2 or VF = 1 for scalable vectors");
     WideningDecisions[std::make_pair(I, VF)] = std::make_pair(W, Cost);
   }
@@ -1125,7 +1130,8 @@ public:
   /// Return the vectorization cost for the given instruction \p I and vector
   /// width \p VF.
   unsigned getWideningCost(Instruction *I, unsigned VF) {
-    assert(VF >= 2 && "Expected VF >=2");
+    bool ValidVF = VF > 1 || (VF == 1 && isScalable());
+    assert(ValidVF && "Expected VF > 1 or scalable vectors");
     std::pair<Instruction *, unsigned> InstOnVF = std::make_pair(I, VF);
     assert(WideningDecisions.find(InstOnVF) != WideningDecisions.end() &&
            "The cost is not calculated");
@@ -2770,7 +2776,7 @@ void InnerLoopVectorizer::emitMemRuntimeChecks(Loop *L, BasicBlock *Bypass) {
   // We currently don't use LoopVersioning for the actual loop cloning but we
   // still use it to add the noalias metadata.
   LVer = std::make_unique<LoopVersioning>(*Legal->getLAI(), OrigLoop, LI, DT,
-                                           PSE.getSE());
+                                          PSE.getSE());
   LVer->prepareNoAliasMetadata();
 }
 
@@ -4321,7 +4327,7 @@ void LoopVectorizationCostModel::collectLoopScalars(unsigned VF) {
   // We should not collect Scalars more than once per VF. Right now, this
   // function is called from collectUniformsAndScalars(), which already does
   // this check. Collecting Scalars for VF=1 does not make any sense.
-  bool ValidVF = VF >=2 || (isScalable() && VF == 1);
+  bool ValidVF = VF >= 2 || (isScalable() && VF == 1);
   assert(ValidVF && Scalars.find(VF) == Scalars.end() &&
          "This function should not be visited twice for the same VF");
 
@@ -4607,7 +4613,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   // this function is called from collectUniformsAndScalars(), which
   // already does this check. Collecting Uniforms for VF=1 does not make any
   // sense.
-  bool ValidVF = VF >=2 || (isScalable() && VF == 1);
+  bool ValidVF = VF >= 2 || (isScalable() && VF == 1);
   assert(ValidVF && Uniforms.find(VF) == Uniforms.end() &&
          "This function should not be visited twice for the same VF");
 
@@ -4782,7 +4788,8 @@ bool LoopVectorizationCostModel::runtimeChecksRequired() {
   LLVM_DEBUG(dbgs() << "LV: Performing code size checks.\n");
 
   if (Legal->getRuntimePointerChecking()->Need) {
-    reportVectorizationFailure("Runtime ptr check is required with -Os/-Oz",
+    reportVectorizationFailure(
+        "Runtime ptr check is required with -Os/-Oz",
         "runtime pointer checks needed. Enable vectorization of this "
         "loop with '#pragma clang loop vectorize(enable)' when "
         "compiling with -Os/-Oz",
@@ -4791,7 +4798,8 @@ bool LoopVectorizationCostModel::runtimeChecksRequired() {
   }
 
   if (!PSE.getUnionPredicate().getPredicates().empty()) {
-    reportVectorizationFailure("Runtime SCEV check is required with -Os/-Oz",
+    reportVectorizationFailure(
+        "Runtime SCEV check is required with -Os/-Oz",
         "runtime SCEV checks needed. Enable vectorization of this "
         "loop with '#pragma clang loop vectorize(enable)' when "
         "compiling with -Os/-Oz",
@@ -4801,7 +4809,8 @@ bool LoopVectorizationCostModel::runtimeChecksRequired() {
 
   // FIXME: Avoid specializing for stride==1 instead of bailing out.
   if (!Legal->getLAI()->getSymbolicStrides().empty()) {
-    reportVectorizationFailure("Runtime stride check is required with -Os/-Oz",
+    reportVectorizationFailure(
+        "Runtime stride check is required with -Os/-Oz",
         "runtime stride == 1 checks needed. Enable vectorization of "
         "this loop with '#pragma clang loop vectorize(enable)' when "
         "compiling with -Os/-Oz",
@@ -4826,7 +4835,8 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   unsigned TC = PSE.getSE()->getSmallConstantTripCount(TheLoop);
   LLVM_DEBUG(dbgs() << "LV: Found trip count: " << TC << '\n');
   if (TC == 1) {
-    reportVectorizationFailure("Single iteration (non) loop",
+    reportVectorizationFailure(
+        "Single iteration (non) loop",
         "loop trip count is one, irrelevant for vectorization",
         "SingleIterationLoop", ORE, TheLoop);
     return None;
@@ -5110,7 +5120,8 @@ LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
   }
 
   if (!EnableCondStoresVectorization && NumPredStores) {
-    reportVectorizationFailure("There are conditional stores.",
+    reportVectorizationFailure(
+        "There are conditional stores.",
         "store that is conditionally executed prevents vectorization",
         "ConditionalStore", ORE, TheLoop);
     Width = 1;
@@ -5127,49 +5138,28 @@ LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
 
 VectorizationFactor
 LoopVectorizationCostModel::selectScalableVectorizationFactor(unsigned VF) {
-  float Cost = expectedCost(1).first;
-  const float ScalarCost = Cost;
-  unsigned Width = 1;
-  LLVM_DEBUG(dbgs() << "LV: Scalar loop costs: " << (int)ScalarCost << ".\n");
-
   bool ForceVectorization = Hints->getForce() == LoopVectorizeHints::FK_Enabled;
-  if (ForceVectorization) {
-    // Ignore scalar width, because the user explicitly wants vectorization.
-    // Initialize cost to max so that VF = 2 is, at least, chosen during cost
-    // evaluation.
-    Cost = std::numeric_limits<float>::max();
-  }
+  assert(!ForceVectorization &&
+         "We do not support Forced Vectorization for scalable vectors");
 
   // Notice that the vector loop needs to be executed less times, so
   // we need to divide the cost of the vector loops by the width of
   // the vector elements.
   VectorizationCostTy C = expectedCost(VF);
-  float VectorCost = C.first / (float)VF;
+  float Cost = C.first / (float)VF;
   LLVM_DEBUG(dbgs() << "LV: Vector loop of width " << VF
-                    << " costs: " << (int)VectorCost << ".\n");
-  if (!C.second && !ForceVectorization) {
-    LLVM_DEBUG(
-        dbgs() << "LV: Not considering vector loop of width " << VF
-               << " because it will not generate any vector instructions.\n");
-  }
-  if (VectorCost < Cost) {
-    Cost = VectorCost;
-    Width = VF;
-  }
+                    << " costs: " << (int)Cost << ".\n");
 
   if (!EnableCondStoresVectorization && NumPredStores) {
-    reportVectorizationFailure("There are conditional stores.",
+    reportVectorizationFailure(
+        "There are conditional stores.",
         "store that is conditionally executed prevents vectorization",
         "ConditionalStore", ORE, TheLoop);
-    Width = 1;
-    Cost = ScalarCost;
+    assert(false && "Not supported for scalable vectors");
   }
 
-  LLVM_DEBUG(if (ForceVectorization && Width > 1 && Cost >= ScalarCost) dbgs()
-             << "LV: Vectorization seems to be not beneficial, "
-             << "but was forced by a user.\n");
-  LLVM_DEBUG(dbgs() << "LV: Selecting VF: " << Width << ".\n");
-  VectorizationFactor Factor = {Width, (unsigned)(Width * Cost)};
+  LLVM_DEBUG(dbgs() << "LV: Selecting VF: " << VF << ".\n");
+  VectorizationFactor Factor = {VF, (unsigned)(VF * Cost)};
   return Factor;
 }
 
@@ -5257,7 +5247,8 @@ unsigned LoopVectorizationCostModel::selectInterleaveCount(unsigned VF,
   if (TC > 1 && TC < TinyTripCountInterleaveThreshold)
     return 1;
 
-  unsigned TargetNumRegisters = TTI.getNumberOfRegisters(VF > 1);//--//
+  unsigned TargetNumRegisters =
+      TTI.getNumberOfRegisters(VF > 1 || isScalable());
   LLVM_DEBUG(dbgs() << "LV: The target has " << TargetNumRegisters
                     << " registers\n");
 
@@ -5707,6 +5698,7 @@ LoopVectorizationCostModel::VectorizationCostTy
 LoopVectorizationCostModel::expectedCost(unsigned VF) {
   VectorizationCostTy Cost;
 
+  bool ValidVF = VF > 1 || (isScalable() && VF == 1);
   // For each block.
   for (BasicBlock *BB : TheLoop->blocks()) {
     VectorizationCostTy BlockCost;
@@ -5715,7 +5707,7 @@ LoopVectorizationCostModel::expectedCost(unsigned VF) {
     for (Instruction &I : BB->instructionsWithoutDebug()) {
       // Skip ignored values.
       if (ValuesToIgnore.find(&I) != ValuesToIgnore.end() ||
-          (VF > 1 && VecValuesToIgnore.find(&I) != VecValuesToIgnore.end())) //--//
+          (ValidVF && VecValuesToIgnore.find(&I) != VecValuesToIgnore.end()))
         continue;
 
       VectorizationCostTy C = getInstructionCost(&I, VF);
@@ -5737,7 +5729,7 @@ LoopVectorizationCostModel::expectedCost(unsigned VF) {
     // unconditionally executed. For the scalar case, we may not always execute
     // the predicated block. Thus, scale the block's cost by the probability of
     // executing it.
-    if (VF == 1 && blockNeedsPredication(BB))
+    if (VF == 1 && !isScalable() && blockNeedsPredication(BB))
       BlockCost.first /= getReciprocalPredBlockProb();
 
     Cost.first += BlockCost.first;
@@ -5922,7 +5914,7 @@ unsigned LoopVectorizationCostModel::getMemoryInstructionCost(Instruction *I,
                                                               unsigned VF) {
   // Calculate scalar cost only. Vectorization cost should be ready at this
   // moment.
-  if (VF == 1) {
+  if (VF == 1 && !isScalable()) {
     Type *ValTy = getMemInstValueType(I);
     unsigned Alignment = getLoadStoreAlignment(I);
     unsigned AS = getLoadStoreAddressSpace(I);
@@ -5937,15 +5929,17 @@ LoopVectorizationCostModel::VectorizationCostTy
 LoopVectorizationCostModel::getInstructionCost(Instruction *I, unsigned VF) {
   // If we know that this instruction will remain uniform, check the cost of
   // the scalar version.
+  bool ValidVF = VF > 1 || (isScalable() && VF == 1);
   if (isUniformAfterVectorization(I, VF))
-    VF = 1;
+    ValidVF = false;
+  // VF = 1;
 
-  if (VF > 1 && isProfitableToScalarize(I, VF))
+  if (ValidVF && isProfitableToScalarize(I, VF))
     return VectorizationCostTy(InstsToScalarize[VF][I], false);
 
   // Forced scalars do not have any scalarization overhead.
   auto ForcedScalar = ForcedScalars.find(VF);
-  if (VF > 1 && ForcedScalar != ForcedScalars.end()) {
+  if (ValidVF && ForcedScalar != ForcedScalars.end()) {
     auto InstSet = ForcedScalar->second;
     if (InstSet.find(I) != InstSet.end())
       return VectorizationCostTy((getInstructionCost(I, 1).first * VF), false);
@@ -5954,8 +5948,12 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, unsigned VF) {
   Type *VectorTy;
   unsigned C = getInstructionCost(I, VF, VectorTy);
 
-  bool TypeNotScalarized =   //--//
-      VF > 1 && VectorTy->isVectorTy() && TTI.getNumberOfParts(VectorTy) < VF;
+  // bool ValidNumParts = TTI.getNumberOfParts(VectorTy) < VF || (VF == 1 &&
+  // isScalable() &&
+  bool TypeNotScalarized = (VF > 1 && VectorTy->isVectorTy() &&
+                            TTI.getNumberOfParts(VectorTy) < VF) ||
+                           (VF == 1 && isScalable() && VectorTy->isVectorTy() &&
+                            TTI.getNumberOfParts(VectorTy) == VF);
   return VectorizationCostTy(C, TypeNotScalarized);
 }
 
@@ -6814,7 +6812,7 @@ VPWidenMemoryInstructionRecipe *
 VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
                                   VPlanPtr &Plan) {
   //-NOTE/VK-//
-  //If it is a load or store instruction, WidenMemory recipe is created. 
+  // If it is a load or store instruction, WidenMemory recipe is created.
   if (!isa<LoadInst>(I) && !isa<StoreInst>(I))
     return nullptr;
 
@@ -7072,10 +7070,10 @@ VPRegionBlock *VPRecipeBuilder::createReplicateRegion(Instruction *Instr,
 
   return Region;
 }
-//-NOTE/VK-// 
-//This is where widening recipe is created for each instruction in the for loop.
-//During the plan execution phase widening is done by simply executing these
-//recipes.
+//-NOTE/VK-//
+// This is where widening recipe is created for each instruction in the for
+// loop. During the plan execution phase widening is done by simply executing
+// these recipes.
 bool VPRecipeBuilder::tryToCreateRecipe(Instruction *Instr, VFRange &Range,
                                         VPlanPtr &Plan, VPBasicBlock *VPBB) {
   VPRecipeBase *Recipe = nullptr;
@@ -7501,7 +7499,7 @@ getScalarEpilogueLowering(Function *F, Loop *L, LoopVectorizeHints &Hints,
       (F->hasOptSize() ||
        llvm::shouldOptimizeForSize(L->getHeader(), PSI, BFI)))
     SEL = CM_ScalarEpilogueNotAllowedOptSize;
-  else if (PreferPredicateOverEpilog || Hints.getPredicate()) 
+  else if (PreferPredicateOverEpilog || Hints.getPredicate())
     SEL = CM_ScalarEpilogueNotNeededUsePredicate;
 
   return SEL;
@@ -7687,8 +7685,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       TTI->isFPVectorizationPotentiallyUnsafe()) {
     reportVectorizationFailure(
         "Potentially unsafe FP op prevents vectorization",
-        "loop not vectorized due to unsafe FP support.",
-        "UnsafeFP", ORE, L);
+        "loop not vectorized due to unsafe FP support.", "UnsafeFP", ORE, L);
     Hints.emitRemarkWithHints();
     return false;
   }
