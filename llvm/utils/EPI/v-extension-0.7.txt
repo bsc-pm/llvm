@@ -82,7 +82,7 @@ vmslt.vv vd, vs2, vs1, vm
 vmslt.vx vd, vs2, rs1, vm
 vmsleu.vv vd, vs2, vs1, vm
 vmsleu.vx vd, vs2, rs1, vm
-vmsleu.vi vd, vs2, imm, vm
+vmsleu.vi vd, vs2, uimm, vm
 vmsle.vv vd, vs2, vs1, vm
 vmsle.vx vd, vs2, rs1, vm
 vmsle.vi vd, vs2, imm, vm

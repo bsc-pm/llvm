@@ -200,6 +200,12 @@ multiclass binary_arithmetic_integer_vxi<string opcodestr, bits<6> funct6> {
   defm _V : binary_arithmetic_integer_n_i<opcodestr, funct6, "v">;
 }
 
+multiclass binary_arithmetic_integer_vxu<string opcodestr, bits<6> funct6> {
+  defm _V : binary_arithmetic_integer_n_v<opcodestr, funct6, "v">;
+  defm _V : binary_arithmetic_integer_n_x<opcodestr, funct6, "v">;
+  defm _V : binary_arithmetic_integer_n_u<opcodestr, funct6, "v">;
+}
+
 multiclass binary_arithmetic_integer_vx<string opcodestr, bits<6> funct6> {
   defm _V : binary_arithmetic_integer_n_v<opcodestr, funct6, "v">;
   defm _V : binary_arithmetic_integer_n_x<opcodestr, funct6, "v">;
@@ -761,7 +767,7 @@ defm VMSEQ  : binary_arithmetic_integer_vxi<"vmseq",  0b011000>;
 defm VMSNE  : binary_arithmetic_integer_vxi<"vmsne",  0b011001>;
 defm VMSLTU : binary_arithmetic_integer_vx<"vmsltu",  0b011010>;
 defm VMSLT  : binary_arithmetic_integer_vx<"vmslt",   0b011011>;
-defm VMSLEU : binary_arithmetic_integer_vxi<"vmsleu", 0b011100>;
+defm VMSLEU : binary_arithmetic_integer_vxu<"vmsleu", 0b011100>;
 defm VMSLE  : binary_arithmetic_integer_vxi<"vmsle",  0b011101>;
 defm VMSGTU : binary_arithmetic_integer_xu<"vmsgtu",  0b011110>;
 defm VMSGT  : binary_arithmetic_integer_xi<"vmsgt",   0b011111>;
@@ -1668,6 +1674,19 @@ multiclass pseudo_binary_m_vv_vx_vi {
   }
 }
 
+multiclass pseudo_binary_m_vv_vx_vu {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllEPIVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VV : pseudo_binary<EPIVR, evr, evr, evr.VLMul>;
+      defm _VX : pseudo_binary<EPIVR, evr, GPR, evr.VLMul>;
+      defm _VU : pseudo_binary<EPIVR, evr, uimm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+    }
+  }
+}
+
 multiclass pseudo_binary_v_vf {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllEPIVRegs in
@@ -1811,7 +1830,7 @@ defm PseudoVMSEQ       : pseudo_binary_m_vv_vx_vi;
 defm PseudoVMSNE       : pseudo_binary_m_vv_vx_vi;
 defm PseudoVMSLTU      : pseudo_binary_m_vv_vx;
 defm PseudoVMSLT       : pseudo_binary_m_vv_vx;
-defm PseudoVMSLEU      : pseudo_binary_m_vv_vx_vi;
+defm PseudoVMSLEU      : pseudo_binary_m_vv_vx_vu;
 defm PseudoVMSLE       : pseudo_binary_m_vv_vx_vi;
 
 defm PseudoVMSGTU      : pseudo_binary_m_vx_vu;
@@ -2434,6 +2453,24 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
                                 vti.RegClass.VLMul, EPIVR, vti.RegClass, GPR>;
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VI",
+                                vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
+                                vti.RegClass.VLMul, EPIVR, vti.RegClass, simm5>;
+  }
+}
+
+multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vu<string intrinsic_name,
+                                                          string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
+                                vti.Mask, vti.Vector, vti.Vector, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, EPIVR,
+                                vti.RegClass, vti.RegClass>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VX",
+                                vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
+                                vti.RegClass.VLMul, EPIVR, vti.RegClass, GPR>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VU",
                                 vti.Mask, vti.Vector, XLenVT, vti.Mask, vti.SEW,
                                 vti.RegClass.VLMul, EPIVR, vti.RegClass, simm5>;
   }
@@ -3142,7 +3179,7 @@ defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmseq", "Pseud
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsne", "PseudoVMSNE">;
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmsltu", "PseudoVMSLTU">;
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmslt", "PseudoVMSLT">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsleu", "PseudoVMSLEU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vu<"int_epi_vmsleu", "PseudoVMSLEU">;
 defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsle", "PseudoVMSLE">;
 
 defm "" : pat_intrinsic_binary_relational_int_m_vx_vu<"int_epi_vmsgtu", "PseudoVMSGTU">;

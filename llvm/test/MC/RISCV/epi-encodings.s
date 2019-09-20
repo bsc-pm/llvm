@@ -444,13 +444,13 @@ vmsleu.vx v30, v29, a5
 vmsleu.vx v0, v31, a7, v0.t
 
 # Encoding: |011100|1|00001|10111|011|00010|1010111|
-# CHECK: vmsleu.vi v2, v1, -9
+# CHECK: vmsleu.vi v2, v1, 23
 # CHECK-SAME: [0x57,0xb1,0x1b,0x72]
-vmsleu.vi v2, v1, -9
+vmsleu.vi v2, v1, 23
 # Encoding: |011100|0|00011|11000|011|00100|1010111|
-# CHECK: vmsleu.vi v4, v3, -8, v0.t
+# CHECK: vmsleu.vi v4, v3, 24, v0.t
 # CHECK-SAME: [0x57,0x32,0x3c,0x70]
-vmsleu.vi v4, v3, -8, v0.t
+vmsleu.vi v4, v3, 24, v0.t
 
 # Encoding: |011101|1|00101|00110|000|00111|1010111|
 # CHECK: vmsle.vv v7, v5, v6

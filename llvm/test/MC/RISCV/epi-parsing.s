@@ -249,10 +249,10 @@ vmsleu.vx v30, v29, a5
 # CHECK: vmsleu.vx v0, v31, a7, v0.t
 vmsleu.vx v0, v31, a7, v0.t
 
-# CHECK: vmsleu.vi v2, v1, -9
-vmsleu.vi v2, v1, -9
-# CHECK: vmsleu.vi v4, v3, -8, v0.t
-vmsleu.vi v4, v3, -8, v0.t
+# CHECK: vmsleu.vi v2, v1, 23
+vmsleu.vi v2, v1, 23
+# CHECK: vmsleu.vi v4, v3, 24, v0.t
+vmsleu.vi v4, v3, 24, v0.t
 
 # CHECK: vmsle.vv v7, v5, v6
 vmsle.vv v7, v5, v6

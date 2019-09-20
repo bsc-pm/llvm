@@ -52,7 +52,7 @@ VMSLT.VV|vd,vs2,vs1,vm|011011|vm|vs2|vs1|000|vd|1010111
 VMSLT.VX|vd,vs2,rs1,vm|011011|vm|vs2|rs1|100|vd|1010111
 VMSLEU.VV|vd,vs2,vs1,vm|011100|vm|vs2|vs1|000|vd|1010111
 VMSLEU.VX|vd,vs2,rs1,vm|011100|vm|vs2|rs1|100|vd|1010111
-VMSLEU.VI|vd,vs2,imm,vm|011100|vm|vs2|imm[4:0]|011|vd|1010111
+VMSLEU.VI|vd,vs2,uimm,vm|011100|vm|vs2|uimm[4:0]|011|vd|1010111
 VMSLE.VV|vd,vs2,vs1,vm|011101|vm|vs2|vs1|000|vd|1010111
 VMSLE.VX|vd,vs2,rs1,vm|011101|vm|vs2|rs1|100|vd|1010111
 VMSLE.VI|vd,vs2,imm,vm|011101|vm|vs2|imm[4:0]|011|vd|1010111
