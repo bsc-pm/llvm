@@ -2815,7 +2815,7 @@ except for the lowermost corresponding element enabled in the given mask.
 
 def : DocEPIBuiltin<vmslt>
 {
-  let Category = DocEPIFloatingPointRelational;
+  let Category = DocEPIIntegerRelational;
   let Title = "Compare elementwise two integer vectors for lower-than";
   let Description = [{Use these builtins to evaluate if the elements of the
 first integer vector are lower than, but not equal to, the corresponding
@@ -3361,7 +3361,7 @@ first element of the vector `b`.
 
 def : DocEPIBuiltin<vredsum>
 {
-  let Category = DocEPIFloatingPointArithmetic;
+  let Category = DocEPIIntegerArithmetic;
   let Title = "Sum of integer vector";
   let Description = [{Use these builtins to compute the sum of all the elements
 of an integer vector. The initial result of the sum is taken from the
