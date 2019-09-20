@@ -30,3 +30,26 @@ void foo(int x) {
 // CHECK-NEXT: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED.VLA"([7 x i32]* %vla, i64 %1, i64 7), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %1, i64 0, i64 %1), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %1, i64 1, i64 %1), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %1, i64 0, i64 2), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %1, i64 3, i64 7) ] 
 // CHECK-NEXT: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED.VLA"([7 x i32]* %vla, i64 %1, i64 7), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %1, i64 5, i64 6), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 4, i64 28, i64 %1, i64 5, i64 6), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 8, i64 %1, i64 5, i64 6), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 12, i64 28, i64 %1, i64 5, i64 6) ] 
 
+void bar() {
+    int **p;
+    int (*kk)[10];
+    int array[10][20];
+    #pragma oss task depend(in: kk[0 : 11])
+    {}
+    #pragma oss task depend(in: p[0 : 11])
+    {}
+    #pragma oss task depend(in: array[0: 11][7 : 11])
+    {}
+    struct C {
+        int (*x)[10];
+    } c;
+
+    #pragma oss task depend(in: c.x[0 : 11])
+    {}
+}
+
+
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"([10 x i32]** %kk), "QUAL.OSS.DEP.IN"([10 x i32]* %0, i64 40, i64 0, i64 40, i64 11, i64 0, i64 11) ]
+// CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32*** %p), "QUAL.OSS.DEP.IN"(i32** %2, i64 88, i64 0, i64 88) ]
+// CHECK: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* %array), "QUAL.OSS.DEP.IN"([20 x i32]* %arraydecay, i64 80, i64 28, i64 72, i64 10, i64 0, i64 11) ]
+// CHECK: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(%struct.C* %c), "QUAL.OSS.DEP.IN"([10 x i32]* %5, i64 40, i64 0, i64 40, i64 11, i64 0, i64 11) ]

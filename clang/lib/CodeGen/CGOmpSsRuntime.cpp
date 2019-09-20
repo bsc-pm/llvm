@@ -106,7 +106,9 @@ public:
     // Add Dimensions
     if (TmpTy->isPointerType()) {
       // T *
-      Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
+      // We have added section dimension before
+      if (Dims.empty())
+        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
       TmpTy = TmpTy->getPointeeType();
     }
     while (TmpTy->isArrayType()) {
@@ -160,13 +162,13 @@ public:
   void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
     // Get Base Type
     // An array section is considered a built-in type
-    BaseElementTy = GetInnermostElementType(
-        OSSArraySectionExpr::getBaseOriginalType(
-                          E->getBase()));
+    BaseElementTy = GetInnermostElementType(E->getType());
+
     // Get the inner expr
     const Expr *TmpE = E;
     // First come OSSArraySection
     while (const OSSArraySectionExpr *ASE = dyn_cast<OSSArraySectionExpr>(TmpE->IgnoreParenImpCasts())) {
+      // Stop in the innermost ArrayToPointerDecay
       TmpE = ASE->getBase();
       // Add indexes
       llvm::Value *Idx, *IdxEnd;
@@ -211,10 +213,15 @@ public:
 
       Starts.push_back(Idx);
       Ends.push_back(IdxEnd);
-      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType())
+      // If we see a Pointer we must to add one dimension and done
+      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+        assert(Size && "Sema should have forbidden unspecified sizes in pointers");
+        Dims.push_back(CGF.Builder.CreateSExt(CGF.EmitScalarExpr(Size), OSSArgTy));
         break;
+      }
     }
     while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+      // Stop in the innermost ArrayToPointerDecay
       TmpE = ASE->getBase();
       // Add indexes
       llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
@@ -222,9 +229,11 @@ public:
       llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       Starts.push_back(Idx);
       Ends.push_back(IdxEnd);
-      // Stop in the innermost ArrayToPointerDecay
-      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType())
+      // If we see a Pointer we must to add one dimension and done
+      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
         break;
+      }
     }
 
     Ptr = CGF.EmitScalarExpr(TmpE);
@@ -237,6 +246,7 @@ public:
     // Get the inner expr
     const Expr *TmpE = E;
     while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+      // Stop in the innermost ArrayToPointerDecay
       TmpE = ASE->getBase();
       // Add indexes
       llvm::Value *Idx = CGF.EmitScalarExpr(ASE->getIdx());
@@ -244,9 +254,11 @@ public:
       llvm::Value *IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       Starts.push_back(Idx);
       Ends.push_back(IdxEnd);
-      // Stop in the innermost ArrayToPointerDecay
-      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType())
+      // If we see a Pointer we must to add one dimension and done
+      if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+        Dims.push_back(llvm::ConstantInt::getSigned(OSSArgTy, 1));
         break;
+      }
     }
 
     Ptr = CGF.EmitScalarExpr(TmpE);
