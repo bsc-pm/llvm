@@ -21,8 +21,8 @@ Several introductory papers and presentations.
 .. toctree::
    :hidden:
 
-   Lexicon
    FAQ
+   Lexicon
 
 `Introduction to the LLVM Compiler`__
   Presentation providing a users introduction to LLVM.
@@ -47,12 +47,6 @@ Several introductory papers and presentations.
 
 `Publications mentioning LLVM <http://llvm.org/pubs>`_
    ..
-
-:doc:`Lexicon`
-   Definition of acronyms, terms and concepts used in LLVM.
-
-:doc:`FAQ`
-   A list of common questions and problems and their solutions.
 
 Documentation
 =============
