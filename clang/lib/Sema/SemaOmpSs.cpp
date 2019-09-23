@@ -422,7 +422,7 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
 public:
 
   void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
-    VisitExpr(E->getBase());
+    Visit(E->getBase());
     IsArraySubscriptIdx = true;
     for (Stmt *S : E->getShapes())
       Visit(S);
@@ -430,7 +430,7 @@ public:
   }
 
   void VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
-    VisitExpr(E->getBase());
+    Visit(E->getBase());
     IsArraySubscriptIdx = true;
     if (E->getLowerBound())
       Visit(E->getLowerBound());
@@ -440,11 +440,12 @@ public:
   }
 
   void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
-    VisitExpr(E->getBase());
+    Visit(E->getBase());
     IsArraySubscriptIdx = true;
-    VisitExpr(E->getIdx());
+    Visit(E->getIdx());
     IsArraySubscriptIdx = false;
   }
+
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
     // Add DSA to 'this' if is the first time we see it
     if (!Stack->getThisExpr()) {
