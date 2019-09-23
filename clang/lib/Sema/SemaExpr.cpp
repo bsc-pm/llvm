@@ -4314,10 +4314,6 @@ Sema::ActOnArraySubscriptExpr(Scope *S, Expr *base, SourceLocation lbLoc,
       base->getType()->isSpecificPlaceholderType(BuiltinType::OSSArraySection))
     return ActOnOSSArraySectionExpr(base, lbLoc, idx, SourceLocation(),
                                     /*Length=*/nullptr, rbLoc);
-  if (base && !base->getType().isNull() &&
-      isa<OSSArraySectionExpr>(base))
-    return ActOnOSSArraySectionExpr(base, lbLoc, idx, SourceLocation(),
-                                    /*Length=*/nullptr, rbLoc);
 
   // Since this might be a postfix expression, get rid of ParenListExprs.
   if (isa<ParenListExpr>(base)) {
@@ -4597,6 +4593,7 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
                                           Expr *LowerBound,
                                           SourceLocation ColonLoc, Expr *Length,
                                           SourceLocation RBLoc) {
+
   if (Base->getType()->isPlaceholderType() &&
       !Base->getType()->isSpecificPlaceholderType(
           BuiltinType::OSSArraySection)) {
@@ -4735,40 +4732,9 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
       return ExprError();
     Base = Result.get();
   }
-#if 1
-  QualType T = Base->getType();
-  if (T->isPointerType())
-    T = T->getPointeeType();
-  else if (T->isArrayType())
-    T = T->getAsArrayTypeUnsafe()->getElementType();
-
-#else
-
-  QualType T = Base->IgnoreParenImpCasts()->getType();
-  Expr *NewLength = Length;
-  if (T->isPointerType()) {
-    // if (!NewLength)
-    //   NewLength = IntegerLiteral::Create(Context, llvm::APInt(64, 1), Context.IntTy, SourceLocation());
-    T = T->getPointeeType();
-  } else if (const ConstantArrayType *BaseArrayTy = Context.getAsConstantArrayType(T)) {
-    if (!NewLength)
-      NewLength = IntegerLiteral::Create(Context, BaseArrayTy->getSize(), Context.getSizeType(), SourceLocation());;
-    T = BaseArrayTy->getElementType();
-  } else if (const VariableArrayType *BaseArrayTy = Context.getAsVariableArrayType(T)) {
-    if (!NewLength)
-      NewLength = BaseArrayTy->getSizeExpr();
-    T = BaseArrayTy->getElementType();
-  } else {
-    llvm_unreachable("Unhandled array type");
-  }
-
-  T = BuildArrayType(T, ArrayType::Normal, NewLength, /*Quals=*/0,
-                     SourceRange(SourceLocation(), SourceLocation()),
-                     DeclarationName());
-#endif
 
   return new (Context)
-      OSSArraySectionExpr(Base, LowerBound, Length, T,
+      OSSArraySectionExpr(Base, LowerBound, Length, Context.OSSArraySectionTy,
                           VK_LValue, OK_Ordinary, ColonLoc, RBLoc);
 }
 

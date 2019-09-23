@@ -162,7 +162,17 @@ public:
   void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
     // Get Base Type
     // An array section is considered a built-in type
-    BaseElementTy = GetInnermostElementType(E->getType());
+    BaseElementTy =
+        OSSArraySectionExpr::getBaseOriginalType(
+                          E->getBase());
+    if (BaseElementTy->isAnyPointerType()) {
+      BaseElementTy = BaseElementTy->getPointeeType();
+    } else if (BaseElementTy->isArrayType()) {
+      BaseElementTy = BaseElementTy->getAsArrayTypeUnsafe()->getElementType();
+    } else {
+      llvm_unreachable("Unhandled Type");
+    }
+    BaseElementTy = GetInnermostElementType(BaseElementTy);
 
     // Get the inner expr
     const Expr *TmpE = E;
