@@ -637,6 +637,10 @@ protected:
   /// vector of instructions.
   void addMetadata(ArrayRef<Value *> To, Instruction *From);
 
+  /// Create a call to Vscale intrinsic that returns the valuse of vscale at
+  /// runtime. ALso insert declaration if required. jj
+  CallInst *emitVscaleCall(IRBuilder<> &Builder, Module* M, Type* Ty);
+
   /// The original loop.
   Loop *OrigLoop;
 
@@ -900,6 +904,13 @@ void InnerLoopVectorizer::addMetadata(ArrayRef<Value *> To, Instruction *From) {
     if (Instruction *I = dyn_cast<Instruction>(V))
       addMetadata(I, From);
   }
+}
+
+CallInst *InnerLoopVectorizer::emitVscaleCall(IRBuilder<> &Builder, Module* M, Type* Ty) {
+  Function *VscaleFunc = Intrinsic::getDeclaration(
+      M, Intrinsic::experimental_vector_vscale, Ty);
+  CallInst *VscaleFuncCall = Builder.CreateCall(VscaleFunc, {});
+  return VscaleFuncCall;
 }
 
 namespace llvm {
@@ -1660,7 +1671,7 @@ Value *InnerLoopVectorizer::getBroadcastInstrs(Value *V) {
     Builder.SetInsertPoint(LoopVectorPreHeader->getTerminator());
 
   // Broadcast the scalar into all locations in the vector.
-  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast");
+  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast"/*, Scalable*/);
 
   return Shuf;
 }
@@ -2607,7 +2618,7 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   IRBuilder<> Builder(L->getLoopPreheader()->getTerminator());
 
   Type *Ty = TC->getType();
-  Constant *Step = ConstantInt::get(Ty, VF * UF);
+  Value *Step = ConstantInt::get(Ty, VF * UF);
 
   // If the tail is to be folded by masking, round the number of iterations N
   // up to a multiple of Step instead of rounding down. This is done by first
@@ -2616,9 +2627,15 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   // that it starts at zero and its Step is a power of two; the loop will then
   // exit, with the last early-exit vector comparison also producing all-true.
   if (Cost->foldTailByMasking()) {
+    // TODO: Fix for scalable vectors.
     assert(isPowerOf2_32(VF * UF) &&
            "VF*UF must be a power of 2 when folding tail by masking");
-    TC = Builder.CreateAdd(TC, ConstantInt::get(Ty, VF * UF - 1), "n.rnd.up");
+    if (Scalable) {
+      CallInst* VscaleFuncCall = emitVscaleCall(Builder, L->getLoopPreheader()->getModule(), Ty);
+      Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
+    }
+    Step = Builder.CreateSub(Step, ConstantInt::get(Ty, 1));
+    TC = Builder.CreateAdd(TC, Step, "n.rnd.up");
   }
 
   // Now we need to generate the expression for the part of the loop that the
@@ -2626,6 +2643,10 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   // iterations are not required for correctness, or N - Step, otherwise. Step
   // is equal to the vectorization factor (number of SIMD elements) times the
   // unroll factor (number of SIMD instructions).
+  if (Scalable){
+    CallInst* VscaleFuncCall = emitVscaleCall(Builder, L->getHeader()->getModule(),Ty);
+    Step = Builder.CreateMul(Step, VscaleFuncCall, "step.vscale");
+  }
   Value *R = Builder.CreateURem(TC, Step, "n.mod.vf");
 
   // If there is a non-reversed interleaved group that may speculatively access
@@ -2692,10 +2713,14 @@ void InnerLoopVectorizer::emitMinimumIterationCountCheck(Loop *L,
 
   // If tail is to be folded, vector loop takes care of all iterations.
   Value *CheckMinIters = Builder.getFalse();
-  if (!Cost->foldTailByMasking())
-    CheckMinIters = Builder.CreateICmp(
-        P, Count, ConstantInt::get(Count->getType(), VF * UF),
-        "min.iters.check");
+  if (!Cost->foldTailByMasking()) {
+    Value* Step = ConstantInt::get(Count->getType(), VF * UF);
+    if (Scalable){
+      CallInst *VscaleFuncCall = emitVscaleCall(Builder, BB->getModule(), Count->getType());
+      Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
+    }
+    CheckMinIters = Builder.CreateICmp( P, Count, Step, "min.iters.check");
+  }
 
   BasicBlock *NewBB = BB->splitBasicBlock(BB->getTerminator(), "vector.ph");
   // Update dominator tree immediately if the generated block is a
