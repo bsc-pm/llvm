@@ -420,6 +420,25 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   bool IsArraySubscriptIdx = false;
 public:
+
+  void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+    VisitExpr(E->getBase());
+    IsArraySubscriptIdx = true;
+    for (Stmt *S : E->getShapes())
+      Visit(S);
+    IsArraySubscriptIdx = false;
+  }
+
+  void VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
+    VisitExpr(E->getBase());
+    IsArraySubscriptIdx = true;
+    if (E->getLowerBound())
+      Visit(E->getLowerBound());
+    if (E->getLength())
+      Visit(E->getLength());
+    IsArraySubscriptIdx = false;
+  }
+
   void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     VisitExpr(E->getBase());
     IsArraySubscriptIdx = true;
