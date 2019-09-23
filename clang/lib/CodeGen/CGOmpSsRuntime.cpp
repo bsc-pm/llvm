@@ -247,6 +247,12 @@ public:
     }
 
     Ptr = CGF.EmitScalarExpr(TmpE);
+    if (const OSSArrayShapingExpr *OSA = dyn_cast<OSSArrayShapingExpr>(TmpE->IgnoreParenImpCasts())) {
+      // We must to emit VLA args
+      if (OSA->getType()->isVariablyModifiedType()) {
+        CGF.EmitVariablyModifiedType(OSA->getType());
+      }
+    }
     FillDimsFromInnermostExpr(TmpE);
   }
 
@@ -272,6 +278,12 @@ public:
     }
 
     Ptr = CGF.EmitScalarExpr(TmpE);
+    if (const OSSArrayShapingExpr *OSA = dyn_cast<OSSArrayShapingExpr>(TmpE->IgnoreParenImpCasts())) {
+      // We must to emit VLA args
+      if (OSA->getType()->isVariablyModifiedType()) {
+        CGF.EmitVariablyModifiedType(OSA->getType());
+      }
+    }
     FillDimsFromInnermostExpr(TmpE);
   }
 
