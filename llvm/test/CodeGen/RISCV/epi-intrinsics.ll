@@ -2,7 +2,7 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+m,+f,+d,+a,+c,+epi -verify-machineinstrs \
 ; RUN:     -no-epi-remove-redundant-vsetvl < %s | FileCheck %s
 
-define i64 @test_vsetvl(i64 %in) nounwind
+define void @test_vsetvl() nounwind
 ; CHECK-LABEL: test_vsetvl:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a0, a0, e8, m1
@@ -16,15 +16,15 @@ define i64 @test_vsetvl(i64 %in) nounwind
 ; CHECK-NEXT:    ret
 {
 entry:
-  %a1 = call i64 @llvm.epi.vsetvl(i64 %in, i64 0, i64 0)
-  %a2 = call i64 @llvm.epi.vsetvl(i64 %a1, i64 1, i64 0)
-  %a3 = call i64 @llvm.epi.vsetvl(i64 %a2, i64 2, i64 0)
-  %a4 = call i64 @llvm.epi.vsetvl(i64 %a3, i64 3, i64 0)
-  %a5 = call i64 @llvm.epi.vsetvl(i64 %a4, i64 4, i64 0)
-  %a6 = call i64 @llvm.epi.vsetvl(i64 %a5, i64 0, i64 1)
-  %a7 = call i64 @llvm.epi.vsetvl(i64 %a6, i64 0, i64 2)
-  %a8 = call i64 @llvm.epi.vsetvl(i64 %a7, i64 0, i64 3)
-  ret i64 %a8
+  %a1 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 0)
+  %a2 = call i64 @llvm.epi.vsetvl(i64 undef, i64 1, i64 0)
+  %a3 = call i64 @llvm.epi.vsetvl(i64 undef, i64 2, i64 0)
+  %a4 = call i64 @llvm.epi.vsetvl(i64 undef, i64 3, i64 0)
+  %a5 = call i64 @llvm.epi.vsetvl(i64 undef, i64 4, i64 0)
+  %a6 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 1)
+  %a7 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 2)
+  %a8 = call i64 @llvm.epi.vsetvl(i64 undef, i64 0, i64 3)
+  ret void
 }
 
 declare i64 @llvm.experimental.vector.vscale.i64()
@@ -119,7 +119,9 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a6, a5, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a0)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vmslt.vv v2, v1, v0
 ; CHECK-NEXT:    vsetvli a0, zero, e8, m1
 ; CHECK-NEXT:    vse.v v2, (a2)
@@ -129,11 +131,15 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
 ; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vle.v v0, (a3)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vle.v v1, (a4)
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vmfle.vv v2, v1, v0
+; CHECK-NEXT:    vsetvli a0, a5, e64, m1
 ; CHECK-NEXT:    vmflt.vv v0, v1, v0
 ; CHECK-NEXT:    vsetvli a0, zero, e8, m1
 ; CHECK-NEXT:    vse.v v0, (a2)
+; CHECK-NEXT:    vsetvli a0, zero, e8, m1
 ; CHECK-NEXT:    vse.v v2, (a2)
 ; CHECK-NEXT:    ret
                                       <vscale x 1 x i64>* %pib,

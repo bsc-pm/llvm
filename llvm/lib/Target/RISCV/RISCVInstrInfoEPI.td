@@ -1044,7 +1044,7 @@ defm VFWNMACC : binary_arithmetic_float_vf_destructive<"vfwnmacc", 0b111101>;
 defm VFWMSAC  : binary_arithmetic_float_vf_destructive<"vfwmsac",  0b111110>;
 defm VFWNMSAC : binary_arithmetic_float_vf_destructive<"vfwnmsac", 0b111111>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Defs = [VL, VTYPE] in
+let hasSideEffects = 1, mayLoad = 1, mayStore = 1, Defs = [VL, VTYPE] in
 def VSETVLI : RVInst<
   (outs GPR:$rd),
   (ins GPR:$rs1, vectorelementwidth:$vsew, vectormultiplier:$vlmul),
@@ -1067,7 +1067,7 @@ def VSETVLI : RVInst<
   let Opcode = OPC_V.Value;
 }
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Defs = [VL, VTYPE] in
+let hasSideEffects = 1, mayLoad = 1, mayStore = 1, Defs = [VL, VTYPE] in
 def VSETVL : RVInst<
   (outs GPR:$rd),
   (ins GPR:$rs1, GPR:$rs2),
