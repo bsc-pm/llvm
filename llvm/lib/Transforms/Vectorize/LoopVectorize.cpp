@@ -1671,7 +1671,7 @@ Value *InnerLoopVectorizer::getBroadcastInstrs(Value *V) {
     Builder.SetInsertPoint(LoopVectorPreHeader->getTerminator());
 
   // Broadcast the scalar into all locations in the vector.
-  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast"/*, Scalable*/);
+  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast", Scalable);
 
   return Shuf;
 }
