@@ -178,7 +178,6 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   }
 
   setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
-  setOperationAction(ISD::GlobalTLSAddress, XLenVT, Custom);
   setOperationAction(ISD::BlockAddress, XLenVT, Custom);
   setOperationAction(ISD::ConstantPool, XLenVT, Custom);
 
@@ -229,7 +228,7 @@ bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
   case Intrinsic::riscv_masked_atomicrmw_min_i32:
   case Intrinsic::riscv_masked_atomicrmw_umax_i32:
   case Intrinsic::riscv_masked_atomicrmw_umin_i32:
-  case Intrinsic::riscv_masked_cmpxchg_i32: {
+  case Intrinsic::riscv_masked_cmpxchg_i32:
     PointerType *PtrTy = cast<PointerType>(I.getArgOperand(0)->getType());
     Info.opc = ISD::INTRINSIC_W_CHAIN;
     Info.memVT = MVT::getVT(PtrTy->getElementType());
@@ -239,26 +238,6 @@ bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     Info.flags = MachineMemOperand::MOLoad | MachineMemOperand::MOStore |
                  MachineMemOperand::MOVolatile;
     return true;
-  }
-  case Intrinsic::riscv_masked_atomicrmw_xchg_i64:
-  case Intrinsic::riscv_masked_atomicrmw_add_i64:
-  case Intrinsic::riscv_masked_atomicrmw_sub_i64:
-  case Intrinsic::riscv_masked_atomicrmw_nand_i64:
-  case Intrinsic::riscv_masked_atomicrmw_max_i64:
-  case Intrinsic::riscv_masked_atomicrmw_min_i64:
-  case Intrinsic::riscv_masked_atomicrmw_umax_i64:
-  case Intrinsic::riscv_masked_atomicrmw_umin_i64:
-  case Intrinsic::riscv_masked_cmpxchg_i64: {
-    PointerType *PtrTy = cast<PointerType>(I.getArgOperand(0)->getType());
-    Info.opc = ISD::INTRINSIC_W_CHAIN;
-    Info.memVT = MVT::getVT(PtrTy->getElementType());
-    Info.ptrVal = I.getArgOperand(0);
-    Info.offset = 0;
-    Info.align = Align(8);
-    Info.flags = MachineMemOperand::MOLoad | MachineMemOperand::MOStore |
-                 MachineMemOperand::MOVolatile;
-    return true;
-  }
   }
 }
 

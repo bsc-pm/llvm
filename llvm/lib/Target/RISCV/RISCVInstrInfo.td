@@ -1034,19 +1034,6 @@ def : Pat<(atomic_fence (XLenVT 6), (imm)), (FENCE_TSO)>;
 // fence seq_cst -> fence rw, rw
 def : Pat<(atomic_fence (XLenVT 7), (imm)), (FENCE 0b11, 0b11)>;
 
-let Predicates = [IsRV64] in {
-
-// fence acquire -> fence r, rw
-def : Pat<(atomic_fence (i64 4), (imm)), (FENCE 0b10, 0b11)>;
-// fence release -> fence rw, w
-def : Pat<(atomic_fence (i64 5), (imm)), (FENCE 0b11, 0b1)>;
-// fence acq_rel -> fence.tso
-def : Pat<(atomic_fence (i64 6), (imm)), (FENCE_TSO)>;
-// fence seq_cst -> fence rw, rw
-def : Pat<(atomic_fence (i64 7), (imm)), (FENCE 0b11, 0b11)>;
-
-}
-
 // Lowering for atomic load and store is defined in RISCVInstrInfoA.td.
 // Although these are lowered to fence+load/store instructions defined in the
 // base RV32I/RV64I ISA, this lowering is only used when the A extension is

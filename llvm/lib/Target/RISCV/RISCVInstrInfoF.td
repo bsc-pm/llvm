@@ -248,14 +248,6 @@ def PseudoFLW  : PseudoFloatLoad<"flw", FPR32>;
 def PseudoFSW  : PseudoStore<"fsw", FPR32>;
 } // Predicates = [HasStdExtF]
 
-let Predicates = [HasStdExtF, IsRV32] in {
-
-// [u]int->fp. Match GCC and default to using dynamic rounding mode.
-def : Pat<(sint_to_fp GPR:$rs1), (FCVT_S_W $rs1, 0b111)>;
-def : Pat<(uint_to_fp GPR:$rs1), (FCVT_S_WU $rs1, 0b111)>;
-
-} // Predicates = [HasStdExtF, IsRV32]
-
 //===----------------------------------------------------------------------===//
 // Pseudo-instructions and codegen patterns
 //===----------------------------------------------------------------------===//
@@ -318,16 +310,6 @@ def : Pat<(fma (fneg FPR32:$rs1), FPR32:$rs2, (fneg FPR32:$rs3)),
 def : PatFpr32Fpr32<fminnum, FMIN_S>;
 def : PatFpr32Fpr32<fmaxnum, FMAX_S>;
 
-/// Fused multiply-add operations
-
-def : Pat<(fma FPR32:$rs1, FPR32:$rs2, FPR32:$rs3),
-          (FMADD_S FPR32:$rs1, FPR32:$rs2, FPR32:$rs3, 0b111)>;
-// fmsub: rs1*rs2-rs3
-def : Pat<(fma FPR32:$rs1, FPR32:$rs2, (fneg FPR32:$rs3)),
-          (FMSUB_S FPR32:$rs1, FPR32:$rs2, FPR32:$rs3, 0b111)>;
-
-// TODO: other FMA patterns
-
 /// Setcc
 
 def : PatFpr32Fpr32<seteq, FEQ_S>;
@@ -336,21 +318,6 @@ def : PatFpr32Fpr32<setlt, FLT_S>;
 def : PatFpr32Fpr32<setolt, FLT_S>;
 def : PatFpr32Fpr32<setle, FLE_S>;
 def : PatFpr32Fpr32<setole, FLE_S>;
-
-// Three operands
-def : Pat<(fma FPR32:$rs1, FPR32:$rs2, FPR32:$rs3),
-          (FMADD_S $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fma FPR32:$rs1, FPR32:$rs2, (fneg FPR32:$rs3)),
-          (FMSUB_S $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fneg (fma FPR32:$rs1, FPR32:$rs2, FPR32:$rs3)),
-          (FNMADD_S $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fma (fneg FPR32:$rs1), FPR32:$rs2, FPR32:$rs3),
-          (FNMSUB_S $rs1, $rs2, $rs3, 0b111)>;
-def : Pat<(fma FPR32:$rs1, (fneg FPR32:$rs2), FPR32:$rs3),
-          (FNMSUB_S $rs1, $rs2, $rs3, 0b111)>;
 
 // Define pattern expansions for setcc operations which aren't directly
 // handled by a RISC-V instruction and aren't expanded in the SelectionDAG
@@ -376,7 +343,6 @@ defm : LdPat<load, FLW>;
 defm : StPat<store, FSW, FPR32>;
 
 } // Predicates = [HasStdExtF]
-
 
 let Predicates = [HasStdExtF, IsRV32] in {
 // float->[u]int. Round-to-zero must be used.

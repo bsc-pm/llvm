@@ -9265,7 +9265,6 @@ public:
   Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                     QualType Ty) const override;
 
-  bool needsExtend(QualType Ty) const;
   ABIArgInfo extendType(QualType Ty) const;
 
   bool detectFPCCEligibleStruct(QualType Ty, llvm::Type *&Field1Ty,
@@ -9646,16 +9645,10 @@ Address RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                           SlotSize, /*AllowHigherAlign=*/true);
 }
 
-bool RISCVABIInfo::needsExtend(QualType Ty) const {
+ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
   int TySize = getContext().getTypeSize(Ty);
   // RV64 ABI requires unsigned 32 bit integers to be sign extended.
-  return (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() &&
-          TySize == 32);
-}
-
-ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
-  // RV64 ABI requires unsigned 32 bit integers to be sign extended.
-  if (needsExtend(Ty))
+  if (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() && TySize == 32)
     return ABIArgInfo::getSignExtend(Ty);
   return ABIArgInfo::getExtend(Ty);
 }

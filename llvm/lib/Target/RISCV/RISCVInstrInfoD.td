@@ -210,10 +210,6 @@ let Predicates = [HasStdExtD] in {
 
 /// Float conversion operations
 
-// Moves (no conversion)
-def : Pat<(bitconvert GPR:$rs1), (FMV_D_X GPR:$rs1)>;
-def : Pat<(bitconvert FPR64:$rs1), (FMV_X_D FPR64:$rs1)>;
-
 // f64 -> f32, f32 -> f64
 def : Pat<(fpround FPR64:$rs1), (FCVT_S_D FPR64:$rs1, 0b111)>;
 def : Pat<(fpextend FPR32:$rs1), (FCVT_D_S FPR32:$rs1)>;
@@ -269,21 +265,6 @@ def : PatFpr64Fpr64<setlt, FLT_D>;
 def : PatFpr64Fpr64<setolt, FLT_D>;
 def : PatFpr64Fpr64<setle, FLE_D>;
 def : PatFpr64Fpr64<setole, FLE_D>;
-
-// Three operands
-def : Pat<(fma FPR64:$rs1, FPR64:$rs2, FPR64:$rs3),
-          (FMADD_D $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fma FPR64:$rs1, FPR64:$rs2, (fneg FPR64:$rs3)),
-          (FMSUB_D $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fneg (fma FPR64:$rs1, FPR64:$rs2, FPR64:$rs3)),
-          (FNMADD_D $rs1, $rs2, $rs3, 0b111)>;
-
-def : Pat<(fma (fneg FPR64:$rs1), FPR64:$rs2, FPR64:$rs3),
-          (FNMSUB_D $rs1, $rs2, $rs3, 0b111)>;
-def : Pat<(fma FPR64:$rs1, (fneg FPR64:$rs2), FPR64:$rs3),
-          (FNMSUB_D $rs1, $rs2, $rs3, 0b111)>;
 
 // Define pattern expansions for setcc operations which aren't directly
 // handled by a RISC-V instruction and aren't expanded in the SelectionDAG

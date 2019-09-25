@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCV.h"
-#include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/MacroBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 

@@ -78,9 +78,9 @@ const MCFixup *RISCVMCExpr::getPCRelHiFixup() const {
     default:
       continue;
     case RISCV::fixup_riscv_got_hi20:
-    case RISCV::fixup_riscv_pcrel_hi20:
-    case RISCV::fixup_riscv_tls_gd_hi20:
     case RISCV::fixup_riscv_tls_got_hi20:
+    case RISCV::fixup_riscv_tls_gd_hi20:
+    case RISCV::fixup_riscv_pcrel_hi20:
       return &F;
     }
   }

@@ -313,7 +313,7 @@ static void doMaskedAtomicBinOpExpansion(
   //   xor scratch, destreg, scratch
   //   sc.w scratch, scratch, (alignedaddr)
   //   bnez scratch, loop
-  BuildMI(LoopMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
+  BuildMI(LoopMBB, DL, TII->get(getLRForRMW32(Ordering)), DestReg)
       .addReg(AddrReg);
   switch (BinOp) {
   default:
@@ -346,7 +346,7 @@ static void doMaskedAtomicBinOpExpansion(
   insertMaskedMerge(TII, DL, LoopMBB, ScratchReg, DestReg, ScratchReg, MaskReg,
                     ScratchReg);
 
-  BuildMI(LoopMBB, DL, TII->get(getSCForRMW(Ordering, Width)), ScratchReg)
+  BuildMI(LoopMBB, DL, TII->get(getSCForRMW32(Ordering)), ScratchReg)
       .addReg(AddrReg)
       .addReg(ScratchReg);
   BuildMI(LoopMBB, DL, TII->get(RISCV::BNE))
@@ -453,7 +453,7 @@ bool RISCVExpandPseudo::expandAtomicMinMaxOp(
   //   mv scratch1, destreg
   //   [sext scratch2 if signed min/max]
   //   ifnochangeneeded scratch2, incr, .looptail
-  BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width)), DestReg)
+  BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW32(Ordering)), DestReg)
       .addReg(AddrReg);
   BuildMI(LoopHeadMBB, DL, TII->get(RISCV::AND), Scratch2Reg)
       .addReg(DestReg)
@@ -505,7 +505,7 @@ bool RISCVExpandPseudo::expandAtomicMinMaxOp(
   // .looptail:
   //   sc.w scratch1, scratch1, (addr)
   //   bnez scratch1, loop
-  BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width)), Scratch1Reg)
+  BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW32(Ordering)), Scratch1Reg)
       .addReg(AddrReg)
       .addReg(Scratch1Reg);
   BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
