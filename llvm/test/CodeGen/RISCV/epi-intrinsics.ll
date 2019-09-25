@@ -45,18 +45,6 @@ entry:
 
 declare i64 @llvm.epi.vsetvl(i64, i64, i64)
 
-define i64 @test_vl() nounwind
-; CHECK-LABEL: test_vl:
-; CHECK:       # %bb.0:
-; CHECK-NEXT:    rdvl a0
-; CHECK-NEXT:    ret
-{
-  %a = call i64 @llvm.epi.vreadvl()
-  ret i64 %a
-}
-
-declare i64 @llvm.epi.vreadvl()
-
 define void @test_load_stores() nounwind
 ; CHECK-LABEL: test_load_stores:
 ; CHECK:       # %bb.0:

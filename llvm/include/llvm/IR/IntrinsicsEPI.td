@@ -37,7 +37,6 @@ class EPIIntrinsic {
 
 let TargetPrefix = "epi" in {
 
-def int_epi_vreadvl   : Intrinsic<[llvm_i64_ty], [], [IntrNoMem]>;
 def int_epi_vsetvl    : Intrinsic<[llvm_i64_ty], [
     /* requested vector length */  llvm_i64_ty,
     /* single element width */     llvm_i64_ty,

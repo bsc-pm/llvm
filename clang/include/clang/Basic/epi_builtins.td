@@ -262,7 +262,6 @@ class EPINulBuiltin<string suffix, string prototype, string type_range>
 let HasVL = 0, HasMask = 0, HasSideEffects = 1, LMUL = [1],
     ManualCodegen = [{}] in
 {
-  def vreadvl : EPIBuiltin<"", "Ue", "l">;
   def vsetvl : EPIBuiltin<"", "UeUeKUeKUe", "l">;
   def vsetvlmax : EPIBuiltin<"", "UeKUeKUe", "l">;
 }

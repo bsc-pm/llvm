@@ -3142,19 +3142,6 @@ to zero.}];
   }];
 }
 
-def : DocEPIBuiltin<vreadvl>
-{
-  let Category = DocEPIVectorConfiguration;
-  let Title = "Read the current vector length";
-  let Description = [{Use this builtin to obtain the current vector length.}];
-
-  let Instruction = "readvl";
-
-  let Operation = [{
-    result = gvl
-  }];
-}
-
 def : DocEPIBuiltin<vredand>
 {
   let Category = DocEPIIntegerArithmetic;
