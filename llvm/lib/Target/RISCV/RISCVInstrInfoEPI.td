@@ -1380,6 +1380,19 @@ multiclass pseudo_unary_nomask<EPIVReg result_reg_class,
                      EPIPseudo;
 }
 
+// Special case for masking that does not have a merge operand.
+multiclass pseudo_unary_mask_nomerge<EPIVReg result_reg_class,
+                                     EPIVReg op_reg_class,
+                                     int vlmul> {
+  let Uses = [VL, VTYPE, V0], VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+      BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
+    def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
+                                 (ins op_reg_class:$rs2, vectormask:$vm,
+                                      GPR:$vl, ixlenimm:$sew),
+                                 []>,
+                          EPIPseudo;
+}
+
 multiclass pseudo_unary<EPIVReg result_reg_class,
                         EPIVReg op_reg_class,
                         int vlmul,
@@ -1808,6 +1821,16 @@ multiclass pseudo_ternary_v_vv_vf {
   }
 }
 
+multiclass pseudo_unary_mask_integer {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
+      VLMul = EPIVR.VLMul in
+  {
+    // FIXME: LMUL=1 here does not correctly capture the idea that
+    // these instructions don't care about LMUL. See llvm-mono#73
+    defm _M : pseudo_unary_nomask<GPR, EPIVR, EPIVR.VLMul>;
+    defm _M : pseudo_unary_mask_nomerge<GPR, EPIVR, EPIVR.VLMul>;
+  }
+}
 
 let Predicates = [HasExtEPI] in {
 
@@ -1981,6 +2004,9 @@ defm PseudoVFNCVT_F_X  : pseudo_unary_v_w;
 defm PseudoVFNCVT_F_F  : pseudo_unary_v_w;
 
 defm PseudoVID         : pseudo_nullary_v;
+
+defm PseudoVMPOPC      : pseudo_unary_mask_integer;
+defm PseudoVMFIRST     : pseudo_unary_mask_integer;
 
 // Load/store pseudo instructions
 
@@ -3247,17 +3273,19 @@ foreach vti = NoGroupIntegerVectors in
 defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1up", "PseudoVSLIDE1UP">;
 defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1down", "PseudoVSLIDE1DOWN">;
 
-//foreach vtp = [nxv1i1] in {
-//def : Pat<(int_epi_vmpopc (vtp EPIVR:$rs2)),
-//          (VMPOPC_M $rs2)>;
-//def : Pat<(int_epi_vmpopc_mask (vtp EPIVR:$rs2), V0),
-//          (VMPOPC_M_MASK $rs2, vmask_only_true.Value)>;
+foreach mti = AllMasks in {
+  def : Pat<(int_epi_vmpopc (mti.Mask EPIVR:$rs2), GPR:$vl),
+            (PseudoVMPOPC_M_M1 $rs2, (NoX0 GPR:$vl), mti.SEW)>;
+  def : Pat<(int_epi_vmpopc_mask (mti.Mask EPIVR:$rs2), (mti.Mask V0), GPR:$vl),
+            (PseudoVMPOPC_M_MASK_M1 $rs2, vmask_only_true.Value,
+            (NoX0 GPR:$vl), mti.SEW)>;
 
-//def : Pat<(int_epi_vmfirst (vtp EPIVR:$rs2)),
-//          (VMFIRST_M $rs2)>;
-//def : Pat<(int_epi_vmfirst_mask (vtp EPIVR:$rs2), V0),
-//          (VMFIRST_M_MASK $rs2, vmask_only_true.Value)>;
-//}
+  def : Pat<(int_epi_vmfirst (mti.Mask EPIVR:$rs2), GPR:$vl),
+            (PseudoVMFIRST_M_M1 $rs2, (NoX0 GPR:$vl), mti.SEW)>;
+  def : Pat<(int_epi_vmfirst_mask (mti.Mask EPIVR:$rs2), (mti.Mask V0), GPR:$vl),
+            (PseudoVMFIRST_M_MASK_M1 $rs2, vmask_only_true.Value,
+            (NoX0 GPR:$vl), mti.SEW)>;
+}
 
 //def : Pat<(int_epi_vmsbf EPIVR:$rs1),
 //        (VMSBF_M $rs1)>;

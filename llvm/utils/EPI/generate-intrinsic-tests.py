@@ -558,7 +558,7 @@ entry:
 }
 """
     pattern_v_mask = """
-declare ${llvm_result_type} @llvm.epi.${intrinsic}.mask(
+declare ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   <vscale x ${lhs_type_scale} x i1>,
   i64);
@@ -568,7 +568,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew}, ${vlmul}
 ; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0, v0.t
-  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask(
+  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
@@ -582,6 +582,7 @@ entry:
     def __init__(self, intr_name, type_generator, **extra_info):
         self.scalar_register = extra_info["scalar_register"]
         del extra_info["scalar_register"]
+        self.bits_per_mask = extra_info.get("bits_per_mask", False)
         super(UnaryIntrinsicScalarResult, self).__init__(intr_name, type_generator, **extra_info)
 
     def get_template(self, variant):
@@ -624,7 +625,12 @@ entry:
                 for vlmul in self.vlmul_values:
                     # vlmul here is 'base' vlmul, vlmul for SEW operand
                     # (as opposed to 2*SEW operand)
-                    subs["vlmul"] = "m" + str(vlmul)
+                    if self.bits_per_mask:
+                        # Overwrite SEW here
+                        subs["sew"] = "e" + str(MAX_SEW / vlmul)
+                        subs["vlmul"] = "m1"
+                    else:
+                        subs["vlmul"] = "m" + str(vlmul)
 
                     # Ensure all operands have the same scale (ie. number of elements)
                     result_scale = result.get_base_scale()
@@ -1719,9 +1725,8 @@ s = ["s"]
 ################################################################################
 
 intrinsics = [
-        # FIXME: These return a scalar result!
-        #UnaryIntrinsicScalarResult("vmpopc", type_generator = generate_mask_to_int_types, variants = m),
-        #UnaryIntrinsicScalarResult("vmfirst", type_generator = generate_mask_to_int_types, variants = m),
+        UnaryIntrinsicScalarResult("vmpopc", type_generator = generate_mask_to_int_types, scalar_register = "a0", variants = m, bits_per_mask = True),
+        UnaryIntrinsicScalarResult("vmfirst", type_generator = generate_mask_to_int_types, scalar_register = "a0", variants = m, bits_per_mask = True),
 
         UnaryIntrinsic("vfsqrt", type_generator = generate_unary_float_types, variants = v),
         # This is a very special one
