@@ -233,8 +233,6 @@ void foo4() {
 void foo5(int *p, int n) {
     #pragma oss task depend(in : [n + 1][n + 2]p)
     {}
-    #pragma oss task depend(in : [n + 1][n + 2]p[11])
-    {}
     #pragma oss task depend(in : ([n + 1][n + 2]p)[43])
     {}
 }
@@ -256,27 +254,7 @@ void foo5(int *p, int n) {
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:48> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
 
-// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:236:13, col:54>
-// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:53>
-// CHECK-NEXT: OSSArrayShapingExpr 0x{{[^ ]*}} <col:34, col:52> 'int [n + 1][n + 2]' lvalue
-// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:48, col:52> 'int' <LValueToRValue>
-// CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:48, col:52> 'int' lvalue
-// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:48> 'int *' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:48> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
-// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:50> 'int' 11
-// CHECK-NEXT: BinaryOperator 0x{{[^ ]*}} <col:35, col:39> 'int' '+'
-// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
-// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:39> 'int' 1
-// CHECK-NEXT: BinaryOperator 0x{{[^ ]*}} <col:42, col:46> 'int' '+'
-// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:42> 'int' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:42> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
-// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:46> 'int' 2
-// CHECK-NEXT: OSSFirstprivateClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:48> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:35> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
-
-// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:238:13, col:56>
+// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:236:13, col:56>
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:55>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:34, col:54> 'int [n + 2]' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:34, col:50> 'int (*)[n + 2]' <ArrayToPointerDecay>

@@ -9743,6 +9743,8 @@ def err_oss_section_length_negative : Error<
   "section length is evaluated to a negative value %0">;
 def err_oss_section_length_undefined : Error<
   "section length is unspecified and cannot be inferred because subscripted value is %select{not an array|an array of unknown bound}0">;
+def err_oss_typecheck_shaping_base_no_ptr_or_array: Error<
+  "shaping expression base is not a pointer or array">;
 def warn_oss_section_is_char : Warning<"array section %select{lower bound|length}0 is of type 'char'">,
   InGroup<CharSubscript>, DefaultIgnore;
 } // end of OmpSs component.

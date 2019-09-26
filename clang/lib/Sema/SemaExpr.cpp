@@ -4780,6 +4780,12 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
       VK_LValue, OK_Ordinary, Base, Shapes, LBLoc, RBLoc);
   }
 
+  if (!Base->getType()->isPointerType()
+      && !Base->getType()->isArrayType()) {
+    Diag(Base->getExprLoc(), diag::err_oss_typecheck_shaping_base_no_ptr_or_array)
+                     << Base->getSourceRange();
+  }
+
   QualType Type = Base->getType();
   if (Type->isPointerType())
     Type = Type->getPointeeType();
