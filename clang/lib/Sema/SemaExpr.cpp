@@ -4648,6 +4648,9 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
     auto Res = PerformOmpSsImplicitIntegerConversion(LowerBound->getExprLoc(),
                                                      LowerBound);
     if (Res.isInvalid())
+      // FIXME: PerformContextualImplicitConversion doesn't always tell us if it
+      // failed and produced a diagnostic.
+      // From commit ef6c43dc
       return ExprError(Diag(LowerBound->getExprLoc(),
                             diag::err_oss_typecheck_section_not_integer)
                        << 0 << LowerBound->getSourceRange());
@@ -4662,6 +4665,9 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
     auto Res =
         PerformOmpSsImplicitIntegerConversion(Length->getExprLoc(), Length);
     if (Res.isInvalid())
+      // FIXME: PerformContextualImplicitConversion doesn't always tell us if it
+      // failed and produced a diagnostic.
+      // From commit ef6c43dc
       return ExprError(Diag(Length->getExprLoc(),
                             diag::err_oss_typecheck_section_not_integer)
                        << 1 << Length->getSourceRange());
@@ -4792,12 +4798,23 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
   else if (Type->isArrayType())
     Type = Type->getAsArrayTypeUnsafe()->getElementType();
 
+  // Handle the case
+  // struct S *p; incomplete type
+  // [10]p
+  if (RequireCompleteType(Base->getExprLoc(), Type,
+                diag::err_oss_shape_incomplete_type, Base)) {
+    ErrorFound = true;
+  }
+
   for (int i = Shapes.size() - 1 ; i >= 0; --i) {
     auto Res = PerformOmpSsImplicitIntegerConversion(Shapes[i]->getExprLoc(),
                                                      Shapes[i]);
     if (Res.isInvalid()) {
       ErrorFound = true;
-      Diag(Shapes[i]->getExprLoc(), diag::err_oss_typecheck_section_not_integer)
+      // FIXME: PerformContextualImplicitConversion doesn't always tell us if it
+      // failed and produced a diagnostic.
+      // From commit ef6c43dc
+      Diag(Shapes[i]->getExprLoc(), diag::err_oss_typecheck_shape_not_integer)
                        << 0 << Shapes[i]->getSourceRange();
       continue;
     }
