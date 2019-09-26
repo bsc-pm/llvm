@@ -16216,16 +16216,6 @@ __epi_4xi64 test_vor_4xi64_mask(__epi_4xi64 arg_0, __epi_4xi64 arg_1, __epi_4xi6
     return __builtin_epi_vor_4xi64_mask(arg_0, arg_1, arg_2, arg_3, arg_4);
 }
 
-// CHECK-O2-LABEL: @test_vreadvl(
-// CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vreadvl()
-// CHECK-O2-NEXT:    ret i64 [[TMP0]]
-//
-unsigned long int test_vreadvl()
-{
-    return __builtin_epi_vreadvl();
-}
-
 // CHECK-O2-LABEL: @test_vredand_8xi8(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.vredand.nxv8i8.nxv8i8(<vscale x 8 x i8> [[ARG_0:%.*]], <vscale x 8 x i8> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
