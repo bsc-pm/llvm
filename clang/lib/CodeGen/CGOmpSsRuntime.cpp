@@ -100,7 +100,7 @@ public:
 
   // This is used in the innermost Expr * in ArraySubscripts and OSSArraySection
   void FillDimsFromInnermostExpr(const Expr *E) {
-    // Go through the expression which may be a DeclRefExpr or MemberExpr
+    // Go through the expression which may be a DeclRefExpr or MemberExpr or OSSArrayShapingExpr
     E = E->IgnoreParenImpCasts();
     QualType TmpTy = E->getType();
     // Add Dimensions

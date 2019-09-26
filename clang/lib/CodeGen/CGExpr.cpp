@@ -3803,7 +3803,11 @@ LValue CodeGenFunction::EmitOMPArraySectionExpr(const OMPArraySectionExpr *E,
 }
 
 LValue CodeGenFunction::EmitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
-  return EmitLValue(E->getBase());
+  LValueBaseInfo EltBaseInfo;
+  TBAAAccessInfo EltTBAAInfo;
+  Address Addr = EmitPointerWithAlignment(E->getBase(), &EltBaseInfo, &EltTBAAInfo);
+  LValue LV = MakeAddrLValue(Addr, E->getType(), EltBaseInfo, EltTBAAInfo);
+  return LV;
 }
 
 LValue CodeGenFunction::

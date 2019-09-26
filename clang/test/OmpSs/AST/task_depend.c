@@ -242,6 +242,7 @@ void foo5(int *p, int n) {
 // CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:234:13, col:50>
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:49>
 // CHECK-NEXT: OSSArrayShapingExpr 0x{{[^ ]*}} <col:34, col:48> 'int [n + 1][n + 2]' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:48> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:48> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
 // CHECK-NEXT: BinaryOperator 0x{{[^ ]*}} <col:35, col:39> 'int' '+'
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:35> 'int' <LValueToRValue>
@@ -258,6 +259,7 @@ void foo5(int *p, int n) {
 // CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:236:13, col:54>
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:53>
 // CHECK-NEXT: OSSArrayShapingExpr 0x{{[^ ]*}} <col:34, col:52> 'int [n + 1][n + 2]' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:48, col:52> 'int' <LValueToRValue>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:48, col:52> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:48> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:48> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
@@ -280,6 +282,7 @@ void foo5(int *p, int n) {
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:34, col:50> 'int (*)[n + 2]' <ArrayToPointerDecay>
 // CHECK-NEXT: ParenExpr 0x{{[^ ]*}} <col:34, col:50> 'int [n + 1][n + 2]' lvalue
 // CHECK-NEXT: OSSArrayShapingExpr 0x{{[^ ]*}} <col:35, col:49> 'int [n + 1][n + 2]' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:49> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:49> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
 // CHECK-NEXT: BinaryOperator 0x{{[^ ]*}} <col:36, col:40> 'int' '+'
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:36> 'int' <LValueToRValue>

@@ -4797,9 +4797,18 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
     }
 
     Type = BuildArrayType(Type, ArrayType::Normal, Res.get(), /*Quals=*/0,
-                          SourceRange(SourceLocation(), SourceLocation()),
+                          Shapes[i]->getSourceRange(),
                           DeclarationName());
+    if (Type.isNull())
+      ErrorFound = true;
   }
+
+  // Promote arrays to pointer
+  ExprResult Result = DefaultFunctionArrayLvalueConversion(Base);
+  if (Result.isInvalid())
+    ErrorFound = true;
+  else
+    Base = Result.get();
 
   if (ErrorFound)
     return ExprError();
