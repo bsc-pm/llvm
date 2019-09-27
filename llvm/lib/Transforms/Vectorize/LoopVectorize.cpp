@@ -639,7 +639,7 @@ protected:
 
   /// Create a call to Vscale intrinsic that returns the valuse of vscale at
   /// runtime. ALso insert declaration if required. jj
-  CallInst *emitVscaleCall(IRBuilder<> &Builder, Module* M, Type* Ty);
+  CallInst *emitVscaleCall(IRBuilder<> &Builder, Module *M, Type *Ty);
 
   /// The original loop.
   Loop *OrigLoop;
@@ -906,9 +906,10 @@ void InnerLoopVectorizer::addMetadata(ArrayRef<Value *> To, Instruction *From) {
   }
 }
 
-CallInst *InnerLoopVectorizer::emitVscaleCall(IRBuilder<> &Builder, Module* M, Type* Ty) {
-  Function *VscaleFunc = Intrinsic::getDeclaration(
-      M, Intrinsic::experimental_vector_vscale, Ty);
+CallInst *InnerLoopVectorizer::emitVscaleCall(IRBuilder<> &Builder, Module *M,
+                                              Type *Ty) {
+  Function *VscaleFunc =
+      Intrinsic::getDeclaration(M, Intrinsic::experimental_vector_vscale, Ty);
   CallInst *VscaleFuncCall = Builder.CreateCall(VscaleFunc, {});
   return VscaleFuncCall;
 }
@@ -1897,6 +1898,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
                                           Instruction::BinaryOps BinOp) {
   // Create and check the types.
   assert(Val->getType()->isVectorTy() && "Must be a vector");
+
   int VLen = Val->getType()->getVectorNumElements();
 
   Type *STy = Val->getType()->getScalarType();
@@ -1908,17 +1910,39 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
 
   if (STy->isIntegerTy()) {
     // Create a vector of consecutive numbers from zero to VF.
-    for (int i = 0; i < VLen; ++i)
-      Indices.push_back(ConstantInt::get(STy, StartIdx + i));
+    if (Scalable) {
+      // Get the stepvector from intrinsic - <0, 1, 2 ... vscale*VF-1>
+      // here VF = k in <vscale x k x type>
+      Function *StepVector = Intrinsic::getDeclaration(
+          LoopVectorPreHeader->getModule(),
+          Intrinsic::experimental_vector_stepvector, Val->getType());
+      Step = Builder.CreateCall(StepVector, {}, "stepvec.base");
+      // StartIdx = VF*Part where VF is the unscaled VF, so we need to adjust it
+      // by multiplying with vscale.
+      CallInst *Vscale =
+          emitVscaleCall(Builder, LoopVectorPreHeader->getModule(), STy);
+      Value *ScaledStartIdx = Builder.CreateMul(
+          Vscale, ConstantInt::get(STy, StartIdx), "startidx.vscale");
+      // The new ScaledStartIdx needs to be added to step vector for each part
+      // of the unrolled vector loop.
+      ScaledStartIdx = Builder.CreateVectorSplat(VLen, ScaledStartIdx,
+                                                 "startindex", Scalable);
+      Step = Builder.CreateAdd(Step, ScaledStartIdx, "stepvec");
+    } else {
+      for (int i = 0; i < VLen; ++i)
+        Indices.push_back(ConstantInt::get(STy, StartIdx + i));
 
-    // Add the consecutive indices to the vector value.
-    Constant *Cv = ConstantVector::get(Indices);
-    assert(Cv->getType() == Val->getType() && "Invalid consecutive vec");
-    Step = Builder.CreateVectorSplat(VLen, Step);
-    assert(Step->getType() == Val->getType() && "Invalid step vec");
-    // FIXME: The newly created binary instructions should contain nsw/nuw
-    // flags, which can be found from the original scalar operations.
-    Step = Builder.CreateMul(Cv, Step);
+      // Add the consecutive indices to the vector value.
+      Constant *Cv = ConstantVector::get(Indices);
+      assert(Cv->getType() == Val->getType() && "Invalid consecutive vec");
+      Step = Builder.CreateVectorSplat(VLen, Step);
+      assert(Step->getType() == Val->getType() && "Invalid step vec");
+      // FIXME: The newly created binary instructions should contain nsw/nuw
+      // flags, which can be found from the original scalar operations.
+      Step = Builder.CreateMul(Cv, Step);
+    }
+    // Vectorized induction variable is created by adding broadcasted index and
+    // the step vector for each part.
     return Builder.CreateAdd(Val, Step, "induction");
   }
 
@@ -2631,7 +2655,8 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
     assert(isPowerOf2_32(VF * UF) &&
            "VF*UF must be a power of 2 when folding tail by masking");
     if (Scalable) {
-      CallInst* VscaleFuncCall = emitVscaleCall(Builder, L->getLoopPreheader()->getModule(), Ty);
+      CallInst *VscaleFuncCall =
+          emitVscaleCall(Builder, L->getLoopPreheader()->getModule(), Ty);
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
     }
     Step = Builder.CreateSub(Step, ConstantInt::get(Ty, 1));
@@ -2643,8 +2668,9 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   // iterations are not required for correctness, or N - Step, otherwise. Step
   // is equal to the vectorization factor (number of SIMD elements) times the
   // unroll factor (number of SIMD instructions).
-  if (Scalable){
-    CallInst* VscaleFuncCall = emitVscaleCall(Builder, L->getHeader()->getModule(),Ty);
+  if (Scalable) {
+    CallInst *VscaleFuncCall =
+        emitVscaleCall(Builder, L->getHeader()->getModule(), Ty);
     Step = Builder.CreateMul(Step, VscaleFuncCall, "step.vscale");
   }
   Value *R = Builder.CreateURem(TC, Step, "n.mod.vf");
@@ -2714,12 +2740,13 @@ void InnerLoopVectorizer::emitMinimumIterationCountCheck(Loop *L,
   // If tail is to be folded, vector loop takes care of all iterations.
   Value *CheckMinIters = Builder.getFalse();
   if (!Cost->foldTailByMasking()) {
-    Value* Step = ConstantInt::get(Count->getType(), VF * UF);
-    if (Scalable){
-      CallInst *VscaleFuncCall = emitVscaleCall(Builder, BB->getModule(), Count->getType());
+    Value *Step = ConstantInt::get(Count->getType(), VF * UF);
+    if (Scalable) {
+      CallInst *VscaleFuncCall =
+          emitVscaleCall(Builder, BB->getModule(), Count->getType());
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
     }
-    CheckMinIters = Builder.CreateICmp( P, Count, Step, "min.iters.check");
+    CheckMinIters = Builder.CreateICmp(P, Count, Step, "min.iters.check");
   }
 
   BasicBlock *NewBB = BB->splitBasicBlock(BB->getTerminator(), "vector.ph");
