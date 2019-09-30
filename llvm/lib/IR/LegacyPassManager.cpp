@@ -1645,11 +1645,6 @@ bool FPPassManager::runOnFunction(Function &F) {
     {
       PassManagerPrettyStackEntry X(FP, F);
       TimeRegion PassTimer(getPassTimer(FP));
-      /* NOTE/VK
-       * This is where a call is made to run the function pass that is
-       * implemented in the pass implementation, for eg. 
-       * LoopVectorizer.cpp:7556:LoopVectorizePass::runImpl()
-       */
       LocalChanged |= FP->runOnFunction(F);
       if (EmitICRemark) {
         unsigned NewSize = F.getInstructionCount();
