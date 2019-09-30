@@ -2143,6 +2143,10 @@ Constant *ConstantExpr::getInsertElement(Constant *Val, Constant *Elt,
   assert(Idx->getType()->isIntegerTy() &&
          "Insertelement index must be i32 type!");
 
+  //Constant folding does not make sense for scalable vector type.
+  if (Val->getType()->getVectorIsScalable())
+    return nullptr;
+
   if (Constant *FC = ConstantFoldInsertElementInstruction(Val, Elt, Idx))
     return FC;          // Fold a few common cases.
 
