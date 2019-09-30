@@ -129,8 +129,6 @@ let Undocumented = 1 in
   def : DocEPIBuiltin<vsadd>;
   def : DocEPIBuiltin<vsaddu>;
   def : DocEPIBuiltin<vsbc>;
-  def : DocEPIBuiltin<vslide1down>;
-  def : DocEPIBuiltin<vslide1up>;
   def : DocEPIBuiltin<vsmul>;
   def : DocEPIBuiltin<vssra>;
   def : DocEPIBuiltin<vssrl>;
@@ -3667,6 +3665,72 @@ vector.}];
   }];
 
   let OperationMask = [{
+
+    result[gvl : VLMAX] = 0
+  }];
+}
+
+def : DocEPIBuiltin<vslide1down>
+{
+  let Category = DocEPILaneManipulation;
+  let Title = "Slide down elements of a vector one position";
+  let Description = [{Use these builtins to "slide down" the elements of a
+vector one position.}];
+
+  let Instruction = "vslide1down.vx";
+
+  let ParameterNames = ["a", "value"];
+
+  let Operation = [{
+    for element = 0 to gvl - 2
+         result[element] = a[element + 1]
+    result[gvl - 1] = value
+
+    result[gvl : VLMAX] = 0
+  }];
+
+  let OperationMask = [{
+    for element = 0 to gvl - 1
+      if mask[element] then
+        if element < gvl - 1 then
+           result[element] = a[element + 1]
+        else
+           result[element] = value
+      else
+        result[element] = merge[element]
+
+    result[gvl : VLMAX] = 0
+  }];
+}
+
+def : DocEPIBuiltin<vslide1up>
+{
+  let Category = DocEPILaneManipulation;
+  let Title = "Slide up elements of a vector one position";
+  let Description = [{Use these builtins to "slide up" the elements of a
+vector one position.}];
+
+  let Instruction = "vslide1up.vx";
+
+  let ParameterNames = ["a", "value"];
+
+  let Operation = [{
+    result[0] = value
+    for element = 1 to gvl - 1
+      result[i] = a[element - offset]
+
+    result[gvl : VLMAX] = 0
+  }];
+
+  let OperationMask = [{
+    for element = 0 to gvl - 1
+      if mask[element] then
+        if element == 0 then
+          result[0] = value
+        else
+          result[i] = a[element - offset]
+      else
+        result[element] = merge[element]
 
     result[gvl : VLMAX] = 0
   }];
