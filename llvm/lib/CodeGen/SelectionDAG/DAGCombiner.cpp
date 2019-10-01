@@ -6633,9 +6633,9 @@ SDValue DAGCombiner::MatchStoreCombine(StoreSDNode *N) {
   if (LegalOperations && !TLI.isOperationLegal(ISD::STORE, VT))
     return SDValue();
 
-  // Check if all the bytes of the combined value we are looking at are stored
-  // to the same base address. Collect bytes offsets from Base address into
-  // ByteOffsets.
+  // Check if all the bytes of the combined value we are looking at are stored 
+  // to the same base address. Collect bytes offsets from Base address into 
+  // ByteOffsets. 
   SDValue CombinedValue;
   SmallVector<int64_t, 4> ByteOffsets(Width, INT64_MAX);
   int64_t FirstOffset = INT64_MAX;
