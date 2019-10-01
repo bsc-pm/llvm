@@ -1336,7 +1336,7 @@ public:
   areFunctionArgsABICompatible(const Function *Caller, const Function *Callee,
                                SmallPtrSetImpl<Argument *> &Args) const = 0;
   virtual bool isIndexedLoadLegal(MemIndexedMode Mode, Type *Ty) const = 0;
-  virtual bool isIndexedStoreLegal(MemIndexedMode Mode, Type *Ty) const = 0;
+  virtual bool isIndexedStoreLegal(MemIndexedMode Mode,Type *Ty) const = 0;
   virtual unsigned getLoadStoreVecRegBitWidth(unsigned AddrSpace) const = 0;
   virtual bool isLegalToVectorizeLoad(LoadInst *LI) const = 0;
   virtual bool isLegalToVectorizeStore(StoreInst *SI) const = 0;

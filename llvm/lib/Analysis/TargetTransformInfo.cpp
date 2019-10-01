@@ -40,7 +40,7 @@ struct NoTTIImpl : TargetTransformInfoImplCRTPBase<NoTTIImpl> {
   explicit NoTTIImpl(const DataLayout &DL)
       : TargetTransformInfoImplCRTPBase<NoTTIImpl>(DL) {}
 };
-} // namespace
+}
 
 bool HardwareLoopInfo::canAnalyze(LoopInfo &LI) {
   // If the loop has irreducible control flow, it can not be converted to
@@ -1239,7 +1239,7 @@ int TargetTransformInfo::getInstructionThroughput(const Instruction *I) const {
     return getCastInstrCost(I->getOpcode(), I->getType(), SrcTy, I);
   }
   case Instruction::ExtractElement: {
-    const ExtractElementInst *EEI = cast<ExtractElementInst>(I);
+    const ExtractElementInst * EEI = cast<ExtractElementInst>(I);
     ConstantInt *CI = dyn_cast<ConstantInt>(I->getOperand(1));
     unsigned Idx = -1;
     if (CI)
@@ -1286,7 +1286,7 @@ int TargetTransformInfo::getInstructionThroughput(const Instruction *I) const {
                                    EEI->getOperand(0)->getType(), Idx);
   }
   case Instruction::InsertElement: {
-    const InsertElementInst *IE = cast<InsertElementInst>(I);
+    const InsertElementInst * IE = cast<InsertElementInst>(I);
     ConstantInt *CI = dyn_cast<ConstantInt>(IE->getOperand(2));
     unsigned Idx = -1;
     if (CI)
