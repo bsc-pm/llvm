@@ -417,9 +417,9 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
                {S32, S8}, {S128, S32}, {S128, S64}, {S32, LLT::scalar(24)}})
     .scalarize(0);
 
-  // TODO: Legal for s1->s64, requires split for VALU.
+  // TODO: Split s1->s64 during regbankselect for VALU.
   getActionDefinitionsBuilder({G_SITOFP, G_UITOFP})
-    .legalFor({{S32, S32}, {S64, S32}, {S16, S32}, {S32, S1}, {S16, S1}})
+    .legalFor({{S32, S32}, {S64, S32}, {S16, S32}, {S32, S1}, {S16, S1}, {S64, S1}})
     .lowerFor({{S32, S64}})
     .customFor({{S64, S64}})
     .scalarize(0);
@@ -1717,9 +1717,14 @@ bool AMDGPULegalizerInfo::loadInputValue(Register DstReg, MachineIRBuilder &B,
     const unsigned Mask = Arg->getMask();
     const unsigned Shift = countTrailingZeros<unsigned>(Mask);
 
-    auto ShiftAmt = B.buildConstant(S32, Shift);
-    auto LShr = B.buildLShr(S32, LiveIn, ShiftAmt);
-    B.buildAnd(DstReg, LShr, B.buildConstant(S32, Mask >> Shift));
+    Register AndMaskSrc = LiveIn;
+
+    if (Shift != 0) {
+      auto ShiftAmt = B.buildConstant(S32, Shift);
+      AndMaskSrc = B.buildLShr(S32, LiveIn, ShiftAmt).getReg(0);
+    }
+
+    B.buildAnd(DstReg, AndMaskSrc, B.buildConstant(S32, Mask >> Shift));
   } else
     B.buildCopy(DstReg, LiveIn);
 
