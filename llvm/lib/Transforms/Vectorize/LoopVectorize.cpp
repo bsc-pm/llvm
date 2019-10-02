@@ -384,7 +384,6 @@ public:
                       LoopVectorizationCostModel *CM)
       : OrigLoop(OrigLoop), PSE(PSE), LI(LI), DT(DT), TLI(TLI), TTI(TTI),
         AC(AC), ORE(ORE), VF(VecWidth), UF(UnrollFactor),
-        Scalable(TTI->useScalableVectorType()),
         Builder(PSE.getSE()->getContext()),
         VectorLoopValueMap(UnrollFactor, VecWidth), Legal(LVL), Cost(CM) {}
   virtual ~InnerLoopVectorizer() = default;
@@ -560,6 +559,9 @@ protected:
   /// Returns true if we should generate a scalar version of \p IV.
   bool needsScalarInduction(Instruction *IV) const;
 
+  /// Returns true if the target uses scalable vector type.
+  bool isScalable() const { return TTI->useScalableVectorType(); }
+
   /// If there is a cast involved in the induction variable \p ID, which should
   /// be ignored in the vectorized loop body, this function records the
   /// VectorLoopValue of the respective Phi also as the VectorLoopValue of the
@@ -684,9 +686,6 @@ protected:
   /// The vectorization unroll factor to use. Each scalar is vectorized to this
   /// many different vector instructions.
   unsigned UF;
-
-  /// Use scalable Vector Types
-  bool Scalable;
 
   /// The builder that we use
   IRBuilder<> Builder;
@@ -1305,6 +1304,10 @@ public:
 private:
   unsigned NumPredStores = 0;
 
+  /// \return An upper bound for the vectorization factor when using scalable
+  /// vectors.
+  unsigned computeFeasibleScalableMaxVF(unsigned ConstTripCount);
+
   /// \return An upper bound for the vectorization factor, larger than zero.
   /// One is returned if vectorization should best be avoided due to cost.
   unsigned computeFeasibleMaxVF(unsigned ConstTripCount);
@@ -1481,9 +1484,6 @@ public:
 
   /// Vector target information.
   const TargetTransformInfo &TTI;
-
-  /// Whether we use scalable vectors
-  bool Scalable;
 
   /// Target Library Info.
   const TargetLibraryInfo *TLI;
@@ -1672,7 +1672,7 @@ Value *InnerLoopVectorizer::getBroadcastInstrs(Value *V) {
     Builder.SetInsertPoint(LoopVectorPreHeader->getTerminator());
 
   // Broadcast the scalar into all locations in the vector.
-  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast", Scalable);
+  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast", isScalable());
 
   return Shuf;
 }
@@ -1910,7 +1910,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
 
   if (STy->isIntegerTy()) {
     // Create a vector of consecutive numbers from zero to VF.
-    if (Scalable) {
+    if (isScalable()) {
       // Get the stepvector from intrinsic - <0, 1, 2 ... vscale*VF-1>
       // here VF = k in <vscale x k x type>
       Function *StepVector = Intrinsic::getDeclaration(
@@ -1926,7 +1926,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
       // The new ScaledStartIdx needs to be added to step vector for each part
       // of the unrolled vector loop.
       ScaledStartIdx = Builder.CreateVectorSplat(VLen, ScaledStartIdx,
-                                                 "startindex", Scalable);
+                                                 "startindex", isScalable());
       Step = Builder.CreateAdd(Step, ScaledStartIdx, "stepvec");
     } else {
       for (int i = 0; i < VLen; ++i)
@@ -2385,7 +2385,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     return vectorizeInterleaveGroup(Instr);
 
   Type *ScalarDataTy = getMemInstValueType(Instr);
-  Type *DataTy = VectorType::get(ScalarDataTy, VF, Scalable);
+  Type *DataTy = VectorType::get(ScalarDataTy, VF, isScalable());
   Value *Ptr = getLoadStorePointerOperand(Instr);
   unsigned Alignment = getLoadStoreAlignment(Instr);
   // An alignment of 0 means target abi alignment. We need to use the scalar's
@@ -2654,7 +2654,7 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
     // TODO: Fix for scalable vectors.
     assert(isPowerOf2_32(VF * UF) &&
            "VF*UF must be a power of 2 when folding tail by masking");
-    if (Scalable) {
+    if (isScalable()) {
       CallInst *VscaleFuncCall =
           emitVscaleCall(Builder, L->getLoopPreheader()->getModule(), Ty);
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
@@ -2668,7 +2668,7 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   // iterations are not required for correctness, or N - Step, otherwise. Step
   // is equal to the vectorization factor (number of SIMD elements) times the
   // unroll factor (number of SIMD instructions).
-  if (Scalable) {
+  if (isScalable()) {
     CallInst *VscaleFuncCall =
         emitVscaleCall(Builder, L->getHeader()->getModule(), Ty);
     Step = Builder.CreateMul(Step, VscaleFuncCall, "step.vscale");
@@ -2741,7 +2741,7 @@ void InnerLoopVectorizer::emitMinimumIterationCountCheck(Loop *L,
   Value *CheckMinIters = Builder.getFalse();
   if (!Cost->foldTailByMasking()) {
     Value *Step = ConstantInt::get(Count->getType(), VF * UF);
-    if (Scalable) {
+    if (isScalable()) {
       CallInst *VscaleFuncCall =
           emitVscaleCall(Builder, BB->getModule(), Count->getType());
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
@@ -4960,45 +4960,34 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   return None;
 }
 
-// The MaxVF calculated here works for fixed vectors but not for scalable
-// vectors. MaxVF for fixed size vectors are represented by a constant value (2,
-// 4, 8 ... 256 ) depending on the vector register width that is fixed for an
-// architecture. For scalable vectors, where vector register width is not fixed,
-// vector width is represented as `<vscale x k x simpleType>`, where k is a
-// multiple of 2 and is known at the compile time (k can range from 1 to 8 for
-// current RISC-V vector specification). vscale is not known at compile time
-// (vscale = VLEN / (k * ELEN)). simpleType is a scalr type like f64, f32, etc.
-//
-// For mixed width operations we can either use n registers for both wide and
-// narrow types, in which case the narrow type will waste half the register, or
-// we can use n*w registers for the wider type and n registers for the narrow
-// type, where wider type is wider by a factor of w.
-//
-// For the time being we make the following assumptions:
-// 1. Assuming f64 to be the largest type we would need, we use
-// <vscale x 1 x f64> as our base type.
-// 2. If the only involved scalar type is f64, we use MaxVectorSize to be
-// vscale x 1. (Eventually we will add support for higher values of k. That
-// would need further analysis to optimize for register pressure.)
-// 2a. If the only involved scalar type is f32, we use MaxVectorSize of
-// vscale x 2. Similar for other narrower types.
-// 3. For mixed width, we will use the full register for the narrower type and
-// register grouping for the wider type.
-unsigned
-LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
+unsigned LoopVectorizationCostModel::computeFeasibleScalableMaxVF(
+    unsigned ConstTripCount) {
+  // The MaxVF calculated here works for fixed vectors but not for scalable
+  // vectors. MaxVF for fixed size vectors are represented by a constant value
+  // (2, 4, 8 ... 256 ) depending on the vector register width that is fixed for
+  // an architecture. For scalable vectors, where vector register width is not
+  // fixed, vector width is represented as `<vscale x k x simpleType>`, where k
+  // is a multiple of 2 and is known at the compile time (k can range from 1 to
+  // 8 for current RISC-V vector specification). vscale is not known at compile
+  // time (vscale = VLEN / (k * ELEN)). simpleType is a scalr type like f64,
+  // f32, etc.
+  //
+  // For mixed width operations we can either use n registers for both wide and
+  // narrow types, in which case the narrow type will waste half the register,
+  // or we can use n*w registers for the wider type and n registers for the
+  // narrow type, where wider type is wider by a factor of w.
+  //
+  // For the time being we make the following assumptions: 1. Assuming f64 to be
+  // the largest type we would need, we use <vscale x 1 x f64> as our base type.
+  // 2. If the only involved scalar type is f64, we use MaxVectorSize to be
+  // vscale x 1. (Eventually we will add support for higher values of k. That
+  // would need further analysis to optimize for register pressure.) 2a. If the
+  // only involved scalar type is f32, we use MaxVectorSize of vscale x 2.
+  // Similar for other narrower types.  3. For mixed width, we will use the full
+  // register for the narrower type and register grouping for the wider type.
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
-
-  // TODO: This should be offloaded to TTI
-  // NOTE/VK
-  // Should we pass in SmallestType and WidestType to offload the VF computation
-  // to TTI?
-  // For now, let's do it here.
-  //
-  // Get the scale width factor k for the base type from the TTI. For our
-  // implementation this is 1xF64, i.e. widest type is F64 and corresponding
-  // scale width factor is 1.
   unsigned TargetWidestType = TTI.getMaxElementWidth();
   unsigned MinKScaleFactor = TargetWidestType / WidestType;
   unsigned MaxKScaleFactor = TargetWidestType / SmallestType;
@@ -5006,17 +4995,12 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
   assert(MinKScaleFactor == MaxKScaleFactor &&
          "Support for mixed width computations is not supported yet.");
   assert(MaxKScaleFactor <= 8 && "Cannot group so many registers together!");
-
-  // Get the maximum safe dependence distance in bits computed by LAA.
-  // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
-  // the memory accesses that is most restrictive (involved in the smallest
-  // dependence distance).
-
-  // Note/VK/Aug192019
+  // TODO:
   // We are ignoring MaxSafeRegisterWidth calculationn based on dependence
   // distance for now. This is another issue that would be needed to handled
   // separately for scalable vectors.
-  // TODO: Fix association between MaxSafeRegisterWidth and WidestRegister
+  // TODO:
+  // Fix association between MaxSafeRegisterWidth and WidestRegister
   // For now we just ensure that the MaxSafeRegisterWidth is >= 256*8*8, which
   // is the tentative VLEN for EPI usecase.
   unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
@@ -5024,117 +5008,80 @@ LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
          "Safe dependency distance is less than tentative VLEN");
 
   return MaxKScaleFactor;
-  /*
-   *  unsigned MaxVF = MaxVectorSize;
-   *  if (TTI.shouldMaximizeVectorBandwidth(OptForSize) ||
-   *      (MaximizeBandwidth && !OptForSize)) {
-   *    // Collect all viable vectorization factors larger than the default
-   * MaxVF
-   *    // (i.e. MaxVectorSize).
-   *    SmallVector<unsigned, 8> VFs;
-   *    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
-   *    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
-   *      VFs.push_back(VS);
-   *
-   *    // For each VF calculate its register usage.
-   *    auto RUs = calculateRegisterUsage(VFs);
-   *
-   *    // Select the largest VF which doesn't require more registers than
-   * existing
-   *    // ones.
-   *    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
-   *    for (int i = RUs.size() - 1; i >= 0; --i) {
-   *      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
-   *        MaxVF = VFs[i];
-   *        break;
-   *      }
-   *    }
-   *    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
-   *      if (MaxVF < MinVF) {
-   *        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
-   *                          << ") with target's minimum: " << MinVF << '\n');
-   *        MaxVF = MinVF;
-   *      }
-   *    }
-   *  }
-   *  return MaxVF;
-   */
 }
 
-/*
- *unsigned
- *LoopVectorizationCostModel::computeFeasibleMaxVF(bool OptForSize,
- *                                                 unsigned ConstTripCount) {
- *  MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
- *  unsigned SmallestType, WidestType;
- *  std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
- *  unsigned WidestRegister = TTI.getRegisterBitWidth(true);
- *
- *  // Get the maximum safe dependence distance in bits computed by LAA.
- *  // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
- *  // the memory accesses that is most restrictive (involved in the smallest
- *  // dependence distance).
- *  unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
- *
- *  WidestRegister = std::min(WidestRegister, MaxSafeRegisterWidth);
- *
- *  unsigned MaxVectorSize = WidestRegister / WidestType;
- *
- *  LLVM_DEBUG(dbgs() << "LV: The Smallest and Widest types: " << SmallestType
- *                    << " / " << WidestType << " bits.\n");
- *  LLVM_DEBUG(dbgs() << "LV: The Widest register safe to use is: "
- *                    << WidestRegister << " bits.\n");
- *
- *  assert(MaxVectorSize <= 256 && "Did not expect to pack so many elements"
- *                                 " into one vector!");
- *  if (MaxVectorSize == 0) {
- *    LLVM_DEBUG(dbgs() << "LV: The target has no vector registers.\n");
- *    MaxVectorSize = 1;
- *    return MaxVectorSize;
- *  } else if (ConstTripCount && ConstTripCount < MaxVectorSize &&
- *             isPowerOf2_32(ConstTripCount)) {
- *    // We need to clamp the VF to be the ConstTripCount. There is no point in
- *    // choosing a higher viable VF as done in the loop below.
- *    LLVM_DEBUG(dbgs() << "LV: Clamping the MaxVF to the constant trip count: "
- *                      << ConstTripCount << "\n");
- *    MaxVectorSize = ConstTripCount;
- *    return MaxVectorSize;
- *  }
- *
- *  unsigned MaxVF = MaxVectorSize;
- *  if (TTI.shouldMaximizeVectorBandwidth(OptForSize) ||
- *      (MaximizeBandwidth && !OptForSize)) {
- *    // Collect all viable vectorization factors larger than the default MaxVF
- *    // (i.e. MaxVectorSize).
- *    SmallVector<unsigned, 8> VFs;
- *    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
- *    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
- *      VFs.push_back(VS);
- *
- *    // For each VF calculate its register usage.
- *    auto RUs = calculateRegisterUsage(VFs);
- *
- *    // Select the largest VF which doesn't require more registers than
- *existing
- *    // ones.
- *    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
- *    for (int i = RUs.size() - 1; i >= 0; --i) {
- *      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
- *        MaxVF = VFs[i];
- *        break;
- *      }
- *    }
- *    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
- *      if (MaxVF < MinVF) {
- *        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
- *                          << ") with target's minimum: " << MinVF << '\n');
- *        MaxVF = MinVF;
- *      }
- *    }
- *  }
- *  return MaxVF;
- *}
- */
+unsigned
+LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
+  if (isScalable())
+    return computeFeasibleScalableMaxVF(ConstTripCount);
+  MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
+  unsigned SmallestType, WidestType;
+  std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
+  unsigned WidestRegister = TTI.getRegisterBitWidth(true);
+
+  // Get the maximum safe dependence distance in bits computed by LAA.
+  // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
+  // the memory accesses that is most restrictive (involved in the smallest
+  // dependence distance).
+  unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
+
+  WidestRegister = std::min(WidestRegister, MaxSafeRegisterWidth);
+
+  unsigned MaxVectorSize = WidestRegister / WidestType;
+
+  LLVM_DEBUG(dbgs() << "LV: The Smallest and Widest types: " << SmallestType
+                    << " / " << WidestType << " bits.\n");
+  LLVM_DEBUG(dbgs() << "LV: The Widest register safe to use is: "
+                    << WidestRegister << " bits.\n");
+
+  assert(MaxVectorSize <= 256 && "Did not expect to pack so many elements"
+                                 " into one vector!");
+  if (MaxVectorSize == 0) {
+    LLVM_DEBUG(dbgs() << "LV: The target has no vector registers.\n");
+    MaxVectorSize = 1;
+    return MaxVectorSize;
+  } else if (ConstTripCount && ConstTripCount < MaxVectorSize &&
+             isPowerOf2_32(ConstTripCount)) {
+    // We need to clamp the VF to be the ConstTripCount. There is no point in
+    // choosing a higher viable VF as done in the loop below.
+    LLVM_DEBUG(dbgs() << "LV: Clamping the MaxVF to the constant trip count: "
+                      << ConstTripCount << "\n");
+    MaxVectorSize = ConstTripCount;
+    return MaxVectorSize;
+  }
+
+  unsigned MaxVF = MaxVectorSize;
+  if (TTI.shouldMaximizeVectorBandwidth(!isScalarEpilogueAllowed()) ||
+      (MaximizeBandwidth && isScalarEpilogueAllowed())) {
+    // Collect all viable vectorization factors larger than the default MaxVF
+    // (i.e. MaxVectorSize).
+    SmallVector<unsigned, 8> VFs;
+    unsigned NewMaxVectorSize = WidestRegister / SmallestType;
+    for (unsigned VS = MaxVectorSize * 2; VS <= NewMaxVectorSize; VS *= 2)
+      VFs.push_back(VS);
+
+    // For each VF calculate its register usage.
+    auto RUs = calculateRegisterUsage(VFs);
+
+    // Select the largest VF which doesn't require more registers than existing
+    // ones.
+    unsigned TargetNumRegisters = TTI.getNumberOfRegisters(true);
+    for (int i = RUs.size() - 1; i >= 0; --i) {
+      if (RUs[i].MaxLocalUsers <= TargetNumRegisters) {
+        MaxVF = VFs[i];
+        break;
+      }
+    }
+    if (unsigned MinVF = TTI.getMinimumVF(SmallestType)) {
+      if (MaxVF < MinVF) {
+        LLVM_DEBUG(dbgs() << "LV: Overriding calculated MaxVF(" << MaxVF
+                          << ") with target's minimum: " << MinVF << '\n');
+        MaxVF = MinVF;
+      }
+    }
+  }
+  return MaxVF;
+}
 
 VectorizationFactor
 LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
