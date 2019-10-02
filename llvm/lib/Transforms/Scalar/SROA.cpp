@@ -787,6 +787,11 @@ private:
         LI.getPointerAddressSpace() != DL.getAllocaAddrSpace())
       return PI.setAborted(&LI);
 
+    if (auto *VTy = dyn_cast<VectorType>(LI.getType())) {
+      if (VTy->isScalable())
+        return PI.setAborted(&LI);
+    }
+
     uint64_t Size = DL.getTypeStoreSize(LI.getType());
     return handleLoadOrStore(LI.getType(), LI, Offset, Size, LI.isVolatile());
   }
@@ -801,6 +806,12 @@ private:
     if (SI.isVolatile() &&
         SI.getPointerAddressSpace() != DL.getAllocaAddrSpace())
       return PI.setAborted(&SI);
+
+    if (auto *VTy = dyn_cast<VectorType>(SI.getValueOperand()->getType())) {
+      if (VTy->isScalable()) {
+        return PI.setAborted(&SI);
+      }
+    }
 
     uint64_t Size = DL.getTypeStoreSize(ValOp->getType());
 
@@ -4437,6 +4448,11 @@ bool SROA::runOnAlloca(AllocaInst &AI) {
   if (AI.isArrayAllocation() || !AI.getAllocatedType()->isSized() ||
       DL.getTypeAllocSize(AI.getAllocatedType()) == 0)
     return false;
+
+  if (auto *VTy = dyn_cast<VectorType>(AI.getAllocatedType())) {
+    if (VTy->isScalable())
+      return false;
+  }
 
   bool Changed = false;
 
