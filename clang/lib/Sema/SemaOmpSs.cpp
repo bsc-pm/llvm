@@ -283,6 +283,7 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   }
 
 public:
+
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
     // Add DSA to 'this' if is the first time we see it
     if (!Stack->getThisExpr()) {
@@ -722,9 +723,12 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
 static std::pair<ValueDecl *, bool>
 getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
                SourceRange &ERange) {
-  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
-      RefExpr->containsUnexpandedParameterPack())
+  if (RefExpr->containsUnexpandedParameterPack()) {
+    S.Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
+    return std::make_pair(nullptr, false);
+  } else if (RefExpr->isTypeDependent() || RefExpr->isValueDependent()) {
     return std::make_pair(nullptr, true);
+  }
 
   RefExpr = RefExpr->IgnoreParens();
   ELoc = RefExpr->getExprLoc();
