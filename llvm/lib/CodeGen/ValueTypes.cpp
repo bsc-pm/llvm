@@ -124,6 +124,8 @@ std::string EVT::getEVTString() const {
       return "i" + utostr(getSizeInBits());
     llvm_unreachable("Invalid EVT!");
   case MVT::i1:      return "i1";
+  case MVT::i2:      return "i2";
+  case MVT::i4:      return "i4";
   case MVT::i8:      return "i8";
   case MVT::i16:     return "i16";
   case MVT::i32:     return "i32";
@@ -216,6 +218,9 @@ std::string EVT::getEVTString() const {
   case MVT::nxv8i1:  return "nxv8i1";
   case MVT::nxv16i1: return "nxv16i1";
   case MVT::nxv32i1: return "nxv32i1";
+  case MVT::nxv64i1:  return "nxv64i1";
+  case MVT::nxv32i2:  return "nxv32i2";
+  case MVT::nxv16i4:  return "nxv16i4";
   case MVT::nxv1i8:  return "nxv1i8";
   case MVT::nxv2i8:  return "nxv2i8";
   case MVT::nxv4i8:  return "nxv4i8";
@@ -268,6 +273,8 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
     return LLVMTy;
   case MVT::isVoid:  return Type::getVoidTy(Context);
   case MVT::i1:      return Type::getInt1Ty(Context);
+  case MVT::i2:      return Type::getInt2Ty(Context);
+  case MVT::i4:      return Type::getInt4Ty(Context);
   case MVT::i8:      return Type::getInt8Ty(Context);
   case MVT::i16:     return Type::getInt16Ty(Context);
   case MVT::i32:     return Type::getInt32Ty(Context);
@@ -365,6 +372,15 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
     return VectorType::get(Type::getInt1Ty(Context), 16, /*Scalable=*/ true);
   case MVT::nxv32i1: 
     return VectorType::get(Type::getInt1Ty(Context), 32, /*Scalable=*/ true);
+  case MVT::nxv64i1:
+    return VectorType::get(Type::getInt1Ty(Context), 64,
+                           /* Scalable */ true);
+  case MVT::nxv32i2:
+    return VectorType::get(Type::getInt2Ty(Context), 32,
+                           /* Scalable */ true);
+  case MVT::nxv16i4:
+    return VectorType::get(Type::getInt4Ty(Context), 16,
+                           /* Scalable */ true);
   case MVT::nxv1i8:  
     return VectorType::get(Type::getInt8Ty(Context), 1, /*Scalable=*/ true);
   case MVT::nxv2i8:  

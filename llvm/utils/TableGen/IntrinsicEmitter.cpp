@@ -221,7 +221,9 @@ enum IIT_Info {
   IIT_STRUCT8 = 40,
   IIT_F128 = 41,
   IIT_VEC_ELEMENT = 42,
-  IIT_NXV1 = 43
+  IIT_NXV1 = 43,
+  IIT_I2 = 44,
+  IIT_I4 = 45,
 };
 
 static void EncodeFixedValueType(MVT::SimpleValueType VT,
@@ -231,6 +233,8 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
     switch (BitWidth) {
     default: PrintFatalError("unhandled integer type width in intrinsic!");
     case 1: return Sig.push_back(IIT_I1);
+    case 2: return Sig.push_back(IIT_I2);
+    case 4: return Sig.push_back(IIT_I4);
     case 8: return Sig.push_back(IIT_I8);
     case 16: return Sig.push_back(IIT_I16);
     case 32: return Sig.push_back(IIT_I32);

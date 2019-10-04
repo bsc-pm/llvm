@@ -703,7 +703,9 @@ enum IIT_Info {
   IIT_STRUCT8 = 40,
   IIT_F128 = 41,
   IIT_VEC_ELEMENT = 42,
-  IIT_NXV1 = 43
+  IIT_NXV1 = 43,
+  IIT_I2 = 44,
+  IIT_I4 = 45,
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -743,6 +745,12 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
     return;
   case IIT_I1:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 1));
+    return;
+  case IIT_I2:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 2));
+    return;
+  case IIT_I4:
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 4));
     return;
   case IIT_I8:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Integer, 8));

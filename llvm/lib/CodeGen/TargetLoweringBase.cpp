@@ -751,6 +751,28 @@ void TargetLoweringBase::initActions() {
   setOperationAction(ISD::ConstantFP, MVT::f80, Expand);
   setOperationAction(ISD::ConstantFP, MVT::f128, Expand);
 
+  // SIGN_EXTEND_INREG is special in which it holds an EVT as its second
+  // operand. Before i2 and i4 were added as MVTs, their EVTs were extended
+  // (i.e. EVT::isExtended returned true for them). Operation legalizer must
+  // Expand for extended types, so continue doing this by default.
+  for (MVT VT : {MVT::i2, MVT::i4}) {
+    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
+  }
+
+  // Also make sure truncating stores and extending loads do not suddenly
+  // become legal for i4 and i2.
+  for (MVT ValVT : MVT::integer_valuetypes()) {
+    if (ValVT == MVT::i2 || ValVT == MVT::i4)
+      continue;
+
+    for (MVT MemVT : {MVT::i2, MVT::i4}) {
+      setTruncStoreAction(ValVT, MemVT, Expand);
+      setLoadExtAction(ISD::EXTLOAD, ValVT, MemVT, Expand);
+      setLoadExtAction(ISD::ZEXTLOAD, ValVT, MemVT, Expand);
+      setLoadExtAction(ISD::SEXTLOAD, ValVT, MemVT, Expand);
+    }
+  }
+
   // These library functions default to expand.
   for (MVT VT : {MVT::f32, MVT::f64, MVT::f128}) {
     setOperationAction(ISD::FCBRT,      VT, Expand);
