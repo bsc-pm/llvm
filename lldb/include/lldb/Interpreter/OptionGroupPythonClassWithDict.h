@@ -6,9 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_OptionGroupString_h_
-#define liblldb_OptionGroupString_h_
+#ifndef liblldb_OptionGroupPythonClassWithDict_h_
+#define liblldb_OptionGroupPythonClassWithDict_h_
 
+#include "lldb/lldb-types.h"
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Utility/StructuredData.h"
 
@@ -26,7 +27,7 @@ public:
                       int class_option = 'C',
                       int key_option = 'k', 
                       int value_option = 'v',
-                      char *class_long_option = "python-class",
+                      const char *class_long_option = "python-class",
                       const char *key_long_option = "python-class-key",
                       const char *value_long_option = "python-class-value",
                       bool required = false);
@@ -61,4 +62,4 @@ protected:
 
 } // namespace lldb_private
 
-#endif // liblldb_OptionGroupString_h_
+#endif // liblldb_OptionGroupPythonClassWithDict_h_
