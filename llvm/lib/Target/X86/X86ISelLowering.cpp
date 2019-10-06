@@ -10298,25 +10298,6 @@ static bool isTargetShuffleEquivalent(ArrayRef<int> Mask,
   return true;
 }
 
-// Merges a general DAG shuffle mask and zeroable bit mask into a target shuffle
-// mask.
-// TODO: Do we need this? It might be better to use Mask+Zeroable directly.
-static SmallVector<int, 64> createTargetShuffleMask(ArrayRef<int> Mask,
-                                                    const APInt &Zeroable) {
-  int NumElts = Mask.size();
-  assert(NumElts == (int)Zeroable.getBitWidth() && "Mismatch mask sizes");
-
-  SmallVector<int, 64> TargetMask(NumElts, SM_SentinelUndef);
-  for (int i = 0; i != NumElts; ++i) {
-    int M = Mask[i];
-    if (M == SM_SentinelUndef)
-      continue;
-    assert(0 <= M && M < (2 * NumElts) && "Out of range shuffle index");
-    TargetMask[i] = (Zeroable[i] ? SM_SentinelZero : M);
-  }
-  return TargetMask;
-}
-
 // Attempt to create a shuffle mask from a VSELECT condition mask.
 static bool createShuffleMaskFromVSELECT(SmallVectorImpl<int> &Mask,
                                          SDValue Cond) {
@@ -10967,9 +10948,9 @@ static SDValue getVectorMaskingNode(SDValue Op, SDValue Mask,
                                     SelectionDAG &DAG);
 
 static bool matchVectorShuffleAsBlend(SDValue V1, SDValue V2,
-                                      MutableArrayRef<int> TargetMask,
-                                      bool &ForceV1Zero, bool &ForceV2Zero,
-                                      uint64_t &BlendMask) {
+                                      MutableArrayRef<int> Mask,
+                                      const APInt &Zeroable, bool &ForceV1Zero,
+                                      bool &ForceV2Zero, uint64_t &BlendMask) {
   bool V1IsZeroOrUndef =
       V1.isUndef() || ISD::isBuildVectorAllZeros(V1.getNode());
   bool V2IsZeroOrUndef =
@@ -10977,13 +10958,12 @@ static bool matchVectorShuffleAsBlend(SDValue V1, SDValue V2,
 
   BlendMask = 0;
   ForceV1Zero = false, ForceV2Zero = false;
-  assert(TargetMask.size() <= 64 && "Shuffle mask too big for blend mask");
+  assert(Mask.size() <= 64 && "Shuffle mask too big for blend mask");
 
   // Attempt to generate the binary blend mask. If an input is zero then
   // we can use any lane.
-  // TODO: generalize the zero matching to any scalar like isShuffleEquivalent.
-  for (int i = 0, Size = TargetMask.size(); i < Size; ++i) {
-    int M = TargetMask[i];
+  for (int i = 0, Size = Mask.size(); i < Size; ++i) {
+    int M = Mask[i];
     if (M == SM_SentinelUndef)
       continue;
     if (M == i)
@@ -10992,16 +10972,16 @@ static bool matchVectorShuffleAsBlend(SDValue V1, SDValue V2,
       BlendMask |= 1ull << i;
       continue;
     }
-    if (M == SM_SentinelZero) {
+    if (Zeroable[i]) {
       if (V1IsZeroOrUndef) {
         ForceV1Zero = true;
-        TargetMask[i] = i;
+        Mask[i] = i;
         continue;
       }
       if (V2IsZeroOrUndef) {
         ForceV2Zero = true;
         BlendMask |= 1ull << i;
-        TargetMask[i] = i + Size;
+        Mask[i] = i + Size;
         continue;
       }
     }
@@ -11030,11 +11010,10 @@ static SDValue lowerShuffleAsBlend(const SDLoc &DL, MVT VT, SDValue V1,
                                    const APInt &Zeroable,
                                    const X86Subtarget &Subtarget,
                                    SelectionDAG &DAG) {
-  SmallVector<int, 64> Mask = createTargetShuffleMask(Original, Zeroable);
-
   uint64_t BlendMask = 0;
   bool ForceV1Zero = false, ForceV2Zero = false;
-  if (!matchVectorShuffleAsBlend(V1, V2, Mask, ForceV1Zero, ForceV2Zero,
+  SmallVector<int, 64> Mask(Original.begin(), Original.end());
+  if (!matchVectorShuffleAsBlend(V1, V2, Mask, Zeroable, ForceV1Zero, ForceV2Zero,
                                  BlendMask))
     return SDValue();
 
@@ -32099,8 +32078,8 @@ static bool matchBinaryPermuteShuffle(
     uint64_t BlendMask = 0;
     bool ForceV1Zero = false, ForceV2Zero = false;
     SmallVector<int, 8> TargetMask(Mask.begin(), Mask.end());
-    if (matchVectorShuffleAsBlend(V1, V2, TargetMask, ForceV1Zero, ForceV2Zero,
-                                  BlendMask)) {
+    if (matchVectorShuffleAsBlend(V1, V2, TargetMask, Zeroable, ForceV1Zero,
+                                  ForceV2Zero, BlendMask)) {
       if (MaskVT == MVT::v16i16) {
         // We can only use v16i16 PBLENDW if the lanes are repeated.
         SmallVector<int, 8> RepeatedMask;
@@ -44197,12 +44176,15 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
     return SDValue();
 
   MVT VT = N->getSimpleValueType(0);
-  EVT WideVecVT = N->getOperand(0).getValueType();
-  SDValue WideVec = peekThroughBitcasts(N->getOperand(0));
+  SDValue InVec = N->getOperand(0);
+  SDValue InVecBC = peekThroughBitcasts(InVec);
+  EVT InVecVT = InVec.getValueType();
+  EVT InVecBCVT = InVecBC.getValueType();
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+
   if (Subtarget.hasAVX() && !Subtarget.hasAVX2() &&
-      TLI.isTypeLegal(WideVecVT) &&
-      WideVecVT.getSizeInBits() == 256 && WideVec.getOpcode() == ISD::AND) {
+      TLI.isTypeLegal(InVecVT) &&
+      InVecVT.getSizeInBits() == 256 && InVecBC.getOpcode() == ISD::AND) {
     auto isConcatenatedNot = [] (SDValue V) {
       V = peekThroughBitcasts(V);
       if (!isBitwiseNot(V))
@@ -44210,12 +44192,12 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
       SDValue NotOp = V->getOperand(0);
       return peekThroughBitcasts(NotOp).getOpcode() == ISD::CONCAT_VECTORS;
     };
-    if (isConcatenatedNot(WideVec.getOperand(0)) ||
-        isConcatenatedNot(WideVec.getOperand(1))) {
+    if (isConcatenatedNot(InVecBC.getOperand(0)) ||
+        isConcatenatedNot(InVecBC.getOperand(1))) {
       // extract (and v4i64 X, (not (concat Y1, Y2))), n -> andnp v2i64 X(n), Y1
-      SDValue Concat = split256IntArith(WideVec, DAG);
+      SDValue Concat = split256IntArith(InVecBC, DAG);
       return DAG.getNode(ISD::EXTRACT_SUBVECTOR, SDLoc(N), VT,
-                         DAG.getBitcast(WideVecVT, Concat), N->getOperand(1));
+                         DAG.getBitcast(InVecVT, Concat), N->getOperand(1));
     }
   }
 
@@ -44225,7 +44207,6 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
   if (SDValue V = narrowExtractedVectorSelect(N, DAG))
     return V;
 
-  SDValue InVec = N->getOperand(0);
   unsigned IdxVal = cast<ConstantSDNode>(N->getOperand(1))->getZExtValue();
 
   if (ISD::isBuildVectorAllZeros(InVec.getNode()))
@@ -44245,25 +44226,22 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
   // Try to move vector bitcast after extract_subv by scaling extraction index:
   // extract_subv (bitcast X), Index --> bitcast (extract_subv X, Index')
   // TODO: Move this to DAGCombiner::visitEXTRACT_SUBVECTOR
-  if (InVec.getOpcode() == ISD::BITCAST &&
-      InVec.getOperand(0).getValueType().isVector()) {
-    SDValue SrcOp = InVec.getOperand(0);
-    EVT SrcVT = SrcOp.getValueType();
-    unsigned SrcNumElts = SrcVT.getVectorNumElements();
-    unsigned DestNumElts = InVec.getValueType().getVectorNumElements();
+  if (InVec != InVecBC && InVecBCVT.isVector()) {
+    unsigned SrcNumElts = InVecBCVT.getVectorNumElements();
+    unsigned DestNumElts = InVecVT.getVectorNumElements();
     if ((DestNumElts % SrcNumElts) == 0) {
       unsigned DestSrcRatio = DestNumElts / SrcNumElts;
       if ((VT.getVectorNumElements() % DestSrcRatio) == 0) {
         unsigned NewExtNumElts = VT.getVectorNumElements() / DestSrcRatio;
         EVT NewExtVT = EVT::getVectorVT(*DAG.getContext(),
-                                        SrcVT.getScalarType(), NewExtNumElts);
+                                        InVecBCVT.getScalarType(), NewExtNumElts);
         if ((N->getConstantOperandVal(1) % DestSrcRatio) == 0 &&
             TLI.isOperationLegalOrCustom(ISD::EXTRACT_SUBVECTOR, NewExtVT)) {
           unsigned IndexValScaled = N->getConstantOperandVal(1) / DestSrcRatio;
           SDLoc DL(N);
           SDValue NewIndex = DAG.getIntPtrConstant(IndexValScaled, DL);
           SDValue NewExtract = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, NewExtVT,
-                                           SrcOp, NewIndex);
+                                           InVecBC, NewIndex);
           return DAG.getBitcast(VT, NewExtract);
         }
       }
@@ -44309,7 +44287,7 @@ static SDValue combineExtractSubvector(SDNode *N, SelectionDAG &DAG,
   // we may be able to perform this with a smaller vector width.
   if (IdxVal == 0 && InVec.hasOneUse()) {
     unsigned InOpcode = InVec.getOpcode();
-    if (VT == MVT::v2f64 && InVec.getValueType() == MVT::v4f64) {
+    if (VT == MVT::v2f64 && InVecVT == MVT::v4f64) {
       // v2f64 CVTDQ2PD(v4i32).
       if (InOpcode == ISD::SINT_TO_FP &&
           InVec.getOperand(0).getValueType() == MVT::v4i32) {
