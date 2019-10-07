@@ -1824,7 +1824,8 @@ void InnerLoopVectorizer::widenIntOrFpInduction(PHINode *IV, TruncInst *Trunc) {
   // Determine if we want a scalar version of the induction variable. This is
   // true if the induction variable itself is not widened, or if it has at
   // least one user in the loop that is not widened.
-  auto NeedsScalarIV = VF > 1 && needsScalarInduction(EntryVal);
+  bool ValidVF = VF > 1 || (VF == 1 && isScalable());
+  auto NeedsScalarIV = ValidVF && needsScalarInduction(EntryVal);
 
   // Generate code for the induction step. Note that induction steps are
   // required to be loop-invariant
@@ -1843,7 +1844,7 @@ void InnerLoopVectorizer::widenIntOrFpInduction(PHINode *IV, TruncInst *Trunc) {
   // Try to create a new independent vector induction variable. If we can't
   // create the phi node, we will splat the scalar induction variable in each
   // loop iteration.
-  if (VF > 1 && !shouldScalarizeInstruction(EntryVal)) {
+  if (ValidVF && !shouldScalarizeInstruction(EntryVal)) {
     createVectorIntOrFpInductionPHI(ID, Step, EntryVal);
     VectorizedIV = true;
   }
@@ -1980,7 +1981,8 @@ void InnerLoopVectorizer::buildScalarSteps(Value *ScalarIV, Value *Step,
                                            Instruction *EntryVal,
                                            const InductionDescriptor &ID) {
   // We shouldn't have to build scalar steps if we aren't vectorizing.
-  assert(VF > 1 && "VF should be greater than one");
+  bool ValidVF = VF > 1 || (VF == 1 && isScalable());
+  assert(ValidVF && "VF should be greater than one");
 
   // Get the value type and ensure it and the step have the same integer type.
   Type *ScalarIVTy = ScalarIV->getType()->getScalarType();
@@ -2002,9 +2004,16 @@ void InnerLoopVectorizer::buildScalarSteps(Value *ScalarIV, Value *Step,
   // Determine the number of scalars we need to generate for each unroll
   // iteration. If EntryVal is uniform, we only need to generate the first
   // lane. Otherwise, we generate all VF values.
-  unsigned Lanes =
-      Cost->isUniformAfterVectorization(cast<Instruction>(EntryVal), VF) ? 1
-                                                                         : VF;
+  // If using scalable vectors, scalar can be generated only if EntryVal is
+  // uniform. If it is not uniform, actual VF (VF * vscale) is unknown and we
+  // cannot generate all VF scalar values.
+  unsigned Lanes = 0;
+  if (Cost->isUniformAfterVectorization(cast<Instruction>(EntryVal), VF)) {
+    Lanes = 1;
+  } else {
+    if (!isScalable())
+      Lanes = VF;
+  }
   // Compute the scalar steps and save the results in VectorLoopValueMap.
   for (unsigned Part = 0; Part < UF; ++Part) {
     for (unsigned Lane = 0; Lane < Lanes; ++Lane) {
@@ -4668,7 +4677,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   // We should not collect Uniforms more than once per VF. Right now,
   // this function is called from collectUniformsAndScalars(), which
   // already does this check. Collecting Uniforms for VF=1 does not make any
-  // sense.
+  // sense for non-scalable vectors.
   bool ValidVF = VF >= 2 || (isScalable() && VF == 1);
   assert(ValidVF && Uniforms.find(VF) == Uniforms.end() &&
          "This function should not be visited twice for the same VF");
