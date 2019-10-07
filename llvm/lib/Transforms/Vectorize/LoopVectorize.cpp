@@ -2662,8 +2662,8 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
           emitVscaleCall(Builder, L->getLoopPreheader()->getModule(), Ty);
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
     }
-    Step = Builder.CreateSub(Step, ConstantInt::get(Ty, 1));
-    TC = Builder.CreateAdd(TC, Step, "n.rnd.up");
+    Value *Stepm = Builder.CreateSub(Step, ConstantInt::get(Ty, 1));
+    TC = Builder.CreateAdd(TC, Stepm, "n.rnd.up");
   }
 
   // Now we need to generate the expression for the part of the loop that the
@@ -2685,7 +2685,8 @@ Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   // does not evenly divide the trip count, no adjustment is necessary since
   // there will already be scalar iterations. Note that the minimum iterations
   // check ensures that N >= Step.
-  if (VF > 1 && Cost->requiresScalarEpilogue()) {
+  bool ValidVF = VF > 1 || (VF == 1 && isScalable());
+  if (ValidVF && Cost->requiresScalarEpilogue()) {
     auto *IsZero = Builder.CreateICmpEQ(R, ConstantInt::get(R->getType(), 0));
     R = Builder.CreateSelect(IsZero, Step, R);
   }
