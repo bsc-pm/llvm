@@ -297,8 +297,9 @@ cl::opt<bool> llvm::EnableLoopVectorization(
 /// A helper function for converting Scalar types to vector types.
 /// If the incoming type is void, we return void. If the VF is 1, we return
 /// the scalar type.
-static Type *ToVectorTy(Type *Scalar, unsigned VF, bool Scalable = false) {
-  if (Scalar->isVoidTy() || (VF == 1 && !Scalable))
+static Type *ToVectorTy(Type *Scalar, unsigned VF, bool Scalable = false,
+                        bool ValidVF = true) {
+  if (Scalar->isVoidTy() || (VF == 1 && !Scalable) || !ValidVF)
     return Scalar;
   return VectorType::get(Scalar, VF, Scalable);
 }
@@ -1060,8 +1061,8 @@ public:
   }
 
   /// Returns true if \p I is known to be scalar after vectorization.
-  bool isScalarAfterVectorization(Instruction *I, unsigned VF) const {
-    if (VF == 1 && !isScalable())
+  bool isScalarAfterVectorization(Instruction *I, unsigned VF, bool ValidVF=true) const {
+    if (!ValidVF || (VF == 1 && !isScalable()))
       return true;
 
     // Cost model is not run in the VPlan-native path - return conservative
@@ -1077,10 +1078,10 @@ public:
 
   /// \returns True if instruction \p I can be truncated to a smaller bitwidth
   /// for vectorization factor \p VF.
-  bool canTruncateToMinimalBitwidth(Instruction *I, unsigned VF) const {
-    return VF > 1 && MinBWs.find(I) != MinBWs.end() &&
+  bool canTruncateToMinimalBitwidth(Instruction *I, unsigned VF, bool ValidVF) const {
+    return ValidVF && MinBWs.find(I) != MinBWs.end() &&
            !isProfitableToScalarize(I, VF) &&
-           !isScalarAfterVectorization(I, VF);
+           !isScalarAfterVectorization(I, VF, ValidVF);
   }
 
   /// Decision that was taken during cost calculation for memory instruction.
@@ -1333,7 +1334,8 @@ private:
 
   /// The cost-computation logic from getInstructionCost which provides
   /// the vector type as an output parameter.
-  unsigned getInstructionCost(Instruction *I, unsigned VF, Type *&VectorTy);
+  unsigned getInstructionCost(Instruction *I, unsigned VF, Type *&VectorTy,
+                              bool ValidVF);
 
   /// Calculate vectorization cost of memory instruction \p I.
   unsigned getMemoryInstructionCost(Instruction *I, unsigned VF);
@@ -1449,7 +1451,8 @@ private:
   /// extracted.
   bool needsExtract(Value *V, unsigned VF) const {
     Instruction *I = dyn_cast<Instruction>(V);
-    if (VF == 1 || !I || !TheLoop->contains(I) || TheLoop->isLoopInvariant(I))
+    if ((VF == 1 && !isScalable()) || !I || !TheLoop->contains(I)
+        || TheLoop->isLoopInvariant(I))
       return false;
 
     // Assume we can vectorize V (and hence we need extraction) if the
@@ -1459,7 +1462,7 @@ private:
     // cases, because we check if the operands have vectorizable types
     // beforehand in LoopVectorizationLegality.
     return Scalars.find(VF) == Scalars.end() ||
-           !isScalarAfterVectorization(I, VF);
+           !isScalarAfterVectorization(I, VF, true);
   };
 
   /// Returns a range containing only operands needing to be extracted.
@@ -5945,7 +5948,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, unsigned VF) {
   }
 
   Type *VectorTy;
-  unsigned C = getInstructionCost(I, VF, VectorTy);
+  unsigned C = getInstructionCost(I, VF, VectorTy, ValidVF);
 
   // bool ValidNumParts = TTI.getNumberOfParts(VectorTy) < VF || (VF == 1 &&
   // isScalable() &&
@@ -5959,7 +5962,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, unsigned VF) {
 unsigned LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
                                                               unsigned VF) {
 
-  if (VF == 1)
+  if (VF == 1 && !isScalable())
     return 0;
 
   unsigned Cost = 0;
@@ -6140,11 +6143,12 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(unsigned VF) {
 
 unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
                                                         unsigned VF,
-                                                        Type *&VectorTy) {
+                                                        Type *&VectorTy,
+                                                        bool ValidVF) {
   Type *RetTy = I->getType();
-  if (canTruncateToMinimalBitwidth(I, VF))
+  if (canTruncateToMinimalBitwidth(I, VF, ValidVF))
     RetTy = IntegerType::get(RetTy->getContext(), MinBWs[I]);
-  VectorTy = isScalarAfterVectorization(I, VF)
+  VectorTy = isScalarAfterVectorization(I, VF, ValidVF)
                  ? RetTy
                  : ToVectorTy(RetTy, VF, isScalable());
   auto SE = PSE.getSE();
@@ -6163,7 +6167,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     // blocks requires also an extract of its vector compare i1 element.
     bool ScalarPredicatedBB = false;
     BranchInst *BI = cast<BranchInst>(I);
-    if (VF > 1 && BI->isConditional() &&
+    if (ValidVF && BI->isConditional() &&
         (PredicatedBBsAfterVectorization.find(BI->getSuccessor(0)) !=
              PredicatedBBsAfterVectorization.end() ||
          PredicatedBBsAfterVectorization.find(BI->getSuccessor(1)) !=
@@ -6191,14 +6195,14 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
 
     // First-order recurrences are replaced by vector shuffles inside the loop.
     // NOTE: Don't use ToVectorTy as SK_ExtractSubvector expects a vector type.
-    if (VF > 1 && Legal->isFirstOrderRecurrence(Phi))
+    if (ValidVF && Legal->isFirstOrderRecurrence(Phi))
       return TTI.getShuffleCost(TargetTransformInfo::SK_ExtractSubvector,
                                 VectorTy, VF - 1, VectorType::get(RetTy, 1));
 
     // Phi nodes in non-header blocks (not inductions, reductions, etc.) are
     // converted into select instructions. We require N - 1 selects per phi
     // node, where N is the number of incoming values.
-    if (VF > 1 && Phi->getParent() != TheLoop->getHeader())
+    if (ValidVF && Phi->getParent() != TheLoop->getHeader())
       return (Phi->getNumIncomingValues() - 1) *
              TTI.getCmpSelInstrCost(
                  Instruction::Select,
@@ -6216,7 +6220,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     // vector lane. Get the scalarization cost and scale this amount by the
     // probability of executing the predicated block. If the instruction is not
     // predicated, we fall through to the next case.
-    if (VF > 1 && isScalarWithPredication(I)) {
+    if (ValidVF && isScalarWithPredication(I)) {
       unsigned Cost = 0;
 
       // These instructions have a non-void type, so account for the phi nodes
@@ -6265,13 +6269,13 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       Op2VK = TargetTransformInfo::OK_UniformValue;
 
     SmallVector<const Value *, 4> Operands(I->operand_values());
-    unsigned N = isScalarAfterVectorization(I, VF) ? VF : 1;
+    unsigned N = isScalarAfterVectorization(I, VF, ValidVF) && ValidVF ? VF : 1;
     return N * TTI.getArithmeticInstrCost(
                    I->getOpcode(), VectorTy, TargetTransformInfo::OK_AnyValue,
                    Op2VK, TargetTransformInfo::OP_None, Op2VP, Operands);
   }
   case Instruction::FNeg: {
-    unsigned N = isScalarAfterVectorization(I, VF) ? VF : 1;
+    unsigned N = isScalarAfterVectorization(I, VF, ValidVF) && ValidVF ? VF : 1;
     return N * TTI.getArithmeticInstrCost(
                    I->getOpcode(), VectorTy, TargetTransformInfo::OK_AnyValue,
                    TargetTransformInfo::OK_AnyValue,
@@ -6284,7 +6288,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     bool ScalarCond = (SE->isLoopInvariant(CondSCEV, TheLoop));
     Type *CondTy = SI->getCondition()->getType();
     if (!ScalarCond)
-      CondTy = VectorType::get(CondTy, VF);
+      CondTy = VectorType::get(CondTy, VF, isScalable());
 
     return TTI.getCmpSelInstrCost(I->getOpcode(), VectorTy, CondTy, I);
   }
@@ -6292,9 +6296,9 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   case Instruction::FCmp: {
     Type *ValTy = I->getOperand(0)->getType();
     Instruction *Op0AsInstruction = dyn_cast<Instruction>(I->getOperand(0));
-    if (canTruncateToMinimalBitwidth(Op0AsInstruction, VF))
+    if (canTruncateToMinimalBitwidth(Op0AsInstruction, VF, ValidVF))
       ValTy = IntegerType::get(ValTy->getContext(), MinBWs[Op0AsInstruction]);
-    VectorTy = ToVectorTy(ValTy, VF, isScalable());
+    VectorTy = ToVectorTy(ValTy, VF, isScalable(), ValidVF);
     return TTI.getCmpSelInstrCost(I->getOpcode(), VectorTy, nullptr, I);
   }
   case Instruction::Store:
@@ -6307,7 +6311,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       if (Decision == CM_Scalarize)
         Width = 1;
     }
-    VectorTy = ToVectorTy(getMemInstValueType(I), Width, isScalable());
+    VectorTy = ToVectorTy(getMemInstValueType(I), Width, isScalable(), ValidVF);
     return getMemoryInstructionCost(I, VF);
   }
   case Instruction::ZExt:
@@ -6335,7 +6339,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     Type *SrcVecTy = VectorTy->isVectorTy()
                          ? ToVectorTy(SrcScalarTy, VF, isScalable())
                          : SrcScalarTy;
-    if (canTruncateToMinimalBitwidth(I, VF)) {
+    if (canTruncateToMinimalBitwidth(I, VF, ValidVF)) {
       // This cast is going to be shrunk. This may remove the cast or it might
       // turn it into slightly different cast. For example, if MinBW == 16,
       // "zext i8 %1 to i32" becomes "zext i8 %1 to i16".
@@ -6350,11 +6354,11 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
                  I->getOpcode() == Instruction::SExt) {
         SrcVecTy = largestIntegerVectorType(SrcVecTy, MinVecTy);
         VectorTy = smallestIntegerVectorType(
-            ToVectorTy(I->getType(), VF, isScalable()), MinVecTy);
+            ToVectorTy(I->getType(), VF, isScalable(), ValidVF), MinVecTy);
       }
     }
 
-    unsigned N = isScalarAfterVectorization(I, VF) ? VF : 1;
+    unsigned N = isScalarAfterVectorization(I, VF, ValidVF) ? VF : 1;
     return N * TTI.getCastInstrCost(I->getOpcode(), VectorTy, SrcVecTy, I);
   }
   case Instruction::Call: {
@@ -6810,15 +6814,13 @@ VPInterleaveRecipe *VPRecipeBuilder::tryToInterleaveMemory(Instruction *I,
 VPWidenMemoryInstructionRecipe *
 VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
                                   VPlanPtr &Plan) {
-  //-NOTE/VK-//
-  // If it is a load or store instruction, WidenMemory recipe is created.
   if (!isa<LoadInst>(I) && !isa<StoreInst>(I))
     return nullptr;
 
   auto willWiden = [&](unsigned VF) -> bool {
     if (!CM.isScalable() && VF == 1)
       return false;
-    if (CM.isScalarAfterVectorization(I, VF) ||
+    if (CM.isScalarAfterVectorization(I, VF, true) ||
         CM.isProfitableToScalarize(I, VF))
       return false;
     LoopVectorizationCostModel::InstWidening Decision =
