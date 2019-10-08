@@ -118,6 +118,8 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     addRegisterClass(MVT::nxv2f64, &RISCV::EPIVR2RegClass);
     addRegisterClass(MVT::nxv4f64, &RISCV::EPIVR4RegClass);
     addRegisterClass(MVT::nxv8f64, &RISCV::EPIVR8RegClass);
+
+    setBooleanVectorContents(ZeroOrOneBooleanContent);
   }
 
   // Compute derived properties from the register classes.
