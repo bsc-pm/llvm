@@ -1283,19 +1283,20 @@ defset list<FloatVectorTypeInfoToWide> AllWideableFloatVectors = {
 //def : FloatVectorTypeInfoToWide<Vtype4xf64, /* FIXME: Vtype4xf128 */ i1>;
 }
 
-class MaskTypeInfo<ValueType Mas, int Sew> {
+class MaskTypeInfo<ValueType Mas, int Sew, ValueType Ivt> {
   ValueType Mask = Mas;
   int SEW = Sew; // FIXME: computed as ELEN/vscale, to be used for loading/storing partial masks
+  ValueType IntegerVector = Ivt;
 }
 
 defset list<MaskTypeInfo> AllMasks = {
-  def : MaskTypeInfo<nxv1i1,  64>; // FIXME SEW should be ELEN/1
-  def : MaskTypeInfo<nxv2i1,  32>; // FIXME SEW should be ELEN/2
-  def : MaskTypeInfo<nxv4i1,  16>; // FIXME SEW should be ELEN/4
-  def : MaskTypeInfo<nxv8i1,  8>;  // FIXME SEW should be ELEN/8
-  def : MaskTypeInfo<nxv16i1, 8>;  // FIXME SEW should be ELEN/16, SEW < 8
-  def : MaskTypeInfo<nxv32i1, 8>;  // FIXME SEW should be ELEN/32, SEW < 8
-//def : MaskTypeInfo<nxv64i1, 8>;  // FIXME SEW should be ELEN/64, SEW < 8, undefined type
+  def : MaskTypeInfo<nxv1i1,  64, nxv1i64>; // FIXME SEW should be ELEN/1
+  def : MaskTypeInfo<nxv2i1,  32, nxv2i32>; // FIXME SEW should be ELEN/2
+  def : MaskTypeInfo<nxv4i1,  16, nxv4i16>; // FIXME SEW should be ELEN/4
+  def : MaskTypeInfo<nxv8i1,  8,  nxv8i8>;  // FIXME SEW should be ELEN/8
+  def : MaskTypeInfo<nxv16i1, 8,  nxv16i4>;  // FIXME SEW should be ELEN/16, SEW < 8
+  def : MaskTypeInfo<nxv32i1, 8,  nxv32i2>;  // FIXME SEW should be ELEN/32, SEW < 8
+//def : MaskTypeInfo<nxv64i1, 8,  nxv64i1>;  // FIXME SEW should be ELEN/64, SEW < 8, undefined type
 }
 
 class EPIVRegToWide<EPIVReg Reg, EPIVReg WideReg> {
@@ -2171,6 +2172,32 @@ multiclass pat_load_store<LLVMType type,
              reg_class:$rs2, AddrFI:$rs1, /* vl */ X0, sew)>;
 }
 
+// Extra patterns for truncating loads and extending stores of mask types
+multiclass pat_load_store_mask<LLVMType type,
+                               LLVMType integer_type,
+                               string load_instr_name,
+                               string store_instr_name,
+                               int sew,
+                               int vlmul,
+                               EPIVReg reg_class>
+{
+  // Load
+  def : Pat<(type (trunc (integer_type (load GPR:$rs1)))),
+            (!cast<Instruction>(load_instr_name#"_M"#vlmul)
+             GPR:$rs1, /* vl */ X0, sew)>;
+  def : Pat<(type (trunc (integer_type (load AddrFI:$rs1)))),
+            (!cast<Instruction>(load_instr_name#"_M"#vlmul)
+             AddrFI:$rs1, /* vl */ X0, sew)>;
+
+  // Store
+  def : Pat<(store (integer_type (zext type:$rs2)), GPR:$rs1),
+            (!cast<Instruction>(store_instr_name#"_M"#vlmul)
+             reg_class:$rs2, GPR:$rs1, /* vl */ X0, sew)>;
+  def : Pat<(store (integer_type (zext type:$rs2)), AddrFI:$rs1),
+            (!cast<Instruction>(store_instr_name#"_M"#vlmul)
+             reg_class:$rs2, AddrFI:$rs1, /* vl */ X0, sew)>;
+}
+
 let Predicates = [HasExtEPI] in {
   foreach vti = AllVectors in
   {
@@ -2183,6 +2210,9 @@ let Predicates = [HasExtEPI] in {
     // Mask values are stored as vectors of bytes
     defm : pat_load_store<mti.Mask, "PseudoVLE_V", "PseudoVSE_V", /* sew */ 8,
                           /* vlmul */ 1, EPIVR>;
+    defm : pat_load_store_mask<mti.Mask, mti.IntegerVector,
+                               "PseudoVLE_V", "PseudoVSE_V",
+                               /* sew */ 8, /* vlmul */ 1, EPIVR>;
   }
 
   // FIXME Deal with {B,H,W} load/store (load + sext)
