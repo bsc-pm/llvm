@@ -80,7 +80,10 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     addRegisterClass(MVT::nxv8i1, &RISCV::EPIVRRegClass);
     addRegisterClass(MVT::nxv16i1, &RISCV::EPIVRRegClass);
     addRegisterClass(MVT::nxv32i1, &RISCV::EPIVRRegClass);
-    //addRegisterClass(MVT::nxv64i1, &RISCV::EPIVRRegClass); // FIXME undefined type
+    addRegisterClass(MVT::nxv64i1, &RISCV::EPIVRRegClass);
+
+    addRegisterClass(MVT::nxv16i4, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv32i2, &RISCV::EPIVRRegClass);
 
     //addRegisterClass(MVT::nxv1i8, &RISCV::EPIVRRegClass); // FIXME illegal type
     //addRegisterClass(MVT::nxv2i8, &RISCV::EPIVRRegClass); // FIXME illegal type

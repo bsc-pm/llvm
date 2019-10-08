@@ -63,7 +63,9 @@ class EPIVReg<list<ValueType> regTypes, dag regList, int Vlmul>
 
 defset list<EPIVReg> AllEPIVRegs = {
   def EPIVR : EPIVReg<[nxv1i64, nxv2i32, nxv4i16, nxv8i8, nxv1f64, nxv2f32,
-                       nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1 /* FIXME, nxv64i1 doesn't exist yet */],
+                       nxv16i4, nxv32i2,
+                       nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1, nxv64i1
+                      ],
                       // Prioritise caller-save and then callee-save
                       (add (sequence "V%u", 0, 7),
                            (sequence "V%u", 16, 23),
