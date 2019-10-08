@@ -84,6 +84,21 @@ void CodeGenTypes::addRecordTypeName(const RecordDecl *RD,
 /// a type.  For example, the scalar representation for _Bool is i1, but the
 /// memory representation is usually i8 or i32, depending on the target.
 llvm::Type *CodeGenTypes::ConvertTypeForMem(QualType T) {
+
+  // Don't use EPI vectors of i1 to access memory.
+  if (const VectorType *VT = dyn_cast<VectorType>(T)) {
+    if (VT->getVectorKind() == VectorType::EPIVector &&
+        VT->getElementType()->isBooleanType()) {
+      // FIXME. Assumes ELEN=64.
+      uint64_t MaskElementSize = 64 / VT->getNumElements();
+      assert(MaskElementSize > 0 && "Invalid mask size, too many elements?");
+      llvm::Type *ElementType =
+          llvm::IntegerType::get(getLLVMContext(), MaskElementSize);
+      return llvm::VectorType::get(ElementType, VT->getNumElements(),
+                                   /* Scalable */ 1);
+    }
+  }
+
   llvm::Type *R = ConvertType(T);
 
   // If this is a non-bool type, don't map it.
@@ -606,9 +621,11 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
   case Type::Vector: {
     const VectorType *VT = cast<VectorType>(Ty);
     if (VT->getVectorKind() == VectorType::EPIVector) {
-      // Use a scalable vector here n x <type>
-      ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),
-                                         VT->getNumElements(),
+      // Use a scalable vector here n x <type> but convert booleans into
+      // "mask vectors"
+      llvm::Type *ElementType = ConvertType(VT->getElementType());
+
+      ResultType = llvm::VectorType::get(ElementType, VT->getNumElements(),
                                          /* Scalable */ 1);
     } else {
       ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),

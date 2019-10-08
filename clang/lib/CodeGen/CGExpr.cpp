@@ -1539,6 +1539,16 @@ static bool hasBooleanRepresentation(QualType Ty) {
   return false;
 }
 
+static bool hasBooleanVectorRepresentation(QualType Ty) {
+  if (const VectorType *VT = dyn_cast<VectorType>(Ty)) {
+    if (VT->getVectorKind() == VectorType::EPIVector &&
+        VT->getElementType()->isBooleanType())
+      return true;
+  }
+
+  return false;
+}
+
 static bool getRangeForType(CodeGenFunction &CGF, QualType Ty,
                             llvm::APInt &Min, llvm::APInt &End,
                             bool StrictEnums, bool IsBool) {
@@ -1697,6 +1707,10 @@ llvm::Value *CodeGenFunction::EmitToMemory(llvm::Value *Value, QualType Ty) {
            "wrong value rep of bool");
   }
 
+  if (hasBooleanVectorRepresentation(Ty)) {
+    return Builder.CreateZExt(Value, ConvertTypeForMem(Ty), "frommask");
+  }
+
   return Value;
 }
 
@@ -1706,6 +1720,10 @@ llvm::Value *CodeGenFunction::EmitFromMemory(llvm::Value *Value, QualType Ty) {
     assert(Value->getType()->isIntegerTy(getContext().getTypeSize(Ty)) &&
            "wrong value rep of bool");
     return Builder.CreateTrunc(Value, Builder.getInt1Ty(), "tobool");
+  }
+
+  if (hasBooleanVectorRepresentation(Ty)) {
+    return Builder.CreateTrunc(Value, ConvertType(Ty), "tomask");
   }
 
   return Value;
@@ -1732,9 +1750,12 @@ void CodeGenFunction::EmitStoreOfScalar(llvm::Value *Value, Address Addr,
                                             MaskV, "extractVec");
         SrcTy = llvm::VectorType::get(VecTy->getElementType(), 4);
       }
-      if (Addr.getElementType() != SrcTy) {
+      const VectorType *VT = dyn_cast<VectorType>(Ty);
+      // EPI mask types can be legitimately different, so don't bitcast.
+      if (Addr.getElementType() != SrcTy &&
+          (!VT || VT->getVectorKind() != VectorType::EPIVector ||
+           !VT->getElementType()->isBooleanType()))
         Addr = Builder.CreateElementBitCast(Addr, SrcTy, "storetmp");
-      }
     }
   }
 

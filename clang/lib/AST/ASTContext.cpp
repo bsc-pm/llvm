@@ -1839,7 +1839,12 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       // EPI vectors don't have a number of elements. Handle them like
       // incomplete/VL arrays above.
       Width = 0;
-      Align = EltInfo.Align;
+      if (VT->getElementType()->isBooleanType()) {
+        // FIXME: Assumes ELEN=64
+        Align = std::max(8u, 64 / VT->getNumElements());
+      } else {
+        Align = EltInfo.Align;
+      }
     } else {
       Width = EltInfo.Width * VT->getNumElements();
       Align = Width;

@@ -8,11 +8,12 @@ void basic_test_callee(__epi_1xf64 a, __epi_1xf64 b, __epi_1xi1 mask);
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[A:%.*]] = alloca <vscale x 1 x double>, align 8
 // CHECK-NEXT:    [[B:%.*]] = alloca <vscale x 1 x double>, align 8
-// CHECK-NEXT:    [[MASK:%.*]] = alloca <vscale x 1 x i1>, align 1
+// CHECK-NEXT:    [[MASK:%.*]] = alloca <vscale x 1 x i64>, align 8
 // CHECK-NEXT:    [[TMP0:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[A]], align 8
 // CHECK-NEXT:    [[TMP1:%.*]] = load <vscale x 1 x double>, <vscale x 1 x double>* [[B]], align 8
-// CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 1 x i1>, <vscale x 1 x i1>* [[MASK]], align 1
-// CHECK-NEXT:    call void @basic_test_callee(<vscale x 1 x double> [[TMP0]], <vscale x 1 x double> [[TMP1]], <vscale x 1 x i1> [[TMP2]])
+// CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 1 x i64>, <vscale x 1 x i64>* [[MASK]], align 8
+// CHECK-NEXT:    [[TOMASK:%.*]] = trunc <vscale x 1 x i64> [[TMP2]] to <vscale x 1 x i1>
+// CHECK-NEXT:    call void @basic_test_callee(<vscale x 1 x double> [[TMP0]], <vscale x 1 x double> [[TMP1]], <vscale x 1 x i1> [[TOMASK]])
 // CHECK-NEXT:    ret void
 //
 void basic_test_caller(void)
