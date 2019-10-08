@@ -3930,8 +3930,11 @@ bool Attributor::checkForAllCallSites(
   // hence the function has internal linkage.
   const IRPosition &IRP = QueryingAA.getIRPosition();
   const Function *AssociatedFunction = IRP.getAssociatedFunction();
-  if (!AssociatedFunction)
+  if (!AssociatedFunction) {
+    LLVM_DEBUG(dbgs() << "[Attributor] No function associated with " << IRP
+                      << "\n");
     return false;
+  }
 
   if (RequireAllCallSites && !AssociatedFunction->hasLocalLinkage()) {
     LLVM_DEBUG(
@@ -4778,7 +4781,6 @@ const char AAMemoryBehavior::ID = 0;
       SWITCH_PK_INV(CLASS, IRP_CALL_SITE, "call site")                         \
       SWITCH_PK_CREATE(CLASS, IRP, IRP_FUNCTION, Function)                     \
     }                                                                          \
-    AA->initialize(A);                                                         \
     return *AA;                                                                \
   }
 
@@ -4795,7 +4797,6 @@ const char AAMemoryBehavior::ID = 0;
       SWITCH_PK_CREATE(CLASS, IRP, IRP_CALL_SITE_RETURNED, CallSiteReturned)   \
       SWITCH_PK_CREATE(CLASS, IRP, IRP_CALL_SITE_ARGUMENT, CallSiteArgument)   \
     }                                                                          \
-    AA->initialize(A);                                                         \
     return *AA;                                                                \
   }
 
@@ -4820,7 +4821,9 @@ CREATE_FUNCTION_ONLY_ABSTRACT_ATTRIBUTE_FOR_POSITION(AAHeapToStack)
 
 CREATE_NON_RET_ABSTRACT_ATTRIBUTE_FOR_POSITION(AAMemoryBehavior)
 
+#undef CREATE_FUNCTION_ONLY_ABSTRACT_ATTRIBUTE_FOR_POSITION
 #undef CREATE_FUNCTION_ABSTRACT_ATTRIBUTE_FOR_POSITION
+#undef CREATE_NON_RET_ABSTRACT_ATTRIBUTE_FOR_POSITION
 #undef CREATE_VALUE_ABSTRACT_ATTRIBUTE_FOR_POSITION
 #undef CREATE_ALL_ABSTRACT_ATTRIBUTE_FOR_POSITION
 #undef SWITCH_PK_CREATE
