@@ -4635,6 +4635,11 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
   QualType OriginalTy = OSSArraySectionExpr::getBaseOriginalType(Base);
   QualType ResultTy;
   if (OriginalTy->isAnyPointerType()) {
+    if (const auto *OASE = dyn_cast<OSSArraySectionExpr>(Base)) {
+      Diag(OASE->getExprLoc(), diag::err_oss_section_only_one_pointer_level)
+        << OASE->getSourceRange();
+      return ExprError();
+    }
     ResultTy = OriginalTy->getPointeeType();
   } else if (OriginalTy->isArrayType()) {
     ResultTy = OriginalTy->getAsArrayTypeUnsafe()->getElementType();

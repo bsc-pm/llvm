@@ -51,7 +51,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task depend(in:argv[argv[:2]:1]) // expected-error {{OmpSs-2 array section is not allowed here}}
   #pragma oss task depend(in:argv[0:][:]) // expected-error {{section length is unspecified and cannot be inferred because subscripted value is not an array}}
   #pragma oss task depend(in:env[0:][:]) // expected-error {{section length is unspecified and cannot be inferred because subscripted value is an array of unknown bound}}
-  #pragma oss task depend(in : argv[ : argc][1 : argc - 1])
+  #pragma oss task depend(in : argv[ : argc][1 : argc - 1]) // expected-error {{pointer types only allow one-level array sections}}
   #pragma oss task depend(in : arr[0])
   #pragma oss task depend(, // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
   #pragma oss task depend(, : // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}}
