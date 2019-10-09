@@ -3273,7 +3273,7 @@ ExprResult Parser::TryParseOSSArrayShaping() {
 
     // Parse whatever between []
     Diags.setSuppressAllDiagnostics();
-    Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+    Actions.CorrectDelayedTyposInExpr(ParseExpression());
     Diags.setSuppressAllDiagnostics(false);
 
     // After that we're supposed to be at ]
@@ -3323,7 +3323,7 @@ ExprResult Parser::ParseOSSArrayShaping() {
       Loc = T.getOpenLocation();
     First = false;
 
-    ExprResult ShapeExpr = Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+    ExprResult ShapeExpr = Actions.CorrectDelayedTyposInExpr(ParseExpression());
 
     ShapeList.push_back(ShapeExpr.get());
 

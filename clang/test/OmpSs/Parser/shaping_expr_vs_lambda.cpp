@@ -21,8 +21,7 @@ void foo2(int x) {
   {}
   #pragma oss task depend(in : [x + x]() {} ) // expected-error {{expected ',' or ']' in lambda capture list}}
   {}
-  // Incomplete lambdas ignore whatever is after it until ';'
-  #pragma oss task depend(in : [x,](array),  [x,](array){} ) // expected-error {{expected variable name or 'this' in lambda capture list}}
+  #pragma oss task depend(in : [x,](array),  [x,](array){}, [3](array, array)) // expected-error 2 {{expected expression}} expected-warning {{expression result unused}}
   {}
   #pragma oss task depend(in : [x](int a) {} ) // expected-error {{expected addressable lvalue expression, array element or array section}}
   {}
