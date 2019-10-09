@@ -3573,6 +3573,7 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
   // Lambdas are FnScopes too, so we can determine if
   // the stmt belongs to the lambda or the OmpSs-2 region.
   if (getLangOpts().OmpSs
+      && getCurScope()->getFnParent()
       && getCurScope()->getFnParent()->isOmpSsDirectiveScope()) {
 
     Diag(ReturnLoc, diag::err_oss_invalid_branch);
