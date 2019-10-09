@@ -129,6 +129,7 @@ public:
   }
 };
 
+// TODO: documentation
 class OSSArrayShapingExpr final
   : public Expr,
     private llvm::TrailingObjects<OSSArrayShapingExpr, Stmt *> {
@@ -147,6 +148,10 @@ class OSSArrayShapingExpr final
   OSSArrayShapingExpr(QualType Type,
                       ExprValueKind VK, ExprObjectKind OK, unsigned N,
                       SourceLocation BeginLoc, SourceLocation EndLoc)
+      // TODO: Should we fill correctly
+      // TypeDependent, ValueDependent,
+      // InstantiationDependent,
+      // ContainsUnexpandedParameterPack ??
       : Expr( OSSArrayShapingExprClass, Type, VK, OK,
             false, false, false, false),
             NumShapes(N), BeginLoc(BeginLoc), EndLoc(EndLoc)

@@ -122,7 +122,9 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 /// Parsing of OmpSs clauses.
 ///
 ///    clause:
-///       task-depend-clause
+///       depend-clause | if-clause | final-clause
+///       | default-clause | shared-clause | private-clause
+///       | firstprivate-clause
 ///
 OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
                                      OmpSsClauseKind CKind, bool FirstClause) {
@@ -340,7 +342,7 @@ OSSClause *Parser::ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
   return Actions.ActOnOmpSsSingleExprClause(Kind, Val.get(), Loc, LLoc, RLoc);
 }
 
-/// Parsing of simple OmpSs clauses like 'default' or 'proc_bind'.
+/// Parsing of simple OmpSs clauses like 'default'.
 ///
 ///    default-clause:
 ///         'default' '(' 'none' | 'shared' ')
