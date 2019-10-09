@@ -9751,6 +9751,8 @@ def err_oss_shape_incomplete_type : Error<
   "shape of pointer to incomplete type %0">;
 def err_oss_variadic_templates_not_clause_allowed : Error<
   "variadic templates are not allowed in OmpSs-2 clauses">;
+def err_oss_invalid_branch : Error<
+  "invalid branch from OmpSs-2 structured block">;
 def warn_oss_section_is_char : Warning<"array section %select{lower bound|length}0 is of type 'char'">,
   InGroup<CharSubscript>, DefaultIgnore;
 } // end of OmpSs component.

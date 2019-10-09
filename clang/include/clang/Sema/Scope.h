@@ -407,6 +407,11 @@ public:
     return false;
   }
 
+  /// Determines whether this scope is the OmpSs directive scope
+  bool isOmpSsDirectiveScope() const {
+    return (getFlags() & Scope::OmpSsDirectiveScope);
+  }
+
   /// Determines whether this scope is the OpenMP directive scope
   bool isOpenMPDirectiveScope() const {
     return (getFlags() & Scope::OpenMPDirectiveScope);

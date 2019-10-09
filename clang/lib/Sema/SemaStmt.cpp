@@ -3568,6 +3568,17 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
   if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp))
     return StmtError();
 
+  // OmpSs directives introduce a new Scope that is both
+  // a FnScope and OmpSsDirectiveScope.
+  // Lambdas are FnScopes too, so we can determine if
+  // the stmt belongs to the lambda or the OmpSs-2 region.
+  if (getLangOpts().OmpSs
+      && getCurScope()->getFnParent()->isOmpSsDirectiveScope()) {
+
+    Diag(ReturnLoc, diag::err_oss_invalid_branch);
+    return StmtError();
+  }
+
   if (isa<CapturingScopeInfo>(getCurFunction()))
     return ActOnCapScopeReturnStmt(ReturnLoc, RetValExp);
 
