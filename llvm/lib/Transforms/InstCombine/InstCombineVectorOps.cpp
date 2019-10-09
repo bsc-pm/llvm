@@ -1626,6 +1626,10 @@ static Instruction *foldIdentityExtractShuffle(ShuffleVectorInst &Shuf) {
 
 /// Try to replace a shuffle with an insertelement.
 static Instruction *foldShuffleWithInsert(ShuffleVectorInst &Shuf) {
+  // Do not fold if shuffle is a scalable vector.
+  if (Shuf.getType()->getVectorIsScalable())
+    return nullptr;
+
   Value *V0 = Shuf.getOperand(0), *V1 = Shuf.getOperand(1);
   SmallVector<int, 16> Mask = Shuf.getShuffleMask();
 
@@ -1756,6 +1760,10 @@ static Instruction *foldIdentityPaddedShuffles(ShuffleVectorInst &Shuf) {
 }
 
 Instruction *InstCombiner::visitShuffleVectorInst(ShuffleVectorInst &SVI) {
+  //Disable InstCombine for shuffle vectors if they are of scalable vector type.
+  //TODO: Disable selectively at more fine grained level. 
+  if (SVI.getType()->getVectorIsScalable())
+    return nullptr;
   Value *LHS = SVI.getOperand(0);
   Value *RHS = SVI.getOperand(1);
   if (auto *V = SimplifyShuffleVectorInst(

@@ -4166,6 +4166,9 @@ static Value *foldIdentityShuffles(int DestElt, Value *Op0, Value *Op1,
   if (!MaxRecurse--)
     return nullptr;
 
+  if (Op0->getType()->getVectorIsScalable())
+    return nullptr;
+
   // Bail out if any mask value is undefined. That kind of shuffle may be
   // simplified further based on demanded bits or other folds.
   if (MaskVal == -1)
@@ -4270,6 +4273,8 @@ static Value *SimplifyShuffleVectorInst(Value *Op0, Value *Op1, Constant *Mask,
   // corresponding element of a single root vector. If so, we don't need this
   // shuffle. This handles simple identity shuffles as well as chains of
   // shuffles that may widen/narrow and/or move elements across lanes and back.
+  // Note that for scalable vectors, since we do not know the actual number of 
+  // elements, we cannot determine shuffle identity. 
   Value *RootVec = nullptr;
   for (unsigned i = 0; i != MaskNumElts; ++i) {
     // Note that recursion is limited for each vector element, so if any element
