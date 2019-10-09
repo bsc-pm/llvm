@@ -128,22 +128,6 @@ endif()
 set(LLDB_DOTEST_ARGS ${LLDB_TEST_COMMON_ARGS};${LLDB_TEST_USER_ARGS})
 set_property(GLOBAL PROPERTY LLDB_DOTEST_ARGS_PROPERTY ${LLDB_DOTEST_ARGS})
 
-add_custom_target(check-lldb)
-add_dependencies(check-lldb lldb-test-deps)
-set_target_properties(check-lldb PROPERTIES FOLDER "lldb misc")
-
-# LLD is required to link test executables on Windows.
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  if (TARGET lld)
-    add_lldb_test_dependency(lld)
-  else ()
-    message(WARNING "lld required to test LLDB on Windows")
-  endif ()
-endif ()
-
-# Run the lit-style tests and the unittests as part of the check-lldb target.
-add_dependencies(check-lldb check-lldb-lit)
-
 # This will add LLDB's test dependencies to the dependencies for check-all and
 # include them in the test-depends target.
 set_property(GLOBAL APPEND PROPERTY LLVM_LIT_DEPENDS ${ARG_DEPENDS})

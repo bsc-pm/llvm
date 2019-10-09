@@ -63,6 +63,11 @@ add_lldb_test_dependency(
 
 if(TARGET lld)
   add_lldb_test_dependency(lld)
+else()
+  # LLD is required to link test executables on Windows.
+  if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+    message(WARNING "lld required to test LLDB on Windows")
+  endif()
 endif()
 
 # the value is not canonicalized within LLVM
@@ -85,6 +90,11 @@ configure_lit_site_cfg(
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/API/lit.site.cfg.in
   ${CMAKE_CURRENT_BINARY_DIR}/API/lit.site.cfg)
+configure_lit_site_cfg(
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
+  MAIN_CONFIG
+  ${CMAKE_CURRENT_SOURCE_DIR}/Shell/lit.cfg.py)
 
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/Shell/lit-lldb-init.in
@@ -98,6 +108,12 @@ if(NOT LLDB_BUILT_STANDALONE)
   )
 endif()
 
+
+add_lit_testsuites(LLDB
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS lldb-test-deps
+  )
+
 add_lit_testsuite(check-lldb-lit "Running lldb lit test suite"
   ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS lldb-test-deps
@@ -105,13 +121,7 @@ add_lit_testsuite(check-lldb-lit "Running lldb lit test suite"
 
 set_target_properties(check-lldb-lit PROPERTIES FOLDER "lldb tests")
 
-# If we're building with an in-tree clang, then list clang as a dependency
-# to run tests.
-if (TARGET clang)
-  add_dependencies(check-lldb-lit clang)
-endif()
-
-add_lit_testsuites(LLDB
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  DEPENDS lldb-test-deps
-  )
+add_custom_target(check-lldb)
+add_dependencies(check-lldb lldb-test-deps)
+set_target_properties(check-lldb PROPERTIES FOLDER "lldb misc")
+add_dependencies(check-lldb check-lldb-lit)
