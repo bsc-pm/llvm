@@ -476,13 +476,12 @@ bool removeDuplicateVSETVLI(MachineBasicBlock &MBB) {
 } // namespace
 
 bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
+  if (skipFunction(F.getFunction()) || DisableRemoveVSETVL)
+    return false;
 
   LLVM_DEBUG(
       dbgs() << "********** Begin remove redundant VSETVLI phase on function '"
              << F.getName() << "' **********\n\n");
-
-  if (skipFunction(F.getFunction()) || DisableRemoveVSETVL)
-    return false;
 
   const MachineRegisterInfo &MRI = F.getRegInfo();
   assert(MRI.isSSA());
@@ -491,26 +490,37 @@ bool EPIRemoveRedundantVSETVL::runOnMachineFunction(MachineFunction &F) {
   bool IsFunctionModified = false;
 
   for (MachineBasicBlock &MBB : F) {
-    IsFunctionModified |= forwardCompatibleAVL(MBB, MRI);
-    LLVM_DEBUG(dbgs() << "--- BB dump after forwardCompatibleAVL ---";
-               MBB.dump(); dbgs() << "\n");
+    bool ForwardedAVL = forwardCompatibleAVL(MBB, MRI);
+    if (ForwardedAVL) {
+      LLVM_DEBUG(dbgs() << "--- BB dump after forwardCompatibleAVL ---";
+                 MBB.dump(); dbgs() << "\n");
+    }
 
-    IsFunctionModified |= forwardCompatibleGVL(MBB, MRI);
-    LLVM_DEBUG(dbgs() << "--- BB dump after forwardCompatibleGVL ---";
-               MBB.dump(); dbgs() << "\n");
+    bool ForwardedGVL = forwardCompatibleGVL(MBB, MRI);
+    if (ForwardedGVL) {
+      LLVM_DEBUG(dbgs() << "--- BB dump after forwardCompatibleGVL ---";
+                 MBB.dump(); dbgs() << "\n");
+    }
 
-    IsFunctionModified |= removeDuplicateVSETVLI(MBB);
-    LLVM_DEBUG(dbgs() << "--- BB dump after removeDuplicateVSETVLI ---";
-               MBB.dump(); dbgs() << "\n");
+    bool RemovedDuplicates = removeDuplicateVSETVLI(MBB);
+    if (RemovedDuplicates) {
+      LLVM_DEBUG(dbgs() << "--- BB dump after removeDuplicateVSETVLI ---";
+                 MBB.dump(); dbgs() << "\n");
+    }
+
+    IsFunctionModified |= ForwardedAVL || ForwardedGVL || RemovedDuplicates;
   }
 
   LiveVariables LV;
   LV.runOnMachineFunction(F);
 
   for (MachineBasicBlock &MBB : F) {
-    IsFunctionModified |= removeDeadVSETVLInstructions(MBB, MRI);
-    LLVM_DEBUG(dbgs() << "--- BB dump after removeDeadVSETVLInstructions ---";
-               MBB.dump(); dbgs() << "\n");
+    bool RemovedDeadInstrs = removeDeadVSETVLInstructions(MBB, MRI);
+    if (RemovedDeadInstrs) {
+      LLVM_DEBUG(dbgs() << "--- BB dump after removeDeadVSETVLInstructions ---";
+                 MBB.dump(); dbgs() << "\n");
+      IsFunctionModified = true;
+    }
   }
 
   LLVM_DEBUG(
