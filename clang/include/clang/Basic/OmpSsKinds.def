@@ -30,6 +30,9 @@
 #ifndef OMPSS_DEPEND_KIND
 #define OMPSS_DEPEND_KIND(Name)
 #endif
+#ifndef OMPSS_CLAUSE_ALIAS
+#define OMPSS_CLAUSE_ALIAS(Alias, Name)
+#endif
 
 // OmpSs directives.
 OMPSS_DIRECTIVE(task)
@@ -54,6 +57,14 @@ OMPSS_DEPEND_KIND(out)
 OMPSS_DEPEND_KIND(inout)
 OMPSS_DEPEND_KIND(weak)
 
+// OmpSs-2 'depend' syntax aliases
+OMPSS_CLAUSE_ALIAS(in, depend)
+OMPSS_CLAUSE_ALIAS(out, depend)
+OMPSS_CLAUSE_ALIAS(inout, depend)
+OMPSS_CLAUSE_ALIAS(weakin, depend)
+OMPSS_CLAUSE_ALIAS(weakout, depend)
+OMPSS_CLAUSE_ALIAS(weakinout, depend)
+
 // Clauses allowed for OmpSs directive 'task'.
 OMPSS_TASK_CLAUSE(if)
 OMPSS_TASK_CLAUSE(final)
@@ -62,10 +73,17 @@ OMPSS_TASK_CLAUSE(private)
 OMPSS_TASK_CLAUSE(firstprivate)
 OMPSS_TASK_CLAUSE(shared)
 OMPSS_TASK_CLAUSE(depend)
+OMPSS_TASK_CLAUSE(in)
+OMPSS_TASK_CLAUSE(out)
+OMPSS_TASK_CLAUSE(inout)
+OMPSS_TASK_CLAUSE(weakin)
+OMPSS_TASK_CLAUSE(weakout)
+OMPSS_TASK_CLAUSE(weakinout)
 
 #undef OMPSS_DEPEND_KIND
 #undef OMPSS_DEFAULT_KIND
 #undef OMPSS_DIRECTIVE
 #undef OMPSS_DIRECTIVE_EXT
+#undef OMPSS_CLAUSE_ALIAS
 #undef OMPSS_CLAUSE
 #undef OMPSS_TASK_CLAUSE

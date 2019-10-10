@@ -759,7 +759,8 @@ OSSClause *
 Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                              SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                              SourceLocation StartLoc,
-                             SourceLocation LParenLoc, SourceLocation EndLoc) {
+                             SourceLocation LParenLoc, SourceLocation EndLoc,
+                             bool OSSSyntax) {
   if (DepKinds.size() == 2) {
     int numWeaks = 0;
     int numUnk = 0;
@@ -821,7 +822,8 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     }
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                 DepKinds, DepLoc, ColonLoc, VarList);
+                                 DepKinds, DepLoc, ColonLoc, VarList,
+                                 OSSSyntax);
 }
 
 OSSClause *
@@ -845,6 +847,33 @@ Sema::ActOnOmpSsVarListClause(
   case OSSC_depend:
     Res = ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_in:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_in }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_out:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_out }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_inout:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_weakin:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_in, OSSC_DEPEND_weak },
+                                 DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_weakout:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_out, OSSC_DEPEND_weak },
+                                 DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_weakinout:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout, OSSC_DEPEND_weak },
+                                 DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");

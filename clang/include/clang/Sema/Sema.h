@@ -9969,7 +9969,7 @@ public:
   ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                           SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                           SourceLocation StartLoc, SourceLocation LParenLoc,
-                          SourceLocation EndLoc);
+                          SourceLocation EndLoc, bool OSSSyntax = false);
 
   OSSClause *ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                         Expr *Expr,

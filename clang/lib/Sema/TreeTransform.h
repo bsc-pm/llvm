@@ -1571,9 +1571,9 @@ public:
   RebuildOSSDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                          SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                          SourceLocation StartLoc, SourceLocation LParenLoc,
-                         SourceLocation EndLoc) {
+                         SourceLocation EndLoc, bool OSSSyntax) {
     return getSema().ActOnOmpSsDependClause(DepKinds, DepLoc, ColonLoc, VarList,
-                                            StartLoc, LParenLoc, EndLoc);
+                                            StartLoc, LParenLoc, EndLoc, OSSSyntax);
   }
 
   /// Build a new OmpSs 'shared' clause.
@@ -9432,7 +9432,7 @@ TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
 
   return getDerived().RebuildOSSDependClause(
       C->getDependencyKind(), C->getDependencyLoc(), C->getColonLoc(), Vars,
-      C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+      C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc(), C->isOSSSyntax());
 }
 
 template <typename Derived>

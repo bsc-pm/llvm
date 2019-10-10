@@ -543,6 +543,9 @@ class OSSDependClause final
   /// Colon location.
   SourceLocation ColonLoc;
 
+  /// OpenMP or OmpSs-2 syntax.
+  bool OSSSyntax;
+
   /// Build clause with number of variables \a N.
   ///
   /// \param StartLoc Starting location of the clause.
@@ -550,9 +553,10 @@ class OSSDependClause final
   /// \param EndLoc Ending location of the clause.
   /// \param N Number of the variables in the clause.
   OSSDependClause(SourceLocation StartLoc, SourceLocation LParenLoc,
-                  SourceLocation EndLoc, unsigned N)
+                  SourceLocation EndLoc, unsigned N, bool OSSSyntax)
       : OSSVarListClause<OSSDependClause>(OSSC_depend, StartLoc, LParenLoc,
-                                          EndLoc, N) {}
+                                          EndLoc, N), OSSSyntax(OSSSyntax)
+                                          {}
 
   /// Build an empty clause.
   ///
@@ -560,7 +564,8 @@ class OSSDependClause final
   explicit OSSDependClause(unsigned N)
       : OSSVarListClause<OSSDependClause>(OSSC_depend, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
-                                          N), DepKinds(1, OSSC_DEPEND_unknown)
+                                          N), DepKinds(1, OSSC_DEPEND_unknown),
+                                          OSSSyntax(false)
                                           {}
 
   /// Set dependency kind.
@@ -587,13 +592,15 @@ public:
   /// \param DepLoc Location of the dependency type.
   /// \param ColonLoc Colon location.
   /// \param VL List of references to the variables.
+  /// \param OSSSyntax True if it's an OmpSs-2 depend clause (i.e. weakin())
   /// clause.
   static OSSDependClause *Create(const ASTContext &C, SourceLocation StartLoc,
                                  SourceLocation LParenLoc,
                                  SourceLocation EndLoc,
                                  ArrayRef<OmpSsDependClauseKind> DepKinds,
                                  SourceLocation DepLoc, SourceLocation ColonLoc,
-                                 ArrayRef<Expr *> VL);
+                                 ArrayRef<Expr *> VL,
+                                 bool OSSSyntax);
 
   /// Creates an empty clause with \a N variables.
   ///
@@ -609,6 +616,8 @@ public:
 
   /// Get colon location.
   SourceLocation getColonLoc() const { return ColonLoc; }
+
+  bool isOSSSyntax() const { return OSSSyntax; }
 
   child_range children() {
     return child_range(reinterpret_cast<Stmt **>(varlist_begin()),

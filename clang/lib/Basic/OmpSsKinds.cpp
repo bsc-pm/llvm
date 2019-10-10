@@ -48,6 +48,7 @@ const char *clang::getOmpSsDirectiveName(OmpSsDirectiveKind Kind) {
 OmpSsClauseKind clang::getOmpSsClauseKind(StringRef Str) {
   return llvm::StringSwitch<OmpSsClauseKind>(Str)
 #define OMPSS_CLAUSE(Name, Class) .Case(#Name, OSSC_##Name)
+#define OMPSS_CLAUSE_ALIAS(Alias, Name) .Case(#Alias, OSSC_##Alias)
 #include "clang/Basic/OmpSsKinds.def"
       .Default(OSSC_unknown);
 }
@@ -60,6 +61,9 @@ const char *clang::getOmpSsClauseName(OmpSsClauseKind Kind) {
 #define OMPSS_CLAUSE(Name, Class)                                             \
   case OSSC_##Name:                                                            \
     return #Name;
+#define OMPSS_CLAUSE_ALIAS(Alias, Name)                                       \
+  case OSSC_##Alias:                                                           \
+    return #Alias;
 #include "clang/Basic/OmpSsKinds.def"
   }
   llvm_unreachable("Invalid OmpSs clause kind");

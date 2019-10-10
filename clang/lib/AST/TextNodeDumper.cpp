@@ -337,6 +337,11 @@ void TextNodeDumper::Visit(const OSSClause *C) {
   dumpSourceRange(SourceRange(C->getBeginLoc(), C->getEndLoc()));
   if (C->isImplicit())
     OS << " <implicit>";
+
+  if (const OSSDependClause *DC = dyn_cast<OSSDependClause>(C)) {
+    if (DC->isOSSSyntax())
+      OS << " <oss syntax>";
+  }
 }
 
 void TextNodeDumper::Visit(const GenericSelectionExpr::ConstAssociation &A) {

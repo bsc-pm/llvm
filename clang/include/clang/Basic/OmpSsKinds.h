@@ -33,6 +33,8 @@ enum OmpSsDirectiveKind {
 enum OmpSsClauseKind {
 #define OMPSS_CLAUSE(Name, Class) \
   OSSC_##Name,
+#define OMPSS_CLAUSE_ALIAS(Alias, Name) \
+  OSSC_##Alias,
 #include "clang/Basic/OmpSsKinds.def"
   OSSC_unknown
 };

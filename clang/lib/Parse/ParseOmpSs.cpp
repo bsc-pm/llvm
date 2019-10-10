@@ -124,10 +124,12 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 ///    clause:
 ///       depend-clause | if-clause | final-clause
 ///       | default-clause | shared-clause | private-clause
-///       | firstprivate-clause
+///       | firstprivate-clause | in-clause | out-clause
+///       | inout-clause | weakin-clause | weakout-clause
+///       | weakinout-clause
 ///
 OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
-                                     OmpSsClauseKind CKind, bool FirstClause) {
+                                    OmpSsClauseKind CKind, bool FirstClause) {
   OSSClause *Clause = nullptr;
   bool ErrorFound = false;
   bool WrongDirective = false;
@@ -162,6 +164,12 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_depend:
+  case OSSC_in:
+  case OSSC_out:
+  case OSSC_inout:
+  case OSSC_weakin:
+  case OSSC_weakout:
+  case OSSC_weakinout:
     Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
   case OSSC_unknown:
@@ -175,9 +183,9 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
 
 /// Parses clauses with list.
 bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
-                                OmpSsClauseKind Kind,
-                                SmallVectorImpl<Expr *> &Vars,
-                                OmpSsVarListDataTy &Data) {
+                               OmpSsClauseKind Kind,
+                               SmallVectorImpl<Expr *> &Vars,
+                               OmpSsVarListDataTy &Data) {
   // Parse '('.
   BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
   if (T.expectAndConsume(diag::err_expected_lparen_after,
@@ -228,9 +236,14 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                              Data.DepKinds.end(),
                              OSSC_DEPEND_unknown);
 
+  // IsComma init determine if we got a well-formed clause
   bool IsComma = (Kind != OSSC_depend)
                  || (Kind == OSSC_depend && DepKindIt == Data.DepKinds.end());
-
+  // We parse the locator-list when:
+  // 1. If we found out something that seems a valid item regardless
+  //    of the clause validity
+  // 2. We got a well-formed clause regardless what comes next.
+  // while (IsComma || Tok.looks_like_valid_item)
   while (IsComma || (Tok.isNot(tok::r_paren) && Tok.isNot(tok::colon) &&
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
     // Parse variable
@@ -256,9 +269,10 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   Data.RLoc = Tok.getLocation();
   if (!T.consumeClose())
     Data.RLoc = T.getCloseLocation();
+  // return Well-formed clause but empty list
   return (Kind == OSSC_depend
-          && DepKindIt == Data.DepKinds.end()
-          && Vars.empty());
+          && DepKindIt == Data.DepKinds.end() && Vars.empty())
+          || (Kind != OSSC_depend && Vars.empty());
 }
 
 /// Parsing of OmpSs
@@ -272,6 +286,18 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 ///       'firstprivate' '(' list ')'
 ///    shared-clause:
 ///       'shared' '(' list ')'
+///    in-clause:
+///       'in' '(' list ')'
+///    out-clause:
+///       'out' '(' list ')'
+///    inout-clause:
+///       'inout' '(' list ')'
+///    weakin-clause:
+///       'weakin' '(' list ')'
+///    weakout-clause:
+///       'weakout' '(' list ')'
+///    weakinout-clause:
+///       'weakinout' '(' list ')'
 OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
                                            OmpSsClauseKind Kind,
                                            bool ParseOnly) {
@@ -280,7 +306,10 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   SmallVector<Expr *, 4> Vars;
   OmpSsVarListDataTy Data;
 
-  Actions.AllowShapings = (Kind == OSSC_depend);
+  Actions.AllowShapings =
+    (Kind == OSSC_depend
+     || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
+     || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout);
 
   if (ParseOmpSsVarList(DKind, Kind, Vars, Data)) {
     Actions.AllowShapings = false;

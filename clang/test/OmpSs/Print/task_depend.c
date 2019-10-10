@@ -4,7 +4,8 @@
 int array[10][10];
 int main(void) {
     int a;
-    #pragma oss task depend(out : a)
+    int b;
+    #pragma oss task depend(out : a) out(b)
     {}
     #pragma oss task depend(out : array[0 : 5])
     {}
@@ -18,7 +19,7 @@ int main(void) {
     {}
 }
 
-// CHECK:       #pragma oss task depend(out : a)
+// CHECK:       #pragma oss task depend(out : a) out(b)
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 // CHECK-NEXT: #pragma oss task depend(out : array[0:5])

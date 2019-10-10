@@ -720,19 +720,27 @@ void OSSClausePrinter::VisitOSSSharedClause(OSSSharedClause *Node) {
 }
 
 void OSSClausePrinter::VisitOSSDependClause(OSSDependClause *Node) {
-  OS << "depend(";
-  OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                     Node->getDependencyKind()[0]);
-  if (Node->getDependencyKind().size() == 2) {
-    OS << " ,";
+  if (Node->isOSSSyntax()) {
     OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                       Node->getDependencyKind()[1]);
+                                       Node->getDependencyKind()[0]);
+    if (!Node->varlist_empty()) {
+      VisitOSSClauseList(Node, '(');
+    }
+  } else {
+    OS << "depend(";
+    OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
+                                       Node->getDependencyKind()[0]);
+    if (Node->getDependencyKind().size() == 2) {
+      OS << " ,";
+      OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
+                                         Node->getDependencyKind()[1]);
+    }
+    if (!Node->varlist_empty()) {
+      OS << " :";
+      VisitOSSClauseList(Node, ' ');
+    }
   }
 
-  if (!Node->varlist_empty()) {
-    OS << " :";
-    VisitOSSClauseList(Node, ' ');
-  }
   OS << ")";
 }
 

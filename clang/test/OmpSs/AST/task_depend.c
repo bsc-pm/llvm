@@ -275,3 +275,18 @@ void foo5(int *p, int n) {
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:49> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:36> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
 
+void foo6(int *p, int n) {
+    #pragma oss task in(p) out(n)
+    {}
+}
+
+// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:279:13, col:34>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:22, col:26> <oss syntax>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:25> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:28, col:33> <oss syntax>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:32> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
+// CHECK-NEXT: OSSFirstprivateClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:25> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:32> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
+
