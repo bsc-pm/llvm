@@ -23,6 +23,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TableGenBackends.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/None.h"
@@ -331,6 +332,17 @@ class Intrinsic {
 
   NeonEmitter &Emitter;
   std::stringstream OS;
+
+  bool isBigEndianSafe() const {
+    if (BigEndianSafe)
+      return true;
+
+    for (const auto &T : Types){
+      if (T.isVector() && T.getNumElements() > 1)
+        return false;
+    }
+    return true;
+  }
 
 public:
   Intrinsic(Record *R, StringRef Name, StringRef Proto, TypeSpec OutTS,
@@ -1293,7 +1305,7 @@ void Intrinsic::emitReverseVariable(Variable &Dest, Variable &Src) {
 }
 
 void Intrinsic::emitArgumentReversal() {
-  if (BigEndianSafe)
+  if (isBigEndianSafe())
     return;
 
   // Reverse all vector arguments.
@@ -1314,7 +1326,7 @@ void Intrinsic::emitArgumentReversal() {
 }
 
 void Intrinsic::emitReturnReversal() {
-  if (BigEndianSafe)
+  if (isBigEndianSafe())
     return;
   if (!getReturnType().isVector() || getReturnType().isVoid() ||
       getReturnType().getNumElements() == 1)
@@ -1578,7 +1590,10 @@ std::pair<Type, std::string> Intrinsic::DagEmitter::emitDagCall(DagInit *DI) {
   Intr.Dependencies.insert(&Callee);
 
   // Now create the call itself.
-  std::string S = CallPrefix.str() + Callee.getMangledName(true) + "(";
+  std::string S = "";
+  if (!Callee.isBigEndianSafe())
+    S += CallPrefix.str();
+  S += Callee.getMangledName(true) + "(";
   for (unsigned I = 0; I < DI->getNumArgs() - 1; ++I) {
     if (I != 0)
       S += ", ";
@@ -1889,6 +1904,11 @@ Intrinsic::DagEmitter::emitDagArg(Init *Arg, std::string ArgName) {
 }
 
 std::string Intrinsic::generate() {
+  // Avoid duplicated code for big and little endian
+  if (isBigEndianSafe()) {
+    generateImpl(false, "", "");
+    return OS.str();
+  }
   // Little endian intrinsics are simple and don't require any argument
   // swapping.
   OS << "#ifdef __LITTLE_ENDIAN__\n";
@@ -2610,22 +2630,18 @@ void NeonEmitter::runFP16(raw_ostream &OS) {
   OS << "#endif /* __ARM_FP16_H */\n";
 }
 
-namespace clang {
-
-void EmitNeon(RecordKeeper &Records, raw_ostream &OS) {
+void clang::EmitNeon(RecordKeeper &Records, raw_ostream &OS) {
   NeonEmitter(Records).run(OS);
 }
 
-void EmitFP16(RecordKeeper &Records, raw_ostream &OS) {
+void clang::EmitFP16(RecordKeeper &Records, raw_ostream &OS) {
   NeonEmitter(Records).runFP16(OS);
 }
 
-void EmitNeonSema(RecordKeeper &Records, raw_ostream &OS) {
+void clang::EmitNeonSema(RecordKeeper &Records, raw_ostream &OS) {
   NeonEmitter(Records).runHeader(OS);
 }
 
-void EmitNeonTest(RecordKeeper &Records, raw_ostream &OS) {
+void clang::EmitNeonTest(RecordKeeper &Records, raw_ostream &OS) {
   llvm_unreachable("Neon test generation no longer implemented!");
 }
-
-} // end namespace clang

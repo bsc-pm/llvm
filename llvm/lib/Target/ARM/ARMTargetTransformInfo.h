@@ -106,20 +106,6 @@ public:
     return !ST->isTargetDarwin() && !ST->hasMVEFloatOps();
   }
 
-  bool isLegalMaskedLoad(Type *DataTy) {
-    if (!ST->hasMVEIntegerOps())
-      return false;
-
-    unsigned VecWidth = DataTy->getPrimitiveSizeInBits();
-    if (VecWidth != 128)
-      return false;
-
-    unsigned EltWidth = DataTy->getScalarSizeInBits();
-    return EltWidth == 32 || EltWidth == 16 || EltWidth == 8;
-  }
-
-  bool isLegalMaskedStore(Type *DataTy) { return isLegalMaskedLoad(DataTy); }
-
   /// \name Scalar TTI Implementations
   /// @{
 
@@ -165,6 +151,9 @@ public:
   unsigned getMaxInterleaveFactor(unsigned VF) {
     return ST->getMaxInterleaveFactor();
   }
+
+  bool isLegalMaskedLoad(Type *DataTy);
+  bool isLegalMaskedStore(Type *DataTy) { return isLegalMaskedLoad(DataTy); }
 
   int getMemcpyCost(const Instruction *I);
 

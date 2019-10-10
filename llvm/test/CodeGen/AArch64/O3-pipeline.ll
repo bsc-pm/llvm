@@ -97,9 +97,11 @@
 ; CHECK-NEXT:       Early If-Conversion
 ; CHECK-NEXT:       AArch64 Store Pair Suppression
 ; CHECK-NEXT:       AArch64 SIMD instructions optimization pass
+; CHECK-NEXT:       AArch64 Stack Tagging PreRA
 ; CHECK-NEXT:       MachineDominator Tree Construction
 ; CHECK-NEXT:       Machine Natural Loop Construction
 ; CHECK-NEXT:       Early Machine Loop Invariant Code Motion
+; CHECK-NEXT:       MachineDominator Tree Construction
 ; CHECK-NEXT:       Machine Block Frequency Analysis
 ; CHECK-NEXT:       Machine Common Subexpression Elimination
 ; CHECK-NEXT:       MachinePostDominator Tree Construction
@@ -113,6 +115,7 @@
 ; CHECK-NEXT:       Live Variable Analysis
 ; CHECK-NEXT:       Eliminate PHI nodes for register allocation
 ; CHECK-NEXT:       Two-Address instruction pass
+; CHECK-NEXT:       MachineDominator Tree Construction
 ; CHECK-NEXT:       Slot index numbering
 ; CHECK-NEXT:       Live Interval Analysis
 ; CHECK-NEXT:       Simple Register Coalescing

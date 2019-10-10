@@ -1486,7 +1486,7 @@ DeduceTemplateArgumentsByTypeMatch(Sema &S,
 #define NON_CANONICAL_TYPE(Class, Base) \
   case Type::Class: llvm_unreachable("deducing non-canonical type: " #Class);
 #define TYPE(Class, Base)
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
 
     case Type::TemplateTypeParm:
     case Type::SubstTemplateTypeParmPack:
@@ -3093,6 +3093,13 @@ Sema::SubstituteExplicitTemplateArguments(
                   Function->getTypeSpecStartLoc(), Function->getDeclName());
     if (ResultType.isNull() || Trap.hasErrorOccurred())
       return TDK_SubstitutionFailure;
+    // CUDA: Kernel function must have 'void' return type.
+    if (getLangOpts().CUDA)
+      if (Function->hasAttr<CUDAGlobalAttr>() && !ResultType->isVoidType()) {
+        Diag(Function->getLocation(), diag::err_kern_type_not_void_return)
+            << Function->getType() << Function->getSourceRange();
+        return TDK_SubstitutionFailure;
+      }
   }
 
   // Instantiate the types of each of the function parameters given the
@@ -3701,6 +3708,12 @@ static Sema::TemplateDeductionResult DeduceFromInitializerList(
     //   considered a non-deduced context
     return Sema::TDK_Success;
   }
+
+  // Resolving a core issue: a braced-init-list containing any designators is
+  // a non-deduced context.
+  for (Expr *E : ILE->inits())
+    if (isa<DesignatedInitExpr>(E))
+      return Sema::TDK_Success;
 
   // Deduction only needs to be done for dependent types.
   if (ElTy->isDependentType()) {
@@ -4508,6 +4521,12 @@ Sema::DeduceAutoType(TypeLoc Type, Expr *&Init, QualType &Result,
     // references results in std::initializer_list<T>.
     if (!Type.getType().getNonReferenceType()->getAs<AutoType>())
       return DAR_Failed;
+
+    // Resolving a core issue: a braced-init-list containing any designators is
+    // a non-deduced context.
+    for (Expr *E : InitList->inits())
+      if (isa<DesignatedInitExpr>(E))
+        return DAR_Failed;
 
     SourceRange DeducedFromInitRange;
     for (unsigned i = 0, e = InitList->getNumInits(); i < e; ++i) {
@@ -5596,7 +5615,7 @@ MarkUsedTemplateParameters(ASTContext &Ctx, QualType T,
 #define ABSTRACT_TYPE(Class, Base)
 #define DEPENDENT_TYPE(Class, Base)
 #define NON_CANONICAL_TYPE(Class, Base) case Type::Class:
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
     break;
   }
 }

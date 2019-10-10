@@ -3272,7 +3272,7 @@ ExprResult Parser::TryParseOSSArrayShaping() {
     }
 
     // Parse whatever between []
-    Diags.setSuppressAllDiagnostics();
+    Diags.setSuppressAllDiagnostics(true);
     Actions.CorrectDelayedTyposInExpr(ParseExpression());
     Diags.setSuppressAllDiagnostics(false);
 

@@ -635,8 +635,9 @@ struct OmpSs : public ModulePass {
     };
 
     // 4. Extract region the way we want
+    CodeExtractorAnalysisCache CEAC(F);
     CodeExtractor CE(TaskBBs.getArrayRef(), rewriteOutToInTaskBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
-    CE.extractCodeRegion();
+    CE.extractCodeRegion(CEAC);
 
     TI.Exit->eraseFromParent();
     TI.Entry->eraseFromParent();
