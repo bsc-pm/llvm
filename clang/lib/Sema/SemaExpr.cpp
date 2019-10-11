@@ -4592,8 +4592,8 @@ ExprResult Sema::ActOnOMPArraySectionExpr(Expr *Base, SourceLocation LBLoc,
 
 ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
                                           Expr *LowerBound,
-                                          SourceLocation ColonLoc, Expr *Length,
-                                          SourceLocation RBLoc) {
+                                          SourceLocation ColonLoc, Expr *LengthUpper,
+                                          SourceLocation RBLoc, bool ColonForm) {
 
   if (Base->getType()->isPlaceholderType() &&
       !Base->getType()->isSpecificPlaceholderType(
@@ -4612,24 +4612,24 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
       return ExprError();
     LowerBound = Result.get();
   }
-  if (Length && Length->getType()->isNonOverloadPlaceholderType()) {
-    ExprResult Result = CheckPlaceholderExpr(Length);
+  if (LengthUpper && LengthUpper->getType()->isNonOverloadPlaceholderType()) {
+    ExprResult Result = CheckPlaceholderExpr(LengthUpper);
     if (Result.isInvalid())
       return ExprError();
     Result = DefaultLvalueConversion(Result.get());
     if (Result.isInvalid())
       return ExprError();
-    Length = Result.get();
+    LengthUpper = Result.get();
   }
 
   // Build an unanalyzed expression if either operand is type-dependent.
   if (Base->isTypeDependent() ||
       (LowerBound &&
        (LowerBound->isTypeDependent() || LowerBound->isValueDependent())) ||
-      (Length && (Length->isTypeDependent() || Length->isValueDependent()))) {
+      (LengthUpper && (LengthUpper->isTypeDependent() || LengthUpper->isValueDependent()))) {
     return new (Context)
-        OSSArraySectionExpr(Base, LowerBound, Length, Context.DependentTy,
-                            VK_LValue, OK_Ordinary, ColonLoc, RBLoc);
+        OSSArraySectionExpr(Base, LowerBound, LengthUpper, Context.DependentTy,
+                            VK_LValue, OK_Ordinary, ColonLoc, RBLoc, ColonForm);
   }
 
   // Perform default conversions.
@@ -4667,22 +4667,22 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
       Diag(LowerBound->getExprLoc(), diag::warn_oss_section_is_char)
           << 0 << LowerBound->getSourceRange();
   }
-  if (Length) {
+  if (LengthUpper) {
     auto Res =
-        PerformOmpSsImplicitIntegerConversion(Length->getExprLoc(), Length);
+        PerformOmpSsImplicitIntegerConversion(LengthUpper->getExprLoc(), LengthUpper);
     if (Res.isInvalid())
       // FIXME: PerformContextualImplicitConversion doesn't always tell us if it
       // failed and produced a diagnostic.
       // From commit ef6c43dc
-      return ExprError(Diag(Length->getExprLoc(),
+      return ExprError(Diag(LengthUpper->getExprLoc(),
                             diag::err_oss_typecheck_section_not_integer)
-                       << 1 << Length->getSourceRange());
-    Length = Res.get();
+                       << 1 << LengthUpper->getSourceRange());
+    LengthUpper = Res.get();
 
-    if (Length->getType()->isSpecificBuiltinType(BuiltinType::Char_S) ||
-        Length->getType()->isSpecificBuiltinType(BuiltinType::Char_U))
-      Diag(Length->getExprLoc(), diag::warn_oss_section_is_char)
-          << 1 << Length->getSourceRange();
+    if (LengthUpper->getType()->isSpecificBuiltinType(BuiltinType::Char_S) ||
+        LengthUpper->getType()->isSpecificBuiltinType(BuiltinType::Char_U))
+      Diag(LengthUpper->getExprLoc(), diag::warn_oss_section_is_char)
+          << 1 << LengthUpper->getSourceRange();
   }
 
   // C99 6.5.2.1p1: "shall have type "pointer to *object* type". Similarly,
@@ -4713,16 +4713,16 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
     }
   }
 
-  if (Length) {
+  if (LengthUpper) {
     Expr::EvalResult Result;
-    if (Length->EvaluateAsInt(Result, Context)) {
+    if (LengthUpper->EvaluateAsInt(Result, Context)) {
       // OpenMP 4.5, [2.4 Array Sections]
       // The length must evaluate to non-negative integers.
-      llvm::APSInt LengthValue = Result.Val.getInt();
-      if (LengthValue.isNegative()) {
-        Diag(Length->getExprLoc(), diag::err_oss_section_length_negative)
-            << LengthValue.toString(/*Radix=*/10, /*Signed=*/true)
-            << Length->getSourceRange();
+      llvm::APSInt LengthUpperValue = Result.Val.getInt();
+      if (LengthUpperValue.isNegative()) {
+        Diag(LengthUpper->getExprLoc(), diag::err_oss_section_length_negative)
+            << LengthUpperValue.toString(/*Radix=*/10, /*Signed=*/true)
+            << LengthUpper->getSourceRange();
         return ExprError();
       }
     }
@@ -4746,8 +4746,8 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
   }
 
   return new (Context)
-      OSSArraySectionExpr(Base, LowerBound, Length, Context.OSSArraySectionTy,
-                          VK_LValue, OK_Ordinary, ColonLoc, RBLoc);
+      OSSArraySectionExpr(Base, LowerBound, LengthUpper, Context.OSSArraySectionTy,
+                          VK_LValue, OK_Ordinary, ColonLoc, RBLoc, ColonForm);
 }
 
 ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,

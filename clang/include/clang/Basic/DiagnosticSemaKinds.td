@@ -9920,6 +9920,8 @@ def err_oss_section_length_undefined : Error<
   "section length is unspecified and cannot be inferred because subscripted value is %select{not an array|an array of unknown bound}0">;
 def err_oss_section_only_one_pointer_level : Error<
   "pointer types only allow one-level array sections">;
+def err_oss_section_invalid_form : Error<
+  "array section form is not valid in 'depend' clause">;
 def err_oss_typecheck_shaping_base_no_ptr_or_array: Error<
   "shaping expression base is not a pointer or array">;
 def err_oss_shape_incomplete_type : Error<

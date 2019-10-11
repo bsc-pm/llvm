@@ -40,6 +40,7 @@ namespace {
 class OSSDependVisitor
   : public ConstStmtVisitor<OSSDependVisitor, void> {
   CodeGenFunction &CGF;
+  bool OSSSyntax;
 
   llvm::Type *OSSArgTy;
 
@@ -51,8 +52,8 @@ class OSSDependVisitor
 
 public:
 
-  OSSDependVisitor(CodeGenFunction &CGF)
-    : CGF(CGF),
+  OSSDependVisitor(CodeGenFunction &CGF, bool OSSSyntax)
+    : CGF(CGF), OSSSyntax(OSSSyntax),
       OSSArgTy(CGF.ConvertType(CGF.getContext().LongTy))
       {}
 
@@ -191,21 +192,35 @@ public:
         Idx = llvm::ConstantInt::getSigned(OSSArgTy, 0);
       Idx = CGF.Builder.CreateSExt(Idx, OSSArgTy);
 
-      const Expr *Size = ASE->getLength();
-      if (Size) {
-        IdxEnd = CGF.EmitScalarExpr(Size);
+      const Expr *LengthUpper = ASE->getLengthUpper();
+      bool ColonForm = ASE->isColonForm();
+      if (LengthUpper &&
+          (!OSSSyntax || (OSSSyntax && !ColonForm))) {
+        // depend(in: array[ : length])
+        // in(array[ ; length])
+        IdxEnd = CGF.EmitScalarExpr(LengthUpper);
         IdxEnd = CGF.Builder.CreateSExt(IdxEnd, OSSArgTy);
         IdxEnd = CGF.Builder.CreateAdd(Idx, IdxEnd);
+      } else if (LengthUpper
+                 && (OSSSyntax && ColonForm)) {
+        // in(array[ : upper])
+        IdxEnd = CGF.EmitScalarExpr(LengthUpper);
+        IdxEnd = CGF.Builder.CreateSExt(IdxEnd, OSSArgTy);
+        IdxEnd = CGF.Builder.CreateAdd(llvm::ConstantInt::getSigned(OSSArgTy, 1), IdxEnd);
       } else if (ASE->getColonLoc().isInvalid()) {
-        assert(!Size);
+        assert(!LengthUpper);
         // OSSArraySection without ':' are regular array subscripts
         IdxEnd = CGF.Builder.CreateAdd(Idx, llvm::ConstantInt::getSigned(OSSArgTy, 1));
       } else {
-        // array[lower : ] -> [lower, dimsize)
 
         // OpenMP 5.0 2.1.5
+        // depend(in: array[lower : ]) -> [lower, dimsize)
         // When the length is absent it defaults to ⌈(size - lowerbound)∕stride⌉,
         // where size is the size of the array dimension.
+        //
+        // OmpSs-2
+        // in(array[lower ; ]) -> [lower, dimsize)
+        // in(array[lower : ]) -> [lower, dimsize)
         QualType BaseOriginalTy =
           OSSArraySectionExpr::getBaseOriginalType(ASE->getBase());
 
@@ -225,8 +240,8 @@ public:
       Ends.push_back(IdxEnd);
       // If we see a Pointer we must to add one dimension and done
       if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
-        assert(Size && "Sema should have forbidden unspecified sizes in pointers");
-        Dims.push_back(CGF.Builder.CreateSExt(CGF.EmitScalarExpr(Size), OSSArgTy));
+        assert(LengthUpper && "Sema should have forbidden unspecified sizes in pointers");
+        Dims.push_back(CGF.Builder.CreateSExt(CGF.EmitScalarExpr(LengthUpper), OSSArgTy));
         break;
       }
     }
@@ -385,14 +400,14 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
   TaskInfo.emplace_back(Basename, DsaData);
 }
 
-static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const Expr *E,
+static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
                            SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   // C long -> LLVM long
   llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
 
-  OSSDependVisitor DepVisitor(CGF);
-  DepVisitor.Visit(E);
+  OSSDependVisitor DepVisitor(CGF, Dep.OSSSyntax);
+  DepVisitor.Visit(Dep.E);
 
   SmallVector<llvm::Value*, 4> DepData;
 
@@ -515,23 +530,23 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   for (const Expr *E : Data.DSAs.Firstprivates) {
     EmitDSA("QUAL.OSS.FIRSTPRIVATE", CGF, E, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.Ins) {
-    EmitDependency("QUAL.OSS.DEP.IN", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
+    EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.Outs) {
-    EmitDependency("QUAL.OSS.DEP.OUT", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
+    EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.Inouts) {
-    EmitDependency("QUAL.OSS.DEP.INOUT", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
+    EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.WeakIns) {
-    EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
+    EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.WeakOuts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
+    EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
   }
-  for (const Expr *E : Data.Deps.WeakInouts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, E, TaskInfo);
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
+    EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
   }
   if (Data.If)
     TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));

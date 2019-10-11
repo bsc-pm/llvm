@@ -435,8 +435,8 @@ public:
     IsArraySubscriptIdx = true;
     if (E->getLowerBound())
       Visit(E->getLowerBound());
-    if (E->getLength())
-      Visit(E->getLength());
+    if (E->getLengthUpper())
+      Visit(E->getLengthUpper());
     IsArraySubscriptIdx = false;
   }
 
@@ -820,6 +820,19 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
           << RefExpr->getSourceRange();
       continue;
     }
+    bool InvalidArraySection = false;
+    while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
+      if (!OASE->isColonForm() && !OSSSyntax) {
+        Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
+            << RefExpr->getSourceRange();
+        // Only diagnose the first error
+        InvalidArraySection = true;
+        break;
+      }
+      SimpleExpr = OASE->getBase()->IgnoreParenCasts();
+    }
+    if (InvalidArraySection)
+      continue;
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
                                  DepKinds, DepLoc, ColonLoc, VarList,

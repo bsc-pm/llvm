@@ -755,7 +755,7 @@ void ASTStmtReader::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
   VisitExpr(E);
   E->setBase(Record.readSubExpr());
   E->setLowerBound(Record.readSubExpr());
-  E->setLength(Record.readSubExpr());
+  E->setLengthUpper(Record.readSubExpr());
   E->setColonLoc(ReadSourceLocation());
   E->setRBracketLoc(ReadSourceLocation());
 }

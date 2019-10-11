@@ -44,36 +44,36 @@ static void AddDSAData(const OSSTaskDirective &S, SmallVectorImpl<const Expr *> 
   }
 }
 
-static void AddDSAData(const OSSTaskDirective &S, OSSDSADataTy &DSAs) {
+static void AddDSAData(const OSSTaskDirective &S, OSSTaskDSADataTy &DSAs) {
   AddDSAData<OSSSharedClause>(S, DSAs.Shareds);
   AddDSAData<OSSPrivateClause>(S, DSAs.Privates);
   AddDSAData<OSSFirstprivateClause>(S, DSAs.Firstprivates);
 };
 
-static void AddDepData(const OSSTaskDirective &S, OSSDepDataTy &Deps) {
+static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
   for (const auto *C : S.getClausesOfKind<OSSDependClause>()) {
     ArrayRef<OmpSsDependClauseKind> DepKinds = C->getDependencyKind();
     if (DepKinds.size() == 2) {
       for (const Expr *Ref : C->varlists()) {
         if (DepKinds[0] == OSSC_DEPEND_in
             || DepKinds[1] == OSSC_DEPEND_in)
-          Deps.WeakIns.push_back(Ref);
+          Deps.WeakIns.push_back({C->isOSSSyntax(), Ref});
         if (DepKinds[0] == OSSC_DEPEND_out
             || DepKinds[1] == OSSC_DEPEND_out)
-          Deps.WeakOuts.push_back(Ref);
+          Deps.WeakOuts.push_back({C->isOSSSyntax(), Ref});
         if (DepKinds[0] == OSSC_DEPEND_inout
             || DepKinds[1] == OSSC_DEPEND_inout)
-          Deps.WeakInouts.push_back(Ref);
+          Deps.WeakInouts.push_back({C->isOSSSyntax(), Ref});
       }
     }
     else {
       for (const Expr *Ref : C->varlists()) {
         if (DepKinds[0] == OSSC_DEPEND_in)
-          Deps.Ins.push_back(Ref);
+          Deps.Ins.push_back({C->isOSSSyntax(), Ref});
         if (DepKinds[0] == OSSC_DEPEND_out)
-          Deps.Outs.push_back(Ref);
+          Deps.Outs.push_back({C->isOSSSyntax(), Ref});
         if (DepKinds[0] == OSSC_DEPEND_inout)
-          Deps.Inouts.push_back(Ref);
+          Deps.Inouts.push_back({C->isOSSSyntax(), Ref});
       }
     }
   }

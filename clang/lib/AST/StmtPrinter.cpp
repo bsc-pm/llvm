@@ -1457,9 +1457,9 @@ void StmtPrinter::VisitOSSArraySectionExpr(OSSArraySectionExpr *Node) {
   if (Node->getLowerBound())
     PrintExpr(Node->getLowerBound());
   if (Node->getColonLoc().isValid()) {
-    OS << ":";
-    if (Node->getLength())
-      PrintExpr(Node->getLength());
+    OS << (Node->isColonForm() ? ":" : ";");
+    if (Node->getLengthUpper())
+      PrintExpr(Node->getLengthUpper());
   }
   OS << "]";
 }

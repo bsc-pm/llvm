@@ -32,24 +32,29 @@ class Address;
 class CodeGenFunction;
 class CodeGenModule;
 
-struct OSSDSADataTy final {
+struct OSSTaskDSADataTy final {
   SmallVector<const Expr *, 4> Shareds;
   SmallVector<const Expr *, 4> Privates;
   SmallVector<const Expr *, 4> Firstprivates;
 };
 
-struct OSSDepDataTy final {
-  SmallVector<const Expr *, 4> WeakIns;
-  SmallVector<const Expr *, 4> WeakOuts;
-  SmallVector<const Expr *, 4> WeakInouts;
-  SmallVector<const Expr *, 4> Ins;
-  SmallVector<const Expr *, 4> Outs;
-  SmallVector<const Expr *, 4> Inouts;
+struct OSSDepDataTy {
+  bool OSSSyntax;
+  const Expr *E;
+};
+
+struct OSSTaskDepDataTy final {
+  SmallVector<OSSDepDataTy, 4> WeakIns;
+  SmallVector<OSSDepDataTy, 4> WeakOuts;
+  SmallVector<OSSDepDataTy, 4> WeakInouts;
+  SmallVector<OSSDepDataTy, 4> Ins;
+  SmallVector<OSSDepDataTy, 4> Outs;
+  SmallVector<OSSDepDataTy, 4> Inouts;
 };
 
 struct OSSTaskDataTy final {
-  OSSDSADataTy DSAs;
-  OSSDepDataTy Deps;
+  OSSTaskDSADataTy DSAs;
+  OSSTaskDepDataTy Deps;
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
 };

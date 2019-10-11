@@ -4557,7 +4557,8 @@ public:
   // OmpSs
   ExprResult ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
                                       Expr *LowerBound, SourceLocation ColonLoc,
-                                      Expr *Length, SourceLocation RBLoc);
+                                      Expr *LengthUpper, SourceLocation RBLoc,
+                                      bool ColonForm = true);
   ExprResult ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
                                       SourceLocation LBLoc,
                                       SourceLocation RBLoc);

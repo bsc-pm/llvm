@@ -664,7 +664,7 @@ void ASTStmtWriter::VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
   VisitExpr(E);
   Record.AddStmt(E->getBase());
   Record.AddStmt(E->getLowerBound());
-  Record.AddStmt(E->getLength());
+  Record.AddStmt(E->getLengthUpper());
   Record.AddSourceLocation(E->getColonLoc());
   Record.AddSourceLocation(E->getRBracketLoc());
   Code = serialization::EXPR_OSS_ARRAY_SECTION;

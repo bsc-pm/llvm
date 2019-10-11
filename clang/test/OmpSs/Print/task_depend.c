@@ -9,11 +9,11 @@ int main(void) {
     {}
     #pragma oss task depend(out : array[0 : 5])
     {}
-    #pragma oss task depend(out : array[ : a])
+    #pragma oss task depend(out : array[ : a]) out(array[ ; a])
     {}
-    #pragma oss task depend(out : array[ : ])
+    #pragma oss task depend(out : array[ : ]) out(array[ ; ])
     {}
-    #pragma oss task depend(out : array[ : ][ : ])
+    #pragma oss task depend(out : array[ : ][ : ]) out(array[ ; ][ ; ])
     {}
     #pragma oss task depend(in : [1][2][3]array)
     {}
@@ -25,13 +25,13 @@ int main(void) {
 // CHECK-NEXT: #pragma oss task depend(out : array[0:5])
 // CHECK-NEXT: {
 // CHECK-NEXT: }
-// CHECK-NEXT: #pragma oss task depend(out : array[:a])
+// CHECK-NEXT: #pragma oss task depend(out : array[:a]) out(array[;a])
 // CHECK-NEXT: {
 // CHECK-NEXT: }
-// CHECK-NEXT: #pragma oss task depend(out : array[:])
+// CHECK-NEXT: #pragma oss task depend(out : array[:]) out(array[;])
 // CHECK-NEXT: {
 // CHECK-NEXT: }
-// CHECK-NEXT: #pragma oss task depend(out : array[:][:])
+// CHECK-NEXT: #pragma oss task depend(out : array[:][:]) out(array[;][;])
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 // CHECK-NEXT: #pragma oss task depend(in : [1][2][3]array)

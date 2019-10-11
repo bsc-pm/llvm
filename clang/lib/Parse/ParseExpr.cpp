@@ -1579,6 +1579,9 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       Loc = T.getOpenLocation();
       ExprResult Idx, Length;
       SourceLocation ColonLoc;
+
+      bool ColonForm = false;
+
       PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
       if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
         Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
@@ -1599,12 +1602,19 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       } else if (getLangOpts().OmpSs) {
         ColonProtectionRAIIObject RAII(*this);
         // Parse [: or [ expr or [ expr :
-        if (!Tok.is(tok::colon)) {
+        // Parse [; or [ expr or [ expr ;
+        if (!Tok.is(tok::colon) && !Tok.is(tok::semi)) {
           // [ expr
           Idx = ParseExpression();
         }
         if (Tok.is(tok::colon)) {
+          ColonForm = true;
           // Consume ':'
+          ColonLoc = ConsumeToken();
+          if (Tok.isNot(tok::r_square))
+            Length = ParseExpression();
+        } else if (Tok.is(tok::semi)) {
+          // Consume ';'
           ColonLoc = ConsumeToken();
           if (Tok.isNot(tok::r_square))
             Length = ParseExpression();
@@ -1625,7 +1635,7 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
                                                    ColonLoc, Length.get(), RLoc);
           else if (getLangOpts().OmpSs)
             LHS = Actions.ActOnOSSArraySectionExpr(LHS.get(), Loc, Idx.get(),
-                                                   ColonLoc, Length.get(), RLoc);
+                                                   ColonLoc, Length.get(), RLoc, ColonForm);
           else
             llvm_unreachable("Parsed Array Section without OpenMP or OmpSs");
         } else {

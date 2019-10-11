@@ -2388,10 +2388,10 @@ public:
   /// Subclasses may override this routine to provide different behavior.
   ExprResult RebuildOSSArraySectionExpr(Expr *Base, SourceLocation LBracketLoc,
                                         Expr *LowerBound,
-                                        SourceLocation ColonLoc, Expr *Length,
-                                        SourceLocation RBracketLoc) {
+                                        SourceLocation ColonLoc, Expr *LengthUpper,
+                                        SourceLocation RBracketLoc, bool ColonForm) {
     return getSema().ActOnOSSArraySectionExpr(Base, LBracketLoc, LowerBound,
-                                              ColonLoc, Length, RBracketLoc);
+                                              ColonLoc, LengthUpper, RBracketLoc, ColonForm);
   }
 
   /// Build a new array shaping expression.
@@ -9906,19 +9906,19 @@ TreeTransform<Derived>::TransformOSSArraySectionExpr(OSSArraySectionExpr *E) {
   }
 
   ExprResult Length;
-  if (E->getLength()) {
-    Length = getDerived().TransformExpr(E->getLength());
+  if (E->getLengthUpper()) {
+    Length = getDerived().TransformExpr(E->getLengthUpper());
     if (Length.isInvalid())
       return ExprError();
   }
 
   if (!getDerived().AlwaysRebuild() && Base.get() == E->getBase() &&
-      LowerBound.get() == E->getLowerBound() && Length.get() == E->getLength())
+      LowerBound.get() == E->getLowerBound() && Length.get() == E->getLengthUpper())
     return E;
 
   return getDerived().RebuildOSSArraySectionExpr(
       Base.get(), E->getBase()->getEndLoc(), LowerBound.get(), E->getColonLoc(),
-      Length.get(), E->getRBracketLoc());
+      Length.get(), E->getRBracketLoc(), E->isColonForm());
 }
 
 template <typename Derived>

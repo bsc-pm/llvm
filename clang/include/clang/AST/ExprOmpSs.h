@@ -17,66 +17,86 @@
 #include "clang/AST/ASTContext.h"
 
 namespace clang {
-/// OmpSs 4.0 [2.4, Array Sections].
-/// To specify an array section in an OmpSs construct, array subscript
+/// OmpSs-2 Array Sections.
+/// To specify an array section in an OmpSs-2 construct, array subscript
 /// expressions are extended with the following syntax:
 /// \code
-/// [ lower-bound : length ]
-/// [ lower-bound : ]
-/// [ : length ]
-/// [ : ]
+/// depend(in : [ lower-bound : length ])
+/// depend(in : [ lower-bound : ])
+/// depend(in : [ : length ])
+/// depend(in : [ : ])
+///
+/// in([ lower-bound ; length ])
+/// in([ lower-bound ; ])
+/// in([ ; length ])
+/// in([ ; ])
+///
+/// in([ lower-bound : upper-bound ])
+/// in([ lower-bound : ])
+/// in([ : upper-bound ])
+/// in([ : ])
+///
 /// \endcode
 /// The array section must be a subset of the original array.
 /// Array sections are allowed on multidimensional arrays. Base language array
 /// subscript expressions can be used to specify length-one dimensions of
 /// multidimensional array sections.
-/// The lower-bound and length are integral type expressions. When evaluated
-/// they represent a set of integer values as follows:
+/// The lower-bound, upper-bound and length are integral type expressions.
+/// When evaluated they represent a set of integer values as follows:
 /// \code
 /// { lower-bound, lower-bound + 1, lower-bound + 2,... , lower-bound + length -
 /// 1 }
+///
+/// { lower-bound, lower-bound + 1, lower-bound + 2,... , upper-bound }
 /// \endcode
-/// The lower-bound and length must evaluate to non-negative integers.
-/// When the size of the array dimension is not known, the length must be
-/// specified explicitly.
+/// The lower-bound, upper-bound and length must evaluate to non-negative integers.
+/// When the size of the array dimension is not known, the length/upper-bound
+/// must be specified explicitly.
 /// When the length is absent, it defaults to the size of the array dimension
 /// minus the lower-bound.
+/// When the upper-bound is absent, it defaults to the size of the
+/// array dimension - 1
 /// When the lower-bound is absent it defaults to 0.
 class OSSArraySectionExpr : public Expr {
-  enum { BASE, LOWER_BOUND, LENGTH, END_EXPR };
+  enum { BASE, LOWER_BOUND, LENGTH_UPPER, END_EXPR };
   Stmt *SubExprs[END_EXPR];
   SourceLocation ColonLoc;
   SourceLocation RBracketLoc;
+  bool ColonForm;
 
 public:
-  OSSArraySectionExpr(Expr *Base, Expr *LowerBound, Expr *Length, QualType Type,
+  OSSArraySectionExpr(Expr *Base, Expr *LowerBound, Expr *LengthUpper, QualType Type,
                       ExprValueKind VK, ExprObjectKind OK,
-                      SourceLocation ColonLoc, SourceLocation RBracketLoc)
+                      SourceLocation ColonLoc, SourceLocation RBracketLoc,
+                      bool ColonForm)
       : Expr(
             OSSArraySectionExprClass, Type, VK, OK,
             Base->isTypeDependent() ||
                 (LowerBound && LowerBound->isTypeDependent()) ||
-                (Length && Length->isTypeDependent()),
+                (LengthUpper && LengthUpper->isTypeDependent()),
             Base->isValueDependent() ||
                 (LowerBound && LowerBound->isValueDependent()) ||
-                (Length && Length->isValueDependent()),
+                (LengthUpper && LengthUpper->isValueDependent()),
             Base->isInstantiationDependent() ||
                 (LowerBound && LowerBound->isInstantiationDependent()) ||
-                (Length && Length->isInstantiationDependent()),
+                (LengthUpper && LengthUpper->isInstantiationDependent()),
             Base->containsUnexpandedParameterPack() ||
                 (LowerBound && LowerBound->containsUnexpandedParameterPack()) ||
-                (Length && Length->containsUnexpandedParameterPack())),
-        ColonLoc(ColonLoc), RBracketLoc(RBracketLoc) {
+                (LengthUpper && LengthUpper->containsUnexpandedParameterPack())),
+        ColonLoc(ColonLoc), RBracketLoc(RBracketLoc), ColonForm(ColonForm) {
     SubExprs[BASE] = Base;
     SubExprs[LOWER_BOUND] = LowerBound;
-    SubExprs[LENGTH] = Length;
+    SubExprs[LENGTH_UPPER] = LengthUpper;
   }
 
   /// Create an empty array section expression.
   explicit OSSArraySectionExpr(EmptyShell Shell)
       : Expr(OSSArraySectionExprClass, Shell) {}
 
-  /// An array section can be written only as Base[LowerBound:Length].
+  /// An array section can be written as:
+  /// Base[LowerBound : Length]
+  /// Base[LowerBound ; Length]
+  /// Base[LowerBound : UpperBound]
 
   /// Get base of the array section.
   Expr *getBase() { return cast<Expr>(SubExprs[BASE]); }
@@ -95,11 +115,14 @@ public:
   /// Set lower bound of the array section.
   void setLowerBound(Expr *E) { SubExprs[LOWER_BOUND] = E; }
 
-  /// Get length of array section.
-  Expr *getLength() { return cast_or_null<Expr>(SubExprs[LENGTH]); }
-  const Expr *getLength() const { return cast_or_null<Expr>(SubExprs[LENGTH]); }
-  /// Set length of the array section.
-  void setLength(Expr *E) { SubExprs[LENGTH] = E; }
+  /// Get length or upper-bound of array section.
+  Expr *getLengthUpper() { return cast_or_null<Expr>(SubExprs[LENGTH_UPPER]); }
+  const Expr *getLengthUpper() const { return cast_or_null<Expr>(SubExprs[LENGTH_UPPER]); }
+  /// Set length or upper-bound of the array section.
+  void setLengthUpper(Expr *E) { SubExprs[LENGTH_UPPER] = E; }
+
+  // Get section form ';' or ':'
+  bool isColonForm() const { return ColonForm; }
 
   SourceLocation getBeginLoc() const LLVM_READONLY {
     return getBase()->getBeginLoc();
