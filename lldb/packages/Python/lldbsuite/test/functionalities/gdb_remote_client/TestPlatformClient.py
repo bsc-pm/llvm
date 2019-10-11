@@ -20,9 +20,13 @@ class TestPlatformClient(GDBRemoteTestBase):
 
         self.server.responder = MyResponder()
 
+        self.runCmd("log enable gdb-remote all")
         self.runCmd("platform select remote-linux")
 
         try:
+            url = "connect://localhost:%d" % self.server.port
+
+            #self.gdb.GetSelectedPlatform().ConnectRemote(lldb.SBPlatformConnectOptions(url))
             self.runCmd("platform connect connect://localhost:%d" %
                         self.server.port)
             self.assertTrue(self.dbg.GetSelectedPlatform().IsConnected())
