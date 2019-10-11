@@ -327,13 +327,17 @@ let HasMergeOperand = 0 in
   // Store mask.
   let Name = "vstore", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
   ManualCodegen = [{ {
-    assert(Ops.size() >= 2);
-    std::swap(Ops[0], Ops[1]);
-    Ops[1] = Builder.CreateBitCast(Ops[1],
-        llvm::PointerType::getUnqual(Ops[0]->getType()));
+    assert(Ops.size() == 2);
     clang::CharUnits Align =
       getNaturalPointeeTypeAlignment(E->getArg(0)->getType());
-    return Builder.CreateAlignedStore(Ops[0], Ops[1], Align);
+    llvm::Type *MemType = ConvertTypeForMem(E->getArg(1)->getType());
+    std::swap(Ops[0], Ops[1]);
+    // Ops[0] = Value
+    // Ops[1] = Address
+    Ops[1] = Builder.CreateBitCast(Ops[1],
+        llvm::PointerType::getUnqual(MemType));
+    llvm::Value *ZExt = Builder.CreateZExt(Ops[0], MemType);
+    return Builder.CreateAlignedStore(ZExt, Ops[1], Align);
   } }] in
   def vstore_mask : EPIBuiltin<"m", "0PUem", "csil">;
 }
@@ -341,11 +345,13 @@ let HasMergeOperand = 0 in
 // Load mask.
 let Name = "vload", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
     ManualCodegen = [{ {
-        Ops[0] = Builder.CreateBitCast(Ops[0],
-                                       llvm::PointerType::getUnqual(ResultType));
         clang::CharUnits Align =
             getNaturalPointeeTypeAlignment(E->getArg(0)->getType());
-        return Builder.CreateAlignedLoad(Ops[0], Align);
+        llvm::Type *MemType = ConvertTypeForMem(E->getType());
+        Ops[0] = Builder.CreateBitCast(Ops[0],
+                                       llvm::PointerType::getUnqual(MemType));
+        llvm::Value *Load = Builder.CreateAlignedLoad(Ops[0], Align);
+        return Builder.CreateTrunc(Load, ResultType);
     } }] in
 def vload_mask : EPIBuiltin<"m", "mPCUe", "csil">;
 
@@ -605,9 +611,15 @@ def vfdot : EPIBinBuiltin<"v", "vvv", "fd">;
 let HasMask = 0 in
 def vbroadcast : EPIScalarToVecBuiltin<"v", "ve", "csilfd">;
 
-let LMUL = [1], HasMask = 0, HasVL = 0, Name = "cast",
-    IntrinsicName = "mask_cast" in
+let LMUL = [1], HasMask = 0, HasVL = 0, Name = "cast", IntrinsicName = "" in
 {
-  def cast_to_mask : EPIUnaBuiltin<"mv", "mv", "csil">;
-  def cast_from_mask : EPIUnaBuiltin<"vm", "vm", "csil">;
+  let ManualCodegen = [{ {
+      return Builder.CreateTrunc(Ops[0], ResultType);
+  } }] in
+  def cast_to_mask : EPIBuiltin<"mv", "mv", "csil">;
+
+  let ManualCodegen = [{ {
+      return Builder.CreateZExt(Ops[0], ResultType);
+  } }] in
+  def cast_from_mask : EPIBuiltin<"vm", "vm", "csil">;
 }
