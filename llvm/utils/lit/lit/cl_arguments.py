@@ -16,7 +16,7 @@ def parse_args():
             help="Show version and exit",
             action="store_true",
             default=False)
-    parser.add_argument("-j", "--workers",
+    parser.add_argument("-j", "--threads", "--workers",
             dest="numWorkers",
             metavar="N",
             help="Number of workers used for testing",
@@ -183,8 +183,10 @@ def parse_args():
             action="store_true",
             default=False)
 
-    opts = parser.parse_args(sys.argv[1:] +
-                             shlex.split(os.environ.get("LIT_OPTS", "")))
+    # LIT is special: environment variables override command line arguments.
+    env_args = shlex.split(os.environ.get("LIT_OPTS", ""))
+    args = sys.argv[1:] + env_args
+    opts = parser.parse_args(args)
 
     # Validate command line options
     if opts.echoAllCommands:
