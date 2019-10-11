@@ -454,9 +454,6 @@ defm vncvt_x_x : epi_conversions;
 
 def int_epi_vbroadcast : EPIUnary;
 
-def int_epi_mask_cast : Intrinsic< [ llvm_anyvector_ty ], [ llvm_anyvector_ty ],
-                                   [ IntrNoMem ]>;
-
 // Loads
 multiclass epi_load {
 

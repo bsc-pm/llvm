@@ -901,8 +901,8 @@ entry:
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -927,8 +927,8 @@ entry:
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -949,8 +949,8 @@ entry:
     ${llvm_rhs_type} undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -975,8 +975,8 @@ entry:
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -992,8 +992,8 @@ entry:
     ${llvm_rhs_type} 9,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -1011,14 +1011,15 @@ entry:
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
 """
 
     def __init__(self, intr_name, type_generator, **extra_info):
+        self.generates_mask = extra_info.get("generates_mask", False)
         super(BinaryIntrinsic, self).__init__(intr_name, type_generator, **extra_info)
 
     def get_template(self, variant):
@@ -1055,6 +1056,9 @@ entry:
                 subs["instruction"] = self.instruction
                 subs["value_result_type"] = result.value_type
                 subs["llvm_result_type"] = result.llvm_type
+                subs["llvm_store_type"] = result.llvm_type
+                subs["store_code"] = ""
+                subs["store_variable_version"] = ""
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["llvm_rhs_type"] = rhs.llvm_type
@@ -1106,6 +1110,15 @@ entry:
                     subs["result_type_scale"] = max_scale*vlmul
                     subs["lhs_type_scale"] = max_scale*vlmul
                     subs["rhs_type_scale"] = max_scale*vlmul
+
+                    if self.generates_mask:
+                        subs["store_variable_version"] = ".zext"
+                        subs["llvm_store_type"] = "i{}".format(64 / (max_scale * vlmul))
+                        subs["store_code"] = "\n  %a.zext = zext <vscale x {} x {}> %a to <vscale x {} x {}>"\
+                                .format(subs["result_type_scale"], \
+                                        subs["llvm_result_type"], \
+                                        subs["result_type_scale"], \
+                                        subs["llvm_store_type"])
 
                     print template.substitute(subs)
 
@@ -1778,16 +1791,16 @@ intrinsics = [
         #BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed, variants = vv_vx_vi),
         #BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed, variants = vv_vx_vi),
 
-        BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
-        BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
-        BinaryIntrinsic("vmsltu", type_generator = generate_binary_integer_types_relational, variants = vv_vx),
-        BinaryIntrinsic("vmslt", type_generator = generate_binary_integer_types_relational, variants = vv_vx),
-        BinaryIntrinsic("vmsleu", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
-        BinaryIntrinsic("vmsle", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi),
-        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmsltu"),
-        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vx_vi),
-        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmslt"),
-        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vx_vi),
+        BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsltu", type_generator = generate_binary_integer_types_relational, variants = vv_vx, generates_mask = True),
+        BinaryIntrinsic("vmslt", type_generator = generate_binary_integer_types_relational, variants = vv_vx, generates_mask = True),
+        BinaryIntrinsic("vmsleu", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsle", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmsltu", generates_mask = True),
+        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmslt", generates_mask = True),
+        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vx_vi, generates_mask = True),
 
         BinaryIntrinsic("vminu", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vmin", type_generator = generate_binary_integer_types, variants = vv_vx),
@@ -1847,15 +1860,15 @@ intrinsics = [
         BinaryIntrinsic("vfsgnjn", type_generator = generate_binary_float_types, variants = vv_vf),
         BinaryIntrinsic("vfsgnjx", type_generator = generate_binary_float_types, variants = vv_vf),
 
-        BinaryIntrinsic("vmfeq", type_generator = generate_binary_float_types_relational, variants = vv_vf),
-        BinaryIntrinsic("vmfne", type_generator = generate_binary_float_types_relational, variants = vv_vf),
-        BinaryIntrinsic("vmflt", type_generator = generate_binary_float_types_relational, variants = vv_vf),
-        BinaryIntrinsic("vmfle", type_generator = generate_binary_float_types_relational, variants = vv_vf),
-        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmflt"),
-        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vf),
-        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmfle"),
-        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vf),
-        BinaryIntrinsic("vmford", type_generator = generate_binary_float_types_relational, variants = vv_vf),
+        BinaryIntrinsic("vmfeq", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfne", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmflt", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfle", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmflt", generates_mask = True),
+        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
+        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmfle", generates_mask = True),
+        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
+        BinaryIntrinsic("vmford", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
 
         BinaryIntrinsicMaskIn("vfmerge", type_generator = generate_binary_float_types, variants = vfm),
 

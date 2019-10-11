@@ -2208,8 +2208,6 @@ let Predicates = [HasExtEPI] in {
   foreach mti = AllMasks in
   {
     // Mask values are stored as vectors of bytes
-    defm : pat_load_store<mti.Mask, "PseudoVLE_V", "PseudoVSE_V", /* sew */ 8,
-                          /* vlmul */ 1, EPIVR>;
     defm : pat_load_store_mask<mti.Mask, mti.IntegerVector,
                                "PseudoVLE_V", "PseudoVSE_V",
                                /* sew */ 8, /* vlmul */ 1, EPIVR>;

@@ -143,7 +143,7 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
 ; CHECK-NEXT:    vse.v v2, (a2)
 ; CHECK-NEXT:    ret
                                       <vscale x 1 x i64>* %pib,
-                                      <vscale x 1 x i1>* %pm,
+                                      <vscale x 1 x i64>* %pm,
                                       <vscale x 1 x double>* %pfa,
                                       <vscale x 1 x double>* %pfb,
                                       i64 %gvl) nounwind {
@@ -151,17 +151,21 @@ define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
    %ib = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* %pib, i64 %gvl)
 
    %ma.1 = call <vscale x 1 x i1> @llvm.epi.vmsgt.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
-   store volatile <vscale x 1 x i1> %ma.1, <vscale x 1 x i1> *%pm
+   %zma.1 = zext <vscale x 1 x i1> %ma.1 to <vscale x 1 x i64>
+   store volatile <vscale x 1 x i64> %zma.1, <vscale x 1 x i64> *%pm
    %ma.2 = call <vscale x 1 x i1> @llvm.epi.vmsgtu.nxv1i1.nxv1i64.nxv1i64(<vscale x 1 x i64> %ia, <vscale x 1 x i64> %ib, i64 %gvl)
-   store volatile <vscale x 1 x i1> %ma.2, <vscale x 1 x i1> *%pm
+   %zma.2 = zext <vscale x 1 x i1> %ma.2 to <vscale x 1 x i64>
+   store volatile <vscale x 1 x i64> %zma.2, <vscale x 1 x i64> *%pm
 
    %fa = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfa, i64 %gvl)
    %fb = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* %pfb, i64 %gvl)
 
    %mb.1 = call <vscale x 1 x i1> @llvm.epi.vmfgt.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
-   store volatile <vscale x 1 x i1> %mb.1, <vscale x 1 x i1> *%pm
+   %zmb.1 = zext <vscale x 1 x i1> %mb.1 to <vscale x 1 x i64>
+   store volatile <vscale x 1 x i64> %zmb.1, <vscale x 1 x i64> *%pm
    %mb.2 = call <vscale x 1 x i1> @llvm.epi.vmfge.nxv1i1.nxv1f64.nxv1f64(<vscale x 1 x double> %fa, <vscale x 1 x double> %fb, i64 %gvl)
-   store volatile <vscale x 1 x i1> %mb.2, <vscale x 1 x i1> *%pm
+   %zmb.2 = zext <vscale x 1 x i1> %mb.2 to <vscale x 1 x i64>
+   store volatile <vscale x 1 x i64> %zmb.2, <vscale x 1 x i64> *%pm
 
    ret void
 }
