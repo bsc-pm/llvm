@@ -62,7 +62,6 @@ def compareTwoBinaryFiles(flags, filepaths, filelines):
             func = difflib.context_diff
         diffs = func(filelines[0], filelines[1], filepaths[0], filepaths[1],
                      n = flags.num_context_lines)
-        diffs = [diff.decode(errors="ignore") for diff in diffs]
 
     for diff in diffs:
         sys.stdout.write(diff)
@@ -96,6 +95,9 @@ def compareTwoTextFiles(flags, filepaths, filelines_bin, encoding):
     func = difflib.unified_diff if flags.unified_diff else difflib.context_diff
     for diff in func(filelines[0], filelines[1], filepaths[0], filepaths[1],
                      n = flags.num_context_lines):
+        if hasattr(diff, 'decode'):
+            # python 2.7
+            diff = diff.decode(errors="ignore")
         sys.stdout.write(diff)
         exitCode = 1
     return exitCode
