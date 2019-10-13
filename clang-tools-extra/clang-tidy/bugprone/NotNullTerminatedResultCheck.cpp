@@ -59,7 +59,8 @@ static const Expr *getDestCapacityExpr(const MatchFinder::MatchResult &Result) {
 
 // Returns the length of \p E as an 'IntegerLiteral' or a 'StringLiteral'
 // without the null-terminator.
-static int getLength(const Expr *E, const MatchFinder::MatchResult &Result) {
+static unsigned getLength(const Expr *E,
+                          const MatchFinder::MatchResult &Result) {
   if (!E)
     return 0;
 
