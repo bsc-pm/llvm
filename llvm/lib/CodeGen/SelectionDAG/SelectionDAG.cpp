@@ -1660,7 +1660,7 @@ SDValue SelectionDAG::getVectorShuffle(EVT VT, const SDLoc &dl, SDValue N1,
     if (MaskVec[i] >= 0 && MaskVec[i] != i) Identity = false;
     if (MaskVec[i] != MaskVec[0]) AllSame = false;
   }
-  if (Identity && NElts)
+  if (Identity && NElts && !VT.isScalableVector())
     return N1;
 
   // Shuffling a constant splat doesn't change the result.

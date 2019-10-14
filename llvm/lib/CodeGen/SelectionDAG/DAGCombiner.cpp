@@ -16498,7 +16498,7 @@ SDValue DAGCombiner::visitINSERT_VECTOR_ELT(SDNode *N) {
     return InVec;
 
   auto *IndexC = dyn_cast<ConstantSDNode>(EltNo);
-  if (!IndexC) {
+  if (!VT.isScalableVector() && !IndexC) {
     // If this is variable insert to undef vector, it might be better to splat:
     // inselt undef, InVal, EltNo --> build_vector < InVal, InVal, ... >
     if (InVec.isUndef() && TLI.shouldSplatInsEltVarIndex(VT)) {
@@ -16535,6 +16535,10 @@ SDValue DAGCombiner::visitINSERT_VECTOR_ELT(SDNode *N) {
 
   // If we can't generate a legal BUILD_VECTOR, exit
   if (LegalOperations && !TLI.isOperationLegal(ISD::BUILD_VECTOR, VT))
+    return SDValue();
+
+  // Scalable vectors give us very little room here
+  if (VT.isScalableVector())
     return SDValue();
 
   // Check that the operand is a BUILD_VECTOR (or UNDEF, which can essentially
@@ -18655,6 +18659,9 @@ static int getShuffleMaskIndexOfOneElementFromOp0IntoOp1(ArrayRef<int> Mask) {
 /// then we can eliminate the shuffle.
 static SDValue replaceShuffleOfInsert(ShuffleVectorSDNode *Shuf,
                                       SelectionDAG &DAG) {
+  if (Shuf->getValueType(0).isScalableVector())
+    return SDValue();
+
   // First, check if we are taking one element of a vector and shuffling that
   // element into another vector.
   ArrayRef<int> Mask = Shuf->getMask();
@@ -18747,7 +18754,7 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
   ShuffleVectorSDNode *SVN = cast<ShuffleVectorSDNode>(N);
 
   // Canonicalize shuffle v, v -> v, undef
-  if (N0 == N1) {
+  if (!VT.isScalableVector() && N0 == N1) {
     SmallVector<int, 8> NewMask;
     for (unsigned i = 0; i != NumElts; ++i) {
       int Idx = SVN->getMaskElt(i);
@@ -18762,7 +18769,7 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
     return DAG.getCommutedVectorShuffle(*SVN);
 
   // Remove references to rhs if it is undef
-  if (N1.isUndef()) {
+  if (!VT.isScalableVector() && N1.isUndef()) {
     bool Changed = false;
     SmallVector<int, 8> NewMask;
     for (unsigned i = 0; i != NumElts; ++i) {
@@ -18786,7 +18793,8 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
 
   // If it is a splat, check if the argument vector is another splat or a
   // build_vector.
-  if (SVN->isSplat() && SVN->getSplatIndex() < (int)NumElts) {
+  if (!VT.isScalableVector() && SVN->isSplat() &&
+      SVN->getSplatIndex() < (int)NumElts) {
     int SplatIndex = SVN->getSplatIndex();
     if (TLI.isExtractVecEltCheap(VT, SplatIndex) &&
         TLI.isBinOp(N0.getOpcode()) && N0.getNode()->getNumValues() == 1) {
@@ -18978,8 +18986,9 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
   //   shuffle(shuffle(A, B, M0), C, M1) -> shuffle(B, C, M2)
   // Don't try to fold shuffles with illegal type.
   // Only fold if this shuffle is the only user of the other shuffle.
-  if (N0.getOpcode() == ISD::VECTOR_SHUFFLE && N->isOnlyUserOf(N0.getNode()) &&
-      Level < AfterLegalizeDAG && TLI.isTypeLegal(VT)) {
+  if (!VT.isScalableVector() && N0.getOpcode() == ISD::VECTOR_SHUFFLE &&
+      N->isOnlyUserOf(N0.getNode()) && Level < AfterLegalizeDAG &&
+      TLI.isTypeLegal(VT)) {
     ShuffleVectorSDNode *OtherSV = cast<ShuffleVectorSDNode>(N0);
 
     // Don't try to fold splats; they're likely to simplify somehow, or they
