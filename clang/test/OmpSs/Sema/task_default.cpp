@@ -8,6 +8,6 @@ int main() {
   #pragma oss task default(none) default(shared) // expected-error {{directive '#pragma oss task' cannot contain more than one 'default' clause}}
   {}
   #pragma oss task default(none)
-  #pragma oss task default(none) depend(in: x) // expected-error {{expected explicit data-sharing for 'x'}}
+  #pragma oss task default(none) depend(in: x)
   { ++x; ++x; } // expected-error {{expected explicit data-sharing for 'x'}}
 }

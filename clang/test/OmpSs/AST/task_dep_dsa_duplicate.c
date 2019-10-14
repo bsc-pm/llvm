@@ -26,10 +26,9 @@ void foo(int i, int j) {
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:54> 'int' lvalue Var 0x{{[^ ]*}} 'global' 'int'
 // CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:32> 'struct S':'struct S' lvalue Var 0x{{[^ ]*}} 's' 'struct S':'struct S'
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:54> 'int' lvalue Var 0x{{[^ ]*}} 'global' 'int'
 // CHECK-NEXT: OSSFirstprivateClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:36> 'int' lvalue ParmVar 0x{{[^ ]*}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:38> 'int' lvalue ParmVar 0x{{[^ ]*}} 'j' 'int'
-// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:54> 'int' lvalue Var 0x{{[^ ]*}} 'global' 'int'
 
 

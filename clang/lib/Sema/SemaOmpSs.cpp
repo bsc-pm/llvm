@@ -47,6 +47,7 @@ public:
     OmpSsClauseKind CKind = OSSC_unknown;
     const Expr *RefExpr = nullptr;
     bool Ignore = false;
+    bool Implicit = false;
     DSAVarData() = default;
     DSAVarData(OmpSsDirectiveKind DKind, OmpSsClauseKind CKind,
                const Expr *RefExpr, bool Ignore)
@@ -59,6 +60,7 @@ private:
     OmpSsClauseKind Attributes = OSSC_unknown;
     const Expr * RefExpr;
     bool Ignore = false;
+    bool Implicit = false;
   };
   using DeclSAMapTy = llvm::SmallDenseMap<const ValueDecl *, DSAInfo, 8>;
 
@@ -106,7 +108,8 @@ public:
   }
 
   /// Adds explicit data sharing attribute to the specified declaration.
-  void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool Ignore=false);
+  void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
+              bool Ignore, bool Implicit);
 
   /// Returns data sharing attributes from top of the stack for the
   /// specified declaration.
@@ -180,6 +183,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
     const DSAInfo &Data = Iter->SharingMap.lookup(D);
     DVar.RefExpr = Data.RefExpr;
     DVar.Ignore = Data.Ignore;
+    DVar.Implicit = Data.Implicit;
     DVar.CKind = Data.Attributes;
     return DVar;
   }
@@ -187,13 +191,15 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
   return DVar;
 }
 
-void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A, bool Ignore) {
+void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
+                        bool Ignore, bool Implicit) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
   DSAInfo &Data = Stack.back().SharingMap[D];
   Data.Attributes = A;
   Data.RefExpr = E;
   Data.Ignore = Ignore;
+  Data.Implicit = Implicit;
 }
 
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
@@ -336,13 +342,13 @@ public:
           if (isOmpSsTaskingDirective(DKind))
             ImplicitShared.push_back(E);
           // Record DSA as Ignored to avoid making the same node again
-          Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true);
+          Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true, /*Implicit=*/true);
           break;
         case DSA_none:
           if (!DVarCurrent.Ignore) {
             SemaRef.Diag(E->getExprLoc(), diag::err_oss_not_defined_dsa_when_default_none) << E->getDecl();
             // Record DSA as ignored to diagnostic only once
-            Stack->addDSA(VD, E, OSSC_unknown, /*Ignore=*/true);
+            Stack->addDSA(VD, E, OSSC_unknown, /*Ignore=*/true, /*Implicit=*/true);
           }
           break;
         case DSA_unspecified:
@@ -356,7 +362,7 @@ public:
               ImplicitFirstprivate.push_back(E);
 
             // Record DSA as Ignored to avoid making the same node again
-            Stack->addDSA(VD, E, OSSC_firstprivate, /*Ignore=*/true);
+            Stack->addDSA(VD, E, OSSC_firstprivate, /*Ignore=*/true, /*Implicit=*/true);
           } else {
             // If no default clause is present and the variable was shared/global
             // in the context encountering the construct, the variable will be shared.
@@ -366,7 +372,7 @@ public:
               ImplicitShared.push_back(E);
 
             // Record DSA as Ignored to avoid making the same node again
-            Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true);
+            Stack->addDSA(VD, E, OSSC_shared, /*Ignore=*/true, /*Implicit=*/true);
           }
         }
       }
@@ -479,6 +485,10 @@ public:
       DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
       switch (DVarCurrent.CKind) {
       case OSSC_shared:
+        if (IsArraySubscriptIdx) {
+          // shared(n) in(array[n])
+          break;
+        }
         if (VKind == OSSC_private || VKind == OSSC_firstprivate) {
           ErrorFound = true;
           SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
@@ -489,28 +499,34 @@ public:
       case OSSC_private:
       case OSSC_firstprivate:
         if (VKind == OSSC_shared) {
-          ErrorFound = true;
-          SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
-            << getOmpSsClauseName(DVarCurrent.CKind)
-            << getOmpSsClauseName(VKind) << ERange;
+          if (DVarCurrent.Implicit) {
+            // Promote Implicit firstprivate to Implicit shared
+            auto It = ImplicitFirstprivate.begin();
+            while (It != ImplicitFirstprivate.end()) {
+              if (*It == DVarCurrent.RefExpr) break;
+              ++It;
+            }
+            assert(It != ImplicitFirstprivate.end());
+            ImplicitFirstprivate.erase(It);
+
+            ImplicitShared.push_back(E);
+            // Rewrite DSA
+            Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
+          } else {
+            ErrorFound = true;
+            SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
+              << getOmpSsClauseName(DVarCurrent.CKind)
+              << getOmpSsClauseName(VKind) << ERange;
+          }
         }
         break;
       case OSSC_unknown:
-        // No DSA explicit
-        if (Stack->getCurrentDefaultDataSharingAttributtes() == DSA_none) {
-          // KO: but default(none)
-          // Record DSA as ignored
-          SemaRef.Diag(ELoc, diag::err_oss_not_defined_dsa_when_default_none) << E->getDecl();
-          Stack->addDSA(VD, E, OSSC_unknown, /*Ignore=*/true);
-        } else {
-          // OK: record DSA as explicit
-          if (VKind == OSSC_shared)
-            ImplicitShared.push_back(E);
-          if (VKind == OSSC_firstprivate)
-            ImplicitFirstprivate.push_back(E);
+        if (VKind == OSSC_shared)
+          ImplicitShared.push_back(E);
+        if (VKind == OSSC_firstprivate)
+          ImplicitFirstprivate.push_back(E);
 
-          Stack->addDSA(VD, E, VKind);
-        }
+        Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
 
         break;
       default:
@@ -595,46 +611,47 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
 
   bool ErrorFound = false;
 
+  OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
-    OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
     if (isa<OSSDependClause>(Clause)) {
       OSSDependChecker.VisitOSSDepend(cast<OSSDependClause> (Clause));
+    }
+    // FIXME: how to handle an error?
+    if (OSSDependChecker.isErrorFound())
+      ErrorFound = true;
+  }
 
-      if (OSSDependChecker.isErrorFound())
+
+  SmallVector<Expr *, 4> ImplicitShared(
+      OSSDependChecker.getImplicitShared().begin(),
+      OSSDependChecker.getImplicitShared().end());
+
+  SmallVector<Expr *, 4> ImplicitFirstprivate(
+      OSSDependChecker.getImplicitFirstprivate().begin(),
+      OSSDependChecker.getImplicitFirstprivate().end());
+
+  if (!ImplicitShared.empty()) {
+    if (OSSClause *Implicit = ActOnOmpSsSharedClause(
+            ImplicitShared, SourceLocation(), SourceLocation(),
+            SourceLocation(), /*isImplicit=*/true)) {
+      Clauses.push_back(Implicit);
+      if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
         ErrorFound = true;
 
-      SmallVector<Expr *, 4> ImplicitShared(
-          OSSDependChecker.getImplicitShared().begin(),
-          OSSDependChecker.getImplicitShared().end());
+    } else {
+      ErrorFound = true;
+    }
+  }
 
-      SmallVector<Expr *, 4> ImplicitFirstprivate(
-          OSSDependChecker.getImplicitFirstprivate().begin(),
-          OSSDependChecker.getImplicitFirstprivate().end());
-
-      if (!ImplicitShared.empty()) {
-        if (OSSClause *Implicit = ActOnOmpSsSharedClause(
-                ImplicitShared, SourceLocation(), SourceLocation(),
-                SourceLocation(), /*isImplicit=*/true)) {
-          Clauses.push_back(Implicit);
-          if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
-            ErrorFound = true;
-
-        } else {
-          ErrorFound = true;
-        }
-      }
-
-      if (!ImplicitFirstprivate.empty()) {
-        if (OSSClause *Implicit = ActOnOmpSsFirstprivateClause(
-                ImplicitFirstprivate, SourceLocation(), SourceLocation(),
-                SourceLocation())) {
-          Clauses.push_back(Implicit);
-          if (cast<OSSFirstprivateClause>(Implicit)->varlist_size() != ImplicitFirstprivate.size())
-            ErrorFound = true;
-        } else {
-          ErrorFound = true;
-        }
-      }
+  if (!ImplicitFirstprivate.empty()) {
+    if (OSSClause *Implicit = ActOnOmpSsFirstprivateClause(
+            ImplicitFirstprivate, SourceLocation(), SourceLocation(),
+            SourceLocation())) {
+      Clauses.push_back(Implicit);
+      if (cast<OSSFirstprivateClause>(Implicit)->varlist_size() != ImplicitFirstprivate.size())
+        ErrorFound = true;
+    } else {
+      ErrorFound = true;
     }
   }
 }
@@ -1017,7 +1034,7 @@ Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_shared);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_shared);
+    DSAStack->addDSA(D, RefExpr, OSSC_shared, /*Ignore=*/false, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
   }
 
@@ -1055,7 +1072,7 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_private);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_private);
+    DSAStack->addDSA(D, RefExpr, OSSC_private, /*Ignore=*/false, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
   }
 
@@ -1093,7 +1110,7 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_firstprivate);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate);
+    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, /*Ignore=*/false, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
   }
 

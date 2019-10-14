@@ -27,9 +27,11 @@ void foo() {
     int array[10];
     int a[10];
     int i, j;
-    #pragma oss task depend(in: array[a[i]], a[i]) // expected-error {{the data-sharing 'firstprivate' conflicts with 'shared' required by the dependency}}
+    // Promotion implicit firstprivate to implicit shared
+    #pragma oss task depend(in: array[a[i]], a[i])
     {}
-    #pragma oss task depend(in: array[i+j]) shared(i) // expected-error {{the data-sharing 'shared' conflicts with 'firstprivate' required by the dependency}}
+    // Promotion implicit firstprivate to shared
+    #pragma oss task depend(in: array[i+j]) shared(i)
     {}
 }
 
