@@ -49,6 +49,9 @@ InstructionSelector *createRISCVInstructionSelector(const RISCVTargetMachine &,
 
 FunctionPass *createEPIRemoveRedundantVSETVLPass();
 void initializeEPIRemoveRedundantVSETVLPass(PassRegistry &);
+
+FunctionPass *createEPIRemoveRedundantVSETVLGlobalPass();
+void initializeEPIRemoveRedundantVSETVLGlobalPass(PassRegistry &);
 }
 
 #endif

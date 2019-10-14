@@ -20,6 +20,10 @@ declare <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float, i64)
 declare void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>* nocapture, i64)
 declare void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float>, <vscale x 2 x float>* nocapture, i64)
 
+declare <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>* nocapture, i64)
+
+declare float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float>, i64)
+
 define <vscale x 1 x double> @test1(i64 %avl, i8 zeroext %cond, <vscale x 1 x double> %a, <vscale x 1 x double> %b) nounwind {
 ; CHECK-LABEL: test1:
 ; CHECK:       # %bb.0: # %entry
@@ -57,14 +61,13 @@ define <vscale x 1 x double> @test2(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    beqz a1, .LBB1_2
 ; CHECK-NEXT:  # %bb.1: # %if.then
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
-; CHECK-NEXT:    vfadd.vv v0, v16, v17
-; CHECK-NEXT:    j .LBB1_3
-; CHECK-NEXT:  .LBB1_2: # %if.else
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
-; CHECK-NEXT:    vfsub.vv v0, v16, v17
-; CHECK-NEXT:  .LBB1_3: # %if.end
 ; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vfadd.vv v0, v16, v17
+; CHECK-NEXT:    vfmul.vv v16, v0, v16
+; CHECK-NEXT:    ret
+; CHECK-NEXT:  .LBB1_2: # %if.else
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vfsub.vv v0, v16, v17
 ; CHECK-NEXT:    vfmul.vv v16, v0, v16
 ; CHECK-NEXT:    ret
 entry:
@@ -188,21 +191,19 @@ define <vscale x 1 x double> @test5(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:    andi a2, a1, 1
 ; CHECK-NEXT:    bnez a2, .LBB4_3
 ; CHECK-NEXT:  # %bb.1: # %if.else
-; CHECK-NEXT:    vsetvli a2, a0, e64, m1
-; CHECK-NEXT:    vfsub.vv v0, v16, v17
-; CHECK-NEXT:    andi a1, a1, 2
-; CHECK-NEXT:    beqz a1, .LBB4_4
-; CHECK-NEXT:  .LBB4_2: # %if.then4
 ; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vfsub.vv v0, v16, v17
+; CHECK-NEXT:    andi a0, a1, 2
+; CHECK-NEXT:    beqz a0, .LBB4_4
+; CHECK-NEXT:  .LBB4_2: # %if.then4
 ; CHECK-NEXT:    vfmul.vv v16, v0, v16
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB4_3: # %if.then
-; CHECK-NEXT:    vsetvli a2, a0, e64, m1
-; CHECK-NEXT:    vfadd.vv v0, v16, v17
-; CHECK-NEXT:    andi a1, a1, 2
-; CHECK-NEXT:    bnez a1, .LBB4_2
-; CHECK-NEXT:  .LBB4_4: # %if.else5
 ; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vfadd.vv v0, v16, v17
+; CHECK-NEXT:    andi a0, a1, 2
+; CHECK-NEXT:    bnez a0, .LBB4_2
+; CHECK-NEXT:  .LBB4_4: # %if.else5
 ; CHECK-NEXT:    vfmul.vv v16, v16, v0
 ; CHECK-NEXT:    ret
 entry:
@@ -250,7 +251,6 @@ define <vscale x 1 x double> @test6(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:    andi a1, a1, 2
 ; CHECK-NEXT:    beqz a1, .LBB5_4
 ; CHECK-NEXT:  .LBB5_2: # %if.then4
-; CHECK-NEXT:    vsetvli a1, a0, e64, m1
 ; CHECK-NEXT:    lui a1, %hi(.LCPI5_0)
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI5_0)
 ; CHECK-NEXT:    fld ft0, 0(a1)
@@ -329,23 +329,22 @@ if.end10:                                         ; preds = %if.else5, %if.then4
 define <vscale x 1 x double> @test7(i64 %avl, i8 zeroext %cond, <vscale x 1 x double> %a, <vscale x 1 x double> %b, i64 %N) nounwind {
 ; CHECK-LABEL: test7:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    vsetvli a3, a0, e64, m1
-; CHECK-NEXT:    addi a4, zero, 1
-; CHECK-NEXT:    blt a2, a4, .LBB6_5
+; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    addi a3, zero, 1
+; CHECK-NEXT:    blt a2, a3, .LBB6_5
 ; CHECK-NEXT:  # %bb.1: # %for.body.lr.ph
-; CHECK-NEXT:    mv a4, zero
+; CHECK-NEXT:    mv a3, zero
 ; CHECK-NEXT:    # implicit-def: $v0
 ; CHECK-NEXT:  .LBB6_2: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    beqz a1, .LBB6_4
 ; CHECK-NEXT:  # %bb.3: # %if.then
 ; CHECK-NEXT:    # in Loop: Header=BB6_2 Depth=1
-; CHECK-NEXT:    vsetvli a5, a0, e64, m1
 ; CHECK-NEXT:    vfadd.vv v0, v16, v17
 ; CHECK-NEXT:  .LBB6_4: # %for.inc
 ; CHECK-NEXT:    # in Loop: Header=BB6_2 Depth=1
-; CHECK-NEXT:    addw a4, a4, a3
-; CHECK-NEXT:    blt a4, a2, .LBB6_2
+; CHECK-NEXT:    addw a3, a3, a0
+; CHECK-NEXT:    blt a3, a2, .LBB6_2
 ; CHECK-NEXT:    j .LBB6_6
 ; CHECK-NEXT:  .LBB6_5:
 ; CHECK-NEXT:    # implicit-def: $v0
@@ -385,4 +384,66 @@ for.inc:                                          ; preds = %for.body, %if.then
   %conv = ashr exact i64 %sext, 32
   %cmp = icmp slt i64 %conv, %N
   br i1 %cmp, label %for.body, label %for.cond.cleanup
+}
+
+define <vscale x 1 x double> @test8(i64 %avl, float %cond, <vscale x 1 x double> %a, <vscale x 1 x double> %b) nounwind {
+; CHECK-LABEL: test8:
+; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    vsetvli a2, a0, e64, m1
+; CHECK-NEXT:    vfadd.vv v16, v16, v17
+; CHECK-NEXT:    fmv.w.x ft1, a1
+; CHECK-NEXT:    lui a1, %hi(.LCPI7_0)
+; CHECK-NEXT:    addi a1, a1, %lo(.LCPI7_0)
+; CHECK-NEXT:    flw ft0, 0(a1)
+; CHECK-NEXT:    lui a1, %hi(scratch)
+; CHECK-NEXT:    addi a1, a1, %lo(scratch)
+; CHECK-NEXT:    lui a2, %hi(.LCPI7_1)
+; CHECK-NEXT:    addi a2, a2, %lo(.LCPI7_1)
+; CHECK-NEXT:    flw ft2, 0(a2)
+; CHECK-NEXT:  .LBB7_1: # %do.body
+; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    flt.s a2, ft0, ft1
+; CHECK-NEXT:    xori a2, a2, 1
+; CHECK-NEXT:    bnez a2, .LBB7_3
+; CHECK-NEXT:  # %bb.2: # %if.then
+; CHECK-NEXT:    # in Loop: Header=BB7_1 Depth=1
+; CHECK-NEXT:    vsetvli a2, a0, e64, m1
+; CHECK-NEXT:    vfadd.vv v16, v16, v17
+; CHECK-NEXT:    vsetvli a2, a0, e32, m1
+; CHECK-NEXT:    vle.v v0, (a1)
+; CHECK-NEXT:    vfmv.f.s ft1, v0
+; CHECK-NEXT:  .LBB7_3: # %do.cond
+; CHECK-NEXT:    # in Loop: Header=BB7_1 Depth=1
+; CHECK-NEXT:    feq.s a2, ft1, ft2
+; CHECK-NEXT:    xori a2, a2, 1
+; CHECK-NEXT:    bnez a2, .LBB7_1
+; CHECK-NEXT:  # %bb.4: # %do.end
+; CHECK-NEXT:    ret
+entry:
+  %0 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)
+  %1 = tail call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %a, <vscale x 1 x double> %b, i64 %0)
+  br label %do.body
+
+do.body:                                          ; preds = %do.cond, %entry
+  %a.addr.0 = phi <vscale x 1 x double> [ %1, %entry ], [ %a.addr.1, %do.cond ]
+  %cond.addr.0 = phi float [ %cond, %entry ], [ %cond.addr.1, %do.cond ]
+  %cmp = fcmp ogt float %cond.addr.0, 1.000000e+00
+  br i1 %cmp, label %if.then, label %do.cond
+
+if.then:                                          ; preds = %do.body
+  %2 = tail call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %a.addr.0, <vscale x 1 x double> %b, i64 %0)
+  %3 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 2, i64 0)
+  %4 = bitcast i8* @scratch to <vscale x 2 x float>*
+  %5 = tail call <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>* %4, i64 %3)
+  %6 = tail call float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float> %5, i64 %3)
+  br label %do.cond
+
+do.cond:                                          ; preds = %do.body, %if.then
+  %a.addr.1 = phi <vscale x 1 x double> [ %2, %if.then ], [ %a.addr.0, %do.body ]
+  %cond.addr.1 = phi float [ %6, %if.then ], [ %cond.addr.0, %do.body ]
+  %tobool = fcmp une float %cond.addr.1, 0.000000e+00
+  br i1 %tobool, label %do.body, label %do.end
+
+do.end:                                           ; preds = %do.cond
+  ret <vscale x 1 x double> %a.addr.1
 }
