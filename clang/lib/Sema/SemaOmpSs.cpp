@@ -419,38 +419,77 @@ public:
       : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
 };
 
+// OSSClauseDSAChecker gathers for each expression in a depend clause
+// all implicit data-sharings.
+//
+// To do so, we classify as firstprivate the base symbol if it's a pointer and is
+// dereferenced by a SubscriptExpr, MemberExpr or UnaryOperator.
+// Otherwise it's shared.
+//
+// At the same time, all symbols found inside a SubscriptExpr will be firstprivate.
+// NOTE: implicit DSA from other tasks are ignored
 class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> {
   DSAStackTy *Stack;
   Sema &SemaRef;
   bool ErrorFound = false;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
-  bool IsArraySubscriptIdx = false;
+  // This is used to know we're inside a subscript expression
+  size_t ArraySubscriptCnt = 0;
+  // This is used to mark the innermost base symbol expression as:
+  // *p, p[2], p[1:2], [2]p, s.x, s->x
+  bool IsDerefMemberArrayBase = false;
 public:
 
   void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
+    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
+      IsDerefMemberArrayBase = true;
     Visit(E->getBase());
-    IsArraySubscriptIdx = true;
+    IsDerefMemberArrayBase = false;
+
+    ArraySubscriptCnt++;
     for (Stmt *S : E->getShapes())
       Visit(S);
-    IsArraySubscriptIdx = false;
+    ArraySubscriptCnt--;
   }
 
   void VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
+    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
+      IsDerefMemberArrayBase = true;
     Visit(E->getBase());
-    IsArraySubscriptIdx = true;
+    IsDerefMemberArrayBase = false;
+
+    ArraySubscriptCnt++;
     if (E->getLowerBound())
       Visit(E->getLowerBound());
     if (E->getLengthUpper())
       Visit(E->getLengthUpper());
-    IsArraySubscriptIdx = false;
+    ArraySubscriptCnt--;
   }
 
   void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
+      IsDerefMemberArrayBase = true;
     Visit(E->getBase());
-    IsArraySubscriptIdx = true;
+    IsDerefMemberArrayBase = false;
+
+    ArraySubscriptCnt++;
     Visit(E->getIdx());
-    IsArraySubscriptIdx = false;
+    ArraySubscriptCnt--;
+  }
+
+  void VisitUnaryOperator(UnaryOperator *E) {
+    if (isa<DeclRefExpr>(E->getSubExpr()->IgnoreParenImpCasts()))
+      IsDerefMemberArrayBase = true;
+    Visit(E->getSubExpr());
+    IsDerefMemberArrayBase = false;
+  }
+
+  void VisitMemberExpr(MemberExpr *E) {
+    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
+      IsDerefMemberArrayBase = true;
+    Visit(E->getBase());
+    IsDerefMemberArrayBase = false;
   }
 
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
@@ -474,9 +513,16 @@ public:
       // inout(s.x)            | shared(s)        | struct S s;
       // inout(ps->x)          | firstprivate(ps) | struct S *ps;
       OmpSsClauseKind VKind = OSSC_shared;
-      if (VD->getType()->isPointerType())
+      // FIXME?: There's an overlapping between IsDerefMemberArrayBase
+      // and ArraySubscriptCnt
+      // i.e
+      //    a[b[7]]
+      // b will have ArraySubscriptCnt > 0
+      // and IsDerefMemberArrayBase true
+      // Check ArraySubscriptCnt first since is more restrictive
+      if (ArraySubscriptCnt)
         VKind = OSSC_firstprivate;
-      else if (IsArraySubscriptIdx)
+      else if (VD->getType()->isPointerType() && IsDerefMemberArrayBase)
         VKind = OSSC_firstprivate;
 
       SourceLocation ELoc = E->getExprLoc();
@@ -485,18 +531,10 @@ public:
       DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
       switch (DVarCurrent.CKind) {
       case OSSC_shared:
-        if (IsArraySubscriptIdx) {
-          // shared(n) in(array[n])
-          break;
-        }
-        if (VKind == OSSC_private || VKind == OSSC_firstprivate) {
-          ErrorFound = true;
-          SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
-            << getOmpSsClauseName(DVarCurrent.CKind)
-            << getOmpSsClauseName(VKind) << ERange;
-        }
+        // Do nothing
         break;
       case OSSC_private:
+        break;
       case OSSC_firstprivate:
         if (VKind == OSSC_shared) {
           if (DVarCurrent.Implicit) {

@@ -47,7 +47,7 @@ void bar()
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:8:17, col:39>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:26, col:38>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:37> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
-// CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:37> 'int *' lvalue ParmVar {{[a-z0-9]+}} 't' 'int *'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:19:13, col:38>

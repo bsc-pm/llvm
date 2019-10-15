@@ -286,13 +286,14 @@ void foo6(int *p, int n) {
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:{{.*}}, col:{{.*}}> <oss syntax>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{.*}}> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
 // CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:32> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
-// CHECK-NEXT: OSSFirstprivateClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:25> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{.*}}> 'int *' lvalue ParmVar 0x{{[^ ]*}} 'p' 'int *'
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{.*}}> 'int' lvalue ParmVar 0x{{[^ ]*}} 'n' 'int'
 
 void foo7() {
     int array[10][10];
     int a;
+    int barr[5];
+    int carr[5];
     #pragma oss task out(array[0 ; 5])
     {}
     #pragma oss task out(array[ ; a])
@@ -300,6 +301,8 @@ void foo7() {
     #pragma oss task out(array[ ; ])
     {}
     #pragma oss task out(array[ ; ][ ; ])
+    {}
+    #pragma oss task out(array[barr[4] ; carr[5]])
     {}
 }
 
@@ -348,5 +351,26 @@ void foo7() {
 // CHECK-NEXT: <<<NULL>>>
 // CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{.*}}> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+
+// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:{{[^ ]*}}:{{[^ ]*}}, col:{{[^ ]*}}>
+// CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> <oss syntax>
+// CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> '<OmpSs-2 array section type>' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int (*)[10]' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> 'int' <LValueToRValue>
+// CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> 'int' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int *' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [5]' lvalue Var 0x{{[^ ]*}} 'barr' 'int [5]'
+// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int' 4
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> 'int' <LValueToRValue>
+// CHECK-NEXT: ArraySubscriptExpr 0x{{[^ ]*}} <col:{{[^ ]*}}, col:{{[^ ]*}}> 'int' lvalue
+// CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int *' <ArrayToPointerDecay>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [5]' lvalue Var 0x{{[^ ]*}} 'carr' 'int [5]'
+// CHECK-NEXT: IntegerLiteral 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int' 5
+// CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
+// CHECK-NEXT: OSSFirstprivateClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [5]' lvalue Var 0x{{[^ ]*}} 'barr' 'int [5]'
+// CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{[^ ]*}}> 'int [5]' lvalue Var 0x{{[^ ]*}} 'carr' 'int [5]'
 
 
