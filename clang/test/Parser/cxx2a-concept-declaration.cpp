@@ -74,7 +74,7 @@ template<bool x> concept C11 = 2; // expected-error {{atomic constraint must be 
 template<bool x> concept C12 = 2 && x; // expected-error {{atomic constraint must be of type 'bool' (found 'int')}}
 template<bool x> concept C13 = x || 2 || x; // expected-error {{atomic constraint must be of type 'bool' (found 'int')}}
 template<bool x> concept C14 = 8ull && x || x; // expected-error {{atomic constraint must be of type 'bool' (found 'unsigned long long')}}
-template<typename T> concept C15 = sizeof(T); // expected-error {{atomic constraint must be of type 'bool' (found 'unsigned long')}}
+template<typename T> concept C15 = sizeof(T); // expected-error {{atomic constraint must be of type 'bool'}}
 template<typename T> concept C16 = true && (0 && 0); // expected-error {{atomic constraint must be of type 'bool' (found 'int')}}
 // expected-warning@-1{{use of logical '&&' with constant operand}}
 // expected-note@-2{{use '&' for a bitwise operation}}
