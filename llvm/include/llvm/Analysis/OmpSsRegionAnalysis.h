@@ -50,6 +50,8 @@ struct TaskDependsInfo {
 struct TaskInfo {
   TaskDSAInfo DSAInfo;
   TaskDependsInfo DependsInfo;
+  Value *Final = nullptr;
+  Value *If = nullptr;
   Instruction *Entry;
   Instruction *Exit;
 };

@@ -146,6 +146,21 @@ static void getValueFromOperandBundlesWithID(const IntrinsicInst *I,
   }
 }
 
+// Gather Value unique OperandBundle Id.
+// Error if there is more than one Value in OperandBundle
+// or more than one OperandBundle
+static void getValueFromOperandBundleWithID(const IntrinsicInst *I,
+                                            Value *&V,
+                                            uint32_t Id) {
+  SmallVector<OperandBundleDef, 1> OpBundles;
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  assert(OpBundles.size() <= 1 && "Only allowed one OperandBundle with this Id");
+  if (OpBundles.size() == 1) {
+    assert(OpBundles[0].input_size() == 1 && "Only allowed one Value per OperandBundle");
+    V = OpBundles[0].inputs()[0];
+  }
+}
+
 // Gather Value list from each OperandBundle Id.
 static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
                                               SetVector<Value *> &Values,
@@ -318,6 +333,11 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
   TI.DependsInfo.NumSymbols = TAI.DepSymToIdx.size();
 }
 
+static void gatherIfFinalInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
+  getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
+}
+
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
     Function &F, DominatorTree &DT, FunctionInfo &FI,
     TaskFunctionAnalysisInfo &TFAI,
@@ -352,6 +372,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
           gatherDSAInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
+          gatherIfFinalInfo(II, T.Info);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {

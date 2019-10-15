@@ -564,8 +564,25 @@ struct OmpSs : public ModulePass {
       IRBuilder<> IRB(codeReplacer);
       Value *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
-      // TODO: For now TaskFlagsVar is hardcoded
-      // Value *TaskFlagsVar = IRB.CreateAlloca(IRB.getInt64Ty());
+      // TaskFlagsVar = !If << 1 | Final
+      Value *TaskFlagsVar = ConstantInt::get(IRB.getInt64Ty(), 0);
+      if (TI.Final) {
+        TaskFlagsVar =
+          IRB.CreateOr(
+            TaskFlagsVar,
+            IRB.CreateZExt(TI.Final,
+                           IRB.getInt64Ty()));
+      }
+      if (TI.If) {
+        TaskFlagsVar =
+          IRB.CreateOr(
+            TaskFlagsVar,
+            IRB.CreateShl(
+              IRB.CreateZExt(
+                IRB.CreateICmpEQ(TI.If, IRB.getFalse()),
+                IRB.getInt64Ty()),
+                1));
+      }
       // IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), TaskFlagsVar);
       Value *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
       // TODO: For now TaskNumDepsVar is hardcoded
@@ -577,7 +594,7 @@ struct OmpSs : public ModulePass {
                                   ConstantInt::get(IRB.getInt64Ty(), TaskArgsSizeOf),
                                   TaskArgsVarCast,
                                   TaskPtrVar,
-                                  ConstantInt::get(IRB.getInt64Ty(), 0), // TaskFlagsVar,
+                                  TaskFlagsVar,
                                   ConstantInt::get(IRB.getInt64Ty(),
                                                    TI.DependsInfo.Ins.size()
                                                    + TI.DependsInfo.Outs.size())}); // TaskNumDepsVar;

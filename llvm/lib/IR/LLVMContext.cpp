@@ -122,6 +122,16 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSDepWeakInoutEntry->second == LLVMContext::OB_oss_dep_weakinout &&
          "oss_dep_weakinout operand bundle id drifted!");
   (void)OSSDepWeakInoutEntry;
+
+  auto *OSSFinalEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FINAL");
+  assert(OSSFinalEntry->second == LLVMContext::OB_oss_final &&
+         "oss_final operand bundle id drifted!");
+  (void)OSSFinalEntry;
+
+  auto *OSSIfEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.IF");
+  assert(OSSIfEntry->second == LLVMContext::OB_oss_if &&
+         "oss_if operand bundle id drifted!");
+  (void)OSSIfEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =
