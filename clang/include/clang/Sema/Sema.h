@@ -418,7 +418,8 @@ public:
     PCSK_BSS          = 1,
     PCSK_Data         = 2,
     PCSK_Rodata       = 3,
-    PCSK_Text         = 4
+    PCSK_Text         = 4,
+    PCSK_Relro        = 5
    };
 
   enum PragmaClangSectionAction {
@@ -439,6 +440,7 @@ public:
    PragmaClangSection PragmaClangBSSSection;
    PragmaClangSection PragmaClangDataSection;
    PragmaClangSection PragmaClangRodataSection;
+   PragmaClangSection PragmaClangRelroSection;
    PragmaClangSection PragmaClangTextSection;
 
   enum PragmaMsStackAction {
@@ -6056,7 +6058,13 @@ public:
                                        Expr *ConstraintExpr,
                                        bool &IsSatisfied);
 
-    // ParseObjCStringLiteral - Parse Objective-C string literals.
+  /// Check that the associated constraints of a template declaration match the
+  /// associated constraints of an older declaration of which it is a
+  /// redeclaration.
+  bool CheckRedeclarationConstraintMatch(TemplateParameterList *Old,
+                                         TemplateParameterList *New);
+
+  // ParseObjCStringLiteral - Parse Objective-C string literals.
   ExprResult ParseObjCStringLiteral(SourceLocation *AtLocs,
                                     ArrayRef<Expr *> Strings);
 
