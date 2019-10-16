@@ -59,6 +59,8 @@ StringRef llvm::getEnumName(MVT::SimpleValueType T) {
   switch (T) {
   case MVT::Other:    return "MVT::Other";
   case MVT::i1:       return "MVT::i1";
+  case MVT::i2:       return "MVT::i2";
+  case MVT::i4:       return "MVT::i4";
   case MVT::i8:       return "MVT::i8";
   case MVT::i16:      return "MVT::i16";
   case MVT::i32:      return "MVT::i32";
