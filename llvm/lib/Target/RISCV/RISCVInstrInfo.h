@@ -25,7 +25,7 @@ class RISCVSubtarget;
 
 class RISCVInstrInfo : public RISCVGenInstrInfo {
 public:
-  explicit RISCVInstrInfo();
+  explicit RISCVInstrInfo(RISCVSubtarget &STI);
 
   unsigned isLoadFromStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
@@ -87,6 +87,12 @@ public:
   getSerializableDirectMachineOperandTargetFlags() const override;
 
   bool isAsCheapAsAMove(const MachineInstr &MI) const override;
+
+  bool verifyInstruction(const MachineInstr &MI,
+                         StringRef &ErrInfo) const override;
+
+protected:
+  const RISCVSubtarget &STI;
 };
 }
 #endif
