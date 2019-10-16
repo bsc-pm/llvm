@@ -19,67 +19,6 @@ class Run(object):
     def __init__(self, lit_config, tests):
         self.lit_config = lit_config
         self.tests = tests
-        # Set up semaphores to limit parallelism of certain classes of tests.
-        self.parallelism_semaphores = {
-                k : NopSemaphore() if v is None else
-                    multiprocessing.BoundedSemaphore(v)
-                for k, v in lit_config.parallelism_groups.items()}
-
-    def _execute_tests_in_pool(self, workers, max_time):
-        # We need to issue many wait calls, so compute the final deadline and
-        # subtract time.time() from that as we go along.
-        deadline = None
-        if max_time:
-            deadline = time.time() + max_time
-
-        # Start a process pool. Copy over the data shared between all test runs.
-        # FIXME: Find a way to capture the worker process stderr. If the user
-        # interrupts the workers before we make it into our task callback, they
-        # will each raise a KeyboardInterrupt exception and print to stderr at
-        # the same time.
-        pool = multiprocessing.Pool(workers, lit.worker.initializer,
-                                    (self.lit_config,
-                                     self.parallelism_semaphores))
-
-        # Install a console-control signal handler on Windows.
-        if lit.util.win32api is not None:
-            def console_ctrl_handler(type):
-                print('\nCtrl-C detected, terminating.')
-                pool.terminate()
-                pool.join()
-                lit.util.abort_now()
-                return True
-            lit.util.win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
-
-        try:
-            async_results = [pool.apply_async(lit.worker.run_one_test,
-                                              args=(test_index, test),
-                                              callback=self.consume_test_result)
-                             for test_index, test in enumerate(self.tests)]
-            pool.close()
-
-            # Wait for all results to come in. The callback that runs in the
-            # parent process will update the display.
-            for a in async_results:
-                if deadline:
-                    a.wait(deadline - time.time())
-                else:
-                    # Python condition variables cannot be interrupted unless
-                    # they have a timeout. This can make lit unresponsive to
-                    # KeyboardInterrupt, so do a busy wait with a timeout.
-                    while not a.ready():
-                        a.wait(1)
-                if not a.successful():
-                    a.get() # Exceptions raised here come from the worker.
-                if self.hit_max_failures:
-                    break
-        except:
-            # Stop the workers and wait for any straggling results to come in
-            # if we exited without waiting on every async result.
-            pool.terminate()
-            raise
-        finally:
-            pool.join()
 
     def execute_tests(self, progress_callback, workers, max_time):
         """
@@ -108,20 +47,84 @@ class Run(object):
         self.failure_count = 0
         self.hit_max_failures = False
         if workers == 1:
-            for test_index, test in enumerate(self.tests):
-                lit.worker._execute_test(test, self.lit_config)
-                self.consume_test_result((test_index, test))
-                if self.hit_max_failures:
-                    break
+            self._execute_in_serial(max_time)
         else:
-            self._execute_tests_in_pool(workers, max_time)
+            self._execute_in_parallel(workers, max_time)
 
         # Mark any tests that weren't run as UNRESOLVED.
         for test in self.tests:
             if test.result is None:
                 test.setResult(lit.Test.Result(lit.Test.UNRESOLVED, '', 0.0))
 
-    def consume_test_result(self, pool_result):
+    def _execute_in_serial(self, max_time):
+        for test_index, test in enumerate(self.tests):
+            lit.worker._execute_test(test, self.lit_config)
+            self._consume_test_result((test_index, test))
+            if self.hit_max_failures:
+                break
+
+    def _execute_in_parallel(self, workers, max_time):
+        assert workers > 1
+        # We need to issue many wait calls, so compute the final deadline and
+        # subtract time.time() from that as we go along.
+        deadline = None
+        if max_time:
+            deadline = time.time() + max_time
+
+        semaphores = {
+            k: NopSemaphore() if v is None else
+            multiprocessing.BoundedSemaphore(v) for k, v in
+            self.lit_config.parallelism_groups.items()}
+
+        # Start a process pool. Copy over the data shared between all test runs.
+        # FIXME: Find a way to capture the worker process stderr. If the user
+        # interrupts the workers before we make it into our task callback, they
+        # will each raise a KeyboardInterrupt exception and print to stderr at
+        # the same time.
+        pool = multiprocessing.Pool(workers, lit.worker.initializer,
+                                    (self.lit_config, semaphores))
+
+        # Install a console-control signal handler on Windows.
+        if lit.util.win32api is not None:
+            def console_ctrl_handler(type):
+                print('\nCtrl-C detected, terminating.')
+                pool.terminate()
+                pool.join()
+                lit.util.abort_now()
+                return True
+            lit.util.win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
+
+        try:
+            async_results = [pool.apply_async(lit.worker.run_one_test,
+                                              args=(test_index, test),
+                                              callback=self._consume_test_result)
+                             for test_index, test in enumerate(self.tests)]
+            pool.close()
+
+            # Wait for all results to come in. The callback that runs in the
+            # parent process will update the display.
+            for a in async_results:
+                if deadline:
+                    a.wait(deadline - time.time())
+                else:
+                    # Python condition variables cannot be interrupted unless
+                    # they have a timeout. This can make lit unresponsive to
+                    # KeyboardInterrupt, so do a busy wait with a timeout.
+                    while not a.ready():
+                        a.wait(1)
+                if not a.successful():
+                    a.get() # Exceptions raised here come from the worker.
+                if self.hit_max_failures:
+                    break
+        except:
+            # Stop the workers and wait for any straggling results to come in
+            # if we exited without waiting on every async result.
+            pool.terminate()
+            raise
+        finally:
+            pool.join()
+
+    def _consume_test_result(self, pool_result):
         """Test completion callback for lit.worker.run_one_test
 
         Updates the test result status in the parent process. Each task in the
