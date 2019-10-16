@@ -33,7 +33,7 @@
 // CHECK-RISCV-BAREMETAL: "-plugin" "{{.*}}{{[/\\]}}LLVMgold.{{dll|dylib|so}}"
 // CHECK-RISCV-BAREMETAL: "-plugin-opt=-mattr=+m"
 // CHECK-RISCV-BAREMETAL: "-plugin-opt=-mattr=+f"
-// CHECK-RISCV-BAREMETAL: "-plugin-opt=-mattr=+relax"
+// CHECK-RISCV-BAREMETAL: "-plugin-opt=-mattr=-relax"
 // CHECK-RISCV-BAREMETAL: "-plugin-opt=-target-abi=lp64f"
 //
 // RUN: %clang -target riscv64-unknown-linux-gnu -### %t.o -flto 2>&1 \
@@ -42,5 +42,5 @@
 // CHECK-RISCV-LINUX: "-plugin" "{{.*}}{{[/\\]}}LLVMgold.{{dll|dylib|so}}"
 // CHECK-RISCV-LINUX: "-plugin-opt=-mattr=+m"
 // CHECK-RISCV-LINUX: "-plugin-opt=-mattr=+f"
-// CHECK-RISCV-LINUX: "-plugin-opt=-mattr=+relax"
+// CHECK-RISCV-LINUX: "-plugin-opt=-mattr=-relax"
 // CHECK-RISCV-LINUX: "-plugin-opt=-target-abi=lp64f"
