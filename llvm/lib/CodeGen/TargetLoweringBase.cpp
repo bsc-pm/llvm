@@ -759,8 +759,8 @@ void TargetLoweringBase::initActions() {
     setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
   }
 
-  // Also make sure truncating stores and extending loads do not suddenly
-  // become legal for i4 and i2.
+  // Also make sure truncating stores and extending loads from any integer type
+  // to i4 and i2 do not suddenly become legal.
   for (MVT ValVT : MVT::integer_valuetypes()) {
     if (ValVT == MVT::i2 || ValVT == MVT::i4)
       continue;
