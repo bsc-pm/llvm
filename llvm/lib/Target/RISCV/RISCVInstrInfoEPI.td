@@ -9,6 +9,17 @@
 
 include "RISCVInstrFormatsEPI.td"
 
+//===----------------------------------------------------------------------===//
+// Target Specific DAG nodes
+//===----------------------------------------------------------------------===//
+
+// We should constraint the second operand
+def SDTUnaryVectorFromScalar : SDTypeProfile<1, 1, [SDTCisVec<0>]>;
+
+def riscv_vbroadcast : SDNode<"RISCVISD::VBROADCAST", SDTUnaryVectorFromScalar>;
+
+//===----------------------------------------------------------------------===//
+
 class VMask<bits<1> vtype>
 {
   bits<1> Value = vtype;
@@ -3651,6 +3662,150 @@ foreach fvti = AllFloatVectors in {
                  (fvti.Scalar fvti.ScalarRegClass:$rs2)),
              $vl, fvti.SEW)>;
 }
+}
+
+//===----------------------------------------------------------------------===//
+// Patterns. Full vector arithmetic operations
+//===----------------------------------------------------------------------===//
+
+// FIXME: Add patterns that can select masked versions
+// FIXME: Add patterns that can select scalar versions
+multiclass pat_vop_binary<SDNode vop,
+                          string instruction_name,
+                          ValueType result_type,
+                          ValueType op_type,
+                          ValueType mask_type,
+                          int sew,
+                          int vlmul,
+                          EPIVReg result_reg_class,
+                          EPIVReg op_reg_class,
+                          bit swap = 0>
+{
+  foreach instruction = [!cast<Instruction>(instruction_name#"_VV_M"#vlmul)] in
+  def : Pat<(result_type (vop
+                          (op_type op_reg_class:$rs1),
+                          (op_type op_reg_class:$rs2))),
+            swap_helper<
+              (instruction), // Empty prefix
+              (instruction op_reg_class:$rs1),
+              (instruction op_reg_class:$rs2),
+              (instruction X0, sew),
+              swap>.Value>;
+}
+
+multiclass pat_vop_binary_common<SDNode vop,
+                          string instruction_name,
+                          list<VectorTypeInfo> vtilist>
+{
+  foreach vti = vtilist in
+  {
+    defm : pat_vop_binary<vop, instruction_name,
+                          vti.Vector, vti.Vector, vti.Mask, vti.SEW,
+                          vti.RegClass.VLMul, vti.RegClass, vti.RegClass>;
+  }
+}
+
+// FIXME: Add patterns that can select masked versions
+multiclass pat_vop_ternary<SDNode vop,
+                           string instruction_name,
+                           ValueType result_type,
+                           ValueType op1_type,
+                           ValueType op2_type,
+                           ValueType mask_type,
+                           int sew,
+                           int vlmul,
+                           EPIVReg result_reg_class,
+                           EPIVReg op1_reg_class,
+                           EPIVReg op2_reg_class> // FIXME Registerclass, dagoperand?
+{
+  def : Pat<(result_type (vop
+                          (result_type result_reg_class:$rs3),
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2))),
+            (!cast<Instruction>(instruction_name#"_VV_M"#vlmul)
+             result_reg_class:$rs3,
+             // Floating point instructions with a scalar operand expect such
+             // operand to be in a register of class FPR64. When dealing with
+             // the f32 variant of such instructions we need to promote the
+             // FPR32 subregister to the FPR64 base register
+             !if(!eq(!cast<string>(op1_reg_class),
+                     !cast<string>(FPR32)),
+                 (SUBREG_TO_REG (i32 -1), FPR32:$rs1, sub_32),
+                 (op1_type op1_reg_class:$rs1)),
+             op2_reg_class:$rs2,
+             X0,
+             sew)>;
+}
+
+multiclass pat_vop_ternary_common<SDNode vop,
+                          string instruction_name,
+                          list<VectorTypeInfo> vtilist>
+{
+  foreach vti = vtilist in
+  {
+    defm : pat_vop_ternary<vop, instruction_name,
+                           vti.Vector, vti.Vector, vti.Vector, vti.Mask,
+                           vti.SEW, vti.RegClass.VLMul, vti.RegClass,
+                           vti.RegClass, vti.RegClass>;
+  }
+}
+
+multiclass pat_vop_binary_int<SDNode vop,
+                             string instruction_name>
+{
+  defm : pat_vop_binary_common<vop, instruction_name, AllIntegerVectors>;
+}
+
+multiclass pat_vop_binary_fp<SDNode vop,
+                             string instruction_name>
+{
+  defm : pat_vop_binary_common<vop, instruction_name, AllFloatVectors>;
+}
+
+multiclass pat_vop_ternary_fp<SDNode vop,
+                             string instruction_name>
+{
+  defm : pat_vop_ternary_common<vop, instruction_name, AllFloatVectors>;
+}
+
+class VectorBroadcastFloat<ValueType VecTy> :
+  PatFrag<(ops node:$value),
+    (vector_shuffle
+      (VecTy (insertelt (VecTy undef), $value, 0)), undef)>;
+
+let Predicates = [HasExtEPI] in {
+
+defm "" : pat_vop_binary_int<add, "PseudoVADD">;
+defm "" : pat_vop_binary_fp<fadd, "PseudoVFADD">;
+
+defm "" : pat_vop_binary_int<mul, "PseudoVMUL">;
+defm "" : pat_vop_binary_fp<fmul, "PseudoVFMUL">;
+
+defm "" : pat_vop_ternary_fp<fma, "PseudoVFMADD">;
+
+foreach fvti = AllFloatVectors in
+{
+  def : Pat<(VectorBroadcastFloat<fvti.Vector> fvti.ScalarRegClass:$value),
+            (!cast<Instruction>("PseudoVFMV_V_F_M" # fvti.RegClass.VLMul)
+                 !if(!eq(!cast<string>(fvti.ScalarRegClass),
+                         !cast<string>(FPR32)),
+                     (SUBREG_TO_REG (i32 -1), FPR32:$value, sub_32),
+                     (fvti.Scalar fvti.ScalarRegClass:$value)),
+                 X0, fvti.SEW)>;
+}
+
+foreach vti = AllIntegerVectors in
+{
+  def : Pat<(vti.Vector (riscv_vbroadcast GPR:$value)),
+            (!cast<Instruction>("PseudoVMV_V_X_M" # vti.RegClass.VLMul)
+                 GPR:$value,
+                 X0, vti.SEW)>;
+  def : Pat<(vti.Vector (riscv_vbroadcast simm5:$value)),
+            (!cast<Instruction>("PseudoVMV_V_I_M" # vti.RegClass.VLMul)
+                 simm5:$value,
+                 X0, vti.SEW)>;
+}
+
 }
 
 //===----------------------------------------------------------------------===//

@@ -124,6 +124,19 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     addRegisterClass(MVT::nxv8f64, &RISCV::EPIVR8RegClass);
 
     setBooleanVectorContents(ZeroOrOneBooleanContent);
+
+    // All integer vector types need special shuffle treatment
+    for (auto SEW : {8, 16, 32, 64}) {
+      // FIXME: Assumes ELEN=64
+      int Scale = 64 / SEW;
+      for (auto NumElems : {Scale * 1, Scale * 2, Scale * 4, Scale * 8}) {
+        MVT VT = MVT::getScalableVectorVT(MVT::getIntegerVT(SEW), NumElems);
+        // FIXME: We can't represent all possible combinations yet.
+        if (VT == MVT::INVALID_SIMPLE_VALUE_TYPE)
+          continue;
+        setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
+      }
+    }
   }
 
   // Compute derived properties from the register classes.
@@ -468,6 +481,37 @@ SDValue RISCVTargetLowering::lowerINTRINSIC_WO_CHAIN(SDValue Op,
   return SDValue();
 }
 
+SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+
+  ShuffleVectorSDNode *SVN = cast<ShuffleVectorSDNode>(Op.getNode());
+
+  if (SVN->isSplat()) {
+    // FIXME - Use split index!
+    if (SVN->getSplatIndex() != 0)
+      return SDValue();
+
+    // Recover the scalar value.
+    SDValue SplatVector = Op.getOperand(0);
+    // FIXME - Look other targets what they do with suffles, it should be
+    // possible to use vmv/vfmv or vrgather.
+    if (SplatVector.getOpcode() != ISD::INSERT_VECTOR_ELT)
+      return SDValue();
+    if (SplatVector.getOperand(0).getOpcode() != ISD::UNDEF)
+      return SDValue();
+    SDValue ScalarValue = SplatVector.getOperand(1);
+    auto *ConstantValue = dyn_cast<ConstantSDNode>(SplatVector.getOperand(2));
+    if (!ConstantValue || ConstantValue->getZExtValue() != 0)
+      return SDValue();
+
+    return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, ScalarValue);
+  }
+
+  return SDValue();
+}
+
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
@@ -508,6 +552,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
   }
   case ISD::INTRINSIC_WO_CHAIN:
     return lowerINTRINSIC_WO_CHAIN(Op, DAG);
+  case ISD::VECTOR_SHUFFLE:
+    return lowerVECTOR_SHUFFLE(Op, DAG);
   }
 }
 
@@ -2801,6 +2847,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::FMV_X_ANYEXTW_RV64";
   case RISCVISD::READ_CYCLE_WIDE:
     return "RISCVISD::READ_CYCLE_WIDE";
+  case RISCVISD::VBROADCAST:
+    return "RISCVISD::VBROADCAST";
   }
   return nullptr;
 }
