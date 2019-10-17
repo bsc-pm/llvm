@@ -621,11 +621,9 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
   case Type::Vector: {
     const VectorType *VT = cast<VectorType>(Ty);
     if (VT->getVectorKind() == VectorType::EPIVector) {
-      // Use a scalable vector here n x <type> but convert booleans into
-      // "mask vectors"
-      llvm::Type *ElementType = ConvertType(VT->getElementType());
-
-      ResultType = llvm::VectorType::get(ElementType, VT->getNumElements(),
+      // Use a scalable vector here n x <type>
+      ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),
+                                         VT->getNumElements(),
                                          /* Scalable */ 1);
     } else {
       ResultType = llvm::VectorType::get(ConvertType(VT->getElementType()),
