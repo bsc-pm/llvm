@@ -1751,7 +1751,9 @@ void CodeGenFunction::EmitStoreOfScalar(llvm::Value *Value, Address Addr,
         SrcTy = llvm::VectorType::get(VecTy->getElementType(), 4);
       }
       const VectorType *VT = dyn_cast<VectorType>(Ty);
-      // EPI mask types can be legitimately different, so don't bitcast.
+      // EPI mask types can be legitimately different, because the value being
+      // stored will be zext'd below in EmitToMemory from i1 to the
+      // corrresponding iN for this mask.
       if (Addr.getElementType() != SrcTy &&
           (!VT || VT->getVectorKind() != VectorType::EPIVector ||
            !VT->getElementType()->isBooleanType()))
