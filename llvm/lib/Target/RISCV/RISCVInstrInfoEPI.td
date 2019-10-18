@@ -1991,6 +1991,11 @@ defm PseudoVFMSUB      : pseudo_ternary_v_vv_vf;
 defm PseudoVFMACC      : pseudo_ternary_v_vv_vf;
 defm PseudoVFMSAC      : pseudo_ternary_v_vv_vf;
 
+defm PseudoVFNMADD     : pseudo_ternary_v_vv_vf;
+defm PseudoVFNMSUB     : pseudo_ternary_v_vv_vf;
+defm PseudoVFNMACC     : pseudo_ternary_v_vv_vf;
+defm PseudoVFNMSAC     : pseudo_ternary_v_vv_vf;
+
 defm PseudoVFWADD      : pseudo_binary_w_vv_vf;
 defm PseudoVFWSUB      : pseudo_binary_w_vv_vf;
 defm PseudoVFWMUL      : pseudo_binary_w_vv_vf;
@@ -3461,13 +3466,13 @@ defm "" : pat_intrinsic_binary_fp_v_vvm<"int_epi_vfmerge", "PseudoVMERGE">;
 defm "" : pat_intrinsic_binary_fp_v_vfm<"int_epi_vfmerge", "PseudoVFMERGE">;
 
 defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfmadd", "PseudoVFMADD">;
-//defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfnmadd", "VFNMADD">;
+defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfnmadd", "PseudoVFNMADD">;
 defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfmsub", "PseudoVFMSUB">;
-//defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfnmsub", "VFNMSUB">;
+defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfnmsub", "PseudoVFNMSUB">;
 defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfmacc", "PseudoVFMACC">;
-//defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfnmacc", "VFNMACC">;
+defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfnmacc", "PseudoVFNMACC">;
 defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfmsac", "PseudoVFMSAC">;
-//defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfnmsac", "VFNMSAC">;
+defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfnmsac", "PseudoVFNMSAC">;
 
 defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwadd", "PseudoVFWADD">;
 //defm "" : pat_intrinsic_binary_fp_vs<"int_epi_vfwredsum", "VFWREDSUM">;

@@ -1929,13 +1929,13 @@ intrinsics = [
         #TernaryIntrinsic("vwmsac", type_generator = generate_ternary_integer_types, variants = vv_vx),
 
         TernaryIntrinsic("vfmadd", type_generator = generate_ternary_float_types, variants = vv_vf),
-        #TernaryIntrinsic("vfnmadd", type_generator = generate_ternary_float_types, variants = vv_vf),
+        TernaryIntrinsic("vfnmadd", type_generator = generate_ternary_float_types, variants = vv_vf),
         TernaryIntrinsic("vfmsub", type_generator = generate_ternary_float_types, variants = vv_vf),
-        #TernaryIntrinsic("vfnmsub", type_generator = generate_ternary_float_types, variants = vv_vf),
+        TernaryIntrinsic("vfnmsub", type_generator = generate_ternary_float_types, variants = vv_vf),
         TernaryIntrinsic("vfmacc", type_generator = generate_ternary_float_types, variants = vv_vf),
-        #TernaryIntrinsic("vfnmacc", type_generator = generate_ternary_float_types, variants = vv_vf),
+        TernaryIntrinsic("vfnmacc", type_generator = generate_ternary_float_types, variants = vv_vf),
         TernaryIntrinsic("vfmsac", type_generator = generate_ternary_float_types, variants = vv_vf),
-        #TernaryIntrinsic("vfnmsac", type_generator = generate_ternary_float_types, variants = vv_vf),
+        TernaryIntrinsic("vfnmsac", type_generator = generate_ternary_float_types, variants = vv_vf),
 
         #TernaryIntrinsic("vfwmacc", type_generator = generate_ternary_float_types_widened, variants = vv_vx),
         #TernaryIntrinsic("vfwnmacc", type_generator = generate_ternary_float_types_widened, variants = vv_vx),
