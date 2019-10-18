@@ -1905,18 +1905,18 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
     Reg = State.AllocateReg(ArgFPR64s, ArgFPR32s);
   else if (ValVT.isScalableVector()) {
     const TargetRegisterClass *RC = TLI->getRegClassFor(ValVT);
-    if (RC == &RISCV::EPIVRRegClass) {
+    if (RC->hasSuperClassEq(&RISCV::EPIVRRegClass)) {
       if (FirstMaskArgument.hasValue() &&
           ValNo == FirstMaskArgument.getValue()) {
         Reg = RISCV::V0;
       } else {
         Reg = State.AllocateReg(ArgEPIVRs);
       }
-    } else if (RC == &RISCV::EPIVR2RegClass) {
+    } else if (RC->hasSuperClassEq(&RISCV::EPIVR2RegClass)) {
       Reg = State.AllocateReg(ArgEPIVR2s);
-    } else if (RC == &RISCV::EPIVR4RegClass) {
+    } else if (RC->hasSuperClassEq(&RISCV::EPIVR4RegClass)) {
       Reg = State.AllocateReg(ArgEPIVR4s);
-    } else if (RC == &RISCV::EPIVR8RegClass) {
+    } else if (RC->hasSuperClassEq(&RISCV::EPIVR8RegClass)) {
       Reg = State.AllocateReg(ArgEPIVR8s);
     } else {
       llvm_unreachable("Unhandled class register for ValueType");

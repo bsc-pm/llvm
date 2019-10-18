@@ -45,9 +45,8 @@ def VectorMaskOp : AsmOperandClass {
   let DiagnosticType = "InvalidVectorMaskOperand";
 }
 
-def vectormask : Operand<XLenVT> {
+def vectormask : RegisterOperand<EPIMaskVR, "printVectorMask"> {
   let ParserMatchClass = VectorMaskOp;
-  let PrintMethod = "printVectorMask";
   let DecoderMethod = "decodeVectorMask";
 }
 
@@ -114,7 +113,7 @@ multiclass binary_arithmetic_integer_n_v<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def V_MASK : RVInstEPIOPV_IVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -134,7 +133,7 @@ multiclass binary_arithmetic_integer_n_x<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def X_MASK : RVInstEPIOPV_IVX<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, GPR:$rs1, vectormask:$vm),
@@ -154,7 +153,7 @@ multiclass binary_arithmetic_integer_n_i<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${imm5}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def I_MASK : RVInstEPIOPV_IVI<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, simm5:$imm5, vectormask:$vm),
@@ -174,7 +173,7 @@ multiclass binary_arithmetic_integer_n_u<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${imm5}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def U_MASK : RVInstEPIOPV_IVI<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, uimm5:$imm5, vectormask:$vm),
@@ -193,7 +192,7 @@ multiclass binary_arithmetic_integer_n_s<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def S_MASK : RVInstEPIOPV_IVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -240,20 +239,20 @@ multiclass binary_arithmetic_integer_vx_mask_in<string opcodestr,
                                                 bits<6> funct6,
                                                 VMask vmask> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask.Value,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def _VVM : RVInstEPIOPV_IVV<funct6,
               (outs EPIVR:$rd),
-              (ins EPIVR:$rs2, EPIVR:$rs1),
+              (ins EPIVR:$rs2, EPIVR:$rs1, EPIMaskVR:$mask),
               opcodestr # ".vvm",
-              "${rd}, ${rs2}, ${rs1}, v0">;
+              "${rd}, ${rs2}, ${rs1}, ${mask}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask.Value,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def _VXM : RVInstEPIOPV_IVX<funct6,
               (outs EPIVR:$rd),
-              (ins EPIVR:$rs2, GPR:$rs1),
+              (ins EPIVR:$rs2, GPR:$rs1, EPIMaskVR:$mask),
               opcodestr # ".vxm",
-              "${rd}, ${rs2}, ${rs1}, v0">;
+              "${rd}, ${rs2}, ${rs1}, ${mask}">;
 }
 
 multiclass binary_arithmetic_integer_vxi_mask_in<string opcodestr,
@@ -262,17 +261,17 @@ multiclass binary_arithmetic_integer_vxi_mask_in<string opcodestr,
   defm "" : binary_arithmetic_integer_vx_mask_in<opcodestr, funct6, vmask>;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask.Value,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def _VIM : RVInstEPIOPV_IVI<funct6,
               (outs EPIVR:$rd),
-              (ins EPIVR:$rs2, simm5:$imm5),
+              (ins EPIVR:$rs2, simm5:$imm5, EPIMaskVR:$mask),
               opcodestr # ".vim",
-              "${rd}, ${rs2}, ${imm5}, v0">;
+              "${rd}, ${rs2}, ${imm5}, ${mask}">;
 }
 
 multiclass binary_arithmetic_integer_vxi_mask<string opcodestr, bits<6> funct6> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def V_MASK : RVInstEPIOPV_IVV<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -280,7 +279,7 @@ multiclass binary_arithmetic_integer_vxi_mask<string opcodestr, bits<6> funct6> 
              "${rd}, ${rs2}, ${rs1}, ${vm}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def X_MASK : RVInstEPIOPV_IVX<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, GPR:$rs1, vectormask:$vm),
@@ -288,7 +287,7 @@ multiclass binary_arithmetic_integer_vxi_mask<string opcodestr, bits<6> funct6> 
              "${rd}, ${rs2}, ${rs1}, ${vm}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def I_MASK : RVInstEPIOPV_IVI<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, simm5:$imm5, vectormask:$vm),
@@ -307,7 +306,7 @@ multiclass binary_arithmetic_float_n_v<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def V_MASK : RVInstEPIOPV_FVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -326,7 +325,7 @@ multiclass binary_arithmetic_float_n_s<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def S_MASK : RVInstEPIOPV_FVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -346,7 +345,7 @@ multiclass binary_arithmetic_float_n_f<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def F_MASK : RVInstEPIOPV_FVF<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, FPR64:$rs1, vectormask:$vm),
@@ -374,7 +373,7 @@ multiclass binary_arithmetic_float_vf_destructive<string opcodestr, bits<6> func
              "${rd}, ${rs1}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Constraints = "$rd = $_rd", Uses = [VL, VTYPE, V0] in
+      Constraints = "$rd = $_rd", Uses = [VL, VTYPE] in
   def _VV_MASK : RVInstEPIOPV_FVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$_rd, EPIVR:$rs1, EPIVR:$rs2, vectormask:$vm),
@@ -390,7 +389,7 @@ multiclass binary_arithmetic_float_vf_destructive<string opcodestr, bits<6> func
              "${rd}, ${rs1}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Constraints = "$rd = $_rd", Uses = [VL, VTYPE, V0] in
+      Constraints = "$rd = $_rd", Uses = [VL, VTYPE] in
   def _VF_MASK : RVInstEPIOPV_FVF<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$_rd, FPR64:$rs1, EPIVR:$rs2, vectormask:$vm),
@@ -421,7 +420,7 @@ multiclass binary_arithmetic_mask_integer_n_v<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def V_MASK : RVInstEPIOPV_MVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -441,7 +440,7 @@ multiclass binary_arithmetic_mask_integer_n_x<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def X_MASK : RVInstEPIOPV_MVX<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$rs2, GPR:$rs1, vectormask:$vm),
@@ -464,7 +463,7 @@ multiclass binary_arithmetic_mask_integer_n_s<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}, ${rs1}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0] in
+      Uses = [VL, VTYPE] in
   def S_MASK : RVInstEPIOPV_MVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, EPIVR:$rs1, vectormask:$vm),
@@ -501,7 +500,7 @@ multiclass binary_arithmetic_mask_integer_vx_destructive<string opcodestr, bits<
              "${rd}, ${rs1}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Constraints = "$rd = $_rd", Uses = [VL, VTYPE, V0] in
+      Constraints = "$rd = $_rd", Uses = [VL, VTYPE] in
   def _VV_MASK : RVInstEPIOPV_MVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$_rd, EPIVR:$rs1, EPIVR:$rs2, vectormask:$vm),
@@ -517,7 +516,7 @@ multiclass binary_arithmetic_mask_integer_vx_destructive<string opcodestr, bits<
              "${rd}, ${rs1}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Constraints = "$rd = $_rd", Uses = [VL, VTYPE, V0] in
+      Constraints = "$rd = $_rd", Uses = [VL, VTYPE] in
   def _VX_MASK : RVInstEPIOPV_MVX<funct6,
              (outs EPIVR:$rd),
              (ins EPIVR:$_rd, GPR:$rs1, EPIVR:$rs2, vectormask:$vm),
@@ -562,7 +561,7 @@ multiclass unary_mask_integer_m<string opcodestr, bits<6> funct6> {
              "${rd}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0], rs1 = 0b00000 in
+      Uses = [VL, VTYPE], rs1 = 0b00000 in
   def _M_MASK : RVInstEPIOPV_MVV<funct6,
                (outs GPR:$rd),
                (ins EPIVR:$rs2, vectormask:$vm),
@@ -582,7 +581,7 @@ multiclass unary_arithmetic_float_v<string opcodestr, bits<6> funct6,
              "${rd}, ${rs2}">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-      Uses = [VL, VTYPE, V0], rs1 = rs1 in
+      Uses = [VL, VTYPE], rs1 = rs1 in
   def _V_MASK : RVInstEPIOPV_FVV<funct6,
                (outs EPIVR:$rd),
                (ins EPIVR:$rs2, vectormask:$vm),
@@ -602,7 +601,7 @@ multiclass vector_store_unit_stride_width<string opcodestr, bits<3> width>
                opcodestr # ".v",
                "${rd}, (${rs1})">;
 
-    let Uses = [VL, VTYPE, V0] in
+    let Uses = [VL, VTYPE] in
     def _V_MASK : RVInstStore<0b000,
                     (outs),
                     (ins EPIVR:$rd, GPR:$rs1, vectormask:$vm),
@@ -632,7 +631,7 @@ multiclass vector_store_nonunit_stride_width<string opcodestr, bits<3> mop,
                opcodestr # ".v",
                "${rd}, (${rs1}), ${rs2}">;
 
-    let Uses = [VL, VTYPE, V0] in
+    let Uses = [VL, VTYPE] in
     def _V_MASK : RVInstStore<mop,
                     (outs),
                     (ins EPIVR:$rd, GPR:$rs1, rc:$rs2, vectormask:$vm),
@@ -670,7 +669,7 @@ multiclass vector_load_unit_stride_width_sign<string opcodestr, bits<1> sign,
                opcodestr # ".v",
                "${rd}, (${rs1})">;
 
-    let Uses = [VL, VTYPE, V0] in
+    let Uses = [VL, VTYPE] in
     def _V_MASK : RVInstLoad<{sign, 0b00},
                     (outs EPIVR:$rd),
                     (ins GPR:$rs1, vectormask:$vm),
@@ -706,7 +705,7 @@ multiclass vector_load_nonunit_stride_width_sign<string opcodestr, bits<1> sign,
                opcodestr # ".v",
                "${rd}, (${rs1}), ${rs2}">;
 
-    let Uses = [VL, VTYPE, V0] in
+    let Uses = [VL, VTYPE] in
     def _V_MASK : RVInstLoad<{sign, mop},
                     (outs EPIVR:$rd),
                     (ins GPR:$rs1, rc:$rs2, vectormask:$vm),
@@ -866,7 +865,7 @@ def VMSBF_M : RVInstEPIOPV_MVV<0b010110,
   (ins EPIVR:$rs2),
   "vmsbf.m", "${rd}, ${rs2}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0], rs1 = 0b00001 in
+    Uses = [VL, VTYPE], rs1 = 0b00001 in
 def VMSBF_M_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2, vectormask:$vm),
@@ -879,7 +878,7 @@ def VMSOF_M : RVInstEPIOPV_MVV<0b010110,
   (ins EPIVR:$rs2),
   "vmsof.m", "${rd}, ${rs2}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0], rs1 = 0b00010 in
+    Uses = [VL, VTYPE], rs1 = 0b00010 in
 def VMSOF_M_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2, vectormask:$vm),
@@ -892,7 +891,7 @@ def VMSIF_M : RVInstEPIOPV_MVV<0b010110,
   (ins EPIVR:$rs2),
   "vmsif.m", "${rd}, ${rs2}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0], rs1 = 0b00011 in
+    Uses = [VL, VTYPE], rs1 = 0b00011 in
 def VMSIF_M_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2, vectormask:$vm),
@@ -905,7 +904,7 @@ def VIOTA_M : RVInstEPIOPV_MVV<0b010110,
   (ins EPIVR:$rs2),
   "viota.m", "${rd}, ${rs2}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0], rs1 = 0b10000 in
+    Uses = [VL, VTYPE], rs1 = 0b10000 in
 def VIOTA_M_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins EPIVR:$rs2, vectormask:$vm),
@@ -918,7 +917,7 @@ def VID_V : RVInstEPIOPV_MVV<0b010110,
   (ins),
   "vid.v", "${rd}">;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0], rs1 = 0b10001, rs2 = 0b00000 in
+    Uses = [VL, VTYPE], rs1 = 0b10001, rs2 = 0b00000 in
 def VID_V_MASK : RVInstEPIOPV_MVV<0b010110,
   (outs EPIVR:$rd),
   (ins vectormask:$vm),
@@ -991,12 +990,12 @@ def VFMV_V_F : RVInstEPIOPV_FVF<0b010111,
            "${rd}, ${rs1}">;
 
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
-    Uses = [VL, VTYPE, V0] in
+    Uses = [VL, VTYPE] in
 def VFMERGE_VFM : RVInstEPIOPV_FVF<0b010111,
            (outs EPIVR:$rd),
-           (ins EPIVR:$rs2, FPR64:$rs1),
+           (ins EPIVR:$rs2, FPR64:$rs1, EPIMaskVR:$mask),
            "vfmerge.vfm",
-           "${rd}, ${rs2}, ${rs1}, v0">;
+           "${rd}, ${rs2}, ${rs1}, ${mask}">;
 
 defm VMFEQ  : binary_arithmetic_float_vf<"vmfeq",  0b011000>;
 defm VMFLE  : binary_arithmetic_float_vf<"vmfle",  0b011001>;
@@ -1185,21 +1184,23 @@ defset list<VectorTypeInfo> AllVectors = {
       def Vtype1xi64 : VectorTypeInfo<nxv1i64, nxv1i1, 64, EPIVR>;
     }
 
-    def Vtype16xi8  : VectorTypeInfo<nxv16i8,  nxv16i1, 8,  EPIVR2>;
-    def Vtype32xi8  : VectorTypeInfo<nxv32i8,  nxv32i1, 8,  EPIVR4>;
-//  def Vtype64xi8  : VectorTypeInfo<nxv64i8,  nxv64i1, 8,  EPIVR8>; // FIXME undefined type
+    defset list<VectorTypeInfo> GroupIntegerVectors = {
+      def Vtype16xi8  : VectorTypeInfo<nxv16i8,  nxv16i1, 8,  EPIVR2>;
+      def Vtype32xi8  : VectorTypeInfo<nxv32i8,  nxv32i1, 8,  EPIVR4>;
+//    def Vtype64xi8  : VectorTypeInfo<nxv64i8,  nxv64i1, 8,  EPIVR8>; // FIXME undefined type
 
-    def Vtype8xi16  : VectorTypeInfo<nxv8i16,  nxv8i1,  16, EPIVR2>;
-    def Vtype16xi16 : VectorTypeInfo<nxv16i16, nxv16i1, 16, EPIVR4>;
-    def Vtype32xi16 : VectorTypeInfo<nxv32i16, nxv32i1, 16, EPIVR8>;
+      def Vtype8xi16  : VectorTypeInfo<nxv8i16,  nxv8i1,  16, EPIVR2>;
+      def Vtype16xi16 : VectorTypeInfo<nxv16i16, nxv16i1, 16, EPIVR4>;
+      def Vtype32xi16 : VectorTypeInfo<nxv32i16, nxv32i1, 16, EPIVR8>;
 
-    def Vtype4xi32  : VectorTypeInfo<nxv4i32,  nxv4i1,  32, EPIVR2>;
-    def Vtype8xi32  : VectorTypeInfo<nxv8i32,  nxv8i1,  32, EPIVR4>;
-    def Vtype16xi32 : VectorTypeInfo<nxv16i32, nxv16i1, 32, EPIVR8>;
+      def Vtype4xi32  : VectorTypeInfo<nxv4i32,  nxv4i1,  32, EPIVR2>;
+      def Vtype8xi32  : VectorTypeInfo<nxv8i32,  nxv8i1,  32, EPIVR4>;
+      def Vtype16xi32 : VectorTypeInfo<nxv16i32, nxv16i1, 32, EPIVR8>;
 
-    def Vtype2xi64  : VectorTypeInfo<nxv2i64,  nxv2i1,  64, EPIVR2>;
-    def Vtype4xi64  : VectorTypeInfo<nxv4i64,  nxv4i1,  64, EPIVR4>;
-    def Vtype8xi64  : VectorTypeInfo<nxv8i64,  nxv8i1,  64, EPIVR8>;
+      def Vtype2xi64  : VectorTypeInfo<nxv2i64,  nxv2i1,  64, EPIVR2>;
+      def Vtype4xi64  : VectorTypeInfo<nxv4i64,  nxv4i1,  64, EPIVR4>;
+      def Vtype8xi64  : VectorTypeInfo<nxv8i64,  nxv8i1,  64, EPIVR8>;
+    }
   }
 
   defset list<FloatVectorTypeInfo> AllFloatVectors = {
@@ -1294,20 +1295,21 @@ defset list<FloatVectorTypeInfoToWide> AllWideableFloatVectors = {
 //def : FloatVectorTypeInfoToWide<Vtype4xf64, /* FIXME: Vtype4xf128 */ i1>;
 }
 
-class MaskTypeInfo<ValueType Mas, int Sew, ValueType Ivt> {
+class MaskTypeInfo<ValueType Mas, int Sew, int Vlmul, ValueType Ivt> {
   ValueType Mask = Mas;
   int SEW = Sew; // FIXME: computed as ELEN/vscale, to be used for loading/storing partial masks
+  int VLMul = Vlmul;
   ValueType IntegerVector = Ivt;
 }
 
 defset list<MaskTypeInfo> AllMasks = {
-  def : MaskTypeInfo<nxv1i1,  64, nxv1i64>; // FIXME SEW should be ELEN/1
-  def : MaskTypeInfo<nxv2i1,  32, nxv2i32>; // FIXME SEW should be ELEN/2
-  def : MaskTypeInfo<nxv4i1,  16, nxv4i16>; // FIXME SEW should be ELEN/4
-  def : MaskTypeInfo<nxv8i1,  8,  nxv8i8>;  // FIXME SEW should be ELEN/8
-  def : MaskTypeInfo<nxv16i1, 8,  nxv16i4>;  // FIXME SEW should be ELEN/16, SEW < 8
-  def : MaskTypeInfo<nxv32i1, 8,  nxv32i2>;  // FIXME SEW should be ELEN/32, SEW < 8
-//def : MaskTypeInfo<nxv64i1, 8,  nxv64i1>;  // FIXME SEW should be ELEN/64, SEW < 8, undefined type
+  def : MaskTypeInfo<nxv1i1,  64, 1, nxv1i64>; // FIXME SEW should be ELEN/1
+  def : MaskTypeInfo<nxv2i1,  32, 1, nxv2i32>; // FIXME SEW should be ELEN/2
+  def : MaskTypeInfo<nxv4i1,  16, 1, nxv4i16>; // FIXME SEW should be ELEN/4
+  def : MaskTypeInfo<nxv8i1,  8,  1, nxv8i8>;  // FIXME SEW should be ELEN/8
+  def : MaskTypeInfo<nxv16i1, 8,  2, nxv16i4>;  // FIXME SEW should be ELEN/16, SEW < 8
+  def : MaskTypeInfo<nxv32i1, 8,  4, nxv32i2>;  // FIXME SEW should be ELEN/32, SEW < 8
+//def : MaskTypeInfo<nxv64i1, 8,  8, nxv64i1>;  // FIXME SEW should be ELEN/64, SEW < 8, undefined type
 }
 
 class EPIVRegToWide<EPIVReg Reg, EPIVReg WideReg> {
@@ -1359,7 +1361,7 @@ multiclass pseudo_nullary<EPIVReg result_reg_class,
                      EPIPseudo;
 
   let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
-      Uses = [VL, VTYPE, V0], VLIndex = 3, SEWIndex = 4, MergeOpIndex = 1,
+      Uses = [VL, VTYPE], VLIndex = 3, SEWIndex = 4, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins result_reg_class:$merge,
@@ -1396,7 +1398,7 @@ multiclass pseudo_unary_nomask<EPIVReg result_reg_class,
 multiclass pseudo_unary_mask_nomerge<EPIVReg result_reg_class,
                                      EPIVReg op_reg_class,
                                      int vlmul> {
-  let Uses = [VL, VTYPE, V0], VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+  let Uses = [VL, VTYPE], VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins op_reg_class:$rs2, vectormask:$vm,
@@ -1414,7 +1416,7 @@ multiclass pseudo_unary<EPIVReg result_reg_class,
   defm "" : pseudo_unary_nomask<result_reg_class, op_reg_class, vlmul>;
 
   let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
-      Uses = [VL, VTYPE, V0], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
+      Uses = [VL, VTYPE], VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins result_reg_class:$merge,
@@ -1484,10 +1486,10 @@ multiclass pseudo_unary_v_w {
   }
 }
 
-multiclass pseudo_binary<EPIVReg result_reg_class,
-                         EPIVReg op1_reg_class,
-                         RegisterClass op2_reg_class, // FIXME dagoperand
-                         int vlmul, string constraints = ""> {
+multiclass pseudo_binary_nomask<EPIVReg result_reg_class,
+                                EPIVReg op1_reg_class,
+                                RegisterClass op2_reg_class, // FIXME dagoperand
+                                int vlmul, string constraints = ""> {
   let Constraints = constraints, Uses = [VL, VTYPE],
       VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
@@ -1496,9 +1498,17 @@ multiclass pseudo_binary<EPIVReg result_reg_class,
                                  GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
+}
+
+multiclass pseudo_binary<EPIVReg result_reg_class,
+                         EPIVReg op1_reg_class,
+                         RegisterClass op2_reg_class, // FIXME dagoperand
+                         int vlmul, string constraints = ""> {
+  defm "" : pseudo_binary_nomask<result_reg_class, op1_reg_class, op2_reg_class,
+                                 vlmul, constraints>;
 
   let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
-      Uses = [VL, VTYPE, V0], VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
+      Uses = [VL, VTYPE], VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                                  (ins result_reg_class:$merge,
@@ -1512,11 +1522,11 @@ multiclass pseudo_binary_mask_in<EPIVReg result_reg_class,
                                  EPIVReg op1_reg_class,
                                  RegisterClass op2_reg_class,
                                  int vlmul> {
-  let Uses = [VL, VTYPE, V0], VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
+  let Uses = [VL, VTYPE], VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                             (ins op1_reg_class:$rs2, op2_reg_class:$rs1,
-                                 GPR:$vl, ixlenimm:$sew),
+                                 EPIMaskVR:$maskop, GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
 }
@@ -1798,7 +1808,7 @@ multiclass pseudo_ternary<EPIVReg result_reg_class,
                      EPIPseudo;
 
   let Constraints = "$rd = $rs3",
-      Uses = [VL, VTYPE, V0],
+      Uses = [VL, VTYPE],
       VLIndex = 5, SEWIndex = 6, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)#"_MASK") in
     def "_MASK_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
@@ -1834,13 +1844,25 @@ multiclass pseudo_ternary_v_vv_vf {
 }
 
 multiclass pseudo_unary_mask_integer {
-  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
-      VLMul = EPIVR.VLMul in
+  foreach Vlmul = [1, 2, 4, 8] in
   {
-    // FIXME: LMUL=1 here does not correctly capture the idea that
-    // these instructions don't care about LMUL. See llvm-mono#73
-    defm _M : pseudo_unary_nomask<GPR, EPIVR, EPIVR.VLMul>;
-    defm _M : pseudo_unary_mask_nomerge<GPR, EPIVR, EPIVR.VLMul>;
+    let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
+        VLMul = Vlmul in
+    {
+      defm _M : pseudo_unary_nomask<GPR, EPIVR, Vlmul>;
+      defm _M : pseudo_unary_mask_nomerge<GPR, EPIVR, Vlmul>;
+    }
+  }
+}
+
+multiclass pseudo_binary_mm {
+  foreach Vlmul = [1, 2, 4, 8] in
+  {
+    let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
+        VLMul = Vlmul in
+    {
+      defm _MM : pseudo_binary_nomask<EPIVR, EPIVR, EPIVR, Vlmul>;
+    }
   }
 }
 
@@ -2025,6 +2047,15 @@ defm PseudoVID         : pseudo_nullary_v;
 defm PseudoVMPOPC      : pseudo_unary_mask_integer;
 defm PseudoVMFIRST     : pseudo_unary_mask_integer;
 
+defm PseudoVMANDNOT    : pseudo_binary_mm;
+defm PseudoVMAND       : pseudo_binary_mm;
+defm PseudoVMOR        : pseudo_binary_mm;
+defm PseudoVMXOR       : pseudo_binary_mm;
+defm PseudoVMORNOT     : pseudo_binary_mm;
+defm PseudoVMNAND      : pseudo_binary_mm;
+defm PseudoVMNOR       : pseudo_binary_mm;
+defm PseudoVMXNOR      : pseudo_binary_mm;
+
 // Load/store pseudo instructions
 
 foreach evr = AllEPIVRegs in
@@ -2043,7 +2074,7 @@ foreach vlmul = [evr.VLMul] in
                    []>,
             EPIPseudo;
 
-    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE],
         VLIndex = 4, SEWIndex = 5, MergeOpIndex = 1,
         BaseInstr = VLE_V_MASK in
       def PseudoVLE_V_MASK_M#vlmul
@@ -2062,7 +2093,7 @@ foreach vlmul = [evr.VLMul] in
                    []>,
             EPIPseudo;
 
-    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE],
         VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
         BaseInstr = VLSE_V_MASK in
       def PseudoVLSE_V_MASK_M#vlmul
@@ -2081,7 +2112,7 @@ foreach vlmul = [evr.VLMul] in
                    []>,
             EPIPseudo;
 
-    let Constraints = "$rd = $merge", Uses = [VL, VTYPE, V0],
+    let Constraints = "$rd = $merge", Uses = [VL, VTYPE],
         VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
         BaseInstr = VLXE_V_MASK in
       def PseudoVLXE_V_MASK_M#vlmul
@@ -2106,7 +2137,7 @@ foreach vlmul = [evr.VLMul] in
             EPIPseudo;
 
     // Masked stores do not have a merge operand as merge is done in memory
-    let Uses = [VL, VTYPE, V0],
+    let Uses = [VL, VTYPE],
         VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
         BaseInstr = VSE_V_MASK in
       def PseudoVSE_V_MASK_M#vlmul
@@ -2126,7 +2157,7 @@ foreach vlmul = [evr.VLMul] in
             EPIPseudo;
 
     // Masked stores do not have a merge operand as merge is done in memory
-    let Uses = [VL, VTYPE, V0],
+    let Uses = [VL, VTYPE],
         VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
         BaseInstr = VSSE_V_MASK in
       def PseudoVSSE_V_MASK_M#vlmul
@@ -2146,7 +2177,7 @@ foreach vlmul = [evr.VLMul] in
             EPIPseudo;
 
     // Masked stores do not have a merge operand as merge is done in memory
-    let Uses = [VL, VTYPE, V0],
+    let Uses = [VL, VTYPE],
         VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
         BaseInstr = VSXE_V_MASK in
       def PseudoVSXE_V_MASK_M#vlmul
@@ -2229,6 +2260,28 @@ let Predicates = [HasExtEPI] in {
                                /* sew */ 8, /* vlmul */ 1, EPIVR>;
   }
 
+  foreach vti = NoGroupIntegerVectors in {
+     def : Pat<(vti.Vector (zext (vti.Mask EPIVR:$rs1))),
+               (PseudoVMAND_MM_M1 EPIVR:$rs1, EPIVR:$rs1, X0, vti.SEW)>;
+     def : Pat<(vti.Mask (trunc (vti.Vector EPIVR:$rs1))),
+               (PseudoVMAND_MM_M1 EPIVR:$rs1, EPIVR:$rs1, X0, vti.SEW)>;
+  }
+
+  foreach vti = GroupIntegerVectors in {
+     def : Pat<(vti.Mask (trunc (vti.Vector vti.RegClass:$rs1))),
+               (!cast<Instruction>("PseudoVMSNE_VV_M"#vti.RegClass.VLMul)
+                 (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
+                   (vti.Vector vti.RegClass:$rs1), 1, X0, vti.SEW),
+                 (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
+                   (vti.Vector (IMPLICIT_DEF)), 0, X0, vti.SEW),
+                 X0, vti.SEW)>;
+     def : Pat<(vti.Vector (zext (vti.Mask EPIVR:$rs1))),
+               (!cast<Instruction>("PseudoVMERGE_VIM_M"#vti.RegClass.VLMul)
+                 (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
+                   (vti.Vector (IMPLICIT_DEF)), 0, X0, vti.SEW),
+                 1, EPIVR:$rs1, X0, vti.SEW)>;
+  }
+
   // FIXME Deal with {B,H,W} load/store (load + sext)
 }
 
@@ -2291,19 +2344,17 @@ class swap_helper<dag Prefix,
        Suffix);
 }
 
-multiclass pat_intrinsic_binary<string intrinsic_name,
-                                string instruction_name,
-                                string kind,
-                                ValueType result_type,
-                                ValueType op1_type,
-                                ValueType op2_type,
-                                ValueType mask_type,
-                                int sew,
-                                int vlmul,
-                                EPIVReg result_reg_class,
-                                EPIVReg op1_reg_class,
-                                RegisterClass op2_reg_class, // FIXME dagoperand?
-                                bit swap = 0>
+multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
+                                       string instruction_name,
+                                       string kind,
+                                       ValueType result_type,
+                                       ValueType op1_type,
+                                       ValueType op2_type,
+                                       int sew,
+                                       int vlmul,
+                                       EPIVReg op1_reg_class,
+                                       RegisterClass op2_reg_class, // FIXME dagoperand?
+                                       bit swap = 0>
 {
   foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)] in
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
@@ -2327,13 +2378,33 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                (NoX0 GPR:$vl),
                sew),
               swap>.Value>;
+}
 
+multiclass pat_intrinsic_binary<string intrinsic_name,
+                                string instruction_name,
+                                string kind,
+                                ValueType result_type,
+                                ValueType op1_type,
+                                ValueType op2_type,
+                                ValueType mask_type,
+                                int sew,
+                                int vlmul,
+                                EPIVReg result_reg_class,
+                                EPIVReg op1_reg_class,
+                                RegisterClass op2_reg_class, // FIXME dagoperand?
+                                bit swap = 0>
+{
+  defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, kind,
+                                     result_type, op1_type, op2_type, sew,
+                                     vlmul, op1_reg_class, op2_reg_class,
+                                     swap>;
+                        
   foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_MASK_M"#vlmul)] in
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
                           (result_type result_reg_class:$merge),
                           (op1_type op1_reg_class:$rs1),
                           (op2_type op2_reg_class:$rs2),
-                          (mask_type V0),
+                          (mask_type EPIMaskVR:$maskop),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction result_reg_class:$merge),
@@ -2349,7 +2420,7 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                    (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
                    (op2_type op2_reg_class:$rs2))),
               (instruction
-               vmask_only_true.Value,
+               EPIMaskVR:$maskop,
                (NoX0 GPR:$vl),
                sew),
               swap>.Value>;
@@ -2373,7 +2444,7 @@ multiclass pat_intrinsic_binary_mask_in<string intrinsic_name,
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
                           (op2_type op2_reg_class:$rs2),
-                          (mask_type V0),
+                          (mask_type EPIMaskVR:$maskop),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction), // empty prefix
@@ -2389,6 +2460,7 @@ multiclass pat_intrinsic_binary_mask_in<string intrinsic_name,
                    (SUBREG_TO_REG (i32 -1), FPR32:$rs2, sub_32),
                    (op2_type op2_reg_class:$rs2))),
               (instruction
+               EPIMaskVR:$maskop,
                (NoX0 GPR:$vl),
                sew),
               swap>.Value>;
@@ -2606,7 +2678,7 @@ multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_nam
 //                                   ValueType op_type,
 //                                   ValueType result_type>
 //{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), (op_type EPIVR:$rs2), (op_type V0))),
+//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), (op_type EPIVR:$rs2), (op_type EPIMaskVR:$maskop))),
 //            (!cast<Instruction>(instruction_name # "_VV")
 //               EPIVR:$rs1, EPIVR:$rs2)>;
 //}
@@ -2616,7 +2688,7 @@ multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_nam
 //                                   ValueType op_type,
 //                                   ValueType result_type>
 //{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), GPR:$rs2, (op_type V0))),
+//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), GPR:$rs2, (op_type EPIMaskVR:$maskop))),
 //            (!cast<Instruction>(instruction_name # "_VX")
 //               EPIVR:$rs1, GPR:$rs2)>;
 //}
@@ -2626,7 +2698,7 @@ multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_nam
 //                                   ValueType op_type,
 //                                   ValueType result_type>
 //{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), simm5:$imm5, (op_type V0))),
+//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type EPIVR:$rs1), simm5:$imm5, (op_type EPIMaskVR:$maskop))),
 //            (!cast<Instruction>(instruction_name # "_VI")
 //               EPIVR:$rs1, simm5:$imm5)>;
 //}
@@ -2791,15 +2863,16 @@ multiclass pat_intrinsic_binary_relational_fp_m_vv_swapped<string intrinsic_name
   }
 }
 
-//multiclass pat_intrinsic_binary_int_mm<string intrinsic_name,
-//                                       string instruction_name>
-//{
-//  def : Pat<(nxv1i1 (!cast<Intrinsic>(intrinsic_name)
-//                         (nxv1i1 EPIVR:$rs1),
-//                         (nxv1i1 EPIVR:$rs2))),
-//            (!cast<Instruction>(instruction_name # "_MM")
-//               EPIVR:$rs1, EPIVR:$rs2)>;
-//}
+multiclass pat_intrinsic_binary_mm<string intrinsic_name,
+                                   string instruction_name>
+{
+  foreach mti = AllMasks in
+  {
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "MM",
+                                       mti.Mask, mti.Mask, mti.Mask, mti.SEW,
+                                       mti.VLMul, EPIVR, EPIVR>;
+  }
+}
 
 multiclass pat_intrinsic_ternary<string intrinsic_name,
                                  string instruction_name,
@@ -2837,7 +2910,7 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
                           (result_type result_reg_class:$rs3),
                           (op1_type op1_reg_class:$rs1),
                           (op2_type op2_reg_class:$rs2),
-                          (mask_type V0),
+                          (mask_type EPIMaskVR:$maskop),
                           (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_MASK_M"#vlmul)
              result_reg_class:$rs3,
@@ -2850,7 +2923,7 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
                  (SUBREG_TO_REG (i32 -1), FPR32:$rs1, sub_32),
                  (op1_type op1_reg_class:$rs1)),
              op2_reg_class:$rs2,
-             vmask_only_true.Value,
+             EPIMaskVR:$maskop,
              (NoX0 GPR:$vl), sew)>;
 }
 
@@ -2907,7 +2980,7 @@ multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
 
 //  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
 //                         (op_type EPIVR:$rs1),
-//                         (op_type EPIVR:$rs2), V0)),
+//                         (op_type EPIVR:$rs2), EPIMaskVR:$maskop)),
 //            (!cast<Instruction>(instruction_name # "_WV_MASK")
 //               EPIVR:$rs1, EPIVR:$rs2, vmask_only_true.Value)>;
 //}
@@ -2934,7 +3007,7 @@ multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
 
 //  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
 //                         (op_type EPIVR:$rs1),
-//                         (op_scalar EPIFPR:$rs2), V0)),
+//                         (op_scalar EPIFPR:$rs2), EPIMaskVR:$maskop)),
 //            (!cast<Instruction>(instruction_name # "_WF_MASK")
 //               EPIVR:$rs1, EPIFPR:$rs2, vmask_only_true.Value)>;
 //}
@@ -2972,7 +3045,7 @@ multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
 
 //  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
 //                         (op_type EPIVR:$rs1),
-//                         GPR:$rs2, V0)),
+//                         GPR:$rs2, EPIMaskVR:$maskop)),
 //            (!cast<Instruction>(instruction_name # "_WX_MASK")
 //               EPIVR:$rs1, GPR:$rs2, vmask_only_true.Value)>;
 //}
@@ -3060,7 +3133,7 @@ multiclass pat_intrinsic_binary_any_and_int_v_vx_vu<string intrinsic_name,
 //{
 //def : Pat<(vtp.First (!cast<Intrinsic>("int_epi_" # intrinsic) (vtp.Second EPIVR:$rs1))),
 //          (!cast<Instruction>(instruction # "_V") EPIVR:$rs1)>;
-//def : Pat<(vtp.First (!cast<Intrinsic>("int_epi_" # intrinsic # "_mask") (vtp.Second EPIVR:$rs1), V0)),
+//def : Pat<(vtp.First (!cast<Intrinsic>("int_epi_" # intrinsic # "_mask") (vtp.Second EPIVR:$rs1), EPIMaskVR:$maskop)),
 //          (!cast<Instruction>(instruction # "_V_MASK") EPIVR:$rs1, vmask_only_true.Value)>;
 
 //}
@@ -3088,12 +3161,12 @@ multiclass pat_intrinsic_unary<string intrinsic_name,
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
                           (result_type result_reg_class:$merge),
                           (op1_type op1_reg_class:$rs1),
-                          (mask_type V0),
+                          (mask_type EPIMaskVR:$maskop),
                           (i64 GPR:$vl))),
             (!cast<Instruction>(instruction_name#_#kind#"_MASK_M"#vlmul)
              result_reg_class:$merge,
              op1_reg_class:$rs1,
-             vmask_only_true.Value,
+             EPIMaskVR:$maskop,
              (NoX0 GPR:$vl), sew)>;
 }
 
@@ -3319,38 +3392,40 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1down", "PseudoVS
 
 foreach mti = AllMasks in {
   def : Pat<(int_epi_vmpopc (mti.Mask EPIVR:$rs2), GPR:$vl),
-            (PseudoVMPOPC_M_M1 $rs2, (NoX0 GPR:$vl), mti.SEW)>;
-  def : Pat<(int_epi_vmpopc_mask (mti.Mask EPIVR:$rs2), (mti.Mask V0), GPR:$vl),
-            (PseudoVMPOPC_M_MASK_M1 $rs2, vmask_only_true.Value,
-            (NoX0 GPR:$vl), mti.SEW)>;
+            (!cast<Instruction>("PseudoVMPOPC_M_M"#mti.VLMul) $rs2,
+              (NoX0 GPR:$vl), mti.SEW)>;
+  def : Pat<(int_epi_vmpopc_mask (mti.Mask EPIVR:$rs2), (mti.Mask EPIMaskVR:$maskop), GPR:$vl),
+            (!cast<Instruction>("PseudoVMPOPC_M_MASK_M"#mti.VLMul) $rs2,
+              EPIMaskVR:$maskop, (NoX0 GPR:$vl), mti.SEW)>;
 
   def : Pat<(int_epi_vmfirst (mti.Mask EPIVR:$rs2), GPR:$vl),
-            (PseudoVMFIRST_M_M1 $rs2, (NoX0 GPR:$vl), mti.SEW)>;
-  def : Pat<(int_epi_vmfirst_mask (mti.Mask EPIVR:$rs2), (mti.Mask V0), GPR:$vl),
-            (PseudoVMFIRST_M_MASK_M1 $rs2, vmask_only_true.Value,
-            (NoX0 GPR:$vl), mti.SEW)>;
+            (!cast<Instruction>("PseudoVMFIRST_M_M"#mti.VLMul) $rs2,
+              (NoX0 GPR:$vl), mti.SEW)>;
+  def : Pat<(int_epi_vmfirst_mask (mti.Mask EPIVR:$rs2), (mti.Mask EPIMaskVR:$maskop), GPR:$vl),
+            (!cast<Instruction>("PseudoVMFIRST_M_MASK_M"#mti.VLMul) $rs2,
+              EPIMaskVR:$maskop, (NoX0 GPR:$vl), mti.SEW)>;
 }
 
 //def : Pat<(int_epi_vmsbf EPIVR:$rs1),
 //        (VMSBF_M $rs1)>;
-//def : Pat<(int_epi_vmsbf_mask EPIVR:$rs1, V0),
+//def : Pat<(int_epi_vmsbf_mask EPIVR:$rs1, EPIMaskVR:$maskop),
 //        (VMSBF_M_MASK $rs1, vmask_only_true.Value)>;
 
 //def : Pat<(int_epi_vmsif EPIVR:$rs1),
 //        (VMSIF_M $rs1)>;
-//def : Pat<(int_epi_vmsif_mask EPIVR:$rs1, V0),
+//def : Pat<(int_epi_vmsif_mask EPIVR:$rs1, EPIMaskVR:$maskop),
 //        (VMSIF_M_MASK $rs1, vmask_only_true.Value)>;
 
 //def : Pat<(int_epi_vmsof EPIVR:$rs1),
 //        (VMSOF_M $rs1)>;
-//def : Pat<(int_epi_vmsof_mask EPIVR:$rs1, V0),
+//def : Pat<(int_epi_vmsof_mask EPIVR:$rs1, EPIMaskVR:$maskop),
 //        (VMSOF_M_MASK $rs1, vmask_only_true.Value)>;
 
 //foreach vtp = AllIntegerVectors in
 //{
 //def : Pat<(vtp.Vector (int_epi_viota EPIVR:$rs1)),
 //        (VIOTA_M $rs1)>;
-//def : Pat<(vtp.Vector (int_epi_viota_mask EPIVR:$rs1, V0)),
+//def : Pat<(vtp.Vector (int_epi_viota_mask EPIVR:$rs1, EPIMaskVR:$maskop)),
 //        (VIOTA_M_MASK $rs1, vmask_only_true.Value)>;
 //}
 
@@ -3358,14 +3433,14 @@ foreach mti = AllMasks in {
 //def : Pat<(vtp.Vector (int_epi_vcompress (vtp.Vector EPIVR:$rs2), (nxv1i1 EPIVR:$rs1))),
 //          (VCOMPRESS_VM $rs2, $rs1)>;
 
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmandnot", "VMANDNOT">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmand", "VMAND">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmor", "VMOR">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmxor", "VMXOR">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmornot", "VMORNOT">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmnand", "VMNAND">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmnor", "VMNOR">;
-//defm "" : pat_intrinsic_binary_int_mm<"int_epi_vmxnor", "VMXNOR">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmandnot", "PseudoVMANDNOT">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmand", "PseudoVMAND">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmor", "PseudoVMOR">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmxor", "PseudoVMXOR">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmornot", "PseudoVMORNOT">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmnand", "PseudoVMNAND">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmnor", "PseudoVMNOR">;
+defm "" : pat_intrinsic_binary_mm<"int_epi_vmxnor", "PseudoVMXNOR">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vdivu", "PseudoVDIVU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vdiv", "PseudoVDIV">;
@@ -3496,10 +3571,10 @@ foreach vti = AllFloatVectors in
 
 foreach vti = AllFloatVectors in
   def : Pat<(vti.Vector (int_epi_vfsqrt_mask (vti.Vector vti.RegClass:$merge),
-                         (vti.Vector vti.RegClass:$rs2), (vti.Mask V0),
+                         (vti.Vector vti.RegClass:$rs2), (vti.Mask EPIMaskVR:$maskop),
                          GPR:$vl)),
             (!cast<Instruction>("PseudoVFSQRT_V_MASK_M"#vti.RegClass.VLMul)
-             $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+             $merge, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 
 //foreach itp = [ nxv1i32, nxv1i64 ] in
 //foreach vtp = AllFloatVectors in
@@ -3508,7 +3583,7 @@ foreach vti = AllFloatVectors in
 
 //foreach itp = [ nxv1i32, nxv1i64 ] in
 //foreach vtp = AllFloatVectors in
-//def : Pat<(itp (int_epi_vfclass_mask (vtp.Vector EPIVR:$rs2), V0)),
+//def : Pat<(itp (int_epi_vfclass_mask (vtp.Vector EPIVR:$rs2), EPIMaskVR:$maskop)),
 //          (VFCLASS_V_MASK $rs2, vmask_only_true.Value)>;
 
 multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
@@ -3528,10 +3603,10 @@ multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
 
     def : Pat<(ivti.Vector (!cast<Intrinsic>(intrinsic_float_to_int#"_mask")
                             (ivti.Vector fvti.RegClass:$merge),
-                            (fvti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
+                            (fvti.Vector fvti.RegClass:$rs2), (fvti.Mask EPIMaskVR:$maskop),
                             GPR:$vl)),
               (!cast<Instruction>(instruction_float_to_int#"_MASK_M"#vlmul)
-               $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
+               $merge, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), fvti.SEW)>;
 
     def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float)
                             (ivti.Vector fvti.RegClass:$rs2),
@@ -3541,10 +3616,10 @@ multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
 
     def : Pat<(fvti.Vector (!cast<Intrinsic>(intrinsic_int_to_float#"_mask")
                             (fvti.Vector fvti.RegClass:$merge),
-                            (ivti.Vector fvti.RegClass:$rs2), (fvti.Mask V0),
+                            (ivti.Vector fvti.RegClass:$rs2), (fvti.Mask EPIMaskVR:$maskop),
                             GPR:$vl)),
               (!cast<Instruction>(instruction_int_to_float#"_MASK_M"#vlmul)
-               $merge, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), fvti.SEW)>;
+               $merge, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), fvti.SEW)>;
   }
 }
 
@@ -3589,13 +3664,13 @@ multiclass pat_intrinsic_binary_int_w_vX0<string intrinsic_name,
     def : Pat<(wti.Vector (!cast<Intrinsic>(intrinsic_name#"_mask")
                            (wti.Vector wti.RegClass:$merge),
                            (vti.Vector vti.RegClass:$rs1),
-                           (wti.Mask V0),
+                           (wti.Mask EPIMaskVR:$maskop),
                            (i64 GPR:$vl))),
               (!cast<Instruction>(instruction_name#"_MASK_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
                wti.RegClass:$merge,
                vti.RegClass:$rs1,
                /* rs2 */ X0,
-               vmask_only_true.Value,
+               EPIMaskVR:$maskop,
                (NoX0 GPR:$vl), vti.SEW)>;
   }
 }
@@ -3619,13 +3694,13 @@ multiclass pat_intrinsic_binary_int_v_wX0<string intrinsic_name,
     def : Pat<(vti.Vector (!cast<Intrinsic>(intrinsic_name#"_mask")
                            (vti.Vector vti.RegClass:$merge),
                            (wti.Vector wti.RegClass:$rs1),
-                           (vti.Mask V0),
+                           (vti.Mask EPIMaskVR:$maskop),
                            (i64 GPR:$vl))),
               (!cast<Instruction>(instruction_name#"_MASK_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
                vti.RegClass:$merge,
                wti.RegClass:$rs1,
                /* rs2 */ X0,
-               vmask_only_true.Value,
+               EPIMaskVR:$maskop,
                (NoX0 GPR:$vl), vti.SEW)>;
   }
 }
@@ -3640,9 +3715,9 @@ foreach vti = AllIntegerVectors in {
             (!cast<Instruction>("PseudoVID_V_M"#vti.RegClass.VLMul)
              (NoX0 GPR:$vl), vti.SEW)>;
   def : Pat<(vti.Vector (int_epi_vid_mask (vti.Vector vti.RegClass:$merge),
-                         (vti.Mask V0), GPR:$vl)),
+                         (vti.Mask EPIMaskVR:$maskop), GPR:$vl)),
             (!cast<Instruction>("PseudoVID_V_MASK_M"#vti.RegClass.VLMul)
-             $merge, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+             $merge, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 }
 
 foreach vti = AllIntegerVectors in {
@@ -3813,22 +3888,22 @@ multiclass pat_load<string width> {
                (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(vti.Vector (int_epi_vload_mask (vti.Vector vti.RegClass:$merge),
-                           GPR:$rs1, (vti.Mask V0), GPR:$vl)),
+                           GPR:$rs1, (vti.Mask EPIMaskVR:$maskop), GPR:$vl)),
                (!cast<Instruction>("PseudoVL"#width#"_V_MASK_M"#vlmul) $merge,
-                $rs1, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+                $rs1, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(vti.Vector (int_epi_vload_strided_mask
                            (vti.Vector vti.RegClass:$merge), GPR:$rs1, GPR:$rs2,
-                           (vti.Mask V0), GPR:$vl)),
+                           (vti.Mask EPIMaskVR:$maskop), GPR:$vl)),
               (!cast<Instruction>("PseudoVLS"#width#"_V_MASK_M"#vlmul) $merge,
-               $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+               $rs1, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(vti.Vector (int_epi_vload_indexed_mask
                            (vti.Vector vti.RegClass:$merge), GPR:$rs1,
-                           (ivti.Vector vti.RegClass:$rs2), (vti.Mask V0),
+                           (ivti.Vector vti.RegClass:$rs2), (vti.Mask EPIMaskVR:$maskop),
                            GPR:$vl)),
               (!cast<Instruction>("PseudoVLX"#width#"_V_MASK_M"#vlmul) $merge,
-               $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+               $rs1, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
   }
 }
 
@@ -3855,22 +3930,22 @@ multiclass pat_store<string width> {
                $rs2, (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(int_epi_vstore_mask
-               (vti.Vector vti.RegClass:$rs3), GPR:$rs1, (vti.Mask V0),
+               (vti.Vector vti.RegClass:$rs3), GPR:$rs1, (vti.Mask EPIMaskVR:$maskop),
                GPR:$vl),
               (!cast<Instruction>("PseudoVS"#width#"_V_MASK_M"#vlmul) $rs3,
-               $rs1, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+               $rs1, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(int_epi_vstore_strided_mask
                (vti.Vector vti.RegClass:$rs3), GPR:$rs1, GPR:$rs2,
-               (vti.Mask V0), GPR:$vl),
+               (vti.Mask EPIMaskVR:$maskop), GPR:$vl),
               (!cast<Instruction>("PseudoVSS"#width#"_V_MASK_M"#vlmul) $rs3,
-               $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl), vti.SEW)>;
+               $rs1, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl), vti.SEW)>;
 
     def : Pat<(int_epi_vstore_indexed_mask
                (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
-               (ivti.Vector vti.RegClass:$rs2), (vti.Mask V0), GPR:$vl),
+               (ivti.Vector vti.RegClass:$rs2), (vti.Mask EPIMaskVR:$maskop), GPR:$vl),
               (!cast<Instruction>("PseudoVSX"#width#"_V_MASK_M"#vlmul) $rs3,
-               $rs1, $rs2, vmask_only_true.Value, (NoX0 GPR:$vl),
+               $rs1, $rs2, EPIMaskVR:$maskop, (NoX0 GPR:$vl),
                vti.SEW)>;
   }
 }

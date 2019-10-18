@@ -74,11 +74,11 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O2-LABEL: merge_mask:
 ; CHECK-O2:       # %bb.0: # %entry
 ; CHECK-O2-NEXT:    vsetvli a0, a0, e64, m1
-; CHECK-O2-NEXT:    vle.v v1, (a3)
-; CHECK-O2-NEXT:    vle.v v2, (a2)
-; CHECK-O2-NEXT:    vmflt.vv v0, v2, v1
-; CHECK-O2-NEXT:    vfsub.vv v1, v1, v2, v0.t
-; CHECK-O2-NEXT:    vse.v v1, (a1)
+; CHECK-O2-NEXT:    vle.v v2, (a3)
+; CHECK-O2-NEXT:    vle.v v1, (a2)
+; CHECK-O2-NEXT:    vmflt.vv v0, v1, v2
+; CHECK-O2-NEXT:    vfsub.vv v2, v2, v1, v0.t
+; CHECK-O2-NEXT:    vse.v v2, (a1)
 ; CHECK-O2-NEXT:    ret
 entry:
 

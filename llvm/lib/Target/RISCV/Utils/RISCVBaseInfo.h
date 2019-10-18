@@ -16,6 +16,7 @@
 #include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/CodeGen/Register.h"
 #include "llvm/MC/SubtargetFeature.h"
 
 namespace llvm {
@@ -159,35 +160,13 @@ inline static bool isValidRoundingMode(unsigned Mode) {
 
 // EPI Vector mask
 namespace RISCVEPIVectorMask {
-enum VectorMask {
-  VectorTrueMask = 0,
-  VectorUnmasked = 1,
-  Invalid
-};
 
-inline static VectorMask stringToVectorMask(StringRef Str) {
-  return StringSwitch<VectorMask>(Str)
-      .Case("v0.t", RISCVEPIVectorMask::VectorTrueMask)
-      .Default(RISCVEPIVectorMask::Invalid);
+inline static Register stringToVectorMask(StringRef Str) {
+  return StringSwitch<Register>(Str)
+      .Case("v0.t", RISCV::V0)
+      .Default(RISCV::NoRegister);
 }
 
-inline static StringRef vectorMaskToString(VectorMask VM) {
-  switch (VM) {
-  default:
-    llvm_unreachable("Invalid vector mask");
-  case RISCVEPIVectorMask::VectorTrueMask:
-    return "v0.t";
-  }
-}
-
-inline static bool isValidVectorMask(unsigned Mode) {
-  switch (Mode) {
-  default:
-    return false;
-  case RISCVEPIVectorMask::VectorTrueMask:
-    return true;
-  }
-}
 } // namespace RISCVEPIVectorMask
 
 namespace RISCVEPIVectorElementWidth {

@@ -379,9 +379,7 @@ public:
       return false;
 
     StringRef Str = SVal->getSymbol().getName();
-
-    return RISCVEPIVectorMask::stringToVectorMask(Str) !=
-           RISCVEPIVectorMask::Invalid;
+    return RISCVEPIVectorMask::stringToVectorMask(Str) != RISCV::NoRegister;
   }
 
   bool isVectorElementWidth() const {
@@ -835,18 +833,17 @@ public:
     Inst.addOperand(MCOperand::createImm(getRoundingMode()));
   }
 
-  RISCVEPIVectorMask::VectorMask getVectorMask() const {
+  Register getVectorMask() const {
     // isVectorMask has validated the operand, meaning this cast is safe.
     auto SE = cast<MCSymbolRefExpr>(getImm());
-    RISCVEPIVectorMask::VectorMask VM =
+    Register VM =
         RISCVEPIVectorMask::stringToVectorMask(SE->getSymbol().getName());
-    assert(VM != RISCVEPIVectorMask::Invalid && "Invalid vector mask");
     return VM;
   }
 
   void addVectorMaskOperands(MCInst &Inst, unsigned N) const {
     assert(N == 1 && "Invalid number of operands!");
-    Inst.addOperand(MCOperand::createImm(getVectorMask()));
+    Inst.addOperand(MCOperand::createReg(getVectorMask()));
   }
 
   RISCVEPIVectorElementWidth::VectorElementWidth getVectorElementWidth() const {

@@ -128,9 +128,9 @@ void RISCVInstPrinter::printAtomicMemOp(const MCInst *MI, unsigned OpNo,
 void RISCVInstPrinter::printVectorMask(const MCInst *MI, unsigned OpNo,
                                        const MCSubtargetInfo &STI,
                                        raw_ostream &O) {
-  auto VectorMask =
-      static_cast<RISCVEPIVectorMask::VectorMask>(MI->getOperand(OpNo).getImm());
-  O << RISCVEPIVectorMask::vectorMaskToString(VectorMask);
+  unsigned VectorMask = MI->getOperand(OpNo).getReg();
+  assert(VectorMask == RISCV::V0 && "Invalid register as vector mask");
+  printRegName(O, VectorMask); O << ".t";
 }
 
 void RISCVInstPrinter::printVectorElementWidth(const MCInst *MI, unsigned OpNo,
@@ -147,10 +147,4 @@ void RISCVInstPrinter::printVectorMultiplier(const MCInst *MI, unsigned OpNo,
   auto VectorMultiplier =
       static_cast<RISCVEPIVectorMultiplier::VectorMultiplier>(MI->getOperand(OpNo).getImm());
   O << RISCVEPIVectorMultiplier::VectorMultiplierToString(VectorMultiplier);
-}
-
-void RISCVInstPrinter::printEPIVRScalar(const MCInst *MI, unsigned OpNo,
-                                        const MCSubtargetInfo &STI,
-                                        raw_ostream &O) {
-  O << getRegisterName(MI->getOperand(OpNo).getReg()) << ".s";
 }

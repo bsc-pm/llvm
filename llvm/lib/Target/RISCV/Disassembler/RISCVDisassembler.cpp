@@ -325,10 +325,11 @@ static DecodeStatus decodeRVCInstrRdRs1Rs2(MCInst &Inst, unsigned Insn,
 static DecodeStatus decodeVectorMask(MCInst &Inst, uint64_t Imm,
                                      int64_t Address, const void *Decoder) {
   assert(isUInt<1>(Imm) && "Invalid immediate");
-  if (!llvm::RISCVEPIVectorMask::isValidVectorMask(Imm))
+  // 0 == masked, 1 == unmasked.
+  if (Imm != 0)
     return MCDisassembler::Fail;
 
-  Inst.addOperand(MCOperand::createImm(Imm));
+  Inst.addOperand(MCOperand::createReg(RISCV::V0));
   return MCDisassembler::Success;
 }
 

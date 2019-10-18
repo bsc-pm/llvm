@@ -95,6 +95,9 @@ defset list<EPIVReg> AllEPIVRegs = {
                        8>;
 }
 
+def EPIMaskVR : EPIVReg<[nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1,
+                         nxv64i1], (add V0), 1>;
+
 // Represents the current vector length
 def VL : RISCVReg<0, "vl">;
 def VLR : RegisterClass<"RISCV", [XLenVT], 32, (add VL)> {
