@@ -335,6 +335,11 @@ public:
           }
       } else {
 
+        QualType Type = VD->getType();
+        if (!(Type.isPODType(SemaRef.Context) || Type->isReferenceType())) {
+          return;
+        }
+
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
         switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
         case DSA_shared:
@@ -806,6 +811,13 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   }
 
   auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
+
+  QualType Type = VD->getType();
+  if (!(Type.isPODType(S.Context) || Type->isReferenceType())) {
+    S.Diag(ELoc, diag::err_oss_non_pod_not_supported) << ERange;
+    return std::make_pair(nullptr, false);
+  }
+
   return std::make_pair(getCanonicalDecl(VD), false);
 }
 
