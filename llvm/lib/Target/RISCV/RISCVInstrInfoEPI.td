@@ -3750,24 +3750,6 @@ multiclass pat_vop_ternary_common<SDNode vop,
   }
 }
 
-multiclass pat_vop_binary_int<SDNode vop,
-                             string instruction_name>
-{
-  defm : pat_vop_binary_common<vop, instruction_name, AllIntegerVectors>;
-}
-
-multiclass pat_vop_binary_fp<SDNode vop,
-                             string instruction_name>
-{
-  defm : pat_vop_binary_common<vop, instruction_name, AllFloatVectors>;
-}
-
-multiclass pat_vop_ternary_fp<SDNode vop,
-                             string instruction_name>
-{
-  defm : pat_vop_ternary_common<vop, instruction_name, AllFloatVectors>;
-}
-
 class VectorBroadcastFloat<ValueType VecTy> :
   PatFrag<(ops node:$value),
     (vector_shuffle
@@ -3775,13 +3757,13 @@ class VectorBroadcastFloat<ValueType VecTy> :
 
 let Predicates = [HasExtEPI] in {
 
-defm "" : pat_vop_binary_int<add, "PseudoVADD">;
-defm "" : pat_vop_binary_fp<fadd, "PseudoVFADD">;
+defm "" : pat_vop_binary_common<add, "PseudoVADD", AllIntegerVectors>;
+defm "" : pat_vop_binary_common<mul, "PseudoVMUL", AllIntegerVectors>;
 
-defm "" : pat_vop_binary_int<mul, "PseudoVMUL">;
-defm "" : pat_vop_binary_fp<fmul, "PseudoVFMUL">;
+defm "" : pat_vop_binary_common<fadd, "PseudoVFADD", AllFloatVectors>;
+defm "" : pat_vop_binary_common<fmul, "PseudoVFMUL", AllFloatVectors>;
 
-defm "" : pat_vop_ternary_fp<fma, "PseudoVFMADD">;
+defm "" : pat_vop_ternary_common<fma, "PseudoVFMADD", AllFloatVectors>;
 
 foreach fvti = AllFloatVectors in
 {
