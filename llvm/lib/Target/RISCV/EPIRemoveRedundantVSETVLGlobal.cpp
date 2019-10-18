@@ -71,8 +71,10 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
 
   VSETVLInstr() : Base(std::make_tuple(Register(), ~0U, ~0U)) {}
 
-  VSETVLInstr(Register AVLReg, unsigned SEW, unsigned VLMul)
-      : Base(std::make_tuple(AVLReg, SEW, VLMul)) {}
+  VSETVLInstr(Register DefReg, Register AVLReg, unsigned SEW, unsigned VLMul)
+      : Base(std::make_tuple(AVLReg, SEW, VLMul)), DefReg(DefReg) { }
+
+  Register getDefReg() { return DefReg; }
 
   Register getAVLReg() { return std::get<0>(*this); }
 
@@ -85,6 +87,10 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
 
     assert(MI.getNumExplicitOperands() == 4);
     assert(MI.getNumOperands() == 6);
+
+    const MachineOperand &DefOp = MI.getOperand(0);
+    assert(DefOp.isReg());
+    Register DefReg = DefOp.getReg();
 
     const MachineOperand &AVLOp = MI.getOperand(1);
     assert(AVLOp.isReg());
@@ -102,8 +108,10 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
     unsigned SEW = (1 << SEWOp.getImm()) * 8;
     unsigned VLMul = 1 << VLMulOp.getImm();
 
-    return VSETVLInstr(AVLReg, SEW, VLMul);
+    return VSETVLInstr(DefReg, AVLReg, SEW, VLMul);
   }
+
+  Register DefReg = Register();
 };
 
 } // namespace
@@ -229,8 +237,6 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
         dbgs() << "BB: '" << MBB.getNumber() << "." << MBB.getName()
                << "'\tUnmatchedVIs\n";
       } else {
-        assert(VI.getAVLReg().isVirtual() &&
-               "Virtual register expected for AVL");
         dbgs() << "BB: '" << MBB.getNumber() << "." << MBB.getName() << "'\t"
                << "(AVL: '" << printReg(VI.getAVLReg()) << "', SEW: e"
                << VI.getSEW() << ", LMUL: m" << VI.getVLMul() << ")\n";
@@ -250,6 +256,16 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
         MBB.instr_begin(), MBB.instr_end(), [](const MachineInstr &MI) {
           return MI.getOpcode() == RISCV::VSETVLI;
         });
+
+    Register DefReg = InVI.getDefReg();
+
+    // Be cautious here.
+    if (!DefReg.isVirtual() && DefReg != RISCV::X0)
+      continue;
+
+    // Be safe here.
+    if (DefReg.isVirtual() && !MRI.use_empty(DefReg))
+      continue;
 
     if ((FirstVSETVLI != MBB.instr_end()) &&
         (InVI == VSETVLInstr::createFromMI(*FirstVSETVLI))) {
