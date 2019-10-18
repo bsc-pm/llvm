@@ -25,7 +25,10 @@ class SingleType(object):
             self.corr_integer_type = self
 
     def get_base_scale(self):
-        return (MAX_SEW/self.sew)
+        if self.is_mask_type:
+            return 1
+        else:
+            return MAX_SEW / self.sew
 
 class IntrinsicType(object):
     def __init__(self, result, operands):
@@ -1079,10 +1082,19 @@ entry:
                     sew = min(sew, rhs.sew)
                 subs["sew"] = "e" + str(sew)
 
+                # Special check for mask operations
+                mask_binary = result.is_mask_type and \
+                        lhs.is_mask_type and \
+                        rhs.is_mask_type
+
                 for vlmul in self.vlmul_values:
-                    # vlmul here is 'base' vlmul, vlmul for SEW operand
-                    # (as opposed to 2*SEW operand)
-                    subs["vlmul"] = "m" + str(vlmul)
+                    if mask_binary:
+                        subs["sew"] = "e{}".format(max(MAX_SEW / vlmul, 8))
+                        subs["vlmul"] = "m1"
+                    else:
+                        # vlmul here is 'base' vlmul, vlmul for SEW operand
+                        # (as opposed to 2*SEW operand)
+                        subs["vlmul"] = "m" + str(vlmul)
 
                     # Ensure all operands have the same scale (ie. number of elements)
                     result_scale = result.get_base_scale()
@@ -1892,14 +1904,14 @@ intrinsics = [
         #BinaryIntrinsic("vfwredsum", type_generator = generate_binary_float_types_widened, variants = vs),
         #BinaryIntrinsic("vfwredosum", type_generator = generate_binary_float_types_widened, variants = vs),
 
-        #BinaryIntrinsic("vmandnot", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmand", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmor", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmxor", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmornot", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmnand", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmnor", type_generator = generate_binary_mask_types, variants = mm, mask = False),
-        #BinaryIntrinsic("vmxnor", type_generator = generate_binary_mask_types, variants = mm, mask = False),
+        BinaryIntrinsic("vmandnot", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmand", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmxor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmornot", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmnand", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmnor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
+        BinaryIntrinsic("vmxnor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
 
         BinaryIntrinsic("vdotu", type_generator = generate_binary_integer_types, variants = vv),
         BinaryIntrinsic("vdot", type_generator = generate_binary_integer_types, variants = vv),
