@@ -16,7 +16,7 @@ def initializer(lit_config, parallelism_semaphores):
     _lit_config = lit_config
     _parallelism_semaphores = parallelism_semaphores
 
-def run_one_test(test_index, test):
+def run_one_test(test):
     """Run one test in a multiprocessing.Pool
 
     Side effects in this function and functions it calls are not visible in the
@@ -24,16 +24,12 @@ def run_one_test(test_index, test):
 
     Arguments and results of this function are pickled, so they should be cheap
     to copy. For efficiency, we copy all data needed to execute all tests into
-    each worker and store it in the worker_* global variables. This reduces the
-    cost of each task.
-
-    Returns an index and a Result, which the parent process uses to update
-    the display.
+    each worker and store it in global variables. This reduces the cost of each
+    task.
     """
     try:
-        _execute_test_in_parallelism_group(test, _lit_config,
-                                           _parallelism_semaphores)
-        return (test_index, test)
+        return _execute_test_in_parallelism_group(test, _lit_config,
+                                                  _parallelism_semaphores)
     except KeyboardInterrupt:
         # If a worker process gets an interrupt, abort it immediately.
         lit.util.abort_now()
@@ -50,11 +46,11 @@ def _execute_test_in_parallelism_group(test, lit_config, parallelism_semaphores)
         semaphore = parallelism_semaphores[pg]
         try:
             semaphore.acquire()
-            _execute_test(test, lit_config)
+            return _execute_test(test, lit_config)
         finally:
             semaphore.release()
     else:
-        _execute_test(test, lit_config)
+        return _execute_test(test, lit_config)
 
 
 def _execute_test(test, lit_config):
@@ -66,7 +62,7 @@ def _execute_test(test, lit_config):
     result.elapsed = end - start
     resolve_result_code(result, test)
 
-    test.setResult(result)
+    return result
 
 
 # TODO(yln): is this the right place to deal with this?
