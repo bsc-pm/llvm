@@ -39,7 +39,7 @@ entry:
   %fptr1 = load i32 (%struct.A*, i32)*, i32 (%struct.A*, i32)** %2, align 8
 
   ; Check that the call was devirtualized.
-  ; CHECK-IR1: %call = tail call i32 bitcast (void ()* @_ZN1A1nEi
+  ; CHECK-IR1: = tail call i32 bitcast (void ()* @_ZN1A1nEi
   %call = tail call i32 %fptr1(%struct.A* nonnull %obj, i32 %a)
 
   ret i32 %call
@@ -49,7 +49,7 @@ entry:
 
 ; CHECK-IR2: define i32 @test2
 ; Check that the call was devirtualized.
-; CHECK-IR2:   %call4 = tail call i32 @_ZN1A1nEi
+; CHECK-IR2: = tail call i32 @_ZN1A1nEi
 
 declare i1 @llvm.type.test(i8*, metadata)
 declare void @llvm.assume(i1)
