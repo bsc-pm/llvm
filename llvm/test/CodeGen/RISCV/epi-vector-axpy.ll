@@ -27,22 +27,21 @@ define dso_local void @saxpy(i32 signext %N, float* noalias nocapture %y, float*
 ; CHECK-NEXT:    slli t0, a4, 3
 ; CHECK-NEXT:    vsetvli a0, zero, e32, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    slli t2, a4, 1
-; CHECK-NEXT:    remu a6, a7, t2
+; CHECK-NEXT:    slli a5, a4, 1
+; CHECK-NEXT:    remu a6, a7, a5
 ; CHECK-NEXT:    sub t1, a7, a6
 ; CHECK-NEXT:    mv a0, zero
 ; CHECK-NEXT:    mv a4, zero
 ; CHECK-NEXT:  .LBB0_4: # %vector.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    add a3, a2, a0
-; CHECK-NEXT:    vsetvli a5, zero, e32, m1
 ; CHECK-NEXT:    vle.v v1, (a3)
 ; CHECK-NEXT:    add a3, a1, a0
 ; CHECK-NEXT:    vle.v v2, (a3)
 ; CHECK-NEXT:    vfmadd.vv v1, v0, v2
 ; CHECK-NEXT:    vse.v v1, (a3)
 ; CHECK-NEXT:    add a0, a0, t0
-; CHECK-NEXT:    add a4, a4, t2
+; CHECK-NEXT:    add a4, a4, a5
 ; CHECK-NEXT:    bne a4, t1, .LBB0_4
 ; CHECK-NEXT:  # %bb.5: # %middle.block
 ; CHECK-NEXT:    beqz a6, .LBB0_8
@@ -141,7 +140,7 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    vsetvl zero, a3, a0
 ; CHECK-NEXT:    bgeu a7, a4, .LBB1_3
 ; CHECK-NEXT:  # %bb.2:
-; CHECK-NEXT:    mv t2, zero
+; CHECK-NEXT:    mv a3, zero
 ; CHECK-NEXT:    j .LBB1_6
 ; CHECK-NEXT:  .LBB1_3: # %vector.ph
 ; CHECK-NEXT:    rdvtype a0
@@ -152,26 +151,25 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
 ; CHECK-NEXT:    remu a6, a7, t1
-; CHECK-NEXT:    sub t2, a7, a6
+; CHECK-NEXT:    sub a3, a7, a6
 ; CHECK-NEXT:    mv a0, zero
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:  .LBB1_4: # %vector.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    add a4, a2, a0
-; CHECK-NEXT:    vsetvli a3, zero, e64, m1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    add a3, a1, a0
-; CHECK-NEXT:    vle.v v2, (a3)
+; CHECK-NEXT:    add a4, a1, a0
+; CHECK-NEXT:    vle.v v2, (a4)
 ; CHECK-NEXT:    vfmadd.vv v1, v0, v2
-; CHECK-NEXT:    vse.v v1, (a3)
+; CHECK-NEXT:    vse.v v1, (a4)
 ; CHECK-NEXT:    add a0, a0, t0
 ; CHECK-NEXT:    add a5, a5, t1
-; CHECK-NEXT:    bne a5, t2, .LBB1_4
+; CHECK-NEXT:    bne a5, a3, .LBB1_4
 ; CHECK-NEXT:  # %bb.5: # %middle.block
 ; CHECK-NEXT:    beqz a6, .LBB1_8
 ; CHECK-NEXT:  .LBB1_6: # %for.body.preheader17
-; CHECK-NEXT:    sub a0, a7, t2
-; CHECK-NEXT:    slli a3, t2, 3
+; CHECK-NEXT:    sub a0, a7, a3
+; CHECK-NEXT:    slli a3, a3, 3
 ; CHECK-NEXT:    add a2, a2, a3
 ; CHECK-NEXT:    add a1, a1, a3
 ; CHECK-NEXT:  .LBB1_7: # %for.body
