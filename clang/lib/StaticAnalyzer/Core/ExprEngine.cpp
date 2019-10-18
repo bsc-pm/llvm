@@ -3030,22 +3030,16 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
       llvm::function_ref<void(const ExplodedNode *)> PreCallback,
       llvm::function_ref<void(const ExplodedNode *)> PostCallback,
       llvm::function_ref<bool(const ExplodedNode *)> Stop) {
-    const ExplodedNode *FirstHiddenNode = N;
-    while (FirstHiddenNode->pred_size() == 1 &&
-           isNodeHidden(*FirstHiddenNode->pred_begin())) {
-      FirstHiddenNode = *FirstHiddenNode->pred_begin();
-    }
-    const ExplodedNode *OtherNode = FirstHiddenNode;
     while (true) {
-      PreCallback(OtherNode);
-      if (Stop(OtherNode))
+      PreCallback(N);
+      if (Stop(N))
         return true;
 
-      if (OtherNode == N)
+      if (N->succ_size() != 1 || !isNodeHidden(N->getFirstSucc()))
         break;
-      PostCallback(OtherNode);
+      PostCallback(N);
 
-      OtherNode = *OtherNode->succ_begin();
+      N = N->getFirstSucc();
     }
     return false;
   }
@@ -3089,16 +3083,7 @@ struct DOTGraphTraits<ExplodedGraph*> : public DefaultDOTGraphTraits {
     Out << "\\l"; // Adds a new-line to the last program point.
     Indent(Out, Space, IsDot) << "],\\l";
 
-    bool SameAsAllPredecessors =
-        std::all_of(N->pred_begin(), N->pred_end(), [&](const ExplodedNode *P) {
-          return P->getState() == State;
-        });
-
-    if (!SameAsAllPredecessors) {
-      State->printDOT(Out, N->getLocationContext(), Space);
-    } else {
-      Indent(Out, Space, IsDot) << "\"program_state\": null";
-    }
+    State->printDOT(Out, N->getLocationContext(), Space);
 
     Out << "\\l}\\l";
     return Out.str();
