@@ -32,10 +32,7 @@ declare i64 @llvm.experimental.vector.vscale.i64()
 define i64 @test_vscale() nounwind
 ; CHECK-LABEL: test_vscale:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    rdvtype a1
-; CHECK-NEXT:    rdvl a2
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m1
-; CHECK-NEXT:    vsetvl zero, a2, a1
 ; CHECK-NEXT:    ret
 {
 entry:

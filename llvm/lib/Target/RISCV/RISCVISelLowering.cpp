@@ -1610,13 +1610,6 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
 
   Register DestReg = MI.getOperand(0).getReg();
 
-  MachineRegisterInfo &MRI = MF.getRegInfo();
-  Register OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  Register OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-
-  // Keep the old VTYPE and VL
-  BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoReadVTYPE), OldVTypeReg);
-  BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoReadVL), OldVLReg);
   // VSCALE can be computed as VLMAX of ELEN, given that the scaling factor for
   // ELEN is '1'.
   MachineInstr &I = *BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), DestReg)
@@ -1628,11 +1621,6 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
   // Set VTYPE and VL as dead.
   I.getOperand(4).setIsDead();
   I.getOperand(5).setIsDead();
-
-  // Restore old VTYPE and VL.
-  BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
-      .addReg(OldVLReg, RegState::Kill)
-      .addReg(OldVTypeReg, RegState::Kill);
 
   // The pseudo instruction is gone now.
   MI.eraseFromParent();
