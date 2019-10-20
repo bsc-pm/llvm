@@ -257,18 +257,35 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
           return MI.getOpcode() == RISCV::VSETVLI;
         });
 
-    Register DefReg = InVI.getDefReg();
-
-    // Be cautious here.
-    if (!DefReg.isVirtual() && DefReg != RISCV::X0)
+    // There is nothing to remove.
+    if (FirstVSETVLI == MBB.instr_end())
       continue;
+    LLVM_DEBUG(dbgs() << "Considering removal of \n"; FirstVSETVLI->dump(););
+
+    VSETVLInstr FirstVI = VSETVLInstr::createFromMI(*FirstVSETVLI);
+    Register DefReg = FirstVI.getDefReg();
+    if (!DefReg.isVirtual() && DefReg != RISCV::X0) {
+      // FIXME: This shouldn't happen actually. Assert instead?
+      LLVM_DEBUG(dbgs() << "Not removing because it defines a physical "
+                           "register other than X0\n";);
+      continue;
+    }
 
     // Be safe here.
-    if (DefReg.isVirtual() && !MRI.use_empty(DefReg))
+    if (DefReg.isVirtual() && !MRI.use_empty(DefReg)) {
+      LLVM_DEBUG(dbgs() << "Not removing because its value is still used.\n";
+                 dbgs() << "Printing uses of defined register "
+                        << printReg(DefReg) << "\n";
+                 for (auto UIt = MRI.use_begin(DefReg), UEnd = MRI.use_end();
+                      UIt != UEnd; UIt++) {
+                   MachineOperand &MO = *UIt;
+                   MachineInstr *MI = MO.getParent();
+                   MI->dump();
+                 });
       continue;
+    }
 
-    if ((FirstVSETVLI != MBB.instr_end()) &&
-        (InVI == VSETVLInstr::createFromMI(*FirstVSETVLI))) {
+    if (InVI == FirstVI) {
       LLVM_DEBUG(dbgs() << "Remove redundant VSETVLI instruction leading BB '"
                         << MBB.getNumber() << "." << MBB.getName() << "':\n";
                  FirstVSETVLI->dump(); dbgs() << "\n");
