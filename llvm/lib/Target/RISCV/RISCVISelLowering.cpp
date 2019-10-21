@@ -490,7 +490,7 @@ SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
   ShuffleVectorSDNode *SVN = cast<ShuffleVectorSDNode>(Op.getNode());
 
   if (SVN->isSplat()) {
-    // FIXME - Use split index!
+    // FIXME - Use splat index!
     if (SVN->getSplatIndex() != 0)
       return SDValue();
 
