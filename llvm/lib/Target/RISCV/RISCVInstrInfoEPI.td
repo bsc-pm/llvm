@@ -3783,7 +3783,7 @@ foreach vti = AllIntegerVectors in
                  GPR:$value,
                  X0, vti.SEW)>;
   def : Pat<(vti.Vector (riscv_vbroadcast simm5:$value)),
-            (!cast<Instruction>("PseudoVMV_V_I_M" # vti.RegClass.VLMul)
+            (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul)
                  simm5:$value,
                  X0, vti.SEW)>;
 }
