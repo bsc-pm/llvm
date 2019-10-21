@@ -3694,8 +3694,8 @@ multiclass pat_vop_binary<SDNode vop,
 }
 
 multiclass pat_vop_binary_common<SDNode vop,
-                          string instruction_name,
-                          list<VectorTypeInfo> vtilist>
+                                 string instruction_name,
+                                 list<VectorTypeInfo> vtilist>
 {
   foreach vti = vtilist in
   {
