@@ -3779,7 +3779,7 @@ foreach fvti = AllFloatVectors in
 foreach vti = AllIntegerVectors in
 {
   def : Pat<(vti.Vector (riscv_vbroadcast GPR:$value)),
-            (!cast<Instruction>("PseudoVMV_V_X_M" # vti.RegClass.VLMul)
+            (!cast<Instruction>("PseudoVMV_V_X_M"#vti.RegClass.VLMul)
                  GPR:$value,
                  X0, vti.SEW)>;
   def : Pat<(vti.Vector (riscv_vbroadcast simm5:$value)),
