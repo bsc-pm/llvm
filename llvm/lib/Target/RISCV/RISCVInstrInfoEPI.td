@@ -3738,8 +3738,8 @@ multiclass pat_vop_ternary<SDNode vop,
 }
 
 multiclass pat_vop_ternary_common<SDNode vop,
-                          string instruction_name,
-                          list<VectorTypeInfo> vtilist>
+                                  string instruction_name,
+                                  list<VectorTypeInfo> vtilist>
 {
   foreach vti = vtilist in
   {
