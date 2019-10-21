@@ -3768,7 +3768,7 @@ defm "" : pat_vop_ternary_common<fma, "PseudoVFMADD", AllFloatVectors>;
 foreach fvti = AllFloatVectors in
 {
   def : Pat<(VectorBroadcastFloat<fvti.Vector> fvti.ScalarRegClass:$value),
-            (!cast<Instruction>("PseudoVFMV_V_F_M" # fvti.RegClass.VLMul)
+            (!cast<Instruction>("PseudoVFMV_V_F_M"#fvti.RegClass.VLMul)
                  !if(!eq(!cast<string>(fvti.ScalarRegClass),
                          !cast<string>(FPR32)),
                      (SUBREG_TO_REG (i32 -1), FPR32:$value, sub_32),
