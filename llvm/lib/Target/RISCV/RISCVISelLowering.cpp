@@ -489,28 +489,27 @@ SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
 
   ShuffleVectorSDNode *SVN = cast<ShuffleVectorSDNode>(Op.getNode());
 
-  if (SVN->isSplat()) {
-    // FIXME - Use splat index!
-    if (SVN->getSplatIndex() != 0)
-      return SDValue();
+  if (!SVN->isSplat())
+    return SDValue();
 
-    // Recover the scalar value.
-    SDValue SplatVector = Op.getOperand(0);
-    // FIXME - Look other targets what they do with suffles, it should be
-    // possible to use vmv/vfmv or vrgather.
-    if (SplatVector.getOpcode() != ISD::INSERT_VECTOR_ELT)
-      return SDValue();
-    if (SplatVector.getOperand(0).getOpcode() != ISD::UNDEF)
-      return SDValue();
-    SDValue ScalarValue = SplatVector.getOperand(1);
-    auto *ConstantValue = dyn_cast<ConstantSDNode>(SplatVector.getOperand(2));
-    if (!ConstantValue || ConstantValue->getZExtValue() != 0)
-      return SDValue();
+  // FIXME - Use splat index!
+  if (SVN->getSplatIndex() != 0)
+    return SDValue();
 
-    return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, ScalarValue);
-  }
+  // Recover the scalar value.
+  SDValue SplatVector = Op.getOperand(0);
+  // FIXME - Look other targets what they do with suffles, it should be
+  // possible to use vmv/vfmv or vrgather.
+  if (SplatVector.getOpcode() != ISD::INSERT_VECTOR_ELT)
+    return SDValue();
+  if (SplatVector.getOperand(0).getOpcode() != ISD::UNDEF)
+    return SDValue();
+  SDValue ScalarValue = SplatVector.getOperand(1);
+  auto *ConstantValue = dyn_cast<ConstantSDNode>(SplatVector.getOperand(2));
+  if (!ConstantValue || ConstantValue->getZExtValue() != 0)
+    return SDValue();
 
-  return SDValue();
+  return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, ScalarValue);
 }
 
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
