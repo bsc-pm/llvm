@@ -66,14 +66,7 @@ class Run(object):
 
         return end - start
 
-    def _consume_test_result(self, test, result):
-        """Test completion callback for lit.worker.run_one_test
-
-        Updates the test result status in the parent process. Each task in the
-        pool returns the test index and the result, and we use the index to look
-        up the original test object. Also updates the progress bar as tasks
-        complete.
-        """
+    def _process_result(self, test, result):
         # Don't add any more test results after we've hit the maximum failure
         # count.  Otherwise we're racing with the main thread, which is going
         # to terminate the process pool soon.
@@ -100,8 +93,8 @@ class SerialRun(Run):
     def _execute(self, deadline):
         # TODO(yln): ignores deadline
         for test in self.tests:
-            result = lit.worker._execute_test(test, self.lit_config)
-            self._consume_test_result(test, result)
+            result = lit.worker._execute(test, self.lit_config)
+            self._process_result(test, result)
             if self.hit_max_failures:
                 break
 
@@ -121,7 +114,7 @@ class ParallelRun(Run):
         # interrupts the workers before we make it into our task callback, they
         # will each raise a KeyboardInterrupt exception and print to stderr at
         # the same time.
-        pool = multiprocessing.Pool(self.workers, lit.worker.initializer,
+        pool = multiprocessing.Pool(self.workers, lit.worker.initialize,
                                     (self.lit_config, semaphores))
 
         # Install a console-control signal handler on Windows.
@@ -134,27 +127,20 @@ class ParallelRun(Run):
                 return True
             lit.util.win32api.SetConsoleCtrlHandler(console_ctrl_handler, True)
 
-        try:
-            async_results = [pool.apply_async(lit.worker.run_one_test,
-                                              args=(test,),
-                                              callback=lambda r,t=test: self._consume_test_result(t, r))
-                             for test in self.tests]
-            pool.close()
+        async_results = [
+            pool.apply_async(lit.worker.execute, args=[test],
+                callback=lambda r, t=test: self._process_result(t, r))
+            for test in self.tests]
+        pool.close()
 
-            # Wait for all results to come in. The callback that runs in the
-            # parent process will update the display.
-            for a in async_results:
-                timeout = deadline - time.time()
-                a.wait(timeout)
-                if not a.successful():
-                    # TODO(yln): this also raises on a --max-time time
-                    a.get() # Exceptions raised here come from the worker.
-                if self.hit_max_failures:
-                    break
-        except:
-            # Stop the workers and wait for any straggling results to come in
-            # if we exited without waiting on every async result.
-            pool.terminate()
-            raise
-        finally:
-            pool.join()
+        for ar in async_results:
+            timeout = deadline - time.time()
+            try:
+                ar.get(timeout)
+            except multiprocessing.TimeoutError:
+                # TODO(yln): print timeout error
+                pool.terminate()
+                break
+            if self.hit_max_failures:
+                pool.terminate()
+                break
