@@ -3764,23 +3764,23 @@ foreach fvti = AllFloatVectors in
 {
   def : Pat<(fvti.Vector (riscv_vbroadcast fvti.ScalarRegClass:$value)),
             (!cast<Instruction>("PseudoVFMV_V_F_M"#fvti.RegClass.VLMul)
-               !if(!eq(!cast<string>(fvti.ScalarRegClass),
-                       !cast<string>(FPR32)),
-                   (SUBREG_TO_REG (i32 -1), FPR32:$value, sub_32),
-                   (fvti.Scalar fvti.ScalarRegClass:$value)),
-               X0, fvti.SEW)>;
+              !if(!eq(!cast<string>(fvti.ScalarRegClass),
+                      !cast<string>(FPR32)),
+                (SUBREG_TO_REG (i32 -1), FPR32:$value, sub_32),
+                (fvti.Scalar fvti.ScalarRegClass:$value)),
+              X0, fvti.SEW)>;
 }
 
 foreach vti = AllIntegerVectors in
 {
   def : Pat<(vti.Vector (riscv_vbroadcast GPR:$value)),
             (!cast<Instruction>("PseudoVMV_V_X_M"#vti.RegClass.VLMul)
-                 GPR:$value,
-                 X0, vti.SEW)>;
+              GPR:$value,
+              X0, vti.SEW)>;
   def : Pat<(vti.Vector (riscv_vbroadcast simm5:$value)),
             (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul)
-                 simm5:$value,
-                 X0, vti.SEW)>;
+              simm5:$value,
+              X0, vti.SEW)>;
 }
 
 }
