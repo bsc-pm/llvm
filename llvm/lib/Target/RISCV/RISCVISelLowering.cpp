@@ -125,13 +125,28 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
     setBooleanVectorContents(ZeroOrOneBooleanContent);
 
-    // All integer vector types need special shuffle treatment
+    // All integer vector types need special shuffle treatment because
+    // their element types may not be legal (e.g. a vector of i8).
     // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
     for (auto SEW : {8, 16, 32, 64}) {
       // FIXME: Assumes ELEN=64
       int Scale = 64 / SEW;
       for (auto NumElems : {Scale * 1, Scale * 2, Scale * 4, Scale * 8}) {
         MVT VT = MVT::getScalableVectorVT(MVT::getIntegerVT(SEW), NumElems);
+        // FIXME: We can't represent all possible combinations yet.
+        if (VT == MVT::INVALID_SIMPLE_VALUE_TYPE)
+          continue;
+        setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
+      }
+    }
+    // For consistency handle shuffles of floating types the same way as
+    // integers.
+    for (auto SEW : {32, 64}) {
+      // FIXME: Assumes ELEN=64
+      int Scale = 64 / SEW;
+      for (auto NumElems : {Scale * 1, Scale * 2, Scale * 4, Scale * 8}) {
+        MVT VT =
+            MVT::getScalableVectorVT(MVT::getFloatingPointVT(SEW), NumElems);
         // FIXME: We can't represent all possible combinations yet.
         if (VT == MVT::INVALID_SIMPLE_VALUE_TYPE)
           continue;
