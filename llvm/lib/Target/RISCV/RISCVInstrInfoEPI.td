@@ -13,7 +13,7 @@ include "RISCVInstrFormatsEPI.td"
 // Target Specific DAG nodes
 //===----------------------------------------------------------------------===//
 
-// We should constraint the second operand
+// FIXME: We should constraint the second operand
 def SDTUnaryVectorFromScalar : SDTypeProfile<1, 1, [SDTCisVec<0>]>;
 
 def riscv_vbroadcast : SDNode<"RISCVISD::VBROADCAST", SDTUnaryVectorFromScalar>;
