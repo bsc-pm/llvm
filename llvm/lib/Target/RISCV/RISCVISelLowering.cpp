@@ -126,7 +126,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setBooleanVectorContents(ZeroOrOneBooleanContent);
 
     // All integer vector types need special shuffle treatment
-    // This will go away once ISD::SPLAT_VECTOR is added.
+    // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
     for (auto SEW : {8, 16, 32, 64}) {
       // FIXME: Assumes ELEN=64
       int Scale = 64 / SEW;
