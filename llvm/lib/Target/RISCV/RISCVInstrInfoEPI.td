@@ -3835,6 +3835,8 @@ let Predicates = [HasExtEPI] in {
 defm "" : pat_vop_binary_common<add, "PseudoVADD", AllIntegerVectors>;
 defm "" : pat_vop_binary_common<mul, "PseudoVMUL", AllIntegerVectors>;
 
+defm "" : pat_vop_binary_common<and, "PseudoVAND", AllIntegerVectors>;
+
 defm "" : pat_vop_binary_common<fadd, "PseudoVFADD", AllFloatVectors>;
 defm "" : pat_vop_binary_common<fmul, "PseudoVFMUL", AllFloatVectors>;
 

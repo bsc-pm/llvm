@@ -125,33 +125,19 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
     setBooleanVectorContents(ZeroOrOneBooleanContent);
 
-    // All integer vector types need special shuffle treatment because
-    // their element types may not be legal (e.g. a vector of i8).
-    // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
-    for (auto SEW : {8, 16, 32, 64}) {
-      // FIXME: Assumes ELEN=64
-      int Scale = 64 / SEW;
-      for (auto NumElems : {Scale * 1, Scale * 2, Scale * 4, Scale * 8}) {
-        MVT VT = MVT::getScalableVectorVT(MVT::getIntegerVT(SEW), NumElems);
-        // FIXME: We can't represent all possible combinations yet.
-        if (VT == MVT::INVALID_SIMPLE_VALUE_TYPE)
-          continue;
-        setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
-      }
+    for (auto VT : MVT::integer_scalable_vector_valuetypes()) {
+      // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
+      // All integer vector types need special shuffle treatment because
+      // their element types may not be legal (e.g. a vector of i8).
+      setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
+      setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
     }
-    // For consistency handle shuffles of floating types the same way as
-    // integers.
-    for (auto SEW : {32, 64}) {
-      // FIXME: Assumes ELEN=64
-      int Scale = 64 / SEW;
-      for (auto NumElems : {Scale * 1, Scale * 2, Scale * 4, Scale * 8}) {
-        MVT VT =
-            MVT::getScalableVectorVT(MVT::getFloatingPointVT(SEW), NumElems);
-        // FIXME: We can't represent all possible combinations yet.
-        if (VT == MVT::INVALID_SIMPLE_VALUE_TYPE)
-          continue;
-        setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
-      }
+    for (auto VT : MVT::fp_scalable_vector_valuetypes()) {
+      // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
+      // For consistency handle shuffles of floating types the same way as
+      // integers.
+      setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
+      setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
     }
   }
 
@@ -527,6 +513,19 @@ SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
   return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, ScalarValue);
 }
 
+SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op,
+                                               SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+
+  BuildVectorSDNode *BV = cast<BuildVectorSDNode>(Op.getNode());
+
+  if (SDValue V = BV->getSplatValue())
+    return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, V);
+
+  return SDValue();
+}
+
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
@@ -569,6 +568,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return lowerINTRINSIC_WO_CHAIN(Op, DAG);
   case ISD::VECTOR_SHUFFLE:
     return lowerVECTOR_SHUFFLE(Op, DAG);
+  case ISD::BUILD_VECTOR:
+    return lowerBUILD_VECTOR(Op, DAG);
   }
 }
 
