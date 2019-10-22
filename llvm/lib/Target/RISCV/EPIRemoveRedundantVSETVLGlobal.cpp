@@ -71,10 +71,10 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
 
   VSETVLInstr() : Base(std::make_tuple(Register(), ~0U, ~0U)) {}
 
-  VSETVLInstr(Register DefReg, Register AVLReg, unsigned SEW, unsigned VLMul)
-      : Base(std::make_tuple(AVLReg, SEW, VLMul)), DefReg(DefReg) { }
+  VSETVLInstr(Register GVLReg, Register AVLReg, unsigned SEW, unsigned VLMul)
+      : Base(std::make_tuple(AVLReg, SEW, VLMul)), GVLReg(GVLReg) {}
 
-  Register getDefReg() { return DefReg; }
+  Register getGVLReg() { return GVLReg; }
 
   Register getAVLReg() { return std::get<0>(*this); }
 
@@ -90,7 +90,7 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
 
     const MachineOperand &DefOp = MI.getOperand(0);
     assert(DefOp.isReg());
-    Register DefReg = DefOp.getReg();
+    Register GVLReg = DefOp.getReg();
 
     const MachineOperand &AVLOp = MI.getOperand(1);
     assert(AVLOp.isReg());
@@ -108,10 +108,11 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
     unsigned SEW = (1 << SEWOp.getImm()) * 8;
     unsigned VLMul = 1 << VLMulOp.getImm();
 
-    return VSETVLInstr(DefReg, AVLReg, SEW, VLMul);
+    return VSETVLInstr(GVLReg, AVLReg, SEW, VLMul);
   }
 
-  Register DefReg = Register();
+private:
+  Register GVLReg;
 };
 
 } // namespace
@@ -260,23 +261,21 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
     // There is nothing to remove.
     if (FirstVSETVLI == MBB.instr_end())
       continue;
+
     LLVM_DEBUG(dbgs() << "Considering removal of \n"; FirstVSETVLI->dump(););
 
     VSETVLInstr FirstVI = VSETVLInstr::createFromMI(*FirstVSETVLI);
-    Register DefReg = FirstVI.getDefReg();
-    if (!DefReg.isVirtual() && DefReg != RISCV::X0) {
-      // FIXME: This shouldn't happen actually. Assert instead?
-      LLVM_DEBUG(dbgs() << "Not removing because it defines a physical "
-                           "register other than X0\n";);
-      continue;
-    }
+    Register GVLReg = FirstVI.getGVLReg();
+    assert((GVLReg.isVirtual() || GVLReg == RISCV::X0) &&
+           "GVL must be a virtual register or X0!");
 
-    // Be safe here.
-    if (DefReg.isVirtual() && !MRI.use_empty(DefReg)) {
+    // Don't remove VSETVLI whose GVL is being used.
+    // FIXME: Replace uses with predecessor's GVL, using a phi if necessary.
+    if (GVLReg.isVirtual() && !MRI.use_empty(GVLReg)) {
       LLVM_DEBUG(dbgs() << "Not removing because its value is still used.\n";
                  dbgs() << "Printing uses of defined register "
-                        << printReg(DefReg) << "\n";
-                 for (auto UIt = MRI.use_begin(DefReg), UEnd = MRI.use_end();
+                        << printReg(GVLReg) << "\n";
+                 for (auto UIt = MRI.use_begin(GVLReg), UEnd = MRI.use_end();
                       UIt != UEnd; UIt++) {
                    MachineOperand &MO = *UIt;
                    MachineInstr *MI = MO.getParent();
