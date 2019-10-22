@@ -808,17 +808,25 @@ def run_builtin_tester(out_file, j, clang):
                 ", ".join(parameters),
                 b.full_name,
                 ", ".join(arguments)))
+
+            def report(msg):
+                out_file.write(msg)
+                out_file.flush()
+
             tmp_file.flush()
+            if not single_test_clang(clang, tmp_file, ["-fsyntax-only"]):
+                report("Builtin {} not supported (clang syntax only)\n".format(b.full_name))
+                continue
             if not single_test_clang(clang, tmp_file, ["-emit-llvm"]):
-                out_file.write("❌Builtin {} not supported (fails in clang codegen)\n".format(b.full_name))
+                report("Builtin {} not supported (clang codegen)\n".format(b.full_name))
                 continue
             if not single_test_clang(clang, tmp_file):
-                out_file.write("❌Builtin {} not supported (fails at -O0)\n".format(b.full_name))
+                report("Builtin {} not supported (llvm codegen -O0)\n".format(b.full_name))
                 continue
             if not single_test_clang(clang, tmp_file, ["-O2"]):
-                out_file.write("❌Builtin {} not supported (fails at -O2)\n".format(b.full_name))
+                report("Builtin {} not supported (llvm codegen -O2)\n".format(b.full_name))
                 continue
-            # out_file.write("✔️ Builtin {} seems to work fine\n".format(b.full_name))
+            # report("Builtin {} seems to work fine\n".format(b.full_name))
             num_builtins_succeeded += 1
     num_builtins_failed = num_builtins_tested - num_builtins_succeeded
     out_file.write("Tested {} builtins. Failed {} ({:.2%})\n".format(
