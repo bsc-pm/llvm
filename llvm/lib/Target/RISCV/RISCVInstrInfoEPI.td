@@ -2268,8 +2268,10 @@ let Predicates = [HasExtEPI] in {
   foreach vti = NoGroupIntegerVectors in {
      def : Pat<(vti.Vector (zext (vti.Mask EPIVR:$rs1))),
                (PseudoVMAND_MM_M1 EPIVR:$rs1, EPIVR:$rs1, X0, vti.SEW)>;
+     // We don't have to do anything here because mask vectors only use the
+     // LSB of each element.
      def : Pat<(vti.Mask (trunc (vti.Vector EPIVR:$rs1))),
-               (PseudoVMAND_MM_M1 EPIVR:$rs1, EPIVR:$rs1, X0, vti.SEW)>;
+               (COPY_TO_REGCLASS EPIVR:$rs1, EPIVR)>;
   }
 
   foreach vti = GroupIntegerVectors in {
@@ -2280,11 +2282,11 @@ let Predicates = [HasExtEPI] in {
                  (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
                    (vti.Vector (IMPLICIT_DEF)), 0, X0, vti.SEW),
                  X0, vti.SEW)>;
-     def : Pat<(vti.Vector (zext (vti.Mask EPIVR:$rs1))),
+     def : Pat<(vti.Vector (zext (vti.Mask V0))),
                (!cast<Instruction>("PseudoVMERGE_VIM_M"#vti.RegClass.VLMul)
                  (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
                    (vti.Vector (IMPLICIT_DEF)), 0, X0, vti.SEW),
-                 1, EPIVR:$rs1, X0, vti.SEW)>;
+                 1, (vti.Mask V0), X0, vti.SEW)>;
   }
 
   // FIXME Deal with {B,H,W} load/store (load + sext)
