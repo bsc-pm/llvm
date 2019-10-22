@@ -1297,8 +1297,9 @@ defset list<FloatVectorTypeInfoToWide> AllWideableFloatVectors = {
 
 class MaskTypeInfo<ValueType Mas, int Sew, int Vlmul, ValueType Ivt> {
   ValueType Mask = Mas;
+  // {SEW, VLMul} values set a valid VType to deal with this mask type.
   int SEW = Sew; // FIXME: computed as ELEN/vscale, to be used for loading/storing partial masks
-  int VLMul = Vlmul;
+  int VLMul = Vlmul; // Convention: Minimum VLMul where this mask type appears.
   ValueType IntegerVector = Ivt;
 }
 
@@ -1843,7 +1844,9 @@ multiclass pseudo_ternary_v_vv_vf {
   }
 }
 
-multiclass pseudo_unary_mask_integer {
+multiclass pseudo_unary_x_v {
+  // A different pseudo is defined for each VLMul value, but (ungrouped) EPIVR
+  // register operands are used in all of them.
   foreach Vlmul = [1, 2, 4, 8] in
   {
     let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
@@ -1855,7 +1858,9 @@ multiclass pseudo_unary_mask_integer {
   }
 }
 
-multiclass pseudo_binary_mm {
+multiclass pseudo_binary_m_mm {
+  // A different pseudo is defined for each VLMul value, but (ungrouped) EPIVR
+  // register operands are used in all of them.
   foreach Vlmul = [1, 2, 4, 8] in
   {
     let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
@@ -2044,17 +2049,17 @@ defm PseudoVFNCVT_F_F  : pseudo_unary_v_w;
 
 defm PseudoVID         : pseudo_nullary_v;
 
-defm PseudoVMPOPC      : pseudo_unary_mask_integer;
-defm PseudoVMFIRST     : pseudo_unary_mask_integer;
+defm PseudoVMPOPC      : pseudo_unary_x_v;
+defm PseudoVMFIRST     : pseudo_unary_x_v;
 
-defm PseudoVMANDNOT    : pseudo_binary_mm;
-defm PseudoVMAND       : pseudo_binary_mm;
-defm PseudoVMOR        : pseudo_binary_mm;
-defm PseudoVMXOR       : pseudo_binary_mm;
-defm PseudoVMORNOT     : pseudo_binary_mm;
-defm PseudoVMNAND      : pseudo_binary_mm;
-defm PseudoVMNOR       : pseudo_binary_mm;
-defm PseudoVMXNOR      : pseudo_binary_mm;
+defm PseudoVMANDNOT    : pseudo_binary_m_mm;
+defm PseudoVMAND       : pseudo_binary_m_mm;
+defm PseudoVMOR        : pseudo_binary_m_mm;
+defm PseudoVMXOR       : pseudo_binary_m_mm;
+defm PseudoVMORNOT     : pseudo_binary_m_mm;
+defm PseudoVMNAND      : pseudo_binary_m_mm;
+defm PseudoVMNOR       : pseudo_binary_m_mm;
+defm PseudoVMXNOR      : pseudo_binary_m_mm;
 
 // Load/store pseudo instructions
 
@@ -2863,8 +2868,8 @@ multiclass pat_intrinsic_binary_relational_fp_m_vv_swapped<string intrinsic_name
   }
 }
 
-multiclass pat_intrinsic_binary_mm<string intrinsic_name,
-                                   string instruction_name>
+multiclass pat_intrinsic_binary_m_mm<string intrinsic_name,
+                                     string instruction_name>
 {
   foreach mti = AllMasks in
   {
@@ -3433,14 +3438,14 @@ foreach mti = AllMasks in {
 //def : Pat<(vtp.Vector (int_epi_vcompress (vtp.Vector EPIVR:$rs2), (nxv1i1 EPIVR:$rs1))),
 //          (VCOMPRESS_VM $rs2, $rs1)>;
 
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmandnot", "PseudoVMANDNOT">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmand", "PseudoVMAND">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmor", "PseudoVMOR">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmxor", "PseudoVMXOR">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmornot", "PseudoVMORNOT">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmnand", "PseudoVMNAND">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmnor", "PseudoVMNOR">;
-defm "" : pat_intrinsic_binary_mm<"int_epi_vmxnor", "PseudoVMXNOR">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmandnot", "PseudoVMANDNOT">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmand", "PseudoVMAND">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmor", "PseudoVMOR">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmxor", "PseudoVMXOR">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmornot", "PseudoVMORNOT">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmnand", "PseudoVMNAND">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmnor", "PseudoVMNOR">;
+defm "" : pat_intrinsic_binary_m_mm<"int_epi_vmxnor", "PseudoVMXNOR">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vdivu", "PseudoVDIVU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vdiv", "PseudoVDIV">;
