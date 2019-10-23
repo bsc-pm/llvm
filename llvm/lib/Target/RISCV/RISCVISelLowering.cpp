@@ -2200,6 +2200,17 @@ static SDValue unpackF64OnRV32DSoftABI(SelectionDAG &DAG, SDValue Chain,
   return DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
 }
 
+static EVT MaskVTToMemVT(EVT VT) {
+  assert(VT.isScalableVector() && "Must be a scalable vector");
+  assert(VT.getVectorElementType() == MVT::i1 && "Must be a mask");
+  // FIXME - Assumes ELEN=64
+  EVT MemVT =
+      MVT::getVectorVT(MVT::getIntegerVT(64 / VT.getVectorNumElements()),
+                       VT.getVectorNumElements(),
+                       /* IsScalable */ true);
+  return MemVT;
+}
+
 // Transform physical registers into virtual registers.
 SDValue RISCVTargetLowering::LowerFormalArguments(
     SDValue Chain, CallingConv::ID CallConv, bool IsVarArg,
@@ -2253,7 +2264,16 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
     else
       ArgValue = unpackFromMemLoc(DAG, Chain, VA, DL);
 
-    if (VA.getLocInfo() == CCValAssign::Indirect) {
+    // Special case for mask vectors.
+    if (VA.getLocInfo() == CCValAssign::Indirect &&
+        VA.getValVT().isScalableVector() &&
+        VA.getValVT().getVectorElementType() == MVT::i1) {
+      EVT LocVT = MaskVTToMemVT(VA.getValVT());
+      InVals.push_back(DAG.getNode(
+          ISD::TRUNCATE, DL, VA.getValVT(),
+          DAG.getLoad(LocVT, DL, Chain, ArgValue, MachinePointerInfo())));
+      continue;
+    } else if (VA.getLocInfo() == CCValAssign::Indirect) {
       // If the original argument was split and passed by reference (e.g. i128
       // on RV32), we need to load all parts of it here (using the same
       // address).
@@ -2545,6 +2565,13 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
         // will replace this slot from a vector type to an XLenVT.
         SDValue Ptr = DAG.getLoad(XLenVT, DL, Chain, SpillSlot,
                                   MachinePointerInfo::getFixedStack(MF, FI));
+
+        // Special case for masks.
+        if (VA.getValVT().getVectorElementType() == MVT::i1) {
+          EVT LocVT = MaskVTToMemVT(VA.getValVT());
+          ArgValue = DAG.getNode(ISD::ZERO_EXTEND, DL, LocVT, ArgValue);
+        }
+
         MemOpChains.push_back(
             DAG.getStore(Chain, DL, ArgValue, Ptr, MachinePointerInfo()));
         ArgValue = Ptr;
