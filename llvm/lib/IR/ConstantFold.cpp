@@ -817,6 +817,10 @@ Constant *llvm::ConstantFoldInsertElementInstruction(Constant *Val,
   if (CIdx->uge(NumElts))
     return UndefValue::get(Val->getType());
 
+  // Leave scalable vectors alone.
+  if (Val->getType()->getVectorIsScalable())
+    return nullptr;
+
   SmallVector<Constant*, 16> Result;
   Result.reserve(NumElts);
   auto *Ty = Type::getInt32Ty(Val->getContext());

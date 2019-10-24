@@ -3991,6 +3991,10 @@ Value *llvm::SimplifyInsertElementInst(Value *Vec, Value *Val, Value *Idx,
   if (VecC && ValC && IdxC)
     return ConstantFoldInsertElementInstruction(VecC, ValC, IdxC);
 
+  // Leave scalable vectors alone.
+  if (Vec->getType()->getVectorIsScalable())
+    return nullptr;
+
   // Fold into undef if index is out of bounds.
   if (auto *CI = dyn_cast<ConstantInt>(Idx)) {
     uint64_t NumElements = cast<VectorType>(Vec->getType())->getNumElements();
