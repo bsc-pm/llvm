@@ -6430,6 +6430,8 @@ def warn_objc_unsafe_perform_selector : Warning<
   InGroup<DiagGroup<"objc-unsafe-perform-selector">>;
 def note_objc_unsafe_perform_selector_method_declared_here :  Note<
   "method %0 that returns %1 declared here">;
+def err_attribute_arm_mve_alias : Error<
+  "'__clang_arm_mve_alias' attribute can only be applied to an ARM MVE builtin">;
 
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
@@ -8660,6 +8662,12 @@ def warn_argument_invalid_range : Warning<
   InGroup<DiagGroup<"argument-outside-range">>;
 def err_argument_not_multiple : Error<
   "argument should be a multiple of %0">;
+def err_argument_not_power_of_2 : Error<
+  "argument should be a power of 2">;
+def err_argument_not_shifted_byte : Error<
+  "argument should be an 8-bit value shifted by a multiple of 8 bits">;
+def err_argument_not_shifted_byte_or_xxff : Error<
+  "argument should be an 8-bit value shifted by a multiple of 8 bits, or in the form 0x??FF">;
 def warn_neon_vector_initializer_non_portable : Warning<
   "vector initializers are not compatible with NEON intrinsics in big endian "
   "mode">, InGroup<DiagGroup<"nonportable-vector-initialization">>;
