@@ -882,7 +882,7 @@ TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
   EVT EltVT = VT.getVectorElementType();
 
   // Vectors with only one element are always scalarized.
-  if (NumElts == 1)
+  if (!VT.isScalableVector() && NumElts == 1)
     return LegalizeKind(TypeScalarizeVector, EltVT);
 
   // Try to widen vector elements until the element type is a power of two and
@@ -948,7 +948,8 @@ TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
     // there are no skipped intermediate vector types in the simple types.
     if (!EltVT.isSimple())
       break;
-    MVT LargerVector = MVT::getVectorVT(EltVT.getSimpleVT(), NumElts);
+    MVT LargerVector =
+        MVT::getVectorVT(EltVT.getSimpleVT(), NumElts, VT.isScalableVector());
     if (LargerVector == MVT())
       break;
 
@@ -964,7 +965,8 @@ TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
   }
 
   // Vectors with illegal element types are expanded.
-  EVT NVT = EVT::getVectorVT(Context, EltVT, VT.getVectorNumElements() / 2);
+  EVT NVT = EVT::getVectorVT(Context, EltVT, VT.getVectorNumElements() / 2,
+                             VT.isScalableVector());
   return LegalizeKind(TypeSplitVector, NVT);
 }
 
@@ -1287,7 +1289,8 @@ void TargetLoweringBase::computeRegisterProperties(
         MVT SVT = (MVT::SimpleValueType) nVT;
         // Promote vectors of integers to vectors with the same number
         // of elements, with a wider element type.
-        if (SVT.getScalarSizeInBits() > EltVT.getSizeInBits() &&
+        if (VT.isScalableVector() == SVT.isScalableVector() &&
+            SVT.getScalarSizeInBits() > EltVT.getSizeInBits() &&
             SVT.getVectorNumElements() == NElts && isTypeLegal(SVT)) {
           TransformToType[i] = SVT;
           RegisterTypeForVT[i] = SVT;
@@ -1306,8 +1309,9 @@ void TargetLoweringBase::computeRegisterProperties(
         // Try to widen the vector.
         for (unsigned nVT = i + 1; nVT <= MVT::LAST_VECTOR_VALUETYPE; ++nVT) {
           MVT SVT = (MVT::SimpleValueType) nVT;
-          if (SVT.getVectorElementType() == EltVT
-              && SVT.getVectorNumElements() > NElts && isTypeLegal(SVT)) {
+          if (VT.isScalableVector() == SVT.isScalableVector() &&
+              SVT.getVectorElementType() == EltVT &&
+              SVT.getVectorNumElements() > NElts && isTypeLegal(SVT)) {
             TransformToType[i] = SVT;
             RegisterTypeForVT[i] = SVT;
             NumRegistersForVT[i] = 1;
@@ -1431,15 +1435,15 @@ unsigned TargetLoweringBase::getVectorTypeBreakdown(LLVMContext &Context, EVT VT
 
   // Divide the input until we get to a supported size.  This will always
   // end with a scalar if the target doesn't support vectors.
-  while (NumElts > 1 && !isTypeLegal(
-                                   EVT::getVectorVT(Context, EltTy, NumElts))) {
+  while (NumElts > 1 && !isTypeLegal(EVT::getVectorVT(Context, EltTy, NumElts,
+                                                      VT.isScalableVector()))) {
     NumElts >>= 1;
     NumVectorRegs <<= 1;
   }
 
   NumIntermediates = NumVectorRegs;
 
-  EVT NewVT = EVT::getVectorVT(Context, EltTy, NumElts);
+  EVT NewVT = EVT::getVectorVT(Context, EltTy, NumElts, VT.isScalableVector());
   if (!isTypeLegal(NewVT))
     NewVT = EltTy;
   IntermediateVT = NewVT;
