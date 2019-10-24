@@ -231,15 +231,19 @@ struct VPCallback {
 /// VPTransformState holds information passed down when "executing" a VPlan,
 /// needed for generating the output IR.
 struct VPTransformState {
-  VPTransformState(unsigned VF, unsigned UF, LoopInfo *LI, DominatorTree *DT,
-                   IRBuilder<> &Builder, VectorizerValueMap &ValueMap,
-                   InnerLoopVectorizer *ILV, VPCallback &Callback)
-      : VF(VF), UF(UF), Instance(), LI(LI), DT(DT), Builder(Builder),
-        ValueMap(ValueMap), ILV(ILV), Callback(Callback) {}
+  VPTransformState(unsigned VF, unsigned UF, bool IsScalable, LoopInfo *LI,
+                   DominatorTree *DT, IRBuilder<> &Builder,
+                   VectorizerValueMap &ValueMap, InnerLoopVectorizer *ILV,
+                   VPCallback &Callback)
+      : VF(VF), UF(UF), IsScalable(IsScalable), Instance(), LI(LI), DT(DT),
+        Builder(Builder), ValueMap(ValueMap), ILV(ILV), Callback(Callback) {}
 
   /// The chosen Vectorization and Unroll Factors of the loop being vectorized.
   unsigned VF;
   unsigned UF;
+
+  // Is this scalable vectorization?
+  bool IsScalable;
 
   /// Hold the indices to generate specific scalar instructions. Null indicates
   /// that all instances are to be generated, using either scalar or vector

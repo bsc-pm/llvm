@@ -102,5 +102,5 @@ unsigned RISCVTTIImpl::getMaxElementWidth() const {
 }
 
 bool RISCVTTIImpl::useScalableVectorType() const {
-  return true;
+  return ST->hasExtEPI();
 }
