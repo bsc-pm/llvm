@@ -14,8 +14,9 @@
 #include "clang/Driver/SanitizerArgs.h"
 #include "llvm/Option/ArgList.h"
 
-namespace aix = clang::driver::tools::aix;
 using AIX = clang::driver::toolchains::AIX;
+using namespace clang::driver;
+using namespace clang::driver::tools;
 
 using namespace llvm::opt;
 
