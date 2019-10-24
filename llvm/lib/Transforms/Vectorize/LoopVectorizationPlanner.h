@@ -167,16 +167,35 @@ public:
 
 /// Information about vectorization costs
 struct VectorizationFactor {
+private:
   // Vector width with best cost
   unsigned Width;
   // Cost of the loop with that width
   unsigned Cost;
 
-  // Width 1 means no vectorization, cost 0 means uncomputed cost.
-  static VectorizationFactor Disabled() { return {1, 0}; }
+  // Width 0 means no vectorization, cost 0 means uncomputed cost.
+  VectorizationFactor() : Width(0), Cost(0) {}
+
+public:
+  VectorizationFactor(unsigned Width, unsigned Cost)
+      : Width(Width), Cost(Cost) {
+    assert(Width > 0 && "Width cannot be zero");
+  }
+
+  unsigned getWidth() const {
+    assert(Width > 0 && "Cannot get width of invalid vectorization factor");
+    return Width;
+  }
+  unsigned getCost() const { return Cost; }
+
+  static VectorizationFactor Disabled() { return VectorizationFactor(); }
 
   bool operator==(const VectorizationFactor &rhs) const {
     return Width == rhs.Width && Cost == rhs.Cost;
+  }
+
+  bool operator!=(const VectorizationFactor &rhs) const {
+    return !this->operator==(rhs);
   }
 };
 

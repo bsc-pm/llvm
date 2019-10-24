@@ -7561,7 +7561,11 @@ static bool processLoopInVPlanNativePath(
   const unsigned UserVF = Hints.getWidth();
 
   // Plan how to best vectorize, return the best VF and its cost.
-  const VectorizationFactor VF = LVP.planInVPlanNativePath(UserVF);
+  VectorizationFactor VF = LVP.planInVPlanNativePath(UserVF);
+  // Normalize the meaning of VF == 1 for fixed vectors.
+  if (!TTI->useScalableVectorType() && VF != VectorizationFactor::Disabled() &&
+      VF.getWidth() == 1)
+    VF = VectorizationFactor::Disabled();
 
   // If we are stress testing VPlan builds, do not attempt to generate vector
   // code. Masked vector code generation support will follow soon.
@@ -7570,10 +7574,10 @@ static bool processLoopInVPlanNativePath(
       VectorizationFactor::Disabled() == VF)
     return false;
 
-  LVP.setBestPlan(VF.Width, 1);
+  LVP.setBestPlan(VF.getWidth(), 1);
 
-  InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.Width, 1, LVL,
-                         &CM);
+  InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.getWidth(), 1,
+                         LVL, &CM);
   LLVM_DEBUG(dbgs() << "Vectorizing outer loop in \""
                     << L->getHeader()->getParent()->getName() << "\"\n");
   LVP.executePlan(LB, DT);
@@ -7749,10 +7753,10 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   unsigned IC = 1;
   unsigned UserIC = Hints.getInterleave();
 
-  if (MaybeVF) {
+  if (MaybeVF && *MaybeVF != VectorizationFactor::Disabled()) {
     VF = *MaybeVF;
     // Select the interleave count.
-    IC = CM.selectInterleaveCount(VF.Width, VF.Cost);
+    IC = CM.selectInterleaveCount(VF.getWidth(), VF.getCost());
   }
 
   // Identify the diagnostic messages that should be produced.
@@ -7765,7 +7769,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     return false;
   }
 
-  if (VF.Width == 1 && !TTI->useScalableVectorType()) {
+  if (VF == VectorizationFactor::Disabled() ||
+      (VF.getWidth() == 1 && !TTI->useScalableVectorType())) {
     LLVM_DEBUG(dbgs() << "LV: Vectorization is possible but not beneficial.\n");
     VecDiagMsg = std::make_pair(
         "VectorizationNotBeneficial",
@@ -7831,7 +7836,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
              << VecDiagMsg.second;
     });
   } else if (VectorizeLoop && !InterleaveLoop) {
-    LLVM_DEBUG(dbgs() << "LV: Found a vectorizable loop (" << VF.Width
+    LLVM_DEBUG(dbgs() << "LV: Found a vectorizable loop (" << VF.getWidth()
                       << ") in " << DebugLocStr << '\n');
     ORE->emit([&]() {
       return OptimizationRemarkAnalysis(LV_NAME, IntDiagMsg.first,
@@ -7839,12 +7844,12 @@ bool LoopVectorizePass::processLoop(Loop *L) {
              << IntDiagMsg.second;
     });
   } else if (VectorizeLoop && InterleaveLoop) {
-    LLVM_DEBUG(dbgs() << "LV: Found a vectorizable loop (" << VF.Width
+    LLVM_DEBUG(dbgs() << "LV: Found a vectorizable loop (" << VF.getWidth()
                       << ") in " << DebugLocStr << '\n');
     LLVM_DEBUG(dbgs() << "LV: Interleave Count is " << IC << '\n');
   }
 
-  LVP.setBestPlan(VF.Width, IC);
+  LVP.setBestPlan(VF.getWidth(), IC);
 
   using namespace ore;
   bool DisableRuntimeUnroll = false;
@@ -7866,7 +7871,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     });
   } else {
     // If we decided that it is *legal* to vectorize the loop, then do it.
-    InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.Width, IC,
+    InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.getWidth(), IC,
                            &LVL, &CM);
     LVP.executePlan(LB, DT);
     ++LoopsVectorized;
@@ -7882,7 +7887,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       return OptimizationRemark(LV_NAME, "Vectorized", L->getStartLoc(),
                                 L->getHeader())
              << "vectorized loop (vectorization width: "
-             << NV("VectorizationFactor", VF.Width)
+             << NV("VectorizationFactor", VF.getWidth())
              << ", interleaved count: " << NV("InterleaveCount", IC) << ")";
     });
   }
