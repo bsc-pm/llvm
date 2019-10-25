@@ -352,52 +352,54 @@ static LValue EmitRefAsIs(CodeGenFunction &CGF, const VarDecl *VD) {
   return CGF.MakeAddrLValue(addr, VD->getType(), AlignmentSource::Decl);
 }
 
-static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
-                    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
+                        SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
   // C long -> LLVM long
   llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
 
+  SmallVector<llvm::Value*, 4> DimsWithValue;
+  DimsWithValue.push_back(V);
+  while (Q->isArrayType()) {
+    if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(Q)) {
+      auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+      llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
+      DimsWithValue.push_back(DimExpr);
+      Q = BaseArrayTy->getElementType();
+    } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(Q)) {
+      uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
+      DimsWithValue.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+      Q = BaseArrayTy->getElementType();
+    } else {
+      llvm_unreachable("Unhandled array type");
+    }
+  }
+  assert(DimsWithValue.size() >= 1);
+  TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
+}
+
+static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
+                    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
   std::string Basename = Name;
 
-  SmallVector<llvm::Value*, 4> DsaData;
-  SmallVector<llvm::Value*, 4> TmpDsaData; // save all dimensions always. if vla add all of them
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
+    llvm::Value *V;
     if (VD->getType()->isReferenceType()) {
       // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
-      DsaData.push_back(EmitRefAsIs(CGF, VD).getPointer());
+      V = EmitRefAsIs(CGF, VD).getPointer();
+      TaskInfo.emplace_back(Basename, V);
     } else {
-      DsaData.push_back(CGF.EmitDeclRefLValue(DRE).getPointer());
+      V = CGF.EmitDeclRefLValue(DRE).getPointer();
+      TaskInfo.emplace_back(Basename, V);
     }
-    QualType TmpTy = DRE->getType();
-    bool FirstTime = true;
-    while (TmpTy->isArrayType()) {
-      if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
-        // New type of bundle for vlas
-        if (FirstTime) {
-          FirstTime = false;
-          Basename += ".VLA";
-        }
-        auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
-        llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
-        DsaData.push_back(DimExpr);
-        TmpTy = BaseArrayTy->getElementType();
-      } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
-        uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-        TmpDsaData.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
-        TmpTy = BaseArrayTy->getElementType();
-      } else {
-        llvm_unreachable("Unhandled array type");
-      }
-    }
-    if (!FirstTime) // We have seen a vla, save dimensions
-      DsaData.append(TmpDsaData.begin(), TmpDsaData.end());
+    QualType Q = VD->getType();
+    if (Q->isVariableArrayType())
+      EmitVLADims(CGF, V, Q, TaskInfo);
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
-    DsaData.push_back(CGF.EmitScalarExpr(ThisE));
+    TaskInfo.emplace_back(Basename, CGF.EmitScalarExpr(ThisE));
   } else {
     llvm_unreachable("Unhandled expression");
   }
-  TaskInfo.emplace_back(Basename, DsaData);
 }
 
 static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,

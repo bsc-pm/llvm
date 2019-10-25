@@ -24,6 +24,9 @@ struct TaskDSAInfo {
   SetVector<Value *> Firstprivate;
 };
 
+// <VLA, VLA_dims>
+using TaskVLADimsInfo = MapVector<Value *, SetVector<Value *>>;
+
 struct DependInfo {
   int SymbolIndex;
   std::string RegionText;
@@ -49,6 +52,7 @@ struct TaskDependsInfo {
 
 struct TaskInfo {
   TaskDSAInfo DSAInfo;
+  TaskVLADimsInfo VLADimsInfo;
   TaskDependsInfo DependsInfo;
   Value *Final = nullptr;
   Value *If = nullptr;

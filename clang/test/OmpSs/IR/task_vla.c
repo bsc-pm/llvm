@@ -20,7 +20,7 @@ void foo(int n) {
 // CHECK-NEXT  %10 = load i32, i32* %i, align 4
 // CHECK-NEXT  %11 = sext i32 %10 to i64
 // CHECK-NEXT  %12 = add i64 %11, 1
-// CHECK-NEXT  %13 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED.VLA"([7 x i32]* %vla, i64 %1, i64 7, i64 %3, i64 7), "QUAL.OSS.FIRSTPRIVATE"(i32* %i), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %3, i64 0, i64 %3, i64 7, i64 %8, i64 %9, i64 1, i64 %11, i64 %12), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %3, i64 0, i64 %3, i64 7, i64 0, i64 7) ]
+// CHECK-NEXT  %13 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED.VLA"([7 x i32]* %vla), "QUAL.OSS.VLA.DIMS"([7 x i32]* %vla, i64 %1, i64 7, i64 %3, i64 7), "QUAL.OSS.FIRSTPRIVATE"(i32* %i), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %3, i64 0, i64 %3, i64 7, i64 %8, i64 %9, i64 1, i64 %11, i64 %12), "QUAL.OSS.DEP.IN"([7 x i32]* %vla, i64 28, i64 0, i64 28, i64 %3, i64 0, i64 %3, i64 7, i64 0, i64 7) ]
 // CHECK-NEXT  call void @llvm.directive.region.exit(token %13)
 // CHECK-NEXT  %14 = load i32, i32* %n.addr, align 4
 // CHECK-NEXT  %add2 = add nsw i32 %14, 1
@@ -57,6 +57,6 @@ void foo2(int x) {
 
 // CHECK: store i64 %1, i64* %__vla_expr0, align 8
 // CHECK-NEXT: store i64 %3, i64* %__vla_expr1, align 8
-// CHECK-NEXT: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE.VLA"(i32* %vla, i64 %1, i64 %3) ]
+// CHECK-NEXT: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3) ]
 // CHECK-NEXT: %7 = mul nsw i64 0, %3
 

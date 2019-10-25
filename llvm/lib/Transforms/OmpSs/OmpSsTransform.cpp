@@ -105,26 +105,35 @@ struct OmpSs : public ModulePass {
   // TODO: Use Map and a function to look up if it exists already
   SmallVector<SmallVector<FunctionCallee, DEP_ENUM_SIZE>, MAX_DEP_DIMS> RegisterRegionsTypes;
 
-  void rewriteDepBase(ArrayRef<Value *> DSAMerge,
-                      Function *F,
-                      DenseMap<Value *, Value *> &ConstExprToInst,
-                      SmallVectorImpl<DependInfo> &DependList) {
-    for (DependInfo &DI : DependList) {
-      if (ConstExprToInst.count(DI.Base)) {
-        DI.Base = ConstExprToInst[DI.Base];
-      } else {
-        Function::arg_iterator AI = F->arg_begin();
-        for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
-          if (DSAMerge[i] == DI.Base) {
-            DI.Base = &*AI;
-            break;
-          }
+  void rewriteDepValue(ArrayRef<Value *> TaskArgsList,
+                       Function *F,
+                       DenseMap<Value *, Value *> &ConstExprToInst,
+                       Value *&V) {
+    if (ConstExprToInst.count(V)) {
+      V = ConstExprToInst[V];
+    } else {
+      Function::arg_iterator AI = F->arg_begin();
+      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
+        if (TaskArgsList[i] == V) {
+          V = &*AI;
+          return;
         }
       }
     }
   }
 
-  void unpackDepsAndRewrite(TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> DSAMerge) {
+  void rewriteDeps(ArrayRef<Value *> TaskArgsList,
+                   Function *F,
+                   DenseMap<Value *, Value *> &ConstExprToInst,
+                   SmallVectorImpl<DependInfo> &DependList) {
+    for (DependInfo &DI : DependList) {
+      rewriteDepValue(TaskArgsList, F, ConstExprToInst, DI.Base);
+      for (Value *&V : DI.Dims)
+        rewriteDepValue(TaskArgsList, F, ConstExprToInst, V);
+    }
+  }
+
+  void unpackDepsAndRewrite(TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> TaskArgsList) {
     BasicBlock &Entry = F->getEntryBlock();
     DenseMap<Value *, Value *> ConstExprToInst;
     for (ConstantExpr * const &CE : TDI.UnpackConstants) {
@@ -139,25 +148,24 @@ struct OmpSs : public ModulePass {
     }
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI) {
-        I.replaceUsesOfWith(DSAMerge[i], &*AI);
+      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
+        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
       }
       for (auto &p : ConstExprToInst) {
         I.replaceUsesOfWith(p.first, p.second);
       }
     }
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Ins);
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Outs);
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.Inouts);
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakIns);
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakOuts);
-    rewriteDepBase(DSAMerge, F, ConstExprToInst, TDI.WeakInouts);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Ins);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Outs);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Inouts);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakIns);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakOuts);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakInouts);
   }
 
   void unpackCallToRTOfType(Module &M,
                             const SmallVectorImpl<DependInfo> &DependList,
                             Function *F,
-                            ArrayRef<Value *> DSAMerge,
                             int DepType) {
     for (const DependInfo &DI : DependList) {
       IRBuilder<> BBBuilder(&F->getEntryBlock().back());
@@ -180,21 +188,20 @@ struct OmpSs : public ModulePass {
 
   void unpackDepsCallToRT(Module &M,
                       const TaskDependsInfo &TDI,
-                      Function *F,
-                      ArrayRef<Value *> DSAMerge) {
-    unpackCallToRTOfType(M, TDI.Ins, F, DSAMerge, DEP_IN);
-    unpackCallToRTOfType(M, TDI.Outs, F, DSAMerge, DEP_OUT);
-    unpackCallToRTOfType(M, TDI.Inouts, F, DSAMerge, DEP_INOUT);
-    unpackCallToRTOfType(M, TDI.WeakIns, F, DSAMerge, DEP_WEAKIN);
-    unpackCallToRTOfType(M, TDI.WeakOuts, F, DSAMerge, DEP_WEAKOUT);
-    unpackCallToRTOfType(M, TDI.WeakInouts, F, DSAMerge, DEP_WEAKINOUT);
+                      Function *F) {
+    unpackCallToRTOfType(M, TDI.Ins, F, DEP_IN);
+    unpackCallToRTOfType(M, TDI.Outs, F, DEP_OUT);
+    unpackCallToRTOfType(M, TDI.Inouts, F, DEP_INOUT);
+    unpackCallToRTOfType(M, TDI.WeakIns, F, DEP_WEAKIN);
+    unpackCallToRTOfType(M, TDI.WeakOuts, F, DEP_WEAKOUT);
+    unpackCallToRTOfType(M, TDI.WeakInouts, F, DEP_WEAKINOUT);
   }
 
   // Creates an empty UnpackDeps Function with entry BB.
-  Function *createUnpackDepsFunction(Module &M, Function &F, std::string Suffix, ArrayRef<Value *> DSAMerge) {
+  Function *createUnpackDepsFunction(Module &M, Function &F, std::string Suffix, ArrayRef<Value *> TaskArgsList) {
     Type *RetTy = Type::getVoidTy(M.getContext());
     std::vector<Type *> ParamsTy;
-    for (Value *V : DSAMerge) {
+    for (Value *V : TaskArgsList) {
       ParamsTy.push_back(V->getType());
     }
     ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * handler */
@@ -212,11 +219,11 @@ struct OmpSs : public ModulePass {
   // Creates an empty UnpackTask Function without entry BB.
   // CodeExtractor will create it for us
   Function *createUnpackTaskFunction(Module &M, Function &F, std::string Suffix,
-                                     ArrayRef<Value *> DSAMerge, SetVector<BasicBlock *> &TaskBBs,
+                                     ArrayRef<Value *> TaskArgsList, SetVector<BasicBlock *> &TaskBBs,
                                      Type *TaskAddrTranslationEntryTy) {
     Type *RetTy = Type::getVoidTy(M.getContext());
     std::vector<Type *> ParamsTy;
-    for (Value *V : DSAMerge) {
+    for (Value *V : TaskArgsList) {
       ParamsTy.push_back(V->getType());
     }
     ParamsTy.push_back(Type::getInt8PtrTy(M.getContext())); /* void * device_env */
@@ -230,21 +237,21 @@ struct OmpSs : public ModulePass {
 
     // Create an iterator to name all of the arguments we inserted.
     Function::arg_iterator AI = UnpackTaskFuncVar->arg_begin();
-    // Rewrite all users of the DSAMerge in the extracted region to use the
+    // Rewrite all users of the TaskArgsList in the extracted region to use the
     // arguments (or appropriate addressing into struct) instead.
-    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i) {
+    for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i) {
       Value *RewriteVal = &*AI++;
 
-      std::vector<User *> Users(DSAMerge[i]->user_begin(), DSAMerge[i]->user_end());
+      std::vector<User *> Users(TaskArgsList[i]->user_begin(), TaskArgsList[i]->user_end());
       for (User *use : Users)
         if (Instruction *inst = dyn_cast<Instruction>(use))
           if (TaskBBs.count(inst->getParent()))
-            inst->replaceUsesOfWith(DSAMerge[i], RewriteVal);
+            inst->replaceUsesOfWith(TaskArgsList[i], RewriteVal);
     }
     // Set names for arguments.
     AI = UnpackTaskFuncVar->arg_begin();
-    for (unsigned i = 0, e = DSAMerge.size(); i != e; ++i, ++AI)
-      AI->setName(DSAMerge[i]->getName());
+    for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI)
+      AI->setName(TaskArgsList[i]->getName());
 
     return UnpackTaskFuncVar;
   }
@@ -286,9 +293,10 @@ struct OmpSs : public ModulePass {
   }
 
   // Given a Outline Function assuming that task args are the first parameter, and
-  // DSAInfo, it unpacks task args in Outline and fills UnpackedList with those Values,
-  // used to call Unpack Functions
-  void unpackDSAs(Module &M, const TaskDSAInfo &DSAInfo, Function *OlFunc,
+  // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
+  // with those Values, used to call Unpack Functions
+  void unpackDSAsWithVLADims(Module &M, const TaskDSAInfo &DSAInfo,
+                  const TaskVLADimsInfo &VLADimsInfo, Function *OlFunc,
                   SmallVectorImpl<Value *> &UnpackedList) {
     UnpackedList.clear();
 
@@ -321,11 +329,24 @@ struct OmpSs : public ModulePass {
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Firstprivate[i]->getName());
       UnpackedList.push_back(GEP);
     }
+    for (const auto &VLAWithDimsMap : VLADimsInfo) {
+      ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
+      for (unsigned j = 0; j < Dims.size(); ++j, ++TaskArgsIdx) {
+        Value *Idx[2];
+        Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+        Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
+        Value *GEP = BBBuilder.CreateGEP(
+            OlDepsFuncTaskArgs, Idx, "dims_gep" + Dims[j]->getName());
+        Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+        UnpackedList.push_back(LGEP);
+      }
+    }
   }
 
   // Given an OutlineDeps and UnpackDeps Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olDepsCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          const TaskVLADimsInfo &VLADimsInfo, 
                           Function *OlFunc, Function *UnpackFunc) {
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
@@ -333,7 +354,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> TaskDepsUnpackParams;
-    unpackDSAs(M, DSAInfo, OlFunc, TaskDepsUnpackParams);
+    unpackDSAsWithVLADims(M, DSAInfo, VLADimsInfo, OlFunc, TaskDepsUnpackParams);
     TaskDepsUnpackParams.push_back(&*AI++);
     // Build TaskUnpackCall
     BBBuilder.CreateCall(UnpackFunc, TaskDepsUnpackParams);
@@ -344,6 +365,7 @@ struct OmpSs : public ModulePass {
   // Given an OutlineTask and UnpackTask Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olTaskCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          const TaskVLADimsInfo &VLADimsInfo,
                           Function *OlFunc, Function *UnpackFunc) {
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
@@ -351,7 +373,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> TaskUnpackParams;
-    unpackDSAs(M, DSAInfo, OlFunc, TaskUnpackParams);
+    unpackDSAsWithVLADims(M, DSAInfo, VLADimsInfo, OlFunc, TaskUnpackParams);
     TaskUnpackParams.push_back(&*AI++);
     TaskUnpackParams.push_back(&*AI++);
     // Build TaskUnpackCall
@@ -415,6 +437,7 @@ struct OmpSs : public ModulePass {
 
     // Create nanos6_task_args_* START
     // Private and Firstprivate must be stored in the struct
+    // Captured values (i.e. VLA dimensions) are not pointers
     SmallVector<Type *, 4> TaskArgsMemberTy;
     for (Value *V : TI.DSAInfo.Shared) {
       TaskArgsMemberTy.push_back(V->getType());
@@ -425,18 +448,28 @@ struct OmpSs : public ModulePass {
     for (Value *V : TI.DSAInfo.Firstprivate) {
       TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
     }
+    for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
+      ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
+      for (unsigned i = 0; i < Dims.size(); ++i) {
+        assert(!Dims[i]->getType()->isPointerTy() && "Captures are not pointers");
+        TaskArgsMemberTy.push_back(Dims[i]->getType());
+      }
+    }
     StructType *TaskArgsTy = StructType::create(M.getContext(), TaskArgsMemberTy, ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
     // Create nanos6_task_args_* END
 
-    SetVector<Value *> DSAMerge;
-    DSAMerge.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
-    DSAMerge.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
-    DSAMerge.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
+    SetVector<Value *> TaskArgsList;
+    TaskArgsList.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
+    TaskArgsList.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
+    TaskArgsList.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
+    for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
+      TaskArgsList.insert(VLAWithDimsMap.second.begin(), VLAWithDimsMap.second.end());
+    }
 
     // nanos6_unpacked_task_region_* START
     Function *UnpackTaskFuncVar
       = createUnpackTaskFunction(M, F, Twine(taskNum).str(),
-                                 DSAMerge.getArrayRef(), TaskBBs,
+                                 TaskArgsList.getArrayRef(), TaskBBs,
                                  TskAddrTranslationEntryTy.Ty);
 
     // nanos6_unpacked_task_region_* END
@@ -445,19 +478,19 @@ struct OmpSs : public ModulePass {
     Function *OlTaskFuncVar
       = createOlTaskFunction(M, F, Twine(taskNum).str(), TaskArgsTy, TskAddrTranslationEntryTy.Ty);
 
-    olTaskCallToUnpack(M, TI.DSAInfo, OlTaskFuncVar, UnpackTaskFuncVar);
+    olTaskCallToUnpack(M, TI.DSAInfo, TI.VLADimsInfo, OlTaskFuncVar, UnpackTaskFuncVar);
 
     // nanos6_ol_task_region_* END
 
     // nanos6_unpacked_deps_* START
 
     Function *UnpackDepsFuncVar
-      = createUnpackDepsFunction(M, F, Twine(taskNum).str(), DSAMerge.getArrayRef());
+      = createUnpackDepsFunction(M, F, Twine(taskNum).str(), TaskArgsList.getArrayRef());
 
-    unpackDepsAndRewrite(TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackDepsAndRewrite(TI.DependsInfo, UnpackDepsFuncVar, TaskArgsList.getArrayRef());
     UnpackDepsFuncVar->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    unpackDepsCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar, DSAMerge.getArrayRef());
+    unpackDepsCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar);
 
     // nanos6_unpacked_deps_* END
 
@@ -466,7 +499,7 @@ struct OmpSs : public ModulePass {
     Function *OlDepsFuncVar
       = createOlDepsFunction(M, F, Twine(taskNum).str(), TaskArgsTy);
 
-    olDepsCallToUnpack(M, TI.DSAInfo, OlDepsFuncVar, UnpackDepsFuncVar);
+    olDepsCallToUnpack(M, TI.DSAInfo, TI.VLADimsInfo, OlDepsFuncVar, UnpackDepsFuncVar);
 
     // nanos6_ol_deps_* END
 
@@ -619,6 +652,17 @@ struct OmpSs : public ModulePass {
             TaskArgsVarL, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
         Value *FPValue = IRB.CreateLoad(TI.DSAInfo.Firstprivate[i]);
         IRB.CreateStore(FPValue, GEP);
+      }
+      for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
+        ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
+        for (unsigned j = 0; j < Dims.size(); ++j, ++TaskArgsIdx) {
+          Value *Idx[2];
+          Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+          Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsIdx);
+          Value *GEP = IRB.CreateGEP(
+              TaskArgsVarL, Idx, "dims_gep_" + Dims[j]->getName());
+          IRB.CreateStore(Dims[j], GEP);
+        }
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
