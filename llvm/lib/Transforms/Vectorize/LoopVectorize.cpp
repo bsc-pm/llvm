@@ -320,7 +320,7 @@ static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF,
                              bool Scalable = false) {
   // Determine if an array of VF elements of type Ty is "bitcast compatible"
   // with a <VF x Ty> vector.
-  if (VF > 1 || Scalable) {
+  if (VF > 1 || (VF==1 && Scalable)) {
     auto *VectorTy = VectorType::get(Ty, VF, Scalable);
     return VF * DL.getTypeAllocSize(Ty) != DL.getTypeStoreSize(VectorTy);
   }
