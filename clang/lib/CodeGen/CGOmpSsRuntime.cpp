@@ -353,7 +353,8 @@ static LValue EmitRefAsIs(CodeGenFunction &CGF, const VarDecl *VD) {
 }
 
 static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
-                        SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+                        SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+                        SmallVectorImpl<llvm::Value *> &CapturedList) {
   // C long -> LLVM long
   llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
 
@@ -364,10 +365,13 @@ static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
       auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
       llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
       DimsWithValue.push_back(DimExpr);
+      CapturedList.push_back(DimExpr);
       Q = BaseArrayTy->getElementType();
     } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(Q)) {
       uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
-      DimsWithValue.push_back(llvm::ConstantInt::getSigned(OSSArgTy, DimSize));
+      llvm::Value *DimConstant = llvm::ConstantInt::getSigned(OSSArgTy, DimSize);
+      DimsWithValue.push_back(DimConstant);
+      CapturedList.push_back(DimConstant);
       Q = BaseArrayTy->getElementType();
     } else {
       llvm_unreachable("Unhandled array type");
@@ -378,7 +382,8 @@ static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
 }
 
 static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
-                    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+                    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+                    SmallVectorImpl<llvm::Value*> &CapturedList) {
   std::string Basename = Name;
 
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -394,7 +399,7 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
     }
     QualType Q = VD->getType();
     if (Q->isVariableArrayType())
-      EmitVLADims(CGF, V, Q, TaskInfo);
+      EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
     TaskInfo.emplace_back(Basename, CGF.EmitScalarExpr(ThisE));
   } else {
@@ -523,15 +528,21 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+
+  SmallVector<llvm::Value*, 4> CapturedList;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSA("QUAL.OSS.SHARED", CGF, E, TaskInfo);
+    EmitDSA("QUAL.OSS.SHARED", CGF, E, TaskInfo, CapturedList);
   }
   for (const Expr *E : Data.DSAs.Privates) {
-    EmitDSA("QUAL.OSS.PRIVATE", CGF, E, TaskInfo);
+    EmitDSA("QUAL.OSS.PRIVATE", CGF, E, TaskInfo, CapturedList);
   }
   for (const Expr *E : Data.DSAs.Firstprivates) {
-    EmitDSA("QUAL.OSS.FIRSTPRIVATE", CGF, E, TaskInfo);
+    EmitDSA("QUAL.OSS.FIRSTPRIVATE", CGF, E, TaskInfo, CapturedList);
   }
+
+  if (!CapturedList.empty())
+    TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
+
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
     EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
   }
