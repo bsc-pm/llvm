@@ -244,7 +244,7 @@ multiclass binary_arithmetic_integer_vx_mask_in<string opcodestr,
               (outs EPIVR:$rd),
               (ins EPIVR:$rs2, EPIVR:$rs1, EPIMaskVR:$mask),
               opcodestr # ".vvm",
-              "${rd}, ${rs2}, ${rs1}, ${mask}">;
+              "${rd}, ${rs2}, ${rs1}, v0">;
 
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask.Value,
       Uses = [VL, VTYPE] in
@@ -252,7 +252,7 @@ multiclass binary_arithmetic_integer_vx_mask_in<string opcodestr,
               (outs EPIVR:$rd),
               (ins EPIVR:$rs2, GPR:$rs1, EPIMaskVR:$mask),
               opcodestr # ".vxm",
-              "${rd}, ${rs2}, ${rs1}, ${mask}">;
+              "${rd}, ${rs2}, ${rs1}, v0">;
 }
 
 multiclass binary_arithmetic_integer_vxi_mask_in<string opcodestr,
@@ -266,7 +266,7 @@ multiclass binary_arithmetic_integer_vxi_mask_in<string opcodestr,
               (outs EPIVR:$rd),
               (ins EPIVR:$rs2, simm5:$imm5, EPIMaskVR:$mask),
               opcodestr # ".vim",
-              "${rd}, ${rs2}, ${imm5}, ${mask}">;
+              "${rd}, ${rs2}, ${imm5}, v0">;
 }
 
 multiclass binary_arithmetic_integer_vxi_mask<string opcodestr, bits<6> funct6> {
@@ -989,13 +989,13 @@ def VFMV_V_F : RVInstEPIOPV_FVF<0b010111,
            "vfmv.v.f",
            "${rd}, ${rs1}">;
 
-let mayLoad = 0, mayStore = 0, hasSideEffects = 0,
+let mayLoad = 0, mayStore = 0, hasSideEffects = 0, vm = vmask_only_true.Value,
     Uses = [VL, VTYPE] in
 def VFMERGE_VFM : RVInstEPIOPV_FVF<0b010111,
            (outs EPIVR:$rd),
            (ins EPIVR:$rs2, FPR64:$rs1, EPIMaskVR:$mask),
            "vfmerge.vfm",
-           "${rd}, ${rs2}, ${rs1}, ${mask}">;
+           "${rd}, ${rs2}, ${rs1}, v0">;
 
 defm VMFEQ  : binary_arithmetic_float_vf<"vmfeq",  0b011000>;
 defm VMFLE  : binary_arithmetic_float_vf<"vmfle",  0b011001>;
