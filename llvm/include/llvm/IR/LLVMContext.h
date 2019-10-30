@@ -98,6 +98,7 @@ public:
     OB_oss_dep_weakinout = 12,   // "OB_oss_dep_weakinout"
     OB_oss_final = 13,           // "OB_oss_final"
     OB_oss_if = 14,              // "OB_oss_if"
+    OB_oss_captured = 15,        // "OB_oss_captured"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

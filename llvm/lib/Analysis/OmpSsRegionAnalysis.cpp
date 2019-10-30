@@ -34,7 +34,8 @@ enum PrintVerbosity {
   PV_Uses,
   PV_UnpackAndConst,
   PV_DsaMissing,
-  PV_DsaVLADimsMissing
+  PV_DsaVLADimsMissing,
+  PV_VLADimsCaptureMissing
 };
 
 static cl::opt<PrintVerbosity>
@@ -46,7 +47,8 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_Uses, "uses", "Print task layout with uses"),
   clEnumValN(PV_UnpackAndConst, "unpack", "Print task layout with unpack instructions/constexprs needed in dependencies"),
   clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA"),
-  clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs")));
+  clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs"),
+  clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture")));
 
 char OmpSsRegionAnalysisPass::ID = 0;
 
@@ -75,6 +77,11 @@ static bool valueInVLADimsBundles(const TaskVLADimsInfo& VLADimsInfo,
       return true;
   }
   return false;
+}
+
+static bool valueInCapturedBundle(const TaskCapturedInfo& CapturedInfo,
+                                  Value *const V) {
+  return CapturedInfo.count(V);
 }
 
 void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
@@ -140,11 +147,22 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
         DSAVLADimsFreqMap[VLAWithDimsMap.first]++;
       }
       for (const auto &Pair : DSAVLADimsFreqMap) {
-        // It's expected to have only two VLA bundles, the DSA and de dimensions
+        // It's expected to have only two VLA bundles, the DSA and dimensions
         if (Pair.second != 2) {
           dbgs() << "\n";
           dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
           Pair.first->printAsOperand(dbgs(), false);
+        }
+      }
+    }
+    else if (PrintVerboseLevel == PV_VLADimsCaptureMissing) {
+      for (auto &VLAWithDimsMap : Info.VLADimsInfo) {
+        for (Value *const &V : VLAWithDimsMap.second) {
+          if (!valueInCapturedBundle(Info.CapturedInfo, V)) {
+            dbgs() << "\n";
+            dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+            V->printAsOperand(dbgs(), false);
+          }
         }
       }
     }
@@ -245,7 +263,7 @@ static bool insertUniqInstInProgramOrder(SmallVectorImpl<Instruction *> &InstLis
 }
 
 static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
-                                     const TaskVLADimsInfo &VLADimsInfo,
+                                     const TaskCapturedInfo &CapturedInfo,
                                      const OrderedInstructions &OI,
                                      DependInfo &DI,
                                      TaskAnalysisInfo &TAI,
@@ -265,13 +283,12 @@ static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
     Value *Dep = It->second;
     WorkList.erase(It);
     bool IsDSA = valueInDSABundles(DSAInfo, Cur);
-    // TODO: this will be get from captured info
-    bool IsVLADim = valueInVLADimsBundles(VLADimsInfo, Cur);
+    bool IsCaptured = valueInCapturedBundle(CapturedInfo, Cur);
     // Go over all uses until:
     //  1. We get a DSA so assign a symbol index
-    //  2. We get a VLA dimension, so we're done. We don't want to move
-    //  instructions that generate the vla dimension
-    if (!IsDSA && !IsVLADim) {
+    //  2. We get a Capture value, so we're done. We don't want to move
+    //  instructions that generate this
+    if (!IsDSA && !IsCaptured) {
       if (ConstantExpr *CE = dyn_cast<ConstantExpr>(Cur)) {
         for (Use &U : CE->operands()) {
           WorkList.emplace_back(U.get(), Dep);
@@ -300,7 +317,7 @@ static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
 static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef> &OpBundles,
                                     const OrderedInstructions &OI,
                                     const TaskDSAInfo &DSAInfo,
-                                    const TaskVLADimsInfo &VLADimsInfo,
+                                    const TaskCapturedInfo &CapturedInfo,
                                     TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList,
                                     SmallVectorImpl<Instruction *> &UnpackInsts,
@@ -317,7 +334,7 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
       DI.Dims.push_back(OBArgs[i]);
     }
 
-    gatherUnpackInstructions(DSAInfo, VLADimsInfo, OI, DI, TAI, UnpackInsts, UnpackConsts);
+    gatherUnpackInstructions(DSAInfo, CapturedInfo, OI, DI, TAI, UnpackInsts, UnpackConsts);
 
     DependsList.push_back(DI);
   }
@@ -327,7 +344,7 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
 static void gatherDependsInfoWithID(const IntrinsicInst *I,
                                     const OrderedInstructions &OI,
                                     const TaskDSAInfo &DSAInfo,
-                                    const TaskVLADimsInfo &VLADimsInfo,
+                                    const TaskCapturedInfo &CapturedInfo,
                                     TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList,
                                     SmallVectorImpl<Instruction *> &UnpackInsts,
@@ -335,42 +352,42 @@ static void gatherDependsInfoWithID(const IntrinsicInst *I,
                                     uint64_t Id) {
   SmallVector<OperandBundleDef, 4> OpBundles;
   getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, VLADimsInfo, TAI, DependsList, UnpackInsts, UnpackConsts);
+  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, CapturedInfo, TAI, DependsList, UnpackInsts, UnpackConsts);
 }
 
 // Gathers all dependencies needed information
 static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                               TaskAnalysisInfo &TAI,
                               const OrderedInstructions &OI) {
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.Ins,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_in);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.Outs,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_out);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.Inouts,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_inout);
 
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.WeakIns,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_weakin);
 
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.WeakOuts,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_weakout);
 
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.VLADimsInfo, TAI,
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.WeakInouts,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
@@ -381,6 +398,20 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
 static void gatherIfFinalInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
   getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
+}
+
+// It's expected to have VLA dims info before calling this
+static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  getValueListFromOperandBundlesWithID(I, TI.CapturedInfo, LLVMContext::OB_oss_captured);
+  if (!DisableChecks) {
+    // VLA Dims that are not Captured is an error
+    for (auto &VLAWithDimsMap : TI.VLADimsInfo) {
+      for (Value *const &V : VLAWithDimsMap.second) {
+        if (!valueInCapturedBundle(TI.CapturedInfo, V))
+          llvm_unreachable("VLA dimension has not been captured");
+      }
+    }
+  }
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
@@ -417,6 +448,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
           gatherDSAInfo(II, T.Info);
           gatherVLADimsInfo(II, T.Info);
+          gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
           gatherIfFinalInfo(II, T.Info);
 
@@ -448,7 +480,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
               T.AnalysisInfo.UsesBeforeEntry.insert(I2);
             if (!DisableChecks
                 && !valueInDSABundles(T.Info.DSAInfo, I2)
-                && !valueInVLADimsBundles(T.Info.VLADimsInfo, I2)) {
+                && !valueInCapturedBundle(T.Info.CapturedInfo, I2)) {
                 llvm_unreachable("Value supposed to be inside task entry "
                                  "OperandBundle not found.");
               }
@@ -457,7 +489,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
             T.AnalysisInfo.UsesBeforeEntry.insert(A);
             if (!DisableChecks
                 && !valueInDSABundles(T.Info.DSAInfo, A)
-                && !valueInVLADimsBundles(T.Info.VLADimsInfo, A)) {
+                && !valueInCapturedBundle(T.Info.CapturedInfo, A)) {
               llvm_unreachable("Value supposed to be inside task entry "
                                "OperandBundle not found.");
             }

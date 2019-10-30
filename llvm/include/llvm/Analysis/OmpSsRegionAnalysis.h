@@ -26,6 +26,7 @@ struct TaskDSAInfo {
 
 // <VLA, VLA_dims>
 using TaskVLADimsInfo = MapVector<Value *, SetVector<Value *>>;
+using TaskCapturedInfo = SetVector<Value *>;
 
 struct DependInfo {
   int SymbolIndex;
@@ -56,6 +57,7 @@ struct TaskInfo {
   TaskDependsInfo DependsInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
+  TaskCapturedInfo CapturedInfo;
   Instruction *Entry;
   Instruction *Exit;
 };

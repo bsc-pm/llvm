@@ -122,6 +122,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSIfEntry->second == LLVMContext::OB_oss_if &&
          "oss_if operand bundle id drifted!");
   (void)OSSIfEntry;
+
+  auto *OSSCapturedEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.CAPTURED");
+  assert(OSSCapturedEntry->second == LLVMContext::OB_oss_captured &&
+         "oss_captured operand bundle id drifted!");
+  (void)OSSCapturedEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

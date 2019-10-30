@@ -105,7 +105,7 @@ entry:
   %9 = mul i64 %4, 4
   %10 = mul i64 %7, 4
 ; to here
-  %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.FIRSTPRIVATE"(i32* %k.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %j.addr), "QUAL.OSS.DEP.IN"(i32* %vla, i64 %8, i64 %9, i64 %10) ]
+  %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.FIRSTPRIVATE"(i32* %k.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %j.addr), "QUAL.OSS.DEP.IN"(i32* %vla, i64 %8, i64 %9, i64 %10) ]
   call void @llvm.directive.region.exit(token %11)
   %12 = load i8*, i8** %saved_stack, align 8
   call void @llvm.stackrestore(i8* %12)
