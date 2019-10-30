@@ -688,6 +688,11 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
   Value *Src = CI.getOperand(0);
   Type *DestTy = CI.getType(), *SrcTy = Src->getType();
 
+  bool IsScalable =
+      CI.getType()->isVectorTy() && CI.getType()->getVectorIsScalable();
+  if (IsScalable)
+    return nullptr;
+
   // Attempt to truncate the entire input expression tree to the destination
   // type.   Only do this if the dest type is a simple type, don't convert the
   // expression tree to something weird like i93 unless the source is also
@@ -1097,6 +1102,11 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
 
   Value *Src = CI.getOperand(0);
   Type *SrcTy = Src->getType(), *DestTy = CI.getType();
+
+  bool IsScalable =
+      CI.getType()->isVectorTy() && CI.getType()->getVectorIsScalable();
+  if (IsScalable)
+    return nullptr;
 
   // Try to extend the entire expression tree to the wide destination type.
   unsigned BitsToClear;
