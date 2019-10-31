@@ -87,6 +87,7 @@ llvm_config.with_environment('PATHTOCLANGCL', llvm_config.use_llvm_tool('clang-c
 
 # Check which debuggers are available:
 built_lldb = llvm_config.use_llvm_tool('lldb', search_env='CLANG')
+lldb_path = None
 if built_lldb is not None:
     lldb_path = built_lldb
 elif lit.util.which('lldb') is not None:
@@ -98,7 +99,7 @@ if lldb_path is not None:
 # Produce dexter path, lldb path, and combine into the %dexter substitution
 dexter_path = os.path.join(config.debuginfo_tests_src_root,
                            'dexter', 'dexter.py')
-dexter_cmd = '{} {} test'.format(config.python3_executable, dexter_path)
+dexter_cmd = '"{}" "{}" test'.format(config.python3_executable, dexter_path)
 if lldb_path is not None:
   dexter_cmd += ' --lldb-executable {}'.format(lldb_path)
 
