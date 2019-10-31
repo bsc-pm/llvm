@@ -726,19 +726,16 @@ struct AAFromMustBeExecutedContext : public Base {
     MustBeExecutedContextExplorer &Explorer =
         A.getInfoCache().getMustBeExecutedContextExplorer();
 
-    SetVector<const Use *> NextUses;
-
     auto EIt = Explorer.begin(CtxI), EEnd = Explorer.end(CtxI);
-    for (const Use *U : Uses) {
+    for (unsigned u = 0 ; u < Uses.size(); ++u) {
+      const Use *U = Uses[u];
       if (const Instruction *UserI = dyn_cast<Instruction>(U->getUser())) {
         bool Found = Explorer.findInContextOf(UserI, EIt, EEnd);
         if (Found && Base::followUse(A, U, UserI))
           for (const Use &Us : UserI->uses())
-            NextUses.insert(&Us);
+            Uses.insert(&Us);
       }
     }
-    for (const Use *U : NextUses)
-      Uses.insert(U);
 
     return BeforeState == S ? ChangeStatus::UNCHANGED : ChangeStatus::CHANGED;
   }
@@ -1550,25 +1547,41 @@ static int64_t getKnownNonNullAndDerefBytesForUse(
     return DerefAA.getKnownDereferenceableBytes();
   }
 
+  // We need to follow common pointer manipulation uses to the accesses they
+  // feed into. We can try to be smart to avoid looking through things we do not
+  // like for now, e.g., non-inbounds GEPs.
+  if (isa<CastInst>(I)) {
+    TrackUse = true;
+    return 0;
+  }
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(I))
+    if (GEP->hasAllZeroIndices() ||
+        (GEP->isInBounds() && GEP->hasAllConstantIndices())) {
+      TrackUse = true;
+      return 0;
+    }
+
   int64_t Offset;
   if (const Value *Base = getBasePointerOfAccessPointerOperand(I, Offset, DL)) {
     if (Base == &AssociatedValue && getPointerOperand(I) == UseV) {
       int64_t DerefBytes =
-          Offset + (int64_t)DL.getTypeStoreSize(PtrTy->getPointerElementType());
+          (int64_t)DL.getTypeStoreSize(PtrTy->getPointerElementType()) + Offset;
 
       IsNonNull |= !NullPointerIsDefined;
-      return DerefBytes;
+      return std::max(int64_t(0), DerefBytes);
     }
   }
   if (const Value *Base =
           GetPointerBaseWithConstantOffset(UseV, Offset, DL,
                                            /*AllowNonInbounds*/ false)) {
-    auto &DerefAA =
-        A.getAAFor<AADereferenceable>(QueryingAA, IRPosition::value(*Base));
-    IsNonNull |= (!NullPointerIsDefined && DerefAA.isKnownNonNull());
-    IsNonNull |= (!NullPointerIsDefined && (Offset != 0));
-    int64_t DerefBytes = DerefAA.getKnownDereferenceableBytes();
-    return std::max(int64_t(0), DerefBytes - Offset);
+    if (Base == &AssociatedValue) {
+      auto &DerefAA =
+          A.getAAFor<AADereferenceable>(QueryingAA, IRPosition::value(*Base));
+      IsNonNull |= (!NullPointerIsDefined && DerefAA.isKnownNonNull());
+      IsNonNull |= (!NullPointerIsDefined && (Offset != 0));
+      int64_t DerefBytes = DerefAA.getKnownDereferenceableBytes();
+      return std::max(int64_t(0), DerefBytes - std::max(int64_t(0), Offset));
+    }
   }
 
   return 0;
@@ -1586,6 +1599,8 @@ struct AANonNullImpl : AANonNull {
     if (!NullIsDefined &&
         hasAttr({Attribute::NonNull, Attribute::Dereferenceable}))
       indicateOptimisticFixpoint();
+    else if (isa<ConstantPointerNull>(getAssociatedValue()))
+      indicatePessimisticFixpoint();
     else
       AANonNull::initialize(A);
   }
@@ -1616,24 +1631,6 @@ struct AANonNullFloating
   using Base = AAFromMustBeExecutedContext<AANonNull, AANonNullImpl>;
   AANonNullFloating(const IRPosition &IRP) : Base(IRP) {}
 
-  /// See AbstractAttribute::initialize(...).
-  void initialize(Attributor &A) override {
-    Base::initialize(A);
-
-    if (isAtFixpoint())
-      return;
-
-    const IRPosition &IRP = getIRPosition();
-    const Value &V = IRP.getAssociatedValue();
-    const DataLayout &DL = A.getDataLayout();
-
-    // TODO: This context sensitive query should be removed once we can do
-    // context sensitive queries in the genericValueTraversal below.
-    if (isKnownNonZero(&V, DL, 0, /* TODO: AC */ nullptr, IRP.getCtxI(),
-                       /* TODO: DT */ nullptr))
-      indicateOptimisticFixpoint();
-  }
-
   /// See AbstractAttribute::updateImpl(...).
   ChangeStatus updateImpl(Attributor &A) override {
     ChangeStatus Change = Base::updateImpl(A);
@@ -1648,13 +1645,16 @@ struct AANonNullFloating
 
     const DataLayout &DL = A.getDataLayout();
 
+    DominatorTree *DT = nullptr;
+    InformationCache &InfoCache = A.getInfoCache();
+    if (const Function *Fn = getAnchorScope())
+      DT = InfoCache.getAnalysisResultForFunction<DominatorTreeAnalysis>(*Fn);
+
     auto VisitValueCB = [&](Value &V, AANonNull::StateType &T,
                             bool Stripped) -> bool {
       const auto &AA = A.getAAFor<AANonNull>(*this, IRPosition::value(V));
       if (!Stripped && this == &AA) {
-        if (!isKnownNonZero(&V, DL, 0, /* TODO: AC */ nullptr,
-                            /* CtxI */ getCtxI(),
-                            /* TODO: DT */ nullptr))
+        if (!isKnownNonZero(&V, DL, 0, /* TODO: AC */ nullptr, getCtxI(), DT))
           T.indicatePessimisticFixpoint();
       } else {
         // Use abstract attribute information.
