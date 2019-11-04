@@ -320,7 +320,7 @@ static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF,
                              bool Scalable = false) {
   // Determine if an array of VF elements of type Ty is "bitcast compatible"
   // with a <VF x Ty> vector.
-  if (VF > 1 || (VF==1 && Scalable)) {
+  if (VF > 1 || (VF == 1 && Scalable)) {
     auto *VectorTy = VectorType::get(Ty, VF, Scalable);
     return VF * DL.getTypeAllocSize(Ty) != DL.getTypeStoreSize(VectorTy);
   }
@@ -1061,7 +1061,8 @@ public:
   }
 
   /// Returns true if \p I is known to be scalar after vectorization.
-  bool isScalarAfterVectorization(Instruction *I, unsigned VF, bool ValidVF=true) const {
+  bool isScalarAfterVectorization(Instruction *I, unsigned VF,
+                                  bool ValidVF = true) const {
     if (!ValidVF || (VF == 1 && !isScalable()))
       return true;
 
@@ -1078,7 +1079,8 @@ public:
 
   /// \returns True if instruction \p I can be truncated to a smaller bitwidth
   /// for vectorization factor \p VF.
-  bool canTruncateToMinimalBitwidth(Instruction *I, unsigned VF, bool ValidVF) const {
+  bool canTruncateToMinimalBitwidth(Instruction *I, unsigned VF,
+                                    bool ValidVF) const {
     return ValidVF && MinBWs.find(I) != MinBWs.end() &&
            !isProfitableToScalarize(I, VF) &&
            !isScalarAfterVectorization(I, VF, ValidVF);
@@ -1451,8 +1453,8 @@ private:
   /// extracted.
   bool needsExtract(Value *V, unsigned VF) const {
     Instruction *I = dyn_cast<Instruction>(V);
-    if ((VF == 1 && !isScalable()) || !I || !TheLoop->contains(I)
-        || TheLoop->isLoopInvariant(I))
+    if ((VF == 1 && !isScalable()) || !I || !TheLoop->contains(I) ||
+        TheLoop->isLoopInvariant(I))
       return false;
 
     // Assume we can vectorize V (and hence we need extraction) if the
@@ -1696,7 +1698,7 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
     Step = Builder.CreateTrunc(Step, TruncType);
     Start = Builder.CreateCast(Instruction::Trunc, Start, TruncType);
   }
-  Value *SplatStart = Builder.CreateVectorSplat(VF, Start);
+  Value *SplatStart = Builder.CreateVectorSplat(VF, Start, "", isScalable());
   Value *SteppedStart =
       getStepVector(SplatStart, 0, Step, II.getInductionOpcode());
 
@@ -1722,9 +1724,9 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
   // FIXME: If the step is non-constant, we create the vector splat with
   //        IRBuilder. IRBuilder can constant-fold the multiply, but it doesn't
   //        handle a constant vector splat.
-  Value *SplatVF = isa<Constant>(Mul)
+  Value *SplatVF = isa<Constant>(Mul) && !isScalable()
                        ? ConstantVector::getSplat(VF, cast<Constant>(Mul))
-                       : Builder.CreateVectorSplat(VF, Mul);
+                       : Builder.CreateVectorSplat(VF, Mul, "", isScalable());
   Builder.restoreIP(CurrIP);
 
   // We may need to add the step a number of times, depending on the unroll
@@ -1939,7 +1941,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
       // Add the consecutive indices to the vector value.
       Constant *Cv = ConstantVector::get(Indices);
       assert(Cv->getType() == Val->getType() && "Invalid consecutive vec");
-      Step = Builder.CreateVectorSplat(VLen, Step);
+      Step = Builder.CreateVectorSplat(VLen, Step, "", isScalable());
       assert(Step->getType() == Val->getType() && "Invalid step vec");
       // FIXME: The newly created binary instructions should contain nsw/nuw
       // flags, which can be found from the original scalar operations.
@@ -1960,7 +1962,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
   // Add the consecutive indices to the vector value.
   Constant *Cv = ConstantVector::get(Indices);
 
-  Step = Builder.CreateVectorSplat(VLen, Step);
+  Step = Builder.CreateVectorSplat(VLen, Step, "", isScalable());
 
   // Floating point operations had to be 'fast' to enable the induction.
   FastMathFlags Flags;
@@ -2400,8 +2402,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     return vectorizeInterleaveGroup(Instr);
 
   Type *ScalarDataTy = getMemInstValueType(Instr);
-  Type *DataTy =
-      VectorType::get(ScalarDataTy, VF, isScalable());
+  Type *DataTy = VectorType::get(ScalarDataTy, VF, isScalable());
   Value *Ptr = getLoadStorePointerOperand(Instr);
   unsigned Alignment = getLoadStoreAlignment(Instr);
   // An alignment of 0 means target abi alignment. We need to use the scalar's
@@ -3362,9 +3363,9 @@ void InnerLoopVectorizer::truncateToMinimalBitwidths() {
       Type *OriginalTy = I->getType();
       Type *ScalarTruncatedTy =
           IntegerType::get(OriginalTy->getContext(), KV.second);
-      Type *TruncatedTy = VectorType::get(ScalarTruncatedTy,
-                                          OriginalTy->getVectorNumElements(),
-                                          Cost->isScalable());
+      Type *TruncatedTy =
+          VectorType::get(ScalarTruncatedTy, OriginalTy->getVectorNumElements(),
+                          Cost->isScalable());
       if (TruncatedTy == OriginalTy)
         continue;
 
@@ -3643,9 +3644,10 @@ void InnerLoopVectorizer::fixFirstOrderRecurrence(PHINode *Phi) {
     Value *PreviousPart = getOrCreateVectorValue(Previous, Part);
     Value *PhiPart = VectorLoopValueMap.getVectorValue(Phi, Part);
     auto *Shuffle =
-        (VF > 1 || isScalable()) ? Builder.CreateShuffleVector(Incoming, PreviousPart,
-                                             ConstantVector::get(ShuffleMask))
-               : Incoming;
+        (VF > 1 || isScalable())
+            ? Builder.CreateShuffleVector(Incoming, PreviousPart,
+                                          ConstantVector::get(ShuffleMask))
+            : Incoming;
     PhiPart->replaceAllUsesWith(Shuffle);
     cast<Instruction>(PhiPart)->eraseFromParent();
     VectorLoopValueMap.resetVectorValue(Phi, Part, Shuffle);
@@ -3733,23 +3735,25 @@ void InnerLoopVectorizer::fixReduction(PHINode *Phi) {
   if (RK == RecurrenceDescriptor::RK_IntegerMinMax ||
       RK == RecurrenceDescriptor::RK_FloatMinMax) {
     // MinMax reduction have the start value as their identify.
-    if (VF == 1) {
+    if (VF == 1 && !isScalable()) {
       VectorStart = Identity = ReductionStartValue;
     } else {
-      VectorStart = Identity =
-          Builder.CreateVectorSplat(VF, ReductionStartValue, "minmax.ident");
+      VectorStart = Identity = Builder.CreateVectorSplat(
+          VF, ReductionStartValue, "minmax.ident", isScalable());
     }
   } else {
     // Handle other reduction kinds:
     Constant *Iden =
         RecurrenceDescriptor::getRecurrenceIdentity(RK, VecTy->getScalarType());
-    if (VF == 1) {
+    if (VF == 1 && !isScalable()) {
       Identity = Iden;
       // This vector is the Identity vector where the first element is the
       // incoming scalar reduction.
       VectorStart = ReductionStartValue;
     } else {
-      Identity = ConstantVector::getSplat(VF, Iden);
+      Identity = isScalable() ? Builder.CreateVectorSplat(VF, Iden, "ident",
+                                                          isScalable())
+                              : ConstantVector::getSplat(VF, Iden);
 
       // This vector is the Identity vector where the first element is the
       // incoming scalar reduction.
@@ -4134,7 +4138,8 @@ void InnerLoopVectorizer::widenInstruction(Instruction &I) {
       //       the lane-zero scalar value.
       auto *Clone = Builder.Insert(GEP->clone());
       for (unsigned Part = 0; Part < UF; ++Part) {
-        Value *EntryPart = Builder.CreateVectorSplat(VF, Clone);
+        Value *EntryPart =
+            Builder.CreateVectorSplat(VF, Clone, "", isScalable());
         VectorLoopValueMap.setVectorValue(&I, Part, EntryPart);
         addMetadata(EntryPart, GEP);
       }
@@ -4695,7 +4700,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(unsigned VF) {
   // this function is called from collectUniformsAndScalars(), which
   // already does this check. Collecting Uniforms for VF=1 does not make any
   // sense for non-scalable vectors.
-  bool ValidVF = VF >= 2 || (isScalable() && VF == 1);
+  bool ValidVF = VF >= 2 || isScalable();
   assert(ValidVF && Uniforms.find(VF) == Uniforms.end() &&
          "This function should not be visited twice for the same VF");
 
@@ -5020,6 +5025,8 @@ unsigned LoopVectorizationCostModel::computeFeasibleScalableMaxVF(
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
   unsigned TargetWidestType = TTI.getMaxElementWidth();
   // unsigned MinKScaleFactor = TargetWidestType / WidestType;
+  if (SmallestType > WidestType)
+    SmallestType = WidestType;
   unsigned MaxKScaleFactor = TargetWidestType / SmallestType;
 
   // assert(MinKScaleFactor == MaxKScaleFactor &&
@@ -5167,8 +5174,8 @@ LoopVectorizationCostModel::selectVectorizationFactor(unsigned MaxVF) {
 
 VectorizationFactor
 LoopVectorizationCostModel::selectScalableVectorizationFactor(unsigned VF) {
-  // bool ForceVectorization = Hints->getForce() == LoopVectorizeHints::FK_Enabled;
-  // assert(!ForceVectorization &&
+  // bool ForceVectorization = Hints->getForce() ==
+  // LoopVectorizeHints::FK_Enabled; assert(!ForceVectorization &&
   //        "We do not support Forced Vectorization for scalable vectors");
 
   // Notice that the vector loop needs to be executed less times, so
@@ -6549,6 +6556,7 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
   // computed MaxVF (max K factor).
   if (TTI->useScalableVectorType()) {
     unsigned VF = MaybeMaxVF.getValue();
+    assert(VF != 0 && "MaxVF is zero.");
     CM.collectUniformsAndScalars(VF);
     CM.collectInstsToScalarize(VF);
     buildVPlansWithVPRecipes(VF, VF);
@@ -6593,9 +6601,9 @@ void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
   // 1. Create a new empty loop. Unlink the old loop and connect the new one.
   VPCallbackILV CallbackILV(ILV);
 
-  VPTransformState State{BestVF, BestUF,      ILV.isScalable(),       LI,
-                         DT,     ILV.Builder, ILV.VectorLoopValueMap,
-                         &ILV,   CallbackILV};
+  VPTransformState State{BestVF,     BestUF,      ILV.isScalable(),       LI,
+                         DT,         ILV.Builder, ILV.VectorLoopValueMap, &ILV,
+                         CallbackILV};
   State.CFG.PrevBB = ILV.createVectorizedLoopSkeleton();
   State.TripCount = ILV.getOrCreateTripCount(nullptr);
 
