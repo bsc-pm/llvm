@@ -87,7 +87,7 @@ static cl::opt<bool> MulConstantOptimization(
     cl::Hidden);
 
 static cl::opt<bool> ExperimentalUnorderedISEL(
-    "x86-experimental-unordered-atomic-isel", cl::init(true),
+    "x86-experimental-unordered-atomic-isel", cl::init(false),
     cl::desc("Use LoadSDNode and StoreSDNode instead of "
              "AtomicSDNode for unordered atomic loads and "
              "stores respectively."),
@@ -41986,8 +41986,9 @@ static SDValue combineFOr(SDNode *N, SelectionDAG &DAG,
 static SDValue combineFMinFMax(SDNode *N, SelectionDAG &DAG) {
   assert(N->getOpcode() == X86ISD::FMIN || N->getOpcode() == X86ISD::FMAX);
 
-  // Only perform optimizations if UnsafeMath is used.
-  if (!DAG.getTarget().Options.UnsafeFPMath)
+  // FMIN/FMAX are commutative if no NaNs and no negative zeros are allowed.
+  if (!DAG.getTarget().Options.NoNaNsFPMath ||
+      !DAG.getTarget().Options.NoSignedZerosFPMath)
     return SDValue();
 
   // If we run in unsafe-math mode, then convert the FMAX and FMIN nodes
