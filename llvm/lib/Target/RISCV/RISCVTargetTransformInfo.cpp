@@ -106,20 +106,16 @@ bool RISCVTTIImpl::useScalableVectorType() const {
 }
 
 bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
-                                              TTI::ReductionFlags Flags) const {
+                                         TTI::ReductionFlags Flags) const {
   assert(isa<VectorType>(Ty) && "Expected Ty to be a vector type");
   if (!useScalableVectorType())
     return false;
-  // FIXME: This is a temporary implementation that only enables Add and Mul
-  // and does it unconditionally to use reduce intrinsics. We need to enable
-  // other Ops and add any required constraints.
   switch (Opcode) {
   case Instruction::And:
   case Instruction::Or:
   case Instruction::Xor:
   case Instruction::ICmp:
   case Instruction::FCmp:
-    return false;
   case Instruction::FAdd:
   case Instruction::FMul:
   case Instruction::Add:
