@@ -26,7 +26,7 @@ TEST_CONSTEXPR_CXX20 void
 test_copy_n()
 {
     const unsigned N = 1000;
-    int ia[N];
+    int ia[N] = {};
     for (unsigned i = 0; i < N; ++i)
         ia[i] = i;
     int ib[N] = {0};
@@ -82,7 +82,7 @@ int main(int, char**)
 {
     test();
 
-#if TEST_STD_VER > 17
+#if TEST_STD_VER > 17 && !defined(_LIBCPP_HAS_NO_BUILTIN_IS_CONSTANT_EVALUATED)
     static_assert(test());
 #endif
 
