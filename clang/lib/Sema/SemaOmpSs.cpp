@@ -335,10 +335,10 @@ public:
           }
       } else {
 
-        QualType Type = VD->getType();
-        if (!(Type.isPODType(SemaRef.Context) || Type->isReferenceType())) {
-          return;
-        }
+        // QualType Type = VD->getType();
+        // if (!(Type.isPODType(SemaRef.Context) || Type->isReferenceType())) {
+        //   return;
+        // }
 
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
         switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
@@ -607,6 +607,32 @@ public:
 };
 } // namespace
 
+static VarDecl *buildVarDecl(Sema &SemaRef, SourceLocation Loc, QualType Type,
+                             StringRef Name, const AttrVec *Attrs = nullptr) {
+  DeclContext *DC = SemaRef.CurContext;
+  IdentifierInfo *II = &SemaRef.PP.getIdentifierTable().get(Name);
+  TypeSourceInfo *TInfo = SemaRef.Context.getTrivialTypeSourceInfo(Type, Loc);
+  auto *Decl =
+      VarDecl::Create(SemaRef.Context, DC, Loc, Loc, II, Type, TInfo, SC_None);
+  if (Attrs) {
+    for (specific_attr_iterator<AlignedAttr> I(Attrs->begin()), E(Attrs->end());
+         I != E; ++I)
+      Decl->addAttr(*I);
+  }
+  Decl->setImplicit();
+  return Decl;
+}
+
+static DeclRefExpr *buildDeclRefExpr(Sema &S, VarDecl *D, QualType Ty,
+                                     SourceLocation Loc,
+                                     bool RefersToCapture = false) {
+  D->setReferenced();
+  D->markUsed(S.Context);
+  return DeclRefExpr::Create(S.getASTContext(), NestedNameSpecifierLoc(),
+                             SourceLocation(), D, RefersToCapture, Loc, Ty,
+                             VK_LValue);
+}
+
 void Sema::InitDataSharingAttributesStackOmpSs() {
   VarDataSharingAttributesStackOmpSs = new DSAStackTy(*this);
   // TODO: use another function
@@ -811,12 +837,6 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   }
 
   auto *VD = cast<VarDecl>(DE ? DE->getDecl() : ME->getMemberDecl());
-
-  QualType Type = VD->getType();
-  if (!(Type.isPODType(S.Context) || Type->isReferenceType())) {
-    S.Diag(ELoc, diag::err_oss_non_pod_not_supported) << ERange;
-    return std::make_pair(nullptr, false);
-  }
 
   return std::make_pair(getCanonicalDecl(VD), false);
 }
@@ -1100,6 +1120,7 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
   SmallVector<Expr *, 8> ClauseVars;
+  SmallVector<Expr *, 8> PrivateCopies;
   for (Expr *RefExpr : Vars) {
 
     SourceLocation ELoc;
@@ -1109,6 +1130,7 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
     if (Res.second) {
       // It will be analyzed later.
       ClauseVars.push_back(RefExpr);
+      PrivateCopies.push_back(nullptr);
     }
     ValueDecl *D = Res.first;
     if (!D) {
@@ -1122,14 +1144,35 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_private);
       continue;
     }
+
+    QualType Type = D->getType().getUnqualifiedType().getNonReferenceType();
+    if (Type->isArrayType())
+      Type = Context.getBaseElementType(Type).getCanonicalType();
+
+    // Generate helper private variable and initialize it with the value of the
+    // original variable. The address of the original variable is replaced by
+    // the address of the new private variable in the CodeGen. This new variable
+    // is not added to IdResolver, so the code in the OmpSs-2 region uses
+    // original variable for proper diagnostics and variable capturing.
+
+    // Build DSA Copy
+    VarDecl *VDPrivate =
+        buildVarDecl(*this, ELoc, Type, D->getName(),
+                     D->hasAttrs() ? &D->getAttrs() : nullptr);
+    ActOnUninitializedDecl(VDPrivate);
+
+    DeclRefExpr *VDPrivateRefExpr = buildDeclRefExpr(
+        *this, VDPrivate, Type, RefExpr->getExprLoc());
+
     DSAStack->addDSA(D, RefExpr, OSSC_private, /*Ignore=*/false, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
+    PrivateCopies.push_back(VDPrivateRefExpr);
   }
 
   if (Vars.empty())
     return nullptr;
 
-  return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
+  return OSSPrivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars, PrivateCopies);
 }
 
 OSSClause *
@@ -1138,6 +1181,8 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                        SourceLocation LParenLoc,
                        SourceLocation EndLoc) {
   SmallVector<Expr *, 8> ClauseVars;
+  SmallVector<Expr *, 8> PrivateCopies;
+  SmallVector<Expr *, 8> Inits;
   for (Expr *RefExpr : Vars) {
 
     SourceLocation ELoc;
@@ -1147,6 +1192,8 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
     if (Res.second) {
       // It will be analyzed later.
       ClauseVars.push_back(RefExpr);
+      PrivateCopies.push_back(nullptr);
+      Inits.push_back(nullptr);
     }
     ValueDecl *D = Res.first;
     if (!D) {
@@ -1160,14 +1207,46 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_firstprivate);
       continue;
     }
+
+    QualType Type = D->getType().getUnqualifiedType().getNonReferenceType();
+    if (Type->isArrayType())
+      Type = Context.getBaseElementType(Type).getCanonicalType();
+
+    // Generate helper private variable and initialize it with the value of the
+    // original variable. The address of the original variable is replaced by
+    // the address of the new private variable in the CodeGen. This new variable
+    // is not added to IdResolver, so the code in the OmpSs-2 region uses
+    // original variable for proper diagnostics and variable capturing.
+
+    // Build DSA clone
+    VarDecl *VDPrivate =
+        buildVarDecl(*this, ELoc, Type, D->getName(),
+                     D->hasAttrs() ? &D->getAttrs() : nullptr);
+    Expr *VDInitRefExpr = nullptr;
+    // Build a temp variable to use it as initializer
+    VarDecl *VDInit = buildVarDecl(*this, RefExpr->getExprLoc(), Type,
+                                   ".firstprivate.temp");
+    VDInitRefExpr = buildDeclRefExpr(*this, VDInit, Type,
+                                     RefExpr->getExprLoc());
+    // Set temp variable as initializer of DSA clone
+    AddInitializerToDecl(VDPrivate,
+                         DefaultLvalueConversion(VDInitRefExpr).get(),
+                         /*DirectInit=*/false);
+
+    DeclRefExpr *VDPrivateRefExpr = buildDeclRefExpr(
+        *this, VDPrivate, Type, RefExpr->getExprLoc());
+
     DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, /*Ignore=*/false, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
+    PrivateCopies.push_back(VDPrivateRefExpr);
+    Inits.push_back(VDInitRefExpr);
   }
 
   if (Vars.empty())
     return nullptr;
 
-  return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc, ClauseVars);
+  return OSSFirstprivateClause::Create(Context, StartLoc, LParenLoc, EndLoc,
+                                       ClauseVars, PrivateCopies, Inits);
 }
 
 OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,

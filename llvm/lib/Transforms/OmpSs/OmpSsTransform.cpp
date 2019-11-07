@@ -18,6 +18,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IRBuilder.h"
@@ -319,6 +320,11 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Private[i]->getName());
+
+      // VLAs
+      if (VLADimsInfo.count(DSAInfo.Private[i]))
+        GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+
       UnpackedList.push_back(GEP);
     }
     for (unsigned i = 0; i < DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
@@ -327,6 +333,11 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), TaskArgsIdx);
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + DSAInfo.Firstprivate[i]->getName());
+
+      // VLAs
+      if (VLADimsInfo.count(DSAInfo.Firstprivate[i]))
+        GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+
       UnpackedList.push_back(GEP);
     }
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
@@ -346,7 +357,7 @@ struct OmpSs : public ModulePass {
   // Given an OutlineDeps and UnpackDeps Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olDepsCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
-                          const TaskVLADimsInfo &VLADimsInfo, 
+                          const TaskVLADimsInfo &VLADimsInfo,
                           Function *OlFunc, Function *UnpackFunc) {
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
@@ -382,6 +393,78 @@ struct OmpSs : public ModulePass {
     BBBuilder.CreateRetVoid();
   }
 
+
+  Value *computeTaskArgsVLAsExtraSizeOf(Module &M, IRBuilder<> &IRB, const TaskVLADimsInfo &VLADimsInfo) {
+    Value *Sum = ConstantInt::get(IRB.getInt64Ty(), 0);
+    for (auto &VLAWithDimsMap : VLADimsInfo) {
+      Type *Ty = VLAWithDimsMap.first->getType()->getPointerElementType();
+      unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
+      Value *ArraySize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
+      for (Value *const &V : VLAWithDimsMap.second) {
+        ArraySize = IRB.CreateNUWMul(ArraySize, V);
+      }
+      Sum = IRB.CreateNUWAdd(Sum, ArraySize);
+    }
+    return Sum;
+  }
+
+  StructType *createTaskArgsType(Module &M, const TaskDSAInfo &DSAInfo, const TaskVLADimsInfo &VLADimsInfo,
+                                 DenseMap<Value *, size_t> &StructToIdxMap, StringRef Str) {
+    // Private and Firstprivate must be stored in the struct
+    // Captured values (i.e. VLA dimensions) are not pointers
+    SmallVector<Type *, 4> TaskArgsMemberTy;
+    size_t TaskArgsIdx = 0;
+    for (Value *V : DSAInfo.Shared) {
+      TaskArgsMemberTy.push_back(V->getType());
+      StructToIdxMap[V] = TaskArgsIdx++;
+    }
+    for (Value *V : DSAInfo.Private) {
+      // VLAs
+      if (VLADimsInfo.count(V))
+        TaskArgsMemberTy.push_back(V->getType());
+      else
+        TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
+      StructToIdxMap[V] = TaskArgsIdx++;
+    }
+    for (Value *V : DSAInfo.Firstprivate) {
+      // VLAs
+      if (VLADimsInfo.count(V))
+        TaskArgsMemberTy.push_back(V->getType());
+      else
+        TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
+      StructToIdxMap[V] = TaskArgsIdx++;
+    }
+    // TODO: esto esta mal. no deberia ser CaputredInfo?
+    for (const auto &VLAWithDimsMap : VLADimsInfo) {
+      ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
+      for (unsigned i = 0; i < Dims.size(); ++i) {
+        assert(!Dims[i]->getType()->isPointerTy() && "Captures are not pointers");
+        TaskArgsMemberTy.push_back(Dims[i]->getType());
+        StructToIdxMap[Dims[i]] = TaskArgsIdx++;
+      }
+    }
+    return StructType::create(M.getContext(), TaskArgsMemberTy, Str);
+  }
+
+  struct VLAAlign {
+    Value *V;
+    unsigned Align;
+  };
+
+  // Greater alignemt go first
+  void computeVLAsAlignOrder(Module &M, SmallVectorImpl<VLAAlign> &VLAAlignsInfo, const TaskVLADimsInfo &VLADimsInfo) {
+    for (const auto &VLAWithDimsMap : VLADimsInfo) {
+      Value *const V = VLAWithDimsMap.first;
+      Type *Ty = V->getType()->getPointerElementType();
+      unsigned Align = M.getDataLayout().getPrefTypeAlignment(Ty);
+
+      auto It = VLAAlignsInfo.begin();
+      while (It != VLAAlignsInfo.end() && It->Align >= Align)
+        ++It;
+
+      VLAAlignsInfo.insert(It, {V, Align});
+    }
+  }
 
   void lowerTaskwait(const TaskwaitInfo &TwI,
                      Module &M) {
@@ -436,26 +519,12 @@ struct OmpSs : public ModulePass {
     }
 
     // Create nanos6_task_args_* START
-    // Private and Firstprivate must be stored in the struct
-    // Captured values (i.e. VLA dimensions) are not pointers
     SmallVector<Type *, 4> TaskArgsMemberTy;
-    for (Value *V : TI.DSAInfo.Shared) {
-      TaskArgsMemberTy.push_back(V->getType());
-    }
-    for (Value *V : TI.DSAInfo.Private) {
-      TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
-    }
-    for (Value *V : TI.DSAInfo.Firstprivate) {
-      TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
-    }
-    for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
-      ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
-      for (unsigned i = 0; i < Dims.size(); ++i) {
-        assert(!Dims[i]->getType()->isPointerTy() && "Captures are not pointers");
-        TaskArgsMemberTy.push_back(Dims[i]->getType());
-      }
-    }
-    StructType *TaskArgsTy = StructType::create(M.getContext(), TaskArgsMemberTy, ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
+    DenseMap<Value *, size_t> TaskArgsToStructIdxMap;
+    StructType *TaskArgsTy = createTaskArgsType(M, TI.DSAInfo,
+                                                 TI.VLADimsInfo,
+                                                 TaskArgsToStructIdxMap,
+                                                 ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
     // Create nanos6_task_args_* END
 
     SetVector<Value *> TaskArgsList;
@@ -595,7 +664,10 @@ struct OmpSs : public ModulePass {
                                   const SetVector<BasicBlock *> &Blocks) {
 
       IRBuilder<> IRB(codeReplacer);
-      Value *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
+      // Set debug info from the task entry to all instructions
+      IRB.SetCurrentDebugLocation(TI.Entry->getDebugLoc());
+
+      AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
       // TaskFlagsVar = !If << 1 | Final
       Value *TaskFlagsVar = ConstantInt::get(IRB.getInt64Ty(), 0);
@@ -616,15 +688,26 @@ struct OmpSs : public ModulePass {
                 IRB.getInt64Ty()),
                 1));
       }
-      // IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), TaskFlagsVar);
       Value *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
-      // TODO: For now TaskNumDepsVar is hardcoded
-      // Value *TaskNumDepsVar = IRB.CreateAlloca(IRB.getInt64Ty());
-      // IRB.CreateStore(ConstantInt::get(IRB.getInt64Ty(), 0), TaskNumDepsVar);
-      uint64_t TaskArgsSizeOf = M.getDataLayout().getTypeAllocSize(TaskArgsTy);
+
+      Value *TaskArgsStructSizeOf = ConstantInt::get(IRB.getInt64Ty(), M.getDataLayout().getTypeAllocSize(TaskArgsTy));
+
+      // TODO: this forces an alignment of 16 for VLAs
+      {
+        const int ALIGN = 16;
+        TaskArgsStructSizeOf =
+          IRB.CreateNUWAdd(TaskArgsStructSizeOf,
+                           ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1));
+        TaskArgsStructSizeOf =
+          IRB.CreateAnd(TaskArgsStructSizeOf,
+                        IRB.CreateNot(ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1)));
+      }
+
+      Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(M, IRB, TI.VLADimsInfo);
+      Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
       IRB.CreateCall(CreateTaskFuncTy, {TaskInfoVar,
                                   TaskInvInfoVar,
-                                  ConstantInt::get(IRB.getInt64Ty(), TaskArgsSizeOf),
+                                  TaskArgsSizeOf,
                                   TaskArgsVarCast,
                                   TaskPtrVar,
                                   TaskFlagsVar,
@@ -634,31 +717,136 @@ struct OmpSs : public ModulePass {
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);
-      size_t TaskArgsIdx = 0;
-      for (unsigned i = 0; i < TI.DSAInfo.Shared.size(); ++i, ++TaskArgsIdx) {
+
+      Value *TaskArgsVarLi8 = IRB.CreateBitCast(TaskArgsVarL, IRB.getInt8PtrTy());
+      Value *TaskArgsVarLi8IdxGEP = IRB.CreateGEP(TaskArgsVarLi8, TaskArgsStructSizeOf, "args_end");
+
+      SmallVector<VLAAlign, 2> VLAAlignsInfo;
+      computeVLAsAlignOrder(M, VLAAlignsInfo, TI.VLADimsInfo);
+
+      // First point VLAs to its according space in task args
+      for (const VLAAlign& VAlign : VLAAlignsInfo) {
+        Value *const V = VAlign.V;
+        size_t Align = VAlign.Align;
+
+        Type *Ty = V->getType()->getPointerElementType();
+
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
-        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsIdx);
+        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL, Idx, "gep_" + TI.DSAInfo.Shared[i]->getName());
-        IRB.CreateStore(TI.DSAInfo.Shared[i], GEP);
+            TaskArgsVarL, Idx, "gep_" + V->getName());
+
+        // Point VLA in task args to an aligned position of the extra space allocated
+        Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
+        IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEPi8, Align);
+        // Skip current VLA size
+        unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
+        Value *VLASize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
+        for (Value *const &Dim : TI.VLADimsInfo[V])
+          VLASize = IRB.CreateNUWMul(VLASize, Dim);
+        TaskArgsVarLi8IdxGEP = IRB.CreateGEP(TaskArgsVarLi8IdxGEP, VLASize);
       }
-      TaskArgsIdx += TI.DSAInfo.Private.size();
-      for (unsigned i = 0; i < TI.DSAInfo.Firstprivate.size(); ++i, ++TaskArgsIdx) {
+
+      for (Value *V : TI.DSAInfo.Shared) {
         Value *Idx[2];
         Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
-        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsIdx);
+        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
         Value *GEP = IRB.CreateGEP(
-            TaskArgsVarL, Idx, "gep_" + TI.DSAInfo.Firstprivate[i]->getName());
-        Value *FPValue = IRB.CreateLoad(TI.DSAInfo.Firstprivate[i]);
-        IRB.CreateStore(FPValue, GEP);
+            TaskArgsVarL, Idx, "gep_" + V->getName());
+        IRB.CreateStore(V, GEP);
+      }
+      for (Value *V : TI.DSAInfo.Private) {
+        // Call custom constructor generated in clang in non-pods
+        // Leave pods unititialized
+        auto It = TI.NonPODsInfo.Inits.find(V);
+        if (It != TI.NonPODsInfo.Inits.end()) {
+          Type *Ty = V->getType()->getPointerElementType();
+          // Compute num elements
+          Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+          if (isa<ArrayType>(Ty)) {
+            while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+              // Constant array
+              Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                                 ArrTy->getNumElements());
+              NSize = IRB.CreateNUWMul(NSize, NumElems);
+              Ty = ArrTy->getElementType();
+            }
+          } else if (TI.VLADimsInfo.count(V)) {
+            for (Value *const &Dim : TI.VLADimsInfo[V])
+              NSize = IRB.CreateNUWMul(NSize, Dim);
+          }
+
+          Value *Idx[2];
+          Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+          Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
+          Value *GEP = IRB.CreateGEP(
+              TaskArgsVarL, Idx, "gep_" + V->getName());
+
+          // VLAs
+          if (TI.VLADimsInfo.count(V))
+            GEP = IRB.CreateLoad(GEP);
+
+          // Regular arrays have types like [10 x %struct.S]*
+          // Cast to %struct.S*
+          GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
+
+          IRB.CreateCall(It->second, ArrayRef<Value*>{GEP, NSize});
+        }
+      }
+      for (Value *V : TI.DSAInfo.Firstprivate) {
+        Type *Ty = V->getType()->getPointerElementType();
+        unsigned Align = M.getDataLayout().getPrefTypeAlignment(Ty);
+
+        // Compute num elements
+        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+        if (isa<ArrayType>(Ty)) {
+          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+            // Constant array
+            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                               ArrTy->getNumElements());
+            NSize = IRB.CreateNUWMul(NSize, NumElems);
+            Ty = ArrTy->getElementType();
+          }
+        } else if (TI.VLADimsInfo.count(V)) {
+          for (Value *const &Dim : TI.VLADimsInfo[V])
+            NSize = IRB.CreateNUWMul(NSize, Dim);
+        }
+
+        // call custom copy constructor generated in clang in non-pods
+        // do a memcpy if pod
+        Value *Idx[2];
+        Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
+        Value *GEP = IRB.CreateGEP(
+            TaskArgsVarL, Idx, "gep_" + V->getName());
+
+        // VLAs
+        if (TI.VLADimsInfo.count(V))
+          GEP = IRB.CreateLoad(GEP);
+
+        auto It = TI.NonPODsInfo.Copies.find(V);
+        if (It != TI.NonPODsInfo.Copies.end()) {
+          // Non-POD
+
+          // Regular arrays have types like [10 x %struct.S]*
+          // Cast to %struct.S*
+          GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
+          V = IRB.CreateBitCast(V, Ty->getPointerTo());
+
+          IRB.CreateCall(It->second, ArrayRef<Value*>{/*Src=*/V, /*Dst=*/GEP, NSize});
+        } else {
+          unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
+          Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(IRB.getInt64Ty(), SizeB));
+          IRB.CreateMemCpy(GEP, Align, V, Align, NSizeB);
+        }
       }
       for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
         ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
-        for (unsigned j = 0; j < Dims.size(); ++j, ++TaskArgsIdx) {
+        for (unsigned j = 0; j < Dims.size(); ++j) {
           Value *Idx[2];
           Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
-          Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsIdx);
+          Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[Dims[j]]);
           Value *GEP = IRB.CreateGEP(
               TaskArgsVarL, Idx, "dims_gep_" + Dims[j]->getName());
           IRB.CreateStore(Dims[j], GEP);
@@ -699,6 +887,74 @@ struct OmpSs : public ModulePass {
     CodeExtractorAnalysisCache CEAC(F);
     CodeExtractor CE(TaskBBs.getArrayRef(), rewriteOutToInTaskBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
     CE.extractCodeRegion(CEAC);
+
+    // Call Dtors
+    // Find 'ret' instr.
+    // TODO: We assume there will be only one
+    Instruction *RetI = nullptr;
+    for (auto I = inst_begin(UnpackTaskFuncVar); I != inst_end(UnpackTaskFuncVar); ++I) {
+      if (isa<ReturnInst>(*I)) {
+        RetI = &*I;
+        break;
+      }
+    }
+    assert(RetI && "UnpackTaskFunc does not have a terminator 'ret'");
+
+    IRBuilder<> IRB(RetI);
+    for (Value *V : TI.DSAInfo.Private) {
+      // Call custom destructor in clang in non-pods
+      auto It = TI.NonPODsInfo.Deinits.find(V);
+      if (It != TI.NonPODsInfo.Deinits.end()) {
+        Type *Ty = V->getType()->getPointerElementType();
+        // Compute num elements
+        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+        if (isa<ArrayType>(Ty)) {
+          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+            // Constant array
+            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                               ArrTy->getNumElements());
+            NSize = IRB.CreateNUWMul(NSize, NumElems);
+            Ty = ArrTy->getElementType();
+          }
+        } else if (TI.VLADimsInfo.count(V)) {
+          for (Value *const &Dim : TI.VLADimsInfo[V])
+            NSize = IRB.CreateNUWMul(NSize, UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[Dim]));
+        }
+
+        // Regular arrays have types like [10 x %struct.S]*
+        // Cast to %struct.S*
+        Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
+
+        IRB.CreateCall(It->second, ArrayRef<Value*>{FArg, NSize});
+      }
+    }
+    for (Value *V : TI.DSAInfo.Firstprivate) {
+      // Call custom destructor in clang in non-pods
+      auto It = TI.NonPODsInfo.Deinits.find(V);
+      if (It != TI.NonPODsInfo.Deinits.end()) {
+        Type *Ty = V->getType()->getPointerElementType();
+        // Compute num elements
+        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+        if (isa<ArrayType>(Ty)) {
+          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+            // Constant array
+            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                               ArrTy->getNumElements());
+            NSize = IRB.CreateNUWMul(NSize, NumElems);
+            Ty = ArrTy->getElementType();
+          }
+        } else if (TI.VLADimsInfo.count(V)) {
+          for (Value *const &Dim : TI.VLADimsInfo[V])
+            NSize = IRB.CreateNUWMul(NSize, UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[Dim]));
+        }
+
+        // Regular arrays have types like [10 x %struct.S]*
+        // Cast to %struct.S*
+        Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
+
+        IRB.CreateCall(It->second, ArrayRef<Value*>{FArg, NSize});
+      }
+    }
 
     TI.Exit->eraseFromParent();
     TI.Entry->eraseFromParent();

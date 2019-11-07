@@ -381,10 +381,316 @@ static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
   TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 }
 
-static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
-                    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-                    SmallVectorImpl<llvm::Value*> &CapturedList) {
-  std::string Basename = Name;
+static void EmitCopyCtorFunc(CodeGenModule &CGM,
+                             llvm::Value *V,
+                             const CXXConstructExpr *CtorE,
+                             const VarDecl *CopyD,
+                             const VarDecl *InitD,
+                             SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  const std::string BundleCopyName = "QUAL.OSS.COPY";
+  const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
+  // If we have already created the function we're done
+  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
+  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(BundleCopyName, ArrayRef<llvm::Value*>{V, It->second});
+    return;
+  }
+
+  ASTContext &C = CGM.getContext();
+  FunctionArgList Args;
+
+  QualType PQ = C.getPointerType(CopyD->getType());
+  ImplicitParamDecl SrcArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+
+  Args.push_back(&SrcArg);
+  Args.push_back(&DstArg);
+  Args.push_back(&NelemsArg);
+  const auto &FnInfo =
+      CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+  llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+
+  GlobalDecl CtorGD(CtorD, Ctor_Complete);
+  llvm::Value *CtorValue = CGM.getAddrOfCXXStructor(CtorGD);
+
+  std::string Name = "oss_copy_ctor";
+  Name += CtorValue->getName();
+
+  auto *Fn = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                    Name, &CGM.getModule());
+  CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
+  Fn->setDoesNotRecurse();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = true;
+
+  CodeGenFunction CGF(CGM);
+  CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
+  // Create a scope with an artificial location for the body of this function.
+  auto AL = ApplyDebugLocation::CreateArtificial(CGF);
+
+  LValue SrcLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&SrcArg),
+                                             PQ->castAs<PointerType>());
+  LValue DstLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&DstArg),
+                                             PQ->castAs<PointerType>());
+  llvm::Value *NelemsValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
+                       NelemsArg.getType(), NelemsArg.getLocation());
+
+  // Find the end of the array.
+  llvm::Value *SrcBegin = SrcLV.getPointer();
+  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
+                                                      "arrayctor.dst.end");
+
+  // Enter the loop, setting up a phi for the current location to initialize.
+  llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
+  llvm::BasicBlock *LoopBB = CGF.createBasicBlock("arrayctor.loop");
+  CGF.EmitBlock(LoopBB);
+  llvm::PHINode *DstCur = CGF.Builder.CreatePHI(DstBegin->getType(), 2,
+                                             "arrayctor.dst.cur");
+  llvm::PHINode *SrcCur = CGF.Builder.CreatePHI(SrcBegin->getType(), 2,
+                                             "arrayctor.src.cur");
+  DstCur->addIncoming(DstBegin, EntryBB);
+  SrcCur->addIncoming(SrcBegin, EntryBB);
+
+  {
+    CodeGenFunction::OSSPrivateScope InitScope(CGF);
+    InitScope.addPrivate(InitD, [SrcCur, SrcLV]() -> Address {
+
+      return Address(SrcCur, SrcLV.getAlignment());
+    });
+    (void)InitScope.Privatize();
+    // CodeGenFunction::CGCapturedStmtRAII CapInfoRAII(CGF, &CapturesInfo);
+    CGF.EmitExprAsInit(CtorE, CopyD,
+                       CGF.MakeAddrLValue(DstCur, DstLV.getType(), DstLV.getAlignment()),
+                       /*capturedByInit=*/false);
+  }
+
+  // Go to the next element. Move SrcBegin too
+  llvm::Value *DstNext =
+    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                              "arrayctor.dst.next");
+  DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
+
+  llvm::Value *SrcDest =
+    CGF.Builder.CreateInBoundsGEP(SrcCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                                  "arrayctor.src.next");
+  SrcCur->addIncoming(SrcDest, CGF.Builder.GetInsertBlock());
+
+  // Check whether that's the end of the loop.
+  llvm::Value *Done = CGF.Builder.CreateICmpEQ(DstNext, DstEnd, "arrayctor.done");
+  llvm::BasicBlock *ContBB = CGF.createBasicBlock("arrayctor.cont");
+  CGF.Builder.CreateCondBr(Done, ContBB, LoopBB);
+
+  CGF.EmitBlock(ContBB);
+
+  CGF.FinishFunction();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = false;
+
+  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
+
+  TaskInfo.emplace_back(BundleCopyName, ArrayRef<llvm::Value*>{V, Fn});
+
+}
+
+static void EmitCtorFunc(CodeGenModule &CGM,
+                         llvm::Value *V,
+                         const VarDecl *CopyD,
+                         SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  const std::string BundleInitName = "QUAL.OSS.INIT";
+  const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getInit());
+  const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
+
+  GlobalDecl CtorGD(CtorD, Ctor_Complete);
+  llvm::Value *CtorValue = CGM.getAddrOfCXXStructor(CtorGD);
+
+  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
+  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(BundleInitName, ArrayRef<llvm::Value*>{V, It->second});
+    return;
+  }
+
+  ASTContext &C = CGM.getContext();
+  FunctionArgList Args;
+
+  QualType PQ = C.getPointerType(CopyD->getType());
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+
+  Args.push_back(&DstArg);
+  Args.push_back(&NelemsArg);
+  const auto &FnInfo =
+      CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+  llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+
+  std::string Name = "oss_ctor";
+  Name += CtorValue->getName();
+
+  auto *Fn = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                    Name, &CGM.getModule());
+  CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
+  Fn->setDoesNotRecurse();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = true;
+
+  CodeGenFunction CGF(CGM);
+  CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
+  // Create a scope with an artificial location for the body of this function.
+  auto AL = ApplyDebugLocation::CreateArtificial(CGF);
+
+  LValue DstLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&DstArg),
+                                             PQ->castAs<PointerType>());
+  llvm::Value *NelemsValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
+                       NelemsArg.getType(), NelemsArg.getLocation());
+
+  // Find the end of the array.
+  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
+                                                      "arrayctor.dst.end");
+
+  // Enter the loop, setting up a phi for the current location to initialize.
+  llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
+  llvm::BasicBlock *LoopBB = CGF.createBasicBlock("arrayctor.loop");
+  CGF.EmitBlock(LoopBB);
+  llvm::PHINode *DstCur = CGF.Builder.CreatePHI(DstBegin->getType(), 2,
+                                             "arrayctor.dst.cur");
+  DstCur->addIncoming(DstBegin, EntryBB);
+
+  CGF.EmitExprAsInit(CtorE, CopyD,
+                     CGF.MakeAddrLValue(DstCur, DstLV.getType(), DstLV.getAlignment()),
+                     /*capturedByInit=*/false);
+
+  // Go to the next element
+  llvm::Value *DstNext =
+    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                              "arrayctor.dst.next");
+  DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
+
+  // Check whether that's the end of the loop.
+  llvm::Value *Done = CGF.Builder.CreateICmpEQ(DstNext, DstEnd, "arrayctor.done");
+  llvm::BasicBlock *ContBB = CGF.createBasicBlock("arrayctor.cont");
+  CGF.Builder.CreateCondBr(Done, ContBB, LoopBB);
+
+  CGF.EmitBlock(ContBB);
+
+  CGF.FinishFunction();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = false;
+
+  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
+
+  TaskInfo.emplace_back(BundleInitName, ArrayRef<llvm::Value*>{V, Fn});
+}
+
+static void EmitDtorFunc(CodeGenModule &CGM,
+                         llvm::Value *V,
+                         const VarDecl *CopyD,
+                         SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  const std::string BundleDeinitName = "QUAL.OSS.DEINIT";
+
+  QualType Q = CopyD->getType();
+
+  const RecordType *RT = Q->getAs<RecordType>();
+  const CXXRecordDecl *RD = cast<CXXRecordDecl>(RT->getDecl());
+  const CXXDestructorDecl *DtorD = RD->getDestructor();
+
+  GlobalDecl DtorGD(DtorD, Dtor_Complete);
+  llvm::Value *DtorValue = CGM.getAddrOfCXXStructor(DtorGD);
+
+  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(DtorD);
+  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(BundleDeinitName, ArrayRef<llvm::Value*>{V, It->second});
+    return;
+  }
+
+  ASTContext &C = CGM.getContext();
+  FunctionArgList Args;
+
+  QualType PQ = C.getPointerType(Q);
+  ImplicitParamDecl DstArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+
+  Args.push_back(&DstArg);
+  Args.push_back(&NelemsArg);
+  const auto &FnInfo =
+      CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+  llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+
+  std::string Name = "oss_dtor";
+  Name += DtorValue->getName();
+
+  auto *Fn = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                    Name, &CGM.getModule());
+  CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
+  Fn->setDoesNotRecurse();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = true;
+
+  CodeGenFunction CGF(CGM);
+  CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
+  // Create a scope with an artificial location for the body of this function.
+  auto AL = ApplyDebugLocation::CreateArtificial(CGF);
+
+  LValue DstLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&DstArg),
+                                             PQ->castAs<PointerType>());
+  llvm::Value *NelemsValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
+                       NelemsArg.getType(), NelemsArg.getLocation());
+
+  // Find the end of the array.
+  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
+                                                      "arraydtor.dst.end");
+
+  // Enter the loop, setting up a phi for the current location to initialize.
+  llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
+  llvm::BasicBlock *LoopBB = CGF.createBasicBlock("arraydtor.loop");
+  CGF.EmitBlock(LoopBB);
+  llvm::PHINode *DstCur = CGF.Builder.CreatePHI(DstBegin->getType(), 2,
+                                             "arraydtor.dst.cur");
+  DstCur->addIncoming(DstBegin, EntryBB);
+
+  CGF.EmitCXXDestructorCall(DtorD, Dtor_Complete,
+                         /*ForVirtualBase=*/false, /*Delegating=*/false,
+                         Address(DstCur, DstLV.getAlignment()), Q);
+
+  // Go to the next element
+  llvm::Value *DstNext =
+    CGF.Builder.CreateInBoundsGEP(DstCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                              "arraydtor.dst.next");
+  DstCur->addIncoming(DstNext, CGF.Builder.GetInsertBlock());
+
+  // Check whether that's the end of the loop.
+  llvm::Value *Done = CGF.Builder.CreateICmpEQ(DstNext, DstEnd, "arraydtor.done");
+  llvm::BasicBlock *ContBB = CGF.createBasicBlock("arraydtor.cont");
+  CGF.Builder.CreateCondBr(Done, ContBB, LoopBB);
+
+  CGF.EmitBlock(ContBB);
+
+  CGF.FinishFunction();
+
+  // TODO: remove this
+  CGM.getOmpSsRuntime().ForceSkip = false;
+
+  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[DtorD] = Fn;
+
+  TaskInfo.emplace_back(BundleDeinitName, ArrayRef<llvm::Value*>{V, Fn});
+}
+
+static void EmitDSAShared(
+  CodeGenFunction &CGF, const Expr *E,
+  SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
+
+  const std::string BundleName = "QUAL.OSS.SHARED";
 
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
@@ -392,18 +698,87 @@ static void EmitDSA(StringRef Name, CodeGenFunction &CGF, const Expr *E,
     if (VD->getType()->isReferenceType()) {
       // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
       V = EmitRefAsIs(CGF, VD).getPointer();
-      TaskInfo.emplace_back(Basename, V);
+      TaskInfo.emplace_back(BundleName, V);
     } else {
       V = CGF.EmitDeclRefLValue(DRE).getPointer();
-      TaskInfo.emplace_back(Basename, V);
+      TaskInfo.emplace_back(BundleName, V);
     }
     QualType Q = VD->getType();
     if (Q->isVariableArrayType())
       EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
-    TaskInfo.emplace_back(Basename, CGF.EmitScalarExpr(ThisE));
+    TaskInfo.emplace_back(BundleName, CGF.EmitScalarExpr(ThisE));
   } else {
     llvm_unreachable("Unhandled expression");
+  }
+}
+
+static void EmitDSAPrivate(
+  CodeGenFunction &CGF, const OSSDSAPrivateDataTy &PDataTy,
+  SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
+
+  const std::string BundleName = "QUAL.OSS.PRIVATE";
+
+  const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
+  const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
+  llvm::Value *V;
+  if (VD->getType()->isReferenceType()) {
+    // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
+    V = EmitRefAsIs(CGF, VD).getPointer();
+    TaskInfo.emplace_back(BundleName, V);
+  } else {
+    V = CGF.EmitDeclRefLValue(DRE).getPointer();
+    TaskInfo.emplace_back(BundleName, V);
+  }
+  QualType Q = VD->getType();
+  if (Q->isVariableArrayType())
+    EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+
+  const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
+  const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
+
+  if (!CopyD->getType().isPODType(CGF.getContext())) {
+    EmitCtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+    // FIXME: Debug location missing
+    EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+  }
+}
+
+static void EmitDSAFirstprivate(
+  CodeGenFunction &CGF, const OSSDSAFirstprivateDataTy &FpDataTy,
+  SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
+
+  const std::string BundleName = "QUAL.OSS.FIRSTPRIVATE";
+
+  const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
+  const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
+  llvm::Value *V;
+  if (VD->getType()->isReferenceType()) {
+    // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
+    V = EmitRefAsIs(CGF, VD).getPointer();
+    TaskInfo.emplace_back(BundleName, V);
+  } else {
+    V = CGF.EmitDeclRefLValue(DRE).getPointer();
+    TaskInfo.emplace_back(BundleName, V);
+  }
+  QualType Q = VD->getType();
+  if (Q->isVariableArrayType())
+    EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+
+  const DeclRefExpr *CopyE = cast<DeclRefExpr>(FpDataTy.Copy);
+  const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
+  const DeclRefExpr *InitE = cast<DeclRefExpr>(FpDataTy.Init);
+  const VarDecl *InitD = cast<VarDecl>(InitE->getDecl());
+
+  if (!CopyD->getType().isPODType(CGF.getContext())) {
+    const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
+
+    EmitCopyCtorFunc(CGF.CGM, V, CtorE, CopyD, InitD, TaskInfo);
+    // FIXME: Debug location missing
+    EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
   }
 }
 
@@ -531,13 +906,13 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
 
   SmallVector<llvm::Value*, 4> CapturedList;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSA("QUAL.OSS.SHARED", CGF, E, TaskInfo, CapturedList);
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList);
   }
-  for (const Expr *E : Data.DSAs.Privates) {
-    EmitDSA("QUAL.OSS.PRIVATE", CGF, E, TaskInfo, CapturedList);
+  for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
   }
-  for (const Expr *E : Data.DSAs.Firstprivates) {
-    EmitDSA("QUAL.OSS.FIRSTPRIVATE", CGF, E, TaskInfo, CapturedList);
+  for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
   }
 
   if (!CapturedList.empty())
@@ -586,4 +961,3 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   TaskAllocaInsertPt->eraseFromParent();
 
 }
-

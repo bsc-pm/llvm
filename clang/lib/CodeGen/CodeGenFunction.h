@@ -948,6 +948,133 @@ public:
     }
   };
 
+  /// The class used to assign some variables some temporarily addresses.
+  class OSSMapVars {
+    DeclMapTy SavedLocals;
+    DeclMapTy SavedTempAddresses;
+    OSSMapVars(const OSSMapVars &) = delete;
+    void operator=(const OSSMapVars &) = delete;
+
+  public:
+    explicit OSSMapVars() = default;
+    ~OSSMapVars() {
+      assert(SavedLocals.empty() && "Did not restored original addresses.");
+    };
+
+    /// Sets the address of the variable \p LocalVD to be \p TempAddr in
+    /// function \p CGF.
+    /// \return true if at least one variable was set already, false otherwise.
+    bool setVarAddr(CodeGenFunction &CGF, const VarDecl *LocalVD,
+                    Address TempAddr) {
+      LocalVD = LocalVD->getCanonicalDecl();
+      // Only save it once.
+      if (SavedLocals.count(LocalVD)) return false;
+
+      // Copy the existing local entry to SavedLocals.
+      auto it = CGF.LocalDeclMap.find(LocalVD);
+      if (it != CGF.LocalDeclMap.end())
+        SavedLocals.try_emplace(LocalVD, it->second);
+      else
+        SavedLocals.try_emplace(LocalVD, Address::invalid());
+
+      // Generate the private entry.
+      QualType VarTy = LocalVD->getType();
+      if (VarTy->isReferenceType()) {
+        Address Temp = CGF.CreateMemTemp(VarTy);
+        CGF.Builder.CreateStore(TempAddr.getPointer(), Temp);
+        TempAddr = Temp;
+      }
+      SavedTempAddresses.try_emplace(LocalVD, TempAddr);
+
+      return true;
+    }
+
+    /// Applies new addresses to the list of the variables.
+    /// \return true if at least one variable is using new address, false
+    /// otherwise.
+    bool apply(CodeGenFunction &CGF) {
+      copyInto(SavedTempAddresses, CGF.LocalDeclMap);
+      SavedTempAddresses.clear();
+      return !SavedLocals.empty();
+    }
+
+    /// Restores original addresses of the variables.
+    void restore(CodeGenFunction &CGF) {
+      if (!SavedLocals.empty()) {
+        copyInto(SavedLocals, CGF.LocalDeclMap);
+        SavedLocals.clear();
+      }
+    }
+
+  private:
+    /// Copy all the entries in the source map over the corresponding
+    /// entries in the destination, which must exist.
+    static void copyInto(const DeclMapTy &Src, DeclMapTy &Dest) {
+      for (auto &Pair : Src) {
+        if (!Pair.second.isValid()) {
+          Dest.erase(Pair.first);
+          continue;
+        }
+
+        auto I = Dest.find(Pair.first);
+        if (I != Dest.end())
+          I->second = Pair.second;
+        else
+          Dest.insert(Pair);
+      }
+    }
+  };
+
+  /// The scope used to remap some variables as private and
+  /// to restore old vars back on exit.
+  class OSSPrivateScope : public RunCleanupsScope {
+    OSSMapVars MappedVars;
+    OSSPrivateScope(const OSSPrivateScope &) = delete;
+    void operator=(const OSSPrivateScope &) = delete;
+
+  public:
+    /// Enter a new OmpSs-2 private scope.
+    explicit OSSPrivateScope(CodeGenFunction &CGF) : RunCleanupsScope(CGF) {}
+
+    /// Registers \p LocalVD variable as a private and apply \p PrivateGen
+    /// function for it to generate corresponding private variable. \p
+    /// PrivateGen returns an address of the generated private variable.
+    /// \return true if the variable is registered as private, false if it has
+    /// been privatized already.
+    bool addPrivate(const VarDecl *LocalVD,
+                    const llvm::function_ref<Address()> PrivateGen) {
+      assert(PerformCleanup && "adding private to dead scope");
+      return MappedVars.setVarAddr(CGF, LocalVD, PrivateGen());
+    }
+
+    /// Privatizes local variables previously registered as private.
+    /// Registration is separate from the actual privatization to allow
+    /// initializers use values of the original variables, not the private one.
+    /// This is important, for example, if the private variable is a class
+    /// variable initialized by a constructor that references other private
+    /// variables. But at initialization original variables must be used, not
+    /// private copies.
+    /// \return true if at least one variable was privatized, false otherwise.
+    bool Privatize() { return MappedVars.apply(CGF); }
+
+    void ForceCleanup() {
+      RunCleanupsScope::ForceCleanup();
+      MappedVars.restore(CGF);
+    }
+
+    /// Exit scope - all the mapped variables are restored.
+    ~OSSPrivateScope() {
+      if (PerformCleanup)
+        ForceCleanup();
+    }
+
+    /// Checks if the global variable is captured in current function.
+    bool isGlobalVarCaptured(const VarDecl *VD) const {
+      VD = VD->getCanonicalDecl();
+      return !VD->isLocalVarDeclOrParm() && CGF.LocalDeclMap.count(VD) > 0;
+    }
+  };
+
   /// Takes the old cleanup stack size and emits the cleanup blocks
   /// that have been added.
   void

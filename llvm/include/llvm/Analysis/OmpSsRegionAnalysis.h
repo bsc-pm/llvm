@@ -28,6 +28,18 @@ struct TaskDSAInfo {
 using TaskVLADimsInfo = MapVector<Value *, SetVector<Value *>>;
 using TaskCapturedInfo = SetVector<Value *>;
 
+
+// Non-POD stuff
+using TaskInits = MapVector<Value *, Value *>;
+using TaskDeinits = MapVector<Value *, Value *>;
+using TaskCopies = MapVector<Value *, Value *>;
+
+struct TaskNonPODsInfo {
+  TaskInits Inits;
+  TaskDeinits Deinits;
+  TaskCopies Copies;
+};
+
 struct DependInfo {
   int SymbolIndex;
   std::string RegionText;
@@ -58,6 +70,7 @@ struct TaskInfo {
   Value *Final = nullptr;
   Value *If = nullptr;
   TaskCapturedInfo CapturedInfo;
+  TaskNonPODsInfo NonPODsInfo;
   Instruction *Entry;
   Instruction *Exit;
 };

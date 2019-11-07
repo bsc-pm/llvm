@@ -127,6 +127,21 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSCapturedEntry->second == LLVMContext::OB_oss_captured &&
          "oss_captured operand bundle id drifted!");
   (void)OSSCapturedEntry;
+
+  auto *OSSInitEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.INIT");
+  assert(OSSInitEntry->second == LLVMContext::OB_oss_init &&
+         "oss_init operand bundle id drifted!");
+  (void)OSSInitEntry;
+
+  auto *OSSDeinitEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEINIT");
+  assert(OSSDeinitEntry->second == LLVMContext::OB_oss_deinit &&
+         "oss_deinit operand bundle id drifted!");
+  (void)OSSDeinitEntry;
+
+  auto *OSSCopyEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.COPY");
+  assert(OSSCopyEntry->second == LLVMContext::OB_oss_copy &&
+         "oss_copy operand bundle id drifted!");
+  (void)OSSCopyEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

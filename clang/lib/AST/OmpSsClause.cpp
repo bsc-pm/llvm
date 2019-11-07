@@ -35,15 +35,24 @@ OSSClause::child_range OSSClause::children() {
   llvm_unreachable("unknown OSSClause");
 }
 
+void OSSPrivateClause::setPrivateCopies(ArrayRef<Expr *> VL) {
+  assert(VL.size() == varlist_size() &&
+         "Number of private copies is not the same as the preallocated buffer");
+  std::copy(VL.begin(), VL.end(), varlist_end());
+}
+
 OSSPrivateClause *OSSPrivateClause::Create(const ASTContext &C,
                                          SourceLocation StartLoc,
                                          SourceLocation LParenLoc,
                                          SourceLocation EndLoc,
-                                         ArrayRef<Expr *> VL) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+                                         ArrayRef<Expr *> VL,
+                                         ArrayRef<Expr *> PrivateVL) {
+  // Info of item 'i' is in VL[i], PrivateVL[i]
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(2 * VL.size()));
   OSSPrivateClause *Clause =
       new (Mem) OSSPrivateClause(StartLoc, LParenLoc, EndLoc, VL.size());
   Clause->setVarRefs(VL);
+  Clause->setPrivateCopies(PrivateVL);
   return Clause;
 }
 
@@ -52,15 +61,32 @@ OSSPrivateClause *OSSPrivateClause::CreateEmpty(const ASTContext &C, unsigned N)
   return new (Mem) OSSPrivateClause(N);
 }
 
+void OSSFirstprivateClause::setPrivateCopies(ArrayRef<Expr *> VL) {
+  assert(VL.size() == varlist_size() &&
+         "Number of private copies is not the same as the preallocated buffer");
+  std::copy(VL.begin(), VL.end(), varlist_end());
+}
+
+void OSSFirstprivateClause::setInits(ArrayRef<Expr *> VL) {
+  assert(VL.size() == varlist_size() &&
+         "Number of inits is not the same as the preallocated buffer");
+  std::copy(VL.begin(), VL.end(), getPrivateCopies().end());
+}
+
 OSSFirstprivateClause *OSSFirstprivateClause::Create(const ASTContext &C,
                                          SourceLocation StartLoc,
                                          SourceLocation LParenLoc,
                                          SourceLocation EndLoc,
-                                         ArrayRef<Expr *> VL) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
+                                         ArrayRef<Expr *> VL,
+                                         ArrayRef<Expr *> PrivateVL,
+                                         ArrayRef<Expr *> InitVL) {
+  // Info of item 'i' is in VL[i], PrivateVL[i] and InitVL[i]
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(3 * VL.size()));
   OSSFirstprivateClause *Clause =
       new (Mem) OSSFirstprivateClause(StartLoc, LParenLoc, EndLoc, VL.size());
   Clause->setVarRefs(VL);
+  Clause->setPrivateCopies(PrivateVL);
+  Clause->setInits(InitVL);
   return Clause;
 }
 

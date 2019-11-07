@@ -32,10 +32,21 @@ class Address;
 class CodeGenFunction;
 class CodeGenModule;
 
+struct OSSDSAPrivateDataTy {
+  const Expr *Ref;
+  const Expr *Copy;
+};
+
+struct OSSDSAFirstprivateDataTy {
+  const Expr *Ref;
+  const Expr *Copy;
+  const Expr *Init;
+};
+
 struct OSSTaskDSADataTy final {
   SmallVector<const Expr *, 4> Shareds;
-  SmallVector<const Expr *, 4> Privates;
-  SmallVector<const Expr *, 4> Firstprivates;
+  SmallVector<OSSDSAPrivateDataTy, 4> Privates;
+  SmallVector<OSSDSAFirstprivateDataTy, 4> Firstprivates;
 };
 
 struct OSSDepDataTy {
@@ -72,6 +83,17 @@ public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
+
+  // This is used to avoid creating the same generic funcion for constructors and
+  // destructors, which will be stored in a bundle for each non-pod private/firstprivate
+  // data-sharing
+  // TODO: try to integrate this better in the class, not as a direct public member
+  llvm::DenseMap<const CXXMethodDecl *, llvm::Function *> GenericCXXNonPodMethodDefs;
+
+
+  // TODO: this is because building a function changes CG instr. building
+  // because of inTask()
+  bool ForceSkip = false;
 
   // returns true if we're emitting code inside a task context (entry/exit)
   bool inTask();

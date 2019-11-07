@@ -35,7 +35,8 @@ enum PrintVerbosity {
   PV_UnpackAndConst,
   PV_DsaMissing,
   PV_DsaVLADimsMissing,
-  PV_VLADimsCaptureMissing
+  PV_VLADimsCaptureMissing,
+  PV_NonPODDSAMissing
 };
 
 static cl::opt<PrintVerbosity>
@@ -48,7 +49,8 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_UnpackAndConst, "unpack", "Print task layout with unpack instructions/constexprs needed in dependencies"),
   clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA"),
   clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs"),
-  clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture")));
+  clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture"),
+  clEnumValN(PV_NonPODDSAMissing, "non_pod_dsa_missing", "Print task layout with non-pod info without according DSA")));
 
 char OmpSsRegionAnalysisPass::ID = 0;
 
@@ -166,6 +168,37 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
         }
       }
     }
+    else if (PrintVerboseLevel == PV_NonPODDSAMissing) {
+      for (auto &InitsPair : Info.NonPODsInfo.Inits) {
+        auto It = find(Info.DSAInfo.Private, InitsPair.first);
+        if (It == Info.DSAInfo.Private.end()) {
+          dbgs() << "\n";
+          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+                 << "[Init] ";
+          InitsPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+      for (auto &CopiesPair : Info.NonPODsInfo.Copies) {
+        auto It = find(Info.DSAInfo.Firstprivate, CopiesPair.first);
+        if (It == Info.DSAInfo.Firstprivate.end()) {
+          dbgs() << "\n";
+          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+                 << "[Copy] ";
+          CopiesPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+      for (auto &DeinitsPair : Info.NonPODsInfo.Deinits) {
+        auto PrivateIt = find(Info.DSAInfo.Private, DeinitsPair.first);
+        auto FirstprivateIt = find(Info.DSAInfo.Firstprivate, DeinitsPair.first);
+        if (FirstprivateIt == Info.DSAInfo.Firstprivate.end()
+            && PrivateIt == Info.DSAInfo.Private.end()) {
+          dbgs() << "\n";
+          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+                 << "[Deinit] ";
+          DeinitsPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+    }
 
     dbgs() << "\n";
   }
@@ -232,6 +265,57 @@ static void gatherDSAInfo(const IntrinsicInst *I, TaskInfo &TI) {
                                     LLVMContext::OB_oss_firstprivate);
 }
 
+static void gatherNonPODInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  // INIT
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_init);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    if (!DisableChecks) {
+      // INIT may only be in private clauses
+      auto It = find(TI.DSAInfo.Private, OBArgs[0]);
+      if (It == TI.DSAInfo.Private.end())
+        llvm_unreachable("Non-POD INIT OperandBundle must have a PRIVATE DSA");
+    }
+    TI.NonPODsInfo.Inits[OBArgs[0]] = OBArgs[1];
+  }
+
+  OpBundles.clear();
+
+  // DEINIT
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_deinit);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    if (!DisableChecks) {
+      // DEINIT may only be in firstprivate clauses
+      auto PrivateIt = find(TI.DSAInfo.Private, OBArgs[0]);
+      auto FirstprivateIt = find(TI.DSAInfo.Firstprivate, OBArgs[0]);
+      if (FirstprivateIt == TI.DSAInfo.Firstprivate.end()
+          && PrivateIt == TI.DSAInfo.Private.end())
+        llvm_unreachable("Non-POD DEINIT OperandBundle must have a PRIVATE or FIRSTPRIVATE DSA");
+    }
+    TI.NonPODsInfo.Deinits[OBArgs[0]] = OBArgs[1];
+  }
+
+  OpBundles.clear();
+
+  // COPY
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_copy);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    if (!DisableChecks) {
+      // COPY may only be in firstprivate clauses
+      auto It = find(TI.DSAInfo.Firstprivate, OBArgs[0]);
+      if (It == TI.DSAInfo.Firstprivate.end())
+        llvm_unreachable("Non-POD COPY OperandBundle must have a FIRSTPRIVATE DSA");
+    }
+    TI.NonPODsInfo.Copies[OBArgs[0]] = OBArgs[1];
+  }
+}
+
 // After gathering DSAInfo we can assert if we find a VLA.DIMS bundle
 // without its corresponding DSA
 static void gatherVLADimsInfo(const IntrinsicInst *I, TaskInfo &TI) {
@@ -243,7 +327,7 @@ static void gatherVLADimsInfo(const IntrinsicInst *I, TaskInfo &TI) {
     if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
       llvm_unreachable("VLA dims OperandBundle must have an associated DSA");
     assert(TI.VLADimsInfo[OBArgs[0]].empty() && "There're VLA dims duplicated OperandBundles");
-    TI.VLADimsInfo[OBArgs[0]].insert(&OBArgs[1], OBArgs.end()); 
+    TI.VLADimsInfo[OBArgs[0]].insert(&OBArgs[1], OBArgs.end());
   }
 }
 
@@ -447,6 +531,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           T.Info.Exit = Exit;
 
           gatherDSAInfo(II, T.Info);
+          gatherNonPODInfo(II, T.Info);
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);

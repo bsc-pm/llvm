@@ -99,6 +99,9 @@ public:
     OB_oss_final = 13,           // "OB_oss_final"
     OB_oss_if = 14,              // "OB_oss_if"
     OB_oss_captured = 15,        // "OB_oss_captured"
+    OB_oss_init = 16,            // "OB_oss_init"
+    OB_oss_deinit = 17,          // "OB_oss_deinit"
+    OB_oss_copy = 18,            // "OB_oss_copy"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

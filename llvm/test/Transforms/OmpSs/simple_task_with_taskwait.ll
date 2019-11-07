@@ -21,22 +21,26 @@ define void @foo(i32 %x, i32 %y) {
 ; CHECK-NEXT:    store i32 42, i32* [[Z_ORIG]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, i32* [[Z_ORIG]], align 4
 ; CHECK-NEXT:    store i32 [[TMP2]], i32* [[Z]], align 4
-; CHECK-NEXT:    br label [[CODEREPL:%.*]]
+; CHECK-NEXT:    br label [[CODEREPL:%.*]], !dbg !1
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP3:%.*]] = alloca %nanos6_task_args_foo0*
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP3]] to i8**
-; CHECK-NEXT:    [[TMP5:%.*]] = alloca i8*
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** [[TMP4]], i8** [[TMP5]], i64 0, i64 0)
-; CHECK-NEXT:    [[TMP6:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP3]]
-; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0:%.*]], %nanos6_task_args_foo0* [[TMP6]], i32 0, i32 0
-; CHECK-NEXT:    store i32* [[X_ADDR]], i32** [[GEP_X_ADDR]]
-; CHECK-NEXT:    [[GEP_Y_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP6]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, i32* [[Y_ADDR]]
-; CHECK-NEXT:    store i32 [[TMP7]], i32* [[GEP_Y_ADDR]]
-; CHECK-NEXT:    [[TMP8:%.*]] = load i8*, i8** [[TMP5]]
-; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP8]])
-; CHECK-NEXT:    br label [[TMP9:%.*]]
-; CHECK:         call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0))
+; CHECK-NEXT:    [[TMP3:%.*]] = alloca %nanos6_task_args_foo0*, !dbg !1
+; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP3]] to i8**, !dbg !1
+; CHECK-NEXT:    [[TMP5:%.*]] = alloca i8*, !dbg !1
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** [[TMP4]], i8** [[TMP5]], i64 0, i64 0), !dbg !1
+; CHECK-NEXT:    [[TMP6:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP3]], !dbg !1
+; CHECK-NEXT:    [[TMP7:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP6]] to i8*, !dbg !1
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP7]], i64 16, !dbg !1
+; CHECK-NEXT:    [[GEP_X_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0:%.*]], %nanos6_task_args_foo0* [[TMP6]], i32 0, i32 0, !dbg !1
+; CHECK-NEXT:    store i32* [[X_ADDR]], i32** [[GEP_X_ADDR]], !dbg !1
+; CHECK-NEXT:    [[GEP_Y_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP6]], i32 0, i32 2, !dbg !1
+; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32* [[GEP_Y_ADDR]] to i8*, !dbg !1
+; CHECK-NEXT:    [[TMP9:%.*]] = bitcast i32* [[Y_ADDR]] to i8*, !dbg !1
+; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP8]], i8* align 4 [[TMP9]], i64 4, i1 false), !dbg !1
+; CHECK-NEXT:    [[TMP10:%.*]] = load i8*, i8** [[TMP5]], !dbg !1
+; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP10]]), !dbg !1
+; CHECK-NEXT:    br label [[TMP11:%.*]], !dbg !1
+; CHECK:       11:
+; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0)), !dbg !1
 ; CHECK-NEXT:    ret void
 ;
 entry:

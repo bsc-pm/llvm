@@ -36,7 +36,7 @@ entry:
   store i64 %5, i64* %__vla_expr2, align 8, !dbg !10
   %9 = mul i64 %5, 4, !dbg !15
   %10 = mul i64 %5, 4, !dbg !15
-  %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla, i64 %9, i64 0, i64 %10, i64 %3, i64 0, i64 %3, i64 %1, i64 0, i64 %1) ], !dbg !15
+  %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla, i64 %9, i64 0, i64 %10, i64 %3, i64 0, i64 %3, i64 %1, i64 0, i64 %1) ], !dbg !15
   %size = alloca i32, align 4
   %12 = mul nuw i64 %1, %3, !dbg !16
   %13 = mul nuw i64 %12, %5, !dbg !16
@@ -54,30 +54,44 @@ entry:
   ret void, !dbg !21
 
 ; CHECK: codeRepl:                                         ; preds = %entry
-; CHECK-NEXT:   %9 = alloca %nanos6_task_args_vla_senction_dep0*
-; CHECK-NEXT:   %10 = bitcast %nanos6_task_args_vla_senction_dep0** %9 to i8**
-; CHECK-NEXT:   %11 = alloca i8*
-; CHECK-NEXT:   call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_vla_senction_dep0, %nanos6_task_invocation_info_t* @task_invocation_info_vla_senction_dep0, i64 32, i8** %10, i8** %11, i64 0, i64 1)
-; CHECK-NEXT:   %12 = load %nanos6_task_args_vla_senction_dep0*, %nanos6_task_args_vla_senction_dep0** %9
-; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %12, i32 0, i32 0
-; CHECK-NEXT:   store i32* %vla, i32** %gep_vla
-; CHECK-NEXT:   %dims_gep_ = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %12, i32 0, i32 1
-; CHECK-NEXT:   store i64 %1, i64* %dims_gep_
-; CHECK-NEXT:   %dims_gep_1 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %12, i32 0, i32 2
-; CHECK-NEXT:   store i64 %3, i64* %dims_gep_1
-; CHECK-NEXT:   %dims_gep_2 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %12, i32 0, i32 3
-; CHECK-NEXT:   store i64 %5, i64* %dims_gep_2
-; CHECK-NEXT:   %13 = load i8*, i8** %11
-; CHECK-NEXT:   call void @nanos6_submit_task(i8* %13)
-; CHECK-NEXT:   br label %14
-; CHECK: 14:                                               ; preds = %codeRepl
-; CHECK-NEXT:   %15 = mul nuw i64 %1, %3, !dbg !14
-; CHECK-NEXT:   %16 = mul nuw i64 %15, %5, !dbg !14
-; CHECK-NEXT:   %17 = mul nuw i64 4, %16, !dbg !14
-; CHECK-NEXT:   %conv4 = trunc i64 %17 to i32, !dbg !14
+; CHECK-NEXT:   %9 = alloca %nanos6_task_args_vla_senction_dep0*, !dbg !13
+; CHECK-NEXT:   %10 = bitcast %nanos6_task_args_vla_senction_dep0** %9 to i8**, !dbg !13
+; CHECK-NEXT:   %11 = alloca i8*, !dbg !13
+; CHECK-NEXT:   %12 = mul nuw i64 4, %1, !dbg !13
+; CHECK-NEXT:   %13 = mul nuw i64 %12, %3, !dbg !13
+; CHECK-NEXT:   %14 = mul nuw i64 %13, %5, !dbg !13
+; CHECK-NEXT:   %15 = add nuw i64 0, %14, !dbg !13
+; CHECK-NEXT:   %16 = add nuw i64 32, %15, !dbg !13
+; CHECK-NEXT:   call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_vla_senction_dep0, %nanos6_task_invocation_info_t* @task_invocation_info_vla_senction_dep0, i64 %16, i8** %10, i8** %11, i64 0, i64 1), !dbg !13
+; CHECK-NEXT:   %17 = load %nanos6_task_args_vla_senction_dep0*, %nanos6_task_args_vla_senction_dep0** %9, !dbg !13
+; CHECK-NEXT:   %18 = bitcast %nanos6_task_args_vla_senction_dep0* %17 to i8*, !dbg !13
+; CHECK-NEXT:   %args_end = getelementptr i8, i8* %18, i64 32, !dbg !13
+; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 0, !dbg !13
+; CHECK-NEXT:   %19 = bitcast i32** %gep_vla to i8**, !dbg !13
+; CHECK-NEXT:   store i8* %args_end, i8** %19, align 4, !dbg !13
+; CHECK-NEXT:   %20 = mul nuw i64 4, %1, !dbg !13
+; CHECK-NEXT:   %21 = mul nuw i64 %20, %3, !dbg !13
+; CHECK-NEXT:   %22 = mul nuw i64 %21, %5, !dbg !13
+; CHECK-NEXT:   %23 = getelementptr i8, i8* %args_end, i64 %22, !dbg !13
+; CHECK-NEXT:   %gep_vla1 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 0, !dbg !13
+; CHECK-NEXT:   store i32* %vla, i32** %gep_vla1, !dbg !13
+; CHECK-NEXT:   %dims_gep_ = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 1, !dbg !13
+; CHECK-NEXT:   store i64 %1, i64* %dims_gep_, !dbg !13
+; CHECK-NEXT:   %dims_gep_2 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 2, !dbg !13
+; CHECK-NEXT:   store i64 %3, i64* %dims_gep_2, !dbg !13
+; CHECK-NEXT:   %dims_gep_3 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 3, !dbg !13
+; CHECK-NEXT:   store i64 %5, i64* %dims_gep_3, !dbg !13
+; CHECK-NEXT:   %24 = load i8*, i8** %11, !dbg !13
+; CHECK-NEXT:   call void @nanos6_submit_task(i8* %24), !dbg !13
+; CHECK-NEXT:   br label %25, !dbg !13
+; CHECK: 25:                                               ; preds = %codeRepl
+; CHECK-NEXT:   %26 = mul nuw i64 %1, %3, !dbg !14
+; CHECK-NEXT:   %27 = mul nuw i64 %26, %5, !dbg !14
+; CHECK-NEXT:   %28 = mul nuw i64 4, %27, !dbg !14
+; CHECK-NEXT:   %conv4 = trunc i64 %28 to i32, !dbg !14
 ; CHECK-NEXT:   store i32 %conv4, i32* %size3, align 4, !dbg !15
-; CHECK-NEXT:   %18 = load i8*, i8** %saved_stack, align 8, !dbg !16
-; CHECK-NEXT:   call void @llvm.stackrestore(i8* %18), !dbg !16
+; CHECK-NEXT:   %29 = load i8*, i8** %saved_stack, align 8, !dbg !16
+; CHECK-NEXT:   call void @llvm.stackrestore(i8* %29), !dbg !16
 ; CHECK-NEXT:   ret void, !dbg !16
 
 }
