@@ -52,9 +52,11 @@ define <vscale x 8 x i8> @foo(<vscale x 8 x i1> %a) nounwind {
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -16(s0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vmand.mm v1, v0, v0
 ; CHECK-NEXT:    ld a0, -16(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vmand.mm v16, v0, v0
+; CHECK-NEXT:    vmv.v.i v0, 1
+; CHECK-NEXT:    vand.vv v16, v1, v0
 ; CHECK-NEXT:    addi sp, s0, -16
 ; CHECK-NEXT:    addi sp, sp, 16
 ; CHECK-NEXT:    ret

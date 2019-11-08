@@ -1,3 +1,5 @@
+# XFAIL: *
+# See explanation below about the XFAIL
 # RUN: llc -o - -mtriple=riscv64-unknown-linux-gnu -mattr=+epi \
 # RUN:     -verify-machineinstrs %s | FileCheck %s
 ---
@@ -36,6 +38,8 @@ body: |
     $x29 = COPY $x10
     $x30 = COPY $x10
     $x31 = COPY $x10
+# This copy was here force a copy under GPR pressure but now it it is scheduled
+# after INLINEASM defeating the purpose of this test. Hence the XFAIL above
     $v1 = COPY $v2
     INLINEASM &nop, 1, 131081, killed $x0, 131081, killed $x1, 131081, killed $x2, 131081, killed $x3, 131081, killed $x4, 131081, killed $x5, 131081, killed $x6, 131081, killed $x7, 131081, killed $x8, 131081, killed $x9, 131081, killed $x11, 131081, killed $x12, 131081, killed $x13, 131081, killed $x14, 131081, killed $x15, 131081, killed $x16, 131081, killed $x17, 131081, killed $x18, 131081, killed $x19, 131081, killed $x20, 131081, killed $x21, 131081, killed $x22, 131081, killed $x23, 131081, killed $x24, 131081, killed $x25, 131081, killed $x26, 131081, killed $x27, 131081, killed $x28, 131081, killed $x29, 131081, killed $x30, 131081, killed $x31
     VSE_V $v1, $x10, implicit $vl, implicit $vtype

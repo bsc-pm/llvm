@@ -11,21 +11,21 @@
 define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-LABEL: foo:
 ; SPILL-O0:       # %bb.0:
-; SPILL-O0-NEXT:    addi sp, sp, -208
-; SPILL-O0-NEXT:    sd ra, 200(sp)
-; SPILL-O0-NEXT:    sd s0, 192(sp)
-; SPILL-O0-NEXT:    sd s1, 184(sp)
-; SPILL-O0-NEXT:    sd s2, 176(sp)
-; SPILL-O0-NEXT:    sd s3, 168(sp)
-; SPILL-O0-NEXT:    sd s4, 160(sp)
-; SPILL-O0-NEXT:    sd s5, 152(sp)
-; SPILL-O0-NEXT:    sd s6, 144(sp)
-; SPILL-O0-NEXT:    sd s7, 136(sp)
-; SPILL-O0-NEXT:    sd s8, 128(sp)
-; SPILL-O0-NEXT:    sd s9, 120(sp)
-; SPILL-O0-NEXT:    sd s10, 112(sp)
-; SPILL-O0-NEXT:    sd s11, 104(sp)
-; SPILL-O0-NEXT:    addi s0, sp, 208
+; SPILL-O0-NEXT:    addi sp, sp, -192
+; SPILL-O0-NEXT:    sd ra, 184(sp)
+; SPILL-O0-NEXT:    sd s0, 176(sp)
+; SPILL-O0-NEXT:    sd s1, 168(sp)
+; SPILL-O0-NEXT:    sd s2, 160(sp)
+; SPILL-O0-NEXT:    sd s3, 152(sp)
+; SPILL-O0-NEXT:    sd s4, 144(sp)
+; SPILL-O0-NEXT:    sd s5, 136(sp)
+; SPILL-O0-NEXT:    sd s6, 128(sp)
+; SPILL-O0-NEXT:    sd s7, 120(sp)
+; SPILL-O0-NEXT:    sd s8, 112(sp)
+; SPILL-O0-NEXT:    sd s9, 104(sp)
+; SPILL-O0-NEXT:    sd s10, 96(sp)
+; SPILL-O0-NEXT:    sd s11, 88(sp)
+; SPILL-O0-NEXT:    addi s0, sp, 192
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
 ; SPILL-O0-NEXT:    vsetvli a1, zero, e64, m1
@@ -33,162 +33,168 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    slli a1, a1, 3
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
-; SPILL-O0-NEXT:    sd sp, -200(s0)
+; SPILL-O0-NEXT:    sd sp, -184(s0)
+; SPILL-O0-NEXT:    sub sp, sp, a1
+; SPILL-O0-NEXT:    andi sp, sp, -16
+; SPILL-O0-NEXT:    sd sp, -192(s0)
 ; SPILL-O0-NEXT:    lui a1, %hi(scratch)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(scratch)
-; SPILL-O0-NEXT:    addi a2, a1, 216
-; SPILL-O0-NEXT:    addi a3, a1, 224
-; SPILL-O0-NEXT:    addi a4, a1, 232
-; SPILL-O0-NEXT:    addi a5, a1, 240
-; SPILL-O0-NEXT:    addi a6, a1, 248
-; SPILL-O0-NEXT:    addi a7, a1, 32
-; SPILL-O0-NEXT:    addi t0, a1, 40
-; SPILL-O0-NEXT:    addi t1, a1, 48
-; SPILL-O0-NEXT:    addi t2, a1, 56
-; SPILL-O0-NEXT:    addi t3, a1, 64
-; SPILL-O0-NEXT:    addi t4, a1, 72
-; SPILL-O0-NEXT:    addi t5, a1, 80
-; SPILL-O0-NEXT:    addi t6, a1, 88
-; SPILL-O0-NEXT:    addi s1, a1, 96
-; SPILL-O0-NEXT:    addi s2, a1, 104
-; SPILL-O0-NEXT:    addi s3, a1, 112
-; SPILL-O0-NEXT:    addi s4, a1, 120
-; SPILL-O0-NEXT:    addi s5, a1, 128
-; SPILL-O0-NEXT:    addi s6, a1, 136
-; SPILL-O0-NEXT:    addi s7, a1, 144
-; SPILL-O0-NEXT:    addi s8, a1, 152
-; SPILL-O0-NEXT:    addi s9, a1, 160
-; SPILL-O0-NEXT:    addi s10, a1, 168
-; SPILL-O0-NEXT:    addi s11, a1, 176
-; SPILL-O0-NEXT:    sd a0, -136(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 184
-; SPILL-O0-NEXT:    sd a0, -144(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 192
-; SPILL-O0-NEXT:    sd a0, -152(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 200
-; SPILL-O0-NEXT:    sd a0, -160(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 208
-; SPILL-O0-NEXT:    sd a0, -168(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 256
-; SPILL-O0-NEXT:    sd a0, -176(s0)
-; SPILL-O0-NEXT:    ld a0, -136(s0)
 ; SPILL-O0-NEXT:    vsetvli a0, a0, e64, m1
-; SPILL-O0-NEXT:    ld a0, -176(s0)
-; SPILL-O0-NEXT:    vle.v v0, (a0)
-; SPILL-O0-NEXT:    vle.v v1, (a6)
-; SPILL-O0-NEXT:    vle.v v2, (a5)
-; SPILL-O0-NEXT:    vle.v v3, (a4)
-; SPILL-O0-NEXT:    vle.v v4, (a3)
-; SPILL-O0-NEXT:    vle.v v5, (a2)
-; SPILL-O0-NEXT:    ld a0, -168(s0)
-; SPILL-O0-NEXT:    vle.v v6, (a0)
-; SPILL-O0-NEXT:    ld a0, -160(s0)
-; SPILL-O0-NEXT:    vle.v v7, (a0)
-; SPILL-O0-NEXT:    ld a0, -152(s0)
-; SPILL-O0-NEXT:    vle.v v16, (a0)
-; SPILL-O0-NEXT:    ld a0, -144(s0)
-; SPILL-O0-NEXT:    vle.v v17, (a0)
-; SPILL-O0-NEXT:    vle.v v18, (s11)
-; SPILL-O0-NEXT:    vle.v v19, (s10)
-; SPILL-O0-NEXT:    vle.v v20, (s9)
-; SPILL-O0-NEXT:    vle.v v21, (s8)
-; SPILL-O0-NEXT:    vle.v v22, (s7)
-; SPILL-O0-NEXT:    vle.v v23, (s6)
-; SPILL-O0-NEXT:    vle.v v8, (s5)
-; SPILL-O0-NEXT:    vle.v v9, (s4)
-; SPILL-O0-NEXT:    vle.v v10, (s3)
-; SPILL-O0-NEXT:    vle.v v11, (s2)
-; SPILL-O0-NEXT:    vle.v v12, (s1)
-; SPILL-O0-NEXT:    vle.v v13, (t6)
-; SPILL-O0-NEXT:    vle.v v14, (t5)
-; SPILL-O0-NEXT:    vle.v v15, (t4)
-; SPILL-O0-NEXT:    vle.v v24, (t3)
-; SPILL-O0-NEXT:    vle.v v25, (t2)
-; SPILL-O0-NEXT:    vle.v v26, (t1)
-; SPILL-O0-NEXT:    vle.v v27, (t0)
-; SPILL-O0-NEXT:    vle.v v28, (a7)
-; SPILL-O0-NEXT:    addi a0, a1, 24
-; SPILL-O0-NEXT:    vle.v v29, (a0)
-; SPILL-O0-NEXT:    sd a0, -184(s0)
-; SPILL-O0-NEXT:    addi a0, a1, 16
-; SPILL-O0-NEXT:    vle.v v30, (a0)
-; SPILL-O0-NEXT:    sd a0, -192(s0)
+; SPILL-O0-NEXT:    vle.v v0, (a1)
 ; SPILL-O0-NEXT:    addi a0, a1, 8
+; SPILL-O0-NEXT:    vle.v v1, (a0)
+; SPILL-O0-NEXT:    addi a2, a1, 16
+; SPILL-O0-NEXT:    vle.v v2, (a2)
+; SPILL-O0-NEXT:    addi a3, a1, 24
+; SPILL-O0-NEXT:    vle.v v3, (a3)
+; SPILL-O0-NEXT:    addi a4, a1, 32
+; SPILL-O0-NEXT:    vle.v v4, (a4)
+; SPILL-O0-NEXT:    addi a5, a1, 40
+; SPILL-O0-NEXT:    vle.v v5, (a5)
+; SPILL-O0-NEXT:    addi a6, a1, 48
+; SPILL-O0-NEXT:    vle.v v6, (a6)
+; SPILL-O0-NEXT:    addi a7, a1, 56
+; SPILL-O0-NEXT:    vle.v v7, (a7)
+; SPILL-O0-NEXT:    addi t0, a1, 64
+; SPILL-O0-NEXT:    vle.v v16, (t0)
+; SPILL-O0-NEXT:    addi t1, a1, 72
+; SPILL-O0-NEXT:    vle.v v17, (t1)
+; SPILL-O0-NEXT:    addi t2, a1, 80
+; SPILL-O0-NEXT:    vle.v v18, (t2)
+; SPILL-O0-NEXT:    addi t3, a1, 88
+; SPILL-O0-NEXT:    vle.v v19, (t3)
+; SPILL-O0-NEXT:    addi t4, a1, 96
+; SPILL-O0-NEXT:    vle.v v20, (t4)
+; SPILL-O0-NEXT:    addi t5, a1, 104
+; SPILL-O0-NEXT:    vle.v v21, (t5)
+; SPILL-O0-NEXT:    addi t6, a1, 112
+; SPILL-O0-NEXT:    vle.v v22, (t6)
+; SPILL-O0-NEXT:    addi s1, a1, 120
+; SPILL-O0-NEXT:    vle.v v23, (s1)
+; SPILL-O0-NEXT:    addi s2, a1, 128
+; SPILL-O0-NEXT:    vle.v v8, (s2)
+; SPILL-O0-NEXT:    addi s3, a1, 136
+; SPILL-O0-NEXT:    vle.v v9, (s3)
+; SPILL-O0-NEXT:    addi s4, a1, 144
+; SPILL-O0-NEXT:    vle.v v10, (s4)
+; SPILL-O0-NEXT:    addi s5, a1, 152
+; SPILL-O0-NEXT:    vle.v v11, (s5)
+; SPILL-O0-NEXT:    addi s6, a1, 160
+; SPILL-O0-NEXT:    vle.v v12, (s6)
+; SPILL-O0-NEXT:    addi s7, a1, 168
+; SPILL-O0-NEXT:    vle.v v13, (s7)
+; SPILL-O0-NEXT:    addi s8, a1, 176
+; SPILL-O0-NEXT:    vle.v v14, (s8)
+; SPILL-O0-NEXT:    addi s9, a1, 184
+; SPILL-O0-NEXT:    vle.v v15, (s9)
+; SPILL-O0-NEXT:    addi s10, a1, 192
+; SPILL-O0-NEXT:    vle.v v24, (s10)
+; SPILL-O0-NEXT:    addi s11, a1, 200
+; SPILL-O0-NEXT:    vle.v v25, (s11)
+; SPILL-O0-NEXT:    addi ra, a1, 208
+; SPILL-O0-NEXT:    vle.v v26, (ra)
+; SPILL-O0-NEXT:    sd a0, -136(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 216
+; SPILL-O0-NEXT:    vle.v v27, (a0)
+; SPILL-O0-NEXT:    sd a0, -144(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 224
+; SPILL-O0-NEXT:    vle.v v28, (a0)
+; SPILL-O0-NEXT:    sd a0, -152(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 232
+; SPILL-O0-NEXT:    vle.v v29, (a0)
+; SPILL-O0-NEXT:    sd a0, -160(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 240
+; SPILL-O0-NEXT:    vle.v v30, (a0)
+; SPILL-O0-NEXT:    sd a0, -168(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 248
 ; SPILL-O0-NEXT:    vle.v v31, (a0)
+; SPILL-O0-NEXT:    sd a0, -176(s0)
+; SPILL-O0-NEXT:    addi a0, a1, 256
 ; SPILL-O0-NEXT:    sd a2, -112(s0)
 ; SPILL-O0-NEXT:    sd a3, -120(s0)
 ; SPILL-O0-NEXT:    sd a4, -128(s0)
-; SPILL-O0-NEXT:    ld a4, -200(s0)
+; SPILL-O0-NEXT:    ld a4, -184(s0)
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vse.v v0, (a4)
+; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    vle.v v0, (a0)
+; SPILL-O0-NEXT:    ld a4, -192(s0)
+; SPILL-O0-NEXT:    rdvtype a3
+; SPILL-O0-NEXT:    rdvl a2
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vse.v v0, (a4)
+; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    ld a4, -184(s0)
+; SPILL-O0-NEXT:    rdvtype a3
+; SPILL-O0-NEXT:    rdvl a2
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vle.v v0, (a4)
 ; SPILL-O0-NEXT:    ld a4, -128(s0)
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
 ; SPILL-O0-NEXT:    ld a3, -120(s0)
 ; SPILL-O0-NEXT:    ld a2, -112(s0)
-; SPILL-O0-NEXT:    vle.v v0, (a1)
 ; SPILL-O0-NEXT:    vse.v v0, (a1)
-; SPILL-O0-NEXT:    vse.v v31, (a0)
-; SPILL-O0-NEXT:    ld a0, -192(s0)
-; SPILL-O0-NEXT:    vse.v v30, (a0)
-; SPILL-O0-NEXT:    ld a0, -184(s0)
-; SPILL-O0-NEXT:    vse.v v29, (a0)
-; SPILL-O0-NEXT:    vse.v v28, (a7)
-; SPILL-O0-NEXT:    vse.v v27, (t0)
-; SPILL-O0-NEXT:    vse.v v26, (t1)
-; SPILL-O0-NEXT:    vse.v v25, (t2)
-; SPILL-O0-NEXT:    vse.v v24, (t3)
-; SPILL-O0-NEXT:    vse.v v15, (t4)
-; SPILL-O0-NEXT:    vse.v v14, (t5)
-; SPILL-O0-NEXT:    vse.v v13, (t6)
-; SPILL-O0-NEXT:    vse.v v12, (s1)
-; SPILL-O0-NEXT:    vse.v v11, (s2)
-; SPILL-O0-NEXT:    vse.v v10, (s3)
-; SPILL-O0-NEXT:    vse.v v9, (s4)
-; SPILL-O0-NEXT:    vse.v v8, (s5)
-; SPILL-O0-NEXT:    vse.v v23, (s6)
-; SPILL-O0-NEXT:    vse.v v22, (s7)
-; SPILL-O0-NEXT:    vse.v v21, (s8)
-; SPILL-O0-NEXT:    vse.v v20, (s9)
-; SPILL-O0-NEXT:    vse.v v19, (s10)
-; SPILL-O0-NEXT:    vse.v v18, (s11)
-; SPILL-O0-NEXT:    ld a0, -144(s0)
-; SPILL-O0-NEXT:    vse.v v17, (a0)
-; SPILL-O0-NEXT:    ld a0, -152(s0)
-; SPILL-O0-NEXT:    vse.v v16, (a0)
-; SPILL-O0-NEXT:    ld a0, -160(s0)
-; SPILL-O0-NEXT:    vse.v v7, (a0)
-; SPILL-O0-NEXT:    ld a0, -168(s0)
-; SPILL-O0-NEXT:    vse.v v6, (a0)
-; SPILL-O0-NEXT:    vse.v v5, (a2)
-; SPILL-O0-NEXT:    vse.v v4, (a3)
-; SPILL-O0-NEXT:    vse.v v3, (a4)
-; SPILL-O0-NEXT:    vse.v v2, (a5)
-; SPILL-O0-NEXT:    vse.v v1, (a6)
-; SPILL-O0-NEXT:    ld a2, -200(s0)
-; SPILL-O0-NEXT:    rdvtype a1
-; SPILL-O0-NEXT:    rdvl a0
+; SPILL-O0-NEXT:    ld a1, -136(s0)
+; SPILL-O0-NEXT:    vse.v v1, (a1)
+; SPILL-O0-NEXT:    vse.v v2, (a2)
+; SPILL-O0-NEXT:    vse.v v3, (a3)
+; SPILL-O0-NEXT:    vse.v v4, (a4)
+; SPILL-O0-NEXT:    vse.v v5, (a5)
+; SPILL-O0-NEXT:    vse.v v6, (a6)
+; SPILL-O0-NEXT:    vse.v v7, (a7)
+; SPILL-O0-NEXT:    vse.v v16, (t0)
+; SPILL-O0-NEXT:    vse.v v17, (t1)
+; SPILL-O0-NEXT:    vse.v v18, (t2)
+; SPILL-O0-NEXT:    vse.v v19, (t3)
+; SPILL-O0-NEXT:    vse.v v20, (t4)
+; SPILL-O0-NEXT:    vse.v v21, (t5)
+; SPILL-O0-NEXT:    vse.v v22, (t6)
+; SPILL-O0-NEXT:    vse.v v23, (s1)
+; SPILL-O0-NEXT:    vse.v v8, (s2)
+; SPILL-O0-NEXT:    vse.v v9, (s3)
+; SPILL-O0-NEXT:    vse.v v10, (s4)
+; SPILL-O0-NEXT:    vse.v v11, (s5)
+; SPILL-O0-NEXT:    vse.v v12, (s6)
+; SPILL-O0-NEXT:    vse.v v13, (s7)
+; SPILL-O0-NEXT:    vse.v v14, (s8)
+; SPILL-O0-NEXT:    vse.v v15, (s9)
+; SPILL-O0-NEXT:    vse.v v24, (s10)
+; SPILL-O0-NEXT:    vse.v v25, (s11)
+; SPILL-O0-NEXT:    vse.v v26, (ra)
+; SPILL-O0-NEXT:    ld a1, -144(s0)
+; SPILL-O0-NEXT:    vse.v v27, (a1)
+; SPILL-O0-NEXT:    ld a1, -152(s0)
+; SPILL-O0-NEXT:    vse.v v28, (a1)
+; SPILL-O0-NEXT:    ld a1, -160(s0)
+; SPILL-O0-NEXT:    vse.v v29, (a1)
+; SPILL-O0-NEXT:    ld a1, -168(s0)
+; SPILL-O0-NEXT:    vse.v v30, (a1)
+; SPILL-O0-NEXT:    ld a1, -176(s0)
+; SPILL-O0-NEXT:    vse.v v31, (a1)
+; SPILL-O0-NEXT:    ld a3, -192(s0)
+; SPILL-O0-NEXT:    rdvtype a2
+; SPILL-O0-NEXT:    rdvl a1
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vle.v v0, (a2)
-; SPILL-O0-NEXT:    vsetvl zero, a0, a1
-; SPILL-O0-NEXT:    ld a0, -176(s0)
+; SPILL-O0-NEXT:    vle.v v0, (a3)
+; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    vse.v v0, (a0)
-; SPILL-O0-NEXT:    addi sp, s0, -208
-; SPILL-O0-NEXT:    ld s11, 104(sp)
-; SPILL-O0-NEXT:    ld s10, 112(sp)
-; SPILL-O0-NEXT:    ld s9, 120(sp)
-; SPILL-O0-NEXT:    ld s8, 128(sp)
-; SPILL-O0-NEXT:    ld s7, 136(sp)
-; SPILL-O0-NEXT:    ld s6, 144(sp)
-; SPILL-O0-NEXT:    ld s5, 152(sp)
-; SPILL-O0-NEXT:    ld s4, 160(sp)
-; SPILL-O0-NEXT:    ld s3, 168(sp)
-; SPILL-O0-NEXT:    ld s2, 176(sp)
-; SPILL-O0-NEXT:    ld s1, 184(sp)
-; SPILL-O0-NEXT:    ld s0, 192(sp)
-; SPILL-O0-NEXT:    ld ra, 200(sp)
-; SPILL-O0-NEXT:    addi sp, sp, 208
+; SPILL-O0-NEXT:    addi sp, s0, -192
+; SPILL-O0-NEXT:    ld s11, 88(sp)
+; SPILL-O0-NEXT:    ld s10, 96(sp)
+; SPILL-O0-NEXT:    ld s9, 104(sp)
+; SPILL-O0-NEXT:    ld s8, 112(sp)
+; SPILL-O0-NEXT:    ld s7, 120(sp)
+; SPILL-O0-NEXT:    ld s6, 128(sp)
+; SPILL-O0-NEXT:    ld s5, 136(sp)
+; SPILL-O0-NEXT:    ld s4, 144(sp)
+; SPILL-O0-NEXT:    ld s3, 152(sp)
+; SPILL-O0-NEXT:    ld s2, 160(sp)
+; SPILL-O0-NEXT:    ld s1, 168(sp)
+; SPILL-O0-NEXT:    ld s0, 176(sp)
+; SPILL-O0-NEXT:    ld ra, 184(sp)
+; SPILL-O0-NEXT:    addi sp, sp, 192
 ; SPILL-O0-NEXT:    ret
   %p1 = getelementptr inbounds i64, i64* @scratch, i64 1
   %p2 = getelementptr inbounds i64, i64* @scratch, i64 2

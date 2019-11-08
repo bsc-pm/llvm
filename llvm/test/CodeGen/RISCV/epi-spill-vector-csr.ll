@@ -24,6 +24,8 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -64(s0)
+; SPILL-O0-NEXT:    vsetvli a1, a0, e64, m1
+; SPILL-O0-NEXT:    vfadd.vv v0, v16, v17
 ; SPILL-O0-NEXT:    lui a1, %hi(.L.str)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(.L.str)
 ; SPILL-O0-NEXT:    sd a0, -48(s0)
@@ -32,31 +34,30 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    rdvtype a2
 ; SPILL-O0-NEXT:    rdvl a1
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vse.v v17, (a3)
+; SPILL-O0-NEXT:    vse.v v16, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    ld a3, -64(s0)
 ; SPILL-O0-NEXT:    rdvtype a2
 ; SPILL-O0-NEXT:    rdvl a1
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O0-NEXT:    vse.v v16, (a3)
+; SPILL-O0-NEXT:    vse.v v0, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    call puts
 ; SPILL-O0-NEXT:    # kill: def $x10 killed $x10
 ; SPILL-O0-NEXT:    ld a0, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli a0, a0, e64, m1
-; SPILL-O0-NEXT:    ld a2, -64(s0)
+; SPILL-O0-NEXT:    ld a2, -56(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v0, (a2)
 ; SPILL-O0-NEXT:    vsetvl zero, a0, a1
-; SPILL-O0-NEXT:    ld a2, -56(s0)
+; SPILL-O0-NEXT:    ld a2, -64(s0)
 ; SPILL-O0-NEXT:    rdvtype a1
 ; SPILL-O0-NEXT:    rdvl a0
 ; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O0-NEXT:    vle.v v1, (a2)
 ; SPILL-O0-NEXT:    vsetvl zero, a0, a1
-; SPILL-O0-NEXT:    vfadd.vv v1, v0, v1
 ; SPILL-O0-NEXT:    vfadd.vv v16, v0, v1
 ; SPILL-O0-NEXT:    addi sp, s0, -64
 ; SPILL-O0-NEXT:    ld s0, 48(sp)
@@ -83,35 +84,36 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O2-NEXT:    andi sp, sp, -16
 ; SPILL-O2-NEXT:    sd sp, -64(s0)
 ; SPILL-O2-NEXT:    mv s1, a0
-; SPILL-O2-NEXT:    ld a2, -56(s0)
-; SPILL-O2-NEXT:    rdvtype a1
-; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O2-NEXT:    vse.v v17, (a2)
-; SPILL-O2-NEXT:    vsetvl zero, a0, a1
+; SPILL-O2-NEXT:    vsetvli a0, a0, e64, m1
 ; SPILL-O2-NEXT:    ld a2, -64(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vse.v v16, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
+; SPILL-O2-NEXT:    vfadd.vv v0, v16, v17
+; SPILL-O2-NEXT:    ld a2, -56(s0)
+; SPILL-O2-NEXT:    rdvtype a1
+; SPILL-O2-NEXT:    rdvl a0
+; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O2-NEXT:    vse.v v0, (a2)
+; SPILL-O2-NEXT:    vsetvl zero, a0, a1
 ; SPILL-O2-NEXT:    lui a0, %hi(.L.str)
 ; SPILL-O2-NEXT:    addi a0, a0, %lo(.L.str)
 ; SPILL-O2-NEXT:    call puts
 ; SPILL-O2-NEXT:    vsetvli a0, s1, e64, m1
-; SPILL-O2-NEXT:    ld a2, -64(s0)
-; SPILL-O2-NEXT:    rdvtype a1
-; SPILL-O2-NEXT:    rdvl a0
-; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
-; SPILL-O2-NEXT:    vle.v v1, (a2)
-; SPILL-O2-NEXT:    vsetvl zero, a0, a1
 ; SPILL-O2-NEXT:    ld a2, -56(s0)
 ; SPILL-O2-NEXT:    rdvtype a1
 ; SPILL-O2-NEXT:    rdvl a0
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
 ; SPILL-O2-NEXT:    vle.v v0, (a2)
 ; SPILL-O2-NEXT:    vsetvl zero, a0, a1
-; SPILL-O2-NEXT:    vfadd.vv v0, v1, v0
+; SPILL-O2-NEXT:    ld a2, -64(s0)
+; SPILL-O2-NEXT:    rdvtype a1
+; SPILL-O2-NEXT:    rdvl a0
+; SPILL-O2-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O2-NEXT:    vle.v v1, (a2)
+; SPILL-O2-NEXT:    vsetvl zero, a0, a1
 ; SPILL-O2-NEXT:    vfadd.vv v16, v1, v0
 ; SPILL-O2-NEXT:    addi sp, s0, -64
 ; SPILL-O2-NEXT:    ld s1, 40(sp)

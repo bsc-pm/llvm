@@ -3,7 +3,7 @@
 name:            test
 stack:
   - { id: 0, name: '', type: default, offset: -16, size: 8,
-      alignment: 8, stack-id: sgpr-spill, callee-saved-register: '', callee-saved-restored: true,
+      alignment: 8, stack-id: epi-vec, callee-saved-register: '', callee-saved-restored: true,
       debug-info-variable: '', debug-info-expression: '', debug-info-location: '' }
   - { id: 1, name: '', type: default, offset: -8, size: 8, alignment: 8,
       stack-id: default, callee-saved-register: '', callee-saved-restored: true,
