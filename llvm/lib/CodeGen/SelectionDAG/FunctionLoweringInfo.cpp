@@ -144,7 +144,11 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
         if (AI->isStaticAlloca() &&
             (TFI->isStackRealignable() || (Align <= StackAlign))) {
           const ConstantInt *CUI = cast<ConstantInt>(AI->getArraySize());
-          uint64_t TySize = MF->getDataLayout().getTypeAllocSize(Ty);
+          // uint64_t TySize = MF->getDataLayout().getTypeAllocSize(Ty);
+          uint64_t TySize = 0;
+          if (!(Ty->isVectorTy() && Ty->getVectorIsScalable())) {
+            TySize = MF->getDataLayout().getTypeAllocSize(Ty);
+          }
 
           TySize *= CUI->getZExtValue();   // Get total allocated size.
           if (TySize == 0) TySize = 1; // Don't create zero-sized stack objects.

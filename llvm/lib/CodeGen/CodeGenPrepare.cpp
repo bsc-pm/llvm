@@ -6676,6 +6676,7 @@ static bool splitMergedValStore(StoreInst &SI, const DataLayout &DL,
   // Handle simple but common cases only.
   Type *StoreType = SI.getValueOperand()->getType();
   if (!DL.typeSizeEqualsStoreSize(StoreType) ||
+      (StoreType->isVectorTy() && StoreType->getVectorIsScalable()) ||
       DL.getTypeSizeInBits(StoreType) == 0)
     return false;
 

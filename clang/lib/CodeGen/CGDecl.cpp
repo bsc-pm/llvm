@@ -1510,7 +1510,10 @@ CodeGenFunction::EmitAutoVarAlloca(const VarDecl &D) {
         // is rare.
         if (!Bypasses.IsBypassed(&D) &&
             !(!getLangOpts().CPlusPlus && hasLabelBeenSeenInCurrentScope())) {
-          uint64_t size = CGM.getDataLayout().getTypeAllocSize(allocaTy);
+          uint64_t size =
+              (allocaTy->isVectorTy() && allocaTy->getVectorIsScalable())
+                  ? -1
+                  : CGM.getDataLayout().getTypeAllocSize(allocaTy);
           emission.SizeForLifetimeMarkers =
               EmitLifetimeStart(size, AllocaAddr.getPointer());
         }

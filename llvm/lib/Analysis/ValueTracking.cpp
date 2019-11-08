@@ -3195,7 +3195,10 @@ Value *llvm::isBytewiseValue(Value *V, const DataLayout &DL) {
   if (isa<UndefValue>(V))
     return UndefInt8;
 
-  const uint64_t Size = DL.getTypeStoreSize(V->getType());
+  const uint64_t Size =
+      V->getType()->isVectorTy() && V->getType()->getVectorIsScalable()
+          ? 0
+          : DL.getTypeStoreSize(V->getType());
   if (!Size)
     return UndefInt8;
 

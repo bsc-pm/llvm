@@ -142,7 +142,10 @@ bool llvm::isDereferenceableAndAlignedPointer(const Value *V, Type *Ty,
                                               const DominatorTree *DT) {
   if (!Ty->isSized())
     return false;
-  
+
+  if (Ty->isVectorTy() && Ty->getVectorIsScalable())
+    return false;
+
   // When dereferenceability information is provided by a dereferenceable
   // attribute, we know exactly how many bytes are dereferenceable. If we can
   // determine the exact offset to the attributed variable, we can use that
@@ -385,7 +388,10 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
   const DataLayout &DL = ScanBB->getModule()->getDataLayout();
 
   // Try to get the store size for the type.
-  auto AccessSize = LocationSize::precise(DL.getTypeStoreSize(AccessTy));
+  LocationSize AccessSize(
+      AccessTy->isVectorTy() && AccessTy->getVectorIsScalable()
+          ? LocationSize::unknown()
+          : LocationSize::precise(DL.getTypeStoreSize(AccessTy)));
 
   Value *StrippedPtr = Ptr->stripPointerCasts();
 

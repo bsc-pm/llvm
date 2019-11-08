@@ -4453,15 +4453,15 @@ bool SROA::runOnAlloca(AllocaInst &AI) {
   }
   const DataLayout &DL = AI.getModule()->getDataLayout();
 
-  // Skip alloca forms that this analysis can't handle.
-  if (AI.isArrayAllocation() || !AI.getAllocatedType()->isSized() ||
-      DL.getTypeAllocSize(AI.getAllocatedType()) == 0)
-    return false;
-
   if (auto *VTy = dyn_cast<VectorType>(AI.getAllocatedType())) {
     if (VTy->isScalable())
       return false;
   }
+
+  // Skip alloca forms that this analysis can't handle.
+  if (AI.isArrayAllocation() || !AI.getAllocatedType()->isSized() ||
+      DL.getTypeAllocSize(AI.getAllocatedType()) == 0)
+    return false;
 
   bool Changed = false;
 

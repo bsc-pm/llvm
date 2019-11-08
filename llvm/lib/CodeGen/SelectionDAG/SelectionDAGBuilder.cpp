@@ -3952,7 +3952,11 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   Type *Ty = I.getAllocatedType();
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   auto &DL = DAG.getDataLayout();
-  uint64_t TySize = DL.getTypeAllocSize(Ty);
+  // FIXME: This is a gross hack but it is unclear what do we want
+  // to happen here?
+  uint64_t TySize = (Ty->isVectorTy() && Ty->getVectorIsScalable())
+                        ? 1
+                        : DL.getTypeAllocSize(Ty);
   unsigned Align =
       std::max((unsigned)DL.getPrefTypeAlignment(Ty), I.getAlignment());
 
@@ -4043,11 +4047,13 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   if (isVolatile || NumValues > MaxParallelChains)
     // Serialize volatile loads with other side effects.
     Root = getRoot();
-  else if (AA &&
-           AA->pointsToConstantMemory(MemoryLocation(
-               SV,
-               LocationSize::precise(DAG.getDataLayout().getTypeStoreSize(Ty)),
-               AAInfo))) {
+  else if (AA && AA->pointsToConstantMemory(MemoryLocation(
+                     SV,
+                     Ty->isVectorTy() && Ty->getVectorIsScalable()
+                         ? LocationSize::unknown()
+                         : LocationSize::precise(
+                               DAG.getDataLayout().getTypeStoreSize(Ty)),
+                     AAInfo))) {
     // Do not serialize (non-volatile) loads of constant memory with anything.
     Root = DAG.getEntryNode();
     ConstantMemory = true;
