@@ -1274,7 +1274,13 @@ public:
   /// instructions that may divide by zero.
   /// If a non-zero VF has been calculated, we check if I will be scalarized
   /// predication for that VF.
-  bool isScalarWithPredication(Instruction *I, unsigned VF = 1);
+  bool isScalarWithPredication(Instruction *I, unsigned VF);
+  bool isScalarWithPredication(Instruction *I ) { 
+    // For scalable vectors use VF = 0 to mean no vectorization.
+    return isScalable() ? isScalarWithPredication(I, 0)
+                        : isScalarWithPredication(I, 1);
+  }
+
 
   // Returns true if \p I is an instruction that will be predicated either
   // through scalar predication or masked load/store or masked gather/scatter.
@@ -2190,7 +2196,8 @@ InnerLoopVectorizer::getOrCreateScalarValue(Value *V,
   // extractelement instruction.
   auto *U = getOrCreateVectorValue(V, Instance.Part);
   if (!U->getType()->isVectorTy()) {
-    assert(VF == 1 && "Value not scalarized has non-vector type");
+    assert(VF == 1 && !isScalable() &&
+           "Value not scalarized has non-vector type");
     return U;
   }
 
@@ -4765,7 +4772,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I,
     auto *Ty = getMemInstValueType(I);
     // We have already decided how to vectorize this instruction, get that
     // result.
-    if (VF > 1 || isScalable()) {
+    if (VF > (isScalable() ? 0 : 1)) {
       InstWidening WideningDecision = getWideningDecision(I, VF);
       assert(WideningDecision != CM_Unknown &&
              "Widening decision should be ready at this moment");
@@ -7307,10 +7314,7 @@ VPRegionBlock *VPRecipeBuilder::createReplicateRegion(Instruction *Instr,
 
   return Region;
 }
-//-NOTE/VK-//
-// This is where widening recipe is created for each instruction in the for
-// loop. During the plan execution phase widening is done by simply executing
-// these recipes.
+
 bool VPRecipeBuilder::tryToCreateRecipe(Instruction *Instr, VFRange &Range,
                                         VPlanPtr &Plan, VPBasicBlock *VPBB) {
   VPRecipeBase *Recipe = nullptr;

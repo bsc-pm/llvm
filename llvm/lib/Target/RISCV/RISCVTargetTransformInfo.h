@@ -51,6 +51,10 @@ public:
   bool useReductionIntrinsic(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
   bool shouldExpandReduction(const IntrinsicInst *II) const { return false; }
+  bool isLegalMaskedLoad(Type *DataType);
+  bool isLegalMaskedStore(Type *DataType);
+  bool isLegalMaskedGather(Type *DataType);
+  bool isLegalMaskedScatter(Type *DataType);
 };
 
 } // end namespace llvm

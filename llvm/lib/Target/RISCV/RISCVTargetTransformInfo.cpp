@@ -129,3 +129,24 @@ bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
   }
   return false;
 }
+
+bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType) {
+  if (!ST->hasExtEPI())
+    return false;
+  Type *ScalarTy = DataType->getScalarType();
+  return (ST->hasExtEPI() &&
+          (ScalarTy->isPointerTy() || ScalarTy->isFloatTy() ||
+           ScalarTy->isDoubleTy() || ScalarTy->isIntegerTy()));
+}
+
+bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType) {
+  return isLegalMaskedLoad(DataType);
+}
+
+bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType) {
+  return isLegalMaskedLoad(DataType);
+}
+
+bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType) {
+  return isLegalMaskedStore(DataType);
+}
