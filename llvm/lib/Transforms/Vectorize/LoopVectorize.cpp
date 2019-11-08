@@ -5352,19 +5352,6 @@ unsigned LoopVectorizationCostModel::selectInterleaveCount(unsigned VF,
   if (BestKnownTC && *BestKnownTC < TinyTripCountInterleaveThreshold)
     return 1;
 
-  unsigned TargetNumRegisters =
-      TTI.getNumberOfRegisters(VF > 1 || isScalable());
-  LLVM_DEBUG(dbgs() << "LV: The target has " << TargetNumRegisters
-                    << " registers\n");
-
-  if (VF == 1) {
-    if (ForceTargetNumScalarRegs.getNumOccurrences() > 0)
-      TargetNumRegisters = ForceTargetNumScalarRegs;
-  } else {
-    if (ForceTargetNumVectorRegs.getNumOccurrences() > 0)
-      TargetNumRegisters = ForceTargetNumVectorRegs;
-  }
-
   RegisterUsage R = calculateRegisterUsage({VF})[0];
   // We divide by these constants so assume that we have at least one
   // instruction that uses at least one register.

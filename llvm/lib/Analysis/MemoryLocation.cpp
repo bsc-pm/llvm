@@ -36,9 +36,13 @@ MemoryLocation MemoryLocation::get(const LoadInst *LI) {
   LI->getAAMetadata(AATags);
   const auto &DL = LI->getModule()->getDataLayout();
 
+  Type *Ty = LI->getType();
   return MemoryLocation(
       LI->getPointerOperand(),
-      LocationSize::precise(DL.getTypeStoreSize(LI->getType())), AATags);
+      (Ty->isVectorTy() && Ty->getVectorIsScalable())
+          ? LocationSize::unknown()
+          : LocationSize::precise(DL.getTypeStoreSize(Ty)),
+      AATags);
 }
 
 MemoryLocation MemoryLocation::get(const StoreInst *SI) {
@@ -46,9 +50,11 @@ MemoryLocation MemoryLocation::get(const StoreInst *SI) {
   SI->getAAMetadata(AATags);
   const auto &DL = SI->getModule()->getDataLayout();
 
+  Type *Ty = SI->getValueOperand()->getType();
   return MemoryLocation(SI->getPointerOperand(),
-                        LocationSize::precise(DL.getTypeStoreSize(
-                            SI->getValueOperand()->getType())),
+                        (Ty->isVectorTy() && Ty->getVectorIsScalable())
+                            ? LocationSize::unknown()
+                            : LocationSize::precise(DL.getTypeStoreSize(Ty)),
                         AATags);
 }
 

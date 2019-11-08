@@ -91,8 +91,11 @@ int RISCVTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx,
   return TTI::TCC_Free;
 }
 
-unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) const {
-  return (Vector && ST->hasExtEPI()) ? 32 : 0;
+unsigned RISCVTTIImpl::getNumberOfRegisters(unsigned ClassID) const {
+  if (ClassID == 1 && ST->hasExtEPI()) {
+    return 32;
+  }
+  return 0;
 }
 
 unsigned RISCVTTIImpl::getMaxElementWidth() const {
