@@ -236,17 +236,23 @@ template <> struct MappingTraits<SIArgumentInfo> {
 struct SIMode {
   bool IEEE = true;
   bool DX10Clamp = true;
+  bool FP32Denormals = true;
+  bool FP64FP16Denormals = true;
 
   SIMode() = default;
-
 
   SIMode(const AMDGPU::SIModeRegisterDefaults &Mode) {
     IEEE = Mode.IEEE;
     DX10Clamp = Mode.DX10Clamp;
+    FP32Denormals = Mode.FP32Denormals;
+    FP64FP16Denormals = Mode.FP64FP16Denormals;
   }
 
   bool operator ==(const SIMode Other) const {
-    return IEEE == Other.IEEE && DX10Clamp == Other.DX10Clamp;
+    return IEEE == Other.IEEE &&
+           DX10Clamp == Other.DX10Clamp &&
+           FP32Denormals == Other.FP32Denormals &&
+           FP64FP16Denormals == Other.FP64FP16Denormals;
   }
 };
 
@@ -254,6 +260,8 @@ template <> struct MappingTraits<SIMode> {
   static void mapping(IO &YamlIO, SIMode &Mode) {
     YamlIO.mapOptional("ieee", Mode.IEEE, true);
     YamlIO.mapOptional("dx10-clamp", Mode.DX10Clamp, true);
+    YamlIO.mapOptional("fp32-denormals", Mode.FP32Denormals, true);
+    YamlIO.mapOptional("fp64-fp16-denormals", Mode.FP64FP16Denormals, true);
   }
 };
 
@@ -265,6 +273,7 @@ struct SIMachineFunctionInfo final : public yaml::MachineFunctionInfo {
   bool NoSignedZerosFPMath = false;
   bool MemoryBound = false;
   bool WaveLimiter = false;
+  uint32_t HighBitsOf32BitAddress = 0;
 
   StringValue ScratchRSrcReg = "$private_rsrc_reg";
   StringValue ScratchWaveOffsetReg = "$scratch_wave_offset_reg";
@@ -302,6 +311,8 @@ template <> struct MappingTraits<SIMachineFunctionInfo> {
                        StringValue("$sp_reg"));
     YamlIO.mapOptional("argumentInfo", MFI.ArgInfo);
     YamlIO.mapOptional("mode", MFI.Mode, SIMode());
+    YamlIO.mapOptional("highBitsOf32BitAddress",
+                       MFI.HighBitsOf32BitAddress, 0u);
   }
 };
 
@@ -670,7 +681,7 @@ public:
     return GITPtrHigh;
   }
 
-  unsigned get32BitAddressHighBits() const {
+  uint32_t get32BitAddressHighBits() const {
     return HighBitsOf32BitAddress;
   }
 

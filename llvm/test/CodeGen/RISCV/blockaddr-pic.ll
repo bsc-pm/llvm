@@ -11,9 +11,9 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV32-NOPIC-NEXT:    sw ra, 12(sp)
 ; RV32-NOPIC-NEXT:    lui a1, %hi(.Ltmp0)
 ; RV32-NOPIC-NEXT:    addi a1, a1, %lo(.Ltmp0)
+; RV32-NOPIC-NEXT:    addi a2, zero, 101
 ; RV32-NOPIC-NEXT:    sw a1, 8(sp)
-; RV32-NOPIC-NEXT:    addi a1, zero, 101
-; RV32-NOPIC-NEXT:    blt a0, a1, .LBB0_3
+; RV32-NOPIC-NEXT:    blt a0, a2, .LBB0_3
 ; RV32-NOPIC-NEXT:  # %bb.1: # %if.then
 ; RV32-NOPIC-NEXT:    lw a0, 8(sp)
 ; RV32-NOPIC-NEXT:    jr a0
@@ -34,9 +34,9 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV64-NOPIC-NEXT:    sd ra, 8(sp)
 ; RV64-NOPIC-NEXT:    lui a1, %hi(.Ltmp0)
 ; RV64-NOPIC-NEXT:    addi a1, a1, %lo(.Ltmp0)
+; RV64-NOPIC-NEXT:    addi a2, zero, 101
 ; RV64-NOPIC-NEXT:    sd a1, 0(sp)
-; RV64-NOPIC-NEXT:    addi a1, zero, 101
-; RV64-NOPIC-NEXT:    blt a0, a1, .LBB0_3
+; RV64-NOPIC-NEXT:    blt a0, a2, .LBB0_3
 ; RV64-NOPIC-NEXT:  # %bb.1: # %if.then
 ; RV64-NOPIC-NEXT:    ld a0, 0(sp)
 ; RV64-NOPIC-NEXT:    jr a0
@@ -59,9 +59,9 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV32-PIC-NEXT:    # Label of block must be emitted
 ; RV32-PIC-NEXT:    auipc a1, %pcrel_hi(.Ltmp0)
 ; RV32-PIC-NEXT:    addi a1, a1, %pcrel_lo(.LBB0_5)
+; RV32-PIC-NEXT:    addi a2, zero, 101
 ; RV32-PIC-NEXT:    sw a1, 8(sp)
-; RV32-PIC-NEXT:    addi a1, zero, 101
-; RV32-PIC-NEXT:    blt a0, a1, .LBB0_3
+; RV32-PIC-NEXT:    blt a0, a2, .LBB0_3
 ; RV32-PIC-NEXT:  # %bb.1: # %if.then
 ; RV32-PIC-NEXT:    lw a0, 8(sp)
 ; RV32-PIC-NEXT:    jr a0
@@ -84,9 +84,9 @@ define dso_local signext i32 @foo(i32 signext %w) nounwind {
 ; RV64-PIC-NEXT:    # Label of block must be emitted
 ; RV64-PIC-NEXT:    auipc a1, %pcrel_hi(.Ltmp0)
 ; RV64-PIC-NEXT:    addi a1, a1, %pcrel_lo(.LBB0_5)
+; RV64-PIC-NEXT:    addi a2, zero, 101
 ; RV64-PIC-NEXT:    sd a1, 0(sp)
-; RV64-PIC-NEXT:    addi a1, zero, 101
-; RV64-PIC-NEXT:    blt a0, a1, .LBB0_3
+; RV64-PIC-NEXT:    blt a0, a2, .LBB0_3
 ; RV64-PIC-NEXT:  # %bb.1: # %if.then
 ; RV64-PIC-NEXT:    ld a0, 0(sp)
 ; RV64-PIC-NEXT:    jr a0

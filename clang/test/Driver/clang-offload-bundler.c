@@ -1,7 +1,6 @@
 // REQUIRES: x86-registered-target
 // REQUIRES: powerpc-registered-target
-// REQUIRES: shell
-// UNSUPPORTED: ms-sdk, darwin, riscv
+// UNSUPPORTED: darwin, riscv
 
 //
 // Generate all the types of files we can bundle.
@@ -53,27 +52,27 @@
 // Check errors.
 //
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i -unbundle 2>&1 | FileCheck %s --check-prefix CK-ERR1
-// CK-ERR1: error: only one input file supported in unbundling mode.
-// CK-ERR1: error: number of output files and targets should match in unbundling mode.
+// CK-ERR1: error: only one input file supported in unbundling mode
+// CK-ERR1: error: number of output files and targets should match in unbundling mode
 
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR2
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR2
-// CK-ERR2: error: number of input files and targets should match in bundling mode.
+// CK-ERR2: error: number of input files and targets should match in bundling mode
 
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.i,%t.tgt1,%t.tgt2 -inputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR3
-// CK-ERR3: error: only one output file supported in bundling mode.
-// CK-ERR3: error: number of input files and targets should match in bundling mode.
+// CK-ERR3: error: only one output file supported in bundling mode
+// CK-ERR3: error: number of input files and targets should match in bundling mode
 
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu -outputs=%t.i,%t.tgt1,%t.tgt2 -inputs=%t.bundle.i -unbundle 2>&1 | FileCheck %s --check-prefix CK-ERR4
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.i,%t.tgt1 -inputs=%t.bundle.i -unbundle 2>&1 | FileCheck %s --check-prefix CK-ERR4
-// CK-ERR4: error: number of output files and targets should match in unbundling mode.
+// CK-ERR4: error: number of output files and targets should match in unbundling mode
 
-// RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2.notexist -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR5
-// RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.i,%t.tgt1,%t.tgt2 -inputs=%t.bundle.i.notexist -unbundle 2>&1 | FileCheck %s --check-prefix CK-ERR5
-// CK-ERR5: error: Can't open file {{.+}}.notexist: {{N|n}}o such file or directory
+// RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2.notexist -outputs=%t.bundle.i 2>&1 | FileCheck %s -DFILE=%t.tgt2.notexist --check-prefix CK-ERR5
+// RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.i,%t.tgt1,%t.tgt2 -inputs=%t.bundle.i.notexist -unbundle 2>&1 | FileCheck %s -DFILE=%t.bundle.i.notexist --check-prefix CK-ERR5
+// CK-ERR5: error: '[[FILE]]': {{N|n}}o such file or directory
 
-// RUN: not clang-offload-bundler -type=invalid -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR6
-// CK-ERR6: error: invalid file type specified.
+// RUN: not clang-offload-bundler -type=invalid -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s -DTYPE=invalid --check-prefix CK-ERR6
+// CK-ERR6: error: '[[TYPE]]': invalid file type specified
 
 // RUN: not clang-offload-bundler 2>&1 | FileCheck %s --check-prefix CK-ERR7
 // CK-ERR7-DAG: clang-offload-bundler: for the --type option: must be specified at least once!
@@ -82,14 +81,14 @@
 // CK-ERR7-DAG: clang-offload-bundler: for the --targets option: must be specified at least once!
 
 // RUN: not clang-offload-bundler -type=i -targets=hxst-powerpcxxle-ibm-linux-gnu,openxp-pxxerpc64le-ibm-linux-gnu,xpenmp-x86_xx-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR8
-// CK-ERR8: error: invalid target 'hxst-powerpcxxle-ibm-linux-gnu', unknown offloading kind 'hxst', unknown target triple 'powerpcxxle-ibm-linux-gnu'.
-// CK-ERR8: error: invalid target 'openxp-pxxerpc64le-ibm-linux-gnu', unknown offloading kind 'openxp', unknown target triple 'pxxerpc64le-ibm-linux-gnu'.
-// CK-ERR8: error: invalid target 'xpenmp-x86_xx-pc-linux-gnu', unknown offloading kind 'xpenmp', unknown target triple 'x86_xx-pc-linux-gnu'.
+// CK-ERR8: error: invalid target 'hxst-powerpcxxle-ibm-linux-gnu', unknown offloading kind 'hxst', unknown target triple 'powerpcxxle-ibm-linux-gnu'
+// CK-ERR8: error: invalid target 'openxp-pxxerpc64le-ibm-linux-gnu', unknown offloading kind 'openxp', unknown target triple 'pxxerpc64le-ibm-linux-gnu'
+// CK-ERR8: error: invalid target 'xpenmp-x86_xx-pc-linux-gnu', unknown offloading kind 'xpenmp', unknown target triple 'x86_xx-pc-linux-gnu'
 
 // RUN: not clang-offload-bundler -type=i -targets=openmp-powerpc64le-linux,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR9A
 // RUN: not clang-offload-bundler -type=i -targets=host-%itanium_abi_triple,host-%itanium_abi_triple,openmp-x86_64-pc-linux-gnu -inputs=%t.i,%t.tgt1,%t.tgt2 -outputs=%t.bundle.i 2>&1 | FileCheck %s --check-prefix CK-ERR9B
-// CK-ERR9A: error: expecting exactly one host target but got 0.
-// CK-ERR9B: error: expecting exactly one host target but got 2.
+// CK-ERR9A: error: expecting exactly one host target but got 0
+// CK-ERR9B: error: expecting exactly one host target but got 2
 
 //
 // Check text bundle. This is a readable format, so we check for the format we expect to find.
@@ -156,14 +155,20 @@
 // RUN: diff %t.i %t.res.i
 // RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=i -targets=openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.tgt1 -inputs=%t.bundle3.i -unbundle
+// RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: clang-offload-bundler -type=ii -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.ii,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.ii -unbundle
 // RUN: diff %t.ii %t.res.ii
 // RUN: diff %t.tgt1 %t.res.tgt1
+// RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=ii -targets=openmp-x86_64-pc-linux-gnu -outputs=%t.res.tgt2 -inputs=%t.bundle3.ii -unbundle
 // RUN: diff %t.tgt2 %t.res.tgt2
 // RUN: clang-offload-bundler -type=ll -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.ll,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.ll -unbundle
 // RUN: diff %t.ll %t.res.ll
 // RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=ll -targets=openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.tgt1 -inputs=%t.bundle3.ll -unbundle
+// RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: clang-offload-bundler -type=s -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.s,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.s -unbundle
 // RUN: diff %t.s %t.res.s
 // RUN: diff %t.tgt1 %t.res.tgt1
@@ -171,6 +176,8 @@
 // RUN: clang-offload-bundler -type=s -targets=openmp-powerpc64le-ibm-linux-gnu,host-%itanium_abi_triple,openmp-x86_64-pc-linux-gnu -outputs=%t.res.tgt1,%t.res.s,%t.res.tgt2 -inputs=%t.bundle3.s -unbundle
 // RUN: diff %t.s %t.res.s
 // RUN: diff %t.tgt1 %t.res.tgt1
+// RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=s -targets=openmp-x86_64-pc-linux-gnu -outputs=%t.res.tgt2 -inputs=%t.bundle3.s -unbundle
 // RUN: diff %t.tgt2 %t.res.tgt2
 
 // Check if we can unbundle a file with no magic strings.
@@ -183,6 +190,10 @@
 // RUN: diff %t.empty %t.res.tgt1
 // RUN: diff %t.empty %t.res.tgt2
 
+// Check that bindler prints an error if given host bundle does not exist in the fat binary.
+// RUN: not clang-offload-bundler -type=s -targets=host-x86_64-xxx-linux-gnu,openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.s,%t.res.tgt1 -inputs=%t.bundle3.s -unbundle 2>&1 | FileCheck %s --check-prefix CK-NO-HOST-BUNDLE
+// CK-NO-HOST-BUNDLE: error: Can't find bundle for the host target
+
 //
 // Check binary bundle/unbundle. The content that we have before bundling must be the same we have after unbundling.
 //
@@ -194,9 +205,13 @@
 // RUN: diff %t.bc %t.res.bc
 // RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=bc -targets=openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.tgt1 -inputs=%t.bundle3.bc -unbundle
+// RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: clang-offload-bundler -type=gch -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.gch,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.gch -unbundle
 // RUN: diff %t.ast %t.res.gch
 // RUN: diff %t.tgt1 %t.res.tgt1
+// RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=gch -targets=openmp-x86_64-pc-linux-gnu -outputs=%t.res.tgt2 -inputs=%t.bundle3.gch -unbundle
 // RUN: diff %t.tgt2 %t.res.tgt2
 // RUN: clang-offload-bundler -type=ast -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.ast,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.ast -unbundle
 // RUN: diff %t.ast %t.res.ast
@@ -210,6 +225,8 @@
 // RUN: diff %t.ast %t.res.ast
 // RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=ast -targets=openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.tgt1 -inputs=%t.bundle3.ast -unbundle
+// RUN: diff %t.tgt1 %t.res.tgt1
 
 // Check if we can unbundle a file with no magic strings.
 // RUN: clang-offload-bundler -type=bc -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.bc,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bc -unbundle
@@ -221,6 +238,11 @@
 // RUN: diff %t.empty %t.res.tgt1
 // RUN: diff %t.empty %t.res.tgt2
 
+// Check that we do not have to unbundle all available bundles from the fat binary.
+// RUN: clang-offload-bundler -type=ast -targets=host-%itanium_abi_triple,openmp-x86_64-pc-linux-gnu -outputs=%t.res.ast,%t.res.tgt2 -inputs=%t.bundle3.unordered.ast -unbundle
+// RUN: diff %t.ast %t.res.ast
+// RUN: diff %t.tgt2 %t.res.tgt2
+
 //
 // Check object bundle/unbundle. The content should be bundled into an ELF
 // section (we are using a PowerPC little-endian host which uses ELF). We
@@ -229,12 +251,9 @@
 // tests.
 //
 
-// RUN: clang-offload-bundler -type=o -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.o,%t.tgt1,%t.tgt2 -outputs=%t.bundle3.o -### -dump-temporary-files 2>&1 \
-// RUN: | FileCheck %s --check-prefix CK-OBJ-CMD
-// CK-OBJ-CMD: private constant [{{[0-9]+}} x i8] c"{{.+}}", section "__CLANG_OFFLOAD_BUNDLE__host-[[HOST:.+]]"
-// CK-OBJ-CMD: private constant [{{[0-9]+}} x i8] c"Content of device file 1{{.+}}", section "__CLANG_OFFLOAD_BUNDLE__openmp-powerpc64le-ibm-linux-gnu"
-// CK-OBJ-CMD: private constant [{{[0-9]+}} x i8] c"Content of device file 2{{.+}}", section "__CLANG_OFFLOAD_BUNDLE__openmp-x86_64-pc-linux-gnu"
-// CK-OBJ-CMD: clang{{(.exe)?}}" "-r" "-target" "[[HOST]]" "-o" "{{.+}}.o" "{{.+}}.o" "{{.+}}.bc" "-nostdlib"
+// RUN: clang-offload-bundler -type=o -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.o,%t.tgt1,%t.tgt2 -outputs=%t.bundle3.o -### 2>&1 \
+// RUN: | FileCheck %s -DHOST=%itanium_abi_triple -DINOBJ1=%t.o -DINOBJ2=%t.tgt1 -DINOBJ3=%t.tgt2 -DOUTOBJ=%t.bundle3.o --check-prefix CK-OBJ-CMD
+// CK-OBJ-CMD: llvm-objcopy{{(.exe)?}}" "--add-section=__CLANG_OFFLOAD_BUNDLE__host-[[HOST]]=[[INOBJ1]]" "--add-section=__CLANG_OFFLOAD_BUNDLE__openmp-powerpc64le-ibm-linux-gnu=[[INOBJ2]]" "--add-section=__CLANG_OFFLOAD_BUNDLE__openmp-x86_64-pc-linux-gnu=[[INOBJ3]]" "[[INOBJ1]]" "[[OUTOBJ]]"
 
 // RUN: clang-offload-bundler -type=o -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -inputs=%t.o,%t.tgt1,%t.tgt2 -outputs=%t.bundle3.o
 // RUN: clang-offload-bundler -type=o -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.o,%t.res.tgt1,%t.res.tgt2 -inputs=%t.bundle3.o -unbundle
@@ -245,6 +264,8 @@
 // RUN: diff %t.o %t.res.o
 // RUN: diff %t.tgt1 %t.res.tgt1
 // RUN: diff %t.tgt2 %t.res.tgt2
+// RUN: clang-offload-bundler -type=o -targets=openmp-powerpc64le-ibm-linux-gnu -outputs=%t.res.tgt1 -inputs=%t.bundle3.o -unbundle
+// RUN: diff %t.tgt1 %t.res.tgt1
 
 // Check if we can unbundle a file with no magic strings.
 // RUN: clang-offload-bundler -type=o -targets=host-%itanium_abi_triple,openmp-powerpc64le-ibm-linux-gnu,openmp-x86_64-pc-linux-gnu -outputs=%t.res.o,%t.res.tgt1,%t.res.tgt2 -inputs=%t.o -unbundle

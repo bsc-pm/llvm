@@ -11,13 +11,13 @@ define dso_local void @foo(i32 signext %n) nounwind {
 ; CHECK-NEXT:    addi s0, sp, 64
 ; CHECK-NEXT:    andi sp, sp, -32
 ; CHECK-NEXT:    mv s1, sp
-; CHECK-NEXT:    addi a1, zero, 1
-; CHECK-NEXT:    slli a1, a1, 35
-; CHECK-NEXT:    addi a1, a1, -16
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a0, a0, 32
 ; CHECK-NEXT:    slli a0, a0, 2
 ; CHECK-NEXT:    addi a0, a0, 15
+; CHECK-NEXT:    addi a1, zero, 1
+; CHECK-NEXT:    slli a1, a1, 35
+; CHECK-NEXT:    addi a1, a1, -16
 ; CHECK-NEXT:    and a0, a0, a1
 ; CHECK-NEXT:    sub a0, sp, a0
 ; CHECK-NEXT:    mv sp, a0

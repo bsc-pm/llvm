@@ -50,6 +50,10 @@ project(LLVM
   VERSION ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}
   LANGUAGES C CXX ASM)
 
+set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_EXTENSIONS NO)
+
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to Debug")
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type (default Debug)" FORCE)
@@ -59,7 +63,7 @@ endif()
 # LLVM_EXTERNAL_${project}_SOURCE_DIR using LLVM_ALL_PROJECTS
 # This allows an easy way of setting up a build directory for llvm and another
 # one for llvm+clang+... using the same sources.
-set(LLVM_ALL_PROJECTS "clang;clang-tools-extra;compiler-rt;debuginfo-tests;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;openmp;parallel-libs;polly;pstl")
+set(LLVM_ALL_PROJECTS "clang;clang-tools-extra;compiler-rt;debuginfo-tests;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;openmp;parallel-libs;polly;pstl")
 set(LLVM_ENABLE_PROJECTS "" CACHE STRING
 	"Semicolon-separated list of projects to build (${LLVM_ALL_PROJECTS}), or \"all\".")
 if( LLVM_ENABLE_PROJECTS STREQUAL "all" )
@@ -592,7 +596,7 @@ if (LLVM_BUILD_INSTRUMENTED OR LLVM_BUILD_INSTRUMENTED_COVERAGE OR
     if(NOT LLVM_PROFILE_DATA_DIR)
       file(TO_NATIVE_PATH "${LLVM_BINARY_DIR}/profiles" LLVM_PROFILE_DATA_DIR)
     endif()
-		file(TO_NATIVE_PATH "${LLVM_PROFILE_DATA_DIR}/%${LLVM_PROFILE_MERGE_POOL_SIZE}m.profraw" LLVM_PROFILE_FILE_PATTERN)
+    file(TO_NATIVE_PATH "${LLVM_PROFILE_DATA_DIR}/%${LLVM_PROFILE_MERGE_POOL_SIZE}m.profraw" LLVM_PROFILE_FILE_PATTERN)
   endif()
   if(NOT LLVM_CSPROFILE_FILE_PATTERN)
     if(NOT LLVM_CSPROFILE_DATA_DIR)
@@ -617,6 +621,9 @@ mark_as_advanced(LLVM_TARGET_TRIPLE_ENV)
 
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR OFF CACHE BOOL
   "Enable per-target runtimes directory")
+
+set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
+  "Profiling data file to use when compiling in order to improve runtime performance.")
 
 # All options referred to from HandleLLVMOptions have to be specified
 # BEFORE this include, otherwise options will not be correctly set on
@@ -659,8 +666,6 @@ endif()
 if( ${PYTHON_VERSION_STRING} VERSION_LESS 2.7 )
   message(FATAL_ERROR "Python 2.7 or newer is required")
 endif()
-
-get_filename_component(PYTHON_BASENAME ${PYTHON_EXECUTABLE} NAME)
 
 ######
 # LLVMBuild Integration
@@ -882,17 +887,6 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 # use export_executable_symbols(target).
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
-set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
-  "Profiling data file to use when compiling in order to improve runtime performance.")
-
-if(LLVM_PROFDATA_FILE AND EXISTS ${LLVM_PROFDATA_FILE})
-  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" )
-    add_definitions("-fprofile-instr-use=${LLVM_PROFDATA_FILE}")
-  else()
-    message(FATAL_ERROR "LLVM_PROFDATA_FILE can only be specified when compiling with clang")
-  endif()
-endif()
-
 include(AddLLVM)
 include(TableGen)
 
@@ -1106,4 +1100,8 @@ if (LLVM_INCLUDE_BENCHMARKS)
 
   add_subdirectory(utils/benchmark)
   add_subdirectory(benchmarks)
+endif()
+
+if (LLVM_INCLUDE_UTILS AND LLVM_INCLUDE_TOOLS)
+  add_subdirectory(utils/llvm-locstats)
 endif()

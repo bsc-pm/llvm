@@ -150,11 +150,22 @@ public:
   unsigned
   getExceptionSelectorRegister(const Constant *PersonalityFn) const override;
 
+
   bool allowsMisalignedMemoryAccesses(EVT E, unsigned AddrSpace, unsigned Align,
                                       MachineMemOperand::Flags Flags,
                                       bool *Fast) const override;
 
   const RISCVSubtarget &getSubtarget() const { return Subtarget; }
+
+  bool shouldExtendTypeInLibCall(EVT Type) const override;
+
+  /// Returns the register with the specified architectural or ABI name. This
+  /// method is necessary to lower the llvm.read_register.* and
+  /// llvm.write_register.* intrinsics. Allocatable registers must be reserved
+  /// with the clang -ffixed-xX flag for access to be allowed.
+  Register getRegisterByName(const char *RegName, EVT VT,
+                             const MachineFunction &MF) const override;
+
 
 private:
   void analyzeInputArgs(MachineFunction &MF, CCState &CCInfo,
@@ -193,9 +204,9 @@ private:
 
   bool shouldConsiderGEPOffsetSplit() const override { return true; }
   SDValue lowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
-  SDValue lowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerSELECT(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerVASTART(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
@@ -222,6 +233,12 @@ private:
                                    Value *AlignedAddr, Value *CmpVal,
                                    Value *NewVal, Value *Mask,
                                    AtomicOrdering Ord) const override;
+
+  /// Generate error diagnostics if any register used by CC has been marked
+  /// reserved.
+  void validateCCReservedRegs(
+      const SmallVectorImpl<std::pair<llvm::Register, llvm::SDValue>> &Regs,
+      MachineFunction &MF) const;
 };
 }
 

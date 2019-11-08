@@ -2181,6 +2181,17 @@ class X86_64ABIInfo : public SwiftABIInfo {
     return true;
   }
 
+  // GCC classifies vectors of __int128 as memory.
+  bool passInt128VectorsInMem() const {
+    // Clang <= 9.0 did not do this.
+    if (getContext().getLangOpts().getClangABICompat() <=
+        LangOptions::ClangABI::Ver9)
+      return false;
+
+    const llvm::Triple &T = getTarget().getTriple();
+    return T.isOSLinux() || T.isOSNetBSD();
+  }
+
   X86AVXABILevel AVXLevel;
   // Some ABIs (e.g. X32 ABI and Native Client OS) use 32 bit pointers on
   // 64-bit hardware.
@@ -2661,6 +2672,14 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase,
         Hi = Lo;
     } else if (Size == 128 ||
                (isNamedArg && Size <= getNativeVectorSizeForAVXABI(AVXLevel))) {
+      QualType ElementType = VT->getElementType();
+
+      // gcc passes 256 and 512 bit <X x __int128> vectors in memory. :(
+      if (passInt128VectorsInMem() && Size != 128 &&
+          (ElementType->isSpecificBuiltinType(BuiltinType::Int128) ||
+           ElementType->isSpecificBuiltinType(BuiltinType::UInt128)))
+        return;
+
       // Arguments of 256-bits are split into four eightbyte chunks. The
       // least significant one belongs to class SSE and all the others to class
       // SSEUP. The original Lo and Hi design considers that types can't be
@@ -2791,8 +2810,8 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase,
       for (const auto &I : CXXRD->bases()) {
         assert(!I.isVirtual() && !I.getType()->isDependentType() &&
                "Unexpected base class!");
-        const CXXRecordDecl *Base =
-          cast<CXXRecordDecl>(I.getType()->getAs<RecordType>()->getDecl());
+        const auto *Base =
+            cast<CXXRecordDecl>(I.getType()->castAs<RecordType>()->getDecl());
 
         // Classify this field.
         //
@@ -2903,6 +2922,11 @@ bool X86_64ABIInfo::IsIllegalVectorType(QualType Ty) const {
     unsigned LargestVector = getNativeVectorSizeForAVXABI(AVXLevel);
     if (Size <= 64 || Size > LargestVector)
       return true;
+    QualType EltTy = VecTy->getElementType();
+    if (passInt128VectorsInMem() &&
+        (EltTy->isSpecificBuiltinType(BuiltinType::Int128) ||
+         EltTy->isSpecificBuiltinType(BuiltinType::UInt128)))
+      return true;
   }
 
   return false;
@@ -2977,13 +3001,27 @@ llvm::Type *X86_64ABIInfo::GetByteVectorType(QualType Ty) const {
     Ty = QualType(InnerTy, 0);
 
   llvm::Type *IRType = CGT.ConvertType(Ty);
-  if (isa<llvm::VectorType>(IRType) ||
-      IRType->getTypeID() == llvm::Type::FP128TyID)
+  if (isa<llvm::VectorType>(IRType)) {
+    // Don't pass vXi128 vectors in their native type, the backend can't
+    // legalize them.
+    if (passInt128VectorsInMem() &&
+        IRType->getVectorElementType()->isIntegerTy(128)) {
+      // Use a vXi64 vector.
+      uint64_t Size = getContext().getTypeSize(Ty);
+      return llvm::VectorType::get(llvm::Type::getInt64Ty(getVMContext()),
+                                   Size / 64);
+    }
+
+    return IRType;
+  }
+
+  if (IRType->getTypeID() == llvm::Type::FP128TyID)
     return IRType;
 
   // We couldn't find the preferred IR vector type for 'Ty'.
   uint64_t Size = getContext().getTypeSize(Ty);
   assert((Size == 128 || Size == 256 || Size == 512) && "Invalid type found!");
+
 
   // Return a LLVM IR vector type based on the size of 'Ty'.
   return llvm::VectorType::get(llvm::Type::getDoubleTy(getVMContext()),
@@ -3034,8 +3072,8 @@ static bool BitsContainNoUserData(QualType Ty, unsigned StartBit,
       for (const auto &I : CXXRD->bases()) {
         assert(!I.isVirtual() && !I.getType()->isDependentType() &&
                "Unexpected base class!");
-        const CXXRecordDecl *Base =
-          cast<CXXRecordDecl>(I.getType()->getAs<RecordType>()->getDecl());
+        const auto *Base =
+            cast<CXXRecordDecl>(I.getType()->castAs<RecordType>()->getDecl());
 
         // If the base is after the span we care about, ignore it.
         unsigned BaseOffset = Context.toBits(Layout.getBaseClassOffset(Base));
@@ -7648,6 +7686,42 @@ private:
   bool isHomogeneousAggregateSmallEnough(const Type *Base,
                                          uint64_t Members) const override;
 
+  // Coerce HIP pointer arguments from generic pointers to global ones.
+  llvm::Type *coerceKernelArgumentType(llvm::Type *Ty, unsigned FromAS,
+                                       unsigned ToAS) const {
+    // Structure types.
+    if (auto STy = dyn_cast<llvm::StructType>(Ty)) {
+      SmallVector<llvm::Type *, 8> EltTys;
+      bool Changed = false;
+      for (auto T : STy->elements()) {
+        auto NT = coerceKernelArgumentType(T, FromAS, ToAS);
+        EltTys.push_back(NT);
+        Changed |= (NT != T);
+      }
+      // Skip if there is no change in element types.
+      if (!Changed)
+        return STy;
+      if (STy->hasName())
+        return llvm::StructType::create(
+            EltTys, (STy->getName() + ".coerce").str(), STy->isPacked());
+      return llvm::StructType::get(getVMContext(), EltTys, STy->isPacked());
+    }
+    // Arrary types.
+    if (auto ATy = dyn_cast<llvm::ArrayType>(Ty)) {
+      auto T = ATy->getElementType();
+      auto NT = coerceKernelArgumentType(T, FromAS, ToAS);
+      // Skip if there is no change in that element type.
+      if (NT == T)
+        return ATy;
+      return llvm::ArrayType::get(NT, ATy->getNumElements());
+    }
+    // Single value types.
+    if (Ty->isPointerTy() && Ty->getPointerAddressSpace() == FromAS)
+      return llvm::PointerType::get(
+          cast<llvm::PointerType>(Ty)->getElementType(), ToAS);
+    return Ty;
+  }
+
 public:
   explicit AMDGPUABIInfo(CodeGen::CodeGenTypes &CGT) :
     DefaultABIInfo(CGT) {}
@@ -7657,6 +7731,8 @@ public:
   ABIArgInfo classifyArgumentType(QualType Ty, unsigned &NumRegsLeft) const;
 
   void computeInfo(CGFunctionInfo &FI) const override;
+  Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
+                    QualType Ty) const override;
 };
 
 bool AMDGPUABIInfo::isHomogeneousAggregateBaseType(QualType Ty) const {
@@ -7720,6 +7796,11 @@ void AMDGPUABIInfo::computeInfo(CGFunctionInfo &FI) const {
   }
 }
 
+Address AMDGPUABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
+                                 QualType Ty) const {
+  llvm_unreachable("AMDGPU does not support varargs");
+}
+
 ABIArgInfo AMDGPUABIInfo::classifyReturnType(QualType RetTy) const {
   if (isAggregateTypeForABI(RetTy)) {
     // Records with non-trivial destructors/copy-constructors should not be
@@ -7768,14 +7849,22 @@ ABIArgInfo AMDGPUABIInfo::classifyKernelArgumentType(QualType Ty) const {
 
   // TODO: Can we omit empty structs?
 
-  // Coerce single element structs to its element.
+  llvm::Type *LTy = nullptr;
   if (const Type *SeltTy = isSingleElementStruct(Ty, getContext()))
-    return ABIArgInfo::getDirect(CGT.ConvertType(QualType(SeltTy, 0)));
+    LTy = CGT.ConvertType(QualType(SeltTy, 0));
+
+  if (getContext().getLangOpts().HIP) {
+    if (!LTy)
+      LTy = CGT.ConvertType(Ty);
+    LTy = coerceKernelArgumentType(
+        LTy, /*FromAS=*/getContext().getTargetAddressSpace(LangAS::Default),
+        /*ToAS=*/getContext().getTargetAddressSpace(LangAS::cuda_device));
+  }
 
   // If we set CanBeFlattened to true, CodeGen will expand the struct to its
   // individual elements, which confuses the Clover OpenCL backend; therefore we
   // have to set it to false here. Other args of getDirect() are just defaults.
-  return ABIArgInfo::getDirect(nullptr, 0, nullptr, false);
+  return ABIArgInfo::getDirect(LTy, 0, nullptr, false);
 }
 
 ABIArgInfo AMDGPUABIInfo::classifyArgumentType(QualType Ty,
@@ -7913,8 +8002,12 @@ void AMDGPUTargetCodeGenInfo::setTargetAttributes(
   const auto *ReqdWGS = M.getLangOpts().OpenCL ?
     FD->getAttr<ReqdWorkGroupSizeAttr>() : nullptr;
 
-  if (((M.getLangOpts().OpenCL && FD->hasAttr<OpenCLKernelAttr>()) ||
-      (M.getLangOpts().HIP && FD->hasAttr<CUDAGlobalAttr>())) &&
+
+  const bool IsOpenCLKernel = M.getLangOpts().OpenCL &&
+                              FD->hasAttr<OpenCLKernelAttr>();
+  const bool IsHIPKernel = M.getLangOpts().HIP &&
+                           FD->hasAttr<CUDAGlobalAttr>();
+  if ((IsOpenCLKernel || IsHIPKernel) &&
       (M.getTriple().getOS() == llvm::Triple::AMDHSA))
     F->addFnAttr("amdgpu-implicitarg-num-bytes", "56");
 
@@ -7940,6 +8033,9 @@ void AMDGPUTargetCodeGenInfo::setTargetAttributes(
       F->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
     } else
       assert(Max == 0 && "Max must be zero");
+  } else if (IsOpenCLKernel || IsHIPKernel) {
+    // By default, restrict the maximum size to 256.
+    F->addFnAttr("amdgpu-flat-work-group-size", "1,256");
   }
 
   if (const auto *Attr = FD->getAttr<AMDGPUWavesPerEUAttr>()) {
@@ -9221,7 +9317,6 @@ public:
   Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                     QualType Ty) const override;
 
-  bool needsExtend(QualType Ty) const;
   ABIArgInfo extendType(QualType Ty) const;
 
   bool detectFPCCEligibleStruct(QualType Ty, llvm::Type *&Field1Ty,
@@ -9395,7 +9490,7 @@ bool RISCVABIInfo::detectFPCCEligibleStruct(QualType Ty, llvm::Type *&Field1Ty,
       Ty, CharUnits::Zero(), Field1Ty, Field1Off, Field2Ty, Field2Off);
   // Not really a candidate if we have a single int but no float.
   if (Field1Ty && !Field2Ty && !Field1Ty->isFloatingPointTy())
-    return IsCandidate = false;
+    return false;
   if (!IsCandidate)
     return false;
   if (Field1Ty && Field1Ty->isFloatingPointTy())
@@ -9489,7 +9584,7 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
   // Complex types for the hard float ABI must be passed direct rather than
   // using CoerceAndExpand.
   if (IsFixed && Ty->isComplexType() && FLen && ArgFPRsLeft >= 2) {
-    QualType EltTy = Ty->getAs<ComplexType>()->getElementType();
+    QualType EltTy = Ty->castAs<ComplexType>()->getElementType();
     if (getContext().getTypeSize(EltTy) <= FLen) {
       ArgFPRsLeft -= 2;
       return ABIArgInfo::getDirect();
@@ -9611,16 +9706,10 @@ Address RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                           SlotSize, /*AllowHigherAlign=*/true);
 }
 
-bool RISCVABIInfo::needsExtend(QualType Ty) const {
+ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
   int TySize = getContext().getTypeSize(Ty);
   // RV64 ABI requires unsigned 32 bit integers to be sign extended.
-  return (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() &&
-          TySize == 32);
-}
-
-ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
-  // RV64 ABI requires unsigned 32 bit integers to be sign extended.
-  if (needsExtend(Ty))
+  if (XLen == 64 && Ty->isUnsignedIntegerOrEnumerationType() && TySize == 32)
     return ABIArgInfo::getSignExtend(Ty);
   return ABIArgInfo::getExtend(Ty);
 }
@@ -9736,7 +9825,8 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
 
   case llvm::Triple::ppc:
     return SetCGInfo(
-        new PPC32TargetCodeGenInfo(Types, CodeGenOpts.FloatABI == "soft"));
+        new PPC32TargetCodeGenInfo(Types, CodeGenOpts.FloatABI == "soft" ||
+                                   getTarget().hasFeature("spe")));
   case llvm::Triple::ppc64:
     if (Triple.isOSBinFormatELF()) {
       PPC64_SVR4_ABIInfo::ABIKind Kind = PPC64_SVR4_ABIInfo::ELFv1;
@@ -9925,7 +10015,7 @@ llvm::Function *AMDGPUTargetCodeGenInfo::createEnqueuedBlockKernel(
   Builder.SetInsertPoint(BB);
   unsigned BlockAlign = CGF.CGM.getDataLayout().getPrefTypeAlignment(BlockTy);
   auto *BlockPtr = Builder.CreateAlloca(BlockTy, nullptr);
-  BlockPtr->setAlignment(BlockAlign);
+  BlockPtr->setAlignment(llvm::MaybeAlign(BlockAlign));
   Builder.CreateAlignedStore(F->arg_begin(), BlockPtr, BlockAlign);
   auto *Cast = Builder.CreatePointerCast(BlockPtr, InvokeFT->getParamType(0));
   llvm::SmallVector<llvm::Value *, 2> Args;

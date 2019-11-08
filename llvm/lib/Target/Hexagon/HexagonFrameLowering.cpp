@@ -223,8 +223,7 @@ namespace {
 
 bool HexagonCallFrameInformation::runOnMachineFunction(MachineFunction &MF) {
   auto &HFI = *MF.getSubtarget<HexagonSubtarget>().getFrameLowering();
-  bool NeedCFI = MF.getMMI().hasDebugInfo() ||
-                 MF.getFunction().needsUnwindTableEntry();
+  bool NeedCFI = MF.needsFrameMoves();
 
   if (!NeedCFI)
     return false;
@@ -1380,7 +1379,7 @@ void HexagonFrameLowering::processFunctionBeforeFrameFinalized(
   Align A = MFI.getLocalFrameMaxAlign();
   assert(A <= 8 && "Unexpected local frame alignment");
   if (A == 1)
-    MFI.setLocalFrameMaxAlign(llvm::Align(8));
+    MFI.setLocalFrameMaxAlign(Align(8));
   MFI.setUseLocalStackAllocationBlock(true);
 
   // Set the physical aligned-stack base address register.

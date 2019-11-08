@@ -9,6 +9,8 @@
 #include "refactor/Rename.h"
 #include "AST.h"
 #include "Logger.h"
+#include "ParsedAST.h"
+#include "SourceCode.h"
 #include "index/SymbolCollector.h"
 #include "clang/Tooling/Refactoring/Rename/RenamingAction.h"
 #include "clang/Tooling/Refactoring/Rename/USRFinder.h"
@@ -23,17 +25,13 @@ llvm::Optional<std::string> filePath(const SymbolLocation &Loc,
                                      llvm::StringRef HintFilePath) {
   if (!Loc)
     return None;
-  auto Uri = URI::parse(Loc.FileURI);
-  if (!Uri) {
-    elog("Could not parse URI {0}: {1}", Loc.FileURI, Uri.takeError());
+  auto Path = URI::resolve(Loc.FileURI, HintFilePath);
+  if (!Path) {
+    elog("Could not resolve URI {0}: {1}", Loc.FileURI, Path.takeError());
     return None;
   }
-  auto U = URIForFile::fromURI(*Uri, HintFilePath);
-  if (!U) {
-    elog("Could not resolve URI {0}: {1}", Loc.FileURI, U.takeError());
-    return None;
-  }
-  return U->file().str();
+
+  return *Path;
 }
 
 // Query the index to find some other files where the Decl is referenced.
@@ -72,14 +70,22 @@ llvm::Optional<ReasonToReject> renamableWithinFile(const Decl &RenameDecl,
                                                    const SymbolIndex *Index) {
   if (llvm::isa<NamespaceDecl>(&RenameDecl))
     return ReasonToReject::UnsupportedSymbol;
+  if (const auto *FD = llvm::dyn_cast<FunctionDecl>(&RenameDecl)) {
+    if (FD->isOverloadedOperator())
+      return ReasonToReject::UnsupportedSymbol;
+  }
   auto &ASTCtx = RenameDecl.getASTContext();
   const auto &SM = ASTCtx.getSourceManager();
   bool MainFileIsHeader = ASTCtx.getLangOpts().IsHeaderFile;
   bool DeclaredInMainFile = isInsideMainFile(RenameDecl.getBeginLoc(), SM);
 
+  if (!DeclaredInMainFile)
+    // We are sure the symbol is used externally, bail out early.
+    return UsedOutsideFile;
+
   // If the symbol is declared in the main file (which is not a header), we
   // rename it.
-  if (DeclaredInMainFile && !MainFileIsHeader)
+  if (!MainFileIsHeader)
     return None;
 
   // Below are cases where the symbol is declared in the header.
@@ -151,8 +157,9 @@ findOccurrencesWithinFile(ParsedAST &AST, const NamedDecl *RenameDecl) {
 llvm::Expected<tooling::Replacements>
 renameWithinFile(ParsedAST &AST, llvm::StringRef File, Position Pos,
                  llvm::StringRef NewName, const SymbolIndex *Index) {
-  SourceLocation SourceLocationBeg = clangd::getBeginningOfIdentifier(
-      AST, Pos, AST.getSourceManager().getMainFileID());
+  const SourceManager &SM = AST.getSourceManager();
+  SourceLocation SourceLocationBeg = SM.getMacroArgExpandedLocation(
+      getBeginningOfIdentifier(Pos, SM, AST.getASTContext().getLangOpts()));
   // FIXME: renaming macros is not supported yet, the macro-handling code should
   // be moved to rename tooling library.
   if (locateMacroAt(SourceLocationBeg, AST.getPreprocessor()))

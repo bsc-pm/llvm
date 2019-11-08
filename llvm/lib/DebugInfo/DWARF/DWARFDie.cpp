@@ -21,6 +21,7 @@
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/WithColor.h"
@@ -90,51 +91,56 @@ static void dumpLocation(raw_ostream &OS, DWARFFormValue &FormValue,
     return;
   }
 
-  FormValue.dump(OS, DumpOpts);
   if (FormValue.isFormClass(DWARFFormValue::FC_SectionOffset)) {
     uint64_t Offset = *FormValue.getAsSectionOffset();
+    uint64_t BaseAddr = 0;
+    if (Optional<object::SectionedAddress> BA = U->getBaseAddress())
+      BaseAddr = BA->Address;
+    auto LLDumpOpts = DumpOpts;
+    LLDumpOpts.Verbose = false;
+
     if (!U->isDWOUnit() && !U->getLocSection()->Data.empty()) {
       DWARFDebugLoc DebugLoc;
       DWARFDataExtractor Data(Obj, *U->getLocSection(), Ctx.isLittleEndian(),
                               Obj.getAddressSize());
-      auto LL = DebugLoc.parseOneLocationList(Data, &Offset);
-      if (LL) {
-        uint64_t BaseAddr = 0;
-        if (Optional<object::SectionedAddress> BA = U->getBaseAddress())
-          BaseAddr = BA->Address;
-        LL->dump(OS, Ctx.isLittleEndian(), Obj.getAddressSize(), MRI, U,
-                 BaseAddr, Indent);
-      } else
-        OS << "error extracting location list.";
+
+      FormValue.dump(OS, DumpOpts);
+      OS << ": ";
+
+      if (Expected<DWARFDebugLoc::LocationList> LL =
+              DebugLoc.parseOneLocationList(Data, &Offset)) {
+        LL->dump(OS, BaseAddr, Ctx.isLittleEndian(), Obj.getAddressSize(), MRI,
+                 U, LLDumpOpts, Indent);
+      } else {
+        OS << '\n';
+        OS.indent(Indent);
+        OS << formatv("error extracting location list: {0}",
+                      fmt_consume(LL.takeError()));
+      }
       return;
     }
 
     bool UseLocLists = !U->isDWOUnit();
-    StringRef LoclistsSectionData =
-        UseLocLists ? Obj.getLoclistsSection().Data : U->getLocSectionData();
+    auto Data =
+        UseLocLists
+            ? DWARFDataExtractor(Obj, Obj.getLoclistsSection(),
+                                 Ctx.isLittleEndian(), Obj.getAddressSize())
+            : DWARFDataExtractor(U->getLocSectionData(), Ctx.isLittleEndian(),
+                                 Obj.getAddressSize());
 
-    if (!LoclistsSectionData.empty()) {
-      DataExtractor Data(LoclistsSectionData, Ctx.isLittleEndian(),
-                         Obj.getAddressSize());
-
+    if (!Data.getData().empty()) {
       // Old-style location list were used in DWARF v4 (.debug_loc.dwo section).
       // Modern locations list (.debug_loclists) are used starting from v5.
       // Ideally we should take the version from the .debug_loclists section
       // header, but using CU's version for simplicity.
-      auto LL = DWARFDebugLoclists::parseOneLocationList(
-          Data, &Offset, UseLocLists ? U->getVersion() : 4);
-
-      uint64_t BaseAddr = 0;
-      if (Optional<object::SectionedAddress> BA = U->getBaseAddress())
-        BaseAddr = BA->Address;
-
-      if (LL)
-        LL->dump(OS, BaseAddr, Ctx.isLittleEndian(), Obj.getAddressSize(), MRI,
-                 U, Indent);
-      else
-        OS << "error extracting location list.";
+      DWARFDebugLoclists::dumpLocationList(
+          Data, &Offset, UseLocLists ? U->getVersion() : 4, OS, BaseAddr, MRI,
+          U, LLDumpOpts, Indent);
     }
+    return;
   }
+
+  FormValue.dump(OS, DumpOpts);
 }
 
 /// Dump the name encoded in the type tag.

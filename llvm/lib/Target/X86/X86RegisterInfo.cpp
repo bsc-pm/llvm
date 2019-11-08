@@ -341,6 +341,10 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
       return (HasSSE ? CSR_32_RegCall_SaveList :
                        CSR_32_RegCall_NoSSE_SaveList);
     }
+  case CallingConv::CFGuard_Check:
+    assert(!Is64Bit && "CFGuard check mechanism only used on 32-bit X86");
+    return (HasSSE ? CSR_Win32_CFGuard_Check_SaveList
+                   : CSR_Win32_CFGuard_Check_NoSSE_SaveList);
   case CallingConv::Cold:
     if (Is64Bit)
       return CSR_64_MostRegs_SaveList;
@@ -455,6 +459,10 @@ X86RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
       return (HasSSE ? CSR_32_RegCall_RegMask :
                        CSR_32_RegCall_NoSSE_RegMask);
     }
+  case CallingConv::CFGuard_Check:
+    assert(!Is64Bit && "CFGuard check mechanism only used on 32-bit X86");
+    return (HasSSE ? CSR_Win32_CFGuard_Check_RegMask
+                   : CSR_Win32_CFGuard_Check_NoSSE_RegMask);
   case CallingConv::Cold:
     if (Is64Bit)
       return CSR_64_MostRegs_RegMask;
@@ -514,6 +522,12 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 
   // Set the floating point control register as reserved.
   Reserved.set(X86::FPCW);
+
+  // Set the floating point status register as reserved.
+  Reserved.set(X86::FPSW);
+
+  // Set the SIMD floating point control register as reserved.
+  Reserved.set(X86::MXCSR);
 
   // Set the stack-pointer register and its aliases as reserved.
   for (MCSubRegIterator I(X86::RSP, this, /*IncludeSelf=*/true); I.isValid();
@@ -692,12 +706,27 @@ static bool tryOptimizeLEAtoMOV(MachineBasicBlock::iterator II) {
   return true;
 }
 
+static bool isFuncletReturnInstr(MachineInstr &MI) {
+  switch (MI.getOpcode()) {
+  case X86::CATCHRET:
+  case X86::CLEANUPRET:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("impossible");
+}
+
 void
 X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                      int SPAdj, unsigned FIOperandNum,
                                      RegScavenger *RS) const {
   MachineInstr &MI = *II;
-  MachineFunction &MF = *MI.getParent()->getParent();
+  MachineBasicBlock &MBB = *MI.getParent();
+  MachineFunction &MF = *MBB.getParent();
+  MachineBasicBlock::iterator MBBI = MBB.getFirstTerminator();
+  bool IsEHFuncletEpilogue = MBBI == MBB.end() ? false
+                                               : isFuncletReturnInstr(*MBBI);
   const X86FrameLowering *TFI = getFrameLowering(MF);
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
 
@@ -709,6 +738,8 @@ X86RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
            MF.getFrameInfo().isFixedObjectIndex(FrameIndex)) &&
            "Return instruction can only reference SP relative frame objects");
     FIOffset = TFI->getFrameIndexReferenceSP(MF, FrameIndex, BasePtr, 0);
+  } else if (TFI->Is64Bit && (MBB.isEHFuncletEntry() || IsEHFuncletEpilogue)) {
+    FIOffset = TFI->getWin64EHFrameIndexRef(MF, FrameIndex, BasePtr);
   } else {
     FIOffset = TFI->getFrameIndexReference(MF, FrameIndex, BasePtr);
   }

@@ -86,8 +86,6 @@ Pass <arg> to the target offloading toolchain identified by <triple>.
 
 Run the static analyzer
 
-.. option:: --analyze-auto
-
 .. option:: --analyzer-no-default-checks
 
 .. option:: --analyzer-output<arg>
@@ -126,7 +124,11 @@ Output path for the plist report
 
 .. option:: -cfguard
 
-Emit tables required for Windows Control Flow Guard.
+Emit tables and checks for Windows Control Flow Guard.
+
+.. option:: -cfguard-no-checks
+
+Emit tables required for Windows Control Flow Guard without checks.
 
 .. option:: -client\_name<arg>
 
@@ -1147,8 +1149,6 @@ Flags allowing the state of the preprocessor to be dumped in various ways.
 .. option:: -d<arg>
 .. program:: clang
 
-.. option:: -dA
-
 .. option:: -dD
 
 Print macro definitions in -E mode in addition to normal output
@@ -1946,7 +1946,8 @@ Perform ThinLTO importing using provided function summary index
 
 .. option:: -ftime-trace
 
-Turn on time profiler
+Turn on time profiler. Results can be analyzed with chrome://tracing or
+`Speedscope App <https://www.speedscope.app>`_ for flamegraph visualization
 
 .. option:: -ftime-trace-granularity=<arg>
 
@@ -2012,7 +2013,7 @@ Use the given vector functions library
 
 Enable the loop vectorization passes
 
-.. option:: -fverbose-asm, -fno-verbose-asm
+.. option:: -fverbose-asm, -fno-verbose-asm, -dA
 
 .. option:: -fvisibility-inlines-hidden
 
@@ -2196,7 +2197,7 @@ Set EABI type, e.g. 4, 5 or gnu (default depends on triple)
 
 .. option:: -mfentry
 
-Insert calls to fentry at function entry (x86 only)
+Insert calls to fentry at function entry (x86/SystemZ only)
 
 .. option:: -mfloat-abi=<arg>
 

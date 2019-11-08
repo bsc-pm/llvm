@@ -21,6 +21,7 @@
 ; CHECK-NEXT:       Module Verifier
 ; CHECK-NEXT:       Lower Garbage Collection Instructions
 ; CHECK-NEXT:       Shadow Stack GC Lowering
+; CHECK-NEXT:       Lower constant intrinsics
 ; CHECK-NEXT:       Remove unreachable blocks from the CFG
 ; CHECK-NEXT:       Instrument function entry/exit with calls to e.g. mcount() (post inlining)
 ; CHECK-NEXT:       Scalarize Masked Memory Intrinsics
@@ -41,6 +42,7 @@
 ; CHECK-NEXT:       Legalizer
 ; CHECK-NEXT:       RegBankSelect
 ; CHECK-NEXT:       Localizer
+; CHECK-NEXT:       Analysis for ComputingKnownBits
 ; CHECK-NEXT:       InstructionSelect
 ; CHECK-NEXT:       ResetMachineFunction
 ; CHECK-NEXT:       AArch64 Instruction Selection
@@ -56,8 +58,8 @@
 ; CHECK-NEXT:       AArch64 pseudo instruction expansion pass
 ; CHECK-NEXT:       AArch64 speculation hardening pass
 ; CHECK-NEXT:       Analyze Machine Code For Garbage Collection
-; CHECK-NEXT:       Branch relaxation pass
 ; CHECK-NEXT:       AArch64 Branch Targets
+; CHECK-NEXT:       Branch relaxation pass
 ; CHECK-NEXT:       Contiguously Lay Out Funclets
 ; CHECK-NEXT:       StackMap Liveness Analysis
 ; CHECK-NEXT:       Live DEBUG_VALUE analysis

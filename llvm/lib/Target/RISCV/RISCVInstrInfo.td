@@ -93,6 +93,8 @@ def fencearg : Operand<XLenVT> {
   let ParserMatchClass = FenceArg;
   let PrintMethod = "printFenceArg";
   let DecoderMethod = "decodeUImmOperand<4>";
+  let OperandType = "OPERAND_UIMM4";
+  let OperandNamespace = "RISCVOp";
 }
 
 def UImmLog2XLenAsmOperand : AsmOperandClass {
@@ -117,11 +119,15 @@ def uimmlog2xlen : Operand<XLenVT>, ImmLeaf<XLenVT, [{
       return  isUInt<6>(Imm);
     return isUInt<5>(Imm);
   }];
+  let OperandType = "OPERAND_UIMMLOG2XLEN";
+  let OperandNamespace = "RISCVOp";
 }
 
 def uimm5 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isUInt<5>(Imm);}]> {
   let ParserMatchClass = UImmAsmOperand<5>;
   let DecoderMethod = "decodeUImmOperand<5>";
+  let OperandType = "OPERAND_UIMM5";
+  let OperandNamespace = "RISCVOp";
 }
 
 def simm12 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<12>(Imm);}]> {
@@ -134,6 +140,8 @@ def simm12 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<12>(Imm);}]> {
       return isInt<12>(Imm);
     return MCOp.isBareSymbolRef();
   }];
+  let OperandType = "OPERAND_SIMM12";
+  let OperandNamespace = "RISCVOp";
 }
 
 // A 13-bit signed immediate where the least significant bit is zero.
@@ -147,6 +155,8 @@ def simm13_lsb0 : Operand<OtherVT> {
       return isShiftedInt<12, 1>(Imm);
     return MCOp.isBareSymbolRef();
   }];
+  let OperandType = "OPERAND_SIMM13_LSB0";
+  let OperandNamespace = "RISCVOp";
 }
 
 class UImm20Operand : Operand<XLenVT> {
@@ -158,6 +168,8 @@ class UImm20Operand : Operand<XLenVT> {
       return isUInt<20>(Imm);
     return MCOp.isBareSymbolRef();
   }];
+  let OperandType = "OPERAND_UIMM20";
+  let OperandNamespace = "RISCVOp";
 }
 
 def uimm20_lui : UImm20Operand {
@@ -182,6 +194,8 @@ def simm21_lsb0_jal : Operand<OtherVT> {
       return isShiftedInt<20, 1>(Imm);
     return MCOp.isBareSymbolRef();
   }];
+  let OperandType = "OPERAND_SIMM21_LSB0";
+  let OperandNamespace = "RISCVOp";
 }
 
 def BareSymbol : AsmOperandClass {
@@ -231,6 +245,8 @@ def csr_sysreg : Operand<XLenVT> {
   let ParserMatchClass = CSRSystemRegister;
   let PrintMethod = "printCSRSystemRegister";
   let DecoderMethod = "decodeUImmOperand<12>";
+  let OperandType = "OPERAND_UIMM12";
+  let OperandNamespace = "RISCVOp";
 }
 
 // A parameterized register class alternative to i32imm/i64imm from Target.td.
@@ -1034,19 +1050,6 @@ def : Pat<(atomic_fence (XLenVT 6), (imm)), (FENCE_TSO)>;
 // fence seq_cst -> fence rw, rw
 def : Pat<(atomic_fence (XLenVT 7), (imm)), (FENCE 0b11, 0b11)>;
 
-let Predicates = [IsRV64] in {
-
-// fence acquire -> fence r, rw
-def : Pat<(atomic_fence (i64 4), (imm)), (FENCE 0b10, 0b11)>;
-// fence release -> fence rw, w
-def : Pat<(atomic_fence (i64 5), (imm)), (FENCE 0b11, 0b1)>;
-// fence acq_rel -> fence.tso
-def : Pat<(atomic_fence (i64 6), (imm)), (FENCE_TSO)>;
-// fence seq_cst -> fence rw, rw
-def : Pat<(atomic_fence (i64 7), (imm)), (FENCE 0b11, 0b11)>;
-
-}
-
 // Lowering for atomic load and store is defined in RISCVInstrInfoA.td.
 // Although these are lowered to fence+load/store instructions defined in the
 // base RV32I/RV64I ISA, this lowering is only used when the A extension is
@@ -1122,6 +1125,16 @@ def : Pat<(readcyclecounter), (CSRRS CYCLE.Encoding, X0)>;
 let Predicates = [IsRV32], usesCustomInserter = 1, hasSideEffects = 0,
 mayLoad = 0, mayStore = 0, hasNoSchedulingInfo = 1 in
 def ReadCycleWide : Pseudo<(outs GPR:$lo, GPR:$hi), (ins), [], "", "">;
+
+/// traps
+
+// We lower `trap` to `unimp`, as this causes a hard exception on nearly all
+// systems.
+def : Pat<(trap), (UNIMP)>;
+
+// We lower `debugtrap` to `ebreak`, as this will get the attention of the
+// debugger if possible.
+def : Pat<(debugtrap), (EBREAK)>;
 
 //===----------------------------------------------------------------------===//
 // Standard extensions

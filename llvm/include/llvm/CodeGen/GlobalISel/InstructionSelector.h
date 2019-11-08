@@ -31,6 +31,7 @@ namespace llvm {
 
 class APInt;
 class APFloat;
+class GISelKnownBits;
 class MachineInstr;
 class MachineInstrBuilder;
 class MachineFunction;
@@ -208,10 +209,21 @@ enum {
   /// - Expected Intrinsic ID
   GIM_CheckIntrinsicID,
 
+  /// Check the operand is a specific predicate
+  /// - InsnID - Instruction ID
+  /// - OpIdx - Operand index
+  /// - Expected predicate
+  GIM_CheckCmpPredicate,
+
   /// Check the specified operand is an MBB
   /// - InsnID - Instruction ID
   /// - OpIdx - Operand index
   GIM_CheckIsMBB,
+
+  /// Check the specified operand is an Imm
+  /// - InsnID - Instruction ID
+  /// - OpIdx - Operand index
+  GIM_CheckIsImm,
 
   /// Check if the specified operand is safe to fold into the current
   /// instruction.
@@ -375,11 +387,15 @@ public:
   virtual bool select(MachineInstr &I) = 0;
 
   CodeGenCoverage *CoverageInfo = nullptr;
+  GISelKnownBits *KnownBits = nullptr;
   MachineFunction *MF = nullptr;
 
   /// Setup per-MF selector state.
-  virtual void setupMF(MachineFunction &mf, CodeGenCoverage &covinfo) {
+  virtual void setupMF(MachineFunction &mf,
+                       GISelKnownBits &KB,
+                       CodeGenCoverage &covinfo) {
     CoverageInfo = &covinfo;
+    KnownBits = &KB;
     MF = &mf;
   }
 
@@ -471,7 +487,7 @@ protected:
   bool isOperandImmEqual(const MachineOperand &MO, int64_t Value,
                          const MachineRegisterInfo &MRI) const;
 
-  /// Return true if the specified operand is a G_GEP with a G_CONSTANT on the
+  /// Return true if the specified operand is a G_PTR_ADD with a G_CONSTANT on the
   /// right-hand side. GlobalISel's separation of pointer and integer types
   /// means that we don't need to worry about G_OR with equivalent semantics.
   bool isBaseWithConstantOffset(const MachineOperand &Root,

@@ -131,13 +131,6 @@ bool X86TargetInfo::initFeatureMap(
   case CK_Lakemont:
     break;
 
-  case CK_PentiumMMX:
-  case CK_Pentium2:
-  case CK_K6:
-  case CK_WinChipC6:
-    setFeatureEnabledImpl(Features, "mmx", true);
-    break;
-
   case CK_Cooperlake:
     // CPX inherits all CLX features plus AVX512BF16
     setFeatureEnabledImpl(Features, "avx512bf16", true);
@@ -198,7 +191,6 @@ IcelakeCommon:
 SkylakeCommon:
     setFeatureEnabledImpl(Features, "xsavec", true);
     setFeatureEnabledImpl(Features, "xsaves", true);
-    setFeatureEnabledImpl(Features, "mpx", true);
     setFeatureEnabledImpl(Features, "clflushopt", true);
     setFeatureEnabledImpl(Features, "aes", true);
     LLVM_FALLTHROUGH;
@@ -254,7 +246,14 @@ SkylakeCommon:
   case CK_Pentium3:
   case CK_C3_2:
     setFeatureEnabledImpl(Features, "sse", true);
+    LLVM_FALLTHROUGH;
+  case CK_Pentium2:
     setFeatureEnabledImpl(Features, "fxsr", true);
+    LLVM_FALLTHROUGH;
+  case CK_PentiumMMX:
+  case CK_K6:
+  case CK_WinChipC6:
+    setFeatureEnabledImpl(Features, "mmx", true);
     break;
 
   case CK_Tremont:
@@ -277,7 +276,6 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "xsavec", true);
     setFeatureEnabledImpl(Features, "xsaves", true);
     setFeatureEnabledImpl(Features, "clflushopt", true);
-    setFeatureEnabledImpl(Features, "mpx", true);
     setFeatureEnabledImpl(Features, "fsgsbase", true);
     setFeatureEnabledImpl(Features, "aes", true);
     LLVM_FALLTHROUGH;
@@ -293,6 +291,7 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "fxsr", true);
     setFeatureEnabledImpl(Features, "cx16", true);
     setFeatureEnabledImpl(Features, "sahf", true);
+    setFeatureEnabledImpl(Features, "mmx", true);
     break;
 
   case CK_KNM:
@@ -323,6 +322,7 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "xsave", true);
     setFeatureEnabledImpl(Features, "movbe", true);
     setFeatureEnabledImpl(Features, "sahf", true);
+    setFeatureEnabledImpl(Features, "mmx", true);
     break;
 
   case CK_K6_2:
@@ -371,6 +371,7 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "cx16", true);
     setFeatureEnabledImpl(Features, "fxsr", true);
     setFeatureEnabledImpl(Features, "sahf", true);
+    setFeatureEnabledImpl(Features, "mmx", true);
     break;
 
   case CK_ZNVER2:
@@ -392,6 +393,7 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "fsgsbase", true);
     setFeatureEnabledImpl(Features, "fxsr", true);
     setFeatureEnabledImpl(Features, "lzcnt", true);
+    setFeatureEnabledImpl(Features, "mmx", true);
     setFeatureEnabledImpl(Features, "mwaitx", true);
     setFeatureEnabledImpl(Features, "movbe", true);
     setFeatureEnabledImpl(Features, "pclmul", true);
@@ -435,6 +437,7 @@ SkylakeCommon:
     setFeatureEnabledImpl(Features, "fxsr", true);
     setFeatureEnabledImpl(Features, "xsave", true);
     setFeatureEnabledImpl(Features, "sahf", true);
+    setFeatureEnabledImpl(Features, "mmx", true);
     break;
   }
   if (!TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec))
@@ -798,8 +801,6 @@ bool X86TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasAVX512VP2INTERSECT = true;
     } else if (Feature == "+sha") {
       HasSHA = true;
-    } else if (Feature == "+mpx") {
-      HasMPX = true;
     } else if (Feature == "+shstk") {
       HasSHSTK = true;
     } else if (Feature == "+movbe") {
@@ -1220,8 +1221,6 @@ void X86TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__CLWB__");
   if (HasWBNOINVD)
     Builder.defineMacro("__WBNOINVD__");
-  if (HasMPX)
-    Builder.defineMacro("__MPX__");
   if (HasSHSTK)
     Builder.defineMacro("__SHSTK__");
   if (HasSGX)
@@ -1378,7 +1377,6 @@ bool X86TargetInfo::isValidFeatureName(StringRef Name) const {
       .Case("movbe", true)
       .Case("movdiri", true)
       .Case("movdir64b", true)
-      .Case("mpx", true)
       .Case("mwaitx", true)
       .Case("pclmul", true)
       .Case("pconfig", true)
@@ -1462,7 +1460,6 @@ bool X86TargetInfo::hasFeature(StringRef Feature) const {
       .Case("movbe", HasMOVBE)
       .Case("movdiri", HasMOVDIRI)
       .Case("movdir64b", HasMOVDIR64B)
-      .Case("mpx", HasMPX)
       .Case("mwaitx", HasMWAITX)
       .Case("pclmul", HasPCLMUL)
       .Case("pconfig", HasPCONFIG)

@@ -91,7 +91,7 @@ int RISCVTTIImpl::getIntImmCost(Intrinsic::ID IID, unsigned Idx,
   return TTI::TCC_Free;
 }
 
-unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) {
+unsigned RISCVTTIImpl::getNumberOfRegisters(bool Vector) const {
   return (Vector && ST->hasExtEPI()) ? 32 : 0;
 }
 

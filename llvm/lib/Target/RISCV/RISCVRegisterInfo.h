@@ -30,6 +30,8 @@ struct RISCVRegisterInfo : public RISCVGenRegisterInfo {
   const MCPhysReg *getCalleeSavedRegs(const MachineFunction *MF) const override;
 
   BitVector getReservedRegs(const MachineFunction &MF) const override;
+  bool isAsmClobberable(const MachineFunction &MF,
+                        unsigned PhysReg) const override;
 
   bool isConstantPhysReg(unsigned PhysReg) const override;
 
@@ -53,10 +55,13 @@ struct RISCVRegisterInfo : public RISCVGenRegisterInfo {
     return true;
   }
 
-  bool hasBasePointer(const MachineFunction &MF) const;
+  const TargetRegisterClass *
+  getPointerRegClass(const MachineFunction &MF,
+                     unsigned Kind = 0) const override {
+    return &RISCV::GPRRegClass;
+  }
 
-  const TargetRegisterClass *getPointerRegClass(const MachineFunction &MF,
-                                                unsigned Kind) const override;
+  bool hasBasePointer(const MachineFunction &MF) const;
 };
 }
 

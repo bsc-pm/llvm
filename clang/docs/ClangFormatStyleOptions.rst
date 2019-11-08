@@ -141,7 +141,7 @@ the configuration (without a prefix: ``Auto``).
     <https://google.github.io/styleguide/cppguide.html>`_
   * ``Chromium``
     A style complying with `Chromium's style guide
-    <https://www.chromium.org/developers/coding-style>`_
+    <https://chromium.googlesource.com/chromium/src/+/master/styleguide/styleguide.md>`_
   * ``Mozilla``
     A style complying with `Mozilla's style guide
     <https://developer.mozilla.org/en-US/docs/Developer_Guide/Coding_Style>`_
@@ -778,24 +778,46 @@ the configuration (without a prefix: ``Auto``).
       class foo
       {};
 
-  * ``bool AfterControlStatement`` Wrap control statements (``if``/``for``/``while``/``switch``/..).
+  * ``BraceWrappingAfterControlStatementStyle AfterControlStatement``
+    Wrap control statements (``if``/``for``/``while``/``switch``/..).
 
-    .. code-block:: c++
+    Possible values:
 
-      true:
-      if (foo())
-      {
-      } else
-      {}
-      for (int i = 0; i < 10; ++i)
-      {}
+    * ``BWACS_Never`` (in configuration: ``Never``)
+      Never wrap braces after a control statement.
 
-      false:
-      if (foo()) {
-      } else {
-      }
-      for (int i = 0; i < 10; ++i) {
-      }
+      .. code-block:: c++
+
+        if (foo()) {
+        } else {
+        }
+        for (int i = 0; i < 10; ++i) {
+        }
+
+    * ``BWACS_MultiLine`` (in configuration: ``MultiLine``)
+      Only wrap braces after a multi-line control statement.
+
+      .. code-block:: c++
+
+        if (foo && bar &&
+            baz)
+        {
+          quux();
+        }
+        while (foo || bar) {
+        }
+
+    * ``BWACS_Always`` (in configuration: ``Always``)
+      Always wrap braces after a control statement.
+
+      .. code-block:: c++
+
+        if (foo())
+        {
+        } else
+        {}
+        for (int i = 0; i < 10; ++i)
+        {}
 
   * ``bool AfterEnum`` Wrap enum definitions.
 
@@ -1128,6 +1150,34 @@ the configuration (without a prefix: ``Auto``).
         B
       };
 
+  * ``BS_Whitesmiths`` (in configuration: ``Whitesmiths``)
+    Like ``Allman`` but always indent braces and line up code with braces.
+
+    .. code-block:: c++
+
+      try
+        {
+        foo();
+        }
+      catch ()
+        {
+        }
+      void foo() { bar(); }
+      class foo
+        {
+        };
+      if (foo())
+        {
+        }
+      else
+        {
+        }
+      enum X : int
+        {
+        A,
+        B
+        };
+
   * ``BS_GNU`` (in configuration: ``GNU``)
     Always break before braces and add an extra level of indentation to
     braces of control statements, not to those of class, function
@@ -1270,6 +1320,17 @@ the configuration (without a prefix: ``Auto``).
 
 **BreakStringLiterals** (``bool``)
   Allow breaking string literals when formatting.
+
+  .. code-block:: c++
+
+     true:
+     const char* x = "veryVeryVeryVeryVeryVe"
+                     "ryVeryVeryVeryVeryVery"
+                     "VeryLongString";
+
+     false:
+     const char* x =
+       "veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongString";
 
 **ColumnLimit** (``unsigned``)
   The column limit.
@@ -1483,6 +1544,13 @@ the configuration (without a prefix: ``Auto``).
   can also assign negative priorities if you have certain headers that
   always need to be first.
 
+  There is a third and optional field ``SortPriority`` which can used while
+  ``IncludeBloks = IBS_Regroup`` to define the priority in which ``#includes``
+  should be ordered, and value of ``Priority`` defines the order of
+  ``#include blocks`` and also enables to group ``#includes`` of different
+  priority for order.``SortPriority`` is set to the value of ``Priority``
+  as default if it is not assigned.
+
   To configure this in the .clang-format file, use:
 
   .. code-block:: yaml
@@ -1490,12 +1558,14 @@ the configuration (without a prefix: ``Auto``).
     IncludeCategories:
       - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
         Priority:        2
+        SortPriority:    2
       - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
         Priority:        3
       - Regex:           '<[[:alnum:].]+>'
         Priority:        4
       - Regex:           '.*'
         Priority:        1
+        SortPriority:    0
 
 **IncludeIsMainRegex** (``std::string``)
   Specify a regular expression of suffixes that are allowed in the
@@ -1525,6 +1595,23 @@ the configuration (without a prefix: ``Auto``).
        break;                                   break;
      default:                                 default:
        plop();                                  plop();
+     }                                      }
+
+**IndentGotoLabels** (``bool``)
+  Indent goto labels.
+
+  When ``false``, goto labels are flushed left.
+
+  .. code-block:: c++
+
+     true:                                  false:
+     int f() {                      vs.     int f() {
+       if (foo()) {                           if (foo()) {
+       label1:                              label1:
+         bar();                                 bar();
+       }                                      }
+     label2:                                label2:
+       return 1;                              return 1;
      }                                      }
 
 **IndentPPDirectives** (``PPDirectiveIndentStyle``)
@@ -2225,7 +2312,8 @@ the configuration (without a prefix: ``Auto``).
 
 **SpacesInSquareBrackets** (``bool``)
   If ``true``, spaces will be inserted after ``[`` and before ``]``.
-  Lambdas or unspecified size array declarations will not be affected.
+  Lambdas without arguments or unspecified size array declarations will not
+  be affected.
 
   .. code-block:: c++
 
@@ -2234,17 +2322,34 @@ the configuration (without a prefix: ``Auto``).
      std::unique_ptr<int[]> foo() {} // Won't be affected
 
 **Standard** (``LanguageStandard``)
-  Format compatible with this standard, e.g. use ``A<A<int> >``
-  instead of ``A<A<int>>`` for ``LS_Cpp03``.
+  Parse and format C++ constructs compatible with this standard.
+
+  .. code-block:: c++
+
+     c++03:                                 latest:
+     vector<set<int> > x;           vs.     vector<set<int>> x;
 
   Possible values:
 
-  * ``LS_Cpp03`` (in configuration: ``Cpp03``)
-    Use C++03-compatible syntax.
+  * ``LS_Cpp03`` (in configuration: ``c++03``)
+    Parse and format as C++03.
+    ``Cpp03`` is a deprecated alias for ``c++03``
 
-  * ``LS_Cpp11`` (in configuration: ``Cpp11``)
-    Use features of C++11, C++14 and C++1z (e.g. ``A<A<int>>`` instead of
-    ``A<A<int> >``).
+  * ``LS_Cpp11`` (in configuration: ``c++11``)
+    Parse and format as C++11.
+
+  * ``LS_Cpp14`` (in configuration: ``c++14``)
+    Parse and format as C++14.
+
+  * ``LS_Cpp17`` (in configuration: ``c++17``)
+    Parse and format as C++17.
+
+  * ``LS_Cpp20`` (in configuration: ``c++20``)
+    Parse and format as C++20.
+
+  * ``LS_Latest`` (in configuration: ``Latest``)
+    Parse and format using the latest supported language version.
+    ``Cpp11`` is a deprecated alias for ``Latest``
 
   * ``LS_Auto`` (in configuration: ``Auto``)
     Automatic detection based on the input.

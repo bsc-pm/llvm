@@ -17,7 +17,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/ScalableSize.h"
+#include "llvm/Support/TypeSize.h"
 #include <cassert>
 
 namespace llvm {
@@ -51,10 +51,10 @@ namespace llvm {
 
       f16            =   10,   // This is a 16 bit floating point value
       f32            =   11,   // This is a 32 bit floating point value
-      f64            =  12,   // This is a 64 bit floating point value
-      f80            =  13,   // This is a 80 bit floating point value
-      f128           =  14,   // This is a 128 bit floating point value
-      ppcf128        =  15,   // This is a PPC 128-bit floating point value
+      f64            =   12,   // This is a 64 bit floating point value
+      f80            =   13,   // This is a 80 bit floating point value
+      f128           =   14,   // This is a 128 bit floating point value
+      ppcf128        =   15,   // This is a PPC 128-bit floating point value
 
       FIRST_FP_VALUETYPE = f16,
       LAST_FP_VALUETYPE  = ppcf128,
@@ -67,160 +67,167 @@ namespace llvm {
       v32i1          =  21,   //   32 x i1
       v64i1          =  22,   //   64 x i1
       v128i1         =  23,   //  128 x i1
-      v512i1         =  24,   //  512 x i1
-      v1024i1        =  25,   // 1024 x i1
+      v256i1         =  24,   //  256 x i1
+      v512i1         =  25,   //  512 x i1
+      v1024i1        =  26,   // 1024 x i1
 
-      v1i8           =  26,   //  1 x i8
-      v2i8           =  27,   //  2 x i8
-      v4i8           =  28,   //  4 x i8
-      v8i8           =  29,   //  8 x i8
-      v16i8          =  30,   // 16 x i8
-      v32i8          =  31,   // 32 x i8
-      v64i8          =  32,   // 64 x i8
-      v128i8         =  33,   //128 x i8
-      v256i8         =  34,   //256 x i8
+      v1i8           =  27,   //  1 x i8
+      v2i8           =  28,   //  2 x i8
+      v4i8           =  29,   //  4 x i8
+      v8i8           =  30,   //  8 x i8
+      v16i8          =  31,   // 16 x i8
+      v32i8          =  32,   // 32 x i8
+      v64i8          =  33,   // 64 x i8
+      v128i8         =  34,   //128 x i8
+      v256i8         =  35,   //256 x i8
 
-      v1i16          =  35,   //  1 x i16
-      v2i16          =  36,   //  2 x i16
-      v3i16          =  37,   //  3 x i16
-      v4i16          =  38,   //  4 x i16
-      v8i16          =  39,   //  8 x i16
-      v16i16         =  40,   // 16 x i16
-      v32i16         =  41,   // 32 x i16
-      v64i16         =  42,   // 64 x i16
-      v128i16        =  43,   //128 x i16
+      v1i16          =  36,   //  1 x i16
+      v2i16          =  37,   //  2 x i16
+      v3i16          =  38,   //  3 x i16
+      v4i16          =  39,   //  4 x i16
+      v8i16          =  40,   //  8 x i16
+      v16i16         =  41,   // 16 x i16
+      v32i16         =  42,   // 32 x i16
+      v64i16         =  43,   // 64 x i16
+      v128i16        =  44,   //128 x i16
 
-      v1i32          =  44,   //    1 x i32
-      v2i32          =  45,   //    2 x i32
-      v3i32          =  46,   //    3 x i32
-      v4i32          =  47,   //    4 x i32
-      v5i32          =  48,   //    5 x i32
-      v8i32          =  49,   //    8 x i32
-      v16i32         =  50,   //   16 x i32
-      v32i32         =  51,   //   32 x i32
-      v64i32         =  52,   //   64 x i32
-      v128i32        =  53,   //  128 x i32
-      v256i32        =  54,   //  256 x i32
-      v512i32        =  55,   //  512 x i32
-      v1024i32       =  56,   // 1024 x i32
-      v2048i32       =  57,   // 2048 x i32
+      v1i32          =  45,   //    1 x i32
+      v2i32          =  46,   //    2 x i32
+      v3i32          =  47,   //    3 x i32
+      v4i32          =  48,   //    4 x i32
+      v5i32          =  49,   //    5 x i32
+      v8i32          =  50,   //    8 x i32
+      v16i32         =  51,   //   16 x i32
+      v32i32         =  52,   //   32 x i32
+      v64i32         =  53,   //   64 x i32
+      v128i32        =  54,   //  128 x i32
+      v256i32        =  55,   //  256 x i32
+      v512i32        =  56,   //  512 x i32
+      v1024i32       =  57,   // 1024 x i32
+      v2048i32       =  58,   // 2048 x i32
 
-      v1i64          =  58,   //  1 x i64
-      v2i64          =  59,   //  2 x i64
-      v4i64          =  60,   //  4 x i64
-      v8i64          =  61,   //  8 x i64
-      v16i64         =  62,   // 16 x i64
-      v32i64         =  63,   // 32 x i64
+      v1i64          =  59,   //  1 x i64
+      v2i64          =  60,   //  2 x i64
+      v4i64          =  61,   //  4 x i64
+      v8i64          =  62,   //  8 x i64
+      v16i64         =  63,   // 16 x i64
+      v32i64         =  64,   // 32 x i64
 
-      v1i128         =  64,   //  1 x i128
+      v1i128         =  65,   //  1 x i128
 
-      // Scalable integer types
-      nxv1i1         =  65,   // n x  1 x i1
-      nxv2i1         =  66,   // n x  2 x i1
-      nxv4i1         =  67,   // n x  4 x i1
-      nxv8i1         =  68,   // n x  8 x i1
-      nxv16i1        =  69,   // n x 16 x i1
-      nxv32i1        =  70,   // n x 32 x i1
+      FIRST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE = v1i1,
+      LAST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE = v1i128,
 
-      nxv1i8         =  71,   // n x  1 x i8
-      nxv2i8         =  72,   // n x  2 x i8
-      nxv4i8         =  73,   // n x  4 x i8
-      nxv8i8         =  74,   // n x  8 x i8
-      nxv16i8        =  75,   // n x 16 x i8
-      nxv32i8        =  76,   // n x 32 x i8
+      v2f16          =  66,   //    2 x f16
+      v3f16          =  67,   //    3 x f16
+      v4f16          =  68,   //    4 x f16
+      v8f16          =  69,   //    8 x f16
+      v16f16         =  70,   //   16 x f16
+      v32f16         =  71,   //   32 x f16
+      v1f32          =  72,   //    1 x f32
+      v2f32          =  73,   //    2 x f32
+      v3f32          =  74,   //    3 x f32
+      v4f32          =  75,   //    4 x f32
+      v5f32          =  76,   //    5 x f32
+      v8f32          =  77,   //    8 x f32
+      v16f32         =  78,   //   16 x f32
+      v32f32         =  79,   //   32 x f32
+      v64f32         =  80,   //   64 x f32
+      v128f32        =  81,   //  128 x f32
+      v256f32        =  82,   //  256 x f32
+      v512f32        =  83,   //  512 x f32
+      v1024f32       =  84,   // 1024 x f32
+      v2048f32       =  85,   // 2048 x f32
+      v1f64          =  86,   //    1 x f64
+      v2f64          =  87,   //    2 x f64
+      v4f64          =  88,   //    4 x f64
+      v8f64          =  89,   //    8 x f64
 
-      nxv1i16        =  77,   // n x  1 x i16
-      nxv2i16        =  78,   // n x  2 x i16
-      nxv4i16        =  79,   // n x  4 x i16
-      nxv8i16        =  80,   // n x  8 x i16
-      nxv16i16       =  81,   // n x 16 x i16
-      nxv32i16       =  82,   // n x 32 x i16
+      FIRST_FP_FIXEDLEN_VECTOR_VALUETYPE = v2f16,
+      LAST_FP_FIXEDLEN_VECTOR_VALUETYPE = v8f64,
 
-      nxv1i32        =  83,   // n x  1 x i32
-      nxv2i32        =  84,   // n x  2 x i32
-      nxv4i32        =  85,   // n x  4 x i32
-      nxv8i32        =  86,   // n x  8 x i32
-      nxv16i32       =  87,   // n x 16 x i32
-      nxv32i32       =  88,   // n x 32 x i32
+      FIRST_FIXEDLEN_VECTOR_VALUETYPE = v1i1,
+      LAST_FIXEDLEN_VECTOR_VALUETYPE = v8f64,
 
-      nxv1i64        =  89,   // n x  1 x i64
-      nxv2i64        =  90,   // n x  2 x i64
-      nxv4i64        =  91,   // n x  4 x i64
-      nxv8i64        =  92,   // n x  8 x i64
-      nxv16i64       =  93,   // n x 16 x i64
-      nxv32i64       =  94,   // n x 32 x i64
+      nxv1i1         =  90,   // n x  1 x i1
+      nxv2i1         =  91,   // n x  2 x i1
+      nxv4i1         =  92,   // n x  4 x i1
+      nxv8i1         =  93,   // n x  8 x i1
+      nxv16i1        =  94,   // n x 16 x i1
+      nxv32i1        =  95,   // n x 32 x i1
 
-      nxv16i4        =  95,   // n x 16 x i4
-      nxv32i2        =  96,   // n x 32 x i2
-      nxv64i1        =  97,   // n x 64 x i1
+      nxv1i8         =  96,   // n x  1 x i8
+      nxv2i8         =  97,   // n x  2 x i8
+      nxv4i8         =  98,   // n x  4 x i8
+      nxv8i8         =  99,   // n x  8 x i8
+      nxv16i8        =  100,   // n x 16 x i8
+      nxv32i8        =  101,   // n x 32 x i8
 
-      FIRST_INTEGER_VECTOR_VALUETYPE = v1i1,
-      LAST_INTEGER_VECTOR_VALUETYPE = nxv64i1,
+      nxv1i16        =  102,  // n x  1 x i16
+      nxv2i16        =  103,  // n x  2 x i16
+      nxv4i16        =  104,  // n x  4 x i16
+      nxv8i16        =  105,  // n x  8 x i16
+      nxv16i16       =  106,  // n x 16 x i16
+      nxv32i16       =  107,  // n x 32 x i16
 
-      FIRST_INTEGER_SCALABLE_VALUETYPE = nxv1i1,
-      LAST_INTEGER_SCALABLE_VALUETYPE = nxv64i1,
+      nxv1i32        =  108,  // n x  1 x i32
+      nxv2i32        =  109,  // n x  2 x i32
+      nxv4i32        =  110,  // n x  4 x i32
+      nxv8i32        =  111,  // n x  8 x i32
+      nxv16i32       =  112,  // n x 16 x i32
+      nxv32i32       =  113,  // n x 32 x i32
 
-      v2f16          =  98,   //    2 x f16
-      v3f16          =  99,   //    3 x f16
-      v4f16          =  100,   //    4 x f16
-      v8f16          =  101,   //    8 x f16
-      v16f16         =  102,  //   16 x f16
-      v32f16         =  103,  //   32 x f16
-      v1f32          =  104,  //    1 x f32
-      v2f32          =  105,  //    2 x f32
-      v3f32          =  106,  //    3 x f32
-      v4f32          =  107,  //    4 x f32
-      v5f32          =  108,  //    5 x f32
-      v8f32          =  109,  //    8 x f32
-      v16f32         =  110,  //   16 x f32
-      v32f32         =  111,  //   32 x f32
-      v64f32         =  112,  //   64 x f32
-      v128f32        =  113,  //  128 x f32
-      v256f32        =  114,  //  256 x f32
-      v512f32        =  115,  //  512 x f32
-      v1024f32       =  116,  // 1024 x f32
-      v2048f32       =  117,  // 2048 x f32
-      v1f64          =  118,  //    1 x f64
-      v2f64          =  119,  //    2 x f64
-      v4f64          =  120,  //    4 x f64
-      v8f64          =  121,  //    8 x f64
+      nxv1i64        =  114,  // n x  1 x i64
+      nxv2i64        =  115,  // n x  2 x i64
+      nxv4i64        =  116,  // n x  4 x i64
+      nxv8i64        =  117,  // n x  8 x i64
+      nxv16i64       =  118,  // n x 16 x i64
+      nxv32i64       =  119,  // n x 32 x i64
 
-      nxv2f16        =  122,  // n x  2 x f16
-      nxv4f16        =  123,  // n x  4 x f16
-      nxv8f16        =  124,  // n x  8 x f16
-      nxv1f32        =  125,  // n x  1 x f32
-      nxv2f32        =  126,  // n x  2 x f32
-      nxv4f32        =  127,  // n x  4 x f32
-      nxv8f32        =  128,  // n x  8 x f32
-      nxv16f32       =  129,  // n x 16 x f32
-      nxv1f64        =  130,  // n x  1 x f64
-      nxv2f64        =  131,  // n x  2 x f64
-      nxv4f64        =  132,  // n x  4 x f64
-      nxv8f64        =  133,  // n x  8 x f64
+      // EPIVR Masks
+      nxv16i4        =  120,   // n x 16 x i4
+      nxv32i2        =  121,   // n x 32 x i2
+      nxv64i1        =  122,   // n x 64 x i1
 
-      FIRST_FP_VECTOR_VALUETYPE = v2f16,
-      LAST_FP_VECTOR_VALUETYPE = nxv8f64,
+      FIRST_INTEGER_SCALABLE_VECTOR_VALUETYPE = nxv1i1,
+      LAST_INTEGER_SCALABLE_VECTOR_VALUETYPE = nxv64i1,
 
-      FIRST_FP_SCALABLE_VALUETYPE = nxv2f16,
-      LAST_FP_SCALABLE_VALUETYPE = nxv8f64,
+      nxv2f16        =  123,  // n x  2 x f16
+      nxv4f16        =  124,  // n x  4 x f16
+      nxv8f16        =  125,  // n x  8 x f16
+      nxv1f32        =  126,  // n x  1 x f32
+      nxv2f32        =  127,  // n x  2 x f32
+      nxv4f32        =  128,  // n x  4 x f32
+      nxv8f32        =  129,  // n x  8 x f32
+      nxv16f32       =  130,  // n x 16 x f32
+      nxv1f64        =  131,  // n x  1 x f64
+      nxv2f64        =  132,  // n x  2 x f64
+      nxv4f64        =  133,  // n x  4 x f64
+      nxv8f64        =  134,  // n x  8 x f64
+
+      FIRST_FP_SCALABLE_VECTOR_VALUETYPE = nxv2f16,
+      LAST_FP_SCALABLE_VECTOR_VALUETYPE = nxv8f64,
+
+      FIRST_SCALABLE_VECTOR_VALUETYPE = nxv1i1,
+      LAST_SCALABLE_VECTOR_VALUETYPE = nxv8f64,
 
       FIRST_VECTOR_VALUETYPE = v1i1,
       LAST_VECTOR_VALUETYPE  = nxv8f64,
 
-      x86mmx         =  134,   // This is an X86 MMX value
+      x86mmx         =  135,   // This is an X86 MMX value
 
-      Glue           =  135,   // This glues nodes together during pre-RA sched
+      Glue           =  136,   // This glues nodes together during pre-RA sched
 
-      isVoid         =  136,   // This has no value
+      isVoid         =  137,   // This has no value
 
-      Untyped        =  137,   // This value takes a register, but has
+      Untyped        =  138,   // This value takes a register, but has
                                // unspecified type.  The register class
                                // will be determined by the opcode.
 
-      exnref         =  138,   // WebAssembly's exnref type
+      exnref         =  139,   // WebAssembly's exnref type
 
       FIRST_VALUETYPE = 1,     // This is always the beginning of the list.
-      LAST_VALUETYPE =  139,   // This always remains at the end of the list.
+      LAST_VALUETYPE =  140,   // This always remains at the end of the list.
 
       // This is the current maximum for LAST_VALUETYPE.
       // MVT::MAX_ALLOWED_VALUETYPE is used for asserts and to size bit vectors
@@ -284,16 +291,20 @@ namespace llvm {
     bool isFloatingPoint() const {
       return ((SimpleTy >= MVT::FIRST_FP_VALUETYPE &&
                SimpleTy <= MVT::LAST_FP_VALUETYPE) ||
-              (SimpleTy >= MVT::FIRST_FP_VECTOR_VALUETYPE &&
-               SimpleTy <= MVT::LAST_FP_VECTOR_VALUETYPE));
+              (SimpleTy >= MVT::FIRST_FP_FIXEDLEN_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_FP_FIXEDLEN_VECTOR_VALUETYPE) ||
+              (SimpleTy >= MVT::FIRST_FP_SCALABLE_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_FP_SCALABLE_VECTOR_VALUETYPE));
     }
 
     /// Return true if this is an integer or a vector integer type.
     bool isInteger() const {
       return ((SimpleTy >= MVT::FIRST_INTEGER_VALUETYPE &&
                SimpleTy <= MVT::LAST_INTEGER_VALUETYPE) ||
-              (SimpleTy >= MVT::FIRST_INTEGER_VECTOR_VALUETYPE &&
-               SimpleTy <= MVT::LAST_INTEGER_VECTOR_VALUETYPE));
+              (SimpleTy >= MVT::FIRST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE) ||
+              (SimpleTy >= MVT::FIRST_INTEGER_SCALABLE_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_INTEGER_SCALABLE_VECTOR_VALUETYPE));
     }
 
     /// Return true if this is an integer, not including vectors.
@@ -311,10 +322,13 @@ namespace llvm {
     /// Return true if this is a vector value type where the
     /// runtime length is machine dependent
     bool isScalableVector() const {
-      return ((SimpleTy >= MVT::FIRST_INTEGER_SCALABLE_VALUETYPE &&
-               SimpleTy <= MVT::LAST_INTEGER_SCALABLE_VALUETYPE) ||
-              (SimpleTy >= MVT::FIRST_FP_SCALABLE_VALUETYPE &&
-               SimpleTy <= MVT::LAST_FP_SCALABLE_VALUETYPE));
+      return (SimpleTy >= MVT::FIRST_SCALABLE_VECTOR_VALUETYPE &&
+              SimpleTy <= MVT::LAST_SCALABLE_VECTOR_VALUETYPE);
+    }
+
+    bool isFixedLengthVector() const {
+      return (SimpleTy >= MVT::FIRST_FIXEDLEN_VECTOR_VALUETYPE &&
+              SimpleTy <= MVT::LAST_FIXEDLEN_VECTOR_VALUETYPE);
     }
 
     /// Return true if this is a 16-bit vector type.
@@ -352,7 +366,7 @@ namespace llvm {
       return (SimpleTy == MVT::v16f16 || SimpleTy == MVT::v8f32 ||
               SimpleTy == MVT::v4f64  || SimpleTy == MVT::v32i8 ||
               SimpleTy == MVT::v16i16 || SimpleTy == MVT::v8i32 ||
-              SimpleTy == MVT::v4i64);
+              SimpleTy == MVT::v4i64  || SimpleTy == MVT::v256i1);
     }
 
     /// Return true if this is a 512-bit vector type.
@@ -426,6 +440,7 @@ namespace llvm {
       case v32i1:
       case v64i1:
       case v128i1:
+      case v256i1:
       case v512i1:
       case v1024i1:
       case nxv1i1:
@@ -551,6 +566,7 @@ namespace llvm {
       case v512i1:
       case v512i32:
       case v512f32: return 512;
+      case v256i1:
       case v256i8:
       case v256i32:
       case v256f32: return 256;
@@ -770,6 +786,7 @@ namespace llvm {
       case nxv2f64: return 128;
       case v5i32:
       case v5f32: return 160;
+      case v256i1:
       case v32i8:
       case v16i16:
       case v8i32:
@@ -913,6 +930,7 @@ namespace llvm {
         if (NumElements == 32)   return MVT::v32i1;
         if (NumElements == 64)   return MVT::v64i1;
         if (NumElements == 128)  return MVT::v128i1;
+        if (NumElements == 256)  return MVT::v256i1;
         if (NumElements == 512)  return MVT::v512i1;
         if (NumElements == 1024) return MVT::v1024i1;
         break;
@@ -1132,26 +1150,40 @@ namespace llvm {
                        (MVT::SimpleValueType)(MVT::LAST_VECTOR_VALUETYPE + 1));
     }
 
-    static mvt_range integer_vector_valuetypes() {
+    static mvt_range fixedlen_vector_valuetypes() {
       return mvt_range(
-          MVT::FIRST_INTEGER_VECTOR_VALUETYPE,
-          (MVT::SimpleValueType)(MVT::LAST_INTEGER_VECTOR_VALUETYPE + 1));
+               MVT::FIRST_FIXEDLEN_VECTOR_VALUETYPE,
+               (MVT::SimpleValueType)(MVT::LAST_FIXEDLEN_VECTOR_VALUETYPE + 1));
     }
 
-    static mvt_range fp_vector_valuetypes() {
+    static mvt_range scalable_vector_valuetypes() {
       return mvt_range(
-          MVT::FIRST_FP_VECTOR_VALUETYPE,
-          (MVT::SimpleValueType)(MVT::LAST_FP_VECTOR_VALUETYPE + 1));
+               MVT::FIRST_SCALABLE_VECTOR_VALUETYPE,
+               (MVT::SimpleValueType)(MVT::LAST_SCALABLE_VECTOR_VALUETYPE + 1));
+    }
+
+    static mvt_range integer_fixedlen_vector_valuetypes() {
+      return mvt_range(
+       MVT::FIRST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE,
+       (MVT::SimpleValueType)(MVT::LAST_INTEGER_FIXEDLEN_VECTOR_VALUETYPE + 1));
+    }
+
+    static mvt_range fp_fixedlen_vector_valuetypes() {
+      return mvt_range(
+          MVT::FIRST_FP_FIXEDLEN_VECTOR_VALUETYPE,
+          (MVT::SimpleValueType)(MVT::LAST_FP_FIXEDLEN_VECTOR_VALUETYPE + 1));
     }
 
     static mvt_range integer_scalable_vector_valuetypes() {
-      return mvt_range(MVT::FIRST_INTEGER_SCALABLE_VALUETYPE,
-              (MVT::SimpleValueType)(MVT::LAST_INTEGER_SCALABLE_VALUETYPE + 1));
+      return mvt_range(
+       MVT::FIRST_INTEGER_SCALABLE_VECTOR_VALUETYPE,
+       (MVT::SimpleValueType)(MVT::LAST_INTEGER_SCALABLE_VECTOR_VALUETYPE + 1));
     }
 
     static mvt_range fp_scalable_vector_valuetypes() {
-      return mvt_range(MVT::FIRST_FP_SCALABLE_VALUETYPE,
-                   (MVT::SimpleValueType)(MVT::LAST_FP_SCALABLE_VALUETYPE + 1));
+      return mvt_range(
+            MVT::FIRST_FP_SCALABLE_VECTOR_VALUETYPE,
+            (MVT::SimpleValueType)(MVT::LAST_FP_SCALABLE_VECTOR_VALUETYPE + 1));
     }
     /// @}
   };

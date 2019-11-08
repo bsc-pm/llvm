@@ -293,7 +293,8 @@ void Function::BuildLazyArguments() const {
 
   // Clear the lazy arguments bit.
   unsigned SDC = getSubclassDataFromValue();
-  const_cast<Function*>(this)->setValueSubclassData(SDC &= ~(1<<0));
+  SDC &= ~(1 << 0);
+  const_cast<Function*>(this)->setValueSubclassData(SDC);
   assert(!hasLazyArguments());
 }
 
@@ -611,11 +612,11 @@ static std::string getMangledTypeStr(Type* Ty) {
       Result += "vararg";
     // Ensure nested function types are distinguishable.
     Result += "f";
-  } else if (isa<VectorType>(Ty)) {
-    if (Ty->getVectorIsScalable())
+  } else if (VectorType* VTy = dyn_cast<VectorType>(Ty)) {
+    if (VTy->isScalable())
       Result += "nx";
-    Result += "v" + utostr(Ty->getVectorNumElements()) +
-      getMangledTypeStr(Ty->getVectorElementType());
+    Result += "v" + utostr(VTy->getVectorNumElements()) +
+      getMangledTypeStr(VTy->getVectorElementType());
   } else if (Ty) {
     switch (Ty->getTypeID()) {
     default: llvm_unreachable("Unhandled type");
@@ -703,9 +704,12 @@ enum IIT_Info {
   IIT_STRUCT8 = 40,
   IIT_F128 = 41,
   IIT_VEC_ELEMENT = 42,
-  IIT_NXV1 = 43,
-  IIT_I2 = 44,
-  IIT_I4 = 45,
+  IIT_SCALABLE_VEC = 43,
+  IIT_SUBDIVIDE2_ARG = 44,
+  IIT_SUBDIVIDE4_ARG = 45,
+  IIT_VEC_OF_BITCASTS_TO_INT = 46,
+  IIT_I2 = 47,
+  IIT_I4 = 48
 };
 
 static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
@@ -769,10 +773,6 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
     return;
   case IIT_V1:
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::Vector, 1));
-    DecodeIITType(NextElt, Infos, OutputTable);
-    return;
-  case IIT_NXV1:
-    OutputTable.push_back(IITDescriptor::get(IITDescriptor::ScalableVector, 1));
     DecodeIITType(NextElt, Infos, OutputTable);
     return;
   case IIT_V2:
@@ -880,9 +880,33 @@ static void DecodeIITType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
       DecodeIITType(NextElt, Infos, OutputTable);
     return;
   }
+  case IIT_SUBDIVIDE2_ARG: {
+    unsigned ArgInfo = (NextElt == Infos.size() ? 0 : Infos[NextElt++]);
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Subdivide2Argument,
+                                             ArgInfo));
+    return;
+  }
+  case IIT_SUBDIVIDE4_ARG: {
+    unsigned ArgInfo = (NextElt == Infos.size() ? 0 : Infos[NextElt++]);
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::Subdivide4Argument,
+                                             ArgInfo));
+    return;
+  }
   case IIT_VEC_ELEMENT: {
     unsigned ArgInfo = (NextElt == Infos.size() ? 0 : Infos[NextElt++]);
     OutputTable.push_back(IITDescriptor::get(IITDescriptor::VecElementArgument,
+                                             ArgInfo));
+    return;
+  }
+  case IIT_SCALABLE_VEC: {
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::ScalableVecArgument,
+                                             0));
+    DecodeIITType(NextElt, Infos, OutputTable);
+    return;
+  }
+  case IIT_VEC_OF_BITCASTS_TO_INT: {
+    unsigned ArgInfo = (NextElt == Infos.size() ? 0 : Infos[NextElt++]);
+    OutputTable.push_back(IITDescriptor::get(IITDescriptor::VecOfBitcastsToInt,
                                              ArgInfo));
     return;
   }
@@ -979,6 +1003,14 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
     assert(ITy->getBitWidth() % 2 == 0);
     return IntegerType::get(Context, ITy->getBitWidth() / 2);
   }
+  case IITDescriptor::Subdivide2Argument:
+  case IITDescriptor::Subdivide4Argument: {
+    Type *Ty = Tys[D.getArgumentNumber()];
+    VectorType *VTy = dyn_cast<VectorType>(Ty);
+    assert(VTy && "Expected an argument of Vector Type");
+    int SubDivs = D.Kind == IITDescriptor::Subdivide2Argument ? 1 : 2;
+    return VectorType::getSubdividedVectorType(VTy, SubDivs);
+  }
   case IITDescriptor::HalfVecArgument:
     return VectorType::getHalfElementsVectorType(cast<VectorType>(
                                                   Tys[D.getArgumentNumber()]));
@@ -986,7 +1018,7 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
     Type *EltTy = DecodeFixedType(Infos, Tys, Context);
     Type *Ty = Tys[D.getArgumentNumber()];
     if (auto *VTy = dyn_cast<VectorType>(Ty))
-      return VectorType::get(EltTy, VTy->getNumElements());
+      return VectorType::get(EltTy, VTy->getElementCount());
     return EltTy;
   }
   case IITDescriptor::PtrToArgument: {
@@ -1007,9 +1039,20 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
       return VTy->getElementType();
     llvm_unreachable("Expected an argument of Vector Type");
   }
+  case IITDescriptor::VecOfBitcastsToInt: {
+    Type *Ty = Tys[D.getArgumentNumber()];
+    VectorType *VTy = dyn_cast<VectorType>(Ty);
+    assert(VTy && "Expected an argument of Vector Type");
+    return VectorType::getInteger(VTy);
+  }
   case IITDescriptor::VecOfAnyPtrsToElt:
     // Return the overloaded type (which determines the pointers address space)
     return Tys[D.getOverloadArgNumber()];
+  case IITDescriptor::ScalableVecArgument: {
+    Type *Ty = DecodeFixedType(Infos, Tys, Context);
+    return VectorType::get(Ty->getVectorElementType(),
+                           { Ty->getVectorNumElements(), true });
+  }
   }
   llvm_unreachable("unhandled");
 }
@@ -1199,8 +1242,9 @@ static bool matchIntrinsicType(
     }
     case IITDescriptor::HalfVecArgument:
       // If this is a forward reference, defer the check for later.
-      return D.getArgumentNumber() >= ArgTys.size() ||
-             !isa<VectorType>(ArgTys[D.getArgumentNumber()]) ||
+      if (D.getArgumentNumber() >= ArgTys.size())
+        return IsDeferredCheck || DeferCheck(Ty);
+      return !isa<VectorType>(ArgTys[D.getArgumentNumber()]) ||
              VectorType::getHalfElementsVectorType(
                      cast<VectorType>(ArgTys[D.getArgumentNumber()])) != Ty;
     case IITDescriptor::SameVecWidthArgument: {
@@ -1216,8 +1260,8 @@ static bool matchIntrinsicType(
         return true;
       Type *EltTy = Ty;
       if (ThisArgType) {
-        if (ReferenceType->getVectorNumElements() !=
-            ThisArgType->getVectorNumElements())
+        if (ReferenceType->getElementCount() !=
+            ThisArgType->getElementCount())
           return true;
         EltTy = ThisArgType->getVectorElementType();
       }
@@ -1279,6 +1323,36 @@ static bool matchIntrinsicType(
         return IsDeferredCheck ? true : DeferCheck(Ty);
       auto *ReferenceType = dyn_cast<VectorType>(ArgTys[D.getArgumentNumber()]);
       return !ReferenceType || Ty != ReferenceType->getElementType();
+    }
+    case IITDescriptor::Subdivide2Argument:
+    case IITDescriptor::Subdivide4Argument: {
+      // If this is a forward reference, defer the check for later.
+      if (D.getArgumentNumber() >= ArgTys.size())
+        return IsDeferredCheck || DeferCheck(Ty);
+
+      Type *NewTy = ArgTys[D.getArgumentNumber()];
+      if (auto *VTy = dyn_cast<VectorType>(NewTy)) {
+        int SubDivs = D.Kind == IITDescriptor::Subdivide2Argument ? 1 : 2;
+        NewTy = VectorType::getSubdividedVectorType(VTy, SubDivs);
+        return Ty != NewTy;
+      }
+      return true;
+    }
+    case IITDescriptor::ScalableVecArgument: {
+      VectorType *VTy = dyn_cast<VectorType>(Ty);
+      if (!VTy || !VTy->isScalable())
+        return true;
+      return matchIntrinsicType(VTy, Infos, ArgTys, DeferredChecks,
+                                IsDeferredCheck);
+    }
+    case IITDescriptor::VecOfBitcastsToInt: {
+      if (D.getArgumentNumber() >= ArgTys.size())
+        return IsDeferredCheck || DeferCheck(Ty);
+      auto *ReferenceType = dyn_cast<VectorType>(ArgTys[D.getArgumentNumber()]);
+      auto *ThisArgVecTy = dyn_cast<VectorType>(Ty);
+      if (!ThisArgVecTy || !ReferenceType)
+        return true;
+      return ThisArgVecTy != VectorType::getInteger(ReferenceType);
     }
   }
   llvm_unreachable("unhandled");
@@ -1477,6 +1551,11 @@ void Function::setEntryCount(ProfileCount Count,
   auto PrevCount = getEntryCount();
   assert(!PrevCount.hasValue() || PrevCount.getType() == Count.getType());
 #endif
+
+  auto ImportGUIDs = getImportGUIDs();
+  if (S == nullptr && ImportGUIDs.size())
+    S = &ImportGUIDs;
+
   MDBuilder MDB(getContext());
   setMetadata(
       LLVMContext::MD_prof,

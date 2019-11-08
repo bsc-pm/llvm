@@ -36,6 +36,7 @@ enum OpenMPClauseKind {
   OMPC_threadprivate,
   OMPC_uniform,
   OMPC_device_type,
+  OMPC_match,
   OMPC_unknown
 };
 
@@ -268,7 +269,8 @@ bool isOpenMPPrivate(OpenMPClauseKind Kind);
 bool isOpenMPThreadPrivate(OpenMPClauseKind Kind);
 
 /// Checks if the specified directive kind is one of tasking directives - task,
-/// taskloop or taksloop simd.
+/// taskloop, taksloop simd, master taskloop, parallel master taskloop, master
+/// taskloop simd, or parallel master taskloop simd.
 bool isOpenMPTaskingDirective(OpenMPDirectiveKind Kind);
 
 /// Checks if the specified directive kind is one of the composite or combined

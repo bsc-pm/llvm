@@ -27,6 +27,15 @@
 
 using namespace llvm;
 
+static_assert(RISCV::X1 == RISCV::X0 + 1, "Register list not consecutive");
+static_assert(RISCV::X31 == RISCV::X0 + 31, "Register list not consecutive");
+static_assert(RISCV::F1_F == RISCV::F0_F + 1, "Register list not consecutive");
+static_assert(RISCV::F31_F == RISCV::F0_F + 31,
+              "Register list not consecutive");
+static_assert(RISCV::F1_D == RISCV::F0_D + 1, "Register list not consecutive");
+static_assert(RISCV::F31_D == RISCV::F0_D + 31,
+              "Register list not consecutive");
+
 RISCVRegisterInfo::RISCVRegisterInfo(unsigned HwMode)
     : RISCVGenRegisterInfo(RISCV::X1, /*DwarfFlavour*/0, /*EHFlavor*/0,
                            /*PC*/0, HwMode) {}
@@ -62,9 +71,14 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = getFrameLowering(MF);
   BitVector Reserved(getNumRegs());
 
+  // Mark any registers requested to be reserved as such
+  for (size_t Reg = 0; Reg < getNumRegs(); Reg++) {
+    if (MF.getSubtarget<RISCVSubtarget>().isRegisterReservedByUser(Reg))
+      markSuperRegs(Reserved, Reg);
+  }
+
   // Use markSuperRegs to ensure any register aliases are also reserved
   markSuperRegs(Reserved, RISCV::X0); // zero
-  markSuperRegs(Reserved, RISCV::X1); // ra
   markSuperRegs(Reserved, RISCV::X2); // sp
   markSuperRegs(Reserved, RISCV::X3); // gp
   markSuperRegs(Reserved, RISCV::X4); // tp
@@ -84,6 +98,11 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 
   assert(checkAllSuperRegsMarked(Reserved));
   return Reserved;
+}
+
+bool RISCVRegisterInfo::isAsmClobberable(const MachineFunction &MF,
+                                         unsigned PhysReg) const {
+  return !MF.getSubtarget<RISCVSubtarget>().isRegisterReservedByUser(PhysReg);
 }
 
 bool RISCVRegisterInfo::isConstantPhysReg(unsigned PhysReg) const {
@@ -131,7 +150,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   case RISCV::PseudoVSPILL:
   case RISCV::PseudoVRELOAD:
     NeedsIndirectAddressing =
-        MFI.getStackID(FrameIndex) == RISCVStackID::EPIVR_SPILL;
+        MFI.getStackID(FrameIndex) == TargetStackID::EPIVector;
     break;
   default:
     OffsetIndex = FIOperandNum + 1;
@@ -149,7 +168,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   if (NeedsIndirectAddressing) {
     assert(OffsetIndex == -1 && "There must not be offset");
-    assert(MFI.getStackID(FrameIndex) == RISCVStackID::EPIVR_SPILL &&
+    assert(MFI.getStackID(FrameIndex) == TargetStackID::EPIVector &&
            "Unexpected stack ID");
 
     MachineOperand SlotAddr = MI.getOperand(FIOperandNum);
@@ -223,8 +242,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     assert(isInt<32>(Offset) && "Int32 expected");
     // The offset won't fit in an immediate, so use a scratch register instead
     // Modify Offset and FrameReg appropriately
-    unsigned ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    TII->movImm32(MBB, II, DL, ScratchReg, Offset);
+    Register ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    TII->movImm(MBB, II, DL, ScratchReg, Offset);
     BuildMI(MBB, II, DL, TII->get(RISCV::ADD), ScratchReg)
         .addReg(FrameReg)
         .addReg(ScratchReg, RegState::Kill);
@@ -281,10 +300,4 @@ bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   return needsStackRealignment(MF) &&
          (MFI.hasVarSizedObjects() || RVFI->hasSpilledEPIVR());
-}
-
-const TargetRegisterClass *
-RISCVRegisterInfo::getPointerRegClass(const MachineFunction &MF,
-                                        unsigned Kind) const {
-  return &RISCV::GPRRegClass;
 }
