@@ -66,18 +66,19 @@ bool RISCVAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
     default:
       llvm_unreachable("Unexpected fixup kind for pcrel_lo12");
       break;
-    case RISCV::fixup_riscv_pcrel_hi20: {
-      MCFragment *TFragment = T->getValue()->findAssociatedFragment();
-      MCFragment *FixupFragment = Fixup.getValue()->findAssociatedFragment();
-      ShouldForce = !TFragment || !FixupFragment ||
-                    TFragment->getParent() != FixupFragment->getParent();
-      break;
-    }
     case RISCV::fixup_riscv_got_hi20:
     case RISCV::fixup_riscv_tls_got_hi20:
     case RISCV::fixup_riscv_tls_gd_hi20:
       ShouldForce = true;
       break;
+    case RISCV::fixup_riscv_pcrel_hi20: {
+      MCFragment *TFragment = T->getValue()->findAssociatedFragment();
+      MCFragment *FixupFragment = Fixup.getValue()->findAssociatedFragment();
+      assert(FixupFragment && "We should have a fragment for this fixup");
+      ShouldForce =
+          !TFragment || TFragment->getParent() != FixupFragment->getParent();
+      break;
+    }
     }
     break;
   }
