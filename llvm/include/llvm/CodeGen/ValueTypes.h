@@ -75,9 +75,7 @@ namespace llvm {
       MVT M = MVT::getVectorVT(VT.V, NumElements, IsScalable);
       if (M.SimpleTy != MVT::INVALID_SIMPLE_VALUE_TYPE)
         return M;
-
-      assert(!IsScalable && "We don't support extended scalable types yet");
-      return getExtendedVectorVT(Context, VT, NumElements);
+      return getExtendedVectorVT(Context, VT, NumElements, IsScalable);
     }
 
     /// Returns the EVT that represents a vector EC.Min elements in length,
@@ -86,8 +84,7 @@ namespace llvm {
       MVT M = MVT::getVectorVT(VT.V, EC);
       if (M.SimpleTy != MVT::INVALID_SIMPLE_VALUE_TYPE)
         return M;
-      assert (!EC.Scalable && "We don't support extended scalable types yet");
-      return getExtendedVectorVT(Context, VT, EC.Min);
+      return getExtendedVectorVT(Context, VT, EC.Min, EC.Scalable);
     }
 
     /// Return a vector with the same number of elements as this vector, but
@@ -430,7 +427,7 @@ namespace llvm {
     EVT changeExtendedVectorElementTypeToInteger() const;
     static EVT getExtendedIntegerVT(LLVMContext &C, unsigned BitWidth);
     static EVT getExtendedVectorVT(LLVMContext &C, EVT VT,
-                                   unsigned NumElements);
+                                   unsigned NumElements, bool Scalable);
     bool isExtendedFloatingPoint() const LLVM_READONLY;
     bool isExtendedInteger() const LLVM_READONLY;
     bool isExtendedScalarInteger() const LLVM_READONLY;
