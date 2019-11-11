@@ -92,6 +92,9 @@ Instruction *InstCombiner::PromoteCastOfAllocation(BitCastInst &CI,
   Type *CastElTy = PTy->getElementType();
   if (!AllocElTy->isSized() || !CastElTy->isSized()) return nullptr;
 
+  if (CastElTy->isVectorTy() && CastElTy->getVectorIsScalable())
+    return nullptr;
+
   unsigned AllocElTyAlign = DL.getABITypeAlignment(AllocElTy);
   unsigned CastElTyAlign = DL.getABITypeAlignment(CastElTy);
   if (CastElTyAlign < AllocElTyAlign) return nullptr;
