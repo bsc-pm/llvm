@@ -431,6 +431,9 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
         return LI;
       }
 
+    // Try to get the store size for the type.
+    auto AccessSize = LocationSize::precise(DL.getTypeStoreSize(AccessTy));
+
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
       Value *StorePtr = SI->getPointerOperand()->stripPointerCasts();
       // If this is a store through Ptr, the value is available!
