@@ -388,10 +388,6 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
   const DataLayout &DL = ScanBB->getModule()->getDataLayout();
 
   // Try to get the store size for the type.
-  LocationSize AccessSize(
-      AccessTy->isVectorTy() && AccessTy->getVectorIsScalable()
-          ? LocationSize::unknown()
-          : LocationSize::precise(DL.getTypeStoreSize(AccessTy)));
 
   Value *StrippedPtr = Ptr->stripPointerCasts();
 
@@ -432,7 +428,10 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
       }
 
     // Try to get the store size for the type.
-    auto AccessSize = LocationSize::precise(DL.getTypeStoreSize(AccessTy));
+    auto AccessSize =
+        AccessTy->isVectorTy() && AccessTy->getVectorIsScalable()
+            ? LocationSize::unknown()
+            : LocationSize::precise(DL.getTypeStoreSize(AccessTy));
 
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
       Value *StorePtr = SI->getPointerOperand()->stripPointerCasts();
