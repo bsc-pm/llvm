@@ -1,4 +1,4 @@
-; RUN: llc -mtriple=riscv64 -mattr=+epi,+a,+f,+d,+c,+m -o - %s | FileCheck %s
+; RUN: llc -mtriple=riscv64 -mattr=+v,+a,+f,+d,+c,+m -o - %s | FileCheck %s
 
 ; Note: This test uses the vector calling convention which is subject to change.
 

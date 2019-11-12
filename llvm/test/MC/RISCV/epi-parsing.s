@@ -1,5 +1,5 @@
 # Generated with utils/EPI/process.py
-# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+epi | FileCheck %s
+# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+v | FileCheck %s
 
 # CHECK: vadd.vv v2, v0, v1
 vadd.vv v2, v0, v1

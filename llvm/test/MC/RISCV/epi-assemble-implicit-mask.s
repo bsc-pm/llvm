@@ -1,4 +1,4 @@
-# RUN: llvm-mc --assemble --triple riscv64 -mattr m,+a,+f,+d,+c,+epi \
+# RUN: llvm-mc --assemble --triple riscv64 -mattr m,+a,+f,+d,+c,+v \
 # RUN:         --show-encoding < %s | FileCheck %s
 
 vmerge.vvm  v1, v2, v3, v0

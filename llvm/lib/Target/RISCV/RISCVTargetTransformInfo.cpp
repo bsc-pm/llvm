@@ -92,7 +92,7 @@ int RISCVTTIImpl::getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
 }
 
 unsigned RISCVTTIImpl::getNumberOfRegisters(unsigned ClassID) const {
-  if (ClassID == 1 && ST->hasExtEPI()) {
+  if (ClassID == 1 && ST->hasStdExtV()) {
     return 32;
   }
   return 0;
@@ -105,7 +105,7 @@ unsigned RISCVTTIImpl::getMaxElementWidth() const {
 }
 
 bool RISCVTTIImpl::useScalableVectorType() const {
-  return ST->hasExtEPI();
+  return ST->hasStdExtV();
 }
 
 bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,

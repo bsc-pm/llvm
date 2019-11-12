@@ -1,4 +1,4 @@
-; RUN: llc -mtriple riscv64 -mattr=+epi -o /dev/null %s \
+; RUN: llc -mtriple riscv64 -mattr=+v -o /dev/null %s \
 ; RUN:     -print-after=riscv-expand-pseudo 2>&1 | FileCheck %s
 
 define dso_local void @test_vload_8xi8_vstore_8xi8(i8* nocapture %addr, i64 %gvl) {

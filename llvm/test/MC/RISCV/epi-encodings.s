@@ -1,5 +1,5 @@
 # Generated witu utils/EPI/process.py
-# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+epi -show-encoding | FileCheck %s
+# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+v -show-encoding | FileCheck %s
 
 # Encoding: |000000|1|00000|00001|000|00010|1010111|
 # CHECK: vadd.vv v2, v0, v1

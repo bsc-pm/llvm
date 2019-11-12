@@ -823,7 +823,7 @@ multiclass pseudo_binary_m_mm {
   }
 }
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
 
 defm PseudoVADD        : pseudo_binary_v_vv_vx_vi;
 defm PseudoVSUB        : pseudo_binary_v_vv_vx;
@@ -1202,7 +1202,7 @@ multiclass pat_load_store_mask<LLVMType type,
              reg_class:$rs2, AddrFI:$rs1, /* vl */ X0, sew)>;
 }
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
   foreach vti = AllVectors in
   {
     defm : pat_load_store<vti.Vector, "PseudoVLE_V", "PseudoVSE_V", vti.SEW,
@@ -1280,7 +1280,7 @@ def Log2 : SDNodeXForm<imm,
         MVT::i64);
 }]>;
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
 
 def : Pat<(int_vscale), (PseudoVSCALE)>;
 
@@ -2271,7 +2271,7 @@ multiclass pat_intrinsic_unary_fp_v_int_w<string intrinsic_name,
 //def FloatNarrowedSize : ValueTypeVarList<
 //  [ ValueTypePair<nxv1f32, nxv1f64> ]>;
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vadd", "PseudoVADD">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vsub", "PseudoVSUB">;
@@ -2803,7 +2803,7 @@ multiclass pat_vop_ternary_common<SDNode vop,
   }
 }
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
 
 defm "" : pat_vop_binary_common<add, "PseudoVADD", AllIntegerVectors>;
 defm "" : pat_vop_binary_common<sub, "PseudoVSUB", AllIntegerVectors>;
@@ -2986,7 +2986,7 @@ multiclass pat_store<string width> {
   }
 }
 
-let Predicates = [HasExtEPI] in {
+let Predicates = [HasStdExtV] in {
 
 defm "" : pat_load<"E">;
 defm "" : pat_store<"E">;

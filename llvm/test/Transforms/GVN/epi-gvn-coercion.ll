@@ -1,4 +1,4 @@
-; RUN: opt < %s -S -o - -mtriple riscv64 -mattr +m,+a,+f,+d,+epi -gvn | \
+; RUN: opt < %s -S -o - -mtriple riscv64 -mattr +m,+a,+f,+d,+v -gvn | \
 ; RUN:     FileCheck %s
 ; REQUIRES: riscv-registered-target
 

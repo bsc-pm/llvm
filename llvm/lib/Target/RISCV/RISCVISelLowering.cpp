@@ -89,7 +89,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   if (Subtarget.hasStdExtD())
     addRegisterClass(MVT::f64, &RISCV::FPR64RegClass);
 
-  if (Subtarget.hasExtEPI()) {
+  if (Subtarget.hasStdExtV()) {
     addRegisterClass(MVT::nxv1i1, &RISCV::VRRegClass);
     addRegisterClass(MVT::nxv2i1, &RISCV::VRRegClass);
     addRegisterClass(MVT::nxv4i1, &RISCV::VRRegClass);
@@ -1986,7 +1986,7 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
   }
 
   assert((!UseGPRForF32 || !UseGPRForF64 ||
-          (TLI->getSubtarget().hasExtEPI() && ValVT.isScalableVector()) ||
+          (TLI->getSubtarget().hasStdExtV() && ValVT.isScalableVector()) ||
           LocVT == XLenVT) &&
          "Expected an XLenVT at this stage");
 
@@ -2028,7 +2028,7 @@ void RISCVTargetLowering::analyzeInputArgs(
   FunctionType *FType = MF.getFunction().getFunctionType();
 
   Optional<unsigned> FirstMaskArgument;
-  if (Subtarget.hasExtEPI()) {
+  if (Subtarget.hasStdExtV()) {
     PreAssignMask(Ins, FirstMaskArgument, CCInfo);
   }
 
@@ -2060,7 +2060,7 @@ void RISCVTargetLowering::analyzeOutputArgs(
   unsigned NumArgs = Outs.size();
 
   Optional<unsigned> FirstMaskArgument;
-  if (Subtarget.hasExtEPI()) {
+  if (Subtarget.hasStdExtV()) {
     PreAssignMask(Outs, FirstMaskArgument, CCInfo);
   }
 
@@ -2852,7 +2852,7 @@ bool RISCVTargetLowering::CanLowerReturn(
   CCState CCInfo(CallConv, IsVarArg, MF, RVLocs, Context);
 
   Optional<unsigned> FirstMaskArgument;
-  if (Subtarget.hasExtEPI()) {
+  if (Subtarget.hasStdExtV()) {
     PreAssignMask(Outs, FirstMaskArgument, CCInfo);
   }
 

@@ -1,4 +1,4 @@
-# RUN: llc -o - -mtriple=riscv64-unknown-linux-gnu -mattr=+epi \
+# RUN: llc -o - -mtriple=riscv64-unknown-linux-gnu -mattr=+v \
 # RUN:     -verify-machineinstrs %s | FileCheck %s
 ---
 name:            test

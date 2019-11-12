@@ -87,7 +87,7 @@ BitVector RISCVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   // Allocator has queried the reserved registers.
   //
   // TODO: Add a pass that undoes this.
-  if (TFI->hasFP(MF) || Subtarget.hasExtEPI())
+  if (TFI->hasFP(MF) || Subtarget.hasStdExtV())
     markSuperRegs(Reserved, RISCV::X8); // fp
   // Reserve the base register if we need to realign the stack and allocate
   // variable-sized objects at runtime.
