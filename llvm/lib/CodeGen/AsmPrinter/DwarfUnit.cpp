@@ -1357,6 +1357,10 @@ DIE *DwarfUnit::getIndexTyDie() {
 static bool hasVectorBeenPadded(const DICompositeType *CTy) {
   assert(CTy && CTy->isVector() && "Composite type is not a vector");
   const uint64_t ActualSize = CTy->getSizeInBits();
+  // FIXME: This is likely a scalable vector. For now assume they are never
+  // padded.
+  if (ActualSize == 0)
+    return false;
 
   // Obtain the size of each element in the vector.
   DIType *BaseTy = CTy->getBaseType();
