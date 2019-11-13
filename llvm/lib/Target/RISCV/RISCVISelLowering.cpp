@@ -90,54 +90,54 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     addRegisterClass(MVT::f64, &RISCV::FPR64RegClass);
 
   if (Subtarget.hasExtEPI()) {
-    addRegisterClass(MVT::nxv1i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv2i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv4i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv8i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv16i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv32i1, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv64i1, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv1i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv2i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv4i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv8i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv16i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv32i1, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv64i1, &RISCV::VRRegClass);
 
-    addRegisterClass(MVT::nxv32i2, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv32i2, &RISCV::VRRegClass);
 
-    addRegisterClass(MVT::nxv16i4, &RISCV::EPIVRRegClass);
+    addRegisterClass(MVT::nxv16i4, &RISCV::VRRegClass);
 
-    //addRegisterClass(MVT::nxv1i8, &RISCV::EPIVRRegClass); // FIXME illegal type
-    //addRegisterClass(MVT::nxv2i8, &RISCV::EPIVRRegClass); // FIXME illegal type
-    //addRegisterClass(MVT::nxv4i8, &RISCV::EPIVRRegClass); // FIXME illegal type
-    addRegisterClass(MVT::nxv8i8, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv16i8, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv32i8, &RISCV::EPIVR4RegClass);
-    //addRegisterClass(MVT::nxv64i8, &RISCV::EPIVR8RegClass); // FIXME undefined type
+    //addRegisterClass(MVT::nxv1i8, &RISCV::VRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv2i8, &RISCV::VRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv4i8, &RISCV::VRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv8i8, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv16i8, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv32i8, &RISCV::VR4RegClass);
+    //addRegisterClass(MVT::nxv64i8, &RISCV::VR8RegClass); // FIXME undefined type
 
-    //addRegisterClass(MVT::nxv1i16, &RISCV::EPIVRRegClass); // FIXME illegal type
-    //addRegisterClass(MVT::nxv2i16, &RISCV::EPIVRRegClass); // FIXME illegal type
-    addRegisterClass(MVT::nxv4i16, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv8i16, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv16i16, &RISCV::EPIVR4RegClass);
-    addRegisterClass(MVT::nxv32i16, &RISCV::EPIVR8RegClass);
+    //addRegisterClass(MVT::nxv1i16, &RISCV::VRRegClass); // FIXME illegal type
+    //addRegisterClass(MVT::nxv2i16, &RISCV::VRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv4i16, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv8i16, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv16i16, &RISCV::VR4RegClass);
+    addRegisterClass(MVT::nxv32i16, &RISCV::VR8RegClass);
 
-    //addRegisterClass(MVT::nxv1i32, &RISCV::EPIVRRegClass); // FIXME illegal type
-    addRegisterClass(MVT::nxv2i32, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv4i32, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv8i32, &RISCV::EPIVR4RegClass);
-    addRegisterClass(MVT::nxv16i32, &RISCV::EPIVR8RegClass);
+    //addRegisterClass(MVT::nxv1i32, &RISCV::VRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv2i32, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv4i32, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv8i32, &RISCV::VR4RegClass);
+    addRegisterClass(MVT::nxv16i32, &RISCV::VR8RegClass);
 
-    addRegisterClass(MVT::nxv1i64, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv2i64, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv4i64, &RISCV::EPIVR4RegClass);
-    addRegisterClass(MVT::nxv8i64, &RISCV::EPIVR8RegClass);
+    addRegisterClass(MVT::nxv1i64, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv2i64, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv4i64, &RISCV::VR4RegClass);
+    addRegisterClass(MVT::nxv8i64, &RISCV::VR8RegClass);
 
-    //addRegisterClass(MVT::nxv1f32, &RISCV::EPIVRRegClass); // FIXME illegal type
-    addRegisterClass(MVT::nxv2f32, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv4f32, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv8f32, &RISCV::EPIVR4RegClass);
-    addRegisterClass(MVT::nxv16f32, &RISCV::EPIVR8RegClass);
+    //addRegisterClass(MVT::nxv1f32, &RISCV::VRRegClass); // FIXME illegal type
+    addRegisterClass(MVT::nxv2f32, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv4f32, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv8f32, &RISCV::VR4RegClass);
+    addRegisterClass(MVT::nxv16f32, &RISCV::VR8RegClass);
 
-    addRegisterClass(MVT::nxv1f64, &RISCV::EPIVRRegClass);
-    addRegisterClass(MVT::nxv2f64, &RISCV::EPIVR2RegClass);
-    addRegisterClass(MVT::nxv4f64, &RISCV::EPIVR4RegClass);
-    addRegisterClass(MVT::nxv8f64, &RISCV::EPIVR8RegClass);
+    addRegisterClass(MVT::nxv1f64, &RISCV::VRRegClass);
+    addRegisterClass(MVT::nxv2f64, &RISCV::VR2RegClass);
+    addRegisterClass(MVT::nxv4f64, &RISCV::VR4RegClass);
+    addRegisterClass(MVT::nxv8f64, &RISCV::VR8RegClass);
 
     setBooleanVectorContents(ZeroOrOneBooleanContent);
 
@@ -1755,17 +1755,17 @@ static const MCPhysReg ArgFPR64s[] = {
   RISCV::F14_D, RISCV::F15_D, RISCV::F16_D, RISCV::F17_D
 };
 
-static const MCPhysReg ArgEPIVRs[] = {RISCV::V16, RISCV::V17, RISCV::V18,
-                                      RISCV::V19, RISCV::V20, RISCV::V21,
-                                      RISCV::V22, RISCV::V23};
-static const MCPhysReg ArgEPIVR2s[] = {
+static const MCPhysReg ArgVRs[] = {RISCV::V16, RISCV::V17, RISCV::V18,
+                                    RISCV::V19, RISCV::V20, RISCV::V21,
+                                    RISCV::V22, RISCV::V23};
+static const MCPhysReg ArgVR2s[] = {
     RISCV::V16_2,
     RISCV::V18_2,
     RISCV::V20_2,
     RISCV::V22_2,
 };
-static const MCPhysReg ArgEPIVR4s[] = {RISCV::V16_4, RISCV::V20_4};
-static const MCPhysReg ArgEPIVR8s[] = {RISCV::V16_8};
+static const MCPhysReg ArgVR4s[] = {RISCV::V16_4, RISCV::V20_4};
+static const MCPhysReg ArgVR8s[] = {RISCV::V16_8};
 
 // Pass a 2*XLEN argument that has been split into two XLEN values through
 // registers or the stack as necessary.
@@ -1941,19 +1941,19 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
     Reg = State.AllocateReg(ArgFPR64s, ArgFPR32s);
   else if (ValVT.isScalableVector()) {
     const TargetRegisterClass *RC = TLI->getRegClassFor(ValVT);
-    if (RC->hasSuperClassEq(&RISCV::EPIVRRegClass)) {
+    if (RC->hasSuperClassEq(&RISCV::VRRegClass)) {
       if (FirstMaskArgument.hasValue() &&
           ValNo == FirstMaskArgument.getValue()) {
         Reg = RISCV::V0;
       } else {
-        Reg = State.AllocateReg(ArgEPIVRs);
+        Reg = State.AllocateReg(ArgVRs);
       }
-    } else if (RC->hasSuperClassEq(&RISCV::EPIVR2RegClass)) {
-      Reg = State.AllocateReg(ArgEPIVR2s);
-    } else if (RC->hasSuperClassEq(&RISCV::EPIVR4RegClass)) {
-      Reg = State.AllocateReg(ArgEPIVR4s);
-    } else if (RC->hasSuperClassEq(&RISCV::EPIVR8RegClass)) {
-      Reg = State.AllocateReg(ArgEPIVR8s);
+    } else if (RC->hasSuperClassEq(&RISCV::VR2RegClass)) {
+      Reg = State.AllocateReg(ArgVR2s);
+    } else if (RC->hasSuperClassEq(&RISCV::VR4RegClass)) {
+      Reg = State.AllocateReg(ArgVR4s);
+    } else if (RC->hasSuperClassEq(&RISCV::VR8RegClass)) {
+      Reg = State.AllocateReg(ArgVR8s);
     } else {
       llvm_unreachable("Unhandled class register for ValueType");
     }
@@ -2660,7 +2660,7 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
         RISCVMachineFunctionInfo *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
         // Let know FrameLowering that we're spilling vector registers.
-        RVFI->setHasSpilledEPIVR();
+        RVFI->setHasSpilledVR();
         // Mark this spill as a vector spill.
         MF.getFrameInfo().setStackID(FI, TargetStackID::EPIVector);
 
@@ -3064,7 +3064,7 @@ RISCVTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
         return std::make_pair(0U, &RISCV::FPR64RegClass);
       break;
     case 'v':
-      return std::make_pair(0U, &RISCV::EPIVRRegClass);
+      return std::make_pair(0U, &RISCV::VRRegClass);
     default:
       break;
     }

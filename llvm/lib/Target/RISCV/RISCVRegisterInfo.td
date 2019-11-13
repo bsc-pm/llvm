@@ -241,20 +241,88 @@ let RegAltNameIndices = [ABIRegAltName] in {
   }
 }
 
-class RegisterTypes<list<ValueType> reg_types> {
-  list<ValueType> types = reg_types;
+
+let Namespace = "RISCV" in {
+def vrodd : SubRegIndex<0, -1>;
+def vreven : SubRegIndex<0, -1>;
+
+def vr2odd : SubRegIndex<0, -1>;
+def vr2even : SubRegIndex<0, -1>;
+
+def vr4odd : SubRegIndex<0, -1>;
+def vr4even : SubRegIndex<0, -1>;
+
+let SubRegIndices = [vreven, vrodd] in
+{
+  foreach Index = 0-15 in {
+    def "V"#!shl(#Index, 1)#"_2" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(#Index, 1)),
+       !cast<Register>("V"#!add(!shl(#Index, 1), 1))]>;
+  }
 }
 
-def VLenVT : RegisterTypes<[nxv16i8, nxv8i16, nxv4i32, nxv2i64]>;
-
-// The order of registers represents the preferred allocation sequence,
-// meaning caller-save regs are listed before callee-save.
-def VR : RegisterClass<"RISCV", VLenVT.types,
-                        128, (add
-    (sequence "V%u", 25, 31),
-    (sequence "V%u", 8, 24),
-    (sequence "V%u", 0, 7)
-  )> {
+let SubRegIndices = [vr2even, vr2odd] in
+{
+  foreach Index = 0-7 in {
+    def "V"#!shl(#Index, 2)#"_4" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(#Index, 2)#"_2"),
+       !cast<Register>("V"#!add(!shl(#Index, 2), 2)#"_2")]>;
+  }
 }
 
-def VRV0 : RegisterClass<"RISCV", VLenVT.types, 128, (add V0)>;
+let SubRegIndices = [vr4even, vr4odd] in
+{
+  foreach Index = 0-3 in {
+    def "V"#!shl(#Index, 3)#"_8" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(#Index, 3)#"_4"),
+       !cast<Register>("V"#!add(!shl(#Index, 3), 4)#"_4")]>;
+  }
+}
+} // Namespace = "RISCV"
+
+class VReg<list<ValueType> regTypes, dag regList, int Vlmul>
+  : RegisterClass<"RISCV",
+                  regTypes,
+                  // Alignment set to 16 bytes
+                  128,
+                  regList> {
+  int VLMul = Vlmul;
+  let Size = 64; // FIXME ELEN
+}
+
+defset list<VReg> AllVRegs = {
+  // The order of registers represents the preferred allocation sequence,
+  // meaning caller-save regs are listed before callee-save.
+  def VR : VReg<[nxv1i64, nxv2i32, nxv4i16, nxv8i8, nxv1f64, nxv2f32,
+                 nxv16i4, nxv32i2,
+                 nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1, nxv64i1
+                ],
+                (add (sequence "V%u", 25, 31),
+                     (sequence "V%u", 8, 24),
+                     (sequence "V%u", 0, 7)),
+                1>;
+
+  def VR2 : VReg<[nxv2i64, nxv4i32, nxv8i16, nxv16i8, nxv2f64, nxv4f32],
+                 // Prioritise caller-save and then callee-save
+                 (add (sequence "V%u_2", 0, 7, 2),
+                      (sequence "V%u_2", 16, 23, 2),
+                      (sequence "V%u_2", 8, 15, 2),
+                      (sequence "V%u_2", 24, 31, 2)),
+                 2>;
+
+  def VR4 : VReg<[nxv4i64, nxv8i32, nxv16i16, nxv32i8, nxv4f64, nxv8f32],
+                 // Prioritise caller-save and then callee-save
+                 (add (sequence "V%u_4", 0, 7, 4),
+                      (sequence "V%u_4", 16, 23, 4),
+                      (sequence "V%u_4", 8, 15, 4),
+                      (sequence "V%u_4", 24, 31, 4)),
+                 4>;
+
+  def VR8 : VReg<[nxv8i64, nxv16i32, nxv32i16, /*FIXME nxv64i8 does not exist yet,*/ nxv8f64, nxv16f32],
+                 // Prioritise caller-save and then callee-save
+                 (add V0_8, V16_8, V8_8, V24_8),
+                 8>;
+}
+
+def VRV0 : VReg<[nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1,
+                 nxv64i1], (add V0), 1>;

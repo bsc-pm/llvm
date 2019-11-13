@@ -753,10 +753,10 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
       unsigned Reg = Op->getReg();
 
       const TargetRegisterClass *RC = RI.getMinimalPhysRegClass(Reg);
-      if (RC->hasSuperClassEq(&RISCV::EPIVR2RegClass) ||
-          RC->hasSuperClassEq(&RISCV::EPIVR4RegClass) ||
-          RC->hasSuperClassEq(&RISCV::EPIVR8RegClass)) {
-        Reg = RI.getSubReg(Reg, RISCV::epivreven);
+      if (RC->hasSuperClassEq(&RISCV::VR2RegClass) ||
+          RC->hasSuperClassEq(&RISCV::VR4RegClass) ||
+          RC->hasSuperClassEq(&RISCV::VR8RegClass)) {
+        Reg = RI.getSubReg(Reg, RISCV::vreven);
         assert(Reg && "Subregister does not exist");
       }
 

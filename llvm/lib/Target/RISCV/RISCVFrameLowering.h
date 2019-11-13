@@ -67,12 +67,12 @@ private:
 
   void expandVectorSpillReload(MachineFunction& MF) const;
 
-  void prepareStorageSpilledEPIVR(MachineFunction &MF, MachineBasicBlock &MBB,
-                                 MachineBasicBlock::iterator MBBI,
-                                 const MachineFrameInfo &MFI,
-                                 MachineRegisterInfo &MRI,
-                                 const TargetInstrInfo &TII,
-                                 const DebugLoc &DL) const;
+  void prepareStorageSpilledVR(MachineFunction &MF, MachineBasicBlock &MBB,
+                                MachineBasicBlock::iterator MBBI,
+                                const MachineFrameInfo &MFI,
+                                MachineRegisterInfo &MRI,
+                                const TargetInstrInfo &TII,
+                                const DebugLoc &DL) const;
 };
 }
 #endif

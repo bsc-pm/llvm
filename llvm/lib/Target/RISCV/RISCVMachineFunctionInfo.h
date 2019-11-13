@@ -31,8 +31,8 @@ private:
   /// of 32-bit GPRs via the stack.
   int MoveF64FrameIndex = -1;
 
-  // True if this function spills EPIVR
-  bool HasSpilledEPIVR = false;
+  // True if this function spills VR
+  bool HasSpilledVR = false;
 
 public:
   RISCVMachineFunctionInfo(MachineFunction &MF) : MF(MF) {}
@@ -49,8 +49,8 @@ public:
     return MoveF64FrameIndex;
   }
 
-  bool hasSpilledEPIVR() const { return HasSpilledEPIVR; }
-  void setHasSpilledEPIVR(bool V = true) { HasSpilledEPIVR = V; }
+  bool hasSpilledVR() const { return HasSpilledVR; }
+  void setHasSpilledVR(bool V = true) { HasSpilledVR = V; }
 };
 
 } // end namespace llvm

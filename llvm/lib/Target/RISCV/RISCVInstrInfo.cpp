@@ -140,11 +140,11 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
-  // EPIVR->EPIVR, EPIVR2->EPIVR2, EPIVR4->EPIVR4, EPIVR8->EPIVR8
-  if (RISCV::EPIVRRegClass.contains(DstReg, SrcReg) ||
-      RISCV::EPIVR2RegClass.contains(DstReg, SrcReg) ||
-      RISCV::EPIVR4RegClass.contains(DstReg, SrcReg) ||
-      RISCV::EPIVR8RegClass.contains(DstReg, SrcReg)) {
+  // VR->VR, VR2->VR2, VR4->VR4, VR8->VR8
+  if (RISCV::VRRegClass.contains(DstReg, SrcReg) ||
+      RISCV::VR2RegClass.contains(DstReg, SrcReg) ||
+      RISCV::VR4RegClass.contains(DstReg, SrcReg) ||
+      RISCV::VR8RegClass.contains(DstReg, SrcReg)) {
     // readvl t0
     // readvtype t1
     // vsetvli x0, x0, ELEN, VLMUL
@@ -200,19 +200,19 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     }
 
     unsigned VLMul;
-    if (RISCV::EPIVRRegClass.contains(DstReg, SrcReg))
+    if (RISCV::VRRegClass.contains(DstReg, SrcReg))
       VLMul = 0;
     else {
-      if (RISCV::EPIVR2RegClass.contains(DstReg, SrcReg))
+      if (RISCV::VR2RegClass.contains(DstReg, SrcReg))
         VLMul = 1;
-      else if (RISCV::EPIVR4RegClass.contains(DstReg, SrcReg))
+      else if (RISCV::VR4RegClass.contains(DstReg, SrcReg))
         VLMul = 2;
       else {
-        assert(RISCV::EPIVR8RegClass.contains(DstReg, SrcReg));
+        assert(RISCV::VR8RegClass.contains(DstReg, SrcReg));
         VLMul = 3;
       }
-      SrcReg = RI.getSubReg(SrcReg, RISCV::epivreven);
-      DstReg = RI.getSubReg(DstReg, RISCV::epivreven);
+      SrcReg = RI.getSubReg(SrcReg, RISCV::vreven);
+      DstReg = RI.getSubReg(DstReg, RISCV::vreven);
       assert(SrcReg && DstReg && "Subregister does not exist");
     }
 
@@ -276,8 +276,8 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FSW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSD;
-  else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
-    RVFI->setHasSpilledEPIVR();
+  else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
     FrameInfo.setStackID(FI, TargetStackID::EPIVector);
     BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL))
         .addReg(SrcReg, getKillRegState(IsKill))
@@ -314,8 +314,8 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FLW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLD;
-  else if (RISCV::EPIVRRegClass.hasSubClassEq(RC)) {
-    RVFI->setHasSpilledEPIVR();
+  else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
     FrameInfo.setStackID(FI, TargetStackID::EPIVector);
     BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD), DstReg)
         .addFrameIndex(FI);

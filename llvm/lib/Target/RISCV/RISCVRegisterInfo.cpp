@@ -303,5 +303,5 @@ bool RISCVRegisterInfo::hasBasePointer(const MachineFunction &MF) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   return needsStackRealignment(MF) &&
-         (MFI.hasVarSizedObjects() || RVFI->hasSpilledEPIVR());
+         (MFI.hasVarSizedObjects() || RVFI->hasSpilledVR());
 }

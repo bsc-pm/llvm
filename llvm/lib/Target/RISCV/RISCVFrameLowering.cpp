@@ -34,12 +34,12 @@ bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
   // - we are told to have one
   // - the stack needs realignment (due to overaligned local objects)
   // - the stack has VLAs
-  // - the function has to spill EPIVR vectors
+  // - the function has to spill VR vectors
   // - the function uses @llvm.frameaddress
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   return MF.getTarget().Options.DisableFramePointerElim(MF) ||
          RegInfo->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
-         RVFI->hasSpilledEPIVR() || MFI.isFrameAddressTaken();
+         RVFI->hasSpilledVR() || MFI.isFrameAddressTaken();
 }
 
 bool RISCVFrameLowering::hasBP(const MachineFunction &MF) const {
@@ -58,7 +58,7 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   // Get the number of bytes to allocate from the FrameInfo.
   uint64_t FrameSize = MFI.getStackSize();
 
-  // Account all EPIVR_SPILL taking the size of a pointer.
+  // Account all VR_SPILL taking the size of a pointer.
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
     uint8_t StackID = MFI.getStackID(FI);
@@ -90,7 +90,7 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
     assert(MFI.getStackID(FI) == TargetStackID::EPIVector &&
            "Unexpected Stack ID!");
     LLVM_DEBUG(dbgs() << "alloc FI(" << FI << ") at SP["
-                      << MFI.getObjectOffset(FI) << "] StackID: EPIVR_SPILL\n");
+                      << MFI.getObjectOffset(FI) << "] StackID: VR_SPILL\n");
   }
 #endif
 
@@ -283,7 +283,7 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   int InsnToSkip = CSI.size();
   for (auto &CS : CSI) {
-    if (RISCV::EPIVRRegClass.contains(CS.getReg()))
+    if (RISCV::VRRegClass.contains(CS.getReg()))
       InsnToSkip--;
   }
   std::advance(MBBI, InsnToSkip);
@@ -293,8 +293,8 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   for (const auto &Entry : CSI) {
     int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx());
     Register Reg = Entry.getReg();
-    // We don't have sensible DWARF for EPI registers yet
-    if (RISCV::EPIVRRegClass.contains(Reg))
+    // We don't have sensible DWARF for VRs yet
+    if (RISCV::VRRegClass.contains(Reg))
       continue;
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
         nullptr, RI->getDwarfRegNum(Reg, true), Offset));
@@ -373,21 +373,21 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
-  prepareStorageSpilledEPIVR(MF, MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
+  prepareStorageSpilledVR(MF, MBB, MBBI, MFI, MF.getRegInfo(), *TII, DL);
 }
 
-void RISCVFrameLowering::prepareStorageSpilledEPIVR(
+void RISCVFrameLowering::prepareStorageSpilledVR(
     MachineFunction &MF, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator MBBI, const MachineFrameInfo &MFI,
     MachineRegisterInfo &MRI, const TargetInstrInfo &TII,
     const DebugLoc &DL) const {
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
-  if (!RVFI->hasSpilledEPIVR())
+  if (!RVFI->hasSpilledVR())
     return;
 
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
-  // FIXME: We're presuming in advance that this is all about EPIVR
+  // FIXME: We're presuming in advance that this is all about VRs
   // FIXME: We are assuming the width of the element is 64 bit, we will want
   // something like an ABI feature or a way to query this from the CPU (via
   // a CSR)
@@ -436,7 +436,7 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
         .addReg(SizeOfVector);
     // Align the stack. Vector registers should always be aligned more than
     // the natural alignment of the stack (currently 16 bytes).
-    alignSP(MBB, MBBI, DL, RegInfo->getSpillAlignment(RISCV::EPIVRRegClass));
+    alignSP(MBB, MBBI, DL, RegInfo->getSpillAlignment(RISCV::VRRegClass));
     // Now SP is the value we want to put in the stack slot.
     unsigned StoreOpcode =
         RegInfo->getSpillSize(RISCV::GPRRegClass) == 4 ? RISCV::SW : RISCV::SD;
@@ -474,11 +474,11 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // Skip to before the restores of callee-saved registers
   // FIXME: assumes exactly one instruction is used to restore each
   // callee-saved register.
-  // Ignore the EPI registers as we did in the prologue.
+  // Ignore the VRs as we did in the prologue.
   const std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
   int InsnToSkip = CSI.size();
   for (auto &CS : CSI) {
-    if (RISCV::EPIVRRegClass.contains(CS.getReg()))
+    if (RISCV::VRRegClass.contains(CS.getReg()))
       InsnToSkip--;
   }
   auto LastFrameDestroy = std::prev(MBBI, InsnToSkip);
@@ -490,7 +490,7 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // necessary if the stack pointer was modified, meaning the stack size is
   // unknown.
   if (RI->needsStackRealignment(MF) || MFI.hasVarSizedObjects() ||
-      RVFI->hasSpilledEPIVR()) {
+      RVFI->hasSpilledVR()) {
     assert(hasFP(MF) && "frame pointer should not have been eliminated");
     adjustReg(MBB, LastFrameDestroy, DL, SPReg, FPReg, -FPOffset,
               MachineInstr::FrameDestroy);
@@ -625,7 +625,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const TargetRegisterClass *RC = &RISCV::GPRRegClass;
 
-  if (RVFI->hasSpilledEPIVR()) {
+  if (RVFI->hasSpilledVR()) {
     // We conservatively add two emergency slots if we have seen PseudoVSPILL
     // or PseudoVRELOAD already. They are used for the virtual registers needed
     // for vtype and vl.
@@ -637,7 +637,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
     RS->addScavengingFrameIndex(RegScavFI);
   }
 
-  // Go through all Stackslots coming from an alloca and make them EPIVR_SPILL.
+  // Go through all Stackslots coming from an alloca and make them VR_SPILL.
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
     // Get the (LLVM IR) allocation instruction
@@ -650,7 +650,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
         dyn_cast<const VectorType>(Alloca->getType()->getElementType());
     if (VT && VT->isScalable()) {
       MFI.setStackID(FI, TargetStackID::EPIVector);
-      RVFI->setHasSpilledEPIVR();
+      RVFI->setHasSpilledVR();
     }
   }
 
@@ -663,7 +663,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   // EPI: frames that store vectors on the stack usually need large offsets
   // so make sure there is an emergency spill for them in case computing
   // them needs an extra register.
-  if (!isInt<11>(MFI.estimateStackSize(MF)) || RVFI->hasSpilledEPIVR()) {
+  if (!isInt<11>(MFI.estimateStackSize(MF)) || RVFI->hasSpilledVR()) {
     int RegScavFI = MFI.CreateStackObject(
         RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
     RS->addScavengingFrameIndex(RegScavFI);
@@ -675,7 +675,7 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
 // preserve stack space for it.
 bool RISCVFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
-  return !(MF.getFrameInfo().hasVarSizedObjects() || RVFI->hasSpilledEPIVR());
+  return !(MF.getFrameInfo().hasVarSizedObjects() || RVFI->hasSpilledVR());
 }
 
 // Eliminate ADJCALLSTACKDOWN, ADJCALLSTACKUP pseudo instructions.
