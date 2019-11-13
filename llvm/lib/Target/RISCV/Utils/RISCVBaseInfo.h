@@ -46,17 +46,9 @@ enum {
   InstFormatCJ = 16,
   InstFormatOther = 17,
 
-  // EPI formats
-  InstEPIVAluInt = 17,
-  InstEPIVAluIntImm = 18,
-  InstEPIVAluFloat = 19,
-  InstEPIVAluFM = 20,
-  InstEPIVLoadInt = 21,
-  InstEPIVLoadFloat = 22,
-  InstEPIVAtomic = 23,
-  // End of EPI formats
+  InstFormatMask = 31,
 
-  InstFormatMask = 31
+  InstVectorWithMask = (0x1 << 5),
 };
 
 // RISC-V Specific Machine Operand Flags

@@ -18,6 +18,7 @@
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
 #include "llvm/MC/MCFixedLenDisassembler.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/Endian.h"
@@ -31,10 +32,12 @@ typedef MCDisassembler::DecodeStatus DecodeStatus;
 
 namespace {
 class RISCVDisassembler : public MCDisassembler {
+  std::unique_ptr<MCInstrInfo const> const MCII;
 
 public:
-  RISCVDisassembler(const MCSubtargetInfo &STI, MCContext &Ctx)
-      : MCDisassembler(STI, Ctx) {}
+  RISCVDisassembler(const MCSubtargetInfo &STI, MCContext &Ctx,
+                    MCInstrInfo const *MCII)
+      : MCDisassembler(STI, Ctx), MCII(MCII) {}
 
   DecodeStatus getInstruction(MCInst &Instr, uint64_t &Size,
                               ArrayRef<uint8_t> Bytes, uint64_t Address,
@@ -45,7 +48,7 @@ public:
 static MCDisassembler *createRISCVDisassembler(const Target &T,
                                                const MCSubtargetInfo &STI,
                                                MCContext &Ctx) {
-  return new RISCVDisassembler(STI, Ctx);
+  return new RISCVDisassembler(STI, Ctx, T.createMCInstrInfo());
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVDisassembler() {
@@ -148,27 +151,29 @@ static DecodeStatus DecodeGPRCRegisterClass(MCInst &Inst, uint64_t RegNo,
   return MCDisassembler::Success;
 }
 
-static const unsigned EPIVRDecoderTable[] = {
-  RISCV::V0,  RISCV::V1,  RISCV::V2,  RISCV::V3,
-  RISCV::V4,  RISCV::V5,  RISCV::V6,  RISCV::V7,
-  RISCV::V8,  RISCV::V9,  RISCV::V10, RISCV::V11,
-  RISCV::V12, RISCV::V13, RISCV::V14, RISCV::V15,
-  RISCV::V16, RISCV::V17, RISCV::V18, RISCV::V19,
-  RISCV::V20, RISCV::V21, RISCV::V22, RISCV::V23,
-  RISCV::V24, RISCV::V25, RISCV::V26, RISCV::V27,
-  RISCV::V28, RISCV::V29, RISCV::V30, RISCV::V31
-};
-
-static DecodeStatus DecodeEPIVRRegisterClass(MCInst &Inst, uint64_t RegNo,
-                                             uint64_t Address,
-                                             const void *Decoder) {
-  if (RegNo > sizeof(EPIVRDecoderTable))
+static DecodeStatus DecodeVRRegisterClass(MCInst &Inst, uint64_t RegNo,
+                                          uint64_t Address,
+                                          const void *Decoder) {
+  if (RegNo >= 32)
     return MCDisassembler::Fail;
 
-  // We must define our own mapping from RegNo to register identifier.
-  // Accessing index RegNo in the register class will work in the case that
-  // registers were added in ascending order, but not in general.
-  unsigned Reg = EPIVRDecoderTable[RegNo];
+  Register Reg = RISCV::V0 + RegNo;
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus decodeVRMaskOp(MCInst &Inst, uint64_t RegNo,
+                                   uint64_t Address, const void *Decoder) {
+  Register Reg = RISCV::NoRegister;
+  switch (RegNo) {
+  default:
+    return MCDisassembler::Fail;
+  case 0:
+    Reg = RISCV::V0;
+    break;
+  case 1:
+    break;
+  }
   Inst.addOperand(MCOperand::createReg(Reg));
   return MCDisassembler::Success;
 }

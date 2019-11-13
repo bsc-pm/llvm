@@ -56,11 +56,11 @@ def HasRVCHints : Predicate<"Subtarget->enableRVCHintInstrs()">,
                             AssemblerPredicate<"FeatureRVCHints",
                             "RVC Hint Instructions">;
 
-def FeatureExtEPI
-    : SubtargetFeature<"epi", "HasExtEPI", "true",
-                       "'EPI' (Research Vector ISA)">;
-def HasExtEPI : Predicate<"Subtarget->hasExtEPI()">,
-                           AssemblerPredicate<"FeatureExtEPI">;
+def FeatureStdExtV
+    : SubtargetFeature<"v", "HasStdExtV", "true",
+                       "'V' (Vector Instructions)">;
+def HasStdExtV : Predicate<"Subtarget->hasStdExtV()">,
+                           AssemblerPredicate<"FeatureStdExtV">;
 
 def Feature64Bit
     : SubtargetFeature<"64bit", "HasRV64", "true", "Implements RV64">;
