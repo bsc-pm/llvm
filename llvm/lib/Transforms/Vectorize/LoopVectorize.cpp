@@ -322,7 +322,8 @@ static bool hasIrregularType(Type *Ty, const DataLayout &DL, unsigned VF,
   // with a <VF x Ty> vector.
   if (VF > 1 || (VF == 1 && Scalable)) {
     auto *VectorTy = VectorType::get(Ty, VF, Scalable);
-    return VF * DL.getTypeAllocSize(Ty) != DL.getTypeStoreSize(VectorTy);
+    return TypeSize(VF * DL.getTypeAllocSize(Ty), Scalable) !=
+           DL.getTypeStoreSize(VectorTy);
   }
 
   // If the vectorization factor is one, we just check if an array of type Ty
@@ -5928,7 +5929,8 @@ static bool isStrideMul(Instruction *I, LoopVectorizationLegality *Legal) {
 
 unsigned LoopVectorizationCostModel::getMemInstScalarizationCost(Instruction *I,
                                                                  unsigned VF) {
-  assert(VF > 1 && "Scalarization cost of instruction implies vectorization.");
+  assert((VF > 1 || isScalable()) &&
+         "Scalarization cost of instruction implies vectorization.");
   Type *ValTy = getMemInstValueType(I);
   auto SE = PSE.getSE();
 
@@ -6942,7 +6944,7 @@ VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
     return nullptr;
 
   auto willWiden = [&](unsigned VF) -> bool {
-    if (VF == 1)
+    if (VF == 1 && !CM.isScalable())
       return false;
     LoopVectorizationCostModel::InstWidening Decision =
         CM.getWideningDecision(I, VF);

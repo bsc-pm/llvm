@@ -3870,6 +3870,10 @@ foreach vti = AllIntegerVectors in
             (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul)
               simm5:$value,
               X0, vti.SEW)>;
+
+  def : Pat<(vti.Vector (int_experimental_vector_stepvector)),
+            (!cast<Instruction>("PseudoVID_V_M"#vti.RegClass.VLMul)
+            X0, vti.SEW)>;
 }
 
 }
