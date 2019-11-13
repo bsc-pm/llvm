@@ -1356,8 +1356,11 @@ void TargetLoweringBase::computeRegisterProperties(
       MVT IntermediateVT;
       MVT RegisterVT;
       unsigned NumIntermediates;
-      NumRegistersForVT[i] = getVectorTypeBreakdownMVT(VT, IntermediateVT,
+      unsigned NumRegisters = getVectorTypeBreakdownMVT(VT, IntermediateVT,
           NumIntermediates, RegisterVT, this);
+      NumRegistersForVT[i] = NumRegisters;
+      assert(NumRegistersForVT[i] == NumRegisters &&
+             "NumRegistersForVT size cannot represent NumRegisters!");
       RegisterTypeForVT[i] = RegisterVT;
 
       MVT NVT = VT.getPow2VectorType();
