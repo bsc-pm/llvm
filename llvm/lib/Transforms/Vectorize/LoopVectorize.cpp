@@ -1959,21 +1959,24 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
       Function *StepVector = Intrinsic::getDeclaration(
           LoopVectorPreHeader->getModule(),
           Intrinsic::experimental_vector_stepvector, Val->getType());
-      Step = Builder.CreateCall(StepVector, {}, "stepvec.base");
+      llvm::Value *Indices = Builder.CreateCall(StepVector, {}, "stepvec.base");
+      assert(Indices->getType() == Val->getType() && "Invalid consecutive vec");
       if (StartIdx) {
-        llvm::Value *StartIdxSplat = Builder.CreateVectorSplat(
-            VLen, ConstantInt::get(STy, StartIdx), "stepvec.start", isScalable());
-        Step = Builder.CreateAdd(Step, StartIdxSplat);
+        llvm::Value *StartIdxSplat =
+            Builder.CreateVectorSplat(VLen, ConstantInt::get(STy, StartIdx),
+                                      "stepvec.start", isScalable());
+        Indices = Builder.CreateAdd(Indices, StartIdxSplat);
       }
 
-      assert(Step->getType() == Val->getType() && "Invalid step vec");
       // FIXME: The newly created binary instructions should contain nsw/nuw
       // flags, which can be found from the original scalar operations.
-      if (VLen != 1) {
-        llvm::Value *Indices = Step;
-        Step = Builder.CreateVectorSplat(VLen, ConstantInt::get(STy, VLen),
-                                         "splat.vlen", isScalable());
+      if (!isa<Constant>(Step) || !cast<Constant>(Step)->isOneValue()) {
+        Step =
+            Builder.CreateVectorSplat(VLen, Step, "splat.step", isScalable());
+        assert(Step->getType() == Val->getType() && "Invalid step vec");
         Step = Builder.CreateMul(Indices, Step, "stepvec.scaled");
+      } else {
+        Step = Indices;
       }
     } else {
       SmallVector<Constant *, 8> Indices;
