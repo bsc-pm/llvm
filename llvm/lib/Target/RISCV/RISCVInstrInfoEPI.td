@@ -3840,11 +3840,13 @@ multiclass pat_vop_ternary_common<SDNode vop,
 let Predicates = [HasExtEPI] in {
 
 defm "" : pat_vop_binary_common<add, "PseudoVADD", AllIntegerVectors>;
+defm "" : pat_vop_binary_common<sub, "PseudoVSUB", AllIntegerVectors>;
 defm "" : pat_vop_binary_common<mul, "PseudoVMUL", AllIntegerVectors>;
 
 defm "" : pat_vop_binary_common<and, "PseudoVAND", AllIntegerVectors>;
 
 defm "" : pat_vop_binary_common<fadd, "PseudoVFADD", AllFloatVectors>;
+defm "" : pat_vop_binary_common<fsub, "PseudoVFSUB", AllFloatVectors>;
 defm "" : pat_vop_binary_common<fmul, "PseudoVFMUL", AllFloatVectors>;
 
 defm "" : pat_vop_ternary_common<fma, "PseudoVFMADD", AllFloatVectors>;
@@ -3858,6 +3860,26 @@ foreach fvti = AllFloatVectors in
                 (SUBREG_TO_REG (i32 -1), FPR32:$value, sub_32),
                 (fvti.Scalar fvti.ScalarRegClass:$value)),
               X0, fvti.SEW)>;
+
+  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in 
+  def : Pat<(fvti.Vector (sint_to_fp (ivti.Vector ivti.RegClass:$value))),
+            (!cast<Instruction>("PseudoVFCVT_F_X_V_M"#fvti.RegClass.VLMul)
+              $value, X0, fvti.SEW)>;
+
+  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in 
+  def : Pat<(fvti.Vector (uint_to_fp (ivti.Vector ivti.RegClass:$value))),
+            (!cast<Instruction>("PseudoVFCVT_F_XU_V_M"#fvti.RegClass.VLMul)
+              $value, X0, fvti.SEW)>;
+
+  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in 
+  def : Pat<(ivti.Vector (fp_to_sint (fvti.Vector fvti.RegClass:$value))),
+            (!cast<Instruction>("PseudoVFCVT_X_F_V_M"#fvti.RegClass.VLMul)
+              $value, X0, fvti.SEW)>;
+
+  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in 
+  def : Pat<(ivti.Vector (fp_to_uint (fvti.Vector fvti.RegClass:$value))),
+            (!cast<Instruction>("PseudoVFCVT_XU_F_V_M"#fvti.RegClass.VLMul)
+              $value, X0, fvti.SEW)>;
 }
 
 foreach vti = AllIntegerVectors in
@@ -3875,6 +3897,20 @@ foreach vti = AllIntegerVectors in
             (!cast<Instruction>("PseudoVID_V_M"#vti.RegClass.VLMul)
             X0, vti.SEW)>;
 }
+
+// FIXME: LMUL>1 is missing
+def : Pat<(extractelt (nxv1i64 EPIVR:$rs2), GPR:$rs1),
+          (PseudoVEXT_X_V (nxv1i64 EPIVR:$rs2), GPR:$rs1, 64)>;
+// def : Pat<(sext_inreg (extractelt (nxv2i32 EPIVR:$rs2), GPR:$rs1), i32),
+//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
+// def : Pat<(sext_inreg (extractelt (nxv4i16 EPIVR:$rs2), GPR:$rs1), i16),
+//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
+// def : Pat<(sext_inreg (extractelt (nxv8i16 EPIVR:$rs2), GPR:$rs1), i8),
+//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
+
+// FIXME: This should be done in a better way.
+def : Pat<(nxv1i64 (sext_inreg (nxv1i64 EPIVR:$value), nxv1i32)),
+          (PseudoVSRA_VI_M1 (PseudoVSLL_VI_M1 $value, 32, X0, 64), 32, X0, 64)>;
 
 }
 

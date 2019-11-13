@@ -283,7 +283,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   setMinimumJumpTableEntries(INT_MAX);
 
   // EPI intrinsics may have illegal operands/results
-  for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32}) {
+  for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32, MVT::nxv1i32}) {
     setOperationAction(ISD::INTRINSIC_WO_CHAIN, VT, Custom);
   }
 }
@@ -1073,7 +1073,27 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
   }
   case ISD::INTRINSIC_WO_CHAIN: {
     unsigned IntNo = cast<ConstantSDNode>(N->getOperand(0))->getZExtValue();
-    if (IntNo == Intrinsic::epi_vext_x_v) {
+    switch (IntNo) {
+    default:
+      llvm_unreachable(
+          "Don't know how to custom type legalize this intrinsic!");
+    case Intrinsic::experimental_vector_vscale: {
+      EVT Ty = N->getValueType(0);
+      switch (Ty.getSimpleVT().SimpleTy) {
+      default:
+        llvm_unreachable("Unexpected result type to legalize");
+      case MVT::i32:
+      case MVT::i16:
+      case MVT::i8:
+        SDValue Promoted = DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, MVT::i64,
+                                       DAG.getConstant(IntNo, DL, MVT::i64));
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Promoted);
+        Results.push_back(Trunc);
+        break;
+      }
+      break;
+    }
+    case Intrinsic::epi_vext_x_v: {
       EVT Ty = N->getValueType(0);
       int ElementWidth;
       switch (Ty.getSimpleVT().SimpleTy) {
@@ -1097,7 +1117,22 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
       Results.push_back(Trunc);
       break;
     }
-    llvm_unreachable("Don't know how to custom type legalize this intrinsic!");
+    case Intrinsic::experimental_vector_stepvector: {
+      EVT Ty = N->getValueType(0);
+      switch (Ty.getSimpleVT().SimpleTy) {
+      default:
+        llvm_unreachable("Unexpected result type to legalize");
+      case MVT::nxv1i32:
+        SDValue Promoted =
+            DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, MVT::nxv1i64,
+                        DAG.getConstant(IntNo, DL, MVT::i64));
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Promoted);
+        Results.push_back(Trunc);
+        break;
+      }
+      break;
+    }
+    }
     break;
   }
   }

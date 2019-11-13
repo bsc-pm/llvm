@@ -5755,6 +5755,10 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
     return false;
 
   Instruction *I0 = cast<Instruction>(S.OpValue);
+  // Ignore scalable vectors for now.
+  if (I0->getType()->isVectorTy() && I0->getType()->getVectorIsScalable())
+    return false;
+
   unsigned Sz = R.getVectorElementSize(I0);
   unsigned MinVF = std::max(2U, R.getMinVecRegSize() / Sz);
   unsigned MaxVF = std::max<unsigned>(PowerOf2Floor(VL.size()), MinVF);
