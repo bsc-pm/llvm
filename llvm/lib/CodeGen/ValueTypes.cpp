@@ -32,10 +32,11 @@ EVT EVT::getExtendedIntegerVT(LLVMContext &Context, unsigned BitWidth) {
   return VT;
 }
 
-EVT EVT::getExtendedVectorVT(LLVMContext &Context, EVT VT,
-                             unsigned NumElements, bool Scalable=false) {
+EVT EVT::getExtendedVectorVT(LLVMContext &Context, EVT VT, unsigned NumElements,
+                             bool Scalable = false) {
   EVT ResultVT;
-  ResultVT.LLVMTy = VectorType::get(VT.getTypeForEVT(Context), NumElements, Scalable);
+  ResultVT.LLVMTy =
+      VectorType::get(VT.getTypeForEVT(Context), NumElements, Scalable);
   assert(ResultVT.isExtended() && "Type is not extended!");
   return ResultVT;
 }

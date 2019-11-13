@@ -553,11 +553,12 @@ CallInst *IRBuilderBase::CreateMaskedGather(Value *Ptrs, Align Alignment,
   auto PtrsTy = cast<VectorType>(Ptrs->getType());
   auto PtrTy = cast<PointerType>(PtrsTy->getElementType());
   unsigned NumElts = PtrsTy->getVectorNumElements();
-  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts);
+  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts,
+                                 PtrsTy->getVectorIsScalable());
 
   if (!Mask)
-    Mask = Constant::getAllOnesValue(VectorType::get(Type::getInt1Ty(Context),
-                                     NumElts));
+    Mask = Constant::getAllOnesValue(VectorType::get(
+        Type::getInt1Ty(Context), NumElts, DataTy->getVectorIsScalable()));
 
   if (!PassThru)
     PassThru = UndefValue::get(DataTy);
@@ -593,7 +594,7 @@ CallInst *IRBuilderBase::CreateMaskedScatter(Value *Data, Value *Ptrs,
 
   if (!Mask)
     Mask = Constant::getAllOnesValue(VectorType::get(Type::getInt1Ty(Context),
-                                     NumElts));
+                                     NumElts, DataTy->getVectorIsScalable()));
 
   Type *OverloadedTypes[] = {DataTy, PtrsTy};
   Value *Ops[] = {Data, Ptrs, getInt32(Alignment.value()), Mask};
