@@ -64,12 +64,12 @@ vsrl.vi vd, vs2, imm, vm
 vsra.vv vd, vs2, vs1, vm
 vsra.vx vd, vs2, rs1, vm
 vsra.vi vd, vs2, imm, vm
-vnsrl.vv vd, vs2, vs1, vm
-vnsrl.vx vd, vs2, rs1, vm
-vnsrl.vi vd, vs2, imm, vm
-vnsra.vv vd, vs2, vs1, vm
-vnsra.vx vd, vs2, rs1, vm
-vnsra.vi vd, vs2, imm, vm
+vnsrl.wv vd, vs2, vs1, vm
+vnsrl.wx vd, vs2, rs1, vm
+vnsrl.wi vd, vs2, uimm, vm
+vnsra.wv vd, vs2, vs1, vm
+vnsra.wx vd, vs2, rs1, vm
+vnsra.wi vd, vs2, uimm, vm
 vmseq.vv vd, vs2, vs1, vm
 vmseq.vx vd, vs2, rs1, vm
 vmseq.vi vd, vs2, imm, vm
@@ -82,12 +82,12 @@ vmslt.vv vd, vs2, vs1, vm
 vmslt.vx vd, vs2, rs1, vm
 vmsleu.vv vd, vs2, vs1, vm
 vmsleu.vx vd, vs2, rs1, vm
-vmsleu.vi vd, vs2, uimm, vm
+vmsleu.vi vd, vs2, imm, vm
 vmsle.vv vd, vs2, vs1, vm
 vmsle.vx vd, vs2, rs1, vm
 vmsle.vi vd, vs2, imm, vm
 vmsgtu.vx vd, vs2, rs1, vm
-vmsgtu.vi vd, vs2, uimm, vm
+vmsgtu.vi vd, vs2, imm, vm
 vmsgt.vx vd, vs2, rs1, vm
 vmsgt.vi vd, vs2, imm, vm
 vminu.vv vd, vs2, vs1, vm
@@ -114,20 +114,19 @@ vwmulsu.vv vd, vs2, vs1, vm
 vwmulsu.vx vd, vs2, rs1, vm
 vmacc.vv vd, vs1, vs2, vm
 vmacc.vx vd, rs1, vs2, vm
-vmsac.vv vd, vs1, vs2, vm
-vmsac.vx vd, rs1, vs2, vm
+vnmsac.vv vd, vs1, vs2, vm
+vnmsac.vx vd, rs1, vs2, vm
 vmadd.vv vd, vs1, vs2, vm
 vmadd.vx vd, rs1, vs2, vm
-vmsub.vv vd, vs1, vs2, vm
-vmsub.vx vd, rs1, vs2, vm
-vwmaccu.vv vd, vs2, vs1, vm
-vwmaccu.vx vd, vs2, rs1, vm
-vwmacc.vv vd, vs2, vs1, vm
-vwmacc.vx vd, vs2, rs1, vm
-vwmsacu.vv vd, vs2, vs1, vm
-vwmsacu.vx vd, vs2, rs1, vm
-vwmsac.vv vd, vs2, vs1, vm
-vwmsac.vx vd, vs2, rs1, vm
+vnmsub.vv vd, vs1, vs2, vm
+vnmsub.vx vd, rs1, vs2, vm
+vwmaccu.vv vd, vs1, vs2, vm
+vwmaccu.vx vd, rs1, vs2, vm
+vwmacc.vv vd, vs1, vs2, vm
+vwmacc.vx vd, rs1, vs2, vm
+vwmaccus.vx vd, rs1, vs2, vm
+vwmaccsu.vv vd, vs1, vs2, vm
+vwmaccsu.vx vd, rs1, vs2, vm
 vdivu.vv vd, vs2, vs1, vm
 vdivu.vx vd, vs2, rs1, vm
 vdiv.vv vd, vs2, vs1, vm
@@ -154,31 +153,22 @@ vssub.vv vd, vs2, vs1, vm
 vssub.vx vd, vs2, rs1, vm
 vaadd.vv vd, vs2, vs1, vm
 vaadd.vx vd, vs2, rs1, vm
-vaadd.vi vd, vs2, imm, vm
 vasub.vv vd, vs2, vs1, vm
 vasub.vx vd, vs2, rs1, vm
 vsmul.vv vd, vs2, vs1, vm
 vsmul.vx vd, vs2, rs1, vm
-vwsmaccu.vv vd, vs2, vs1, vm
-vwsmaccu.vx vd, vs2, rs1, vm
-vwsmacc.vv vd, vs2, vs1, vm
-vwsmacc.vx vd, vs2, rs1, vm
-vwsmsacu.vv vd, vs2, vs1, vm
-vwsmsacu.vx vd, vs2, rs1, vm
-vwsmsac.vv vd, vs2, vs1, vm
-vwsmsac.vx vd, vs2, rs1, vm
 vssrl.vv vd, vs2, vs1, vm
 vssrl.vx vd, vs2, rs1, vm
 vssrl.vi vd, vs2, imm, vm
 vssra.vv vd, vs2, vs1, vm
 vssra.vx vd, vs2, rs1, vm
 vssra.vi vd, vs2, imm, vm
-vnclipu.vv vd, vs2, vs1, vm
-vnclipu.vx vd, vs2, rs1, vm
-vnclipu.vi vd, vs2, imm, vm
-vnclip.vv vd, vs2, vs1, vm
-vnclip.vx vd, vs2, rs1, vm
-vnclip.vi vd, vs2, imm, vm
+vnclipu.wv vd, vs2, vs1, vm
+vnclipu.wx vd, vs2, rs1, vm
+vnclipu.wi vd, vs2, uimm, vm
+vnclip.wv vd, vs2, vs1, vm
+vnclip.wx vd, vs2, rs1, vm
+vnclip.wi vd, vs2, uimm, vm
 vfadd.vv vd, vs2, vs1, vm
 vfadd.vf vd, vs2, rs1, vm
 vfsub.vv vd, vs2, vs1, vm
@@ -243,8 +233,6 @@ vmfle.vv vd, vs2, vs1, vm
 vmfle.vf vd, vs2, rs1, vm
 vmfgt.vf vd, vs2, rs1, vm
 vmfge.vf vd, vs2, rs1, vm
-vmford.vv vd, vs2, vs1, vm
-vmford.vf vd, vs2, rs1, vm
 vfclass.v vd, vs2, vm
 vfmv.v.f vd, rs1
 vfmerge.vfm vd, vs2, rs1, v0
@@ -257,11 +245,11 @@ vfwcvt.x.f.v vd, vs2, vm
 vfwcvt.f.xu.v vd, vs2, vm
 vfwcvt.f.x.v vd, vs2, vm
 vfwcvt.f.f.v vd, vs2, vm
-vfncvt.xu.f.v vd, vs2, vm
-vfncvt.x.f.v vd, vs2, vm
-vfncvt.f.xu.v vd, vs2, vm
-vfncvt.f.x.v vd, vs2, vm
-vfncvt.f.f.v vd, vs2, vm
+vfncvt.xu.f.w vd, vs2, vm
+vfncvt.x.f.w vd, vs2, vm
+vfncvt.f.xu.w vd, vs2, vm
+vfncvt.f.x.w vd, vs2, vm
+vfncvt.f.f.w vd, vs2, vm
 vredsum.vs vd, vs2, vs1, vm
 vredmaxu.vs vd, vs2, vs1, vm
 vredmax.vs vd, vs2, vs1, vm
@@ -286,14 +274,14 @@ vmor.mm vd, vs2, vs1
 vmnor.mm vd, vs2, vs1
 vmornot.mm vd, vs2, vs1
 vmxnor.mm vd, vs2, vs1
-vmpopc.m rd, vs2, vm
-vmfirst.m rd, vs2, vm
+vmv.x.s rd, vs2
+vpopc.m rd, vs2, vm
+vfirst.m rd, vs2, vm
 vmsbf.m vd, vs2, vm
 vmsif.m vd, vs2, vm
 vmsof.m vd, vs2, vm
 viota.m vd, vs2, vm
 vid.v vd, vm
-vext.x.v rd, vs2, rs1
 vmv.s.x vd, rs1
 vfmv.f.s rd, vs2
 vfmv.s.f vd, rs1
@@ -307,9 +295,10 @@ vrgather.vv vd, vs2, vs1, vm
 vrgather.vx vd, vs2, rs1, vm
 vrgather.vi vd, vs2, imm, vm
 vcompress.vm vd, vs2, vs1
-vdot.vv vd, vs2, vs1, vm
-vdotu.vv vd, vs2, vs1, vm
-vfdot.vv vd, vs2, vs1, vm
+# FIXME extension
+#vdot.vv vd, vs2, vs1, vm
+#vdotu.vv vd, vs2, vs1, vm
+#vfdot.vv vd, vs2, vs1, vm
 # Loads/stores
 vlb.v vd, (rs1), vm
 vlh.v vd, (rs1), vm
@@ -380,11 +369,11 @@ vslideup.vx|OPIVX|funct=001110
 vslideup.vi|OPIVI|funct=001110
 vslidedown.vx|OPIVX|funct=001111
 vslidedown.vi|OPIVI|funct=001111
-vadc.vvm|OPIVV|funct=010000|vm=1
-vadc.vxm|OPIVX|funct=010000|vm=1
-vadc.vim|OPIVI|funct=010000|vm=1
-vsbc.vvm|OPIVV|funct=010010|vm=1
-vsbc.vxm|OPIVX|funct=010010|vm=1
+vadc.vvm|OPIVV|funct=010000|vm=0
+vadc.vxm|OPIVX|funct=010000|vm=0
+vadc.vim|OPIVI|funct=010000|vm=0
+vsbc.vvm|OPIVV|funct=010010|vm=0
+vsbc.vxm|OPIVX|funct=010010|vm=0
 vmv.v.v|OPIVV|funct=010111|vs2=00000|vm=1
 vmv.v.x|OPIVX|funct=010111|vs2=00000|vm=1
 vmv.v.i|OPIVI|funct=010111|vs2=00000|vm=1
@@ -421,14 +410,13 @@ vssubu.vv|OPIVV|funct=100010
 vssubu.vx|OPIVX|funct=100010
 vssub.vv|OPIVV|funct=100011
 vssub.vx|OPIVX|funct=100011
-vaadd.vv|OPIVV|funct=100100
-vaadd.vx|OPIVX|funct=100100
-vaadd.vi|OPIVI|funct=100100
+vaadd.vv|OPMVV|funct=001001
+vaadd.vx|OPMVX|funct=001001
 vsll.vv|OPIVV|funct=100101
 vsll.vx|OPIVX|funct=100101
 vsll.vi|OPIVI|funct=100101
-vasub.vv|OPIVV|funct=100110
-vasub.vx|OPIVX|funct=100110
+vasub.vv|OPMVV|funct=001011
+vasub.vx|OPMVX|funct=001011
 vsmul.vv|OPIVV|funct=100111
 vsmul.vx|OPIVX|funct=100111
 vsrl.vv|OPIVV|funct=101000
@@ -443,30 +431,23 @@ vssrl.vi|OPIVI|funct=101010
 vssra.vv|OPIVV|funct=101011
 vssra.vx|OPIVX|funct=101011
 vssra.vi|OPIVI|funct=101011
-vnsrl.vv|OPIVV|funct=101100
-vnsrl.vx|OPIVX|funct=101100
-vnsrl.vi|OPIVI|funct=101100
-vnsra.vv|OPIVV|funct=101101
-vnsra.vx|OPIVX|funct=101101
-vnsra.vi|OPIVI|funct=101101
-vnclipu.vv|OPIVV|funct=101110
-vnclipu.vx|OPIVX|funct=101110
-vnclipu.vi|OPIVI|funct=101110
-vnclip.vv|OPIVV|funct=101111
-vnclip.vx|OPIVX|funct=101111
-vnclip.vi|OPIVI|funct=101111
+vnsrl.wv|OPIVV|funct=101100
+vnsrl.wx|OPIVX|funct=101100
+vnsrl.wi|OPIVI|funct=101100
+vnsra.wv|OPIVV|funct=101101
+vnsra.wx|OPIVX|funct=101101
+vnsra.wi|OPIVI|funct=101101
+vnclipu.wv|OPIVV|funct=101110
+vnclipu.wx|OPIVX|funct=101110
+vnclipu.wi|OPIVI|funct=101110
+vnclip.wv|OPIVV|funct=101111
+vnclip.wx|OPIVX|funct=101111
+vnclip.wi|OPIVI|funct=101111
 vwredsumu.vs|OPIVV|funct=110000
 vwredsum.vs|OPIVV|funct=110001
-vdotu.vv|OPIVV|funct=111000
-vdot.vv|OPIVV|funct=111001
-vwsmaccu.vv|OPIVV|funct=111100
-vwsmaccu.vx|OPIVX|funct=111100
-vwsmacc.vv|OPIVV|funct=111101
-vwsmacc.vx|OPIVX|funct=111101
-vwsmsacu.vv|OPIVV|funct=111110
-vwsmsacu.vx|OPIVX|funct=111110
-vwsmsac.vv|OPIVV|funct=111111
-vwsmsac.vx|OPIVX|funct=111111
+# FIXME extension
+#vdotu.vv|OPIVV|funct=111000
+#vdot.vv|OPIVV|funct=111001
 vredsum.vs|OPMVV|funct=000000
 vredand.vs|OPMVV|funct=000001
 vredor.vs|OPMVV|funct=000010
@@ -475,12 +456,12 @@ vredminu.vs|OPMVV|funct=000100
 vredmin.vs|OPMVV|funct=000101
 vredmaxu.vs|OPMVV|funct=000110
 vredmax.vs|OPMVV|funct=000111
-vext.x.v|OPMVV|funct=001100|vm=1
-vmv.s.x|OPMVX|funct=001101|vm=1|vs2=00000
+vmv.s.x|OPMVX|funct=010000|vm=1|vs2=00000
 vslide1up.vx|OPMVX|funct=001110
 vslide1down.vx|OPMVX|funct=001111
-vmpopc.m|OPMVV|funct=010100|vs1=00000
-vmfirst.m|OPMVV|funct=010101|vs1=00000
+vmv.x.s|OPMVV|funct=010000|vm=1|vs1=00000
+vpopc.m|OPMVV|funct=010000|vs1=10000
+vfirst.m|OPMVV|funct=010000|vs1=10001
 vcompress.vm|OPMVV|funct=010111|vm=1
 vmandnot.mm|OPMVV|funct=011000|vm=1
 vmand.mm|OPMVV|funct=011001|vm=1
@@ -508,12 +489,12 @@ vmulh.vv|OPMVV|funct=100111
 vmulh.vx|OPMVX|funct=100111
 vmadd.vv|OPMVV|funct=101001
 vmadd.vx|OPMVX|funct=101001
-vmsub.vv|OPMVV|funct=101011
-vmsub.vx|OPMVX|funct=101011
+vnmsub.vv|OPMVV|funct=101011
+vnmsub.vx|OPMVX|funct=101011
 vmacc.vv|OPMVV|funct=101101
 vmacc.vx|OPMVX|funct=101101
-vmsac.vv|OPMVV|funct=101111
-vmsac.vx|OPMVX|funct=101111
+vnmsac.vv|OPMVV|funct=101111
+vnmsac.vx|OPMVX|funct=101111
 vwaddu.vv|OPMVV|funct=110000
 vwaddu.vx|OPMVX|funct=110000
 vwadd.vv|OPMVV|funct=110001
@@ -540,10 +521,9 @@ vwmaccu.vv|OPMVV|funct=111100
 vwmaccu.vx|OPMVX|funct=111100
 vwmacc.vv|OPMVV|funct=111101
 vwmacc.vx|OPMVX|funct=111101
-vwmsacu.vv|OPMVV|funct=111110
-vwmsacu.vx|OPMVX|funct=111110
-vwmsac.vv|OPMVV|funct=111111
-vwmsac.vx|OPMVX|funct=111111
+vwmaccus.vx|OPMVX|funct=111110
+vwmaccsu.vv|OPMVV|funct=111111
+vwmaccsu.vx|OPMVX|funct=111111
 vfadd.vv|OPFVV|funct=000000
 vfadd.vf|OPFVF|funct=000000
 vfredsum.vs|OPFVV|funct=000001
@@ -562,16 +542,14 @@ vfsgnjn.vv|OPFVV|funct=001001
 vfsgnjn.vf|OPFVF|funct=001001
 vfsgnjx.vv|OPFVV|funct=001010
 vfsgnjx.vf|OPFVF|funct=001010
-vfmv.f.s|OPFVV|funct=001100|vs1=00000|vm=1
-vfmv.s.f|OPFVF|funct=001101|vs2=00000|vm=1
 vfmv.v.f|OPFVF|funct=010111|vs2=00000|vm=1
+vfmv.f.s|OPFVV|funct=010000|vs1=00000|vm=1
+vfmv.s.f|OPFVF|funct=010000|vs2=00000|vm=1
 vfmerge.vfm|OPFVF|funct=010111|vm=0
 vmfeq.vv|OPFVV|funct=011000
 vmfeq.vf|OPFVF|funct=011000
 vmfle.vv|OPFVV|funct=011001
 vmfle.vf|OPFVF|funct=011001
-vmford.vv|OPFVV|funct=011010
-vmford.vf|OPFVF|funct=011010
 vmflt.vv|OPFVV|funct=011011
 vmflt.vf|OPFVF|funct=011011
 vmfne.vv|OPFVV|funct=011100
@@ -611,7 +589,8 @@ vfwsub.wv|OPFVV|funct=110110
 vfwsub.wf|OPFVF|funct=110110
 vfwmul.vv|OPFVV|funct=111000
 vfwmul.vf|OPFVF|funct=111000
-vfdot.vv|OPFVV|funct=111001
+# FIXME extension
+#vfdot.vv|OPFVV|funct=111001
 vfwmacc.vv|OPFVV|funct=111100
 vfwmacc.vf|OPFVF|funct=111100
 vfwnmacc.vv|OPFVV|funct=111101
@@ -631,16 +610,16 @@ vfwcvt.x.f.v|OPFVV|funct=100010|vs1=01001
 vfwcvt.f.xu.v|OPFVV|funct=100010|vs1=01010
 vfwcvt.f.x.v|OPFVV|funct=100010|vs1=01011
 vfwcvt.f.f.v|OPFVV|funct=100010|vs1=01100
-vfncvt.xu.f.v|OPFVV|funct=100010|vs1=10000
-vfncvt.x.f.v|OPFVV|funct=100010|vs1=10001
-vfncvt.f.xu.v|OPFVV|funct=100010|vs1=10010
-vfncvt.f.x.v|OPFVV|funct=100010|vs1=10011
-vfncvt.f.f.v|OPFVV|funct=100010|vs1=10100
-vmsbf.m|OPMVV|funct=010110|vs1=00001
-vmsof.m|OPMVV|funct=010110|vs1=00010
-vmsif.m|OPMVV|funct=010110|vs1=00011
-viota.m|OPMVV|funct=010110|vs1=10000
-vid.v|OPMVV|funct=010110|vs1=10001|vs2=00000
+vfncvt.xu.f.w|OPFVV|funct=100010|vs1=10000
+vfncvt.x.f.w|OPFVV|funct=100010|vs1=10001
+vfncvt.f.xu.w|OPFVV|funct=100010|vs1=10010
+vfncvt.f.x.w|OPFVV|funct=100010|vs1=10011
+vfncvt.f.f.w|OPFVV|funct=100010|vs1=10100
+vmsbf.m|OPMVV|funct=010100|vs1=00001
+vmsof.m|OPMVV|funct=010100|vs1=00010
+vmsif.m|OPMVV|funct=010100|vs1=00011
+viota.m|OPMVV|funct=010100|vs1=10000
+vid.v|OPMVV|funct=010100|vs1=10001|vs2=00000
 vlb.v|VLUNIT|nf=000|mop=100|lumop=00000|width=000
 vlh.v|VLUNIT|nf=000|mop=100|lumop=00000|width=101
 vlw.v|VLUNIT|nf=000|mop=100|lumop=00000|width=110

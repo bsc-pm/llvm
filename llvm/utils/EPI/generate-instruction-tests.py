@@ -212,7 +212,13 @@ class InstructionParser:
                 if op == "rs1":
                     instr.operand_order[i] = "fs1"
 
+        if iname.startswith("vw") or iname.startswith("vfw"):
+            for (i, op) in enumerate(instr.fields):
+                if isinstance(op, Register) and op.name == "vd":
+                    op.scale = 2
+
         # Special cases
+        # FIXME don't think those are necessary anymore
         if iname in ["vfmv.s.f", "vfmv.v.f"]:
             for (i, op) in enumerate(instr.fields):
                 if isinstance(op, Register) and op.name == "rs1":
@@ -316,9 +322,9 @@ class Context:
         return res
 
     @staticmethod
-    def get_next_vr_modulo(m):
+    def get_next_vr_modulo(m, exclude=[]):
         res = Context.get_next_vr()
-        while res % m != 0:
+        while res % m != 0 or res in exclude:
             res = Context.get_next_vr()
         return res
 
@@ -381,6 +387,12 @@ def generate_instruction_tests(i):
             raise Exception("Syntax order of operand {} not found".format(field))
         return result
 
+    masked = False
+    for f in i.fields:
+        if isinstance(f, VectorMask):
+            masked = True
+            break
+
     for f in i.fields:
         if isinstance(f, SlicedImmediate):
             if immediate is None:
@@ -408,8 +420,11 @@ def generate_instruction_tests(i):
             elif f.kind == Register.FPR:
                 ops_generator.append((op_idx, lambda : Register.FPR_ABI_NAMES[Context.get_next_fpr()]))
             elif f.kind == Register.VR:
+                exclude_regs = []
+                if masked and f.scale > 1 and dest is not None and dest[1] == f:
+                    exclude_regs = [0]
                 def capture_field(f):
-                    return lambda : "v{}".format(Context.get_next_vr_modulo(f.scale))
+                    return lambda : "v{}".format(Context.get_next_vr_modulo(f.scale, exclude_regs))
                 ops_generator.append((op_idx, capture_field(f)))
             else:
                 raise Exception("Unhandled class of register {}".format(f))
@@ -512,7 +527,7 @@ def generate_instruction_tests(i):
 
 def emit_test_parsing(instructions):
     print "# Generated with utils/EPI/process.py"
-    print "# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+epi | FileCheck %s"
+    print "# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+v | FileCheck %s"
     print ""
 
     def input_and_check(x):
@@ -540,6 +555,13 @@ def generate_expected_encodings(i):
     vm = -1   # Some instructions may lack it
     dest = None
     generator = Generator()
+
+    masked = False
+    for f in i.fields:
+        if isinstance(f, VectorMask):
+            masked = True
+            break
+
     for f in i.fields:
         if isinstance(f, VectorMask):
             vm = len(generator.fields)
@@ -559,8 +581,11 @@ def generate_expected_encodings(i):
             elif f.kind == Register.FPR:
                 generator.fields.append(lambda x : "{:05b}|".format(Context.get_next_fpr()))
             elif f.kind == Register.VR:
+                exclude_regs = []
+                if masked and f.scale > 1 and dest == f:
+                    exclude_regs = [0]
                 def capture_field(f):
-                    return lambda x : "{:05b}|".format(Context.get_next_vr_modulo(f.scale))
+                    return lambda x : "{:05b}|".format(Context.get_next_vr_modulo(f.scale, exclude_regs))
                 generator.fields.append(capture_field(f))
             else:
                 raise Exception("unhandled register kind {}".format(f))
@@ -607,7 +632,7 @@ def generate_expected_encodings(i):
 
 def emit_test_encoding(instructions):
     print "# Generated witu utils/EPI/process.py"
-    print "# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+epi -show-encoding | FileCheck %s"
+    print "# RUN: llvm-mc < %s -arch=riscv64 -mattr=+m,+f,+d,+a,+v -show-encoding | FileCheck %s"
     print ""
     testcases_list = []
     encodings_list = []
