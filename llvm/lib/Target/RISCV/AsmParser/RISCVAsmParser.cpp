@@ -432,48 +432,6 @@ public:
     return RISCVFPRndMode::stringToRoundingMode(Str) != RISCVFPRndMode::Invalid;
   }
 
-  bool isVectorMask() const {
-    if (!isImm())
-      return false;
-    const MCExpr *Val = getImm();
-    auto *SVal = dyn_cast<MCSymbolRefExpr>(Val);
-    if (!SVal || SVal->getKind() != MCSymbolRefExpr::VK_None)
-      return false;
-
-    StringRef Str = SVal->getSymbol().getName();
-    return RISCVEPIVectorMask::stringToVectorMask(Str) != RISCV::NoRegister;
-  }
-
-  bool isVectorElementWidth() const {
-    if (!isImm())
-      return false;
-    const MCExpr *Val = getImm();
-    auto *SVal = dyn_cast<MCSymbolRefExpr>(Val);
-    if (!SVal || SVal->getKind() != MCSymbolRefExpr::VK_None)
-      return false;
-
-    StringRef Str = SVal->getSymbol().getName();
-
-    return RISCVEPIVectorElementWidth::stringToVectorElementWidth(Str) !=
-           RISCVEPIVectorElementWidth::Invalid;
-  }
-
-  bool isVectorMultiplier() const {
-    if (!isImm())
-      return false;
-    const MCExpr *Val = getImm();
-    auto *SVal = dyn_cast<MCSymbolRefExpr>(Val);
-    if (!SVal || SVal->getKind() != MCSymbolRefExpr::VK_None)
-      return false;
-
-    StringRef Str = SVal->getSymbol().getName();
-
-    return RISCVEPIVectorMultiplier::stringToVectorMultiplier(Str) !=
-           RISCVEPIVectorMultiplier::Invalid;
-  }
-
-  bool isEPIVectorRegisterScalar() const;
-
   bool isImmXLenLI() const {
     int64_t Imm;
     RISCVMCExpr::VariantKind VK = RISCVMCExpr::VK_RISCV_None;
@@ -529,16 +487,6 @@ public:
     int64_t Imm;
     bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isInt<3>(Imm) &&
-           VK == RISCVMCExpr::VK_RISCV_None;
-  }
-
-  bool isSImm5() const {
-    if (!isImm())
-      return false;
-    RISCVMCExpr::VariantKind VK;
-    int64_t Imm;
-    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
-    return IsConstantImm && isInt<5>(Imm) &&
            VK == RISCVMCExpr::VK_RISCV_None;
   }
 
@@ -969,51 +917,6 @@ public:
     assert(N == 1 && "Invalid number of operands!");
     Inst.addOperand(MCOperand::createImm(getRoundingMode()));
   }
-
-  Register getVectorMask() const {
-    // isVectorMask has validated the operand, meaning this cast is safe.
-    auto SE = cast<MCSymbolRefExpr>(getImm());
-    Register VM =
-        RISCVEPIVectorMask::stringToVectorMask(SE->getSymbol().getName());
-    return VM;
-  }
-
-  void addVectorMaskOperands(MCInst &Inst, unsigned N) const {
-    assert(N == 1 && "Invalid number of operands!");
-    Inst.addOperand(MCOperand::createReg(getVectorMask()));
-  }
-
-  RISCVEPIVectorElementWidth::VectorElementWidth getVectorElementWidth() const {
-    // isVectorElementWidth has validated the operand, meaning this cast is
-    // safe.
-    auto SE = cast<MCSymbolRefExpr>(getImm());
-    RISCVEPIVectorElementWidth::VectorElementWidth VT =
-        RISCVEPIVectorElementWidth::stringToVectorElementWidth(
-            SE->getSymbol().getName());
-    assert(VT != RISCVEPIVectorElementWidth::Invalid && "Invalid vector type");
-    return VT;
-  }
-
-  void addVectorElementWidthOperands(MCInst &Inst, unsigned N) const {
-    assert(N == 1 && "Invalid number of operands!");
-    Inst.addOperand(MCOperand::createImm(getVectorElementWidth()));
-  }
-
-  RISCVEPIVectorMultiplier::VectorMultiplier getVectorMultiplier() const {
-    // isVectorMultiplier has validated the operand, meaning this cast is safe.
-    auto SE = cast<MCSymbolRefExpr>(getImm());
-    RISCVEPIVectorMultiplier::VectorMultiplier VT =
-        RISCVEPIVectorMultiplier::stringToVectorMultiplier(SE->getSymbol().getName());
-    assert(VT != RISCVEPIVectorMultiplier::Invalid && "Invalid vector type");
-    return VT;
-  }
-
-  void addVectorMultiplierOperands(MCInst &Inst, unsigned N) const {
-    assert(N == 1 && "Invalid number of operands!");
-    Inst.addOperand(MCOperand::createImm(getVectorMultiplier()));
-  }
-
-  void addEPIVectorRegisterScalarOperands(MCInst &Inst, unsigned N) const;
 };
 } // end anonymous namespace.
 
@@ -1022,48 +925,6 @@ public:
 #define GET_MATCHER_IMPLEMENTATION
 #define GET_MNEMONIC_SPELL_CHECKER
 #include "RISCVGenAsmMatcher.inc"
-
-bool RISCVOperand::isEPIVectorRegisterScalar() const {
-  if (!isImm())
-    return false;
-  const MCExpr *Val = getImm();
-  auto *SVal = dyn_cast<MCSymbolRefExpr>(Val);
-  if (!SVal || SVal->getKind() != MCSymbolRefExpr::VK_None)
-    return false;
-
-  StringRef Str = SVal->getSymbol().getName();
-  auto Pair = Str.split('.');
-  if (Pair.second != "s")
-    return false;
-
-  unsigned Reg = MatchRegisterName(Pair.first);
-  if (!Reg)
-    Reg = MatchRegisterAltName(Pair.first);
-  if (!Reg)
-    return false;
-
-  bool IsRegEPIVR =
-      RISCVMCRegisterClasses[RISCV::EPIVRRegClassID].contains(Reg);
-
-  return IsRegEPIVR;
-}
-
-void RISCVOperand::addEPIVectorRegisterScalarOperands(MCInst &Inst,
-                                                      unsigned N) const {
-  assert(N == 1 && "Invalid number of operands!");
-
-  // Simpler version of what isEPIVectorRegisterScalar did.
-  const MCExpr *Val = getImm();
-  auto *SVal = cast<MCSymbolRefExpr>(Val);
-  StringRef Str = SVal->getSymbol().getName();
-  auto Pair = Str.split('.');
-  unsigned Reg = MatchRegisterName(Pair.first);
-  if (!Reg)
-    Reg = MatchRegisterAltName(Pair.first);
-  assert(Reg != 0 && "Invalid register");
-
-  Inst.addOperand(MCOperand::createReg(Reg));
-}
 
 static Register convertFPR64ToFPR32(Register Reg) {
   assert(Reg >= RISCV::F0_D && Reg <= RISCV::F31_D && "Invalid register");

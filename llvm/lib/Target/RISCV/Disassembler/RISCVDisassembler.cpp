@@ -284,37 +284,6 @@ static DecodeStatus decodeRVCInstrRdRs1Rs2(MCInst &Inst, unsigned Insn,
                                            uint64_t Address,
                                            const void *Decoder);
 
-static DecodeStatus decodeVectorMask(MCInst &Inst, uint64_t Imm,
-                                     int64_t Address, const void *Decoder) {
-  assert(isUInt<1>(Imm) && "Invalid immediate");
-  // 0 == masked, 1 == unmasked.
-  if (Imm != 0)
-    return MCDisassembler::Fail;
-
-  Inst.addOperand(MCOperand::createReg(RISCV::V0));
-  return MCDisassembler::Success;
-}
-
-static DecodeStatus decodeVectorElementWidth(MCInst &Inst, uint64_t Imm,
-                                     int64_t Address, const void *Decoder) {
-  assert(isUInt<3>(Imm) && "Invalid immediate");
-  if (!llvm::RISCVEPIVectorElementWidth::isValidVectorElementWidth(Imm))
-    return MCDisassembler::Fail;
-
-  Inst.addOperand(MCOperand::createImm(Imm));
-  return MCDisassembler::Success;
-}
-
-static DecodeStatus decodeVectorMultiplier(MCInst &Inst, uint64_t Imm,
-                                     int64_t Address, const void *Decoder) {
-  assert(isUInt<2>(Imm) && "Invalid immediate");
-  if (!llvm::RISCVEPIVectorMultiplier::isValidVectorMultiplier(Imm))
-    return MCDisassembler::Fail;
-
-  Inst.addOperand(MCOperand::createImm(Imm));
-  return MCDisassembler::Success;
-}
-
 #include "RISCVGenDisassemblerTables.inc"
 
 static DecodeStatus decodeRVCInstrSImm(MCInst &Inst, unsigned Insn,

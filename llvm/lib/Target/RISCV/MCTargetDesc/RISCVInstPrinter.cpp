@@ -178,27 +178,3 @@ const char *RISCVInstPrinter::getRegisterName(unsigned RegNo) {
   return getRegisterName(RegNo, ArchRegNames ? RISCV::NoRegAltName
                                              : RISCV::ABIRegAltName);
 }
-
-void RISCVInstPrinter::printVectorMask(const MCInst *MI, unsigned OpNo,
-                                       const MCSubtargetInfo &STI,
-                                       raw_ostream &O) {
-  unsigned VectorMask = MI->getOperand(OpNo).getReg();
-  assert(VectorMask == RISCV::V0 && "Invalid register as vector mask");
-  printRegName(O, VectorMask); O << ".t";
-}
-
-void RISCVInstPrinter::printVectorElementWidth(const MCInst *MI, unsigned OpNo,
-                                       const MCSubtargetInfo &STI,
-                                       raw_ostream &O) {
-  auto VectorElementWidth =
-      static_cast<RISCVEPIVectorElementWidth::VectorElementWidth>(MI->getOperand(OpNo).getImm());
-  O << RISCVEPIVectorElementWidth::VectorElementWidthToString(VectorElementWidth);
-}
-
-void RISCVInstPrinter::printVectorMultiplier(const MCInst *MI, unsigned OpNo,
-                                       const MCSubtargetInfo &STI,
-                                       raw_ostream &O) {
-  auto VectorMultiplier =
-      static_cast<RISCVEPIVectorMultiplier::VectorMultiplier>(MI->getOperand(OpNo).getImm());
-  O << RISCVEPIVectorMultiplier::VectorMultiplierToString(VectorMultiplier);
-}
