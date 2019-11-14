@@ -2541,6 +2541,11 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       if (CreateGatherScatter) {
         Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
         Value *VectorGep = State.get(Addr, Part);
+        VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
+        if (!MaskPart && VectorGepTy->getVectorIsScalable()) {
+          MaskPart = Builder.CreateVectorSplat(
+              VectorGepTy->getVectorNumElements(), Builder.getTrue(), "", true);
+        }
         NewSI = Builder.CreateMaskedScatter(StoredVal, VectorGep, Alignment,
                                             MaskPart);
       } else {
@@ -2571,6 +2576,11 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     if (CreateGatherScatter) {
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
+      VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
+      if (!MaskPart && VectorGepTy->getVectorIsScalable()) {
+        MaskPart = Builder.CreateVectorSplat(
+            VectorGepTy->getVectorNumElements(), Builder.getTrue(), "", true);
+      }
       NewLI = Builder.CreateMaskedGather(VectorGep, Alignment, MaskPart,
                                          nullptr, "wide.masked.gather");
       addMetadata(NewLI, LI);

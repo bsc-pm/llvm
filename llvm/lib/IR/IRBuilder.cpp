@@ -556,9 +556,13 @@ CallInst *IRBuilderBase::CreateMaskedGather(Value *Ptrs, Align Alignment,
   Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts,
                                  PtrsTy->getVectorIsScalable());
 
+  if (DataTy->getVectorIsScalable())
+    assert(Mask && Mask->getType()->getVectorIsScalable() &&
+           "Scalable vector mask required");
+
   if (!Mask)
-    Mask = Constant::getAllOnesValue(VectorType::get(
-        Type::getInt1Ty(Context), NumElts, DataTy->getVectorIsScalable()));
+    Mask = Constant::getAllOnesValue(
+        VectorType::get(Type::getInt1Ty(Context), NumElts));
 
   if (!PassThru)
     PassThru = UndefValue::get(DataTy);
@@ -592,9 +596,13 @@ CallInst *IRBuilderBase::CreateMaskedScatter(Value *Data, Value *Ptrs,
          "Incompatible pointer and data types");
 #endif
 
+  if (DataTy->getVectorIsScalable())
+    assert(Mask && Mask->getType()->getVectorIsScalable() &&
+           "Scalable vector mask required");
+
   if (!Mask)
-    Mask = Constant::getAllOnesValue(VectorType::get(Type::getInt1Ty(Context),
-                                     NumElts, DataTy->getVectorIsScalable()));
+    Mask = Constant::getAllOnesValue(
+        VectorType::get(Type::getInt1Ty(Context), NumElts));
 
   Type *OverloadedTypes[] = {DataTy, PtrsTy};
   Value *Ops[] = {Data, Ptrs, getInt32(Alignment.value()), Mask};
