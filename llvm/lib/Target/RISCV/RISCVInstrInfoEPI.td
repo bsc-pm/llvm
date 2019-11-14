@@ -3906,21 +3906,21 @@ def : Pat<(extractelt (nxv2i64 EPIVR2:$rs2), GPR:$rs1),
             (EXTRACT_SUBREG
               (PseudoVSLIDEDOWN_VX_M2 (nxv2i64 EPIVR2:$rs2), GPR:$rs1, X0, 64),
               epivreven),
-            GPR:$rs1, 64)>;
+            X0, 64)>;
 
 def : Pat<(extractelt (nxv4i64 EPIVR4:$rs2), GPR:$rs1),
           (PseudoVEXT_X_V
             (EXTRACT_SUBREG
               (PseudoVSLIDEDOWN_VX_M4 (nxv4i64 EPIVR4:$rs2), GPR:$rs1, X0, 64),
               epivreven),
-            GPR:$rs1, 64)>;
+            X0, 64)>;
 
 def : Pat<(extractelt (nxv8i64 EPIVR8:$rs2), GPR:$rs1),
           (PseudoVEXT_X_V
             (EXTRACT_SUBREG
               (PseudoVSLIDEDOWN_VX_M8 (nxv8i64 EPIVR8:$rs2), GPR:$rs1, X0, 64),
               epivreven),
-            GPR:$rs1, 64)>;
+            X0, 64)>;
 
 // def : Pat<(sext_inreg (extractelt (nxv2i32 EPIVR:$rs2), GPR:$rs1), i32),
 //           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
