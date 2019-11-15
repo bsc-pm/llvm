@@ -32,13 +32,7 @@ define i32 @callee(i32 %a, i64 %b, i32 %c, i32 %d, double %e) {
 ; CHECK-NEXT:    lw s1, 20(sp)
 ; CHECK-NEXT:    lw s0, 24(sp)
 ; CHECK-NEXT:    lw ra, 28(sp)
-; CHECK-NEXT:    .cfi_restore ra
-; CHECK-NEXT:    .cfi_restore s0
-; CHECK-NEXT:    .cfi_restore s1
-; CHECK-NEXT:    .cfi_restore s2
-; CHECK-NEXT:    .cfi_restore s3
 ; CHECK-NEXT:    addi sp, sp, 32
-; CHECK-NEXT:    .cfi_def_cfa_offset 0
 ; CHECK-NEXT:    ret
   %b_trunc = trunc i64 %b to i32
   %e_fptosi = fptosi double %e to i32
