@@ -42,8 +42,8 @@ DumpObjects::operator()(std::unique_ptr<MemoryBuffer> Obj) {
   }
 
   LLVM_DEBUG({
-    dbgs() << "Dumping object buffer [ " << (void *)Obj->getBufferStart()
-           << " -- " << (void *)(Obj->getBufferEnd() - 1) << " ] to "
+    dbgs() << "Dumping object buffer [ " << (const void *)Obj->getBufferStart()
+           << " -- " << (const void *)(Obj->getBufferEnd() - 1) << " ] to "
            << DumpPath << "\n";
   });
 
@@ -53,7 +53,7 @@ DumpObjects::operator()(std::unique_ptr<MemoryBuffer> Obj) {
     return errorCodeToError(EC);
   DumpStream.write(Obj->getBufferStart(), Obj->getBufferSize());
 
-  return Obj;
+  return std::move(Obj);
 }
 
 StringRef DumpObjects::getBufferIdentifier(MemoryBuffer &B) {
