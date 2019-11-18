@@ -35,6 +35,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MathExtras.h"
@@ -61,14 +62,17 @@ static Timer inputFileTimer("Input File Reading", Timer::root());
 Configuration *config;
 LinkerDriver *driver;
 
-bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &diag) {
+bool link(ArrayRef<const char *> args, bool canExitEarly, raw_ostream &stdoutOS,
+          raw_ostream &stderrOS) {
   errorHandler().logName = args::getFilenameWithoutExe(args[0]);
-  errorHandler().errorOS = &diag;
   errorHandler().errorLimitExceededMsg =
       "too many errors emitted, stopping now"
       " (use /errorlimit:0 to see all errors)";
   errorHandler().exitEarly = canExitEarly;
-  enableColors(diag.has_colors());
+  enableColors(stderrOS.has_colors());
+
+  lld::stdoutOS = &stdoutOS;
+  lld::stderrOS = &stderrOS;
 
   config = make<Configuration>();
   symtab = make<SymbolTable>();
@@ -1149,7 +1153,7 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
   // because it doesn't start with "/", but we deliberately chose "--" to
   // avoid conflict with /version and for compatibility with clang-cl.
   if (args.hasArg(OPT_dash_dash_version)) {
-    outs() << getLLDVersion() << "\n";
+    lld::outs() << getLLDVersion() << "\n";
     return;
   }
 
@@ -1170,7 +1174,7 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
     }
   }
 
-  if (!args.hasArg(OPT_INPUT)) {
+  if (!args.hasArg(OPT_INPUT, OPT_wholearchive_file)) {
     if (args.hasArg(OPT_deffile))
       config->noEntry = true;
     else
@@ -1699,7 +1703,7 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
   }
 
   // Handle generation of import library from a def file.
-  if (!args.hasArg(OPT_INPUT)) {
+  if (!args.hasArg(OPT_INPUT, OPT_wholearchive_file)) {
     fixupExports();
     createImportLibrary(/*asLib=*/true);
     return;
@@ -1748,8 +1752,8 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
 
   // Set default image name if neither /out or /def set it.
   if (config->outputFile.empty()) {
-    config->outputFile =
-        getOutputPath((*args.filtered(OPT_INPUT).begin())->getValue());
+    config->outputFile = getOutputPath(
+        (*args.filtered(OPT_INPUT, OPT_wholearchive_file).begin())->getValue());
   }
 
   // Fail early if an output file is not writable.

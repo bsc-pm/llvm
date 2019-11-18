@@ -56,7 +56,7 @@ public:
   /// \p NumElements must be at least 2.
   static LLT vector(uint16_t NumElements, unsigned ScalarSizeInBits,
                     bool Scalable = false) {
-    assert(NumElements > 1 && "invalid number of vector elements");
+    assert((NumElements > 1  || Scalable) && "invalid number of vector elements");
     assert(ScalarSizeInBits > 0 && "invalid vector element size");
     return LLT{/*isPointer=*/false, /*isVector=*/true, NumElements,
                ScalarSizeInBits, /*AddressSpace=*/0, Scalable};
@@ -64,7 +64,7 @@ public:
 
   /// Get a low-level vector of some number of elements and element type.
   static LLT vector(uint16_t NumElements, LLT ScalarTy, bool Scalable = false) {
-    assert(NumElements > 1 && "invalid number of vector elements");
+    assert((NumElements > 1 || Scalable) && "invalid number of vector elements");
     assert(!ScalarTy.isVector() && "invalid vector element type");
     return LLT{ScalarTy.isPointer(), /*isVector=*/true, NumElements,
                ScalarTy.getSizeInBits(),
@@ -272,7 +272,8 @@ private:
         RawData = maskAndShift(SizeInBits, PointerSizeFieldInfo) |
                   maskAndShift(AddressSpace, PointerAddressSpaceFieldInfo);
     } else {
-      assert(NumElements > 1 && "invalid number of vector elements");
+      assert((NumElements > 1 || Scalable) &&
+             "invalid number of vector elements");
       if (!IsPointer)
         RawData = maskAndShift(NumElements, VectorElementsFieldInfo) |
                   maskAndShift(SizeInBits, VectorSizeFieldInfo) |

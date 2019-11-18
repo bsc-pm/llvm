@@ -59,6 +59,7 @@ class EPIVReg<list<ValueType> regTypes, dag regList, int Vlmul>
                   128,
                   regList> {
   int VLMul = Vlmul;
+  let Size = 64;
 }
 
 defset list<EPIVReg> AllEPIVRegs = {

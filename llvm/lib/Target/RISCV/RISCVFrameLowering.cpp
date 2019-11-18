@@ -42,6 +42,13 @@ bool RISCVFrameLowering::hasFP(const MachineFunction &MF) const {
          RVFI->hasSpilledEPIVR() || MFI.isFrameAddressTaken();
 }
 
+bool RISCVFrameLowering::hasBP(const MachineFunction &MF) const {
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
+  const TargetRegisterInfo *TRI = STI.getRegisterInfo();
+
+  return MFI.hasVarSizedObjects() && TRI->needsStackRealignment(MF);
+}
+
 // Determines the size of the frame and maximum call frame size.
 void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   MachineFrameInfo &MFI = MF.getFrameInfo();
@@ -226,13 +233,10 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   const RISCVRegisterInfo *RI = STI.getRegisterInfo();
   const RISCVInstrInfo *TII = STI.getInstrInfo();
   MachineBasicBlock::iterator MBBI = MBB.begin();
-  const RISCVRegisterInfo *RegInfo =
-      MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
-  bool NeedsStackRealignment = RegInfo->needsStackRealignment(MF);
 
   Register FPReg = getFPReg(STI);
   Register SPReg = getSPReg(STI);
-  Register BPReg = getBPReg(STI);
+  Register BPReg = RISCVABI::getBPReg();
 
   // Debug location must be unknown since the first debug location is used
   // to determine the end of the prologue.
@@ -337,15 +341,37 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     }
   }
 
-  if (NeedsStackRealignment) {
-    // Realign the stack now.
-    alignSP(MBB, MBBI, DL, MFI.getMaxAlignment());
+  if (hasFP(MF)) {
+    // Realign Stack
+    const RISCVRegisterInfo *RI = STI.getRegisterInfo();
+    if (RI->needsStackRealignment(MF)) {
+      unsigned MaxAlignment = MFI.getMaxAlignment();
 
-    assert(hasFP(MF) && "we need an FP to properly realign the stack");
-
-    if (RegInfo->hasBasePointer(MF)) {
-      // Set BP to be the current SP
-      adjustReg(MBB, MBBI, DL, BPReg, SPReg, 0, MachineInstr::FrameSetup);
+      const RISCVInstrInfo *TII = STI.getInstrInfo();
+      if (isInt<12>(-(int)MaxAlignment)) {
+        BuildMI(MBB, MBBI, DL, TII->get(RISCV::ANDI), SPReg)
+            .addReg(SPReg)
+            .addImm(-(int)MaxAlignment);
+      } else {
+        unsigned ShiftAmount = countTrailingZeros(MaxAlignment);
+        Register VR =
+            MF.getRegInfo().createVirtualRegister(&RISCV::GPRRegClass);
+        BuildMI(MBB, MBBI, DL, TII->get(RISCV::SRLI), VR)
+            .addReg(SPReg)
+            .addImm(ShiftAmount);
+        BuildMI(MBB, MBBI, DL, TII->get(RISCV::SLLI), SPReg)
+            .addReg(VR)
+            .addImm(ShiftAmount);
+      }
+      // FP will be used to restore the frame in the epilogue, so we need
+      // another base register BP to record SP after re-alignment. SP will
+      // track the current stack after allocating variable sized objects.
+      if (hasBP(MF)) {
+        // move BP, SP
+        BuildMI(MBB, MBBI, DL, TII->get(RISCV::ADDI), BPReg)
+            .addReg(SPReg)
+            .addImm(0);
+      }
     }
   }
 
@@ -423,8 +449,6 @@ void RISCVFrameLowering::prepareStorageSpilledEPIVR(
   }
 }
 
-// FIXME Fix emission of .cfi_restore and .cfi_def_cfa CFI directives that can
-// incorrectly affect subsequent basic blocks.
 void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
                                       MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
@@ -432,7 +456,6 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   DebugLoc DL = MBBI->getDebugLoc();
-  const RISCVInstrInfo *TII = STI.getInstrInfo();
   Register FPReg = getFPReg(STI);
   Register SPReg = getSPReg(STI);
 
@@ -469,55 +492,6 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
 
     adjustReg(MBB, LastFrameDestroy, DL, SPReg, SPReg, SecondSPAdjustAmount,
               MachineInstr::FrameDestroy);
-
-    // Emit ".cfi_def_cfa_offset FirstSPAdjustAmount" if using an sp-based CFA
-    if (!hasFP(MF)) {
-      unsigned CFIIndex = MF.addFrameInst(
-          MCCFIInstruction::createDefCfaOffset(nullptr, -FirstSPAdjustAmount));
-      BuildMI(MBB, LastFrameDestroy, DL,
-              TII->get(TargetOpcode::CFI_INSTRUCTION))
-          .addCFIIndex(CFIIndex);
-    }
-  }
-
-  if (hasFP(MF)) {
-    // To find the instruction restoring FP from stack.
-    for (auto &I = LastFrameDestroy; I != MBBI; ++I) {
-      if (I->mayLoad() && I->getOperand(0).isReg()) {
-        Register DestReg = I->getOperand(0).getReg();
-        if (DestReg == FPReg) {
-          // If there is frame pointer, after restoring $fp registers, we
-          // need adjust CFA back to the correct sp-based offset.
-          // Emit ".cfi_def_cfa $sp, CFAOffset"
-          uint64_t CFAOffset =
-              FirstSPAdjustAmount
-                  ? -FirstSPAdjustAmount + RVFI->getVarArgsSaveSize()
-                  : -FPOffset;
-          unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createDefCfa(
-              nullptr, RI->getDwarfRegNum(SPReg, true), CFAOffset));
-          BuildMI(MBB, std::next(I), DL,
-                  TII->get(TargetOpcode::CFI_INSTRUCTION))
-              .addCFIIndex(CFIIndex)
-              .setMIFlag(MachineInstr::FrameSetup);
-          break;
-        }
-      }
-    }
-  }
-
-  // Add CFI directives for callee-saved registers.
-  // Iterate over list of callee-saved registers and emit .cfi_restore
-  // directives.
-  for (const auto &Entry : CSI) {
-    Register Reg = Entry.getReg();
-    // We don't have sensible DWARF for EPI registers yet
-    if (RISCV::EPIVRRegClass.contains(Reg))
-      continue;
-    unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createRestore(
-        nullptr, RI->getDwarfRegNum(Reg, true)));
-    BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-        .addCFIIndex(CFIIndex)
-        .setMIFlag(MachineInstr::FrameSetup);
   }
 
   if (FirstSPAdjustAmount)
@@ -525,14 +499,6 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
 
   // Deallocate stack
   adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackSize, MachineInstr::FrameDestroy);
-
-  // After restoring $sp, we need to adjust CFA to $(sp + 0)
-  // Emit ".cfi_def_cfa_offset 0"
-  unsigned CFIIndex =
-      MF.addFrameInst(MCCFIInstruction::createDefCfaOffset(nullptr, 0));
-  BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
-      .addCFIIndex(CFIIndex)
-      .setMIFlag(MachineInstr::FrameSetup);
 }
 
 int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
@@ -562,7 +528,6 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
     MaxCSFI = CSI[CSI.size() - 1].getFrameIdx();
   }
   bool IsCSR = FI >= MinCSFI && FI <= MaxCSFI;
-  bool isFixed = !IsCSR && MFI.isFixedObjectIndex(FI);
 
   if (IsCSR && MFI.getStackID(FI) == 0) {
     // Only CSRs in the default stack can be accessed using SP
@@ -571,15 +536,21 @@ int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
       Offset += FirstSPAdjustAmount;
     else
       Offset += MF.getFrameInfo().getStackSize();
+  } else if (RI->needsStackRealignment(MF) && !MFI.isFixedObjectIndex(FI)) {
+    // If the stack was realigned, the frame pointer is set in order to allow
+    // SP to be restored, so we need another base register to record the stack
+    // after realignment.
+    if (hasBP(MF))
+      FrameReg = RISCVABI::getBPReg();
+    else
+      FrameReg = RISCV::X2;
+    Offset += MF.getFrameInfo().getStackSize();
   } else {
-    if (hasFP(MF) && (isFixed || (!RI->needsStackRealignment(MF) &&
-                                  !MFI.isVariableSizedObjectIndex(FI)))) {
-      FrameReg = getFPReg(STI);
+    FrameReg = RI->getFrameRegister(MF);
+    if (hasFP(MF))
       Offset += RVFI->getVarArgsSaveSize();
-    } else {
-      FrameReg = RI->hasBasePointer(MF) ? getBPReg(STI) : getSPReg(STI);
+    else
       Offset += MF.getFrameInfo().getStackSize();
-    }
   }
   return Offset;
 }
@@ -600,6 +571,9 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
   if (RI->hasBasePointer(MF)) {
     SavedRegs.set(getBPReg(STI));
   }
+  // Mark BP as used if function has dedicated base pointer.
+  if (hasBP(MF))
+    SavedRegs.set(RISCVABI::getBPReg());
 
   // If interrupt is enabled and there are calls in the handler,
   // unconditionally save all Caller-saved registers and

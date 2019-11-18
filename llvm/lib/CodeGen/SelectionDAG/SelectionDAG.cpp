@@ -1943,7 +1943,7 @@ SDValue SelectionDAG::expandVACopy(SDNode *Node) {
 
 SDValue SelectionDAG::CreateStackTemporary(EVT VT, unsigned minAlign) {
   MachineFrameInfo &MFI = getMachineFunction().getFrameInfo();
-  unsigned ByteSize = VT.getStoreSize();
+  unsigned ByteSize = VT.getStoreSize().getKnownMinSize();
   Type *Ty = VT.getTypeForEVT(*getContext());
   unsigned StackAlign =
       std::max((unsigned)getDataLayout().getPrefTypeAlignment(Ty), minAlign);
@@ -6711,7 +6711,8 @@ SDValue SelectionDAG::getLoad(ISD::MemIndexedMode AM, ISD::LoadExtType ExtType,
 
   MachineFunction &MF = getMachineFunction();
   MachineMemOperand *MMO = MF.getMachineMemOperand(
-      PtrInfo, MMOFlags, MemVT.getStoreSize(), Alignment, AAInfo, Ranges);
+      PtrInfo, MMOFlags, MemVT.getStoreSize().getKnownMinSize(), Alignment,
+      AAInfo, Ranges);
   return getLoad(AM, ExtType, VT, dl, Chain, Ptr, Offset, MemVT, MMO);
 }
 
@@ -6832,7 +6833,8 @@ SDValue SelectionDAG::getStore(SDValue Chain, const SDLoc &dl, SDValue Val,
 
   MachineFunction &MF = getMachineFunction();
   MachineMemOperand *MMO = MF.getMachineMemOperand(
-      PtrInfo, MMOFlags, Val.getValueType().getStoreSize(), Alignment, AAInfo);
+      PtrInfo, MMOFlags, Val.getValueType().getStoreSize().getKnownMinSize(),
+      Alignment, AAInfo);
   return getStore(Chain, dl, Val, Ptr, MMO);
 }
 
@@ -6884,7 +6886,8 @@ SDValue SelectionDAG::getTruncStore(SDValue Chain, const SDLoc &dl, SDValue Val,
 
   MachineFunction &MF = getMachineFunction();
   MachineMemOperand *MMO = MF.getMachineMemOperand(
-      PtrInfo, MMOFlags, SVT.getStoreSize(), Alignment, AAInfo);
+      PtrInfo, MMOFlags, SVT.getStoreSize().getKnownMinSize(), Alignment,
+      AAInfo);
   return getTruncStore(Chain, dl, Val, Ptr, SVT, MMO);
 }
 
@@ -8842,7 +8845,9 @@ MemSDNode::MemSDNode(unsigned Opc, unsigned Order, const DebugLoc &dl,
   // We check here that the size of the memory operand fits within the size of
   // the MMO. This is because the MMO might indicate only a possible address
   // range instead of specifying the affected memory addresses precisely.
-  assert(memvt.getStoreSize() <= MMO->getSize() && "Size mismatch!");
+  // TODO: Make MachineMemOperands aware of scalable vectors.
+  assert(memvt.getStoreSize().getKnownMinSize() <= MMO->getSize() &&
+         "Size mismatch!");
 }
 
 /// Profile - Gather unique data for the node.

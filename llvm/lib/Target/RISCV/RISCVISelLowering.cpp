@@ -2156,7 +2156,7 @@ static SDValue unpackFromMemLoc(SelectionDAG &DAG, SDValue Chain,
   EVT LocVT = VA.getLocVT();
   EVT ValVT = VA.getValVT();
   EVT PtrVT = MVT::getIntegerVT(DAG.getDataLayout().getPointerSizeInBits(0));
-  int FI = MFI.CreateFixedObject(ValVT.getSizeInBits() / 8,
+  int FI = MFI.CreateFixedObject(ValVT.getSizeInBits().getKnownMinSize() / 8,
                                  VA.getLocMemOffset(), /*Immutable=*/true);
   SDValue FIN = DAG.getFrameIndex(FI, PtrVT);
   SDValue Val;

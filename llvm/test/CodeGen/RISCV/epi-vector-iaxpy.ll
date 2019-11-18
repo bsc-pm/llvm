@@ -57,7 +57,6 @@ define dso_local void @s16axpy(i16 signext %N, i16* noalias nocapture %y, i16* n
 ; CHECK-NEXT:    addi a2, a2, 2
 ; CHECK-NEXT:    bnez a0, .LBB0_7
 ; CHECK-NEXT:  .LBB0_8: # %for.cond.cleanup
-; CHECK-NEXT:    .cfi_def_cfa_offset 0
 ; CHECK-NEXT:    ret
 entry:
   %cmp17 = icmp sgt i16 %N, 0
@@ -177,7 +176,6 @@ define dso_local void @s32axpy(i32 signext %N, i32* noalias nocapture %y, i32* n
 ; CHECK-NEXT:    addi a2, a2, 4
 ; CHECK-NEXT:    bnez a0, .LBB1_7
 ; CHECK-NEXT:  .LBB1_8: # %for.cond.cleanup
-; CHECK-NEXT:    .cfi_def_cfa_offset 0
 ; CHECK-NEXT:    ret
 entry:
   %cmp11 = icmp sgt i32 %N, 0
@@ -293,7 +291,6 @@ define dso_local void @s64axpy(i64 %N, i64* noalias nocapture %y, i64* noalias n
 ; CHECK-NEXT:    addi a2, a2, 8
 ; CHECK-NEXT:    bnez a0, .LBB2_7
 ; CHECK-NEXT:  .LBB2_8: # %for.cond.cleanup
-; CHECK-NEXT:    .cfi_def_cfa_offset 0
 ; CHECK-NEXT:    ret
 entry:
   %cmp9 = icmp sgt i64 %N, 0

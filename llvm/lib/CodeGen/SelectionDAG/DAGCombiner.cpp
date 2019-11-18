@@ -220,11 +220,13 @@ namespace {
       ForCodeSize = DAG.getMachineFunction().getFunction().hasOptSize();
 
       MaximumLegalStoreInBits = 0;
+      // We use the minimum store size here, since that's all we can guarantee
+      // for the scalable vector types.
       for (MVT VT : MVT::all_valuetypes())
         if (EVT(VT).isSimple() && VT != MVT::Other &&
             TLI.isTypeLegal(EVT(VT)) &&
-            VT.getSizeInBits() >= MaximumLegalStoreInBits)
-          MaximumLegalStoreInBits = VT.getSizeInBits();
+            VT.getSizeInBits().getKnownMinSize() >= MaximumLegalStoreInBits)
+          MaximumLegalStoreInBits = VT.getSizeInBits().getKnownMinSize();
     }
 
     void ConsiderForPruning(SDNode *N) {
@@ -13958,6 +13960,9 @@ SDValue DAGCombiner::ForwardStoreValueToDirectLoad(LoadSDNode *LD) {
   EVT STMemType = ST->getMemoryVT();
   EVT STType = ST->getValue().getValueType();
 
+  if (LDMemType.isScalableVector() || STMemType.isScalableVector())
+    return SDValue();
+
   BaseIndexOffset BasePtrLD = BaseIndexOffset::match(LD, DAG);
   BaseIndexOffset BasePtrST = BaseIndexOffset::match(ST, DAG);
   int64_t Offset;
@@ -13969,8 +13974,8 @@ SDValue DAGCombiner::ForwardStoreValueToDirectLoad(LoadSDNode *LD) {
   // the stored value). With Offset=n (for n > 0) the loaded value starts at the
   // n:th least significant byte of the stored value.
   if (DAG.getDataLayout().isBigEndian())
-    Offset = (STMemType.getStoreSizeInBits() -
-              LDMemType.getStoreSizeInBits()) / 8 - Offset;
+    Offset = ((int64_t)STMemType.getStoreSizeInBits() -
+              (int64_t)LDMemType.getStoreSizeInBits()) / 8 - Offset;
 
   // Check that the stored value cover all bits that are loaded.
   bool STCoversLD =
@@ -14625,6 +14630,9 @@ bool DAGCombiner::SliceUpLoad(SDNode *N) {
       !LD->getValueType(0).isInteger())
     return false;
 
+  if (LD->getValueType(0).isScalableVector())
+    return false;
+
   // Keep track of already used bits to detect overlapping values.
   // In that case, we will just abort the transformation.
   APInt UsedBits(LD->getValueSizeInBits(0), 0);
@@ -14990,7 +14998,8 @@ SDValue DAGCombiner::TransformFPLoadStorePair(SDNode *N) {
         ST->getPointerInfo().getAddrSpace() != 0)
       return SDValue();
 
-    EVT IntVT = EVT::getIntegerVT(*DAG.getContext(), VT.getSizeInBits());
+    EVT IntVT = EVT::getIntegerVT(*DAG.getContext(),
+                                  VT.getSizeInBits().getKnownMinSize());
     if (!TLI.isOperationLegal(ISD::LOAD, IntVT) ||
         !TLI.isOperationLegal(ISD::STORE, IntVT) ||
         !TLI.isDesirableToTransformToIntegerOp(ISD::LOAD, VT) ||
@@ -15127,7 +15136,7 @@ bool DAGCombiner::MergeStoresOfConstantsOrVecElts(
   // The latest Node in the DAG.
   SDLoc DL(StoreNodes[0].MemNode);
 
-  int64_t ElementSizeBits = MemVT.getStoreSizeInBits();
+  TypeSize ElementSizeBits = MemVT.getStoreSizeInBits();
   unsigned SizeInBits = NumStores * ElementSizeBits;
   unsigned NumMemElts = MemVT.isVector() ? MemVT.getVectorNumElements() : 1;
 
@@ -15502,6 +15511,11 @@ bool DAGCombiner::MergeConsecutiveStores(StoreSDNode *St) {
     return false;
 
   EVT MemVT = St->getMemoryVT();
+
+  // Skip scalable vectors for now.
+  if (MemVT.isScalableVector())
+    return false;
+
   int64_t ElementSizeBytes = MemVT.getStoreSize();
   unsigned NumMemElts = MemVT.isVector() ? MemVT.getVectorNumElements() : 1;
 
@@ -15512,7 +15526,7 @@ bool DAGCombiner::MergeConsecutiveStores(StoreSDNode *St) {
       Attribute::NoImplicitFloat);
 
   // This function cannot currently deal with non-byte-sized memory sizes.
-  if (ElementSizeBytes * 8 != MemVT.getSizeInBits())
+  if (ElementSizeBytes * 8 != (int64_t)MemVT.getSizeInBits())
     return false;
 
   if (!MemVT.isSimple())
@@ -20525,13 +20539,18 @@ bool DAGCombiner::isAlias(SDNode *Op0, SDNode *Op1) const {
                      : (LSN->getAddressingMode() == ISD::PRE_DEC)
                            ? -1 * C->getSExtValue()
                            : 0;
-      return {LSN->isVolatile(), LSN->isAtomic(), LSN->getBasePtr(),
+      return {LSN->isVolatile(),
+              LSN->isAtomic(),
+              LSN->getBasePtr(),
               Offset /*base offset*/,
-              Optional<int64_t>(LSN->getMemoryVT().getStoreSize()),
+              Optional<int64_t>(
+                  LSN->getMemoryVT().getStoreSize().getKnownMinSize()),
               LSN->getMemOperand()};
     }
     if (const auto *LN = cast<LifetimeSDNode>(N))
-      return {false /*isVolatile*/, /*isAtomic*/ false, LN->getOperand(1),
+      return {false /*isVolatile*/,
+              /*isAtomic*/ false,
+              LN->getOperand(1),
               (LN->hasOffset()) ? LN->getOffset() : 0,
               (LN->hasOffset()) ? Optional<int64_t>(LN->getSize())
                                 : Optional<int64_t>(),
@@ -20805,6 +20824,10 @@ bool DAGCombiner::parallelizeChainedStores(StoreSDNode *St) {
 
   // Do not handle stores to undef base pointers.
   if (BasePtr.getBase().isUndef())
+    return false;
+
+  // Skip for now scalable vectors.
+  if (St->getMemoryVT().isScalableVector())
     return false;
 
   // Add ST's interval.

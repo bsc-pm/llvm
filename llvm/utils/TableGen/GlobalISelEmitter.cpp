@@ -137,7 +137,7 @@ public:
     }
     if (Ty.isVector()) {
       OS << "LLT::vector(" << Ty.getNumElements() << ", "
-         << Ty.getScalarSizeInBits() << ")";
+         << Ty.getScalarSizeInBits() << ", " << Ty.isScalable() << ")";
       return;
     }
     if (Ty.isPointer() && Ty.getSizeInBits() > 0) {
@@ -187,9 +187,11 @@ class InstructionMatcher;
 static Optional<LLTCodeGen> MVTToLLT(MVT::SimpleValueType SVT) {
   MVT VT(SVT);
 
-  if (VT.isVector() && VT.getVectorNumElements() != 1)
-    return LLTCodeGen(
-        LLT::vector(VT.getVectorNumElements(), VT.getScalarSizeInBits()));
+  if (VT.isVector() &&
+      (VT.getVectorNumElements() != 1 || VT.isScalableVector()))
+    return LLTCodeGen(LLT::vector(VT.getVectorNumElements(),
+                                  VT.getScalarSizeInBits(),
+                                  VT.isScalableVector()));
 
   if (VT.isInteger() || VT.isFloatingPoint())
     return LLTCodeGen(LLT::scalar(VT.getSizeInBits()));

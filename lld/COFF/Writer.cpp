@@ -20,6 +20,7 @@
 #include "lld/Common/Timer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/BinaryStreamReader.h"
 #include "llvm/Support/Debug.h"
@@ -1843,7 +1844,7 @@ void Writer::sortExceptionTable() {
         [](const Entry &a, const Entry &b) { return a.begin < b.begin; });
     return;
   }
-  errs() << "warning: don't know how to handle .pdata.\n";
+  lld::errs() << "warning: don't know how to handle .pdata.\n";
 }
 
 // The CRT section contains, among other things, the array of function
