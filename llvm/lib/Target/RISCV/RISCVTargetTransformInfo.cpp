@@ -130,7 +130,7 @@ bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
   return false;
 }
 
-bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType) {
+bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment) {
   if (!ST->hasExtEPI())
     return false;
   Type *ScalarTy = DataType->getScalarType();
@@ -139,14 +139,14 @@ bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType) {
            ScalarTy->isDoubleTy() || ScalarTy->isIntegerTy()));
 }
 
-bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType) {
-  return isLegalMaskedLoad(DataType);
+bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType, MaybeAlign Alignment) {
+  return isLegalMaskedLoad(DataType, Alignment);
 }
 
 bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType) {
-  return isLegalMaskedLoad(DataType);
+  return isLegalMaskedLoad(DataType, MaybeAlign());
 }
 
 bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType) {
-  return isLegalMaskedStore(DataType);
+  return isLegalMaskedStore(DataType, MaybeAlign());
 }
