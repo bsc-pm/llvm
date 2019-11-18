@@ -152,8 +152,8 @@ define dso_local void @test4() nounwind {
 ; RV32-NEXT:    lui a0, 2
 ; RV32-NEXT:    addi a0, a0, -2032
 ; RV32-NEXT:    sub sp, sp, a0
-; RV32-NEXT:    srli sp, sp, 12
-; RV32-NEXT:    slli sp, sp, 12
+; RV32-NEXT:    srli a0, sp, 12
+; RV32-NEXT:    slli sp, a0, 12
 ; RV32-NEXT:    lui a0, 1
 ; RV32-NEXT:    add a0, sp, a0
 ; RV32-NEXT:    lw a0, 0(a0)
@@ -180,8 +180,8 @@ define dso_local void @test4() nounwind {
 ; RV64-NEXT:    lui a0, 2
 ; RV64-NEXT:    addiw a0, a0, -2032
 ; RV64-NEXT:    sub sp, sp, a0
-; RV64-NEXT:    srli sp, sp, 12
-; RV64-NEXT:    slli sp, sp, 12
+; RV64-NEXT:    srli a0, sp, 12
+; RV64-NEXT:    slli sp, a0, 12
 ; RV64-NEXT:    lui a0, 1
 ; RV64-NEXT:    add a0, sp, a0
 ; RV64-NEXT:    lw a0, 0(a0)

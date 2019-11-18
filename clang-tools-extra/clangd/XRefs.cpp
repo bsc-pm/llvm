@@ -417,6 +417,7 @@ static std::string getLocalScope(const Decl *D) {
   auto GetName = [](const Decl *D) {
     const NamedDecl *ND = dyn_cast<NamedDecl>(D);
     std::string Name = ND->getNameAsString();
+    // FIXME(sammccall): include template params/specialization args?.
     if (!Name.empty())
       return Name;
     if (auto RD = dyn_cast<RecordDecl>(D))
@@ -455,6 +456,7 @@ static std::string printDefinition(const Decl *D) {
   PrintingPolicy Policy =
       printingPolicyForDecls(D->getASTContext().getPrintingPolicy());
   Policy.IncludeTagDefinition = false;
+  Policy.SuppressTemplateArgsInCXXConstructors = true;
   D->print(OS, Policy);
   OS.flush();
   return Definition;
@@ -881,11 +883,11 @@ llvm::Optional<HoverInfo> getHover(ParsedAST &AST, Position Pos,
   return HI;
 }
 
-std::vector<Location> findReferences(ParsedAST &AST, Position Pos,
-                                     uint32_t Limit, const SymbolIndex *Index) {
+ReferencesResult findReferences(ParsedAST &AST, Position Pos, uint32_t Limit,
+                                const SymbolIndex *Index) {
   if (!Limit)
     Limit = std::numeric_limits<uint32_t>::max();
-  std::vector<Location> Results;
+  ReferencesResult Results;
   const SourceManager &SM = AST.getSourceManager();
   auto MainFilePath =
       getCanonicalPath(SM.getFileEntryForID(SM.getMainFileID()), SM);
@@ -920,12 +922,11 @@ std::vector<Location> findReferences(ParsedAST &AST, Position Pos,
       Location Result;
       Result.range = *Range;
       Result.uri = URIForFile::canonicalize(*MainFilePath, *MainFilePath);
-      Results.push_back(std::move(Result));
+      Results.References.push_back(std::move(Result));
     }
   }
-
   // Now query the index for references from other files.
-  if (Index && Results.size() < Limit) {
+  if (Index && Results.References.size() <= Limit) {
     RefsRequest Req;
     Req.Limit = Limit;
 
@@ -940,15 +941,22 @@ std::vector<Location> findReferences(ParsedAST &AST, Position Pos,
     }
     if (Req.IDs.empty())
       return Results;
-    Index->refs(Req, [&](const Ref &R) {
+    Results.HasMore |= Index->refs(Req, [&](const Ref &R) {
+      // no need to continue process if we reach the limit.
+      if (Results.References.size() > Limit)
+        return;
       auto LSPLoc = toLSPLocation(R.Location, *MainFilePath);
       // Avoid indexed results for the main file - the AST is authoritative.
-      if (LSPLoc && LSPLoc->uri.file() != *MainFilePath)
-        Results.push_back(std::move(*LSPLoc));
+      if (!LSPLoc || LSPLoc->uri.file() == *MainFilePath)
+        return;
+
+      Results.References.push_back(std::move(*LSPLoc));
     });
   }
-  if (Results.size() > Limit)
-    Results.resize(Limit);
+  if (Results.References.size() > Limit) {
+    Results.HasMore = true;
+    Results.References.resize(Limit);
+  }
   return Results;
 }
 
