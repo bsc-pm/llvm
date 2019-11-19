@@ -910,17 +910,26 @@ void foo())cpp";
        }},
       // Constructor of partially-specialized class template
       {R"cpp(
-          template<typename> struct X;
+          template<typename, typename=void> struct X;
           template<typename T> struct X<T*>{ [[^X]](); };
           )cpp",
        [](HoverInfo &HI) {
          HI.NamespaceScope = "";
          HI.Name = "X";
-         HI.LocalScope = "X::";        // FIXME: Should be X<T *>::
+         HI.LocalScope = "X<T *>::"; // FIXME: X<T *, void>::
          HI.Kind = SymbolKind::Constructor;
-         HI.Type = "void ()";          // FIXME: Should be None
-         HI.ReturnType = "void";       // FIXME: Should be None or X<T*>
+         HI.ReturnType = "X<T *>";
          HI.Definition = "X()";
+         HI.Parameters.emplace();
+       }},
+      {"class X { [[^~]]X(); };", // FIXME: Should be [[~X]]()
+       [](HoverInfo &HI) {
+         HI.NamespaceScope = "";
+         HI.Name = "~X";
+         HI.LocalScope = "X::";
+         HI.Kind = SymbolKind::Constructor;
+         HI.ReturnType = "void";
+         HI.Definition = "~X()";
          HI.Parameters.emplace();
        }},
 
@@ -1020,8 +1029,8 @@ void foo())cpp";
          HI.Type = "enum Color";
          HI.Value = "1";
        }},
-      // FIXME: We should use the Decl referenced, even if it comes from an
-      // implicit instantiation.
+      // FIXME: We should use the Decl referenced, even if from an implicit
+      // instantiation. Then the scope would be Add<1, 2> and the value 3.
       {R"cpp(
         template<int a, int b> struct Add {
           static constexpr int result = a + b;
@@ -1034,7 +1043,7 @@ void foo())cpp";
          HI.Kind = SymbolKind::Property;
          HI.Type = "const int";
          HI.NamespaceScope = "";
-         HI.LocalScope = "Add::";
+         HI.LocalScope = "Add<a, b>::";
        }},
       {R"cpp(
         const char *[[ba^r]] = "1234";
