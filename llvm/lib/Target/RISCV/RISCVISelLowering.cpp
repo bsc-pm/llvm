@@ -3352,7 +3352,8 @@ Value *RISCVTargetLowering::emitMaskedAtomicCmpXchgIntrinsic(
   return Result;
 }
 
-bool RISCVTargetLowering::isFMAFasterThanFMulAndFAdd(EVT VT) const {
+bool RISCVTargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
+                                                     EVT VT) const {
   VT = VT.getScalarType();
 
   if (!VT.isSimple())

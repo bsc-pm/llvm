@@ -1266,13 +1266,8 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
 
   if (Arg *A = Args.getLastArg(OPT_fdenormal_fp_math_EQ)) {
     StringRef Val = A->getValue();
-    if (Val == "ieee")
-      Opts.FPDenormalMode = "ieee";
-    else if (Val == "preserve-sign")
-      Opts.FPDenormalMode = "preserve-sign";
-    else if (Val == "positive-zero")
-      Opts.FPDenormalMode = "positive-zero";
-    else
+    Opts.FPDenormalMode = llvm::parseDenormalFPAttribute(Val);
+    if (Opts.FPDenormalMode == llvm::DenormalMode::Invalid)
       Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args) << Val;
   }
 
@@ -2780,6 +2775,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
     && Opts.OpenCLVersion == 200);
   Opts.BlocksRuntimeOptional = Args.hasArg(OPT_fblocks_runtime_optional);
   Opts.Coroutines = Opts.CPlusPlus2a || Args.hasArg(OPT_fcoroutines_ts);
+
+  Opts.ConvergentFunctions = Opts.OpenCL || (Opts.CUDA && Opts.CUDAIsDevice) ||
+    Args.hasArg(OPT_fconvergent_functions);
 
   Opts.DoubleSquareBracketAttributes =
       Args.hasFlag(OPT_fdouble_square_bracket_attributes,

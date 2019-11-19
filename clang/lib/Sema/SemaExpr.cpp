@@ -7678,7 +7678,7 @@ static bool IsArithmeticBinaryExpr(Expr *E, BinaryOperatorKind *Opcode,
   E = E->IgnoreConversionOperator();
   E = E->IgnoreImpCasts();
   if (auto *MTE = dyn_cast<MaterializeTemporaryExpr>(E)) {
-    E = MTE->GetTemporaryExpr();
+    E = MTE->getSubExpr();
     E = E->IgnoreImpCasts();
   }
 
@@ -8734,7 +8734,7 @@ namespace {
 struct OriginalOperand {
   explicit OriginalOperand(Expr *Op) : Orig(Op), Conversion(nullptr) {
     if (auto *MTE = dyn_cast<MaterializeTemporaryExpr>(Op))
-      Op = MTE->GetTemporaryExpr();
+      Op = MTE->getSubExpr();
     if (auto *BTE = dyn_cast<CXXBindTemporaryExpr>(Op))
       Op = BTE->getSubExpr();
     if (auto *ICE = dyn_cast<ImplicitCastExpr>(Op)) {
