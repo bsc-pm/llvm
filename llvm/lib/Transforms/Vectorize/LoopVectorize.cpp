@@ -1975,16 +1975,21 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
     // Create a vector of consecutive numbers from zero to VF.
     if (isScalable()) {
       // Get the stepvector from intrinsic - <0, 1, 2 ... vscale*VF-1>
-      // here VF = k in <vscale x k x type>
       Function *StepVector = Intrinsic::getDeclaration(
           LoopVectorPreHeader->getModule(),
           Intrinsic::experimental_vector_stepvector, Val->getType());
-      llvm::Value *Indices = Builder.CreateCall(StepVector, {}, "stepvec.base");
+      Value *Indices = Builder.CreateCall(StepVector, {}, "stepvec.base");
       assert(Indices->getType() == Val->getType() && "Invalid consecutive vec");
+
       if (StartIdx) {
-        llvm::Value *StartIdxSplat =
-            Builder.CreateVectorSplat(VLen, ConstantInt::get(STy, StartIdx),
-                                      "stepvec.start", isScalable());
+        // here VF = k in <vscale x k x type>. We need to scale StartIdx by
+        // vscale, since StartIdx = VF * Part.
+        CallInst *Vscale =
+            emitVscaleCall(Builder, LoopVectorPreHeader->getModule(), STy);
+        Value *ScaledStartIdx = Builder.CreateMul(
+            Vscale, ConstantInt::get(STy, StartIdx), "startidx.vscale");
+        Value *StartIdxSplat = Builder.CreateVectorSplat(
+            VLen, ScaledStartIdx, "stepvec.start", isScalable());
         Indices = Builder.CreateAdd(Indices, StartIdxSplat);
       }
 
