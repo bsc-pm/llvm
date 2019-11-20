@@ -1101,13 +1101,15 @@ void ClangExpressionDeclMap::FindExternalVisibleDecls(
                                    : CompilerDeclContext();
 
       if (frame_decl_context) {
-        ClangASTContext *ast = llvm::dyn_cast_or_null<ClangASTContext>(
+        ClangASTContext *frame_ast = llvm::dyn_cast_or_null<ClangASTContext>(
             frame_decl_context.GetTypeSystem());
 
-        if (ast) {
+        ClangASTContext *map_ast =
+            ClangASTContext::GetASTContext(m_ast_context);
+        if (frame_ast && map_ast) {
           clang::NamespaceDecl *namespace_decl =
-              ClangASTContext::GetUniqueNamespaceDeclaration(
-                  m_ast_context, name.GetCString(), nullptr);
+              map_ast->GetUniqueNamespaceDeclaration(name.GetCString(),
+                                                     nullptr);
           if (namespace_decl) {
             context.AddNamedDecl(namespace_decl);
             clang::DeclContext *clang_decl_ctx =
@@ -1722,17 +1724,15 @@ void ClangExpressionDeclMap::AddOneGenericVariable(NameSearchContext &context,
   if (target == nullptr)
     return;
 
-  ASTContext *scratch_ast_context =
-      target->GetScratchClangASTContext()->getASTContext();
+  ClangASTContext *scratch_ast_context = target->GetScratchClangASTContext();
 
-  TypeFromUser user_type(
-      ClangASTContext::GetBasicType(scratch_ast_context, eBasicTypeVoid)
-          .GetPointerType()
-          .GetLValueReferenceType());
-  TypeFromParser parser_type(
-      ClangASTContext::GetBasicType(m_ast_context, eBasicTypeVoid)
-          .GetPointerType()
-          .GetLValueReferenceType());
+  TypeFromUser user_type(scratch_ast_context->GetBasicType(eBasicTypeVoid)
+                             .GetPointerType()
+                             .GetLValueReferenceType());
+  ClangASTContext *own_context = ClangASTContext::GetASTContext(m_ast_context);
+  TypeFromParser parser_type(own_context->GetBasicType(eBasicTypeVoid)
+                                 .GetPointerType()
+                                 .GetLValueReferenceType());
   NamedDecl *var_decl = context.AddVarDecl(parser_type);
 
   std::string decl_name(context.m_decl_name.getAsString());
@@ -2022,8 +2022,9 @@ void ClangExpressionDeclMap::AddThisType(NameSearchContext &context,
 
   if (copied_clang_type.IsAggregateType() &&
       copied_clang_type.GetCompleteType()) {
-    CompilerType void_clang_type =
-        ClangASTContext::GetBasicType(m_ast_context, eBasicTypeVoid);
+    ClangASTContext *own_context =
+        ClangASTContext::GetASTContext(m_ast_context);
+    CompilerType void_clang_type = own_context->GetBasicType(eBasicTypeVoid);
     CompilerType void_ptr_clang_type = void_clang_type.GetPointerType();
 
     CompilerType method_type = ClangASTContext::CreateFunctionType(
