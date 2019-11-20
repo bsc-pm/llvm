@@ -599,6 +599,10 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 
   const RecordType *RT = Q->getAs<RecordType>();
   const CXXRecordDecl *RD = cast<CXXRecordDecl>(RT->getDecl());
+
+  if (RD->hasTrivialDestructor())
+    return;
+
   const CXXDestructorDecl *DtorD = RD->getDestructor();
 
   GlobalDecl DtorGD(DtorD, Dtor_Complete);
@@ -741,7 +745,6 @@ static void EmitDSAPrivate(
 
   if (!CopyD->getType().isPODType(CGF.getContext())) {
     EmitCtorFunc(CGF.CGM, V, CopyD, TaskInfo);
-    // FIXME: Debug location missing
     EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
   }
 }
@@ -777,7 +780,6 @@ static void EmitDSAFirstprivate(
     const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
 
     EmitCopyCtorFunc(CGF.CGM, V, CtorE, CopyD, InitD, TaskInfo);
-    // FIXME: Debug location missing
     EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
   }
 }
