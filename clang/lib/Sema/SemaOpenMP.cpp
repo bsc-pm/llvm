@@ -4498,6 +4498,8 @@ StmtResult Sema::ActOnOpenMPExecutableDirective(
   case OMPD_for_simd:
     Res = ActOnOpenMPForSimdDirective(ClausesWithImplicit, AStmt, StartLoc,
                                       EndLoc, VarsWithInheritedDSA);
+    if (LangOpts.OpenMP >= 50)
+      AllowedNameModifiers.push_back(OMPD_simd);
     break;
   case OMPD_sections:
     Res = ActOnOpenMPSectionsDirective(ClausesWithImplicit, AStmt, StartLoc,
@@ -4764,12 +4766,16 @@ StmtResult Sema::ActOnOpenMPExecutableDirective(
       case OMPC_num_threads:
       case OMPC_dist_schedule:
         // Do not analyse if no parent teams directive.
-        if (isOpenMPTeamsDirective(DSAStack->getCurrentDirective()))
+        if (isOpenMPTeamsDirective(Kind))
           break;
         continue;
       case OMPC_if:
-        if (isOpenMPTeamsDirective(DSAStack->getCurrentDirective()) &&
+        if (isOpenMPTeamsDirective(Kind) &&
             cast<OMPIfClause>(C)->getNameModifier() != OMPD_target)
+          break;
+        if (isOpenMPParallelDirective(Kind) &&
+            isOpenMPTaskLoopDirective(Kind) &&
+            cast<OMPIfClause>(C)->getNameModifier() != OMPD_parallel)
           break;
         continue;
       case OMPC_schedule:
@@ -4779,7 +4785,7 @@ StmtResult Sema::ActOnOpenMPExecutableDirective(
       case OMPC_final:
       case OMPC_priority:
         // Do not analyze if no parent parallel directive.
-        if (isOpenMPParallelDirective(DSAStack->getCurrentDirective()))
+        if (isOpenMPParallelDirective(Kind))
           break;
         continue;
       case OMPC_ordered:
@@ -10670,6 +10676,7 @@ static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
     case OMPD_master_taskloop_simd:
     case OMPD_target_data:
     case OMPD_simd:
+    case OMPD_for_simd:
       // Do not capture if-clause expressions.
       break;
     case OMPD_threadprivate:
@@ -10687,7 +10694,6 @@ static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
     case OMPD_end_declare_target:
     case OMPD_teams:
     case OMPD_for:
-    case OMPD_for_simd:
     case OMPD_sections:
     case OMPD_section:
     case OMPD_single:
