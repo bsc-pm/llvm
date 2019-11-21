@@ -1848,7 +1848,8 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
     Type *IndexTy = (*I)->getType();
     Type *NewIndexType =
         IndexTy->isVectorTy()
-            ? VectorType::get(NewScalarIndexTy, IndexTy->getVectorNumElements())
+            ? VectorType::get(NewScalarIndexTy, IndexTy->getVectorNumElements(),
+                              IndexTy->getVectorIsScalable())
             : NewScalarIndexTy;
 
     // If the element type has zero size then any index over it is equivalent
