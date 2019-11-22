@@ -674,16 +674,21 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::STRICT_FDIV, MVT::f128, LibCall);
     setOperationAction(ISD::FMUL,        MVT::f128, LibCall);
     setOperationAction(ISD::STRICT_FMUL, MVT::f128, LibCall);
-    setOperationAction(ISD::FMA,         MVT::f128, Expand);
+    setOperationAction(ISD::FMA,         MVT::f128, LibCall);
+    setOperationAction(ISD::STRICT_FMA,  MVT::f128, LibCall);
 
     setOperationAction(ISD::FABS, MVT::f128, Custom);
     setOperationAction(ISD::FNEG, MVT::f128, Custom);
     setOperationAction(ISD::FCOPYSIGN, MVT::f128, Custom);
 
-    setOperationAction(ISD::FSIN,    MVT::f128, Expand);
-    setOperationAction(ISD::FCOS,    MVT::f128, Expand);
-    setOperationAction(ISD::FSINCOS, MVT::f128, Expand);
-    setOperationAction(ISD::FSQRT,   MVT::f128, Expand);
+    setOperationAction(ISD::FSIN,         MVT::f128, LibCall);
+    setOperationAction(ISD::STRICT_FSIN,  MVT::f128, LibCall);
+    setOperationAction(ISD::FCOS,         MVT::f128, LibCall);
+    setOperationAction(ISD::STRICT_FCOS,  MVT::f128, LibCall);
+    setOperationAction(ISD::FSINCOS,      MVT::f128, LibCall);
+    // No STRICT_FSINCOS
+    setOperationAction(ISD::FSQRT,        MVT::f128, LibCall);
+    setOperationAction(ISD::STRICT_FSQRT, MVT::f128, LibCall);
 
     setOperationAction(ISD::FP_EXTEND, MVT::f128, Custom);
     // We need to custom handle any FP_ROUND with an f128 input, but
