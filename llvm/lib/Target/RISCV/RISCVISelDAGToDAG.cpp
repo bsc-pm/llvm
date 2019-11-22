@@ -16,6 +16,7 @@
 #include "Utils/RISCVMatInt.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/IR/IntrinsicsEPI.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -178,6 +179,60 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
         CurDAG->RemoveDeadNode(Node);
         return;
       }
+    }
+    break;
+  }
+  case ISD::INTRINSIC_WO_CHAIN: {
+    unsigned IntNo = cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue();
+    SDLoc DL(Node);
+    switch (IntNo) {
+      // By default we do not lower any intrinsic.
+    default:
+      break;
+
+    case Intrinsic::epi_vsetvl: {
+      assert(Node->getNumOperands() == 4);
+      auto *SEW = cast<ConstantSDNode>(Node->getOperand(2));
+      auto *VMul = cast<ConstantSDNode>(Node->getOperand(3));
+
+      uint64_t SEWBits = SEW->getZExtValue() & 0x7;
+      uint64_t VMulBits = VMul->getZExtValue() & 0x3;
+
+      uint64_t VTypeI = (SEWBits << 2) | VMulBits;
+      SDValue VTypeIOp = CurDAG->getTargetConstant(VTypeI, DL, MVT::i64);
+
+      SDValue VLOperand = Node->getOperand(1);
+      if (auto *C = dyn_cast<ConstantSDNode>(VLOperand)) {
+        if (C->isNullValue()) {
+          VLOperand = SDValue(CurDAG->getMachineNode(
+                                  RISCV::ADDI, DL, MVT::i64,
+                                  CurDAG->getRegister(RISCV::X0, MVT::i64),
+                                  CurDAG->getTargetConstant(0, DL, MVT::i64)),
+                              0);
+        }
+      }
+
+      ReplaceNode(Node, CurDAG->getMachineNode(RISCV::PseudoVSETVLI, DL,
+                                               MVT::i64, VLOperand, VTypeIOp));
+      return;
+    }
+    case Intrinsic::epi_vsetvlmax: {
+      assert(Node->getNumOperands() == 3);
+      auto *SEW = cast<ConstantSDNode>(Node->getOperand(1));
+      auto *VMul = cast<ConstantSDNode>(Node->getOperand(2));
+
+      uint64_t SEWBits = SEW->getZExtValue() & 0x7;
+      uint64_t VMulBits = VMul->getZExtValue() & 0x3;
+
+      uint64_t VTypeI = (SEWBits << 2) | VMulBits;
+      SDValue VTypeIOp = CurDAG->getTargetConstant(VTypeI, DL, MVT::i64);
+
+      // FIXME DstReg for VLMAX must be != X0
+      SDValue VLOperand = CurDAG->getRegister(RISCV::X0, MVT::i64);
+      ReplaceNode(Node, CurDAG->getMachineNode(RISCV::PseudoVSETVLI, DL,
+                                               MVT::i64, VLOperand, VTypeIOp));
+      return;
+    }
     }
     break;
   }

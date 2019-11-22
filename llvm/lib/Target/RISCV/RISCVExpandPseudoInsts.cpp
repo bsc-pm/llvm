@@ -73,6 +73,7 @@ private:
   bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                  unsigned BaseInstr, int VLIndex, int SEWIndex,
                  int MergeOpIndex);
+  bool expandVSETVL(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
 };
 
 char RISCVExpandPseudo::ID = 0;
@@ -150,6 +151,9 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
     return expandLoadTLSIEAddress(MBB, MBBI, NextMBBI);
   case RISCV::PseudoLA_TLS_GD:
     return expandLoadTLSGDAddress(MBB, MBBI, NextMBBI);
+  case RISCV::PseudoVSETVL:
+  case RISCV::PseudoVSETVLI:
+    return expandVSETVL(MBB, MBBI);
   }
 
   return false;
@@ -778,6 +782,33 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
 
     MIB.addReg(Reg, Flags);
   }
+
+  MI.eraseFromParent(); // The pseudo instruction is gone now.
+  return true;
+}
+
+bool RISCVExpandPseudo::expandVSETVL(MachineBasicBlock &MBB,
+                                     MachineBasicBlock::iterator MBBI) {
+  MachineInstr &MI = *MBBI;
+  assert(MI.getNumOperands() == 5 && "Unexpected instruction format");
+
+  MachineFunction &MF = *MBB.getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  const MCInstrDesc *MCInstr;
+  if (MI.getOpcode() == RISCV::PseudoVSETVLI) {
+    MCInstr = &TII.get(RISCV::VSETVLI);
+  } else if (MI.getOpcode() == RISCV::PseudoVSETVL) {
+    MCInstr = &TII.get(RISCV::VSETVL);
+  } else {
+    llvm_unreachable("Unexpected pseudo instruction");
+  }
+  assert(MCInstr->getNumOperands() == 3 && "Unexpected instruction format");
+
+  BuildMI(MBB, MI, DL, *MCInstr, /* DstReg */ MI.getOperand(0).getReg())
+      .add(MI.getOperand(1))  // VL
+      .add(MI.getOperand(2)); // VType
 
   MI.eraseFromParent(); // The pseudo instruction is gone now.
   return true;

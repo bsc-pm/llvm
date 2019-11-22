@@ -401,16 +401,15 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
   // Get VLMAX (2)
   unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
   MachineInstr &MI =
-      *BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVLI), SizeOfVector)
+      *BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVLI), SizeOfVector)
            .addReg(RISCV::X0)
-           // FIXME - Hardcoded to SEW=64
-           .addImm(3)
-           .addImm(0); // VLMUL=1
+           // FIXME - Hardcoded to SEW=64, LMUL=1.
+           .addImm(/* e64,m1 */ 3 << 2);
   // Set VTYPE and VL as dead.
+  MI.getOperand(3).setIsDead();
   MI.getOperand(4).setIsDead();
-  MI.getOperand(5).setIsDead();
   // Restore VTYPE.
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::VSETVL), RISCV::X0)
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVL), RISCV::X0)
       .addReg(OldVLReg, RegState::Kill)
       .addReg(OldVTypeReg, RegState::Kill);
   // Compute the size in bytes (3)

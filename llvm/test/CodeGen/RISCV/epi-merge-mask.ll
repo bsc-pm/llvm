@@ -54,7 +54,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    vsetvl zero, a0, a2
 ; CHECK-O0-NEXT:    rdvtype ra
 ; CHECK-O0-NEXT:    rdvl t0
-; CHECK-O0-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-O0-NEXT:    vsetvli t1, zero, e64,m1
 ; CHECK-O0-NEXT:    vmv.v.v v0, v2
 ; CHECK-O0-NEXT:    vsetvl zero, t0, ra
 ; CHECK-O0-NEXT:    ld a3, -56(s0)

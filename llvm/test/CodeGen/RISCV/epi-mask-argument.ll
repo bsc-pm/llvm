@@ -7,21 +7,21 @@ define <vscale x 8 x i1> @indirect_register_param(<vscale x 8 x i32> %a, <vscale
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli a2, zero, e8,m1
 ; CHECK-NEXT:    vle.v v1, (a0)
+; CHECK-NEXT:    rdvtype t0
+; CHECK-NEXT:    rdvl t1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
+; CHECK-NEXT:    vmv.v.v v2, v0
+; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vsetvli a0, a1, e32,m4
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v2, v0
-; CHECK-NEXT:    vsetvl zero, t1, t0
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v1
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vmseq.vv v2, v16, v20, v0.t
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v2
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    ret
@@ -51,7 +51,7 @@ define void @indirect_register_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1>
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    rdvtype ra
 ; CHECK-NEXT:    rdvl t0
-; CHECK-NEXT:    vsetvli zero, zero, e64,m4
+; CHECK-NEXT:    vsetvli t1, zero, e64,m4
 ; CHECK-NEXT:    vmv.v.v v20, v16
 ; CHECK-NEXT:    vsetvl zero, t0, ra
 ; CHECK-NEXT:    call indirect_register_param
@@ -70,21 +70,21 @@ define <vscale x 8 x i1> @indirect_stack_param(
 ; CHECK-NEXT:    ld a1, 0(sp)
 ; CHECK-NEXT:    vsetvli a2, zero, e8,m1
 ; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    rdvtype t0
+; CHECK-NEXT:    rdvl t1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
+; CHECK-NEXT:    vmv.v.v v2, v0
+; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vsetvli a0, a0, e32,m4
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v2, v0
-; CHECK-NEXT:    vsetvl zero, t1, t0
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v1
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vmseq.vv v2, v16, v20, v0.t
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v2
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    ret
@@ -124,7 +124,7 @@ define void @indirect_stack_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1> %m
 ; CHECK-NEXT:    vse.v v0, (t0)
 ; CHECK-NEXT:    rdvtype ra
 ; CHECK-NEXT:    rdvl t0
-; CHECK-NEXT:    vsetvli zero, zero, e64,m4
+; CHECK-NEXT:    vsetvli t1, zero, e64,m4
 ; CHECK-NEXT:    vmv.v.v v20, v16
 ; CHECK-NEXT:    vsetvl zero, t0, ra
 ; CHECK-NEXT:    call indirect_stack_param

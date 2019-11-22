@@ -1597,26 +1597,22 @@ static MachineBasicBlock *addEPISetVL(MachineInstr &MI, MachineBasicBlock *BB,
   }
 
   MachineRegisterInfo &MRI = MF.getRegInfo();
-  unsigned DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
 
   // Note: VL and VTYPE are alive here.
-  MachineInstrBuilder MIB =
-      BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI))
-          .addReg(DestReg, RegState::Define | RegState::Dead);
+  MachineInstrBuilder MIB = BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoVSETVLI));
 
   if (VLIndex >= 0) {
+    // rs1 != X0.
+    unsigned DestReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    MIB.addReg(DestReg, RegState::Define | RegState::Dead);
     MIB.addReg(MI.getOperand(VLIndex).getReg());
   } else {
-    // If there is no VL present in the pseudoinstruction, use undef value
-
-    // FIXME if we switch to 0.8 we will probably want to pass 'X0' here to
-    // change the VType but do not modify VL
-    unsigned VLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-    BuildMI(*BB, MI, DL, TII.get(TargetOpcode::IMPLICIT_DEF), VLReg);
-    MIB.addReg(VLReg, RegState::Kill);
+    // No VL operator in the pseudo, do not modify VL (rd = X0, rs1 = X0).
+    MIB.addReg(RISCV::X0, RegState::Define | RegState::Dead);
+    MIB.addReg(RISCV::X0, RegState::Kill);
   }
 
-  MIB.addImm(ElementWidth).addImm(Multiplier);
+  MIB.addImm((ElementWidth << 2) | Multiplier);
 
   // Remove (now) redundant operands from pseudo
   MI.getOperand(SEWIndex).setImm(-1);
@@ -1638,15 +1634,14 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
 
   // VSCALE can be computed as VLMAX of ELEN, given that the scaling factor for
   // ELEN is '1'.
-  MachineInstr &I = *BuildMI(*BB, MI, DL, TII.get(RISCV::VSETVLI), DestReg)
-                         .addReg(RISCV::X0)
-                         // FIXME - ELEN hardcoded to SEW=64.
-                         .addImm(3)
-                         // LMUL=1.
-                         .addImm(0);
+  MachineInstr &I =
+      *BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoVSETVLI), DestReg)
+           .addReg(RISCV::X0)
+           // FIXME - ELEN hardcoded to SEW=64.
+           .addImm(/* e64,m1 */ 3 << 2);
   // Set VTYPE and VL as dead.
+  I.getOperand(3).setIsDead();
   I.getOperand(4).setIsDead();
-  I.getOperand(5).setIsDead();
 
   // The pseudo instruction is gone now.
   MI.eraseFromParent();

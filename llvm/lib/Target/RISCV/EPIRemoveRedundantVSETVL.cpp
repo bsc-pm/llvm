@@ -86,23 +86,23 @@ struct VSETVLInfo {
       : AVLReg(AVLReg), SEW(SEW), VLMul(VLMul) {}
 
   VSETVLInfo(const MachineInstr &MI) {
-    assert(MI.getOpcode() == RISCV::VSETVLI);
+    assert(MI.getOpcode() == RISCV::PseudoVSETVLI);
 
     const MachineOperand &AVLOp = MI.getOperand(1);
     assert(AVLOp.isReg());
 
     AVLReg = AVLOp.getReg();
 
-    const MachineOperand &SEWOp = MI.getOperand(2);
+    const MachineOperand &VTypeIOp = MI.getOperand(2);
+    assert(VTypeIOp.isImm());
 
-    assert(SEWOp.isImm());
+    unsigned VTypeI = VTypeIOp.getImm();
 
-    const MachineOperand &VLMulOp = MI.getOperand(3);
+    unsigned SEWBits = (VTypeI >> 2) & 0x7;
+    unsigned VMulBits = VTypeI & 0x3;
 
-    assert(VLMulOp.isImm());
-
-    SEW = (1 << SEWOp.getImm()) * 8;
-    VLMul = 1 << VLMulOp.getImm();
+    SEW = (1 << SEWBits) * 8;
+    VLMul = 1 << VMulBits;
   }
 
   // A VSETVLI instruction has a 'more restrictive VType' if it entails a
@@ -133,11 +133,11 @@ bool removeDeadVSETVLInstructions(MachineBasicBlock &MBB,
     do {
       RemovedLastUse = false;
 
-      if (MI->getOpcode() != RISCV::VSETVLI)
+      if (MI->getOpcode() != RISCV::PseudoVSETVLI)
         continue;
 
-      assert(MI->getNumExplicitOperands() == 4);
-      assert(MI->getNumOperands() == 6);
+      assert(MI->getNumExplicitOperands() == 3);
+      assert(MI->getNumOperands() == 5);
 
       const MachineOperand &GVLOp = MI->getOperand(0);
       assert(GVLOp.isReg());
@@ -145,8 +145,8 @@ bool removeDeadVSETVLInstructions(MachineBasicBlock &MBB,
       const MachineOperand &AVLOp = MI->getOperand(1);
       assert(AVLOp.isReg());
 
-      const MachineOperand &ImplVLOp = MI->getOperand(4);
-      const MachineOperand &ImplVTypeOp = MI->getOperand(5);
+      const MachineOperand &ImplVLOp = MI->getOperand(3);
+      const MachineOperand &ImplVTypeOp = MI->getOperand(4);
 
       assert(ImplVLOp.isImplicit() && ImplVLOp.isReg());
       assert(ImplVTypeOp.isImplicit() && ImplVTypeOp.isReg());
@@ -193,7 +193,7 @@ bool forwardCompatibleAVLToGVLUses(const MachineRegisterInfo &MRI,
     assert(Use.getParent() != nullptr);
     const MachineInstr &UseInstr = *Use.getParent();
 
-    if (UseInstr.getOpcode() != RISCV::VSETVLI)
+    if (UseInstr.getOpcode() != RISCV::PseudoVSETVLI)
       continue;
 
     // Ensure use is AVL operand
@@ -242,11 +242,11 @@ bool forwardCompatibleAVL(MachineBasicBlock &MBB,
        II != IIEnd;) {
     MachineInstr &MI(*II++);
 
-    if (MI.getOpcode() != RISCV::VSETVLI)
+    if (MI.getOpcode() != RISCV::PseudoVSETVLI)
       continue;
 
-    assert(MI.getNumExplicitOperands() == 4);
-    assert(MI.getNumOperands() == 6);
+    assert(MI.getNumExplicitOperands() == 3);
+    assert(MI.getNumOperands() == 5);
 
     const MachineOperand &GVLOp = MI.getOperand(0);
     assert(GVLOp.isReg());
@@ -303,11 +303,11 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
        II != IIEnd;) {
     MachineInstr &MI(*II++);
 
-    if (MI.getOpcode() != RISCV::VSETVLI)
+    if (MI.getOpcode() != RISCV::PseudoVSETVLI)
       continue;
 
-    assert(MI.getNumExplicitOperands() == 4);
-    assert(MI.getNumOperands() == 6);
+    assert(MI.getNumExplicitOperands() == 3);
+    assert(MI.getNumOperands() == 5);
 
     MachineOperand &GVLOp = MI.getOperand(0);
     assert(GVLOp.isReg());
@@ -315,8 +315,8 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
     const MachineOperand *AVLOp = &MI.getOperand(1);
     assert(AVLOp->isReg());
 
-    const MachineOperand &ImplVLOp = MI.getOperand(4);
-    const MachineOperand &ImplVTypeOp = MI.getOperand(5);
+    const MachineOperand &ImplVLOp = MI.getOperand(3);
+    const MachineOperand &ImplVTypeOp = MI.getOperand(4);
 
     assert(ImplVLOp.isImplicit() && ImplVLOp.isReg());
     assert(ImplVTypeOp.isImplicit() && ImplVTypeOp.isReg());
@@ -333,7 +333,7 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
       // Given that forwardCompatibleGVL is run after forwardCompatibleAVL, we
       // should find the most restrictive VSETVLI instruction within one jump in
       // the AVL - GVL chain. Otherwise we would need a loop here.
-      if (ParentMI->getOpcode() == RISCV::VSETVLI &&
+      if (ParentMI->getOpcode() == RISCV::PseudoVSETVLI &&
           !VI.hasMoreRestrictiveVType(VSETVLInfo(*ParentMI))) {
         // Ensure is GVL op.
         assert(ParentMI->getOperand(0).isReg() &&
@@ -392,7 +392,7 @@ bool removeDuplicateVSETVLI(MachineBasicBlock &MBB) {
        II != IIEnd;) {
     MachineInstr &MI(*II++);
 
-    if (MI.getOpcode() != RISCV::VSETVLI) {
+    if (MI.getOpcode() != RISCV::PseudoVSETVLI) {
       // Check if the current intruction defines VL (e.g. 'vsetvl', (but not
       // 'vsetvli')). If it does, we should not remove a subsequent 'vsetvli',
       // even when its vtype matches the reference 'vsetvli's. To force this
@@ -423,8 +423,8 @@ bool removeDuplicateVSETVLI(MachineBasicBlock &MBB) {
       continue;
     }
 
-    assert(MI.getNumExplicitOperands() == 4);
-    assert(MI.getNumOperands() == 6);
+    assert(MI.getNumExplicitOperands() == 3);
+    assert(MI.getNumOperands() == 5);
 
     if (RefInstr == nullptr) {
       RefInstr = &MI;
@@ -441,15 +441,15 @@ bool removeDuplicateVSETVLI(MachineBasicBlock &MBB) {
                  dbgs() << "in favour of:\n"; RefInstr->dump(); dbgs() << "\n");
       MI.eraseFromParent();
 
-      MachineOperand &RefInstrImplVLOp = RefInstr->getOperand(4);
-      MachineOperand &RefInstrImplVTypeOp = RefInstr->getOperand(5);
+      MachineOperand &RefInstrImplVLOp = RefInstr->getOperand(3);
+      MachineOperand &RefInstrImplVTypeOp = RefInstr->getOperand(4);
 
       assert(RefInstrImplVLOp.isImplicit() && RefInstrImplVLOp.isReg());
       assert(RefInstrImplVTypeOp.isImplicit() && RefInstrImplVTypeOp.isReg());
       assert(RefInstrImplVTypeOp.isDead() == RefInstrImplVLOp.isDead());
 
-      const MachineOperand &ImplVLOp = MI.getOperand(4);
-      const MachineOperand &ImplVTypeOp = MI.getOperand(5);
+      const MachineOperand &ImplVLOp = MI.getOperand(3);
+      const MachineOperand &ImplVTypeOp = MI.getOperand(4);
 
       assert(ImplVLOp.isImplicit() && ImplVLOp.isReg());
       assert(ImplVTypeOp.isImplicit() && ImplVTypeOp.isReg());

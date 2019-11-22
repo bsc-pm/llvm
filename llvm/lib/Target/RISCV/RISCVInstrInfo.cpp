@@ -216,17 +216,24 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
       assert(SrcReg && DstReg && "Subregister does not exist");
     }
 
+    // FIXME use whole register move vmv<nf>
     BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVTYPE), OldVTypeReg);
     BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVL), OldVLReg);
     // Note: VL and VTYPE are alive here.
-    BuildMI(MBB, MBBI, DL, get(RISCV::VSETVLI), RISCV::X0)
+    int TmpReg = Available.find_next(OldVLReg);
+    assert(TmpReg > 0 && "Unable to scavenger a register!");
+    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoVSETVLI))
+        // Note: TmpReg must not be X0, otherwise the VSETVLI instruction will
+        // leave VL unchanged (in 0.8). Currently X0 is a reserved register and
+        // the register allocator will not consider it.
+        .addReg(TmpReg, RegState::Define | RegState::Dead)
         .addReg(RISCV::X0)
         // FIXME - Hardcoded to SEW=64
-        .addImm(3)
-        .addImm(VLMul);
+        .addImm((/* e64 */ 3 << 2) | VLMul);
+
     BuildMI(MBB, MBBI, DL, get(RISCV::VMV_V_V), DstReg)
         .addReg(SrcReg, getKillRegState(KillSrc));
-    BuildMI(MBB, MBBI, DL, get(RISCV::VSETVL), RISCV::X0)
+    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoVSETVL), RISCV::X0)
         .addReg(OldVLReg, RegState::Kill)
         .addReg(OldVTypeReg, RegState::Kill);
 

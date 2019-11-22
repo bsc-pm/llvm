@@ -64,6 +64,11 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
 def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
                           (ins), [], "rdvtype", "$rd">;
 
+let hasSideEffects = 1, mayLoad = 0, mayStore = 0, Defs = [VL, VTYPE] in {
+def PseudoVSETVLI : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, VTypeIOp:$vtypei), []>;
+def PseudoVSETVL : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2), []>;
+}
+
 //===----------------------------------------------------------------------===//
 // Pseudo instructions we need for SPILL and RELOAD
 //===----------------------------------------------------------------------===//
@@ -1256,18 +1261,6 @@ def : Pat<(int_vscale), (PseudoVSCALE)>;
 def : Pat<(vscale 1), (PseudoVSCALE)>;
 def : Pat<(vscale pow2uimm5:$mul),
           (SLLI (PseudoVSCALE), (Log2 imm:$mul))>;
-
-// FIXME: uimm5 here is not very precise. It should be uimm3 and uimm2 but we
-// will probably want to wait for intrinsics with constant values constraints.
-// FIXME This pattern is wrong
-//def : Pat<(int_epi_vsetvl GPR:$vl, uimm5:$sew, uimm5:$vmul),
-//          (VSETVLI (NoX0 GPR:$vl), uimm5:$sew, uimm5:$vmul)>;
-
-// FIXME: uimm5 here is not very precise. It should be uimm3 and uimm2 but we
-// will probably want to wait for intrinsics with constant values constraints.
-// FIXME This pattern is wrong
-//def : Pat<(int_epi_vsetvlmax uimm5:$sew, uimm5:$vmul),
-//          (VSETVLI X0, uimm5:$sew, uimm5:$vmul)>;
 
 }
 

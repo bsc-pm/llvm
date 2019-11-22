@@ -76,10 +76,10 @@ let TargetPrefix = "epi" in {
 def int_epi_vsetvl    : Intrinsic<[llvm_i64_ty], [
     /* requested vector length */  llvm_i64_ty,
     /* single element width */     llvm_i64_ty,
-    /* vector length multiplier */ llvm_i64_ty], []>;
+    /* vector length multiplier */ llvm_i64_ty], [ IntrNoMem ]>;
 def int_epi_vsetvlmax : Intrinsic<[llvm_i64_ty], [
     /* single element width */     llvm_i64_ty,
-    /* vector length multiplier */ llvm_i64_ty], []>;
+    /* vector length multiplier */ llvm_i64_ty], [ IntrNoMem ]>;
 
 class EPIBinaryCommon<EPIIntrinsicClassID EPICID>
       : Intrinsic< [ llvm_anyvector_ty ],

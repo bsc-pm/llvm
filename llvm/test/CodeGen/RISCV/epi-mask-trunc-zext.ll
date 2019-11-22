@@ -70,7 +70,7 @@ define <vscale x 2 x i64> @mzext_2(<vscale x 2 x i1> %ma, <vscale x 2 x i1> %mb,
 ; CHECK-NEXT:    vmerge.vim v4, v2, 1, v0
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v16
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vmerge.vim v0, v2, 1, v0

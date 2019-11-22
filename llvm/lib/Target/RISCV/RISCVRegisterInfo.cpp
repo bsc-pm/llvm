@@ -198,11 +198,9 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       // Make sure we spill/reload all the bits.
       // Note: VL and VTYPE are alive here.
       BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
-          .addReg(RISCV::X0)
-          // FIXME - Hardcoded to SEW=64
-          .addImm(3)
-          // VLMUL=1
-          .addImm(0);
+          .addReg(RISCV::X0) // FIXME VLMAX
+          // FIXME - Hardcoded to SEW=64, LMUL=1.
+          .addImm(/* e64 */ 3 << 2);
 
       MachineOperand &OpReg = MI.getOperand(0);
       switch (MI.getOpcode()) {

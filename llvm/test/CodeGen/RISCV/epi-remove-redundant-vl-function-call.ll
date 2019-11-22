@@ -39,10 +39,10 @@ define void @foo(double*) nounwind {
 ; DISABLED-NEXT:    sd ra, 24(sp)
 ; DISABLED-NEXT:    sd s1, 16(sp)
 ; DISABLED-NEXT:    sd s2, 8(sp)
-; DISABLED-NEXT:    vsetvli s1, zero, e64,m1
-; DISABLED-NEXT:    vsetvli a1, s1, e64,m1
 ; DISABLED-NEXT:    add s2, zero, a0
-; DISABLED-NEXT:    vle.v v16, (a0)
+; DISABLED-NEXT:    vsetvli s1, zero, e64,m1
+; DISABLED-NEXT:    vsetvli a0, s1, e64,m1
+; DISABLED-NEXT:    vle.v v16, (s2)
 ; DISABLED-NEXT:    srli a0, s1, 1
 ; DISABLED-NEXT:    call add1
 ; DISABLED-NEXT:    vsetvli a0, s1, e64,m1
@@ -58,10 +58,10 @@ define void @foo(double*) nounwind {
 ; CHECK-NEXT:    addi sp, sp, -16
 ; CHECK-NEXT:    sd ra, 8(sp)
 ; CHECK-NEXT:    sd s1, 0(sp)
-; CHECK-NEXT:    vsetvli a1, zero, e64,m1
 ; CHECK-NEXT:    add s1, zero, a0
-; CHECK-NEXT:    vle.v v16, (a0)
-; CHECK-NEXT:    srli a0, a1, 1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
+; CHECK-NEXT:    vle.v v16, (s1)
+; CHECK-NEXT:    srli a0, a0, 1
 ; CHECK-NEXT:    call add1
 ; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    vse.v v16, (s1)

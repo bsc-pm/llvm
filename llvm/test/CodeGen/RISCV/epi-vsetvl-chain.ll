@@ -252,12 +252,10 @@ define void @test_vsetvl_chain_4(<vscale x 1 x double>* %v, i64 %avl) nounwind
 define void @test_vsetvl_chain_5() nounwind
 ; CHECK-O0-LABEL: test_vsetvl_chain_5:
 ; CHECK-O0:       # %bb.0:
-; CHECK-O0-NEXT:    mv a0, zero
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vsetvl_chain_5:
 ; CHECK-O2:       # %bb.0:
-; CHECK-O2-NEXT:    mv a0, zero
 ; CHECK-O2-NEXT:    ret
 {
   call i64 @llvm.epi.vsetvl(i64 0, i64 0, i64 0)

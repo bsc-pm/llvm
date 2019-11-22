@@ -84,13 +84,13 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O2-NEXT:    andi sp, sp, -16
 ; SPILL-O2-NEXT:    sd sp, -64(s0)
 ; SPILL-O2-NEXT:    mv s1, a0
-; SPILL-O2-NEXT:    vsetvli a0, a0, e64,m1
-; SPILL-O2-NEXT:    ld a2, -64(s0)
-; SPILL-O2-NEXT:    rdvtype a1
-; SPILL-O2-NEXT:    rdvl a0
+; SPILL-O2-NEXT:    ld a3, -64(s0)
+; SPILL-O2-NEXT:    rdvtype a2
+; SPILL-O2-NEXT:    rdvl a1
 ; SPILL-O2-NEXT:    vsetvli zero, zero, e64,m1
-; SPILL-O2-NEXT:    vse.v v16, (a2)
-; SPILL-O2-NEXT:    vsetvl zero, a0, a1
+; SPILL-O2-NEXT:    vse.v v16, (a3)
+; SPILL-O2-NEXT:    vsetvl zero, a1, a2
+; SPILL-O2-NEXT:    vsetvli a0, a0, e64,m1
 ; SPILL-O2-NEXT:    vfadd.vv v0, v16, v17
 ; SPILL-O2-NEXT:    ld a2, -56(s0)
 ; SPILL-O2-NEXT:    rdvtype a1

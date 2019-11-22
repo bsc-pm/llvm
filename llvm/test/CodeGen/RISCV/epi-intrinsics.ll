@@ -5,14 +5,6 @@
 define void @test_vsetvl() nounwind
 ; CHECK-LABEL: test_vsetvl:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    vsetvli a0, a0, e8,m1
-; CHECK-NEXT:    vsetvli a0, a0, e16,m1
-; CHECK-NEXT:    vsetvli a0, a0, e32,m1
-; CHECK-NEXT:    vsetvli a0, a0, e64,m1
-; CHECK-NEXT:    vsetvli a0, a0, e128,m1
-; CHECK-NEXT:    vsetvli a0, a0, e8,m2
-; CHECK-NEXT:    vsetvli a0, a0, e8,m4
-; CHECK-NEXT:    vsetvli a0, a0, e8,m8
 ; CHECK-NEXT:    ret
 {
 entry:

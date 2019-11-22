@@ -83,10 +83,10 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
   Register getVLMul() { return std::get<2>(*this); }
 
   static VSETVLInstr createFromMI(const MachineInstr &MI) {
-    assert(MI.getOpcode() == RISCV::VSETVLI);
+    assert(MI.getOpcode() == RISCV::PseudoVSETVLI);
 
-    assert(MI.getNumExplicitOperands() == 4);
-    assert(MI.getNumOperands() == 6);
+    assert(MI.getNumExplicitOperands() == 3);
+    assert(MI.getNumOperands() == 5);
 
     const MachineOperand &DefOp = MI.getOperand(0);
     assert(DefOp.isReg());
@@ -97,16 +97,16 @@ struct VSETVLInstr : public std::tuple<Register, unsigned, unsigned> {
 
     Register AVLReg = AVLOp.getReg();
 
-    const MachineOperand &SEWOp = MI.getOperand(2);
+    const MachineOperand &VTypeIOp = MI.getOperand(2);
+    assert(VTypeIOp.isImm());
 
-    assert(SEWOp.isImm());
+    unsigned VTypeI = VTypeIOp.getImm();
 
-    const MachineOperand &VLMulOp = MI.getOperand(3);
+    unsigned SEWBits = (VTypeI >> 2) & 0x7;
+    unsigned VMulBits = VTypeI & 0x3;
 
-    assert(VLMulOp.isImm());
-
-    unsigned SEW = (1 << SEWOp.getImm()) * 8;
-    unsigned VLMul = 1 << VLMulOp.getImm();
+    unsigned SEW = (1 << SEWBits) * 8;
+    unsigned VLMul = 1 << VMulBits;
 
     return VSETVLInstr(GVLReg, AVLReg, SEW, VLMul);
   }
@@ -145,7 +145,7 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
   for (const MachineBasicBlock &MBB : F) {
     MachineBasicBlock::const_reverse_instr_iterator LastVSETVLI = std::find_if(
         MBB.instr_rbegin(), MBB.instr_rend(), [](const MachineInstr &MI) {
-          return MI.getOpcode() == RISCV::VSETVLI;
+          return MI.getOpcode() == RISCV::PseudoVSETVLI;
         });
 
     // No VSETVLI instructions in this MBB.
@@ -255,7 +255,7 @@ bool EPIRemoveRedundantVSETVLGlobal::runOnMachineFunction(MachineFunction &F) {
 
     MachineBasicBlock::instr_iterator FirstVSETVLI = std::find_if(
         MBB.instr_begin(), MBB.instr_end(), [](const MachineInstr &MI) {
-          return MI.getOpcode() == RISCV::VSETVLI;
+          return MI.getOpcode() == RISCV::PseudoVSETVLI;
         });
 
     // There is nothing to remove.

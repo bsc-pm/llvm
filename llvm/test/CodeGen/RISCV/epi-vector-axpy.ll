@@ -7,25 +7,25 @@ define dso_local void @saxpy(i32 signext %N, float* noalias nocapture %y, float*
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB0_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a7, a0, 32
-; CHECK-NEXT:    slli a0, a4, 1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
+; CHECK-NEXT:    slli a0, a0, 1
 ; CHECK-NEXT:    fmv.w.x ft0, a3
 ; CHECK-NEXT:    bgeu a7, a0, .LBB0_3
 ; CHECK-NEXT:  # %bb.2:
 ; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB0_6
 ; CHECK-NEXT:  .LBB0_3: # %vector.ph
-; CHECK-NEXT:    vsetvli a3, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv a4, zero
-; CHECK-NEXT:    vsetvli a0, zero, e32,m1
-; CHECK-NEXT:    slli t1, a3, 1
-; CHECK-NEXT:    remu a6, a7, t1
+; CHECK-NEXT:    vsetvli t1, zero, e64,m1
+; CHECK-NEXT:    slli t2, t1, 1
+; CHECK-NEXT:    remu a6, a7, t2
 ; CHECK-NEXT:    sub t0, a7, a6
+; CHECK-NEXT:    vsetvli a3, zero, e32,m1
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    slli a3, a3, 3
+; CHECK-NEXT:    slli a3, t1, 3
 ; CHECK-NEXT:  .LBB0_4: # %vector.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    add a0, a2, a5
@@ -34,7 +34,7 @@ define dso_local void @saxpy(i32 signext %N, float* noalias nocapture %y, float*
 ; CHECK-NEXT:    vle.v v2, (a0)
 ; CHECK-NEXT:    vfmadd.vv v1, v0, v2
 ; CHECK-NEXT:    vse.v v1, (a0)
-; CHECK-NEXT:    add a4, a4, t1
+; CHECK-NEXT:    add a4, a4, t2
 ; CHECK-NEXT:    add a5, a5, a3
 ; CHECK-NEXT:    bne a4, t0, .LBB0_4
 ; CHECK-NEXT:  # %bb.5: # %middle.block
@@ -125,22 +125,22 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB1_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a7, a0, 32
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    fmv.d.x ft0, a3
-; CHECK-NEXT:    bgeu a7, a4, .LBB1_3
+; CHECK-NEXT:    bgeu a7, a0, .LBB1_3
 ; CHECK-NEXT:  # %bb.2:
-; CHECK-NEXT:    mv t1, zero
+; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB1_6
 ; CHECK-NEXT:  .LBB1_3: # %vector.ph
-; CHECK-NEXT:    vsetvli t0, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
-; CHECK-NEXT:    mv a0, zero
-; CHECK-NEXT:    remu a6, a7, t0
-; CHECK-NEXT:    sub t1, a7, a6
+; CHECK-NEXT:    mv a4, zero
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
+; CHECK-NEXT:    remu a6, a7, a0
+; CHECK-NEXT:    sub t0, a7, a6
 ; CHECK-NEXT:    vfmv.v.f v0, ft0
-; CHECK-NEXT:    slli a4, t0, 3
+; CHECK-NEXT:    slli t1, a0, 3
 ; CHECK-NEXT:  .LBB1_4: # %vector.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    add a3, a2, a5
@@ -149,14 +149,14 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    vle.v v2, (a3)
 ; CHECK-NEXT:    vfmadd.vv v1, v0, v2
 ; CHECK-NEXT:    vse.v v1, (a3)
-; CHECK-NEXT:    add a0, a0, t0
-; CHECK-NEXT:    add a5, a5, a4
-; CHECK-NEXT:    bne a0, t1, .LBB1_4
+; CHECK-NEXT:    add a4, a4, a0
+; CHECK-NEXT:    add a5, a5, t1
+; CHECK-NEXT:    bne a4, t0, .LBB1_4
 ; CHECK-NEXT:  # %bb.5: # %middle.block
 ; CHECK-NEXT:    beqz a6, .LBB1_8
 ; CHECK-NEXT:  .LBB1_6: # %for.body.preheader17
-; CHECK-NEXT:    sub a0, a7, t1
-; CHECK-NEXT:    slli a3, t1, 3
+; CHECK-NEXT:    sub a0, a7, t0
+; CHECK-NEXT:    slli a3, t0, 3
 ; CHECK-NEXT:    add a1, a1, a3
 ; CHECK-NEXT:    add a2, a2, a3
 ; CHECK-NEXT:  .LBB1_7: # %for.body

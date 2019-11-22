@@ -5,21 +5,21 @@
 define dso_local <vscale x 1 x i1> @foo(<vscale x 1 x i64> %a, <vscale x 1 x i64> %b, <vscale x 1 x i1> %merge, <vscale x 1 x i1> %m, i64 %gvl) nounwind {
 ; CHECK-LABEL: foo:
 ; CHECK:       # %bb.0: # %entry
+; CHECK-NEXT:    rdvtype t0
+; CHECK-NEXT:    rdvl t1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
+; CHECK-NEXT:    vmv.v.v v1, v0
+; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v1, v0
-; CHECK-NEXT:    vsetvl zero, t1, t0
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v18
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    vmseq.vv v1, v16, v17, v0.t
 ; CHECK-NEXT:    rdvtype t0
 ; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli zero, zero, e64,m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    vmv.v.v v0, v1
 ; CHECK-NEXT:    vsetvl zero, t1, t0
 ; CHECK-NEXT:    ret
