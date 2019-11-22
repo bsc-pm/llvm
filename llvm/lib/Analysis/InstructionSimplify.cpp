@@ -4081,6 +4081,12 @@ static Value *SimplifyGEPInst(Type *SrcTy, ArrayRef<Value *> Ops,
   if (isa<UndefValue>(Ops[0]))
     return UndefValue::get(GEPTy);
 
+  // FIXME: If GEPTy is a scalable vector type, we do not attempt to simplify
+  // further. It might be possible to change the following simplifications to
+  // adapt to scalable vectors.
+  if (GEPTy->isVectorTy() && GEPTy->getVectorIsScalable())
+    return nullptr;
+
   if (Ops.size() == 2) {
     // getelementptr P, 0 -> P.
     if (match(Ops[1], m_Zero()) && Ops[0]->getType() == GEPTy)
