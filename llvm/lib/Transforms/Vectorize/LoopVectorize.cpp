@@ -1355,7 +1355,7 @@ private:
 
   /// \return An upper bound for the vectorization factor when using scalable
   /// vectors.
-  unsigned computeFeasibleScalableMaxVF(unsigned ConstTripCount);
+  Optional<unsigned> computeFeasibleScalableMaxVF();
 
   /// \return An upper bound for the vectorization factor, larger than zero.
   /// One is returned if vectorization should best be avoided due to cost.
@@ -5136,8 +5136,16 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   }
 
   switch (ScalarEpilogueStatus) {
-  case CM_ScalarEpilogueAllowed:
-    return computeFeasibleMaxVF(TC);
+  case CM_ScalarEpilogueAllowed: {
+    Optional<unsigned> MaxVF = isScalable() ? computeFeasibleScalableMaxVF()
+                                            : computeFeasibleMaxVF(TC);
+    if (!MaxVF)
+      reportVectorizationFailure(
+          "Cannot vectorize operations on unsupported type size",
+          "Cannot vectorize operations on unsupported type size",
+          "UnsupportedTypeSize", ORE, TheLoop);
+    return MaxVF;
+  }
   case CM_ScalarEpilogueNotNeededUsePredicate:
     LLVM_DEBUG(
         dbgs() << "LV: vector predicate hint/switch found.\n"
@@ -5168,8 +5176,17 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   if (!useMaskedInterleavedAccesses(TTI))
     InterleaveInfo.invalidateGroupsRequiringScalarEpilogue();
 
-  unsigned MaxVF = computeFeasibleMaxVF(TC);
-  if (TC > 0 && TC % MaxVF == 0) {
+  Optional<unsigned> MaxVF =
+      isScalable() ? computeFeasibleScalableMaxVF() : computeFeasibleMaxVF(TC);
+  if (!MaxVF) {
+    reportVectorizationFailure(
+        "Cannot vectorize operations on unsupported type size",
+        "Cannot vectorize operations on unsupported type size",
+        "UnsupportedTypeSize", ORE, TheLoop);
+    return None;
+  }
+
+  if (TC > 0 && TC % MaxVF.getValue() == 0) {
     // Accept MaxVF if we do not have a tail.
     LLVM_DEBUG(dbgs() << "LV: No tail will remain for any chosen VF.\n");
     return MaxVF;
@@ -5201,8 +5218,7 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
   return None;
 }
 
-unsigned LoopVectorizationCostModel::computeFeasibleScalableMaxVF(
-    unsigned ConstTripCount) {
+Optional<unsigned> LoopVectorizationCostModel::computeFeasibleScalableMaxVF() {
   // The MaxVF calculated here works for fixed vectors but not for scalable
   // vectors. MaxVF for fixed size vectors are represented by a constant value
   // (2, 4, 8 ... 256 ) depending on the vector register width that is fixed for
@@ -5250,13 +5266,11 @@ unsigned LoopVectorizationCostModel::computeFeasibleScalableMaxVF(
   assert(MaxSafeRegisterWidth >= 256 * 8 * 8 &&
          "Safe dependency distance is less than tentative VLEN");
 
-  return MaxKScaleFactor;
+  return MaxKScaleFactor ? Optional<unsigned>(MaxKScaleFactor) : None;
 }
 
 unsigned
 LoopVectorizationCostModel::computeFeasibleMaxVF(unsigned ConstTripCount) {
-  if (isScalable())
-    return computeFeasibleScalableMaxVF(ConstTripCount);
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
