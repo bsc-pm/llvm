@@ -1,4 +1,3 @@
-; XFAIL: riscv
 ; REQUIRES: object-emission
 
 ; RUN: %llc_dwarf -O2  -dwarf-version 2 -filetype=obj < %s | llvm-dwarfdump - 2>&1 | FileCheck %s  --check-prefix=RELOC --check-prefix=DWARF23
