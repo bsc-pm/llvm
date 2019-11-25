@@ -1891,22 +1891,20 @@ Instruction *InstCombiner::visitShuffleVectorInst(ShuffleVectorInst &SVI) {
   SmallVector<int, 16> Mask = SVI.getShuffleMask();
   Type *Int32Ty = Type::getInt32Ty(SVI.getContext());
   if (LHS == RHS || isa<UndefValue>(LHS)) {
+    assert(!isa<UndefValue>(RHS) && "Shuffle with 2 undef ops not simplified?");
     // Remap any references to RHS to use LHS.
     SmallVector<Constant*, 16> Elts;
-    for (unsigned i = 0, e = LHSWidth; i != VWidth; ++i) {
+    for (unsigned i = 0; i != VWidth; ++i) {
       if (Mask[i] < 0) {
         Elts.push_back(UndefValue::get(Int32Ty));
         continue;
       }
 
-      if ((Mask[i] >= (int)e && isa<UndefValue>(RHS)) ||
-          (Mask[i] <  (int)e && isa<UndefValue>(LHS))) {
-        Mask[i] = -1;     // Turn into undef.
+      // Change select of undef to undef mask element or force to LHS.
+      if (Mask[i] < (int)LHSWidth && isa<UndefValue>(LHS))
         Elts.push_back(UndefValue::get(Int32Ty));
-      } else {
-        Mask[i] = Mask[i] % e;  // Force to LHS.
-        Elts.push_back(ConstantInt::get(Int32Ty, Mask[i]));
-      }
+      else
+        Elts.push_back(ConstantInt::get(Int32Ty, Mask[i] % LHSWidth));
     }
     SVI.setOperand(0, SVI.getOperand(1));
     SVI.setOperand(1, UndefValue::get(RHS->getType()));
