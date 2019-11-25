@@ -48,11 +48,7 @@ namespace tools {
 namespace RISCV {
 class LLVM_LIBRARY_VISIBILITY Linker : public GnuTool {
 public:
-  Linker(const ToolChain &TC)
-      : GnuTool("RISCV::Linker",
-                TC.getTriple().isArch64Bit() ? "riscv64-unknown-elf-ld"
-                                             : "riscv32-unknown-elf-ld",
-                TC) {}
+  Linker(const ToolChain &TC) : GnuTool("RISCV::Linker", "ld", TC) {}
 
   bool hasIntegratedCPP() const override { return false; }
   bool isLinkJob() const override { return true; }
