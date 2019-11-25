@@ -4337,10 +4337,14 @@ void InnerLoopVectorizer::widenPHIInstruction(Instruction *PN, unsigned UF,
     // This is the normalized GEP that starts counting at zero.
     Value *PtrInd = Induction;
     PtrInd = Builder.CreateSExtOrTrunc(PtrInd, II.getStep()->getType());
-    if (isScalable()) {
+    bool Uniform = Cost->isUniformAfterVectorization(P, VF);
+    if (isScalable() && !Uniform) {
       // If using scalable vectors, we cannot scalarize the pointer induction.
       // Instead, we will vectorize it using a vector GEP instruction that takes
       // step vector for indices.
+      // However if the phi-node is uniform after vectorization, we do not
+      // want to use a step vector and we also do not need to generate a vector
+      // GEP.
       Value *PtrIndSplat = Builder.CreateVectorSplat(VF, PtrInd, "", true);
       for (unsigned Part = 0; Part < UF; ++Part) {
         SCEVExpander Exp(*PSE.getSE(), DL, "induction");
@@ -4358,7 +4362,7 @@ void InnerLoopVectorizer::widenPHIInstruction(Instruction *PN, unsigned UF,
     // Determine the number of scalars we need to generate for each unroll
     // iteration. If the instruction is uniform, we only need to generate the
     // first lane. Otherwise, we generate all VF values.
-    unsigned Lanes = Cost->isUniformAfterVectorization(P, VF) ? 1 : VF;
+    unsigned Lanes = Uniform ? 1 : VF;
     // These are the scalar results. Notice that we don't generate vector GEPs
     // because scalar GEPs result in better code.
     for (unsigned Part = 0; Part < UF; ++Part) {
