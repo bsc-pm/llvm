@@ -110,7 +110,7 @@ llvm::AllocaInst *CodeGenFunction::CreateTempAlloca(llvm::Type *Ty,
                                                     llvm::Value *ArraySize) {
   if (ArraySize)
     return Builder.CreateAlloca(Ty, ArraySize, Name);
-  if (getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTask() && !CGM.getOmpSsRuntime().ForceSkip)
+  if (getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTaskBody())
     return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
                                 ArraySize, Name,
                                 CGM.getOmpSsRuntime().getCurrentTask());
@@ -2526,6 +2526,19 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
          "should not emit an unevaluated operand");
 
   if (const auto *VD = dyn_cast<VarDecl>(ND)) {
+
+    // OmpSs: Reuse Address from already emited references if found
+    if (getLangOpts().OmpSs
+        && (CGM.getOmpSsRuntime().inTaskBody()
+            || CGM.getOmpSsRuntime().InTaskEmission)
+        && VD->getType()->isReferenceType()) {
+
+      auto it = CGM.getOmpSsRuntime().RefMap.find(VD);
+      if (it != CGM.getOmpSsRuntime().RefMap.end()) {
+        return MakeAddrLValue(it->second, T, AlignmentSource::Decl);
+      }
+    }
+
     // Global Named registers access via intrinsics only
     if (VD->getStorageClass() == SC_Register &&
         VD->hasAttr<AsmLabelAttr>() && !VD->isLocalVarDecl())
@@ -2536,10 +2549,12 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
     // not be captured if capture would be necessary for a use. Emit the
     // constant value directly instead.
     //
-    // OmpSs-2: Skip this because of we want to access the storage through
-    // the reference, not directly
-    if (!(getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTask()) &&
-        E->isNonOdrUse() == NOUR_Constant &&
+    // OmpSs: Skip global constant references resolution to referenced value.
+    if (!(getLangOpts().OmpSs
+          && (CGM.getOmpSsRuntime().inTaskBody()
+              || CGM.getOmpSsRuntime().InTaskEmission)
+          && VD->getType()->isReferenceType()) &&
+      E->isNonOdrUse() == NOUR_Constant &&
         (VD->getType()->isReferenceType() ||
          !canEmitSpuriousReferenceToVariable(*this, E, VD, true))) {
       VD->getAnyInitializer(VD);

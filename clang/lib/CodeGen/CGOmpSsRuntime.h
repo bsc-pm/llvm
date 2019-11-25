@@ -76,13 +76,16 @@ protected:
 
 private:
   SmallVector<llvm::AssertingVH<llvm::Instruction>, 2> TaskEntryStack;
-  // This is used to extend the inTask scope including the intrinsic too
-  bool InTaskEntryEmission = false;
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
+
+  // Map to reuse Addresses emited for data sharings
+  // TODO: try to integrate this better in the class, not as a direct public member
+  llvm::DenseMap<const VarDecl *, Address> RefMap;
+  bool InTaskEmission;
 
   // This is used to avoid creating the same generic funcion for constructors and
   // destructors, which will be stored in a bundle for each non-pod private/firstprivate
@@ -90,13 +93,8 @@ public:
   // TODO: try to integrate this better in the class, not as a direct public member
   llvm::DenseMap<const CXXMethodDecl *, llvm::Function *> GenericCXXNonPodMethodDefs;
 
-
-  // TODO: this is because building a function changes CG instr. building
-  // because of inTask()
-  bool ForceSkip = false;
-
   // returns true if we're emitting code inside a task context (entry/exit)
-  bool inTask();
+  bool inTaskBody();
   // returns the innermost nested task entry mark instruction
   llvm::AssertingVH<llvm::Instruction> getCurrentTask();
 

@@ -335,23 +335,6 @@ public:
 };
 } // namespace
 
-static LValue EmitRefAsIs(CodeGenFunction &CGF, const VarDecl *VD) {
-  Address addr = Address::invalid();
-  //                                hasLocalStorage()     hasLinkage()
-  // (global) int &rx;                     0                  1
-  // struct { static int &rx; };           0                  1
-  // int main() { static int &rx; }        0                  0
-  if (!VD->hasLocalStorage()) {
-    llvm::Value *V = CGF.CGM.GetAddrOfGlobalVar(VD);
-    CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
-    addr = Address(V, Alignment);
-  } else {
-    addr = CGF.GetAddrOfLocalVar(VD);
-  }
-
-  return CGF.MakeAddrLValue(addr, VD->getType(), AlignmentSource::Decl);
-}
-
 static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
                         SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
                         SmallVectorImpl<llvm::Value *> &CapturedList) {
@@ -422,9 +405,6 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
   CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
   Fn->setDoesNotRecurse();
 
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = true;
-
   CodeGenFunction CGF(CGM);
   CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
   // Create a scope with an artificial location for the body of this function.
@@ -488,9 +468,6 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
 
   CGF.FinishFunction();
 
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = false;
-
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
   TaskInfo.emplace_back(BundleCopyName, ArrayRef<llvm::Value*>{V, Fn});
@@ -535,9 +512,6 @@ static void EmitCtorFunc(CodeGenModule &CGM,
   CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
   Fn->setDoesNotRecurse();
 
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = true;
-
   CodeGenFunction CGF(CGM);
   CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
   // Create a scope with an artificial location for the body of this function.
@@ -580,9 +554,6 @@ static void EmitCtorFunc(CodeGenModule &CGM,
   CGF.EmitBlock(ContBB);
 
   CGF.FinishFunction();
-
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = false;
 
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
@@ -635,9 +606,6 @@ static void EmitDtorFunc(CodeGenModule &CGM,
   CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
   Fn->setDoesNotRecurse();
 
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = true;
-
   CodeGenFunction CGF(CGM);
   CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
   // Create a scope with an artificial location for the body of this function.
@@ -681,9 +649,6 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 
   CGF.FinishFunction();
 
-  // TODO: remove this
-  CGM.getOmpSsRuntime().ForceSkip = false;
-
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[DtorD] = Fn;
 
   TaskInfo.emplace_back(BundleDeinitName, ArrayRef<llvm::Value*>{V, Fn});
@@ -692,7 +657,8 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 static void EmitDSAShared(
   CodeGenFunction &CGF, const Expr *E,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList) {
+  SmallVectorImpl<llvm::Value*> &CapturedList,
+  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
 
   const std::string BundleName = "QUAL.OSS.SHARED";
 
@@ -700,8 +666,10 @@ static void EmitDSAShared(
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
     llvm::Value *V;
     if (VD->getType()->isReferenceType()) {
-      // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
-      V = EmitRefAsIs(CGF, VD).getPointer();
+      // Record Ref Address to be reused in task body and other clasues
+      LValue LV = CGF.EmitDeclRefLValue(DRE);
+      RefMap.try_emplace(VD, LV.getAddress());
+      V = LV.getPointer();
       TaskInfo.emplace_back(BundleName, V);
     } else {
       V = CGF.EmitDeclRefLValue(DRE).getPointer();
@@ -721,7 +689,8 @@ static void EmitDSAShared(
 static void EmitDSAPrivate(
   CodeGenFunction &CGF, const OSSDSAPrivateDataTy &PDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList) {
+  SmallVectorImpl<llvm::Value*> &CapturedList,
+  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
 
   const std::string BundleName = "QUAL.OSS.PRIVATE";
 
@@ -729,8 +698,10 @@ static void EmitDSAPrivate(
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *V;
   if (VD->getType()->isReferenceType()) {
-    // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
-    V = EmitRefAsIs(CGF, VD).getPointer();
+    // Record Ref Address to be reused in task body and other clauses
+    LValue LV = CGF.EmitDeclRefLValue(DRE);
+    RefMap.try_emplace(VD, LV.getAddress());
+    V = LV.getPointer();
     TaskInfo.emplace_back(BundleName, V);
   } else {
     V = CGF.EmitDeclRefLValue(DRE).getPointer();
@@ -752,7 +723,8 @@ static void EmitDSAPrivate(
 static void EmitDSAFirstprivate(
   CodeGenFunction &CGF, const OSSDSAFirstprivateDataTy &FpDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList) {
+  SmallVectorImpl<llvm::Value*> &CapturedList,
+  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
 
   const std::string BundleName = "QUAL.OSS.FIRSTPRIVATE";
 
@@ -760,8 +732,10 @@ static void EmitDSAFirstprivate(
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *V;
   if (VD->getType()->isReferenceType()) {
-    // Emit the reference Value as is since EmitDeclRefLValue will emit a load of it
-    V = EmitRefAsIs(CGF, VD).getPointer();
+    // Record Ref Address to be reused in task body and other clauses
+    LValue LV = CGF.EmitDeclRefLValue(DRE);
+    RefMap.try_emplace(VD, LV.getAddress());
+    V = LV.getPointer();
     TaskInfo.emplace_back(BundleName, V);
   } else {
     V = CGF.EmitDeclRefLValue(DRE).getPointer();
@@ -887,8 +861,8 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                                                                     "TASKWAIT"))});
 }
 
-bool CGOmpSsRuntime::inTask() {
-  return !TaskEntryStack.empty() || InTaskEntryEmission;
+bool CGOmpSsRuntime::inTaskBody() {
+  return !TaskEntryStack.empty();
 }
 
 llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getCurrentTask() {
@@ -899,7 +873,6 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   const OSSExecutableDirective &D,
                                   SourceLocation Loc,
                                   const OSSTaskDataTy &Data) {
-  InTaskEntryEmission = true;
 
   llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
@@ -907,14 +880,16 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
   SmallVector<llvm::Value*, 4> CapturedList;
+
+  InTaskEmission = true;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList);
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList, RefMap);
   }
   for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, RefMap);
   }
   for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, RefMap);
   }
 
   if (!CapturedList.empty())
@@ -938,16 +913,16 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
     EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
   }
+
   if (Data.If)
     TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
 
+  InTaskEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
-
-  InTaskEntryEmission = false;
 
   // Push Task Stack
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
@@ -955,6 +930,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   TaskEntryStack.push_back(TaskAllocaInsertPt);
 
   CGF.EmitStmt(D.getAssociatedStmt());
+
+  // Task body emited, clear RefMap to be reused
+  RefMap.clear();
 
   CGF.Builder.CreateCall(ExitCallee, Result);
 

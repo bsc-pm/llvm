@@ -1,3 +1,6 @@
+// RUN: %clang_cc1 -x c++ -verify -fompss-2 -disable-llvm-passes -ferror-limit 100 %s -S -emit-llvm -o - | FileCheck %s
+// expected-no-diagnostics
+
 struct S {
     int x;
     S();
