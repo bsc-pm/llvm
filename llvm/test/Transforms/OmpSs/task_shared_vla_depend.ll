@@ -106,7 +106,7 @@ entry:
 ; CHECK-NEXT:   %8 = mul nuw i64 4, %7, !dbg !17
 ; CHECK-NEXT:   %conv = trunc i64 %8 to i32, !dbg !17
 ; CHECK-NEXT:   store i32 %conv, i32* %size, align 4, !dbg !18
-; CHECK-NEXT:   ret void, !dbg !19
+; CHECK-NEXT:   ret void, !dbg !14
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_ol_task_region_vla_senction_dep0(%nanos6_task_args_vla_senction_dep0* %0, i8* %1, %nanos6_address_translation_entry_t* %2) {

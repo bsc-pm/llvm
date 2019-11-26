@@ -506,16 +506,29 @@ struct OmpSs : public ModulePass {
     EntryBB = EntryBB->splitBasicBlock(TI.Entry);
 
     BasicBlock *ExitBB = TI.Exit->getParent();
-    ExitBB = ExitBB->splitBasicBlock(TI.Exit);
+    // Assuming well-formed BB
+    ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
 
     // 2. Gather BB between entry and exit (is there any function/util to do this?)
-    ReversePostOrderTraversal<BasicBlock *> RPOT(EntryBB);
+    SmallVector<BasicBlock*, 8> Worklist;
+    SmallPtrSet<BasicBlock*, 8> Visited;
     SetVector<BasicBlock *> TaskBBs;
-    for (BasicBlock *BB : RPOT) {
-      // End of task reached, done
-      if (BB == ExitBB)
-        break;
-      TaskBBs.insert(BB);
+
+    Worklist.push_back(EntryBB);
+    Visited.insert(EntryBB);
+    TaskBBs.insert(EntryBB);
+    while (!Worklist.empty()) {
+      auto WIt = Worklist.begin();
+      BasicBlock *BB = *WIt;
+      Worklist.erase(WIt);
+
+      for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
+        if (!Visited.count(*It) && *It != ExitBB) {
+          Worklist.push_back(*It);
+          Visited.insert(*It);
+          TaskBBs.insert(*It);
+        }
+      }
     }
 
     // Create nanos6_task_args_* START
@@ -860,13 +873,12 @@ struct OmpSs : public ModulePass {
       // and replace the terminator that exits the task region
       // Since this is a single entry single exit region this should
       // be done once.
-      bool DoneOnce = false;
+      Instruction *OldT = nullptr;
       for (BasicBlock *Block : Blocks) {
         Instruction *TI = Block->getTerminator();
         for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i)
           if (!Blocks.count(TI->getSuccessor(i))) {
-            assert(!DoneOnce && "More than one exit in task code");
-            DoneOnce = true;
+            assert(!OldT && "More than one exit in task code");
 
             BasicBlock *OldTarget = TI->getSuccessor(i);
 
@@ -875,10 +887,11 @@ struct OmpSs : public ModulePass {
 
             IRBuilder<> BNewTerminatorI(TI);
             BNewTerminatorI.CreateRetVoid();
+
+            OldT = TI;
           }
-          if (DoneOnce)
-            TI->eraseFromParent();
       }
+      OldT->eraseFromParent();
 
       return TaskSubmitFuncCall;
     };
