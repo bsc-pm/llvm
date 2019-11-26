@@ -1286,24 +1286,7 @@ TypeSP DWARFASTParserClang::ParseTypeFromDWARF(const SymbolContext &sc,
   } break;
 
   case DW_TAG_ptr_to_member_type: {
-    Type *pointee_type = dwarf->ResolveTypeUID(attrs.type.Reference(), true);
-    Type *class_type =
-        dwarf->ResolveTypeUID(attrs.containing_type.Reference(), true);
-
-    CompilerType pointee_clang_type = pointee_type->GetForwardCompilerType();
-    CompilerType class_clang_type = class_type->GetLayoutCompilerType();
-
-    clang_type = ClangASTContext::CreateMemberPointerType(class_clang_type,
-                                                          pointee_clang_type);
-
-    if (llvm::Optional<uint64_t> clang_type_size =
-            clang_type.GetByteSize(nullptr)) {
-      type_sp = std::make_shared<Type>(
-          die.GetID(), dwarf, attrs.name, *clang_type_size, nullptr,
-          LLDB_INVALID_UID, Type::eEncodingIsUID, nullptr, clang_type,
-          Type::ResolveState::Forward);
-    }
-
+    type_sp = ParsePointerToMemberType(die, attrs);
     break;
   }
   default:
@@ -1320,6 +1303,29 @@ TypeSP DWARFASTParserClang::ParseTypeFromDWARF(const SymbolContext &sc,
   return UpdateSymbolContextScopeForType(sc, die, type_sp);
 }
 
+TypeSP DWARFASTParserClang::ParsePointerToMemberType(
+    const DWARFDIE &die, const ParsedDWARFTypeAttributes &attrs) {
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+  Type *pointee_type = dwarf->ResolveTypeUID(attrs.type.Reference(), true);
+  Type *class_type =
+      dwarf->ResolveTypeUID(attrs.containing_type.Reference(), true);
+
+  CompilerType pointee_clang_type = pointee_type->GetForwardCompilerType();
+  CompilerType class_clang_type = class_type->GetLayoutCompilerType();
+
+  CompilerType clang_type = ClangASTContext::CreateMemberPointerType(
+      class_clang_type, pointee_clang_type);
+
+  if (llvm::Optional<uint64_t> clang_type_size =
+          clang_type.GetByteSize(nullptr)) {
+    return std::make_shared<Type>(die.GetID(), dwarf, attrs.name,
+                                  *clang_type_size, nullptr, LLDB_INVALID_UID,
+                                  Type::eEncodingIsUID, nullptr, clang_type,
+                                  Type::ResolveState::Forward);
+  }
+  return nullptr;
+}
+
 TypeSP DWARFASTParserClang::UpdateSymbolContextScopeForType(
     const SymbolContext &sc, const DWARFDIE &die, TypeSP type_sp) {
   if (!type_sp)
@@ -1330,20 +1336,20 @@ TypeSP DWARFASTParserClang::UpdateSymbolContextScopeForType(
   DWARFDIE sc_parent_die = SymbolFileDWARF::GetParentSymbolContextDIE(die);
   dw_tag_t sc_parent_tag = sc_parent_die.Tag();
 
-  SymbolContextScope *symbol_context_scope = NULL;
+  SymbolContextScope *symbol_context_scope = nullptr;
   if (sc_parent_tag == DW_TAG_compile_unit ||
       sc_parent_tag == DW_TAG_partial_unit) {
     symbol_context_scope = sc.comp_unit;
-  } else if (sc.function != NULL && sc_parent_die) {
+  } else if (sc.function != nullptr && sc_parent_die) {
     symbol_context_scope =
         sc.function->GetBlock(true).FindBlockByID(sc_parent_die.GetID());
-    if (symbol_context_scope == NULL)
+    if (symbol_context_scope == nullptr)
       symbol_context_scope = sc.function;
   } else {
     symbol_context_scope = sc.module_sp.get();
   }
 
-  if (symbol_context_scope != NULL)
+  if (symbol_context_scope != nullptr)
     type_sp->SetSymbolContextScope(symbol_context_scope);
 
   // We are ready to put this type into the uniqued list up at the module
