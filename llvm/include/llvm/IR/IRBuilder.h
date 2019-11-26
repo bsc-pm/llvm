@@ -41,6 +41,7 @@
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/TypeSize.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -1689,11 +1690,17 @@ public:
                  Name);
   }
 
-  Value *CreateNot(Value *V, const Twine &Name = "") {
-    if (auto *VC = dyn_cast<Constant>(V))
-      return Insert(Folder.CreateNot(VC), Name);
-    return Insert(BinaryOperator::CreateNot(V), Name);
+Value *CreateNot(Value *V, const Twine &Name = "") {
+  Type *VTy = V->getType();
+  if (dyn_cast<VectorType>(VTy) && VTy->getVectorIsScalable()) {
+    Value *Ones = getAllOnesValue(VTy);
+    return Insert(BinaryOperator::Create(Instruction::Xor, V, Ones, Name,
+                                         static_cast<Instruction *>(nullptr)));
   }
+  if (auto *VC = dyn_cast<Constant>(V))
+    return Insert(Folder.CreateNot(VC), Name);
+  return Insert(BinaryOperator::CreateNot(V), Name);
+}
 
   Value *CreateUnOp(Instruction::UnaryOps Opc,
                     Value *V, const Twine &Name = "",
@@ -2778,6 +2785,8 @@ public:
   Value *CreateVectorSplat(unsigned NumElts, Value *V, const Twine &Name = "",
                            bool Scalable = false) {
     assert(NumElts > 0 && "Cannot splat to an empty vector!");
+    if (NumElts == 1 && !Scalable)
+      return V;
 
     // First insert it into an undef vector so we can shuffle it.
     Type *I32Ty = getInt32Ty();
@@ -2790,6 +2799,17 @@ public:
     Value *Zeros =
         ConstantAggregateZero::get(VectorType::get(I32Ty, NumElts, Scalable));
     return CreateShuffleVector(V, Undef, Zeros, Name + ".splat");
+  }
+ 
+  /// Helper function that creates a vector of all ones with the same number of
+  /// elements and type as given vector type argument.
+  Value *getAllOnesValue(Type *Ty) {
+    VectorType *VTy = dyn_cast<VectorType>(Ty);
+    if (VTy && Ty->getVectorIsScalable()){
+      Constant *Ones = Constant::getAllOnesValue(VTy->getElementType());
+      return CreateVectorSplat(VTy->getNumElements(), Ones, "", true);
+    }
+    return Constant::getAllOnesValue(Ty);
   }
 
   /// Return a value that has been extracted from a larger integer type.
