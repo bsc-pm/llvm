@@ -2,7 +2,8 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+v -verify-machineinstrs -O0 < %s \
 ; RUN:    | FileCheck --check-prefix=CHECK-O0 %s
 ; RUN: llc -mtriple=riscv64 -mattr=+v -verify-machineinstrs -O2 \
-; RUN:    -no-epi-remove-redundant-vsetvl < %s \
+; RUN:    -no-epi-remove-redundant-vsetvl \
+; RUN:    -no-epi-remove-redundant-vsetvl-global < %s \
 ; RUN:    | FileCheck --check-prefix=CHECK-O2-DISABLED %s
 ; RUN: llc -mtriple=riscv64 -mattr=+v -verify-machineinstrs -O2 < %s \
 ; RUN:    | FileCheck --check-prefix=CHECK-O2 %s
