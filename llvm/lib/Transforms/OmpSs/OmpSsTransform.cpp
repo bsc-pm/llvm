@@ -296,7 +296,9 @@ struct OmpSs : public ModulePass {
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
   // with those Values, used to call Unpack Functions
   void unpackDSAsWithVLADims(Module &M, const TaskDSAInfo &DSAInfo,
-                  const TaskVLADimsInfo &VLADimsInfo, Function *OlFunc,
+                  const TaskCapturedInfo &CapturedInfo,
+                  const TaskVLADimsInfo &VLADimsInfo,
+                  Function *OlFunc,
                   DenseMap<Value *, size_t> &StructToIdxMap,
                   SmallVectorImpl<Value *> &UnpackedList) {
     UnpackedList.clear();
@@ -339,22 +341,21 @@ struct OmpSs : public ModulePass {
 
       UnpackedList.push_back(GEP);
     }
-    for (const auto &VLAWithDimsMap : VLADimsInfo) {
-      for (Value *const &V : VLAWithDimsMap.second) {
-        Value *Idx[2];
-        Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-        Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
-        Value *GEP = BBBuilder.CreateGEP(
-            OlDepsFuncTaskArgs, Idx, "dims_gep" + V->getName());
-        Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
-        UnpackedList.push_back(LGEP);
-      }
+    for (Value *V : CapturedInfo) {
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
+      Value *GEP = BBBuilder.CreateGEP(
+          OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
+      Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+      UnpackedList.push_back(LGEP);
     }
   }
 
   // Given an OutlineDeps and UnpackDeps Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olDepsCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          const TaskCapturedInfo &CapturedInfo,
                           const TaskVLADimsInfo &VLADimsInfo,
                           DenseMap<Value *, size_t> &StructToIdxMap,
                           Function *OlFunc, Function *UnpackFunc) {
@@ -364,7 +365,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> TaskDepsUnpackParams;
-    unpackDSAsWithVLADims(M, DSAInfo, VLADimsInfo, OlFunc, StructToIdxMap, TaskDepsUnpackParams);
+    unpackDSAsWithVLADims(M, DSAInfo, CapturedInfo, VLADimsInfo, OlFunc, StructToIdxMap, TaskDepsUnpackParams);
     TaskDepsUnpackParams.push_back(&*AI++);
     // Build TaskUnpackCall
     BBBuilder.CreateCall(UnpackFunc, TaskDepsUnpackParams);
@@ -375,6 +376,7 @@ struct OmpSs : public ModulePass {
   // Given an OutlineTask and UnpackTask Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
   void olTaskCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
+                          const TaskCapturedInfo &CapturedInfo,
                           const TaskVLADimsInfo &VLADimsInfo,
                           DenseMap<Value *, size_t> &StructToIdxMap,
                           Function *OlFunc, Function *UnpackFunc) {
@@ -384,7 +386,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> TaskUnpackParams;
-    unpackDSAsWithVLADims(M, DSAInfo, VLADimsInfo, OlFunc, StructToIdxMap, TaskUnpackParams);
+    unpackDSAsWithVLADims(M, DSAInfo, CapturedInfo, VLADimsInfo, OlFunc, StructToIdxMap, TaskUnpackParams);
     TaskUnpackParams.push_back(&*AI++);
     TaskUnpackParams.push_back(&*AI++);
     // Build TaskUnpackCall
@@ -408,7 +410,10 @@ struct OmpSs : public ModulePass {
     return Sum;
   }
 
-  StructType *createTaskArgsType(Module &M, const TaskDSAInfo &DSAInfo, const TaskVLADimsInfo &VLADimsInfo,
+  StructType *createTaskArgsType(Module &M,
+                                 const TaskDSAInfo &DSAInfo,
+                                 const TaskCapturedInfo &CapturedInfo,
+                                 const TaskVLADimsInfo &VLADimsInfo,
                                  DenseMap<Value *, size_t> &StructToIdxMap, StringRef Str) {
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
@@ -434,14 +439,10 @@ struct OmpSs : public ModulePass {
         TaskArgsMemberTy.push_back(V->getType()->getPointerElementType());
       StructToIdxMap[V] = TaskArgsIdx++;
     }
-    // TODO: esto esta mal. no deberia ser CaputredInfo?
-    for (const auto &VLAWithDimsMap : VLADimsInfo) {
-      ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
-      for (unsigned i = 0; i < Dims.size(); ++i) {
-        assert(!Dims[i]->getType()->isPointerTy() && "Captures are not pointers");
-        TaskArgsMemberTy.push_back(Dims[i]->getType());
-        StructToIdxMap[Dims[i]] = TaskArgsIdx++;
-      }
+    for (Value *V : CapturedInfo) {
+      assert(!V->getType()->isPointerTy() && "Captures are not pointers");
+      TaskArgsMemberTy.push_back(V->getType());
+      StructToIdxMap[V] = TaskArgsIdx++;
     }
     return StructType::create(M.getContext(), TaskArgsMemberTy, Str);
   }
@@ -535,6 +536,7 @@ struct OmpSs : public ModulePass {
     SmallVector<Type *, 4> TaskArgsMemberTy;
     DenseMap<Value *, size_t> TaskArgsToStructIdxMap;
     StructType *TaskArgsTy = createTaskArgsType(M, TI.DSAInfo,
+                                                 TI.CapturedInfo,
                                                  TI.VLADimsInfo,
                                                  TaskArgsToStructIdxMap,
                                                  ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
@@ -544,9 +546,7 @@ struct OmpSs : public ModulePass {
     TaskArgsList.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
     TaskArgsList.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
     TaskArgsList.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
-    for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
-      TaskArgsList.insert(VLAWithDimsMap.second.begin(), VLAWithDimsMap.second.end());
-    }
+    TaskArgsList.insert(TI.CapturedInfo.begin(), TI.CapturedInfo.end());
 
     // nanos6_unpacked_task_region_* START
     Function *UnpackTaskFuncVar
@@ -560,7 +560,7 @@ struct OmpSs : public ModulePass {
     Function *OlTaskFuncVar
       = createOlTaskFunction(M, F, Twine(taskNum).str(), TaskArgsTy, TskAddrTranslationEntryTy.Ty);
 
-    olTaskCallToUnpack(M, TI.DSAInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar);
+    olTaskCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar);
 
     // nanos6_ol_task_region_* END
 
@@ -581,7 +581,7 @@ struct OmpSs : public ModulePass {
     Function *OlDepsFuncVar
       = createOlDepsFunction(M, F, Twine(taskNum).str(), TaskArgsTy);
 
-    olDepsCallToUnpack(M, TI.DSAInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar);
+    olDepsCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar);
 
     // nanos6_ol_deps_* END
 
@@ -854,16 +854,13 @@ struct OmpSs : public ModulePass {
           IRB.CreateMemCpy(GEP, Align, V, Align, NSizeB);
         }
       }
-      for (const auto &VLAWithDimsMap : TI.VLADimsInfo) {
-        ArrayRef<Value *> Dims = VLAWithDimsMap.second.getArrayRef();
-        for (unsigned j = 0; j < Dims.size(); ++j) {
-          Value *Idx[2];
-          Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
-          Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[Dims[j]]);
-          Value *GEP = IRB.CreateGEP(
-              TaskArgsVarL, Idx, "dims_gep_" + Dims[j]->getName());
-          IRB.CreateStore(Dims[j], GEP);
-        }
+      for (Value *V : TI.CapturedInfo) {
+        Value *Idx[2];
+        Idx[0] = Constant::getNullValue(IRB.getInt32Ty());
+        Idx[1] = ConstantInt::get(IRB.getInt32Ty(), TaskArgsToStructIdxMap[V]);
+        Value *GEP = IRB.CreateGEP(
+            TaskArgsVarL, Idx, "capt_gep_" + V->getName());
+        IRB.CreateStore(V, GEP);
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);

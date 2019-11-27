@@ -39,8 +39,8 @@ entry:
 ; CHECK-NEXT:   store i8* %args_end, i8** %11, align 4, !dbg !10
 ; CHECK-NEXT:   %12 = mul nuw i64 4, %1, !dbg !10
 ; CHECK-NEXT:   %13 = getelementptr i8, i8* %args_end, i64 %12, !dbg !10
-; CHECK-NEXT:   %dims_gep_ = getelementptr %nanos6_task_args__Z9pod_arrayi0, %nanos6_task_args__Z9pod_arrayi0* %9, i32 0, i32 1, !dbg !10
-; CHECK-NEXT:   store i64 %1, i64* %dims_gep_, !dbg !10
+; CHECK-NEXT:   %capt_gep_ = getelementptr %nanos6_task_args__Z9pod_arrayi0, %nanos6_task_args__Z9pod_arrayi0* %9, i32 0, i32 1, !dbg !10
+; CHECK-NEXT:   store i64 %1, i64* %capt_gep_, !dbg !10
 ; CHECK-NEXT:   %14 = load i8*, i8** %5, !dbg !10
 ; CHECK-NEXT:   call void @nanos6_submit_task(i8* %14), !dbg !10
 ; CHECK-NEXT:   br label %15, !dbg !10
@@ -69,8 +69,8 @@ entry:
 ; CHECK-NEXT:   %30 = bitcast i32* %28 to i8*, !dbg !11
 ; CHECK-NEXT:   %31 = bitcast i32* %vla to i8*, !dbg !11
 ; CHECK-NEXT:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 %30, i8* align 4 %31, i64 %29, i1 false), !dbg !11
-; CHECK-NEXT:   %dims_gep_5 = getelementptr %nanos6_task_args__Z9pod_arrayi1, %nanos6_task_args__Z9pod_arrayi1* %22, i32 0, i32 1, !dbg !11
-; CHECK-NEXT:   store i64 %1, i64* %dims_gep_5, !dbg !11
+; CHECK-NEXT:   %capt_gep_5 = getelementptr %nanos6_task_args__Z9pod_arrayi1, %nanos6_task_args__Z9pod_arrayi1* %22, i32 0, i32 1, !dbg !11
+; CHECK-NEXT:   store i64 %1, i64* %capt_gep_5, !dbg !11
 ; CHECK-NEXT:   %32 = load i8*, i8** %18, !dbg !11
 ; CHECK-NEXT:   call void @nanos6_submit_task(i8* %32), !dbg !11
 ; CHECK-NEXT:   br label %33, !dbg !11
@@ -132,8 +132,8 @@ arrayctor.cont:                                   ; preds = %entry, %arrayctor.l
 ; CHECK-NEXT:   %gep_vla1 = getelementptr %nanos6_task_args__Z13non_pod_arrayi0, %nanos6_task_args__Z13non_pod_arrayi0* %9, i32 0, i32 0, !dbg !17
 ; CHECK-NEXT:   %15 = load %struct.S*, %struct.S** %gep_vla1, !dbg !17
 ; CHECK-NEXT:   call void @oss_ctor_ZN1SC1Ev(%struct.S* %15, i64 %14), !dbg !17
-; CHECK-NEXT:   %dims_gep_ = getelementptr %nanos6_task_args__Z13non_pod_arrayi0, %nanos6_task_args__Z13non_pod_arrayi0* %9, i32 0, i32 1, !dbg !17
-; CHECK-NEXT:   store i64 %1, i64* %dims_gep_, !dbg !17
+; CHECK-NEXT:   %capt_gep_ = getelementptr %nanos6_task_args__Z13non_pod_arrayi0, %nanos6_task_args__Z13non_pod_arrayi0* %9, i32 0, i32 1, !dbg !17
+; CHECK-NEXT:   store i64 %1, i64* %capt_gep_, !dbg !17
 ; CHECK-NEXT:   %16 = load i8*, i8** %5, !dbg !17
 ; CHECK-NEXT:   call void @nanos6_submit_task(i8* %16), !dbg !17
 ; CHECK-NEXT:   br label %17, !dbg !17
@@ -159,8 +159,8 @@ arrayctor.cont:                                   ; preds = %entry, %arrayctor.l
 ; CHECK-NEXT:   %gep_vla5 = getelementptr %nanos6_task_args__Z13non_pod_arrayi1, %nanos6_task_args__Z13non_pod_arrayi1* %24, i32 0, i32 0, !dbg !18
 ; CHECK-NEXT:   %30 = load %struct.S*, %struct.S** %gep_vla5, !dbg !18
 ; CHECK-NEXT:   call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* %vla, %struct.S* %30, i64 %29), !dbg !18
-; CHECK-NEXT:   %dims_gep_6 = getelementptr %nanos6_task_args__Z13non_pod_arrayi1, %nanos6_task_args__Z13non_pod_arrayi1* %24, i32 0, i32 1, !dbg !18
-; CHECK-NEXT:   store i64 %1, i64* %dims_gep_6, !dbg !18
+; CHECK-NEXT:   %capt_gep_6 = getelementptr %nanos6_task_args__Z13non_pod_arrayi1, %nanos6_task_args__Z13non_pod_arrayi1* %24, i32 0, i32 1, !dbg !18
+; CHECK-NEXT:   store i64 %1, i64* %capt_gep_6, !dbg !18
 ; CHECK-NEXT:   %31 = load i8*, i8** %20, !dbg !18
 ; CHECK-NEXT:   call void @nanos6_submit_task(i8* %31), !dbg !18
 ; CHECK-NEXT:   br label %32, !dbg !18
