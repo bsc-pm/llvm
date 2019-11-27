@@ -209,21 +209,54 @@ struct OmpSs : public ModulePass {
     StructType *getType() { return Ty; }
   };
 
+  class Nanos6MultidepFactory {
+    const size_t MAX_DEP_DIMS = 8;
+  private:
+    StringMap<FunctionCallee> DepNameToFuncCalleeMap;
+
+    FunctionType *BuildDepFuncType(Module &M, StringRef FullName, size_t Ndims) {
+      // void nanos6_register_region_X_depinfoY(
+      //   void *handler, int symbol_index, char const *region_text,
+      //   void *base_address,
+      //   long dim1size, long dim1start, long dim1end,
+      //   ...);
+      SmallVector<Type *, 8> Params = {
+        Type::getInt8PtrTy(M.getContext()),
+        Type::getInt32Ty(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext())
+      };
+      for (size_t i = 0; i < Ndims; ++i) {
+        // long dimsize
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+        // long dimstart
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+        // long dimend
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+      }
+      return FunctionType::get(Type::getVoidTy(M.getContext()),
+                               Params, /*IsVarArgs=*/false);
+    }
+  public:
+    FunctionCallee getMultidepFuncCallee(Module &M, StringRef &Name, size_t Ndims) {
+      std::string FullName = ("nanos6_register_region_" + Name + "_depinfo" + Twine(Ndims)).str();
+
+      auto It = DepNameToFuncCalleeMap.find(FullName);
+      if (It != DepNameToFuncCalleeMap.end())
+        return It->second;
+
+      assert(Ndims <= MAX_DEP_DIMS);
+
+      FunctionType *DepF = BuildDepFuncType(M, FullName, Ndims);
+      FunctionCallee DepCallee = M.getOrInsertFunction(FullName, DepF);
+      DepNameToFuncCalleeMap[FullName] = DepCallee;
+      return DepCallee;
+    }
+  };
+  Nanos6MultidepFactory MultidepFactory;
+
   FunctionCallee CreateTaskFuncTy;
   FunctionCallee TaskSubmitFuncTy;
-  enum {
-    DEP_IN,
-    DEP_OUT,
-    DEP_INOUT,
-    DEP_WEAKIN,
-    DEP_WEAKOUT,
-    DEP_WEAKINOUT,
-    DEP_ENUM_SIZE,
-  };
-
-  static const int MAX_DEP_DIMS = 8;
-  // TODO: Use Map and a function to look up if it exists already
-  SmallVector<SmallVector<FunctionCallee, DEP_ENUM_SIZE>, MAX_DEP_DIMS> RegisterRegionsTypes;
 
   void rewriteDepValue(ArrayRef<Value *> TaskArgsList,
                        Function *F,
@@ -286,7 +319,7 @@ struct OmpSs : public ModulePass {
   void unpackCallToRTOfType(Module &M,
                             const SmallVectorImpl<DependInfo> &DependList,
                             Function *F,
-                            int DepType) {
+                            StringRef DepType) {
     for (const DependInfo &DI : DependList) {
       IRBuilder<> BBBuilder(&F->getEntryBlock().back());
 
@@ -298,23 +331,23 @@ struct OmpSs : public ModulePass {
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
       TaskDepAPICall.push_back(BaseCast);
       assert(!(DI.Dims.size()%3));
-      int NumDims = DI.Dims.size()/3 - 1;
+      size_t NumDims = DI.Dims.size()/3;
       for (Value *V : DI.Dims) {
         TaskDepAPICall.push_back(V);
       }
-      BBBuilder.CreateCall(RegisterRegionsTypes[NumDims][DepType], TaskDepAPICall);
+      BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, DepType, NumDims), TaskDepAPICall);
     }
   }
 
   void unpackDepsCallToRT(Module &M,
                       const TaskDependsInfo &TDI,
                       Function *F) {
-    unpackCallToRTOfType(M, TDI.Ins, F, DEP_IN);
-    unpackCallToRTOfType(M, TDI.Outs, F, DEP_OUT);
-    unpackCallToRTOfType(M, TDI.Inouts, F, DEP_INOUT);
-    unpackCallToRTOfType(M, TDI.WeakIns, F, DEP_WEAKIN);
-    unpackCallToRTOfType(M, TDI.WeakOuts, F, DEP_WEAKOUT);
-    unpackCallToRTOfType(M, TDI.WeakInouts, F, DEP_WEAKINOUT);
+    unpackCallToRTOfType(M, TDI.Ins, F, "read");
+    unpackCallToRTOfType(M, TDI.Outs, F, "write");
+    unpackCallToRTOfType(M, TDI.Inouts, F, "readwrite");
+    unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
+    unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
+    unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
   }
 
   // Creates an empty UnpackDeps Function with entry BB.
@@ -1106,68 +1139,7 @@ struct OmpSs : public ModulePass {
         Type::getVoidTy(M.getContext()),
         Type::getInt8PtrTy(M.getContext()) // void *task
     );
-
-    SmallVector<Type *, 8> RegisterRegionParams;
-    static const char *DepFuncNames[] = {
-      "read",
-      "write",
-      "readwrite",
-      "weak_read",
-      "weak_write",
-      "weak_readwrite"
-    };
-
-    // void *handler, Task handler
-    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
-    // int symbol_index, Argument identifier
-    RegisterRegionParams.push_back(Type::getInt32Ty(M.getContext()));
-    // char const *region_text, Stringified contents of the dependency clause
-    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
-    // void *base_address
-    RegisterRegionParams.push_back(Type::getInt8PtrTy(M.getContext()));
-    for (int i = 0; i < MAX_DEP_DIMS; ++i) {
-      // long dimsize
-      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
-      // long dimstart
-      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
-      // long dimend
-      RegisterRegionParams.push_back(Type::getInt64Ty(M.getContext()));
-      SmallVector<FunctionCallee, DEP_ENUM_SIZE> RegisterRegionsOfDim;
-      for (int j = 0; j < DEP_ENUM_SIZE; ++j) {
-        FunctionType *RegisterRegionFuncType =
-                        FunctionType::get(Type::getVoidTy(M.getContext()),
-                                          RegisterRegionParams,
-                                          /*IsVarArgs */ false);
-        RegisterRegionsOfDim.push_back(
-          M.getOrInsertFunction(
-            ("nanos6_register_region_" + Twine(DepFuncNames[j]) + "_depinfo" + Twine(i + 1)).str(),
-            RegisterRegionFuncType));
-      }
-      RegisterRegionsTypes.push_back(RegisterRegionsOfDim);
-    }
-
-    // RegisterRegionRead1Ty = M.getOrInsertFunction("nanos6_register_region_read_depinfo1",
-    //     Type::getVoidTy(M.getContext()),
-    //     Type::getInt8PtrTy(M.getContext()),
-    //     Type::getInt32Ty(M.getContext()),
-    //     Type::getInt8PtrTy(M.getContext()),
-    //     Type::getInt8PtrTy(M.getContext()),
-    //     Type::getInt64Ty(M.getContext()),   // long dim1size
-    //     Type::getInt64Ty(M.getContext()),   // long dim1start
-    //     Type::getInt64Ty(M.getContext())    // long dim1end
-    // );
-
-    // RegisterRegionWrite1Ty = M.getOrInsertFunction("nanos6_register_region_write_depinfo1",
-    //     Type::getVoidTy(M.getContext()),
-    //     Type::getInt8PtrTy(M.getContext()), // void *handler, Task handler
-    //     Type::getInt32Ty(M.getContext()),   // int symbol_index, Argument identifier
-    //     Type::getInt8PtrTy(M.getContext()), // char const *region_text, Stringified contents of the dependency clause
-    //     Type::getInt8PtrTy(M.getContext()), // void *base_address
-    //     Type::getInt64Ty(M.getContext()),   // long dim1size
-    //     Type::getInt64Ty(M.getContext()),   // long dim1start
-    //     Type::getInt64Ty(M.getContext()));  // long dim1end
   }
-
 
   bool runOnModule(Module &M) override {
     if (skipModule(M))
