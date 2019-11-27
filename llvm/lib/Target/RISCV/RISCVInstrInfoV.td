@@ -507,7 +507,7 @@ defm VWMACCUS_V : VALUr_MV_X<"vwmaccus", 0b111110>;
 }
 
 // Vector Integer Merge Instructions
-defm VMERGE : VALUm_IV_V_X_I<"vmerge", 0b010111>;
+defm VMERGE_V : VALUm_IV_V_X_I<"vmerge", 0b010111>;
 
 // Vector Integer Move Instructions
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
