@@ -5141,9 +5141,9 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
                                             : computeFeasibleMaxVF(TC);
     if (!MaxVF)
       reportVectorizationFailure(
-          "Cannot vectorize operations on unsupported type size",
-          "Cannot vectorize operations on unsupported type size",
-          "UnsupportedTypeSize", ORE, TheLoop);
+          "Cannot vectorize operations on unsupported scalable vector type",
+          "Cannot vectorize operations on unsupported scalable vector type",
+          "UnsupportedScalableVectorType", ORE, TheLoop);
     return MaxVF;
   }
   case CM_ScalarEpilogueNotNeededUsePredicate:
@@ -5180,9 +5180,9 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
       isScalable() ? computeFeasibleScalableMaxVF() : computeFeasibleMaxVF(TC);
   if (!MaxVF) {
     reportVectorizationFailure(
-        "Cannot vectorize operations on unsupported type size",
-        "Cannot vectorize operations on unsupported type size",
-        "UnsupportedTypeSize", ORE, TheLoop);
+        "Cannot vectorize operations on unsupported scalable vector type",
+        "Cannot vectorize operations on unsupported scalable vector type",
+        "UnsupportedScalableVectorType", ORE, TheLoop);
     return None;
   }
 
@@ -5246,22 +5246,16 @@ Optional<unsigned> LoopVectorizationCostModel::computeFeasibleScalableMaxVF() {
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
   unsigned TargetWidestType = TTI.getMaxElementWidth();
-  // unsigned MinKScaleFactor = TargetWidestType / WidestType;
   if (SmallestType > WidestType)
     SmallestType = WidestType;
   unsigned MaxKScaleFactor = TargetWidestType / SmallestType;
+  if (MaxKScaleFactor > 8)
+    return None;
 
-  // assert(MinKScaleFactor == MaxKScaleFactor &&
-  //        "Support for mixed width computations is not supported yet.");
-  assert(MaxKScaleFactor <= 8 && "Cannot group so many registers together!");
   // TODO:
   // We are ignoring MaxSafeRegisterWidth calculationn based on dependence
   // distance for now. This is another issue that would be needed to handled
   // separately for scalable vectors.
-  // TODO:
-  // Fix association between MaxSafeRegisterWidth and WidestRegister
-  // For now we just ensure that the MaxSafeRegisterWidth is >= 256*8*8, which
-  // is the tentative VLEN for EPI usecase.
   unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
   assert(MaxSafeRegisterWidth >= 256 * 8 * 8 &&
          "Safe dependency distance is less than tentative VLEN");
