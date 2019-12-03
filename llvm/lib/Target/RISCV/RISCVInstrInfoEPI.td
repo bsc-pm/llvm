@@ -53,7 +53,7 @@ let Predicates = [HasStdExtV] in {
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     Uses = [VL] in
 def PseudoReadVL : Pseudo<(outs GPR:$rd),
-                          (ins), [], "rdvl $rd">;
+                          (ins), [], "rdvl", "$rd">;
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 1,
      usesCustomInserter = 1 in
@@ -62,7 +62,7 @@ def PseudoVSCALE : Pseudo<(outs GPR:$rd), (ins), [], "">;
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     Uses = [VTYPE] in
 def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
-                          (ins), [], "rdvtype $rd">;
+                          (ins), [], "rdvtype", "$rd">;
 
 //===----------------------------------------------------------------------===//
 // Pseudo instructions we need for SPILL and RELOAD
@@ -70,11 +70,11 @@ def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
 
 let hasSideEffects = 1, mayLoad = 0, mayStore = 1, isCodeGenOnly = 1,
     Uses = [VL, VTYPE] in
-def PseudoVSPILL : Pseudo<(outs), (ins EPIVR:$rs1, GPR:$rs2), [], "">;
+def PseudoVSPILL : Pseudo<(outs), (ins EPIVR:$rs1, GPR:$rs2), []>;
 
 let hasSideEffects = 1, mayLoad = 1, mayStore = 0, isCodeGenOnly = 1,
     Uses = [VL, VTYPE] in
-def PseudoVRELOAD : Pseudo<(outs EPIVR:$rs1), (ins GPR:$rs2), [], "">;
+def PseudoVRELOAD : Pseudo<(outs EPIVR:$rs1), (ins GPR:$rs2), []>;
 
 }
 
