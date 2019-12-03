@@ -297,9 +297,10 @@ defset list<VReg> AllVRegs = {
                  nxv16i4, nxv32i2,
                  nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1, nxv64i1
                 ],
-                (add (sequence "V%u", 25, 31),
-                     (sequence "V%u", 8, 24),
-                     (sequence "V%u", 0, 7)),
+                (add (sequence "V%u", 0, 7),
+                     (sequence "V%u", 16, 23),
+                     (sequence "V%u", 8, 15),
+                     (sequence "V%u", 24, 31)),
                 1>;
 
   def VR2 : VReg<[nxv2i64, nxv4i32, nxv8i16, nxv16i8, nxv2f64, nxv4f32],
