@@ -619,18 +619,6 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const TargetRegisterClass *RC = &RISCV::GPRRegClass;
 
-  if (RVFI->hasSpilledVR()) {
-    // We conservatively add two emergency slots if we have seen PseudoVSPILL
-    // or PseudoVRELOAD already. They are used for the virtual registers needed
-    // for vtype and vl.
-    int RegScavFI = MFI.CreateStackObject(
-        RegInfo->getSpillSize(*RC), RegInfo->getSpillAlignment(*RC), false);
-    RS->addScavengingFrameIndex(RegScavFI);
-    RegScavFI = MFI.CreateStackObject(RegInfo->getSpillSize(*RC),
-                                      RegInfo->getSpillAlignment(*RC), false);
-    RS->addScavengingFrameIndex(RegScavFI);
-  }
-
   // Go through all Stackslots coming from an alloca and make them VR_SPILL.
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {

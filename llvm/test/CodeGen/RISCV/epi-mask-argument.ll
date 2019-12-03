@@ -33,19 +33,19 @@ entry:
 define void @indirect_register_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1> %m, i64 %gvl) nounwind {
 ; CHECK-LABEL: indirect_register_argument:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    addi sp, sp, -64
-; CHECK-NEXT:    sd ra, 56(sp)
-; CHECK-NEXT:    sd s0, 48(sp)
-; CHECK-NEXT:    addi s0, sp, 64
+; CHECK-NEXT:    addi sp, sp, -48
+; CHECK-NEXT:    sd ra, 40(sp)
+; CHECK-NEXT:    sd s0, 32(sp)
+; CHECK-NEXT:    addi s0, sp, 48
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a2
 ; CHECK-NEXT:    vsetvli a1, zero, e8,m1
 ; CHECK-NEXT:    vsetvl zero, a2, a3
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -56(s0)
+; CHECK-NEXT:    sd sp, -40(s0)
 ; CHECK-NEXT:    add a1, zero, a0
-; CHECK-NEXT:    ld a0, -56(s0)
+; CHECK-NEXT:    ld a0, -40(s0)
 ; CHECK-NEXT:    vsetvli a2, zero, e8,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    rdvtype ra
@@ -54,10 +54,10 @@ define void @indirect_register_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1>
 ; CHECK-NEXT:    vmv.v.v v20, v16
 ; CHECK-NEXT:    vsetvl zero, t0, ra
 ; CHECK-NEXT:    call indirect_register_param
-; CHECK-NEXT:    addi sp, s0, -64
-; CHECK-NEXT:    ld s0, 48(sp)
-; CHECK-NEXT:    ld ra, 56(sp)
-; CHECK-NEXT:    addi sp, sp, 64
+; CHECK-NEXT:    addi sp, s0, -48
+; CHECK-NEXT:    ld s0, 32(sp)
+; CHECK-NEXT:    ld ra, 40(sp)
+; CHECK-NEXT:    addi sp, sp, 48
 ; CHECK-NEXT:    ret
    %x = call <vscale x 8 x i1> @indirect_register_param(<vscale x 8 x i32> %a, <vscale x 8 x i32> %a, <vscale x 8 x i1> %m, <vscale x 8 x i1> %m, i64 %gvl)
    ret void
@@ -97,19 +97,19 @@ entry:
 define void @indirect_stack_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1> %m, i64 %gvl) nounwind {
 ; CHECK-LABEL: indirect_stack_argument:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    addi sp, sp, -64
-; CHECK-NEXT:    sd ra, 56(sp)
-; CHECK-NEXT:    sd s0, 48(sp)
-; CHECK-NEXT:    addi s0, sp, 64
+; CHECK-NEXT:    addi sp, sp, -48
+; CHECK-NEXT:    sd ra, 40(sp)
+; CHECK-NEXT:    sd s0, 32(sp)
+; CHECK-NEXT:    addi s0, sp, 48
 ; CHECK-NEXT:    rdvtype a3
 ; CHECK-NEXT:    rdvl a2
 ; CHECK-NEXT:    vsetvli a1, zero, e8,m1
 ; CHECK-NEXT:    vsetvl zero, a2, a3
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -56(s0)
+; CHECK-NEXT:    sd sp, -40(s0)
 ; CHECK-NEXT:    addi sp, sp, -16
-; CHECK-NEXT:    ld t0, -56(s0)
+; CHECK-NEXT:    ld t0, -40(s0)
 ; CHECK-NEXT:    sd t0, 0(sp)
 ; CHECK-NEXT:    vsetvli a1, zero, e8,m1
 ; CHECK-NEXT:    addi a1, zero, 2
@@ -127,10 +127,10 @@ define void @indirect_stack_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1> %m
 ; CHECK-NEXT:    vsetvl zero, t0, ra
 ; CHECK-NEXT:    call indirect_stack_param
 ; CHECK-NEXT:    addi sp, sp, 16
-; CHECK-NEXT:    addi sp, s0, -64
-; CHECK-NEXT:    ld s0, 48(sp)
-; CHECK-NEXT:    ld ra, 56(sp)
-; CHECK-NEXT:    addi sp, sp, 64
+; CHECK-NEXT:    addi sp, s0, -48
+; CHECK-NEXT:    ld s0, 32(sp)
+; CHECK-NEXT:    ld ra, 40(sp)
+; CHECK-NEXT:    addi sp, sp, 48
 ; CHECK-NEXT:    ret
    %x = call <vscale x 8 x i1> @indirect_stack_param(i64 %gvl, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, <vscale x 8 x i32> %a, <vscale x 8 x i32> %a, <vscale x 8 x i1> %m, <vscale x 8 x i1> %m)
    ret void

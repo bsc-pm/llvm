@@ -11,31 +11,31 @@
 define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-LABEL: foo:
 ; SPILL-O0:       # %bb.0:
-; SPILL-O0-NEXT:    addi sp, sp, -192
-; SPILL-O0-NEXT:    sd ra, 184(sp)
-; SPILL-O0-NEXT:    sd s0, 176(sp)
-; SPILL-O0-NEXT:    sd s1, 168(sp)
-; SPILL-O0-NEXT:    sd s2, 160(sp)
-; SPILL-O0-NEXT:    sd s3, 152(sp)
-; SPILL-O0-NEXT:    sd s4, 144(sp)
-; SPILL-O0-NEXT:    sd s5, 136(sp)
-; SPILL-O0-NEXT:    sd s6, 128(sp)
-; SPILL-O0-NEXT:    sd s7, 120(sp)
-; SPILL-O0-NEXT:    sd s8, 112(sp)
-; SPILL-O0-NEXT:    sd s9, 104(sp)
-; SPILL-O0-NEXT:    sd s10, 96(sp)
-; SPILL-O0-NEXT:    sd s11, 88(sp)
-; SPILL-O0-NEXT:    addi s0, sp, 192
+; SPILL-O0-NEXT:    addi sp, sp, -176
+; SPILL-O0-NEXT:    sd ra, 168(sp)
+; SPILL-O0-NEXT:    sd s0, 160(sp)
+; SPILL-O0-NEXT:    sd s1, 152(sp)
+; SPILL-O0-NEXT:    sd s2, 144(sp)
+; SPILL-O0-NEXT:    sd s3, 136(sp)
+; SPILL-O0-NEXT:    sd s4, 128(sp)
+; SPILL-O0-NEXT:    sd s5, 120(sp)
+; SPILL-O0-NEXT:    sd s6, 112(sp)
+; SPILL-O0-NEXT:    sd s7, 104(sp)
+; SPILL-O0-NEXT:    sd s8, 96(sp)
+; SPILL-O0-NEXT:    sd s9, 88(sp)
+; SPILL-O0-NEXT:    sd s10, 80(sp)
+; SPILL-O0-NEXT:    sd s11, 72(sp)
+; SPILL-O0-NEXT:    addi s0, sp, 176
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
 ; SPILL-O0-NEXT:    vsetvli a1, zero, e8,m1
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
-; SPILL-O0-NEXT:    sd sp, -184(s0)
+; SPILL-O0-NEXT:    sd sp, -168(s0)
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
-; SPILL-O0-NEXT:    sd sp, -192(s0)
+; SPILL-O0-NEXT:    sd sp, -176(s0)
 ; SPILL-O0-NEXT:    lui a1, %hi(scratch)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(scratch)
 ; SPILL-O0-NEXT:    vsetvli a0, a0, e64,m1
@@ -92,50 +92,34 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    vle.v v25, (s11)
 ; SPILL-O0-NEXT:    addi ra, a1, 208
 ; SPILL-O0-NEXT:    vle.v v26, (ra)
-; SPILL-O0-NEXT:    sd a0, -136(s0)
+; SPILL-O0-NEXT:    sd a0, -120(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 216
 ; SPILL-O0-NEXT:    vle.v v27, (a0)
-; SPILL-O0-NEXT:    sd a0, -144(s0)
+; SPILL-O0-NEXT:    sd a0, -128(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 224
 ; SPILL-O0-NEXT:    vle.v v28, (a0)
-; SPILL-O0-NEXT:    sd a0, -152(s0)
+; SPILL-O0-NEXT:    sd a0, -136(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 232
 ; SPILL-O0-NEXT:    vle.v v29, (a0)
-; SPILL-O0-NEXT:    sd a0, -160(s0)
+; SPILL-O0-NEXT:    sd a0, -144(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 240
 ; SPILL-O0-NEXT:    vle.v v30, (a0)
-; SPILL-O0-NEXT:    sd a0, -168(s0)
+; SPILL-O0-NEXT:    sd a0, -152(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 248
 ; SPILL-O0-NEXT:    vle.v v31, (a0)
-; SPILL-O0-NEXT:    sd a0, -176(s0)
+; SPILL-O0-NEXT:    sd a0, -160(s0)
 ; SPILL-O0-NEXT:    addi a0, a1, 256
 ; SPILL-O0-NEXT:    sd a2, -112(s0)
-; SPILL-O0-NEXT:    sd a3, -120(s0)
-; SPILL-O0-NEXT:    sd a4, -128(s0)
-; SPILL-O0-NEXT:    ld a4, -184(s0)
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
-; SPILL-O0-NEXT:    vse.v v0, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    ld a2, -168(s0)
+; SPILL-O0-NEXT:    vs1r.v v0, (a2)
 ; SPILL-O0-NEXT:    vle.v v0, (a0)
-; SPILL-O0-NEXT:    ld a4, -192(s0)
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
-; SPILL-O0-NEXT:    vse.v v0, (a4)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
-; SPILL-O0-NEXT:    ld a4, -184(s0)
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
-; SPILL-O0-NEXT:    vle.v v0, (a4)
-; SPILL-O0-NEXT:    ld a4, -128(s0)
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
-; SPILL-O0-NEXT:    ld a3, -120(s0)
+; SPILL-O0-NEXT:    ld a2, -176(s0)
+; SPILL-O0-NEXT:    vs1r.v v0, (a2)
+; SPILL-O0-NEXT:    ld a2, -168(s0)
+; SPILL-O0-NEXT:    vl1r.v v0, (a2)
 ; SPILL-O0-NEXT:    ld a2, -112(s0)
 ; SPILL-O0-NEXT:    vse.v v0, (a1)
-; SPILL-O0-NEXT:    ld a1, -136(s0)
+; SPILL-O0-NEXT:    ld a1, -120(s0)
 ; SPILL-O0-NEXT:    vse.v v1, (a1)
 ; SPILL-O0-NEXT:    vse.v v2, (a2)
 ; SPILL-O0-NEXT:    vse.v v3, (a3)
@@ -162,38 +146,34 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    vse.v v24, (s10)
 ; SPILL-O0-NEXT:    vse.v v25, (s11)
 ; SPILL-O0-NEXT:    vse.v v26, (ra)
-; SPILL-O0-NEXT:    ld a1, -144(s0)
+; SPILL-O0-NEXT:    ld a1, -128(s0)
 ; SPILL-O0-NEXT:    vse.v v27, (a1)
-; SPILL-O0-NEXT:    ld a1, -152(s0)
+; SPILL-O0-NEXT:    ld a1, -136(s0)
 ; SPILL-O0-NEXT:    vse.v v28, (a1)
-; SPILL-O0-NEXT:    ld a1, -160(s0)
+; SPILL-O0-NEXT:    ld a1, -144(s0)
 ; SPILL-O0-NEXT:    vse.v v29, (a1)
-; SPILL-O0-NEXT:    ld a1, -168(s0)
+; SPILL-O0-NEXT:    ld a1, -152(s0)
 ; SPILL-O0-NEXT:    vse.v v30, (a1)
-; SPILL-O0-NEXT:    ld a1, -176(s0)
+; SPILL-O0-NEXT:    ld a1, -160(s0)
 ; SPILL-O0-NEXT:    vse.v v31, (a1)
-; SPILL-O0-NEXT:    ld a3, -192(s0)
-; SPILL-O0-NEXT:    rdvtype a2
-; SPILL-O0-NEXT:    rdvl a1
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
-; SPILL-O0-NEXT:    vle.v v0, (a3)
-; SPILL-O0-NEXT:    vsetvl zero, a1, a2
+; SPILL-O0-NEXT:    ld a1, -176(s0)
+; SPILL-O0-NEXT:    vl1r.v v0, (a1)
 ; SPILL-O0-NEXT:    vse.v v0, (a0)
-; SPILL-O0-NEXT:    addi sp, s0, -192
-; SPILL-O0-NEXT:    ld s11, 88(sp)
-; SPILL-O0-NEXT:    ld s10, 96(sp)
-; SPILL-O0-NEXT:    ld s9, 104(sp)
-; SPILL-O0-NEXT:    ld s8, 112(sp)
-; SPILL-O0-NEXT:    ld s7, 120(sp)
-; SPILL-O0-NEXT:    ld s6, 128(sp)
-; SPILL-O0-NEXT:    ld s5, 136(sp)
-; SPILL-O0-NEXT:    ld s4, 144(sp)
-; SPILL-O0-NEXT:    ld s3, 152(sp)
-; SPILL-O0-NEXT:    ld s2, 160(sp)
-; SPILL-O0-NEXT:    ld s1, 168(sp)
-; SPILL-O0-NEXT:    ld s0, 176(sp)
-; SPILL-O0-NEXT:    ld ra, 184(sp)
-; SPILL-O0-NEXT:    addi sp, sp, 192
+; SPILL-O0-NEXT:    addi sp, s0, -176
+; SPILL-O0-NEXT:    ld s11, 72(sp)
+; SPILL-O0-NEXT:    ld s10, 80(sp)
+; SPILL-O0-NEXT:    ld s9, 88(sp)
+; SPILL-O0-NEXT:    ld s8, 96(sp)
+; SPILL-O0-NEXT:    ld s7, 104(sp)
+; SPILL-O0-NEXT:    ld s6, 112(sp)
+; SPILL-O0-NEXT:    ld s5, 120(sp)
+; SPILL-O0-NEXT:    ld s4, 128(sp)
+; SPILL-O0-NEXT:    ld s3, 136(sp)
+; SPILL-O0-NEXT:    ld s2, 144(sp)
+; SPILL-O0-NEXT:    ld s1, 152(sp)
+; SPILL-O0-NEXT:    ld s0, 160(sp)
+; SPILL-O0-NEXT:    ld ra, 168(sp)
+; SPILL-O0-NEXT:    addi sp, sp, 176
 ; SPILL-O0-NEXT:    ret
   %p1 = getelementptr inbounds i64, i64* @scratch, i64 1
   %p2 = getelementptr inbounds i64, i64* @scratch, i64 2

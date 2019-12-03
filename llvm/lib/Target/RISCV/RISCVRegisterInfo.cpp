@@ -189,42 +189,24 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     if (MI.getOpcode() == RISCV::PseudoVSPILL ||
         MI.getOpcode() == RISCV::PseudoVRELOAD) {
 
-      // Save VTYPE and VL
-      unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-      BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVTYPE), OldVTypeReg);
-      unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-      BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVL), OldVLReg);
-
-      // Make sure we spill/reload all the bits.
-      // Note: VL and VTYPE are alive here.
-      BuildMI(MBB, II, DL, TII->get(RISCV::VSETVLI), RISCV::X0)
-          .addReg(RISCV::X0) // FIXME VLMAX
-          // FIXME - Hardcoded to SEW=64, LMUL=1.
-          .addImm(/* e64 */ 3 << 2);
-
+      // Make sure we spill/reload all the bits using whole register
+      // instructions.
       MachineOperand &OpReg = MI.getOperand(0);
       switch (MI.getOpcode()) {
       default:
         llvm_unreachable("Unexpected instruction");
       case RISCV::PseudoVSPILL: {
-        BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
+        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
             .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg, RegState::Kill)
-            .addReg(RISCV::NoRegister);
+            .addReg(HandleReg, RegState::Kill);
         break;
       }
       case RISCV::PseudoVRELOAD: {
-        BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
-            .addReg(HandleReg, RegState::Kill)
-            .addReg(RISCV::NoRegister);
+        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), OpReg.getReg())
+            .addReg(HandleReg, RegState::Kill);
         break;
       }
       }
-
-      // Restore VTYPE and VL
-      BuildMI(MBB, II, DL, TII->get(RISCV::VSETVL), RISCV::X0)
-          .addReg(OldVLReg, RegState::Kill)
-          .addReg(OldVTypeReg, RegState::Kill);
 
       // Remove the pseudo
       MI.eraseFromParent();
