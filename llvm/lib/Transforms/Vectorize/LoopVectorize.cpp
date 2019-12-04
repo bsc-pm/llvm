@@ -5219,48 +5219,41 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
 }
 
 Optional<unsigned> LoopVectorizationCostModel::computeFeasibleScalableMaxVF() {
-  // The MaxVF calculated here works for fixed vectors but not for scalable
-  // vectors. MaxVF for fixed size vectors are represented by a constant value
-  // (2, 4, 8 ... 256 ) depending on the vector register width that is fixed for
-  // an architecture. For scalable vectors, where vector register width is not
-  // fixed, vector width is represented as `<vscale x k x simpleType>`, where k
-  // is a multiple of 2 and is known at the compile time (k can range from 1 to
-  // 8 for current RISC-V vector specification). vscale is not known at compile
-  // time (vscale = VLEN / (k * ELEN)). simpleType is a scalr type like f64,
-  // f32, etc.
+  // For scalable vectors, where vector register width is not fixed, vector
+  // width is represented as `<vscale x k x simpleType>`, where k is a power of
+  // 2 and is known at the compile time (k can range from 1 to 8 for current
+  // RISC-V vector specification). vscale is not known at compile time (vscale =
+  // VLEN / (k * ELEN)). simpleType is a scalr type like f64, f32, etc.
   //
   // For mixed width operations we can either use n registers for both wide and
   // narrow types, in which case the narrow type will waste half the register,
   // or we can use n*w registers for the wider type and n registers for the
-  // narrow type, where wider type is wider by a factor of w.
+  // narrow type, where wider type is wider by a factor of w. In the current
+  // implementation we take the latter approach because of the backend
+  // limitations.
   //
-  // For the time being we make the following assumptions: 1. Assuming f64 to be
-  // the largest type we would need, we use <vscale x 1 x f64> as our base type.
+  // We make the following assumptions:
+  // 1. Assuming f64 to be the largest type we would need, we use
+  // <vscale x 1 x f64> as our base type.
   // 2. If the only involved scalar type is f64, we use MaxVectorSize to be
   // vscale x 1. (Eventually we will add support for higher values of k. That
-  // would need further analysis to optimize for register pressure.) 2a. If the
-  // only involved scalar type is f32, we use MaxVectorSize of vscale x 2.
-  // Similar for other narrower types.  3. For mixed width, we will use the full
-  // register for the narrower type and register grouping for the wider type.
+  // would need further analysis to optimize for register pressure.)
+  // 2a. If the only involved scalar type is f32, we use MaxVectorSize of
+  // vscale x 2. Similar for other narrower types.
+  // 3. For mixed width, we will use the full register for the narrower type
+  // and register grouping for the wider type.
   MinBWs = computeMinimumValueSizes(TheLoop->getBlocks(), *DB, &TTI);
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = getSmallestAndWidestTypes();
   unsigned TargetWidestType = TTI.getMaxElementWidth();
   if (SmallestType > WidestType)
     SmallestType = WidestType;
-  unsigned MaxKScaleFactor = TargetWidestType / SmallestType;
-  if (MaxKScaleFactor > 8)
+  unsigned MaxScaleFactor = TargetWidestType / SmallestType;
+  if (!MaxScaleFactor || MaxScaleFactor > 8)
     return None;
-
-  // TODO:
-  // We are ignoring MaxSafeRegisterWidth calculationn based on dependence
-  // distance for now. This is another issue that would be needed to handled
-  // separately for scalable vectors.
-  unsigned MaxSafeRegisterWidth = Legal->getMaxSafeRegisterWidth();
-  assert(MaxSafeRegisterWidth >= 256 * 8 * 8 &&
-         "Safe dependency distance is less than tentative VLEN");
-
-  return MaxKScaleFactor ? Optional<unsigned>(MaxKScaleFactor) : None;
+  if (Legal->getMaxSafeRegisterWidth() < 256 * 8 * 8)
+    return None;
+  return MaxScaleFactor;
 }
 
 unsigned
