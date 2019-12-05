@@ -1614,17 +1614,19 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
     if (TiedTo != -1) {
       if (!MO->isReg())
         report("Tied use must be a register", MO, MONum);
-      else if (!MO->isTied())
-        report("Operand should be tied", MO, MONum);
-      else if (unsigned(TiedTo) != MI->findTiedOperandIdx(MONum))
-        report("Tied def doesn't match MCInstrDesc", MO, MONum);
-      else if (Register::isPhysicalRegister(MO->getReg())) {
-        const MachineOperand &MOTied = MI->getOperand(TiedTo);
-        if (!MOTied.isReg())
-          report("Tied counterpart must be a register", &MOTied, TiedTo);
-        else if (Register::isPhysicalRegister(MOTied.getReg()) &&
-                 MO->getReg() != MOTied.getReg())
-          report("Tied physical registers must match.", &MOTied, TiedTo);
+      else if (MO->getReg() != /* NoRegister */ 0) {
+        if (!MO->isTied())
+          report("Operand should be tied", MO, MONum);
+        else if (unsigned(TiedTo) != MI->findTiedOperandIdx(MONum))
+          report("Tied def doesn't match MCInstrDesc", MO, MONum);
+        else if (Register::isPhysicalRegister(MO->getReg())) {
+          const MachineOperand &MOTied = MI->getOperand(TiedTo);
+          if (!MOTied.isReg())
+            report("Tied counterpart must be a register", &MOTied, TiedTo);
+          else if (Register::isPhysicalRegister(MOTied.getReg()) &&
+                   MO->getReg() != MOTied.getReg())
+            report("Tied physical registers must match.", &MOTied, TiedTo);
+        }
       }
     } else if (MO->isReg() && MO->isTied())
       report("Explicit operand should not be tied", MO, MONum);
