@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -34,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 
 #include<assert.h>
 
-#pragma omp task out(c[4][0:4])
+#pragma oss task out(c[4][0:4])
 void producer(int c[][5])
 {
     int i;
@@ -44,7 +46,7 @@ void producer(int c[][5])
     }
 }
 
-#pragma omp task inout(c[4][0:4])
+#pragma oss task inout(c[4][0:4])
 void consumer(int c[][5])
 {
 }
@@ -58,7 +60,7 @@ int main()
     producer(c);
     consumer(c);
 
-#pragma omp taskwait
+#pragma oss taskwait
     for (i = 0; i < 5; ++i)
     {
         assert(c[4][i] == 4);

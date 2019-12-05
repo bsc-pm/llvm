@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -49,12 +51,12 @@ int main()
     struct D d;
     d.z = v;
 
-    #pragma omp task inout(d.z[0;n]) firstprivate(n)
+    #pragma oss task inout(d.z[0;n]) firstprivate(n)
     {
         for (int i = 0; i < n; ++i)
             d.z[i] = i;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 
     for (int i = 0; i < n; ++i)
         assert(d.z[i] == i);

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -59,9 +61,9 @@ int backtrack(int n)
         for (int i = 0; i < n; ++i)
         {
 #ifdef __NANOS6__
-            #pragma omp task weakreduction(+: global_var)  firstprivate(i)
+            #pragma oss task weakreduction(+: global_var)  firstprivate(i)
 #else
-            #pragma omp task reduction(+: global_var)  firstprivate(i)
+            #pragma oss task reduction(+: global_var)  firstprivate(i)
 #endif
             {
                 //  The function call to backtrack may modify the value of global_var, so firstly we
@@ -70,12 +72,12 @@ int backtrack(int n)
                 int res = backtrack(i);
 
 #ifdef __NANOS6__
-                #pragma omp task reduction(+: global_var)
+                #pragma oss task reduction(+: global_var)
 #endif
                 global_var += res;
             }
         }
-        #pragma omp taskwait
+        #pragma oss taskwait
         return 0;
     }
 }
@@ -84,7 +86,7 @@ int main()
 {
     global_var = 0;
     backtrack(N);
-    #pragma omp taskwait
+    #pragma oss taskwait
     int x = global_var;
     assert(x == power(2,N-1));
 }

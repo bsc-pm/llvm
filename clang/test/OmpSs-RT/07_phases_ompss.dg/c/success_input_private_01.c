@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -40,12 +42,12 @@ int main()
     int x = 1;
     int *y = &x;
     //printf("original_address: %p\n", &x);
-    #pragma omp task inprivate(x) shared(y)
+    #pragma oss task inprivate(x) shared(y)
     {
         //printf("original_address: %p vs copy_address: %p \n", y, &x);
         assert(&x != y);
         x++;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == 1);
 }

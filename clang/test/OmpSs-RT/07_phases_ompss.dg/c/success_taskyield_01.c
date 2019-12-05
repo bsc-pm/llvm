@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -35,11 +37,11 @@ test_compile_fail_nanos6_imcc=yes
 
 int main(int argc, char*argv[])
 {
-    #pragma omp task
+    #pragma oss task
     {
-        #pragma omp taskyield
+        #pragma oss taskyield
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     return 0;
 }

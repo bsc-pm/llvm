@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -63,16 +65,16 @@ int main( int argc, char *argv[] )
    int error = 0;
    int A[ARRAY_SIZE];
 
-   #pragma omp for schedule(static,2)
+   #pragma oss for schedule(static,2)
    TEST_SLICER( 2 );
 
-   #pragma omp for schedule(dynamic,2)
+   #pragma oss for schedule(dynamic,2)
    TEST_SLICER( 2 );
 
-   #pragma omp for schedule(static,13)
+   #pragma oss for schedule(static,13)
    TEST_SLICER( 13 );
 
-   #pragma omp for schedule(dynamic,13)
+   #pragma oss for schedule(dynamic,13)
    TEST_SLICER( 13 );
 
    if ( error ) {

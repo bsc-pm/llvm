@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -35,7 +37,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <string.h>
 #include <stdlib.h>
 
-#pragma omp task
+#pragma oss task
 void f(int n, int m, int v[n][m]);
 
 int g(int n1, int m1)
@@ -47,7 +49,7 @@ int g(int n1, int m1)
     fprintf(stderr, "g: %p -> [%d][%d] -> %p\n", v, n1-1, m1-1, &v[n1-1][m1-1]);
 
     f(n1, m1, v);
-#pragma omp taskwait
+#pragma oss taskwait
     if (v[n1-1][m1-1] != 42)
     {
         fprintf(stderr, "%d != 42\n", v[n1-1][m1-1]);

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -34,13 +36,13 @@ test_nolink=yes
 int main()
 {
     int x;
-    #pragma omp taskwait on(x)
+    #pragma oss taskwait on(x)
 
-    #pragma omp taskwait in(x)
-    #pragma omp taskwait out(x)
-    #pragma omp taskwait inout(x)
+    #pragma oss taskwait in(x)
+    #pragma oss taskwait out(x)
+    #pragma oss taskwait inout(x)
 
-    #pragma omp taskwait depend(in: x)
-    #pragma omp taskwait depend(out: x)
-    #pragma omp taskwait depend(inout: x)
+    #pragma oss taskwait depend(in: x)
+    #pragma oss taskwait depend(out: x)
+    #pragma oss taskwait depend(inout: x)
 }

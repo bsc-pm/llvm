@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -40,20 +42,20 @@ int main()
     int x1 = -1;
     int x2 = -1;
 
-    #pragma omp task shared(x1, x2)
+    #pragma oss task shared(x1, x2)
     {
-        #pragma omp for lastprivate(x1)
+        #pragma oss for lastprivate(x1)
         for (x1 = 0; x1 < n; ++x1)
         {
         }
 
-        #pragma omp for
+        #pragma oss for
         for (x2 = 0; x2 < n; ++x2)
         {
         }
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x1 == n);
     assert(x2 == -1);
 

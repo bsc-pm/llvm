@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -35,7 +37,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 
 int main (int argc, char *argv[])
 {
-#pragma omp taskwait noflush
+#pragma oss taskwait noflush
   return 0;
 }
 

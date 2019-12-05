@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -34,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include<assert.h>
 
 int main() {
-    #pragma omp taskloop grainsize(1)
+    #pragma oss taskloop grainsize(1)
     for (unsigned int x = 0u; x < 0u; ++x)
     {
         assert(0);

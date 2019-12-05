@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -44,11 +46,11 @@ int main ( int argc, char* argv[] )
 
    for (i = 0; i<SIZE; i++) A[i]=0;
 
-#pragma omp for schedule(ompss_dynamic)
+#pragma oss for schedule(ompss_dynamic)
    for (i = 0; i<SIZE; i+=1)
       A[i]++;
 
-#pragma omp for schedule(ompss_dynamic)
+#pragma oss for schedule(ompss_dynamic)
    for (i = 0; i<SIZE; i+=step)
       A[i]--;
 

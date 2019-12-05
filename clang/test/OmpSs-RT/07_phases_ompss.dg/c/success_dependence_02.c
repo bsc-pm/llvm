@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -44,16 +46,16 @@ int main()
     struct A a = { -1 };
     int *p = &a.x;
 
-    #pragma omp task out(a.x)
+    #pragma oss task out(a.x)
     {
         sleep(1);
         a.x = 2;
     }
 
-    #pragma omp task in(*p)
+    #pragma oss task in(*p)
     {
         assert(*p == 2);
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     return 0;
 }

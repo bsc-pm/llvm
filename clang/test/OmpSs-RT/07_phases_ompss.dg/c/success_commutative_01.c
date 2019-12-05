@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -38,12 +40,12 @@ int main()
     int v[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
     for (i = 0; i < 10; ++i)
     {
-        #pragma omp task commutative(res) shared(v) firstprivate(i)
+        #pragma oss task commutative(res) shared(v) firstprivate(i)
         {
-            #pragma omp atomic
+            #pragma oss atomic
             res += v[i];
         }
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(res == 55);
 }

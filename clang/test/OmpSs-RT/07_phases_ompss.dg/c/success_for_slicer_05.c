@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -47,7 +49,7 @@ int main(int argc, char *argv[])
     b[4] = 4;
     b[5] = 5;
 
-#pragma omp parallel for firstprivate(a, b) lastprivate(a, b)
+#pragma oss parallel for firstprivate(a, b) lastprivate(a, b)
     for (i = 0; i < 10; i++)
     {
         a[1] = a[2];

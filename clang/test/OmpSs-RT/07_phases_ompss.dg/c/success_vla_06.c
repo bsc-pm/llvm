@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -40,12 +42,12 @@ int v(int n) {
     for (int i = 0; i < n; ++i)
         v1[i] = 0;
 
-    #pragma omp task private(v1)
+    #pragma oss task private(v1)
     {
         for (int i = 0; i < n; ++i)
             v1[i] = 7;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     for (int i = 0; i < n; ++i)
         assert(v1[i] == 0);
 }

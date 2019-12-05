@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -40,14 +42,14 @@ int my_global = 1;
 int main(int argc, char *argv[])
 {
     int cpinout = 9;
-#pragma omp target device(smp) copy_inout(my_global, cpinout)
-#pragma omp task 
+#pragma oss target device(smp) copy_inout(my_global, cpinout)
+#pragma oss task 
     {
         my_global++;
         cpinout++;
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     if (my_global != 2)
     {

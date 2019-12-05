@@ -24,7 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -36,7 +37,7 @@ test_compile_fail=yes
 int main()
 {
     int i;
-    #pragma omp for firstprivate(i)
+    #pragma oss for firstprivate(i)
     for (i = 0; i  < 100; ++i)
     {
     }

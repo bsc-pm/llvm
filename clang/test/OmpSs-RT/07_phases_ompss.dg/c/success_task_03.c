@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -46,16 +48,16 @@ int main(int arg, char* argv[])
         }
     }
 
-#pragma omp task inout(x[1][2])
+#pragma oss task inout(x[1][2])
     {
         x[1][2] += 41;
     }
 
-#pragma omp task in(x[1][2])
+#pragma oss task in(x[1][2])
     {
         if (x[1][2] != 42) abort();
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
     return 0;
 }

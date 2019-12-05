@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -57,7 +59,7 @@ int main()
 
     int z = 3, ub = 10, lb = 0;
     int *p = &(a[z].x[lb]);
-    #pragma omp task out(a[z].x[lb:ub])
+    #pragma oss task out(a[z].x[lb:ub])
     {
         sleep(1);
         int k;
@@ -65,12 +67,12 @@ int main()
             a[z].x[k] = 2;
     }
 
-    #pragma omp task in(*p)
+    #pragma oss task in(*p)
     {
         int i;
         for (i = 0; i <= (ub - lb); i++)
             assert(p[i] == 2);
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     return 0;
 }

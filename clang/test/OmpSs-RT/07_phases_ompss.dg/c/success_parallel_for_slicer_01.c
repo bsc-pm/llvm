@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -41,7 +43,7 @@ int main(int argc, char *argv[])
     int i;
     int s = 0;
 
-#pragma omp parallel for reduction(+:s)
+#pragma oss parallel for reduction(+:s)
     for (i = 0; i < 100; i++)
     {
         s += i;

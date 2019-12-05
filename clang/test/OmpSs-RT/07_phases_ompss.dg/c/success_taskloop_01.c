@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -41,12 +43,12 @@ int main(int argc, char* argv[])
     for (int x = 1; x <= MAX_GRAINSIZE; ++x)
     {
         int a[N] = {0};
-        #pragma omp taskloop grainsize(x) shared(a)
+        #pragma oss taskloop grainsize(x) shared(a)
         for (int i = 0; i < N; ++i)
             a[i]++;
 
         int j;
-        #pragma omp taskloop grainsize(x) shared(a)
+        #pragma oss taskloop grainsize(x) shared(a)
         for (j = 0; j < N; ++j)
             a[j]++;
 

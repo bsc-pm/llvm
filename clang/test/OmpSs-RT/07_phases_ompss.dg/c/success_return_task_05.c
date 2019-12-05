@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -34,7 +36,7 @@ test_CFLAGS="-std=gnu99 --variable=enable_nonvoid_function_tasks:1"
 
 #include<assert.h>
 #define N 10
-#pragma omp task
+#pragma oss task
 int foo()
 {
     return 1;
@@ -44,7 +46,7 @@ int main()
 {
     int accum = 0;
     for(int i = 0; i < N; ++i) accum += foo();
-#pragma omp taskwait
+#pragma oss taskwait
 
     assert(accum == N);
 }

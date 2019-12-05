@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -37,14 +39,14 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 void g(int **a)
 {
     int ** b = a;
-#pragma omp task inout([10](a[3])) firstprivate(b) no_copy_deps
+#pragma oss task inout([10](a[3])) firstprivate(b) no_copy_deps
     {
         if (a != b)
         {
             abort();
         }
     }
-#pragma omp taskwait
+#pragma oss taskwait
 }
 
 int main(int argc, char* argv[])

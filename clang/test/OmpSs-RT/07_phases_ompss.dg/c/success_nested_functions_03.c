@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -42,8 +44,8 @@ int main(int argc, char *argv[])
     int y;
     main_wd = nanos_get_wd_id(nanos_current_wd());
 
-#pragma omp target device(smp) no_copy_deps
-#pragma omp task inout(*x)
+#pragma oss target device(smp) no_copy_deps
+#pragma oss task inout(*x)
     void g(int *x);
 
     y = 1;
@@ -53,7 +55,7 @@ int main(int argc, char *argv[])
     g(&y);
     g(&y);
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     return 0;
 }

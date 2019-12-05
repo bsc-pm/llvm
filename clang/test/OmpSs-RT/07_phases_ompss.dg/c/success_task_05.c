@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -55,13 +57,13 @@ void foo (unsigned sizex, unsigned sizey, int u[sizex][sizey])
     {
         for (j = sizey-1; j >= 1; j--)
         {
-#pragma omp task in(u[i-1][j-1]) inout(u[i][j])
+#pragma oss task in(u[i-1][j-1]) inout(u[i][j])
             {
                 u[i][j] += u[i-1][j-1];
             }
         }
     }
-#pragma omp taskwait
+#pragma oss taskwait
 
     for (i = 1; j < sizex; i++)
     {

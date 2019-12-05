@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -52,8 +54,8 @@ int main (int argc, char *argv[])
         }
     }
 
-#pragma omp target device(smp) copy_in(a[0:M-1])
-#pragma omp task firstprivate(stderr) firstprivate(M)
+#pragma oss target device(smp) copy_in(a[0:M-1])
+#pragma oss task firstprivate(stderr) firstprivate(M)
     {
         int k;
         for (k = 0; k < M; k++)
@@ -66,7 +68,7 @@ int main (int argc, char *argv[])
         }
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     return 0;
 }

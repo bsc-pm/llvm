@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -43,10 +45,10 @@ int main()
     for ( i = 0; i < N; ++i) v[i] = i;
     for (int  i = 0; i < N; ++i)
     {
-        #pragma omp task shared(v) concurrent(res) no_copy_deps
-        #pragma omp atomic
+        #pragma oss task shared(v) concurrent(res) no_copy_deps
+        #pragma oss atomic
         res += v[i];
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(res == (((N - 1) * (N + 1 - 1)) / 2));
 }

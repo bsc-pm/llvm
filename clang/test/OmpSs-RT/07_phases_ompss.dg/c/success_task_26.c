@@ -10,10 +10,10 @@ test_nolink=yes
 int main()
 {
     int x = 0;
-    #pragma omp task inout(x)
+    #pragma oss task inout(x)
     {
         x++;
-        #pragma omp taskwait inout(x)
+        #pragma oss taskwait inout(x)
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

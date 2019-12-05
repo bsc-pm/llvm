@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -40,7 +42,7 @@ int main(int argc, char *argv[])
   int a[8] = {0,0,0,0,0,0,0,0};
   int num_threads = 8;
 
-  #pragma omp task output([num_threads]a)
+  #pragma oss task out([num_threads]a)
   {
       int i;
       for (i = 0; i < num_threads; i++)
@@ -49,7 +51,7 @@ int main(int argc, char *argv[])
       }
   }
 
-#pragma omp taskwait
+#pragma oss taskwait
 
   int i;
   for (i = 0; i < num_threads; i++)

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -56,13 +58,13 @@ int backtrack(int n)
         int local_counter = 0;
         for (int i = 0; i < n; ++i)
         {
-            #pragma omp task reduction(+: local_counter)  firstprivate(i)
+            #pragma oss task reduction(+: local_counter)  firstprivate(i)
             {
                 int res = backtrack(i);
                 local_counter += res;
             }
         }
-        #pragma omp taskwait
+        #pragma oss taskwait
         return local_counter;
     }
 }

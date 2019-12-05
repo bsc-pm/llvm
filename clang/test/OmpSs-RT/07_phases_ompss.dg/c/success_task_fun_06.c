@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -33,7 +35,7 @@ test_CFLAGS="--no-copy-deps"
 */
 #include <assert.h>
 
-#pragma omp task  inout([1] var)
+#pragma oss task  inout([1] var)
 void f(int * var, int cnst)
 {
     int i = 0;
@@ -46,7 +48,7 @@ void f(int * var, int cnst)
     (*var) = (*var) + 1;
 }
 
-#pragma omp task  concurrent([1] var)
+#pragma oss task  concurrent([1] var)
 void g(int * var)
 {
     (*var) = 0;
@@ -64,7 +66,7 @@ int main()
 
     for (i = 0; i < 10; i++)
         f(ptrResult, i);
-#pragma omp taskwait
+#pragma oss taskwait
 
 }
 

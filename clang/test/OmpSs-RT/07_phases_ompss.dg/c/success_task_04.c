@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -36,12 +38,12 @@ int main()
 {
     const int ntasks = 4;
     int out[4];
-#pragma omp target device(smp) copy_out(out[0:ntasks-1])
-#pragma omp task inout(out[0:ntasks-1])
+#pragma oss target device(smp) copy_out(out[0:ntasks-1])
+#pragma oss task inout(out[0:ntasks-1])
     {
         ntasks;
     }
-#pragma omp taskwait
+#pragma oss taskwait
 
     return 0;
 }

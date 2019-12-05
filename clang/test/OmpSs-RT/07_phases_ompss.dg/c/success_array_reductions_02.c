@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -35,13 +37,13 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 
 void f(int n, int * v)
 {
-    #pragma omp task reduction(+: [n]v)
+    #pragma oss task reduction(+: [n]v)
     {
         int i;
         for(i = 0; i < n; ++i)
             v[i]++;
     }
-    #pragma omp task reduction(+: [n]v)
+    #pragma oss task reduction(+: [n]v)
     {
         int i;
         for(i = 0; i < n; ++i)
@@ -53,7 +55,7 @@ int main()
 {
     int i, v[10] = {0};
     f(10, v);
-#pragma omp taskwait
+#pragma oss taskwait
     for(i = 0; i < 10; ++i)
         assert(v[i] == 2);
     return 0;

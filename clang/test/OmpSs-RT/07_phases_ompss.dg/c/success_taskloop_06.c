@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -41,13 +43,13 @@ void strictly_increasing_loop(int l, int u, int s, int ntasks)
 {
     int var = 0;
     char first_time = 1;
-    #pragma omp taskloop num_tasks(ntasks) firstprivate(first_time) shared(var)
+    #pragma oss taskloop num_tasks(ntasks) firstprivate(first_time) shared(var)
     for (int j = l; j < u; j += s)
     {
 
         if (first_time)
         {
-            #pragma omp atomic
+            #pragma oss atomic
             var++;
             first_time = 0;
         }
@@ -59,12 +61,12 @@ void strictly_decreasing_loop(int l, int u, int s, int ntasks)
 {
     int var = 0;
     char first_time = 1;
-    #pragma omp taskloop num_tasks(ntasks) firstprivate(first_time) shared(var)
+    #pragma oss taskloop num_tasks(ntasks) firstprivate(first_time) shared(var)
     for (int j = l; j >= u; j += s)
     {
         if (first_time)
         {
-            #pragma omp atomic
+            #pragma oss atomic
             var++;
             first_time = 0;
         }

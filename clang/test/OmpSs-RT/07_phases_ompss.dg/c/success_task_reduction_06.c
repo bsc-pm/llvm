@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -55,7 +57,7 @@ int main()
 
     for(i = 0;i < N; i++)
     {
-        #pragma omp task reduction(max : max_val) firstprivate(i) shared(v)
+        #pragma oss task reduction(max : max_val) firstprivate(i) shared(v)
         {
             if(v[i] > max_val)
             {
@@ -64,10 +66,10 @@ int main()
         }
     }
 
-    #pragma omp task in(max_val)
+    #pragma oss task in(max_val)
     {
         assert(serial_max_val == max_val);
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

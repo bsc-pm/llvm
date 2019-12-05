@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -34,8 +36,8 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <stdio.h>
 #include <stdlib.h>
 
-#pragma omp target device(smp) copy_in(*a) copy_out(*b)
-#pragma omp task
+#pragma oss target device(smp) copy_in(*a) copy_out(*b)
+#pragma oss task
 void f(int *a, int *b)
 {
     *b = *a + 1;
@@ -48,7 +50,7 @@ int main(int argc, char *argv[])
 
     f(&t_a, &t_b);
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     if (t_b != 11)
     {

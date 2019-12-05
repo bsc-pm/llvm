@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -33,7 +35,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 */
 #include <stdlib.h>
 
-#pragma omp task
+#pragma oss task
 void process_plain_bad(int num_tasks, int vec[num_tasks][num_tasks])
 {
 }
@@ -44,6 +46,6 @@ int main(int argc, char *argv[])
     int t = 100;
     void * const output = malloc(t*sizeof(int));
     process_plain_bad(t, output);
-#pragma omp taskwait
+#pragma oss taskwait
     return 0;
 }

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -48,7 +50,7 @@ void f1(int array_size, int (*a)[array_size], int *result)
       result[i] = 0;
   }
 
-  #pragma omp parallel for firstprivate(a) reduction(+:[array_size]result)
+  #pragma oss parallel for firstprivate(a) reduction(+:[array_size]result)
   for (i = 0; i < NUM_ITEMS; i++)
   {
     int j;

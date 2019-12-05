@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -40,7 +42,7 @@ int main()
     int x[2][2] = {{-1, -1}, {-1, -1}};
     int (*y)[2] = x;
     //printf("original_address: %p\n", x);
-    #pragma omp task inprivate(x)
+    #pragma oss task inprivate(x)
     {
         assert(y != x);
         //printf("original_address: %p vs copy_address: %p \n", y, x);
@@ -49,7 +51,7 @@ int main()
         x[1][0]++;
         x[1][1]++;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x[0][0] == -1);
     assert(x[0][1] == -1);
     assert(x[1][0] == -1);

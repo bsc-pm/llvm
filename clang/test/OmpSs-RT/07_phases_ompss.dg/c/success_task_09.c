@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -41,9 +43,9 @@ int main()
 
 int foo()
 {
-    #pragma omp task
+    #pragma oss task
     {
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
     return 0;
 }

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -50,18 +52,18 @@ int main()
 
     for (i = 0; i < N; ++i)
     {
-        #pragma omp task shared(v) firstprivate(i)
+        #pragma oss task shared(v) firstprivate(i)
         {
             // printf("begining the task(%d): %d, %d, %p\n", v[i], omp_get_thread_num(), res, &res);
             res += v[i];
             // printf("ending the task(%d): %d, %d, %p\n", v[i], omp_get_thread_num(), res, &res);
         }
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 
     // Note: I came up with this idea to reduce the thread local copies,
     //       I'm not sure if there are other ways to do it!
-    #pragma omp for reduction(+:result)
+    #pragma oss for reduction(+:result)
     for (i = 0; i < omp_get_max_threads(); ++i)
     {
         // printf("%d: %d -> %p\n", omp_get_thread_num(),res, &res);

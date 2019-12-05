@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -44,7 +46,7 @@ void foo(int n)
 
     memset(v, 0, sizeof(v));
 
-    #pragma omp for firstprivate(v)
+    #pragma oss for firstprivate(v)
     for (int i = 0; i < n; ++i)
     {
         for (int j = 0; j < n; ++j)
@@ -55,7 +57,7 @@ void foo(int n)
         }
     }
 
-    #pragma omp for shared(v)
+    #pragma oss for shared(v)
     for (int i = 0; i < n; ++i)
     {
         for (int j = 0; j < n; ++j)
@@ -66,7 +68,7 @@ void foo(int n)
         }
     }
 
-    #pragma omp for firstprivate(v)
+    #pragma oss for firstprivate(v)
     for (int i = 0; i < n; ++i)
     {
         for (int j = 0; j < n; ++j)

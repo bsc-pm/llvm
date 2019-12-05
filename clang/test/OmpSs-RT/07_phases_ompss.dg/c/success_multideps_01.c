@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -39,7 +41,7 @@ test_CFLAGS="--no-copy-deps"
 
 void generate0(int length, int *a, int val)
 {
-#pragma omp task out( { a[k], k = 0;length } )
+#pragma oss task out( { a[k], k = 0;length } )
     {
         usleep(50);
         int i;
@@ -52,7 +54,7 @@ void generate0(int length, int *a, int val)
 
 void consume0(int length, int *a, int val)
 {
-#pragma omp task in( { a[k], k = 0;length } )
+#pragma oss task in( { a[k], k = 0;length } )
     {
         usleep(50);
         int i;
@@ -69,7 +71,7 @@ void consume0(int length, int *a, int val)
 
 void generate1(int start, int length, int *a, int val)
 {
-#pragma omp task out( { a[k], k = start;length } )
+#pragma oss task out( { a[k], k = start;length } )
     {
         usleep(50);
         int i;
@@ -82,7 +84,7 @@ void generate1(int start, int length, int *a, int val)
 
 void consume1(int start, int length, int *a, int val)
 {
-#pragma omp task in( { a[k], k = start;length } )
+#pragma oss task in( { a[k], k = start;length } )
     {
         usleep(50);
         int i;
@@ -144,7 +146,7 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr, "Waiting tasks...\n");
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     return 0;
 }

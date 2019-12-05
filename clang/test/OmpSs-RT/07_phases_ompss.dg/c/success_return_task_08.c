@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -35,27 +37,27 @@ test_compile_fail_nanos6_imcc=yes
 test_compile_end_signal_nanos6_imcc=yes
 </testinfo>
 */
-#pragma omp task
+#pragma oss task
 void foo() { }
 
-#pragma omp task
+#pragma oss task
 int fii() { }
 
 
 int main()
 {
     int x = 0;
-#pragma omp task
+#pragma oss task
     {
-#pragma omp task
+#pragma oss task
         {
             x++;
         }
-#pragma omp taskwait
+#pragma oss taskwait
     }
 
     foo();
 
     int h = fii();
-#pragma omp taskwait
+#pragma oss taskwait
 }

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -42,10 +44,10 @@ int foo(void)
 int main(int argc, char *argv[])
 {
         int result=666;
-        #pragma omp task out(result)
+        #pragma oss task out(result)
         result = foo();
 
-        #pragma omp taskwait on(result)
+        #pragma oss taskwait on(result)
         if (result != 999) abort();
 
         return 0;

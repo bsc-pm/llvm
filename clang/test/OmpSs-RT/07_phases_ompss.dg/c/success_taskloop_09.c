@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -61,25 +63,25 @@ int main()
 
     for (int k = 1; k <= N; ++k) {
         INIT
-        #pragma omp taskloop shared(v) grainsize(k)
+        #pragma oss taskloop shared(v) grainsize(k)
         for (int i = BEG; i < MID; ++i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) grainsize(k)
+        #pragma oss taskloop shared(v) grainsize(k)
         for (int i = BEG; i <= MID-1; ++i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) grainsize(k)
+        #pragma oss taskloop shared(v) grainsize(k)
         for (int i = MID-1; i > BEG-1; --i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) grainsize(k)
+        #pragma oss taskloop shared(v) grainsize(k)
         for (int i = MID-1; i >= BEG; --i)
             v[i]++;
         VALIDATE
@@ -87,25 +89,25 @@ int main()
 
     for (int k = 1; k <= N; ++k) {
         INIT
-        #pragma omp taskloop shared(v) num_tasks(k)
+        #pragma oss taskloop shared(v) num_tasks(k)
         for (int i = BEG; i < MID; ++i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) num_tasks(k)
+        #pragma oss taskloop shared(v) num_tasks(k)
         for (int i = BEG; i <= MID-1; ++i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) num_tasks(k)
+        #pragma oss taskloop shared(v) num_tasks(k)
         for (int i = MID-1; i > BEG-1; --i)
             v[i]++;
         VALIDATE
 
         INIT
-        #pragma omp taskloop shared(v) num_tasks(k)
+        #pragma oss taskloop shared(v) num_tasks(k)
         for (int i = MID-1; i >= BEG; --i)
             v[i]++;
         VALIDATE

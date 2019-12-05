@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -43,14 +45,14 @@ void h(void)
     orig_x = x = 1;
     z = 2;
 
-#pragma omp task inout(*y, z)
+#pragma oss task inout(*y, z)
     void f(int *y)
     {
         (*y) += z;
     }
 
     f(&x);
-#pragma omp taskwait
+#pragma oss taskwait
 
     assert(x == (orig_x + z));
 }

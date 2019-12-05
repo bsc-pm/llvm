@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -33,8 +35,8 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 */
 #include <stdlib.h>
 
-#pragma omp target device(smp) copy_deps
-#pragma omp task inout([n]v)
+#pragma oss target device(smp) copy_deps
+#pragma oss task inout([n]v)
 void f(int n, int *v)
 {
     int i;
@@ -52,7 +54,7 @@ int main(int argc, char *argv[])
         w[i] = i;
 
     f(10, w);
-#pragma omp taskwait
+#pragma oss taskwait
 
     for (i = 0; i < 10; i++)
     {

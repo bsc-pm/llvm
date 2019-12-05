@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 /*
 <testinfo>
@@ -35,15 +37,15 @@ int main(int argc, char* argv[])
 {
     int a = 0xFE70, b = 0x07EF;
 
-#pragma omp parallel
+#pragma oss parallel
     {
-#pragma omp atomic
+#pragma oss atomic
         a &= b;
 
-#pragma omp atomic
+#pragma oss atomic
         a |= b;
 
-#pragma omp atomic
+#pragma oss atomic
         a ^= b;
     }
 

@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -41,7 +43,7 @@ char check[N] = { };
 void f(int *a, int n)
 {
     int i;
-    #pragma omp taskloop out(a[i]) grainsize(10) shared(check) nogroup
+    #pragma oss taskloop out(a[i]) grainsize(10) shared(check) nogroup
     for (i = 0; i < n; i++)
     {
         if (check[i] != 0)
@@ -50,7 +52,7 @@ void f(int *a, int n)
         check[i] = 1;
     }
 
-#pragma omp taskloop inout(a[i]) grainsize(10) shared(check) nogroup
+#pragma oss taskloop inout(a[i]) grainsize(10) shared(check) nogroup
     for (i = 0; i < n; i++)
     {
         if (check[i] != 1)
@@ -59,7 +61,7 @@ void f(int *a, int n)
         check[i] = 0;
     }
 
-#pragma omp taskloop in(a[i]) grainsize(10) shared(check)
+#pragma oss taskloop in(a[i]) grainsize(10) shared(check)
     for (i = 0; i < n; i++)
     {
         if (check[i] != 0)

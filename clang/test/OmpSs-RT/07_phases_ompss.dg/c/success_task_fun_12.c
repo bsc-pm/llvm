@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -41,7 +43,7 @@ struct C
     int y[5];
 };
 
-#pragma omp task out(c->y[0:4])
+#pragma oss task out(c->y[0:4])
 void producer(struct C* c)
 {
     for (int i = 0; i < 5; ++i)
@@ -50,7 +52,7 @@ void producer(struct C* c)
     }
 }
 
-#pragma omp task inout(c->y[0:4])
+#pragma oss task inout(c->y[0:4])
 void consumer(struct C* c)
 {
 }
@@ -69,7 +71,7 @@ int main()
     producer(&c);
     consumer(&c);
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     for (int i = 0; i < 5; ++i)
     {

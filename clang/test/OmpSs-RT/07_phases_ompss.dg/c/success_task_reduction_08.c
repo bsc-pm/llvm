@@ -1,3 +1,32 @@
+/*--------------------------------------------------------------------
+  (C) Copyright 2006-2013 Barcelona Supercomputing Center
+                          Centro Nacional de Supercomputacion
+  
+  This file is part of Mercurium C/C++ source-to-source compiler.
+  
+  See AUTHORS file in the top level directory for information
+  regarding developers and contributors.
+  
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 3 of the License, or (at your option) any later version.
+  
+  Mercurium C/C++ source-to-source compiler is distributed in the hope
+  that it will be useful, but WITHOUT ANY WARRANTY; without even the
+  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+  PURPOSE.  See the GNU Lesser General Public License for more
+  details.
+  
+  You should have received a copy of the GNU Lesser General Public
+  License along with Mercurium C/C++ source-to-source compiler; if
+  not, write to the Free Software Foundation, Inc., 675 Mass Ave,
+  Cambridge, MA 02139, USA.
+--------------------------------------------------------------------*/
+
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
+
 /*
 <testinfo>
 test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
@@ -21,17 +50,17 @@ int main()
     x = 0;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(+: x)
+        #pragma oss task reduction(+: x)
         {
             x += 2;
         }
     }
-    #pragma omp task reduction(+: x)
+    #pragma oss task reduction(+: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == N*2);
 
     // Multiplication
@@ -39,17 +68,17 @@ int main()
     x = 10;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(*: x)
+        #pragma oss task reduction(*: x)
         {
             x *= 2;
         }
     }
-    #pragma omp task reduction(*: x)
+    #pragma oss task reduction(*: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == 10*(1 << N));
 
     // Substraction
@@ -57,17 +86,17 @@ int main()
     x = 100;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(-: x)
+        #pragma oss task reduction(-: x)
         {
             x -= 2;
         }
     }
-    #pragma omp task reduction(-: x)
+    #pragma oss task reduction(-: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == 100 - N*2);
 
     // Bitwise AND
@@ -75,18 +104,18 @@ int main()
     x = ~0;
     for (int i = 0; i < sizeof(int)*8; ++i)
     {
-        #pragma omp task reduction(&: x) firstprivate(i)
+        #pragma oss task reduction(&: x) firstprivate(i)
         {
             if (i%2 == 0)
                 x &= ~(1 << i);
         }
     }
-    #pragma omp task reduction(&: x)
+    #pragma oss task reduction(&: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     for (int j = 0; j < sizeof(int); ++j)
     {
         assert(((unsigned char*)&x)[j] == 0xAA);
@@ -97,18 +126,18 @@ int main()
     x = 0;
     for (int i = 0; i < sizeof(int)*8; ++i)
     {
-        #pragma omp task reduction(|: x) firstprivate(i)
+        #pragma oss task reduction(|: x) firstprivate(i)
         {
             if (i%2 == 0)
                 x |= (1 << i);
         }
     }
-    #pragma omp task reduction(|: x)
+    #pragma oss task reduction(|: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     for (int j = 0; j < sizeof(int); ++j)
     {
         assert(((unsigned char*)&x)[j] == 0x55);
@@ -119,18 +148,18 @@ int main()
     x = ~0;
     for (int i = 0; i < sizeof(int)*8; ++i)
     {
-        #pragma omp task reduction(^: x) firstprivate(i)
+        #pragma oss task reduction(^: x) firstprivate(i)
         {
             if (i%2 == 0)
                 x ^= (1 << i);
         }
     }
-    #pragma omp task reduction(^: x)
+    #pragma oss task reduction(^: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     for (int j = 0; j < sizeof(int); ++j)
     {
         assert(((unsigned char*)&x)[j] == 0xAA);
@@ -141,17 +170,17 @@ int main()
     x = true;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(&&: x) firstprivate(i)
+        #pragma oss task reduction(&&: x) firstprivate(i)
         {
             x = x && true;
         }
     }
-    #pragma omp task reduction(&&: x)
+    #pragma oss task reduction(&&: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x);
 
     // Logical OR
@@ -159,7 +188,7 @@ int main()
     x = false;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(||: x) firstprivate(i)
+        #pragma oss task reduction(||: x) firstprivate(i)
         {
             if (i%2 == 0)
                 x = x || true;
@@ -167,12 +196,12 @@ int main()
                 x = x || false;
         }
     }
-    #pragma omp task reduction(||: x)
+    #pragma oss task reduction(||: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x);
 
     // MAX
@@ -180,17 +209,17 @@ int main()
     x = 0;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(max: x) firstprivate(i)
+        #pragma oss task reduction(max: x) firstprivate(i)
         {
             x = MAX(x, i);
         }
     }
-    #pragma omp task reduction(max: x)
+    #pragma oss task reduction(max: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == N - 1);
 
     // MIN
@@ -198,16 +227,16 @@ int main()
     x = N;
     for (int i = 0; i < N; ++i)
     {
-        #pragma omp task reduction(min: x) firstprivate(i)
+        #pragma oss task reduction(min: x) firstprivate(i)
         {
             x = MIN(x, i);
         }
     }
-    #pragma omp task reduction(min: x)
+    #pragma oss task reduction(min: x)
     {
         // Empty task to test initialization
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
     assert(x == 0);
 }

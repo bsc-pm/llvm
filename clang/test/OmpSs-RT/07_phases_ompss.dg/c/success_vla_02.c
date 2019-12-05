@@ -24,6 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
+// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
 
 
 /*
@@ -34,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include<assert.h>
 int** global;
 
-#pragma omp task
+#pragma oss task
 void f(int n, int v[n][n])
 {
     assert(global == (int**)v);
@@ -42,7 +44,7 @@ void f(int n, int v[n][n])
     if (n > 0)
     {
         f(n-1, v);
-#pragma omp taskwait
+#pragma oss taskwait
     }
 }
 
@@ -52,6 +54,6 @@ int main()
     int v[n][n];
     global = (int**) v;
     f(n, v);
-#pragma omp taskwait
+#pragma oss taskwait
     return 0;
 }
