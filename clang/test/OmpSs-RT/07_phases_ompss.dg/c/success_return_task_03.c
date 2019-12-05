@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// RUN: %oss-compile-and-run
 // XFAIL: *
 
 /*
