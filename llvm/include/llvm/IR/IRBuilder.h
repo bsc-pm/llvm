@@ -2637,6 +2637,8 @@ public:
 
   Value *CreateInsertElement(Value *Vec, Value *NewElt, Value *Idx,
                              const Twine &Name = "") {
+    if (Vec->getType()->getVectorIsScalable())
+      return Insert(InsertElementInst::Create(Vec, NewElt, Idx), Name);
     if (auto *VC = dyn_cast<Constant>(Vec))
       if (auto *NC = dyn_cast<Constant>(NewElt))
         if (auto *IC = dyn_cast<Constant>(Idx))

@@ -425,6 +425,20 @@ Instruction *InstCombiner::foldSelectIntoOp(SelectInst &SI, Value *TrueVal,
                                             Value *FalseVal) {
   // See the comment above GetSelectFoldableOperands for a description of the
   // transformation we are doing here.
+  auto ConstIntOrVector = [&](Value *OOp, APInt CI) -> Value * {
+    Value *C;
+    Type *OOpTy = OOp->getType();
+    if (OOpTy->isVectorTy() && OOpTy->getVectorIsScalable()) {
+      VectorType *VTy = dyn_cast<VectorType>(OOp->getType());
+      C = Builder.CreateVectorSplat(OOpTy->getVectorNumElements(),
+                                    ConstantInt::get(VTy->getContext(), CI),
+                                    "constant.splat",
+                                    OOpTy->getVectorIsScalable());
+    } else {
+      C = ConstantInt::get(OOpTy, CI);
+    }
+    return C;
+  };
   if (auto *TVI = dyn_cast<BinaryOperator>(TrueVal)) {
     if (TVI->hasOneUse() && !isa<Constant>(FalseVal)) {
       if (unsigned SFO = getSelectFoldableOperands(TVI)) {
@@ -443,7 +457,7 @@ Instruction *InstCombiner::foldSelectIntoOp(SelectInst &SI, Value *TrueVal,
           const APInt *OOpC;
           bool OOpIsAPInt = match(OOp, m_APInt(OOpC));
           if (!isa<Constant>(OOp) || (OOpIsAPInt && isSelect01(CI, *OOpC))) {
-            Value *C = ConstantInt::get(OOp->getType(), CI);
+            Value *C = ConstIntOrVector(OOp, CI);
             Value *NewSel = Builder.CreateSelect(SI.getCondition(), OOp, C);
             NewSel->takeName(TVI);
             BinaryOperator *BO = BinaryOperator::Create(TVI->getOpcode(),
@@ -474,7 +488,7 @@ Instruction *InstCombiner::foldSelectIntoOp(SelectInst &SI, Value *TrueVal,
           const APInt *OOpC;
           bool OOpIsAPInt = match(OOp, m_APInt(OOpC));
           if (!isa<Constant>(OOp) || (OOpIsAPInt && isSelect01(CI, *OOpC))) {
-            Value *C = ConstantInt::get(OOp->getType(), CI);
+            Value *C = ConstIntOrVector(OOp, CI);
             Value *NewSel = Builder.CreateSelect(SI.getCondition(), C, OOp);
             NewSel->takeName(FVI);
             BinaryOperator *BO = BinaryOperator::Create(FVI->getOpcode(),
