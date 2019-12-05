@@ -735,6 +735,9 @@ static bool isBackwardPropagatableCopy(MachineInstr &MI,
   Register Def = MI.getOperand(0).getReg();
   Register Src = MI.getOperand(1).getReg();
 
+  if (!Def || !Src)
+    return false;
+
   if (MRI.isReserved(Def) || MRI.isReserved(Src))
     return false;
 
@@ -754,6 +757,9 @@ void MachineCopyPropagation::propagateDefs(MachineInstr &MI) {
 
     // Ignore non-trivial cases.
     if (MODef.isTied() || MODef.isUndef() || MODef.isImplicit())
+      continue;
+
+    if (!MODef.getReg())
       continue;
 
     // We only handle if the register comes from a vreg.
