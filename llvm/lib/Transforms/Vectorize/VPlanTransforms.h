@@ -1,4 +1,4 @@
-//===- VPlanHCFGTransforms.h - Utility VPlan to VPlan transforms ----------===//
+//===- VPlanTransforms.h - Utility VPlan to VPlan transforms --------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,8 +10,8 @@
 /// This file provides utility VPlan to VPlan transformations.
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TRANSFORMS_VECTORIZE_VPLANHCFGTRANSFORMS_H
-#define LLVM_TRANSFORMS_VECTORIZE_VPLANHCFGTRANSFORMS_H
+#ifndef LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H
+#define LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H
 
 #include "VPlan.h"
 #include "llvm/IR/Instruction.h"
@@ -19,17 +19,17 @@
 
 namespace llvm {
 
-class VPlanHCFGTransforms {
+class VPlanTransforms {
 
 public:
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes.
   static void VPInstructionsToVPRecipes(
-      VPlanPtr &Plan,
+      Loop *OrigLoop, VPlanPtr &Plan,
       LoopVectorizationLegality::InductionList *Inductions,
       SmallPtrSetImpl<Instruction *> &DeadInstructions);
 };
 
 } // namespace llvm
 
-#endif // LLVM_TRANSFORMS_VECTORIZE_VPLANHCFGTRANSFORMS_H
+#endif // LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H

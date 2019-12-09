@@ -2189,10 +2189,6 @@ Constant *ConstantExpr::getInsertElement(Constant *Val, Constant *Elt,
   assert(Idx->getType()->isIntegerTy() &&
          "Insertelement index must be i32 type!");
 
-  //Constant folding does not make sense for scalable vector type.
-  if (Val->getType()->getVectorIsScalable())
-    return nullptr;
-
   if (Constant *FC = ConstantFoldInsertElementInstruction(Val, Elt, Idx))
     return FC;          // Fold a few common cases.
 
@@ -2215,9 +2211,9 @@ Constant *ConstantExpr::getShuffleVector(Constant *V1, Constant *V2,
   if (Constant *FC = ConstantFoldShuffleVectorInstruction(V1, V2, Mask))
     return FC;          // Fold a few common cases.
 
-  unsigned NElts = Mask->getType()->getVectorNumElements();
+  ElementCount EC = Mask->getType()->getVectorElementCount();
   Type *EltTy = V1->getType()->getVectorElementType();
-  Type *ShufTy = VectorType::get(EltTy, NElts);
+  Type *ShufTy = VectorType::get(EltTy, EC);
 
   if (OnlyIfReducedTy == ShufTy)
     return nullptr;

@@ -331,15 +331,16 @@ define <vscale x 1 x double> @test7(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:  # %bb.1: # %for.body.lr.ph
 ; CHECK-NEXT:    mv a3, zero
 ; CHECK-NEXT:    # implicit-def: $v0
-; CHECK-NEXT:    bnez a1, .LBB6_4
+; CHECK-NEXT:    j .LBB6_3
 ; CHECK-NEXT:  .LBB6_2: # %for.inc
-; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    # in Loop: Header=BB6_3 Depth=1
 ; CHECK-NEXT:    addw a3, a3, a0
 ; CHECK-NEXT:    bge a3, a2, .LBB6_6
-; CHECK-NEXT:  # %bb.3: # %for.body
-; CHECK-NEXT:    # in Loop: Header=BB6_2 Depth=1
+; CHECK-NEXT:  .LBB6_3: # %for.body
+; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    beqz a1, .LBB6_2
-; CHECK-NEXT:  .LBB6_4: # %if.then
+; CHECK-NEXT:  # %bb.4: # %if.then
+; CHECK-NEXT:    # in Loop: Header=BB6_3 Depth=1
 ; CHECK-NEXT:    vfadd.vv v0, v16, v17
 ; CHECK-NEXT:    j .LBB6_2
 ; CHECK-NEXT:  .LBB6_5:

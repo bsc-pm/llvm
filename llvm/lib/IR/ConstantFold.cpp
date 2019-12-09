@@ -843,10 +843,6 @@ Constant *llvm::ConstantFoldInsertElementInstruction(Constant *Val,
   if (CIdx->uge(NumElts))
     return UndefValue::get(Val->getType());
 
-  // Leave scalable vectors alone.
-  if (Val->getType()->getVectorIsScalable())
-    return nullptr;
-
   SmallVector<Constant*, 16> Result;
   Result.reserve(NumElts);
   auto *Ty = Type::getInt32Ty(Val->getContext());
@@ -876,6 +872,12 @@ Constant *llvm::ConstantFoldShuffleVectorInstruction(Constant *V1,
 
   // Don't break the bitcode reader hack.
   if (isa<ConstantExpr>(Mask)) return nullptr;
+
+  // Do not iterate on scalable vector. The num of elements is unknown at
+  // compile-time.
+  VectorType *ValTy = cast<VectorType>(V1->getType());
+  if (ValTy->isScalable())
+    return nullptr;
 
   unsigned SrcNumElts = V1->getType()->getVectorNumElements();
 

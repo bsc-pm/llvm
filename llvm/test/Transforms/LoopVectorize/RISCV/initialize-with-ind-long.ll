@@ -22,21 +22,17 @@ define dso_local signext i32 @main(i32 signext %argc, i8** nocapture readnone %a
 ; CHECK-NEXT:    [[STEP_VSCALE1:%.*]] = mul i64 1, [[TMP2]]
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[STEP_VSCALE1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 1024, [[N_MOD_VF]]
-; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 1 x i64> undef, i64 0, i32 0
-; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 1 x i64> [[DOTSPLATINSERT]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
 ; CHECK-NEXT:    [[STEPVEC_BASE:%.*]] = call <vscale x 1 x i64> @llvm.experimental.vector.stepvector.nxv1i64()
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 1 x i64> [[DOTSPLAT]], [[STEPVEC_BASE]]
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 1 x i64> shufflevector (<vscale x 1 x i64> insertelement (<vscale x 1 x i64> undef, i64 0, i32 0), <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer), [[STEPVEC_BASE]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul i64 1, [[TMP3]]
-; CHECK-NEXT:    [[DOTSPLATINSERT2:%.*]] = insertelement <vscale x 1 x i64> undef, i64 [[TMP4]], i32 0
-; CHECK-NEXT:    [[DOTSPLAT3:%.*]] = shufflevector <vscale x 1 x i64> [[DOTSPLATINSERT2]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 1 x i64> undef, i64 42, i32 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 1 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
+; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 1 x i64> undef, i64 [[TMP4]], i32 0
+; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 1 x i64> [[DOTSPLATINSERT]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 1 x i64> [ [[INDUCTION]], [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw <vscale x 1 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw <vscale x 1 x i64> [[VEC_IND]], shufflevector (<vscale x 1 x i64> insertelement (<vscale x 1 x i64> undef, i64 42, i32 0), <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer)
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <vscale x 1 x i64> [[VEC_IND]], i32 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [1024 x i64], [1024 x i64]* [[A]], i64 0, i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, i64* [[TMP7]], i32 0
@@ -45,7 +41,7 @@ define dso_local signext i32 @main(i32 signext %argc, i8** nocapture readnone %a
 ; CHECK-NEXT:    [[TMP10:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
 ; CHECK-NEXT:    [[INDEX_VSCALE:%.*]] = mul i64 [[TMP10]], 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[INDEX_VSCALE]]
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 1 x i64> [[VEC_IND]], [[DOTSPLAT3]]
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 1 x i64> [[VEC_IND]], [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop !6
 ; CHECK:       middle.block:
