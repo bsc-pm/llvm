@@ -5062,7 +5062,7 @@ public:
     CodeGenOptions::SignReturnAddressKeyValue Key = CGM.getCodeGenOpts().getSignReturnAddressKey();
     bool BranchTargetEnforcement = CGM.getCodeGenOpts().BranchTargetEnforcement;
     if (const auto *TA = FD->getAttr<TargetAttr>()) {
-      TargetAttr::ParsedTargetAttr Attr = TA->parse();
+      ParsedTargetAttr Attr = TA->parse();
       if (!Attr.BranchProtection.empty()) {
         TargetInfo::BranchProtectionInfo BPI;
         StringRef Error;
