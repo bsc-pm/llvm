@@ -1692,7 +1692,7 @@ public:
 
 Value *CreateNot(Value *V, const Twine &Name = "") {
   Type *VTy = V->getType();
-  if (dyn_cast<VectorType>(VTy) && VTy->getVectorIsScalable()) {
+  if (VTy->isVectorTy() && VTy->getVectorIsScalable()) {
     Value *Ones = getAllOnesValue(VTy);
     return Insert(BinaryOperator::Create(Instruction::Xor, V, Ones, Name,
                                          static_cast<Instruction *>(nullptr)));
@@ -2787,8 +2787,6 @@ public:
   Value *CreateVectorSplat(unsigned NumElts, Value *V, const Twine &Name = "",
                            bool Scalable = false) {
     assert(NumElts > 0 && "Cannot splat to an empty vector!");
-    if (NumElts == 1 && !Scalable)
-      return V;
 
     // First insert it into an undef vector so we can shuffle it.
     Type *I32Ty = getInt32Ty();
