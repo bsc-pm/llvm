@@ -676,6 +676,9 @@ static void EmitDSAShared(
       TaskInfo.emplace_back(BundleName, V);
     }
     QualType Q = VD->getType();
+    // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
+    while (Q->isPointerType())
+      Q = Q->getPointeeType();
     if (Q->isVariableArrayType())
       EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
 
@@ -708,6 +711,9 @@ static void EmitDSAPrivate(
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
+  // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
+  while (Q->isPointerType())
+      Q = Q->getPointeeType();
   if (Q->isVariableArrayType())
     EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
 
@@ -742,6 +748,9 @@ static void EmitDSAFirstprivate(
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
+  // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
+  while (Q->isPointerType())
+      Q = Q->getPointeeType();
   if (Q->isVariableArrayType())
     EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
 
