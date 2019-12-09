@@ -7111,7 +7111,6 @@ public:
     ResultList Results;
 
     switch (DCK) {
-    default:
     case DefaultedComparisonKind::None:
       llvm_unreachable("not a defaulted comparison");
 
@@ -7126,6 +7125,7 @@ public:
           ParamLvalType, getDerived().getCompleteObject()));
       return Results;
     }
+    llvm_unreachable("");
   }
 
 protected:
@@ -7509,8 +7509,7 @@ public:
       VarDecl *EqualVD = S.Context.CompCategories.getInfoForType(StrongOrdering)
                              .getValueInfo(ComparisonCategoryResult::Equal)
                              ->VD;
-      RetVal = S.BuildDeclarationNameExpr(
-          CXXScopeSpec(), DeclarationNameInfo(), EqualVD);
+      RetVal = getDecl(EqualVD);
       if (RetVal.isInvalid())
         return StmtError();
       RetVal = buildStaticCastToR(RetVal.get());
@@ -7535,10 +7534,14 @@ public:
   }
 
 private:
+  ExprResult getDecl(ValueDecl *VD) {
+    return S.BuildDeclarationNameExpr(
+        CXXScopeSpec(), DeclarationNameInfo(VD->getDeclName(), Loc), VD);
+  }
+
   ExprResult getParam(unsigned I) {
     ParmVarDecl *PD = FD->getParamDecl(I);
-    return S.BuildDeclarationNameExpr(
-        CXXScopeSpec(), DeclarationNameInfo(PD->getDeclName(), Loc), PD);
+    return getDecl(PD);
   }
 
   ExprPair getCompleteObject() {
@@ -7601,7 +7604,6 @@ private:
       return StmtError();
 
     switch (DCK) {
-    default:
     case DefaultedComparisonKind::None:
       llvm_unreachable("not a defaulted comparison");
 
@@ -7631,8 +7633,7 @@ private:
       Stmt *InitStmt = new (S.Context) DeclStmt(DeclGroupRef(VD), Loc, Loc);
 
       // cmp != 0
-      ExprResult VDRef = S.BuildDeclarationNameExpr(
-          CXXScopeSpec(), DeclarationNameInfo(Name, Loc), VD);
+      ExprResult VDRef = getDecl(VD);
       if (VDRef.isInvalid())
         return StmtError();
       llvm::APInt ZeroVal(S.Context.getIntWidth(S.Context.IntTy), 0);
@@ -7648,8 +7649,7 @@ private:
         return StmtError();
 
       // return cmp;
-      VDRef = S.BuildDeclarationNameExpr(
-          CXXScopeSpec(), DeclarationNameInfo(Name, Loc), VD);
+      VDRef = getDecl(VD);
       if (VDRef.isInvalid())
         return StmtError();
       StmtResult ReturnStmt = S.BuildReturnStmt(Loc, VDRef.get());
@@ -7668,6 +7668,7 @@ private:
       //   Otherwise, the operator function yields x @ y.
       return Op.get();
     }
+    llvm_unreachable("");
   }
 
   /// Build "static_cast<R>(E)".
@@ -10243,11 +10244,25 @@ QualType Sema::CheckComparisonCategoryType(ComparisonCategoryType Kind,
   assert(getLangOpts().CPlusPlus &&
          "Looking for comparison category type outside of C++.");
 
+  // Use an elaborated type for diagnostics which has a name containing the
+  // prepended 'std' namespace but not any inline namespace names.
+  auto TyForDiags = [&](ComparisonCategoryInfo *Info) {
+    auto *NNS =
+        NestedNameSpecifier::Create(Context, nullptr, getStdNamespace());
+    return Context.getElaboratedType(ETK_None, NNS, Info->getType());
+  };
+
   // Check if we've already successfully checked the comparison category type
   // before. If so, skip checking it again.
   ComparisonCategoryInfo *Info = Context.CompCategories.lookupInfo(Kind);
-  if (Info && FullyCheckedComparisonCategories[static_cast<unsigned>(Kind)])
+  if (Info && FullyCheckedComparisonCategories[static_cast<unsigned>(Kind)]) {
+    // The only thing we need to check is that the type has a reachable
+    // definition in the current context.
+    if (RequireCompleteType(Loc, TyForDiags(Info), diag::err_incomplete_type))
+      return QualType();
+
     return Info->getType();
+  }
 
   // If lookup failed
   if (!Info) {
@@ -10266,18 +10281,10 @@ QualType Sema::CheckComparisonCategoryType(ComparisonCategoryType Kind,
   if (Info->Record->hasDefinition())
     Info->Record = Info->Record->getDefinition();
 
-  // Use an elaborated type for diagnostics which has a name containing the
-  // prepended 'std' namespace but not any inline namespace names.
-  QualType TyForDiags = [&]() {
-    auto *NNS =
-        NestedNameSpecifier::Create(Context, nullptr, getStdNamespace());
-    return Context.getElaboratedType(ETK_None, NNS, Info->getType());
-  }();
-
-  if (RequireCompleteType(Loc, TyForDiags, diag::err_incomplete_type))
+  if (RequireCompleteType(Loc, TyForDiags(Info), diag::err_incomplete_type))
     return QualType();
 
-  InvalidSTLDiagnoser UnsupportedSTLError{*this, Loc, TyForDiags};
+  InvalidSTLDiagnoser UnsupportedSTLError{*this, Loc, TyForDiags(Info)};
 
   if (!Info->Record->isTriviallyCopyable())
     return UnsupportedSTLError(USS_NonTrivial);
