@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile-and-run
-// XFAIL: *
+// RUN: %oss-compile
 
 /*
 <testinfo>

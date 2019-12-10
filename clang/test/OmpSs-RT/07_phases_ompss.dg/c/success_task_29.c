@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile-and-run
-// XFAIL: *
+// RUN: %oss-compile
 
 /*
 <testinfo>
@@ -42,4 +41,7 @@ void foo(int N, int *p) {
     A var = { N };
     #pragma oss task inout([var.n]p)
     {}
+}
+
+int main() {
 }

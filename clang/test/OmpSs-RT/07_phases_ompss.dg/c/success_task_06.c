@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile-and-run
-// XFAIL: *
+// RUN: %oss-compile
 
 /*
 <testinfo>
@@ -34,8 +33,8 @@ test_nolink=yes
 </testinfo>
 */
 
-extern int me;
-extern int nodes;
+int me;
+int nodes;
 
 void matmul ( int m, int n, double (*A)[m], double (*B)[n], double (*C)[n] )
 {
@@ -74,3 +73,5 @@ void matmul ( int m, int n, double (*A)[m], double (*B)[n], double (*C)[n] )
 
 #pragma oss taskwait
 }
+
+int main() {}
