@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile-and-run
+// RUN: %oss-compile
 // XFAIL: *
 
 /*
@@ -38,4 +38,7 @@ int foo(int n) {
     int v2[10];
     #pragma oss task inout(v, v2)
     {}
+    return 0;
 }
+
+int main() {}
