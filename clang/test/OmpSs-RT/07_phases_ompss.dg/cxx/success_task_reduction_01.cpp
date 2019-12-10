@@ -24,6 +24,8 @@ namespace N
     };
 
     void A::foo()
+// RUN: oss-cxx-compile-and-run
+//XFAIL: *
     {
         int x = 0;
 

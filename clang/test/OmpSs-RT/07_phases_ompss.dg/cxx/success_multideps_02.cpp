@@ -24,6 +24,8 @@ void set(std::vector<T *>& w)
             *n = k;
         }
     }
+// RUN: oss-cxx-compile-and-run
+//XFAIL: *
 }
 
 template <typename T>

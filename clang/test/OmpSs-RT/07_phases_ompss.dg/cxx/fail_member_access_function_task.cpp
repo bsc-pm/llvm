@@ -24,7 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-
+// RUN: oss-cxx-compile-and-run
+// XFAIL: *
 
 /*
 <testinfo>
