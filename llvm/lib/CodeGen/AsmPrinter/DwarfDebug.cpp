@@ -535,6 +535,14 @@ void DwarfDebug::constructAbstractSubprogramScopeDIE(DwarfCompileUnit &SrcCU,
   }
 }
 
+DIE &DwarfDebug::constructSubprogramDefinitionDIE(const DISubprogram *SP) {
+  DICompileUnit *Unit = SP->getUnit();
+  assert(SP->isDefinition() && "Subprogram not a definition");
+  assert(Unit && "Subprogram definition without parent unit");
+  auto &CU = getOrCreateDwarfCompileUnit(Unit);
+  return *CU.getOrCreateSubprogramDIE(SP);
+}
+
 /// Try to interpret values loaded into registers that forward parameters
 /// for \p CallMI. Store parameters with interpreted value into \p Params.
 static void collectCallSiteParameters(const MachineInstr *CallMI,
@@ -745,6 +753,15 @@ void DwarfDebug::constructCallSiteEntryDIEs(const DISubprogram &SP,
         if (!CalleeDecl || !CalleeDecl->getSubprogram())
           continue;
         CalleeSP = CalleeDecl->getSubprogram();
+
+        if (CalleeSP->isDefinition()) {
+          // Ensure that a subprogram DIE for the callee is available in the
+          // appropriate CU.
+          constructSubprogramDefinitionDIE(CalleeSP);
+        } else {
+          assert(CU.getDIE(CalleeSP) &&
+                 "Expected declaration subprogram DIE for callee");
+        }
       }
 
       // TODO: Omit call site entries for runtime calls (objc_msgSend, etc).
@@ -2522,6 +2539,8 @@ void DwarfDebug::emitDebugLocDWO() {
       Asm->emitInt8(dwarf::DW_LLE_startx_length);
       unsigned idx = AddrPool.getIndex(Entry.Begin);
       Asm->EmitULEB128(idx);
+      // Also the pre-standard encoding is slightly different, emitting this as
+      // an address-length entry here, but its a ULEB128 in DWARFv5 loclists.
       Asm->EmitLabelDifference(Entry.End, Entry.Begin, 4);
       emitDebugLocEntryLocation(Entry, List.CU);
     }
@@ -2773,8 +2792,7 @@ void DwarfDebug::emitMacroFile(DIMacroFile &F, DwarfCompileUnit &U) {
   Asm->EmitULEB128(dwarf::DW_MACINFO_end_file);
 }
 
-/// Emit macros into a debug macinfo section.
-void DwarfDebug::emitDebugMacinfo() {
+void DwarfDebug::emitDebugMacinfoImpl(MCSection *Section) {
   for (const auto &P : CUMap) {
     auto &TheCU = *P.second;
     auto *SkCU = TheCU.getSkeleton();
@@ -2783,8 +2801,7 @@ void DwarfDebug::emitDebugMacinfo() {
     DIMacroNodeArray Macros = CUNode->getMacros();
     if (Macros.empty())
       continue;
-    Asm->OutStreamer->SwitchSection(
-        Asm->getObjFileLowering().getDwarfMacinfoSection());
+    Asm->OutStreamer->SwitchSection(Section);
     Asm->OutStreamer->EmitLabel(U.getMacroLabelBegin());
     handleMacroNodes(Macros, U);
     Asm->OutStreamer->AddComment("End Of Macro List Mark");
@@ -2792,22 +2809,13 @@ void DwarfDebug::emitDebugMacinfo() {
   }
 }
 
+/// Emit macros into a debug macinfo section.
+void DwarfDebug::emitDebugMacinfo() {
+  emitDebugMacinfoImpl(Asm->getObjFileLowering().getDwarfMacinfoSection());
+}
+
 void DwarfDebug::emitDebugMacinfoDWO() {
-  for (const auto &P : CUMap) {
-    auto &TheCU = *P.second;
-    auto *SkCU = TheCU.getSkeleton();
-    DwarfCompileUnit &U = SkCU ? *SkCU : TheCU;
-    auto *CUNode = cast<DICompileUnit>(P.first);
-    DIMacroNodeArray Macros = CUNode->getMacros();
-    if (Macros.empty())
-      continue;
-    Asm->OutStreamer->SwitchSection(
-        Asm->getObjFileLowering().getDwarfMacinfoDWOSection());
-    Asm->OutStreamer->EmitLabel(U.getMacroLabelBegin());
-    handleMacroNodes(Macros, U);
-    Asm->OutStreamer->AddComment("End Of Macro List Mark");
-    Asm->emitInt8(0);
-  }
+  emitDebugMacinfoImpl(Asm->getObjFileLowering().getDwarfMacinfoDWOSection());
 }
 
 // DWARF5 Experimental Separate Dwarf emitters.
