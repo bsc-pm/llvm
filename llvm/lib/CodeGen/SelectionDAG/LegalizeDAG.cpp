@@ -541,10 +541,11 @@ void SelectionDAGLegalize::LegalizeStoreOps(SDNode *Node) {
   LLVM_DEBUG(dbgs() << "Legalizing truncating store operations\n");
   SDValue Value = ST->getValue();
   EVT StVT = ST->getMemoryVT();
-  unsigned StWidth = StVT.getSizeInBits();
+  TypeSize StWidthSbit = StVT.getSizeInBits();
+  unsigned StWidth = StWidthSbit.getKnownMinSize();
   auto &DL = DAG.getDataLayout();
 
-  if (StWidth != StVT.getStoreSizeInBits()) {
+  if (StWidthSbit != StVT.getStoreSizeInBits()) {
     // Promote to a byte-sized store with upper bits zero if not
     // storing an integral number of bytes.  For example, promote
     // TRUNCSTORE:i1 X -> TRUNCSTORE:i8 (and X, 1)
