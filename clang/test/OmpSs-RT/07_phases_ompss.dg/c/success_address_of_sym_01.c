@@ -25,8 +25,6 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// XFAIL: *
-
 
 /*
 <testinfo>
@@ -39,7 +37,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 void g(int **a)
 {
     int ** b = a;
-#pragma oss task inout([10](a[3])) firstprivate(b) no_copy_deps
+#pragma oss task inout([10](a[3])) firstprivate(b)
     {
         if (a != b)
         {

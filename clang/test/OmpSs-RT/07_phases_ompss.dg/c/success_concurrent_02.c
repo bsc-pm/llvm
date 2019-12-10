@@ -45,7 +45,7 @@ int main()
     for ( i = 0; i < N; ++i) v[i] = i;
     for (int  i = 0; i < N; ++i)
     {
-        #pragma oss task shared(v) concurrent(res) no_copy_deps
+        #pragma oss task shared(v) concurrent(res)
         #pragma oss atomic
         res += v[i];
     }
