@@ -140,7 +140,7 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
   if (HasC)
     Builder.defineMacro("__riscv_compressed");
 
-  if (HasEPI)
+  if (Opts.EPI)
     Builder.defineMacro("__epi");
 }
 
@@ -161,7 +161,7 @@ bool RISCVTargetInfo::hasFeature(StringRef Feature) const {
       .Case("f", HasF)
       .Case("d", HasD)
       .Case("c", HasC)
-      .Case("epi", HasEPI)
+      .Case("v", HasV)
       .Default(false);
 }
 
@@ -179,15 +179,13 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasD = true;
     else if (Feature == "+c")
       HasC = true;
-    else if (Feature == "+epi")
-      HasEPI = true;
+    else if (Feature == "+v")
+      HasV = true;
   }
 
   return true;
 }
 
 void RISCVTargetInfo::adjust(LangOptions &Opts) {
-  if (HasEPI)
-    Opts.EPI = 1;
   TargetInfo::adjust(Opts);
 }

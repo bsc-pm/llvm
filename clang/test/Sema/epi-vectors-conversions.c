@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple riscv64 -target-feature +epi -verify -fsyntax-only %s
+// RUN: %clang_cc1 -triple riscv64 -mepi -verify -fsyntax-only %s
 
 void foo(void) {
   __epi_2xi32 vc1;

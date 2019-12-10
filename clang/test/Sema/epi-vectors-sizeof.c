@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple riscv64 -target-feature +epi -verify -fsyntax-only %s
+// RUN: %clang_cc1 -triple riscv64 -mepi -verify -fsyntax-only %s
 
 int foo1(void)
 {

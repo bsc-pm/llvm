@@ -331,6 +331,9 @@ static bool getArchFeatures(const Driver &D, StringRef MArch,
     case 'c':
       Features.push_back("+c");
       break;
+    case 'v':
+      Features.push_back("+v");
+      break;
     }
   }
 
@@ -456,9 +459,12 @@ void riscv::getRISCVTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     HasA = HasFeature("+a");
     HasF = HasFeature("+f");
     HasD = HasFeature("+d");
-    if (Args.getLastArg(options::OPT_mepi) &&
-        (!HasRV64 || !HasM || !HasA || !HasF || !HasD)) {
-      D.Diag(diag::err_drv_invalid_riscv_epi_ext);
+
+    if (Args.getLastArg(options::OPT_mepi)) {
+      if (!HasRV64 || !HasM || !HasA || !HasF || !HasD)
+        D.Diag(diag::err_drv_invalid_riscv_epi_ext);
+      else
+        Features.push_back("+v");
     }
   }
 

@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -triple riscv64 -target-feature +epi -ast-print %s \
+// RUN: %clang_cc1 -triple riscv64 -mepi -ast-print %s \
 // RUN:    | FileCheck %s
 
 // All lmul possibilities so far.

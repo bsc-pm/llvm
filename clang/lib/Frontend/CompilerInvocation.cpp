@@ -3324,6 +3324,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.BuildingPCHWithObjectFile = Args.hasArg(OPT_building_pch_with_obj);
 
   Opts.MaxTokens = getLastArgIntValue(Args, OPT_fmax_tokens, 0, Diags);
+
+  // -mepi.
+  Opts.EPI = Args.hasArg(OPT_mepi);
 }
 
 static bool isStrictlyPreprocessorAction(frontend::ActionKind Action) {

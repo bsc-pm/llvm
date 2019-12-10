@@ -1977,6 +1977,10 @@ void Clang::AddRISCVTargetArgs(const ArgList &Args,
 
   CmdArgs.push_back("-target-abi");
   CmdArgs.push_back(ABIName.data());
+
+  if (Args.hasArg(options::OPT_mepi)) {
+    CmdArgs.push_back("-mepi");
+  }
 }
 
 void Clang::AddSparcTargetArgs(const ArgList &Args,

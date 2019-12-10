@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -target-feature +epi -triple riscv64 -verify -fsyntax-only %s
+// RUN: %clang_cc1 -mepi -triple riscv64 -verify -fsyntax-only %s
 
 // expected-no-diagnostics
 
