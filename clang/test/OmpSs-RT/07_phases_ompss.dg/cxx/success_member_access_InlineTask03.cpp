@@ -45,7 +45,7 @@ struct A
 
     void foo(int &a, int &b)
     {
-        #pragma omp task inout(a,b) input(n,m)
+        #pragma omp task inout(a,b) in(n,m)
         {
             a++;
             b++;
