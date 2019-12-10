@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -36,7 +36,7 @@ test_nolink=yes
 */
 template<typename E>
 void foo() {
-    #pragma omp taskloop num_tasks (5)
+    #pragma oss taskloop num_tasks (5)
     for (E i = 0 ; i <10; ++i) {
     }
 }

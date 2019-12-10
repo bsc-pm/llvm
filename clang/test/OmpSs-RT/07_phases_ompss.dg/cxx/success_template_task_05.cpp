@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -51,10 +50,10 @@ struct A
     int foo(const Object& o)
     {
         int error;
-        #pragma omp task shared(error)
+        #pragma oss task shared(error)
             error = (o.get_x() != 13);
 
-        #pragma omp taskwait
+        #pragma oss taskwait
         return error;
     }
 };
@@ -65,10 +64,10 @@ struct B
     int foo(const E& e)
     {
         int error;
-        #pragma omp task shared(error)
+        #pragma oss task shared(error)
             error = (e.get_x() != 13);
 
-        #pragma omp taskwait
+        #pragma oss taskwait
         return error;
     }
 };

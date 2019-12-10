@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -37,7 +37,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 struct A
 {
     double x[10];
-#pragma omp task out(x[i])
+#pragma oss task out(x[i])
     void f(int i)
     {
     }

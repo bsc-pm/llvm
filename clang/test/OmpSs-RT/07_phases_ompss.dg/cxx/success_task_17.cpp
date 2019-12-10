@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -49,13 +48,13 @@ int main (int argc, char *argv[])
             it != m.end();
             it++)
 	{
-		#pragma omp task
+		#pragma oss task
 		{
             it->second++;
 		}
 	}
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     for (int i = 0; i < 100; i++)
     {

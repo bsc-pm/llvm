@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -36,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include<assert.h>
 #include<unistd.h>
 
-#pragma omp task inout(v[0:n-1])
+#pragma oss task inout(v[0:n-1])
 template < typename T>
 void foo_array_section_range(T *v, int n)
 {
@@ -47,7 +47,7 @@ void foo_array_section_range(T *v, int n)
     }
 }
 
-#pragma omp task inout(v[0;n])
+#pragma oss task inout(v[0;n])
 template < typename T>
 void foo_array_section_size(T *v, int n)
 {
@@ -63,7 +63,7 @@ int main()
     const int n = 10;
     int v[n];
 
-    #pragma omp task out(v)
+    #pragma oss task out(v)
     {
         for (int i = 0; i < n; ++i)
             v[i] = 0;
@@ -71,7 +71,7 @@ int main()
 
     foo_array_section_range(v, n);
 
-    #pragma omp task in(v)
+    #pragma oss task in(v)
     {
         for (int i = 0; i < n; ++i)
             assert(v[i] == i);
@@ -79,10 +79,10 @@ int main()
 
     foo_array_section_size(v, n);
 
-    #pragma omp task in(v)
+    #pragma oss task in(v)
     {
         for (int i = 0; i < n; ++i)
             assert(v[i] == 2*i);
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

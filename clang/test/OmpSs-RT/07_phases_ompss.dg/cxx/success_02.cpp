@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -39,7 +39,7 @@ void foo(int* n)
     *n = 2;
 }
 
-#pragma omp task inout(*n) final(1)
+#pragma oss task inout(*n) final(1)
 void bar(int* n)
 {
     *n = 4;
@@ -48,15 +48,15 @@ void bar(int* n)
 int main()
 {
     int x = -1;
-#pragma omp task inout(x) final(1)
+#pragma oss task inout(x) final(1)
     {
         foo(&x);
     }
 
-#pragma omp taskwait on(x)
+#pragma oss taskwait on(x)
     assert(x == 2);
 
     bar(&x);
-#pragma omp taskwait on(x)
+#pragma oss taskwait on(x)
     assert(x == 4);
 }

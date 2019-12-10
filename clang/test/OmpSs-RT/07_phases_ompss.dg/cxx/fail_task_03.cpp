@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -46,6 +46,6 @@ struct A
     int n;
     B* b;
 
-#pragma omp task inout(this->n, this->b->n)
+#pragma oss task inout(this->n, this->b->n)
     void f();
 };

@@ -24,9 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
-
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -48,7 +46,7 @@ struct A
     {
         //d must be firstprivate 
         int d = 0;
-        #pragma omp task inout(a,b) 
+        #pragma oss task inout(a,b) 
         {
             d = 1;
             a+=d;
@@ -56,7 +54,7 @@ struct A
             n+=d;
             m+=d;
         }
-        #pragma omp taskwait
+        #pragma oss taskwait
         assert(d == 0);
 
     }
@@ -69,7 +67,7 @@ void foo()
     int n1 = 3, m1 = 4;
 
     a.foo(n1, m1);
-    //#pragma omp taskwait
+    //#pragma oss taskwait
     assert(n1 == 4);
     assert(m1 == 5);
     assert(a.n == 2);

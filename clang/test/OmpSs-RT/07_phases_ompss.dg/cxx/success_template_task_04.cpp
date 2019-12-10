@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -36,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <unistd.h>
 #include <assert.h>
 
-#pragma omp task inout(v[0;N][0;M])
+#pragma oss task inout(v[0;N][0;M])
 template <typename T, int N, int M>
 void producer(T (&v)[N][M])
 {
@@ -52,14 +52,14 @@ int main()
     const int m = 20;
     int v[n][m];
 
-    #pragma omp task out(v)
+    #pragma oss task out(v)
     {
         for (int i = 0; i < n; ++i)
             for (int j = 0; j < m; ++j)
                 v[i][j] = 0;
     }
 
-    #pragma omp task in(v)
+    #pragma oss task in(v)
     {
         for (int i = 0; i < n; ++i)
             for (int j = 0; j < m; ++j)
@@ -68,7 +68,7 @@ int main()
 
     producer(v);
 
-    #pragma omp task in(v)
+    #pragma oss task in(v)
     {
         for (int i = 0; i < n; ++i)
             for (int j = 0; j < m; ++j)
@@ -77,12 +77,12 @@ int main()
 
     producer(v);
 
-    #pragma omp task in(v)
+    #pragma oss task in(v)
     {
         for (int i = 0; i < n; ++i)
             for (int j = 0; j < m; ++j)
                 assert(v[i][j] == 2*(j + i * n));
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

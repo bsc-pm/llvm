@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-// XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -39,17 +38,17 @@ namespace N
     {
         void foo()
         {
-            #pragma omp task
+            #pragma oss task
             bar();
 
         }
         void bar()
         {
             int var;
-            #pragma omp task
+            #pragma oss task
             {
             }
-            #pragma omp taskwait
+            #pragma oss taskwait
         }
     };
 }
@@ -59,5 +58,5 @@ int main()
     struct N::A a;
 
     a.foo();
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

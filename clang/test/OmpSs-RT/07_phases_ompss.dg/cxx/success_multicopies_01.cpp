@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -54,11 +54,11 @@ int main() {
     A_indexes[3] = 725;
     A_sizes[3] = 524;
 
-#pragma omp task in(B) inout( { A[ A_indexes[i] ; A_sizes[i] ] , i = 0 ; 4 } )
+#pragma oss task in(B) inout( { A[ A_indexes[i] ; A_sizes[i] ] , i = 0 ; 4 } )
    {
    }
 
-#pragma omp taskwait
+#pragma oss taskwait
 
    return 0;
 }

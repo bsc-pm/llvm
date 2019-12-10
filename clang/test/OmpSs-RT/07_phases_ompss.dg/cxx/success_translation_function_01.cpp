@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -42,13 +42,13 @@ void f()
     int a[10];
     for (int i = 0; i < 10; i++)
         a[i] = i;
-#pragma omp target device(smp) copy_deps
-#pragma omp task inout([10]a)
+#pragma oss target device(smp) copy_deps
+#pragma oss task inout([10]a)
     {
         for (int i = 0; i < 10; i++)
             a[i]++;
     }
-#pragma omp taskwait
+#pragma oss taskwait
     for (int i = 0; i < 10; i++)
         assert(a[i] == (i + 1));
 }

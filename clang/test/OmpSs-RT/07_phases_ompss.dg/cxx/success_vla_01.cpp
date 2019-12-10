@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -53,7 +52,7 @@ void f(int n)
         }
     }
 
-#pragma omp task shared(x) firstprivate(y) no_copy_deps
+#pragma oss task shared(x) firstprivate(y)
     {
         for (int i = 0; i < n; i++)
         {
@@ -65,7 +64,7 @@ void f(int n)
         }
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     for (int i = 0; i < n; i++)
     {

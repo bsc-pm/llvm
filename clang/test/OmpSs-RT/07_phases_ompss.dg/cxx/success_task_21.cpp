@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-// XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -44,7 +43,7 @@ struct A
 template <typename T>
 void f(A<T> *a, int first, int last, int val)
 {
-#pragma omp task out(a[first:last])
+#pragma oss task out(a[first:last])
     {
         int i;
         for (i = first; i <= last; i++)
@@ -57,7 +56,7 @@ void f(A<T> *a, int first, int last, int val)
 template <typename T>
 void g(A<T> *a, int length, int val)
 {
-#pragma omp task in(a[0;length])
+#pragma oss task in(a[0;length])
     {
         int i;
         for (i = 0; i < length; i++)
@@ -80,5 +79,5 @@ int main(int argc, char *argv[])
         g(a, 10, j);
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
 }

@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -44,7 +43,7 @@ int main(int argc, char*argv[])
 
 
     int *ptr =(int*)&v;
-    #pragma omp task
+    #pragma oss task
     {
         int x = BS;
         typedef int (*ptrArray)[x];
@@ -56,7 +55,7 @@ int main(int argc, char*argv[])
             for (int j = 0; j < x; ++j)
                 m[i][j] = 1;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 
     for (int i = 0; i < BS; ++i)
         for (int j = 0; j < BS; ++j)

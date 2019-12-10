@@ -24,8 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-// XFAIL: *
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -52,12 +51,12 @@ void f(A &a)
 {
     A b;
 
-#pragma omp task inout(a.x) inout(b.x) no_copy_deps
+#pragma oss task inout(a.x) inout(b.x)
     {
         a.x.y++;
         b.x.y++;
     }
-#pragma omp taskwait
+#pragma oss taskwait
 
     assert(b.x.y == 1);
 }

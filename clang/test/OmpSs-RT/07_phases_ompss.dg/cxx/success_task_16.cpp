@@ -24,9 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
-
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -37,9 +35,9 @@ test_generator=("config/mercurium-ompss c++11" "config/mercurium-ompss-2 openmp-
 // Smoketest for C++11
 int main(int argc, char *argv[])
 {
-#pragma omp task
+#pragma oss task
     {
     }
-#pragma omp taskwait
+#pragma oss taskwait
     return 0;
 }

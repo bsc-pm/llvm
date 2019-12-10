@@ -14,27 +14,27 @@ namespace N
         {
             int x = 0;
 
-            #pragma omp task reduction(+: x)
+            #pragma oss task reduction(+: x)
             {
                 x++;
             }
 
-            #pragma omp taskwait
+            #pragma oss taskwait
         }
     };
 
     void A::foo()
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
     {
         int x = 0;
 
-        #pragma omp task reduction(+: x)
+        #pragma oss task reduction(+: x)
         {
             x++;
         }
 
-        #pragma omp taskwait
+        #pragma oss taskwait
     }
 }
 

@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -39,7 +39,7 @@ test_compile_end_signal_nanos6_imcxx=yes
 */
 #include<assert.h>
 
-#pragma omp task in(x)
+#pragma oss task in(x)
 int foo(int x)
 {
     return x + 1;
@@ -52,7 +52,7 @@ int main()
 
     x = foo(valor) + 1 + foo(valor);
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     assert(x == 7);
 }

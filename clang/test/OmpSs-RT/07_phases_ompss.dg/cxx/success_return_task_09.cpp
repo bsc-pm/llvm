@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -46,12 +46,12 @@ class A
         int bar()
         {
             int x = foo() + foo();
-            #pragma omp taskwait on(x)
+            #pragma oss taskwait on(x)
             return x;
         }
 
     private:
-        #pragma omp task
+        #pragma oss task
         int foo() { return 1; }
 };
 

@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 /*
@@ -37,7 +37,7 @@ test_CXXFLAGS=--variable=enable_nonvoid_function_tasks:1
 #include<assert.h>
 
 #define N 5
-#pragma omp task
+#pragma oss task
 int f(int i)
 {
     return i + 1;
@@ -51,7 +51,7 @@ int main()
     {
         x = f(i) + i + x;
     }
-    #pragma omp taskwait
+    #pragma oss taskwait
 
 assert(x == 25);
 }

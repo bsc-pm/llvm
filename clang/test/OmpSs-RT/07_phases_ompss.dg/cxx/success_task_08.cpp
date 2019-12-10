@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -34,7 +34,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 </testinfo>
 */
 
-#pragma omp task inout(*var) priority(*var)
+#pragma oss task inout(*var) priority(*var)
 void foo(int* var)
 {
     var++;
@@ -45,9 +45,9 @@ int main()
     int a;
     foo(&a);
 
-    #pragma omp task priority(0)
+    #pragma oss task priority(0)
     {
     }
 
-    #pragma omp taskwait
+    #pragma oss taskwait
 }

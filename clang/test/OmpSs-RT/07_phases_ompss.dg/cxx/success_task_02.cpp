@@ -24,9 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
-
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -50,12 +48,12 @@ struct B
 int main(int argc, char* argv[])
 {
     A<B> c;
-#pragma omp task shared(c)
+#pragma oss task shared(c)
     {
         c.e.d = 3;
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
     if (c.e.d != 3)
     {
         abort();

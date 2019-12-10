@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 
 
@@ -38,16 +38,16 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <stdio.h>
 #include <stdlib.h>
 
-#pragma omp target device(smp)
-#pragma omp task out(a[n])
+#pragma oss target device(smp)
+#pragma oss task out(a[n])
 void generator(int *a, int n)
 {
     fprintf(stderr, "%s: a -> %p | a[%d] -> %p\n", __FUNCTION__, a, n, &a[n]);
     a[n] = n;
 }
 
-#pragma omp target device(smp)
-#pragma omp task in(*a)
+#pragma oss target device(smp)
+#pragma oss task in(*a)
 void consumer(int *a, int n)
 {
     fprintf(stderr, "%s a[%d] -> %p\n", __FUNCTION__, n, &a[n]);
@@ -74,5 +74,5 @@ int main(int argc, char* argv[])
         consumer(p, i);
     }
 
-#pragma omp taskwait
+#pragma oss taskwait
 }

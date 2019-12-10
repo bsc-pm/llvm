@@ -24,9 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: oss-cxx-compile-and-run
-//XFAIL: *
-
+// RUN: %oss-cxx-compile-and-run
 
 /*
 <testinfo>
@@ -42,10 +40,10 @@ void copy(T* dst, T* src, int N)
 {
     for(int i = 0; i < N; i++)
     {
-#pragma omp task shared(dst, src)
+#pragma oss task shared(dst, src)
         dst[i] = src[i];
     }
-#pragma omp taskwait
+#pragma oss taskwait
 }
 
 int main(int argc, char *argv[])

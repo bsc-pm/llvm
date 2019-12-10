@@ -14,7 +14,7 @@ template <typename T>
 void set(std::vector<T *>& w)
 {
     T **pw = w.data();
-#pragma omp task out({ *(pw[i]), i = 0 : w.size() - 1 }) shared(w)
+#pragma oss task out({ *(pw[i]), i = 0 : w.size() - 1 }) shared(w)
     {
         int k = 0;
         for (typename std::vector<T *>::iterator it = w.begin(); it != w.end();
@@ -24,7 +24,7 @@ void set(std::vector<T *>& w)
             *n = k;
         }
     }
-// RUN: oss-cxx-compile-and-run
+// RUN: %oss-cxx-compile-and-run
 //XFAIL: *
 }
 
@@ -32,7 +32,7 @@ template <typename T>
 void check(std::vector<T *>& w)
 {
     T **pw = w.data();
-#pragma omp task out({ *(pw[i]), i = 0 : w.size() - 1 }) shared(w)
+#pragma oss task out({ *(pw[i]), i = 0 : w.size() - 1 }) shared(w)
     {
         int k = 0;
         for (typename std::vector<T *>::iterator it = w.begin(); it != w.end();
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     check(fw);
     check(iw);
 
-#pragma omp taskwait
+#pragma oss taskwait
 
     return 0;
 }
