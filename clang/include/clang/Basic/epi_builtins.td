@@ -573,8 +573,6 @@ def vmsif : EPIMaskUnaBuiltin<"m", "mm", "csil">;
 def vmsof : EPIMaskUnaBuiltin<"m", "mm", "csil">;
 }
 
-// FIXME: This should have merge operand.
-let HasMergeOperand = 0 in
 def viota : EPIMaskToIntBuiltin<"v", "vm", "csil">;
 
 def vid : EPINulBuiltin<"v", "v", "csil">;

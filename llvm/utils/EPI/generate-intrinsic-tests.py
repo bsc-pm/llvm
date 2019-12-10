@@ -1906,7 +1906,7 @@ intrinsics = [
         #UnaryIntrinsicMask("vmsof", type_generator = generate_unary_mask_types, variants = m),
         #UnaryIntrinsicMask("vmsif", type_generator = generate_unary_mask_types, variants = m),
 
-        #UnaryIntrinsic("viota", type_generator = generate_unary_mask_to_integer_types, variants = m),
+        UnaryIntrinsic("viota", type_generator = generate_unary_mask_to_integer_types, variants = m),
 
         UnaryIntrinsicScalarResultNoVL("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", scalar_register = "ft0", mask = False, vlmul_values = [1]),
 

@@ -484,8 +484,8 @@ def int_epi_viota : Intrinsic<[ llvm_anyvector_ty ],
                               [ IntrNoMem ]>,
                      EPIIntrinsic<EPICIDvmiota>;
 def int_epi_viota_mask : Intrinsic<[ llvm_anyvector_ty ],
-                                   [ llvm_anyvector_ty, LLVMMatchType<1>,
-                                     llvm_i64_ty ],
+                                   [ LLVMMatchType<0>, llvm_anyvector_ty,
+                                     LLVMMatchType<1>, llvm_i64_ty ],
                                    [ IntrNoMem ]>,
                      EPIIntrinsic<EPICIDvmiota_mask>;
 

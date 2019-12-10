@@ -6854,12 +6854,12 @@ __epi_8xi8 test_viota_8xi8(__epi_8xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_8xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.viota.mask.nxv8i8.nxv8i1(<vscale x 8 x i1> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i8> @llvm.epi.viota.mask.nxv8i8.nxv8i1(<vscale x 8 x i8> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], <vscale x 8 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 8 x i8> [[TMP0]]
 //
-__epi_8xi8 test_viota_8xi8_mask(__epi_8xi1 arg_0, __epi_8xi1 arg_1, unsigned long int arg_2)
+__epi_8xi8 test_viota_8xi8_mask(__epi_8xi8 arg_0, __epi_8xi1 arg_1, __epi_8xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_8xi8_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_8xi8_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_4xi16(
@@ -6874,12 +6874,12 @@ __epi_4xi16 test_viota_4xi16(__epi_4xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_4xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.viota.mask.nxv4i16.nxv4i1(<vscale x 4 x i1> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i16> @llvm.epi.viota.mask.nxv4i16.nxv4i1(<vscale x 4 x i16> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], <vscale x 4 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 4 x i16> [[TMP0]]
 //
-__epi_4xi16 test_viota_4xi16_mask(__epi_4xi1 arg_0, __epi_4xi1 arg_1, unsigned long int arg_2)
+__epi_4xi16 test_viota_4xi16_mask(__epi_4xi16 arg_0, __epi_4xi1 arg_1, __epi_4xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_4xi16_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_4xi16_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_2xi32(
@@ -6894,12 +6894,12 @@ __epi_2xi32 test_viota_2xi32(__epi_2xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_2xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.viota.mask.nxv2i32.nxv2i1(<vscale x 2 x i1> [[ARG_0:%.*]], <vscale x 2 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i32> @llvm.epi.viota.mask.nxv2i32.nxv2i1(<vscale x 2 x i32> [[ARG_0:%.*]], <vscale x 2 x i1> [[ARG_1:%.*]], <vscale x 2 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 2 x i32> [[TMP0]]
 //
-__epi_2xi32 test_viota_2xi32_mask(__epi_2xi1 arg_0, __epi_2xi1 arg_1, unsigned long int arg_2)
+__epi_2xi32 test_viota_2xi32_mask(__epi_2xi32 arg_0, __epi_2xi1 arg_1, __epi_2xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_2xi32_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_2xi32_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_1xi64(
@@ -6914,12 +6914,12 @@ __epi_1xi64 test_viota_1xi64(__epi_1xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_1xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.viota.mask.nxv1i64.nxv1i1(<vscale x 1 x i1> [[ARG_0:%.*]], <vscale x 1 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.viota.mask.nxv1i64.nxv1i1(<vscale x 1 x i64> [[ARG_0:%.*]], <vscale x 1 x i1> [[ARG_1:%.*]], <vscale x 1 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 1 x i64> [[TMP0]]
 //
-__epi_1xi64 test_viota_1xi64_mask(__epi_1xi1 arg_0, __epi_1xi1 arg_1, unsigned long int arg_2)
+__epi_1xi64 test_viota_1xi64_mask(__epi_1xi64 arg_0, __epi_1xi1 arg_1, __epi_1xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_1xi64_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_1xi64_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_16xi8(
@@ -6934,12 +6934,12 @@ __epi_16xi8 test_viota_16xi8(__epi_16xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_16xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 16 x i8> @llvm.epi.viota.mask.nxv16i8.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 16 x i8> @llvm.epi.viota.mask.nxv16i8.nxv16i1(<vscale x 16 x i8> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], <vscale x 16 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 16 x i8> [[TMP0]]
 //
-__epi_16xi8 test_viota_16xi8_mask(__epi_16xi1 arg_0, __epi_16xi1 arg_1, unsigned long int arg_2)
+__epi_16xi8 test_viota_16xi8_mask(__epi_16xi8 arg_0, __epi_16xi1 arg_1, __epi_16xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_16xi8_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_16xi8_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_8xi16(
@@ -6954,12 +6954,12 @@ __epi_8xi16 test_viota_8xi16(__epi_8xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_8xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i16> @llvm.epi.viota.mask.nxv8i16.nxv8i1(<vscale x 8 x i1> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i16> @llvm.epi.viota.mask.nxv8i16.nxv8i1(<vscale x 8 x i16> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], <vscale x 8 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 8 x i16> [[TMP0]]
 //
-__epi_8xi16 test_viota_8xi16_mask(__epi_8xi1 arg_0, __epi_8xi1 arg_1, unsigned long int arg_2)
+__epi_8xi16 test_viota_8xi16_mask(__epi_8xi16 arg_0, __epi_8xi1 arg_1, __epi_8xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_8xi16_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_8xi16_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_4xi32(
@@ -6974,12 +6974,12 @@ __epi_4xi32 test_viota_4xi32(__epi_4xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_4xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i32> @llvm.epi.viota.mask.nxv4i32.nxv4i1(<vscale x 4 x i1> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i32> @llvm.epi.viota.mask.nxv4i32.nxv4i1(<vscale x 4 x i32> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], <vscale x 4 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 4 x i32> [[TMP0]]
 //
-__epi_4xi32 test_viota_4xi32_mask(__epi_4xi1 arg_0, __epi_4xi1 arg_1, unsigned long int arg_2)
+__epi_4xi32 test_viota_4xi32_mask(__epi_4xi32 arg_0, __epi_4xi1 arg_1, __epi_4xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_4xi32_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_4xi32_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_2xi64(
@@ -6994,12 +6994,12 @@ __epi_2xi64 test_viota_2xi64(__epi_2xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_2xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i64> @llvm.epi.viota.mask.nxv2i64.nxv2i1(<vscale x 2 x i1> [[ARG_0:%.*]], <vscale x 2 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x i64> @llvm.epi.viota.mask.nxv2i64.nxv2i1(<vscale x 2 x i64> [[ARG_0:%.*]], <vscale x 2 x i1> [[ARG_1:%.*]], <vscale x 2 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 2 x i64> [[TMP0]]
 //
-__epi_2xi64 test_viota_2xi64_mask(__epi_2xi1 arg_0, __epi_2xi1 arg_1, unsigned long int arg_2)
+__epi_2xi64 test_viota_2xi64_mask(__epi_2xi64 arg_0, __epi_2xi1 arg_1, __epi_2xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_2xi64_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_2xi64_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_32xi8(
@@ -7014,12 +7014,12 @@ __epi_32xi8 test_viota_32xi8(__epi_32xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_32xi8_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 32 x i8> @llvm.epi.viota.mask.nxv32i8.nxv32i1(<vscale x 32 x i1> [[ARG_0:%.*]], <vscale x 32 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 32 x i8> @llvm.epi.viota.mask.nxv32i8.nxv32i1(<vscale x 32 x i8> [[ARG_0:%.*]], <vscale x 32 x i1> [[ARG_1:%.*]], <vscale x 32 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 32 x i8> [[TMP0]]
 //
-__epi_32xi8 test_viota_32xi8_mask(__epi_32xi1 arg_0, __epi_32xi1 arg_1, unsigned long int arg_2)
+__epi_32xi8 test_viota_32xi8_mask(__epi_32xi8 arg_0, __epi_32xi1 arg_1, __epi_32xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_32xi8_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_32xi8_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_16xi16(
@@ -7034,12 +7034,12 @@ __epi_16xi16 test_viota_16xi16(__epi_16xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_16xi16_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 16 x i16> @llvm.epi.viota.mask.nxv16i16.nxv16i1(<vscale x 16 x i1> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 16 x i16> @llvm.epi.viota.mask.nxv16i16.nxv16i1(<vscale x 16 x i16> [[ARG_0:%.*]], <vscale x 16 x i1> [[ARG_1:%.*]], <vscale x 16 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 16 x i16> [[TMP0]]
 //
-__epi_16xi16 test_viota_16xi16_mask(__epi_16xi1 arg_0, __epi_16xi1 arg_1, unsigned long int arg_2)
+__epi_16xi16 test_viota_16xi16_mask(__epi_16xi16 arg_0, __epi_16xi1 arg_1, __epi_16xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_16xi16_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_16xi16_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_8xi32(
@@ -7054,12 +7054,12 @@ __epi_8xi32 test_viota_8xi32(__epi_8xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_8xi32_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i32> @llvm.epi.viota.mask.nxv8i32.nxv8i1(<vscale x 8 x i1> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 8 x i32> @llvm.epi.viota.mask.nxv8i32.nxv8i1(<vscale x 8 x i32> [[ARG_0:%.*]], <vscale x 8 x i1> [[ARG_1:%.*]], <vscale x 8 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 8 x i32> [[TMP0]]
 //
-__epi_8xi32 test_viota_8xi32_mask(__epi_8xi1 arg_0, __epi_8xi1 arg_1, unsigned long int arg_2)
+__epi_8xi32 test_viota_8xi32_mask(__epi_8xi32 arg_0, __epi_8xi1 arg_1, __epi_8xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_8xi32_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_8xi32_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_viota_4xi64(
@@ -7074,12 +7074,12 @@ __epi_4xi64 test_viota_4xi64(__epi_4xi1 arg_0, unsigned long int arg_1)
 
 // CHECK-O2-LABEL: @test_viota_4xi64_mask(
 // CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i64> @llvm.epi.viota.mask.nxv4i64.nxv4i1(<vscale x 4 x i1> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])
+// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 4 x i64> @llvm.epi.viota.mask.nxv4i64.nxv4i1(<vscale x 4 x i64> [[ARG_0:%.*]], <vscale x 4 x i1> [[ARG_1:%.*]], <vscale x 4 x i1> [[ARG_2:%.*]], i64 [[ARG_3:%.*]])
 // CHECK-O2-NEXT:    ret <vscale x 4 x i64> [[TMP0]]
 //
-__epi_4xi64 test_viota_4xi64_mask(__epi_4xi1 arg_0, __epi_4xi1 arg_1, unsigned long int arg_2)
+__epi_4xi64 test_viota_4xi64_mask(__epi_4xi64 arg_0, __epi_4xi1 arg_1, __epi_4xi1 arg_2, unsigned long int arg_3)
 {
-    return __builtin_epi_viota_4xi64_mask(arg_0, arg_1, arg_2);
+    return __builtin_epi_viota_4xi64_mask(arg_0, arg_1, arg_2, arg_3);
 }
 
 // CHECK-O2-LABEL: @test_vload_8xi8(

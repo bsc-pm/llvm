@@ -413,6 +413,17 @@ multiclass pseudo_unary_nomask<VReg result_reg_class,
                      EPIPseudo;
 }
 
+multiclass pseudo_unary_v_m {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _M : pseudo_unary<evr, VR, evr.VLMul>;
+    }
+  }
+}
+
 multiclass pseudo_unary_v_v {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
@@ -966,6 +977,8 @@ defm PseudoVFWMUL      : pseudo_binary_w_vv_vf;
 //defm PseudoVFDOT       : pseudo_binary_v_vv;
 
 defm PseudoVFSQRT      : pseudo_unary_v_v;
+
+defm PseudoVIOTA       : pseudo_unary_v_m;
 
 defm PseudoVFCVT_XU_F  : pseudo_unary_v_v;
 defm PseudoVFCVT_X_F   : pseudo_unary_v_v;
@@ -2315,14 +2328,6 @@ foreach mti = AllMasks in {
 //def : Pat<(int_epi_vmsof_mask VR:$rs1, V0),
 //        (VMSOF_M_MASK $rs1, vmask_only_true.Value)>;
 
-//foreach vtp = AllIntegerVectors in
-//{
-//def : Pat<(vtp.Vector (int_epi_viota VR:$rs1)),
-//        (VIOTA_M $rs1)>;
-//def : Pat<(vtp.Vector (int_epi_viota_mask VR:$rs1, V0)),
-//        (VIOTA_M_MASK $rs1, vmask_only_true.Value)>;
-//}
-
 //foreach vtp = AllVectors in
 //def : Pat<(vtp.Vector (int_epi_vcompress (vtp.Vector VR:$rs2), (nxv1i1 VR:$rs1))),
 //          (VCOMPRESS_VM $rs2, $rs1)>;
@@ -2478,6 +2483,22 @@ foreach vti = AllFloatVectors in
 //foreach vtp = AllFloatVectors in
 //def : Pat<(itp (int_epi_vfclass_mask (vtp.Vector VR:$rs2), V0)),
 //          (VFCLASS_V_MASK $rs2, vmask_only_true.Value)>;
+
+foreach vti = AllIntegerVectors in {
+  def : Pat<(vti.Vector (int_epi_viota (vti.Mask VR:$rs2), GPR:$vl)),
+            (!cast<Instruction>("PseudoVIOTA_M_M"#vti.RegClass.VLMul)
+             (vti.Vector zero_reg),
+             $rs2,
+             (vti.Mask zero_reg),
+             (NoX0 GPR:$vl), vti.SEW)>;
+  def : Pat<(vti.Vector (int_epi_viota_mask (vti.Vector vti.RegClass:$merge),
+                         (vti.Mask VR:$rs2), (vti.Mask V0), GPR:$vl)),
+            (!cast<Instruction>("PseudoVIOTA_M_M"#vti.RegClass.VLMul)
+             $merge,
+             $rs2,
+             (vti.Mask V0),
+             (NoX0 GPR:$vl), vti.SEW)>;
+}
 
 multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
                                     string instruction_float_to_int,
