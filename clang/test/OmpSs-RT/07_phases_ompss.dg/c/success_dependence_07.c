@@ -43,3 +43,5 @@ void foo(n)
 
     #pragma oss taskwait
 }
+
+int main() {}
