@@ -1,3 +1,4 @@
+// RUN: %oss-cxx-compile-and-run
 /*
 <testinfo>
 test_generator="config/mercurium-ompss-2"
