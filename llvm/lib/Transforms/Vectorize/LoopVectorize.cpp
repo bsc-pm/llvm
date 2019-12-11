@@ -2229,9 +2229,10 @@ Value *InnerLoopVectorizer::reverseVector(Value *Vec) {
   assert(Vec->getType()->isVectorTy() && "Invalid type");
 
   if (Vec->getType()->getVectorIsScalable()) {
-    return Intrinsic::getDeclaration(LoopVectorPreHeader->getModule(),
-                                     Intrinsic::experimental_vector_reverse,
-                                     Vec->getType());
+    Function *ReverseFunc = Intrinsic::getDeclaration(
+        LoopVectorPreHeader->getModule(),
+        Intrinsic::experimental_vector_reverse, {Vec->getType()});
+    return Builder.CreateCall(ReverseFunc, {Vec}, "reverse");
   }
 
   SmallVector<Constant *, 8> ShuffleMask;
