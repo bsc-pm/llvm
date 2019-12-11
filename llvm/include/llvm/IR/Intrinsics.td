@@ -1373,6 +1373,10 @@ def int_experimental_vector_stepvector : Intrinsic<[llvm_anyvector_ty],
 
 //===----------------------------------------------------------------------===//
 
+def int_experimental_vector_reverse : Intrinsic<[llvm_anyvector_ty],
+                                                [llvm_anyvector_ty],
+                                                [IntrNoMem]>;
+
 //===----------------------------------------------------------------------===//
 // Target-specific intrinsics
 //===----------------------------------------------------------------------===//

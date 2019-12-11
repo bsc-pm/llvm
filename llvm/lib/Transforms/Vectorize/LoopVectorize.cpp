@@ -2227,6 +2227,13 @@ void InnerLoopVectorizer::packScalarIntoVectorValue(
 
 Value *InnerLoopVectorizer::reverseVector(Value *Vec) {
   assert(Vec->getType()->isVectorTy() && "Invalid type");
+
+  if (Vec->getType()->getVectorIsScalable()) {
+    return Intrinsic::getDeclaration(LoopVectorPreHeader->getModule(),
+                                     Intrinsic::experimental_vector_reverse,
+                                     Vec->getType());
+  }
+
   SmallVector<Constant *, 8> ShuffleMask;
   for (unsigned i = 0; i < VF; ++i)
     ShuffleMask.push_back(Builder.getInt32(VF - i - 1));
