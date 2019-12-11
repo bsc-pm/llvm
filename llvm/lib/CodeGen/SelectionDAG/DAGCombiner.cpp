@@ -16527,8 +16527,9 @@ SDValue DAGCombiner::visitSTORE(SDNode *N) {
           !ST1->getBasePtr().isUndef()) {
         const BaseIndexOffset STBase = BaseIndexOffset::match(ST, DAG);
         const BaseIndexOffset ChainBase = BaseIndexOffset::match(ST1, DAG);
-        unsigned STBitSize = ST->getMemoryVT().getSizeInBits();
-        unsigned ChainBitSize = ST1->getMemoryVT().getSizeInBits();
+        unsigned STBitSize = ST->getMemoryVT().getSizeInBits().getKnownMinSize();
+        unsigned ChainBitSize =
+            ST1->getMemoryVT().getSizeInBits().getKnownMinSize();
         // If this is a store who's preceding store to a subset of the current
         // location and no one other node is chained to that store we can
         // effectively drop the store. Do not remove stores to undef as they may

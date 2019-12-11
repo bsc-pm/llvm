@@ -5252,7 +5252,8 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     // amounts.  This catches things like trying to shift an i1024 value by an
     // i8, which is easy to fall into in generic code that uses
     // TLI.getShiftAmount().
-    assert(N2.getValueSizeInBits() >= Log2_32_Ceil(N1.getValueSizeInBits()) &&
+    assert(N2.getValueSizeInBits().getKnownMinSize() >=
+           Log2_32_Ceil(N1.getValueSizeInBits().getKnownMinSize()) &&
            "Invalid use of small shift amount with oversized value!");
 
     // Always fold shifts of i1 values so the code generator doesn't need to

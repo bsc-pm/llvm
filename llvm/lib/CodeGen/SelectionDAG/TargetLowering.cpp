@@ -29,6 +29,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TypeSize.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include <cctype>
@@ -6706,8 +6707,8 @@ TargetLowering::expandUnalignedLoad(LoadSDNode *LD, SelectionDAG &DAG) const {
     // Copy the value to a (aligned) stack slot using (unaligned) integer
     // loads and stores, then do a (aligned) load from the stack slot.
     MVT RegVT = getRegisterType(*DAG.getContext(), intVT);
-    unsigned LoadedBytes = LoadedVT.getStoreSize();
-    unsigned RegBytes = RegVT.getSizeInBits() / 8;
+    unsigned LoadedBytes = LoadedVT.getStoreSize().getKnownMinSize();
+    unsigned RegBytes = RegVT.getSizeInBits().getKnownMinSize() / 8;
     unsigned NumRegs = (LoadedBytes + RegBytes - 1) / RegBytes;
 
     // Make sure the stack slot is also aligned for the register type.
@@ -6773,7 +6774,7 @@ TargetLowering::expandUnalignedLoad(LoadSDNode *LD, SelectionDAG &DAG) const {
 
   // Compute the new VT that is half the size of the old one.  This is an
   // integer MVT.
-  unsigned NumBits = LoadedVT.getSizeInBits();
+  unsigned NumBits = LoadedVT.getSizeInBits().getKnownMinSize();
   EVT NewLoadedVT;
   NewLoadedVT = EVT::getIntegerVT(*DAG.getContext(), NumBits/2);
   NumBits >>= 1;
@@ -6837,7 +6838,8 @@ SDValue TargetLowering::expandUnalignedStore(StoreSDNode *ST,
 
   SDLoc dl(ST);
   if (StoreMemVT.isFloatingPoint() || StoreMemVT.isVector()) {
-    EVT intVT = EVT::getIntegerVT(*DAG.getContext(), VT.getSizeInBits());
+    EVT intVT = EVT::getIntegerVT(*DAG.getContext(),
+                                  VT.getSizeInBits().getKnownMinSize());
     if (isTypeLegal(intVT)) {
       if (!isOperationLegalOrCustom(ISD::STORE, intVT) &&
           StoreMemVT.isVector()) {
@@ -6857,10 +6859,11 @@ SDValue TargetLowering::expandUnalignedStore(StoreSDNode *ST,
     // to the final destination using (unaligned) integer loads and stores.
     MVT RegVT = getRegisterType(
         *DAG.getContext(),
-        EVT::getIntegerVT(*DAG.getContext(), StoreMemVT.getSizeInBits()));
+        EVT::getIntegerVT(*DAG.getContext(),
+                          StoreMemVT.getSizeInBits().getKnownMinSize()));
     EVT PtrVT = Ptr.getValueType();
-    unsigned StoredBytes = StoreMemVT.getStoreSize();
-    unsigned RegBytes = RegVT.getSizeInBits() / 8;
+    unsigned StoredBytes = StoreMemVT.getStoreSize().getKnownMinSize();
+    unsigned RegBytes = RegVT.getSizeInBits().getKnownMinSize() / 8;
     unsigned NumRegs = (StoredBytes + RegBytes - 1) / RegBytes;
 
     // Make sure the stack slot is also aligned for the register type.
