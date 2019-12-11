@@ -457,6 +457,7 @@ static int regex_helper(const uint8_t *data, size_t size, std::regex::flag_type 
 {
     if (size > 0)
     {
+#ifndef _LIBCPP_NO_EXCEPTIONS
         try
         {
             std::string s((const char *)data, size);
@@ -464,6 +465,11 @@ static int regex_helper(const uint8_t *data, size_t size, std::regex::flag_type 
             return std::regex_match(s, re) ? 1 : 0;
         }
         catch (std::regex_error &ex) {}
+#else
+      ((void)data);
+      ((void)size);
+      ((void)flag);
+#endif
     }
     return 0;
 }
@@ -646,6 +652,8 @@ enum InitKind {
   VectorResultType
 };
 
+
+
 template <class Dist>
 struct ParamTypeHelper {
   using ParamT = typename Dist::param_type;
@@ -653,16 +661,24 @@ struct ParamTypeHelper {
   static_assert(std::is_same<ResultT, typename ParamT::distribution_type::result_type>::value, "");
   static  ParamT Create(const uint8_t* data, size_t size, bool &OK) {
 
-    if constexpr (std::is_constructible<ParamT, ResultT*, ResultT*, ResultT*>::value)
-      return CreateVectorResult(data, size, OK);
-    else if constexpr (std::is_constructible<ParamT, double*, double*>::value)
-      return CreateVectorDouble(data, size, OK);
-    else
-      return CreateDefault(data, size, OK);
+    constexpr bool select_vector_result = std::is_constructible<ParamT, ResultT*, ResultT*, ResultT*>::value;
+    constexpr bool select_vector_double = std::is_constructible<ParamT, double*, double*>::value;
+    constexpr int selector = select_vector_result ? 0 : (select_vector_double ? 1 : 2);
+    return DispatchAndCreate(std::integral_constant<int, selector>{}, data, size, OK);
+
   }
 
+  static ParamT DispatchAndCreate(std::integral_constant<int, 0>, const uint8_t *data, size_t size, bool &OK) {
+    return CreateVectorResult(data, size, OK);
+  }
+  static ParamT DispatchAndCreate(std::integral_constant<int, 1>, const uint8_t *data, size_t size, bool &OK) {
+    return CreateVectorDouble(data, size, OK);
+  }
+  static ParamT DispatchAndCreate(std::integral_constant<int, 2>, const uint8_t *data, size_t size, bool &OK) {
+    return CreateDefault(data, size, OK);
+  }
 
-static    ParamT
+static ParamT
 CreateVectorResult(const uint8_t *data, size_t size, bool &OK) {
   auto Input = GetValues<ResultT>(data, size);
   OK = false;
