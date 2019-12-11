@@ -1106,6 +1106,19 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
       }
       break;
     }
+    case Intrinsic::epi_vmv_x_s: {
+      EVT Ty = N->getValueType(0);
+      MVT::SimpleValueType SimpleVT = Ty.getSimpleVT().SimpleTy;
+      assert(SimpleVT == MVT::i8 || SimpleVT == MVT::i16 ||
+             SimpleVT == MVT::i32);
+
+      SDValue Extract64 =
+          DAG.getNode(RISCVISD::VMV_X_S, DL, MVT::i64, N->getOperand(1));
+      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
+      Results.push_back(Trunc);
+
+      break;
+    }
     case Intrinsic::experimental_vector_stepvector: {
       EVT Ty = N->getValueType(0);
       switch (Ty.getSimpleVT().SimpleTy) {
@@ -1288,6 +1301,17 @@ unsigned RISCVTargetLowering::ComputeNumSignBitsForTargetNode(
     // more precise answer could be calculated for SRAW depending on known
     // bits in the shift amount.
     return 33;
+  case RISCVISD::VMV_X_S:
+    unsigned XLen = DAG.getDataLayout().getLargestLegalIntTypeSizeInBits();
+    // The number of sign bits of the scalar result is computed by obtaining the
+    // element type of the input vector operand, substracting its width from the
+    // XLEN, and then adding one (sign bit within the element type).
+    return XLen -
+           Op->getOperand(0)
+               .getValueType()
+               .getVectorElementType()
+               .getSizeInBits() +
+           1;
   }
 
   return 1;
@@ -2993,6 +3017,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::READ_CYCLE_WIDE";
   case RISCVISD::VBROADCAST:
     return "RISCVISD::VBROADCAST";
+  case RISCVISD::VMV_X_S:
+    return "RISCVISD::VMV_X_S";
   }
   return nullptr;
 }

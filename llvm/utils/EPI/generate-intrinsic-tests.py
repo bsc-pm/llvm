@@ -658,6 +658,122 @@ entry:
 
                     print template.substitute(subs)
 
+class UnaryIntrinsicScalarResultNoVL(Intrinsic):
+    pattern_v = """
+declare ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>);
+
+define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli zero, zero, ${sew},${vlmul}
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0
+  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef)
+
+  %p = bitcast i8* @scratch to ${llvm_result_type}*
+  store ${llvm_result_type} %a, ${llvm_result_type}* %p
+
+  ret void
+}
+"""
+    pattern_v_mask = """
+declare ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli zero, zero, ${sew},${vlmul}
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0, v0.t
+  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef)
+
+  %p = bitcast i8* @scratch to ${llvm_result_type}*
+  store ${llvm_result_type} %a, ${llvm_result_type}* %p
+
+  ret void
+}
+"""
+    def __init__(self, intr_name, type_generator, **extra_info):
+        self.scalar_register = extra_info["scalar_register"]
+        del extra_info["scalar_register"]
+        self.bits_per_mask = extra_info.get("bits_per_mask", False)
+        super(UnaryIntrinsicScalarResultNoVL, self).__init__(intr_name, type_generator, **extra_info)
+
+    def get_template(self, variant):
+        result = ""
+        if variant in ["s"]:
+            result = UnaryIntrinsicScalarResultNoVL.pattern_v
+            if self.mask:
+                result += UnaryIntrinsicScalarResultNoVL.pattern_v_mask
+        else:
+            raise Exception("Unhandled variant '{}'".format(variant))
+        return string.Template(result)
+
+    def render(self):
+        for v in self.variants:
+            template = self.get_template(v)
+
+            op_subs = {}
+            op_subs["intrinsic"] = self.intr_name
+            op_subs["suffix"] = v
+            op_subs["scalar_register"] = self.scalar_register
+            for intrinsic_type in self.type_generator():
+                result = intrinsic_type.result
+                lhs = intrinsic_type.operands[0]
+
+                subs = op_subs.copy()
+                subs["instruction"] = self.instruction
+                subs["value_result_type"] = result.value_type
+                subs["llvm_result_type"] = result.llvm_type
+
+                subs["llvm_lhs_type"] = lhs.llvm_type
+                subs["value_lhs_type"] = lhs.value_type
+
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    if self.bits_per_mask:
+                        # Overwrite SEW here
+                        subs["sew"] = "e" + str(MAX_SEW / vlmul)
+                        subs["vlmul"] = "m1"
+                    else:
+                        subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
+
 class UnaryIntrinsicScalarInput(Intrinsic):
     pattern_v = """
 declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
@@ -1781,6 +1897,8 @@ intrinsics = [
         UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_integer_types, variants = x, instruction = "vmv.v", scalar_register = "a0", mask = False),
         UnaryIntrinsicScalarInput("vbroadcast", type_generator = generate_unary_float_types, variants = f, instruction = "vfmv.v", scalar_register = "ft0", mask = False),
 
+        UnaryIntrinsicScalarResultNoVL("vmv.x.s", type_generator = generate_unary_integer_types, variants = s, instruction = "vmv.x", scalar_register = "a0", mask = False, vlmul_values = [1]),
+
         UnaryIntrinsicScalarInput("vmv.s.x", type_generator = generate_unary_integer_types, variants = x, instruction = "vmv.s", scalar_register = "a0", mask = False, vlmul_values = [1]),
         UnaryIntrinsicScalarInput("vfmv.s.f", type_generator = generate_unary_float_types, variants = f, instruction = "vfmv.s", scalar_register = "ft0", mask = False, vlmul_values = [1]),
 
@@ -1790,7 +1908,7 @@ intrinsics = [
 
         #UnaryIntrinsic("viota", type_generator = generate_unary_mask_to_integer_types, variants = m),
 
-        UnaryIntrinsicScalarResult("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", scalar_register = "ft0", mask = False, vlmul_values = [1]),
+        UnaryIntrinsicScalarResultNoVL("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", scalar_register = "ft0", mask = False, vlmul_values = [1]),
 
         NullaryIntrinsic("vid", type_generator = generate_nullary_integer_types, variants = v),
 

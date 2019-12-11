@@ -585,7 +585,7 @@ def vsetfirst_int : EPIScalarToVecBuiltin<"v", "ve", "csil">;
 let LMUL = [1], HasMask = 0, Name = "vsetfirst", IntrinsicName = "vfmv_s_f" in
 def vsetfirst_float : EPIScalarToVecBuiltin<"v", "ve", "fd">;
 
-let HasMask = 0, HasMask = 0, IntrinsicName = "vfmv_f_s" in
+let HasMask = 0, HasVL = 0, IntrinsicName = "vfmv_f_s" in
 def vgetfirst : EPIVecToScalarBuiltin<"v", "ev", "fd">;
 
 def vslideup : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;

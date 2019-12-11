@@ -16,6 +16,10 @@ def SDTUnaryVectorFromScalar : SDTypeProfile<1, 1, [SDTCisVec<0>]>;
 
 def riscv_vbroadcast : SDNode<"RISCVISD::VBROADCAST", SDTUnaryVectorFromScalar>;
 
+def riscv_vmv_x_s : SDNode<"RISCVISD::VMV_X_S",
+                           SDTypeProfile<1, 1, [SDTCisInt<0>, SDTCisVec<1>,
+                                                SDTCisInt<1>]>>;
+
 //===----------------------------------------------------------------------===//
 
 class VMask<bits<1> vtype>
@@ -866,9 +870,9 @@ defm PseudoVREDMAX     : pseudo_binary_v_vs;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
     Uses = [VL, VTYPE], VLMul = VR.VLMul, MergeOpIndex = -1 in
 {
-  let VLIndex = 2, SEWIndex = 3, BaseInstr = VMV_X_S in
+  let VLIndex = -1, SEWIndex = 2, BaseInstr = VMV_X_S in
     def PseudoVMV_X_S : Pseudo<(outs GPR:$rd),
-                               (ins VR:$rs2, GPR:$vl, ixlenimm:$sew),
+                               (ins VR:$rs2, ixlenimm:$sew),
                                []>,
                         EPIPseudo;
   let VLIndex = 2, SEWIndex = 3, BaseInstr = VMV_S_X in
@@ -919,9 +923,9 @@ defm PseudoVFSGNJX     : pseudo_binary_v_vv_vf;
 let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
     Uses = [VL, VTYPE], VLMul = VR.VLMul, MergeOpIndex = -1 in
 {
-  let VLIndex = 2, SEWIndex = 3, BaseInstr = VFMV_F_S in
+  let VLIndex = -1, SEWIndex = 2, BaseInstr = VFMV_F_S in
     def PseudoVFMV_F_S : Pseudo<(outs FPR32:$rd),
-                                (ins VR:$rs2, GPR:$vl, ixlenimm:$sew),
+                                (ins VR:$rs2, ixlenimm:$sew),
                                 []>,
                          EPIPseudo;
   let VLIndex = 2, SEWIndex = 3, BaseInstr = VFMV_S_F in
@@ -2308,6 +2312,17 @@ defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmin", "PseudoVREDMIN">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmaxu", "PseudoVREDMAXU">;
 defm "" : pat_intrinsic_binary_int_v_vs<"int_epi_vredmax", "PseudoVREDMAX">;
 
+// The 'int.epi.vmv_x_s' intrinsic will have an illegal result type (i8, i16,
+// i32) whenever the operand type is nxv8i8, nxv4i16 or nxv2i32. In such cases,
+// the intrinsic is legalized programatically using the RISCVISD::VMV_X_S custom
+// node, which is then selected using a pattern as usual.
+foreach vti = [Vtype1xi64] in
+  def : Pat<(int_epi_vmv_x_s (vti.Vector vti.RegClass:$rs2)),
+            (PseudoVMV_X_S $rs2, vti.SEW)>;
+foreach vti = [Vtype2xi32, Vtype4xi16, Vtype8xi8] in
+  def : Pat<(riscv_vmv_x_s (vti.Vector vti.RegClass:$rs2)),
+            (PseudoVMV_X_S $rs2, vti.SEW)>;
+
 foreach vti = NoGroupIntegerVectors in
   def : Pat<(vti.Vector (int_epi_vmv_s_x GPR:$rs2, GPR:$vl)),
             (PseudoVMV_S_X $rs2, (NoX0 GPR:$vl), vti.SEW)>;
@@ -2416,8 +2431,7 @@ defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfsgnjx", "PseudoVFSGNJX">;
 
 foreach fvti = NoGroupFloatVectors in
 {
-  def : Pat<(fvti.Scalar (int_epi_vfmv_f_s (fvti.Vector fvti.RegClass:$rs2),
-                          GPR:$vl)),
+  def : Pat<(fvti.Scalar (int_epi_vfmv_f_s (fvti.Vector fvti.RegClass:$rs2))),
              // Floating point instructions with a scalar result will always
              // generate the result in a register of class FPR32. When dealing
              // with the f64 variant of a pattern we need to promote the FPR32
@@ -2426,9 +2440,9 @@ foreach fvti = NoGroupFloatVectors in
              !if(!eq(!cast<string>(fvti.ScalarRegClass),
                      !cast<string>(FPR64)),
                  (SUBREG_TO_REG (i32 -1),
-                  (PseudoVFMV_F_S $rs2, (NoX0 GPR:$vl), fvti.SEW),
+                  (PseudoVFMV_F_S $rs2, fvti.SEW),
                   sub_32),
-                 (PseudoVFMV_F_S $rs2, (NoX0 GPR:$vl), fvti.SEW))>;
+                 (PseudoVFMV_F_S $rs2, fvti.SEW))>;
 
   def : Pat<(fvti.Vector (int_epi_vfmv_s_f
                           (fvti.Scalar fvti.ScalarRegClass:$rs2), GPR:$vl)),

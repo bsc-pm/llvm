@@ -58,6 +58,7 @@ def EPICIDvid : EPIIntrinsicClassID;
 def EPICIDvid_mask : EPIIntrinsicClassID;
 def EPICIDvmiota : EPIIntrinsicClassID;
 def EPICIDvmiota_mask : EPIIntrinsicClassID;
+def EPICIDvmv_x_s : EPIIntrinsicClassID;
 def EPICIDvmv_s_x : EPIIntrinsicClassID;
 
 class EPIIntrinsic<EPIIntrinsicClassID CID> {
@@ -454,15 +455,18 @@ defm vslidedown : epi_binary;
 defm vslide1up : epi_binary;
 defm vslide1down : epi_binary;
 
+def int_epi_vmv_x_s : Intrinsic< [ llvm_anyint_ty ],
+                                 [ llvm_anyvector_ty ],
+                                 [ IntrNoMem ] >, EPIIntrinsic<EPICIDvmv_x_s>;
 def int_epi_vmv_s_x : Intrinsic< [ llvm_anyvector_ty ],
-                      [ llvm_anyint_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDvmv_s_x>
+                                 [ llvm_anyint_ty, llvm_i64_ty ],
+                                 [ IntrNoMem ] >, EPIIntrinsic<EPICIDvmv_s_x>
 {
   let ExtendOperand = 1;
 }
 
 def int_epi_vfmv_f_s : Intrinsic< [ llvm_anyfloat_ty ],
-                                  [ llvm_anyvector_ty, llvm_i64_ty ],
+                                  [ llvm_anyvector_ty ],
                                   [ IntrNoMem ]>, EPIIntrinsic<EPICIDvfmv_f_s>;
 def int_epi_vfmv_s_f : Intrinsic< [ llvm_anyvector_ty ],
                                   [ llvm_anyfloat_ty, llvm_i64_ty ],

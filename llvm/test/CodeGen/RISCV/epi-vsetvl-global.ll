@@ -22,7 +22,7 @@ declare void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float>, <vscale x 2 x float>
 
 declare <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>* nocapture, i64)
 
-declare float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float>, i64)
+declare float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float>)
 
 define <vscale x 1 x double> @test1(i64 %avl, i8 zeroext %cond, <vscale x 1 x double> %a, <vscale x 1 x double> %b) nounwind {
 ; CHECK-LABEL: test1:
@@ -414,6 +414,7 @@ define <vscale x 1 x double> @test8(i64 %avl, float %cond, <vscale x 1 x double>
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17
 ; CHECK-NEXT:    vsetvli a2, a0, e32,m1
 ; CHECK-NEXT:    vle.v v0, (a1)
+; CHECK-NEXT:    vsetvli zero, zero, e32,m1
 ; CHECK-NEXT:    vfmv.f.s ft1, v0
 ; CHECK-NEXT:    j .LBB7_1
 ; CHECK-NEXT:  .LBB7_4: # %do.end
@@ -434,7 +435,7 @@ if.then:                                          ; preds = %do.body
   %3 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 2, i64 0)
   %4 = bitcast i8* @scratch to <vscale x 2 x float>*
   %5 = tail call <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>* %4, i64 %3)
-  %6 = tail call float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float> %5, i64 %3)
+  %6 = tail call float @llvm.epi.vfmv.f.s.f32.nxv2f32(<vscale x 2 x float> %5)
   br label %do.cond
 
 do.cond:                                          ; preds = %do.body, %if.then

@@ -55,6 +55,7 @@ enum NodeType : unsigned {
 
   // EPI nodes
   VBROADCAST,
+  VMV_X_S,
 };
 }
 
