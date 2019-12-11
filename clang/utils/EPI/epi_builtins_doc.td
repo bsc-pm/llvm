@@ -115,8 +115,9 @@ let Undocumented = 1 in
   def : DocEPIBuiltin<vadc>;
   def : DocEPIBuiltin<vasub>;
   def : DocEPIBuiltin<vdot>;
-  def : DocEPIBuiltin<vdotu>;
-  def : DocEPIBuiltin<vfdot>;
+  // FIXME EDIV builtins disabled
+  //def : DocEPIBuiltin<vdotu>;
+  //def : DocEPIBuiltin<vfdot>;
   def : DocEPIBuiltin<vmacc>;
   def : DocEPIBuiltin<vmadc>;
   def : DocEPIBuiltin<vmadd>;

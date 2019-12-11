@@ -600,9 +600,10 @@ def vsplat : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 let HasMask = 0 in
 def vcompress : EPIBinBuiltin<"v", "vvm", "csilfd">;
 
-def vdot : EPIBinBuiltin<"v", "vvv", "csil">;
-def vdotu : EPIBinBuiltin<"v", "vvv", "csil">;
-def vfdot : EPIBinBuiltin<"v", "vvv", "fd">;
+// FIXME EDIV intrinsics disabled
+//def vdot : EPIBinBuiltin<"v", "vvv", "csil">;
+//def vdotu : EPIBinBuiltin<"v", "vvv", "csil">;
+//def vfdot : EPIBinBuiltin<"v", "vvv", "fd">;
 
 let HasMask = 0 in
 def vbroadcast : EPIScalarToVecBuiltin<"v", "ve", "csilfd">;

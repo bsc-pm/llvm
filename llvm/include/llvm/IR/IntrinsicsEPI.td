@@ -437,10 +437,10 @@ defm vmnand : epi_binary_nomask;
 defm vmnor : epi_binary_nomask;
 defm vmxnor : epi_binary_nomask;
 
-defm vdotu : epi_binary;
-defm vdot : epi_binary;
-
-defm vfdot : epi_binary;
+// FIXME EDIV intrinsics disabled
+//defm vdotu : epi_binary;
+//defm vdot : epi_binary;
+//defm vfdot : epi_binary;
 
 defm vcompress : epi_binary;
 

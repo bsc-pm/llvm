@@ -1822,11 +1822,6 @@ intrinsics = [
         BinaryIntrinsic("vmnor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
         BinaryIntrinsic("vmxnor", type_generator = generate_binary_mask_types, variants = mm, generates_mask = True, mask = False),
 
-        BinaryIntrinsic("vdotu", type_generator = generate_binary_integer_types, variants = vv),
-        BinaryIntrinsic("vdot", type_generator = generate_binary_integer_types, variants = vv),
-
-        BinaryIntrinsic("vfdot", type_generator = generate_binary_float_types, variants = vv),
-
         #BinaryIntrinsic("vcompress", type_generator = generate_binary_any_and_mask_types, variants = vm, mask = False),
 
         BinaryIntrinsic("vrgather", type_generator = generate_binary_any_and_integer_types, variants = vv_vx_vi),
