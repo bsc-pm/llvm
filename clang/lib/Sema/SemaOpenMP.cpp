@@ -4741,6 +4741,8 @@ StmtResult Sema::ActOnOpenMPExecutableDirective(
   case OMPD_teams_distribute_simd:
     Res = ActOnOpenMPTeamsDistributeSimdDirective(
         ClausesWithImplicit, AStmt, StartLoc, EndLoc, VarsWithInheritedDSA);
+    if (LangOpts.OpenMP >= 50)
+      AllowedNameModifiers.push_back(OMPD_simd);
     break;
   case OMPD_teams_distribute_parallel_for_simd:
     Res = ActOnOpenMPTeamsDistributeParallelForSimdDirective(
@@ -10703,8 +10705,10 @@ static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
     switch (DKind) {
     case OMPD_target_parallel_for_simd:
       if (OpenMPVersion >= 50 &&
-          (NameModifier == OMPD_unknown || NameModifier == OMPD_simd))
+          (NameModifier == OMPD_unknown || NameModifier == OMPD_simd)) {
         CaptureRegion = OMPD_parallel;
+        break;
+      }
       LLVM_FALLTHROUGH;
     case OMPD_target_parallel:
     case OMPD_target_parallel_for:
@@ -10768,6 +10772,11 @@ static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
           (NameModifier == OMPD_unknown || NameModifier == OMPD_simd))
         CaptureRegion = OMPD_target;
       break;
+    case OMPD_teams_distribute_simd:
+      if (OpenMPVersion >= 50 &&
+          (NameModifier == OMPD_unknown || NameModifier == OMPD_simd))
+        CaptureRegion = OMPD_teams;
+      break;
     case OMPD_cancel:
     case OMPD_parallel:
     case OMPD_parallel_master:
@@ -10812,7 +10821,6 @@ static OpenMPDirectiveKind getOpenMPCaptureRegionForClause(
     case OMPD_ordered:
     case OMPD_atomic:
     case OMPD_teams_distribute:
-    case OMPD_teams_distribute_simd:
     case OMPD_requires:
       llvm_unreachable("Unexpected OpenMP directive with if-clause");
     case OMPD_unknown:
