@@ -754,6 +754,7 @@ def single_test_clang(clang, tmp_file, extra_flags = []):
     DEVNULL = open(os.devnull, 'wb')
     try:
         subprocess.check_call([clang,
+            "--target=riscv64-unknown-linux-gnu",
             "-fno-crash-diagnostics",
             "-mepi",
             "-S",
