@@ -501,7 +501,6 @@ def vmflt : EPIRelBuiltin<"v", "mvv", "fd">;
 def vmfle : EPIRelBuiltin<"v", "mvv", "fd">;
 def vmfgt : EPIRelBuiltin<"v", "mvv", "fd">;
 def vmfge : EPIRelBuiltin<"v", "mvv", "fd">;
-def vmford : EPIRelBuiltin<"v", "mvv", "fd">;
 
 let HasMask = 0 in
 def vfmerge : EPIBinMaskInBuiltin<"v", "vvvm", "fd">;

@@ -2369,38 +2369,6 @@ comparison holds for that element.}];
   }];
 }
 
-def : DocEPIBuiltin<vmford>
-{
-  let Category = DocEPIFloatingPointRelational;
-  let Title = "Compute elementwise if floating-point vectors are ordered floating-point values";
-  let Description = [{Use these builtins to check if the elements of the first floating-point vector
-are ordered with respect to the corresponding element of the second floating-point. Two floating-point
-values are ordered if neither is NaN.
-
-The result is a mask that enables the element if the the floating-point
-comparison holds for that element.}];
-  let Instruction = "vmfne.vv";
-
-  let Operation = [{
-    for element = 0 to gvl - 1
-       result[element] = logical_not(logical_or(is_nan(a[element]),
-                                                is_nan(b[element])))
-
-    result[gvl : VLMAX] = 0
-  }];
-
-  let OperationMask = [{
-    for element = 0 to gvl - 1
-       if mask[element] then
-         result[element] = logical_not(logical_or(is_nan(a[element]),
-                                                  is_nan(b[element])))
-       else
-         result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
-  }];
-}
-
 def : DocEPIBuiltin<vmin>
 {
   let Category = DocEPIIntegerArithmetic;

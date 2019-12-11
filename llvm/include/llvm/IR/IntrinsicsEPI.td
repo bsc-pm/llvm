@@ -405,7 +405,6 @@ defm vmflt : epi_relational;
 defm vmfle : epi_relational;
 defm vmfgt : epi_relational;
 defm vmfge : epi_relational;
-defm vmford : epi_relational;
 
 defm vfmerge : epi_binary_mask_in;
 

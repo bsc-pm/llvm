@@ -1790,7 +1790,6 @@ intrinsics = [
         BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
         BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmfle", generates_mask = True),
         BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
-        BinaryIntrinsic("vmford", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
 
         BinaryIntrinsicMaskIn("vfmerge", type_generator = generate_binary_float_types, variants = vfm),
 
