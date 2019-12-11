@@ -1633,94 +1633,6 @@ entry:
 
                     print template.substitute(subs)
 
-# Very similar to UnaryIntrinsicScalarResult, but here the second operand is an
-# index (as opposed to the GVL)
-class VExt(Intrinsic):
-    pattern_v = """
-declare ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
-  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
-  i64);
-
-define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
-; CHECK:       vsetvli {{.*}}, {{.*}}, ${sew}, ${vlmul}
-; CHECK:       ${instruction}.${suffix} a0, v0
-  %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
-    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to ${llvm_result_type}*
-  store ${llvm_result_type} %a, ${llvm_result_type}* %p
-
-  ret void
-}
-"""
-    def __init__(self, intr_name, type_generator, **extra_info):
-        super(VExt, self).__init__(intr_name, type_generator, **extra_info)
-
-    def get_template(self, variant):
-        result = ""
-        if variant in ["v"] and not self.mask:
-            result = VExt.pattern_v
-        else:
-            raise Exception("Unhandled variant '{}'".format(variant))
-        return string.Template(result)
-
-    def render(self):
-        for v in self.variants:
-            template = self.get_template(v)
-
-            op_subs = {}
-            op_subs["intrinsic"] = self.intr_name
-            op_subs["suffix"] = v
-            for intrinsic_type in self.type_generator():
-                result = intrinsic_type.result
-                lhs = intrinsic_type.operands[0]
-
-                subs = op_subs.copy()
-                subs["instruction"] = self.instruction
-                subs["value_result_type"] = result.value_type
-                subs["llvm_result_type"] = result.llvm_type
-
-                subs["llvm_lhs_type"] = lhs.llvm_type
-                subs["value_lhs_type"] = lhs.value_type
-
-                sew = MAX_SEW
-                if not result.is_mask_type:
-                    sew = min(sew, result.sew)
-                if not lhs.is_mask_type:
-                    sew = min(sew, lhs.sew)
-                subs["sew"] = "e" + str(sew)
-
-                for vlmul in self.vlmul_values:
-                    # vlmul here is 'base' vlmul, vlmul for SEW operand
-                    # (as opposed to 2*SEW operand)
-                    subs["vlmul"] = "m" + str(vlmul)
-
-                    # Ensure all operands have the same scale (ie. number of elements)
-                    result_scale = result.get_base_scale()
-                    lhs_scale = lhs.get_base_scale()
-                    max_scale = max(result_scale, lhs_scale)
-
-                    # Check legal VLMUL for non-mask types
-                    if (not result.is_mask_type) and (result_scale != max_scale):
-                        result_vlmul = vlmul*(max_scale/result_scale)
-                        assert(result_vlmul <= MAX_VLMUL)
-
-                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
-                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
-                        assert(lhs_vlmul <= MAX_VLMUL)
-
-                    # FIXME: nxv64T types not defined (ie. nxv64i8)
-                    if max_scale*vlmul >= 64:
-                        continue
-
-                    subs["result_type_scale"] = max_scale*vlmul
-                    subs["lhs_type_scale"] = max_scale*vlmul
-
-                    print template.substitute(subs)
-
 ################################################################################
 ################################################################################
 ################################################################################
@@ -1768,8 +1680,6 @@ intrinsics = [
         #UnaryIntrinsicMask("vmsif", type_generator = generate_unary_mask_types, variants = m),
 
         #UnaryIntrinsic("viota", type_generator = generate_unary_mask_to_integer_types, variants = m),
-
-        VExt("vext.x.v", type_generator = generate_unary_integer_types, variants = v, instruction = "vext.x", mask = False, vlmul_values = [1]),
 
         UnaryIntrinsicScalarResult("vfmv.f.s", type_generator = generate_unary_float_types, variants = s, instruction = "vfmv.f", scalar_register = "ft0", mask = False, vlmul_values = [1]),
 

@@ -2362,46 +2362,6 @@ __epi_4xi64 test_vdotu_4xi64_mask(__epi_4xi64 arg_0, __epi_4xi64 arg_1, __epi_4x
     return __builtin_epi_vdotu_4xi64_mask(arg_0, arg_1, arg_2, arg_3, arg_4);
 }
 
-// CHECK-O2-LABEL: @test_vextract_8xi8(
-// CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i8 @llvm.epi.vext.x.v.i8.nxv8i8(<vscale x 8 x i8> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
-// CHECK-O2-NEXT:    ret i8 [[TMP0]]
-//
-signed char test_vextract_8xi8(__epi_8xi8 arg_0, unsigned long int arg_1)
-{
-    return __builtin_epi_vextract_8xi8(arg_0, arg_1);
-}
-
-// CHECK-O2-LABEL: @test_vextract_4xi16(
-// CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i16 @llvm.epi.vext.x.v.i16.nxv4i16(<vscale x 4 x i16> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
-// CHECK-O2-NEXT:    ret i16 [[TMP0]]
-//
-signed short int test_vextract_4xi16(__epi_4xi16 arg_0, unsigned long int arg_1)
-{
-    return __builtin_epi_vextract_4xi16(arg_0, arg_1);
-}
-
-// CHECK-O2-LABEL: @test_vextract_2xi32(
-// CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i32 @llvm.epi.vext.x.v.i32.nxv2i32(<vscale x 2 x i32> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
-// CHECK-O2-NEXT:    ret i32 [[TMP0]]
-//
-signed int test_vextract_2xi32(__epi_2xi32 arg_0, unsigned long int arg_1)
-{
-    return __builtin_epi_vextract_2xi32(arg_0, arg_1);
-}
-
-// CHECK-O2-LABEL: @test_vextract_1xi64(
-// CHECK-O2-NEXT:  entry:
-// CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call i64 @llvm.epi.vext.x.v.i64.nxv1i64(<vscale x 1 x i64> [[ARG_0:%.*]], i64 [[ARG_1:%.*]])
-// CHECK-O2-NEXT:    ret i64 [[TMP0]]
-//
-signed long int test_vextract_1xi64(__epi_1xi64 arg_0, unsigned long int arg_1)
-{
-    return __builtin_epi_vextract_1xi64(arg_0, arg_1);
-}
-
 // CHECK-O2-LABEL: @test_vfadd_2xf32(
 // CHECK-O2-NEXT:  entry:
 // CHECK-O2-NEXT:    [[TMP0:%.*]] = tail call <vscale x 2 x float> @llvm.epi.vfadd.nxv2f32.nxv2f32(<vscale x 2 x float> [[ARG_0:%.*]], <vscale x 2 x float> [[ARG_1:%.*]], i64 [[ARG_2:%.*]])

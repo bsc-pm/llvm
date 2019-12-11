@@ -1106,30 +1106,6 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
       }
       break;
     }
-    case Intrinsic::epi_vext_x_v: {
-      EVT Ty = N->getValueType(0);
-      int ElementWidth;
-      switch (Ty.getSimpleVT().SimpleTy) {
-      default:
-        llvm_unreachable("Unexpected result type to legalize");
-      case MVT::i8:
-        ElementWidth = 8;
-        break;
-      case MVT::i16:
-        ElementWidth = 16;
-        break;
-      case MVT::i32:
-        ElementWidth = 32;
-      }
-      SDValue SEW = DAG.getTargetConstant(ElementWidth, DL, MVT::i64);
-      SDValue Extract64 =
-          SDValue(DAG.getMachineNode(RISCV::PseudoVEXT_X_V, DL, MVT::i64,
-                                     N->getOperand(1), N->getOperand(2), SEW),
-                  0);
-      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
-      Results.push_back(Trunc);
-      break;
-    }
     case Intrinsic::experimental_vector_stepvector: {
       EVT Ty = N->getValueType(0);
       switch (Ty.getSimpleVT().SimpleTy) {

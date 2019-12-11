@@ -353,24 +353,6 @@ of two integer vectors.}];
   }];
 }
 
-def : DocEPIBuiltin<vextract>
-{
-  let Category = DocEPILaneManipulation;
-  let Title = "Extract integer element";
-  let Description = [{Use these builtins to extract a single element from an
-integer vector.}];
-  let Instruction = "vext.x.v";
-
-  let ParameterNames = ["a", "idx"];
-
-  let Operation = [{
-    if idx < VLMAX then
-      result = a[idx]
-    else
-      result = 0
-  }];
-}
-
 def : DocEPIBuiltin<vfadd>
 {
   let Category = DocEPIFloatingPointArithmetic;

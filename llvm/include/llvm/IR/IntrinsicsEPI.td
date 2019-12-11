@@ -52,7 +52,6 @@ def EPICIDReduction : EPIIntrinsicClassID;
 def EPICIDReductionMask : EPIIntrinsicClassID;
 def EPICIDReductionWide : EPIIntrinsicClassID;
 def EPICIDReductionWideMask : EPIIntrinsicClassID;
-def EPICIDvext_x_v : EPIIntrinsicClassID;
 def EPICIDvfmv_f_s : EPIIntrinsicClassID;
 def EPICIDvfmv_s_f : EPIIntrinsicClassID;
 def EPICIDvid : EPIIntrinsicClassID;
@@ -455,10 +454,6 @@ defm vslideup : epi_binary;
 defm vslidedown : epi_binary;
 defm vslide1up : epi_binary;
 defm vslide1down : epi_binary;
-
-def int_epi_vext_x_v : Intrinsic< [ llvm_anyint_ty ],
-                      [ llvm_anyvector_ty, llvm_i64_ty ],
-                      [ IntrNoMem ] >, EPIIntrinsic<EPICIDvext_x_v>;
 
 def int_epi_vmv_s_x : Intrinsic< [ llvm_anyvector_ty ],
                       [ llvm_anyint_ty, llvm_i64_ty ],

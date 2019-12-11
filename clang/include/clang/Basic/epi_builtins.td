@@ -580,9 +580,6 @@ def viota : EPIMaskToIntBuiltin<"v", "vm", "csil">;
 
 def vid : EPINulBuiltin<"v", "v", "csil">;
 
-let LMUL = [1], HasVL = 0, HasMask = 0, IntrinsicName = "vext_x_v" in
-def vextract : EPIVecToScalarBuiltin<"v", "evu", "csil">;
-
 let LMUL = [1], HasMask = 0, Name = "vsetfirst", IntrinsicName = "vmv_s_x" in
 def vsetfirst_int : EPIScalarToVecBuiltin<"v", "ve", "csil">;
 
