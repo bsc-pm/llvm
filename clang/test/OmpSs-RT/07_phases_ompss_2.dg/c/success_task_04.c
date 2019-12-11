@@ -1,3 +1,4 @@
+// RUN: %oss-compile
 /*
 <testinfo>
 test_generator=config/mercurium-ompss-2
@@ -12,3 +13,5 @@ void bar(int* x)
 
     #pragma oss taskwait
 }
+
+int main() {}
