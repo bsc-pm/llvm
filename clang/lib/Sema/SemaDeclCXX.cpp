@@ -7337,7 +7337,7 @@ private:
 
     OverloadCandidateSet::iterator Best;
     switch (CandidateSet.BestViableFunction(S, FD->getLocation(), Best)) {
-    case OR_Success:
+    case OR_Success: {
       // C++2a [class.compare.secondary]p2 [P2002R0]:
       //   The operator function [...] is defined as deleted if [...] the
       //   candidate selected by overload resolution is not a rewritten
@@ -7351,6 +7351,28 @@ private:
               << FD;
         }
         return Result::deleted();
+      }
+
+      // Throughout C++2a [class.compare]: if overload resolution does not
+      // result in a usable function, the candidate function is defined as
+      // deleted. This requires that we selected an accessible function.
+      //
+      // Note that this only considers the access of the function when named
+      // within the type of the subobject, and not the access path for any
+      // derived-to-base conversion.
+      CXXRecordDecl *ArgClass = Args[0]->getType()->getAsCXXRecordDecl();
+      if (ArgClass && Best->FoundDecl.getDecl() &&
+          Best->FoundDecl.getDecl()->isCXXClassMember()) {
+        QualType ObjectType = Subobj.Kind == Subobject::Member
+                                  ? Args[0]->getType()
+                                  : S.Context.getRecordType(RD);
+        if (!S.isMemberAccessibleForDeletion(
+                ArgClass, Best->FoundDecl, ObjectType, Subobj.Loc,
+                Diagnose == ExplainDeleted
+                    ? S.PDiag(diag::note_defaulted_comparison_inaccessible)
+                          << FD << Subobj.Kind << Subobj.Decl
+                    : S.PDiag()))
+          return Result::deleted();
       }
 
       // C++2a [class.compare.default]p3 [P2002R0]:
@@ -7399,6 +7421,7 @@ private:
       // Note that we might be rewriting to a different operator. That call is
       // not considered until we come to actually build the comparison function.
       break;
+    }
 
     case OR_Ambiguous:
       if (Diagnose == ExplainDeleted) {
@@ -7898,21 +7921,40 @@ bool Sema::CheckExplicitlyDefaultedComparison(Scope *S, FunctionDecl *FD,
   //   non-template function declared in the member-specification of C that is
   //    -- a non-static const member of C having one parameter of type
   //       const C&, or
-  //    -- a friend of C having two parameters of type const C&.
-  QualType ExpectedParmType =
-      Context.getLValueReferenceType(Context.getRecordType(RD).withConst());
+  //    -- a friend of C having two parameters of type const C& or two
+  //       parameters of type C.
+  QualType ExpectedParmType1 = Context.getRecordType(RD);
+  QualType ExpectedParmType2 =
+      Context.getLValueReferenceType(ExpectedParmType1.withConst());
+  if (isa<CXXMethodDecl>(FD))
+    ExpectedParmType1 = ExpectedParmType2;
   for (const ParmVarDecl *Param : FD->parameters()) {
     if (!Param->getType()->isDependentType() &&
-        !Context.hasSameType(Param->getType(), ExpectedParmType)) {
+        !Context.hasSameType(Param->getType(), ExpectedParmType1) &&
+        !Context.hasSameType(Param->getType(), ExpectedParmType2)) {
       // Don't diagnose an implicit 'operator=='; we will have diagnosed the
       // corresponding defaulted 'operator<=>' already.
       if (!FD->isImplicit()) {
         Diag(FD->getLocation(), diag::err_defaulted_comparison_param)
-            << (int)DCK << Param->getType() << ExpectedParmType
-            << Param->getSourceRange();
+            << (int)DCK << Param->getType() << ExpectedParmType1
+            << !isa<CXXMethodDecl>(FD)
+            << ExpectedParmType2 << Param->getSourceRange();
       }
       return true;
     }
+  }
+  if (FD->getNumParams() == 2 &&
+      !Context.hasSameType(FD->getParamDecl(0)->getType(),
+                           FD->getParamDecl(1)->getType())) {
+    if (!FD->isImplicit()) {
+      Diag(FD->getLocation(), diag::err_defaulted_comparison_param_mismatch)
+          << (int)DCK
+          << FD->getParamDecl(0)->getType()
+          << FD->getParamDecl(0)->getSourceRange()
+          << FD->getParamDecl(1)->getType()
+          << FD->getParamDecl(1)->getSourceRange();
+    }
+    return true;
   }
 
   // ... non-static const member ...
@@ -8303,7 +8345,8 @@ bool SpecialMemberDeletionInfo::isAccessible(Subobject Subobj,
     objectTy = S.Context.getTypeDeclType(target->getParent());
   }
 
-  return S.isSpecialMemberAccessibleForDeletion(target, access, objectTy);
+  return S.isMemberAccessibleForDeletion(
+      target->getParent(), DeclAccessPair::make(target, access), objectTy);
 }
 
 /// Check whether we should delete a special member due to the implicit

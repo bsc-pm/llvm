@@ -8194,7 +8194,10 @@ def err_defaulted_comparison_out_of_class : Error<
   "definition">;
 def err_defaulted_comparison_param : Error<
   "invalid parameter type for defaulted %sub{select_defaulted_comparison_kind}0"
-  "%diff{; found $, expected $|}1,2">;
+  "; found %1, expected %2%select{| or %4}3">;
+def err_defaulted_comparison_param_mismatch : Error<
+  "parameters for defaulted %sub{select_defaulted_comparison_kind}0 "
+  "must have the same type%diff{ (found $ vs $)|}1,2">;
 def err_defaulted_comparison_non_const : Error<
   "defaulted member %sub{select_defaulted_comparison_kind}0 must be "
   "const-qualified">;
@@ -8220,6 +8223,10 @@ def note_defaulted_comparison_reference_member : Note<
 def note_defaulted_comparison_ambiguous : Note<
   "defaulted %0 is implicitly deleted because implied %select{|'==' |'<' }1"
   "comparison %select{|for member %3 |for base class %3 }2is ambiguous">;
+def note_defaulted_comparison_inaccessible : Note<
+  "defaulted %0 is implicitly deleted because it would invoke a "
+  "%select{private|protected}3 %4%select{ member of %6|"
+  " member of %6 to compare member %2| to compare base class %2}1">;
 def note_defaulted_comparison_calls_deleted : Note<
   "defaulted %0 is implicitly deleted because it would invoke a deleted "
   "comparison function%select{| for member %2| for base class %2}1">;
