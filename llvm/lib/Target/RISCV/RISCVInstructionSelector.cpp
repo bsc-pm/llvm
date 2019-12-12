@@ -16,6 +16,7 @@
 #include "RISCVTargetMachine.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelectorImpl.h"
+#include "llvm/IR/IntrinsicsEPI.h"
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "riscv-isel"

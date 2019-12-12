@@ -42,16 +42,15 @@ public:
         TLI(ST->getTargetLowering()) {}
 
   int getIntImmCost(const APInt &Imm, Type *Ty);
-  int getIntImmCost(unsigned Opcode, unsigned Idx, const APInt &Imm, Type *Ty);
-  int getIntImmCost(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
-                    Type *Ty);
+  int getIntImmCostInst(unsigned Opcode, unsigned Idx, const APInt &Imm, Type *Ty);
+  int getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx, const APInt &Imm,
+                          Type *Ty);
   unsigned getNumberOfRegisters(unsigned ClassID) const;
   unsigned getMaxElementWidth() const;
   bool useScalableVectorType() const;
   bool useReductionIntrinsic(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
   bool shouldExpandReduction(const IntrinsicInst *II) const { return false; }
-
 };
 
 } // end namespace llvm
