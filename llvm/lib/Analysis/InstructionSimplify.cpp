@@ -4146,7 +4146,8 @@ static Value *SimplifyGEPInst(Type *SrcTy, ArrayRef<Value *> Ops,
              [](Value *Idx) { return match(Idx, m_Zero()); })) {
     unsigned IdxWidth =
         Q.DL.getIndexSizeInBits(Ops[0]->getType()->getPointerAddressSpace());
-    if (Q.DL.getTypeSizeInBits(Ops.back()->getType()) == IdxWidth) {
+    if (Q.DL.getTypeSizeInBits(
+          Ops.back()->getType()).getKnownMinSize() == IdxWidth) {
       APInt BasePtrOffset(IdxWidth, 0);
       Value *StrippedBasePtr =
           Ops[0]->stripAndAccumulateInBoundsConstantOffsets(Q.DL,

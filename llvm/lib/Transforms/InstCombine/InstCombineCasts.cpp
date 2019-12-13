@@ -2123,7 +2123,7 @@ static Instruction *canonicalizeBitCastExtElt(BitCastInst &BitCast,
   if (!VectorType::isValidElementType(DestType))
     return nullptr;
 
-  unsigned NumElts = ExtElt->getVectorOperandType()->getNumElements();
+  ElementCount NumElts = ExtElt->getVectorOperandType()->getElementCount();
   auto *NewVecType = VectorType::get(DestType, NumElts);
   auto *NewBC = IC.Builder.CreateBitCast(ExtElt->getVectorOperand(),
                                          NewVecType, "bc");

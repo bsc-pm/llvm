@@ -6684,7 +6684,8 @@ TargetLowering::expandUnalignedLoad(LoadSDNode *LD, SelectionDAG &DAG) const {
   auto &MF = DAG.getMachineFunction();
 
   if (VT.isFloatingPoint() || VT.isVector()) {
-    EVT intVT = EVT::getIntegerVT(*DAG.getContext(), LoadedVT.getSizeInBits());
+    EVT intVT = EVT::getIntegerVT(*DAG.getContext(),
+                                  LoadedVT.getSizeInBits().getKnownMinSize());
     if (isTypeLegal(intVT) && isTypeLegal(LoadedVT)) {
       if (!isOperationLegalOrCustom(ISD::LOAD, intVT) &&
           LoadedVT.isVector()) {
