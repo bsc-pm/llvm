@@ -3792,11 +3792,26 @@ void InnerLoopVectorizer::fixFirstOrderRecurrence(PHINode *Phi) {
   for (unsigned Part = 0; Part < UF; ++Part) {
     Value *PreviousPart = getOrCreateVectorValue(Previous, Part);
     Value *PhiPart = VectorLoopValueMap.getVectorValue(Phi, Part);
-    auto *Shuffle =
-        (VF > 1 || isScalable())
-            ? Builder.CreateShuffleVector(Incoming, PreviousPart,
-                                          ConstantVector::get(ShuffleMask))
-            : Incoming;
+    Value *Shuffle;
+    if (isScalable()) {
+      Type *Int32Ty = Type::getInt32Ty(Phi->getContext());
+      Module *M = OrigLoop->getHeader()->getModule();
+      CallInst *Vscale = emitVscaleCall(Builder, M, Int32Ty);
+      Value *Vlen = Builder.CreateMul(Vscale, ConstantInt::get(Int32Ty, VF));
+      Value *Shift = Builder.CreateSub(Vlen, ConstantInt::get(Int32Ty, 1));
+      Function *SlideLeftFill = Intrinsic::getDeclaration(
+          M, Intrinsic::experimental_vector_slideleftfill,
+          {VecPhi->getType(), Int32Ty});
+      Shuffle =
+          Builder.CreateCall(SlideLeftFill, {Incoming, PreviousPart, Shift});
+    } else {
+      Shuffle =
+          (VF > 1 || isScalable())
+              ? Builder.CreateShuffleVector(Incoming, PreviousPart,
+                                            ConstantVector::get(ShuffleMask))
+              : Incoming;
+    }
+
     PhiPart->replaceAllUsesWith(Shuffle);
     cast<Instruction>(PhiPart)->eraseFromParent();
     VectorLoopValueMap.resetVectorValue(Phi, Part, Shuffle);
