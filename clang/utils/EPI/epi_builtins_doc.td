@@ -1748,7 +1748,23 @@ elements.}];
   }];
 }
 
-def : DocEPIBuiltin<vgetfirst>
+def : DocEPIBuiltin<vmv_x_s>
+{
+  let Category = DocEPILaneManipulation;
+  let Title = "Extract first element of an integer vector";
+  let Description = [{Use these builtins to extract the first element of a vector.
+
+This is useful when the result of some operation, like a reduction, is found
+in the first element of a vector.}];
+
+  let Instruction = "vmv.x.s";
+
+  let Operation = [{
+    result = a[0];
+  }];
+}
+
+def : DocEPIBuiltin<vfmv_f_s>
 {
   let Category = DocEPILaneManipulation;
   let Title = "Extract first element of a floating-point vector";
@@ -1760,8 +1776,7 @@ in the first element of a vector.}];
   let Instruction = "vfmv.f.s";
 
   let Operation = [{
-    if gvl > 0 then
-       result = a[0];
+    result = a[0];
   }];
 }
 
@@ -3463,7 +3478,7 @@ elements have the value of an element of another vector}];
   }];
 }
 
-def : DocEPIBuiltin<vsetfirst_int>
+def : DocEPIBuiltin<vmv_s_x>
 {
   let Category = DocEPILaneManipulation;
   let Title = "Set first integer element of integer vector";
@@ -3478,7 +3493,7 @@ to a given value.}];
   }];
 }
 
-def : DocEPIBuiltin<vsetfirst_float>
+def : DocEPIBuiltin<vfmv_s_f>
 {
   let Category = DocEPILaneManipulation;
   let Title = "Set first floating-point element of floating-point vector";

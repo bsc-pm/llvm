@@ -579,14 +579,17 @@ def viota : EPIMaskToIntBuiltin<"v", "vm", "csil">;
 
 def vid : EPINulBuiltin<"v", "v", "csil">;
 
-let LMUL = [1], HasMask = 0, Name = "vsetfirst", IntrinsicName = "vmv_s_x" in
-def vsetfirst_int : EPIScalarToVecBuiltin<"v", "ve", "csil">;
+let LMUL = [1], HasMask = 0 in
+def vmv_s_x : EPIScalarToVecBuiltin<"v", "ve", "csil">;
 
-let LMUL = [1], HasMask = 0, Name = "vsetfirst", IntrinsicName = "vfmv_s_f" in
-def vsetfirst_float : EPIScalarToVecBuiltin<"v", "ve", "fd">;
+let LMUL = [1], HasMask = 0 in
+def vfmv_s_f : EPIScalarToVecBuiltin<"v", "ve", "fd">;
 
-let HasMask = 0, HasVL = 0, IntrinsicName = "vfmv_f_s" in
-def vgetfirst : EPIVecToScalarBuiltin<"v", "ev", "fd">;
+let LMUL = [1], HasMask = 0, HasVL = 0 in
+def vmv_x_s : EPIVecToScalarBuiltin<"v", "ev", "csil">;
+
+let LMUL = [1], HasMask = 0, HasVL = 0 in
+def vfmv_f_s : EPIVecToScalarBuiltin<"v", "ev", "fd">;
 
 def vslideup : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
 def vslidedown : EPIVecScalarBuiltin<"v", "vvu", "csilfd">;
