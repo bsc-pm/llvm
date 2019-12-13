@@ -23,6 +23,11 @@ def riscv_vmv_x_s : SDNode<"RISCVISD::VMV_X_S",
                            SDTypeProfile<1, 1, [SDTCisInt<0>, SDTCisVec<1>,
                                                 SDTCisInt<1>]>>;
 
+def riscv_extract_vector_elt : SDNode<"RISCVISD::EXTRACT_VECTOR_ELT",
+                                      SDTypeProfile<1, 2,
+                                       [SDTCisInt<0>, SDTCisVec<1>,
+                                       SDTCisInt<1>, SDTCisPtrTy<2>]>>;
+
 //===----------------------------------------------------------------------===//
 
 class VMask<bits<1> vtype>
@@ -2860,37 +2865,51 @@ foreach vti = AllIntegerVectors in
              VLMax, vti.SEW)>;
 }
 
-// FIXME Replace VEXT patterns with VMV.X.S
-//def : Pat<(extractelt (nxv1i64 EPIVR:$rs2), GPR:$rs1),
-//          (PseudoVEXT_X_V (nxv1i64 EPIVR:$rs2), GPR:$rs1, 64)>;
+// FIXME We should use extractelt here, since vector_extract is deprecated.
+// However, it is illegal in extractelt to have a return type that is different
+// to the vector element type, which is what we need here. Insted, when using
+// a return type equal to the vector element type, the pattern disappears.
+foreach vti = NoGroupIntegerVectors in {
+  def : Pat<(i64 (!cast<SDNode>(!if(!eq(!cast<string>(vti),
+                                     !cast<string>(Vtype1xi64)),
+                                 vector_extract, riscv_extract_vector_elt))
+                   (vti.Vector vti.RegClass:$rs2),
+                   GPR:$rs1)),
+            (PseudoVMV_X_S
+             (PseudoVSLIDEDOWN_VX_M1
+              (vti.Vector zero_reg),
+              (vti.Vector vti.RegClass:$rs2),
+              GPR:$rs1,
+              (vti.Mask zero_reg),
+              VLMax,
+              vti.SEW),
+             vti.SEW)>;
+}
 
-//def : Pat<(extractelt (nxv2i64 EPIVR2:$rs2), GPR:$rs1),
-//          (PseudoVEXT_X_V
-//            (EXTRACT_SUBREG
-//              (PseudoVSLIDEDOWN_VX_M2 (nxv2i64 EPIVR2:$rs2), GPR:$rs1, X0, 64),
-//              epivreven),
-//            X0, 64)>;
-
-//def : Pat<(extractelt (nxv4i64 EPIVR4:$rs2), GPR:$rs1),
-//          (PseudoVEXT_X_V
-//            (EXTRACT_SUBREG
-//              (PseudoVSLIDEDOWN_VX_M4 (nxv4i64 EPIVR4:$rs2), GPR:$rs1, X0, 64),
-//              epivreven),
-//            X0, 64)>;
-
-//def : Pat<(extractelt (nxv8i64 EPIVR8:$rs2), GPR:$rs1),
-//          (PseudoVEXT_X_V
-//            (EXTRACT_SUBREG
-//              (PseudoVSLIDEDOWN_VX_M8 (nxv8i64 EPIVR8:$rs2), GPR:$rs1, X0, 64),
-//              epivreven),
-//            X0, 64)>;
-
-// def : Pat<(sext_inreg (extractelt (nxv2i32 EPIVR:$rs2), GPR:$rs1), i32),
-//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
-// def : Pat<(sext_inreg (extractelt (nxv4i16 EPIVR:$rs2), GPR:$rs1), i16),
-//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
-// def : Pat<(sext_inreg (extractelt (nxv8i16 EPIVR:$rs2), GPR:$rs1), i8),
-//           (PseudoVEXT_X_V $rs2, $rs1, 64)>;
+// FIXME We should use extractelt here too, see comment above.
+foreach vti = GroupIntegerVectors in {
+  def : Pat<(i64 (!cast<SDNode>(!cond(
+                   !eq(!cast<string>(vti), !cast<string>(Vtype2xi64))
+                    : vector_extract,
+                   !eq(!cast<string>(vti), !cast<string>(Vtype4xi64))
+                    : vector_extract,
+                   !eq(!cast<string>(vti), !cast<string>(Vtype8xi64))
+                    : vector_extract,
+                   1 : riscv_extract_vector_elt))
+                   (vti.Vector vti.RegClass:$rs2),
+                   GPR:$rs1)),
+            (PseudoVMV_X_S
+             (EXTRACT_SUBREG
+              (!cast<Instruction>("PseudoVSLIDEDOWN_VX_M"#vti.RegClass.VLMul)
+               (vti.Vector zero_reg),
+               (vti.Vector vti.RegClass:$rs2),
+               GPR:$rs1,
+               (vti.Mask zero_reg),
+               VLMax,
+               vti.SEW),
+              vreven),
+             vti.SEW)>;
+}
 
 // FIXME: This should be done in a better way.
 // FIXME This pattern is wrong

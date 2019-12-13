@@ -302,6 +302,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32, MVT::nxv1i32}) {
     setOperationAction(ISD::INTRINSIC_WO_CHAIN, VT, Custom);
   }
+
+  // Custom-legalize this node for illegal result types.
+  for (auto VT : {MVT::i8, MVT::i16, MVT::i32}) {
+    setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
+  }
 }
 
 EVT RISCVTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -1146,6 +1151,18 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
     }
     break;
   }
+  case ISD::EXTRACT_VECTOR_ELT: {
+    EVT Ty = N->getValueType(0);
+    MVT::SimpleValueType SimpleVT = Ty.getSimpleVT().SimpleTy;
+    assert(SimpleVT == MVT::i8 || SimpleVT == MVT::i16 || SimpleVT == MVT::i32);
+
+    SDValue Extract64 = DAG.getNode(RISCVISD::EXTRACT_VECTOR_ELT, DL, MVT::i64,
+                                    N->getOperand(0), N->getOperand(1));
+    SDValue Trunc = DAG.getNode(ISD::TRUNCATE, DL, Ty, Extract64);
+    Results.push_back(Trunc);
+
+    break;
+  }
   }
 }
 
@@ -1311,6 +1328,7 @@ unsigned RISCVTargetLowering::ComputeNumSignBitsForTargetNode(
     // bits in the shift amount.
     return 33;
   case RISCVISD::VMV_X_S:
+  case RISCVISD::EXTRACT_VECTOR_ELT:
     unsigned XLen = DAG.getDataLayout().getLargestLegalIntTypeSizeInBits();
     // The number of sign bits of the scalar result is computed by obtaining the
     // element type of the input vector operand, substracting its width from the
@@ -3030,6 +3048,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::VFMV_V_F";
   case RISCVISD::VMV_X_S:
     return "RISCVISD::VMV_X_S";
+  case RISCVISD::EXTRACT_VECTOR_ELT:
+    return "RISCVISD::EXTRACT_VECTOR_ELT";
   }
   return nullptr;
 }
