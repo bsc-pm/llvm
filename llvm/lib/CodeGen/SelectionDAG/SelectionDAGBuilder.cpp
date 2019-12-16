@@ -109,6 +109,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MachineValueType.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TypeSize.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetIntrinsicInfo.h"
 #include "llvm/Target/TargetMachine.h"
@@ -3876,10 +3877,11 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
 
   // Normalize Vector GEP - all scalar operands should be converted to the
   // splat vector.
-  unsigned VectorWidth = I.getType()->isVectorTy() ?
-    I.getType()->getVectorNumElements() : 0;
+  ElementCount VectorWidth = I.getType()->isVectorTy()
+                                 ? I.getType()->getVectorElementCount()
+                                 : ElementCount(0, false);
 
-  if (VectorWidth && !N.getValueType().isVector()) {
+  if (VectorWidth.Min && !N.getValueType().isVector()) {
     LLVMContext &Context = *DAG.getContext();
     EVT VT = EVT::getVectorVT(Context, N.getValueType(), VectorWidth);
     N = DAG.getSplatBuildVector(VT, dl, N);
@@ -3919,7 +3921,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
           continue;
         APInt Offs = ElementSize * CI->getValue().sextOrTrunc(IdxSize);
         LLVMContext &Context = *DAG.getContext();
-        SDValue OffsVal = VectorWidth ?
+        SDValue OffsVal = VectorWidth.Min ?
           DAG.getConstant(Offs, dl, EVT::getVectorVT(Context, IdxTy, VectorWidth)) :
           DAG.getConstant(Offs, dl, IdxTy);
 
@@ -3938,7 +3940,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
       // N = N + Idx * ElementSize;
       SDValue IdxN = getValue(Idx);
 
-      if (!IdxN.getValueType().isVector() && VectorWidth) {
+      if (!IdxN.getValueType().isVector() && VectorWidth.Min) {
         EVT VT = EVT::getVectorVT(*Context, IdxN.getValueType(), VectorWidth);
         IdxN = DAG.getSplatBuildVector(VT, dl, IdxN);
       }
