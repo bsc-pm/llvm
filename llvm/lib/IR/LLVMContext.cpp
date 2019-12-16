@@ -98,6 +98,16 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_dep_inout operand bundle id drifted!");
   (void)OSSDepInoutEntry;
 
+  auto *OSSDepConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.CONCURRENT");
+  assert(OSSDepConcurrentEntry->second == LLVMContext::OB_oss_dep_concurrent &&
+         "oss_dep_concurrent operand bundle id drifted!");
+  (void)OSSDepConcurrentEntry;
+
+  auto *OSSDepCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.COMMUTATIVE");
+  assert(OSSDepCommutativeEntry->second == LLVMContext::OB_oss_dep_commutative &&
+         "oss_dep_commutative operand bundle id drifted!");
+  (void)OSSDepCommutativeEntry;
+
   auto *OSSDepWeakInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKIN");
   assert(OSSDepWeakInEntry->second == LLVMContext::OB_oss_dep_weakin &&
          "oss_dep_weakin operand bundle id drifted!");

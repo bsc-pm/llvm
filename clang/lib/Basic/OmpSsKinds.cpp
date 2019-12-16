@@ -88,6 +88,14 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
+  case OSSC_in:
+  case OSSC_out:
+  case OSSC_inout:
+  case OSSC_concurrent:
+  case OSSC_commutative:
+  case OSSC_weakin:
+  case OSSC_weakout:
+  case OSSC_weakinout:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -122,6 +130,14 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
+  case OSSC_in:
+  case OSSC_out:
+  case OSSC_inout:
+  case OSSC_concurrent:
+  case OSSC_commutative:
+  case OSSC_weakin:
+  case OSSC_weakout:
+  case OSSC_weakinout:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");

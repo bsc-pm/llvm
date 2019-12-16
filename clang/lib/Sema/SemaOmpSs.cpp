@@ -851,6 +851,16 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
   if (DepKinds.size() == 2) {
     int numWeaks = 0;
     int numUnk = 0;
+    // This is for concurrent and commutative. For now we don't allow combination
+    // with 'weak'
+    int numNoWeakCompats = 0;
+    if (DepKinds[0] == OSSC_DEPEND_mutexinoutset
+        || DepKinds[0] == OSSC_DEPEND_inoutset)
+      ++numNoWeakCompats;
+    if (DepKinds[1] == OSSC_DEPEND_mutexinoutset
+        || DepKinds[1] == OSSC_DEPEND_inoutset)
+      ++numNoWeakCompats;
+
     if (DepKinds[0] == OSSC_DEPEND_weak)
       ++numWeaks;
     else if (DepKinds[0] == OSSC_DEPEND_unknown)
@@ -860,23 +870,37 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     else if (DepKinds[1] == OSSC_DEPEND_unknown)
       ++numUnk;
 
+    // concurrent/commutative cannot be combined with other modifiers
+    if (numNoWeakCompats) {
+        SmallString<256> Buffer;
+        llvm::raw_svector_ostream Out(Buffer);
+        Out << "'" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_mutexinoutset) << "'"
+          << ", '" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_inoutset) << "'";
+        Diag(DepLoc, diag::err_oss_depend_no_weak_compatible)
+          << Out.str();
+        return nullptr;
+    }
+
     if (numWeaks == 0) {
       if (numUnk == 0 || numUnk == 1) {
         Diag(DepLoc, diag::err_oss_depend_weak_required);
         return nullptr;
       } else if (numUnk == 2) {
-        Diag(DepLoc, diag::err_oss_unexpected_clause_value)
-            << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown)
-            << getOmpSsClauseName(OSSC_depend);
-      }
-    } else if ((numWeaks == 1 && numUnk == 1)
-               || (numWeaks == 2 && numUnk == 0)) {
-        unsigned Except[] = {OSSC_DEPEND_weak};
+        unsigned Except[] = {OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                        /*Last=*/OSSC_DEPEND_unknown, Except)
             << getOmpSsClauseName(OSSC_depend);
+        return nullptr;
+      }
+    } else if ((numWeaks == 1 && numUnk == 1)
+               || (numWeaks == 2 && numUnk == 0)) {
+        unsigned Except[] = {OSSC_DEPEND_weak, OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
+        Diag(DepLoc, diag::err_oss_unexpected_clause_value)
+            << getListOfPossibleValues(OSSC_depend, /*First=*/0,
+                                       /*Last=*/OSSC_DEPEND_unknown, Except)
+            << getOmpSsClauseName(OSSC_depend);
+        return nullptr;
     }
   } else {
     if (DepKinds[0] == OSSC_DEPEND_unknown
@@ -958,6 +982,14 @@ Sema::ActOnOmpSsVarListClause(
     break;
   case OSSC_inout:
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_concurrent:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_commutative:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inoutset }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   case OSSC_weakin:

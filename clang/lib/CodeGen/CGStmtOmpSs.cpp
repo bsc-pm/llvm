@@ -109,6 +109,10 @@ static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
           Deps.Outs.push_back({C->isOSSSyntax(), Ref});
         if (DepKinds[0] == OSSC_DEPEND_inout)
           Deps.Inouts.push_back({C->isOSSSyntax(), Ref});
+        if (DepKinds[0] == OSSC_DEPEND_mutexinoutset)
+          Deps.Concurrents.push_back({C->isOSSSyntax(), Ref});
+        if (DepKinds[0] == OSSC_DEPEND_inoutset)
+          Deps.Commutatives.push_back({C->isOSSSyntax(), Ref});
       }
     }
   }

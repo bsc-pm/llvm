@@ -913,6 +913,12 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
     EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
   }
+  for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
+    EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
+    EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+  }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
     EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
   }

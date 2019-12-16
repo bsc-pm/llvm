@@ -167,6 +167,8 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_in:
   case OSSC_out:
   case OSSC_inout:
+  case OSSC_concurrent:
+  case OSSC_commutative:
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
@@ -309,6 +311,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   Actions.AllowShapings =
     (Kind == OSSC_depend
      || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
+     || Kind == OSSC_concurrent || Kind == OSSC_commutative
      || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout);
 
   if (ParseOmpSsVarList(DKind, Kind, Vars, Data)) {

@@ -458,6 +458,16 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_inout);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+                          TI.DependsInfo.Concurrents,
+                          TI.DependsInfo.UnpackInstructions,
+                          TI.DependsInfo.UnpackConstants,
+                          LLVMContext::OB_oss_dep_concurrent);
+  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+                          TI.DependsInfo.Commutatives,
+                          TI.DependsInfo.UnpackInstructions,
+                          TI.DependsInfo.UnpackConstants,
+                          LLVMContext::OB_oss_dep_commutative);
 
   gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
                           TI.DependsInfo.WeakIns,

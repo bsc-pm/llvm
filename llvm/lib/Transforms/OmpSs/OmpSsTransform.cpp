@@ -311,6 +311,8 @@ struct OmpSs : public ModulePass {
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Ins);
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Outs);
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Inouts);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Concurrents);
+    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Commutatives);
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakIns);
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakOuts);
     rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakInouts);
@@ -345,6 +347,8 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, TDI.Ins, F, "read");
     unpackCallToRTOfType(M, TDI.Outs, F, "write");
     unpackCallToRTOfType(M, TDI.Inouts, F, "readwrite");
+    unpackCallToRTOfType(M, TDI.Concurrents, F, "concurrent");
+    unpackCallToRTOfType(M, TDI.Commutatives, F, "commutative");
     unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
     unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
     unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
@@ -1121,8 +1125,6 @@ struct OmpSs : public ModulePass {
     // Create function types
     // nanos6_create_task
     // nanos6_submit_task
-    // nanos6_register_region_write_depinfo1
-    // nanos6_register_region_write_depinfo1
 
     CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),

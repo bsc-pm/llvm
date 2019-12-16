@@ -9874,7 +9874,9 @@ let CategoryName = "OmpSs Issue" in {
 def err_oss_unexpected_clause_value : Error<
   "expected %0 in OmpSs-2 clause '%1'">;
 def err_oss_depend_weak_required : Error<
- "expected 'weak' clause">;
+ "expected 'weak' dependency type">;
+def err_oss_depend_no_weak_compatible : Error<
+  "dependency types %0 cannot be combined with others">;
 def err_oss_wrong_dsa : Error<
   "%0 variable cannot be %1">;
 def err_oss_array_section_use : Error<"OmpSs-2 array section is not allowed here">;
