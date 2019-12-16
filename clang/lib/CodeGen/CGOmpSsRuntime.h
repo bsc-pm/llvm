@@ -70,6 +70,7 @@ struct OSSTaskDataTy final {
   OSSTaskDepDataTy Deps;
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
+  const Expr *Cost = nullptr;
 };
 
 class CGOmpSsRuntime {

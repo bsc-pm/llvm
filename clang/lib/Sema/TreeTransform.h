@@ -1563,6 +1563,17 @@ public:
                                            EndLoc);
   }
 
+  /// Build a new OmpSs 'cost' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSCostClause(Expr *Condition, SourceLocation StartLoc,
+                                  SourceLocation LParenLoc,
+                                  SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsCostClause(Condition, StartLoc, LParenLoc,
+                                          EndLoc);
+  }
+
   /// Build a new OmpSs 'depend' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -9403,6 +9414,15 @@ OSSClause *TreeTransform<Derived>::TransformOSSFinalClause(OSSFinalClause *C) {
     return nullptr;
   return getDerived().RebuildOSSFinalClause(Cond.get(), C->getBeginLoc(),
                                             C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSCostClause(OSSCostClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSCostClause(E.get(), C->getBeginLoc(),
+                                           C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

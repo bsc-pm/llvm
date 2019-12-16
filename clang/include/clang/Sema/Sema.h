@@ -9986,6 +9986,10 @@ public:
   OSSClause *ActOnOmpSsFinalClause(Expr *Condition, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,
                                    SourceLocation EndLoc);
+  /// Called on well-formed 'cost' clause.
+  OSSClause *ActOnOmpSsCostClause(Expr *E, SourceLocation StartLoc,
+                                  SourceLocation LParenLoc,
+                                  SourceLocation EndLoc);
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {

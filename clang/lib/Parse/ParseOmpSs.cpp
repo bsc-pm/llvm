@@ -144,6 +144,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   switch (CKind) {
   case OSSC_if:
   case OSSC_final:
+  case OSSC_cost:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
@@ -281,6 +282,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 ///
 ///    depend-clause:
 ///       'depend' '(' in | out | inout [ ,weak ] : ')'
+///       'depend' '(' mutexinoutset | inoutset : ')'
 ///       'depend' '(' [ weak, ] in | out | inout : ')'
 ///    private-clause:
 ///       'private' '(' list ')'
@@ -294,6 +296,10 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 ///       'out' '(' list ')'
 ///    inout-clause:
 ///       'inout' '(' list ')'
+///    concurrent-clause:
+///       'concurrent' '(' list ')'
+///    commutative-clause:
+///       'commutative' '(' list ')'
 ///    weakin-clause:
 ///       'weakin' '(' list ')'
 ///    weakout-clause:
@@ -355,6 +361,9 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
 ///
 ///    final-clause:
 ///      'final' '(' expression ')'
+///
+///    cost-clause:
+///      'cost' '(' expression ')'
 ///
 ///    if-clause:
 ///      'if' '(' expression ')'

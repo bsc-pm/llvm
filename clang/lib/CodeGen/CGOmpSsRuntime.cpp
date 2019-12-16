@@ -933,6 +933,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
+  if (Data.Cost)
+    TaskInfo.emplace_back("QUAL.OSS.COST", CGF.EmitScalarExpr(Data.Cost));
 
   InTaskEmission = false;
 

@@ -136,6 +136,15 @@ static void AddFinalData(const OSSTaskDirective &S, const Expr * &FinalExpr) {
   }
 }
 
+static void AddCostData(const OSSTaskDirective &S, const Expr * &CostExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSCostClause>()) {
+    assert(!Found);
+    Found = true;
+    CostExpr = C->getExpression();
+  }
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 
@@ -143,6 +152,7 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   AddDepData(S, Data.Deps);
   AddIfData(S, Data.If);
   AddFinalData(S, Data.Final);
+  AddCostData(S, Data.Cost);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }

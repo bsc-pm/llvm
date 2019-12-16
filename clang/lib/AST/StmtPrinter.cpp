@@ -689,6 +689,12 @@ void OSSClausePrinter::VisitOSSFinalClause(OSSFinalClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSCostClause(OSSCostClause *Node) {
+  OS << "cost(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSDefaultClause(OSSDefaultClause *Node) {
   OS << "default("
      << getOmpSsSimpleClauseTypeName(OSSC_default, Node->getDefaultKind())

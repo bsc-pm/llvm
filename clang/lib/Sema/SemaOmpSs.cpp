@@ -424,7 +424,7 @@ public:
       : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
 };
 
-// OSSClauseDSAChecker gathers for each expression in a depend clause
+// OSSClauseDSAChecker gathers for each expression in a clause
 // all implicit data-sharings.
 //
 // To do so, we classify as firstprivate the base symbol if it's a pointer and is
@@ -578,7 +578,7 @@ public:
     }
   }
 
-  void VisitOSSDepend(OSSDependClause *Clause) {
+  void VisitClause(OSSClause *Clause) {
     for (Stmt *Child : Clause->children()) {
       if (Child)
         Visit(Child);
@@ -680,24 +680,27 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
 
   bool ErrorFound = false;
 
-  OSSClauseDSAChecker OSSDependChecker(DSAStack, *this);
+  OSSClauseDSAChecker OSSClauseChecker(DSAStack, *this);
   for (auto *Clause : Clauses) {
     if (isa<OSSDependClause>(Clause)) {
-      OSSDependChecker.VisitOSSDepend(cast<OSSDependClause> (Clause));
+      OSSClauseChecker.VisitClause(Clause);
+    }
+    if (isa<OSSCostClause>(Clause)) {
+      OSSClauseChecker.VisitClause(Clause);
     }
     // FIXME: how to handle an error?
-    if (OSSDependChecker.isErrorFound())
+    if (OSSClauseChecker.isErrorFound())
       ErrorFound = true;
   }
 
 
   SmallVector<Expr *, 4> ImplicitShared(
-      OSSDependChecker.getImplicitShared().begin(),
-      OSSDependChecker.getImplicitShared().end());
+      OSSClauseChecker.getImplicitShared().begin(),
+      OSSClauseChecker.getImplicitShared().end());
 
   SmallVector<Expr *, 4> ImplicitFirstprivate(
-      OSSDependChecker.getImplicitFirstprivate().begin(),
-      OSSDependChecker.getImplicitFirstprivate().end());
+      OSSClauseChecker.getImplicitFirstprivate().begin(),
+      OSSClauseChecker.getImplicitFirstprivate().end());
 
   if (!ImplicitShared.empty()) {
     if (OSSClause *Implicit = ActOnOmpSsSharedClause(
@@ -1281,6 +1284,34 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                        ClauseVars, PrivateCopies, Inits);
 }
 
+static bool isNonNegativeIntegerValue(Expr *&ValExpr, Sema &SemaRef,
+                                      OmpSsClauseKind CKind,
+                                      bool StrictlyPositive) {
+  if (!ValExpr->isTypeDependent() && !ValExpr->isValueDependent() &&
+      !ValExpr->isInstantiationDependent() &&
+      !ValExpr->containsUnexpandedParameterPack()) {
+    SourceLocation Loc = ValExpr->getExprLoc();
+    ExprResult Value =
+        SemaRef.PerformOmpSsImplicitIntegerConversion(Loc, ValExpr);
+    if (Value.isInvalid())
+      return false;
+
+    ValExpr = Value.get();
+    // The expression must evaluate to a non-negative integer value.
+    llvm::APSInt Result;
+    if (ValExpr->isIntegerConstantExpr(Result, SemaRef.Context) &&
+        Result.isSigned() &&
+        !((!StrictlyPositive && Result.isNonNegative()) ||
+          (StrictlyPositive && Result.isStrictlyPositive()))) {
+      SemaRef.Diag(Loc, diag::err_oss_negative_expression_in_clause)
+          << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
+          << ValExpr->getSourceRange();
+      return false;
+    }
+  }
+  return true;
+}
+
 OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
@@ -1317,6 +1348,20 @@ OSSClause *Sema::ActOnOmpSsFinalClause(Expr *Condition,
   return new (Context) OSSFinalClause(ValExpr, StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsCostClause(Expr *E,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+  Expr *ValExpr = E;
+  // The parameter of the cost() clause must be > 0
+  // expression.
+  if (!isNonNegativeIntegerValue(ValExpr, *this, OSSC_cost,
+                                 /*StrictlyPositive=*/false))
+    return nullptr;
+
+  return new (Context) OSSCostClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
                                             SourceLocation StartLoc,
                                             SourceLocation LParenLoc,
@@ -1328,6 +1373,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_final:
     Res = ActOnOmpSsFinalClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_cost:
+    Res = ActOnOmpSsCostClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");
