@@ -11,6 +11,8 @@
 // CHECK-NOT: __riscv_fdiv
 // CHECK-NOT: __riscv_fsqrt
 // CHECK-NOT: __riscv_atomic
+// CHECK-NOT: __riscv_vector
+// CHECK-NOT: __riscv_vector_version
 
 // RUN: %clang -target riscv32-unknown-linux-gnu -march=rv32im -x c -E -dM %s \
 // RUN: -o - | FileCheck --check-prefix=CHECK-M-EXT %s
@@ -47,6 +49,13 @@
 // RUN: %clang -target riscv64-unknown-linux-gnu -march=rv64ic -x c -E -dM %s \
 // RUN: -o - | FileCheck --check-prefix=CHECK-C-EXT %s
 // CHECK-C-EXT: __riscv_compressed 1
+
+// RUN: %clang -target riscv32-unknown-linux-gnu -march=rv32iv -x c -E -dM %s \
+// RUN: -o - | FileCheck --check-prefix=CHECK-V-EXT %s
+// RUN: %clang -target riscv64-unknown-linux-gnu -march=rv64iv -x c -E -dM %s \
+// RUN: -o - | FileCheck --check-prefix=CHECK-V-EXT %s
+// CHECK-V-EXT: __riscv_vector 1
+// CHECK-V-EXT: __riscv_vector_version {{[0-9]+$}}
 
 // RUN: %clang -target riscv32-unknown-linux-gnu -march=rv32ifd -mabi=ilp32 -x c -E -dM %s \
 // RUN: -o - | FileCheck --check-prefix=CHECK-SOFT %s

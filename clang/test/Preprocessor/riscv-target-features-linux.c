@@ -12,3 +12,5 @@
 // CHECK: __riscv_fsqrt 1
 // CHECK: __riscv_mul 1
 // CHECK: __riscv_muldiv 1
+// CHECK-NOT: __riscv_vector
+// CHECK-NOT: __riscv_vector_version

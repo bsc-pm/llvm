@@ -140,6 +140,12 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
   if (HasC)
     Builder.defineMacro("__riscv_compressed");
 
+  if (HasV) {
+    Builder.defineMacro("__riscv_vector");
+    // Version computed as: major*100^2 + minor*100 + patch
+    Builder.defineMacro("__riscv_vector_version", "800");
+  }
+
   if (Opts.EPI)
     Builder.defineMacro("__epi");
 }
