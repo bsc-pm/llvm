@@ -519,7 +519,8 @@ defm vwcvtu_x_x : epi_conversions;
 
 defm vncvt_x_x : epi_conversions;
 
-def int_epi_vbroadcast : EPIUnary;
+def int_epi_vmv_v_x : EPIUnary;
+def int_epi_vfmv_v_f : EPIUnary;
 
 // Loads
 multiclass epi_load {

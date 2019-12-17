@@ -609,7 +609,10 @@ def vcompress : EPIBinBuiltin<"v", "vvm", "csilfd">;
 //def vfdot : EPIBinBuiltin<"v", "vvv", "fd">;
 
 let HasMask = 0 in
-def vbroadcast : EPIScalarToVecBuiltin<"v", "ve", "csilfd">;
+def vmv_v_x : EPIScalarToVecBuiltin<"v", "ve", "csil">;
+
+let HasMask = 0 in
+def vfmv_v_f : EPIScalarToVecBuiltin<"v", "ve", "fd">;
 
 let LMUL = [1], HasMask = 0, HasVL = 0, Name = "cast", IntrinsicName = "" in
 {

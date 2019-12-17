@@ -54,7 +54,8 @@ enum NodeType : unsigned {
   READ_CYCLE_WIDE,
 
   // EPI nodes
-  VBROADCAST,
+  VMV_V_X,
+  VFMV_V_F,
   VMV_X_S,
 };
 }

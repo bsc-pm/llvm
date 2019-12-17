@@ -513,7 +513,11 @@ SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
   if (!ConstantValue || ConstantValue->getZExtValue() != 0)
     return SDValue();
 
-  return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, ScalarValue);
+  RISCVISD::NodeType OpCode = ScalarValue.getValueType().isFloatingPoint()
+                                  ? RISCVISD::VFMV_V_F
+                                  : RISCVISD::VMV_V_X;
+
+  return DAG.getNode(OpCode, DL, VT, ScalarValue);
 }
 
 SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op,
@@ -523,8 +527,13 @@ SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op,
 
   BuildVectorSDNode *BV = cast<BuildVectorSDNode>(Op.getNode());
 
-  if (SDValue V = BV->getSplatValue())
-    return DAG.getNode(RISCVISD::VBROADCAST, DL, VT, V);
+  if (SDValue V = BV->getSplatValue()) {
+    RISCVISD::NodeType OpCode = V.getValueType().isFloatingPoint()
+                                    ? RISCVISD::VFMV_V_F
+                                    : RISCVISD::VMV_V_X;
+
+    return DAG.getNode(OpCode, DL, VT, V);
+  }
 
   return SDValue();
 }
@@ -3015,8 +3024,10 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::FMV_X_ANYEXTW_RV64";
   case RISCVISD::READ_CYCLE_WIDE:
     return "RISCVISD::READ_CYCLE_WIDE";
-  case RISCVISD::VBROADCAST:
-    return "RISCVISD::VBROADCAST";
+  case RISCVISD::VMV_V_X:
+    return "RISCVISD::VMV_V_X";
+  case RISCVISD::VFMV_V_F:
+    return "RISCVISD::VFMV_V_F";
   case RISCVISD::VMV_X_S:
     return "RISCVISD::VMV_X_S";
   }

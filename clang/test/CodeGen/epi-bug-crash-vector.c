@@ -33,11 +33,11 @@ __attribute__((noinline)) __epi_2xi32 second(__epi_2xi32 a, __epi_2xi32 b) {
 // CHECK-NEXT:    store i32 [[CONV]], i32* [[GVL]], align 4
 // CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* [[GVL]], align 4
 // CHECK-NEXT:    [[CONV1:%.*]] = sext i32 [[TMP1]] to i64
-// CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 2 x i32> @llvm.epi.vbroadcast.nxv2i32.i32(i32 1, i64 [[CONV1]])
+// CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 2 x i32> @llvm.epi.vmv.v.x.nxv2i32.i32(i32 1, i64 [[CONV1]])
 // CHECK-NEXT:    store <vscale x 2 x i32> [[TMP2]], <vscale x 2 x i32>* [[VA]], align 4
 // CHECK-NEXT:    [[TMP3:%.*]] = load i32, i32* [[GVL]], align 4
 // CHECK-NEXT:    [[CONV2:%.*]] = sext i32 [[TMP3]] to i64
-// CHECK-NEXT:    [[TMP4:%.*]] = call <vscale x 2 x i32> @llvm.epi.vbroadcast.nxv2i32.i32(i32 2, i64 [[CONV2]])
+// CHECK-NEXT:    [[TMP4:%.*]] = call <vscale x 2 x i32> @llvm.epi.vmv.v.x.nxv2i32.i32(i32 2, i64 [[CONV2]])
 // CHECK-NEXT:    store <vscale x 2 x i32> [[TMP4]], <vscale x 2 x i32>* [[VB]], align 4
 // CHECK-NEXT:    [[TMP5:%.*]] = load <vscale x 2 x i32>, <vscale x 2 x i32>* [[VA]], align 4
 // CHECK-NEXT:    [[TMP6:%.*]] = load <vscale x 2 x i32>, <vscale x 2 x i32>* [[VB]], align 4
@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
 
   int gvl = __builtin_epi_vsetvlmax(2, 0);
 
-  __epi_2xi32 va = __builtin_epi_vbroadcast_2xi32(1, gvl);
-  __epi_2xi32 vb = __builtin_epi_vbroadcast_2xi32(2, gvl);
+  __epi_2xi32 va = __builtin_epi_vmv_v_x_2xi32(1, gvl);
+  __epi_2xi32 vb = __builtin_epi_vmv_v_x_2xi32(2, gvl);
 
   __epi_2xi32 vc = second(va, vb);
 

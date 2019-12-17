@@ -265,13 +265,29 @@ two integer vectors.}];
   }];
 }
 
-def : DocEPIBuiltin<vbroadcast>
+def : DocEPIBuiltin<vmv_v_x>
 {
   let Category = DocEPILaneManipulation;
-  let Title = "Broadcast a scalar value to all the elements of a vector";
+  let Title = "Broadcast an integer scalar to all the elements of a vector";
   let Description = [{Use these builtins to create a vector where all the
 elements have the value of a given scalar.}];
-  let Instruction = "vmv.vi / vfmv.vx";
+  let Instruction = "vmv.v.x";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = a
+
+    result[gvl : VLMAX] = 0
+  }];
+}
+
+def : DocEPIBuiltin<vfmv_v_f>
+{
+  let Category = DocEPILaneManipulation;
+  let Title = "Broadcast a floating-point scalar to all the elements of a vector";
+  let Description = [{Use these builtins to create a vector where all the
+elements have the value of a given scalar.}];
+  let Instruction = "vfmv.v.f";
 
   let Operation = [{
     for element = 0 to gvl - 1

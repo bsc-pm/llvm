@@ -11,10 +11,13 @@
 // Target Specific DAG nodes
 //===----------------------------------------------------------------------===//
 
-// FIXME: We should constraint the second operand
-def SDTUnaryVectorFromScalar : SDTypeProfile<1, 1, [SDTCisVec<0>]>;
+def riscv_vmv_v_x : SDNode<"RISCVISD::VMV_V_X",
+                           SDTypeProfile<1, 1, [SDTCisVec<0>, SDTCisInt<0>,
+                                                SDTCisInt<1>]>>;
 
-def riscv_vbroadcast : SDNode<"RISCVISD::VBROADCAST", SDTUnaryVectorFromScalar>;
+def riscv_vfmv_v_f : SDNode<"RISCVISD::VFMV_V_F",
+                           SDTypeProfile<1, 1, [SDTCisVec<0>, SDTCisFP<0>,
+                                                SDTCisFP<1>]>>;
 
 def riscv_vmv_x_s : SDNode<"RISCVISD::VMV_X_S",
                            SDTypeProfile<1, 1, [SDTCisInt<0>, SDTCisVec<1>,
@@ -2680,17 +2683,17 @@ foreach vti = AllIntegerVectors in {
 }
 
 foreach vti = AllIntegerVectors in {
-  def : Pat<(vti.Vector (int_epi_vbroadcast GPR:$rs2, GPR:$vl)),
+  def : Pat<(vti.Vector (int_epi_vmv_v_x GPR:$rs2, GPR:$vl)),
             (!cast<Instruction>("PseudoVMV_V_X_M"#vti.RegClass.VLMul)
              $rs2,
              (NoX0 GPR:$vl), vti.SEW)>;
-  def : Pat<(vti.Vector (int_epi_vbroadcast simm5:$imm5, GPR:$vl)),
+  def : Pat<(vti.Vector (int_epi_vmv_v_x simm5:$imm5, GPR:$vl)),
             (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul)
              simm5:$imm5,
              (NoX0 GPR:$vl), vti.SEW)>;
 }
 foreach fvti = AllFloatVectors in {
-  def : Pat<(fvti.Vector (int_epi_vbroadcast
+  def : Pat<(fvti.Vector (int_epi_vfmv_v_f
                          (fvti.Scalar fvti.ScalarRegClass:$rs2), GPR:$vl)),
             (!cast<Instruction>("PseudoVFMV_V_F_M"#fvti.RegClass.VLMul)
              ToFPR32<fvti.Scalar, fvti.ScalarRegClass, "rs2">.ret,
@@ -2796,7 +2799,7 @@ defm "" : pat_vop_ternary_common<fma, "PseudoVFMADD", AllFloatVectors>;
 
 foreach fvti = AllFloatVectors in
 {
-  def : Pat<(fvti.Vector (riscv_vbroadcast fvti.ScalarRegClass:$value)),
+  def : Pat<(fvti.Vector (riscv_vfmv_v_f fvti.ScalarRegClass:$value)),
             (!cast<Instruction>("PseudoVFMV_V_F_M"#fvti.RegClass.VLMul)
              ToFPR32<fvti.Scalar, fvti.ScalarRegClass, "value">.ret,
              VLMax,
@@ -2841,11 +2844,11 @@ foreach fvti = AllFloatVectors in
 
 foreach vti = AllIntegerVectors in
 {
-  def : Pat<(vti.Vector (riscv_vbroadcast GPR:$value)),
+  def : Pat<(vti.Vector (riscv_vmv_v_x GPR:$value)),
             (!cast<Instruction>("PseudoVMV_V_X_M"#vti.RegClass.VLMul)
              GPR:$value,
              VLMax, vti.SEW)>;
-  def : Pat<(vti.Vector (riscv_vbroadcast simm5:$value)),
+  def : Pat<(vti.Vector (riscv_vmv_v_x simm5:$value)),
             (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul)
              simm5:$value,
              VLMax, vti.SEW)>;

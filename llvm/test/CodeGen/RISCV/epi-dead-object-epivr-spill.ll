@@ -274,15 +274,15 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    vrgather.vv v0, v0, v24
 ; CHECK-NEXT:    vsxe.v v0, (a0), v1
 entry:
-  %0 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 0x3FEA9B66290EA1A3, i64 8)
-  %1 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 0x3FE561B82AB7F990, i64 8)
-  %2 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 0x3FED906BCF328D46, i64 8)
-  %3 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 0x3FDA827999FCEF32, i64 8)
+  %0 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 0x3FEA9B66290EA1A3, i64 8)
+  %1 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 0x3FE561B82AB7F990, i64 8)
+  %2 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 0x3FED906BCF328D46, i64 8)
+  %3 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 0x3FDA827999FCEF32, i64 8)
   %cmp1384 = icmp sgt i64 %v, 0
   %4 = tail call <vscale x 1 x i64> @llvm.epi.vid.nxv1i64(i64 8) #4
-  %5 = tail call <vscale x 1 x i64> @llvm.epi.vbroadcast.nxv1i64.i64(i64 1, i64 8) #4
+  %5 = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 1, i64 8) #4
   %6 = tail call <vscale x 1 x i64> @llvm.epi.vsrl.nxv1i64.nxv1i64(<vscale x 1 x i64> %4, <vscale x 1 x i64> %5, i64 8) #4
-  %7 = tail call <vscale x 1 x i64> @llvm.epi.vbroadcast.nxv1i64.i64(i64 undef, i64 8) #4
+  %7 = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 undef, i64 8) #4
   %8 = tail call <vscale x 1 x i64> @llvm.epi.vmul.nxv1i64.nxv1i64(<vscale x 1 x i64> %6, <vscale x 1 x i64> %7, i64 8) #4
   %9 = tail call <vscale x 1 x i64> @llvm.epi.vand.nxv1i64.nxv1i64(<vscale x 1 x i64> %4, <vscale x 1 x i64> %5, i64 8) #4
   %10 = tail call <vscale x 1 x i64> @llvm.epi.vmul.nxv1i64.nxv1i64(<vscale x 1 x i64> %9, <vscale x 1 x i64> undef, i64 8) #4
@@ -554,7 +554,7 @@ entry:
 }
 
 ; Function Attrs: nounwind readnone
-declare <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double, i64) #1
+declare <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double, i64) #1
 
 ; Function Attrs: nounwind readnone
 declare <vscale x 1 x double> @llvm.epi.vfsub.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64) #1
@@ -575,7 +575,7 @@ declare <vscale x 1 x double> @llvm.epi.vfmacc.nxv1f64.nxv1f64(<vscale x 1 x dou
 declare <vscale x 1 x i64> @llvm.epi.vid.nxv1i64(i64) #1
 
 ; Function Attrs: nounwind readnone
-declare <vscale x 1 x i64> @llvm.epi.vbroadcast.nxv1i64.i64(i64, i64) #1
+declare <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64, i64) #1
 
 ; Function Attrs: nounwind readnone
 declare <vscale x 1 x i64> @llvm.epi.vsrl.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64) #1

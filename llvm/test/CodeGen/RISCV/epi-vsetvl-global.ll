@@ -14,8 +14,8 @@ declare <vscale x 1 x double> @llvm.epi.vfsub.nxv1f64.nxv1f64(<vscale x 1 x doub
 
 declare <vscale x 1 x double> @llvm.epi.vfmul.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64)
 
-declare <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double, i64)
-declare <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float, i64)
+declare <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double, i64)
+declare <vscale x 2 x float> @llvm.epi.vfmv.v.f.nxv2f32.f32(float, i64)
 
 declare void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>* nocapture, i64)
 declare void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float>, <vscale x 2 x float>* nocapture, i64)
@@ -163,8 +163,8 @@ entry:
 
 if.then:                                          ; preds = %entry
   %0 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)
-  %1 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 1.000000e+00, i64 %0)
-  %2 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 2.000000e+00, i64 %0)
+  %1 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 1.000000e+00, i64 %0)
+  %2 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 2.000000e+00, i64 %0)
   %3 = tail call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %1, <vscale x 1 x double> %2, i64 %0)
   %4 = bitcast i8* @scratch to <vscale x 1 x double>*
   tail call void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double> %3, <vscale x 1 x double>* %4, i64 %0)
@@ -172,8 +172,8 @@ if.then:                                          ; preds = %entry
 
 if.else:                                          ; preds = %entry
   %5 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 2, i64 0)
-  %6 = tail call <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float 1.000000e+00, i64 %5)
-  %7 = tail call <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float 2.000000e+00, i64 %5)
+  %6 = tail call <vscale x 2 x float> @llvm.epi.vfmv.v.f.nxv2f32.f32(float 1.000000e+00, i64 %5)
+  %7 = tail call <vscale x 2 x float> @llvm.epi.vfmv.v.f.nxv2f32.f32(float 2.000000e+00, i64 %5)
   %8 = tail call <vscale x 2 x float> @llvm.epi.vfadd.nxv2f32.nxv2f32(<vscale x 2 x float> %6, <vscale x 2 x float> %7, i64 %5)
   %9 = bitcast i8* @scratch to <vscale x 2 x float>*
   tail call void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float> %8, <vscale x 2 x float>* %9, i64 %5)
@@ -305,8 +305,8 @@ if.end:                                           ; preds = %if.else, %if.then
 
 if.then4:                                         ; preds = %if.end
   %3 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)
-  %4 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 1.000000e+00, i64 %3)
-  %5 = tail call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 2.000000e+00, i64 %3)
+  %4 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 1.000000e+00, i64 %3)
+  %5 = tail call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 2.000000e+00, i64 %3)
   %6 = tail call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %4, <vscale x 1 x double> %5, i64 %3)
   %7 = bitcast i8* @scratch to <vscale x 1 x double>*
   tail call void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double> %6, <vscale x 1 x double>* %7, i64 %3)
@@ -314,8 +314,8 @@ if.then4:                                         ; preds = %if.end
 
 if.else5:                                         ; preds = %if.end
   %8 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 2, i64 0)
-  %9 = tail call <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float 1.000000e+00, i64 %8)
-  %10 = tail call <vscale x 2 x float> @llvm.epi.vbroadcast.nxv2f32.f32(float 2.000000e+00, i64 %8)
+  %9 = tail call <vscale x 2 x float> @llvm.epi.vfmv.v.f.nxv2f32.f32(float 1.000000e+00, i64 %8)
+  %10 = tail call <vscale x 2 x float> @llvm.epi.vfmv.v.f.nxv2f32.f32(float 2.000000e+00, i64 %8)
   %11 = tail call <vscale x 2 x float> @llvm.epi.vfadd.nxv2f32.nxv2f32(<vscale x 2 x float> %9, <vscale x 2 x float> %10, i64 %8)
   %12 = bitcast i8* @scratch to <vscale x 2 x float>*
   tail call void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float> %11, <vscale x 2 x float>* %12, i64 %8)

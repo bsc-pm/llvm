@@ -6,10 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements a function pass that folds the following pattern
+// This file implements a function pass that folds the following patterns
 //
 //    %v1 = ...
-//    %v2 = <vscale x ...> @llvm.int.epi.vbroadcast(%scalar, %gvl)
+//    %v2 = <vscale x ...> @llvm.int.epi.vmv.v.x(%scalar, %gvl)
+//    %v3 = <vscale x ...> @llvm.int.epi.v<op>(%v1, %v2, %gvl)
+//
+//    %v1 = ...
+//    %v2 = <vscale x ...> @llvm.int.epi.vfmv.v.f(%scalar, %gvl)
 //    %v3 = <vscale x ...> @llvm.int.epi.v<op>(%v1, %v2, %gvl)
 //
 // into
@@ -93,7 +97,11 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
                                              Value *Scalar, Value *GVL) {
   // A broadcast has foldable uses if it looks like this
   //    %v1 = ...
-  //    %v2 = <vscale x ...> @llvm.int.epi.vbroadcast(%scalar, %gvl)
+  //    %v2 = <vscale x ...> @llvm.int.epi.vmv.v.x(%scalar, %gvl)
+  //    %v3 = <vscale x ...> @llvm.int.epi.v<op>(%v1, %v2, %gvl)
+  //
+  //    %v1 = ...
+  //    %v2 = <vscale x ...> @llvm.int.epi.vfmv.v.f(%scalar, %gvl)
   //    %v3 = <vscale x ...> @llvm.int.epi.v<op>(%v1, %v2, %gvl)
   LLVM_DEBUG(dbgs() << "Determining uses of broadcasted value ");
   LLVM_DEBUG(Broadcast->dump());
@@ -220,7 +228,8 @@ bool EPIFoldBroadcast::runOnFunction(Function &F) {
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (auto CS = CallSite(&I)) {
-        if (CS.getIntrinsicID() == Intrinsic::epi_vbroadcast) {
+        if (CS.getIntrinsicID() == Intrinsic::epi_vmv_v_x ||
+            CS.getIntrinsicID() == Intrinsic::epi_vfmv_v_f) {
           determineFoldableUses(CS.getInstruction(), CS.getArgument(0),
                                 CS.getArgument(1));
         }

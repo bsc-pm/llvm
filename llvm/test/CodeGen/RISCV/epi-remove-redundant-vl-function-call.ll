@@ -24,12 +24,12 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vfadd.vf v16, v16, ft0
 ; CHECK-NEXT:    ret
-  %3 = call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 1.0, i64 %1)
+  %3 = call <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double 1.0, i64 %1)
   %4 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double> %0, <vscale x 1 x double> %3, i64 %1)
   ret <vscale x 1 x double> %4
 }
 
-declare <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double, i64)
+declare <vscale x 1 x double> @llvm.epi.vfmv.v.f.nxv1f64.f64(double, i64)
 
 declare <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64)
 
