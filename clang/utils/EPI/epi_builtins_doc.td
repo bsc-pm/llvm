@@ -3820,7 +3820,7 @@ contiguous locations in memory.}];
 
   let Instruction = "vse.v";
 
-  let ParameterNames = ["value", "address"];
+  let ParameterNames = ["address", "value"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -3845,7 +3845,7 @@ contiguous locations in memory.}];
 
   let Instruction = "vse.v";
 
-  let ParameterNames = ["value", "address"];
+  let ParameterNames = ["address", "value"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -3874,7 +3874,7 @@ the vector.}];
 
   let Instruction = "vsx.v";
 
-  let ParameterNames = ["value", "address"];
+  let ParameterNames = ["address", "value", "indexes"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -3901,7 +3901,7 @@ the vector.}];
 
   let Instruction = "vsx.v";
 
-  let ParameterNames = ["value", "address"];
+  let ParameterNames = ["address", "value", "indexes"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -3925,7 +3925,7 @@ All the elements of the vector, in groups of 8 bits, are stored.}];
 
   let Instruction = "vse.v";
 
-  let ParameterNames = ["address"];
+  let ParameterNames = ["address", "value"];
 
   let Operation = [{
     for element = 0 to VLMAX
@@ -3946,7 +3946,7 @@ yield the effective address that loads the element of the vector.}];
 
   let Instruction = "vss.v";
 
-  let ParameterNames = ["address", "stride"];
+  let ParameterNames = ["address", "value", "stride"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -3978,7 +3978,7 @@ yield the effective address that loads the element of the vector.}];
 
   let Instruction = "vss.v";
 
-  let ParameterNames = ["address", "stride"];
+  let ParameterNames = ["address", "value", "stride"];
 
   let Operation = [{
     for element = 0 to gvl - 1
