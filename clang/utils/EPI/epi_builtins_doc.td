@@ -536,13 +536,11 @@ def : DocEPIBuiltin<vfmacc>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and add.
 
-There is semantically no difference to `__builtin_epi_vfmadd`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `c` will be located in a vector register that will
 be overwritten by the `vfmacc` instruction.}];
   let Instruction = "vfmacc.vv";
+
+  let ParameterNames = ["c", "a", "b"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -569,13 +567,11 @@ def : DocEPIBuiltin<vfmadd>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and add.
 
-There is semantically no difference to `__builtin_epi_vfmacc`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmadd` instruction.}];
   let Instruction = "vfmadd.vv";
+
+  let ParameterNames = ["b", "a", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -670,13 +666,11 @@ def : DocEPIBuiltin<vfmsac>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and subtract.
 
-There is semantically no difference to `__builtin_epi_vfmsub`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `c` will be located in a vector register that will
 be overwritten by the `vfmsac` instruction.}];
   let Instruction = "vfmsac.vv";
+
+  let ParameterNames = ["c", "a", "b"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -703,13 +697,11 @@ def : DocEPIBuiltin<vfmsub>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and subtract.
 
-There is semantically no difference to `__builtin_epi_vfmsac`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmsub` instruction.}];
   let Instruction = "vfmsub.vv";
+
+  let ParameterNames = ["b", "a", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -896,13 +888,11 @@ def : DocEPIBuiltin<vfnmacc>
   let Description = [{Use these builtins to do an elementwise floating-point
 negate multiply and add.
 
-There is semantically no difference to `__builtin_epi_vfnmadd`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `c` will be located in a vector register that will
 be overwritten by the `vfnmacc` instruction.}];
   let Instruction = "vfnmacc.vv";
+
+  let ParameterNames = ["c", "a", "b"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -929,13 +919,11 @@ def : DocEPIBuiltin<vfnmadd>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and add.
 
-There is semantically no difference to `__builtin_epi_vfnmacc`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmadd` instruction.}];
   let Instruction = "vfnmadd.vv";
+
+  let ParameterNames = ["b", "a", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -962,13 +950,11 @@ def : DocEPIBuiltin<vfnmsac>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and subtract.
 
-There is semantically no difference to `__builtin_epi_vfnmsub`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `c` will be located in a vector register that will
 be overwritten by the `vfnmsac` instruction.}];
   let Instruction = "vfnmsac.vv";
+
+  let ParameterNames = ["c", "a", "b"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -995,13 +981,11 @@ def : DocEPIBuiltin<vfnmsub>
   let Description = [{Use these builtins to do an elementwise floating-point
 multiply and subtract.
 
-There is semantically no difference to `__builtin_epi_vfnmsac`
-except for the instruction used which determines the destructive nature
-of this instruction.
-
 At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmsub` instruction.}];
   let Instruction = "vfnmsub.vv";
+
+  let ParameterNames = ["b", "a", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
