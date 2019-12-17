@@ -257,14 +257,14 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      BasicBlock *newHeader,
                                                      Function *oldFunction,
                                                      Module *M,
-                                                     const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc,
+                                                     const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                              std::function<CallInst*(Function *newFunction,
                                                      BasicBlock *codeReplacer,
                                                      const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
       BPI(nullptr), AllowVarArgs(false),
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
-      rewriteOutToInTaskBrAndGetOmpSsUnpackFunc(rewriteOutToInTaskBrAndGetOmpSsUnpackFunc),
+      rewriteUsesBrAndGetOmpSsUnpackFunc(rewriteUsesBrAndGetOmpSsUnpackFunc),
       emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {}
 
 CodeExtractor::CodeExtractor(DominatorTree &DT, Loop &L, bool AggregateArgs,
@@ -1526,8 +1526,8 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC) {
 
   // Construct new function based on inputs/outputs & add allocas for all defs.
   Function *newFunction;
-  if (rewriteOutToInTaskBrAndGetOmpSsUnpackFunc) {
-    newFunction = rewriteOutToInTaskBrAndGetOmpSsUnpackFunc(header, newFuncRoot, codeReplacer,
+  if (rewriteUsesBrAndGetOmpSsUnpackFunc) {
+    newFunction = rewriteUsesBrAndGetOmpSsUnpackFunc(header, newFuncRoot, codeReplacer,
                       oldFunction, oldFunction->getParent(), Blocks);
   } else {
     newFunction = constructFunction(inputs, outputs, header, newFuncRoot, codeReplacer,
@@ -1555,7 +1555,7 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC) {
   // Replicate the effects of any lifetime start/end markers which referenced
   // input objects in the extraction region by placing markers around the call.
   // FIXME OmpSs: For now lets ignore lifetimes
-  if (!rewriteOutToInTaskBrAndGetOmpSsUnpackFunc && !emitOmpSsCaptureAndSubmitTask)
+  if (!rewriteUsesBrAndGetOmpSsUnpackFunc && !emitOmpSsCaptureAndSubmitTask)
     insertLifetimeMarkersSurroundingCall(
         oldFunction->getParent(), LifetimesStart.getArrayRef(), {}, TheCall);
 

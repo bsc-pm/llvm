@@ -110,7 +110,7 @@ public:
                             BasicBlock *newHeader,
                             Function *oldFunction,
                             Module *M,
-                            const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc;
+                            const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc;
     std::function<CallInst*(Function *newFunction,
                             BasicBlock *codeReplacer,
                             const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask;
@@ -149,7 +149,7 @@ public:
                                           BasicBlock *newHeader,
                                           Function *oldFunction,
                                           Module *M,
-                                          const SetVector<BasicBlock *> &Blocks)> rewriteOutToInTaskBrAndGetOmpSsUnpackFunc,
+                                          const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                   std::function<CallInst*(Function *newFunction,
                                           BasicBlock *codeReplacer,
                                           const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask);

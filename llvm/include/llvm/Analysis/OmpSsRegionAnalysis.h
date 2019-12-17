@@ -71,6 +71,7 @@ struct TaskInfo {
   TaskDependsInfo DependsInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
+  Value *Cost = nullptr;
   TaskCapturedInfo CapturedInfo;
   TaskNonPODsInfo NonPODsInfo;
   Instruction *Entry;

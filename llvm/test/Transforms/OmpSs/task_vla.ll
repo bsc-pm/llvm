@@ -182,12 +182,12 @@ arraydestroy.done1:                               ; preds = %arraydestroy.body, 
   ret void, !dbg !23
 }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi0(%struct.S* %vla, i64 %0, i8* %1, %nanos6_address_translation_entry_t* %2) {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %4)
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi0(%struct.S* %vla, i64 %0, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %2)
 ; CHECK: }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi1(%struct.S* %vla, i64 %0, i8* %1, %nanos6_address_translation_entry_t* %2) {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %4)
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi1(%struct.S* %vla, i64 %0, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %2)
 ; CHECK: }
 
 declare i8* @llvm.stacksave()

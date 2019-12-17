@@ -104,12 +104,12 @@ arrayctor.cont:                                   ; preds = %arrayctor.loop
 ; CHECK-NEXT:   ret void, !dbg !15
 }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv0([10 x %struct.S]* %array, i8* %0, %nanos6_address_translation_entry_t* %1) {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %3, i64 10)
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv0([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %1, i64 10)
 ; CHECK: }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv1([10 x %struct.S]* %array, i8* %0, %nanos6_address_translation_entry_t* %1) {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %3, i64 10)
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv1([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %1, i64 10)
 ; CHECK: }
 
 declare token @llvm.directive.region.entry()

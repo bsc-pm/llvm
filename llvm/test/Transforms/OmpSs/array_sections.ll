@@ -12,21 +12,21 @@ entry:
   ret i32 0, !dbg !8
 }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %0, i8* %1) {
+; CHECK: define internal void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %mat, i8* %handler) {
 ; CHECK-NEXT:   entry:
-; CHECK-NEXT:   %2 = getelementptr inbounds [7 x [3 x i32]], [7 x [3 x i32]]* %0, i64 0, i64 0
-; CHECK-NEXT:   %3 = bitcast [3 x i32]* %2 to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %1, i32 0, i8* null, i8* %3, i64 12, i64 0, i64 12, i64 7, i64 0, i64 7)
-; CHECK-NEXT:   %4 = bitcast [3 x i32]* %2 to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %1, i32 0, i8* null, i8* %4, i64 12, i64 4, i64 8, i64 7, i64 0, i64 2)
+; CHECK-NEXT:   %0 = getelementptr inbounds [7 x [3 x i32]], [7 x [3 x i32]]* %mat, i64 0, i64 0
+; CHECK-NEXT:   %1 = bitcast [3 x i32]* %0 to i8*
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %1, i64 12, i64 0, i64 12, i64 7, i64 0, i64 7)
+; CHECK-NEXT:   %2 = bitcast [3 x i32]* %0 to i8*
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %2, i64 12, i64 4, i64 8, i64 7, i64 0, i64 2)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0* %0, i8* %1) {
+; CHECK: define internal void @nanos6_ol_deps_main0(%nanos6_task_args_main0* %task_args, i8* %handler) {
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   %gep_mat = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %0, i32 0, i32 0
+; CHECK-NEXT:   %gep_mat = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_mat = load [7 x [3 x i32]]*, [7 x [3 x i32]]** %gep_mat
-; CHECK-NEXT:   call void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %load_gep_mat, i8* %1)
+; CHECK-NEXT:   call void @nanos6_unpacked_deps_main0([7 x [3 x i32]]* %load_gep_mat, i8* %handler)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -42,22 +42,22 @@ entry:
   ret i32 0, !dbg !12
 }
 
-; CHECK: define internal void @nanos6_unpacked_deps_foo10(%struct.S* %0, i8* %1) {
+; CHECK: define internal void @nanos6_unpacked_deps_foo10(%struct.S* %s, i8* %handler) {
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   %2 = getelementptr inbounds %struct.S, %struct.S* %0, i32 0, i32 0
-; CHECK-NEXT:   %3 = getelementptr inbounds %struct.S, %struct.S* %0, i32 0, i32 1
-; CHECK-NEXT:   %4 = bitcast i32* %2 to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %1, i32 0, i8* null, i8* %4, i64 4, i64 0, i64 4)
-; CHECK-NEXT:   %5 = bitcast i32* %3 to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %1, i32 0, i8* null, i8* %5, i64 4, i64 0, i64 4)
+; CHECK-NEXT:   %0 = getelementptr inbounds %struct.S, %struct.S* %s, i32 0, i32 0
+; CHECK-NEXT:   %1 = getelementptr inbounds %struct.S, %struct.S* %s, i32 0, i32 1
+; CHECK-NEXT:   %2 = bitcast i32* %0 to i8*
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %2, i64 4, i64 0, i64 4)
+; CHECK-NEXT:   %3 = bitcast i32* %1 to i8*
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %3, i64 4, i64 0, i64 4)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_foo10(%nanos6_task_args_foo10* %0, i8* %1) {
+; CHECK: define internal void @nanos6_ol_deps_foo10(%nanos6_task_args_foo10* %task_args, i8* %handler) {
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   %gep_s = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %0, i32 0, i32 0
+; CHECK-NEXT:   %gep_s = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_s = load %struct.S*, %struct.S** %gep_s
-; CHECK-NEXT:   call void @nanos6_unpacked_deps_foo10(%struct.S* %load_gep_s, i8* %1)
+; CHECK-NEXT:   call void @nanos6_unpacked_deps_foo10(%struct.S* %load_gep_s, i8* %handler)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
