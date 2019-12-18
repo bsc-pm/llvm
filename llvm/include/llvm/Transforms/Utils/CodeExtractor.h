@@ -109,7 +109,6 @@ public:
                             BasicBlock *newRootNode,
                             BasicBlock *newHeader,
                             Function *oldFunction,
-                            Module *M,
                             const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc;
     std::function<CallInst*(Function *newFunction,
                             BasicBlock *codeReplacer,
@@ -148,7 +147,6 @@ public:
                                           BasicBlock *newRootNode,
                                           BasicBlock *newHeader,
                                           Function *oldFunction,
-                                          Module *M,
                                           const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                   std::function<CallInst*(Function *newFunction,
                                           BasicBlock *codeReplacer,

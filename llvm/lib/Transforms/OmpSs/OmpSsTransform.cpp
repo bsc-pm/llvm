@@ -611,8 +611,9 @@ struct OmpSs : public ModulePass {
                  size_t taskNum,
                  Module &M) {
 
-    unsigned Line = TI.Entry->getDebugLoc().getLine();
-    unsigned Col = TI.Entry->getDebugLoc().getCol();
+    DebugLoc DLoc = TI.Entry->getDebugLoc();
+    unsigned Line = DLoc.getLine();
+    unsigned Col = DLoc.getCol();
     std::string FileNamePlusLoc = (M.getSourceFileName()
                                    + ":" + Twine(Line)
                                    + ":" + Twine(Col)).str();
@@ -763,7 +764,7 @@ struct OmpSs : public ModulePass {
     // 3. Create Nanos6 task data structures info
     Constant *TaskInvInfoVar = M.getOrInsertGlobal(("task_invocation_info_" + F.getName() + Twine(taskNum)).str(),
                                       Nanos6TaskInvInfo::getInstance(M).getType(),
-                                      [&] {
+                                      [&M, &F, &Nanos6TaskLocStr, &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInvInfo::getInstance(M).getType(),
                                 /*isConstant=*/true,
                                 GlobalVariable::InternalLinkage,
@@ -776,7 +777,9 @@ struct OmpSs : public ModulePass {
 
     Constant *TaskImplInfoVar = M.getOrInsertGlobal(("implementations_var_" + F.getName() + Twine(taskNum)).str(),
                                       ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
-                                      [&] {
+                                      [&M, &F, &OlTaskFuncVar,
+                                       &UnpackConstraintsFuncVar, &Nanos6TaskLocStr,
+                                       &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
                                 /*isConstant=*/true,
                                 GlobalVariable::InternalLinkage,
@@ -798,7 +801,8 @@ struct OmpSs : public ModulePass {
 
     Constant *TaskInfoVar = M.getOrInsertGlobal(("task_info_var_" + F.getName() + Twine(taskNum)).str(),
                                       Nanos6TaskInfo::getInstance(M).getType(),
-                                      [&] {
+                                      [&M, &F, &TI, &OlDepsFuncVar,
+                                       &TaskImplInfoVar, &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInfo::getInstance(M).getType(),
                                 /*isConstant=*/true,
                                 GlobalVariable::InternalLinkage,
@@ -820,12 +824,12 @@ struct OmpSs : public ModulePass {
       return GV;
     });
 
-    auto rewriteUsesBrAndGetOmpSsUnpackFunc = [&](BasicBlock *header,
-                                              BasicBlock *newRootNode,
-                                              BasicBlock *newHeader,
-                                              Function *oldFunction,
-                                              Module *M,
-                                              const SetVector<BasicBlock *> &Blocks) {
+    auto rewriteUsesBrAndGetOmpSsUnpackFunc
+      = [&UnpackTaskFuncVar, &TaskArgsList](BasicBlock *header,
+                                            BasicBlock *newRootNode,
+                                            BasicBlock *newHeader,
+                                            Function *oldFunction,
+                                            const SetVector<BasicBlock *> &Blocks) {
 
       UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
 
@@ -839,7 +843,7 @@ struct OmpSs : public ModulePass {
         std::vector<User *> Users(TaskArgsList[i]->user_begin(), TaskArgsList[i]->user_end());
         for (User *use : Users)
           if (Instruction *inst = dyn_cast<Instruction>(use))
-            if (TaskBBs.count(inst->getParent()))
+            if (Blocks.count(inst->getParent()))
               inst->replaceUsesOfWith(TaskArgsList[i], RewriteVal);
       }
 
@@ -857,13 +861,16 @@ struct OmpSs : public ModulePass {
 
       return UnpackTaskFuncVar;
     };
-    auto emitOmpSsCaptureAndSubmitTask = [&](Function *newFunction,
-                                  BasicBlock *codeReplacer,
-                                  const SetVector<BasicBlock *> &Blocks) {
+    auto emitOmpSsCaptureAndSubmitTask
+      = [this, &M, &DLoc, &TaskArgsTy,
+         &TI, &TaskArgsToStructIdxMap,
+         &TaskInfoVar, &TaskInvInfoVar](Function *newFunction,
+                                        BasicBlock *codeReplacer,
+                                        const SetVector<BasicBlock *> &Blocks) {
 
       IRBuilder<> IRB(codeReplacer);
       // Set debug info from the task entry to all instructions
-      IRB.SetCurrentDebugLocation(TI.Entry->getDebugLoc());
+      IRB.SetCurrentDebugLocation(DLoc);
 
       AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());

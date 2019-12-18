@@ -256,7 +256,6 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      BasicBlock *newRootNode,
                                                      BasicBlock *newHeader,
                                                      Function *oldFunction,
-                                                     Module *M,
                                                      const SetVector<BasicBlock *> &Blocks)> rewriteUsesBrAndGetOmpSsUnpackFunc,
                              std::function<CallInst*(Function *newFunction,
                                                      BasicBlock *codeReplacer,
@@ -1528,7 +1527,7 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC) {
   Function *newFunction;
   if (rewriteUsesBrAndGetOmpSsUnpackFunc) {
     newFunction = rewriteUsesBrAndGetOmpSsUnpackFunc(header, newFuncRoot, codeReplacer,
-                      oldFunction, oldFunction->getParent(), Blocks);
+                      oldFunction, Blocks);
   } else {
     newFunction = constructFunction(inputs, outputs, header, newFuncRoot, codeReplacer,
                       oldFunction, oldFunction->getParent());
