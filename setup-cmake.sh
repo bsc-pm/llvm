@@ -90,7 +90,7 @@ then
   info "Using Makefiles as build system because 'ninja' wasn't found in your PATH. You can override the location setting the NINJA_BIN environment variable"
 elif [ ! -x "${NINJA_BIN}" ];
 then
-  info "Using Makefiles as build system because '${NINJA_BIN}' is not executable. You can override the location setting the NINJA_BIN environment variable"
+  info "Using Makefiles as build system because '${NINJA_BIN}' is not executable."
 else
   info "Using ninja in '${NINJA_BIN}'"
   BUILD_SYSTEM="Ninja"
@@ -99,6 +99,7 @@ else
   if [ -z "$(which ninja)" ];
   then
     COMMAND_TO_BUILD="${NINJA_BIN}"
+    CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_MAKE_PROGRAM=${NINJA_BIN}")
   fi
 fi
 
@@ -165,6 +166,15 @@ then
 fi
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=${CC}")
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=${CXX}")
+
+if [ -n "${CFLAGS}" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_FLAGS=${CFLAGS}")
+fi
+if [ -n "${CXXFLAGS}" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_FLAGS=${CXXFLAGS}")
+fi
 
 ################################################################################
 # Detection of the linker
