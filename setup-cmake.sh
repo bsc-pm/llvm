@@ -173,7 +173,7 @@ then
 fi
 if [ -n "${CXXFLAGS}" ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_C_FLAGS=${CXXFLAGS}")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_FLAGS=${CXXFLAGS}")
 fi
 
 ################################################################################
