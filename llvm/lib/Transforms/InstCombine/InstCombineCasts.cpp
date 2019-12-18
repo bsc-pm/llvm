@@ -1202,7 +1202,9 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       // zext (or icmp, icmp) -> or (zext icmp), (zext icmp)
       Value *LCast = Builder.CreateZExt(LHS, CI.getType(), LHS->getName());
       Value *RCast = Builder.CreateZExt(RHS, CI.getType(), RHS->getName());
-      BinaryOperator *Or = BinaryOperator::Create(Instruction::Or, LCast, RCast);
+      Value *Or = Builder.CreateOr(LCast, RCast, CI.getName());
+      if (auto *OrInst = dyn_cast<Instruction>(Or))
+        Builder.SetInsertPoint(OrInst);
 
       // Perform the elimination.
       if (auto *LZExt = dyn_cast<ZExtInst>(LCast))
@@ -1210,7 +1212,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       if (auto *RZExt = dyn_cast<ZExtInst>(RCast))
         transformZExtICmp(RHS, *RZExt);
 
-      return Or;
+      return replaceInstUsesWith(CI, Or);
     }
   }
 
