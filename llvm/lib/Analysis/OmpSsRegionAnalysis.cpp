@@ -489,10 +489,52 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
   TI.DependsInfo.NumSymbols = TAI.DepSymToIdx.size();
 }
 
-static void gatherIfFinalCostInfo(const IntrinsicInst *I, TaskInfo &TI) {
+static void gatherUnpackCostInstructions(const TaskDSAInfo &DSAInfo,
+                                     const TaskCapturedInfo &CapturedInfo,
+                                     const OrderedInstructions &OI,
+                                     Value *V,
+                                     SmallVectorImpl<Instruction *> &UnpackInsts,
+                                     SetVector<ConstantExpr *> &UnpackConsts) {
+
+  // First element is the current instruction, second is
+  // the Instruction where we come from
+  SmallVector<std::pair<Value *, Value *>, 4> WorkList;
+  WorkList.emplace_back(V, V);
+  while (!WorkList.empty()) {
+    auto It = WorkList.begin();
+    Value *Cur = It->first;
+    Value *Dep = It->second;
+    WorkList.erase(It);
+    bool IsDSA = valueInDSABundles(DSAInfo, Cur);
+    // Go over all uses until we get a DSA
+    if (!IsDSA) {
+      if (ConstantExpr *CE = dyn_cast<ConstantExpr>(Cur)) {
+        for (Use &U : CE->operands()) {
+          WorkList.emplace_back(U.get(), Dep);
+        }
+        UnpackConsts.insert(CE);
+      }
+
+      if (Instruction *I = dyn_cast<Instruction>(Cur)) {
+        for (Use &U : I->operands()) {
+          WorkList.emplace_back(U.get(), Dep);
+        }
+        insertUniqInstInProgramOrder(UnpackInsts, I, OI);
+      }
+    }
+  }
+}
+
+static void gatherCostInfo(const IntrinsicInst *I, TaskInfo &TI,
+                           const OrderedInstructions &OI) {
+  getValueFromOperandBundleWithID(I, TI.CostInfo.Cost, LLVMContext::OB_oss_cost);
+  if (TI.CostInfo.Cost)
+    gatherUnpackCostInstructions(TI.DSAInfo, TI.CapturedInfo, OI, TI.CostInfo.Cost, TI.CostInfo.UnpackInstructions, TI.CostInfo.UnpackConstants);
+}
+
+static void gatherIfFinalInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
   getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
-  getValueFromOperandBundleWithID(I, TI.Cost, LLVMContext::OB_oss_cost);
 }
 
 // It's expected to have VLA dims info before calling this
@@ -546,7 +588,8 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
-          gatherIfFinalCostInfo(II, T.Info);
+          gatherCostInfo(II, T.Info, OI);
+          gatherIfFinalInfo(II, T.Info);
 
           Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {

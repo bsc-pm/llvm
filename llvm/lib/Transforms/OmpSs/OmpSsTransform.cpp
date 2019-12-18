@@ -325,6 +325,42 @@ struct OmpSs : public ModulePass {
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
   }
 
+  void unpackCostAndRewrite(Module &M, TaskCostInfo &TCI, Function *F, ArrayRef<Value *> TaskArgsList) {
+    BasicBlock::Create(M.getContext(), "entry", F);
+    BasicBlock &Entry = F->getEntryBlock();
+    DenseMap<Value *, Value *> ConstExprToInst;
+    for (ConstantExpr * const &CE : TCI.UnpackConstants) {
+      Instruction *I = CE->getAsInstruction();
+      Entry.getInstList().push_back(I);
+
+      ConstExprToInst[CE] = I;
+    }
+    for (Instruction * const &I : TCI.UnpackInstructions) {
+      I->removeFromParent();
+      Entry.getInstList().push_back(I);
+    }
+    for (Instruction &I : Entry) {
+      Function::arg_iterator AI = F->arg_begin();
+      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
+        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
+      }
+      for (auto &p : ConstExprToInst) {
+        I.replaceUsesOfWith(p.first, p.second);
+      }
+    }
+    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+    IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+    Value *Constraints = &*(F->arg_end() - 1);
+    Value *Idx[2];
+    Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+    Idx[1] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+
+    Value *GEPConstraints = BBBuilder.CreateGEP(
+          Constraints, Idx, "gep_" + Constraints->getName());
+    Value *CostCast = BBBuilder.CreateZExt(TCI.Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
+    BBBuilder.CreateStore(CostCast, GEPConstraints);
+  }
+
   void unpackCallToRTOfType(Module &M,
                             const SmallVectorImpl<DependInfo> &DependList,
                             Function *F,
@@ -696,6 +732,34 @@ struct OmpSs : public ModulePass {
 
     // nanos6_ol_deps_* END
 
+    Function *UnpackConstraintsFuncVar = nullptr;
+    if (TI.CostInfo.Cost) {
+      // nanos6_unpacked_constraints_* START
+      TaskExtraTypeList.clear();
+      TaskExtraNameList.clear();
+      // nanos6_task_constraints_t *constraints
+      TaskExtraTypeList.push_back(Nanos6TaskConstraints::getInstance(M).getType()->getPointerTo());
+      TaskExtraNameList.push_back("constraints");
+
+      UnpackConstraintsFuncVar = createUnpackOlFunction(M, F,
+                                 ("nanos6_unpacked_constraints_" + F.getName() + Twine(taskNum)).str(),
+                                 TaskTypeList, TaskNameList,
+                                 TaskExtraTypeList, TaskExtraNameList);
+      unpackCostAndRewrite(M, TI.CostInfo, UnpackConstraintsFuncVar, TaskArgsList.getArrayRef());
+      // nanos6_unpacked_constraints_* END
+
+      // nanos6_ol_constraints_* START
+
+      Function *OlConstraintsFuncVar
+        = createUnpackOlFunction(M, F,
+                                 ("nanos6_ol_constraints_" + F.getName() + Twine(taskNum)).str(),
+                                 {TaskArgsTy->getPointerTo()}, {"task_args"},
+                                 TaskExtraTypeList, TaskExtraNameList);
+      olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar);
+
+      // nanos6_ol_constraints_* END
+    }
+
     // 3. Create Nanos6 task data structures info
     Constant *TaskInvInfoVar = M.getOrInsertGlobal(("task_invocation_info_" + F.getName() + Twine(taskNum)).str(),
                                       Nanos6TaskInvInfo::getInstance(M).getType(),
@@ -721,7 +785,9 @@ struct OmpSs : public ModulePass {
                                                                        ConstantInt::get(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(0), 0),
                                                                        ConstantExpr::getPointerCast(OlTaskFuncVar, Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(1)),
                                                                        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
-                                                                       ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
+                                                                       UnpackConstraintsFuncVar
+                                                                         ? ConstantExpr::getPointerCast(UnpackConstraintsFuncVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))
+                                                                         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
                                                                        Nanos6TaskLocStr,
                                                                        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(5))))),
                                 ("implementations_var_" + F.getName() + Twine(taskNum)).str());

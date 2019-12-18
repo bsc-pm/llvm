@@ -65,13 +65,21 @@ struct TaskDependsInfo {
   int NumSymbols;
 };
 
+struct TaskCostInfo {
+  Value *Cost = nullptr;
+  // Unique Instructions needed as a bridge between cost and DSAs
+  // Stored in program order
+  SmallVector<Instruction *, 4> UnpackInstructions;
+  SetVector<ConstantExpr *> UnpackConstants;
+};
+
 struct TaskInfo {
   TaskDSAInfo DSAInfo;
   TaskVLADimsInfo VLADimsInfo;
   TaskDependsInfo DependsInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
-  Value *Cost = nullptr;
+  TaskCostInfo CostInfo;
   TaskCapturedInfo CapturedInfo;
   TaskNonPODsInfo NonPODsInfo;
   Instruction *Entry;
