@@ -62,6 +62,19 @@ fi
 CMAKE_INVOCATION_EXTRA_FLAGS=("-DCMAKE_INSTALL_PREFIX=${INSTALLDIR}")
 
 ################################################################################
+# Build type
+################################################################################
+
+if [ -z "${BUILD_TYPE}" ];
+then
+  BUILD_TYPE="Debug"
+  info "Defaulting to Debug build"
+else
+  info "Specified a ${BUILD_TYPE} build"
+fi
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_BUILD_TYPE=${BUILD_TYPE}")
+
+################################################################################
 # Detection of build system
 ################################################################################
 
@@ -236,6 +249,8 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
    -DLLVM_ENABLE_PROJECTS=clang \
    -DLLVM_INSTALL_UTILS=ON \
+   -DLLVM_ENABLE_ASSERTIONS=ON \
+   -DLLVM_USE_SPLIT_DWARF=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
 if [ $? = 0 ];
