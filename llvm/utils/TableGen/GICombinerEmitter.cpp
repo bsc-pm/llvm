@@ -291,7 +291,7 @@ static const DagInit *getDagWithOperatorOfSubClass(const Init &N,
 
 StringRef makeNameForAnonInstr(CombineRule &Rule) {
   return insertStrTab(to_string(
-      format("__anon%" PRIu64 "_%" PRIu64, Rule.getID(), Rule.allocUID())));
+      format("__anon%" PRIu64 "_%u", Rule.getID(), Rule.allocUID())));
 }
 
 StringRef makeDebugName(CombineRule &Rule, StringRef Name) {
@@ -300,7 +300,7 @@ StringRef makeDebugName(CombineRule &Rule, StringRef Name) {
 
 StringRef makeNameForAnonPredicate(CombineRule &Rule) {
   return insertStrTab(to_string(
-      format("__anonpred%" PRIu64 "_%" PRIu64, Rule.getID(), Rule.allocUID())));
+      format("__anonpred%" PRIu64 "_%u", Rule.getID(), Rule.allocUID())));
 }
 
 void CombineRule::declareMatchData(StringRef PatternSymbol, StringRef Type,
@@ -710,7 +710,8 @@ void GICombinerEmitter::run(raw_ostream &OS) {
      << "  bool tryCombineAll(\n"
      << "    GISelChangeObserver &Observer,\n"
      << "    MachineInstr &MI,\n"
-     << "    MachineIRBuilder &B) const;\n"
+     << "    MachineIRBuilder &B,\n"
+     << "    CombinerHelper &Helper) const;\n"
      << "};\n\n";
 
   emitNameMatcher(OS);
@@ -766,8 +767,8 @@ void GICombinerEmitter::run(raw_ostream &OS) {
   OS << "bool " << getClassName() << "::tryCombineAll(\n"
      << "    GISelChangeObserver &Observer,\n"
      << "    MachineInstr &MI,\n"
-     << "    MachineIRBuilder &B) const {\n"
-     << "  CombinerHelper Helper(Observer, B);\n"
+     << "    MachineIRBuilder &B,\n"
+     << "    CombinerHelper &Helper) const {\n"
      << "  MachineBasicBlock *MBB = MI.getParent();\n"
      << "  MachineFunction *MF = MBB->getParent();\n"
      << "  MachineRegisterInfo &MRI = MF->getRegInfo();\n"
