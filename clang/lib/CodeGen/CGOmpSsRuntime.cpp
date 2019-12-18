@@ -335,33 +335,36 @@ public:
 };
 } // namespace
 
-static void EmitVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
-                        SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-                        SmallVectorImpl<llvm::Value *> &CapturedList) {
+// Gathers VLA dims info for VLA.DIMS (if IsPtr) and CAPTURED bundles
+static void GatherVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
+                          SmallVectorImpl<llvm::Value *> &DimsWithValue,
+                          SmallVectorImpl<llvm::Value *> &CapturedList,
+                          bool IsPtr) {
+  assert(DimsWithValue.empty() && "DimsWithValue must be empty");
   // C long -> LLVM long
   llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
 
-  SmallVector<llvm::Value*, 4> DimsWithValue;
-  DimsWithValue.push_back(V);
+  if (!IsPtr)
+    DimsWithValue.push_back(V);
   while (Q->isArrayType()) {
     if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(Q)) {
       auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
       llvm::Value *DimExpr = CGF.Builder.CreateSExt(VlaSize.NumElts, OSSArgTy);
-      DimsWithValue.push_back(DimExpr);
+      if (!IsPtr)
+        DimsWithValue.push_back(DimExpr);
       CapturedList.push_back(DimExpr);
       Q = BaseArrayTy->getElementType();
     } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(Q)) {
       uint64_t DimSize = BaseArrayTy->getSize().getSExtValue();
       llvm::Value *DimConstant = llvm::ConstantInt::getSigned(OSSArgTy, DimSize);
-      DimsWithValue.push_back(DimConstant);
+      if (!IsPtr)
+        DimsWithValue.push_back(DimConstant);
       CapturedList.push_back(DimConstant);
       Q = BaseArrayTy->getElementType();
     } else {
       llvm_unreachable("Unhandled array type");
     }
   }
-  assert(DimsWithValue.size() >= 1);
-  TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 }
 
 static void EmitCopyCtorFunc(CodeGenModule &CGM,
@@ -676,11 +679,17 @@ static void EmitDSAShared(
       TaskInfo.emplace_back(BundleName, V);
     }
     QualType Q = VD->getType();
-    // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
-    while (Q->isPointerType())
+    // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
+    bool IsPtr = Q->isPointerType();
+    SmallVector<llvm::Value *, 4> DimsWithValue;
+    while (Q->isPointerType()) {
       Q = Q->getPointeeType();
+    }
     if (Q->isVariableArrayType())
-      EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+      GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+
+    if (!DimsWithValue.empty())
+      TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
     TaskInfo.emplace_back(BundleName, CGF.EmitScalarExpr(ThisE));
@@ -711,11 +720,17 @@ static void EmitDSAPrivate(
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
-  // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
-  while (Q->isPointerType())
-      Q = Q->getPointeeType();
+  // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
+  bool IsPtr = Q->isPointerType();
+  SmallVector<llvm::Value *, 4> DimsWithValue;
+  while (Q->isPointerType()) {
+    Q = Q->getPointeeType();
+  }
   if (Q->isVariableArrayType())
-    EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+    GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+
+  if (!DimsWithValue.empty())
+    TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 
   const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
   const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
@@ -748,11 +763,17 @@ static void EmitDSAFirstprivate(
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
-  // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
-  while (Q->isPointerType())
-      Q = Q->getPointeeType();
+  // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
+  bool IsPtr = Q->isPointerType();
+  SmallVector<llvm::Value *, 4> DimsWithValue;
+  while (Q->isPointerType()) {
+    Q = Q->getPointeeType();
+  }
   if (Q->isVariableArrayType())
-    EmitVLADims(CGF, V, Q, TaskInfo, CapturedList);
+    GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+
+  if (!DimsWithValue.empty())
+    TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 
   const DeclRefExpr *CopyE = cast<DeclRefExpr>(FpDataTy.Copy);
   const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());

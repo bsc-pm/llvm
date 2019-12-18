@@ -261,7 +261,7 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      BasicBlock *codeReplacer,
                                                      const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
-      BPI(nullptr), AllowVarArgs(false),
+      BPI(nullptr), AC(nullptr), AllowVarArgs(false),
       Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
       rewriteUsesBrAndGetOmpSsUnpackFunc(rewriteUsesBrAndGetOmpSsUnpackFunc),
       emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {}

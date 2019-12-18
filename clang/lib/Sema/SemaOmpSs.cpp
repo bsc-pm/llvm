@@ -275,6 +275,9 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   // Walks over all array dimensions looking for VLA size Expr.
   void GetTypeDSAs(QualType T) {
     QualType TmpTy = T;
+    // int (**p)[sizex][sizey] -> we need sizex sizey for vla dims
+    while (TmpTy->isPointerType())
+      TmpTy = TmpTy->getPointeeType();
     while (TmpTy->isArrayType()) {
       if (const ConstantArrayType *BaseArrayTy = SemaRef.Context.getAsConstantArrayType(TmpTy)) {
         TmpTy = BaseArrayTy->getElementType();

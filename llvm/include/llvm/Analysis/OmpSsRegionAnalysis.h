@@ -101,18 +101,7 @@ struct TaskwaitFunctionInfo {
 };
 // End Taskwait data structures
 
-struct FunctionInfo {
-  TaskFunctionInfo TaskFuncInfo;
-  TaskwaitFunctionInfo TaskwaitFuncInfo;
-};
-
 // Start Analysis data structures. this info is not passed to transformation phase
-struct TaskPrintInfo {
-  // Task nesting level
-  size_t Depth;
-  size_t Idx;
-};
-
 struct TaskAnalysisInfo {
   SetVector<Value *> UsesBeforeEntry;
   SetVector<Value *> UsesAfterExit;
@@ -120,23 +109,28 @@ struct TaskAnalysisInfo {
   std::map<Value *, int> DepSymToIdx;
 };
 
-struct TaskFunctionAnalysisInfo {
-  SmallVector<TaskAnalysisInfo, 4> PostOrder;
+struct TaskWithAnalysisInfo {
+  TaskAnalysisInfo AnalysisInfo;
+  TaskInfo Info;
 };
 
 // End Analysis data structures
 
+struct FunctionInfo {
+  TaskFunctionInfo TaskFuncInfo;
+  TaskwaitFunctionInfo TaskwaitFuncInfo;
+};
+
 class OmpSsRegionAnalysisPass : public FunctionPass {
 private:
 
+  // Task Analysis and Info for a task entry
+  MapVector<Instruction *, TaskWithAnalysisInfo> TEntryToTaskWithAnalysisInfo;
+  // nullptr is the first level where the outer tasks are
+  MapVector<Instruction *, SmallVector<Instruction *, 4>> TasksTree;
 
-  // AnalysisInfo only used in this pass
-  TaskFunctionAnalysisInfo TaskFuncAnalysisInfo;
   // Info used by the transform pass
   FunctionInfo FuncInfo;
-  // Used to keep the task layout to print it properly, since
-  // we save the tasks in post order
-  MapVector<Instruction *, TaskPrintInfo> TaskProgramOrder;
 
   static const int PrintSpaceMultiplier = 2;
   // Walk over each task in RPO identifying uses before entry
@@ -145,8 +139,8 @@ private:
   // Also, gathers all taskwait instructions
   static void getOmpSsFunctionInfo(
       Function &F, DominatorTree &DT, FunctionInfo &FI,
-      TaskFunctionAnalysisInfo &TFAI,
-      MapVector<Instruction *, TaskPrintInfo> &TPO);
+      MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
+      MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree);
 
 public:
   static char ID;

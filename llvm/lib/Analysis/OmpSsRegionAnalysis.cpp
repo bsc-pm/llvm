@@ -86,17 +86,15 @@ static bool valueInCapturedBundle(const TaskCapturedInfo& CapturedInfo,
   return CapturedInfo.count(V);
 }
 
-void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
-  for (auto it = TaskProgramOrder.begin(); it != TaskProgramOrder.end(); ++it) {
-    Instruction *I = it->first;
-    int Depth = it->second.Depth;
-    int Idx = it->second.Idx;
-    const TaskAnalysisInfo &AnalysisInfo = TaskFuncAnalysisInfo.PostOrder[Idx];
-    const TaskInfo &Info = FuncInfo.TaskFuncInfo.PostOrder[Idx];
-
+static void print_verbose(
+  const MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
+  const MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
+  Instruction *Cur, int Depth, int PrintSpaceMultiplier) {
+  if (Cur) {
     dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
-    I->printAsOperand(dbgs(), false);
-
+    Cur->printAsOperand(dbgs(), false);
+    const TaskAnalysisInfo &AnalysisInfo = TEntryToTaskWithAnalysisInfo.lookup(Cur).AnalysisInfo;
+    const TaskInfo &Info = TEntryToTaskWithAnalysisInfo.lookup(Cur).Info;
     if (PrintVerboseLevel == PV_Uses) {
       for (size_t j = 0; j < AnalysisInfo.UsesBeforeEntry.size(); ++j) {
         dbgs() << "\n";
@@ -199,9 +197,16 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
         }
       }
     }
-
     dbgs() << "\n";
   }
+  for (auto II : TasksTree.lookup(Cur)) {
+    print_verbose(TEntryToTaskWithAnalysisInfo,
+                  TasksTree, II, Depth + 1, PrintSpaceMultiplier);
+  }
+}
+
+void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
+  print_verbose(TEntryToTaskWithAnalysisInfo, TasksTree, nullptr, -1, PrintSpaceMultiplier);
 }
 
 FunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return FuncInfo; }
@@ -551,35 +556,75 @@ static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
   }
 }
 
+// in: TasksTree, Cur
+// out: tasks are ordered in post order, which means that
+// child tasks will be placed before its parent tasks
+static void convertTasksTreeToVectorImpl(
+  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
+  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
+  Instruction *Cur,
+  SmallVectorImpl<TaskInfo> &PostOrder) {
+
+  // TODO: Why using operator[] does weird things?
+  // for (auto II : TasksTree[Cur]) {
+  for (auto II : TasksTree.lookup(Cur)) {
+    convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
+                                 TasksTree, II, PostOrder);
+  }
+  if (Cur)
+    PostOrder.push_back(TEntryToTaskWithAnalysisInfo[Cur].Info);
+}
+
+// in: TasksTree, Cur
+// out: tasks are ordered in post order, which means that
+// child tasks will be placed before its parent tasks
+static void convertTasksTreeToVector(
+  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
+  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
+  SmallVectorImpl<TaskInfo> &PostOrder) {
+
+  convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
+                               TasksTree, nullptr, PostOrder);
+}
+
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
-    Function &F, DominatorTree &DT, FunctionInfo &FI,
-    TaskFunctionAnalysisInfo &TFAI,
-    MapVector<Instruction *, TaskPrintInfo> &TPO) {
+  Function &F, DominatorTree &DT, FunctionInfo &FI,
+  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
+  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree) {
 
   OrderedInstructions OI(&DT);
 
-  struct Task {
-    TaskAnalysisInfo AnalysisInfo;
-    TaskInfo Info;
-  };
+  MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBTaskStacks;
+  SmallVector<BasicBlock*, 8> Worklist;
+  SmallPtrSet<BasicBlock*, 8> Visited;
 
-  SmallVector<Task, 2> Stack;
+  Worklist.push_back(&F.getEntryBlock());
+  Visited.insert(&F.getEntryBlock());
+  while (!Worklist.empty()) {
+    auto WIt = Worklist.begin();
+    BasicBlock *BB = *WIt;
+    Worklist.erase(WIt);
 
-  ReversePostOrderTraversal<BasicBlock *> RPOT(&F.getEntryBlock());
-  for (BasicBlock *BB : RPOT) {
+    SmallVectorImpl<Instruction *> &Stack = BBTaskStacks[BB];
+
     for (Instruction &I : *BB) {
       if (auto *II = dyn_cast<IntrinsicInst>(&I)) {
         if (II->getIntrinsicID() == Intrinsic::directive_region_entry) {
           assert(II->hasOneUse() && "Task entry has more than one user.");
 
-          TaskPrintInfo &TPI = TPO[II];
-          TPI.Depth = Stack.size();
-
-          Instruction *Exit = dyn_cast<Instruction>(II->user_back());
-          assert(Exit && "Task exit is not a Instruction.");
+          Instruction *Exit = cast<Instruction>(II->user_back());
+          // This should not happen because it will crash before this pass
           assert(OI.dominates(II, Exit) && "Task entry does not dominate exit.");
 
-          Task T;
+          if (Stack.empty()) {
+            // outer task, insert into nullptr
+            TasksTree[nullptr].push_back(II);
+          } else {
+            TasksTree[Stack.back()].push_back(II);
+          }
+          Stack.push_back(II);
+
+          TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[II];
           T.Info.Entry = II;
           T.Info.Exit = Exit;
 
@@ -591,31 +636,25 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherCostInfo(II, T.Info, OI);
           gatherIfFinalInfo(II, T.Info);
 
-          Stack.push_back(T);
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
           if (Stack.empty())
             llvm_unreachable("Task exit hit without and entry.");
 
-          Task &T = Stack.back();
-          Instruction *Entry = T.Info.Entry;
-
-          TaskPrintInfo &TPI = TPO[&*Entry];
-          TPI.Idx = FI.TaskFuncInfo.PostOrder.size();
-
-          TFAI.PostOrder.push_back(T.AnalysisInfo);
-          FI.TaskFuncInfo.PostOrder.push_back(T.Info);
+          Instruction *StackEntry = Stack.back();
+          Instruction *StackExit = cast<Instruction>(StackEntry->user_back());
+          assert(StackExit == II && "unexpected task exit instr.");
 
           Stack.pop_back();
         } else if (II->getIntrinsicID() == Intrinsic::directive_marker) {
           FI.TaskwaitFuncInfo.PostOrder.push_back({II});
         }
       } else if (!Stack.empty()) {
-        Task &T = Stack.back();
-        Instruction *Entry = T.Info.Entry;
-        Instruction *Exit = T.Info.Exit;
+        Instruction *StackEntry = Stack.back();
+        Instruction *StackExit = cast<Instruction>(StackEntry->user_back());
+        TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[StackEntry];
         for (Use &U : I.operands()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U.get())) {
-            if (OI.dominates(I2, Entry)) {
+            if (OI.dominates(I2, StackEntry)) {
               T.AnalysisInfo.UsesBeforeEntry.insert(I2);
             if (!DisableChecks
                 && !valueInDSABundles(T.Info.DSAInfo, I2)
@@ -636,7 +675,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         }
         for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {
-            if (OI.dominates(Exit, I2)) {
+            if (OI.dominates(StackExit, I2)) {
               T.AnalysisInfo.UsesAfterExit.insert(&I);
               if (!DisableChecks) {
                 llvm_unreachable("Value inside the task body used after it.");
@@ -646,20 +685,34 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         }
       }
     }
+
+    for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
+      if (!Visited.count(*It)) {
+        Worklist.push_back(*It);
+        Visited.insert(*It);
+        // Forward Stack, since we are setting visited here
+        // we do this only once per BB
+        BBTaskStacks[*It].append(Stack.begin(), Stack.end());
+      }
+    }
   }
+
+  convertTasksTreeToVector(TEntryToTaskWithAnalysisInfo,
+                           TasksTree, FI.TaskFuncInfo.PostOrder);
+
 }
 
 bool OmpSsRegionAnalysisPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  getOmpSsFunctionInfo(F, DT, FuncInfo, TaskFuncAnalysisInfo, TaskProgramOrder);
+  getOmpSsFunctionInfo(F, DT, FuncInfo, TEntryToTaskWithAnalysisInfo, TasksTree);
 
   return false;
 }
 
 void OmpSsRegionAnalysisPass::releaseMemory() {
   FuncInfo = FunctionInfo();
-  TaskFuncAnalysisInfo = TaskFunctionAnalysisInfo();
-  TaskProgramOrder.clear();
+  TEntryToTaskWithAnalysisInfo.clear();
+  TasksTree.clear();
 }
 
 void OmpSsRegionAnalysisPass::getAnalysisUsage(AnalysisUsage &AU) const {

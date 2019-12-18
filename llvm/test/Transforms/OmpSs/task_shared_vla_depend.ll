@@ -54,51 +54,51 @@ entry:
   ret void, !dbg !21
 
 ; CHECK: codeRepl:                                         ; preds = %entry
-; CHECK-NEXT:   %9 = alloca %nanos6_task_args_vla_senction_dep0*, !dbg !13
-; CHECK-NEXT:   %10 = bitcast %nanos6_task_args_vla_senction_dep0** %9 to i8**, !dbg !13
-; CHECK-NEXT:   %11 = alloca i8*, !dbg !13
-; CHECK-NEXT:   %12 = mul nuw i64 4, %1, !dbg !13
-; CHECK-NEXT:   %13 = mul nuw i64 %12, %3, !dbg !13
-; CHECK-NEXT:   %14 = mul nuw i64 %13, %5, !dbg !13
-; CHECK-NEXT:   %15 = add nuw i64 0, %14, !dbg !13
-; CHECK-NEXT:   %16 = add nuw i64 32, %15, !dbg !13
-; CHECK-NEXT:   call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_vla_senction_dep0, %nanos6_task_invocation_info_t* @task_invocation_info_vla_senction_dep0, i64 %16, i8** %10, i8** %11, i64 0, i64 1), !dbg !13
-; CHECK-NEXT:   %17 = load %nanos6_task_args_vla_senction_dep0*, %nanos6_task_args_vla_senction_dep0** %9, !dbg !13
-; CHECK-NEXT:   %18 = bitcast %nanos6_task_args_vla_senction_dep0* %17 to i8*, !dbg !13
-; CHECK-NEXT:   %args_end = getelementptr i8, i8* %18, i64 32, !dbg !13
-; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 0, !dbg !13
-; CHECK-NEXT:   %19 = bitcast i32** %gep_vla to i8**, !dbg !13
-; CHECK-NEXT:   store i8* %args_end, i8** %19, align 4, !dbg !13
-; CHECK-NEXT:   %20 = mul nuw i64 4, %1, !dbg !13
-; CHECK-NEXT:   %21 = mul nuw i64 %20, %3, !dbg !13
-; CHECK-NEXT:   %22 = mul nuw i64 %21, %5, !dbg !13
-; CHECK-NEXT:   %23 = getelementptr i8, i8* %args_end, i64 %22, !dbg !13
-; CHECK-NEXT:   %gep_vla1 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 0, !dbg !13
+; CHECK-NEXT:   %11 = alloca %nanos6_task_args_vla_senction_dep0*, !dbg !13
+; CHECK-NEXT:   %12 = bitcast %nanos6_task_args_vla_senction_dep0** %11 to i8**, !dbg !13
+; CHECK-NEXT:   %13 = alloca i8*, !dbg !13
+; CHECK-NEXT:   %14 = mul nuw i64 4, %1, !dbg !13
+; CHECK-NEXT:   %15 = mul nuw i64 %14, %3, !dbg !13
+; CHECK-NEXT:   %16 = mul nuw i64 %15, %5, !dbg !13
+; CHECK-NEXT:   %17 = add nuw i64 0, %16, !dbg !13
+; CHECK-NEXT:   %18 = add nuw i64 32, %17, !dbg !13
+; CHECK-NEXT:   call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_vla_senction_dep0, %nanos6_task_invocation_info_t* @task_invocation_info_vla_senction_dep0, i64 %18, i8** %12, i8** %13, i64 0, i64 1), !dbg !13
+; CHECK-NEXT:   %19 = load %nanos6_task_args_vla_senction_dep0*, %nanos6_task_args_vla_senction_dep0** %11, !dbg !13
+; CHECK-NEXT:   %20 = bitcast %nanos6_task_args_vla_senction_dep0* %19 to i8*, !dbg !13
+; CHECK-NEXT:   %args_end = getelementptr i8, i8* %20, i64 32, !dbg !13
+; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %19, i32 0, i32 0, !dbg !13
+; CHECK-NEXT:   %21 = bitcast i32** %gep_vla to i8**, !dbg !13
+; CHECK-NEXT:   store i8* %args_end, i8** %21, align 4, !dbg !13
+; CHECK-NEXT:   %22 = mul nuw i64 4, %1, !dbg !13
+; CHECK-NEXT:   %23 = mul nuw i64 %22, %3, !dbg !13
+; CHECK-NEXT:   %24 = mul nuw i64 %23, %5, !dbg !13
+; CHECK-NEXT:   %25 = getelementptr i8, i8* %args_end, i64 %24, !dbg !13
+; CHECK-NEXT:   %gep_vla1 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %19, i32 0, i32 0, !dbg !13
 ; CHECK-NEXT:   store i32* %vla, i32** %gep_vla1, !dbg !13
-; CHECK-NEXT:   %capt_gep_ = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 1, !dbg !13
+; CHECK-NEXT:   %capt_gep_ = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %19, i32 0, i32 1, !dbg !13
 ; CHECK-NEXT:   store i64 %1, i64* %capt_gep_, !dbg !13
-; CHECK-NEXT:   %capt_gep_2 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 2, !dbg !13
+; CHECK-NEXT:   %capt_gep_2 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %19, i32 0, i32 2, !dbg !13
 ; CHECK-NEXT:   store i64 %3, i64* %capt_gep_2, !dbg !13
-; CHECK-NEXT:   %capt_gep_3 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %17, i32 0, i32 3, !dbg !13
+; CHECK-NEXT:   %capt_gep_3 = getelementptr %nanos6_task_args_vla_senction_dep0, %nanos6_task_args_vla_senction_dep0* %19, i32 0, i32 3, !dbg !13
 ; CHECK-NEXT:   store i64 %5, i64* %capt_gep_3, !dbg !13
-; CHECK-NEXT:   %24 = load i8*, i8** %11, !dbg !13
-; CHECK-NEXT:   call void @nanos6_submit_task(i8* %24), !dbg !13
-; CHECK-NEXT:   br label %25, !dbg !13
-; CHECK: 25:                                               ; preds = %codeRepl
-; CHECK-NEXT:   %26 = mul nuw i64 %1, %3, !dbg !14
-; CHECK-NEXT:   %27 = mul nuw i64 %26, %5, !dbg !14
-; CHECK-NEXT:   %28 = mul nuw i64 4, %27, !dbg !14
-; CHECK-NEXT:   %conv4 = trunc i64 %28 to i32, !dbg !14
+; CHECK-NEXT:   %26 = load i8*, i8** %13, !dbg !13
+; CHECK-NEXT:   call void @nanos6_submit_task(i8* %26), !dbg !13
+; CHECK-NEXT:   br label %27, !dbg !13
+; CHECK: 27:                                               ; preds = %codeRepl
+; CHECK-NEXT:   %28 = mul nuw i64 %1, %3, !dbg !14
+; CHECK-NEXT:   %29 = mul nuw i64 %28, %5, !dbg !14
+; CHECK-NEXT:   %30 = mul nuw i64 4, %29, !dbg !14
+; CHECK-NEXT:   %conv4 = trunc i64 %30 to i32, !dbg !14
 ; CHECK-NEXT:   store i32 %conv4, i32* %size3, align 4, !dbg !15
-; CHECK-NEXT:   %29 = load i8*, i8** %saved_stack, align 8, !dbg !16
-; CHECK-NEXT:   call void @llvm.stackrestore(i8* %29), !dbg !16
+; CHECK-NEXT:   %31 = load i8*, i8** %saved_stack, align 8, !dbg !16
+; CHECK-NEXT:   call void @llvm.stackrestore(i8* %31), !dbg !16
 ; CHECK-NEXT:   ret void, !dbg !16
 
 }
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_vla_senction_dep0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
 ; CHECK-NEXT: newFuncRoot:
-; CHECK-NEXT:   br label %3, !dbg !13
+; CHECK-NEXT:   br label %3, !dbg !17
 ; CHECK: 3:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %size = alloca i32, align 4
 ; CHECK-NEXT:   %4 = mul nuw i64 %0, %1, !dbg !17

@@ -263,48 +263,32 @@ struct OmpSs : public ModulePass {
   FunctionCallee CreateTaskFuncTy;
   FunctionCallee TaskSubmitFuncTy;
 
-  void rewriteDepValue(ArrayRef<Value *> TaskArgsList,
-                       Function *F,
-                       DenseMap<Value *, Value *> &ConstExprToInst,
-                       Value *&V) {
-    if (ConstExprToInst.count(V)) {
-      V = ConstExprToInst[V];
-    } else {
-      Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
-        if (TaskArgsList[i] == V) {
-          V = &*AI;
-          return;
-        }
-      }
-    }
-  }
-
-  void rewriteDeps(ArrayRef<Value *> TaskArgsList,
-                   Function *F,
-                   DenseMap<Value *, Value *> &ConstExprToInst,
-                   SmallVectorImpl<DependInfo> &DependList) {
-    for (DependInfo &DI : DependList) {
-      rewriteDepValue(TaskArgsList, F, ConstExprToInst, DI.Base);
-      for (Value *&V : DI.Dims)
-        rewriteDepValue(TaskArgsList, F, ConstExprToInst, V);
-    }
-  }
-
   void unpackDepsAndRewrite(Module &M, TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> TaskArgsList) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
     DenseMap<Value *, Value *> ConstExprToInst;
+    DenseMap<Value *, Value *> InstToClone;
     for (ConstantExpr * const &CE : TDI.UnpackConstants) {
       Instruction *I = CE->getAsInstruction();
       Entry.getInstList().push_back(I);
 
+      // TODO: make a use case that have two or more same constants
       ConstExprToInst[CE] = I;
     }
     for (Instruction * const &I : TDI.UnpackInstructions) {
-      I->removeFromParent();
-      Entry.getInstList().push_back(I);
+      Instruction *IClone = I->clone();
+      if (I->hasName())
+        IClone->setName(I->getName());
+      Entry.getInstList().push_back(IClone);
+      InstToClone[I] = IClone;
     }
+    // Once we have inserted the cloned instructions and the ConstantExpr instructions
+    // add the terminator so IRBuilder inserts just before it
+    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+
+    // Insert RT call before replacing uses
+    unpackDepsCallToRT(M, ConstExprToInst, TDI, F);
+
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
       for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
@@ -313,16 +297,10 @@ struct OmpSs : public ModulePass {
       for (auto &p : ConstExprToInst) {
         I.replaceUsesOfWith(p.first, p.second);
       }
+      for (auto &p : InstToClone) {
+        I.replaceUsesOfWith(p.first, p.second);
+      }
     }
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Ins);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Outs);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Inouts);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Concurrents);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.Commutatives);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakIns);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakOuts);
-    rewriteDeps(TaskArgsList, F, ConstExprToInst, TDI.WeakInouts);
-    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
   }
 
   void unpackCostAndRewrite(Module &M, TaskCostInfo &TCI, Function *F, ArrayRef<Value *> TaskArgsList) {
@@ -333,6 +311,7 @@ struct OmpSs : public ModulePass {
       Instruction *I = CE->getAsInstruction();
       Entry.getInstList().push_back(I);
 
+      // TODO: make a use case that have two or more same constants
       ConstExprToInst[CE] = I;
     }
     for (Instruction * const &I : TCI.UnpackInstructions) {
@@ -362,13 +341,22 @@ struct OmpSs : public ModulePass {
   }
 
   void unpackCallToRTOfType(Module &M,
+                            DenseMap<Value *, Value *> &ConstExprToInst,
                             const SmallVectorImpl<DependInfo> &DependList,
                             Function *F,
                             StringRef DepType) {
     for (const DependInfo &DI : DependList) {
-      IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+      BasicBlock &Entry = F->getEntryBlock();
+      Instruction &RetI = Entry.back();
+      IRBuilder<> BBBuilder(&RetI);
 
-      Value *BaseCast = BBBuilder.CreateBitCast(DI.Base, Type::getInt8PtrTy(M.getContext()));
+      // We have built the Instruction equivalent of a ConstantExpr.
+      // but Base has the ConstantExpr. Use the instruction
+      Value *NewBase = DI.Base;
+      if (ConstExprToInst.count(NewBase))
+        NewBase = ConstExprToInst[NewBase];
+
+      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
       SmallVector<Value *, 4> TaskDepAPICall;
       Value *Handler = &*(F->arg_end() - 1);
       TaskDepAPICall.push_back(Handler);
@@ -385,16 +373,17 @@ struct OmpSs : public ModulePass {
   }
 
   void unpackDepsCallToRT(Module &M,
+                      DenseMap<Value *, Value *> &ConstExprToInst,
                       const TaskDependsInfo &TDI,
                       Function *F) {
-    unpackCallToRTOfType(M, TDI.Ins, F, "read");
-    unpackCallToRTOfType(M, TDI.Outs, F, "write");
-    unpackCallToRTOfType(M, TDI.Inouts, F, "readwrite");
-    unpackCallToRTOfType(M, TDI.Concurrents, F, "concurrent");
-    unpackCallToRTOfType(M, TDI.Commutatives, F, "commutative");
-    unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
-    unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
-    unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.Ins, F, "read");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.Outs, F, "write");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.Inouts, F, "readwrite");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.Concurrents, F, "concurrent");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.Commutatives, F, "commutative");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakIns, F, "weak_read");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakOuts, F, "weak_write");
+    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakInouts, F, "weak_readwrite");
   }
 
   // TypeList[i] <-> NameList[i]
@@ -575,6 +564,7 @@ struct OmpSs : public ModulePass {
     for (const auto &VLAWithDimsMap : VLADimsInfo) {
       Value *const V = VLAWithDimsMap.first;
       Type *Ty = V->getType()->getPointerElementType();
+
       unsigned Align = M.getDataLayout().getPrefTypeAlignment(Ty);
 
       auto It = VLAAlignsInfo.begin();
@@ -627,6 +617,9 @@ struct OmpSs : public ModulePass {
     BasicBlock *ExitBB = TI.Exit->getParent();
     // Assuming well-formed BB
     ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
+
+    TI.Exit->eraseFromParent();
+    TI.Entry->eraseFromParent();
 
     // 2. Gather BB between entry and exit (is there any function/util to do this?)
     SmallVector<BasicBlock*, 8> Worklist;
@@ -718,7 +711,6 @@ struct OmpSs : public ModulePass {
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
     unpackDepsAndRewrite(M, TI.DependsInfo, UnpackDepsFuncVar, TaskArgsList.getArrayRef());
-    unpackDepsCallToRT(M, TI.DependsInfo, UnpackDepsFuncVar);
 
     // nanos6_unpacked_deps_* END
 
@@ -1157,9 +1149,6 @@ struct OmpSs : public ModulePass {
         IRB.CreateCall(It->second, ArrayRef<Value*>{FArg, NSize});
       }
     }
-
-    TI.Exit->eraseFromParent();
-    TI.Entry->eraseFromParent();
   }
 
   void buildNanos6Types(Module &M) {

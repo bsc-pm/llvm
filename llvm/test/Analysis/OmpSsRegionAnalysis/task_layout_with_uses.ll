@@ -87,19 +87,19 @@ if.else:
 if.end:
   ret i32 0
 
-; USES: [0] %1
+; USES: [0] %0
+; USES-NEXT:   [Before] %func1
+; USES-NEXT:   [Before] %arg
+; USES-NEXT: [0] %1
 ; USES-NEXT:   [Before] %func2
 ; USES-NEXT:   [Before] %func3
 ; USES-NEXT:   [Before] %arg
-; USES-NEXT: [0] %0
-; USES-NEXT:   [Before] %func1
-; USES-NEXT:   [Before] %arg
 
-; DSA: [0] %1
-; DSA-NEXT:   %func3
-; DSA-NEXT:   %arg
-; DSA-NEXT: [0] %0
+; DSA: [0] %0
 ; DSA-NEXT:   %func1
+; DSA-NEXT:   %arg
+; DSA-NEXT: [0] %1
+; DSA-NEXT:   %func3
 ; DSA-NEXT:   %arg
 
 }
