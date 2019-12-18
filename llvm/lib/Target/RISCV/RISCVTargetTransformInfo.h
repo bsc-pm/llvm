@@ -53,8 +53,8 @@ public:
   bool shouldExpandReduction(const IntrinsicInst *II) const { return false; }
   bool isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment);
   bool isLegalMaskedStore(Type *DataType, MaybeAlign Alignment);
-  bool isLegalMaskedGather(Type *DataType);
-  bool isLegalMaskedScatter(Type *DataType);
+  bool isLegalMaskedGather(Type *DataType, MaybeAlign Alignment);
+  bool isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment);
 };
 
 } // end namespace llvm

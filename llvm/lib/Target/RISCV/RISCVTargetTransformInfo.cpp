@@ -143,10 +143,10 @@ bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType, MaybeAlign Alignment) {
   return isLegalMaskedLoad(DataType, Alignment);
 }
 
-bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType) {
-  return isLegalMaskedLoad(DataType, MaybeAlign());
+bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType, MaybeAlign Alignment) {
+  return isLegalMaskedLoad(DataType, Alignment);
 }
 
-bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType) {
-  return isLegalMaskedStore(DataType, MaybeAlign());
+bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment) {
+  return isLegalMaskedStore(DataType, Alignment);
 }
