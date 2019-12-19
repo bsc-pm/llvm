@@ -307,6 +307,11 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   for (auto VT : {MVT::i8, MVT::i16, MVT::i32}) {
     setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
   }
+
+  // Custom-legalize this node for scalable vectors.
+  for (auto VT : {MVT::nxv1i64, MVT::nxv2i32, MVT::nxv4i16}) {
+    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
+  }
 }
 
 EVT RISCVTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
@@ -543,6 +548,35 @@ SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op,
   return SDValue();
 }
 
+SDValue RISCVTargetLowering::lowerSIGN_EXTEND_INREG(SDValue Op,
+                                                    SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+
+  VTSDNode *SrcVTNode = cast<VTSDNode>(Op.getOperand(1));
+  assert(SrcVTNode != nullptr && "Unexpected SDNode");
+  EVT SrcVT = SrcVTNode->getVT();
+  MVT::SimpleValueType SimpleSrcVT = SrcVT.getSimpleVT().SimpleTy;
+
+  assert((SimpleSrcVT == MVT::nxv1i8 || SimpleSrcVT == MVT::nxv1i16 ||
+          SimpleSrcVT == MVT::nxv1i32 || SimpleSrcVT == MVT::nxv2i8 ||
+          SimpleSrcVT == MVT::nxv2i16 || SimpleSrcVT == MVT::nxv4i8) &&
+         "Unexpected type to extend");
+
+  unsigned ResTyBits = VT.getScalarSizeInBits();
+  unsigned OpTyBits = SrcVT.getScalarSizeInBits();
+
+  assert(ResTyBits > OpTyBits);
+
+  // Compute the number of bits to sign-extend.
+  SDValue ExtendBits = DAG.getConstant(ResTyBits - OpTyBits, DL, MVT::i64);
+
+  SDValue SextInreg = DAG.getNode(RISCVISD::SIGN_EXTEND_BITS_INREG, DL, VT,
+                                  Op.getOperand(0), ExtendBits);
+
+  return SextInreg;
+}
+
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
@@ -587,6 +621,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return lowerVECTOR_SHUFFLE(Op, DAG);
   case ISD::BUILD_VECTOR:
     return lowerBUILD_VECTOR(Op, DAG);
+  case ISD::SIGN_EXTEND_INREG:
+    return lowerSIGN_EXTEND_INREG(Op, DAG);
   }
 }
 
@@ -3050,6 +3086,8 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
     return "RISCVISD::VMV_X_S";
   case RISCVISD::EXTRACT_VECTOR_ELT:
     return "RISCVISD::EXTRACT_VECTOR_ELT";
+  case RISCVISD::SIGN_EXTEND_BITS_INREG:
+    return "RISCVISD::SIGN_EXTEND_BITS_INREG";
   }
   return nullptr;
 }

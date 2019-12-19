@@ -28,6 +28,12 @@ def riscv_extract_vector_elt : SDNode<"RISCVISD::EXTRACT_VECTOR_ELT",
                                        [SDTCisInt<0>, SDTCisVec<1>,
                                        SDTCisInt<1>, SDTCisPtrTy<2>]>>;
 
+def riscv_sign_extend_inreg : SDNode<"RISCVISD::SIGN_EXTEND_BITS_INREG",
+                                     SDTypeProfile<1, 2,
+                                      [SDTCisSameAs<0, 1>,
+                                      SDTCisVec<0>, SDTCisInt<0>,
+                                      SDTCisInt<2>]>>;
+
 //===----------------------------------------------------------------------===//
 
 class VMask<bits<1> vtype>
@@ -273,6 +279,24 @@ defset list<MaskTypeInfo> AllMasks = {
   def : MaskTypeInfo<nxv16i1, 8,  2, nxv16i4>;  // FIXME SEW should be ELEN/16, SEW < 8
   def : MaskTypeInfo<nxv32i1, 8,  4, nxv32i2>;  // FIXME SEW should be ELEN/32, SEW < 8
 //def : MaskTypeInfo<nxv64i1, 8,  8, nxv64i1>;  // FIXME SEW should be ELEN/64, SEW < 8, undefined type
+}
+
+class IllegalVectorTypeInfo<ValueType Vec, VectorTypeInfo LVti, ValueType Mas,
+                            int Sew, VReg Reg>
+    : VectorTypeInfo<Vec, Mas, Sew, Reg>
+{
+  VectorTypeInfo LegalVti = LVti;
+}
+
+defset list<IllegalVectorTypeInfo> AllIllegalIntegerVectors = {
+  def Vtype1xi8  : IllegalVectorTypeInfo<nxv1i8,  Vtype1xi64, nxv1i1, 8,  VR>;
+  def Vtype2xi8  : IllegalVectorTypeInfo<nxv2i8,  Vtype2xi32, nxv2i1, 8,  VR>;
+  def Vtype4xi8  : IllegalVectorTypeInfo<nxv4i8,  Vtype4xi16, nxv4i1, 8,  VR>;
+
+  def Vtype1xi16 : IllegalVectorTypeInfo<nxv1i16, Vtype1xi64, nxv1i1, 16, VR>;
+  def Vtype2xi16 : IllegalVectorTypeInfo<nxv2i16, Vtype2xi32, nxv2i1, 16, VR>;
+
+  def Vtype1xi32 : IllegalVectorTypeInfo<nxv1i32, Vtype1xi64, nxv1i1, 32, VR>;
 }
 
 class VRegToWide<VReg Reg, VReg WideReg> {
@@ -2911,10 +2935,41 @@ foreach vti = GroupIntegerVectors in {
              vti.SEW)>;
 }
 
-// FIXME: This should be done in a better way.
-// FIXME This pattern is wrong
-//def : Pat<(nxv1i64 (sext_inreg (nxv1i64 VR:$value), nxv1i32)),
-//          (PseudoVSRA_VI_M1 (PseudoVSLL_VI_M1 $value, 32, X0, 64), 32, X0, 64)>;
+foreach vti = AllIllegalIntegerVectors in
+foreach lvti = [vti.LegalVti] in {
+  def : Pat<(lvti.Vector (riscv_sign_extend_inreg (lvti.Vector VR:$rs2),
+                          uimm5:$rs1)),
+            (PseudoVSRA_VI_M1
+             (lvti.Vector zero_reg),
+             (PseudoVSLL_VI_M1
+              (lvti.Vector zero_reg),
+              $rs2, uimm5:$rs1,
+              (lvti.Mask zero_reg),
+              VLMax,
+              lvti.SEW),
+             uimm5:$rs1,
+             (lvti.Mask zero_reg),
+             VLMax,
+             lvti.SEW)>;
+}
+
+foreach vti = AllIllegalIntegerVectors in
+foreach lvti = [vti.LegalVti] in {
+  def : Pat<(lvti.Vector (riscv_sign_extend_inreg (lvti.Vector VR:$rs2),
+                          GPR:$rs1)),
+            (PseudoVSRA_VX_M1
+             (lvti.Vector zero_reg),
+             (PseudoVSLL_VX_M1
+              (lvti.Vector zero_reg),
+              $rs2, $rs1,
+              (lvti.Mask zero_reg),
+              VLMax,
+              lvti.SEW),
+             $rs1,
+             (lvti.Mask zero_reg),
+             VLMax,
+             lvti.SEW)>;
+}
 
 }
 

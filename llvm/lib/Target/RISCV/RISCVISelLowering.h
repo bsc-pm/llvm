@@ -58,6 +58,7 @@ enum NodeType : unsigned {
   VFMV_V_F,
   VMV_X_S,
   EXTRACT_VECTOR_ELT,
+  SIGN_EXTEND_BITS_INREG,
 };
 }
 
@@ -220,6 +221,7 @@ private:
   SDValue lowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerSIGN_EXTEND_INREG(SDValue Op, SelectionDAG &DAG) const;
 
   bool isEligibleForTailCallOptimization(
       CCState &CCInfo, CallLoweringInfo &CLI, MachineFunction &MF,
