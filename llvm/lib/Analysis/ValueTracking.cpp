@@ -2840,6 +2840,12 @@ static unsigned ComputeNumSignBitsImpl(const Value *V,
     case Instruction::ShuffleVector: {
       // Collect the minimum number of sign bits that are shared by every vector
       // element referenced by the shuffle.
+
+      // For scalable vectors, we do not know all the elements. Return the
+      // default conservative result.
+      if (U->getType()->getVectorIsScalable())
+        return 1;
+
       auto *Shuf = cast<ShuffleVectorInst>(U);
       APInt DemandedLHS, DemandedRHS;
       // For undef elements, we don't know anything about the common state of
