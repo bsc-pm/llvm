@@ -12779,6 +12779,9 @@ public:
                   SmallVectorImpl<const Expr *> &WorkList)
       : Base(S.Context), SemaRef(S), Region(Tree.root()), WorkList(WorkList) {
     Visit(E);
+    // Silence a -Wunused-private-field since WorkList is now unused.
+    // TODO: Evaluate if it can be used, and if not remove it.
+    (void)this->WorkList;
   }
 
   void VisitStmt(const Stmt *S) {
@@ -12829,8 +12832,37 @@ public:
     //   expression E1 is sequenced before the expression E2.
     if (SemaRef.getLangOpts().CPlusPlus17)
       VisitSequencedExpressions(ASE->getLHS(), ASE->getRHS());
-    else
-      Base::VisitStmt(ASE);
+    else {
+      Visit(ASE->getLHS());
+      Visit(ASE->getRHS());
+    }
+  }
+
+  void VisitBinPtrMemD(const BinaryOperator *BO) { VisitBinPtrMem(BO); }
+  void VisitBinPtrMemI(const BinaryOperator *BO) { VisitBinPtrMem(BO); }
+  void VisitBinPtrMem(const BinaryOperator *BO) {
+    // C++17 [expr.mptr.oper]p4:
+    //  Abbreviating pm-expression.*cast-expression as E1.*E2, [...]
+    //  the expression E1 is sequenced before the expression E2.
+    if (SemaRef.getLangOpts().CPlusPlus17)
+      VisitSequencedExpressions(BO->getLHS(), BO->getRHS());
+    else {
+      Visit(BO->getLHS());
+      Visit(BO->getRHS());
+    }
+  }
+
+  void VisitBinShl(const BinaryOperator *BO) { VisitBinShlShr(BO); }
+  void VisitBinShr(const BinaryOperator *BO) { VisitBinShlShr(BO); }
+  void VisitBinShlShr(const BinaryOperator *BO) {
+    // C++17 [expr.shift]p4:
+    //  The expression E1 is sequenced before the expression E2.
+    if (SemaRef.getLangOpts().CPlusPlus17)
+      VisitSequencedExpressions(BO->getLHS(), BO->getRHS());
+    else {
+      Visit(BO->getLHS());
+      Visit(BO->getRHS());
+    }
   }
 
   void VisitBinComma(const BinaryOperator *BO) {
@@ -12842,38 +12874,67 @@ public:
   }
 
   void VisitBinAssign(const BinaryOperator *BO) {
-    // The modification is sequenced after the value computation of the LHS
-    // and RHS, so check it before inspecting the operands and update the
-    // map afterwards.
-    Object O = getObject(BO->getLHS(), true);
-    if (!O)
-      return VisitExpr(BO);
-
-    notePreMod(O, BO);
-
-    // C++11 [expr.ass]p7:
-    //   E1 op= E2 is equivalent to E1 = E1 op E2, except that E1 is evaluated
-    //   only once.
-    //
-    // Therefore, for a compound assignment operator, O is considered used
-    // everywhere except within the evaluation of E1 itself.
-    if (isa<CompoundAssignOperator>(BO))
-      notePreUse(O, BO);
-
-    Visit(BO->getLHS());
-
-    if (isa<CompoundAssignOperator>(BO))
-      notePostUse(O, BO);
-
-    Visit(BO->getRHS());
+    SequenceTree::Seq RHSRegion;
+    SequenceTree::Seq LHSRegion;
+    if (SemaRef.getLangOpts().CPlusPlus17) {
+      RHSRegion = Tree.allocate(Region);
+      LHSRegion = Tree.allocate(Region);
+    } else {
+      RHSRegion = Region;
+      LHSRegion = Region;
+    }
+    SequenceTree::Seq OldRegion = Region;
 
     // C++11 [expr.ass]p1:
-    //   the assignment is sequenced [...] before the value computation of the
-    //   assignment expression.
+    //  [...] the assignment is sequenced after the value computation
+    //  of the right and left operands, [...]
+    //
+    // so check it before inspecting the operands and update the
+    // map afterwards.
+    Object O = getObject(BO->getLHS(), /*Mod=*/true);
+    if (O)
+      notePreMod(O, BO);
+
+    if (SemaRef.getLangOpts().CPlusPlus17) {
+      // C++17 [expr.ass]p1:
+      //  [...] The right operand is sequenced before the left operand. [...]
+      {
+        SequencedSubexpression SeqBefore(*this);
+        Region = RHSRegion;
+        Visit(BO->getRHS());
+      }
+
+      Region = LHSRegion;
+      Visit(BO->getLHS());
+
+      if (O && isa<CompoundAssignOperator>(BO))
+        notePostUse(O, BO);
+
+    } else {
+      // C++11 does not specify any sequencing between the LHS and RHS.
+      Region = LHSRegion;
+      Visit(BO->getLHS());
+
+      if (O && isa<CompoundAssignOperator>(BO))
+        notePostUse(O, BO);
+
+      Region = RHSRegion;
+      Visit(BO->getRHS());
+    }
+
+    // C++11 [expr.ass]p1:
+    //  the assignment is sequenced [...] before the value computation of the
+    //  assignment expression.
     // C11 6.5.16/3 has no such rule.
-    notePostMod(O, BO,
-                SemaRef.getLangOpts().CPlusPlus ? UK_ModAsValue
-                                                : UK_ModAsSideEffect);
+    Region = OldRegion;
+    if (O)
+      notePostMod(O, BO,
+                  SemaRef.getLangOpts().CPlusPlus ? UK_ModAsValue
+                                                  : UK_ModAsSideEffect);
+    if (SemaRef.getLangOpts().CPlusPlus17) {
+      Tree.merge(RHSRegion);
+      Tree.merge(LHSRegion);
+    }
   }
 
   void VisitCompoundAssignOperator(const CompoundAssignOperator *CAO) {
@@ -12908,64 +12969,126 @@ public:
     notePostMod(O, UO, UK_ModAsSideEffect);
   }
 
-  /// Don't visit the RHS of '&&' or '||' if it might not be evaluated.
   void VisitBinLOr(const BinaryOperator *BO) {
-    // The side-effects of the LHS of an '&&' are sequenced before the
-    // value computation of the RHS, and hence before the value computation
-    // of the '&&' itself, unless the LHS evaluates to zero. We treat them
-    // as if they were unconditionally sequenced.
+    // C++11 [expr.log.or]p2:
+    //  If the second expression is evaluated, every value computation and
+    //  side effect associated with the first expression is sequenced before
+    //  every value computation and side effect associated with the
+    //  second expression.
+    SequenceTree::Seq LHSRegion = Tree.allocate(Region);
+    SequenceTree::Seq RHSRegion = Tree.allocate(Region);
+    SequenceTree::Seq OldRegion = Region;
+
     EvaluationTracker Eval(*this);
     {
       SequencedSubexpression Sequenced(*this);
+      Region = LHSRegion;
       Visit(BO->getLHS());
     }
 
-    bool Result;
-    if (Eval.evaluate(BO->getLHS(), Result)) {
-      if (!Result)
-        Visit(BO->getRHS());
-    } else {
-      // Check for unsequenced operations in the RHS, treating it as an
-      // entirely separate evaluation.
-      //
-      // FIXME: If there are operations in the RHS which are unsequenced
-      // with respect to operations outside the RHS, and those operations
-      // are unconditionally evaluated, diagnose them.
-      WorkList.push_back(BO->getRHS());
+    // C++11 [expr.log.or]p1:
+    //  [...] the second operand is not evaluated if the first operand
+    //  evaluates to true.
+    bool EvalResult = false;
+    bool EvalOK = Eval.evaluate(BO->getLHS(), EvalResult);
+    bool ShouldVisitRHS = !EvalOK || (EvalOK && !EvalResult);
+    if (ShouldVisitRHS) {
+      Region = RHSRegion;
+      Visit(BO->getRHS());
     }
+
+    Region = OldRegion;
+    Tree.merge(LHSRegion);
+    Tree.merge(RHSRegion);
   }
+
   void VisitBinLAnd(const BinaryOperator *BO) {
+    // C++11 [expr.log.and]p2:
+    //  If the second expression is evaluated, every value computation and
+    //  side effect associated with the first expression is sequenced before
+    //  every value computation and side effect associated with the
+    //  second expression.
+    SequenceTree::Seq LHSRegion = Tree.allocate(Region);
+    SequenceTree::Seq RHSRegion = Tree.allocate(Region);
+    SequenceTree::Seq OldRegion = Region;
+
     EvaluationTracker Eval(*this);
     {
       SequencedSubexpression Sequenced(*this);
+      Region = LHSRegion;
       Visit(BO->getLHS());
     }
 
-    bool Result;
-    if (Eval.evaluate(BO->getLHS(), Result)) {
-      if (Result)
-        Visit(BO->getRHS());
-    } else {
-      WorkList.push_back(BO->getRHS());
+    // C++11 [expr.log.and]p1:
+    //  [...] the second operand is not evaluated if the first operand is false.
+    bool EvalResult = false;
+    bool EvalOK = Eval.evaluate(BO->getLHS(), EvalResult);
+    bool ShouldVisitRHS = !EvalOK || (EvalOK && EvalResult);
+    if (ShouldVisitRHS) {
+      Region = RHSRegion;
+      Visit(BO->getRHS());
     }
+
+    Region = OldRegion;
+    Tree.merge(LHSRegion);
+    Tree.merge(RHSRegion);
   }
 
-  // Only visit the condition, unless we can be sure which subexpression will
-  // be chosen.
   void VisitAbstractConditionalOperator(const AbstractConditionalOperator *CO) {
+    // C++11 [expr.cond]p1:
+    //  [...] Every value computation and side effect associated with the first
+    //  expression is sequenced before every value computation and side effect
+    //  associated with the second or third expression.
+    SequenceTree::Seq ConditionRegion = Tree.allocate(Region);
+
+    // No sequencing is specified between the true and false expression.
+    // However since exactly one of both is going to be evaluated we can
+    // consider them to be sequenced. This is needed to avoid warning on
+    // something like "x ? y+= 1 : y += 2;" in the case where we will visit
+    // both the true and false expressions because we can't evaluate x.
+    // This will still allow us to detect an expression like (pre C++17)
+    // "(x ? y += 1 : y += 2) = y".
+    //
+    // We don't wrap the visitation of the true and false expression with
+    // SequencedSubexpression because we don't want to downgrade modifications
+    // as side effect in the true and false expressions after the visition
+    // is done. (for example in the expression "(x ? y++ : y++) + y" we should
+    // not warn between the two "y++", but we should warn between the "y++"
+    // and the "y".
+    SequenceTree::Seq TrueRegion = Tree.allocate(Region);
+    SequenceTree::Seq FalseRegion = Tree.allocate(Region);
+    SequenceTree::Seq OldRegion = Region;
+
     EvaluationTracker Eval(*this);
     {
       SequencedSubexpression Sequenced(*this);
+      Region = ConditionRegion;
       Visit(CO->getCond());
     }
 
-    bool Result;
-    if (Eval.evaluate(CO->getCond(), Result))
-      Visit(Result ? CO->getTrueExpr() : CO->getFalseExpr());
-    else {
-      WorkList.push_back(CO->getTrueExpr());
-      WorkList.push_back(CO->getFalseExpr());
+    // C++11 [expr.cond]p1:
+    // [...] The first expression is contextually converted to bool (Clause 4).
+    // It is evaluated and if it is true, the result of the conditional
+    // expression is the value of the second expression, otherwise that of the
+    // third expression. Only one of the second and third expressions is
+    // evaluated. [...]
+    bool EvalResult = false;
+    bool EvalOK = Eval.evaluate(CO->getCond(), EvalResult);
+    bool ShouldVisitTrueExpr = !EvalOK || (EvalOK && EvalResult);
+    bool ShouldVisitFalseExpr = !EvalOK || (EvalOK && !EvalResult);
+    if (ShouldVisitTrueExpr) {
+      Region = TrueRegion;
+      Visit(CO->getTrueExpr());
     }
+    if (ShouldVisitFalseExpr) {
+      Region = FalseRegion;
+      Visit(CO->getFalseExpr());
+    }
+
+    Region = OldRegion;
+    Tree.merge(ConditionRegion);
+    Tree.merge(TrueRegion);
+    Tree.merge(FalseRegion);
   }
 
   void VisitCallExpr(const CallExpr *CE) {
