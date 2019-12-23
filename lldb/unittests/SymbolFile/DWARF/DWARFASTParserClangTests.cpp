@@ -6,26 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 #include "Plugins/SymbolFile/DWARF/DWARFASTParserClang.h"
 #include "Plugins/SymbolFile/DWARF/DWARFDIE.h"
+#include "TestingSupport/SubsystemRAII.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using namespace lldb;
 using namespace lldb_private;
 
 class DWARFASTParserClangTests : public testing::Test {
-public:
-  void SetUp() override {
-    FileSystem::Initialize();
-    ClangASTContext::Initialize();
-  }
-
-  void TearDown() override {
-    ClangASTContext::Terminate();
-    FileSystem::Terminate();
-  }
+  SubsystemRAII<FileSystem, ClangASTContext> subsystems;
 };
 
 namespace {
@@ -61,7 +52,7 @@ TEST_F(DWARFASTParserClangTests,
   for (int i = 0; i < 4; ++i)
     ast_parser.LinkDeclContextToDIE(decl_ctxs[i], dies[i]);
   ast_parser.EnsureAllDIEsInDeclContextHaveBeenParsed(
-      CompilerDeclContext(nullptr, decl_ctxs[1]));
+      ast_ctx.CreateDeclContext(decl_ctxs[1]));
 
   EXPECT_THAT(ast_parser.GetDeclContextToDIEMapKeys(),
               testing::UnorderedElementsAre(decl_ctxs[0], decl_ctxs[3]));
