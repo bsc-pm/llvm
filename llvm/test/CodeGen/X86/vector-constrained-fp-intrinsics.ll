@@ -4904,10 +4904,10 @@ define <2 x i32> @constrained_vector_fptoui_v2i32_v2f64() #0 {
 ;
 ; AVX512-LABEL: constrained_vector_fptoui_v2i32_v2f64:
 ; AVX512:       # %bb.0: # %entry
-; AVX512-NEXT:    vcvttsd2usi {{.*}}(%rip), %eax
-; AVX512-NEXT:    vmovd %eax, %xmm0
-; AVX512-NEXT:    vcvttsd2usi {{.*}}(%rip), %eax
-; AVX512-NEXT:    vpinsrd $1, %eax, %xmm0, %xmm0
+; AVX512-NEXT:    vmovaps {{.*#+}} ymm0 = [4.2100000000000001E+1,4.2200000000000003E+1,0.0E+0,0.0E+0]
+; AVX512-NEXT:    vcvttpd2udq %zmm0, %ymm0
+; AVX512-NEXT:    # kill: def $xmm0 killed $xmm0 killed $ymm0
+; AVX512-NEXT:    vzeroupper
 ; AVX512-NEXT:    retq
 entry:
   %result = call <2 x i32> @llvm.experimental.constrained.fptoui.v2i32.v2f64(
@@ -6852,7 +6852,7 @@ define <2 x double> @constrained_vector_uitofp_v2f64_v2i32(<2 x i32> %x) #0 {
 ;
 ; AVX512-LABEL: constrained_vector_uitofp_v2f64_v2i32:
 ; AVX512:       # %bb.0: # %entry
-; AVX512-NEXT:    # kill: def $xmm0 killed $xmm0 def $ymm0
+; AVX512-NEXT:    vmovq {{.*#+}} xmm0 = xmm0[0],zero
 ; AVX512-NEXT:    vcvtudq2pd %ymm0, %zmm0
 ; AVX512-NEXT:    # kill: def $xmm0 killed $xmm0 killed $zmm0
 ; AVX512-NEXT:    vzeroupper
