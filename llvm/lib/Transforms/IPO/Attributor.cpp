@@ -183,6 +183,60 @@ ChangeStatus llvm::operator&(ChangeStatus l, ChangeStatus r) {
 }
 ///}
 
+Argument *IRPosition::getAssociatedArgument() const {
+  if (getPositionKind() == IRP_ARGUMENT)
+    return cast<Argument>(&getAnchorValue());
+
+  // Not an Argument and no argument number means this is not a call site
+  // argument, thus we cannot find a callback argument to return.
+  int ArgNo = getArgNo();
+  if (ArgNo < 0)
+    return nullptr;
+
+  // Use abstract call sites to make the connection between the call site
+  // values and the ones in callbacks. If a callback was found that makes use
+  // of the underlying call site operand, we want the corresponding callback
+  // callee argument and not the direct callee argument.
+  Optional<Argument *> CBCandidateArg;
+  SmallVector<const Use *, 4> CBUses;
+  ImmutableCallSite ICS(&getAnchorValue());
+  AbstractCallSite::getCallbackUses(ICS, CBUses);
+  for (const Use *U : CBUses) {
+    AbstractCallSite ACS(U);
+    assert(ACS && ACS.isCallbackCall());
+    if (!ACS.getCalledFunction())
+      continue;
+
+    for (unsigned u = 0, e = ACS.getNumArgOperands(); u < e; u++) {
+
+      // Test if the underlying call site operand is argument number u of the
+      // callback callee.
+      if (ACS.getCallArgOperandNo(u) != ArgNo)
+        continue;
+
+      assert(ACS.getCalledFunction()->arg_size() > u &&
+             "ACS mapped into var-args arguments!");
+      if (CBCandidateArg.hasValue()) {
+        CBCandidateArg = nullptr;
+        break;
+      }
+      CBCandidateArg = ACS.getCalledFunction()->getArg(u);
+    }
+  }
+
+  // If we found a unique callback candidate argument, return it.
+  if (CBCandidateArg.hasValue() && CBCandidateArg.getValue())
+    return CBCandidateArg.getValue();
+
+  // If no callbacks were found, or none used the underlying call site operand
+  // exclusively, use the direct callee argument if available.
+  const Function *Callee = ICS.getCalledFunction();
+  if (Callee && Callee->arg_size() > unsigned(ArgNo))
+    return Callee->getArg(ArgNo);
+
+  return nullptr;
+}
+
 /// For calls (and invokes) we will only replace instruction uses to not disturb
 /// the old style call graph.
 /// TODO: Remove this once we get rid of the old PM.
@@ -2339,8 +2393,43 @@ struct AANoAliasFloating final : AANoAliasImpl {
 /// NoAlias attribute for an argument.
 struct AANoAliasArgument final
     : AAArgumentFromCallSiteArguments<AANoAlias, AANoAliasImpl> {
-  AANoAliasArgument(const IRPosition &IRP)
-      : AAArgumentFromCallSiteArguments<AANoAlias, AANoAliasImpl>(IRP) {}
+  using Base = AAArgumentFromCallSiteArguments<AANoAlias, AANoAliasImpl>;
+  AANoAliasArgument(const IRPosition &IRP) : Base(IRP) {}
+
+  /// See AbstractAttribute::update(...).
+  ChangeStatus updateImpl(Attributor &A) override {
+    // We have to make sure no-alias on the argument does not break
+    // synchronization when this is a callback argument, see also [1] below.
+    // If synchronization cannot be affected, we delegate to the base updateImpl
+    // function, otherwise we give up for now.
+
+    // If the function is no-sync, no-alias cannot break synchronization.
+    const auto &NoSyncAA = A.getAAFor<AANoSync>(
+        *this, IRPosition::function_scope(getIRPosition()));
+    if (NoSyncAA.isAssumedNoSync())
+      return Base::updateImpl(A);
+
+    // If the argument is read-only, no-alias cannot break synchronization.
+    const auto &MemBehaviorAA =
+        A.getAAFor<AAMemoryBehavior>(*this, getIRPosition());
+    if (MemBehaviorAA.isAssumedReadOnly())
+      return Base::updateImpl(A);
+
+    // If the argument is never passed through callbacks, no-alias cannot break
+    // synchronization.
+    if (A.checkForAllCallSites(
+            [](AbstractCallSite ACS) { return !ACS.isCallbackCall(); }, *this,
+            true))
+      return Base::updateImpl(A);
+
+    // TODO: add no-alias but make sure it doesn't break synchronization by
+    // introducing fake uses. See:
+    // [1] Compiler Optimizations for OpenMP, J. Doerfert and H. Finkel,
+    //     International Workshop on OpenMP 2018,
+    //     http://compilers.cs.uni-saarland.de/people/doerfert/par_opt18.pdf
+
+    return indicatePessimisticFixpoint();
+  }
 
   /// See AbstractAttribute::trackStatistics()
   void trackStatistics() const override { STATS_DECLTRACK_ARG_ATTR(noalias) }
@@ -2395,6 +2484,7 @@ struct AANoAliasCallSiteArgument final : AANoAliasImpl {
 
     // (iii) Check there is no other pointer argument which could alias with the
     // value.
+    // TODO: AbstractCallSite
     ImmutableCallSite ICS(&getAnchorValue());
     for (unsigned i = 0; i < ICS.getNumArgOperands(); i++) {
       if (getArgNo() == (int)i)
@@ -3574,6 +3664,18 @@ struct AAAlignCallSiteArgument final : AAAlignFloating {
   /// See AbstractAttribute::manifest(...).
   ChangeStatus manifest(Attributor &A) override {
     return AAAlignImpl::manifest(A);
+  }
+
+  /// See AbstractAttribute::updateImpl(Attributor &A).
+  ChangeStatus updateImpl(Attributor &A) override {
+    ChangeStatus Changed = AAAlignFloating::updateImpl(A);
+    if (Argument *Arg = getAssociatedArgument()) {
+      const auto &ArgAlignAA = A.getAAFor<AAAlign>(
+          *this, IRPosition::argument(*Arg), /* TrackDependence */ false,
+          DepClassTy::OPTIONAL);
+      takeKnownMaximum(ArgAlignAA.getKnownAlign());
+    }
+    return Changed;
   }
 
   /// See AbstractAttribute::trackStatistics()
@@ -4933,7 +5035,8 @@ ChangeStatus AAMemoryBehaviorFloating::updateImpl(Attributor &A) {
   // it is, any information derived would be irrelevant anyway as we cannot
   // check the potential aliases introduced by the capture. However, no need
   // to fall back to anythign less optimistic than the function state.
-  const auto &ArgNoCaptureAA = A.getAAFor<AANoCapture>(*this, IRP);
+  const auto &ArgNoCaptureAA = A.getAAFor<AANoCapture>(
+      *this, IRP, /* TrackDependence */ true, DepClassTy::OPTIONAL);
   if (!ArgNoCaptureAA.isAssumedNoCaptureMaybeReturned()) {
     S.intersectAssumedBits(FnMemAssumedState);
     return ChangeStatus::CHANGED;
@@ -5822,7 +5925,7 @@ void Attributor::identifyDefaultAbstractAttributes(Function &F) {
         getOrCreateAAFor<AAIsDead>(CSRetPos);
       }
 
-      for (int i = 0, e = Callee->arg_size(); i < e; i++) {
+      for (int i = 0, e = CS.getNumArgOperands(); i < e; i++) {
 
         IRPosition CSArgPos = IRPosition::callsite_argument(CS, i);
 
@@ -5846,6 +5949,10 @@ void Attributor::identifyDefaultAbstractAttributes(Function &F) {
 
         // Call site argument attribute "align".
         getOrCreateAAFor<AAAlign>(CSArgPos);
+
+        // Call site argument attribute
+        // "readnone/readonly/writeonly/..."
+        getOrCreateAAFor<AAMemoryBehavior>(CSArgPos);
 
         // Call site argument attribute "nofree".
         getOrCreateAAFor<AANoFree>(CSArgPos);
