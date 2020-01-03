@@ -97,15 +97,20 @@ ValueHandle LoopNestRangeBuilder::LoopNestRangeBuilder::operator()(
   return ValueHandle::null();
 }
 
+namespace mlir {
+namespace edsc {
+
 template <>
-GenericLoopNestRangeBuilder<loop::ForOp>::GenericLoopNestRangeBuilder(
-    ArrayRef<edsc::ValueHandle *> ivs, ArrayRef<Value> ranges) {
+GenericLoopNestRangeBuilder<
+    loop::ForOp>::GenericLoopNestRangeBuilder(ArrayRef<edsc::ValueHandle *> ivs,
+                                              ArrayRef<Value> ranges) {
   builder = std::make_unique<LoopNestRangeBuilder>(ivs, ranges);
 }
 
 template <>
-GenericLoopNestRangeBuilder<AffineForOp>::GenericLoopNestRangeBuilder(
-    ArrayRef<ValueHandle *> ivs, ArrayRef<Value> ranges) {
+GenericLoopNestRangeBuilder<
+    AffineForOp>::GenericLoopNestRangeBuilder(ArrayRef<ValueHandle *> ivs,
+                                              ArrayRef<Value> ranges) {
   SmallVector<ValueHandle, 4> lbs;
   SmallVector<ValueHandle, 4> ubs;
   SmallVector<int64_t, 4> steps;
@@ -119,6 +124,9 @@ GenericLoopNestRangeBuilder<AffineForOp>::GenericLoopNestRangeBuilder(
   }
   builder = std::make_unique<AffineLoopNestBuilder>(ivs, lbs, ubs, steps);
 }
+
+} // namespace edsc
+} // namespace mlir
 
 static Value emitOrFoldComposedAffineApply(OpBuilder &b, Location loc,
                                            AffineMap map,
