@@ -737,13 +737,26 @@ def i64imm_32bit : ImmLeaf<i64, [{
   return (Imm & 0xffffffffULL) == static_cast<uint64_t>(Imm);
 }]>;
 
-class InlineImm <ValueType vt> : PatLeaf <(vt imm), [{
-  return isInlineImmediate(N);
+def InlineImm16 : ImmLeaf<i16, [{
+  return isInlineImmediate16(Imm);
 }]>;
 
-class InlineFPImm <ValueType vt> : PatLeaf <(vt fpimm), [{
-  return isInlineImmediate(N);
+def InlineImm32 : ImmLeaf<i32, [{
+  return isInlineImmediate32(Imm);
 }]>;
+
+def InlineImm64 : ImmLeaf<i64, [{
+  return isInlineImmediate64(Imm);
+}]>;
+
+def InlineImmFP32 : FPImmLeaf<f32, [{
+  return isInlineImmediate(Imm);
+}]>;
+
+def InlineImmFP64 : FPImmLeaf<f64, [{
+  return isInlineImmediate(Imm);
+}]>;
+
 
 class VGPRImm <dag frag> : PatLeaf<frag, [{
   return isVGPRImm(N);
@@ -762,8 +775,8 @@ def NegSubInlineConst16 : ImmLeaf<i16, [{
   return Imm < -16 && Imm >= -64;
 }], NegateImm>;
 
-def ShiftAmt32Imm : PatLeaf <(imm), [{
-  return N->getZExtValue() < 32;
+def ShiftAmt32Imm : ImmLeaf <i32, [{
+  return Imm < 32;
 }]>;
 
 def getNegV2I16Imm : SDNodeXForm<build_vector, [{
