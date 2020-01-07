@@ -2820,7 +2820,7 @@ void InnerLoopVectorizer::emitMinimumIterationCountCheck(Loop *L,
     Value *Step = ConstantInt::get(Count->getType(), VF * UF);
     if (isScalable()) {
       CallInst *VscaleFuncCall =
-          emitVscaleCall(Builder, BB->getModule(), Count->getType());
+          emitVscaleCall(Builder, TCCheckBlock->getModule(), Count->getType());
       Step = Builder.CreateMul(VscaleFuncCall, Step, "step.vscale");
     }
     CheckMinIters = Builder.CreateICmp(P, Count, Step, "min.iters.check");
