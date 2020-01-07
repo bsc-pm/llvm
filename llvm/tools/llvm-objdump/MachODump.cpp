@@ -7633,9 +7633,10 @@ static void DisassembleMachO(StringRef Filename, MachOObjectFile *MachOOF,
           formatted_raw_ostream FormattedOS(outs());
           StringRef AnnotationsStr = Annotations.str();
           if (UseThumbTarget)
-            ThumbIP->printInst(&Inst, FormattedOS, AnnotationsStr, *ThumbSTI);
+            ThumbIP->printInst(&Inst, PC, AnnotationsStr, *ThumbSTI,
+                               FormattedOS);
           else
-            IP->printInst(&Inst, FormattedOS, AnnotationsStr, *STI);
+            IP->printInst(&Inst, PC, AnnotationsStr, *STI, FormattedOS);
           emitComments(CommentStream, CommentsToEmit, FormattedOS, *AsmInfo);
 
           // Print debug info.
@@ -7712,7 +7713,7 @@ static void DisassembleMachO(StringRef Filename, MachOObjectFile *MachOOF,
             dumpBytes(makeArrayRef(Bytes.data() + Index, InstSize), outs());
           }
           StringRef AnnotationsStr = Annotations.str();
-          IP->printInst(&Inst, outs(), AnnotationsStr, *STI);
+          IP->printInst(&Inst, PC, AnnotationsStr, *STI, outs());
           outs() << "\n";
         } else {
           unsigned int Arch = MachOOF->getArch();
@@ -7730,7 +7731,7 @@ static void DisassembleMachO(StringRef Filename, MachOObjectFile *MachOOF,
       }
     }
     // The TripleName's need to be reset if we are called again for a different
-    // archtecture.
+    // architecture.
     TripleName = "";
     ThumbTripleName = "";
 

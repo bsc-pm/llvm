@@ -379,6 +379,13 @@ void ARMTargetLowering::addMVEVectorTypes(bool HasMVEFP) {
   addAllExtLoads(MVT::v4i32, MVT::v4i16, Legal);
   addAllExtLoads(MVT::v4i32, MVT::v4i8, Legal);
 
+  // It is legal to sign extend from v4i8/v4i16 to v4i32 or v8i8 to v8i16.
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i8,  Legal);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i16, Legal);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v4i32, Legal);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v8i8,  Legal);
+  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::v8i16, Legal);
+
   // Some truncating stores are legal too.
   setTruncStoreAction(MVT::v4i32, MVT::v4i16, Legal);
   setTruncStoreAction(MVT::v4i32, MVT::v4i8,  Legal);
@@ -2087,11 +2094,10 @@ ARMTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   MachineFunction::CallSiteInfo CSInfo;
   bool isStructRet = (Outs.empty()) ? false : Outs[0].Flags.isSRet();
   bool isThisReturn = false;
-  auto Attr = MF.getFunction().getFnAttribute("disable-tail-calls");
   bool PreferIndirect = false;
 
   // Disable tail calls if they're not supported.
-  if (!Subtarget->supportsTailCall() || Attr.getValueAsString() == "true")
+  if (!Subtarget->supportsTailCall())
     isTailCall = false;
 
   if (isa<GlobalAddressSDNode>(Callee)) {
@@ -2968,9 +2974,7 @@ bool ARMTargetLowering::mayBeEmittedAsTailCall(const CallInst *CI) const {
   if (!Subtarget->supportsTailCall())
     return false;
 
-  auto Attr =
-      CI->getParent()->getParent()->getFnAttribute("disable-tail-calls");
-  if (!CI->isTailCall() || Attr.getValueAsString() == "true")
+  if (!CI->isTailCall())
     return false;
 
   return true;
@@ -14711,7 +14715,7 @@ bool ARMTargetLowering::allowsMisalignedMemoryAccesses(EVT VT, unsigned,
   if (!VT.isSimple())
     return false;
 
-  // The AllowsUnaliged flag models the SCTLR.A setting in ARM cpus
+  // The AllowsUnaligned flag models the SCTLR.A setting in ARM cpus
   bool AllowsUnaligned = Subtarget->allowsUnalignedMem();
   auto Ty = VT.getSimpleVT().SimpleTy;
 
@@ -14913,6 +14917,7 @@ bool ARMTargetLowering::shouldSinkOperands(Instruction *I,
     switch (I->getOpcode()) {
     case Instruction::Add:
     case Instruction::Mul:
+    case Instruction::ICmp:
       return true;
     case Instruction::Sub:
     case Instruction::Shl:
@@ -15013,16 +15018,19 @@ int ARMTargetLowering::getScalingFactorCost(const DataLayout &DL,
 /// patterns (and we don't have the non-fused floating point instruction).
 bool ARMTargetLowering::isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
                                                    EVT VT) const {
-  if (!Subtarget->hasMVEFloatOps())
-    return false;
-
   if (!VT.isSimple())
     return false;
 
   switch (VT.getSimpleVT().SimpleTy) {
   case MVT::v4f32:
   case MVT::v8f16:
-    return true;
+    return Subtarget->hasMVEFloatOps();
+  case MVT::f16:
+    return Subtarget->useFPVFMx16();
+  case MVT::f32:
+    return Subtarget->useFPVFMx();
+  case MVT::f64:
+    return Subtarget->useFPVFMx64();
   default:
     break;
   }

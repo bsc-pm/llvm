@@ -3104,6 +3104,20 @@ SDValue DAGCombiner::visitSUB(SDNode *N) {
                        DAG.getNode(ISD::SUB, DL, VT, N1.getOperand(1),
                                    N1.getOperand(0)));
 
+  // A - (A & B)  ->  A & (~B)
+  if (N1.getOpcode() == ISD::AND) {
+    SDValue A = N1.getOperand(0);
+    SDValue B = N1.getOperand(1);
+    if (A != N0)
+      std::swap(A, B);
+    if (A == N0 &&
+        (N1.hasOneUse() || isConstantOrConstantVector(B, /*NoOpaques=*/true))) {
+      SDValue InvB =
+          DAG.getNode(ISD::XOR, DL, VT, B, DAG.getAllOnesConstant(DL, VT));
+      return DAG.getNode(ISD::AND, DL, VT, A, InvB);
+    }
+  }
+
   // fold (X - (-Y * Z)) -> (X + (Y * Z))
   if (N1.getOpcode() == ISD::MUL && N1.hasOneUse()) {
     if (N1.getOperand(0).getOpcode() == ISD::SUB &&
@@ -7106,6 +7120,13 @@ SDValue DAGCombiner::visitXOR(SDNode *N) {
                        DAG.getAllOnesConstant(DL, VT));
   }
 
+  // fold (not (add X, -1)) -> (neg X)
+  if (isAllOnesConstant(N1) && N0.getOpcode() == ISD::ADD &&
+      isAllOnesOrAllOnesSplat(N0.getOperand(1))) {
+    return DAG.getNode(ISD::SUB, DL, VT, DAG.getConstant(0, DL, VT),
+                       N0.getOperand(0));
+  }
+
   // fold (xor (and x, y), y) -> (and (not x), y)
   if (N0Opcode == ISD::AND && N0.hasOneUse() && N0->getOperand(1) == N1) {
     SDValue X = N0.getOperand(0);
@@ -7712,8 +7733,9 @@ SDValue DAGCombiner::visitSRA(SDNode *N) {
     if (VT.isVector())
       ExtVT = EVT::getVectorVT(*DAG.getContext(),
                                ExtVT, VT.getVectorNumElements());
-    if ((!LegalOperations ||
-         TLI.isOperationLegal(ISD::SIGN_EXTEND_INREG, ExtVT)))
+    if (!LegalOperations ||
+        TLI.getOperationAction(ISD::SIGN_EXTEND_INREG, ExtVT) ==
+        TargetLowering::Legal)
       return DAG.getNode(ISD::SIGN_EXTEND_INREG, SDLoc(N), VT,
                          N0.getOperand(0), DAG.getValueType(ExtVT));
   }
@@ -13349,6 +13371,16 @@ SDValue DAGCombiner::visitFNEG(SDNode *N) {
 
   if (TLI.isNegatibleForFree(N0, DAG, LegalOperations, ForCodeSize))
     return TLI.getNegatedExpression(N0, DAG, LegalOperations, ForCodeSize);
+
+  // -(X-Y) -> (Y-X) is unsafe because when X==Y, -0.0 != +0.0 FIXME: This is
+  // duplicated in isNegatibleForFree, but isNegatibleForFree doesn't know it
+  // was called from a context with a nsz flag if the input fsub does not.
+  if (N0.getOpcode() == ISD::FSUB &&
+      (DAG.getTarget().Options.NoSignedZerosFPMath ||
+       N->getFlags().hasNoSignedZeros()) && N0.hasOneUse()) {
+    return DAG.getNode(ISD::FSUB, SDLoc(N), VT, N0.getOperand(1),
+                       N0.getOperand(0), N->getFlags());
+  }
 
   // Transform fneg(bitconvert(x)) -> bitconvert(x ^ sign) to avoid loading
   // constant pool values.
@@ -19759,8 +19791,10 @@ SDValue DAGCombiner::XformToShuffleWithZero(SDNode *N) {
       int EltIdx = i / Split;
       int SubIdx = i % Split;
       SDValue Elt = RHS.getOperand(EltIdx);
+      // X & undef --> 0 (not undef). So this lane must be converted to choose
+      // from the zero constant vector (same as if the element had all 0-bits).
       if (Elt.isUndef()) {
-        Indices.push_back(-1);
+        Indices.push_back(i + NumSubElts);
         continue;
       }
 
@@ -19773,14 +19807,10 @@ SDValue DAGCombiner::XformToShuffleWithZero(SDNode *N) {
         return SDValue();
 
       // Extract the sub element from the constant bit mask.
-      if (DAG.getDataLayout().isBigEndian()) {
-        Bits.lshrInPlace((Split - SubIdx - 1) * NumSubBits);
-      } else {
-        Bits.lshrInPlace(SubIdx * NumSubBits);
-      }
-
-      if (Split > 1)
-        Bits = Bits.trunc(NumSubBits);
+      if (DAG.getDataLayout().isBigEndian())
+        Bits = Bits.extractBits(NumSubBits, (Split - SubIdx - 1) * NumSubBits);
+      else
+        Bits = Bits.extractBits(NumSubBits, SubIdx * NumSubBits);
 
       if (Bits.isAllOnesValue())
         Indices.push_back(i);

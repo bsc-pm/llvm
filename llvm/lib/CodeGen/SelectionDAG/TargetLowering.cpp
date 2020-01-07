@@ -52,6 +52,10 @@ bool TargetLowering::isInTailCallPosition(SelectionDAG &DAG, SDNode *Node,
                                           SDValue &Chain) const {
   const Function &F = DAG.getMachineFunction().getFunction();
 
+  // First, check if tail calls have been disabled in this function.
+  if (F.getFnAttribute("disable-tail-calls").getValueAsString() == "true")
+    return false;
+
   // Conservatively require the attributes of the call to match those of
   // the return. Ignore NoAlias and NonNull because they don't affect the
   // call sequence.
@@ -1257,7 +1261,7 @@ bool TargetLowering::SimplifyDemandedBits(
     // -1, we may be able to bypass the setcc.
     if (DemandedBits.isSignMask() &&
         Op0.getScalarValueSizeInBits() == BitWidth &&
-        getBooleanContents(VT) ==
+        getBooleanContents(Op0.getValueType()) ==
             BooleanContent::ZeroOrNegativeOneBooleanContent) {
       // If we're testing X < 0, then this compare isn't needed - just use X!
       // FIXME: We're limiting to integer types here, but this should also work
@@ -1831,6 +1835,17 @@ bool TargetLowering::SimplifyDemandedBits(
     if (SimplifyDemandedBits(Src, DemandedSrcBits, DemandedSrcElts, Known2, TLO,
                              Depth + 1))
       return true;
+
+    // Attempt to avoid multi-use ops if we don't need anything from them.
+    if (!DemandedSrcBits.isAllOnesValue() ||
+        !DemandedSrcElts.isAllOnesValue()) {
+      if (SDValue DemandedSrc = SimplifyMultipleUseDemandedBits(
+              Src, DemandedSrcBits, DemandedSrcElts, TLO.DAG, Depth + 1)) {
+        SDValue NewOp =
+            TLO.DAG.getNode(Op.getOpcode(), dl, VT, DemandedSrc, Idx);
+        return TLO.CombineTo(Op, NewOp);
+      }
+    }
 
     Known = Known2;
     if (BitWidth > EltBitWidth)
@@ -6052,6 +6067,8 @@ bool TargetLowering::expandFP_TO_UINT(SDNode *Node, SDValue &Result,
   EVT DstVT = Node->getValueType(0);
   EVT SetCCVT =
       getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), SrcVT);
+  EVT DstSetCCVT =
+      getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), DstVT);
 
   // Only expand vector types if we have the appropriate vector bit operations.
   unsigned SIntOpcode = Node->isStrictFPOpcode() ? ISD::STRICT_FP_TO_SINT : 
@@ -6100,6 +6117,7 @@ bool TargetLowering::expandFP_TO_UINT(SDNode *Node, SDValue &Result,
     // TODO: Should any fast-math-flags be set for the FSUB?
     SDValue FltOfs = DAG.getSelect(dl, SrcVT, Sel,
                                    DAG.getConstantFP(0.0, dl, SrcVT), Cst);
+    Sel = DAG.getBoolExtOrTrunc(Sel, dl, DstSetCCVT, DstVT);
     SDValue IntOfs = DAG.getSelect(dl, DstVT, Sel,
                                    DAG.getConstant(0, dl, DstVT),
                                    DAG.getConstant(SignMask, dl, DstVT));
@@ -6127,6 +6145,7 @@ bool TargetLowering::expandFP_TO_UINT(SDNode *Node, SDValue &Result,
                                 DAG.getNode(ISD::FSUB, dl, SrcVT, Src, Cst));
     False = DAG.getNode(ISD::XOR, dl, DstVT, False,
                         DAG.getConstant(SignMask, dl, DstVT));
+    Sel = DAG.getBoolExtOrTrunc(Sel, dl, DstSetCCVT, DstVT);
     Result = DAG.getSelect(dl, DstVT, Sel, True, False);
   }
   return true;
@@ -6190,8 +6209,10 @@ bool TargetLowering::expandUINT_TO_FP(SDNode *Node, SDValue &Result,
       // incoming STRICT_UINT_TO_FP node; the STRICT_FADD node can
       // never raise any exception.
       SDNodeFlags Flags;
-      Flags.setFPExcept(Node->getFlags().hasFPExcept());
+      Flags.setNoFPExcept(Node->getFlags().hasNoFPExcept());
       Fast->setFlags(Flags);
+      Flags.setNoFPExcept(true);
+      Slow->setFlags(Flags);
     } else {
       SDValue SignCvt = DAG.getNode(ISD::SINT_TO_FP, dl, DstVT, Or);
       Slow = DAG.getNode(ISD::FADD, dl, DstVT, SignCvt, SignCvt);
@@ -6497,8 +6518,9 @@ bool TargetLowering::expandABS(SDNode *N, SDValue &Result,
   return true;
 }
 
-SDValue TargetLowering::scalarizeVectorLoad(LoadSDNode *LD,
-                                            SelectionDAG &DAG) const {
+std::pair<SDValue, SDValue>
+TargetLowering::scalarizeVectorLoad(LoadSDNode *LD,
+                                    SelectionDAG &DAG) const {
   SDLoc SL(LD);
   SDValue Chain = LD->getChain();
   SDValue BasePTR = LD->getBasePtr();
@@ -6532,7 +6554,7 @@ SDValue TargetLowering::scalarizeVectorLoad(LoadSDNode *LD,
   SDValue NewChain = DAG.getNode(ISD::TokenFactor, SL, MVT::Other, LoadChains);
   SDValue Value = DAG.getBuildVector(LD->getValueType(0), SL, Vals);
 
-  return DAG.getMergeValues({Value, NewChain}, SL);
+  return std::make_pair(Value, NewChain);
 }
 
 SDValue TargetLowering::scalarizeVectorStore(StoreSDNode *ST,
@@ -6626,10 +6648,7 @@ TargetLowering::expandUnalignedLoad(LoadSDNode *LD, SelectionDAG &DAG) const {
       if (!isOperationLegalOrCustom(ISD::LOAD, intVT) &&
           LoadedVT.isVector()) {
         // Scalarize the load and let the individual components be handled.
-        SDValue Scalarized = scalarizeVectorLoad(LD, DAG);
-        if (Scalarized->getOpcode() == ISD::MERGE_VALUES)
-          return std::make_pair(Scalarized.getOperand(0), Scalarized.getOperand(1));
-        return std::make_pair(Scalarized.getValue(0), Scalarized.getValue(1));
+        return scalarizeVectorLoad(LD, DAG);
       }
 
       // Expand to a (misaligned) integer load of the same size,

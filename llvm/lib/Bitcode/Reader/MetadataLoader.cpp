@@ -411,7 +411,7 @@ void PlaceholderQueue::flush(BitcodeReaderMetadataList &MetadataList) {
   }
 }
 
-} // anonynous namespace
+} // anonymous namespace
 
 static Error error(const Twine &Message) {
   return make_error<StringError>(
@@ -1457,7 +1457,7 @@ Error MetadataLoader::MetadataLoaderImpl::parseOneMetadata(
     break;
   }
   case bitc::METADATA_COMPILE_UNIT: {
-    if (Record.size() < 14 || Record.size() > 20)
+    if (Record.size() < 14 || Record.size() > 19)
       return error("Invalid record");
 
     // Ignore Record[0], which indicates whether this compile unit is

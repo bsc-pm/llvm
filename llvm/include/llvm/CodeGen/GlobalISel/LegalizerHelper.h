@@ -231,6 +231,7 @@ public:
   LegalizeResult lowerFCopySign(MachineInstr &MI, unsigned TypeIdx, LLT Ty);
   LegalizeResult lowerFMinNumMaxNum(MachineInstr &MI);
   LegalizeResult lowerFMad(MachineInstr &MI);
+  LegalizeResult lowerIntrinsicRound(MachineInstr &MI);
   LegalizeResult lowerUnmergeValues(MachineInstr &MI);
   LegalizeResult lowerShuffleVector(MachineInstr &MI);
   LegalizeResult lowerDynStackAlloc(MachineInstr &MI);
@@ -238,6 +239,7 @@ public:
   LegalizeResult lowerInsert(MachineInstr &MI);
   LegalizeResult lowerSADDO_SSUBO(MachineInstr &MI);
   LegalizeResult lowerBswap(MachineInstr &MI);
+  LegalizeResult lowerBitreverse(MachineInstr &MI);
 
 private:
   MachineRegisterInfo &MRI;
