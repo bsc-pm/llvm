@@ -9,35 +9,35 @@
 vor.vv v1, v3, v2, v0.t
 // CHECK-INST: vor.vv v1, v3, v2, v0.t
 // CHECK-ENCODING: [0xd7,0x00,0x31,0x28]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 00 31 28 <unknown>
 
 vor.vv v1, v3, v2
 // CHECK-INST: vor.vv v1, v3, v2
 // CHECK-ENCODING: [0xd7,0x00,0x31,0x2a]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 00 31 2a <unknown>
 
 vor.vx v1, v3, a0, v0.t
 // CHECK-INST: vor.vx v1, v3, a0, v0.t
 // CHECK-ENCODING: [0xd7,0x40,0x35,0x28]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 40 35 28 <unknown>
 
 vor.vx v1, v3, a0
 // CHECK-INST: vor.vx v1, v3, a0
 // CHECK-ENCODING: [0xd7,0x40,0x35,0x2a]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 40 35 2a <unknown>
 
 vor.vi v1, v3, 15, v0.t
 // CHECK-INST: vor.vi v1, v3, 15, v0.t
 // CHECK-ENCODING: [0xd7,0xb0,0x37,0x28]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 b0 37 28 <unknown>
 
 vor.vi v1, v3, 15
 // CHECK-INST: vor.vi v1, v3, 15
 // CHECK-ENCODING: [0xd7,0xb0,0x37,0x2a]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 b0 37 2a <unknown>

@@ -9,35 +9,35 @@
 vand.vv v1, v3, v2, v0.t
 // CHECK-INST: vand.vv v1, v3, v2, v0.t
 // CHECK-ENCODING: [0xd7,0x00,0x31,0x24]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 00 31 24 <unknown>
 
 vand.vv v1, v3, v2
 // CHECK-INST: vand.vv v1, v3, v2
 // CHECK-ENCODING: [0xd7,0x00,0x31,0x26]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 00 31 26 <unknown>
 
 vand.vx v1, v3, a0, v0.t
 // CHECK-INST: vand.vx v1, v3, a0, v0.t
 // CHECK-ENCODING: [0xd7,0x40,0x35,0x24]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 40 35 24 <unknown>
 
 vand.vx v1, v3, a0
 // CHECK-INST: vand.vx v1, v3, a0
 // CHECK-ENCODING: [0xd7,0x40,0x35,0x26]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 40 35 26 <unknown>
 
 vand.vi v1, v3, 15, v0.t
 // CHECK-INST: vand.vi v1, v3, 15, v0.t
 // CHECK-ENCODING: [0xd7,0xb0,0x37,0x24]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 b0 37 24 <unknown>
 
 vand.vi v1, v3, 15
 // CHECK-INST: vand.vi v1, v3, 15
 // CHECK-ENCODING: [0xd7,0xb0,0x37,0x26]
-// CHECK-ERROR: instruction use requires an option to be enabled
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 b0 37 26 <unknown>
