@@ -138,6 +138,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_cost operand bundle id drifted!");
   (void)OSSCostEntry;
 
+  auto *OSSPriorityEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.PRIORITY");
+  assert(OSSPriorityEntry->second == LLVMContext::OB_oss_priority &&
+         "oss_priority operand bundle id drifted!");
+  (void)OSSPriorityEntry;
+
   auto *OSSCapturedEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.CAPTURED");
   assert(OSSCapturedEntry->second == LLVMContext::OB_oss_captured &&
          "oss_captured operand bundle id drifted!");

@@ -71,6 +71,7 @@ struct OSSTaskDataTy final {
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;
+  const Expr *Priority = nullptr;
 };
 
 class CGOmpSsRuntime {

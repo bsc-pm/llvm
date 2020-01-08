@@ -4,27 +4,27 @@ template<typename T> T foo() { return T(); }
 
 void bar(int n) {
     int vla[n];
-    #pragma oss task cost(foo<int>())
+    #pragma oss task priority(foo<int>())
     {}
-    #pragma oss task cost(n)
+    #pragma oss task priority(n)
     {}
-    #pragma oss task cost(vla[1])
+    #pragma oss task priority(vla[1])
     {}
 }
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: OSSCostClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSPriorityClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: CallExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int':'int'
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int (*)()' <FunctionToPointerDecay>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int ()' lvalue Function 0x{{.*}} 'foo' 'int ()' (FunctionTemplate 0x{{.*}} 'foo')
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: OSSCostClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSPriorityClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr 0x{{.*}} <col:{{.*}}> 'int' lvalue ParmVar 0x{{.*}} 'n' 'int'
 
 // CHECK: OSSTaskDirective 0x{{.*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
-// CHECK-NEXT: OSSCostClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
+// CHECK-NEXT: OSSPriorityClause 0x{{.*}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' <LValueToRValue>
 // CHECK-NEXT: ArraySubscriptExpr 0x{{.*}} <col:{{.*}}, col:{{.*}}> 'int' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{.*}} <col:{{.*}}> 'int *' <ArrayToPointerDecay>

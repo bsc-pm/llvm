@@ -688,9 +688,6 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
     if (isa<OSSDependClause>(Clause)) {
       OSSClauseChecker.VisitClause(Clause);
     }
-    if (isa<OSSCostClause>(Clause)) {
-      OSSClauseChecker.VisitClause(Clause);
-    }
     // FIXME: how to handle an error?
     if (OSSClauseChecker.isErrorFound())
       ErrorFound = true;
@@ -1365,6 +1362,27 @@ OSSClause *Sema::ActOnOmpSsCostClause(Expr *E,
   return new (Context) OSSCostClause(ValExpr, StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+  Expr *ValExpr = E;
+  // The parameter of the priority() clause must be integer signed
+  // expression.
+  if (!ValExpr->isTypeDependent() && !ValExpr->isValueDependent() &&
+      !ValExpr->isInstantiationDependent() &&
+      !ValExpr->containsUnexpandedParameterPack()) {
+    SourceLocation Loc = ValExpr->getExprLoc();
+    ExprResult Value =
+        PerformOmpSsImplicitIntegerConversion(Loc, ValExpr);
+    if (Value.isInvalid())
+      return nullptr;
+    ValExpr = Value.get();
+  }
+
+  return new (Context) OSSPriorityClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
                                             SourceLocation StartLoc,
                                             SourceLocation LParenLoc,
@@ -1379,6 +1397,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_cost:
     Res = ActOnOmpSsCostClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_priority:
+    Res = ActOnOmpSsPriorityClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");

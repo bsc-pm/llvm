@@ -145,6 +145,15 @@ static void AddCostData(const OSSTaskDirective &S, const Expr * &CostExpr) {
   }
 }
 
+static void AddPriorityData(const OSSTaskDirective &S, const Expr * &PriorityExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSPriorityClause>()) {
+    assert(!Found);
+    Found = true;
+    PriorityExpr = C->getExpression();
+  }
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 
@@ -153,6 +162,7 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   AddIfData(S, Data.If);
   AddFinalData(S, Data.Final);
   AddCostData(S, Data.Cost);
+  AddPriorityData(S, Data.Priority);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }

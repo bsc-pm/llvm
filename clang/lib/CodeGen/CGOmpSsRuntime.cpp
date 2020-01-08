@@ -922,6 +922,17 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, RefMap);
   }
 
+  if (Data.Cost) {
+    llvm::Value *V = CGF.EmitScalarExpr(Data.Cost);
+    CapturedList.push_back(V);
+    TaskInfo.emplace_back("QUAL.OSS.COST", V);
+  }
+  if (Data.Priority) {
+    llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
+    CapturedList.push_back(V);
+    TaskInfo.emplace_back("QUAL.OSS.PRIORITY", V);
+  }
+
   if (!CapturedList.empty())
     TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
 
@@ -954,8 +965,6 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
-  if (Data.Cost)
-    TaskInfo.emplace_back("QUAL.OSS.COST", CGF.EmitScalarExpr(Data.Cost));
 
   InTaskEmission = false;
 

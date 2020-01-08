@@ -101,10 +101,11 @@ public:
     OB_oss_final = 15,           // "OB_oss_final"
     OB_oss_if = 16,              // "OB_oss_if"
     OB_oss_cost = 17,            // "OB_oss_cost"
-    OB_oss_captured = 18,        // "OB_oss_captured"
-    OB_oss_init = 19,            // "OB_oss_init"
-    OB_oss_deinit = 20,          // "OB_oss_deinit"
-    OB_oss_copy = 21,            // "OB_oss_copy"
+    OB_oss_priority = 18,        // "OB_oss_priority"
+    OB_oss_captured = 19,        // "OB_oss_captured"
+    OB_oss_init = 20,            // "OB_oss_init"
+    OB_oss_deinit = 21,          // "OB_oss_deinit"
+    OB_oss_copy = 22,            // "OB_oss_copy"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

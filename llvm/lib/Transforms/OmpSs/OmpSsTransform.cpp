@@ -303,30 +303,9 @@ struct OmpSs : public ModulePass {
     }
   }
 
-  void unpackCostAndRewrite(Module &M, TaskCostInfo &TCI, Function *F, ArrayRef<Value *> TaskArgsList) {
+  void unpackCostAndRewrite(Module &M, Value *Cost, Function *F, ArrayRef<Value *> TaskArgsList) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
-    DenseMap<Value *, Value *> ConstExprToInst;
-    for (ConstantExpr * const &CE : TCI.UnpackConstants) {
-      Instruction *I = CE->getAsInstruction();
-      Entry.getInstList().push_back(I);
-
-      // TODO: make a use case that have two or more same constants
-      ConstExprToInst[CE] = I;
-    }
-    for (Instruction * const &I : TCI.UnpackInstructions) {
-      I->removeFromParent();
-      Entry.getInstList().push_back(I);
-    }
-    for (Instruction &I : Entry) {
-      Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
-        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
-      }
-      for (auto &p : ConstExprToInst) {
-        I.replaceUsesOfWith(p.first, p.second);
-      }
-    }
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
     IRBuilder<> BBBuilder(&F->getEntryBlock().back());
     Value *Constraints = &*(F->arg_end() - 1);
@@ -336,8 +315,30 @@ struct OmpSs : public ModulePass {
 
     Value *GEPConstraints = BBBuilder.CreateGEP(
           Constraints, Idx, "gep_" + Constraints->getName());
-    Value *CostCast = BBBuilder.CreateZExt(TCI.Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
+    Value *CostCast = BBBuilder.CreateZExt(Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
     BBBuilder.CreateStore(CostCast, GEPConstraints);
+    for (Instruction &I : Entry) {
+      Function::arg_iterator AI = F->arg_begin();
+      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
+        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
+      }
+    }
+  }
+
+  void unpackPriorityAndRewrite(Module &M, Value *Priority, Function *F, ArrayRef<Value *> TaskArgsList) {
+    BasicBlock::Create(M.getContext(), "entry", F);
+    BasicBlock &Entry = F->getEntryBlock();
+    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+    IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+    Value *PriorityArg = &*(F->arg_end() - 1);
+    Value *PrioritySExt = BBBuilder.CreateSExt(Priority, Type::getInt64Ty(M.getContext()));
+    BBBuilder.CreateStore(PrioritySExt, PriorityArg);
+    for (Instruction &I : Entry) {
+      Function::arg_iterator AI = F->arg_begin();
+      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
+        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
+      }
+    }
   }
 
   void unpackCallToRTOfType(Module &M,
@@ -738,8 +739,8 @@ struct OmpSs : public ModulePass {
 
     // nanos6_ol_deps_* END
 
-    Function *UnpackConstraintsFuncVar = nullptr;
-    if (TI.CostInfo.Cost) {
+    Function *OlConstraintsFuncVar = nullptr;
+    if (TI.Cost) {
       // nanos6_unpacked_constraints_* START
       TaskExtraTypeList.clear();
       TaskExtraNameList.clear();
@@ -747,16 +748,16 @@ struct OmpSs : public ModulePass {
       TaskExtraTypeList.push_back(Nanos6TaskConstraints::getInstance(M).getType()->getPointerTo());
       TaskExtraNameList.push_back("constraints");
 
-      UnpackConstraintsFuncVar = createUnpackOlFunction(M, F,
+      Function *UnpackConstraintsFuncVar = createUnpackOlFunction(M, F,
                                  ("nanos6_unpacked_constraints_" + F.getName() + Twine(taskNum)).str(),
                                  TaskTypeList, TaskNameList,
                                  TaskExtraTypeList, TaskExtraNameList);
-      unpackCostAndRewrite(M, TI.CostInfo, UnpackConstraintsFuncVar, TaskArgsList.getArrayRef());
+      unpackCostAndRewrite(M, TI.Cost, UnpackConstraintsFuncVar, TaskArgsList.getArrayRef());
       // nanos6_unpacked_constraints_* END
 
       // nanos6_ol_constraints_* START
 
-      Function *OlConstraintsFuncVar
+      OlConstraintsFuncVar
         = createUnpackOlFunction(M, F,
                                  ("nanos6_ol_constraints_" + F.getName() + Twine(taskNum)).str(),
                                  {TaskArgsTy->getPointerTo()}, {"task_args"},
@@ -764,6 +765,35 @@ struct OmpSs : public ModulePass {
       olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar);
 
       // nanos6_ol_constraints_* END
+    }
+
+    Function *OlPriorityFuncVar = nullptr;
+    if (TI.Priority) {
+      // nanos6_unpacked_priority_* START
+      TaskExtraTypeList.clear();
+      TaskExtraNameList.clear();
+      // nanos6_priority_t *priority
+      // long int *priority
+      TaskExtraTypeList.push_back(Type::getInt64Ty(M.getContext())->getPointerTo());
+      TaskExtraNameList.push_back("priority");
+
+      Function *UnpackPriorityFuncVar = createUnpackOlFunction(M, F,
+                                 ("nanos6_unpacked_priority_" + F.getName() + Twine(taskNum)).str(),
+                                 TaskTypeList, TaskNameList,
+                                 TaskExtraTypeList, TaskExtraNameList);
+      unpackPriorityAndRewrite(M, TI.Priority, UnpackPriorityFuncVar, TaskArgsList.getArrayRef());
+      // nanos6_unpacked_priority_* END
+
+      // nanos6_ol_priority_* START
+
+      OlPriorityFuncVar
+        = createUnpackOlFunction(M, F,
+                                 ("nanos6_ol_priority_" + F.getName() + Twine(taskNum)).str(),
+                                 {TaskArgsTy->getPointerTo()}, {"task_args"},
+                                 TaskExtraTypeList, TaskExtraNameList);
+      olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlPriorityFuncVar, UnpackPriorityFuncVar);
+
+      // nanos6_ol_priority_* END
     }
 
     // 3. Create Nanos6 task data structures info
@@ -783,7 +813,7 @@ struct OmpSs : public ModulePass {
     Constant *TaskImplInfoVar = M.getOrInsertGlobal(("implementations_var_" + F.getName() + Twine(taskNum)).str(),
                                       ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
                                       [&M, &F, &OlTaskFuncVar,
-                                       &UnpackConstraintsFuncVar, &Nanos6TaskLocStr,
+                                       &OlConstraintsFuncVar, &Nanos6TaskLocStr,
                                        &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
                                 /*isConstant=*/true,
@@ -793,8 +823,9 @@ struct OmpSs : public ModulePass {
                                                                        ConstantInt::get(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(0), 0),
                                                                        ConstantExpr::getPointerCast(OlTaskFuncVar, Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(1)),
                                                                        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
-                                                                       UnpackConstraintsFuncVar
-                                                                         ? ConstantExpr::getPointerCast(UnpackConstraintsFuncVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))
+                                                                       OlConstraintsFuncVar
+                                                                         ? ConstantExpr::getPointerCast(OlConstraintsFuncVar,
+                                                                                                        Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
                                                                          : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
                                                                        Nanos6TaskLocStr,
                                                                        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(5))))),
@@ -807,6 +838,7 @@ struct OmpSs : public ModulePass {
     Constant *TaskInfoVar = M.getOrInsertGlobal(("task_info_var_" + F.getName() + Twine(taskNum)).str(),
                                       Nanos6TaskInfo::getInstance(M).getType(),
                                       [&M, &F, &TI, &OlDepsFuncVar,
+                                       &OlPriorityFuncVar,
                                        &TaskImplInfoVar, &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInfo::getInstance(M).getType(),
                                 /*isConstant=*/true,
@@ -815,7 +847,10 @@ struct OmpSs : public ModulePass {
                                                     // TODO: Add support for devices
                                                     ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(0), TI.DependsInfo.NumSymbols),
                                                     ConstantExpr::getPointerCast(OlDepsFuncVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(1)),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))),
+                                                    OlPriorityFuncVar
+                                                      ? ConstantExpr::getPointerCast(OlPriorityFuncVar,
+                                                                                     Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))
+                                                      : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))),
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))),
                                                     ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(4), 1),
                                                     ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(5)),

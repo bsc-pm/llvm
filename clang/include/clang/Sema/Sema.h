@@ -9990,6 +9990,10 @@ public:
   OSSClause *ActOnOmpSsCostClause(Expr *E, SourceLocation StartLoc,
                                   SourceLocation LParenLoc,
                                   SourceLocation EndLoc);
+  /// Called on well-formed 'priority' clause.
+  OSSClause *ActOnOmpSsPriorityClause(Expr *E, SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc);
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {
