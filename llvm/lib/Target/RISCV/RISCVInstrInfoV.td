@@ -92,14 +92,6 @@ class VIndexedLoad<RISCVMOP mop, RISCVWidth width, string opcodestr>
     : RVInstVLX<0b000, mop, width, (outs VRRegOp:$vd),
                 (ins GPR:$rs1, VRRegOp:$vs2, VRMaskRegOp:$vm), opcodestr,
                 "$vd, (${rs1}), $vs2${vm}">;
-
-// vl<nf>r.v vd, (rs1)
-class VWholeLoad<bits<3> nf, string opcodestr>
-    : RVInstVLU<nf, MOPLDUnitStrideU, LUMOPUnitStrideWholeReg,
-                LSWidthVSEW, (outs VRRegOp:$vd), (ins GPR:$rs1),
-                opcodestr, "$vd, (${rs1})"> {
-  let vm = 1;
-}
 }
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in {
@@ -121,14 +113,6 @@ class VIndexedStore<RISCVMOP mop, RISCVWidth width, string opcodestr>
     : RVInstVSX<0b000, mop, width, (outs),
                 (ins VRRegOp:$vs3, GPR:$rs1, VRRegOp:$vs2, VRMaskRegOp:$vm),
                 opcodestr, "$vs3, (${rs1}), $vs2${vm}">;
-
-// vs<nf>r.v vd, (rs1)
-class VWholeStore<bits<3> nf, string opcodestr>
-    : RVInstVSU<nf, MOPSTUnitStride, SUMOPUnitStrideWholeReg,
-                LSWidthVSEW, (outs), (ins VRRegOp:$vs3, GPR:$rs1),
-                opcodestr, "$vs3, (${rs1})"> {
-  let vm = 1;
-}
 }
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
@@ -413,9 +397,19 @@ def VSUXH_V : VIndexedStore<MOPSTIndexedUnOrd, LSWidthVHalf, "vsuxh.v">;
 def VSUXW_V : VIndexedStore<MOPSTIndexedUnOrd, LSWidthVWord, "vsuxw.v">;
 def VSUXE_V : VIndexedStore<MOPSTIndexedUnOrd, LSWidthVSEW, "vsuxe.v">;
 
-foreach nf = 1-7 in {
-  def VL#nf#R_V : VWholeLoad<nf, "vl" # nf # "r.v">;
-  def VS#nf#R_V : VWholeStore<nf, "vs" # nf # "r.v">;
+// vl1r.v vd, (rs1)
+let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
+def VL1R_V : RVInstVLU<0b000, MOPLDUnitStrideU, LUMOPUnitStrideWholeReg,
+                       LSWidthVSEW, (outs VRRegOp:$vd), (ins GPR:$rs1),
+                       "vl1r.v", "$vd, (${rs1})"> {
+  let vm = 1;
+}
+// vs1r.v vd, (rs1)
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+def VS1R_V : RVInstVSU<0b000, MOPSTUnitStride, SUMOPUnitStrideWholeReg,
+                       LSWidthVSEW, (outs), (ins VRRegOp:$vs3, GPR:$rs1),
+                       "vs1r.v", "$vs3, (${rs1})"> {
+  let vm = 1;
 }
 
 // Vector Single-Width Integer Add and Subtract

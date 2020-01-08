@@ -200,42 +200,6 @@ vsuxe.v v4, (a0), v3
 
 vs1r.v v1, (a0)
 // CHECK-INST: vs1r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0x22]
+// CHECK-ENCODING: [0xa7,0x70,0x85,0x02]
 // CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 22 <unknown>
-
-vs2r.v v1, (a0)
-// CHECK-INST: vs2r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0x42]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 42 <unknown>
-
-vs3r.v v1, (a0)
-// CHECK-INST: vs3r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0x62]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 62 <unknown>
-
-vs4r.v v1, (a0)
-// CHECK-INST: vs4r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0x82]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 82 <unknown>
-
-vs5r.v v1, (a0)
-// CHECK-INST: vs5r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0xa2]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 a2 <unknown>
-
-vs6r.v v1, (a0)
-// CHECK-INST: vs6r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0xc2]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 c2 <unknown>
-
-vs7r.v v1, (a0)
-// CHECK-INST: vs7r.v v1, (a0)
-// CHECK-ENCODING: [0xa7,0x70,0x85,0xe2]
-// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
-// CHECK-UNKNOWN: a7 70 85 e2 <unknown>
+// CHECK-UNKNOWN: a7 70 85 02 <unknown>
