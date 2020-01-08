@@ -145,116 +145,30 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
       RISCV::VR2RegClass.contains(DstReg, SrcReg) ||
       RISCV::VR4RegClass.contains(DstReg, SrcReg) ||
       RISCV::VR8RegClass.contains(DstReg, SrcReg)) {
-    // readvl t0
-    // readvtype t1
-    // vsetvli x0, x0, ELEN, VLMUL
-    // vmv.v.v dest, src
-    // vsetvl x0, t0, t1
-    RegScavenger RS;
-
-    RS.enterBasicBlock(MBB);
-    RS.forward(*MBBI);
-
-    BitVector Available = RS.getRegsAvailable(&RISCV::GPRRegClass);
-
-    int OldVTypeReg = -1;
-    int OldVLReg = -1;
-    SmallVector<Register, 2> RegistersToSpill;
-
-    OldVTypeReg = Available.find_first();
-    if (OldVTypeReg == -1) {
-      // Use t0.
-      OldVTypeReg = RISCV::X5;
-      RegistersToSpill.push_back(OldVTypeReg);
-    } else {
-      OldVLReg = Available.find_next(OldVTypeReg);
-    }
-
-    if (OldVLReg == -1) {
-      // Use t1.
-      OldVLReg = RISCV::X6;
-      RegistersToSpill.push_back(OldVLReg);
-    }
-
     MachineFunction *MF = MBB.getParent();
     const TargetRegisterInfo &RI = *MF->getSubtarget().getRegisterInfo();
 
-    // Emergency spill.
-    if (!RegistersToSpill.empty()) {
-      assert(RegistersToSpill.size() <= 2 && "Too many registers!");
-      // Grow stack.
-      BuildMI(MBB, MBBI, DL, get(RISCV::ADDI), RISCV::X2)
-          .addReg(RISCV::X2)
-          .addImm(-(RegistersToSpill.size() *
-                    RI.getSpillSize(RISCV::GPRRegClass)));
-      int Idx = 0;
-      for (auto &R : RegistersToSpill) {
-        unsigned Opcode =
-            RI.getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::SW : RISCV::SD;
-        BuildMI(MBB, MBBI, DL, get(Opcode))
-          .addReg(R)
-          .addReg(RISCV::X2)
-          .addImm(Idx * RI.getSpillSize(RISCV::GPRRegClass));
-        Idx++;
-      }
-    }
-
-    unsigned VLMul;
+    unsigned VMVOpcode;
     if (RISCV::VRRegClass.contains(DstReg, SrcReg))
-      VLMul = 0;
+      VMVOpcode = RISCV::VMV1R_V;
     else {
       if (RISCV::VR2RegClass.contains(DstReg, SrcReg))
-        VLMul = 1;
+        VMVOpcode = RISCV::VMV2R_V;
       else if (RISCV::VR4RegClass.contains(DstReg, SrcReg))
-        VLMul = 2;
+        VMVOpcode = RISCV::VMV4R_V;
       else {
         assert(RISCV::VR8RegClass.contains(DstReg, SrcReg));
-        VLMul = 3;
+        VMVOpcode = RISCV::VMV8R_V;
       }
       SrcReg = RI.getSubReg(SrcReg, RISCV::vreven);
       DstReg = RI.getSubReg(DstReg, RISCV::vreven);
       assert(SrcReg && DstReg && "Subregister does not exist");
     }
 
-    // FIXME use whole register move vmv<nf>
-    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVTYPE), OldVTypeReg);
-    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoReadVL), OldVLReg);
-    // Note: VL and VTYPE are alive here.
-    int TmpReg = Available.find_next(OldVLReg);
-    assert(TmpReg > 0 && "Unable to scavenger a register!");
-    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoVSETVLI))
-        // Note: TmpReg must not be X0, otherwise the VSETVLI instruction will
-        // leave VL unchanged (in 0.8). Currently X0 is a reserved register and
-        // the register allocator will not consider it.
-        .addReg(TmpReg, RegState::Define | RegState::Dead)
-        .addReg(RISCV::X0)
-        // FIXME - Hardcoded to SEW=64
-        .addImm((/* e64 */ 3 << 2) | VLMul);
-
-    BuildMI(MBB, MBBI, DL, get(RISCV::VMV_V_V), DstReg)
+    // vmv<nf>r.v dest, src
+    BuildMI(MBB, MBBI, DL, get(VMVOpcode), DstReg)
         .addReg(SrcReg, getKillRegState(KillSrc));
-    BuildMI(MBB, MBBI, DL, get(RISCV::PseudoVSETVL), RISCV::X0)
-        .addReg(OldVLReg, RegState::Kill)
-        .addReg(OldVTypeReg, RegState::Kill);
 
-    // Emergency reload.
-    if (!RegistersToSpill.empty()) {
-      assert(RegistersToSpill.size() <= 2 && "Too many registers!");
-      int Idx = 0;
-      for (auto &R : RegistersToSpill) {
-        unsigned Opcode =
-            RI.getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
-        BuildMI(MBB, MBBI, DL, get(Opcode), R)
-          .addReg(RISCV::X2)
-          .addImm(Idx * RI.getSpillSize(RISCV::GPRRegClass));
-        Idx++;
-      }
-      // Shrink stack.
-      BuildMI(MBB, MBBI, DL, get(RISCV::ADDI), RISCV::X2)
-          .addReg(RISCV::X2)
-          .addImm((RegistersToSpill.size() *
-                    RI.getSpillSize(RISCV::GPRRegClass)));
-    }
     return;
   }
 

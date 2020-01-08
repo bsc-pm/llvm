@@ -10,9 +10,5 @@ body: |
     VSE_V $v1, $x10, $noreg, implicit $vl, implicit $vtype
 ...
 
-# CHECK: rdvtype t0
-# CHECK-NEXT: rdvl t1
-# CHECK-NEXT: vsetvli t2, zero, e64,m1
-# CHECK-NEXT: vmv.v.v v1, v2
-# CHECK-NEXT: vsetvl  zero, t1, t0
+# CHECK: vmv1r.v v1, v2
 # CHECK-NEXT: vse.v v1, (a0)

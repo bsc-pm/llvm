@@ -53,3 +53,27 @@ vfmv.s.f v1, fa0
 // CHECK-ENCODING: [0xd7,0x50,0x05,0x42]
 // CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
 // CHECK-UNKNOWN: d7 50 05 42 <unknown>
+
+vmv1r.v v0, v1
+// CHECK-INST: vmv1r.v v0, v1
+// CHECK-ENCODING: [0x57,0x30,0x10,0x9e]
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
+// CHECK-UNKNOWN: 57 30 10 9e <unknown>
+
+vmv2r.v v0, v2
+// CHECK-INST: vmv2r.v v0, v2
+// CHECK-ENCODING: [0x57,0xb0,0x20,0x9e]
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
+// CHECK-UNKNOWN: 57 b0 20 9e <unknown>
+
+vmv4r.v v0, v4
+// CHECK-INST: vmv4r.v v0, v4
+// CHECK-ENCODING: [0x57,0xb0,0x41,0x9e]
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
+// CHECK-UNKNOWN: 57 b0 41 9e <unknown>
+
+vmv8r.v v0, v8
+// CHECK-INST: vmv8r.v v0, v8
+// CHECK-ENCODING: [0x57,0xb0,0x83,0x9e]
+// CHECK-ERROR: instruction requires the following: 'V' (Vector Instructions)
+// CHECK-UNKNOWN: 57 b0 83 9e <unknown>

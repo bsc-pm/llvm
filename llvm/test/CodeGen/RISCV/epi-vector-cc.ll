@@ -216,11 +216,7 @@ define <vscale x 1 x double> @first_mask_2(
 define <vscale x 1 x double> @second_mask_1(
 ; CHECK-LABEL: second_mask_1:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli t2, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v0, v18
-; CHECK-NEXT:    vsetvl zero, t1, t0
+; CHECK-NEXT:    vmv1r.v v0, v18
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vfadd.vv v16, v16, v17, v0.t
 ; CHECK-NEXT:    ret
@@ -250,11 +246,7 @@ define <vscale x 1 x i1> @return_mask_1(<vscale x 1 x i1> %mask1) nounwind
 define <vscale x 1 x i1> @return_mask_2(<vscale x 1 x i1> %mask1,
 ; CHECK-LABEL: return_mask_2:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli t2, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v0, v16
-; CHECK-NEXT:    vsetvl zero, t1, t0
+; CHECK-NEXT:    vmv1r.v v0, v16
 ; CHECK-NEXT:    ret
                                       <vscale x 1 x i1> %mask2) nounwind
 {

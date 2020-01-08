@@ -350,11 +350,7 @@ define <vscale x 1 x double> @test7(i64 %avl, i8 zeroext %cond, <vscale x 1 x do
 ; CHECK-NEXT:  .LBB6_5:
 ; CHECK-NEXT:    # implicit-def: $v0
 ; CHECK-NEXT:  .LBB6_6: # %for.cond.cleanup
-; CHECK-NEXT:    rdvtype t0
-; CHECK-NEXT:    rdvl t1
-; CHECK-NEXT:    vsetvli t2, zero, e64,m1
-; CHECK-NEXT:    vmv.v.v v16, v0
-; CHECK-NEXT:    vsetvl zero, t1, t0
+; CHECK-NEXT:    vmv1r.v v16, v0
 ; CHECK-NEXT:    ret
 entry:
   %0 = tail call i64 @llvm.epi.vsetvl(i64 %avl, i64 3, i64 0)

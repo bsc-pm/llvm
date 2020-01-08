@@ -47,11 +47,7 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    vmflt.vv v2, v0, v1
 ; CHECK-O0-NEXT:    ld a0, -40(s0)
 ; CHECK-O0-NEXT:    vs1r.v v0, (a0)
-; CHECK-O0-NEXT:    rdvtype ra
-; CHECK-O0-NEXT:    rdvl t0
-; CHECK-O0-NEXT:    vsetvli t1, zero, e64,m1
-; CHECK-O0-NEXT:    vmv.v.v v0, v2
-; CHECK-O0-NEXT:    vsetvl zero, t0, ra
+; CHECK-O0-NEXT:    vmv1r.v v0, v2
 ; CHECK-O0-NEXT:    ld a0, -40(s0)
 ; CHECK-O0-NEXT:    vl1r.v v2, (a0)
 ; CHECK-O0-NEXT:    vfsub.vv v1, v1, v2, v0.t

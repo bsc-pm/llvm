@@ -211,6 +211,14 @@ class VALUVs2<bits<6> funct6, bits<5> vs1, RISCVVFormat opv, string opcodestr>
     : RVInstV<funct6, vs1, opv, (outs VRRegOp:$vd),
                (ins VRRegOp:$vs2, VRMaskRegOp:$vm),
                opcodestr, "$vd, $vs2${vm}">;
+
+// vmv<nf>r.v vd, vs2
+class VWholeMV<bits<3> nf, string opcodestr>
+    : RVInstIVI<0b100111, (outs VRRegOp:$vd), (ins VRRegOp:$vs2),
+                opcodestr, "$vd, $vs2"> {
+  let imm = { 0b00, nf };
+  let vm = 1;
+}
 }
 
 //===----------------------------------------------------------------------===//
@@ -522,6 +530,10 @@ def VMV_V_I : RVInstIVI<0b010111, (outs VRRegOp:$vd),
                        (ins simm5:$imm), "vmv.v.i", "$vd, $imm"> {
   let vs2 = 0;
   let vm = 1;
+}
+
+foreach nf = [1, 2, 4, 8] in {
+  def VMV#nf#R_V : VWholeMV<!add(nf, -1), "vmv" # nf # "r.v">;
 }
 }
 
