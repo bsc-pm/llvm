@@ -350,19 +350,32 @@ struct OmpSs : public ModulePass {
       Instruction &RetI = Entry.back();
       IRBuilder<> BBBuilder(&RetI);
 
-      // We have built the Instruction equivalent of a ConstantExpr.
-      // but Base has the ConstantExpr. Use the instruction
       Value *NewBase = DI.Base;
-      if (ConstExprToInst.count(NewBase))
+      // Possible cases when generating the final Value for dependency base.
+      // 1. ConstantExpr: We gathered this in analysis so it's safe to replace here
+      // 2. GlobLVal: This will make a ConstantExpr for the BitCast, so we must to register it
+      // 3. Instruction: With the BitCast we are done here
+      if (isa<ConstantExpr>(NewBase))
         NewBase = ConstExprToInst[NewBase];
 
-      Value *BaseCast = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      NewBase = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+
+      if (auto *CE = dyn_cast<ConstantExpr>(NewBase)) {
+        if (!ConstExprToInst.count(CE)) {
+          // ConstantExpr may be used more than once. Reuse the instruction
+          Instruction *I = CE->getAsInstruction();
+          BBBuilder.Insert(I);
+
+          ConstExprToInst[CE] = I;
+        }
+      }
+
       SmallVector<Value *, 4> TaskDepAPICall;
       Value *Handler = &*(F->arg_end() - 1);
       TaskDepAPICall.push_back(Handler);
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
-      TaskDepAPICall.push_back(BaseCast);
+      TaskDepAPICall.push_back(NewBase);
       assert(!(DI.Dims.size()%3));
       size_t NumDims = DI.Dims.size()/3;
       for (Value *V : DI.Dims) {

@@ -24,7 +24,7 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile-and-run | FileCheck %s
+// RUN: %oss-compile-and-run
 
 #include <stdio.h>
 void foo(int n) {
@@ -34,7 +34,7 @@ void foo(int n) {
     int d;
     int e;
     int f;
-    
+
     #pragma oss task in(a, b, c, d, e, f)
     {
     }
