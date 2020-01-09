@@ -35,6 +35,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/TypeSize.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -518,6 +519,7 @@ private:
 public:
   /// Return a ConstantVector with the specified constant in each element.
   static Constant *getSplat(unsigned NumElts, Constant *Elt);
+  static Constant *getSplat(ElementCount NumElts, Constant *Elt);
 
   /// Specialize the getType() method to always return a VectorType,
   /// which reduces the amount of casting needed in parts of the compiler.
@@ -1201,6 +1203,7 @@ public:
                                      Type *OnlyIfReducedTy = nullptr);
   static Constant *getInsertElement(Constant *Vec, Constant *Elt, Constant *Idx,
                                     Type *OnlyIfReducedTy = nullptr);
+  static Constant *getScalableSplat(ElementCount NumElts, Constant *Val);
   static Constant *getShuffleVector(Constant *V1, Constant *V2, Constant *Mask,
                                     Type *OnlyIfReducedTy = nullptr);
   static Constant *getExtractValue(Constant *Agg, ArrayRef<unsigned> Idxs,

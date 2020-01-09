@@ -16,6 +16,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalValue.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TypeSize.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
@@ -712,7 +714,7 @@ Constant *ConstantInt::get(Type *Ty, uint64_t V, bool isSigned) {
 
   // For vectors, broadcast the value.
   if (VectorType *VTy = dyn_cast<VectorType>(Ty))
-    return ConstantVector::getSplat(VTy->getNumElements(), C);
+    return ConstantVector::getSplat(VTy->getElementCount(), C);
 
   return C;
 }
@@ -1204,6 +1206,8 @@ Constant *ConstantVector::getImpl(ArrayRef<Constant*> V) {
   return nullptr;
 }
 
+// FIXME: All calls to this function should be changed to pass ElementCount
+// NumElts and this function should be replaced accordingly. 
 Constant *ConstantVector::getSplat(unsigned NumElts, Constant *V) {
   // If this splat is compatible with ConstantDataVector, use it instead of
   // ConstantVector.
@@ -1213,6 +1217,11 @@ Constant *ConstantVector::getSplat(unsigned NumElts, Constant *V) {
 
   SmallVector<Constant*, 32> Elts(NumElts, V);
   return get(Elts);
+}
+
+Constant *ConstantVector::getSplat(ElementCount NumElts, Constant *V) {
+  return NumElts.Scalable ? ConstantExpr::getScalableSplat(NumElts, V)
+                          : getSplat(NumElts.Min, V);
 }
 
 ConstantTokenNone *ConstantTokenNone::get(LLVMContext &Context) {
@@ -2229,6 +2238,23 @@ Constant *ConstantExpr::getInsertElement(Constant *Val, Constant *Elt,
 
   LLVMContextImpl *pImpl = Val->getContext().pImpl;
   return pImpl->ExprConstants.getOrCreate(Val->getType(), Key);
+}
+
+// TODO:
+// Based on the fact that a scalable shuffle vector can be used as a constant
+// expression (See changes introduced by Master commit 381d3c5c45c5), it should
+// be safe to assume that we can create a Scalable Vector Splat as a constant
+// expression. This behaviour is likely to change in the future, given that only
+// documented scalable vector constants allowed are zeroinitializer and undef.
+// Use it with caution.
+Constant *ConstantExpr::getScalableSplat(ElementCount NumElts, Constant *Val) {
+  assert(ConstantDataArray::isElementTypeCompatible(Val->getType()) &&
+         "Element type not compatible with ConstantData");
+  auto *Undef = UndefValue::get(VectorType::get(Val->getType(), NumElts));
+  Type *I32Ty = Type::getInt32Ty(Val->getType()->getContext());
+  Constant *Insert = getInsertElement(Undef, Val, ConstantInt::get(I32Ty, 0));
+  Constant *Zeros = ConstantAggregateZero::get(VectorType::get(I32Ty, NumElts));
+  return getShuffleVector(Insert, Undef, Zeros);
 }
 
 Constant *ConstantExpr::getShuffleVector(Constant *V1, Constant *V2,
