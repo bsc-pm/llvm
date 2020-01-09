@@ -4574,11 +4574,12 @@ void SelectionDAGBuilder::visitMaskedGather(const CallInst &I) {
                                     this);
   bool ConstantMemory = false;
   if (UniformBase && AA &&
-      AA->pointsToConstantMemory(
-          MemoryLocation(BasePtr,
-                         LocationSize::precise(
-                             DAG.getDataLayout().getTypeStoreSize(I.getType())),
-                         AAInfo))) {
+      AA->pointsToConstantMemory(MemoryLocation(
+          BasePtr,
+          LocationSize::precise(DAG.getDataLayout()
+                                    .getTypeStoreSize(I.getType())
+                                    .getKnownMinSize()),
+          AAInfo))) {
     // Do not serialize (non-volatile) loads of constant memory with anything.
     Root = DAG.getEntryNode();
     ConstantMemory = true;
