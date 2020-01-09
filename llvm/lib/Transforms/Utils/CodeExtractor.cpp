@@ -262,9 +262,11 @@ CodeExtractor::CodeExtractor(ArrayRef<BasicBlock *> BBs,
                                                      const SetVector<BasicBlock *> &Blocks)> emitOmpSsCaptureAndSubmitTask)
     : DT(nullptr), AggregateArgs(false), BFI(nullptr),
       BPI(nullptr), AC(nullptr), AllowVarArgs(false),
-      Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
+      // Blocks(buildExtractionBlockSet(BBs, DT, AllowVarArgs, /* AllowAlloca */ true)),
       rewriteUsesBrAndGetOmpSsUnpackFunc(rewriteUsesBrAndGetOmpSsUnpackFunc),
-      emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {}
+      emitOmpSsCaptureAndSubmitTask(emitOmpSsCaptureAndSubmitTask) {
+        Blocks.insert(BBs.begin(), BBs.end());
+      }
 
 CodeExtractor::CodeExtractor(DominatorTree &DT, Loop &L, bool AggregateArgs,
                              BlockFrequencyInfo *BFI,

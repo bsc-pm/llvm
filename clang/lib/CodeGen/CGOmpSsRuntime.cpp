@@ -976,7 +976,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   TaskEntryStack.push_back(TaskAllocaInsertPt);
 
+  // CGF.EHStack.pushTerminate();
   CGF.EmitStmt(D.getAssociatedStmt());
+  // CGF.EHStack.popTerminate();
 
   // Task body emited, clear RefMap to be reused
   RefMap.clear();
