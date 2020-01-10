@@ -387,6 +387,11 @@ public:
     }
   }
 
+  void VisitCXXCatchStmt(CXXCatchStmt *Node) {
+    InnerDecls.insert(Node->getExceptionDecl());
+    Visit(Node->getHandlerBlock());
+  }
+
   void VisitExpr(Expr *E) {
     for (Stmt *Child : E->children()) {
       if (Child)
