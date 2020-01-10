@@ -164,6 +164,10 @@ class LLDBTestResult(unittest2.TextTestResult):
                     return True
         return False
 
+    def checkCategoryExclusion(self, exclusion_list, test):
+        return not set(exclusion_list).isdisjoint(
+            self.getCategoriesForTest(test))
+
     def startTest(self, test):
         if configuration.shouldSkipBecauseOfCategories(
                 self.getCategoriesForTest(test)):
@@ -182,8 +186,10 @@ class LLDBTestResult(unittest2.TextTestResult):
                 EventBuilder.event_for_start(test))
 
     def addSuccess(self, test):
-        if self.checkExclusion(
-                configuration.xfail_tests, test.id()):
+        if (self.checkExclusion(
+                configuration.xfail_tests, test.id()) or
+            self.checkCategoryExclusion(
+                configuration.xfail_categories, test)):
             self.addUnexpectedSuccess(test, None)
             return
 
@@ -245,8 +251,10 @@ class LLDBTestResult(unittest2.TextTestResult):
                     test, err))
 
     def addFailure(self, test, err):
-        if self.checkExclusion(
-                configuration.xfail_tests, test.id()):
+        if (self.checkExclusion(
+                configuration.xfail_tests, test.id()) or
+            self.checkCategoryExclusion(
+                configuration.xfail_categories, test)):
             self.addExpectedFailure(test, err, None)
             return
 
@@ -258,14 +266,14 @@ class LLDBTestResult(unittest2.TextTestResult):
         self.stream.write(
             "FAIL: LLDB (%s) :: %s\n" %
             (self._config_string(test), str(test)))
-        if configuration.useCategories:
+        if configuration.use_categories:
             test_categories = self.getCategoriesForTest(test)
             for category in test_categories:
-                if category in configuration.failuresPerCategory:
-                    configuration.failuresPerCategory[
-                        category] = configuration.failuresPerCategory[category] + 1
+                if category in configuration.failures_per_category:
+                    configuration.failures_per_category[
+                        category] = configuration.failures_per_category[category] + 1
                 else:
-                    configuration.failuresPerCategory[category] = 1
+                    configuration.failures_per_category[category] = 1
         if self.results_formatter:
             self.results_formatter.handle_event(
                 EventBuilder.event_for_failure(test, err))
