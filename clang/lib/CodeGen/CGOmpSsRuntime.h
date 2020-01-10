@@ -79,7 +79,13 @@ protected:
   CodeGenModule &CGM;
 
 private:
-  SmallVector<llvm::AssertingVH<llvm::Instruction>, 2> TaskEntryStack;
+  struct TaskContext {
+    llvm::AssertingVH<llvm::Instruction> InsertPt;
+    llvm::BasicBlock *TerminateLandingPad = nullptr;
+    llvm::BasicBlock *TerminateHandler = nullptr;
+  };
+
+  SmallVector<TaskContext, 2> TaskStack;
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
@@ -99,8 +105,16 @@ public:
 
   // returns true if we're emitting code inside a task context (entry/exit)
   bool inTaskBody();
-  // returns the innermost nested task entry mark instruction
-  llvm::AssertingVH<llvm::Instruction> getCurrentTask();
+  // returns the innermost nested task InsertPt instruction
+  llvm::AssertingVH<llvm::Instruction> getTaskInsertPt();
+  // returns the innermost nested task TerminateHandler instruction
+  llvm::BasicBlock *getTaskTerminateHandler();
+  // returns the innermost nested task TerminateLandingPad instruction
+  llvm::BasicBlock *getTaskTerminateLandingPad();
+  // sets the innermost nested task TerminateHandler instruction
+  void setTaskTerminateHandler(llvm::BasicBlock *BB);
+  // sets the innermost nested task TerminateLandingPad instruction
+  void setTaskTerminateLandingPad(llvm::BasicBlock *BB);
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);

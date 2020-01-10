@@ -113,7 +113,7 @@ llvm::AllocaInst *CodeGenFunction::CreateTempAlloca(llvm::Type *Ty,
   if (getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTaskBody())
     return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
                                 ArraySize, Name,
-                                CGM.getOmpSsRuntime().getCurrentTask());
+                                CGM.getOmpSsRuntime().getTaskInsertPt());
 
   return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
                               ArraySize, Name, AllocaInsertPt);

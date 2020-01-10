@@ -892,11 +892,35 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
 }
 
 bool CGOmpSsRuntime::inTaskBody() {
-  return !TaskEntryStack.empty();
+  return !TaskStack.empty();
 }
 
-llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getCurrentTask() {
-  return TaskEntryStack.back();
+llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getTaskInsertPt() {
+  return TaskStack.back().InsertPt;
+}
+
+llvm::BasicBlock *CGOmpSsRuntime::getTaskTerminateHandler() {
+  return TaskStack.back().TerminateHandler;
+}
+
+llvm::BasicBlock *CGOmpSsRuntime::getTaskTerminateLandingPad() {
+  return TaskStack.back().TerminateLandingPad;
+}
+
+void CGOmpSsRuntime::setTaskTerminateHandler(llvm::BasicBlock *BB) {
+  TaskStack.back().TerminateHandler = BB;
+}
+
+void CGOmpSsRuntime::setTaskTerminateLandingPad(llvm::BasicBlock *BB) {
+  TaskStack.back().TerminateLandingPad = BB;
+}
+
+// Borrowed brom CodeGenFunction.cpp
+static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
+  if (!BB) return;
+  if (!BB->use_empty())
+    return CGF.CurFn->getBasicBlockList().push_back(BB);
+  delete BB;
 }
 
 void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
@@ -974,19 +998,30 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   // Push Task Stack
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
-  TaskEntryStack.push_back(TaskAllocaInsertPt);
+  TaskStack.push_back({TaskAllocaInsertPt,
+                       /*TerminateLandingPad=*/nullptr,
+                       /*TerminateHandler=*/nullptr});
 
-  // CGF.EHStack.pushTerminate();
+  // The point of exit cannot be a branch out of the structured block.
+  // longjmp() and throw() must not violate the entry/exit criteria.
+  CGF.EHStack.pushTerminate();
   CGF.EmitStmt(D.getAssociatedStmt());
-  // CGF.EHStack.popTerminate();
+  CGF.EHStack.popTerminate();
 
   // Task body emited, clear RefMap to be reused
   RefMap.clear();
 
+  // TODO: do we need this? we're pushing a terminate...
+  // EmitIfUsed(*this, EHResumeBlock);
+  EmitIfUsed(CGF, TaskStack.back().TerminateLandingPad);
+  EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
+  // TODO: do we need this?
+  // EmitIfUsed(*this, UnreachableBlock);
+
   CGF.Builder.CreateCall(ExitCallee, Result);
 
   // Pop Task Stack
-  TaskEntryStack.pop_back();
+  TaskStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
 }

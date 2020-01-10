@@ -14,6 +14,7 @@
 #include "CGCXXABI.h"
 #include "CGCleanup.h"
 #include "CGObjCRuntime.h"
+#include "CGOmpSsRuntime.h"
 #include "ConstantEmitter.h"
 #include "TargetInfo.h"
 #include "clang/AST/Mangle.h"
@@ -1455,60 +1456,85 @@ void CodeGenFunction::FinallyInfo::exit(CodeGenFunction &CGF) {
 }
 
 llvm::BasicBlock *CodeGenFunction::getTerminateLandingPad() {
+  auto l = [&](llvm::BasicBlock *&TLandingPad) {
+    CGBuilderTy::InsertPoint SavedIP = Builder.saveAndClearIP();
+
+    // This will get inserted at the end of the function.
+    TLandingPad = createBasicBlock("terminate.lpad");
+    Builder.SetInsertPoint(TLandingPad);
+
+    // Tell the backend that this is a landing pad.
+    const EHPersonality &Personality = EHPersonality::get(*this);
+
+    if (!CurFn->hasPersonalityFn())
+      CurFn->setPersonalityFn(getOpaquePersonalityFn(CGM, Personality));
+
+    llvm::LandingPadInst *LPadInst =
+        Builder.CreateLandingPad(llvm::StructType::get(Int8PtrTy, Int32Ty), 0);
+    LPadInst->addClause(getCatchAllValue(*this));
+
+    llvm::Value *Exn = nullptr;
+    if (getLangOpts().CPlusPlus)
+      Exn = Builder.CreateExtractValue(LPadInst, 0);
+    llvm::CallInst *terminateCall =
+        CGM.getCXXABI().emitTerminateForUnexpectedException(*this, Exn);
+    terminateCall->setDoesNotReturn();
+    Builder.CreateUnreachable();
+
+    // Restore the saved insertion state.
+    Builder.restoreIP(SavedIP);
+  };
+
+  if (getContext().getLangOpts().OmpSs
+      && CGM.getOmpSsRuntime().inTaskBody()) {
+        llvm::BasicBlock *TLandingPad = CGM.getOmpSsRuntime().getTaskTerminateLandingPad();
+        if (TLandingPad)
+          return TLandingPad;
+        l(TLandingPad);
+        CGM.getOmpSsRuntime().setTaskTerminateLandingPad(TLandingPad);
+        return TLandingPad;
+
+  }
   if (TerminateLandingPad)
     return TerminateLandingPad;
-
-  CGBuilderTy::InsertPoint SavedIP = Builder.saveAndClearIP();
-
-  // This will get inserted at the end of the function.
-  TerminateLandingPad = createBasicBlock("terminate.lpad");
-  Builder.SetInsertPoint(TerminateLandingPad);
-
-  // Tell the backend that this is a landing pad.
-  const EHPersonality &Personality = EHPersonality::get(*this);
-
-  if (!CurFn->hasPersonalityFn())
-    CurFn->setPersonalityFn(getOpaquePersonalityFn(CGM, Personality));
-
-  llvm::LandingPadInst *LPadInst =
-      Builder.CreateLandingPad(llvm::StructType::get(Int8PtrTy, Int32Ty), 0);
-  LPadInst->addClause(getCatchAllValue(*this));
-
-  llvm::Value *Exn = nullptr;
-  if (getLangOpts().CPlusPlus)
-    Exn = Builder.CreateExtractValue(LPadInst, 0);
-  llvm::CallInst *terminateCall =
-      CGM.getCXXABI().emitTerminateForUnexpectedException(*this, Exn);
-  terminateCall->setDoesNotReturn();
-  Builder.CreateUnreachable();
-
-  // Restore the saved insertion state.
-  Builder.restoreIP(SavedIP);
-
+  l(TerminateLandingPad);
   return TerminateLandingPad;
 }
 
 llvm::BasicBlock *CodeGenFunction::getTerminateHandler() {
+  auto l = [&](llvm::BasicBlock *&THandler) {
+
+    // Set up the terminate handler.  This block is inserted at the very
+    // end of the function by FinishFunction.
+    THandler = createBasicBlock("terminate.handler");
+    CGBuilderTy::InsertPoint SavedIP = Builder.saveAndClearIP();
+    Builder.SetInsertPoint(THandler);
+
+    llvm::Value *Exn = nullptr;
+    if (getLangOpts().CPlusPlus)
+      Exn = getExceptionFromSlot();
+    llvm::CallInst *terminateCall =
+        CGM.getCXXABI().emitTerminateForUnexpectedException(*this, Exn);
+    terminateCall->setDoesNotReturn();
+    Builder.CreateUnreachable();
+
+    // Restore the saved insertion state.
+    Builder.restoreIP(SavedIP);
+  };
+
+  if (getContext().getLangOpts().OmpSs
+      && CGM.getOmpSsRuntime().inTaskBody()) {
+        llvm::BasicBlock *THandler = CGM.getOmpSsRuntime().getTaskTerminateHandler();
+        if (THandler)
+          return THandler;
+        l(THandler);
+        CGM.getOmpSsRuntime().setTaskTerminateHandler(THandler);
+        return THandler;
+
+  }
   if (TerminateHandler)
     return TerminateHandler;
-
-  // Set up the terminate handler.  This block is inserted at the very
-  // end of the function by FinishFunction.
-  TerminateHandler = createBasicBlock("terminate.handler");
-  CGBuilderTy::InsertPoint SavedIP = Builder.saveAndClearIP();
-  Builder.SetInsertPoint(TerminateHandler);
-
-  llvm::Value *Exn = nullptr;
-  if (getLangOpts().CPlusPlus)
-    Exn = getExceptionFromSlot();
-  llvm::CallInst *terminateCall =
-      CGM.getCXXABI().emitTerminateForUnexpectedException(*this, Exn);
-  terminateCall->setDoesNotReturn();
-  Builder.CreateUnreachable();
-
-  // Restore the saved insertion state.
-  Builder.restoreIP(SavedIP);
-
+  l(TerminateHandler);
   return TerminateHandler;
 }
 
