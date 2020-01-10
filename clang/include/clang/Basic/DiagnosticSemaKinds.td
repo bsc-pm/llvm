@@ -1933,7 +1933,8 @@ def err_lvalue_reference_bind_to_unrelated : Error<
   "cannot bind to a value of unrelated type}1,2">;
 def err_reference_bind_drops_quals : Error<
   "binding reference %diff{of type $ to value of type $|to value}0,1 "
-  "%select{drops %3 qualifier%plural{1:|2:|4:|:s}4|changes address space}2">;
+  "%select{drops %3 qualifier%plural{1:|2:|4:|:s}4|changes address space|"
+  "not permitted due to incompatible qualifiers}2">;
 def err_reference_bind_failed : Error<
   "reference %diff{to %select{type|incomplete type}1 $ could not bind to an "
   "%select{rvalue|lvalue}2 of type $|could not bind to %select{rvalue|lvalue}2 of "
@@ -3871,10 +3872,9 @@ def note_ovl_candidate : Note<
     "| has different qualifiers (expected %5 but found %6)"
     "| has different exception specification}4">;
 
-def note_ovl_candidate_explicit_forbidden : Note<
-    "candidate %0 ignored: cannot be explicit">;
-def note_explicit_bool_resolved_to_true : Note<
-    "explicit(bool) specifier resolved to true">;
+def note_ovl_candidate_explicit : Note<
+    "explicit %select{constructor|conversion function|deduction guide}0 "
+    "is not a candidate%select{| (explicit specifier evaluates to true)}1">;
 def note_ovl_candidate_inherited_constructor : Note<
     "constructor from base class %0 inherited here">;
 def note_ovl_candidate_inherited_constructor_slice : Note<
