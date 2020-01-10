@@ -907,12 +907,34 @@ llvm::BasicBlock *CGOmpSsRuntime::getTaskTerminateLandingPad() {
   return TaskStack.back().TerminateLandingPad;
 }
 
+llvm::BasicBlock *CGOmpSsRuntime::getTaskUnreachableBlock() {
+  return TaskStack.back().UnreachableBlock;
+}
+
+Address CGOmpSsRuntime::getTaskExceptionSlot() {
+  return TaskStack.back().ExceptionSlot;
+}
+Address CGOmpSsRuntime::getTaskEHSelectorSlot() {
+  return TaskStack.back().EHSelectorSlot;
+}
+
 void CGOmpSsRuntime::setTaskTerminateHandler(llvm::BasicBlock *BB) {
   TaskStack.back().TerminateHandler = BB;
 }
 
 void CGOmpSsRuntime::setTaskTerminateLandingPad(llvm::BasicBlock *BB) {
   TaskStack.back().TerminateLandingPad = BB;
+}
+
+void CGOmpSsRuntime::setTaskUnreachableBlock(llvm::BasicBlock *BB) {
+  TaskStack.back().UnreachableBlock = BB;
+}
+
+void CGOmpSsRuntime::setTaskExceptionSlot(Address Addr) {
+  TaskStack.back().ExceptionSlot = Addr;
+}
+void CGOmpSsRuntime::setTaskEHSelectorSlot(Address Addr) {
+  TaskStack.back().EHSelectorSlot = Addr;
 }
 
 // Borrowed brom CodeGenFunction.cpp
@@ -1000,7 +1022,10 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   TaskStack.push_back({TaskAllocaInsertPt,
                        /*TerminateLandingPad=*/nullptr,
-                       /*TerminateHandler=*/nullptr});
+                       /*TerminateHandler=*/nullptr,
+                       /*UnreachableBlock=*/nullptr,
+                       /*ExceptionSlot=*/Address::invalid(),
+                       /*EHSelectorSlot=*/Address::invalid()});
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
@@ -1015,8 +1040,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   // EmitIfUsed(*this, EHResumeBlock);
   EmitIfUsed(CGF, TaskStack.back().TerminateLandingPad);
   EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
-  // TODO: do we need this?
-  // EmitIfUsed(*this, UnreachableBlock);
+  EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
   CGF.Builder.CreateCall(ExitCallee, Result);
 

@@ -16,6 +16,7 @@
 #include "CGBuilder.h"
 #include "CGDebugInfo.h"
 #include "CGLoopInfo.h"
+#include "CGOmpSsRuntime.h"
 #include "CGValue.h"
 #include "CodeGenModule.h"
 #include "CodeGenPGO.h"
@@ -1770,6 +1771,19 @@ public:
   Address getNormalCleanupDestSlot();
 
   llvm::BasicBlock *getUnreachableBlock() {
+    if (getContext().getLangOpts().OmpSs
+        && CGM.getOmpSsRuntime().inTaskBody()) {
+          llvm::BasicBlock *UBlock = CGM.getOmpSsRuntime().getTaskUnreachableBlock();
+          if (UBlock)
+            return UBlock;
+
+          UBlock = createBasicBlock("unreachable");
+          new llvm::UnreachableInst(getLLVMContext(), UBlock);
+
+          CGM.getOmpSsRuntime().setTaskUnreachableBlock(UBlock);
+          return UBlock;
+
+    }
     if (!UnreachableBlock) {
       UnreachableBlock = createBasicBlock("unreachable");
       new llvm::UnreachableInst(getLLVMContext(), UnreachableBlock);

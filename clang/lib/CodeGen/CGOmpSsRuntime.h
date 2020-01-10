@@ -81,8 +81,11 @@ protected:
 private:
   struct TaskContext {
     llvm::AssertingVH<llvm::Instruction> InsertPt;
-    llvm::BasicBlock *TerminateLandingPad = nullptr;
-    llvm::BasicBlock *TerminateHandler = nullptr;
+    llvm::BasicBlock *TerminateLandingPad;
+    llvm::BasicBlock *TerminateHandler;
+    llvm::BasicBlock *UnreachableBlock;
+    Address ExceptionSlot;
+    Address EHSelectorSlot;
   };
 
   SmallVector<TaskContext, 2> TaskStack;
@@ -107,14 +110,27 @@ public:
   bool inTaskBody();
   // returns the innermost nested task InsertPt instruction
   llvm::AssertingVH<llvm::Instruction> getTaskInsertPt();
-  // returns the innermost nested task TerminateHandler instruction
+  // returns the innermost nested task TerminateHandler BB
   llvm::BasicBlock *getTaskTerminateHandler();
-  // returns the innermost nested task TerminateLandingPad instruction
+  // returns the innermost nested task TerminateLandingPad BB
   llvm::BasicBlock *getTaskTerminateLandingPad();
+  // returns the innermost nested task UnreachableBlock BB
+  llvm::BasicBlock *getTaskUnreachableBlock();
+  // returns the innermost nested task ExceptionSlot instruction
+  Address getTaskExceptionSlot();
+  // returns the innermost nested task ExceptionSlot instruction
+  Address getTaskEHSelectorSlot();
+
   // sets the innermost nested task TerminateHandler instruction
   void setTaskTerminateHandler(llvm::BasicBlock *BB);
   // sets the innermost nested task TerminateLandingPad instruction
   void setTaskTerminateLandingPad(llvm::BasicBlock *BB);
+  // sets the innermost nested task UnreachableBlock instruction
+  void setTaskUnreachableBlock(llvm::BasicBlock *BB);
+  // sets the innermost nested task ExceptionSlot address
+  void setTaskExceptionSlot(Address Addr);
+  // sets the innermost nested task EHSelectorSlot address
+  void setTaskEHSelectorSlot(Address Addr);
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);

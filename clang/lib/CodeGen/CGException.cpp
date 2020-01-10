@@ -402,12 +402,34 @@ void CodeGenFunction::EmitAnyExprToExn(const Expr *e, Address addr) {
 }
 
 Address CodeGenFunction::getExceptionSlot() {
+  if (getContext().getLangOpts().OmpSs
+      && CGM.getOmpSsRuntime().inTaskBody()) {
+    Address ESlotAddr = CGM.getOmpSsRuntime().getTaskExceptionSlot();
+    if (ESlotAddr.isValid())
+      return ESlotAddr;
+    llvm::Instruction *I = CreateTempAlloca(Int8PtrTy, "exn.slot");
+    Address Addr = Address(I, getPointerAlign());
+    CGM.getOmpSsRuntime().setTaskExceptionSlot(Addr);
+    return Addr;
+  }
+
   if (!ExceptionSlot)
     ExceptionSlot = CreateTempAlloca(Int8PtrTy, "exn.slot");
   return Address(ExceptionSlot, getPointerAlign());
 }
 
 Address CodeGenFunction::getEHSelectorSlot() {
+  if (getContext().getLangOpts().OmpSs
+      && CGM.getOmpSsRuntime().inTaskBody()) {
+    Address EHSSlotAddr = CGM.getOmpSsRuntime().getTaskEHSelectorSlot();
+    if (EHSSlotAddr.isValid())
+      return EHSSlotAddr;
+    llvm::Instruction *I = CreateTempAlloca(Int32Ty, "ehselector.slot");
+    Address Addr = Address(I, CharUnits::fromQuantity(4));
+    CGM.getOmpSsRuntime().setTaskEHSelectorSlot(Addr);
+    return Addr;
+  }
+
   if (!EHSelectorSlot)
     EHSelectorSlot = CreateTempAlloca(Int32Ty, "ehselector.slot");
   return Address(EHSelectorSlot, CharUnits::fromQuantity(4));
