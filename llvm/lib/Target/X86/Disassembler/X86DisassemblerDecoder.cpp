@@ -13,7 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "X86DisassemblerDecoder.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <cstdarg> /* for va_*()       */
 #include <cstdio>  /* for vsnprintf()  */
@@ -21,6 +24,8 @@
 #include <cstring> /* for memset()     */
 
 using namespace llvm::X86Disassembler;
+
+#define DEBUG_TYPE "x86-disassembler"
 
 /// Specifies whether a ModR/M byte is needed and (if so) which
 /// instruction each possible value of the ModR/M byte corresponds to.  Once
@@ -190,74 +195,34 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid) {
   return &INSTRUCTIONS_SYM[uid];
 }
 
-/*
- * consumeByte - Uses the reader function provided by the user to consume one
- *   byte from the instruction's memory and advance the cursor.
- *
- * @param insn  - The instruction with the reader function to use.  The cursor
- *                for this instruction is advanced.
- * @param byte  - A pointer to a pre-allocated memory buffer to be populated
- *                with the data read.
- * @return      - 0 if the read was successful; nonzero otherwise.
- */
-static int consumeByte(struct InternalInstruction* insn, uint8_t* byte) {
-  int ret = insn->reader(insn->readerArg, byte, insn->readerCursor);
-
-  if (!ret)
-    ++(insn->readerCursor);
-
-  return ret;
-}
-
-/*
- * lookAtByte - Like consumeByte, but does not advance the cursor.
- *
- * @param insn  - See consumeByte().
- * @param byte  - See consumeByte().
- * @return      - See consumeByte().
- */
-static int lookAtByte(struct InternalInstruction* insn, uint8_t* byte) {
-  return insn->reader(insn->readerArg, byte, insn->readerCursor);
+static bool peek(struct InternalInstruction *insn, uint8_t &byte) {
+  auto *r = static_cast<const std::pair<llvm::ArrayRef<uint8_t>, uint64_t> *>(
+      insn->readerArg);
+  uint64_t offset = insn->readerCursor - r->second;
+  if (offset >= r->first.size())
+    return true;
+  byte = r->first[offset];
+  return false;
 }
 
 static void unconsumeByte(struct InternalInstruction* insn) {
   insn->readerCursor--;
 }
 
-#define CONSUME_FUNC(name, type)                                  \
-  static int name(struct InternalInstruction* insn, type* ptr) {  \
-    type combined = 0;                                            \
-    unsigned offset;                                              \
-    for (offset = 0; offset < sizeof(type); ++offset) {           \
-      uint8_t byte;                                               \
-      int ret = insn->reader(insn->readerArg,                     \
-                             &byte,                               \
-                             insn->readerCursor + offset);        \
-      if (ret)                                                    \
-        return ret;                                               \
-      combined = combined | ((uint64_t)byte << (offset * 8));     \
-    }                                                             \
-    *ptr = combined;                                              \
-    insn->readerCursor += sizeof(type);                           \
-    return 0;                                                     \
-  }
-
-/*
- * consume* - Use the reader function provided by the user to consume data
- *   values of various sizes from the instruction's memory and advance the
- *   cursor appropriately.  These readers perform endian conversion.
- *
- * @param insn    - See consumeByte().
- * @param ptr     - A pointer to a pre-allocated memory of appropriate size to
- *                  be populated with the data read.
- * @return        - See consumeByte().
- */
-CONSUME_FUNC(consumeInt8, int8_t)
-CONSUME_FUNC(consumeInt16, int16_t)
-CONSUME_FUNC(consumeInt32, int32_t)
-CONSUME_FUNC(consumeUInt16, uint16_t)
-CONSUME_FUNC(consumeUInt32, uint32_t)
-CONSUME_FUNC(consumeUInt64, uint64_t)
+template <typename T>
+static bool consume(InternalInstruction *insn, T &ptr) {
+  auto *r = static_cast<const std::pair<llvm::ArrayRef<uint8_t>, uint64_t> *>(
+      insn->readerArg);
+  uint64_t offset = insn->readerCursor - r->second;
+  if (offset + sizeof(T) > r->first.size())
+    return true;
+  T ret = 0;
+  for (unsigned i = 0; i < sizeof(T); ++i)
+    ret |= (uint64_t)r->first[offset + i] << (i * 8);
+  ptr = ret;
+  insn->readerCursor += sizeof(T);
+  return false;
+}
 
 /*
  * dbgprintf - Uses the logging function provided by the user to log a single
@@ -270,17 +235,14 @@ CONSUME_FUNC(consumeUInt64, uint64_t)
 static void dbgprintf(struct InternalInstruction* insn,
                       const char* format,
                       ...) {
-  char buffer[256];
-  va_list ap;
-
-  if (!insn->dlog)
-    return;
-
-  va_start(ap, format);
-  (void)vsnprintf(buffer, sizeof(buffer), format, ap);
-  va_end(ap);
-
-  insn->dlog(insn->dlogArg, buffer);
+  LLVM_DEBUG({
+    char buffer[256];
+    va_list ap;
+    va_start(ap, format);
+    (void)vsnprintf(buffer, sizeof(buffer), format, ap);
+    va_end(ap);
+    llvm::errs() << buffer;
+  });
 }
 
 static bool isREX(struct InternalInstruction *insn, uint8_t prefix) {
@@ -307,7 +269,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
 
   while (isPrefix) {
     /* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
-    if (consumeByte(insn, &byte))
+    if (consume(insn, byte))
       break;
 
     /*
@@ -317,7 +279,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
     if (insn->readerCursor - 1 == insn->startLocation && byte == 0xf0) // LOCK
       break;
 
-    if ((byte == 0xf2 || byte == 0xf3) && !lookAtByte(insn, &nextByte)) {
+    if ((byte == 0xf2 || byte == 0xf3) && !peek(insn, nextByte)) {
       /*
        * If the byte is 0xf2 or 0xf3, and any of the following conditions are
        * met:
@@ -345,10 +307,10 @@ static int readPrefixes(struct InternalInstruction* insn) {
       if (isREX(insn, nextByte)) {
         uint8_t nnextByte;
         // Go to REX prefix after the current one
-        if (consumeByte(insn, &nnextByte))
+        if (consume(insn, nnextByte))
           return -1;
         // We should be able to read next byte after REX prefix
-        if (lookAtByte(insn, &nnextByte))
+        if (peek(insn, nnextByte))
           return -1;
         unconsumeByte(insn);
       }
@@ -361,7 +323,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
     case 0xf2:  /* REPNE/REPNZ */
     case 0xf3:  /* REP or REPE/REPZ */ {
       uint8_t nextByte;
-      if (lookAtByte(insn, &nextByte))
+      if (peek(insn, nextByte))
         break;
       // TODO:
       //  1. There could be several 0x66
@@ -376,39 +338,27 @@ static int readPrefixes(struct InternalInstruction* insn) {
       break;
     }
     case 0x2e:  /* CS segment override -OR- Branch not taken */
-    case 0x36:  /* SS segment override -OR- Branch taken */
-    case 0x3e:  /* DS segment override */
-    case 0x26:  /* ES segment override */
-    case 0x64:  /* FS segment override */
-    case 0x65:  /* GS segment override */
-      switch (byte) {
-      case 0x2e:
-        insn->segmentOverride = SEG_OVERRIDE_CS;
-        break;
-      case 0x36:
-        insn->segmentOverride = SEG_OVERRIDE_SS;
-        break;
-      case 0x3e:
-        insn->segmentOverride = SEG_OVERRIDE_DS;
-        break;
-      case 0x26:
-        insn->segmentOverride = SEG_OVERRIDE_ES;
-        break;
-      case 0x64:
-        insn->segmentOverride = SEG_OVERRIDE_FS;
-        break;
-      case 0x65:
-        insn->segmentOverride = SEG_OVERRIDE_GS;
-        break;
-      default:
-        debug("Unhandled override");
-        return -1;
-      }
+      insn->segmentOverride = SEG_OVERRIDE_CS;
       break;
-    case 0x66:  /* Operand-size override */ {
+    case 0x36:  /* SS segment override -OR- Branch taken */
+      insn->segmentOverride = SEG_OVERRIDE_SS;
+      break;
+    case 0x3e: /* DS segment override */
+      insn->segmentOverride = SEG_OVERRIDE_DS;
+      break;
+    case 0x26: /* ES segment override */
+      insn->segmentOverride = SEG_OVERRIDE_ES;
+      break;
+    case 0x64: /* FS segment override */
+      insn->segmentOverride = SEG_OVERRIDE_FS;
+      break;
+    case 0x65: /* GS segment override */
+      insn->segmentOverride = SEG_OVERRIDE_GS;
+      break;
+    case 0x66: /* Operand-size override */ {
       uint8_t nextByte;
       insn->hasOpSize = true;
-      if (lookAtByte(insn, &nextByte))
+      if (peek(insn, nextByte))
         break;
       // 0x66 can't overwrite existing mandatory prefix and should be ignored
       if (!insn->mandatoryPrefix && (nextByte == 0x0f || isREX(insn, nextByte)))
@@ -431,13 +381,12 @@ static int readPrefixes(struct InternalInstruction* insn) {
 
   if (byte == 0x62) {
     uint8_t byte1, byte2;
-
-    if (consumeByte(insn, &byte1)) {
+    if (consume(insn, byte1)) {
       dbgprintf(insn, "Couldn't read second byte of EVEX prefix");
       return -1;
     }
 
-    if (lookAtByte(insn, &byte2)) {
+    if (peek(insn, byte2)) {
       dbgprintf(insn, "Couldn't read third byte of EVEX prefix");
       return -1;
     }
@@ -453,11 +402,11 @@ static int readPrefixes(struct InternalInstruction* insn) {
     if (insn->vectorExtensionType == TYPE_EVEX) {
       insn->vectorExtensionPrefix[0] = byte;
       insn->vectorExtensionPrefix[1] = byte1;
-      if (consumeByte(insn, &insn->vectorExtensionPrefix[2])) {
+      if (consume(insn, insn->vectorExtensionPrefix[2])) {
         dbgprintf(insn, "Couldn't read third byte of EVEX prefix");
         return -1;
       }
-      if (consumeByte(insn, &insn->vectorExtensionPrefix[3])) {
+      if (consume(insn, insn->vectorExtensionPrefix[3])) {
         dbgprintf(insn, "Couldn't read fourth byte of EVEX prefix");
         return -1;
       }
@@ -477,8 +426,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
     }
   } else if (byte == 0xc4) {
     uint8_t byte1;
-
-    if (lookAtByte(insn, &byte1)) {
+    if (peek(insn, byte1)) {
       dbgprintf(insn, "Couldn't read second byte of VEX");
       return -1;
     }
@@ -490,8 +438,8 @@ static int readPrefixes(struct InternalInstruction* insn) {
 
     if (insn->vectorExtensionType == TYPE_VEX_3B) {
       insn->vectorExtensionPrefix[0] = byte;
-      consumeByte(insn, &insn->vectorExtensionPrefix[1]);
-      consumeByte(insn, &insn->vectorExtensionPrefix[2]);
+      consume(insn, insn->vectorExtensionPrefix[1]);
+      consume(insn, insn->vectorExtensionPrefix[2]);
 
       /* We simulate the REX prefix for simplicity's sake */
 
@@ -508,8 +456,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
     }
   } else if (byte == 0xc5) {
     uint8_t byte1;
-
-    if (lookAtByte(insn, &byte1)) {
+    if (peek(insn, byte1)) {
       dbgprintf(insn, "Couldn't read second byte of VEX");
       return -1;
     }
@@ -521,7 +468,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
 
     if (insn->vectorExtensionType == TYPE_VEX_2B) {
       insn->vectorExtensionPrefix[0] = byte;
-      consumeByte(insn, &insn->vectorExtensionPrefix[1]);
+      consume(insn, insn->vectorExtensionPrefix[1]);
 
       if (insn->mode == MODE_64BIT)
         insn->rexPrefix = 0x40
@@ -541,8 +488,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
     }
   } else if (byte == 0x8f) {
     uint8_t byte1;
-
-    if (lookAtByte(insn, &byte1)) {
+    if (peek(insn, byte1)) {
       dbgprintf(insn, "Couldn't read second byte of XOP");
       return -1;
     }
@@ -554,8 +500,8 @@ static int readPrefixes(struct InternalInstruction* insn) {
 
     if (insn->vectorExtensionType == TYPE_XOP) {
       insn->vectorExtensionPrefix[0] = byte;
-      consumeByte(insn, &insn->vectorExtensionPrefix[1]);
-      consumeByte(insn, &insn->vectorExtensionPrefix[2]);
+      consume(insn, insn->vectorExtensionPrefix[1]);
+      consume(insn, insn->vectorExtensionPrefix[2]);
 
       /* We simulate the REX prefix for simplicity's sake */
 
@@ -579,7 +525,7 @@ static int readPrefixes(struct InternalInstruction* insn) {
                 insn->vectorExtensionPrefix[2]);
     }
   } else if (isREX(insn, byte)) {
-    if (lookAtByte(insn, &nextByte))
+    if (peek(insn, nextByte))
       return -1;
     insn->rexPrefix = byte;
     dbgprintf(insn, "Found REX prefix 0x%hhx", byte);
@@ -618,11 +564,8 @@ static int readModRM(struct InternalInstruction* insn);
 /*
  * readOpcode - Reads the opcode (excepting the ModR/M byte in the case of
  *   extended or escape opcodes).
- *
- * @param insn  - The instruction whose opcode is to be read.
- * @return      - 0 if the opcode could be read successfully; nonzero otherwise.
  */
-static int readOpcode(struct InternalInstruction* insn) {
+static bool readOpcode(struct InternalInstruction* insn) {
   /* Determine the length of the primary opcode */
 
   uint8_t current;
@@ -636,74 +579,74 @@ static int readOpcode(struct InternalInstruction* insn) {
     default:
       dbgprintf(insn, "Unhandled mm field for instruction (0x%hhx)",
                 mmFromEVEX2of4(insn->vectorExtensionPrefix[1]));
-      return -1;
+      return true;
     case VEX_LOB_0F:
       insn->opcodeType = TWOBYTE;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case VEX_LOB_0F38:
       insn->opcodeType = THREEBYTE_38;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case VEX_LOB_0F3A:
       insn->opcodeType = THREEBYTE_3A;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     }
   } else if (insn->vectorExtensionType == TYPE_VEX_3B) {
     switch (mmmmmFromVEX2of3(insn->vectorExtensionPrefix[1])) {
     default:
       dbgprintf(insn, "Unhandled m-mmmm field for instruction (0x%hhx)",
                 mmmmmFromVEX2of3(insn->vectorExtensionPrefix[1]));
-      return -1;
+      return true;
     case VEX_LOB_0F:
       insn->opcodeType = TWOBYTE;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case VEX_LOB_0F38:
       insn->opcodeType = THREEBYTE_38;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case VEX_LOB_0F3A:
       insn->opcodeType = THREEBYTE_3A;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     }
   } else if (insn->vectorExtensionType == TYPE_VEX_2B) {
     insn->opcodeType = TWOBYTE;
-    return consumeByte(insn, &insn->opcode);
+    return consume(insn, insn->opcode);
   } else if (insn->vectorExtensionType == TYPE_XOP) {
     switch (mmmmmFromXOP2of3(insn->vectorExtensionPrefix[1])) {
     default:
       dbgprintf(insn, "Unhandled m-mmmm field for instruction (0x%hhx)",
                 mmmmmFromVEX2of3(insn->vectorExtensionPrefix[1]));
-      return -1;
+      return true;
     case XOP_MAP_SELECT_8:
       insn->opcodeType = XOP8_MAP;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case XOP_MAP_SELECT_9:
       insn->opcodeType = XOP9_MAP;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     case XOP_MAP_SELECT_A:
       insn->opcodeType = XOPA_MAP;
-      return consumeByte(insn, &insn->opcode);
+      return consume(insn, insn->opcode);
     }
   }
 
-  if (consumeByte(insn, &current))
-    return -1;
+  if (consume(insn, current))
+    return true;
 
   if (current == 0x0f) {
     dbgprintf(insn, "Found a two-byte escape prefix (0x%hhx)", current);
 
-    if (consumeByte(insn, &current))
-      return -1;
+    if (consume(insn, current))
+      return true;
 
     if (current == 0x38) {
       dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
 
-      if (consumeByte(insn, &current))
+      if (consume(insn, current))
         return -1;
 
       insn->opcodeType = THREEBYTE_38;
     } else if (current == 0x3a) {
       dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
 
-      if (consumeByte(insn, &current))
+      if (consume(insn, current))
         return -1;
 
       insn->opcodeType = THREEBYTE_3A;
@@ -712,10 +655,10 @@ static int readOpcode(struct InternalInstruction* insn) {
 
       // Consume operands before the opcode to comply with the 3DNow encoding
       if (readModRM(insn))
-        return -1;
+        return true;
 
-      if (consumeByte(insn, &current))
-        return -1;
+      if (consume(insn, current))
+        return true;
 
       insn->opcodeType = THREEDNOW_MAP;
     } else {
@@ -735,7 +678,7 @@ static int readOpcode(struct InternalInstruction* insn) {
 
   insn->opcode = current;
 
-  return 0;
+  return false;
 }
 
 /*
@@ -1164,7 +1107,7 @@ static int readSIB(struct InternalInstruction* insn) {
     break;
   }
 
-  if (consumeByte(insn, &insn->sib))
+  if (consume(insn, insn->sib))
     return -1;
 
   index = indexFromSIB(insn->sib) | (xFromREX(insn->rexPrefix) << 3);
@@ -1233,17 +1176,17 @@ static int readDisplacement(struct InternalInstruction* insn) {
     insn->consumedDisplacement = false;
     break;
   case EA_DISP_8:
-    if (consumeInt8(insn, &d8))
+    if (consume(insn, d8))
       return -1;
     insn->displacement = d8;
     break;
   case EA_DISP_16:
-    if (consumeInt16(insn, &d16))
+    if (consume(insn, d16))
       return -1;
     insn->displacement = d16;
     break;
   case EA_DISP_32:
-    if (consumeInt32(insn, &d32))
+    if (consume(insn, d32))
       return -1;
     insn->displacement = d32;
     break;
@@ -1268,7 +1211,7 @@ static int readModRM(struct InternalInstruction* insn) {
   if (insn->consumedModRM)
     return 0;
 
-  if (consumeByte(insn, &insn->modRM))
+  if (consume(insn, insn->modRM))
     return -1;
   insn->consumedModRM = true;
 
@@ -1623,22 +1566,22 @@ static int readImmediate(struct InternalInstruction* insn, uint8_t size) {
 
   switch (size) {
   case 1:
-    if (consumeByte(insn, &imm8))
+    if (consume(insn, imm8))
       return -1;
     insn->immediates[insn->numImmediatesConsumed] = imm8;
     break;
   case 2:
-    if (consumeUInt16(insn, &imm16))
+    if (consume(insn, imm16))
       return -1;
     insn->immediates[insn->numImmediatesConsumed] = imm16;
     break;
   case 4:
-    if (consumeUInt32(insn, &imm32))
+    if (consume(insn, imm32))
       return -1;
     insn->immediates[insn->numImmediatesConsumed] = imm32;
     break;
   case 8:
-    if (consumeUInt64(insn, &imm64))
+    if (consume(insn, imm64))
       return -1;
     insn->immediates[insn->numImmediatesConsumed] = imm64;
     break;
@@ -1873,10 +1816,6 @@ static int readOperands(struct InternalInstruction* insn) {
  * @param reader    - The function to be used to read the instruction's bytes.
  * @param readerArg - A generic argument to be passed to the reader to store
  *                    any internal state.
- * @param logger    - If non-NULL, the function to be used to write log messages
- *                    and warnings.
- * @param loggerArg - A generic argument to be passed to the logger to store
- *                    any internal state.
  * @param startLoc  - The address (in the reader's address space) of the first
  *                    byte in the instruction.
  * @param mode      - The mode (real mode, IA-32e, or IA-32e in 64-bit mode) to
@@ -1884,16 +1823,14 @@ static int readOperands(struct InternalInstruction* insn) {
  * @return          - 0 if the instruction's memory could be read; nonzero if
  *                    not.
  */
-int llvm::X86Disassembler::decodeInstruction(
-    struct InternalInstruction *insn, byteReader_t reader,
-    const void *readerArg, dlog_t logger, void *loggerArg, const void *miiArg,
-    uint64_t startLoc, DisassemblerMode mode) {
+int llvm::X86Disassembler::decodeInstruction(struct InternalInstruction *insn,
+                                             const void *readerArg,
+                                             const void *miiArg,
+                                             uint64_t startLoc,
+                                             DisassemblerMode mode) {
   memset(insn, 0, sizeof(struct InternalInstruction));
 
-  insn->reader = reader;
   insn->readerArg = readerArg;
-  insn->dlog = logger;
-  insn->dlogArg = loggerArg;
   insn->startLocation = startLoc;
   insn->readerCursor = startLoc;
   insn->mode = mode;
