@@ -332,6 +332,13 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   switch (Op.getOpcode()) {
   default:
     return TranslateLegalizeResults(Op, Node);
+  case ISD::MERGE_VALUES:
+    Action = TLI.getOperationAction(Node->getOpcode(), Node->getValueType(0));
+    // This operation lies about being legal: when it claims to be legal,
+    // it should actually be expanded.
+    if (Action == TargetLowering::Legal)
+      Action = TargetLowering::Expand;
+    break;
 #define INSTRUCTION(NAME, NARG, ROUND_MODE, INTRINSIC, DAGN)                   \
   case ISD::STRICT_##DAGN:
 #include "llvm/IR/ConstrainedOps.def"
@@ -834,6 +841,10 @@ SDValue VectorLegalizer::ExpandStore(SDNode *N) {
 void VectorLegalizer::Expand(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
   SDValue Tmp;
   switch (Node->getOpcode()) {
+  case ISD::MERGE_VALUES:
+    for (unsigned i = 0, e = Node->getNumValues(); i != e; ++i)
+      Results.push_back(Node->getOperand(i));
+    return;
   case ISD::SIGN_EXTEND_INREG:
     Results.push_back(ExpandSEXTINREG(Node));
     return;
@@ -1364,15 +1375,18 @@ void VectorLegalizer::ExpandUINT_TO_FLOAT(SDNode *Node,
                               {Node->getValueType(0), MVT::Other},
                               {Node->getOperand(0), HI});
     fHI = DAG.getNode(ISD::STRICT_FMUL, DL, {Node->getValueType(0), MVT::Other},
-                      {SDValue(fHI.getNode(), 1), fHI, TWOHW});
+                      {fHI.getValue(1), fHI, TWOHW});
     SDValue fLO = DAG.getNode(ISD::STRICT_SINT_TO_FP, DL,
                               {Node->getValueType(0), MVT::Other},
-                              {SDValue(fHI.getNode(), 1), LO});
+                              {Node->getOperand(0), LO});
+
+    SDValue TF = DAG.getNode(ISD::TokenFactor, DL, MVT::Other, fHI.getValue(1),
+                             fLO.getValue(1));
 
     // Add the two halves
     SDValue Result =
         DAG.getNode(ISD::STRICT_FADD, DL, {Node->getValueType(0), MVT::Other},
-                    {SDValue(fLO.getNode(), 1), fHI, fLO});
+                    {TF, fHI, fLO});
 
     Results.push_back(Result);
     Results.push_back(Result.getValue(1));
