@@ -17,6 +17,7 @@
 #include "MCTargetDesc/RISCVTargetStreamer.h"
 #include "RISCVTargetMachine.h"
 #include "TargetInfo/RISCVTargetInfo.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -32,6 +33,9 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "asm-printer"
+
+STATISTIC(RISCVNumInstrsCompressed,
+          "Number of RISC-V Compressed instructions emitted");
 
 namespace {
 class RISCVAsmPrinter : public AsmPrinter {
@@ -86,6 +90,8 @@ void RISCVAsmPrinter::EmitToStreamer(MCStreamer &S, const MCInst &Inst) {
   MCInst CInst;
   bool Res = compressInst(CInst, Inst, *TM.getMCSubtargetInfo(),
                           OutStreamer->getContext());
+  if (Res)
+    ++RISCVNumInstrsCompressed;
   AsmPrinter::EmitToStreamer(*OutStreamer, Res ? CInst : Inst);
 }
 
