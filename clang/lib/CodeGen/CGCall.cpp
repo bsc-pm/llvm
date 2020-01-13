@@ -4409,7 +4409,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
   // If the call doesn't return, finish the basic block and clear the
   // insertion point; this allows the rest of IRGen to discard
   // unreachable code.
-  if (CI->doesNotReturn() && !getLangOpts().OmpSs) {
+  if (CI->doesNotReturn() &&
+      !(getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTaskBody())) {
     if (UnusedReturnSizePtr)
       PopCleanupBlock();
 
