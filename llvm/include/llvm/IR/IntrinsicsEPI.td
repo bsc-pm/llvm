@@ -328,9 +328,9 @@ defm vwmulu : epi_binary_wide;
 defm vwmulsu : epi_binary_wide;
 
 defm vmacc : epi_ternary;
-defm vmsac : epi_ternary;
+defm vnmsac : epi_ternary;
 defm vmadd : epi_ternary;
-defm vmsub : epi_ternary;
+defm vnmsub : epi_ternary;
 
 defm vwmaccu : epi_ternary_wide;
 defm vwmacc : epi_ternary_wide;

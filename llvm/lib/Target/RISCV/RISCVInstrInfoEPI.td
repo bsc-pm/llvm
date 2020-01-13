@@ -2377,9 +2377,9 @@ defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vmulhsu", "PseudoVMULHSU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx<"int_epi_vmulh", "PseudoVMULH">;
 
 defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vmadd", "PseudoVMADD">;
-defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vmsub", "PseudoVNMSUB">;
+defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vnmsub", "PseudoVNMSUB">;
 defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vmacc", "PseudoVMACC">;
-defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vmsac", "PseudoVNMSAC">;
+defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vnmsac", "PseudoVNMSAC">;
 
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwaddu", "PseudoVWADDU">;
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwadd", "PseudoVWADD">;

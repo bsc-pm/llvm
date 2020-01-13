@@ -416,9 +416,9 @@ def vwmulsu : EPIWidenBinBuiltin<"w", "wvv", "csi">;
 let HasMergeOperand = 0 in
 {
   def vmacc : EPIBinBuiltin<"v", "vvvv", "csil">;
-  def vmsac : EPIBinBuiltin<"v", "vvvv", "csil">;
+  def vnmsac : EPIBinBuiltin<"v", "vvvv", "csil">;
   def vmadd : EPIBinBuiltin<"v", "vvvv", "csil">;
-  def vmsub : EPIBinBuiltin<"v", "vvvv", "csil">;
+  def vnmsub : EPIBinBuiltin<"v", "vvvv", "csil">;
 
   def vwmaccu : EPIWidenTerBuiltin<"w", "wvvw", "csi">;
   def vwmacc : EPIWidenTerBuiltin<"w", "wvvw", "csi">;

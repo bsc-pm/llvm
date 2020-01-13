@@ -1835,9 +1835,9 @@ intrinsics = [
         #TernaryIntrinsicSwap("vsbc", type_generator = generate_ternary_integer_types, variants = vv_vx, mask = False),
 
         TernaryIntrinsic("vmacc", type_generator = generate_ternary_integer_types, variants = vv_vx),
-        TernaryIntrinsic("vmsac", type_generator = generate_ternary_integer_types, variants = vv_vx),
+        TernaryIntrinsic("vnmsac", type_generator = generate_ternary_integer_types, variants = vv_vx),
         TernaryIntrinsic("vmadd", type_generator = generate_ternary_integer_types, variants = vv_vx),
-        TernaryIntrinsic("vmsub", type_generator = generate_ternary_integer_types, variants = vv_vx),
+        TernaryIntrinsic("vnmsub", type_generator = generate_ternary_integer_types, variants = vv_vx),
 
         #TernaryIntrinsic("vwmaccu", type_generator = generate_ternary_integer_types, variants = vv_vx),
         #TernaryIntrinsic("vwmacc", type_generator = generate_ternary_integer_types, variants = vv_vx),
