@@ -1235,7 +1235,10 @@ void ItaniumCXXABI::emitThrow(CodeGenFunction &CGF, const CXXThrowExpr *E) {
   if (!Dtor) Dtor = llvm::Constant::getNullValue(CGM.Int8PtrTy);
 
   llvm::Value *args[] = { ExceptionPtr, TypeInfo, Dtor };
-  CGF.EmitNoreturnRuntimeCallOrInvoke(getThrowFn(CGM), args);
+  if (getContext().getLangOpts().OmpSs)
+    CGF.EmitRuntimeCallOrInvoke(getThrowFn(CGM), args);
+  else
+    CGF.EmitNoreturnRuntimeCallOrInvoke(getThrowFn(CGM), args);
 }
 
 static llvm::FunctionCallee getItaniumDynamicCastFn(CodeGenFunction &CGF) {

@@ -86,6 +86,7 @@ private:
     llvm::BasicBlock *UnreachableBlock;
     Address ExceptionSlot;
     Address EHSelectorSlot;
+    Address NormalCleanupDestSlot;
   };
 
   SmallVector<TaskContext, 2> TaskStack;
@@ -116,10 +117,12 @@ public:
   llvm::BasicBlock *getTaskTerminateLandingPad();
   // returns the innermost nested task UnreachableBlock BB
   llvm::BasicBlock *getTaskUnreachableBlock();
-  // returns the innermost nested task ExceptionSlot instruction
+  // returns the innermost nested task ExceptionSlot address
   Address getTaskExceptionSlot();
-  // returns the innermost nested task ExceptionSlot instruction
+  // returns the innermost nested task EHSelectorSlot address
   Address getTaskEHSelectorSlot();
+  // returns the innermost nested task NormalCleanupDestSlot address
+  Address getTaskNormalCleanupDestSlot();
 
   // sets the innermost nested task TerminateHandler instruction
   void setTaskTerminateHandler(llvm::BasicBlock *BB);
@@ -131,6 +134,8 @@ public:
   void setTaskExceptionSlot(Address Addr);
   // sets the innermost nested task EHSelectorSlot address
   void setTaskEHSelectorSlot(Address Addr);
+  // returns the innermost nested task NormalCleanupDestSlot address
+  void setTaskNormalCleanupDestSlot(Address Addr);
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);

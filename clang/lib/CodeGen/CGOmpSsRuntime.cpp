@@ -914,8 +914,13 @@ llvm::BasicBlock *CGOmpSsRuntime::getTaskUnreachableBlock() {
 Address CGOmpSsRuntime::getTaskExceptionSlot() {
   return TaskStack.back().ExceptionSlot;
 }
+
 Address CGOmpSsRuntime::getTaskEHSelectorSlot() {
   return TaskStack.back().EHSelectorSlot;
+}
+
+Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
+  return TaskStack.back().NormalCleanupDestSlot;
 }
 
 void CGOmpSsRuntime::setTaskTerminateHandler(llvm::BasicBlock *BB) {
@@ -933,8 +938,13 @@ void CGOmpSsRuntime::setTaskUnreachableBlock(llvm::BasicBlock *BB) {
 void CGOmpSsRuntime::setTaskExceptionSlot(Address Addr) {
   TaskStack.back().ExceptionSlot = Addr;
 }
+
 void CGOmpSsRuntime::setTaskEHSelectorSlot(Address Addr) {
   TaskStack.back().EHSelectorSlot = Addr;
+}
+
+void CGOmpSsRuntime::setTaskNormalCleanupDestSlot(Address Addr) {
+  TaskStack.back().NormalCleanupDestSlot = Addr;
 }
 
 // Borrowed brom CodeGenFunction.cpp
@@ -1025,7 +1035,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                        /*TerminateHandler=*/nullptr,
                        /*UnreachableBlock=*/nullptr,
                        /*ExceptionSlot=*/Address::invalid(),
-                       /*EHSelectorSlot=*/Address::invalid()});
+                       /*EHSelectorSlot=*/Address::invalid(),
+                       /*NormalCleanupDestSlot=*/Address::invalid()});
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
