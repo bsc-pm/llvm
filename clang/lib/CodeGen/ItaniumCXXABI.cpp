@@ -1181,7 +1181,10 @@ void ItaniumCXXABI::emitRethrow(CodeGenFunction &CGF, bool isNoReturn) {
 
   llvm::FunctionCallee Fn = CGM.CreateRuntimeFunction(FTy, "__cxa_rethrow");
 
-  CGF.EmitRuntimeCallOrInvoke(Fn);
+  if (isNoReturn)
+    CGF.EmitNoreturnRuntimeCallOrInvoke(Fn, None);
+  else
+    CGF.EmitRuntimeCallOrInvoke(Fn);
 }
 
 static llvm::FunctionCallee getAllocateExceptionFn(CodeGenModule &CGM) {
