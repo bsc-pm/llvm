@@ -2834,6 +2834,15 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
       Known.One <<= Shift;
       // Low bits are known zero.
       Known.Zero.setLowBits(Shift);
+    } else if (const APInt *ShMinAmt = getValidMinimumShiftAmountConstant(Op)) {
+      // Minimum shift low bits are known zero.
+      Known.Zero.setLowBits(ShMinAmt->getZExtValue());
+    } else {
+      // No matter the shift amount, the trailing zeros will stay zero.
+      Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
+      Known.Zero =
+          APInt::getLowBitsSet(BitWidth, Known.countMinTrailingZeros());
+      Known.One.clearAllBits();
     }
     break;
   case ISD::SRL:
@@ -2847,6 +2856,11 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     } else if (const APInt *ShMinAmt = getValidMinimumShiftAmountConstant(Op)) {
       // Minimum shift high bits are known zero.
       Known.Zero.setHighBits(ShMinAmt->getZExtValue());
+    } else {
+      // No matter the shift amount, the leading zeros will stay zero.
+      Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
+      Known.Zero = APInt::getHighBitsSet(BitWidth, Known.countMinLeadingZeros());
+      Known.One.clearAllBits();
     }
     break;
   case ISD::SRA:
