@@ -2316,10 +2316,10 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1up", "PseudoVSLI
 defm "" : pat_intrinsic_binary_any_and_int_v_vx<"int_epi_vslide1down", "PseudoVSLIDE1DOWN">;
 
 foreach mti = AllMasks in {
-  def : Pat<(int_epi_vmpopc (mti.Mask VR:$rs2), GPR:$vl),
+  def : Pat<(int_epi_vpopc (mti.Mask VR:$rs2), GPR:$vl),
             (!cast<Instruction>("PseudoVPOPC_M_M"#mti.VLMul) $rs2,
               (mti.Mask zero_reg), (NoX0 GPR:$vl), mti.SEW)>;
-  def : Pat<(int_epi_vmpopc_mask (mti.Mask VR:$rs2), (mti.Mask V0), GPR:$vl),
+  def : Pat<(int_epi_vpopc_mask (mti.Mask VR:$rs2), (mti.Mask V0), GPR:$vl),
             (!cast<Instruction>("PseudoVPOPC_M_M"#mti.VLMul) $rs2,
               (mti.Mask V0), (NoX0 GPR:$vl), mti.SEW)>;
 

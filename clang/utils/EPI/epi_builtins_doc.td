@@ -2530,14 +2530,14 @@ mask operand does not enable that element.}];
   }];
 }
 
-def : DocEPIBuiltin<vmpopc>
+def : DocEPIBuiltin<vpopc>
 {
   let Category = DocEPIMaskOperations;
   let Title = "Population count of a mask vector";
   let Description = [{Use these builtins to count the number of elements
 that are enabled by a mask.}];
 
-  let Instruction = "vmpopc.m";
+  let Instruction = "vpopc.m";
 
   let Operation = [{
     result = 0

@@ -563,7 +563,7 @@ let HasMask = 0 in
 
 let HasMergeOperand = 0 in
 {
-  def vmpopc : EPIMaskToScalarBuiltin<"m", "sm", "csil">;
+  def vpopc : EPIMaskToScalarBuiltin<"m", "sm", "csil">;
   def vfirst : EPIMaskToScalarBuiltin<"m", "sm", "csil">;
 }
 
