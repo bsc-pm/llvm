@@ -76,14 +76,14 @@ entry:
 }
 
 ; Widening int->uint
-declare <vscale x 2 x i64> @llvm.epi.vwcvt.xu.x.nxv2i64.nxv2i32( <vscale x 2 x i32>, i64);
+declare <vscale x 2 x i64> @llvm.epi.vwcvtu.x.x.nxv2i64.nxv2i32( <vscale x 2 x i32>, i64);
 
 define <vscale x 2 x i64> @test_widen_int_to_uint(<vscale x 2 x i32> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_widen_int_to_uint
 ; CHECK:     vwaddu.vx
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]], zero
-  %a = call <vscale x 2 x i64> @llvm.epi.vwcvt.xu.x.nxv2i64.nxv2i32(
+  %a = call <vscale x 2 x i64> @llvm.epi.vwcvtu.x.x.nxv2i64.nxv2i32(
     <vscale x 2 x i32> %parm0,
     i64 %gvl)
 
