@@ -5,14 +5,14 @@
 define void @test_vsetvl() nounwind
 ; CHECK-LABEL: test_vsetvl:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    vsetvli a0, a0, e8, m1
-; CHECK-NEXT:    vsetvli a0, a0, e16, m1
-; CHECK-NEXT:    vsetvli a0, a0, e32, m1
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
-; CHECK-NEXT:    vsetvli a0, a0, e128, m1
-; CHECK-NEXT:    vsetvli a0, a0, e8, m2
-; CHECK-NEXT:    vsetvli a0, a0, e8, m4
-; CHECK-NEXT:    vsetvli a0, a0, e8, m8
+; CHECK-NEXT:    vsetvli a0, a0, e8,m1
+; CHECK-NEXT:    vsetvli a0, a0, e16,m1
+; CHECK-NEXT:    vsetvli a0, a0, e32,m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
+; CHECK-NEXT:    vsetvli a0, a0, e128,m1
+; CHECK-NEXT:    vsetvli a0, a0, e8,m2
+; CHECK-NEXT:    vsetvli a0, a0, e8,m4
+; CHECK-NEXT:    vsetvli a0, a0, e8,m8
 ; CHECK-NEXT:    ret
 {
 entry:
@@ -32,7 +32,7 @@ declare i64 @llvm.vscale.i64()
 define i64 @test_vscale() nounwind
 ; CHECK-LABEL: test_vscale:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    ret
 {
 entry:
@@ -45,29 +45,29 @@ declare i64 @llvm.epi.vsetvl(i64, i64, i64)
 define void @test_load_stores() nounwind
 ; CHECK-LABEL: test_load_stores:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a0, a0, e8, m1
+; CHECK-NEXT:    vsetvli a0, a0, e8,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e8, m1
+; CHECK-NEXT:    vsetvli a0, a0, e8,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e16, m1
+; CHECK-NEXT:    vsetvli a0, a0, e16,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e16, m1
+; CHECK-NEXT:    vsetvli a0, a0, e16,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e32, m1
+; CHECK-NEXT:    vsetvli a0, a0, e32,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    ret
 {
@@ -114,29 +114,29 @@ declare void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double>, <vscale x 1 x doubl
 define void @test_greater_comparisons(<vscale x 1 x i64>* %pia,
 ; CHECK-LABEL: test_greater_comparisons:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vsetvli a6, a5, e64, m1
+; CHECK-NEXT:    vsetvli a6, a5, e64,m1
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vle.v v1, (a1)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vmslt.vv v2, v1, v0
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vse.v v2, (a2)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vmsltu.vv v0, v1, v0
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vse.v v0, (a2)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vle.v v0, (a3)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vle.v v1, (a4)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vmflt.vv v2, v1, v0
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vse.v v2, (a2)
-; CHECK-NEXT:    vsetvli a0, a5, e64, m1
+; CHECK-NEXT:    vsetvli a0, a5, e64,m1
 ; CHECK-NEXT:    vmfle.vv v0, v1, v0
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vse.v v0, (a2)
 ; CHECK-NEXT:    ret
                                       <vscale x 1 x i64>* %pib,

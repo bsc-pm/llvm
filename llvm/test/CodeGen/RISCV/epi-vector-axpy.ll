@@ -7,7 +7,7 @@ define dso_local void @saxpy(i32 signext %N, float* noalias nocapture %y, float*
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB0_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a7, a0, 32
 ; CHECK-NEXT:    slli a0, a4, 1
@@ -17,10 +17,10 @@ define dso_local void @saxpy(i32 signext %N, float* noalias nocapture %y, float*
 ; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB0_6
 ; CHECK-NEXT:  .LBB0_3: # %vector.ph
-; CHECK-NEXT:    vsetvli a3, zero, e64, m1
+; CHECK-NEXT:    vsetvli a3, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv a4, zero
-; CHECK-NEXT:    vsetvli a0, zero, e32, m1
+; CHECK-NEXT:    vsetvli a0, zero, e32,m1
 ; CHECK-NEXT:    slli t1, a3, 1
 ; CHECK-NEXT:    remu a6, a7, t1
 ; CHECK-NEXT:    sub t0, a7, a6
@@ -125,7 +125,7 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB1_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a7, a0, 32
 ; CHECK-NEXT:    fmv.d.x ft0, a3
@@ -134,7 +134,7 @@ define dso_local void @daxpy(i32 signext %N, double* noalias nocapture %y, doubl
 ; CHECK-NEXT:    mv t1, zero
 ; CHECK-NEXT:    j .LBB1_6
 ; CHECK-NEXT:  .LBB1_3: # %vector.ph
-; CHECK-NEXT:    vsetvli t0, zero, e64, m1
+; CHECK-NEXT:    vsetvli t0, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv a0, zero
 ; CHECK-NEXT:    remu a6, a7, t0

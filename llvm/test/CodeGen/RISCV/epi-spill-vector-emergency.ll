@@ -28,7 +28,7 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    addi s0, sp, 192
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli a1, zero, e64, m1
+; SPILL-O0-NEXT:    vsetvli a1, zero, e64,m1
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
 ; SPILL-O0-NEXT:    slli a1, a1, 3
 ; SPILL-O0-NEXT:    sub sp, sp, a1
@@ -39,7 +39,7 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    sd sp, -192(s0)
 ; SPILL-O0-NEXT:    lui a1, %hi(scratch)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(scratch)
-; SPILL-O0-NEXT:    vsetvli a0, a0, e64, m1
+; SPILL-O0-NEXT:    vsetvli a0, a0, e64,m1
 ; SPILL-O0-NEXT:    vle.v v0, (a1)
 ; SPILL-O0-NEXT:    addi a0, a1, 8
 ; SPILL-O0-NEXT:    vle.v v1, (a0)
@@ -116,20 +116,20 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    ld a4, -184(s0)
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
 ; SPILL-O0-NEXT:    vse.v v0, (a4)
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
 ; SPILL-O0-NEXT:    vle.v v0, (a0)
 ; SPILL-O0-NEXT:    ld a4, -192(s0)
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
 ; SPILL-O0-NEXT:    vse.v v0, (a4)
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
 ; SPILL-O0-NEXT:    ld a4, -184(s0)
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
 ; SPILL-O0-NEXT:    vle.v v0, (a4)
 ; SPILL-O0-NEXT:    ld a4, -128(s0)
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
@@ -176,7 +176,7 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    ld a3, -192(s0)
 ; SPILL-O0-NEXT:    rdvtype a2
 ; SPILL-O0-NEXT:    rdvl a1
-; SPILL-O0-NEXT:    vsetvli zero, zero, e64, m1
+; SPILL-O0-NEXT:    vsetvli zero, zero, e64,m1
 ; SPILL-O0-NEXT:    vle.v v0, (a3)
 ; SPILL-O0-NEXT:    vsetvl zero, a1, a2
 ; SPILL-O0-NEXT:    vse.v v0, (a0)

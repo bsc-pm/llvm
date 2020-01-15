@@ -11,7 +11,7 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; DISABLED-NEXT:    lui a1, %hi(.LCPI0_0)
 ; DISABLED-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; DISABLED-NEXT:    fld ft0, 0(a1)
-; DISABLED-NEXT:    vsetvli a0, a0, e64, m1
+; DISABLED-NEXT:    vsetvli a0, a0, e64,m1
 ; DISABLED-NEXT:    vfadd.vf v16, v16, ft0
 ; DISABLED-NEXT:    ret
 ;
@@ -20,7 +20,7 @@ define <vscale x 1 x double> @add1(<vscale x 1 x double>, i64) nounwind {
 ; CHECK-NEXT:    lui a1, %hi(.LCPI0_0)
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI0_0)
 ; CHECK-NEXT:    fld ft0, 0(a1)
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vfadd.vf v16, v16, ft0
 ; CHECK-NEXT:    ret
   %3 = call <vscale x 1 x double> @llvm.epi.vbroadcast.nxv1f64.f64(double 1.0, i64 %1)
@@ -39,13 +39,13 @@ define void @foo(double*) nounwind {
 ; DISABLED-NEXT:    sd ra, 24(sp)
 ; DISABLED-NEXT:    sd s1, 16(sp)
 ; DISABLED-NEXT:    sd s2, 8(sp)
-; DISABLED-NEXT:    vsetvli s1, zero, e64, m1
-; DISABLED-NEXT:    vsetvli a1, s1, e64, m1
+; DISABLED-NEXT:    vsetvli s1, zero, e64,m1
+; DISABLED-NEXT:    vsetvli a1, s1, e64,m1
 ; DISABLED-NEXT:    add s2, zero, a0
 ; DISABLED-NEXT:    vle.v v16, (a0)
 ; DISABLED-NEXT:    srli a0, s1, 1
 ; DISABLED-NEXT:    call add1
-; DISABLED-NEXT:    vsetvli a0, s1, e64, m1
+; DISABLED-NEXT:    vsetvli a0, s1, e64,m1
 ; DISABLED-NEXT:    vse.v v16, (s2)
 ; DISABLED-NEXT:    ld s2, 8(sp)
 ; DISABLED-NEXT:    ld s1, 16(sp)
@@ -58,12 +58,12 @@ define void @foo(double*) nounwind {
 ; CHECK-NEXT:    addi sp, sp, -16
 ; CHECK-NEXT:    sd ra, 8(sp)
 ; CHECK-NEXT:    sd s1, 0(sp)
-; CHECK-NEXT:    vsetvli a1, zero, e64, m1
+; CHECK-NEXT:    vsetvli a1, zero, e64,m1
 ; CHECK-NEXT:    add s1, zero, a0
 ; CHECK-NEXT:    vle.v v16, (a0)
 ; CHECK-NEXT:    srli a0, a1, 1
 ; CHECK-NEXT:    call add1
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    vse.v v16, (s1)
 ; CHECK-NEXT:    ld s1, 0(sp)
 ; CHECK-NEXT:    ld ra, 8(sp)

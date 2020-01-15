@@ -9,21 +9,21 @@ define <vscale x 8 x i8> @foo_O0(<vscale x 8 x i1> %a) nounwind noinline optnone
 ; CHECK-NEXT:    addi s0, sp, 16
 ; CHECK-NEXT:    rdvtype a2
 ; CHECK-NEXT:    rdvl a1
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    vsetvl zero, a1, a2
 ; CHECK-NEXT:    slli a0, a0, 3
 ; CHECK-NEXT:    sub sp, sp, a0
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -16(s0)
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -16(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -16(s0)
 ; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vmv.v.i v1, 1
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vand.vv v16, v0, v1
 ; CHECK-NEXT:    addi sp, s0, -16
 ; CHECK-NEXT:    addi sp, sp, 16
@@ -45,13 +45,13 @@ define <vscale x 8 x i8> @foo(<vscale x 8 x i1> %a) nounwind {
 ; CHECK-NEXT:    addi s0, sp, 16
 ; CHECK-NEXT:    rdvtype a2
 ; CHECK-NEXT:    rdvl a1
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    vsetvl zero, a1, a2
 ; CHECK-NEXT:    slli a0, a0, 3
 ; CHECK-NEXT:    sub sp, sp, a0
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -16(s0)
-; CHECK-NEXT:    vsetvli a0, zero, e8, m1
+; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -16(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    ld a0, -16(s0)

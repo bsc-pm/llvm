@@ -30,7 +30,7 @@ body:             |
 #CHECK-NEXT: addi s0, sp, 16
 #CHECK-NEXT: rdvtype a2
 #CHECK-NEXT: rdvl a1
-#CHECK-NEXT: vsetvli a0, zero, e64, m1
+#CHECK-NEXT: vsetvli a0, zero, e64,m1
 #CHECK-NEXT: vsetvl zero, a1, a2
 #CHECK-NEXT: slli a0, a0, 3
 #CHECK-NEXT: sub sp, sp, a0

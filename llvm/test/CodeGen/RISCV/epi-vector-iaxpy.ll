@@ -7,7 +7,7 @@ define dso_local void @s16axpy(i16 signext %N, i16* noalias nocapture %y, i16* n
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB0_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    lui a5, 16
 ; CHECK-NEXT:    addiw a5, a5, -1
 ; CHECK-NEXT:    and a7, a0, a5
@@ -17,10 +17,10 @@ define dso_local void @s16axpy(i16 signext %N, i16* noalias nocapture %y, i16* n
 ; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB0_6
 ; CHECK-NEXT:  .LBB0_3: # %vector.ph
-; CHECK-NEXT:    vsetvli t2, zero, e64, m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv a0, zero
-; CHECK-NEXT:    vsetvli a4, zero, e16, m1
+; CHECK-NEXT:    vsetvli a4, zero, e16,m1
 ; CHECK-NEXT:    slli t1, t2, 2
 ; CHECK-NEXT:    remu a6, a7, t1
 ; CHECK-NEXT:    sub t0, a7, a6
@@ -127,7 +127,7 @@ define dso_local void @s32axpy(i32 signext %N, i32* noalias nocapture %y, i32* n
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB1_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    slli a0, a0, 32
 ; CHECK-NEXT:    srli a7, a0, 32
 ; CHECK-NEXT:    slli a0, a4, 1
@@ -136,10 +136,10 @@ define dso_local void @s32axpy(i32 signext %N, i32* noalias nocapture %y, i32* n
 ; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB1_6
 ; CHECK-NEXT:  .LBB1_3: # %vector.ph
-; CHECK-NEXT:    vsetvli t2, zero, e64, m1
+; CHECK-NEXT:    vsetvli t2, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv a0, zero
-; CHECK-NEXT:    vsetvli a4, zero, e32, m1
+; CHECK-NEXT:    vsetvli a4, zero, e32,m1
 ; CHECK-NEXT:    slli t1, t2, 1
 ; CHECK-NEXT:    remu a6, a7, t1
 ; CHECK-NEXT:    sub t0, a7, a6
@@ -247,13 +247,13 @@ define dso_local void @s64axpy(i64 %N, i64* noalias nocapture %y, i64* noalias n
 ; CHECK-NEXT:    addi a4, zero, 1
 ; CHECK-NEXT:    blt a0, a4, .LBB2_8
 ; CHECK-NEXT:  # %bb.1: # %for.body.preheader
-; CHECK-NEXT:    vsetvli a4, zero, e64, m1
+; CHECK-NEXT:    vsetvli a4, zero, e64,m1
 ; CHECK-NEXT:    bgeu a0, a4, .LBB2_3
 ; CHECK-NEXT:  # %bb.2:
 ; CHECK-NEXT:    mv t0, zero
 ; CHECK-NEXT:    j .LBB2_6
 ; CHECK-NEXT:  .LBB2_3: # %vector.ph
-; CHECK-NEXT:    vsetvli a7, zero, e64, m1
+; CHECK-NEXT:    vsetvli a7, zero, e64,m1
 ; CHECK-NEXT:    mv a5, zero
 ; CHECK-NEXT:    mv t2, zero
 ; CHECK-NEXT:    remu a6, a0, a7

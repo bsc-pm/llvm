@@ -5,7 +5,7 @@ define void @store(<vscale x 1 x i64> %v1) nounwind
 ; CHECK-LABEL: store:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    addi sp, sp, -512
-; CHECK-NEXT:    vsetvli a0, zero, e64, m1
+; CHECK-NEXT:    vsetvli a0, zero, e64,m1
 ; CHECK-NEXT:    mv a0, zero
 ; CHECK-NEXT:    add a0, sp, a0
 ; CHECK-NEXT:    vse.v v16, (a0)
@@ -24,7 +24,7 @@ define void @intrinsic(<vscale x 1 x i64> %v1, i64 %gvl) nounwind
 ; CHECK-LABEL: intrinsic:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    addi sp, sp, -512
-; CHECK-NEXT:    vsetvli a0, a0, e64, m1
+; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    mv a0, sp
 ; CHECK-NEXT:    vse.v v16, (a0)
 ; CHECK-NEXT:    addi sp, sp, 512
