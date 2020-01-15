@@ -3271,7 +3271,7 @@ private:
   const RecordKeeper &RK;
   const CodeGenDAGPatterns CGP;
   const CodeGenTarget &Target;
-  CodeGenRegBank CGRegs;
+  CodeGenRegBank &CGRegs;
 
   /// Keep track of the equivalence between SDNodes and Instruction by mapping
   /// SDNodes to the GINodeEquiv mapping. We need to map to the GINodeEquiv to
@@ -3479,7 +3479,7 @@ GlobalISelEmitter::getEquivNode(Record &Equiv, const TreePatternNode *N) const {
 
 GlobalISelEmitter::GlobalISelEmitter(RecordKeeper &RK)
     : RK(RK), CGP(RK), Target(CGP.getTargetInfo()),
-      CGRegs(RK, Target.getHwModes()) {}
+      CGRegs(Target.getRegBank()) {}
 
 //===- Emitter ------------------------------------------------------------===//
 
@@ -4227,7 +4227,7 @@ GlobalISelEmitter::createAndImportSubInstructionRenderer(
     if (!SubIdx)
       return failedImport("EXTRACT_SUBREG child #1 is not a subreg index");
 
-    const auto &SrcRCDstRCPair =
+    const auto SrcRCDstRCPair =
       (*SuperClass)->getMatchingSubClassWithSubRegs(CGRegs, *SubIdx);
     assert(SrcRCDstRCPair->second && "Couldn't find a matching subclass");
     M.insertAction<ConstrainOperandToRegClassAction>(
@@ -4318,7 +4318,7 @@ Expected<action_iterator> GlobalISelEmitter::importExplicitUseRenderers(
       CodeGenRegisterClass *RC = CGRegs.getRegClass(RCDef);
       CodeGenSubRegIndex *SubIdx = CGRegs.getSubRegIdx(SubRegInit->getDef());
 
-      const auto &SrcRCDstRCPair =
+      const auto SrcRCDstRCPair =
           RC->getMatchingSubClassWithSubRegs(CGRegs, SubIdx);
       if (SrcRCDstRCPair.hasValue()) {
         assert(SrcRCDstRCPair->second && "Couldn't find a matching subclass");
@@ -4834,7 +4834,7 @@ Expected<RuleMatcher> GlobalISelEmitter::runOnPattern(const PatternToMatch &P) {
     assert(Src->getExtTypes().size() == 1 &&
              "Expected Src of EXTRACT_SUBREG to have one result type");
 
-    const auto &SrcRCDstRCPair =
+    const auto SrcRCDstRCPair =
       (*SuperClass)->getMatchingSubClassWithSubRegs(CGRegs, *SubIdx);
     assert(SrcRCDstRCPair->second && "Couldn't find a matching subclass");
     M.addAction<ConstrainOperandToRegClassAction>(0, 0, *SrcRCDstRCPair->second);
