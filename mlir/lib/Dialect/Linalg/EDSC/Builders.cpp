@@ -87,6 +87,8 @@ operator()(std::function<void(void)> fun) {
   return ValueHandle::null();
 }
 
+namespace mlir {
+namespace edsc {
 template <>
 GenericLoopNestRangeBuilder<loop::ForOp>::GenericLoopNestRangeBuilder(
     ArrayRef<edsc::ValueHandle *> ivs, ArrayRef<Value> ranges) {
@@ -109,6 +111,8 @@ GenericLoopNestRangeBuilder<AffineForOp>::GenericLoopNestRangeBuilder(
   }
   builder = std::make_unique<AffineLoopNestBuilder>(ivs, lbs, ubs, steps);
 }
+} // namespace edsc
+} // namespace mlir
 
 static void getMaxDimIndex(ArrayRef<StructuredIndexed> structuredIndices,
                            unsigned &pos) {
