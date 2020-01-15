@@ -843,6 +843,9 @@ void ELFState<ELFT>::writeSectionContent(Elf_Shdr &SHeader,
     return;
   }
 
+  if (!Section.Entries)
+    return;
+
   for (llvm::yaml::Hex64 E : *Section.Entries) {
     if (!ELFT::Is64Bits && E > UINT32_MAX)
       reportError(Section.Name + ": the value is too large for 32-bits: 0x" +
