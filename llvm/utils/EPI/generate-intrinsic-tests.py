@@ -1750,7 +1750,7 @@ intrinsics = [
         BinaryIntrinsic("vssubu", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vssub", type_generator = generate_binary_integer_types, variants = vv_vx),
 
-        BinaryIntrinsic("vaadd", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
+        BinaryIntrinsic("vaadd", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vasub", type_generator = generate_binary_integer_types, variants = vv_vx),
 
         BinaryIntrinsic("vsmul", type_generator = generate_binary_integer_types, variants = vv_vx),
