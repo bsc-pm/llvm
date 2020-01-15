@@ -111,7 +111,7 @@ declare <vscale x 2 x i32> @llvm.epi.vfncvt.xu.f.nxv2i32.nxv2f64(<vscale x 2 x d
 define <vscale x 2 x i32> @test_narrow_float_to_uint(<vscale x 2 x double> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_float_to_uint
-; CHECK:     vfncvt.xu.f.v
+; CHECK:     vfncvt.xu.f.w
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]]
   %a = call <vscale x 2 x i32> @llvm.epi.vfncvt.xu.f.nxv2i32.nxv2f64(
     <vscale x 2 x double> %parm0,
@@ -125,7 +125,7 @@ declare <vscale x 2 x i32> @llvm.epi.vfncvt.x.f.nxv2i32.nxv2f64(<vscale x 2 x do
 define <vscale x 2 x i32> @test_narrow_float_to_int(<vscale x 2 x double> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_float_to_int
-; CHECK:     vfncvt.x.f.v
+; CHECK:     vfncvt.x.f.w
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]]
   %a = call <vscale x 2 x i32> @llvm.epi.vfncvt.x.f.nxv2i32.nxv2f64(
     <vscale x 2 x double> %parm0,
@@ -139,7 +139,7 @@ declare <vscale x 2 x float> @llvm.epi.vfncvt.f.xu.nxv2f32.nxv2i64( <vscale x 2 
 define <vscale x 2 x float> @test_narrow_uint_to_float(<vscale x 2 x i64> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_uint_to_float
-; CHECK:     vfncvt.f.xu.v
+; CHECK:     vfncvt.f.xu.w
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]]
   %a = call <vscale x 2 x float> @llvm.epi.vfncvt.f.xu.nxv2f32.nxv2i64(
     <vscale x 2 x i64> %parm0,
@@ -154,7 +154,7 @@ declare <vscale x 2 x float> @llvm.epi.vfncvt.f.x.nxv2f32.nxv2i64( <vscale x 2 x
 define <vscale x 2 x float> @test_narrow_int_to_float(<vscale x 2 x i64> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_int_to_float
-; CHECK:     vfncvt.f.x.v
+; CHECK:     vfncvt.f.x.w
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]]
   %a = call <vscale x 2 x float> @llvm.epi.vfncvt.f.x.nxv2f32.nxv2i64(
     <vscale x 2 x i64> %parm0,
@@ -169,7 +169,7 @@ declare <vscale x 2 x float> @llvm.epi.vfncvt.f.f.nxv2f32.nxv2f64( <vscale x 2 x
 define <vscale x 2 x float> @test_narrow_float_to_float(<vscale x 2 x double> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_float_to_float
-; CHECK:     vfncvt.f.f.v
+; CHECK:     vfncvt.f.f.w
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]], zero
   %a = call <vscale x 2 x float> @llvm.epi.vfncvt.f.f.nxv2f32.nxv2f64(
     <vscale x 2 x double> %parm0,

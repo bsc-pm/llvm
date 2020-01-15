@@ -887,6 +887,115 @@ entry:
 
                     print template.substitute(subs)
 
+class NarrowingConversion(Intrinsic):
+    pattern_v = """
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  i64);
+
+define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
+; CHECK:       ${instruction}.${suffix}.w v0, v0
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
+  ret void
+}
+"""
+    pattern_v_mask = """
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+  <vscale x ${lhs_type_scale} x ${llvm_result_type}>,
+  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
+  <vscale x ${lhs_type_scale} x i1>,
+  i64);
+
+define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
+; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
+; CHECK:       ${instruction}.${suffix}.w v0, v0, v0.t
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
+    <vscale x ${lhs_type_scale} x ${llvm_result_type}> undef,
+    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
+    <vscale x ${lhs_type_scale} x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
+  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+
+  ret void
+}
+"""
+    def __init__(self, intr_name, type_generator, **extra_info):
+        super(NarrowingConversion, self).__init__(intr_name, type_generator, **extra_info)
+
+    def get_template(self, variant):
+        result = ""
+        result += NarrowingConversion.pattern_v
+        if self.mask:
+            result += NarrowingConversion.pattern_v_mask
+        return string.Template(result)
+
+    def render(self):
+        for v in self.variants:
+            template = self.get_template(v)
+
+            op_subs = {}
+            op_subs["intrinsic"] = self.intr_name
+            op_subs["suffix"] = v
+            for intrinsic_type in self.type_generator():
+                result = intrinsic_type.result
+                lhs = intrinsic_type.operands[0]
+
+                subs = op_subs.copy()
+                subs["instruction"] = self.instruction
+                subs["value_result_type"] = result.value_type
+                subs["llvm_result_type"] = result.llvm_type
+
+                subs["llvm_lhs_type"] = lhs.llvm_type
+                subs["value_lhs_type"] = lhs.value_type
+
+                sew = MAX_SEW
+                if not result.is_mask_type:
+                    sew = min(sew, result.sew)
+                if not lhs.is_mask_type:
+                    sew = min(sew, lhs.sew)
+                subs["sew"] = "e" + str(sew)
+
+                for vlmul in self.vlmul_values:
+                    # vlmul here is 'base' vlmul, vlmul for SEW operand
+                    # (as opposed to 2*SEW operand)
+                    subs["vlmul"] = "m" + str(vlmul)
+
+                    # Ensure all operands have the same scale (ie. number of elements)
+                    result_scale = result.get_base_scale()
+                    lhs_scale = lhs.get_base_scale()
+                    max_scale = max(result_scale, lhs_scale)
+
+                    # Check legal VLMUL for non-mask types
+                    if (not result.is_mask_type) and (result_scale != max_scale):
+                        result_vlmul = vlmul*(max_scale/result_scale)
+                        assert(result_vlmul <= MAX_VLMUL)
+
+                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
+                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
+                        assert(lhs_vlmul <= MAX_VLMUL)
+
+                    # FIXME: nxv64T types not defined (ie. nxv64i8)
+                    if max_scale*vlmul >= 64:
+                        continue
+
+                    subs["result_type_scale"] = max_scale*vlmul
+                    subs["lhs_type_scale"] = max_scale*vlmul
+
+                    print template.substitute(subs)
+
 class BinaryIntrinsic(Intrinsic):
     pattern_vv = """
 declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
@@ -1874,11 +1983,12 @@ intrinsics = [
         Conversion("vfwcvt", type_generator = generate_integer_to_widened_float_types, variants = ["f.x"], vlmul_values = [1, 2, 4]),
         Conversion("vfwcvt", type_generator = generate_float_to_widened_float_types, variants = ["f.f"], vlmul_values = [1, 2, 4]),
 
-        Conversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["xu.f"], vlmul_values = [1, 2, 4]),
-        Conversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["x.f"], vlmul_values = [1, 2, 4]),
-        Conversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.xu"], vlmul_values = [1, 2, 4]),
-        Conversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.x"], vlmul_values = [1, 2, 4]),
-        Conversion("vfncvt", type_generator = generate_float_to_narrowed_float_types, variants = ["f.f"], vlmul_values = [1, 2, 4])
+        # These differ from regular conversions in that they have a trailing '.w' (eg. vfncvt.x.f.w)
+        NarrowingConversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["xu.f"], vlmul_values = [1, 2, 4]),
+        NarrowingConversion("vfncvt", type_generator = generate_float_to_narrowed_integer_types, variants = ["x.f"], vlmul_values = [1, 2, 4]),
+        NarrowingConversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.xu"], vlmul_values = [1, 2, 4]),
+        NarrowingConversion("vfncvt", type_generator = generate_integer_to_narrowed_float_types, variants = ["f.x"], vlmul_values = [1, 2, 4]),
+        NarrowingConversion("vfncvt", type_generator = generate_float_to_narrowed_float_types, variants = ["f.f"], vlmul_values = [1, 2, 4])
 ]
 
 for intr in intrinsics:

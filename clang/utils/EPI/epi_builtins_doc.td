@@ -736,7 +736,7 @@ def : DocEPIBuiltin<vfncvt_f_x>
   let Description = [{Use these builtins to convert elementwise an integer
 vector to a vector of floating-point elements that are half the width of the
 integer element.}];
-  let Instruction = "vfncvt.f.x.v";
+  let Instruction = "vfncvt.f.x.w";
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -763,7 +763,7 @@ def : DocEPIBuiltin<vfncvt_f_xu>
   let Description = [{Use these builtins to convert elementwise an integer
 vector, where elements are interpreted as unsigned integers, to a vector of
 floating-point elements that are half the width of the integer element.}];
-  let Instruction = "vfncvt.f.xu.v";
+  let Instruction = "vfncvt.f.xu.w";
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -790,7 +790,7 @@ def : DocEPIBuiltin<vfncvt_x_f>
   let Description = [{Use these builtins to convert elementwise an
 floating-point vector to a vector of integer elements that are half the width
 of the floating-point elements.}];
-  let Instruction = "vfncvt.x.f.v";
+  let Instruction = "vfncvt.x.f.w";
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -817,7 +817,7 @@ def : DocEPIBuiltin<vfncvt_xu_f>
   let Description = [{Use these builtins to convert elementwise an
 floating-point vector to a vector of integer elements, interpreted as unsigned,
 that are half the width of the floating-point elements.}];
-  let Instruction = "vfncvt.xu.f.v";
+  let Instruction = "vfncvt.xu.f.w";
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -844,7 +844,7 @@ def : DocEPIBuiltin<vfncvt_f_f>
   let Description = [{Use these builtins to convert elementwise a floating-point
 vector to another vector of floating-point elements that are half the width of the
 source vector.}];
-  let Instruction = "vfncvt.f.f.v";
+  let Instruction = "vfncvt.f.f.w";
 
   let Operation = [{
     for element = 0 to gvl - 1
