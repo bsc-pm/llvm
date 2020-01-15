@@ -36,9 +36,8 @@ define void @merge_mask(i64 %vl, double* %c, double* %a, double* %b) nounwind {
 ; CHECK-O0-NEXT:    addi s0, sp, 64
 ; CHECK-O0-NEXT:    rdvtype a6
 ; CHECK-O0-NEXT:    rdvl a5
-; CHECK-O0-NEXT:    vsetvli a4, zero, e64,m1
+; CHECK-O0-NEXT:    vsetvli a4, zero, e8,m1
 ; CHECK-O0-NEXT:    vsetvl zero, a5, a6
-; CHECK-O0-NEXT:    slli a4, a4, 3
 ; CHECK-O0-NEXT:    sub sp, sp, a4
 ; CHECK-O0-NEXT:    andi sp, sp, -16
 ; CHECK-O0-NEXT:    sd sp, -56(s0)

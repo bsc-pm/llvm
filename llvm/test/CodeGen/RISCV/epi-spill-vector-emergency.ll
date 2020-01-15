@@ -28,9 +28,8 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    addi s0, sp, 192
 ; SPILL-O0-NEXT:    rdvtype a3
 ; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli a1, zero, e64,m1
+; SPILL-O0-NEXT:    vsetvli a1, zero, e8,m1
 ; SPILL-O0-NEXT:    vsetvl zero, a2, a3
-; SPILL-O0-NEXT:    slli a1, a1, 3
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -184(s0)

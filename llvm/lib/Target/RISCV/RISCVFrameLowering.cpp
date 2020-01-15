@@ -403,8 +403,7 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
   MachineInstr &MI =
       *BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVLI), SizeOfVector)
            .addReg(RISCV::X0)
-           // FIXME - Hardcoded to SEW=64, LMUL=1.
-           .addImm(/* e64,m1 */ 3 << 2);
+           .addImm(/* e8,m1 */ 0);
   // Set VTYPE and VL as dead.
   MI.getOperand(3).setIsDead();
   MI.getOperand(4).setIsDead();
@@ -412,10 +411,6 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
   BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVL), RISCV::X0)
       .addReg(OldVLReg, RegState::Kill)
       .addReg(OldVTypeReg, RegState::Kill);
-  // Compute the size in bytes (3)
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::SLLI), SizeOfVector)
-      .addReg(SizeOfVector)
-      .addImm(3); // 2^3 = 8 bytes
 
   // Do the actual allocation.
   unsigned SPReg = getSPReg(STI);
