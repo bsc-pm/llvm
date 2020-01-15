@@ -2323,10 +2323,10 @@ foreach mti = AllMasks in {
             (!cast<Instruction>("PseudoVPOPC_M_M"#mti.VLMul) $rs2,
               (mti.Mask V0), (NoX0 GPR:$vl), mti.SEW)>;
 
-  def : Pat<(int_epi_vmfirst (mti.Mask VR:$rs2), GPR:$vl),
+  def : Pat<(int_epi_vfirst (mti.Mask VR:$rs2), GPR:$vl),
             (!cast<Instruction>("PseudoVFIRST_M_M"#mti.VLMul) $rs2,
               (mti.Mask zero_reg), (NoX0 GPR:$vl), mti.SEW)>;
-  def : Pat<(int_epi_vmfirst_mask (mti.Mask VR:$rs2), (mti.Mask V0), GPR:$vl),
+  def : Pat<(int_epi_vfirst_mask (mti.Mask VR:$rs2), (mti.Mask V0), GPR:$vl),
             (!cast<Instruction>("PseudoVFIRST_M_M"#mti.VLMul) $rs2,
               (mti.Mask V0), (NoX0 GPR:$vl), mti.SEW)>;
 }

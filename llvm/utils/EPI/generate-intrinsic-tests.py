@@ -1663,7 +1663,7 @@ s = ["s"]
 
 intrinsics = [
         UnaryIntrinsicScalarResult("vmpopc", type_generator = generate_mask_to_int_types, scalar_register = "a0", variants = m, bits_per_mask = True),
-        UnaryIntrinsicScalarResult("vmfirst", type_generator = generate_mask_to_int_types, scalar_register = "a0", variants = m, bits_per_mask = True),
+        UnaryIntrinsicScalarResult("vfirst", type_generator = generate_mask_to_int_types, scalar_register = "a0", variants = m, bits_per_mask = True),
 
         UnaryIntrinsic("vfsqrt", type_generator = generate_unary_float_types, variants = v),
         # This is a very special one

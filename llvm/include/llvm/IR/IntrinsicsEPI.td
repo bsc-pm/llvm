@@ -447,7 +447,7 @@ defm vcompress : epi_binary;
 defm vrgather : epi_binary;
 
 defm vmpopc : epi_unary_mask_to_scalar;
-defm vmfirst : epi_unary_mask_to_scalar;
+defm vfirst : epi_unary_mask_to_scalar;
 
 defm vslideup : epi_binary;
 defm vslidedown : epi_binary;

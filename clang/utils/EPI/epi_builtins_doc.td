@@ -2255,14 +2255,14 @@ comparison holds for that element.}];
   }];
 }
 
-def : DocEPIBuiltin<vmfirst>
+def : DocEPIBuiltin<vfirst>
 {
   let Category = DocEPIMaskOperations;
   let Title = "Compute the index of the first enabled element";
   let Description = [{Use these builtins to compute the lowermost index
 of all the enabled elements of a given mask vector.}];
 
-  let Instruction = "vmfirst.m";
+  let Instruction = "vfirst.m";
 
   let Operation = [{
     result = -1
