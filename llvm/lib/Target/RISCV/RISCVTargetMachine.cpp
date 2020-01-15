@@ -33,12 +33,13 @@
 
 using namespace llvm;
 
+
 static cl::opt<bool>
 EnableGEPOpt("riscv-gep-opt", cl::Hidden,
              cl::desc("Enable optimizations on complex GEPs"),
              cl::init(false));
 
-extern "C" void LLVMInitializeRISCVTarget() {
+extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   RegisterTargetMachine<RISCVTargetMachine> X(getTheRISCV32Target());
   RegisterTargetMachine<RISCVTargetMachine> Y(getTheRISCV64Target());
   auto PR = PassRegistry::getPassRegistry();
