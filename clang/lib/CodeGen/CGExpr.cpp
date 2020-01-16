@@ -4541,6 +4541,16 @@ RValue CodeGenFunction::EmitRValueForField(LValue LV,
 
 RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
                                      ReturnValueSlot ReturnValue) {
+  // OmpSs
+  if (getLangOpts().OmpSs) {
+    if (const auto *FD = dyn_cast<FunctionDecl>(E->getCalleeDecl())) {
+      if (FD->hasAttr<OSSTaskDeclAttr>()) {
+        // FD->dump();
+        return CGM.getOmpSsRuntime().emitTaskFunction(*this, FD, E, ReturnValue);
+      }
+    }
+  }
+
   // Builtins never have block type.
   if (E->getCallee()->getType()->isBlockPointerType())
     return EmitBlockCallExpr(E, ReturnValue);

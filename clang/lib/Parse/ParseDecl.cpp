@@ -4164,9 +4164,10 @@ void Parser::ParseStructUnionBody(SourceLocation RecordLoc,
     }
 
     if (Tok.is(tok::annot_pragma_ompss)) {
-      Diag(Tok, diag::err_oss_unsupported_declarative_and_ol_task);
-      ConsumeAnnotationToken();
-      SkipUntil(tok::annot_pragma_ompss_end);
+      // Result can be ignored, because it must be always empty.
+      AccessSpecifier AS = AS_none;
+      ParsedAttributesWithRange Attrs(AttrFactory);
+      (void)ParseOmpSsDeclarativeDirectiveWithExtDecl(AS, Attrs);
       continue;
     }
 

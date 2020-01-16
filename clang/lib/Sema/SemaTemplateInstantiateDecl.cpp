@@ -561,6 +561,13 @@ void Sema::InstantiateAttrs(const MultiLevelTemplateArgumentList &TemplateArgs,
       continue;
     }
 
+    // OmpSs
+    // TODO: Is this needed?
+    // if (const auto *OSSAttr = dyn_cast<OSSTaskDeclAttr>(TmplAttr)) {
+    //   instantiateOSSDeclareSimdDeclAttr(*this, TemplateArgs, *OSSAttr, New);
+    //   continue;
+    // }
+
     if (const auto *OMPAttr = dyn_cast<OMPDeclareSimdDeclAttr>(TmplAttr)) {
       instantiateOMPDeclareSimdDeclAttr(*this, TemplateArgs, *OMPAttr, New);
       continue;

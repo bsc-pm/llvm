@@ -9459,7 +9459,7 @@ TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
   Vars.reserve(C->varlist_size());
 
   // We need to enable Shapings here since we're in a depend clause
-  getSema().AllowShapings = true;
+  Sema::AllowShapingsRAII AllowShapings(getSema(), []() { return true; });
 
   for (auto *VE : C->varlists()) {
     ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
@@ -9468,10 +9468,8 @@ TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
     Vars.push_back(EVar.get());
   }
 
-  getSema().AllowShapings = false;
-
   return getDerived().RebuildOSSDependClause(
-      C->getDependencyKind(), C->getDependencyLoc(), C->getColonLoc(), Vars,
+      C->getDependencyKinds(), C->getDependencyLoc(), C->getColonLoc(), Vars,
       C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc(), C->isOSSSyntax());
 }
 

@@ -25,7 +25,6 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// XFAIL: *
 
 
 /*
@@ -34,7 +33,6 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 </testinfo>
 */
 
-#pragma oss target device(smp) copy_deps
 #pragma oss task out(*a)
 void foo(float* a)
 {

@@ -1028,14 +1028,20 @@ public:
 
   /// The scope used to remap some variables as private and
   /// to restore old vars back on exit.
+  /// Also keeps VLASizeMap unmodified
   class OSSPrivateScope : public RunCleanupsScope {
     OSSMapVars MappedVars;
+
+    using VLASizeMapTy = llvm::DenseMap<const Expr*, llvm::Value*>;
+    VLASizeMapTy SavedVLASizeMap;
+
     OSSPrivateScope(const OSSPrivateScope &) = delete;
     void operator=(const OSSPrivateScope &) = delete;
 
   public:
     /// Enter a new OmpSs-2 private scope.
-    explicit OSSPrivateScope(CodeGenFunction &CGF) : RunCleanupsScope(CGF) {}
+    explicit OSSPrivateScope(CodeGenFunction &CGF)
+      : RunCleanupsScope(CGF), SavedVLASizeMap(CGF.VLASizeMap) {}
 
     /// Registers \p LocalVD variable as a private and apply \p PrivateGen
     /// function for it to generate corresponding private variable. \p
@@ -1061,6 +1067,7 @@ public:
     void ForceCleanup() {
       RunCleanupsScope::ForceCleanup();
       MappedVars.restore(CGF);
+      CGF.VLASizeMap = SavedVLASizeMap;
     }
 
     /// Exit scope - all the mapped variables are restored.

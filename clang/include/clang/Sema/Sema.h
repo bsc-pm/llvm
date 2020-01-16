@@ -156,6 +156,7 @@ namespace clang {
   class OMPRequiresDecl;
   class OMPDeclareReductionDecl;
   class OMPDeclareSimdDecl;
+  class OSSTaskDecl;
   class OMPClause;
   class OSSClause;
   struct OMPVarListLocTy;
@@ -9894,10 +9895,28 @@ public:
   //===--------------------------------------------------------------------===//
   // OmpSs directives and clauses.
   bool AllowShapings;
+  // This RAII manages the scope where we allow array shaping expressions
+  class AllowShapingsRAII {
+    Sema &SemaRef;
+  public:
+    AllowShapingsRAII(Sema &S, llvm::function_ref<bool()> CondFun)
+      : SemaRef(S)
+    { SemaRef.AllowShapings = CondFun(); }
+    ~AllowShapingsRAII() { SemaRef.AllowShapings = false; }
+  };
   void *VarDataSharingAttributesStackOmpSs;
   /// Initialization of data-sharing attributes stack.
   void InitDataSharingAttributesStackOmpSs();
   void DestroyDataSharingAttributesStackOmpSs();
+  ExprResult
+  VerifyBooleanConditionWithCleanups(Expr *Condition,
+                                     SourceLocation StartLoc);
+  ExprResult
+  CheckNonNegativeIntegerValue(Expr *ValExpr,
+                               OmpSsClauseKind CKind,
+                               bool StrictlyPositive);
+  ExprResult
+  CheckSignedIntegerValue(Expr *ValExpr);
   /// Called on start of new data sharing attribute block.
   void StartOmpSsDSABlock(OmpSsDirectiveKind K,
                           Scope *CurScope,
@@ -9923,6 +9942,20 @@ public:
                                      Stmt *AStmt,
                                      SourceLocation StartLoc,
                                      SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss task' after parsing of
+  /// the associated method/function.
+  DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
+      DeclGroupPtrTy DG,
+      Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+      ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
+      ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
+      ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
+      ArrayRef<Expr *> WeakInouts,
+      ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
+      ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
+      ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
+      ArrayRef<Expr *> DepWeakInouts, SourceRange SR);
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,
@@ -9965,6 +9998,13 @@ public:
                                           SourceLocation LParenLoc,
                                           SourceLocation EndLoc);
 
+  // Checks depend kinds for errors
+  // if no errors DepKindsOrdered is like
+  // { OSSC_DEPEND_in, OSSC_DEPEND_weak }
+  // { OSSC_DEPEND_in }
+  bool ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
+                             SmallVectorImpl<OmpSsDependClauseKind> &DepKindsOrdered,
+                             SourceLocation DepLoc);
   /// Called on well-formed 'depend' clause.
   OSSClause *
   ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,

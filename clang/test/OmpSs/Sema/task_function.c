@@ -1,0 +1,19 @@
+// RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - %s
+
+#pragma oss task depend(in, asdf: p) // expected-error {{expected 'weak' dependency type}}
+void foo1(int *p) {}
+#pragma oss task asdf(*a) // expected-warning {{extra tokens at the end of '#pragma oss task' are ignored}}
+void foo2(int *p) {}
+#pragma oss taskwait // expected-error {{unexpected OmpSs-2 directive '#pragma oss taskwait'}}
+void foo3(int *p) {}
+#pragma oss task // expected-error {{function declaration is expected after 'task' function directive}}
+#pragma oss task
+void foo4(int *p) {}
+
+// TODO?: maybe we want to emit a better diagnostic
+#pragma oss task shared(p) private(p) firstprivate(p) default(none) // expected-error {{unexpected OmpSs-2 clause 'shared' in directive '#pragma oss task'}}
+void foo5(int *p) {}
+#pragma oss task depend(in: p[0 ; 5]) // expected-error {{array section form is not valid in 'depend' clause}}
+void foo6(int *p) {}
+
+#pragma oss task // expected-error {{function declaration is expected after 'task' function directive}}

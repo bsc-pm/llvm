@@ -115,14 +115,16 @@ OSSSharedClause *OSSSharedClause::CreateEmpty(const ASTContext &C, unsigned N) {
 OSSDependClause *
 OSSDependClause::Create(const ASTContext &C, SourceLocation StartLoc,
                         SourceLocation LParenLoc, SourceLocation EndLoc,
-                        ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
-                        SourceLocation ColonLoc, ArrayRef<Expr *> VL,
-                        bool OSSSyntax) {
+                        ArrayRef<OmpSsDependClauseKind> DepKinds,
+                        ArrayRef<OmpSsDependClauseKind> DepKindsOrdered,
+                        SourceLocation DepLoc, SourceLocation ColonLoc,
+                        ArrayRef<Expr *> VL, bool OSSSyntax) {
   void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(VL.size()));
   OSSDependClause *Clause = new (Mem)
       OSSDependClause(StartLoc, LParenLoc, EndLoc, VL.size(), OSSSyntax);
   Clause->setVarRefs(VL);
   Clause->setDependencyKinds(DepKinds);
+  Clause->setDependencyKindsOrdered(DepKindsOrdered);
   Clause->setDependencyLoc(DepLoc);
   Clause->setColonLoc(ColonLoc);
   return Clause;

@@ -25,7 +25,6 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// XFAIL: *
 
 /*
 <testinfo>
@@ -37,7 +36,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <stdio.h>
 #include <string.h>
 
-#pragma oss task copy_inout([n]f)
+#pragma oss task inout([n]f)
 void foo_failure(int *f, int n)
 {
     int i;

@@ -35,11 +35,11 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task depend (out: ) // expected-error {{expected expression}}
   #pragma oss task depend (out :S1) // expected-error {{'S1' does not refer to a value}}
   #pragma oss task depend(in : argv[1][1] = '2')
-  #pragma oss task depend (in : vec[1]) // expected-error {{expected addressable lvalue expression, array element or array section}}
+  #pragma oss task depend (in : vec[1]) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task depend (in : argv[0])
   #pragma oss task depend (in : ) // expected-error {{expected expression}}
   #pragma oss task depend (in : main)
-  #pragma oss task depend(in : a[0]) // expected-error{{expected addressable lvalue expression, array element or array section}}
+  #pragma oss task depend(in : a[0]) // expected-error{{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task depend (in : argv[ // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}
   #pragma oss task depend (in : argv[: // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}
   #pragma oss task depend (in : argv[:] // expected-error {{section length is unspecified and cannot be inferred because subscripted value is not an array}} expected-error {{expected ')'}} expected-note {{to match this '('}}
@@ -87,7 +87,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task depend(weak, weak: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
   #pragma oss task depend(in, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss task depend(out, in: argc) // expected-error {{expected 'weak' dependency type}}
-  #pragma oss task depend(weak, in: 1) // expected-error {{expected addressable lvalue expression, array element or array section}}
+  #pragma oss task depend(weak, in: 1) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task depend(weak, in: S2::s2)
   #pragma oss task depend(weak, mutexinoutset: argc) // expected-error {{dependency types 'mutexinoutset', 'inoutset' cannot be combined with others}}
   #pragma oss task depend(kk, inoutset: argc) // expected-error {{dependency types 'mutexinoutset', 'inoutset' cannot be combined with others}}

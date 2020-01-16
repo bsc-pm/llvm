@@ -25,7 +25,6 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// XFAIL: *
 
 
 /*
@@ -36,7 +35,6 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 #include <stdio.h>
 #include <stdlib.h>
 
-#pragma oss target device(smp) copy_in(*a) copy_out(*b)
 #pragma oss task
 void f(int *a, int *b)
 {

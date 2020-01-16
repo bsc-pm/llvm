@@ -726,8 +726,12 @@ class OSSDependClause final
   friend OSSVarListClause;
   friend TrailingObjects;
 
-  /// Dependency type (one of in, out, inout).
+  /// Dependency types in parsing order
   SmallVector<OmpSsDependClauseKind, 2> DepKinds;
+  /// Dependency types ordered.
+  /// { OSSC_DEPEND_in }
+  /// { OSSC_DEPEND_in, OSSC_DEPEND_weak }
+  SmallVector<OmpSsDependClauseKind, 2> DepKindsOrdered;
 
   /// Dependency type location.
   SourceLocation DepLoc;
@@ -757,13 +761,21 @@ class OSSDependClause final
       : OSSVarListClause<OSSDependClause>(OSSC_depend, SourceLocation(),
                                           SourceLocation(), SourceLocation(),
                                           N), DepKinds(1, OSSC_DEPEND_unknown),
+                                          DepKindsOrdered(1, OSSC_DEPEND_unknown),
                                           OSSSyntax(false)
                                           {}
 
-  /// Set dependency kind.
+  /// Set dependency kinds.
   void setDependencyKinds(ArrayRef<OmpSsDependClauseKind> K) {
     for (const OmpSsDependClauseKind& CK : K) {
       DepKinds.push_back(CK);
+    }
+  }
+
+  /// Set dependency kinds.
+  void setDependencyKindsOrdered(ArrayRef<OmpSsDependClauseKind> K) {
+    for (const OmpSsDependClauseKind& CK : K) {
+      DepKindsOrdered.push_back(CK);
     }
   }
 
@@ -781,6 +793,7 @@ public:
   /// \param LParenLoc Location of '('.
   /// \param EndLoc Ending location of the clause.
   /// \param DepKind Dependency type.
+  /// \param DepKind Dependency type ordered.
   /// \param DepLoc Location of the dependency type.
   /// \param ColonLoc Colon location.
   /// \param VL List of references to the variables.
@@ -790,6 +803,7 @@ public:
                                  SourceLocation LParenLoc,
                                  SourceLocation EndLoc,
                                  ArrayRef<OmpSsDependClauseKind> DepKinds,
+                                 ArrayRef<OmpSsDependClauseKind> DepKindsOrdered,
                                  SourceLocation DepLoc, SourceLocation ColonLoc,
                                  ArrayRef<Expr *> VL,
                                  bool OSSSyntax);
@@ -801,7 +815,10 @@ public:
   static OSSDependClause *CreateEmpty(const ASTContext &C, unsigned N);
 
   /// Get dependency types.
-  ArrayRef<OmpSsDependClauseKind> getDependencyKind() const { return DepKinds; }
+  ArrayRef<OmpSsDependClauseKind> getDependencyKinds() const { return DepKinds; }
+
+  /// Get dependency types.
+  ArrayRef<OmpSsDependClauseKind> getDependencyKindsOrdered() const { return DepKindsOrdered; }
 
   /// Get dependency type location.
   SourceLocation getDependencyLoc() const { return DepLoc; }

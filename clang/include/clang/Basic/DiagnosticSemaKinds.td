@@ -9890,7 +9890,9 @@ def err_oss_not_defined_dsa_when_default_none : Error<
   "expected explicit data-sharing for %0">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
-  "expected addressable lvalue expression, array element or array section">;
+  "expected addressable lvalue expression, array element, array shape or array section">;
+def err_oss_expected_dereference_or_array_item : Error<
+  "expected dereference, array element, array shape or array section">;
 def err_oss_expected_var_name_member_expr : Error<
   "expected variable name%select{| or data member of current class}0">;
 
@@ -9936,6 +9938,12 @@ def err_oss_invalid_branch : Error<
   "invalid branch from OmpSs-2 structured block">;
 def warn_oss_section_is_char : Warning<"array section %select{lower bound|length}0 is of type 'char'">,
   InGroup<CharSubscript>, DefaultIgnore;
+def err_oss_single_decl_in_task : Error<
+  "single declaration is expected after 'task' directive">;
+def err_oss_function_expected : Error<
+  "'#pragma oss task' can only be applied to %select{functions|non-volatile or static methods}0">;
+def err_oss_non_void_task : Error<
+  "non-void tasks are not supported">;
 } // end of OmpSs component.
 
 

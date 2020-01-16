@@ -1165,13 +1165,13 @@ def err_oss_expected_punc : Error<
   "expected ',' or ')' in '%0' clause">;
 def err_oss_unknown_directive : Error<
   "unknown OmpSs-2 directive">;
-def err_oss_unsupported_declarative_and_ol_task : Error<
-  "declarative directives and outlined tasks are not supported yet">;
 def err_oss_unexpected_clause : Error<
   "unexpected OmpSs-2 clause '%0' in directive '#pragma oss %1'">;
 def warn_oss_extra_tokens_at_eol : Warning<
   "extra tokens at the end of '#pragma oss %0' are ignored">,
   InGroup<ExtraTokens>;
+def err_oss_decl_in_task: Error<
+  "function declaration is expected after 'task' function directive">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

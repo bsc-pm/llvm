@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_LIB_CODEGEN_CGOMPSSRUNTIME_H
 #define LLVM_CLANG_LIB_CODEGEN_CGOMPSSRUNTIME_H
 
+#include "CGCall.h"
 #include "CGValue.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/OmpSsKinds.h"
@@ -136,6 +137,11 @@ public:
   void setTaskEHSelectorSlot(Address Addr);
   // returns the innermost nested task NormalCleanupDestSlot address
   void setTaskNormalCleanupDestSlot(Address Addr);
+
+  RValue emitTaskFunction(CodeGenFunction &CGF,
+                          const FunctionDecl *FD,
+                          const CallExpr *CE,
+                          ReturnValueSlot ReturnValue);
 
   /// Emit code for 'taskwait' directive.
   virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);

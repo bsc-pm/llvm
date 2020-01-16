@@ -25,7 +25,6 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// XFAIL: *
 
 /*
 <testinfo>
@@ -38,7 +37,6 @@ test_CFLAGS=-std=gnu99
 #include <stdio.h>
 #include <string.h>
 
-#pragma oss target device(smp) copy_deps
 #pragma oss task inout(a[0;10])
 void foo1(int* a)
 {
@@ -47,7 +45,6 @@ void foo1(int* a)
         a[i] = i;
 }
 
-#pragma oss target device(smp) copy_deps
 #pragma oss task in(a[0;10])
 void foo2(int* a)
 {
@@ -58,7 +55,7 @@ void foo2(int* a)
     }
 }
 
-int main (int argc, char*argv)
+int main (int argc, char **argv)
 {
     int v[10];
     memset(v, 0, sizeof(v));

@@ -698,7 +698,6 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
       ErrorFound = true;
   }
 
-
   SmallVector<Expr *, 4> ImplicitShared(
       OSSClauseChecker.getImplicitShared().begin(),
       OSSClauseChecker.getImplicitShared().end());
@@ -813,6 +812,165 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
   return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt);
 }
 
+static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false) {
+  SourceLocation ELoc = RefExpr->getExprLoc();
+  Expr *SimpleExpr = RefExpr->IgnoreParenCasts();
+  if (RefExpr->isTypeDependent() || RefExpr->isValueDependent() ||
+      RefExpr->containsUnexpandedParameterPack()) {
+    // It will be analyzed later.
+    return;
+  }
+  auto *ASE = dyn_cast<ArraySubscriptExpr>(SimpleExpr);
+  if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
+      (ASE &&
+       !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
+       !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
+    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
+        << RefExpr->getSourceRange();
+    return;
+  }
+  if (isa<DeclRefExpr>(SimpleExpr) || isa<MemberExpr>(SimpleExpr)) {
+    S.Diag(ELoc, diag::err_oss_expected_dereference_or_array_item)
+        << RefExpr->getSourceRange();
+    return;
+  }
+  while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
+    if (!OASE->isColonForm() && !OSSSyntax) {
+      S.Diag(OASE->getColonLoc(), diag::err_oss_section_invalid_form)
+          << RefExpr->getSourceRange();
+      return;
+    }
+    SimpleExpr = OASE->getBase()->IgnoreParenCasts();
+  }
+}
+
+Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
+    DeclGroupPtrTy DG,
+    Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+    ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
+    ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
+    ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
+    ArrayRef<Expr *> WeakInouts,
+    ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
+    ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
+    ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
+    ArrayRef<Expr *> DepWeakInouts, SourceRange SR) {
+  if (!DG || DG.get().isNull())
+    return DeclGroupPtrTy();
+
+  if (!DG.get().isSingleDecl()) {
+    Diag(SR.getBegin(), diag::err_oss_single_decl_in_task);
+    return DG;
+  }
+  Decl *ADecl = DG.get().getSingleDecl();
+  if (auto *FTD = dyn_cast<FunctionTemplateDecl>(ADecl))
+    ADecl = FTD->getTemplatedDecl();
+
+  auto *FD = dyn_cast<FunctionDecl>(ADecl);
+  if (!FD) {
+    Diag(ADecl->getLocation(), diag::err_oss_function_expected);
+    return DeclGroupPtrTy();
+  }
+  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(FD)) {
+    if (MD->isVirtual() || isa<CXXConstructorDecl>(MD)
+        || isa<CXXDestructorDecl>(MD)
+        || MD->isOverloadedOperator()) {
+      Diag(ADecl->getLocation(), diag::err_oss_function_expected) << 1;
+      return DeclGroupPtrTy();
+    }
+  }
+  if (FD->getReturnType() != Context.VoidTy) {
+    Diag(ADecl->getLocation(), diag::err_oss_non_void_task);
+    return DeclGroupPtrTy();
+  }
+
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes;
+  if (If) {
+    IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
+  }
+  if (Final) {
+    FinalRes = VerifyBooleanConditionWithCleanups(Final, Final->getExprLoc());
+  }
+  if (Cost) {
+    CostRes = CheckNonNegativeIntegerValue(
+      Cost, OSSC_cost, /*StrictlyPositive=*/false);
+  }
+  if (Priority) {
+    PriorityRes = CheckSignedIntegerValue(Priority);
+  }
+  for (Expr *RefExpr : Ins) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : Outs) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : Inouts) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : Concurrents) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : Commutatives) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : WeakIns) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : WeakOuts) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : WeakInouts) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : DepIns) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepOuts) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepInouts) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepConcurrents) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepCommutatives) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepWeakIns) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepWeakOuts) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepWeakInouts) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+
+  auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
+    Context,
+    IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
+    const_cast<Expr **>(Ins.data()), Ins.size(),
+    const_cast<Expr **>(Outs.data()), Outs.size(),
+    const_cast<Expr **>(Inouts.data()), Inouts.size(),
+    const_cast<Expr **>(Concurrents.data()), Concurrents.size(),
+    const_cast<Expr **>(Commutatives.data()), Commutatives.size(),
+    const_cast<Expr **>(WeakIns.data()), WeakIns.size(),
+    const_cast<Expr **>(WeakOuts.data()), WeakOuts.size(),
+    const_cast<Expr **>(WeakInouts.data()), WeakInouts.size(),
+    const_cast<Expr **>(DepIns.data()), DepIns.size(),
+    const_cast<Expr **>(DepOuts.data()), DepOuts.size(),
+    const_cast<Expr **>(DepInouts.data()), DepInouts.size(),
+    const_cast<Expr **>(DepConcurrents.data()), DepConcurrents.size(),
+    const_cast<Expr **>(DepCommutatives.data()), DepCommutatives.size(),
+    const_cast<Expr **>(DepWeakIns.data()), DepWeakIns.size(),
+    const_cast<Expr **>(DepWeakOuts.data()), DepWeakOuts.size(),
+    const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
+    SR);
+  ADecl->addAttr(NewAttr);
+  return DG;
+}
+
 // the boolean marks if it's a template
 static std::pair<ValueDecl *, bool>
 getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
@@ -849,13 +1007,9 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   return std::make_pair(getCanonicalDecl(VD), false);
 }
 
-
-OSSClause *
-Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
-                             SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
-                             SourceLocation StartLoc,
-                             SourceLocation LParenLoc, SourceLocation EndLoc,
-                             bool OSSSyntax) {
+bool Sema::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
+                                 SmallVectorImpl<OmpSsDependClauseKind> &DepKindsOrdered,
+                                 SourceLocation DepLoc) {
   if (DepKinds.size() == 2) {
     int numWeaks = 0;
     int numUnk = 0;
@@ -886,20 +1040,20 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
           << ", '" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_inoutset) << "'";
         Diag(DepLoc, diag::err_oss_depend_no_weak_compatible)
           << Out.str();
-        return nullptr;
+        return false;
     }
 
     if (numWeaks == 0) {
       if (numUnk == 0 || numUnk == 1) {
         Diag(DepLoc, diag::err_oss_depend_weak_required);
-        return nullptr;
+        return false;
       } else if (numUnk == 2) {
         unsigned Except[] = {OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                        /*Last=*/OSSC_DEPEND_unknown, Except)
             << getOmpSsClauseName(OSSC_depend);
-        return nullptr;
+        return false;
       }
     } else if ((numWeaks == 1 && numUnk == 1)
                || (numWeaks == 2 && numUnk == 0)) {
@@ -908,7 +1062,7 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                        /*Last=*/OSSC_DEPEND_unknown, Except)
             << getOmpSsClauseName(OSSC_depend);
-        return nullptr;
+        return false;
     }
   } else {
     if (DepKinds[0] == OSSC_DEPEND_unknown
@@ -918,9 +1072,33 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
           << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                      /*Last=*/OSSC_DEPEND_unknown, Except)
           << getOmpSsClauseName(OSSC_depend);
-      return nullptr;
+      return false;
     }
   }
+  // Here we have three cases:
+  // { OSSC_DEPEND_in }
+  // { OSSC_DEPEND_weak, OSSC_DEPEND_in }
+  // { OSSC_DEPEND_in, OSSC_DEPEND_weak }
+  if (DepKinds[0] == OSSC_DEPEND_weak) {
+    DepKindsOrdered.push_back(DepKinds[1]);
+    DepKindsOrdered.push_back(DepKinds[0]);
+  } else {
+    DepKindsOrdered.push_back(DepKinds[0]);
+    if (DepKinds.size() == 2)
+      DepKindsOrdered.push_back(DepKinds[1]);
+  }
+  return true;
+}
+
+OSSClause *
+Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
+                             SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
+                             SourceLocation StartLoc,
+                             SourceLocation LParenLoc, SourceLocation EndLoc,
+                             bool OSSSyntax) {
+  SmallVector<OmpSsDependClauseKind, 2> DepKindsOrdered;
+  if (!ActOnOmpSsDependKinds(DepKinds, DepKindsOrdered, DepLoc))
+    return nullptr;
 
   for (Expr *RefExpr : VarList) {
     SourceLocation ELoc = RefExpr->getExprLoc();
@@ -954,7 +1132,8 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
       continue;
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
-                                 DepKinds, DepLoc, ColonLoc, VarList,
+                                 DepKinds, DepKindsOrdered,
+                                 DepLoc, ColonLoc, VarList,
                                  OSSSyntax);
 }
 
@@ -1289,91 +1468,81 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
                                        ClauseVars, PrivateCopies, Inits);
 }
 
-static bool isNonNegativeIntegerValue(Expr *&ValExpr, Sema &SemaRef,
+ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
                                       OmpSsClauseKind CKind,
                                       bool StrictlyPositive) {
-  if (!ValExpr->isTypeDependent() && !ValExpr->isValueDependent() &&
-      !ValExpr->isInstantiationDependent() &&
-      !ValExpr->containsUnexpandedParameterPack()) {
-    SourceLocation Loc = ValExpr->getExprLoc();
-    ExprResult Value =
-        SemaRef.PerformOmpSsImplicitIntegerConversion(Loc, ValExpr);
-    if (Value.isInvalid())
-      return false;
+  ExprResult Res = CheckSignedIntegerValue(ValExpr);
+  if (Res.isInvalid())
+    return ExprError();
 
-    ValExpr = Value.get();
-    // The expression must evaluate to a non-negative integer value.
-    llvm::APSInt Result;
-    if (ValExpr->isIntegerConstantExpr(Result, SemaRef.Context) &&
-        Result.isSigned() &&
-        !((!StrictlyPositive && Result.isNonNegative()) ||
-          (StrictlyPositive && Result.isStrictlyPositive()))) {
-      SemaRef.Diag(Loc, diag::err_oss_negative_expression_in_clause)
-          << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
-          << ValExpr->getSourceRange();
-      return false;
-    }
+  ValExpr = Res.get();
+  // The expression must evaluate to a non-negative integer value.
+  llvm::APSInt Result;
+  if (ValExpr->isIntegerConstantExpr(Result, Context) &&
+      Result.isSigned() &&
+      !((!StrictlyPositive && Result.isNonNegative()) ||
+        (StrictlyPositive && Result.isStrictlyPositive()))) {
+    Diag(ValExpr->getExprLoc(), diag::err_oss_negative_expression_in_clause)
+        << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
+        << ValExpr->getSourceRange();
+    return ExprError();
   }
-  return true;
+  return ValExpr;
+}
+
+ExprResult Sema::VerifyBooleanConditionWithCleanups(
+    Expr *Condition,
+    SourceLocation StartLoc) {
+
+  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
+      !Condition->isInstantiationDependent() &&
+      !Condition->containsUnexpandedParameterPack()) {
+    ExprResult Val = CheckBooleanCondition(StartLoc, Condition);
+    if (Val.isInvalid())
+      return ExprError();
+
+    return MakeFullExpr(Val.get()).get();
+  }
+  return Condition;
 }
 
 OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
                                     SourceLocation EndLoc) {
-  Expr *ValExpr = Condition;
-  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
-      !Condition->isInstantiationDependent() &&
-      !Condition->containsUnexpandedParameterPack()) {
-    ExprResult Val = CheckBooleanCondition(StartLoc, Condition);
-    if (Val.isInvalid())
-      return nullptr;
+  ExprResult Res = VerifyBooleanConditionWithCleanups(Condition, StartLoc);
+  if (Res.isInvalid())
+    return nullptr;
 
-    ValExpr = MakeFullExpr(Val.get()).get();
-  }
-
-  return new (Context) OSSIfClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+  return new (Context) OSSIfClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsFinalClause(Expr *Condition,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc) {
-  Expr *ValExpr = Condition;
-  if (!Condition->isValueDependent() && !Condition->isTypeDependent() &&
-      !Condition->isInstantiationDependent() &&
-      !Condition->containsUnexpandedParameterPack()) {
-    ExprResult Val = CheckBooleanCondition(StartLoc, Condition);
-    if (Val.isInvalid())
-      return nullptr;
+  ExprResult Res = VerifyBooleanConditionWithCleanups(Condition, StartLoc);
+  if (Res.isInvalid())
+    return nullptr;
 
-    ValExpr = MakeFullExpr(Val.get()).get();
-  }
-
-  return new (Context) OSSFinalClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+  return new (Context) OSSFinalClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsCostClause(Expr *E,
                                       SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc) {
-  Expr *ValExpr = E;
   // The parameter of the cost() clause must be > 0
   // expression.
-  if (!isNonNegativeIntegerValue(ValExpr, *this, OSSC_cost,
-                                 /*StrictlyPositive=*/false))
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_cost, /*StrictlyPositive=*/false);
+  if (Res.isInvalid())
     return nullptr;
 
-  return new (Context) OSSCostClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+  return new (Context) OSSCostClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
-OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
-                                      SourceLocation StartLoc,
-                                      SourceLocation LParenLoc,
-                                      SourceLocation EndLoc) {
-  Expr *ValExpr = E;
-  // The parameter of the priority() clause must be integer signed
-  // expression.
+ExprResult Sema::CheckSignedIntegerValue(Expr *ValExpr) {
   if (!ValExpr->isTypeDependent() && !ValExpr->isValueDependent() &&
       !ValExpr->isInstantiationDependent() &&
       !ValExpr->containsUnexpandedParameterPack()) {
@@ -1381,11 +1550,23 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
     ExprResult Value =
         PerformOmpSsImplicitIntegerConversion(Loc, ValExpr);
     if (Value.isInvalid())
-      return nullptr;
-    ValExpr = Value.get();
+      return ExprError();
+    return Value.get();
   }
+  return ExprEmpty();
+}
 
-  return new (Context) OSSPriorityClause(ValExpr, StartLoc, LParenLoc, EndLoc);
+OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
+                                      SourceLocation StartLoc,
+                                      SourceLocation LParenLoc,
+                                      SourceLocation EndLoc) {
+  // The parameter of the priority() clause must be integer signed
+  // expression.
+  ExprResult Res = CheckSignedIntegerValue(E);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,

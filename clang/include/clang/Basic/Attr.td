@@ -3120,6 +3120,88 @@ def CapturedRecord : InheritableAttr {
   let Documentation = [Undocumented];
 }
 
+// OmpSs
+def OSSTaskDecl : Attr {
+  let Spellings = [Pragma<"oss", "task">];
+  let Subjects = SubjectList<[Function]>;
+  let SemaHandler = 0;
+  // Clang CFE documentation says this is only needed for Parser::ParseGNUAttributeArgs()
+  // let HasCustomParsing = 1;
+  // let Documentation = [OSSDeclareSimdDocs];
+  let Documentation = [Undocumented];
+  let Args = [
+    ExprArgument<"IfExpr">, ExprArgument<"FinalExpr">,
+    ExprArgument<"CostExpr">, ExprArgument<"PriorityExpr">,
+    // in()
+    VariadicExprArgument<"Ins">, VariadicExprArgument<"Outs">,
+    VariadicExprArgument<"Inouts">,
+    VariadicExprArgument<"Concurrents">, VariadicExprArgument<"Commutatives">,
+    VariadicExprArgument<"WeakIns">, VariadicExprArgument<"WeakOuts">,
+    VariadicExprArgument<"WeakInouts">,
+    // depend(in : )
+    VariadicExprArgument<"DepIns">, VariadicExprArgument<"DepOuts">,
+    VariadicExprArgument<"DepInouts">,
+    VariadicExprArgument<"DepConcurrents">, VariadicExprArgument<"DepCommutatives">,
+    VariadicExprArgument<"DepWeakIns">, VariadicExprArgument<"DepWeakOuts">,
+    VariadicExprArgument<"DepWeakInouts">
+  ];
+  let AdditionalMembers = [{
+    void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy)
+        const {
+      auto l = [](StringRef S, StringRef Sep, unsigned Size, Expr **Begin, Expr **End,
+                  raw_ostream &OS, const PrintingPolicy &Policy) {
+        if (Size > 0) {
+          OS << " " << S;
+          Expr **I = Begin;
+          while (I != End) {
+            OS << Sep;
+            (*I)->printPretty(OS, nullptr, Policy);
+            Sep = ", ";
+            ++I;
+          }
+          OS << ")";
+        }
+      };
+      l("in", "(", ins_size(), ins_begin(), ins_end(), OS, Policy);
+      l("out", "(", outs_size(), outs_begin(), outs_end(), OS, Policy);
+      l("inout", "(", inouts_size(), inouts_begin(), inouts_end(), OS, Policy);
+      l("concurrent", "(", concurrents_size(), concurrents_begin(), concurrents_end(), OS, Policy);
+      l("commutative", "(", commutatives_size(), commutatives_begin(), commutatives_end(), OS, Policy);
+      l("weakin", "(", weakIns_size(), weakIns_begin(), weakIns_end(), OS, Policy);
+      l("weakout", "(", weakOuts_size(), weakOuts_begin(), weakOuts_end(), OS, Policy);
+      l("weakinout", "(", weakInouts_size(), weakInouts_begin(), weakInouts_end(), OS, Policy);
+      l("depend(in", ":", depIns_size(), depIns_begin(), depIns_end(), OS, Policy);
+      l("depend(out", ":", depOuts_size(), depOuts_begin(), depOuts_end(), OS, Policy);
+      l("depend(inout", ":", depInouts_size(), depInouts_begin(), depInouts_end(), OS, Policy);
+      l("depend(mutexinoutset", ":", depConcurrents_size(), depConcurrents_begin(), depConcurrents_end(), OS, Policy);
+      l("depend(inoutset", ":", depCommutatives_size(), depCommutatives_begin(), depCommutatives_end(), OS, Policy);
+      l("depend(weak, in", ":", depWeakIns_size(), depWeakIns_begin(), depWeakIns_end(), OS, Policy);
+      l("depend(weak, out", ":", depWeakOuts_size(), depWeakOuts_begin(), depWeakOuts_end(), OS, Policy);
+      l("depend(weak, inout", ":", depWeakInouts_size(), depWeakInouts_begin(), depWeakInouts_end(), OS, Policy);
+      if (auto *E = getIfExpr()) {
+        OS << " if(";
+        E->printPretty(OS, nullptr, Policy);
+        OS << ")";
+      }
+      if (auto *E = getFinalExpr()) {
+        OS << " final(";
+        E->printPretty(OS, nullptr, Policy);
+        OS << ")";
+      }
+      if (auto *E = getCostExpr()) {
+        OS << " cost(";
+        E->printPretty(OS, nullptr, Policy);
+        OS << ")";
+      }
+      if (auto *E = getPriorityExpr()) {
+        OS << "priority(";
+        E->printPretty(OS, nullptr, Policy);
+        OS << ")";
+      }
+    }
+  }];
+}
+
 def OMPThreadPrivateDecl : InheritableAttr {
   // This attribute has no spellings as it is only ever created implicitly.
   let Spellings = [];

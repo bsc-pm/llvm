@@ -445,7 +445,6 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
       return Address(SrcCur, SrcLV.getAlignment());
     });
     (void)InitScope.Privatize();
-    // CodeGenFunction::CGCapturedStmtRAII CapInfoRAII(CGF, &CapturesInfo);
     CGF.EmitExprAsInit(CtorE, CopyD,
                        CGF.MakeAddrLValue(DstCur, DstLV.getType(), DstLV.getAlignment()),
                        /*capturedByInit=*/false);
@@ -775,16 +774,19 @@ static void EmitDSAFirstprivate(
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
 
-  const DeclRefExpr *CopyE = cast<DeclRefExpr>(FpDataTy.Copy);
-  const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
-  const DeclRefExpr *InitE = cast<DeclRefExpr>(FpDataTy.Init);
-  const VarDecl *InitD = cast<VarDecl>(InitE->getDecl());
+  // TODO: is this sufficient to skip COPY/DEINIT? (task functions)
+  if (FpDataTy.Copy) {
+    const DeclRefExpr *CopyE = cast<DeclRefExpr>(FpDataTy.Copy);
+    const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
+    const DeclRefExpr *InitE = cast<DeclRefExpr>(FpDataTy.Init);
+    const VarDecl *InitD = cast<VarDecl>(InitE->getDecl());
 
-  if (!CopyD->getType().isPODType(CGF.getContext())) {
-    const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
+    if (!CopyD->getType().isPODType(CGF.getContext())) {
+      const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
 
-    EmitCopyCtorFunc(CGF.CGM, V, CtorE, CopyD, InitD, TaskInfo);
-    EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+      EmitCopyCtorFunc(CGF.CGM, V, CtorE, CopyD, InitD, TaskInfo);
+      EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+    }
   }
 }
 
@@ -953,6 +955,243 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB->use_empty())
     return CGF.CurFn->getBasicBlockList().push_back(BB);
   delete BB;
+}
+
+RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
+                                        const FunctionDecl *FD,
+                                        const CallExpr *CE,
+                                        ReturnValueSlot ReturnValue) {
+  CodeGenModule &CGM = CGF.CGM;
+  ASTContext &Ctx = CGM.getContext();
+
+  SourceLocation Loc = CE->getBeginLoc();
+
+  SmallVector<Expr *, 4> ParmCopies;
+
+  CodeGenFunction::OSSPrivateScope InitScope(CGF);
+
+  auto ArgI = CE->arg_begin();
+  auto ParI = FD->param_begin(); 
+  while (ArgI != CE->arg_end()) {
+
+    // QualType ParQ = (*ParI)->getType();
+    QualType ParQ = (*ParI)->getType().getUnqualifiedType().getNonReferenceType();
+    if (ParQ->isArrayType())
+      ParQ = Ctx.getBaseElementType(ParQ).getCanonicalType();
+
+    // The a new VarDecl like ParamArgDecl, but in context of function call
+    auto *ParmDecl =
+      VarDecl::Create(Ctx,
+                      const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
+                      Loc,
+                      Loc,
+                      &Ctx.Idents.get("call_arg"),
+                      ParQ,
+                      Ctx.getTrivialTypeSourceInfo(ParQ, Loc),
+                      SC_Auto);
+    ParmDecl->setImplicit();
+    ParmDecl->setReferenced();
+    ParmDecl->markUsed(Ctx);
+    ParmDecl->setInitStyle(VarDecl::CInit);
+    ParmDecl->setInit(const_cast<Expr *>(*ArgI));
+
+    CGF.EmitVarDecl(*ParmDecl);
+
+    auto *ParmRef = DeclRefExpr::Create(
+        Ctx, NestedNameSpecifierLoc(), SourceLocation(), ParmDecl,
+        /*RefersToEnclosingVariableOrCapture=*/false, Loc, ParQ, VK_LValue);
+
+    ParmCopies.push_back(
+      ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
+                               ParmRef, /*BasePath=*/nullptr,
+                               VK_RValue));
+
+    LValue ParmLV = CGF.EmitLValue(ParmRef);
+
+    InitScope.addPrivate(*ParI, [&ParmLV]() -> Address { return ParmLV.getAddress(); });
+    // We do need to do this every time because the next param may use the previous one
+    (void)InitScope.Privatize();
+
+    ++ArgI;
+    ++ParI;
+  }
+  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
+  SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
+  TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+
+  bool IsMethodCall = false;
+  if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
+    IsMethodCall = true;
+    const Expr *callee = CXXE->getCallee()->IgnoreParens();
+    const MemberExpr *ME = cast<MemberExpr>(callee);
+    const Expr *Base = ME->getBase();
+    LValue This = CGF.EmitLValue(Base);
+    TaskInfo.emplace_back("QUAL.OSS.FIRSTPRIVATE", This.getPointer());
+  }
+
+  // NOTE: this should do only one iteration
+  for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
+    SmallVector<llvm::Value*, 4> CapturedList;
+    for (const Expr *E : ParmCopies) {
+      OSSDSAFirstprivateDataTy FpDataTy;
+      // Ignore ImplicitCast built for the new function call
+      FpDataTy.Ref = E->IgnoreImpCasts();
+      FpDataTy.Copy = FpDataTy.Init = nullptr;
+      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, RefMap);
+    }
+    if (const Expr *E = Attr->getIfExpr()) {
+      TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(E));
+    }
+    if (const Expr *E = Attr->getFinalExpr()) {
+      TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(E));
+    }
+    if (const Expr *E = Attr->getCostExpr()) {
+      llvm::Value *V = CGF.EmitScalarExpr(E);
+      CapturedList.push_back(V);
+      TaskInfo.emplace_back("QUAL.OSS.COST", V);
+    }
+    if (const Expr *E = Attr->getPriorityExpr()) {
+      llvm::Value *V = CGF.EmitScalarExpr(E);
+      CapturedList.push_back(V);
+      TaskInfo.emplace_back("QUAL.OSS.PRIORITY", V);
+    }
+    // in()
+    for (const Expr *E : Attr->ins()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->outs()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->inouts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->concurrents()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->commutatives()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->weakIns()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->weakOuts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->weakInouts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+    }
+    // depend(in :)
+    for (const Expr *E : Attr->depIns()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depOuts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depInouts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depConcurrents()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depCommutatives()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depWeakIns()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depWeakOuts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
+    }
+    for (const Expr *E : Attr->depWeakInouts()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+    }
+    if (!CapturedList.empty())
+      TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
+  }
+
+  llvm::Instruction *Result =
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
+  TaskStack.push_back({TaskAllocaInsertPt,
+                       /*TerminateLandingPad=*/nullptr,
+                       /*TerminateHandler=*/nullptr,
+                       /*UnreachableBlock=*/nullptr,
+                       /*ExceptionSlot=*/Address::invalid(),
+                       /*EHSelectorSlot=*/Address::invalid(),
+                       /*NormalCleanupDestSlot=*/Address::invalid()});
+
+  // From EmitCallExpr
+  RValue RV;
+  if (IsMethodCall) {
+    RV = CGF.EmitCXXMemberCallExpr(cast<CXXMemberCallExpr>(CE), ReturnValue);
+  } else {
+    // Regular function call
+    CGCallee callee = CGF.EmitCallee(CE->getCallee());
+
+    CallExpr *NewCE = CallExpr::Create(Ctx, const_cast<Expr *>(CE->getCallee()), ParmCopies,
+                                       Ctx.VoidTy, VK_RValue, SourceLocation());
+
+    RV = CGF.EmitCall(CE->getCallee()->getType(), callee, NewCE, ReturnValue);
+  }
+
+  CGF.Builder.CreateCall(ExitCallee, Result);
+
+  // Pop Task Stack
+  TaskStack.pop_back();
+  TaskAllocaInsertPt->eraseFromParent();
+
+  return RV;
 }
 
 void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,

@@ -734,18 +734,18 @@ void OSSClausePrinter::VisitOSSSharedClause(OSSSharedClause *Node) {
 void OSSClausePrinter::VisitOSSDependClause(OSSDependClause *Node) {
   if (Node->isOSSSyntax()) {
     OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                       Node->getDependencyKind()[0]);
+                                       Node->getDependencyKinds()[0]);
     if (!Node->varlist_empty()) {
       VisitOSSClauseList(Node, '(');
     }
   } else {
     OS << "depend(";
     OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                       Node->getDependencyKind()[0]);
-    if (Node->getDependencyKind().size() == 2) {
+                                       Node->getDependencyKinds()[0]);
+    if (Node->getDependencyKinds().size() == 2) {
       OS << " ,";
       OS << getOmpSsSimpleClauseTypeName(Node->getClauseKind(),
-                                         Node->getDependencyKind()[1]);
+                                         Node->getDependencyKinds()[1]);
     }
     if (!Node->varlist_empty()) {
       OS << " :";

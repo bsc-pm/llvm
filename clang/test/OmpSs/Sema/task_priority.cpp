@@ -1,6 +1,9 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - -std=c++11 %s
 template<typename T> T foo() { return T(); }
 
+#pragma oss task cost(vla[3]) // expected-error {{expression must have integral or unscoped enumeration type, not 'int *'}}
+void foo1(int n, int *vla[n]) {}
+
 void bar(int n) {
     n = -1;
     const int m = -1;

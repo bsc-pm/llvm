@@ -2834,6 +2834,18 @@ private:
                                   UnqualifiedId &Result);
   //===--------------------------------------------------------------------===//
   // OpenSs: Directives and clauses.
+
+  /// Parse clauses for '#pragma oss task'.
+  DeclGroupPtrTy ParseOSSDeclareTaskClauses(DeclGroupPtrTy Ptr,
+                                            CachedTokens &Toks,
+                                            SourceLocation Loc);
+
+  /// Parses declarative OmpSs directives.
+  DeclGroupPtrTy ParseOmpSsDeclarativeDirectiveWithExtDecl(
+      AccessSpecifier &AS, ParsedAttributesWithRange &Attrs,
+      DeclSpec::TST TagType = DeclSpec::TST_unspecified,
+      Decl *TagDecl = nullptr);
+
   StmtResult
   ParseOmpSsDeclarativeOrExecutableDirective(ParsedStmtContext Allowed);
 
