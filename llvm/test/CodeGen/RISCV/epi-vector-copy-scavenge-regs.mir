@@ -11,7 +11,7 @@ body: |
     $v4 = COPY $v3
     $v5 = COPY $v4
     $v6 = COPY $v5
-    VSE_V $v6, $x10, implicit $vl, implicit $vtype
+    VSE_V $v6, $x10, $noreg, implicit $vl, implicit $vtype
 ...
 
 # CHECK:	rdvtype t0

@@ -211,12 +211,14 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       case RISCV::PseudoVSPILL: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VSE_V))
             .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg, RegState::Kill);
+            .addReg(HandleReg, RegState::Kill)
+            .addReg(RISCV::NoRegister);
         break;
       }
       case RISCV::PseudoVRELOAD: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VLE_V), OpReg.getReg())
-            .addReg(HandleReg, RegState::Kill);
+            .addReg(HandleReg, RegState::Kill)
+            .addReg(RISCV::NoRegister);
         break;
       }
       }
