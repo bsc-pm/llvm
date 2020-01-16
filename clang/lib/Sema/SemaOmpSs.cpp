@@ -304,6 +304,8 @@ public:
     if (E->isTypeDependent() || E->isValueDependent() ||
         E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
       return;
+    if (E->isNonOdrUse())
+      return;
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
 
