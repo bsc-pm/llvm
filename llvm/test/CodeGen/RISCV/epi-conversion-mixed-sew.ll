@@ -184,7 +184,7 @@ declare <vscale x 2 x i32> @llvm.epi.vncvt.x.x.nxv2i32.nxv2i64( <vscale x 2 x i6
 define <vscale x 2 x i32> @test_narrow_int_to_int(<vscale x 2 x i64> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_narrow_int_to_int
-; CHECK:     vnsrl.vx
+; CHECK:     vnsrl.wx
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]]
   %a = call <vscale x 2 x i32> @llvm.epi.vncvt.x.x.nxv2i32.nxv2i64(
     <vscale x 2 x i64> %parm0,
