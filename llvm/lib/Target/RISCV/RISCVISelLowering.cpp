@@ -2343,7 +2343,13 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, IsVarArg, MF, ArgLocs, *DAG.getContext());
 
-  if (CallConv == CallingConv::Fast)
+  // We do not want to use fastcc when returning scalable vectors because
+  // we want to have the CC for them in a single place in the code for now.
+  bool HasInsScalableVectors =
+      std::any_of(Ins.begin(), Ins.end(),
+                  [](ISD::InputArg In) { return In.VT.isScalableVector(); });
+
+  if (CallConv == CallingConv::Fast && !HasInsScalableVectors)
     CCInfo.AnalyzeFormalArguments(Ins, CC_RISCV_FastCC);
   else
     analyzeInputArgs(MF, CCInfo, Ins, /*IsRet=*/false);
@@ -2552,7 +2558,13 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState ArgCCInfo(CallConv, IsVarArg, MF, ArgLocs, *DAG.getContext());
 
-  if (CallConv == CallingConv::Fast)
+  // We do not want to use fastcc when returning scalable vectors because
+  // we want to have the CC for them in a single place in the code for now.
+  bool ReturningScalableVectors =
+      std::any_of(Outs.begin(), Outs.end(),
+                  [](ISD::OutputArg Out) { return Out.VT.isScalableVector(); });
+
+  if (CallConv == CallingConv::Fast && !ReturningScalableVectors)
     ArgCCInfo.AnalyzeCallOperands(Outs, CC_RISCV_FastCC);
   else
     analyzeOutputArgs(MF, ArgCCInfo, Outs, /*IsRet=*/false, &CLI);
