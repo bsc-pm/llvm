@@ -4061,12 +4061,6 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   SDValue Ptr = getValue(SV);
 
   Type *Ty = I.getType();
-
-  bool isVolatile = I.isVolatile();
-  bool isNonTemporal = I.hasMetadata(LLVMContext::MD_nontemporal);
-  bool isInvariant = I.hasMetadata(LLVMContext::MD_invariant_load);
-  bool isDereferenceable =
-      isDereferenceablePointer(SV, I.getType(), DAG.getDataLayout());
   unsigned Alignment = I.getAlignment();
 
   AAMDNodes AAInfo;
@@ -4079,6 +4073,8 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   unsigned NumValues = ValueVTs.size();
   if (NumValues == 0)
     return;
+
+  bool isVolatile = I.isVolatile();
 
   SDValue Root;
   bool ConstantMemory = false;
@@ -4115,6 +4111,10 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   SmallVector<SDValue, 4> Values(NumValues);
   SmallVector<SDValue, 4> Chains(std::min(MaxParallelChains, NumValues));
   EVT PtrVT = Ptr.getValueType();
+
+  MachineMemOperand::Flags MMOFlags
+    = TLI.getLoadMemOperandFlags(I, DAG.getDataLayout());
+
   unsigned ChainI = 0;
   for (unsigned i = 0; i != NumValues; ++i, ++ChainI) {
     // Serializing loads here may result in excessive register pressure, and
@@ -4134,16 +4134,6 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
                             PtrVT, Ptr,
                             DAG.getConstant(Offsets[i], dl, PtrVT),
                             Flags);
-    auto MMOFlags = MachineMemOperand::MONone;
-    if (isVolatile)
-      MMOFlags |= MachineMemOperand::MOVolatile;
-    if (isNonTemporal)
-      MMOFlags |= MachineMemOperand::MONonTemporal;
-    if (isInvariant)
-      MMOFlags |= MachineMemOperand::MOInvariant;
-    if (isDereferenceable)
-      MMOFlags |= MachineMemOperand::MODereferenceable;
-    MMOFlags |= TLI.getMMOFlags(I);
 
     SDValue L = DAG.getLoad(MemVTs[i], dl, Root, A,
                             MachinePointerInfo(SV, Offsets[i]), Alignment,
@@ -4270,12 +4260,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   AAMDNodes AAInfo;
   I.getAAMetadata(AAInfo);
 
-  auto MMOFlags = MachineMemOperand::MONone;
-  if (I.isVolatile())
-    MMOFlags |= MachineMemOperand::MOVolatile;
-  if (I.hasMetadata(LLVMContext::MD_nontemporal))
-    MMOFlags |= MachineMemOperand::MONonTemporal;
-  MMOFlags |= TLI.getMMOFlags(I);
+  auto MMOFlags = TLI.getStoreMemOperandFlags(I, DAG.getDataLayout());
 
   // An aggregate load cannot wrap around the address space, so offsets to its
   // parts don't wrap either.
@@ -4640,11 +4625,8 @@ void SelectionDAGBuilder::visitAtomicCmpXchg(const AtomicCmpXchgInst &I) {
   SDVTList VTs = DAG.getVTList(MemVT, MVT::i1, MVT::Other);
 
   auto Alignment = DAG.getEVTAlignment(MemVT);
-
-  auto Flags = MachineMemOperand::MOLoad | MachineMemOperand::MOStore;
-  if (I.isVolatile())
-    Flags |= MachineMemOperand::MOVolatile;
-  Flags |= DAG.getTargetLoweringInfo().getMMOFlags(I);
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  auto Flags = TLI.getAtomicMemOperandFlags(I, DAG.getDataLayout());
 
   MachineFunction &MF = DAG.getMachineFunction();
   MachineMemOperand *MMO =
@@ -4691,11 +4673,8 @@ void SelectionDAGBuilder::visitAtomicRMW(const AtomicRMWInst &I) {
 
   auto MemVT = getValue(I.getValOperand()).getSimpleValueType();
   auto Alignment = DAG.getEVTAlignment(MemVT);
-
-  auto Flags = MachineMemOperand::MOLoad |  MachineMemOperand::MOStore;
-  if (I.isVolatile())
-    Flags |= MachineMemOperand::MOVolatile;
-  Flags |= DAG.getTargetLoweringInfo().getMMOFlags(I);
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  auto Flags = TLI.getAtomicMemOperandFlags(I, DAG.getDataLayout());
 
   MachineFunction &MF = DAG.getMachineFunction();
   MachineMemOperand *MMO =
@@ -4741,16 +4720,7 @@ void SelectionDAGBuilder::visitAtomicLoad(const LoadInst &I) {
       I.getAlignment() < MemVT.getSizeInBits() / 8)
     report_fatal_error("Cannot generate unaligned atomic load");
 
-  auto Flags = MachineMemOperand::MOLoad;
-  if (I.isVolatile())
-    Flags |= MachineMemOperand::MOVolatile;
-  if (I.hasMetadata(LLVMContext::MD_invariant_load))
-    Flags |= MachineMemOperand::MOInvariant;
-  if (isDereferenceablePointer(I.getPointerOperand(), I.getType(),
-                               DAG.getDataLayout()))
-    Flags |= MachineMemOperand::MODereferenceable;
-
-  Flags |= TLI.getMMOFlags(I);
+  auto Flags = TLI.getLoadMemOperandFlags(I, DAG.getDataLayout());
 
   MachineMemOperand *MMO =
       DAG.getMachineFunction().
@@ -4806,10 +4776,7 @@ void SelectionDAGBuilder::visitAtomicStore(const StoreInst &I) {
   if (I.getAlignment() < MemVT.getSizeInBits() / 8)
     report_fatal_error("Cannot generate unaligned atomic store");
 
-  auto Flags = MachineMemOperand::MOStore;
-  if (I.isVolatile())
-    Flags |= MachineMemOperand::MOVolatile;
-  Flags |= TLI.getMMOFlags(I);
+  auto Flags = TLI.getStoreMemOperandFlags(I, DAG.getDataLayout());
 
   MachineFunction &MF = DAG.getMachineFunction();
   MachineMemOperand *MMO =
