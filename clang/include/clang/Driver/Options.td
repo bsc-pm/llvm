@@ -1292,6 +1292,13 @@ def fxray_always_emit_typedevents : Flag<["-"], "fxray-always-emit-typedevents">
 def fnoxray_always_emit_typedevents : Flag<["-"], "fno-xray-always-emit-typedevents">, Group<f_Group>,
   Flags<[CC1Option]>;
 
+def fxray_ignore_loops : Flag<["-"], "fxray-ignore-loops">, Group<f_Group>,
+  Flags<[CC1Option]>,
+  HelpText<"Don't instrument functions with loops unless they also meet the minimum function size">;
+def fno_xray_ignore_loops : Flag<["-"], "fno-xray-ignore-loops">, Group<f_Group>,
+  Flags<[CC1Option]>;
+
+
 def fxray_link_deps : Flag<["-"], "fxray-link-deps">, Group<f_Group>,
   Flags<[CC1Option]>,
   HelpText<"Tells clang to add the link dependencies for XRay.">;
@@ -1301,7 +1308,7 @@ def fnoxray_link_deps : Flag<["-"], "fnoxray-link-deps">, Group<f_Group>,
 def fxray_instrumentation_bundle :
   JoinedOrSeparate<["-"], "fxray-instrumentation-bundle=">,
   Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"Select which XRay instrumentation points to emit. Options: all, none, function, custom. Default is 'all'.">;
+  HelpText<"Select which XRay instrumentation points to emit. Options: all, none, function-entry, function-exit, function, custom. Default is 'all'.  'function' includes both 'function-entry' and 'function-exit'.">;
 
 def ffine_grained_bitfield_accesses : Flag<["-"],
   "ffine-grained-bitfield-accesses">, Group<f_clang_Group>, Flags<[CC1Option]>,
