@@ -762,3 +762,5 @@ defm VCOMPRESS_V : VALU_MV_Mask<"vcompress", 0b010111>;
 }
 
 } // Predicates = [HasStdExtV]
+
+include "RISCVInstrInfoEPI.td"

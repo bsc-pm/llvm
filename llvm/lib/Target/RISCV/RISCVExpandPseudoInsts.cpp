@@ -749,31 +749,34 @@ bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
     if (OpNo == VLIndex || OpNo == SEWIndex || OpNo == MergeOpIndex)
       continue;
 
-    if (Op->isReg()) {
-      unsigned Reg = Op->getReg();
-
-      const TargetRegisterClass *RC = RI.getMinimalPhysRegClass(Reg);
-      if (RC->hasSuperClassEq(&RISCV::VR2RegClass) ||
-          RC->hasSuperClassEq(&RISCV::VR4RegClass) ||
-          RC->hasSuperClassEq(&RISCV::VR8RegClass)) {
-        Reg = RI.getSubReg(Reg, RISCV::vreven);
-        assert(Reg && "Subregister does not exist");
-      }
-
-      unsigned int Flags = 0;
-      if (Op->isImplicit())
-        Flags |= RegState::Implicit;
-
-      if (Op->isDef())
-        Flags |= RegState::Define;
-
-      if (Op->isUndef())
-        Flags |= RegState::Undef;
-
-      MIB.addReg(Reg, Flags);
-    } else {
+    // Nothing to do on operands other than registers, as well as NoRegister
+    // (used as vector mask operand on unmasked instructions)
+    if (!Op->isReg() || (Op->getReg() == RISCV::NoRegister)) {
       MIB.add(*Op);
+      continue;
     }
+
+    unsigned Reg = Op->getReg();
+
+    const TargetRegisterClass *RC = RI.getMinimalPhysRegClass(Reg);
+    if (RC->hasSuperClassEq(&RISCV::VR2RegClass) ||
+        RC->hasSuperClassEq(&RISCV::VR4RegClass) ||
+        RC->hasSuperClassEq(&RISCV::VR8RegClass)) {
+      Reg = RI.getSubReg(Reg, RISCV::vreven);
+      assert(Reg && "Subregister does not exist");
+    }
+
+    unsigned int Flags = 0;
+    if (Op->isImplicit())
+      Flags |= RegState::Implicit;
+
+    if (Op->isDef())
+      Flags |= RegState::Define;
+
+    if (Op->isUndef())
+      Flags |= RegState::Undef;
+
+    MIB.addReg(Reg, Flags);
   }
 
   MI.eraseFromParent(); // The pseudo instruction is gone now.
