@@ -845,8 +845,9 @@ defm PseudoVNSRL       : pseudo_binary_v_wv_wx_wi;
 defm PseudoVMV_V       : pseudo_unary_v_v_x_i_nomask;
 defm PseudoVMERGE      : pseudo_binary_v_vvm_vxm_vim;
 
-defm PseudoVDOTU       : pseudo_binary_v_vv;
-defm PseudoVDOT        : pseudo_binary_v_vv;
+// FIXME EDIV instructions disabled
+//defm PseudoVDOTU       : pseudo_binary_v_vv;
+//defm PseudoVDOT        : pseudo_binary_v_vv;
 
 defm PseudoVREDSUM     : pseudo_binary_v_vs;
 defm PseudoVREDAND     : pseudo_binary_v_vs;
@@ -953,7 +954,8 @@ defm PseudoVFNMSAC     : pseudo_ternary_v_vv_vf;
 defm PseudoVFWADD      : pseudo_binary_w_vv_vf;
 defm PseudoVFWSUB      : pseudo_binary_w_vv_vf;
 defm PseudoVFWMUL      : pseudo_binary_w_vv_vf;
-defm PseudoVFDOT       : pseudo_binary_v_vv;
+// FIXME EDIV instructions disabled
+//defm PseudoVFDOT       : pseudo_binary_v_vv;
 
 defm PseudoVFSQRT      : pseudo_unary_v_v;
 
@@ -2294,8 +2296,9 @@ defm "" : pat_intrinsic_binary_int_v_vvm_vxm_vim<"int_epi_vmerge", "PseudoVMERGE
 //defm "" : pat_intrinsic_binary_int_vs<"int_epi_vwredsumu", "VWREDSUMU">;
 //defm "" : pat_intrinsic_binary_int_vs<"int_epi_vwredsum", "VWREDSUM">;
 
-defm "" : pat_intrinsic_binary_int_v_vv<"int_epi_vdotu", "PseudoVDOTU">;
-defm "" : pat_intrinsic_binary_int_v_vv<"int_epi_vdot", "PseudoVDOT">;
+// FIXME EDIV patterns disabled
+//defm "" : pat_intrinsic_binary_int_v_vv<"int_epi_vdotu", "PseudoVDOTU">;
+//defm "" : pat_intrinsic_binary_int_v_vv<"int_epi_vdot", "PseudoVDOT">;
 
 //// FIXME: These patterns are wrong
 //defm "" : pat_intrinsic_binary_int_vv_vx<"int_epi_vwsmaccu", "VWSMACCU">;
@@ -2478,7 +2481,8 @@ defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwsub", "PseudoVFWSUB">;
 //defm "" : pat_intrinsic_binary_fp_wv_wf<"int_epi_vfwadd_w", "VFWADD">;
 //defm "" : pat_intrinsic_binary_fp_wv_wf<"int_epi_vfwsub_w", "VFWSUB">;
 defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwmul", "PseudoVFWMUL">;
-defm "" : pat_intrinsic_binary_fp_v_vv<"int_epi_vfdot", "PseudoVFDOT">;
+// FIXME EDIV patterns disabled
+//defm "" : pat_intrinsic_binary_fp_v_vv<"int_epi_vfdot", "PseudoVFDOT">;
 
 //defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfwmacc", "VFWMACC">;
 //defm "" : pat_intrinsic_ternary_fp_vv_vf<"int_epi_vfwnmacc", "VFWNMACC">;
