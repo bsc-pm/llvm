@@ -9,11 +9,11 @@ define dso_local void @test_vmfirst() #0 {
 ; CHECK-NEXT:    [[MASK:%.*]] = alloca <vscale x 2 x i1>, align 1
 ; CHECK-NEXT:    [[A:%.*]] = alloca [128 x i32], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = bitcast <vscale x 2 x i32>* [[V]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 8, i8* [[TMP0]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 8, i8* [[TMP0]]) #5
 ; CHECK-NEXT:    [[TMP1:%.*]] = call <vscale x 2 x i32> @llvm.epi.vbroadcast.nxv2i32.i32(i32 0, i64 128)
 ; CHECK-NEXT:    store <vscale x 2 x i32> [[TMP1]], <vscale x 2 x i32>* [[V]], align 4, !tbaa !2
 ; CHECK-NEXT:    [[TMP2:%.*]] = bitcast <vscale x 2 x i1>* [[MASK]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 2, i8* [[TMP2]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 2, i8* [[TMP2]]) #5
 ; CHECK-NEXT:    [[TMP3:%.*]] = load <vscale x 2 x i32>, <vscale x 2 x i32>* [[V]], align 4, !tbaa !2
 ; CHECK-NEXT:    [[TMP4:%.*]] = call <vscale x 2 x i1> @llvm.epi.mask.cast.nxv2i1.nxv2i32(<vscale x 2 x i32> [[TMP3]])
 ; CHECK-NEXT:    store <vscale x 2 x i1> [[TMP4]], <vscale x 2 x i1>* [[MASK]], align 1, !tbaa !2
@@ -22,11 +22,11 @@ define dso_local void @test_vmfirst() #0 {
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[TMP6]], -1
 ; CHECK-NEXT:    br i1 [[CMP]], label [[IF_END:%.*]], label [[IF_ELSE:%.*]]
 ; CHECK:       if.else:
-; CHECK-NEXT:    call void @abort() #5
+; CHECK-NEXT:    call void @abort() #6
 ; CHECK-NEXT:    unreachable
 ; CHECK:       if.end:
 ; CHECK-NEXT:    [[TMP7:%.*]] = bitcast [128 x i32]* [[A]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 512, i8* [[TMP7]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 512, i8* [[TMP7]]) #5
 ; CHECK-NEXT:    [[ARRAYDECAY:%.*]] = getelementptr inbounds [128 x i32], [128 x i32]* [[A]], i64 0, i64 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32* [[ARRAYDECAY]] to i8*
 ; CHECK-NEXT:    call void @llvm.memset.p0i8.i64(i8* align 4 [[TMP8]], i8 0, i64 512, i1 false)
@@ -41,15 +41,15 @@ define dso_local void @test_vmfirst() #0 {
 ; CHECK-NEXT:    [[CMP2:%.*]] = icmp eq i64 [[TMP12]], 0
 ; CHECK-NEXT:    br i1 [[CMP2]], label [[IF_END5:%.*]], label [[IF_ELSE4:%.*]]
 ; CHECK:       if.else4:
-; CHECK-NEXT:    call void @abort() #5
+; CHECK-NEXT:    call void @abort() #6
 ; CHECK-NEXT:    unreachable
 ; CHECK:       if.end5:
 ; CHECK-NEXT:    [[TMP13:%.*]] = bitcast [128 x i32]* [[A]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 512, i8* [[TMP13]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 512, i8* [[TMP13]]) #5
 ; CHECK-NEXT:    [[TMP14:%.*]] = bitcast <vscale x 2 x i1>* [[MASK]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 2, i8* [[TMP14]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 2, i8* [[TMP14]]) #5
 ; CHECK-NEXT:    [[TMP15:%.*]] = bitcast <vscale x 2 x i32>* [[V]] to i8*
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 8, i8* [[TMP15]]) #4
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0i8(i64 8, i8* [[TMP15]]) #5
 ; CHECK-NEXT:    ret void
 ;
 entry:
