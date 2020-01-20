@@ -3312,6 +3312,22 @@ multiclass pat_store<string width> {
 
 let Predicates = [HasStdExtV] in {
 
+def : Pat<(nxv1f64 (masked_ld GPR:$addr, undef, (nxv1i1 V0), (nxv1f64 VR:$merge))),
+          (PseudoVLE_V_M1
+             (nxv1f64 VR:$merge),
+             GPR:$addr,
+             (nxv1i1 V0),
+             /* vl */ X0,
+             64)>;
+
+def : Pat<(masked_st (nxv1f64 VR:$value), GPR:$addr, undef, (nxv1i1 V0)),
+          (PseudoVSE_V_M1
+              VR:$value, GPR:$addr, (nxv1i1 V0), /* vl */ X0, 64)>;
+
+def : Pat<(nxv1i1 (setule (nxv1i64 VR:$rs1), (nxv1i64 VR:$rs2))),
+          (PseudoVMSLEU_VV_M1 (nxv1i64 zero_reg), VR:$rs1, VR:$rs2, (nxv1i1 zero_reg),
+                              /* vl */ X0, 64)>;
+
 defm "" : pat_load<"E">;
 defm "" : pat_store<"E">;
 

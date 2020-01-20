@@ -962,6 +962,57 @@ bool LoopVectorizationLegality::blockCanBePredicated(
     }
     if (I.mayThrow())
       return false;
+
+    // FIXME: This is awful
+    auto IsVectorizableOpcode = [](unsigned Opcode) {
+      switch (Opcode) {
+      case Instruction::Add:
+      case Instruction::And:
+      case Instruction::AShr:
+      case Instruction::BitCast:
+      case Instruction::Br:
+      case Instruction::Call:
+      case Instruction::FAdd:
+      case Instruction::FCmp:
+      case Instruction::FDiv:
+      case Instruction::FMul:
+      case Instruction::FNeg:
+      case Instruction::FPExt:
+      case Instruction::FPToSI:
+      case Instruction::FPToUI:
+      case Instruction::FPTrunc:
+      case Instruction::FRem:
+      case Instruction::FSub:
+      case Instruction::ICmp:
+      case Instruction::IntToPtr:
+      case Instruction::Load:
+      case Instruction::LShr:
+      case Instruction::Mul:
+      case Instruction::Or:
+      case Instruction::PHI:
+      case Instruction::PtrToInt:
+      case Instruction::SDiv:
+      case Instruction::Select:
+      case Instruction::SExt:
+      case Instruction::Shl:
+      case Instruction::SIToFP:
+      case Instruction::SRem:
+      case Instruction::Store:
+      case Instruction::Sub:
+      case Instruction::Trunc:
+      case Instruction::UDiv:
+      case Instruction::UIToFP:
+      case Instruction::URem:
+      case Instruction::Xor:
+      case Instruction::ZExt:
+        return true;
+      }
+      return false;
+    };
+
+    if (IsVectorizableOpcode(I.getOpcode())) {
+      MaskedOp.insert(&I);
+    }
   }
 
   return true;
