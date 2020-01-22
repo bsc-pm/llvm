@@ -69,6 +69,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "AMDGPURegisterBankInfo.h"
+
+#include "AMDGPUGlobalISelUtils.h"
 #include "AMDGPUInstrInfo.h"
 #include "AMDGPUSubtarget.h"
 #include "MCTargetDesc/AMDGPUMCTargetDesc.h"
@@ -76,8 +78,8 @@
 #include "SIRegisterInfo.h"
 #include "llvm/CodeGen/GlobalISel/LegalizationArtifactCombiner.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
-#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
+#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/RegisterBank.h"
 #include "llvm/CodeGen/GlobalISel/RegisterBankInfo.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
@@ -1286,13 +1288,16 @@ void AMDGPURegisterBankInfo::lowerScalarMinMax(MachineIRBuilder &B,
 
 // For cases where only a single copy is inserted for matching register banks.
 // Replace the register in the instruction operand
-static void substituteSimpleCopyRegs(
+static bool substituteSimpleCopyRegs(
   const AMDGPURegisterBankInfo::OperandsMapper &OpdMapper, unsigned OpIdx) {
   SmallVector<unsigned, 1> SrcReg(OpdMapper.getVRegs(OpIdx));
   if (!SrcReg.empty()) {
     assert(SrcReg.size() == 1);
     OpdMapper.getMI().getOperand(OpIdx).setReg(SrcReg[0]);
+    return true;
   }
+
+  return false;
 }
 
 /// Handle register layout difference for f16 images for some subtargets.
@@ -1504,6 +1509,25 @@ bool AMDGPURegisterBankInfo::buildVCopy(MachineIRBuilder &B, Register DstReg,
 
   return constrainGenericRegister(SrcReg, AMDGPU::SReg_64RegClass, MRI) &&
          constrainGenericRegister(DstReg, AMDGPU::VReg_64RegClass, MRI);
+}
+
+/// Utility function for pushing dynamic vector indexes with a constant offset
+/// into waterwall loops.
+static void reinsertVectorIndexAdd(MachineIRBuilder &B,
+                                   MachineInstr &IdxUseInstr,
+                                   unsigned OpIdx,
+                                   unsigned ConstOffset) {
+  MachineRegisterInfo &MRI = *B.getMRI();
+  const LLT S32 = LLT::scalar(32);
+  Register WaterfallIdx = IdxUseInstr.getOperand(OpIdx).getReg();
+  B.setInsertPt(*IdxUseInstr.getParent(), IdxUseInstr.getIterator());
+
+  auto MaterializedOffset = B.buildConstant(S32, ConstOffset);
+
+  auto Add = B.buildAdd(S32, WaterfallIdx, MaterializedOffset);
+  MRI.setRegBank(MaterializedOffset.getReg(0), AMDGPU::SGPRRegBank);
+  MRI.setRegBank(Add.getReg(0), AMDGPU::SGPRRegBank);
+  IdxUseInstr.getOperand(OpIdx).setReg(Add.getReg(0));
 }
 
 void AMDGPURegisterBankInfo::applyMappingImpl(
@@ -1975,7 +1999,13 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
 
     assert(OpdMapper.getVRegs(1).empty() && OpdMapper.getVRegs(2).empty());
 
-    LLT DstTy = MRI.getType(MI.getOperand(0).getReg());
+    Register DstReg = MI.getOperand(0).getReg();
+    Register SrcReg = MI.getOperand(1).getReg();
+
+    const LLT S32 = LLT::scalar(32);
+    LLT DstTy = MRI.getType(DstReg);
+    LLT SrcTy = MRI.getType(SrcReg);
+
     MachineIRBuilder B(MI);
 
     const ValueMapping &DstMapping
@@ -1983,10 +2013,26 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
     const RegisterBank *DstBank = DstMapping.BreakDown[0].RegBank;
     const RegisterBank *SrcBank =
       OpdMapper.getInstrMapping().getOperandMapping(1).BreakDown[0].RegBank;
+    const RegisterBank *IdxBank =
+        OpdMapper.getInstrMapping().getOperandMapping(2).BreakDown[0].RegBank;
 
-    Register DstReg = MI.getOperand(0).getReg();
-    Register SrcReg = MI.getOperand(1).getReg();
-    Register IdxReg = MI.getOperand(2).getReg();
+    Register BaseIdxReg;
+    unsigned ConstOffset;
+    MachineInstr *OffsetDef;
+    std::tie(BaseIdxReg, ConstOffset, OffsetDef) =
+        AMDGPU::getBaseWithConstantOffset(MRI, MI.getOperand(2).getReg());
+
+    // See if the index is an add of a constant which will be foldable by moving
+    // the base register of the index later if this is going to be executed in a
+    // waterfall loop. This is essentially to reassociate the add of a constant
+    // with the readfirstlane.
+    bool ShouldMoveIndexIntoLoop = IdxBank != &AMDGPU::SGPRRegBank &&
+                                   ConstOffset > 0 &&
+                                   ConstOffset < SrcTy.getNumElements();
+
+    // Move the base register. We'll re-insert the add later.
+    if (ShouldMoveIndexIntoLoop)
+      MI.getOperand(2).setReg(BaseIdxReg);
 
     // If this is a VGPR result only because the index was a VGPR result, the
     // actual indexing will be done on the SGPR source vector, which will
@@ -2010,26 +2056,30 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
         buildVCopy(B, DstReg, TmpReg);
       }
 
+      // Re-insert the constant offset add inside the waterfall loop.
+      if (ShouldMoveIndexIntoLoop)
+        reinsertVectorIndexAdd(B, MI, 2, ConstOffset);
+
       return;
     }
 
     assert(DstTy.getSizeInBits() == 64);
 
-    LLT SrcTy = MRI.getType(SrcReg);
-    const LLT S32 = LLT::scalar(32);
     LLT Vec32 = LLT::vector(2 * SrcTy.getNumElements(), 32);
 
     auto CastSrc = B.buildBitcast(Vec32, SrcReg);
     auto One = B.buildConstant(S32, 1);
 
+    MachineBasicBlock::iterator MII = MI.getIterator();
+
     // Split the vector index into 32-bit pieces. Prepare to move all of the
     // new instructions into a waterfall loop if necessary.
     //
     // Don't put the bitcast or constant in the loop.
-    MachineInstrSpan Span(MachineBasicBlock::iterator(&MI), &B.getMBB());
+    MachineInstrSpan Span(MII, &B.getMBB());
 
     // Compute 32-bit element indices, (2 * OrigIdx, 2 * OrigIdx + 1).
-    auto IdxLo = B.buildShl(S32, IdxReg, One);
+    auto IdxLo = B.buildShl(S32, BaseIdxReg, One);
     auto IdxHi = B.buildAdd(S32, IdxLo, One);
 
     auto Extract0 = B.buildExtractVectorElement(DstRegs[0], CastSrc, IdxLo);
@@ -2070,33 +2120,67 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
       buildVCopy(B, DstRegs[1], TmpReg1);
     }
 
+    if (ShouldMoveIndexIntoLoop)
+      reinsertVectorIndexAdd(B, *IdxLo, 1, ConstOffset);
+
     return;
   }
   case AMDGPU::G_INSERT_VECTOR_ELT: {
     SmallVector<Register, 2> InsRegs(OpdMapper.getVRegs(2));
 
+    Register DstReg = MI.getOperand(0).getReg();
+    LLT VecTy = MRI.getType(DstReg);
+
     assert(OpdMapper.getVRegs(0).empty());
-    assert(OpdMapper.getVRegs(1).empty());
     assert(OpdMapper.getVRegs(3).empty());
 
+    const RegisterBank *IdxBank =
+      OpdMapper.getInstrMapping().getOperandMapping(3).BreakDown[0].RegBank;
+
+    if (substituteSimpleCopyRegs(OpdMapper, 1))
+      MRI.setType(MI.getOperand(1).getReg(), VecTy);
+
+    Register SrcReg = MI.getOperand(1).getReg();
+    Register InsReg = MI.getOperand(2).getReg();
+    LLT InsTy = MRI.getType(InsReg);
+    (void)InsTy;
+
+    Register BaseIdxReg;
+    unsigned ConstOffset;
+    MachineInstr *OffsetDef;
+    std::tie(BaseIdxReg, ConstOffset, OffsetDef) =
+      AMDGPU::getBaseWithConstantOffset(MRI, MI.getOperand(3).getReg());
+
+    // See if the index is an add of a constant which will be foldable by moving
+    // the base register of the index later if this is going to be executed in a
+    // waterfall loop. This is essentially to reassociate the add of a constant
+    // with the readfirstlane.
+    bool ShouldMoveIndexIntoLoop = IdxBank != &AMDGPU::SGPRRegBank &&
+      ConstOffset > 0 &&
+      ConstOffset < VecTy.getNumElements();
+
+    // Move the base register. We'll re-insert the add later.
+    if (ShouldMoveIndexIntoLoop)
+      MI.getOperand(3).setReg(BaseIdxReg);
+
+
     if (InsRegs.empty()) {
-      applyDefaultMapping(OpdMapper);
       executeInWaterfallLoop(MI, MRI, { 3 });
+
+      // Re-insert the constant offset add inside the waterfall loop.
+      if (ShouldMoveIndexIntoLoop) {
+        MachineIRBuilder B(MI);
+        reinsertVectorIndexAdd(B, MI, 3, ConstOffset);
+      }
+
       return;
     }
 
-    Register DstReg = MI.getOperand(0).getReg();
-    Register SrcReg = MI.getOperand(1).getReg();
-    Register InsReg = MI.getOperand(2).getReg();
-    Register IdxReg = MI.getOperand(3).getReg();
-    LLT SrcTy = MRI.getType(SrcReg);
-    LLT InsTy = MRI.getType(InsReg);
-    (void)InsTy;
 
     assert(InsTy.getSizeInBits() == 64);
 
     const LLT S32 = LLT::scalar(32);
-    LLT Vec32 = LLT::vector(2 * SrcTy.getNumElements(), 32);
+    LLT Vec32 = LLT::vector(2 * VecTy.getNumElements(), 32);
 
     MachineIRBuilder B(MI);
     auto CastSrc = B.buildBitcast(Vec32, SrcReg);
@@ -2109,12 +2193,11 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
     MachineInstrSpan Span(MachineBasicBlock::iterator(&MI), &B.getMBB());
 
     // Compute 32-bit element indices, (2 * OrigIdx, 2 * OrigIdx + 1).
-    auto IdxLo = B.buildShl(S32, IdxReg, One);
+    auto IdxLo = B.buildShl(S32, BaseIdxReg, One);
     auto IdxHi = B.buildAdd(S32, IdxLo, One);
 
     auto InsLo = B.buildInsertVectorElement(Vec32, CastSrc, InsRegs[0], IdxLo);
     auto InsHi = B.buildInsertVectorElement(Vec32, InsLo, InsRegs[1], IdxHi);
-    B.buildBitcast(DstReg, InsHi);
 
     const RegisterBank *DstBank =
       OpdMapper.getInstrMapping().getOperandMapping(0).BreakDown[0].RegBank;
@@ -2134,6 +2217,8 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
 
     SmallSet<Register, 4> OpsToWaterfall;
     if (!collectWaterfallOperands(OpsToWaterfall, MI, MRI, { 3 })) {
+      B.setInsertPt(B.getMBB(), MI);
+      B.buildBitcast(DstReg, InsHi);
       MI.eraseFromParent();
       return;
     }
@@ -2141,8 +2226,21 @@ void AMDGPURegisterBankInfo::applyMappingImpl(
     B.setInstr(*Span.begin());
     MI.eraseFromParent();
 
+    // Figure out the point after the waterfall loop before mangling the control
+    // flow.
     executeInWaterfallLoop(B, make_range(Span.begin(), Span.end()),
                            OpsToWaterfall, MRI);
+
+    // The insertion point is now right after the original instruction.
+    //
+    // Keep the bitcast to the original vector type out of the loop. Doing this
+    // saved an extra phi we don't need inside the loop.
+    B.buildBitcast(DstReg, InsHi);
+
+    // Re-insert the constant offset add inside the waterfall loop.
+    if (ShouldMoveIndexIntoLoop)
+      reinsertVectorIndexAdd(B, *IdxLo, 1, ConstOffset);
+
     return;
   }
   case AMDGPU::G_INTRINSIC: {
@@ -2909,15 +3007,22 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
     unsigned VecSize = MRI.getType(MI.getOperand(0).getReg()).getSizeInBits();
     unsigned InsertSize = MRI.getType(MI.getOperand(2).getReg()).getSizeInBits();
     unsigned IdxSize = MRI.getType(MI.getOperand(3).getReg()).getSizeInBits();
-    unsigned SrcBankID = getRegBankID(MI.getOperand(1).getReg(), MRI, *TRI);
     unsigned InsertEltBankID = getRegBankID(MI.getOperand(2).getReg(),
                                             MRI, *TRI);
     unsigned IdxBankID = getRegBankID(MI.getOperand(3).getReg(), MRI, *TRI);
 
     OpdsMapping[0] = AMDGPU::getValueMapping(OutputBankID, VecSize);
-    OpdsMapping[1] = AMDGPU::getValueMapping(SrcBankID, VecSize);
-    OpdsMapping[2] = AMDGPU::getValueMappingSGPR64Only(InsertEltBankID,
-                                                       InsertSize);
+    OpdsMapping[1] = AMDGPU::getValueMapping(OutputBankID, VecSize);
+
+    // This is a weird case, because we need to break down the mapping based on
+    // the register bank of a different operand.
+    if (InsertSize == 64 && OutputBankID == AMDGPU::VGPRRegBankID) {
+      OpdsMapping[2] = AMDGPU::getValueMappingSplit64(InsertEltBankID,
+                                                      InsertSize);
+    } else {
+      assert(InsertSize == 32 || InsertSize == 64);
+      OpdsMapping[2] = AMDGPU::getValueMapping(InsertEltBankID, InsertSize);
+    }
 
     // The index can be either if the source vector is VGPR.
     OpdsMapping[3] = AMDGPU::getValueMapping(IdxBankID, IdxSize);
@@ -2998,6 +3103,8 @@ AMDGPURegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
     case Intrinsic::amdgcn_ds_permute:
     case Intrinsic::amdgcn_ds_bpermute:
     case Intrinsic::amdgcn_update_dpp:
+    case Intrinsic::amdgcn_mov_dpp8:
+    case Intrinsic::amdgcn_mov_dpp:
       return getDefaultMappingAllVGPR(MI);
     case Intrinsic::amdgcn_kernarg_segment_ptr:
     case Intrinsic::amdgcn_s_getpc:
