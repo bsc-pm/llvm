@@ -1342,15 +1342,14 @@ def int_preserve_struct_access_index : Intrinsic<[llvm_anyptr_ty],
                                                  [IntrNoMem, ImmArg<1>,
                                                   ImmArg<2>]>;
 
-//===--------- Intrinsics that are used with scalable vector types --------===//
+//===---------- Intrinsics to query properties of scalable vectors --------===//
+def int_vscale : Intrinsic<[llvm_anyint_ty], [], [IntrNoMem]>;
 
 def int_experimental_vector_stepvector : Intrinsic<[llvm_anyvector_ty],
                                                    [],
                                                    [IntrNoMem]>;
 
-def int_experimental_vector_vscale : Intrinsic<[llvm_anyint_ty],
-                                               [],
-                                               [IntrNoMem]>;
+//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Target-specific intrinsics

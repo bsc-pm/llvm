@@ -64,7 +64,7 @@ entry:
 
 for.body.preheader:                               ; preds = %entry
   %wide.trip.count = zext i16 %N to i64
-  %0 = call i64 @llvm.experimental.vector.vscale.i64()
+  %0 = call i64 @llvm.vscale.i64()
   %step.vscale = shl i64 %0, 2
   %min.iters.check = icmp ugt i64 %step.vscale, %wide.trip.count
   br i1 %min.iters.check, label %for.body.preheader23, label %vector.ph
@@ -74,13 +74,13 @@ for.body.preheader23:                             ; preds = %middle.block, %for.
   br label %for.body
 
 vector.ph:                                        ; preds = %for.body.preheader
-  %1 = call i64 @llvm.experimental.vector.vscale.i64()
+  %1 = call i64 @llvm.vscale.i64()
   %step.vscale19 = shl i64 %1, 2
   %n.mod.vf = urem i64 %wide.trip.count, %step.vscale19
   %n.vec = sub nsw i64 %wide.trip.count, %n.mod.vf
   %broadcast.splatinsert20 = insertelement <vscale x 4 x i16> undef, i16 %alpha, i32 0
   %broadcast.splat21 = shufflevector <vscale x 4 x i16> %broadcast.splatinsert20, <vscale x 4 x i16> undef, <vscale x 4 x i32> zeroinitializer
-  %2 = call i64 @llvm.experimental.vector.vscale.i64()
+  %2 = call i64 @llvm.vscale.i64()
   %index.vscale = shl i64 %2, 2
   br label %vector.body
 
@@ -183,7 +183,7 @@ entry:
 
 for.body.preheader:                               ; preds = %entry
   %wide.trip.count = zext i32 %N to i64
-  %0 = call i64 @llvm.experimental.vector.vscale.i64()
+  %0 = call i64 @llvm.vscale.i64()
   %step.vscale = shl i64 %0, 1
   %min.iters.check = icmp ugt i64 %step.vscale, %wide.trip.count
   br i1 %min.iters.check, label %for.body.preheader17, label %vector.ph
@@ -193,13 +193,13 @@ for.body.preheader17:                             ; preds = %middle.block, %for.
   br label %for.body
 
 vector.ph:                                        ; preds = %for.body.preheader
-  %1 = call i64 @llvm.experimental.vector.vscale.i64()
+  %1 = call i64 @llvm.vscale.i64()
   %step.vscale13 = shl i64 %1, 1
   %n.mod.vf = urem i64 %wide.trip.count, %step.vscale13
   %n.vec = sub nsw i64 %wide.trip.count, %n.mod.vf
   %broadcast.splatinsert14 = insertelement <vscale x 2 x i32> undef, i32 %alpha, i32 0
   %broadcast.splat15 = shufflevector <vscale x 2 x i32> %broadcast.splatinsert14, <vscale x 2 x i32> undef, <vscale x 2 x i32> zeroinitializer
-  %2 = call i64 @llvm.experimental.vector.vscale.i64()
+  %2 = call i64 @llvm.vscale.i64()
   %index.vscale = shl i64 %2, 1
   br label %vector.body
 
@@ -297,7 +297,7 @@ entry:
   br i1 %cmp9, label %for.body.preheader, label %for.cond.cleanup
 
 for.body.preheader:                               ; preds = %entry
-  %0 = call i64 @llvm.experimental.vector.vscale.i64()
+  %0 = call i64 @llvm.vscale.i64()
   %min.iters.check = icmp ugt i64 %0, %N
   br i1 %min.iters.check, label %for.body.preheader15, label %vector.ph
 
@@ -306,12 +306,12 @@ for.body.preheader15:                             ; preds = %middle.block, %for.
   br label %for.body
 
 vector.ph:                                        ; preds = %for.body.preheader
-  %1 = call i64 @llvm.experimental.vector.vscale.i64()
+  %1 = call i64 @llvm.vscale.i64()
   %n.mod.vf = urem i64 %N, %1
   %n.vec = sub i64 %N, %n.mod.vf
   %broadcast.splatinsert12 = insertelement <vscale x 1 x i64> undef, i64 %alpha, i32 0
   %broadcast.splat13 = shufflevector <vscale x 1 x i64> %broadcast.splatinsert12, <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
-  %2 = call i64 @llvm.experimental.vector.vscale.i64()
+  %2 = call i64 @llvm.vscale.i64()
   br label %vector.body
 
 vector.body:                                      ; preds = %vector.body, %vector.ph
@@ -352,4 +352,4 @@ for.body:                                         ; preds = %for.body.preheader1
 }
 
 ; Function Attrs: nounwind readnone
-declare i64 @llvm.experimental.vector.vscale.i64() #1
+declare i64 @llvm.vscale.i64() #1

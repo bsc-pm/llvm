@@ -2326,9 +2326,23 @@ def NoX0 : SDNodeXForm<undef,
     return SDValue(N, 0);
 }]>;
 
+def pow2uimm5 : ImmLeaf<XLenVT, [{
+    return isPowerOf2_64(Imm) && isUInt<5>(Log2_64(Imm));
+}]>;
+def Log2 : SDNodeXForm<imm,
+[{
+    return CurDAG->getTargetConstant(Log2_64(N->getZExtValue()), SDLoc(N),
+        MVT::i64);
+}]>;
+
 let Predicates = [HasExtEPI] in {
 
-def : Pat<(int_experimental_vector_vscale), (PseudoVSCALE)>;
+def : Pat<(int_vscale), (PseudoVSCALE)>;
+
+// FIXME: These patterns can be improved.
+def : Pat<(vscale 1), (PseudoVSCALE)>;
+def : Pat<(vscale pow2uimm5:$mul),
+          (SLLI (PseudoVSCALE), (Log2 imm:$mul))>;
 
 // FIXME: uimm5 here is not very precise. It should be uimm3 and uimm2 but we
 // will probably want to wait for intrinsics with constant values constraints.

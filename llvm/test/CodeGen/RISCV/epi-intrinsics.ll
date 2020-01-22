@@ -27,7 +27,7 @@ entry:
   ret void
 }
 
-declare i64 @llvm.experimental.vector.vscale.i64()
+declare i64 @llvm.vscale.i64()
 
 define i64 @test_vscale() nounwind
 ; CHECK-LABEL: test_vscale:
@@ -36,7 +36,7 @@ define i64 @test_vscale() nounwind
 ; CHECK-NEXT:    ret
 {
 entry:
-  %a1 = call i64 @llvm.experimental.vector.vscale.i64()
+  %a1 = call i64 @llvm.vscale.i64()
   ret i64 %a1
 }
 

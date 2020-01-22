@@ -1076,7 +1076,7 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
     default:
       llvm_unreachable(
           "Don't know how to custom type legalize this intrinsic!");
-    case Intrinsic::experimental_vector_vscale: {
+    case Intrinsic::vscale: {
       EVT Ty = N->getValueType(0);
       switch (Ty.getSimpleVT().SimpleTy) {
       default:
