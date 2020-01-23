@@ -5373,11 +5373,9 @@ bool Sema::SemaBuiltinAssumeAligned(CallExpr *TheCall) {
       return Diag(TheCall->getBeginLoc(), diag::err_alignment_not_power_of_two)
              << Arg->getSourceRange();
 
-    // Alignment calculations can wrap around if it's greater than 2**29.
-    unsigned MaximumAlignment = 536870912;
-    if (Result > MaximumAlignment)
+    if (Result > Sema::MaximumAlignment)
       Diag(TheCall->getBeginLoc(), diag::warn_assume_aligned_too_great)
-          << Arg->getSourceRange() << MaximumAlignment;
+          << Arg->getSourceRange() << Sema::MaximumAlignment;
   }
 
   if (NumArgs > 2) {
