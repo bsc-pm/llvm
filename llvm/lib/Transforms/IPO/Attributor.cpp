@@ -971,6 +971,8 @@ public:
       indicatePessimisticFixpoint();
       return;
     }
+    assert(!F->getReturnType()->isVoidTy() &&
+           "Did not expect a void return type!");
 
     // The map from instruction opcodes to those instructions in the function.
     auto &OpcodeInstMap = A.getInfoCache().getOpcodeInstMapForFunction(*F);
@@ -2386,6 +2388,14 @@ struct AANoAliasArgument final
   using Base = AAArgumentFromCallSiteArguments<AANoAlias, AANoAliasImpl>;
   AANoAliasArgument(const IRPosition &IRP) : Base(IRP) {}
 
+  /// See AbstractAttribute::initialize(...).
+  void initialize(Attributor &A) override {
+    Base::initialize(A);
+    // See callsite argument attribute and callee argument attribute.
+    if (hasAttr({Attribute::ByVal}))
+      indicateOptimisticFixpoint();
+  }
+
   /// See AbstractAttribute::update(...).
   ChangeStatus updateImpl(Attributor &A) override {
     // We have to make sure no-alias on the argument does not break
@@ -3420,9 +3430,10 @@ static unsigned int getKnownAlignForUse(Attributor &A,
   }
 
   const Value *UseV = U->get();
-  if (auto *SI = dyn_cast<StoreInst>(I))
-    Alignment = SI->getAlignment();
-  else if (auto *LI = dyn_cast<LoadInst>(I))
+  if (auto *SI = dyn_cast<StoreInst>(I)) {
+    if (SI->getPointerOperand() == UseV)
+      Alignment = SI->getAlignment();
+  } else if (auto *LI = dyn_cast<LoadInst>(I))
     Alignment = LI->getAlignment();
 
   if (Alignment <= 1)
@@ -3463,7 +3474,7 @@ struct AAAlignImpl : AAAlign {
 
   /// See AbstractAttribute::manifest(...).
   ChangeStatus manifest(Attributor &A) override {
-    ChangeStatus Changed = ChangeStatus::UNCHANGED;
+    ChangeStatus LoadStoreChanged = ChangeStatus::UNCHANGED;
 
     // Check for users that allow alignment annotations.
     Value &AnchorVal = getIRPosition().getAnchorValue();
@@ -3474,7 +3485,7 @@ struct AAAlignImpl : AAAlign {
             STATS_DECLTRACK(AAAlign, Store,
                             "Number of times alignment added to a store");
             SI->setAlignment(Align(getAssumedAlign()));
-            Changed = ChangeStatus::CHANGED;
+            LoadStoreChanged = ChangeStatus::CHANGED;
           }
       } else if (auto *LI = dyn_cast<LoadInst>(U.getUser())) {
         if (LI->getPointerOperand() == &AnchorVal)
@@ -3482,12 +3493,18 @@ struct AAAlignImpl : AAAlign {
             LI->setAlignment(Align(getAssumedAlign()));
             STATS_DECLTRACK(AAAlign, Load,
                             "Number of times alignment added to a load");
-            Changed = ChangeStatus::CHANGED;
+            LoadStoreChanged = ChangeStatus::CHANGED;
           }
       }
     }
 
-    return AAAlign::manifest(A) | Changed;
+    ChangeStatus Changed = AAAlign::manifest(A);
+
+    MaybeAlign InheritAlign =
+        getAssociatedValue().getPointerAlignment(A.getDataLayout());
+    if (InheritAlign.valueOrOne() >= getAssumedAlign())
+      return LoadStoreChanged;
+    return Changed | LoadStoreChanged;
   }
 
   // TODO: Provide a helper to determine the implied ABI alignment and check in
@@ -3591,7 +3608,12 @@ struct AAAlignCallSiteArgument final : AAAlignFloating {
 
   /// See AbstractAttribute::manifest(...).
   ChangeStatus manifest(Attributor &A) override {
-    return AAAlignImpl::manifest(A);
+    ChangeStatus Changed = AAAlignImpl::manifest(A);
+    MaybeAlign InheritAlign =
+        getAssociatedValue().getPointerAlignment(A.getDataLayout());
+    if (InheritAlign.valueOrOne() >= getAssumedAlign())
+      Changed = ChangeStatus::UNCHANGED;
+    return Changed;
   }
 
   /// See AbstractAttribute::updateImpl(Attributor &A).
@@ -4134,11 +4156,11 @@ struct AAValueSimplifyImpl : AAValueSimplify {
                              Optional<Value *> &AccumulatedSimplifiedValue) {
     // FIXME: Add a typecast support.
 
-    auto &ValueSimpifyAA = A.getAAFor<AAValueSimplify>(
+    auto &ValueSimplifyAA = A.getAAFor<AAValueSimplify>(
         QueryingAA, IRPosition::value(QueryingValue));
 
     Optional<Value *> QueryingValueSimplified =
-        ValueSimpifyAA.getAssumedSimplifiedValue(A);
+        ValueSimplifyAA.getAssumedSimplifiedValue(A);
 
     if (!QueryingValueSimplified.hasValue())
       return true;
@@ -6041,7 +6063,7 @@ ChangeStatus Attributor::run(Module &M) {
                       << ToBeDeletedInsts.size() << " instructions and "
                       << ToBeChangedUses.size() << " uses\n");
 
-    SmallVector<Instruction *, 32> DeadInsts;
+    SmallVector<WeakTrackingVH, 32> DeadInsts;
     SmallVector<Instruction *, 32> TerminatorsToFold;
 
     for (auto &It : ToBeChangedUses) {
