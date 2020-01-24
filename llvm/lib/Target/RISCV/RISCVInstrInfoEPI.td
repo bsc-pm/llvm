@@ -1018,8 +1018,9 @@ defm PseudoVMXNOR      : pseudo_binary_m_mm;
 // Load/store pseudo instructions
 
 foreach evr = AllVRegs in
-foreach vlmul = [evr.VLMul] in
 {
+  defvar vlmul = evr.VLMul;
+
   let mayLoad = 1, mayStore = 0, hasSideEffects = 0,
       usesCustomInserter = 1,
       VLMul = vlmul in
@@ -1314,40 +1315,39 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                                 RegisterClass op2_reg_class, // FIXME dagoperand?
                                 bit swap = 0>
 {
-  foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)] in
-  {
-    def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
-                            (op1_type op1_reg_class:$rs1),
-                            (op2_type op2_reg_class:$rs2),
-                            (i64 GPR:$vl))),
-              swap_helper<
-                (instruction (result_type zero_reg)),
-                (instruction
-                 (op1_type op1_reg_class:$rs1)),
-                (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
-                (instruction
-                 (mask_type zero_reg),
-                 (NoX0 GPR:$vl),
-                 sew),
-                swap>.Value>;
+  defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
 
-    def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
-                            (result_type result_reg_class:$merge),
-                            (op1_type op1_reg_class:$rs1),
-                            (op2_type op2_reg_class:$rs2),
-                            (mask_type V0),
-                            (i64 GPR:$vl))),
-              swap_helper<
-                (instruction result_reg_class:$merge),
-                (instruction
-                 op1_reg_class:$rs1),
-                (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
-                (instruction
-                 (mask_type V0),
-                 (NoX0 GPR:$vl),
-                 sew),
-                swap>.Value>;
-  }
+  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (i64 GPR:$vl))),
+            swap_helper<
+              (instruction (result_type zero_reg)),
+              (instruction
+               (op1_type op1_reg_class:$rs1)),
+              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction
+               (mask_type zero_reg),
+               (NoX0 GPR:$vl),
+               sew),
+              swap>.Value>;
+
+  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
+                          (result_type result_reg_class:$merge),
+                          (op1_type op1_reg_class:$rs1),
+                          (op2_type op2_reg_class:$rs2),
+                          (mask_type V0),
+                          (i64 GPR:$vl))),
+            swap_helper<
+              (instruction result_reg_class:$merge),
+              (instruction
+               op1_reg_class:$rs1),
+              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction
+               (mask_type V0),
+               (NoX0 GPR:$vl),
+               sew),
+              swap>.Value>;
 }
 
 multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
@@ -1363,7 +1363,8 @@ multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
                                        RegisterClass op2_reg_class, // FIXME dagoperand?
                                        bit swap = 0>
 {
-  foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)] in
+  defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
+
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
                           (op2_type op2_reg_class:$rs2),
@@ -1393,7 +1394,8 @@ multiclass pat_intrinsic_binary_mask_in<string intrinsic_name,
                                         RegisterClass op2_reg_class, // FIXME dagoperand?
                                         bit swap = 0>
 {
-  foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)] in
+  defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
+
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
                           (op2_type op2_reg_class:$rs2),
@@ -1514,9 +1516,10 @@ multiclass pat_intrinsic_binary_int_w_vv_vx<string intrinsic_name,
                                             string instruction_name>
 {
   foreach vtiToWti = AllWideableIntVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach wti = [vtiToWti.Wti] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 wti.Vector, vti.Vector, vti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, wti.RegClass,
@@ -1722,9 +1725,10 @@ multiclass pat_intrinsic_binary_fp_w_vv_vf<string intrinsic_name,
                                            string instruction_name>
 {
   foreach fvtiToFWti = AllWideableFloatVectors in
-  foreach fvti = [fvtiToFWti.FVti] in
-  foreach fwti = [fvtiToFWti.FWti] in
   {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar fwti = fvtiToFWti.FWti;
+
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 fwti.Vector, fvti.Vector, fvti.Vector,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
@@ -1979,8 +1983,9 @@ multiclass pat_intrinsic_binary_any_and_int_v_vv_vx_vi<string intrinsic_name,
                                                        Operand imm_type = simm5>
 {
   foreach vti = AllVectors in
-  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
   {
+    defvar ivti = GetIntVectorTypeInfo<vti>.Vti;
+
     defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "VV",
                                 vti.Vector, vti.Vector, ivti.Vector, vti.Mask,
                                 vti.SEW, vti.RegClass.VLMul, vti.RegClass,
@@ -2080,9 +2085,10 @@ multiclass pat_intrinsic_unary_int_w_v<string intrinsic_name,
                                        string instruction_name>
 {
   foreach vtiToWti = AllWideableIntVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach wti = [vtiToWti.Wti] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
                                wti.Vector, vti.Vector, wti.Mask, vti.SEW,
                                vti.RegClass.VLMul, wti.RegClass, vti.RegClass>;
@@ -2093,9 +2099,10 @@ multiclass pat_intrinsic_unary_int_v_w<string intrinsic_name,
                                        string instruction_name>
 {
   foreach vtiToWti = AllWideableIntVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach wti = [vtiToWti.Wti] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
                                vti.Vector, wti.Vector, vti.Mask, vti.SEW,
                                vti.RegClass.VLMul, vti.RegClass, wti.RegClass>;
@@ -2107,9 +2114,10 @@ multiclass pat_intrinsic_unary_fp_w_v<string intrinsic_name,
                                       string instruction_name>
 {
   foreach fvtiToFWti = AllWideableFloatVectors in
-  foreach fvti = [fvtiToFWti.FVti] in
-  foreach fwti = [fvtiToFWti.FWti] in
   {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar fwti = fvtiToFWti.FWti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
                                fwti.Vector, fvti.Vector, fwti.Mask, fvti.SEW,
                                fvti.RegClass.VLMul, fwti.RegClass,
@@ -2121,9 +2129,10 @@ multiclass pat_intrinsic_unary_int_w_fp_v<string intrinsic_name,
                                           string instruction_name>
 {
   foreach fvtiToFWti = AllWideableFloatVectors in
-  foreach fvti = [fvtiToFWti.FVti] in
-  foreach iwti = [GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti] in
   {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar iwti = GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
                                iwti.Vector, fvti.Vector, iwti.Mask, fvti.SEW,
                                fvti.RegClass.VLMul, iwti.RegClass,
@@ -2135,9 +2144,10 @@ multiclass pat_intrinsic_unary_fp_w_int_v<string intrinsic_name,
                                           string instruction_name>
 {
   foreach vtiToWti = AllWideableIntToFloatVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach fwti = [GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar fwti = GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "V",
                                fwti.Vector, vti.Vector, fwti.Mask, vti.SEW,
                                vti.RegClass.VLMul, fwti.RegClass, vti.RegClass>;
@@ -2148,9 +2158,10 @@ multiclass pat_intrinsic_unary_fp_v_w<string intrinsic_name,
                                       string instruction_name>
 {
   foreach fvtiToFWti = AllWideableFloatVectors in
-  foreach fvti = [fvtiToFWti.FVti] in
-  foreach fwti = [fvtiToFWti.FWti] in
   {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar fwti = fvtiToFWti.FWti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "W",
                                fvti.Vector, fwti.Vector, fvti.Mask, fvti.SEW,
                                fvti.RegClass.VLMul, fvti.RegClass,
@@ -2162,9 +2173,10 @@ multiclass pat_intrinsic_unary_int_v_fp_w<string intrinsic_name,
                                           string instruction_name>
 {
   foreach vtiToWti = AllWideableIntToFloatVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach fwti = [GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar fwti = GetFloatVectorTypeInfo<vtiToWti.Wti>.FVti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "W",
                                vti.Vector, fwti.Vector, vti.Mask, vti.SEW,
                                vti.RegClass.VLMul, vti.RegClass, fwti.RegClass>;
@@ -2175,9 +2187,10 @@ multiclass pat_intrinsic_unary_fp_v_int_w<string intrinsic_name,
                                           string instruction_name>
 {
   foreach fvtiToFWti = AllWideableFloatVectors in
-  foreach fvti = [fvtiToFWti.FVti] in
-  foreach iwti = [GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti] in
   {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar iwti = GetIntVectorTypeInfo<fvtiToFWti.FWti>.Vti;
+
     defm : pat_intrinsic_unary<intrinsic_name, instruction_name, "W",
                                fvti.Vector, iwti.Vector, fvti.Mask, fvti.SEW,
                                fvti.RegClass.VLMul, fvti.RegClass,
@@ -2511,8 +2524,9 @@ multiclass pat_conversions_same_sew<string intrinsic_float_to_int,
 {
   foreach fvti = AllFloatVectors in
   foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
-  foreach vlmul = [fvti.RegClass.VLMul] in
   {
+    defvar vlmul = fvti.RegClass.VLMul;
+
     def : Pat<(ivti.Vector (!cast<Intrinsic>(intrinsic_float_to_int)
                             (fvti.Vector fvti.RegClass:$rs2),
                             GPR:$vl)),
@@ -2579,10 +2593,11 @@ multiclass pat_intrinsic_binary_int_w_vX0<string intrinsic_name,
                                           string instruction_name>
 {
   foreach vtiToWti = AllWideableIntVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach wti = [vtiToWti.Wti] in
-  foreach vlmul = [vti.RegClass.VLMul] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+    defvar vlmul = vti.RegClass.VLMul;
+
     def : Pat<(wti.Vector (!cast<Intrinsic>(intrinsic_name)
                            (vti.Vector vti.RegClass:$rs1),
                            (i64 GPR:$vl))),
@@ -2611,10 +2626,11 @@ multiclass pat_intrinsic_binary_int_v_wX0<string intrinsic_name,
                                           string instruction_name>
 {
   foreach vtiToWti = AllWideableIntVectors in
-  foreach vti = [vtiToWti.Vti] in
-  foreach wti = [vtiToWti.Wti] in
-  foreach vlmul = [vti.RegClass.VLMul] in
   {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+    defvar vlmul = vti.RegClass.VLMul;
+
     def : Pat<(vti.Vector (!cast<Intrinsic>(intrinsic_name)
                            (wti.Vector wti.RegClass:$rs1),
                            (i64 GPR:$vl))),
@@ -2775,13 +2791,14 @@ defm "" : pat_vop_ternary_common<fma, "PseudoVFMADD", AllFloatVectors>;
 
 foreach fvti = AllFloatVectors in
 {
+  defvar ivti = GetIntVectorTypeInfo<fvti>.Vti;
+
   def : Pat<(fvti.Vector (riscv_vfmv_v_f fvti.ScalarRegClass:$value)),
             (!cast<Instruction>("PseudoVFMV_V_F_M"#fvti.RegClass.VLMul)
              ToFPR32<fvti.Scalar, fvti.ScalarRegClass, "value">.ret,
              VLMax,
              fvti.SEW)>;
 
-  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
   def : Pat<(fvti.Vector (sint_to_fp (ivti.Vector ivti.RegClass:$value))),
             (!cast<Instruction>("PseudoVFCVT_F_X_V_M" # fvti.RegClass.VLMul)
              (fvti.Vector zero_reg),
@@ -2790,7 +2807,6 @@ foreach fvti = AllFloatVectors in
              VLMax,
              fvti.SEW)>;
 
-  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
   def : Pat<(fvti.Vector (uint_to_fp (ivti.Vector ivti.RegClass:$value))),
             (!cast<Instruction>("PseudoVFCVT_F_XU_V_M" # fvti.RegClass.VLMul)
              (fvti.Vector zero_reg),
@@ -2799,7 +2815,6 @@ foreach fvti = AllFloatVectors in
              VLMax,
              fvti.SEW)>;
 
-  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
   def : Pat<(ivti.Vector (fp_to_sint (fvti.Vector fvti.RegClass:$value))),
             (!cast<Instruction>("PseudoVFCVT_X_F_V_M" # fvti.RegClass.VLMul)
              (ivti.Vector zero_reg),
@@ -2808,7 +2823,6 @@ foreach fvti = AllFloatVectors in
              VLMax,
              fvti.SEW)>;
 
-  foreach ivti = [GetIntVectorTypeInfo<fvti>.Vti] in
   def : Pat<(ivti.Vector (fp_to_uint (fvti.Vector fvti.RegClass:$value))),
             (!cast<Instruction>("PseudoVFCVT_XU_F_V_M" # fvti.RegClass.VLMul)
              (ivti.Vector zero_reg),
@@ -2882,8 +2896,9 @@ foreach vti = GroupIntegerVectors in {
              vti.SEW)>;
 }
 
-foreach vti = AllIllegalIntegerVectors in
-foreach lvti = [vti.LegalVti] in {
+foreach vti = AllIllegalIntegerVectors in {
+  defvar lvti = vti.LegalVti;
+
   def : Pat<(lvti.Vector (riscv_sign_extend_inreg (lvti.Vector VR:$rs2),
                           uimm5:$rs1)),
             (PseudoVSRA_VI_M1
@@ -2900,8 +2915,9 @@ foreach lvti = [vti.LegalVti] in {
              lvti.SEW)>;
 }
 
-foreach vti = AllIllegalIntegerVectors in
-foreach lvti = [vti.LegalVti] in {
+foreach vti = AllIllegalIntegerVectors in {
+  defvar lvti = vti.LegalVti;
+
   def : Pat<(lvti.Vector (riscv_sign_extend_inreg (lvti.Vector VR:$rs2),
                           GPR:$rs1)),
             (PseudoVSRA_VX_M1
@@ -2925,10 +2941,10 @@ foreach lvti = [vti.LegalVti] in {
 //===----------------------------------------------------------------------===//
 
 multiclass pat_load<string width> {
-  foreach vti = AllVectors in
-  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
-  foreach vlmul = [vti.RegClass.VLMul] in
-  {
+  foreach vti = AllVectors in {
+    defvar ivti = GetIntVectorTypeInfo<vti>.Vti;
+    defvar vlmul = vti.RegClass.VLMul;
+
     def : Pat<(vti.Vector (int_epi_vload GPR:$rs1, GPR:$vl)),
               (!cast<Instruction>("PseudoVL"#width#"_V_M"#vlmul)
                (vti.Vector zero_reg),
@@ -2988,10 +3004,10 @@ multiclass pat_load<string width> {
 
 
 multiclass pat_store<string width> {
-  foreach vti = AllVectors in
-  foreach ivti = [GetIntVectorTypeInfo<vti>.Vti] in
-  foreach vlmul = [vti.RegClass.VLMul] in
-  {
+  foreach vti = AllVectors in {
+    defvar ivti = GetIntVectorTypeInfo<vti>.Vti;
+    defvar vlmul = vti.RegClass.VLMul;
+
     def : Pat<(int_epi_vstore (vti.Vector vti.RegClass:$rs3), GPR:$rs1,
                GPR:$vl),
               (!cast<Instruction>("PseudoVS"#width#"_V_M"#vlmul)
