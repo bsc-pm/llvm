@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 include "AMDGPU.td"
+include "AMDGPUCombine.td"
 
 def sd_vsrc0 : ComplexPattern<i32, 1, "">;
 def gi_vsrc0 :
@@ -119,6 +120,12 @@ def : GINodeEquiv<G_ATOMICRMW_FADD, atomic_load_fadd_glue>;
 def : GINodeEquiv<G_AMDGPU_FFBH_U32, AMDGPUffbh_u32>;
 def : GINodeEquiv<G_AMDGPU_ATOMIC_CMPXCHG, AMDGPUatomic_cmp_swap>;
 
+// FIXME: Check MMO is atomic
+def : GINodeEquiv<G_AMDGPU_ATOMIC_INC, SIatomic_inc>;
+def : GINodeEquiv<G_AMDGPU_ATOMIC_DEC, SIatomic_dec>;
+def : GINodeEquiv<G_AMDGPU_ATOMIC_INC, atomic_inc_glue>;
+def : GINodeEquiv<G_AMDGPU_ATOMIC_DEC, atomic_dec_glue>;
+
 
 class GISelSop2Pat <
   SDPatternOperator node,
@@ -194,9 +201,6 @@ multiclass GISelVop2IntrPat <
   // directly.
   def : GISelVop2CommutePat <node, inst, dst_vt, src_vt>;
 }
-
-def : GISelSop2Pat <or, S_OR_B32, i32>;
-def : GISelVop2Pat <or, V_OR_B32_e32, i32>;
 
 // Since GlobalISel is more flexible then SelectionDAG, I think we can get
 // away with adding patterns for integer types and not legalizing all
