@@ -18,6 +18,7 @@ import sys
 import os
 import tempfile
 import subprocess
+import hashlib
 
 
 def help():
@@ -29,11 +30,12 @@ def main():
         help()
         return 1
 
-    # Compute a hash based on the input arguments and the current working
+    # Compute an MD5 hash based on the input arguments and the current working
     # directory.
-    args = ' '.join(sys.argv[2:])
-    cwd = os.getcwd()
-    input_hash = str(hash((cwd, args)))
+    h = hashlib.md5()
+    h.update(' '.join(sys.argv[2:]).encode('utf-8'))
+    h.update(os.getcwd().encode('utf-8'))
+    input_hash = h.hexdigest()
 
     # Use the hash to "uniquely" identify a reproducer path.
     reproducer_path = os.path.join(tempfile.gettempdir(), input_hash)
@@ -41,8 +43,10 @@ def main():
     # Create a new lldb invocation with capture or replay enabled.
     lldb = os.path.join(os.path.dirname(sys.argv[0]), 'lldb')
     new_args = [lldb]
+    cleanup = False
     if sys.argv[1] == "replay":
         new_args.extend(['--replay', reproducer_path])
+        cleanup = True
     elif sys.argv[1] == "capture":
         new_args.extend([
             '--capture', '--capture-path', reproducer_path,
@@ -53,7 +57,10 @@ def main():
         help()
         return 1
 
-    return subprocess.call(new_args)
+    exit_code = subprocess.call(new_args)
+    if cleanup:
+        shutil.rmtree(reproducer_path, True)
+    return exit_code
 
 
 if __name__ == '__main__':
