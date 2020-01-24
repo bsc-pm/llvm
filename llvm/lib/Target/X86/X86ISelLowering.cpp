@@ -4972,7 +4972,7 @@ bool X86TargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
       ScalarVT = MVT::i32;
 
     Info.memVT = MVT::getVectorVT(ScalarVT, VT.getVectorNumElements());
-    Info.align = Align::None();
+    Info.align = Align(1);
     Info.flags |= MachineMemOperand::MOStore;
     break;
   }
@@ -4985,7 +4985,7 @@ bool X86TargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     unsigned NumElts = std::min(DataVT.getVectorNumElements(),
                                 IndexVT.getVectorNumElements());
     Info.memVT = MVT::getVectorVT(DataVT.getVectorElementType(), NumElts);
-    Info.align = Align::None();
+    Info.align = Align(1);
     Info.flags |= MachineMemOperand::MOLoad;
     break;
   }
@@ -4997,7 +4997,7 @@ bool X86TargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     unsigned NumElts = std::min(DataVT.getVectorNumElements(),
                                 IndexVT.getVectorNumElements());
     Info.memVT = MVT::getVectorVT(DataVT.getVectorElementType(), NumElts);
-    Info.align = Align::None();
+    Info.align = Align(1);
     Info.flags |= MachineMemOperand::MOStore;
     break;
   }
@@ -13316,10 +13316,11 @@ static SDValue lowerV2I64Shuffle(const SDLoc &DL, ArrayRef<int> Mask,
 /// It makes no assumptions about whether this is the *best* lowering, it simply
 /// uses it.
 static SDValue lowerShuffleWithSHUFPS(const SDLoc &DL, MVT VT,
-                                      ArrayRef<int> Mask, SDValue V1,
+                                      ArrayRef<int> OriginalMask, SDValue V1,
                                       SDValue V2, SelectionDAG &DAG) {
   SDValue LowV = V1, HighV = V2;
-  int NewMask[4] = {Mask[0], Mask[1], Mask[2], Mask[3]};
+  SmallVector<int, 4> Mask(OriginalMask.begin(), OriginalMask.end());
+  SmallVector<int, 4> NewMask = Mask;
 
   int NumV2Elements = count_if(Mask, [](int M) { return M >= 4; });
 
@@ -13357,6 +13358,14 @@ static SDValue lowerShuffleWithSHUFPS(const SDLoc &DL, MVT VT,
       NewMask[V2Index] = 0; // We shifted the V2 element into V2[0].
     }
   } else if (NumV2Elements == 2) {
+    // If we are likely to fold V1 but not V2, then commute the shuffle.
+    if (MayFoldLoad(V1) && !MayFoldLoad(V2)) {
+      ShuffleVectorSDNode::commuteMask(Mask);
+      NewMask = Mask;
+      std::swap(V1, V2);
+      std::swap(LowV, HighV);
+    }
+
     if (Mask[0] < 4 && Mask[1] < 4) {
       // Handle the easy case where we have V1 in the low lanes and V2 in the
       // high lanes.
