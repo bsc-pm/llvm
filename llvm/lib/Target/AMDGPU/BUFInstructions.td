@@ -1152,19 +1152,19 @@ let SubtargetPredicate = isGFX10Plus in {
 // MUBUF Patterns
 //===----------------------------------------------------------------------===//
 
-def extract_glc : SDNodeXForm<imm, [{
+def extract_glc : SDNodeXForm<timm, [{
   return CurDAG->getTargetConstant(N->getZExtValue() & 1, SDLoc(N), MVT::i8);
 }]>;
 
-def extract_slc : SDNodeXForm<imm, [{
+def extract_slc : SDNodeXForm<timm, [{
   return CurDAG->getTargetConstant((N->getZExtValue() >> 1) & 1, SDLoc(N), MVT::i8);
 }]>;
 
-def extract_dlc : SDNodeXForm<imm, [{
+def extract_dlc : SDNodeXForm<timm, [{
   return CurDAG->getTargetConstant((N->getZExtValue() >> 2) & 1, SDLoc(N), MVT::i8);
 }]>;
 
-def extract_swz : SDNodeXForm<imm, [{
+def extract_swz : SDNodeXForm<timm, [{
   return CurDAG->getTargetConstant((N->getZExtValue() >> 3) & 1, SDLoc(N), MVT::i8);
 }]>;
 
@@ -1221,6 +1221,7 @@ defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format, v4i32, "BUFFER_LOAD_FORMAT_X
 let SubtargetPredicate = HasUnpackedD16VMem in {
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, f16, "BUFFER_LOAD_FORMAT_D16_X_gfx80">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, i16, "BUFFER_LOAD_FORMAT_D16_X_gfx80">;
+  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, i32, "BUFFER_LOAD_FORMAT_D16_X_gfx80">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2i32, "BUFFER_LOAD_FORMAT_D16_XY_gfx80">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v4i32, "BUFFER_LOAD_FORMAT_D16_XYZW_gfx80">;
 } // End HasUnpackedD16VMem.
@@ -1228,6 +1229,7 @@ let SubtargetPredicate = HasUnpackedD16VMem in {
 let SubtargetPredicate = HasPackedD16VMem in {
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, f16, "BUFFER_LOAD_FORMAT_D16_X">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, i16, "BUFFER_LOAD_FORMAT_D16_X">;
+  defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, i32, "BUFFER_LOAD_FORMAT_D16_X">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2f16, "BUFFER_LOAD_FORMAT_D16_XY">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v2i16, "BUFFER_LOAD_FORMAT_D16_XY">;
   defm : MUBUF_LoadIntrinsicPat<SIbuffer_load_format_d16, v4f16, "BUFFER_LOAD_FORMAT_D16_XYZW">;

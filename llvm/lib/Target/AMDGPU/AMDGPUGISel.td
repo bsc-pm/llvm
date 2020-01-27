@@ -31,6 +31,10 @@ def gi_vop3mods :
     GIComplexOperandMatcher<s32, "selectVOP3Mods">,
     GIComplexPatternEquiv<VOP3Mods>;
 
+def gi_vop3_no_mods :
+    GIComplexOperandMatcher<s32, "selectVOP3NoMods">,
+    GIComplexPatternEquiv<VOP3NoMods>;
+
 def gi_vop3mods_nnan :
     GIComplexOperandMatcher<s32, "selectVOP3Mods_nnan">,
     GIComplexPatternEquiv<VOP3Mods_nnan>;
@@ -126,6 +130,13 @@ def : GINodeEquiv<G_ATOMICRMW_FADD, atomic_load_fadd_glue>;
 
 def : GINodeEquiv<G_AMDGPU_FFBH_U32, AMDGPUffbh_u32>;
 def : GINodeEquiv<G_AMDGPU_ATOMIC_CMPXCHG, AMDGPUatomic_cmp_swap>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD, SIbuffer_load>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_USHORT, SIbuffer_load_ushort>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_UBYTE, SIbuffer_load_ubyte>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_SSHORT, SIbuffer_load_short>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_SBYTE, SIbuffer_load_byte>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_FORMAT, SIbuffer_load_format>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_FORMAT_D16, SIbuffer_load_format_d16>;
 
 // FIXME: Check MMO is atomic
 def : GINodeEquiv<G_AMDGPU_ATOMIC_INC, SIatomic_inc>;
@@ -234,3 +245,15 @@ def gi_bitcast_fpimm_to_i32 : GICustomOperandRenderer<"renderBitcastImm">,
 
 def gi_IMMPopCount : GICustomOperandRenderer<"renderPopcntImm">,
   GISDNodeXFormEquiv<IMMPopCount>;
+
+def gi_extract_glc : GICustomOperandRenderer<"renderExtractGLC">,
+  GISDNodeXFormEquiv<extract_glc>;
+
+def gi_extract_slc : GICustomOperandRenderer<"renderExtractSLC">,
+  GISDNodeXFormEquiv<extract_slc>;
+
+def gi_extract_dlc : GICustomOperandRenderer<"renderExtractDLC">,
+  GISDNodeXFormEquiv<extract_dlc>;
+
+def gi_extract_swz : GICustomOperandRenderer<"renderExtractSWZ">,
+  GISDNodeXFormEquiv<extract_swz>;
