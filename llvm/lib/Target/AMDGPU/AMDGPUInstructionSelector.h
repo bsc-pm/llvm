@@ -142,6 +142,9 @@ private:
   selectVOP3OMods(MachineOperand &Root) const;
   InstructionSelector::ComplexRendererFns
   selectVOP3Mods(MachineOperand &Root) const;
+
+  ComplexRendererFns selectVOP3NoMods(MachineOperand &Root) const;
+
   InstructionSelector::ComplexRendererFns
   selectVOP3Mods_nnan(MachineOperand &Root) const;
 
@@ -199,6 +202,13 @@ private:
 
   MUBUFAddressData parseMUBUFAddress(Register Src) const;
 
+  bool selectMUBUFAddr64Impl(MachineOperand &Root, Register &VAddr,
+                             Register &RSrcReg, Register &SOffset,
+                             int64_t &Offset) const;
+
+  bool selectMUBUFOffsetImpl(MachineOperand &Root, Register &RSrcReg,
+                             Register &SOffset, int64_t &Offset) const;
+
   InstructionSelector::ComplexRendererFns
   selectMUBUFAddr64(MachineOperand &Root) const;
 
@@ -223,6 +233,14 @@ private:
 
   void renderPopcntImm(MachineInstrBuilder &MIB, const MachineInstr &MI,
                        int OpIdx) const;
+  void renderExtractGLC(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const;
+  void renderExtractSLC(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const;
+  void renderExtractDLC(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const;
+  void renderExtractSWZ(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const;
 
   bool isInlineImmediate16(int64_t Imm) const;
   bool isInlineImmediate32(int64_t Imm) const;
