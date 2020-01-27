@@ -100,11 +100,7 @@ private:
   bool selectInterpP1F16(MachineInstr &MI) const;
   bool selectG_INTRINSIC(MachineInstr &I) const;
 
-  std::tuple<Register, unsigned, unsigned>
-  splitBufferOffsets(MachineIRBuilder &B, Register OrigOffset) const;
-
   bool selectEndCfIntrinsic(MachineInstr &MI) const;
-  bool selectStoreIntrinsic(MachineInstr &MI, bool IsFormat) const;
   bool selectDSOrderedIntrinsic(MachineInstr &MI, Intrinsic::ID IID) const;
   bool selectDSGWSIntrinsic(MachineInstr &MI, Intrinsic::ID IID) const;
   bool selectDSAppendConsume(MachineInstr &MI, bool IsAppend) const;
@@ -218,12 +214,28 @@ private:
   void renderTruncImm32(MachineInstrBuilder &MIB, const MachineInstr &MI,
                         int OpIdx = -1) const;
 
-  void renderTruncTImm32(MachineInstrBuilder &MIB, const MachineInstr &MI,
-                         int OpIdx) const;
-  void renderTruncTImm16(MachineInstrBuilder &MIB, const MachineInstr &MI,
-                         int OpIdx) const;
+  void renderTruncTImm(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                       int OpIdx) const;
+
   void renderTruncTImm1(MachineInstrBuilder &MIB, const MachineInstr &MI,
-                        int OpIdx) const;
+                        int OpIdx) const {
+    renderTruncTImm(MIB, MI, OpIdx);
+  }
+
+  void renderTruncTImm8(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const {
+    renderTruncTImm(MIB, MI, OpIdx);
+  }
+
+  void renderTruncTImm16(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const {
+    renderTruncTImm(MIB, MI, OpIdx);
+  }
+
+  void renderTruncTImm32(MachineInstrBuilder &MIB, const MachineInstr &MI,
+                        int OpIdx) const {
+    renderTruncTImm(MIB, MI, OpIdx);
+  }
 
   void renderNegateImm(MachineInstrBuilder &MIB, const MachineInstr &MI,
                        int OpIdx) const;
