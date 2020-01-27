@@ -137,12 +137,35 @@ def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_SSHORT, SIbuffer_load_short>;
 def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_SBYTE, SIbuffer_load_byte>;
 def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_FORMAT, SIbuffer_load_format>;
 def : GINodeEquiv<G_AMDGPU_BUFFER_LOAD_FORMAT_D16, SIbuffer_load_format_d16>;
+def : GINodeEquiv<G_AMDGPU_TBUFFER_LOAD_FORMAT, SItbuffer_load>;
+def : GINodeEquiv<G_AMDGPU_TBUFFER_LOAD_FORMAT_D16, SItbuffer_load_d16>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_STORE, SIbuffer_store>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_STORE_SHORT, SIbuffer_store_short>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_STORE_BYTE, SIbuffer_store_byte>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_STORE_FORMAT, SIbuffer_store_format>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_STORE_FORMAT_D16, SIbuffer_store_format_d16>;
+def : GINodeEquiv<G_AMDGPU_TBUFFER_STORE_FORMAT, SItbuffer_store>;
+def : GINodeEquiv<G_AMDGPU_TBUFFER_STORE_FORMAT_D16, SItbuffer_store_d16>;
 
 // FIXME: Check MMO is atomic
 def : GINodeEquiv<G_AMDGPU_ATOMIC_INC, SIatomic_inc>;
 def : GINodeEquiv<G_AMDGPU_ATOMIC_DEC, SIatomic_dec>;
 def : GINodeEquiv<G_AMDGPU_ATOMIC_INC, atomic_inc_glue>;
 def : GINodeEquiv<G_AMDGPU_ATOMIC_DEC, atomic_dec_glue>;
+
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_SWAP, SIbuffer_atomic_swap>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_ADD, SIbuffer_atomic_add>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_SUB, SIbuffer_atomic_sub>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_SMIN, SIbuffer_atomic_smin>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_UMIN, SIbuffer_atomic_umin>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_SMAX, SIbuffer_atomic_smax>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_UMAX, SIbuffer_atomic_umax>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_AND, SIbuffer_atomic_and>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_OR, SIbuffer_atomic_or>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_XOR, SIbuffer_atomic_xor>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_INC, SIbuffer_atomic_inc>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_DEC, SIbuffer_atomic_dec>;
+def : GINodeEquiv<G_AMDGPU_BUFFER_ATOMIC_CMPSWAP, SIbuffer_atomic_cmpswap>;
 
 
 class GISelSop2Pat <
@@ -233,6 +256,9 @@ def gi_as_i32timm : GICustomOperandRenderer<"renderTruncTImm32">,
 
 def gi_as_i16timm : GICustomOperandRenderer<"renderTruncTImm16">,
   GISDNodeXFormEquiv<as_i16timm>;
+
+def gi_as_i8timm : GICustomOperandRenderer<"renderTruncTImm8">,
+  GISDNodeXFormEquiv<as_i8timm>;
 
 def gi_as_i1timm : GICustomOperandRenderer<"renderTruncTImm1">,
   GISDNodeXFormEquiv<as_i1timm>;
