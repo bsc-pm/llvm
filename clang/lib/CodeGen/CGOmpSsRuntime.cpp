@@ -893,8 +893,9 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                                                                     "TASKWAIT"))});
 }
 
+// We're in task body context once we set InsertPt
 bool CGOmpSsRuntime::inTaskBody() {
-  return !TaskStack.empty();
+  return !TaskStack.empty() && TaskStack.back().InsertPt;
 }
 
 llvm::AssertingVH<llvm::Instruction> CGOmpSsRuntime::getTaskInsertPt() {
@@ -923,6 +924,14 @@ Address CGOmpSsRuntime::getTaskEHSelectorSlot() {
 
 Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
   return TaskStack.back().NormalCleanupDestSlot;
+}
+
+llvm::DenseMap<const VarDecl *, Address> &CGOmpSsRuntime::getTaskRefMap() {
+  return TaskStack.back().RefMap;
+}
+
+void CGOmpSsRuntime::setTaskInsertPt(llvm::Instruction *I) {
+  TaskStack.back().InsertPt = I;
 }
 
 void CGOmpSsRuntime::setTaskTerminateHandler(llvm::BasicBlock *BB) {
@@ -1020,6 +1029,8 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
+  TaskStack.push_back(TaskContext());
+
   bool IsMethodCall = false;
   if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
     IsMethodCall = true;
@@ -1038,7 +1049,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       // Ignore ImplicitCast built for the new function call
       FpDataTy.Ref = E->IgnoreImpCasts();
       FpDataTy.Copy = FpDataTy.Init = nullptr;
-      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, RefMap);
+      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, TaskStack.back().RefMap);
     }
     if (const Expr *E = Attr->getIfExpr()) {
       TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(E));
@@ -1163,13 +1174,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
-  TaskStack.push_back({TaskAllocaInsertPt,
-                       /*TerminateLandingPad=*/nullptr,
-                       /*TerminateHandler=*/nullptr,
-                       /*UnreachableBlock=*/nullptr,
-                       /*ExceptionSlot=*/Address::invalid(),
-                       /*EHSelectorSlot=*/Address::invalid(),
-                       /*NormalCleanupDestSlot=*/Address::invalid()});
+  setTaskInsertPt(TaskAllocaInsertPt);
 
   // From EmitCallExpr
   RValue RV;
@@ -1206,15 +1211,17 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
 
   SmallVector<llvm::Value*, 4> CapturedList;
 
+  TaskStack.push_back(TaskContext());
+
   InTaskEmission = true;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList, RefMap);
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList, TaskStack.back().RefMap);
   }
   for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, RefMap);
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, getTaskRefMap());
   }
   for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, RefMap);
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskRefMap());
   }
 
   if (Data.Cost) {
@@ -1269,22 +1276,13 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   // Push Task Stack
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
-  TaskStack.push_back({TaskAllocaInsertPt,
-                       /*TerminateLandingPad=*/nullptr,
-                       /*TerminateHandler=*/nullptr,
-                       /*UnreachableBlock=*/nullptr,
-                       /*ExceptionSlot=*/Address::invalid(),
-                       /*EHSelectorSlot=*/Address::invalid(),
-                       /*NormalCleanupDestSlot=*/Address::invalid()});
+  setTaskInsertPt(TaskAllocaInsertPt);
 
   // The point of exit cannot be a branch out of the structured block.
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
   CGF.EmitStmt(D.getAssociatedStmt());
   CGF.EHStack.popTerminate();
-
-  // Task body emited, clear RefMap to be reused
-  RefMap.clear();
 
   // TODO: do we need this? we're pushing a terminate...
   // EmitIfUsed(*this, EHResumeBlock);

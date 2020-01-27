@@ -2533,8 +2533,8 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
             || CGM.getOmpSsRuntime().InTaskEmission)
         && VD->getType()->isReferenceType()) {
 
-      auto it = CGM.getOmpSsRuntime().RefMap.find(VD);
-      if (it != CGM.getOmpSsRuntime().RefMap.end()) {
+      auto it = CGM.getOmpSsRuntime().getTaskRefMap().find(VD);
+      if (it != CGM.getOmpSsRuntime().getTaskRefMap().end()) {
         return MakeAddrLValue(it->second, T, AlignmentSource::Decl);
       }
     }

@@ -81,13 +81,15 @@ protected:
 
 private:
   struct TaskContext {
-    llvm::AssertingVH<llvm::Instruction> InsertPt;
-    llvm::BasicBlock *TerminateLandingPad;
-    llvm::BasicBlock *TerminateHandler;
-    llvm::BasicBlock *UnreachableBlock;
-    Address ExceptionSlot;
-    Address EHSelectorSlot;
-    Address NormalCleanupDestSlot;
+    llvm::AssertingVH<llvm::Instruction> InsertPt = nullptr;
+    llvm::BasicBlock *TerminateLandingPad = nullptr;
+    llvm::BasicBlock *TerminateHandler = nullptr;
+    llvm::BasicBlock *UnreachableBlock = nullptr;
+    Address ExceptionSlot = Address::invalid();
+    Address EHSelectorSlot = Address::invalid();
+    Address NormalCleanupDestSlot = Address::invalid();
+    // Map to reuse Addresses emited for data sharings
+    llvm::DenseMap<const VarDecl *, Address> RefMap;
   };
 
   SmallVector<TaskContext, 2> TaskStack;
@@ -97,9 +99,6 @@ public:
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
-  // Map to reuse Addresses emited for data sharings
-  // TODO: try to integrate this better in the class, not as a direct public member
-  llvm::DenseMap<const VarDecl *, Address> RefMap;
   bool InTaskEmission;
 
   // This is used to avoid creating the same generic funcion for constructors and
@@ -124,7 +123,11 @@ public:
   Address getTaskEHSelectorSlot();
   // returns the innermost nested task NormalCleanupDestSlot address
   Address getTaskNormalCleanupDestSlot();
+  // returns the innermost nested task RefMap
+  llvm::DenseMap<const VarDecl *, Address> &getTaskRefMap();
 
+  // sets the innermost nested task InsertPt instruction
+  void setTaskInsertPt(llvm::Instruction *I);
   // sets the innermost nested task TerminateHandler instruction
   void setTaskTerminateHandler(llvm::BasicBlock *BB);
   // sets the innermost nested task TerminateLandingPad instruction
