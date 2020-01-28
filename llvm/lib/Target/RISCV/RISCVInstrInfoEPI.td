@@ -404,14 +404,14 @@ multiclass pseudo_unary_nomerge<VReg result_reg_class,
 
 // Special case for masking that does not have a merge operand nor a mask.
 multiclass pseudo_unary_nomask<VReg result_reg_class,
-                               VReg op_reg_class,
+                               DAGOperand op_kind,
                                int vlmul,
                                string constraints = ""> {
   let Constraints = constraints,
       Uses = [VL, VTYPE], VLIndex = 2, SEWIndex = 3, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
-                            (ins op_reg_class:$rs2,
+                            (ins op_kind:$rs2,
                                  GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
@@ -448,7 +448,7 @@ multiclass pseudo_unary_v_v_x_i_nomask
     {
       defm _V : pseudo_unary_nomask<evr, evr, evr.VLMul>;
       defm _X : pseudo_unary_nomask<evr, GPR, evr.VLMul>;
-      defm _I : pseudo_unary_nomask<evr, simm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _I : pseudo_unary_nomask<evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -490,14 +490,14 @@ multiclass pseudo_unary_v_w {
 
 multiclass pseudo_binary<VReg result_reg_class,
                          VReg op1_reg_class,
-                         RegisterClass op2_reg_class, // FIXME dagoperand
+                         DAGOperand op2_kind,
                          int vlmul, string constraints = ""> {
   let Constraints = Join<[constraints, "$rd = $merge"], ",">.ret,
       Uses = [VL, VTYPE], VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
                             (ins result_reg_class:$merge,
-                                 op1_reg_class:$rs2, op2_reg_class:$rs1,
+                                 op1_reg_class:$rs2, op2_kind:$rs1,
                                  VRMaskRegOp:$vm, GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
@@ -506,13 +506,13 @@ multiclass pseudo_binary<VReg result_reg_class,
 // Special case for masking that does not have a merge operand nor a mask.
 multiclass pseudo_binary_nomask<VReg result_reg_class,
                                 VReg op1_reg_class,
-                                RegisterClass op2_reg_class, // FIXME dagoperand
+                                DAGOperand op2_kind,
                                 int vlmul, string constraints = ""> {
   let Constraints = constraints,
       Uses = [VL, VTYPE], VLIndex = 3, SEWIndex = 4, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
-                            (ins op1_reg_class:$rs2, op2_reg_class:$rs1,
+                            (ins op1_reg_class:$rs2, op2_kind:$rs1,
                                  GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
@@ -520,12 +520,12 @@ multiclass pseudo_binary_nomask<VReg result_reg_class,
 
 multiclass pseudo_binary_mask_in<VReg result_reg_class,
                                  VReg op1_reg_class,
-                                 RegisterClass op2_reg_class,
+                                 DAGOperand op2_kind,
                                  int vlmul> {
   let Uses = [VL, VTYPE], VLIndex = 4, SEWIndex = 5, MergeOpIndex = -1,
       BaseInstr = !cast<Instruction>(!subst("Pseudo", "", NAME)) in
     def "_M"#vlmul : Pseudo<(outs result_reg_class:$rd),
-                            (ins op1_reg_class:$rs2, op2_reg_class:$rs1,
+                            (ins op1_reg_class:$rs2, op2_kind:$rs1,
                                  VRV0:$maskop, GPR:$vl, ixlenimm:$sew),
                             []>,
                      EPIPseudo;
@@ -583,7 +583,7 @@ multiclass pseudo_binary_v_vx_vi<Operand imm_type = simm5> {
     let VLMul = evr.VLMul in
     {
       defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>;
     }
   }
 }
@@ -596,7 +596,7 @@ multiclass pseudo_binary_v_vv_vx_vi<Operand imm_type = simm5> {
     {
       defm _VV : pseudo_binary<evr, evr, evr, evr.VLMul>;
       defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>;
     }
   }
 }
@@ -612,7 +612,7 @@ multiclass pseudo_binary_v_wv_wx_wi<Operand imm_type = simm5> {
       defm _WX : pseudo_binary<evr.RegClass, evr.WideRegClass, GPR,
                                evr.RegClass.VLMul, "@earlyclobber $rd">;
       defm _WI : pseudo_binary<evr.RegClass, evr.WideRegClass, imm_type,
-                               evr.RegClass.VLMul, "@earlyclobber $rd">; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
     }
   }
 }
@@ -625,7 +625,7 @@ multiclass pseudo_binary_v_vvm_vxm_vim {
     {
       defm _VVM : pseudo_binary_mask_in<evr, evr, evr, evr.VLMul>;
       defm _VXM : pseudo_binary_mask_in<evr, evr, GPR, evr.VLMul>;
-      defm _VIM : pseudo_binary_mask_in<evr, evr, simm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _VIM : pseudo_binary_mask_in<evr, evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -663,7 +663,7 @@ multiclass pseudo_binary_m_vx_vi {
     let VLMul = evr.VLMul in
     {
       defm _VX : pseudo_binary<VR, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<VR, evr, simm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _VI : pseudo_binary<VR, evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -676,7 +676,7 @@ multiclass pseudo_binary_m_vv_vx_vi {
     {
       defm _VV : pseudo_binary<VR, evr, evr, evr.VLMul>;
       defm _VX : pseudo_binary<VR, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<VR, evr, simm5, evr.VLMul>; // FIXME how can this work? simm5 is not a RegisterClass but an Operand
+      defm _VI : pseudo_binary<VR, evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -755,7 +755,7 @@ multiclass pseudo_binary_m_vv_vf {
 multiclass pseudo_ternary<VReg result_reg_class,
                           VReg op1_reg_class,
                           RegisterClass op2_reg_class,
-                          int vlmul> { // FIXME dagoperand?
+                          int vlmul> {
   let Constraints = "$rd = $rs3",
       Uses = [VL, VTYPE],
       VLIndex = 5, SEWIndex = 6, MergeOpIndex = 1,
@@ -1312,20 +1312,20 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
                                 int vlmul,
                                 VReg result_reg_class,
                                 VReg op1_reg_class,
-                                RegisterClass op2_reg_class, // FIXME dagoperand?
+                                DAGOperand op2_kind,
                                 bit swap = 0>
 {
   defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
 
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
-                          (op2_type op2_reg_class:$rs2),
+                          (op2_type op2_kind:$rs2),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction (result_type zero_reg)),
               (instruction
                (op1_type op1_reg_class:$rs1)),
-              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction ToFPR32<op2_type, op2_kind, "rs2">.ret),
               (instruction
                (mask_type zero_reg),
                (NoX0 GPR:$vl),
@@ -1335,14 +1335,14 @@ multiclass pat_intrinsic_binary<string intrinsic_name,
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
                           (result_type result_reg_class:$merge),
                           (op1_type op1_reg_class:$rs1),
-                          (op2_type op2_reg_class:$rs2),
+                          (op2_type op2_kind:$rs2),
                           (mask_type V0),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction result_reg_class:$merge),
               (instruction
                op1_reg_class:$rs1),
-              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction ToFPR32<op2_type, op2_kind, "rs2">.ret),
               (instruction
                (mask_type V0),
                (NoX0 GPR:$vl),
@@ -1360,20 +1360,20 @@ multiclass pat_intrinsic_binary_nomask<string intrinsic_name,
                                        int sew,
                                        int vlmul,
                                        VReg op1_reg_class,
-                                       RegisterClass op2_reg_class, // FIXME dagoperand?
+                                       DAGOperand op2_kind,
                                        bit swap = 0>
 {
   defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
 
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
-                          (op2_type op2_reg_class:$rs2),
+                          (op2_type op2_kind:$rs2),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction), // empty prefix
               (instruction
                (op1_type op1_reg_class:$rs1)),
-              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction ToFPR32<op2_type, op2_kind, "rs2">.ret),
               (instruction
                (NoX0 GPR:$vl),
                sew),
@@ -1391,21 +1391,21 @@ multiclass pat_intrinsic_binary_mask_in<string intrinsic_name,
                                         int vlmul,
                                         VReg result_reg_class,
                                         VReg op1_reg_class,
-                                        RegisterClass op2_reg_class, // FIXME dagoperand?
+                                        DAGOperand op2_kind,
                                         bit swap = 0>
 {
   defvar instruction = !cast<Instruction>(instruction_name#_#kind#"_M"#vlmul);
 
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
-                          (op2_type op2_reg_class:$rs2),
+                          (op2_type op2_kind:$rs2),
                           (mask_type V0),
                           (i64 GPR:$vl))),
             swap_helper<
               (instruction), // empty prefix
               (instruction
                op1_reg_class:$rs1),
-              (instruction ToFPR32<op2_type, op2_reg_class, "rs2">.ret),
+              (instruction ToFPR32<op2_type, op2_kind, "rs2">.ret),
               (instruction
                (mask_type V0),
                (NoX0 GPR:$vl),
@@ -1802,8 +1802,8 @@ multiclass pat_intrinsic_ternary<string intrinsic_name,
                                  int sew,
                                  int vlmul,
                                  VReg result_reg_class,
-                                 VReg op1_reg_class,
-                                 VReg op2_reg_class> // FIXME Registerclass, dagoperand?
+                                 RegisterClass op1_reg_class,
+                                 VReg op2_reg_class>
 {
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (result_type result_reg_class:$rs3),
@@ -2058,7 +2058,7 @@ multiclass pat_intrinsic_unary<string intrinsic_name,
                                int sew,
                                int vlmul,
                                VReg result_reg_class,
-                               VReg op1_reg_class> // FIXME Registerclass, dagoperand?
+                               VReg op1_reg_class>
 {
   def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
                           (op1_type op1_reg_class:$rs1),
@@ -2601,7 +2601,7 @@ multiclass pat_intrinsic_binary_int_w_vX0<string intrinsic_name,
     def : Pat<(wti.Vector (!cast<Intrinsic>(intrinsic_name)
                            (vti.Vector vti.RegClass:$rs1),
                            (i64 GPR:$vl))),
-              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+              (!cast<Instruction>(instruction_name#"_M"#vlmul)
                (wti.Vector zero_reg),
                vti.RegClass:$rs1,
                /* rs2 */ X0,
@@ -2613,7 +2613,7 @@ multiclass pat_intrinsic_binary_int_w_vX0<string intrinsic_name,
                            (vti.Vector vti.RegClass:$rs1),
                            (wti.Mask V0),
                            (i64 GPR:$vl))),
-              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+              (!cast<Instruction>(instruction_name#"_M"#vlmul)
                wti.RegClass:$merge,
                vti.RegClass:$rs1,
                /* rs2 */ X0,
@@ -2634,7 +2634,7 @@ multiclass pat_intrinsic_binary_int_v_wX0<string intrinsic_name,
     def : Pat<(vti.Vector (!cast<Intrinsic>(intrinsic_name)
                            (wti.Vector wti.RegClass:$rs1),
                            (i64 GPR:$vl))),
-              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+              (!cast<Instruction>(instruction_name#"_M"#vlmul)
                (vti.Vector zero_reg),
                wti.RegClass:$rs1,
                /* rs2 */ X0,
@@ -2646,7 +2646,7 @@ multiclass pat_intrinsic_binary_int_v_wX0<string intrinsic_name,
                            (wti.Vector wti.RegClass:$rs1),
                            (vti.Mask V0),
                            (i64 GPR:$vl))),
-              (!cast<Instruction>(instruction_name#"_M"#vlmul) // FIXME change when fix nameing in binary intrinsics
+              (!cast<Instruction>(instruction_name#"_M"#vlmul)
                vti.RegClass:$merge,
                wti.RegClass:$rs1,
                /* rs2 */ X0,
@@ -2747,7 +2747,7 @@ multiclass pat_vop_ternary<SDNode vop,
                            int vlmul,
                            VReg result_reg_class,
                            VReg op1_reg_class,
-                           VReg op2_reg_class> // FIXME Registerclass, dagoperand?
+                           VReg op2_reg_class>
 {
   def : Pat<(result_type (vop
                           (result_type result_reg_class:$rs3),
