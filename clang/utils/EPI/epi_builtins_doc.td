@@ -114,16 +114,16 @@ let Undocumented = 1 in
   def : DocEPIBuiltin<vaadd>;
   def : DocEPIBuiltin<vadc>;
   def : DocEPIBuiltin<vasub>;
-  def : DocEPIBuiltin<vdot>;
   // FIXME EDIV builtins disabled
+  //def : DocEPIBuiltin<vdot>;
   //def : DocEPIBuiltin<vdotu>;
   //def : DocEPIBuiltin<vfdot>;
   def : DocEPIBuiltin<vmacc>;
   def : DocEPIBuiltin<vmadc>;
   def : DocEPIBuiltin<vmadd>;
-  def : DocEPIBuiltin<vmsac>; // This one does not seem to exist anymore?
+  def : DocEPIBuiltin<vnmsac>;
   def : DocEPIBuiltin<vmsbc>;
-  def : DocEPIBuiltin<vmsub>; // This one does not seem to exist anymore?
+  def : DocEPIBuiltin<vnmsub>;
   def : DocEPIBuiltin<vnclip>;
   def : DocEPIBuiltin<vnclipu>;
   def : DocEPIBuiltin<vrsub>;
@@ -174,8 +174,6 @@ integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] + b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -184,8 +182,6 @@ integer vectors.}];
          result[element] = a[element] + b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -200,8 +196,6 @@ integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] - b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -210,8 +204,6 @@ integer vectors.}];
          result[element] = a[element] - b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -226,7 +218,6 @@ two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = bitwise_and(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -235,8 +226,6 @@ two integer vectors.}];
          result[element] = bitwise_and(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -251,7 +240,6 @@ two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = bitwise_or(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -260,8 +248,6 @@ two integer vectors.}];
          result[element] = bitwise_or(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -276,8 +262,6 @@ elements have the value of a given scalar.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -292,8 +276,6 @@ elements have the value of a given scalar.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -329,8 +311,6 @@ integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] / b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -339,8 +319,6 @@ integer vectors.}];
          result[element] = a[element] / b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -355,8 +333,6 @@ of two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = divu(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -365,8 +341,6 @@ of two integer vectors.}];
          result[element] = divu(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -381,8 +355,6 @@ floating-point vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] + b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -391,8 +363,6 @@ floating-point vectors.}];
          result[element] = a[element] + b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -408,8 +378,6 @@ vector to a floating-point vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = int_to_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -418,8 +386,6 @@ vector to a floating-point vector.}];
          result[element] = int_to_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -434,8 +400,6 @@ integer vector to a floating-point vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = uint_to_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -444,8 +408,6 @@ integer vector to a floating-point vector.}];
          result[element] = uint_to_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -460,8 +422,6 @@ floating-point vector to an integer vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_int(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -470,8 +430,6 @@ floating-point vector to an integer vector.}];
          result[element] = fp_to_int(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -487,8 +445,6 @@ unsigned integers.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_uint(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -497,8 +453,6 @@ unsigned integers.}];
          result[element] = fp_to_uint(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -513,8 +467,6 @@ floating-point vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] / b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -523,8 +475,6 @@ floating-point vectors.}];
          result[element] = a[element] / b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -544,8 +494,6 @@ be overwritten by the `vfmacc` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element] + c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -554,8 +502,6 @@ be overwritten by the `vfmacc` instruction.}];
          result[element] = a[element] * b[element] + c[element]
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -575,8 +521,6 @@ be overwritten by the `vfmadd` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element] + c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -585,8 +529,6 @@ be overwritten by the `vfmadd` instruction.}];
          result[element] = a[element] * b[element] + c[element]
        else
          result[element] = a[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -600,8 +542,6 @@ def : DocEPIBuiltin<vfmax>
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = max(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -610,8 +550,6 @@ def : DocEPIBuiltin<vfmax>
          result[element] = max(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -643,8 +581,6 @@ def : DocEPIBuiltin<vfmin>
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = min(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -653,8 +589,6 @@ def : DocEPIBuiltin<vfmin>
          result[element] = min(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -674,8 +608,6 @@ be overwritten by the `vfmsac` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element] - c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -684,8 +616,6 @@ be overwritten by the `vfmsac` instruction.}];
          result[element] = a[element] * b[element] - c[element]
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -705,8 +635,6 @@ be overwritten by the `vfmsub` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element] - c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -715,8 +643,6 @@ be overwritten by the `vfmsub` instruction.}];
          result[element] = a[element] * b[element] - c[element]
        else
          result[element] = a[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -730,8 +656,6 @@ def : DocEPIBuiltin<vfmul>
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -740,8 +664,6 @@ def : DocEPIBuiltin<vfmul>
          result[element] = a[element] * b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -757,8 +679,6 @@ integer element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = int_to_narrow_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -767,8 +687,6 @@ integer element.}];
          result[element] = int_to_narrow_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -784,8 +702,6 @@ floating-point elements that are half the width of the integer element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = uint_to_narrow_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -794,8 +710,6 @@ floating-point elements that are half the width of the integer element.}];
          result[element] = uint_to_narrow_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -811,8 +725,6 @@ of the floating-point elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_narrow_int(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -821,8 +733,6 @@ of the floating-point elements.}];
          result[element] = fp_to_narrow_int(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -838,8 +748,6 @@ that are half the width of the floating-point elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_narrow_uint(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -848,8 +756,6 @@ that are half the width of the floating-point elements.}];
          result[element] = fp_to_narrow_uint(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -865,8 +771,6 @@ source vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_narrow_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -875,8 +779,6 @@ source vector.}];
          result[element] = fp_to_narrow_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -896,8 +798,6 @@ be overwritten by the `vfnmacc` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = -( a[element] * b[element] ) - c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -906,8 +806,6 @@ be overwritten by the `vfnmacc` instruction.}];
          result[element] = -( a[element] * b[element] ) - c[element]
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -927,8 +825,6 @@ be overwritten by the `vfnmadd` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = -( a[element] * b[element] ) - c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -937,8 +833,6 @@ be overwritten by the `vfnmadd` instruction.}];
          result[element] = -( a[element] * b[element] ) - c[element]
        else
          result[element] = a[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -958,8 +852,6 @@ be overwritten by the `vfnmsac` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = -( a[element] * b[element] ) + c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -968,8 +860,6 @@ be overwritten by the `vfnmsac` instruction.}];
          result[element] = -( a[element] * b[element] ) + c[element]
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -989,8 +879,6 @@ be overwritten by the `vfnmsub` instruction.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element] - c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -999,8 +887,6 @@ be overwritten by the `vfnmsub` instruction.}];
          result[element] = a[element] * b[element] - c[element]
        else
          result[element] = a[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1154,8 +1040,6 @@ is taken from the elements of the second operand.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fsgnj(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1164,8 +1048,6 @@ is taken from the elements of the second operand.}];
          result[element] = fsgnj(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1185,8 +1067,6 @@ vector for the two operands.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fsgnjn(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1195,8 +1075,6 @@ vector for the two operands.
          result[element] = fsgnjn(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1219,8 +1097,6 @@ elements. To do that use the same vector for the two operands.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fsgnjx(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1229,8 +1105,6 @@ elements. To do that use the same vector for the two operands.}];
          result[element] = fsgnjx(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1245,8 +1119,6 @@ root of a given floating-point vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = sqrt(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1255,8 +1127,6 @@ root of a given floating-point vector.}];
          result[element] = sqrt(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1271,8 +1141,6 @@ floating-point vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] - b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1281,8 +1149,6 @@ floating-point vectors.}];
          result[element] = a[element] - b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1301,8 +1167,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = wide_fp(a[element]) + wide_fp(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1311,8 +1175,6 @@ elements.}];
          result[element] = wide_fp(a[element]) + wide_fp(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1331,8 +1193,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] + wide_fp(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1341,8 +1201,6 @@ elements.}];
          result[element] = a[element] + wide_fp(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1358,8 +1216,6 @@ integer element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = int_to_wide_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1368,8 +1224,6 @@ integer element.}];
          result[element] = int_to_wide_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1385,8 +1239,6 @@ floating-point elements that are twice the width of the integer element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = uint_to_wide_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1395,8 +1247,6 @@ floating-point elements that are twice the width of the integer element.}];
          result[element] = uint_to_wide_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1412,8 +1262,6 @@ of the floating-point elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_wide_int(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1422,8 +1270,6 @@ of the floating-point elements.}];
          result[element] = fp_to_wide_int(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1439,8 +1285,6 @@ that are twice the width of the floating-point elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_wide_uint(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1449,8 +1293,6 @@ that are twice the width of the floating-point elements.}];
          result[element] = fp_to_wide_uint(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1466,8 +1308,6 @@ source vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_to_wide_fp(a[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1476,8 +1316,6 @@ source vector.}];
          result[element] = fp_to_wide_fp(a[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1494,8 +1332,6 @@ number of bits as the original elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_fp(a[element]) * widen_fp(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1504,8 +1340,6 @@ number of bits as the original elements.}];
          result[element] = widen_fp(a[element]) * widen_fp(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1524,8 +1358,6 @@ with twice the number of bits as the original elements.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_fp(a[element]) * widen_fp(b[element]) + widen_fp(c[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1534,8 +1366,6 @@ with twice the number of bits as the original elements.
          result[element] = widen_fp(a[element]) * widen_fp(b[element]) + widen_fp(c[element])
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1554,8 +1384,6 @@ with twice the number of bits as the original elements.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_fp(a[element]) * widen_fp(b[element]) - widen_fp(c[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1564,8 +1392,6 @@ with twice the number of bits as the original elements.
          result[element] = widen_fp(a[element]) * widen_fp(b[element]) - widen_fp(c[element])
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1584,8 +1410,6 @@ with twice the number of bits as the original elements.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = -( widen_fp(a[element]) * widen_fp(b[element]) ) - widen_fp(c[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1594,8 +1418,6 @@ with twice the number of bits as the original elements.
          result[element] = -( widen_fp(a[element]) * widen_fp(b[element]) ) - widen_fp(c[element])
        else
          result[element] = c[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1614,8 +1436,6 @@ with twice the number of bits as the original elements.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = -( widen_fp(a[element]) * widen_fp(b[element]) ) + widen_fp(c[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1624,8 +1444,6 @@ with twice the number of bits as the original elements.
          result[element] = -( widen_fp(a[element]) * widen_fp(b[element]) ) + widen_fp(c[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1719,8 +1537,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = fp_widen(a[element]) - fp_widen(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1729,8 +1545,6 @@ elements.}];
          result[element] = fp_widen(a[element]) - fp_widen(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1749,8 +1563,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] - fp_widen(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1759,8 +1571,6 @@ elements.}];
          result[element] = a[element] - fp_widen(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1810,7 +1620,6 @@ An index vector is useful for indexed loads and stores and for register gathers.
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = element
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1819,8 +1628,6 @@ An index vector is useful for indexed loads and stores and for register gathers.
          result[element] = element
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1840,8 +1647,6 @@ otherwise they count as zero.}];
        result[element] = prefix_sum
        if a[element] then
           prefix_sum = prefix_sum + 1
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1853,8 +1658,6 @@ otherwise they count as zero.}];
             prefix_sum = prefix_sum + 1
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1873,8 +1676,6 @@ into a vector.}];
     for element = 0 to gvl - 1
       result[element] = load_element(address)
       address = address + SEW / 8
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -1884,8 +1685,6 @@ into a vector.}];
          address = address + SEW / 8
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1907,21 +1706,16 @@ the vector.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = load_element(address + index[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
     for element = 0 to gvl - 1
 
-    result[gvl : VLMAX] = 0
     for element = 0 to gvl - 1
        if mask[element] then
          result[element] = load_element(address + index[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -1947,21 +1741,16 @@ these builtins and the corresponding `__builtin_epi_vload_indexed` builtins.
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = load_unsigned_element(address + index[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
     for element = 0 to gvl - 1
 
-    result[gvl : VLMAX] = 0
     for element = 0 to gvl - 1
        if mask[element] then
          result[element] = load_unsigned_element(address + index[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2002,8 +1791,6 @@ yield the effective address that loads the element of the vector.}];
     for element = 0 to gvl - 1
       result[element] = load_element(address)
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2013,8 +1800,6 @@ yield the effective address that loads the element of the vector.}];
        else
          result[element] = merge[element]
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2040,8 +1825,6 @@ these builtins and the corresponding `__builtin_epi_vload_strided`.
     for element = 0 to gvl - 1
       result[element] = load_unsigned_element(address)
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2051,8 +1834,6 @@ these builtins and the corresponding `__builtin_epi_vload_strided`.
        else
          result[element] = merge[element]
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2075,8 +1856,6 @@ these builtins and the corresponding `__builtin_epi_vload`.
     for element = 0 to gvl - 1
       result[element] = load_unsigned_element(address)
       address = address + SEW / 8
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2086,8 +1865,6 @@ these builtins and the corresponding `__builtin_epi_vload`.
          address = address + SEW / 8
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2104,8 +1881,6 @@ an element if and only if the two mask operands enable that element.
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_and(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2122,8 +1897,6 @@ mask operand does not enable the element.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_and(a[element], logical_not(b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2138,8 +1911,6 @@ two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = max(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2148,8 +1919,6 @@ two integer vectors.}];
          result[element] = max(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2164,8 +1933,6 @@ two unsigned integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = maxu(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2174,8 +1941,6 @@ two unsigned integer vectors.}];
          result[element] = maxu(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2211,8 +1976,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] == b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2221,8 +1984,6 @@ comparison holds for that element.}];
          result[element] = a[element] == b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2241,8 +2002,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] >= b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2251,8 +2010,6 @@ comparison holds for that element.}];
          result[element] = a[element] >= b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2271,8 +2028,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] > b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2281,8 +2036,6 @@ comparison holds for that element.}];
          result[element] = a[element] > b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2327,8 +2080,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] <= b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2337,8 +2088,6 @@ comparison holds for that element.}];
          result[element] = a[element] <= b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2357,8 +2106,6 @@ comparison holds.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] < b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2367,8 +2114,6 @@ comparison holds.}];
          result[element] = a[element] < b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2386,8 +2131,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] != b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2396,8 +2139,6 @@ comparison holds for that element.}];
          result[element] = a[element] != b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2412,8 +2153,6 @@ two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = min(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2422,8 +2161,6 @@ two integer vectors.}];
          result[element] = min(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2438,8 +2175,6 @@ two unsigned integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = minu(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2448,8 +2183,6 @@ two unsigned integer vectors.}];
          result[element] = minu(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2466,8 +2199,6 @@ the element.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_not(logical_and(a[element], b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2484,8 +2215,6 @@ element.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_not(logical_or(a[element], b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2502,8 +2231,6 @@ do not enable or disable that element at the same time.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_xor(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2520,8 +2247,6 @@ enable or disable that element at the same time.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_not(logical_xor(a[element], b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2538,8 +2263,6 @@ enable that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_or(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2556,8 +2279,6 @@ mask operand does not enable that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
       result[element] = logical_or(a[element], logical_not(b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2667,8 +2388,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] == b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2677,8 +2396,6 @@ comparison holds for that element.}];
          result[element] = a[element] == b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2697,8 +2414,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] > b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2707,8 +2422,6 @@ comparison holds for that element.}];
          result[element] = a[element] > b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2727,8 +2440,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] > b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2737,8 +2448,6 @@ comparison holds for that element.}];
          result[element] = a[element] > b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2792,8 +2501,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] < b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2802,8 +2509,6 @@ comparison holds for that element.}];
          result[element] = a[element] < b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2822,8 +2527,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] < b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2832,8 +2535,6 @@ comparison holds for that element.}];
          result[element] = a[element] < b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2852,8 +2553,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] <= b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2862,8 +2561,6 @@ comparison holds for that element.}];
          result[element] = a[element] <= b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2882,8 +2579,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] <= b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2892,8 +2587,6 @@ comparison holds for that element.}];
          result[element] = a[element] <= b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2911,8 +2604,6 @@ comparison holds for that element.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] != b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2921,8 +2612,6 @@ comparison holds for that element.}];
          result[element] = a[element] != b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2939,8 +2628,6 @@ This operation returns the lower bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] * b[element]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2949,8 +2636,6 @@ This operation returns the lower bits of the multiplication}];
          result[element] = a[element] * b[element]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2967,8 +2652,6 @@ This operation returns the higher bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = mulh(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -2977,8 +2660,6 @@ This operation returns the higher bits of the multiplication}];
          result[element] = mulh(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -2995,8 +2676,6 @@ This operation returns the higher bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = mulhu(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3005,8 +2684,6 @@ This operation returns the higher bits of the multiplication}];
          result[element] = mulhu(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3025,8 +2702,6 @@ This operation returns the higher bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = mulhsu([element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3035,8 +2710,6 @@ This operation returns the higher bits of the multiplication}];
          result[element] = mulhsu([element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3058,8 +2731,6 @@ to zero.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = narrow_int(srl(a[element], b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3068,8 +2739,6 @@ to zero.}];
          result[element] = narrow_int(srl(a[element], b[element]))
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3091,8 +2760,6 @@ to zero.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = narrow_int(sra(a[element], b[element]))
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3101,8 +2768,6 @@ to zero.}];
          result[element] = narrow_int(sra(a[element], b[element]))
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3389,8 +3054,6 @@ division remainder of two integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = rem(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3399,8 +3062,6 @@ division remainder of two integer vectors.}];
          result[element] = rem(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3415,8 +3076,6 @@ division remainder of two unsigned integer vectors.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = remu(a[element], b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3425,8 +3084,6 @@ division remainder of two unsigned integer vectors.}];
          result[element] = remu(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3444,8 +3101,6 @@ based on a vector of indices.}];
          result[element] = 0
        else
          result[element] = a[b[element]]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3457,8 +3112,6 @@ based on a vector of indices.}];
            result[element] = a[b[element]]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3476,8 +3129,6 @@ elements have the value of an element of another vector}];
          result[element] = 0
        else
          result[element] = a[b]
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3489,8 +3140,6 @@ elements have the value of an element of another vector}];
            result[element] = a[b]
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3505,7 +3154,6 @@ to a given value.}];
   let Operation = [{
      result[0] = b
      result[1 : gvl - 1]= a[1:gvl]
-     result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3520,7 +3168,6 @@ to a given value.}];
   let Operation = [{
      result[0] = b
      result[1 : gvl - 1]= a[1:gvl]
-     result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3594,8 +3241,6 @@ vector.}];
          result[element] = a[element + offset]
       else
          result[element] = 0
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3607,8 +3252,6 @@ vector.}];
            result[element] = 0
       else
         result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3625,14 +3268,10 @@ vector.}];
 
   let Operation = [{
     for element = offset to gvl - 1
-      result[i] = a[element - offset]
-
-    result[gvl : VLMAX] = 0
+      result[element] = a[element - offset]
   }];
 
   let OperationMask = [{
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3651,8 +3290,6 @@ vector one position.}];
     for element = 0 to gvl - 2
          result[element] = a[element + 1]
     result[gvl - 1] = value
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3664,8 +3301,6 @@ vector one position.}];
            result[element] = value
       else
         result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3683,9 +3318,7 @@ vector one position.}];
   let Operation = [{
     result[0] = value
     for element = 1 to gvl - 1
-      result[i] = a[element - offset]
-
-    result[gvl : VLMAX] = 0
+      result[element] = a[element - offset]
   }];
 
   let OperationMask = [{
@@ -3694,11 +3327,9 @@ vector one position.}];
         if element == 0 then
           result[0] = value
         else
-          result[i] = a[element - offset]
+          result[element] = a[element - offset]
       else
         result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3713,7 +3344,6 @@ left given two integer vector operands.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = sll(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3722,8 +3352,6 @@ left given two integer vector operands.}];
          result[element] = sll(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3738,7 +3366,6 @@ right given two integer vector operands.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = srl(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3747,8 +3374,6 @@ right given two integer vector operands.}];
          result[element] = srl(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3763,7 +3388,6 @@ right given two integer vector operands.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = sra(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3772,8 +3396,6 @@ right given two integer vector operands.}];
          result[element] = sra(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3918,8 +3540,6 @@ yield the effective address that loads the element of the vector.}];
     for element = 0 to gvl - 1
       store_element(address, result[element])
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3927,8 +3547,6 @@ yield the effective address that loads the element of the vector.}];
        if mask[element] then
          store_element(address, result[element])
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3950,8 +3568,6 @@ yield the effective address that loads the element of the vector.}];
     for element = 0 to gvl - 1
       store_element(address, result[element])
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3959,8 +3575,6 @@ yield the effective address that loads the element of the vector.}];
        if mask[element] then
          store_element(address, result[element])
       address = address + stride
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -3975,7 +3589,6 @@ two integer vectors}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = bitwise_xor(a[element], b[element])
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -3984,8 +3597,6 @@ two integer vectors}];
          result[element] = bitwise_xor(a[element], b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4004,8 +3615,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = wide_int(a[element]) + wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4014,8 +3623,6 @@ elements.}];
          result[element] = wide_int(a[element]) + wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4034,8 +3641,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] + wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4044,8 +3649,6 @@ elements.}];
          result[element] = a[element] + wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4064,8 +3667,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = wide_int(a[element]) + wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4074,8 +3675,6 @@ elements.}];
          result[element] = wide_int(a[element]) + wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4094,8 +3693,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] + wide_uint(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4104,8 +3701,6 @@ elements.}];
          result[element] = a[element] + wide_uint(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4123,8 +3718,6 @@ This operation returns the lower bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_int(a[element]) * widen_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4133,8 +3726,6 @@ This operation returns the lower bits of the multiplication}];
          result[element] = widen_int(a[element]) * widen_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4151,8 +3742,6 @@ This operation returns the higher bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_uint(a[element]) * widen_uint(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4161,8 +3750,6 @@ This operation returns the higher bits of the multiplication}];
          result[element] = widen_uint(a[element]) * widen_uint(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4179,8 +3766,6 @@ This operation returns the higher bits of the multiplication}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = widen_int(a[element]) * widen_uint(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4189,8 +3774,6 @@ This operation returns the higher bits of the multiplication}];
          result[element] = widen_int(a[element]) * widen_uint(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4209,8 +3792,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = wide_int(a[element]) - wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4219,8 +3800,6 @@ elements.}];
          result[element] = wide_int(a[element]) - wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4239,8 +3818,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] - wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4249,8 +3826,6 @@ elements.}];
          result[element] = a[element] + wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4269,8 +3844,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = wide_int(a[element]) - wide_int(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4279,8 +3852,6 @@ elements.}];
          result[element] = wide_int(a[element]) - wide_int(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
 
@@ -4299,8 +3870,6 @@ elements.}];
   let Operation = [{
     for element = 0 to gvl - 1
        result[element] = a[element] - wide_uint(b[element])
-
-    result[gvl : VLMAX] = 0
   }];
 
   let OperationMask = [{
@@ -4309,7 +3878,5 @@ elements.}];
          result[element] = a[element] - wide_uint(b[element])
        else
          result[element] = merge[element]
-
-    result[gvl : VLMAX] = 0
   }];
 }
