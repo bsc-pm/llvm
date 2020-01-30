@@ -1077,6 +1077,10 @@ def VSETVLI : RVInst<
   let Opcode = OPC_V.Value;
 }
 
+let EmitPriority = 0 in
+def : InstAlias<"vsetvli ${rd}, ${rs1}, ${vsew}",
+                (VSETVLI GPR:$rd, GPR:$rs1, vectorelementwidth:$vsew, 0)>;
+
 let hasSideEffects = 1, mayLoad = 1, mayStore = 1, Defs = [VL, VTYPE] in
 def VSETVL : RVInst<
   (outs GPR:$rd),
