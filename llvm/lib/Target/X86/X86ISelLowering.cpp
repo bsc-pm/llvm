@@ -3131,10 +3131,10 @@ static SDValue CreateCopyOfByValArgument(SDValue Src, SDValue Dst,
                                          SelectionDAG &DAG, const SDLoc &dl) {
   SDValue SizeNode = DAG.getConstant(Flags.getByValSize(), dl, MVT::i32);
 
-  return DAG.getMemcpy(Chain, dl, Dst, Src, SizeNode, Flags.getByValAlign(),
-                       /*isVolatile*/false, /*AlwaysInline=*/true,
-                       /*isTailCall*/false,
-                       MachinePointerInfo(), MachinePointerInfo());
+  return DAG.getMemcpy(
+      Chain, dl, Dst, Src, SizeNode, Flags.getNonZeroByValAlign(),
+      /*isVolatile*/ false, /*AlwaysInline=*/true,
+      /*isTailCall*/ false, MachinePointerInfo(), MachinePointerInfo());
 }
 
 /// Return true if the calling convention is one that we can guarantee TCO for.
@@ -3966,8 +3966,8 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
         // the caller from seeing any modifications the callee may make
         // as guaranteed by the `byval` attribute.
         int FrameIdx = MF.getFrameInfo().CreateStackObject(
-            Flags.getByValSize(), std::max(16, (int)Flags.getByValAlign()),
-            false);
+            Flags.getByValSize(),
+            std::max(Align(16), Flags.getNonZeroByValAlign()), false);
         SDValue StackSlot =
             DAG.getFrameIndex(FrameIdx, getPointerTy(DAG.getDataLayout()));
         Chain =
@@ -23310,9 +23310,8 @@ static SDValue LowerVACOPY(SDValue Op, const X86Subtarget &Subtarget,
   const Value *SrcSV = cast<SrcValueSDNode>(Op.getOperand(4))->getValue();
   SDLoc DL(Op);
 
-  return DAG.getMemcpy(Chain, DL, DstPtr, SrcPtr,
-                       DAG.getIntPtrConstant(24, DL), 8, /*isVolatile*/false,
-                       false, false,
+  return DAG.getMemcpy(Chain, DL, DstPtr, SrcPtr, DAG.getIntPtrConstant(24, DL),
+                       Align(8), /*isVolatile*/ false, false, false,
                        MachinePointerInfo(DstSV), MachinePointerInfo(SrcSV));
 }
 
@@ -32721,6 +32720,28 @@ void X86TargetLowering::computeKnownBitsForTargetNode(const SDValue Op,
     Known.Zero &= Known2.Zero;
     break;
   }
+  case X86ISD::BEXTR: {
+    SDValue Op0 = Op.getOperand(0);
+    SDValue Op1 = Op.getOperand(1);
+
+    if (auto* Cst1 = dyn_cast<ConstantSDNode>(Op1)) {
+      unsigned Shift = Cst1->getAPIntValue().extractBitsAsZExtValue(8, 0);
+      unsigned Length = Cst1->getAPIntValue().extractBitsAsZExtValue(8, 8);
+
+      // If the length is 0, the result is 0.
+      if (Length == 0) {
+        Known.setAllZero();
+        break;
+      }
+
+      if ((Shift + Length) <= BitWidth) {
+        Known = DAG.computeKnownBits(Op0, Depth + 1);
+        Known = Known.extractBits(Length, Shift);
+        Known = Known.zextOrTrunc(BitWidth, true /* ExtBitsAreKnownZero */);
+      }
+    }
+    break;
+  }
   }
 
   // Handle target shuffles.
@@ -36246,6 +36267,35 @@ bool X86TargetLowering::SimplifyDemandedBitsForTargetNode(
     else if (KnownSrc.Zero[SrcBits - 1])
       Known.Zero.setLowBits(NumElts);
     return false;
+  }
+  case X86ISD::BEXTR: {
+    SDValue Op0 = Op.getOperand(0);
+    SDValue Op1 = Op.getOperand(1);
+
+    // Only bottom 16-bits of the control bits are required.
+    if (auto *Cst1 = dyn_cast<ConstantSDNode>(Op1)) {
+      // NOTE: SimplifyDemandedBits won't do this for constants.
+      const APInt &Val1 = Cst1->getAPIntValue();
+      APInt MaskedVal1 = Val1 & 0xFFFF;
+      if (MaskedVal1 != Val1) {
+        SDLoc DL(Op);
+        return TLO.CombineTo(
+            Op, TLO.DAG.getNode(X86ISD::BEXTR, DL, VT, Op0,
+                                TLO.DAG.getConstant(MaskedVal1, DL, VT)));
+      }
+    }
+
+    KnownBits Known1;
+    APInt DemandedMask(APInt::getLowBitsSet(BitWidth, 16));
+    if (SimplifyDemandedBits(Op1, DemandedMask, Known1, TLO, Depth + 1))
+      return true;
+
+    // If the length is 0, replace with 0.
+    KnownBits LengthBits = Known1.extractBits(8, 8);
+    if (LengthBits.isZero())
+      return TLO.CombineTo(Op, TLO.DAG.getConstant(0, SDLoc(Op), VT));
+
+    break;
   }
   }
 
@@ -43019,27 +43069,15 @@ static SDValue combineXor(SDNode *N, SelectionDAG &DAG,
 static SDValue combineBEXTR(SDNode *N, SelectionDAG &DAG,
                             TargetLowering::DAGCombinerInfo &DCI,
                             const X86Subtarget &Subtarget) {
-  SDValue Op0 = N->getOperand(0);
-  SDValue Op1 = N->getOperand(1);
   EVT VT = N->getValueType(0);
   unsigned NumBits = VT.getSizeInBits();
 
-  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-
   // TODO - Constant Folding.
-  if (auto *Cst1 = dyn_cast<ConstantSDNode>(Op1)) {
-    // Reduce Cst1 to the bottom 16-bits.
-    // NOTE: SimplifyDemandedBits won't do this for constants.
-    const APInt &Val1 = Cst1->getAPIntValue();
-    APInt MaskedVal1 = Val1 & 0xFFFF;
-    if (MaskedVal1 != Val1)
-      return DAG.getNode(X86ISD::BEXTR, SDLoc(N), VT, Op0,
-                         DAG.getConstant(MaskedVal1, SDLoc(N), VT));
-  }
 
-  // Only bottom 16-bits of the control bits are required.
-  APInt DemandedMask(APInt::getLowBitsSet(NumBits, 16));
-  if (TLI.SimplifyDemandedBits(Op1, DemandedMask, DCI))
+  // Simplify the inputs.
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  APInt DemandedMask(APInt::getAllOnesValue(NumBits));
+  if (TLI.SimplifyDemandedBits(SDValue(N, 0), DemandedMask, DCI))
     return SDValue(N, 0);
 
   return SDValue();
