@@ -991,27 +991,72 @@ static void changeFCMPPredToAArch64CC(CmpInst::Predicate P,
 }
 
 /// Return a register which can be used as a bit to test in a TB(N)Z.
-static Register getTestBitReg(Register Reg, MachineRegisterInfo &MRI) {
+static Register getTestBitReg(Register Reg, uint64_t Bit,
+                              MachineRegisterInfo &MRI) {
   assert(Reg.isValid() && "Expected valid register!");
   while (MachineInstr *MI = getDefIgnoringCopies(Reg, MRI)) {
     unsigned Opc = MI->getOpcode();
-    Register NextReg;
-
     // (tbz (any_ext x), b) -> (tbz x, b) if we don't use the extended bits.
     //
     // (tbz (trunc x), b) -> (tbz x, b) is always safe, because the bit number
     // on the truncated x is the same as the bit number on x.
     if (Opc == TargetOpcode::G_ANYEXT || Opc == TargetOpcode::G_ZEXT ||
-        Opc == TargetOpcode::G_TRUNC)
-      NextReg = MI->getOperand(1).getReg();
+        Opc == TargetOpcode::G_TRUNC) {
+      Register NextReg = MI->getOperand(1).getReg();
+      // Did we find something worth folding?
+      if (!NextReg.isValid() || !MRI.hasOneUse(NextReg))
+        break;
 
-    // Did we find something worth folding?
-    if (!NextReg.isValid() || !MRI.hasOneUse(NextReg))
+      // NextReg is worth folding. Keep looking.
+      Reg = NextReg;
+      continue;
+    }
+
+    // Attempt to find a suitable operation with a constant on one side.
+    Optional<uint64_t> C;
+    Register TestReg;
+    switch (Opc) {
+    default:
+      break;
+    case TargetOpcode::G_AND: {
+      TestReg = MI->getOperand(1).getReg();
+      Register ConstantReg = MI->getOperand(2).getReg();
+      auto VRegAndVal = getConstantVRegValWithLookThrough(ConstantReg, MRI);
+      if (!VRegAndVal) {
+        // AND commutes, check the other side for a constant.
+        // FIXME: Can we canonicalize the constant so that it's always on the
+        // same side at some point earlier?
+        std::swap(ConstantReg, TestReg);
+        VRegAndVal = getConstantVRegValWithLookThrough(ConstantReg, MRI);
+      }
+      if (VRegAndVal)
+        C = VRegAndVal->Value;
+    }
+    }
+
+    // Didn't find a constant. Bail out of the loop.
+    if (!C)
       break;
 
-    // NextReg is worth folding. Keep looking.
+    // We found a suitable instruction with a constant. Check to see if we can
+    // walk through the instruction.
+    Register NextReg;
+    switch (Opc) {
+    default:
+      break;
+    case TargetOpcode::G_AND:
+      // (tbz (and x, m), b) -> (tbz x, b) when the b-th bit of m is set.
+      if ((*C >> Bit) & 1)
+        NextReg = TestReg;
+      break;
+    }
+
+    // Check if we found anything worth folding.
+    if (!NextReg.isValid() || !MRI.hasOneUse(NextReg))
+      break;
     Reg = NextReg;
   }
+
   return Reg;
 }
 
@@ -1062,7 +1107,7 @@ bool AArch64InstructionSelector::tryOptAndIntoCompareBranch(
   // Try to optimize the TB(N)Z.
   uint64_t Bit = Log2_64(static_cast<uint64_t>(MaybeBit->Value));
   Register TestReg = AndInst->getOperand(1).getReg();
-  TestReg = getTestBitReg(TestReg, MRI);
+  TestReg = getTestBitReg(TestReg, Bit, MRI);
 
   // Choose the correct TB(N)Z opcode to use.
   unsigned Opc = 0;
@@ -1408,9 +1453,7 @@ bool AArch64InstructionSelector::preISelLower(MachineInstr &I) {
 }
 
 /// This lowering tries to look for G_PTR_ADD instructions and then converts
-/// them to a standard G_ADD with a COPY on the source, and G_INTTOPTR on the
-/// result. This is ok for address space 0 on AArch64 as p0 can be treated as
-/// s64.
+/// them to a standard G_ADD with a COPY on the source.
 ///
 /// The motivation behind this is to expose the add semantics to the imported
 /// tablegen patterns. We shouldn't need to check for uses being loads/stores,
@@ -1422,7 +1465,6 @@ bool AArch64InstructionSelector::convertPtrAddToAdd(
   assert(I.getOpcode() == TargetOpcode::G_PTR_ADD && "Expected G_PTR_ADD");
   Register DstReg = I.getOperand(0).getReg();
   Register AddOp1Reg = I.getOperand(1).getReg();
-  Register AddOp2Reg = I.getOperand(2).getReg();
   const LLT PtrTy = MRI.getType(DstReg);
   if (PtrTy.getAddressSpace() != 0)
     return false;
@@ -1434,23 +1476,14 @@ bool AArch64InstructionSelector::convertPtrAddToAdd(
   MachineIRBuilder MIB(I);
   const LLT s64 = LLT::scalar(64);
   auto PtrToInt = MIB.buildPtrToInt(s64, AddOp1Reg);
-  auto Add = MIB.buildAdd(s64, PtrToInt, AddOp2Reg);
   // Set regbanks on the registers.
   MRI.setRegBank(PtrToInt.getReg(0), RBI.getRegBank(AArch64::GPRRegBankID));
-  MRI.setRegBank(Add.getReg(0), RBI.getRegBank(AArch64::GPRRegBankID));
 
-  // Now turn the %dst = G_PTR_ADD %base, off into:
-  // %dst = G_INTTOPTR %Add
-  I.setDesc(TII.get(TargetOpcode::G_INTTOPTR));
-  I.getOperand(1).setReg(Add.getReg(0));
-  I.RemoveOperand(2);
-
-  // We need to manually call select on these because new instructions don't
-  // get added to the selection queue.
-  if (!select(*Add)) {
-    LLVM_DEBUG(dbgs() << "Failed to select G_ADD in convertPtrAddToAdd");
-    return false;
-  }
+  // Now turn the %dst(p0) = G_PTR_ADD %base, off into:
+  // %dst(s64) = G_ADD %intbase, off
+  I.setDesc(TII.get(TargetOpcode::G_ADD));
+  MRI.setType(DstReg, s64);
+  I.getOperand(1).setReg(PtrToInt.getReg(0));
   if (!select(*PtrToInt)) {
     LLVM_DEBUG(dbgs() << "Failed to select G_PTRTOINT in convertPtrAddToAdd");
     return false;
