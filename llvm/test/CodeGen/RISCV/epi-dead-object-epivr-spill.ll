@@ -14,10 +14,7 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    sd s4, 64(sp)
 ; CHECK-NEXT:    sd s5, 56(sp)
 ; CHECK-NEXT:    addi s0, sp, 112
-; CHECK-NEXT:    rdvtype a6
-; CHECK-NEXT:    rdvl a3
-; CHECK-NEXT:    vsetvli a1, zero, e8,m1
-; CHECK-NEXT:    vsetvl zero, a3, a6
+; CHECK-NEXT:    rdvlenb a1
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -72(s0)

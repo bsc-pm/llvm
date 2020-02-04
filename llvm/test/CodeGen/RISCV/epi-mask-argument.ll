@@ -25,10 +25,7 @@ define void @indirect_register_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1>
 ; CHECK-NEXT:    sd ra, 40(sp)
 ; CHECK-NEXT:    sd s0, 32(sp)
 ; CHECK-NEXT:    addi s0, sp, 48
-; CHECK-NEXT:    rdvtype a3
-; CHECK-NEXT:    rdvl a2
-; CHECK-NEXT:    vsetvli a1, zero, e8,m1
-; CHECK-NEXT:    vsetvl zero, a2, a3
+; CHECK-NEXT:    rdvlenb a1
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -40(s0)
@@ -73,10 +70,7 @@ define void @indirect_stack_argument(<vscale x 8 x i32> %a, <vscale x 8 x i1> %m
 ; CHECK-NEXT:    sd ra, 40(sp)
 ; CHECK-NEXT:    sd s0, 32(sp)
 ; CHECK-NEXT:    addi s0, sp, 48
-; CHECK-NEXT:    rdvtype a3
-; CHECK-NEXT:    rdvl a2
-; CHECK-NEXT:    vsetvli a1, zero, e8,m1
-; CHECK-NEXT:    vsetvl zero, a2, a3
+; CHECK-NEXT:    rdvlenb a1
 ; CHECK-NEXT:    sub sp, sp, a1
 ; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -40(s0)

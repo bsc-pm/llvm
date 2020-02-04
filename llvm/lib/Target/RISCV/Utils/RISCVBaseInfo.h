@@ -83,6 +83,7 @@ enum {
   VXRM = 0x00A,
   VL = 0xC20,
   VTYPE = 0xC21,
+  VLENB = 0xC22,
 };
 
 }

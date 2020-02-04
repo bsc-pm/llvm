@@ -11,10 +11,7 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    sd ra, 40(sp)
 ; SPILL-O0-NEXT:    sd s0, 32(sp)
 ; SPILL-O0-NEXT:    addi s0, sp, 48
-; SPILL-O0-NEXT:    rdvtype a3
-; SPILL-O0-NEXT:    rdvl a2
-; SPILL-O0-NEXT:    vsetvli a1, zero, e8,m1
-; SPILL-O0-NEXT:    vsetvl zero, a2, a3
+; SPILL-O0-NEXT:    rdvlenb a1
 ; SPILL-O0-NEXT:    sub sp, sp, a1
 ; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -40(s0)
@@ -139,10 +136,7 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O2-NEXT:    sd ra, 40(sp)
 ; SPILL-O2-NEXT:    sd s0, 32(sp)
 ; SPILL-O2-NEXT:    addi s0, sp, 48
-; SPILL-O2-NEXT:    rdvtype a3
-; SPILL-O2-NEXT:    rdvl a2
-; SPILL-O2-NEXT:    vsetvli a1, zero, e8,m1
-; SPILL-O2-NEXT:    vsetvl zero, a2, a3
+; SPILL-O2-NEXT:    rdvlenb a1
 ; SPILL-O2-NEXT:    sub sp, sp, a1
 ; SPILL-O2-NEXT:    andi sp, sp, -16
 ; SPILL-O2-NEXT:    sd sp, -40(s0)

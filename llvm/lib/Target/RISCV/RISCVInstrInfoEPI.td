@@ -80,7 +80,11 @@ def PseudoVSCALE : Pseudo<(outs GPR:$rd), (ins), [], "">;
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0,
     Uses = [VTYPE] in
 def PseudoReadVTYPE : Pseudo<(outs GPR:$rd),
-                          (ins), [], "rdvtype", "$rd">;
+                             (ins), [], "rdvtype", "$rd">;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 0 in
+def PseudoReadVLENB : Pseudo<(outs GPR:$rd),
+                             (ins), [], "rdvlenb", "$rd">;
 
 let hasSideEffects = 1, mayLoad = 0, mayStore = 0, Defs = [VL, VTYPE] in {
 def PseudoVSETVLI : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, VTypeIOp:$vtypei), []>;

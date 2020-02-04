@@ -388,29 +388,9 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
   // FIXME: We're presuming in advance that this is all about VRs
-  // FIXME: We are assuming the width of the element is 64 bit, we will want
-  // something like an ABI feature or a way to query this from the CPU (via
-  // a CSR)
 
-  // Save VTYPE and VL (1)
-  unsigned OldVTypeReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVTYPE), OldVTypeReg);
-  unsigned OldVLReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVL), OldVLReg);
-
-  // Get VLMAX (2)
   unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-  MachineInstr &MI =
-      *BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVLI), SizeOfVector)
-           .addReg(RISCV::X0)
-           .addImm(/* e8,m1 */ 0);
-  // Set VTYPE and VL as dead.
-  MI.getOperand(3).setIsDead();
-  MI.getOperand(4).setIsDead();
-  // Restore VTYPE.
-  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoVSETVL), RISCV::X0)
-      .addReg(OldVLReg, RegState::Kill)
-      .addReg(OldVTypeReg, RegState::Kill);
+  BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVLENB), SizeOfVector);
 
   // Do the actual allocation.
   unsigned SPReg = getSPReg(STI);
