@@ -1,4 +1,5 @@
 ; RUN: llc < %s -debug-only=isel -o /dev/null 2>&1 | FileCheck %s
+; XFAIL: riscv
 ; REQUIRES: asserts
 
 @a = global [1024 x i32] zeroinitializer, align 16
