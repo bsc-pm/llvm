@@ -270,6 +270,16 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::STRICT_FP_TO_UINT, MVT::i32, Custom);
     setOperationAction(ISD::FP_TO_UINT,        MVT::i64, Custom);
     setOperationAction(ISD::STRICT_FP_TO_UINT, MVT::i64, Custom);
+
+    setOperationAction(ISD::LRINT,             MVT::f32, Custom);
+    setOperationAction(ISD::LRINT,             MVT::f64, Custom);
+    setOperationAction(ISD::LLRINT,            MVT::f32, Custom);
+    setOperationAction(ISD::LLRINT,            MVT::f64, Custom);
+
+    if (!Subtarget.is64Bit()) {
+      setOperationAction(ISD::LRINT,  MVT::i64, Custom);
+      setOperationAction(ISD::LLRINT, MVT::i64, Custom);
+    }
   }
 
   // Handle address space casts between mixed sized pointers.
@@ -663,8 +673,8 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::FMA, MVT::f80, Expand);
     setOperationAction(ISD::LROUND, MVT::f80, Expand);
     setOperationAction(ISD::LLROUND, MVT::f80, Expand);
-    setOperationAction(ISD::LRINT, MVT::f80, Expand);
-    setOperationAction(ISD::LLRINT, MVT::f80, Expand);
+    setOperationAction(ISD::LRINT, MVT::f80, Custom);
+    setOperationAction(ISD::LLRINT, MVT::f80, Custom);
 
     // Handle constrained floating-point operations of scalar.
     setOperationAction(ISD::STRICT_FADD     , MVT::f80, Legal);
@@ -20306,6 +20316,63 @@ SDValue X86TargetLowering::LowerFP_TO_INT(SDValue Op, SelectionDAG &DAG) const {
   llvm_unreachable("Expected FP_TO_INTHelper to handle all remaining cases.");
 }
 
+SDValue X86TargetLowering::LowerLRINT_LLRINT(SDValue Op,
+                                             SelectionDAG &DAG) const {
+  SDValue Src = Op.getOperand(0);
+  MVT SrcVT = Src.getSimpleValueType();
+
+  // If the source is in an SSE register, the node is Legal.
+  if (isScalarFPTypeInSSEReg(SrcVT))
+    return Op;
+
+  return LRINT_LLRINTHelper(Op.getNode(), DAG);
+}
+
+SDValue X86TargetLowering::LRINT_LLRINTHelper(SDNode *N,
+                                              SelectionDAG &DAG) const {
+  EVT DstVT = N->getValueType(0);
+  SDValue Src = N->getOperand(0);
+  EVT SrcVT = Src.getValueType();
+
+  if (SrcVT != MVT::f32 && SrcVT != MVT::f64 && SrcVT != MVT::f80) {
+    // f16 must be promoted before using the lowering in this routine.
+    // fp128 does not use this lowering.
+    return SDValue();
+  }
+
+  SDLoc DL(N);
+  SDValue Chain = DAG.getEntryNode();
+
+  bool UseSSE = isScalarFPTypeInSSEReg(SrcVT);
+
+  // If we're converting from SSE, the stack slot needs to hold both types.
+  // Otherwise it only needs to hold the DstVT.
+  EVT OtherVT = UseSSE ? SrcVT : DstVT;
+  SDValue StackPtr = DAG.CreateStackTemporary(DstVT, OtherVT);
+  int SPFI = cast<FrameIndexSDNode>(StackPtr.getNode())->getIndex();
+  MachinePointerInfo MPI =
+      MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), SPFI);
+
+  if (UseSSE) {
+    assert(DstVT == MVT::i64 && "Invalid LRINT/LLRINT to lower!");
+    Chain = DAG.getStore(Chain, DL, Src, StackPtr, MPI);
+    SDVTList Tys = DAG.getVTList(MVT::f80, MVT::Other);
+    SDValue Ops[] = { Chain, StackPtr };
+
+    Src = DAG.getMemIntrinsicNode(X86ISD::FLD, DL, Tys, Ops, SrcVT, MPI,
+                                  /*Align*/0, MachineMemOperand::MOLoad);
+    Chain = Src.getValue(1);
+  }
+
+  SDValue StoreOps[] = { Chain, Src, StackPtr };
+  Chain = DAG.getMemIntrinsicNode(X86ISD::FIST, DL,
+                                  DAG.getVTList(MVT::Other), StoreOps,
+                                  DstVT, MPI, /*Align*/0,
+                                  MachineMemOperand::MOStore);
+
+  return DAG.getLoad(DstVT, DL, Chain, StackPtr, MPI);
+}
+
 SDValue X86TargetLowering::LowerFP_EXTEND(SDValue Op, SelectionDAG &DAG) const {
   bool IsStrict = Op->isStrictFPOpcode();
 
@@ -28637,6 +28704,8 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::FNEG:               return LowerFABSorFNEG(Op, DAG);
   case ISD::FCOPYSIGN:          return LowerFCOPYSIGN(Op, DAG);
   case ISD::FGETSIGN:           return LowerFGETSIGN(Op, DAG);
+  case ISD::LRINT:
+  case ISD::LLRINT:             return LowerLRINT_LLRINT(Op, DAG);
   case ISD::SETCC:
   case ISD::STRICT_FSETCC:
   case ISD::STRICT_FSETCCS:     return LowerSETCC(Op, DAG);
@@ -29191,6 +29260,13 @@ void X86TargetLowering::ReplaceNodeResults(SDNode *N,
     }
     return;
   }
+  case ISD::LRINT:
+  case ISD::LLRINT: {
+    if (SDValue V = LRINT_LLRINTHelper(N, DAG))
+      Results.push_back(V);
+    return;
+  }
+
   case ISD::SINT_TO_FP:
   case ISD::STRICT_SINT_TO_FP:
   case ISD::UINT_TO_FP:
@@ -31273,25 +31349,12 @@ X86TargetLowering::EmitLoweredCatchRet(MachineInstr &MI,
   BB->addSuccessor(RestoreMBB);
   MI.getOperand(0).setMBB(RestoreMBB);
 
-  auto RestoreMBBI = RestoreMBB->begin();
-  BuildMI(*RestoreMBB, RestoreMBBI, DL, TII.get(X86::EH_RESTORE));
-  BuildMI(*RestoreMBB, RestoreMBBI, DL, TII.get(X86::JMP_4)).addMBB(TargetMBB);
-  return BB;
-}
+  // Marking this as an EH pad but not a funclet entry block causes PEI to
+  // restore stack pointers in the block.
+  RestoreMBB->setIsEHPad(true);
 
-MachineBasicBlock *
-X86TargetLowering::EmitLoweredCatchPad(MachineInstr &MI,
-                                       MachineBasicBlock *BB) const {
-  MachineFunction *MF = BB->getParent();
-  const Constant *PerFn = MF->getFunction().getPersonalityFn();
-  bool IsSEH = isAsynchronousEHPersonality(classifyEHPersonality(PerFn));
-  // Only 32-bit SEH requires special handling for catchpad.
-  if (IsSEH && Subtarget.is32Bit()) {
-    const TargetInstrInfo &TII = *Subtarget.getInstrInfo();
-    DebugLoc DL = MI.getDebugLoc();
-    BuildMI(*BB, MI, DL, TII.get(X86::EH_RESTORE));
-  }
-  MI.eraseFromParent();
+  auto RestoreMBBI = RestoreMBB->begin();
+  BuildMI(*RestoreMBB, RestoreMBBI, DL, TII.get(X86::JMP_4)).addMBB(TargetMBB);
   return BB;
 }
 
@@ -32283,8 +32346,6 @@ X86TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     return EmitLoweredRetpoline(MI, BB);
   case X86::CATCHRET:
     return EmitLoweredCatchRet(MI, BB);
-  case X86::CATCHPAD:
-    return EmitLoweredCatchPad(MI, BB);
   case X86::SEG_ALLOCA_32:
   case X86::SEG_ALLOCA_64:
     return EmitLoweredSegAlloca(MI, BB);
