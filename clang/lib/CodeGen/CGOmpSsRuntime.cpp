@@ -976,15 +976,24 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   SourceLocation Loc = CE->getBeginLoc();
 
   SmallVector<Expr *, 4> ParmCopies;
+  SmallVector<Expr *, 4> FirstprivateCopies;
+  SmallVector<Expr *, 4> SharedCopies;
 
   CodeGenFunction::OSSPrivateScope InitScope(CGF);
+
+  InTaskEmission = true;
+  // NOTE: this differs a bit from the regular use where InTaskEmission
+  // means building bundles, and inTaskBody() meaning emiting the code
+  // of the task. Since we build the call_arg before that and RefMap
+  // is inside TaskContext we do this here.
+  TaskStack.push_back(TaskContext());
 
   auto ArgI = CE->arg_begin();
   auto ParI = FD->param_begin(); 
   while (ArgI != CE->arg_end()) {
 
     // QualType ParQ = (*ParI)->getType();
-    QualType ParQ = (*ParI)->getType().getUnqualifiedType().getNonReferenceType();
+    QualType ParQ = (*ParI)->getType().getUnqualifiedType();
     if (ParQ->isArrayType())
       ParQ = Ctx.getBaseElementType(ParQ).getCanonicalType();
 
@@ -1006,14 +1015,21 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     CGF.EmitVarDecl(*ParmDecl);
 
-    auto *ParmRef = DeclRefExpr::Create(
+    Expr *ParmRef = DeclRefExpr::Create(
         Ctx, NestedNameSpecifierLoc(), SourceLocation(), ParmDecl,
-        /*RefersToEnclosingVariableOrCapture=*/false, Loc, ParQ, VK_LValue);
+        /*RefersToEnclosingVariableOrCapture=*/false, Loc, ParQ.getNonReferenceType(), VK_LValue);
 
-    ParmCopies.push_back(
-      ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
-                               ParmRef, /*BasePath=*/nullptr,
-                               VK_RValue));
+    if (!(*ParI)->getType()->isReferenceType()) {
+      ParmRef =
+        ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
+                                 ParmRef, /*BasePath=*/nullptr,
+                                 VK_RValue);
+      FirstprivateCopies.push_back(ParmRef);
+    } else {
+      // We want to pass references as shared so task can modify the original value
+      SharedCopies.push_back(ParmRef);
+    }
+    ParmCopies.push_back(ParmRef);
 
     LValue ParmLV = CGF.EmitLValue(ParmRef);
 
@@ -1029,8 +1045,6 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
-  TaskStack.push_back(TaskContext());
-
   bool IsMethodCall = false;
   if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
     IsMethodCall = true;
@@ -1044,7 +1058,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   // NOTE: this should do only one iteration
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
     SmallVector<llvm::Value*, 4> CapturedList;
-    for (const Expr *E : ParmCopies) {
+    for (const Expr *E : SharedCopies) {
+      EmitDSAShared(CGF, E, TaskInfo, CapturedList, TaskStack.back().RefMap);
+    }
+    for (const Expr *E : FirstprivateCopies) {
       OSSDSAFirstprivateDataTy FpDataTy;
       // Ignore ImplicitCast built for the new function call
       FpDataTy.Ref = E->IgnoreImpCasts();
@@ -1168,6 +1185,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     if (!CapturedList.empty())
       TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
   }
+  InTaskEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
