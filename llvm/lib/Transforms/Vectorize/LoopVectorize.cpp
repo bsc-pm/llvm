@@ -6800,7 +6800,9 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
   buildVPlansWithVPRecipes(1, MaxVF);
   LLVM_DEBUG(printPlans(dbgs()));
   if (MaxVF == 1)
-    return VectorizationFactor::Disabled();
+    // Do not return VectorizationFactor::Disabled() here, since that means a
+    // width=0. For fixed vectors we want width=1, cost=0 here.
+    return VectorizationFactor(1, 0);
 
   // Select the optimal vectorization factor.
   return CM.selectVectorizationFactor(MaxVF);

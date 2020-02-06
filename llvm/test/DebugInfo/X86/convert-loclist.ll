@@ -1,4 +1,4 @@
-; RUN: %llc_dwarf -filetype=obj < %s \
+; RUN: %llc_dwarf -mtriple x86_64 -filetype=obj < %s \
 ; RUN:   | llvm-dwarfdump -debug-info -debug-loclists - | FileCheck %s
 ; RUN: llc -mtriple x86_64-pc-linux -split-dwarf-file=foo.dwo -filetype=obj < %s \
 ; RUN:   | llvm-dwarfdump -debug-info -debug-loclists - | FileCheck --check-prefix=SPLIT --check-prefix=CHECK %s

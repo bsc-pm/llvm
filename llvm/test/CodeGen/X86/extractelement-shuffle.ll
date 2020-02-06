@@ -1,4 +1,4 @@
-; RUN: llc < %s
+; RUN: llc -mtriple x86_64 < %s
 ; REQUIRES: default_triple
 
 ; Examples that exhibits a bug in DAGCombine.  The case is triggered by the
