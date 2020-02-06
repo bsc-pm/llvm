@@ -33,7 +33,7 @@ using testing::UnorderedElementsAreArray;
 // Convert a Range to a Ref.
 Ref refWithRange(const clangd::Range &Range, const std::string &URI) {
   Ref Result;
-  Result.Kind = RefKind::Reference;
+  Result.Kind = RefKind::Reference | RefKind::Spelled;
   Result.Location.Start.setLine(Range.start.line);
   Result.Location.Start.setColumn(Range.start.character);
   Result.Location.End.setLine(Range.end.line);
@@ -889,6 +889,22 @@ TEST(CrossFileRenameTests, WithUpToDateIndex) {
         #include "foo.h"
         Kind ff() {
           return Kind::[[ABC]];
+        }
+      )cpp",
+      },
+      {
+          // Implicit references in macro expansions.
+          R"cpp(
+        class [[Fo^o]] {};
+        #define FooFoo Foo
+        #define FOO Foo
+      )cpp",
+          R"cpp(
+        #include "foo.h"
+        void bar() {
+          [[Foo]] x;
+          FOO y;
+          FooFoo z;
         }
       )cpp",
       },
