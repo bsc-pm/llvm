@@ -25,16 +25,8 @@ define dso_local signext i32 @main(i32 signext %argc, i8** nocapture readnone %a
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 1 x i64> undef, i64 0, i32 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 1 x i64> [[DOTSPLATINSERT]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer
 ; CHECK-NEXT:    [[STEPVEC_BASE:%.*]] = call <vscale x 1 x i64> @llvm.experimental.vector.stepvector.nxv1i64()
-<<<<<<< HEAD
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 1 x i64> shufflevector (<vscale x 1 x i64> insertelement (<vscale x 1 x i64> undef, i64 0, i32 0), <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer), [[STEPVEC_BASE]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-||||||| merged common ancestors
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 1 x i64> shufflevector (<vscale x 1 x i64> insertelement (<vscale x 1 x i64> undef, i64 0, i32 0), <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer), [[STEPVEC_BASE]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
-=======
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 1 x i64> [[DOTSPLAT]], [[STEPVEC_BASE]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.vector.vscale.i64()
->>>>>>> Updated loop vectorizer tests
+; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul i64 1, [[TMP3]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT2:%.*]] = insertelement <vscale x 1 x i64> undef, i64 [[TMP4]], i32 0
 ; CHECK-NEXT:    [[DOTSPLAT3:%.*]] = shufflevector <vscale x 1 x i64> [[DOTSPLATINSERT2]], <vscale x 1 x i64> undef, <vscale x 1 x i32> zeroinitializer

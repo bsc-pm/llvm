@@ -131,10 +131,10 @@ bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
 }
 
 bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment) {
-  if (!ST->hasExtEPI())
+  if (!ST->hasStdExtV())
     return false;
   Type *ScalarTy = DataType->getScalarType();
-  return (ST->hasExtEPI() &&
+  return (ST->hasStdExtV() &&
           (ScalarTy->isPointerTy() || ScalarTy->isFloatTy() ||
            ScalarTy->isDoubleTy() || ScalarTy->isIntegerTy()));
 }
