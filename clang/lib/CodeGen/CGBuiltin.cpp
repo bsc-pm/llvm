@@ -10115,6 +10115,8 @@ static Value *EmitX86FMAExpr(CodeGenFunction &CGF, ArrayRef<Value *> Ops,
       for (unsigned i = 0; i != NumElts; ++i)
         Indices[i] = i + (i % 2) * NumElts;
 
+      // FIXME: This code isn't exception safe for constrained FP. We need to
+      // suppress exceptions on the unselected elements.
       Value *NegC = CGF.Builder.CreateFNeg(C);
       Value *FMSub;
       if (CGF.Builder.getIsFPConstrained())
