@@ -170,8 +170,10 @@ bool removeDeadVSETVLInstructions(MachineBasicBlock &MBB,
             MI = DefMI;
           }
         } else {
-          // VSETVLMAX instruction.
+          // Instruction does not modify VL or sets it to VLMAX.
           assert(AVLOp.getReg() == RISCV::X0);
+          assert(Register::isVirtualRegister(GVLOp.getReg()) ||
+                 GVLOp.getReg() == RISCV::X0);
         }
       }
     } while (RemovedLastUse);
@@ -254,6 +256,13 @@ bool forwardCompatibleAVL(MachineBasicBlock &MBB,
     const MachineOperand &AVLOp = MI.getOperand(1);
     assert(AVLOp.isReg());
 
+    // Skip instruction if it does not modify VL.
+    if (GVLOp.getReg() == RISCV::X0) {
+      assert(AVLOp.getReg() == RISCV::X0 &&
+             "Unexpected VSETVLI instruction (AVL != X0 while GVL == X0)");
+      continue;
+    }
+
     IsMBBModified |=
         forwardCompatibleAVLToGVLUses(MRI, MI, GVLOp.getReg(), AVLOp.getReg());
   }
@@ -312,8 +321,8 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
     MachineOperand &GVLOp = MI.getOperand(0);
     assert(GVLOp.isReg());
 
-    const MachineOperand *AVLOp = &MI.getOperand(1);
-    assert(AVLOp->isReg());
+    MachineOperand &AVLOp = MI.getOperand(1);
+    assert(AVLOp.isReg());
 
     const MachineOperand &ImplVLOp = MI.getOperand(3);
     const MachineOperand &ImplVTypeOp = MI.getOperand(4);
@@ -327,8 +336,8 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
     // Find the VSETVLI instruction up in the AVL - GVL chain that actually
     // determines the GVL. That is, the VSETVLI with the most restrictive VType
     // (and thus the VSETVLI that produces the smallest GVL).
-    if (Register::isVirtualRegister(AVLOp->getReg())) {
-      MachineInstr *ParentMI = MRI.getUniqueVRegDef(AVLOp->getReg());
+    if (Register::isVirtualRegister(AVLOp.getReg())) {
+      MachineInstr *ParentMI = MRI.getUniqueVRegDef(AVLOp.getReg());
       assert(ParentMI != nullptr);
       // Given that forwardCompatibleGVL is run after forwardCompatibleAVL, we
       // should find the most restrictive VSETVLI instruction within one jump in
@@ -337,13 +346,18 @@ bool forwardCompatibleGVL(MachineBasicBlock &MBB,
           !VI.hasMoreRestrictiveVType(VSETVLInfo(*ParentMI))) {
         // Ensure is GVL op.
         assert(ParentMI->getOperand(0).isReg() &&
-               ParentMI->getOperand(0).getReg() == AVLOp->getReg());
+               ParentMI->getOperand(0).getReg() == AVLOp.getReg());
 
         VI = VSETVLInfo(*ParentMI);
       }
     } else {
-      // VSETVLMAX instruction.
-      assert(AVLOp->getReg() == RISCV::X0);
+      assert(AVLOp.getReg() == RISCV::X0);
+      // Skip instruction if it does not modify VL.
+      if (GVLOp.getReg() == RISCV::X0)
+        continue;
+
+      // Instruction computes VLMAX.
+      assert(Register::isVirtualRegister(GVLOp.getReg()));
     }
 
     VSETVLInfoMap_t::const_iterator I = VSETVLInfoMap.find(VI);
