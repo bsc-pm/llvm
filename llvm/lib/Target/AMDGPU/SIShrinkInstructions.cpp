@@ -426,8 +426,7 @@ getSubRegForIndex(unsigned Reg, unsigned Sub, unsigned I,
     if (Register::isPhysicalRegister(Reg)) {
       Reg = TRI.getSubReg(Reg, TRI.getSubRegFromChannel(I));
     } else {
-      LaneBitmask LM = TRI.getSubRegIndexLaneMask(Sub);
-      Sub = TRI.getSubRegFromChannel(I + countTrailingZeros(LM.getAsInteger()));
+      Sub = TRI.getSubRegFromChannel(I + TRI.getChannelFromSubReg(Sub));
     }
   }
   return TargetInstrInfo::RegSubRegPair(Reg, Sub);
@@ -472,29 +471,26 @@ static MachineInstr* matchSwap(MachineInstr &MovT, MachineRegisterInfo &MRI,
   if (!TRI.isVGPR(MRI, X))
     return nullptr;
 
-  const unsigned SearchLimit = 16;
-  unsigned Count = 0;
-  for (auto Iter = std::next(MovT.getIterator()),
-            E = MovT.getParent()->instr_end();
-       Iter != E && Count < SearchLimit; ++Iter, ++Count) {
-
-    MachineInstr *MovY = &*Iter;
-    if ((MovY->getOpcode() != AMDGPU::V_MOV_B32_e32 &&
-         MovY->getOpcode() != AMDGPU::COPY) ||
-        MovY->getOperand(1).getSubReg() != Tsub ||
-        MovY->getOperand(1).getReg() != T)
+  for (MachineOperand &YTop : MRI.use_nodbg_operands(T)) {
+    if (YTop.getSubReg() != Tsub)
       continue;
 
-    Register Y = MovY->getOperand(0).getReg();
-    unsigned Ysub = MovY->getOperand(0).getSubReg();
+    MachineInstr &MovY = *YTop.getParent();
+    if ((MovY.getOpcode() != AMDGPU::V_MOV_B32_e32 &&
+         MovY.getOpcode() != AMDGPU::COPY) ||
+        MovY.getOperand(1).getSubReg() != Tsub)
+      continue;
 
-    if (!TRI.isVGPR(MRI, Y))
+    Register Y = MovY.getOperand(0).getReg();
+    unsigned Ysub = MovY.getOperand(0).getSubReg();
+
+    if (!TRI.isVGPR(MRI, Y) || MovT.getParent() != MovY.getParent())
       continue;
 
     MachineInstr *MovX = nullptr;
-    for (auto IY = MovY->getIterator(), I = std::next(MovT.getIterator());
-         I != IY; ++I) {
-      if (instReadsReg(&*I, X, Xsub, TRI)    ||
+    auto I = std::next(MovT.getIterator()), E = MovT.getParent()->instr_end();
+    for (auto IY = MovY.getIterator(); I != E && I != IY; ++I) {
+      if (instReadsReg(&*I, X, Xsub, TRI) ||
           instModifiesReg(&*I, Y, Ysub, TRI) ||
           instModifiesReg(&*I, T, Tsub, TRI) ||
           (MovX && instModifiesReg(&*I, X, Xsub, TRI))) {
@@ -519,7 +515,7 @@ static MachineInstr* matchSwap(MachineInstr &MovT, MachineRegisterInfo &MRI,
       MovX = &*I;
     }
 
-    if (!MovX)
+    if (!MovX || I == E)
       continue;
 
     LLVM_DEBUG(dbgs() << "Matched v_swap_b32:\n" << MovT << *MovX << MovY);
@@ -536,7 +532,7 @@ static MachineInstr* matchSwap(MachineInstr &MovT, MachineRegisterInfo &MRI,
         .addReg(X1.Reg, 0, X1.SubReg).getInstr();
     }
     MovX->eraseFromParent();
-    MovY->eraseFromParent();
+    MovY.eraseFromParent();
     MachineInstr *Next = &*std::next(MovT.getIterator());
     if (MRI.use_nodbg_empty(T))
       MovT.eraseFromParent();
