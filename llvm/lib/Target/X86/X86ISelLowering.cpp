@@ -16100,13 +16100,14 @@ static SDValue lowerV8F32Shuffle(const SDLoc &DL, ArrayRef<int> Mask,
   // If we have a single input shuffle with different shuffle patterns in the
   // two 128-bit lanes use the variable mask to VPERMILPS.
   if (V2.isUndef()) {
-    SDValue VPermMask = getConstVector(Mask, MVT::v8i32, DAG, DL, true);
-    if (!is128BitLaneCrossingShuffleMask(MVT::v8f32, Mask))
+    if (!is128BitLaneCrossingShuffleMask(MVT::v8f32, Mask)) {
+      SDValue VPermMask = getConstVector(Mask, MVT::v8i32, DAG, DL, true);
       return DAG.getNode(X86ISD::VPERMILPV, DL, MVT::v8f32, V1, VPermMask);
-
-    if (Subtarget.hasAVX2())
+    }
+    if (Subtarget.hasAVX2()) {
+      SDValue VPermMask = getConstVector(Mask, MVT::v8i32, DAG, DL, true);
       return DAG.getNode(X86ISD::VPERMV, DL, MVT::v8f32, VPermMask, V1);
-
+    }
     // Otherwise, fall back.
     return lowerShuffleAsLanePermuteAndShuffle(DL, MVT::v8f32, V1, V2, Mask,
                                                DAG, Subtarget);
@@ -42926,7 +42927,8 @@ char X86TargetLowering::isNegatibleForFree(SDValue Op, SelectionDAG &DAG,
   case X86ISD::FNMADD_RND:
   case X86ISD::FNMSUB_RND: {
     if (!Op.hasOneUse() || !Subtarget.hasAnyFMA() || !isTypeLegal(VT) ||
-        !(SVT == MVT::f32 || SVT == MVT::f64) || !LegalOperations)
+        !(SVT == MVT::f32 || SVT == MVT::f64) ||
+        !isOperationLegal(ISD::FMA, VT))
       break;
 
     // This is always negatible for free but we might be able to remove some
@@ -42966,7 +42968,8 @@ SDValue X86TargetLowering::getNegatedExpression(SDValue Op, SelectionDAG &DAG,
   case X86ISD::FNMADD_RND:
   case X86ISD::FNMSUB_RND: {
     if (!Op.hasOneUse() || !Subtarget.hasAnyFMA() || !isTypeLegal(VT) ||
-        !(SVT == MVT::f32 || SVT == MVT::f64) || !LegalOperations)
+        !(SVT == MVT::f32 || SVT == MVT::f64) ||
+        !isOperationLegal(ISD::FMA, VT))
       break;
 
     // This is always negatible for free but we might be able to remove some
