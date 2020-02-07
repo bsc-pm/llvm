@@ -130,23 +130,31 @@ bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
   return false;
 }
 
-bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment) {
+bool RISCVTTIImpl::isLegalMaskedLoadStore(Type *DataType) const {
   if (!ST->hasStdExtV())
     return false;
   Type *ScalarTy = DataType->getScalarType();
-  return (ST->hasStdExtV() &&
-          (ScalarTy->isPointerTy() || ScalarTy->isFloatTy() ||
-           ScalarTy->isDoubleTy() || ScalarTy->isIntegerTy()));
+  return (ScalarTy->isFloatTy() || ScalarTy->isDoubleTy() ||
+          ScalarTy->isIntegerTy(8) || ScalarTy->isIntegerTy(16) ||
+          ScalarTy->isIntegerTy(32) || ScalarTy->isIntegerTy(64));
 }
 
-bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType, MaybeAlign Alignment) {
-  return isLegalMaskedLoad(DataType, Alignment);
+bool RISCVTTIImpl::isLegalMaskedLoad(Type *DataType,
+                                     MaybeAlign Alignment) const {
+  return isLegalMaskedLoadStore(DataType);
 }
 
-bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType, MaybeAlign Alignment) {
-  return isLegalMaskedLoad(DataType, Alignment);
+bool RISCVTTIImpl::isLegalMaskedStore(Type *DataType,
+                                      MaybeAlign Alignment) const {
+  return isLegalMaskedLoadStore(DataType);
 }
 
-bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment) {
-  return isLegalMaskedStore(DataType, Alignment);
+bool RISCVTTIImpl::isLegalMaskedGather(Type *DataType,
+                                       MaybeAlign Alignment) const {
+  return isLegalMaskedLoadStore(DataType);
+}
+
+bool RISCVTTIImpl::isLegalMaskedScatter(Type *DataType,
+                                        MaybeAlign Alignment) const {
+  return isLegalMaskedLoadStore(DataType);
 }

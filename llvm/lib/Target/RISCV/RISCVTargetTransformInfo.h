@@ -36,6 +36,8 @@ class RISCVTTIImpl : public BasicTTIImplBase<RISCVTTIImpl> {
   const RISCVSubtarget *getST() const { return ST; }
   const RISCVTargetLowering *getTLI() const { return TLI; }
 
+  bool isLegalMaskedLoadStore(Type *DataType) const;
+
 public:
   explicit RISCVTTIImpl(const RISCVTargetMachine *TM, const Function &F)
       : BaseT(TM, F.getParent()->getDataLayout()), ST(TM->getSubtargetImpl(F)),
@@ -51,10 +53,10 @@ public:
   bool useReductionIntrinsic(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
   bool shouldExpandReduction(const IntrinsicInst *II) const { return false; }
-  bool isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment);
-  bool isLegalMaskedStore(Type *DataType, MaybeAlign Alignment);
-  bool isLegalMaskedGather(Type *DataType, MaybeAlign Alignment);
-  bool isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment);
+  bool isLegalMaskedLoad(Type *DataType, MaybeAlign Alignment) const;
+  bool isLegalMaskedStore(Type *DataType, MaybeAlign Alignment) const;
+  bool isLegalMaskedGather(Type *DataType, MaybeAlign Alignment) const;
+  bool isLegalMaskedScatter(Type *DataType, MaybeAlign Alignment) const;
 };
 
 } // end namespace llvm
