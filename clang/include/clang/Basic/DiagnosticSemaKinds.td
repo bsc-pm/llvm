@@ -9944,6 +9944,10 @@ def err_oss_function_expected : Error<
   "'#pragma oss task' can only be applied to %select{functions|non-volatile or static methods}0">;
 def err_oss_non_void_task : Error<
   "non-void tasks are not supported">;
+def err_oss_rvalue_param_task : Error<
+  "r-values are not allowed in task outline">;
+def err_oss_non_pod_parm_task : Error<
+  "non-PODs by value are not allowed in task outline">;
 } // end of OmpSs component.
 
 

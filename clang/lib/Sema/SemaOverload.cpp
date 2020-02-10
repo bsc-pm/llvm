@@ -12222,6 +12222,16 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
     if (SemaRef.DiagnoseUseOfDecl(FDecl, ULE->getNameLoc()))
       return ExprError();
     Fn = SemaRef.FixOverloadedFunctionReference(Fn, (*Best)->FoundDecl, FDecl);
+
+    if (SemaRef.getLangOpts().OmpSs) {
+      if (FDecl->hasAttr<OSSTaskDeclAttr>()) {
+        for (const Expr *E : Args) {
+          if (E->isRValue())
+            SemaRef.Diag(E->getExprLoc(), diag::err_oss_rvalue_param_task);
+        }
+      }
+    }
+
     return SemaRef.BuildResolvedCallExpr(Fn, FDecl, LParenLoc, Args, RParenLoc,
                                          ExecConfig, /*IsExecConfig=*/false,
                                          (*Best)->IsADLCandidate);

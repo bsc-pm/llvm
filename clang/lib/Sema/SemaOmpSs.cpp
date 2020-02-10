@@ -886,6 +886,15 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     return DeclGroupPtrTy();
   }
 
+  auto ParI = FD->param_begin();
+  while (ParI != FD->param_end()) {
+    if (!(*ParI)->getType().isPODType(Context)
+        && !(*ParI)->getType()->isReferenceType()) {
+      Diag((*ParI)->getBeginLoc(), diag::err_oss_non_pod_parm_task);
+    }
+    ++ParI;
+  }
+
   ExprResult IfRes, FinalRes, CostRes, PriorityRes;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
