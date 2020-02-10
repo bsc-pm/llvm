@@ -455,23 +455,32 @@ return:                                           ; preds = %if.else, %if.then
 
 
 define dso_local i32 @test4-g2(i32 %u) {
-; CHECK-LABEL: define {{[^@]+}}@test4-g2
-; CHECK-SAME: (i32 [[U:%.*]])
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CALL:%.*]] = tail call i32 @test4-f2(i32 [[U]])
-; CHECK-NEXT:    ret i32 [[CALL]]
+; OLD_PM-LABEL: define {{[^@]+}}@test4-g2
+; OLD_PM-SAME: (i32 [[U:%.*]])
+; OLD_PM-NEXT:  entry:
+; OLD_PM-NEXT:    [[CALL:%.*]] = tail call i32 @test4-f2(i32 [[U]])
+; OLD_PM-NEXT:    ret i32 [[CALL]]
 ;
-; FIXME: %call should have range [1, inf]
+; NEW_PM-LABEL: define {{[^@]+}}@test4-g2
+; NEW_PM-SAME: (i32 [[U:%.*]])
+; NEW_PM-NEXT:  entry:
+; NEW_PM-NEXT:    [[CALL:%.*]] = tail call i32 @test4-f2(i32 [[U]]) #2, !range !3
+; NEW_PM-NEXT:    ret i32 [[CALL]]
 entry:
   %call = tail call i32 @test4-f2(i32 %u)
   ret i32 %call
 }
 
 define dso_local i32 @test-5() {
-; CHECK-LABEL: define {{[^@]+}}@test-5()
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CALL:%.*]] = call i32 @rec(i32 0), !range !3
-; CHECK-NEXT:    ret i32 [[CALL]]
+; OLD_PM-LABEL: define {{[^@]+}}@test-5()
+; OLD_PM-NEXT:  entry:
+; OLD_PM-NEXT:    [[CALL:%.*]] = call i32 @rec(i32 0), !range !3
+; OLD_PM-NEXT:    ret i32 [[CALL]]
+;
+; NEW_PM-LABEL: define {{[^@]+}}@test-5()
+; NEW_PM-NEXT:  entry:
+; NEW_PM-NEXT:    [[CALL:%.*]] = call i32 @rec(i32 0), !range !4
+; NEW_PM-NEXT:    ret i32 [[CALL]]
 ;
 entry:
   %call = call i32 @rec(i32 0)
@@ -525,9 +534,150 @@ return:                                           ; preds = %if.end3, %if.then
 }
 declare dso_local i32 @foo(i32)
 
+
+; Examples taken from https://llvm.discourse.group/t/impossible-condition-optimization/461/1
+;
+; The important part is that we return a constant (false)
+;
+; {
+
+; FIXME: All but the return is not needed anymore
+define dso_local zeroext i1 @phi(i32 %arg) {
+; CHECK-LABEL: define {{[^@]+}}@phi
+; CHECK-SAME: (i32 [[ARG:%.*]])
+; CHECK-NEXT:  bb:
+; CHECK-NEXT:    [[TMP:%.*]] = icmp sgt i32 [[ARG]], 5
+; CHECK-NEXT:    br i1 [[TMP]], label [[BB1:%.*]], label [[BB2:%.*]]
+; CHECK:       bb1:
+; CHECK-NEXT:    br label [[BB3:%.*]]
+; CHECK:       bb2:
+; CHECK-NEXT:    br label [[BB3]]
+; CHECK:       bb3:
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt i32 [[ARG]], 10
+; CHECK-NEXT:    br i1 [[TMP4]], label [[BB5:%.*]], label [[BB7:%.*]]
+; CHECK:       bb5:
+; CHECK-NEXT:    br label [[BB9:%.*]]
+; CHECK:       bb7:
+; CHECK-NEXT:    br label [[BB9]]
+; CHECK:       bb9:
+; CHECK-NEXT:    br label [[BB12:%.*]]
+; CHECK:       bb11:
+; CHECK-NEXT:    unreachable
+; CHECK:       bb12:
+; CHECK-NEXT:    br label [[BB13:%.*]]
+; CHECK:       bb13:
+; CHECK-NEXT:    ret i1 false
+;
+bb:
+  %tmp = icmp sgt i32 %arg, 5
+  br i1 %tmp, label %bb1, label %bb2
+
+bb1:                                              ; preds = %bb
+  br label %bb3
+
+bb2:                                              ; preds = %bb
+  br label %bb3
+
+bb3:                                              ; preds = %bb2, %bb1
+  %.02 = phi i32 [ 1, %bb1 ], [ 2, %bb2 ]
+  %tmp4 = icmp sgt i32 %arg, 10
+  br i1 %tmp4, label %bb5, label %bb7
+
+bb5:                                              ; preds = %bb3
+  %tmp6 = add nsw i32 %.02, 1
+  br label %bb9
+
+bb7:                                              ; preds = %bb3
+  %tmp8 = add nsw i32 %.02, 2
+  br label %bb9
+
+bb9:                                              ; preds = %bb7, %bb5
+  %.01 = phi i32 [ %tmp6, %bb5 ], [ %tmp8, %bb7 ]
+  %tmp10 = icmp eq i32 %.01, 5
+  br i1 %tmp10, label %bb11, label %bb12
+
+bb11:                                             ; preds = %bb9
+  br label %bb13
+
+bb12:                                             ; preds = %bb9
+  br label %bb13
+
+bb13:                                             ; preds = %bb12, %bb11
+  %.0 = phi i1 [ true, %bb11 ], [ false, %bb12 ]
+  ret i1 %.0
+}
+
+define dso_local i1 @select(i32 %a) local_unnamed_addr #0 {
+; CHECK-LABEL: define {{[^@]+}}@select
+; CHECK-SAME: (i32 [[A:%.*]]) local_unnamed_addr
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %cmp = icmp sgt i32 %a, 5
+  %. = select i1 %cmp, i32 1, i32 2
+  %cmp1 = icmp sgt i32 %a, 10
+  %y.0.v = select i1 %cmp1, i32 1, i32 2
+  %y.0 = add nuw nsw i32 %., %y.0.v
+  %cmp6 = icmp eq i32 %y.0, 5
+  ret i1 %cmp6
+}
+
+define dso_local i32 @select_zext(i32 %a) local_unnamed_addr #0 {
+; CHECK-LABEL: define {{[^@]+}}@select_zext
+; CHECK-SAME: (i32 [[A:%.*]]) local_unnamed_addr
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    ret i32 0
+;
+entry:
+  %cmp = icmp sgt i32 %a, 5
+  %. = select i1 %cmp, i32 1, i32 2
+  %cmp1 = icmp sgt i32 %a, 10
+  %y.0.v = select i1 %cmp1, i32 1, i32 2
+  %y.0 = add nuw nsw i32 %., %y.0.v
+  %cmp6 = icmp eq i32 %y.0, 5
+  %.13 = zext i1 %cmp6 to i32
+  ret i32 %.13
+}
+
+; FIXME: We do not look through the ptr casts here.
+define dso_local i64 @select_int2ptr_bitcast_ptr2int(i32 %a) local_unnamed_addr #0 {
+; CHECK-LABEL: define {{[^@]+}}@select_int2ptr_bitcast_ptr2int
+; CHECK-SAME: (i32 [[A:%.*]]) local_unnamed_addr
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[A]], 5
+; CHECK-NEXT:    [[DOT:%.*]] = select i1 [[CMP]], i32 1, i32 2
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp sgt i32 [[A]], 10
+; CHECK-NEXT:    [[Y_0_V:%.*]] = select i1 [[CMP1]], i32 1, i32 2
+; CHECK-NEXT:    [[Y_0:%.*]] = add nuw nsw i32 [[DOT]], [[Y_0_V]]
+; CHECK-NEXT:    [[CMP6:%.*]] = icmp eq i32 [[Y_0]], 5
+; CHECK-NEXT:    [[I2P:%.*]] = inttoptr i1 [[CMP6]] to i1*
+; CHECK-NEXT:    [[BC:%.*]] = bitcast i1* [[I2P]] to i32*
+; CHECK-NEXT:    [[P2I:%.*]] = ptrtoint i32* [[BC]] to i64
+; CHECK-NEXT:    ret i64 [[P2I]]
+;
+entry:
+  %cmp = icmp sgt i32 %a, 5
+  %. = select i1 %cmp, i32 1, i32 2
+  %cmp1 = icmp sgt i32 %a, 10
+  %y.0.v = select i1 %cmp1, i32 1, i32 2
+  %y.0 = add nuw nsw i32 %., %y.0.v
+  %cmp6 = icmp eq i32 %y.0, 5
+  %i2p = inttoptr i1 %cmp6 to i1*
+  %bc = bitcast i1* %i2p to i32*
+  %p2i = ptrtoint i32* %bc to i64
+  ret i64 %p2i
+}
+
+; }
+
 !0 = !{i32 0, i32 10}
 !1 = !{i32 10, i32 100}
-;CHECK: !0 = !{i32 0, i32 10}
-;CHECK-NEXT: !1 = !{i32 10, i32 100}
-;CHECK-NEXT: !2 = !{i32 200, i32 1091}
+; CHECK: !0 = !{i32 0, i32 10}
+; CHECK-NEXT: !1 = !{i32 10, i32 100}
+; CHECK-NEXT: !2 = !{i32 200, i32 1091}
+; OLD_PM:     !3 = !{i32 0, i32 2}
+; NEW_PM:     !3 = !{i32 1, i32 -2147483648}
+; NEW_PM:     !4 = !{i32 0, i32 2}
+
 
