@@ -215,6 +215,8 @@ unsigned clang::getOpenMPSimpleClauseType(OpenMPClauseKind Kind,
   case OMPC_capture:
   case OMPC_seq_cst:
   case OMPC_acq_rel:
+  case OMPC_acquire:
+  case OMPC_release:
   case OMPC_device:
   case OMPC_threads:
   case OMPC_simd:
@@ -428,6 +430,8 @@ const char *clang::getOpenMPSimpleClauseTypeName(OpenMPClauseKind Kind,
   case OMPC_capture:
   case OMPC_seq_cst:
   case OMPC_acq_rel:
+  case OMPC_acquire:
+  case OMPC_release:
   case OMPC_device:
   case OMPC_threads:
   case OMPC_simd:
@@ -593,7 +597,8 @@ bool clang::isAllowedClauseForDirective(OpenMPDirectiveKind DKind,
     }
     break;
   case OMPD_atomic:
-    if (OpenMPVersion < 50 && CKind == OMPC_acq_rel)
+    if (OpenMPVersion < 50 && (CKind == OMPC_acq_rel || CKind == OMPC_acquire ||
+                               CKind == OMPC_release))
       return false;
     switch (CKind) {
 #define OPENMP_ATOMIC_CLAUSE(Name)                                             \
