@@ -1194,10 +1194,20 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
 
+  // The point of exit cannot be a branch out of the structured block.
+  // longjmp() and throw() must not violate the entry/exit criteria.
+  CGF.EHStack.pushTerminate();
+
   // From EmitCallExpr
   RValue RV;
   if (IsMethodCall) {
-    RV = CGF.EmitCXXMemberCallExpr(cast<CXXMemberCallExpr>(CE), ReturnValue);
+    const Expr *callee = cast<CXXMemberCallExpr>(CE)->getCallee()->IgnoreParens();
+    const MemberExpr *ME = cast<MemberExpr>(callee);
+
+    CXXMemberCallExpr *NewCXXE = CXXMemberCallExpr::Create(
+        Ctx, const_cast<MemberExpr *>(ME), ParmCopies, Ctx.VoidTy, VK_RValue, SourceLocation());
+
+    RV = CGF.EmitCXXMemberCallExpr(NewCXXE, ReturnValue);
   } else {
     // Regular function call
     CGCallee callee = CGF.EmitCallee(CE->getCallee());
@@ -1207,6 +1217,14 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     RV = CGF.EmitCall(CE->getCallee()->getType(), callee, NewCE, ReturnValue);
   }
+
+  CGF.EHStack.popTerminate();
+
+  // TODO: do we need this? we're pushing a terminate...
+  // EmitIfUsed(*this, EHResumeBlock);
+  EmitIfUsed(CGF, TaskStack.back().TerminateLandingPad);
+  EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
+  EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
 
   CGF.Builder.CreateCall(ExitCallee, Result);
 

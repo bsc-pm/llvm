@@ -888,8 +888,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 
   auto ParI = FD->param_begin();
   while (ParI != FD->param_end()) {
-    if (!(*ParI)->getType().isPODType(Context)
-        && !(*ParI)->getType()->isReferenceType()) {
+    QualType Type = (*ParI)->getType();
+    if (!Type->isDependentType()
+        && !Type.isPODType(Context)
+        && !Type->isReferenceType()) {
       Diag((*ParI)->getBeginLoc(), diag::err_oss_non_pod_parm_task);
     }
     ++ParI;

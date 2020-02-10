@@ -12225,9 +12225,12 @@ static ExprResult FinishOverloadedCallExpr(Sema &SemaRef, Scope *S, Expr *Fn,
 
     if (SemaRef.getLangOpts().OmpSs) {
       if (FDecl->hasAttr<OSSTaskDeclAttr>()) {
+        auto ParI = FDecl->param_begin();
         for (const Expr *E : Args) {
-          if (E->isRValue())
+          if ((*ParI)->getType()->isReferenceType() && E->isRValue())
             SemaRef.Diag(E->getExprLoc(), diag::err_oss_rvalue_param_task);
+
+          ++ParI;
         }
       }
     }
