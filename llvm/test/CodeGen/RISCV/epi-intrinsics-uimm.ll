@@ -46,18 +46,18 @@ define <vscale x 1 x i64> @foo(<vscale x 1 x i64> %v, <vscale x 2 x i64> %w, i64
 ; CHECK-NEXT:    vssra.vi v0, v0, 31
 ; CHECK-NEXT:    vssra.vx v0, v0, a0
 ; CHECK-NEXT:    vssra.vx v0, v0, a1
-; CHECK-NEXT:    vslideup.vi v0, v0, 0
-; CHECK-NEXT:    vslideup.vi v0, v0, 31
-; CHECK-NEXT:    vslideup.vx v0, v0, a0
-; CHECK-NEXT:    vslideup.vx v0, v0, a1
+; CHECK-NEXT:    vslideup.vi v1, v0, 0
+; CHECK-NEXT:    vslideup.vi v0, v1, 31
+; CHECK-NEXT:    vslideup.vx v1, v0, a0
+; CHECK-NEXT:    vslideup.vx v0, v1, a1
 ; CHECK-NEXT:    vslidedown.vi v0, v0, 0
 ; CHECK-NEXT:    vslidedown.vi v0, v0, 31
 ; CHECK-NEXT:    vslidedown.vx v0, v0, a0
 ; CHECK-NEXT:    vslidedown.vx v0, v0, a1
-; CHECK-NEXT:    vrgather.vi v0, v0, 0
-; CHECK-NEXT:    vrgather.vi v0, v0, 31
-; CHECK-NEXT:    vrgather.vx v0, v0, a0
-; CHECK-NEXT:    vrgather.vx v16, v0, a1
+; CHECK-NEXT:    vrgather.vi v1, v0, 0
+; CHECK-NEXT:    vrgather.vi v0, v1, 31
+; CHECK-NEXT:    vrgather.vx v1, v0, a0
+; CHECK-NEXT:    vrgather.vx v16, v1, a1
 ; CHECK-NEXT:    ret
 {
   %1 = call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64(<vscale x 1 x i64> %v, i64 0, i64 %gvl)

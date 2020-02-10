@@ -423,7 +423,7 @@ multiclass pseudo_unary_v_m {
   {
     let VLMul = evr.VLMul in
     {
-      defm _M : pseudo_unary<evr, VR, evr.VLMul>;
+      defm _M : pseudo_unary<evr, VR, evr.VLMul, "@earlyclobber $rd">;
     }
   }
 }
@@ -542,13 +542,13 @@ multiclass pseudo_binary_v_vv {
   }
 }
 
-multiclass pseudo_binary_v_vx {
+multiclass pseudo_binary_v_vx<string constraints = ""> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
   {
     let VLMul = evr.VLMul in
     {
-      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
+      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul, constraints>;
     }
   }
 }
@@ -576,27 +576,29 @@ multiclass pseudo_binary_v_vv_vx {
   }
 }
 
-multiclass pseudo_binary_v_vx_vi<Operand imm_type = simm5> {
+multiclass pseudo_binary_v_vx_vi<Operand imm_type = simm5,
+                                 string constraints = ""> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
   {
     let VLMul = evr.VLMul in
     {
-      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>;
+      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul, constraints>;
+      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul, constraints>;
     }
   }
 }
 
-multiclass pseudo_binary_v_vv_vx_vi<Operand imm_type = simm5> {
+multiclass pseudo_binary_v_vv_vx_vi<Operand imm_type = simm5,
+                                    string constraints = ""> {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
   {
     let VLMul = evr.VLMul in
     {
-      defm _VV : pseudo_binary<evr, evr, evr, evr.VLMul>;
-      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul>;
-      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul>;
+      defm _VV : pseudo_binary<evr, evr, evr, evr.VLMul, constraints>;
+      defm _VX : pseudo_binary<evr, evr, GPR, evr.VLMul, constraints>;
+      defm _VI : pseudo_binary<evr, evr, imm_type, evr.VLMul, constraints>;
     }
   }
 }
@@ -831,8 +833,8 @@ defm PseudoVAND        : pseudo_binary_v_vv_vx_vi;
 defm PseudoVOR         : pseudo_binary_v_vv_vx_vi;
 defm PseudoVXOR        : pseudo_binary_v_vv_vx_vi;
 
-defm PseudoVRGATHER    : pseudo_binary_v_vv_vx_vi<uimm5>;
-defm PseudoVSLIDEUP    : pseudo_binary_v_vx_vi<uimm5>;
+defm PseudoVRGATHER    : pseudo_binary_v_vv_vx_vi<uimm5, "@earlyclobber $rd">;
+defm PseudoVSLIDEUP    : pseudo_binary_v_vx_vi<uimm5, "@earlyclobber $rd">;
 defm PseudoVSLIDEDOWN  : pseudo_binary_v_vx_vi<uimm5>;
 
 defm PseudoVMSEQ       : pseudo_binary_m_vv_vx_vi;
@@ -896,7 +898,7 @@ let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
                         EPIPseudo;
 }
 
-defm PseudoVSLIDE1UP   : pseudo_binary_v_vx;
+defm PseudoVSLIDE1UP   : pseudo_binary_v_vx<"@earlyclobber $rd">;
 defm PseudoVSLIDE1DOWN : pseudo_binary_v_vx;
 
 defm PseudoVDIVU       : pseudo_binary_v_vv_vx;
