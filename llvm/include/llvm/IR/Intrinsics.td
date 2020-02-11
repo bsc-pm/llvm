@@ -1371,22 +1371,14 @@ def int_experimental_vector_stepvector : Intrinsic<[llvm_anyvector_ty],
                                                    [],
                                                    [IntrNoMem]>;
 
-//===----------------------------------------------------------------------===//
+//===---------- Intrinsics to modify scalable vectors ---------------------===//
+// TODO: These intrinsics are placeholder until a decision is reached on
+// shufflevector for scalable vectors. They will be replaced eventually. Use
+// them with caution. 
 
 def int_experimental_vector_reverse : Intrinsic<[llvm_anyvector_ty],
                                                 [LLVMMatchType<0>],
                                                 [IntrNoMem]>;
-
-// This intrinsic takes two vector arguments v1 and v2 and an integer number
-// num. It slides the elements of v1 to the right by num places. The num empty
-// places on the left are filled by v2[0..num-1] elements.
-// v1, v2 and return value should be of the same vector type. if num is >=
-// vector length, the return vecotor will be same as v2.
-def int_experimental_vector_sliderightfill : Intrinsic<[llvm_anyvector_ty],
-                                                    [LLVMMatchType<0>,
-                                                     LLVMMatchType<0>,
-                                                     llvm_anyint_ty],
-                                                    [IntrNoMem]>; 
 
 // This intrinsic takes two vector arguments v1 and v2 and an integer number
 // num. It slides the elements of v1 to the left by num places. The num empty

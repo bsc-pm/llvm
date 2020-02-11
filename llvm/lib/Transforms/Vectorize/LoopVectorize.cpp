@@ -2526,11 +2526,24 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     if (Reverse) {
       // If the address is consecutive but reversed, then the
       // wide store needs to start at the last vector element.
-      PartPtr = cast<GetElementPtrInst>(
-          Builder.CreateGEP(ScalarDataTy, Ptr, Builder.getInt32(-Part * VF)));
+      Value *ScaledVF = nullptr;
+      if (isScalable()) {
+        CallInst *Vscale =
+            emitVscaleCall(Builder, Instr->getModule(),
+                           Type::getInt32Ty(ScalarDataTy->getContext()));
+        ScaledVF = Builder.CreateMul(Builder.getInt32(VF), Vscale);
+      }
+      Value *Index = isScalable()
+                         ? Builder.CreateMul(ScaledVF, Builder.getInt32(-Part))
+                         : Builder.getInt32(-Part * VF);
+      PartPtr =
+          cast<GetElementPtrInst>(Builder.CreateGEP(ScalarDataTy, Ptr, Index));
       PartPtr->setIsInBounds(InBounds);
+      Value *RevIndex = isScalable()
+                            ? Builder.CreateSub(Builder.getInt32(1), ScaledVF)
+                            : Builder.getInt32(1 - VF);
       PartPtr = cast<GetElementPtrInst>(
-          Builder.CreateGEP(ScalarDataTy, PartPtr, Builder.getInt32(1 - VF)));
+          Builder.CreateGEP(ScalarDataTy, PartPtr, RevIndex));
       PartPtr->setIsInBounds(InBounds);
       if (isMaskRequired) // Reverse of a null all-one mask is a null mask.
         BlockInMaskParts[Part] = reverseVector(BlockInMaskParts[Part]);
