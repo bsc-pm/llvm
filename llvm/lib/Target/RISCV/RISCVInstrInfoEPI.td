@@ -794,9 +794,9 @@ multiclass pseudo_ternary_v_vv_vf {
   }
 }
 
-multiclass pseudo_unary_x_v {
-  // A different pseudo is defined for each VLMul value, but (ungrouped) VR
-  // register operands are used in all of them.
+multiclass pseudo_unary_x_m {
+  // A different pseudo is defined for each VLMul value, but a VR operand
+  // is used in all of them.
   foreach Vlmul = [1, 2, 4, 8] in
   {
     let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
@@ -808,8 +808,8 @@ multiclass pseudo_unary_x_v {
 }
 
 multiclass pseudo_binary_m_mm {
-  // A different pseudo is defined for each VLMul value, but (ungrouped) VR
-  // register operands are used in all of them.
+  // A different pseudo is defined for each VLMul value, but VR operands
+  // are used in all of them.
   foreach Vlmul = [1, 2, 4, 8] in
   {
     let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1,
@@ -1005,8 +1005,8 @@ defm PseudoVFNCVT_F_F  : pseudo_unary_v_w;
 
 defm PseudoVID         : pseudo_nullary_v;
 
-defm PseudoVPOPC       : pseudo_unary_x_v;
-defm PseudoVFIRST      : pseudo_unary_x_v;
+defm PseudoVPOPC       : pseudo_unary_x_m;
+defm PseudoVFIRST      : pseudo_unary_x_m;
 
 defm PseudoVMANDNOT    : pseudo_binary_m_mm;
 defm PseudoVMAND       : pseudo_binary_m_mm;
@@ -1580,7 +1580,7 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_int_v_vv_swapped<string intrinsic_name,
+multiclass pat_intrinsic_binary_relational_int_m_vv_swapped<string intrinsic_name,
                                                             string instruction_name>
 {
   foreach vti = AllIntegerVectors in
@@ -2248,11 +2248,11 @@ defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsle", "Pseud
 
 defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vmsgtu", "PseudoVMSGTU">;
 // Select (int_epi_vmsgtu reg:$rs1, reg:$rs2) as (PseudoVMSLTU reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vmsgtu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_swapped<"int_epi_vmsgtu", "PseudoVMSLTU">;
 
 defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vmsgt", "PseudoVMSGT">;
 // Select (int_epi_vmsgt reg:$rs1, reg:$rs2) as (PseudoVMSLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_v_vv_swapped<"int_epi_vmsgt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_relational_int_m_vv_swapped<"int_epi_vmsgt", "PseudoVMSLT">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsaddu", "PseudoVSADDU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsadd", "PseudoVSADD">;
