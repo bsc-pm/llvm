@@ -1,5 +1,4 @@
 ; UNSUPPORTED: riscv
-; REQUIRES: object-emission
 
 ; RUN: %llc_dwarf -O0 -filetype=obj < %s > %t
 ; RUN: llvm-dwarfdump %t | FileCheck %s
