@@ -5,20 +5,20 @@ set(LLVM_OPTIONAL_SOURCES
 set(LIB_LIBS
   MLIRAnalysis
   MLIRLLVMIR
-  MLIROptMain
+  MLIROptLib
   MLIRParser
   MLIRPass
   MLIRTransforms
   MLIRSupport
 )
-add_llvm_library(MLIRMlirOptLib
+add_llvm_library(MLIRMlirOptMain
   mlir-opt.cpp
 )
-target_link_libraries(MLIRMlirOptLib
+target_link_libraries(MLIRMlirOptMain
   ${LIB_LIBS}
 )
 
-set(FULL_LINK_LIBS
+set(LIBS
   MLIRLoopAnalysis
   MLIRAnalysis
   MLIRAffineOps
@@ -43,7 +43,7 @@ set(FULL_LINK_LIBS
   MLIRLoopOps
   MLIRNVVMIR
   MLIROpenMP
-  MLIROptMain
+  MLIROptLib
   MLIRParser
   MLIRPass
   MLIRQuantizerFxpMathConfig
@@ -68,10 +68,8 @@ set(FULL_LINK_LIBS
   MLIRVectorOps
   MLIRVectorToLLVM
   MLIRVectorToLoops
-)
-set(LIBS
   MLIRIR
-  MLIROptMain
+  MLIROptLib
   LLVMSupport
   LLVMCore
   LLVMAsmParser
@@ -82,19 +80,12 @@ if(MLIR_CUDA_CONVERSIONS_ENABLED)
     LLVMNVPTXCodeGen
     LLVMNVPTXDesc
     LLVMNVPTXInfo
-    MLIRTargetNVVMIR
-  )
-  # Order matters here, so insert at front.
-  list(INSERT FULL_LINK_LIBS 0
     MLIRGPUtoCUDATransforms
+    MLIRTargetNVVMIR
   )
 endif()
 add_llvm_tool(mlir-opt
  mlir-opt.cpp
 )
 llvm_update_compile_flags(mlir-opt)
-# It is necessary to use whole_archive_link to ensure that all static
-# initializers are called. However, whole_archive_link libraries cannot
-# also be target_link_libraries.
-whole_archive_link(mlir-opt ${FULL_LINK_LIBS})
 target_link_libraries(mlir-opt PRIVATE ${LIBS})

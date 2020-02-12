@@ -1745,7 +1745,8 @@ static Instruction *foldIdentityExtractShuffle(ShuffleVectorInst &Shuf) {
 
 /// Try to replace a shuffle with an insertelement or try to replace a shuffle
 /// operand with the operand of an insertelement.
-static Instruction *foldShuffleWithInsert(ShuffleVectorInst &Shuf) {
+static Instruction *foldShuffleWithInsert(ShuffleVectorInst &Shuf,
+                                          InstCombiner &IC) {
   // Do not fold if shuffle is a scalable vector.
   if (Shuf.getType()->getVectorIsScalable())
     return nullptr;
@@ -1769,20 +1770,16 @@ static Instruction *foldShuffleWithInsert(ShuffleVectorInst &Shuf) {
   uint64_t IdxC;
   if (match(V0, m_InsertElement(m_Value(X), m_Value(), m_ConstantInt(IdxC)))) {
     // shuf (inselt X, ?, IdxC), ?, Mask --> shuf X, ?, Mask
-    if (none_of(Mask, [IdxC](int MaskElt) { return MaskElt == (int)IdxC; })) {
-      Shuf.setOperand(0, X);
-      return &Shuf;
-    }
+    if (none_of(Mask, [IdxC](int MaskElt) { return MaskElt == (int)IdxC; }))
+      return IC.replaceOperand(Shuf, 0, X);
   }
   if (match(V1, m_InsertElement(m_Value(X), m_Value(), m_ConstantInt(IdxC)))) {
     // Offset the index constant by the vector width because we are checking for
     // accesses to the 2nd vector input of the shuffle.
     IdxC += NumElts;
     // shuf ?, (inselt X, ?, IdxC), Mask --> shuf ?, X, Mask
-    if (none_of(Mask, [IdxC](int MaskElt) { return MaskElt == (int)IdxC; })) {
-      Shuf.setOperand(1, X);
-      return &Shuf;
-    }
+    if (none_of(Mask, [IdxC](int MaskElt) { return MaskElt == (int)IdxC; }))
+      return IC.replaceOperand(Shuf, 1, X);
   }
 
   // shuffle (insert ?, Scalar, IndexC), V1, Mask --> insert V1, Scalar, IndexC'
@@ -1963,7 +1960,7 @@ Instruction *InstCombiner::visitShuffleVectorInst(ShuffleVectorInst &SVI) {
 
   // These transforms have the potential to lose undef knowledge, so they are
   // intentionally placed after SimplifyDemandedVectorElts().
-  if (Instruction *I = foldShuffleWithInsert(SVI))
+  if (Instruction *I = foldShuffleWithInsert(SVI, *this))
     return I;
   if (Instruction *I = foldIdentityPaddedShuffles(SVI))
     return I;
