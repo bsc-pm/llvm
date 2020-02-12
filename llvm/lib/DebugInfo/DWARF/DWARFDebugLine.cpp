@@ -155,25 +155,36 @@ void DWARFDebugLine::Prologue::dump(raw_ostream &OS,
 }
 
 // Parse v2-v4 directory and file tables.
-static void
+static Error
 parseV2DirFileTables(const DWARFDataExtractor &DebugLineData,
                      uint64_t *OffsetPtr, uint64_t EndPrologueOffset,
                      DWARFDebugLine::ContentTypeTracker &ContentTypes,
                      std::vector<DWARFFormValue> &IncludeDirectories,
                      std::vector<DWARFDebugLine::FileNameEntry> &FileNames) {
+  bool Terminated = false;
   while (*OffsetPtr < EndPrologueOffset) {
     StringRef S = DebugLineData.getCStrRef(OffsetPtr);
-    if (S.empty())
+    if (S.empty()) {
+      Terminated = true;
       break;
+    }
     DWARFFormValue Dir =
         DWARFFormValue::createFromPValue(dwarf::DW_FORM_string, S.data());
     IncludeDirectories.push_back(Dir);
   }
 
+  if (!Terminated)
+    return createStringError(errc::invalid_argument,
+                             "include directories table was not null "
+                             "terminated before the end of the prologue");
+
+  Terminated = false;
   while (*OffsetPtr < EndPrologueOffset) {
     StringRef Name = DebugLineData.getCStrRef(OffsetPtr);
-    if (Name.empty())
+    if (Name.empty()) {
+      Terminated = true;
       break;
+    }
     DWARFDebugLine::FileNameEntry FileEntry;
     FileEntry.Name =
         DWARFFormValue::createFromPValue(dwarf::DW_FORM_string, Name.data());
@@ -185,6 +196,13 @@ parseV2DirFileTables(const DWARFDataExtractor &DebugLineData,
 
   ContentTypes.HasModTime = true;
   ContentTypes.HasLength = true;
+
+  if (!Terminated)
+    return createStringError(errc::invalid_argument,
+                             "file names table was not null terminated before "
+                             "the end of the prologue");
+
+  return Error::success();
 }
 
 // Parse v5 directory/file entry content descriptions.
@@ -331,10 +349,11 @@ Error DWARFDebugLine::Prologue::parse(
     // Treat this error as unrecoverable - we cannot be sure what any of
     // the data represents including the length field, so cannot skip it or make
     // any reasonable assumptions.
-    return createStringError(errc::not_supported,
-                       "parsing line table prologue at offset 0x%8.8" PRIx64
-                       " found unsupported version 0x%2.2" PRIx16,
-                       PrologueOffset, getVersion());
+    return createStringError(
+        errc::not_supported,
+        "parsing line table prologue at offset 0x%8.8" PRIx64
+        " found unsupported version %" PRIu16,
+        PrologueOffset, getVersion());
 
   if (getVersion() >= 5) {
     FormParams.AddrSize = DebugLineData.getU8(OffsetPtr);
@@ -355,33 +374,47 @@ Error DWARFDebugLine::Prologue::parse(
   LineRange = DebugLineData.getU8(OffsetPtr);
   OpcodeBase = DebugLineData.getU8(OffsetPtr);
 
-  StandardOpcodeLengths.reserve(OpcodeBase - 1);
-  for (uint32_t I = 1; I < OpcodeBase; ++I) {
-    uint8_t OpLen = DebugLineData.getU8(OffsetPtr);
-    StandardOpcodeLengths.push_back(OpLen);
+  if (OpcodeBase == 0) {
+    // If the opcode base is 0, we cannot read the standard opcode lengths (of
+    // which there are supposed to be one fewer than the opcode base). Assume
+    // there are no standard opcodes and continue parsing.
+    RecoverableErrorHandler(createStringError(
+        errc::invalid_argument,
+        "parsing line table prologue at offset 0x%8.8" PRIx64
+        " found opcode base of 0. Assuming no standard opcodes",
+        PrologueOffset));
+  } else {
+    StandardOpcodeLengths.reserve(OpcodeBase - 1);
+    for (uint32_t I = 1; I < OpcodeBase; ++I) {
+      uint8_t OpLen = DebugLineData.getU8(OffsetPtr);
+      StandardOpcodeLengths.push_back(OpLen);
+    }
   }
 
+  auto ReportInvalidDirFileTable = [&](Error E) {
+    RecoverableErrorHandler(joinErrors(
+        createStringError(
+            errc::invalid_argument,
+            "parsing line table prologue at 0x%8.8" PRIx64
+            " found an invalid directory or file table description at"
+            " 0x%8.8" PRIx64,
+            PrologueOffset, *OffsetPtr),
+        std::move(E)));
+    // Skip to the end of the prologue, since the chances are that the parser
+    // did not read the whole table. This prevents the length check below from
+    // executing.
+    if (*OffsetPtr < EndPrologueOffset)
+      *OffsetPtr = EndPrologueOffset;
+  };
   if (getVersion() >= 5) {
     if (Error E =
             parseV5DirFileTables(DebugLineData, OffsetPtr, FormParams, Ctx, U,
-                                 ContentTypes, IncludeDirectories, FileNames)) {
-      RecoverableErrorHandler(joinErrors(
-          createStringError(
-              errc::invalid_argument,
-              "parsing line table prologue at 0x%8.8" PRIx64
-              " found an invalid directory or file table description at"
-              " 0x%8.8" PRIx64,
-              PrologueOffset, *OffsetPtr),
-          std::move(E)));
-      // Skip to the end of the prologue, since the chances are that the parser
-      // did not read the whole table. This prevents the length check below from
-      // executing.
-      if (*OffsetPtr < EndPrologueOffset)
-        *OffsetPtr = EndPrologueOffset;
-    }
-  } else
-    parseV2DirFileTables(DebugLineData, OffsetPtr, EndPrologueOffset,
-                         ContentTypes, IncludeDirectories, FileNames);
+                                 ContentTypes, IncludeDirectories, FileNames))
+      ReportInvalidDirFileTable(std::move(E));
+  } else if (Error E = parseV2DirFileTables(DebugLineData, OffsetPtr,
+                                            EndPrologueOffset, ContentTypes,
+                                            IncludeDirectories, FileNames))
+    ReportInvalidDirFileTable(std::move(E));
 
   if (*OffsetPtr != EndPrologueOffset) {
     RecoverableErrorHandler(createStringError(
