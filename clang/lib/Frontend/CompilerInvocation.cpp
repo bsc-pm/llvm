@@ -792,16 +792,6 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.DisableLLVMPasses = Args.hasArg(OPT_disable_llvm_passes);
   Opts.DisableLifetimeMarkers = Args.hasArg(OPT_disable_lifetimemarkers);
-
-  const llvm::Triple::ArchType DebugEntryValueArchs[] = {
-      llvm::Triple::x86, llvm::Triple::x86_64, llvm::Triple::aarch64,
-      llvm::Triple::arm, llvm::Triple::armeb};
-
-  llvm::Triple T(TargetOpts.Triple);
-  if (Opts.OptimizationLevel > 0 && Opts.hasReducedDebugInfo() &&
-      llvm::is_contained(DebugEntryValueArchs, T.getArch()))
-    Opts.EnableDebugEntryValues = Args.hasArg(OPT_femit_debug_entry_values);
-
   Opts.DisableO0ImplyOptNone = Args.hasArg(OPT_disable_O0_optnone);
   Opts.DisableRedZone = Args.hasArg(OPT_disable_red_zone);
   Opts.IndirectTlsSegRefs = Args.hasArg(OPT_mno_tls_direct_seg_refs);
@@ -1099,8 +1089,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
       Args.hasArg(OPT_fxray_always_emit_typedevents);
   Opts.XRayInstructionThreshold =
       getLastArgIntValue(Args, OPT_fxray_instruction_threshold_EQ, 200, Diags);
-  Opts.XRayIgnoreLoops =
-      Args.hasArg(OPT_fxray_ignore_loops, OPT_fno_xray_ignore_loops, false);
+  Opts.XRayIgnoreLoops = Args.hasArg(OPT_fxray_ignore_loops);
 
   auto XRayInstrBundles =
       Args.getAllArgValues(OPT_fxray_instrumentation_bundle);
@@ -2784,6 +2773,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   if (Args.hasArg(OPT_fno_threadsafe_statics))
     Opts.ThreadsafeStatics = 0;
   Opts.Exceptions = Args.hasArg(OPT_fexceptions);
+  Opts.IgnoreExceptions = Args.hasArg(OPT_fignore_exceptions);
   Opts.ObjCExceptions = Args.hasArg(OPT_fobjc_exceptions);
   Opts.CXXExceptions = Args.hasArg(OPT_fcxx_exceptions);
 

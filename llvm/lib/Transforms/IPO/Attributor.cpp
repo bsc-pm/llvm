@@ -374,10 +374,11 @@ static Value *constructPointer(Type *ResTy, Value *Ptr, int64_t Offset,
 /// will be done by looking through cast instructions, selects, phis, and calls
 /// with the "returned" attribute. Once we cannot look through the value any
 /// further, the callback \p VisitValueCB is invoked and passed the current
-/// value, the \p State, and a flag to indicate if we stripped anything (=the
-/// value used for the callback is not the value associated with \p IRP). To
-/// limit how much effort is invested, we will never visit more values than
-/// specified by \p MaxValues.
+/// value, the \p State, and a flag to indicate if we stripped anything.
+/// Stripped means that we unpacked the value associated with \p IRP at least
+/// once. Note that the value used for the callback may still be the value
+/// associated with \p IRP (due to PHIs). To limit how much effort is invested,
+/// we will never visit more values than specified by \p MaxValues.
 template <typename AAType, typename StateTy>
 static bool genericValueTraversal(
     Attributor &A, IRPosition IRP, const AAType &QueryingAA, StateTy &State,
@@ -6489,14 +6490,27 @@ bool Attributor::checkForAllUses(
     const Use *U = Worklist.pop_back_val();
     if (!Visited.insert(U).second)
       continue;
-    LLVM_DEBUG(dbgs() << "[Attributor] Check use: " << **U << "\n");
-    if (Instruction *UserI = dyn_cast<Instruction>(U->getUser()))
-      if (LivenessAA && LivenessAA->isAssumedDead(UserI)) {
-        LLVM_DEBUG(dbgs() << "[Attributor] Dead user: " << *UserI << ": "
-                          << *LivenessAA << "\n");
-        AnyDead = true;
-        continue;
+    LLVM_DEBUG(dbgs() << "[Attributor] Check use: " << **U << " [" << LivenessAA
+                      << "]\n");
+    if (LivenessAA) {
+      if (Instruction *UserI = dyn_cast<Instruction>(U->getUser())) {
+        if (LivenessAA->isAssumedDead(UserI)) {
+          LLVM_DEBUG(dbgs() << "[Attributor] Dead user: " << *UserI << ": "
+                            << *LivenessAA << "\n");
+          AnyDead = true;
+          continue;
+        }
+        if (PHINode *PHI = dyn_cast<PHINode>(UserI)) {
+          BasicBlock *IncomingBB = PHI->getIncomingBlock(*U);
+          if (LivenessAA->isAssumedDead(IncomingBB->getTerminator())) {
+            LLVM_DEBUG(dbgs() << "[Attributor] Dead user: " << *UserI << ": "
+                              << *LivenessAA << "\n");
+            AnyDead = true;
+            continue;
+          }
+        }
       }
+    }
 
     bool Follow = false;
     if (!Pred(*U, Follow))
