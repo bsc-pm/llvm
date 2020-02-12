@@ -88,11 +88,13 @@ private:
     Address ExceptionSlot = Address::invalid();
     Address EHSelectorSlot = Address::invalid();
     Address NormalCleanupDestSlot = Address::invalid();
-    // Map to reuse Addresses emited for data sharings
-    llvm::DenseMap<const VarDecl *, Address> RefMap;
   };
 
+  using RefMapTy = llvm::DenseMap<const VarDecl *, Address>;
+
   SmallVector<TaskContext, 2> TaskStack;
+  // Map to reuse Addresses emited for data sharings
+  SmallVector<RefMapTy, 2> RefMapStack;
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
@@ -124,7 +126,7 @@ public:
   // returns the innermost nested task NormalCleanupDestSlot address
   Address getTaskNormalCleanupDestSlot();
   // returns the innermost nested task RefMap
-  llvm::DenseMap<const VarDecl *, Address> &getTaskRefMap();
+  RefMapTy &getTaskRefMap();
 
   // sets the innermost nested task InsertPt instruction
   void setTaskInsertPt(llvm::Instruction *I);

@@ -927,7 +927,8 @@ Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
 }
 
 llvm::DenseMap<const VarDecl *, Address> &CGOmpSsRuntime::getTaskRefMap() {
-  return TaskStack.back().RefMap;
+  assert(!RefMapStack.empty());
+  return RefMapStack.back();
 }
 
 void CGOmpSsRuntime::setTaskInsertPt(llvm::Instruction *I) {
@@ -982,11 +983,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   CodeGenFunction::OSSPrivateScope InitScope(CGF);
 
   InTaskEmission = true;
-  // NOTE: this differs a bit from the regular use where InTaskEmission
-  // means building bundles, and inTaskBody() meaning emiting the code
-  // of the task. Since we build the call_arg before that and RefMap
-  // is inside TaskContext we do this here.
-  TaskStack.push_back(TaskContext());
+  RefMapStack.push_back(RefMapTy());
 
   auto ArgI = CE->arg_begin();
   auto ParI = FD->param_begin(); 
@@ -1045,6 +1042,8 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
   TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
+  TaskStack.push_back(TaskContext());
+
   bool IsMethodCall = false;
   if (const auto *CXXE = dyn_cast<CXXMemberCallExpr>(CE)) {
     IsMethodCall = true;
@@ -1059,14 +1058,14 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
     SmallVector<llvm::Value*, 4> CapturedList;
     for (const Expr *E : SharedCopies) {
-      EmitDSAShared(CGF, E, TaskInfo, CapturedList, TaskStack.back().RefMap);
+      EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskRefMap());
     }
     for (const Expr *E : FirstprivateCopies) {
       OSSDSAFirstprivateDataTy FpDataTy;
       // Ignore ImplicitCast built for the new function call
       FpDataTy.Ref = E->IgnoreImpCasts();
       FpDataTy.Copy = FpDataTy.Init = nullptr;
-      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, TaskStack.back().RefMap);
+      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskRefMap());
     }
     if (const Expr *E = Attr->getIfExpr()) {
       TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(E));
@@ -1230,6 +1229,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   // Pop Task Stack
   TaskStack.pop_back();
+  RefMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
   return RV;
@@ -1248,10 +1248,11 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   SmallVector<llvm::Value*, 4> CapturedList;
 
   TaskStack.push_back(TaskContext());
+  RefMapStack.push_back(RefMapTy());
 
   InTaskEmission = true;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList, TaskStack.back().RefMap);
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskRefMap());
   }
   for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
     EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, getTaskRefMap());
@@ -1330,6 +1331,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
 
   // Pop Task Stack
   TaskStack.pop_back();
+  RefMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
 }
