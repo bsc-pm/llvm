@@ -174,6 +174,15 @@ void RISCVInstPrinter::printVRMaskOp(const MCInst *MI, unsigned OpNo,
   O << ".t";
 }
 
+void RISCVInstPrinter::printImmPlus1(const MCInst *MI, unsigned OpNo,
+                                     const MCSubtargetInfo &STI,
+                                     raw_ostream &O) {
+  const MCOperand &MO = MI->getOperand(OpNo);
+
+  assert(MO.isImm() && "printImmPlus1 can only print immediate operands");
+  O << MO.getImm() + 1;
+}
+
 const char *RISCVInstPrinter::getRegisterName(unsigned RegNo) {
   return getRegisterName(RegNo, ArchRegNames ? RISCV::NoRegAltName
                                              : RISCV::ABIRegAltName);

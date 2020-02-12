@@ -339,6 +339,9 @@ namespace llvm {
     bool CoveredBySubRegs;
     /// A register class is artificial if all its members are artificial.
     bool Artificial;
+    /// Whether instructions may use NoRegister (0) instead of a physical
+    /// register for an operand of this register class.
+    bool AllowsNoRegister;
 
     // Return the Record that defined this class, or NULL if the class was
     // created by TableGen.

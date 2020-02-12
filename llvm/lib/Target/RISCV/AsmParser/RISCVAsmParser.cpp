@@ -551,6 +551,15 @@ public:
     return IsConstantImm && isInt<5>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
   }
 
+  bool isSImm5Plus1() const {
+    if (!isImm())
+      return false;
+    RISCVMCExpr::VariantKind VK = RISCVMCExpr::VK_RISCV_None;
+    int64_t Imm;
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
+    return IsConstantImm && isInt<5>(Imm - 1) && VK == RISCVMCExpr::VK_RISCV_None;
+  }
+
   bool isSImm6() const {
     if (!isImm())
       return false;
@@ -886,6 +895,15 @@ public:
     addExpr(Inst, getImm());
   }
 
+  void addImmPlus1Operands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    RISCVMCExpr::VariantKind VK = RISCVMCExpr::VK_RISCV_None;
+    int64_t Imm;
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
+    assert(IsConstantImm && "Constant immediate expected");
+    Inst.addOperand(MCOperand::createImm(Imm - 1));
+  }
+
   void addFenceArgOperands(MCInst &Inst, unsigned N) const {
     assert(N == 1 && "Invalid number of operands!");
     // isFenceArg has validated the operand, meaning this cast is safe
@@ -1176,6 +1194,11 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   case Match_InvalidVRMaskAsmOperand: {
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
     return Error(ErrorLoc, "operand must be v0.t");
+  }
+  case Match_InvalidSImm5Plus1: {
+    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 4) + 1,
+                                      (1 << 4),
+                                      "immediate must be in the range");
   }
   }
 

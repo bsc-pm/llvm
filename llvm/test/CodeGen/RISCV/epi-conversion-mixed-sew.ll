@@ -81,7 +81,7 @@ declare <vscale x 2 x i64> @llvm.epi.vwcvtu.x.x.nxv2i64.nxv2i32( <vscale x 2 x i
 define <vscale x 2 x i64> @test_widen_int_to_uint(<vscale x 2 x i32> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_widen_int_to_uint
-; CHECK:     vwaddu.vx
+; CHECK:     vwcvtu.x.x.v
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]], zero
   %a = call <vscale x 2 x i64> @llvm.epi.vwcvtu.x.x.nxv2i64.nxv2i32(
     <vscale x 2 x i32> %parm0,
@@ -96,7 +96,7 @@ declare <vscale x 2 x i64> @llvm.epi.vwcvt.x.x.nxv2i64.nxv2i32( <vscale x 2 x i3
 define <vscale x 2 x i64> @test_widen_int_to_int(<vscale x 2 x i32> %parm0, i64 %gvl) nounwind {
 entry:
 ; CHECK-LABEL: test_widen_int_to_int
-; CHECK:     vwadd.vx
+; CHECK:     vwcvt.x.x.v
 ; CHECK-NOT: [[DEST:v[0-9]+]], [[DEST]], zero
   %a = call <vscale x 2 x i64> @llvm.epi.vwcvt.x.x.nxv2i64.nxv2i32(
     <vscale x 2 x i32> %parm0,

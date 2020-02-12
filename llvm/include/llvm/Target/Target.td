@@ -276,6 +276,10 @@ class RegisterClass<string namespace, list<ValueType> regTypes, int alignment,
   // constrained classes first. The value has to be in the range [0,63].
   int AllocationPriority = 0;
 
+  // AllowsNoRegister - Specify that instructions may use NoRegister (0) instead
+  // of a physical register for an operand of this register class.
+  bit AllowsNoRegister = 0;
+
   // The diagnostic type to present when referencing this operand in a match
   // failure error message. If this is empty, the default Match_InvalidOperand
   // diagnostic type will be used. If this is "<name>", a Match_<name> enum

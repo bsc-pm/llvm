@@ -41,6 +41,7 @@ public:
   const uint16_t ID;
   const int8_t CopyCost;
   const bool Allocatable;
+  const bool AllowsNoRegister;
 
   /// getID() - Return the register class ID number.
   ///
@@ -86,6 +87,10 @@ public:
   /// isAllocatable - Return true if this register class may be used to create
   /// virtual registers.
   bool isAllocatable() const { return Allocatable; }
+
+  /// allowsNoRegister - Return true if instructions may use NoRegister (0)
+  /// instead of a physical register for an operand of this register class.
+  bool allowsNoRegister() const { return AllowsNoRegister; }
 };
 
 /// MCRegisterDesc - This record contains information about a particular

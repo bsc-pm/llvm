@@ -806,6 +806,7 @@ CodeGenRegisterClass::CodeGenRegisterClass(CodeGenRegBank &RegBank, Record *R)
   if (AllocationPriority < 0 || AllocationPriority > 63)
     PrintFatalError(R->getLoc(), "AllocationPriority out of range [0,63]");
   this->AllocationPriority = AllocationPriority;
+  AllowsNoRegister = R->getValueAsBit("AllowsNoRegister");
 }
 
 // Create an inferred register class that was missing from the .td files.
@@ -815,7 +816,8 @@ CodeGenRegisterClass::CodeGenRegisterClass(CodeGenRegBank &RegBank,
                                            StringRef Name, Key Props)
     : Members(*Props.Members), TheDef(nullptr), Name(std::string(Name)),
       TopoSigs(RegBank.getNumTopoSigs()), EnumValue(-1), RSI(Props.RSI),
-      CopyCost(0), Allocatable(true), AllocationPriority(0) {
+      CopyCost(0), Allocatable(true), AllocationPriority(0),
+      AllowsNoRegister(false) {
   Artificial = true;
   for (const auto R : Members) {
     TopoSigs.set(R->getTopoSig());
@@ -839,6 +841,7 @@ void CodeGenRegisterClass::inheritProperties(CodeGenRegBank &RegBank) {
   Allocatable = Super.Allocatable;
   AltOrderSelect = Super.AltOrderSelect;
   AllocationPriority = Super.AllocationPriority;
+  AllowsNoRegister = Super.AllowsNoRegister;
 
   // Copy all allocation orders, filter out foreign registers from the larger
   // super-class.

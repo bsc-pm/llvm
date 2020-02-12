@@ -48,6 +48,23 @@ class EPILookupIntrinsic<string basename> {
   Intrinsic I = !cast<Intrinsic>("int_epi_" # basename);
 }
 
+class SImmPlus1AsmOperand<int width> : AsmOperandClass {
+  let Name = "SImm" # width # "Plus1";
+  let RenderMethod = "addImmPlus1Operands";
+  let DiagnosticType = !strconcat("Invalid", Name);
+}
+
+def simm5plus1 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<5>(Imm - 1);}]> {
+  let ParserMatchClass = SImmPlus1AsmOperand<5>;
+  let PrintMethod = "printImmPlus1";
+  let MCOperandPredicate = [{
+    int64_t Imm;
+    if (MCOp.evaluateAsConstantImm(Imm))
+      return isInt<5>(Imm);
+    return MCOp.isBareSymbolRef();
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -90,6 +107,64 @@ let hasSideEffects = 1, mayLoad = 0, mayStore = 0, Defs = [VL, VTYPE] in {
 def PseudoVSETVLI : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, VTypeIOp:$vtypei), []>;
 def PseudoVSETVL : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2), []>;
 }
+
+//===----------------------------------------------------------------------===//
+// Assembler Pseudo instructions
+//===----------------------------------------------------------------------===//
+
+// FIXME add Pseudo for vmsge{u}.vx
+
+def : InstAlias<"vwcvt.x.x.v $vd, $vs$vm",
+                (VWADD_VX VRRegOp:$vd, VRRegOp:$vs, X0, VRMaskRegOp:$vm)>;
+def : InstAlias<"vwcvtu.x.x.v $vd, $vs$vm",
+                (VWADDU_VX VRRegOp:$vd, VRRegOp:$vs, X0, VRMaskRegOp:$vm)>;
+
+def : InstAlias<"vnot.v $vd$vm",
+                (VXOR_VI VRRegOp:$vd, VRRegOp:$vd, -1, VRMaskRegOp:$vm)>;
+
+def : InstAlias<"vmsgt.vv $vd, $va, $vb$vm",
+                (VMSLT_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                          VRMaskRegOp:$vm), 0>;
+def : InstAlias<"vmsgtu.vv $vd, $va, $vb$vm",
+                (VMSLTU_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                           VRMaskRegOp:$vm), 0>;
+
+def : InstAlias<"vmsge.vv $vd, $va, $vb$vm",
+                (VMSLE_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                          VRMaskRegOp:$vm), 0>;
+def : InstAlias<"vmsgeu.vv $vd, $va, $vb$vm",
+                (VMSLEU_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                           VRMaskRegOp:$vm), 0>;
+
+def : InstAlias<"vmslt.vi $vd, $va, $i$vm",
+                (VMSLE_VI VRRegOp:$vd, VRRegOp:$va, simm5plus1:$i,
+                          VRMaskRegOp:$vm), 0>;
+def : InstAlias<"vmsltu.vi $vd, $va, $i$vm",
+                (VMSLEU_VI VRRegOp:$vd, VRRegOp:$va, simm5plus1:$i,
+                           VRMaskRegOp:$vm), 0>;
+
+def : InstAlias<"vmsge.vi $vd, $va, $i$vm",
+                (VMSGT_VI VRRegOp:$vd, VRRegOp:$va, simm5plus1:$i,
+                          VRMaskRegOp:$vm), 0>;
+def : InstAlias<"vmsgeu.vi $vd, $va, $i$vm",
+                (VMSGTU_VI VRRegOp:$vd, VRRegOp:$va, simm5plus1:$i,
+                           VRMaskRegOp:$vm), 0>;
+
+def : InstAlias<"vmfgt.vv $vd, $va, $vb$vm",
+                (VMFLT_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                          VRMaskRegOp:$vm), 0>;
+def : InstAlias<"vmfge.vv $vd, $va, $vb$vm",
+                (VMFLE_VV VRRegOp:$vd, VRRegOp:$vb, VRRegOp:$va,
+                           VRMaskRegOp:$vm), 0>;
+
+def : InstAlias<"vmcpy.m $vd, $vs",
+                (VMAND_MM VRRegOp:$vd, VRRegOp:$vs, VRRegOp:$vs)>;
+def : InstAlias<"vmclr.m $vd",
+                (VMXOR_MM VRRegOp:$vd, VRRegOp:$vd, VRRegOp:$vd)>;
+def : InstAlias<"vmset.m $vd",
+                (VMXNOR_MM VRRegOp:$vd, VRRegOp:$vd, VRRegOp:$vd)>;
+def : InstAlias<"vmnot.m $vd, $vs",
+                (VMNAND_MM VRRegOp:$vd, VRRegOp:$vs, VRRegOp:$vs)>;
 
 //===----------------------------------------------------------------------===//
 // Pseudo instructions we need for SPILL and RELOAD

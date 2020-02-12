@@ -23,8 +23,8 @@ define <vscale x 1 x i64> @mzext_1(<vscale x 1 x i1> %ma, <vscale x 1 x i1> %mb,
 ; CHECK-LABEL: mzext_1:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a1, zero, e64,m1
-; CHECK-NEXT:    vmand.mm v0, v0, v0
-; CHECK-NEXT:    vmand.mm v1, v16, v16
+; CHECK-NEXT:    vmcpy.m v0, v0
+; CHECK-NEXT:    vmcpy.m v1, v16
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
 ; CHECK-NEXT:    vand.vv v16, v0, v1
 ; CHECK-NEXT:    ret
