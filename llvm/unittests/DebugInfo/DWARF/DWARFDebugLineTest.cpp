@@ -339,36 +339,33 @@ TEST_F(DebugLineBasicFixture, ErrorForReservedLength) {
       "unit length found of value 0xfffffff0");
 }
 
-TEST_F(DebugLineBasicFixture, ErrorForLowVersion) {
+struct DebugLineUnsupportedVersionFixture : public TestWithParam<uint16_t>,
+                                            public CommonFixture {
+  void SetUp() { Version = GetParam(); }
+
+  uint16_t Version;
+};
+
+TEST_P(DebugLineUnsupportedVersionFixture, ErrorForUnsupportedVersion) {
   if (!setupGenerator())
     return;
 
   LineTable &LT = Gen->addLineTable();
   LT.setCustomPrologue(
-      {{LineTable::Half, LineTable::Long}, {1, LineTable::Half}});
-
-  generate();
-
-  checkGetOrParseLineTableEmitsFatalError(
-      "parsing line table prologue at offset "
-      "0x00000000 found unsupported version "
-      "0x01");
-}
-
-TEST_F(DebugLineBasicFixture, ErrorForHighVersion) {
-  if (!setupGenerator())
-    return;
-
-  LineTable &LT = Gen->addLineTable();
-  LT.setCustomPrologue(
-      {{LineTable::Half, LineTable::Long}, {6, LineTable::Half}});
+      {{LineTable::Half, LineTable::Long}, {Version, LineTable::Half}});
 
   generate();
 
   checkGetOrParseLineTableEmitsFatalError(
       "parsing line table prologue at offset 0x00000000 found unsupported "
-      "version 0x06");
+      "version " +
+      std::to_string(Version));
 }
+
+INSTANTIATE_TEST_CASE_P(UnsupportedVersionTestParams,
+                        DebugLineUnsupportedVersionFixture,
+                        Values(/*1 below min */ 1, /* 1 above max */ 6,
+                               /* Maximum possible */ 0xffff), );
 
 TEST_F(DebugLineBasicFixture, ErrorForInvalidV5IncludeDirTable) {
   if (!setupGenerator(5))
@@ -452,12 +449,7 @@ TEST_P(DebugLineParameterisedFixture, ErrorForTooShortPrologueLength) {
 
   LineTable &LT = Gen->addLineTable(Format);
   DWARFDebugLine::Prologue Prologue = LT.createBasicPrologue();
-  // FIXME: Ideally, we'd test for 1 less than expected, but the code does not
-  // currently fail if missing only the terminator of a v2-4 file table.
-  if (Version < 5)
-    Prologue.PrologueLength -= 2;
-  else
-    Prologue.PrologueLength -= 1;
+  Prologue.PrologueLength -= 2;
   LT.setPrologue(Prologue);
 
   generate();
@@ -468,23 +460,34 @@ TEST_P(DebugLineParameterisedFixture, ErrorForTooShortPrologueLength) {
   DWARFDebugLine::LineTable Result(**ExpectedLineTable);
   // Undo the earlier modification so that it can be compared against a
   // "default" prologue.
-  if (Version < 5)
-    Result.Prologue.PrologueLength += 2;
-  else
-    Result.Prologue.PrologueLength += 1;
+  Result.Prologue.PrologueLength += 2;
   checkDefaultPrologue(Version, Format, Result.Prologue, 0);
 
   uint64_t ExpectedEnd =
-      Prologue.TotalLength - 1 + Prologue.sizeofTotalLength();
-  if (Version < 5)
-    --ExpectedEnd;
-  checkError(
+      Prologue.TotalLength - 2 + Prologue.sizeofTotalLength();
+  std::vector<std::string> Errs;
+  // Parsing of a DWARFv2-4 file table stops at the end of an entry once the
+  // prologue end has been reached, whether or not the trailing null terminator
+  // has been found. As such, the expected error message will be slightly
+  // different.
+  uint64_t ActualEnd = Version == 5 ? ExpectedEnd + 2 : ExpectedEnd + 1;
+  if (Version != 5) {
+    Errs.emplace_back(
+        (Twine("parsing line table prologue at 0x00000000 found an invalid "
+               "directory or file table description at 0x000000") +
+         Twine::utohexstr(ActualEnd))
+            .str());
+    Errs.emplace_back("file names table was not null terminated before the end "
+                      "of the prologue");
+  }
+  Errs.emplace_back(
       (Twine("parsing line table prologue at 0x00000000 should have ended at "
              "0x000000") +
        Twine::utohexstr(ExpectedEnd) + " but it ended at 0x000000" +
-       Twine::utohexstr(ExpectedEnd + 1))
-          .str(),
-      std::move(Recoverable));
+       Twine::utohexstr(ActualEnd))
+          .str());
+  std::vector<StringRef> ErrRefs(Errs.begin(), Errs.end());
+  checkError(ErrRefs, std::move(Recoverable));
 }
 
 INSTANTIATE_TEST_CASE_P(
@@ -785,9 +788,9 @@ TEST_F(DebugLineBasicFixture, ParserReportsFirstErrorInEachTableWhenParsing) {
   EXPECT_FALSE(Recoverable);
 
   checkError({"parsing line table prologue at offset 0x00000000 found "
-              "unsupported version 0x00",
+              "unsupported version 0",
               "parsing line table prologue at offset 0x00000006 found "
-              "unsupported version 0x01"},
+              "unsupported version 1"},
              std::move(Unrecoverable));
 }
 
@@ -843,9 +846,9 @@ TEST_F(DebugLineBasicFixture,
   EXPECT_FALSE(Recoverable);
 
   checkError({"parsing line table prologue at offset 0x00000000 found "
-              "unsupported version 0x00",
+              "unsupported version 0",
               "parsing line table prologue at offset 0x00000006 found "
-              "unsupported version 0x01"},
+              "unsupported version 1"},
              std::move(Unrecoverable));
 }
 
