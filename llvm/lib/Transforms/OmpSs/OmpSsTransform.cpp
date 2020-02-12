@@ -25,6 +25,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 using namespace llvm;
 
 namespace {
@@ -262,6 +263,7 @@ struct OmpSs : public ModulePass {
 
   FunctionCallee CreateTaskFuncTy;
   FunctionCallee TaskSubmitFuncTy;
+  FunctionCallee TaskInFinalFuncTy;
 
   void unpackDepsAndRewrite(Module &M, TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> TaskArgsList) {
     BasicBlock::Create(M.getContext(), "entry", F);
@@ -613,7 +615,8 @@ struct OmpSs : public ModulePass {
   void lowerTask(TaskInfo &TI,
                  Function &F,
                  size_t taskNum,
-                 Module &M) {
+                 Module &M,
+                 SmallVectorImpl<DenseMap<BasicBlock *, BasicBlock *>> &TaskCopyBBs) {
 
     DebugLoc DLoc = TI.Entry->getDebugLoc();
     unsigned Line = DLoc.getLine();
@@ -626,20 +629,60 @@ struct OmpSs : public ModulePass {
 
     // 1. Split BB
     BasicBlock *EntryBB = TI.Entry->getParent();
-    EntryBB = EntryBB->splitBasicBlock(TI.Entry);
+    // EntryBB = EntryBB->splitBasicBlock(TI.Entry);
 
-    BasicBlock *ExitBB = TI.Exit->getParent();
+    BasicBlock *ExitBB = TI.Exit->getParent()->getNextNode();
     // Assuming well-formed BB
-    ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
+    // ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
 
     TI.Exit->eraseFromParent();
     TI.Entry->eraseFromParent();
+    SetVector<BasicBlock *> TaskBBs;
+
+    ExitBB->setName("final.end");
+    assert(EntryBB->getSinglePredecessor());
+    BasicBlock *FinalCondBB = BasicBlock::Create(M.getContext(), "final.cond", &F);
+    // TaskBBs.insert(FinalCondBB);
+    BasicBlock *FinalThenBB = BasicBlock::Create(M.getContext(), "final.then", &F);
+    // TaskBBs.insert(FinalThenBB);
+    {
+      // We are now just before the branch to task body
+      Instruction *EntryBBTerminator = EntryBB->getSinglePredecessor()->getTerminator();
+      IRBuilder<> IRB(EntryBBTerminator);
+      IRB.CreateBr(FinalCondBB);
+      // Remove the old branch
+      EntryBBTerminator->eraseFromParent();
+
+      IRB.SetInsertPoint(FinalCondBB);
+      // if (nanos6_in_final())
+      Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncTy, {}), IRB.getInt32(0));
+      IRB.CreateCondBr(Cond, FinalThenBB, EntryBB);
+      IRB.SetInsertPoint(FinalThenBB);
+
+      BasicBlock *CopyEntryBB = nullptr;
+      // Rewrite branches out of CopyBBs to ExitBB
+      // It should be only one block that do this
+      for (auto &p : TaskCopyBBs[taskNum]) {
+        BasicBlock *&CopyBB = p.second;
+        if (CopyBB->hasNPredecessors(0)) {
+          assert(!CopyEntryBB);
+          CopyEntryBB = CopyBB;
+        }
+      }
+      assert(CopyEntryBB);
+      IRB.CreateBr(CopyEntryBB);
+
+    }
 
     // 2. Gather BB between entry and exit (is there any function/util to do this?)
     SmallVector<BasicBlock*, 8> Worklist;
     SmallPtrSet<BasicBlock*, 8> Visited;
-    SetVector<BasicBlock *> TaskBBs;
-
+#if 0
+    for (auto &p : TaskCopyBBs[taskNum]) {
+      TaskBBs.insert(p.first);
+      // TaskBBs.insert(p.second);
+    }
+#else
     Worklist.push_back(EntryBB);
     Visited.insert(EntryBB);
     TaskBBs.insert(EntryBB);
@@ -656,6 +699,8 @@ struct OmpSs : public ModulePass {
         }
       }
     }
+#endif
+
 
     // Create nanos6_task_args_* START
     SmallVector<Type *, 4> TaskArgsMemberTy;
@@ -1204,6 +1249,7 @@ struct OmpSs : public ModulePass {
     // Create function types
     // nanos6_create_task
     // nanos6_submit_task
+    // nanos6_in_final
 
     CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),
@@ -1219,6 +1265,10 @@ struct OmpSs : public ModulePass {
     TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
         Type::getVoidTy(M.getContext()),
         Type::getInt8PtrTy(M.getContext()) // void *task
+    );
+
+    TaskInFinalFuncTy = M.getOrInsertFunction("nanos6_in_final",
+        Type::getInt32Ty(M.getContext())
     );
   }
 
@@ -1243,6 +1293,9 @@ struct OmpSs : public ModulePass {
     }
 
     for (auto *F : Functs) {
+
+      SmallVector<DenseMap<BasicBlock *, BasicBlock *>, 4> TaskCopyBBs;
+
       FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
       TaskFunctionInfo &TFI = FI.TaskFuncInfo;
       TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
@@ -1250,9 +1303,80 @@ struct OmpSs : public ModulePass {
       for (TaskwaitInfo& TwI : TwFI.PostOrder) {
         lowerTaskwait(TwI, M);
       }
+      for (TaskInfo &TI : TFI.PostOrder) {
+        // 1. Split BB
+        BasicBlock *EntryBB = TI.Entry->getParent();
+        EntryBB = EntryBB->splitBasicBlock(TI.Entry);
+
+        BasicBlock *ExitBB = TI.Exit->getParent();
+        // Assuming well-formed BB
+        ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
+        // TI.Exit->eraseFromParent();
+
+        // 2. Gather BB between entry and exit (is there any function/util to do this?)
+        SmallVector<BasicBlock*, 8> Worklist;
+        SmallPtrSet<BasicBlock*, 8> Visited;
+        SetVector<BasicBlock *> TaskBBs;
+
+        Worklist.push_back(EntryBB);
+        Visited.insert(EntryBB);
+        TaskBBs.insert(EntryBB);
+        while (!Worklist.empty()) {
+          auto WIt = Worklist.begin();
+          BasicBlock *BB = *WIt;
+          Worklist.erase(WIt);
+
+          for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
+            if (!Visited.count(*It) && *It != ExitBB) {
+              Worklist.push_back(*It);
+              Visited.insert(*It);
+              TaskBBs.insert(*It);
+            }
+          }
+        }
+        DenseMap<BasicBlock *, BasicBlock *> CopyBBs;
+        ValueToValueMapTy VMap;
+        // 1. Clone BBs
+        for (BasicBlock *BB : TaskBBs) {
+          BasicBlock *CopyBB = CloneBasicBlock(BB, VMap, ".clone", F);
+          CopyBBs[BB] = CopyBB;
+        }
+        // 2. Rewrite ops and branches to cloned ones.
+        //    Intrinsic exit is mapped to the original entry, so before removing it
+        //    we must to map it to the cloned entry.
+        for (auto &p : CopyBBs) {
+          BasicBlock *& CopyBB = p.second;
+          for (BasicBlock::iterator II = CopyBB->begin(), E = CopyBB->end(); II != E;) {
+            Instruction &I = *II++;
+            for (unsigned op = 0, E = I.getNumOperands(); op != E; ++op) {
+              Value *Op = I.getOperand(op);
+
+              ValueToValueMapTy::iterator It = VMap.find(Op);
+              if (It != VMap.end())
+                I.setOperand(op, It->second);
+              if (BasicBlock *BrBB = dyn_cast<BasicBlock>(Op)) {
+                auto It1CopyBBs = CopyBBs.find(BrBB);
+                if (It1CopyBBs != CopyBBs.end())
+                  I.setOperand(op, It1CopyBBs->second);
+              }
+            }
+            if (auto *IIntr = dyn_cast<IntrinsicInst>(&I)) {
+              if (IIntr->getIntrinsicID() == Intrinsic::directive_region_entry) {
+                IIntr->eraseFromParent();
+              } else if (IIntr->getIntrinsicID() == Intrinsic::directive_region_exit) {
+                IIntr->eraseFromParent();
+              }
+            }
+          }
+          for (auto &p1 : CopyBBs) {
+            CopyBB->replacePhiUsesWith(p1.first, p1.second);
+          }
+        }
+        TaskCopyBBs.push_back(CopyBBs);
+      }
       size_t taskNum = 0;
       for (TaskInfo &TI : TFI.PostOrder) {
-        lowerTask(TI, *F, taskNum++, M);
+        lowerTask(TI, *F, taskNum++, M, TaskCopyBBs);
       }
 
     }

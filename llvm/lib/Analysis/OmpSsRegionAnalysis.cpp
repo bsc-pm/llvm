@@ -630,6 +630,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
                                "OperandBundle not found.");
             }
           }
+          // T.TaskBodyIns.push_back(&I);
         }
         for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {

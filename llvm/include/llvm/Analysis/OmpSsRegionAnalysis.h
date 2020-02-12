@@ -77,6 +77,9 @@ struct TaskInfo {
   TaskNonPODsInfo NonPODsInfo;
   Instruction *Entry;
   Instruction *Exit;
+  // Used in final(), since once we transform
+  // one task we cannot distinguish the original code
+  // SmallVector<Instruction *> TaskBodyIns;
 };
 
 struct TaskFunctionInfo {
