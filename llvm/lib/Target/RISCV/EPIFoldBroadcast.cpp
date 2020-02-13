@@ -62,7 +62,7 @@ namespace {
 class EPIFoldBroadcast : public FunctionPass {
 private:
   void initRun();
-  void determineFoldableUses(Instruction *Broadcast, Value *Scalar, Value *GVL);
+  void determineFoldableUses(Instruction *Broadcast, Value *Scalar);
   bool foldBroadcasts(Function &F);
 
 public:
@@ -94,7 +94,7 @@ FunctionPass *createEPIFoldBroadcastPass() { return new EPIFoldBroadcast(); }
 } // end of namespace llvm
 
 void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
-                                             Value *Scalar, Value *GVL) {
+                                             Value *Scalar) {
   // A broadcast has foldable uses if it looks like this
   //    %v1 = ...
   //    %v2 = <vscale x ...> @llvm.int.epi.vmv.v.x(%scalar, %gvl)
@@ -122,9 +122,19 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
         continue;
 
       // Check that the broadcasted value is used in the extended operand.
-      if (Broadcast != CSUser.getArgument(EII->ExtendedOperand - 1) ||
-          GVL != CSUser.getArgument(EII->GVLOperand - 1))
+      if (Broadcast != CSUser.getArgument(EII->ExtendedOperand - 1))
         continue;
+      // Note: we used to check that the GVL in both cases matches but
+      // this seems unnecessary because:
+      //  - if the values are the same, then exactly the same set
+      //  of produced elements is consumed.
+      //  - if the consumer uses a smaller gvl than the one used by the
+      //  producer, then the consumer consumes a subset of the elements
+      //  produced.
+      //  - if the consumer uses a larger gvl than the one used by the
+      //  producer, then the consumer will use more elements than those
+      //  produced. Because we currently only fold unmasked broadcasts, this
+      //  triggers undefined behaviour because elements beyond gvl are undef.
 
       LLVM_DEBUG(dbgs() << "Found a foldable use");
       LLVM_DEBUG(CSUser.getInstruction()->dump());
@@ -230,8 +240,7 @@ bool EPIFoldBroadcast::runOnFunction(Function &F) {
       if (auto CS = CallSite(&I)) {
         if (CS.getIntrinsicID() == Intrinsic::epi_vmv_v_x ||
             CS.getIntrinsicID() == Intrinsic::epi_vfmv_v_f) {
-          determineFoldableUses(CS.getInstruction(), CS.getArgument(0),
-                                CS.getArgument(1));
+          determineFoldableUses(CS.getInstruction(), CS.getArgument(0));
         }
       }
     }
