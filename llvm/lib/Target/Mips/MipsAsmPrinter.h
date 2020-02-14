@@ -126,11 +126,11 @@ public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
-  void EmitConstantPool() override {
+  void emitConstantPool() override {
     bool UsingConstantPools =
       (Subtarget->inMips16Mode() && Subtarget->useConstantIslands());
     if (!UsingConstantPools)
-      AsmPrinter::EmitConstantPool();
+      AsmPrinter::emitConstantPool();
     // we emit constant pools customly!
   }
 
@@ -157,7 +157,7 @@ public:
   void emitStartOfAsmFile(Module &M) override;
   void emitEndOfAsmFile(Module &M) override;
   void PrintDebugValueComment(const MachineInstr *MI, raw_ostream &OS);
-  void EmitDebugValue(const MCExpr *Value, unsigned Size) const override;
+  void emitDebugValue(const MCExpr *Value, unsigned Size) const override;
 };
 
 } // end namespace llvm
