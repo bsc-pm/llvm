@@ -178,6 +178,20 @@ static LegalityPredicate isWideScalarTruncStore(unsigned TypeIdx) {
   };
 }
 
+static LegalityPredicate smallerThan(unsigned TypeIdx0, unsigned TypeIdx1) {
+  return [=](const LegalityQuery &Query) {
+    return Query.Types[TypeIdx0].getSizeInBits() <
+           Query.Types[TypeIdx1].getSizeInBits();
+  };
+}
+
+static LegalityPredicate greaterThan(unsigned TypeIdx0, unsigned TypeIdx1) {
+  return [=](const LegalityQuery &Query) {
+    return Query.Types[TypeIdx0].getSizeInBits() >
+           Query.Types[TypeIdx1].getSizeInBits();
+  };
+}
+
 AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
                                          const GCNTargetMachine &TM)
   :  ST(ST_) {
@@ -480,7 +494,8 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
   if (ST.has16BitInsts())
     IToFP.legalFor({{S16, S16}});
   IToFP.clampScalar(1, S32, S64)
-       .scalarize(0);
+       .scalarize(0)
+       .widenScalarToNextPow2(1);
 
   auto &FPToI = getActionDefinitionsBuilder({G_FPTOSI, G_FPTOUI})
     .legalFor({{S32, S32}, {S32, S64}, {S32, S16}})
@@ -598,12 +613,21 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
     .widenScalarToNextPow2(0, 32)
     .widenScalarToNextPow2(1, 32);
 
-  getActionDefinitionsBuilder({G_BSWAP, G_BITREVERSE})
+  getActionDefinitionsBuilder(G_BITREVERSE)
     .legalFor({S32})
     .clampScalar(0, S32, S32)
     .scalarize(0);
 
   if (ST.has16BitInsts()) {
+    getActionDefinitionsBuilder(G_BSWAP)
+      .legalFor({S16, S32, V2S16})
+      .clampMaxNumElements(0, S16, 2)
+      // FIXME: Fixing non-power-of-2 before clamp is workaround for
+      // narrowScalar limitation.
+      .widenScalarToNextPow2(0)
+      .clampScalar(0, S16, S32)
+      .scalarize(0);
+
     if (ST.hasVOP3PInsts()) {
       getActionDefinitionsBuilder({G_SMIN, G_SMAX, G_UMIN, G_UMAX})
         .legalFor({S32, S16, V2S16})
@@ -620,26 +644,23 @@ AMDGPULegalizerInfo::AMDGPULegalizerInfo(const GCNSubtarget &ST_,
         .scalarize(0);
     }
   } else {
+    // TODO: Should have same legality without v_perm_b32
+    getActionDefinitionsBuilder(G_BSWAP)
+      .legalFor({S32})
+      .lowerIf(narrowerThan(0, 32))
+      // FIXME: Fixing non-power-of-2 before clamp is workaround for
+      // narrowScalar limitation.
+      .widenScalarToNextPow2(0)
+      .maxScalar(0, S32)
+      .scalarize(0)
+      .lower();
+
     getActionDefinitionsBuilder({G_SMIN, G_SMAX, G_UMIN, G_UMAX})
       .legalFor({S32})
       .clampScalar(0, S32, S32)
       .widenScalarToNextPow2(0)
       .scalarize(0);
   }
-
-  auto smallerThan = [](unsigned TypeIdx0, unsigned TypeIdx1) {
-    return [=](const LegalityQuery &Query) {
-      return Query.Types[TypeIdx0].getSizeInBits() <
-             Query.Types[TypeIdx1].getSizeInBits();
-    };
-  };
-
-  auto greaterThan = [](unsigned TypeIdx0, unsigned TypeIdx1) {
-    return [=](const LegalityQuery &Query) {
-      return Query.Types[TypeIdx0].getSizeInBits() >
-             Query.Types[TypeIdx1].getSizeInBits();
-    };
-  };
 
   getActionDefinitionsBuilder(G_INTTOPTR)
     // List the common cases
