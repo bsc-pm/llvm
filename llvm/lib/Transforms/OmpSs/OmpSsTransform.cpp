@@ -26,6 +26,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 using namespace llvm;
 
 namespace {
@@ -1332,6 +1333,8 @@ struct OmpSs : public ModulePass {
         for (BasicBlock *BB : TaskBBs) {
           BasicBlock *CopyBB = CloneBasicBlock(BB, VMap, ".clone", F);
           CopyBBs[BB] = CopyBB;
+          // Map the BBs too
+          VMap[BB] = CopyBB;
         }
         // 2. Rewrite ops and branches to cloned ones.
         //    Intrinsic exit is mapped to the original entry, so before removing it
@@ -1340,30 +1343,24 @@ struct OmpSs : public ModulePass {
           BasicBlock *& CopyBB = p.second;
           for (BasicBlock::iterator II = CopyBB->begin(), E = CopyBB->end(); II != E;) {
             Instruction &I = *II++;
-            for (unsigned op = 0, E = I.getNumOperands(); op != E; ++op) {
-              Value *Op = I.getOperand(op);
-
-              ValueToValueMapTy::iterator It = VMap.find(Op);
-              if (It != VMap.end())
-                I.setOperand(op, It->second);
-              if (BasicBlock *BrBB = dyn_cast<BasicBlock>(Op)) {
-                auto It1CopyBBs = CopyBBs.find(BrBB);
-                if (It1CopyBBs != CopyBBs.end())
-                  I.setOperand(op, It1CopyBBs->second);
-              }
-            }
+            // Remove OmpSs-2 intrinsics before, since RemapInstruction will crash.
+            // This happers because VMap has the map <IEntry, IcloneEntry>, we erase IcloneEntry
+            // but the map is kept. When remapping IcloneExit that entry is used...
             if (auto *IIntr = dyn_cast<IntrinsicInst>(&I)) {
-              if (IIntr->getIntrinsicID() == Intrinsic::directive_region_entry) {
+              Intrinsic::ID IID = IIntr->getIntrinsicID();
+              if (IID == Intrinsic::directive_region_entry
+                  || IID == Intrinsic::directive_region_exit
+                  || IID == Intrinsic::directive_marker) {
+                if (!IIntr->use_empty())
+                  IIntr->replaceAllUsesWith(UndefValue::get(IIntr->getType()));
+
+                assert(IIntr->getParent() &&
+                       "BB containing IIntr deleted unexpectedly!");
                 IIntr->eraseFromParent();
-              } else if (IIntr->getIntrinsicID() == Intrinsic::directive_region_exit) {
-                IIntr->eraseFromParent();
-              } else if (IIntr->getIntrinsicID() == Intrinsic::directive_marker) {
-                IIntr->eraseFromParent();
+                continue;
               }
             }
-          }
-          for (auto &p1 : CopyBBs) {
-            CopyBB->replacePhiUsesWith(p1.first, p1.second);
+            RemapInstruction(&I, VMap, RF_NoModuleLevelChanges | RF_IgnoreMissingLocals);
           }
         }
         TaskCopyBBs.push_back(CopyBBs);
