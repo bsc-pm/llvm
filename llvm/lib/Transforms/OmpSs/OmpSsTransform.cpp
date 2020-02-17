@@ -612,6 +612,41 @@ struct OmpSs : public ModulePass {
     TwI.I->eraseFromParent();
   }
 
+  void buildFinalCondCFG(BasicBlock *EntryBB, BasicBlock *ExitBB,
+                         DenseMap<BasicBlock *, BasicBlock *> &CopyBBs,
+                         Function &F, Module &M) {
+    ExitBB->setName("final.end");
+    assert(EntryBB->getSinglePredecessor());
+    BasicBlock *FinalCondBB = BasicBlock::Create(M.getContext(), "final.cond", &F);
+
+    BasicBlock *CopyEntryBB = nullptr;
+    // There is only one CopyBB that has no predecessors,
+    // this is the entry
+    for (auto &p : CopyBBs) {
+      BasicBlock *&CopyBB = p.second;
+      if (CopyBB->hasNPredecessors(0)) {
+        assert(!CopyEntryBB);
+        CopyEntryBB = CopyBB;
+      }
+    }
+    assert(CopyEntryBB);
+    CopyEntryBB->setName("final.then");
+
+    // We are now just before the branch to task body
+    Instruction *EntryBBTerminator = EntryBB->getSinglePredecessor()->getTerminator();
+
+    IRBuilder<> IRB(EntryBBTerminator);
+
+    IRB.CreateBr(FinalCondBB);
+    // Remove the old branch
+    EntryBBTerminator->eraseFromParent();
+
+    IRB.SetInsertPoint(FinalCondBB);
+    // if (nanos6_in_final())
+    Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncTy, {}), IRB.getInt32(0));
+    IRB.CreateCondBr(Cond, CopyEntryBB, EntryBB);
+  }
+
   void lowerTask(TaskInfo &TI,
                  Function &F,
                  size_t taskNum,
@@ -639,50 +674,12 @@ struct OmpSs : public ModulePass {
     TI.Entry->eraseFromParent();
     SetVector<BasicBlock *> TaskBBs;
 
-    ExitBB->setName("final.end");
-    assert(EntryBB->getSinglePredecessor());
-    BasicBlock *FinalCondBB = BasicBlock::Create(M.getContext(), "final.cond", &F);
-    // TaskBBs.insert(FinalCondBB);
-    BasicBlock *FinalThenBB = BasicBlock::Create(M.getContext(), "final.then", &F);
-    // TaskBBs.insert(FinalThenBB);
-    {
-      // We are now just before the branch to task body
-      Instruction *EntryBBTerminator = EntryBB->getSinglePredecessor()->getTerminator();
-      IRBuilder<> IRB(EntryBBTerminator);
-      IRB.CreateBr(FinalCondBB);
-      // Remove the old branch
-      EntryBBTerminator->eraseFromParent();
-
-      IRB.SetInsertPoint(FinalCondBB);
-      // if (nanos6_in_final())
-      Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncTy, {}), IRB.getInt32(0));
-      IRB.CreateCondBr(Cond, FinalThenBB, EntryBB);
-      IRB.SetInsertPoint(FinalThenBB);
-
-      BasicBlock *CopyEntryBB = nullptr;
-      // Rewrite branches out of CopyBBs to ExitBB
-      // It should be only one block that do this
-      for (auto &p : TaskCopyBBs[taskNum]) {
-        BasicBlock *&CopyBB = p.second;
-        if (CopyBB->hasNPredecessors(0)) {
-          assert(!CopyEntryBB);
-          CopyEntryBB = CopyBB;
-        }
-      }
-      assert(CopyEntryBB);
-      IRB.CreateBr(CopyEntryBB);
-
-    }
+    buildFinalCondCFG(EntryBB, ExitBB, TaskCopyBBs[taskNum], F, M);
 
     // 2. Gather BB between entry and exit (is there any function/util to do this?)
     SmallVector<BasicBlock*, 8> Worklist;
     SmallPtrSet<BasicBlock*, 8> Visited;
-#if 0
-    for (auto &p : TaskCopyBBs[taskNum]) {
-      TaskBBs.insert(p.first);
-      // TaskBBs.insert(p.second);
-    }
-#else
+
     Worklist.push_back(EntryBB);
     Visited.insert(EntryBB);
     TaskBBs.insert(EntryBB);
@@ -699,8 +696,6 @@ struct OmpSs : public ModulePass {
         }
       }
     }
-#endif
-
 
     // Create nanos6_task_args_* START
     SmallVector<Type *, 4> TaskArgsMemberTy;
@@ -1293,16 +1288,13 @@ struct OmpSs : public ModulePass {
     }
 
     for (auto *F : Functs) {
-
       SmallVector<DenseMap<BasicBlock *, BasicBlock *>, 4> TaskCopyBBs;
 
       FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
       TaskFunctionInfo &TFI = FI.TaskFuncInfo;
       TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
 
-      for (TaskwaitInfo& TwI : TwFI.PostOrder) {
-        lowerTaskwait(TwI, M);
-      }
+      // First sweep to clone BBs
       for (TaskInfo &TI : TFI.PostOrder) {
         // 1. Split BB
         BasicBlock *EntryBB = TI.Entry->getParent();
@@ -1365,6 +1357,8 @@ struct OmpSs : public ModulePass {
                 IIntr->eraseFromParent();
               } else if (IIntr->getIntrinsicID() == Intrinsic::directive_region_exit) {
                 IIntr->eraseFromParent();
+              } else if (IIntr->getIntrinsicID() == Intrinsic::directive_marker) {
+                IIntr->eraseFromParent();
               }
             }
           }
@@ -1374,6 +1368,11 @@ struct OmpSs : public ModulePass {
         }
         TaskCopyBBs.push_back(CopyBBs);
       }
+
+      for (TaskwaitInfo& TwI : TwFI.PostOrder) {
+        lowerTaskwait(TwI, M);
+      }
+
       size_t taskNum = 0;
       for (TaskInfo &TI : TFI.PostOrder) {
         lowerTask(TI, *F, taskNum++, M, TaskCopyBBs);

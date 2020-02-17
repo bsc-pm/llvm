@@ -21,7 +21,7 @@ define void @foo(i32 %x, i32 %y) {
 ; CHECK-NEXT:    store i32 42, i32* [[Z_ORIG]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, i32* [[Z_ORIG]], align 4
 ; CHECK-NEXT:    store i32 [[TMP2]], i32* [[Z]], align 4
-; CHECK-NEXT:    br label [[CODEREPL:%.*]], !dbg !1
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !1
 ; CHECK:       codeRepl:
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca %nanos6_task_args_foo0*, !dbg !1
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP3]] to i8**, !dbg !1
@@ -38,10 +38,25 @@ define void @foo(i32 %x, i32 %y) {
 ; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP8]], i8* align 4 [[TMP9]], i64 4, i1 false), !dbg !1
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i8*, i8** [[TMP5]], !dbg !1
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP10]]), !dbg !1
-; CHECK-NEXT:    br label [[TMP11:%.*]], !dbg !1
-; CHECK:       11:
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !1
+; CHECK:       final.end:
 ; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0)), !dbg !1
 ; CHECK-NEXT:    ret void
+; CHECK:       final.then:
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, i32* [[X_ADDR]], align 4
+; CHECK-NEXT:    [[INC_CLONE:%.*]] = add nsw i32 [[TMP11]], 1
+; CHECK-NEXT:    store i32 [[INC_CLONE]], i32* [[X_ADDR]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = load i32, i32* [[Y_ADDR]], align 4
+; CHECK-NEXT:    [[INC1_CLONE:%.*]] = add nsw i32 [[TMP12]], 1
+; CHECK-NEXT:    store i32 [[INC1_CLONE]], i32* [[Y_ADDR]], align 4
+; CHECK-NEXT:    [[TMP13:%.*]] = load i32, i32* [[Z]], align 4
+; CHECK-NEXT:    [[INC2_CLONE:%.*]] = add nsw i32 [[TMP13]], 1
+; CHECK-NEXT:    store i32 [[INC2_CLONE]], i32* [[Z]], align 4
+; CHECK-NEXT:    br label [[FINAL_END]], !dbg !1
+; CHECK:       final.cond:
+; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @nanos6_in_final(), !dbg !1
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp ne i32 [[TMP14]], 0, !dbg !1
+; CHECK-NEXT:    br i1 [[TMP15]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg !1
 ;
 entry:
   %x.addr = alloca i32, align 4
