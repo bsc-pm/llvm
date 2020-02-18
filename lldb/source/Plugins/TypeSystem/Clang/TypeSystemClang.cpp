@@ -240,7 +240,7 @@ static lldb::addr_t GetVTableAddress(Process &process,
   if (err.Fail() || vbtable_ptr_offset + data.GetAddressByteSize() > size)
     return LLDB_INVALID_ADDRESS;
 
-  return data.GetPointer(&vbtable_ptr_offset);
+  return data.GetAddress(&vbtable_ptr_offset);
 }
 
 static int64_t ReadVBaseOffsetFromVTable(Process &process,
@@ -1298,11 +1298,13 @@ static TemplateParameterList *CreateTemplateParameterList(
 
     if (!template_param_infos.packed_args->args.empty() &&
         IsValueParam(template_param_infos.packed_args->args[0])) {
+      QualType template_param_type =
+          template_param_infos.packed_args->args[0].getIntegralType();
       template_param_decls.push_back(NonTypeTemplateParmDecl::Create(
           ast, decl_context, SourceLocation(), SourceLocation(), depth,
-          num_template_params, identifier_info,
-          template_param_infos.packed_args->args[0].getIntegralType(),
-          parameter_pack_true, nullptr));
+          num_template_params, identifier_info, template_param_type,
+          parameter_pack_true,
+          ast.getTrivialTypeSourceInfo(template_param_type)));
     } else {
       template_param_decls.push_back(TemplateTypeParmDecl::Create(
           ast, decl_context, SourceLocation(), SourceLocation(), depth,
