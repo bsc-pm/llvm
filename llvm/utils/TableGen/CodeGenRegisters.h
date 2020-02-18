@@ -342,6 +342,9 @@ namespace llvm {
     /// Whether instructions may use NoRegister (0) instead of a physical
     /// register for an operand of this register class.
     bool AllowsNoRegister;
+    /// Generate register pressure set for this register class and any class
+    /// synthesized from it.
+    bool GeneratePressureSet;
 
     // Return the Record that defined this class, or NULL if the class was
     // created by TableGen.
