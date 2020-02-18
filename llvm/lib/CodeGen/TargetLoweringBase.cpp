@@ -1090,7 +1090,7 @@ TargetLoweringBase::emitPatchPoint(MachineInstr &InitialMI,
           MF.getDataLayout().getPointerSize(), MFI.getObjectAlignment(FI));
       MIB->addMemOperand(MF, MMO);
     }
-    
+
     // Replace the instruction and update the operand index.
     MBB->insert(MachineBasicBlock::iterator(MI), MIB);
     OperIdx += (MIB->getNumOperands() - MI->getNumOperands()) - 1;

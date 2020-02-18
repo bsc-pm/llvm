@@ -21212,7 +21212,7 @@ static SDValue EmitCmp(SDValue Op0, SDValue Op1, unsigned X86CC,
   // 0-x == y --> x+y == 0
   // 0-x != y --> x+y != 0
   if (Op0.getOpcode() == ISD::SUB && isNullConstant(Op0.getOperand(0)) &&
-      (X86CC == X86::COND_E || X86CC == X86::COND_NE)) {
+      Op0.hasOneUse() && (X86CC == X86::COND_E || X86CC == X86::COND_NE)) {
     SDVTList VTs = DAG.getVTList(CmpVT, MVT::i32);
     SDValue Add = DAG.getNode(X86ISD::ADD, dl, VTs, Op0.getOperand(1), Op1);
     return Add.getValue(1);
@@ -21221,7 +21221,7 @@ static SDValue EmitCmp(SDValue Op0, SDValue Op1, unsigned X86CC,
   // x == 0-y --> x+y == 0
   // x != 0-y --> x+y != 0
   if (Op1.getOpcode() == ISD::SUB && isNullConstant(Op1.getOperand(0)) &&
-      (X86CC == X86::COND_E || X86CC == X86::COND_NE)) {
+      Op1.hasOneUse() && (X86CC == X86::COND_E || X86CC == X86::COND_NE)) {
     SDVTList VTs = DAG.getVTList(CmpVT, MVT::i32);
     SDValue Add = DAG.getNode(X86ISD::ADD, dl, VTs, Op0, Op1.getOperand(1));
     return Add.getValue(1);
@@ -22391,9 +22391,7 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   // Lower FP selects into a CMP/AND/ANDN/OR sequence when the necessary SSE ops
   // are available or VBLENDV if AVX is available.
   // Otherwise FP cmovs get lowered into a less efficient branch sequence later.
-  if (Cond.getOpcode() == ISD::SETCC &&
-      ((Subtarget.hasSSE2() && VT == MVT::f64) ||
-       (Subtarget.hasSSE1() && VT == MVT::f32)) &&
+  if (Cond.getOpcode() == ISD::SETCC && isScalarFPTypeInSSEReg(VT) &&
       VT == Cond.getOperand(0).getSimpleValueType() && Cond->hasOneUse()) {
     SDValue CondOp0 = Cond.getOperand(0), CondOp1 = Cond.getOperand(1);
     bool IsAlwaysSignaling;
@@ -22449,7 +22447,7 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   }
 
   // AVX512 fallback is to lower selects of scalar floats to masked moves.
-  if ((VT == MVT::f64 || VT == MVT::f32) && Subtarget.hasAVX512()) {
+  if (isScalarFPTypeInSSEReg(VT) && Subtarget.hasAVX512()) {
     SDValue Cmp = DAG.getNode(ISD::SCALAR_TO_VECTOR, DL, MVT::v1i1, Cond);
     return DAG.getNode(X86ISD::SELECTS, DL, VT, Cmp, Op1, Op2);
   }
@@ -38163,8 +38161,6 @@ combineVSelectWithAllOnesOrZeros(SDNode *N, SelectionDAG &DAG,
 
   assert(CondVT.isVector() && "Vector select expects a vector selector!");
 
-  // Check if the first operand is all zeros and Cond type is vXi1.
-  // This situation only applies to avx512.
   // TODO: Use isNullOrNullSplat() to distinguish constants with undefs?
   // TODO: Can we assert that both operands are not zeros (because that should
   //       get simplified at node creation time)?
@@ -38177,14 +38173,6 @@ combineVSelectWithAllOnesOrZeros(SDNode *N, SelectionDAG &DAG,
     if (VT.isFloatingPoint())
       return DAG.getConstantFP(0.0, DL, VT);
     return DAG.getConstant(0, DL, VT);
-  }
-
-  if (TValIsAllZeros && !FValIsAllZeros && Subtarget.hasAVX512() &&
-      Cond.hasOneUse() && CondVT.getVectorElementType() == MVT::i1) {
-    // Invert the cond to not(cond) : xor(op,allones)=not(op)
-    SDValue CondNew = DAG.getNOT(DL, Cond, CondVT);
-    // Vselect cond, op1, op2 = Vselect not(cond), op2, op1
-    return DAG.getSelect(DL, VT, CondNew, RHS, LHS);
   }
 
   // To use the condition operand as a bitwise mask, it must have elements that
@@ -38928,6 +38916,19 @@ static SDValue combineSelect(SDNode *N, SelectionDAG &DAG,
           return DAG.getNode(ISD::UADDSAT, DL, VT, OpLHS, OpRHS);
       }
     }
+  }
+
+  // Check if the first operand is all zeros and Cond type is vXi1.
+  // If this an avx512 target we can improve the use of zero masking by
+  // swapping the operands and inverting the condition.
+  if (N->getOpcode() == ISD::VSELECT && Cond.hasOneUse() &&
+       Subtarget.hasAVX512() && CondVT.getVectorElementType() == MVT::i1 &&
+      ISD::isBuildVectorAllZeros(LHS.getNode()) &&
+      !ISD::isBuildVectorAllZeros(RHS.getNode())) {
+    // Invert the cond to not(cond) : xor(op,allones)=not(op)
+    SDValue CondNew = DAG.getNOT(DL, Cond, CondVT);
+    // Vselect cond, op1, op2 = Vselect not(cond), op2, op1
+    return DAG.getSelect(DL, VT, CondNew, RHS, LHS);
   }
 
   // Early exit check
