@@ -4796,6 +4796,9 @@ static bool isKnownNonNaN(const Value *V, FastMathFlags FMF) {
     return true;
   }
 
+  if (isa<ConstantAggregateZero>(V))
+    return true;
+
   return false;
 }
 
