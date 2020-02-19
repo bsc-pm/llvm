@@ -4020,7 +4020,7 @@ X86TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
     } else if (VA.isRegLoc()) {
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), Arg));
       const TargetOptions &Options = DAG.getTarget().Options;
-      if (Options.EnableDebugEntryValues)
+      if (Options.SupportsDebugEntryValues)
         CSInfo.emplace_back(VA.getLocReg(), I);
       if (isVarArg && IsWin64) {
         // Win64 ABI requires argument XMM reg to be copied to the corresponding
@@ -5168,7 +5168,8 @@ bool X86TargetLowering::shouldScalarizeBinop(SDValue VecOp) const {
   return isOperationLegalOrCustomOrPromote(Opc, ScalarVT);
 }
 
-bool X86TargetLowering::shouldFormOverflowOp(unsigned Opcode, EVT VT) const {
+bool X86TargetLowering::shouldFormOverflowOp(unsigned Opcode, EVT VT,
+                                             bool) const {
   // TODO: Allow vectors?
   if (VT.isVector())
     return false;
