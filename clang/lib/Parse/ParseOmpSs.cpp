@@ -269,6 +269,7 @@ static bool parseDeclareTaskClauses(
         IsError = true;
       break;
     }
+    case OSSC_reduction:
     case OSSC_unknown:
       P.Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
           << getOmpSsDirectiveName(OSSD_task);
@@ -555,6 +556,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_depend:
+  case OSSC_reduction:
   case OSSC_in:
   case OSSC_out:
   case OSSC_inout:
@@ -574,11 +576,60 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   return ErrorFound ? nullptr : Clause;
 }
 
+static bool ParseReductionId(Parser &P, CXXScopeSpec &ReductionIdScopeSpec,
+                             UnqualifiedId &ReductionId) {
+  if (ReductionIdScopeSpec.isEmpty()) {
+    auto OOK = OO_None;
+    switch (P.getCurToken().getKind()) {
+    case tok::plus:
+      OOK = OO_Plus;
+      break;
+    case tok::minus:
+      OOK = OO_Minus;
+      break;
+    case tok::star:
+      OOK = OO_Star;
+      break;
+    case tok::amp:
+      OOK = OO_Amp;
+      break;
+    case tok::pipe:
+      OOK = OO_Pipe;
+      break;
+    case tok::caret:
+      OOK = OO_Caret;
+      break;
+    case tok::ampamp:
+      OOK = OO_AmpAmp;
+      break;
+    case tok::pipepipe:
+      OOK = OO_PipePipe;
+      break;
+    default:
+      break;
+    }
+    if (OOK != OO_None) {
+      SourceLocation OpLoc = P.ConsumeToken();
+      SourceLocation SymbolLocations[] = {OpLoc, OpLoc, SourceLocation()};
+      ReductionId.setOperatorFunctionId(OpLoc, OOK, SymbolLocations);
+      return false;
+    }
+  }
+  return P.ParseUnqualifiedId(ReductionIdScopeSpec, /*EnteringContext*/ false,
+                              /*AllowDestructorName*/ false,
+                              /*AllowConstructorName*/ false,
+                              /*AllowDeductionGuide*/ false,
+                              nullptr, nullptr, ReductionId);
+}
+
 /// Parses clauses with list.
 bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                                OmpSsClauseKind Kind,
                                SmallVectorImpl<Expr *> &Vars,
                                OmpSsVarListDataTy &Data) {
+  UnqualifiedId UnqualifiedReductionId;
+  bool InvalidReductionId = false;
+
   // Parse '('.
   BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
   if (T.expectAndConsume(diag::err_expected_lparen_after,
@@ -623,14 +674,35 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
     } else {
       Diag(Tok, diag::warn_pragma_expected_colon) << "dependency type";
     }
+  } else if (Kind == OSSC_reduction) {
+    ColonProtectionRAIIObject ColonRAII(*this);
+    if (getLangOpts().CPlusPlus)
+      ParseOptionalCXXScopeSpecifier(Data.ReductionIdScopeSpec,
+                                     /*ObjectType=*/nullptr,
+                                     /*EnteringContext=*/false);
+    InvalidReductionId = ParseReductionId(
+        *this, Data.ReductionIdScopeSpec, UnqualifiedReductionId);
+    if (InvalidReductionId) {
+      SkipUntil(tok::colon, tok::r_paren, tok::annot_pragma_ompss_end,
+                StopBeforeMatch);
+    }
+    if (Tok.is(tok::colon))
+      Data.ColonLoc = ConsumeToken();
+    else
+      Diag(Tok, diag::warn_pragma_expected_colon) << "reduction identifier";
+    if (!InvalidReductionId)
+      Data.ReductionId =
+          Actions.GetNameFromUnqualifiedId(UnqualifiedReductionId);
   }
 
   auto DepKindIt = std::find(Data.DepKinds.begin(),
                              Data.DepKinds.end(),
                              OSSC_DEPEND_unknown);
 
+
   // IsComma init determine if we got a well-formed clause
-  bool IsComma = (Kind != OSSC_depend)
+  bool IsComma = (Kind != OSSC_depend && Kind != OSSC_reduction)
+                 || (Kind == OSSC_reduction && !InvalidReductionId)
                  || (Kind == OSSC_depend && DepKindIt == Data.DepKinds.end());
   // We parse the locator-list when:
   // 1. If we found out something that seems a valid item regardless
@@ -662,10 +734,14 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   Data.RLoc = Tok.getLocation();
   if (!T.consumeClose())
     Data.RLoc = T.getCloseLocation();
-  // return Well-formed clause but empty list
+  // Do not pass to Sema when
+  //   - depend(in : )
+  //       we have nothing to analize
+  //   - reduction(invalid : ...)
+  //       we cannot analize anything because we need a valid reduction id
   return (Kind == OSSC_depend
           && DepKindIt == Data.DepKinds.end() && Vars.empty())
-          || (Kind != OSSC_depend && Vars.empty());
+          || (Kind == OSSC_reduction && InvalidReductionId);
 }
 
 /// Parsing of OmpSs
@@ -705,7 +781,7 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   OmpSsVarListDataTy Data;
 
   Sema::AllowShapingsRAII AllowShapings(Actions, [&Kind]() {
-    return Kind == OSSC_depend
+    return Kind == OSSC_depend || Kind == OSSC_reduction
      || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
      || Kind == OSSC_concurrent || Kind == OSSC_commutative
      || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout;
@@ -720,7 +796,8 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
   }
   return Actions.ActOnOmpSsVarListClause(
       Kind, Vars, Loc, LOpen, Data.ColonLoc, Data.RLoc,
-      Data.DepKinds, Data.DepLoc);
+      Data.DepKinds, Data.DepLoc, Data.ReductionIdScopeSpec,
+      Data.ReductionId);
 }
 
 /// Parses simple expression in parens for single-expression clauses of OmpSs

@@ -2895,6 +2895,8 @@ public:
     SourceLocation RLoc;
     SourceLocation DepLoc;
     SmallVector<OmpSsDependClauseKind, 2> DepKinds;
+    CXXScopeSpec ReductionIdScopeSpec;
+    DeclarationNameInfo ReductionId;
   };
 
   /// Parses clauses with list.

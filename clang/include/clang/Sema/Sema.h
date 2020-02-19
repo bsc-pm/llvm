@@ -9962,7 +9962,9 @@ public:
       SourceLocation StartLoc, SourceLocation LParenLoc,
       SourceLocation ColonLoc, SourceLocation EndLoc,
       ArrayRef<OmpSsDependClauseKind> DepKinds,
-      SourceLocation DepLoc);
+      SourceLocation DepLoc,
+      CXXScopeSpec &ReductionIdScopeSpec,
+      DeclarationNameInfo &ReductionId);
 
   OSSClause *ActOnOmpSsSimpleClause(OmpSsClauseKind Kind,
                                     unsigned Argument,
@@ -10005,12 +10007,22 @@ public:
   bool ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
                              SmallVectorImpl<OmpSsDependClauseKind> &DepKindsOrdered,
                              SourceLocation DepLoc);
+
   /// Called on well-formed 'depend' clause.
   OSSClause *
   ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLocation DepLoc,
                           SourceLocation ColonLoc, ArrayRef<Expr *> VarList,
                           SourceLocation StartLoc, SourceLocation LParenLoc,
                           SourceLocation EndLoc, bool OSSSyntax = false);
+
+  /// Called on well-formed 'depend' clause.
+  OSSClause *
+  ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
+                         SourceLocation StartLoc, SourceLocation LParenLoc,
+                         SourceLocation ColonLoc,
+                         SourceLocation EndLoc,
+                         CXXScopeSpec &ReductionIdScopeSpec,
+                         const DeclarationNameInfo &ReductionId);
 
   OSSClause *ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                         Expr *Expr,

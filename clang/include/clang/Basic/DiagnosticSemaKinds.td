@@ -9888,13 +9888,19 @@ def err_oss_mismatch_depend_dsa : Error<
   "the data-sharing '%0' conflicts with '%1' required by the dependency">;
 def err_oss_not_defined_dsa_when_default_none : Error<
   "expected explicit data-sharing for %0">;
+def err_oss_reduction_id_not_compatible : Error<
+  "list item of type %0 is not valid for specified reduction operation: unable to provide default initialization value">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element, array shape or array section">;
 def err_oss_expected_dereference_or_array_item : Error<
   "expected dereference, array element, array shape or array section">;
+def err_oss_expected_var_name_member_expr_or_array_item : Error<
+  "expected variable name%select{|, data member of current class}0, array element or array section">;
 def err_oss_expected_var_name_member_expr : Error<
   "expected variable name%select{| or data member of current class}0">;
+def err_oss_expected_base_var_name : Error<
+  "expected variable name as a base of the array %select{subscript|section}0">;
 
 def err_oss_not_integral : Error<
   "expression must have integral or unscoped enumeration "
@@ -9948,6 +9954,8 @@ def err_oss_rvalue_param_task : Error<
   "r-values are not allowed in task outline">;
 def err_oss_non_pod_parm_task : Error<
   "non-PODs by value are not allowed in task outline">;
+def err_oss_non_pod_reduction : Error<
+  "non-PODs value are not allowed in reductions">;
 } // end of OmpSs component.
 
 

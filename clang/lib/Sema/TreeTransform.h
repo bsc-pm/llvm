@@ -1598,6 +1598,23 @@ public:
                                             StartLoc, LParenLoc, EndLoc, OSSSyntax);
   }
 
+  /// Build a new OpenMP 'reduction' clause.
+  ///
+  /// By default, performs semantic analysis to build the new statement.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *
+  RebuildOSSReductionClause(ArrayRef<Expr *> VarList,
+                            SourceLocation StartLoc,
+                            SourceLocation LParenLoc,
+                            SourceLocation ColonLoc,
+                            SourceLocation EndLoc,
+                            CXXScopeSpec &ReductionIdScopeSpec,
+                            const DeclarationNameInfo &ReductionId) {
+    return getSema().ActOnOmpSsReductionClause(
+        VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
+        ReductionId);
+  }
+
   /// Build a new OmpSs 'shared' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -9471,6 +9488,35 @@ TreeTransform<Derived>::TransformOSSDependClause(OSSDependClause *C) {
   return getDerived().RebuildOSSDependClause(
       C->getDependencyKinds(), C->getDependencyLoc(), C->getColonLoc(), Vars,
       C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc(), C->isOSSSyntax());
+}
+
+template <typename Derived>
+OSSClause *
+TreeTransform<Derived>::TransformOSSReductionClause(OSSReductionClause *C) {
+  llvm::SmallVector<Expr *, 16> Vars;
+  Vars.reserve(C->varlist_size());
+
+  // We need to enable Shapings here since we're in a depend clause
+  Sema::AllowShapingsRAII AllowShapings(getSema(), []() { return true; });
+
+  for (auto *VE : C->varlists()) {
+    ExprResult EVar = getDerived().TransformExpr(cast<Expr>(VE));
+    if (EVar.isInvalid())
+      return nullptr;
+    Vars.push_back(EVar.get());
+  }
+  CXXScopeSpec ReductionIdScopeSpec;
+  ReductionIdScopeSpec.Adopt(C->getQualifierLoc());
+
+  DeclarationNameInfo NameInfo = C->getNameInfo();
+  if (NameInfo.getName()) {
+    NameInfo = getDerived().TransformDeclarationNameInfo(NameInfo);
+    if (!NameInfo.getName())
+      return nullptr;
+  }
+  return getDerived().RebuildOSSReductionClause(
+      Vars, C->getBeginLoc(), C->getLParenLoc(), C->getColonLoc(),
+      C->getEndLoc(), ReductionIdScopeSpec, NameInfo);
 }
 
 template <typename Derived>

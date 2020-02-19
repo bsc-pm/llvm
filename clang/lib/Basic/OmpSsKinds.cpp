@@ -90,6 +90,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
+  case OSSC_reduction:
   case OSSC_in:
   case OSSC_out:
   case OSSC_inout:
@@ -134,6 +135,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_private:
   case OSSC_firstprivate:
   case OSSC_shared:
+  case OSSC_reduction:
   case OSSC_in:
   case OSSC_out:
   case OSSC_inout:

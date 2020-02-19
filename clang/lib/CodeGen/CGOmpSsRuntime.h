@@ -66,9 +66,23 @@ struct OSSTaskDepDataTy final {
   SmallVector<OSSDepDataTy, 4> Commutatives;
 };
 
+struct OSSReductionDataTy {
+  const Expr *SimpleRef;
+  const Expr *Ref;
+  const Expr *Init;
+  const Expr *LHS;
+  const Expr *RHS;
+  const Expr *ReductionOp;
+};
+
+struct OSSTaskReductionDataTy final {
+  SmallVector<OSSReductionDataTy, 4> RedList;
+};
+
 struct OSSTaskDataTy final {
   OSSTaskDSADataTy DSAs;
   OSSTaskDepDataTy Deps;
+  OSSTaskReductionDataTy Reductions;
   const Expr *If = nullptr;
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;

@@ -8,7 +8,7 @@ T adder(T v) {
 template<typename T, typename... Args>
 T adder(T first, Args... args) {
   T tmp;
-  #pragma oss task firstprivate(args) // expected-error {{variadic templates are not allowed in OmpSs-2 clauses}}
+  #pragma oss task firstprivate(args) in(args) // expected-error 2 {{variadic templates are not allowed in OmpSs-2 clauses}}
   {
     tmp = first + adder(args...);
   }

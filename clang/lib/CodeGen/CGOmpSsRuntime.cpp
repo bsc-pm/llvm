@@ -790,16 +790,13 @@ static void EmitDSAFirstprivate(
   }
 }
 
-static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
-
+static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List) {
   // C long -> LLVM long
   llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
 
   OSSDependVisitor DepVisitor(CGF, Dep.OSSSyntax);
   DepVisitor.Visit(Dep.E);
 
-  SmallVector<llvm::Value*, 4> DepData;
 
   SmallVector<llvm::Value *, 4> Starts(
       DepVisitor.getStarts().begin(),
@@ -821,7 +818,7 @@ static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDat
                .getTypeSizeInBits(CGF
                                   .ConvertType(BaseElementTy))/8;
 
-  DepData.push_back(Ptr);
+  List.push_back(Ptr);
   bool First = true;
   for (size_t i = Dims.size() - 1; i > 0; --i) {
     llvm::Value *Dim = Dims[i];
@@ -849,9 +846,9 @@ static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDat
                                   llvm::ConstantInt::getSigned(OSSArgTy,
                                                                BaseElementSize));
     }
-    DepData.push_back(Dim);
-    DepData.push_back(IdxStart);
-    DepData.push_back(IdxEnd);
+    List.push_back(Dim);
+    List.push_back(IdxStart);
+    List.push_back(IdxEnd);
   }
   llvm::Value *Dim = Dims[0];
   llvm::Value *IdxStart;
@@ -876,11 +873,152 @@ static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDat
                                 llvm::ConstantInt::getSigned(OSSArgTy,
                                                              BaseElementSize));
   }
-  DepData.push_back(Dim);
-  DepData.push_back(IdxStart);
-  DepData.push_back(IdxEnd);
+  List.push_back(Dim);
+  List.push_back(IdxStart);
+  List.push_back(IdxEnd);
+}
 
-  TaskInfo.emplace_back(Name, makeArrayRef(DepData));
+static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  SmallVector<llvm::Value*, 4> DepData;
+  EmitDependency(CGF, Dep, DepData);
+  TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
+}
+
+/// Emits reduction initializer function:
+/// \code
+/// void @.red_init(void* %arg) {
+/// %0 = bitcast void* %arg to <type>*
+/// store <type> <init>, <type>* %0
+/// ret void
+/// }
+/// \endcode
+static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
+                                           const OSSReductionDataTy &Red) {
+  ASTContext &C = CGM.getContext();
+
+  const DeclRefExpr *InitRef = cast<DeclRefExpr>(Red.Init);
+  const VarDecl *InitVD = cast<VarDecl>(InitRef->getDecl());
+
+  QualType PQ = C.getPointerType(InitVD->getType());
+
+  FunctionArgList Args;
+  ImplicitParamDecl PrivArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl OrigArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+
+  Args.emplace_back(&PrivArg);
+  Args.emplace_back(&OrigArg);
+  Args.emplace_back(&NelemsArg);
+
+  const auto &FnInfo =
+      CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+  llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+  std::string Name = "red_init";
+  auto *Fn = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                    Name, &CGM.getModule());
+  CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
+  Fn->setDoesNotRecurse();
+  CodeGenFunction CGF(CGM);
+  CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
+
+  LValue PrivLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&PrivArg),
+                                              PQ->castAs<PointerType>());
+  LValue OrigLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OrigArg),
+                                              PQ->castAs<PointerType>());
+  llvm::Value *NelemsValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
+                       NelemsArg.getType(), NelemsArg.getLocation());
+
+  // Emit the initializer:
+  // %0 = bitcast void* %arg to <type>*
+  // store <type> <init>, <type>* %0
+  CGF.EmitExprAsInit(InitVD->getInit(), InitVD,
+                     CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
+                     /*capturedByInit=*/false);
+  CGF.FinishFunction();
+  return Fn;
+}
+
+/// Emits reduction combiner function:
+/// \code
+/// void @.red_comb(void* %arg0, void* %arg1) {
+/// %lhs = bitcast void* %arg0 to <type>*
+/// %rhs = bitcast void* %arg1 to <type>*
+/// %2 = <ReductionOp>(<type>* %lhs, <type>* %rhs)
+/// store <type> %2, <type>* %lhs
+/// ret void
+/// }
+/// \endcode
+static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
+                                           const OSSReductionDataTy &Red) {
+  ASTContext &C = CGM.getContext();
+  const auto *LHSVD = cast<VarDecl>(cast<DeclRefExpr>(Red.LHS)->getDecl());
+  const auto *RHSVD = cast<VarDecl>(cast<DeclRefExpr>(Red.RHS)->getDecl());
+
+  QualType PQ = C.getPointerType(LHSVD->getType());
+
+  FunctionArgList Args;
+  ImplicitParamDecl OutArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl InArg(C, PQ, ImplicitParamDecl::Other);
+  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+
+  Args.emplace_back(&OutArg);
+  Args.emplace_back(&InArg);
+  Args.emplace_back(&NelemsArg);
+
+  const auto &FnInfo =
+      CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
+  llvm::FunctionType *FnTy = CGM.getTypes().GetFunctionType(FnInfo);
+  std::string Name = "red_comb";
+  auto *Fn = llvm::Function::Create(FnTy, llvm::GlobalValue::InternalLinkage,
+                                    Name, &CGM.getModule());
+  CGM.SetInternalFunctionAttributes(GlobalDecl(), Fn, FnInfo);
+  Fn->setDoesNotRecurse();
+  CodeGenFunction CGF(CGM);
+  CGF.StartFunction(GlobalDecl(), C.VoidTy, Fn, FnInfo, Args, SourceLocation(), SourceLocation());
+
+  LValue OutLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OutArg),
+                                              PQ->castAs<PointerType>());
+  LValue InLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&InArg),
+                                              PQ->castAs<PointerType>());
+  llvm::Value *NelemsValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
+                       NelemsArg.getType(), NelemsArg.getLocation());
+  // Remap lhs and rhs variables to the addresses of the function arguments.
+  CodeGenFunction::OSSPrivateScope PrivateScope(CGF);
+
+  CodeGenFunction::OSSPrivateScope InitScope(CGF);
+  InitScope.addPrivate(LHSVD, [OutLV]() -> Address {
+    return OutLV.getAddress();
+  });
+  InitScope.addPrivate(RHSVD, [InLV]() -> Address {
+    return InLV.getAddress();
+  });
+  (void)InitScope.Privatize();
+  PrivateScope.Privatize();
+
+  // Emit the combiner body:
+  // %2 = <ReductionOp>(<type> *%lhs, <type> *%rhs)
+  // store <type> %2, <type>* %lhs
+  CGF.EmitIgnoredExpr(Red.ReductionOp);
+
+  CGF.FinishFunction();
+  return Fn;
+}
+
+static void EmitReduction(StringRef RedName,
+                          StringRef RedInitName,
+                          StringRef RedCombName,
+                          CodeGenFunction &CGF, const OSSReductionDataTy &Red,
+                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+  SmallVector<llvm::Value *, 4> List;
+  llvm::Value *SimpleValue = CGF.EmitLValue(Red.SimpleRef).getPointer();
+  List.push_back(SimpleValue);
+  EmitDependency(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
+  TaskInfo.emplace_back(RedName, makeArrayRef(List));
+  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{SimpleValue, emitReduceInitFunction(CGF.CGM, Red)});
+  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{SimpleValue, emitReduceCombFunction(CGF.CGM, Red)});
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
@@ -1298,6 +1436,14 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
     EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+  }
+  for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
+    EmitReduction("QUAL.OSS.DEP.REDUCTION",
+                  "QUAL.OSS.DEP.REDUCTION.INIT",
+                  "QUAL.OSS.DEP.REDUCTION.COMBINE",
+                  CGF,
+                  Red,
+                  TaskInfo);
   }
 
   if (Data.If)

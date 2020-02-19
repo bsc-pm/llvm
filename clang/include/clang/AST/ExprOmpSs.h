@@ -168,17 +168,28 @@ class OSSArrayShapingExpr final
     return NumShapes;
   }
 
-  OSSArrayShapingExpr(QualType Type,
+  OSSArrayShapingExpr(QualType Type, Expr *Base, ArrayRef<Expr *> ShapeList,
                       ExprValueKind VK, ExprObjectKind OK, unsigned N,
                       SourceLocation BeginLoc, SourceLocation EndLoc)
-      // TODO: Should we fill correctly
-      // TypeDependent, ValueDependent,
-      // InstantiationDependent,
-      // ContainsUnexpandedParameterPack ??
       : Expr( OSSArrayShapingExprClass, Type, VK, OK,
             false, false, false, false),
             NumShapes(N), BeginLoc(BeginLoc), EndLoc(EndLoc)
-      {}
+      {
+        bool isTypeDependent = Base->isTypeDependent();
+        bool isValueDependent = Base->isValueDependent();
+        bool isInstantiationDependent = Base->isInstantiationDependent();
+        bool containsUnexpandedParameterPack = Base->containsUnexpandedParameterPack();
+        for (Expr *E : ShapeList) {
+          isTypeDependent |= E->isTypeDependent();
+          isValueDependent |= E->isValueDependent();
+          isInstantiationDependent |= E->isInstantiationDependent();
+          containsUnexpandedParameterPack |= E->containsUnexpandedParameterPack();
+        }
+        setTypeDependent(isTypeDependent);
+        setValueDependent(isValueDependent);
+        setInstantiationDependent(isInstantiationDependent);
+        setContainsUnexpandedParameterPack(containsUnexpandedParameterPack);
+      }
 
   /// Create an empty array section expression.
   explicit OSSArrayShapingExpr(EmptyShell Shell, unsigned N)
@@ -196,7 +207,7 @@ public:
                                  SourceLocation EndLoc) {
     void *Mem = C.Allocate(totalSizeToAlloc<Stmt *>(ShapeList.size() + 1));
     OSSArrayShapingExpr *Clause = new (Mem)
-        OSSArrayShapingExpr(Type, VK, OK, ShapeList.size(), BeginLoc, EndLoc);
+        OSSArrayShapingExpr(Type, Base, ShapeList, VK, OK, ShapeList.size(), BeginLoc, EndLoc);
     Clause->setBase(Base);
     Clause->setShapes(ShapeList);
     return Clause;

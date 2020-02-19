@@ -42,6 +42,7 @@ static void AddDSASharedData(const OSSTaskDirective &S, SmallVectorImpl<const Ex
     }
   }
 }
+
 static void AddDSAPrivateData(const OSSTaskDirective &S, SmallVectorImpl<OSSDSAPrivateDataTy> &PList) {
   // All DSA are DeclRefExpr
   llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
@@ -151,6 +152,25 @@ static void AddPriorityData(const OSSTaskDirective &S, const Expr * &PriorityExp
   }
 }
 
+static void AddReductionData(const OSSTaskDirective &S, OSSTaskReductionDataTy &Reductions) {
+  for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
+    auto SimpleRef = C->simple_exprs().begin();
+    auto InitRef = C->privates().begin();
+    auto LHSRef = C->lhs_exprs().begin();
+    auto RHSRef = C->rhs_exprs().begin();
+    auto RedOp = C->reduction_ops().begin();
+    for (const Expr *Ref : C->varlists()) {
+      Reductions.RedList.push_back({*SimpleRef, Ref, *InitRef, *LHSRef, *RHSRef, *RedOp});
+
+      ++SimpleRef;
+      ++InitRef;
+      ++LHSRef;
+      ++RHSRef;
+      ++RedOp;
+    }
+  }
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 
@@ -160,6 +180,7 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   AddFinalData(S, Data.Final);
   AddCostData(S, Data.Cost);
   AddPriorityData(S, Data.Priority);
+  AddReductionData(S, Data.Reductions);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
 }
