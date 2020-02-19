@@ -556,10 +556,9 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
     BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
         .addReg(SPReg)
         .addReg(SizeOfVector);
-    // Align the stack. Vector registers should always be aligned more than
-    // the natural alignment of the stack (currently 16 bytes).
-    alignSP(MBB, MBBI, DL, RegInfo->getSpillAlignment(RISCV::VRRegClass));
-    // Now SP is the value we want to put in the stack slot.
+    // FIXME: We used to align the stack here but given that the default
+    // minimum alignment is already 16 bytes, we'd only need to keep it aligned
+    // if VLEN < 128 bits. We presume VLEN >= 128 bit in every implementation.
     unsigned StoreOpcode =
         RegInfo->getSpillSize(RISCV::GPRRegClass) == 4 ? RISCV::SW : RISCV::SD;
     BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))

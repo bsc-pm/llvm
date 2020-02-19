@@ -28,10 +28,8 @@ define void @foo(i64 %avl) nounwind {
 ; SPILL-O0-NEXT:    addi s0, sp, 176
 ; SPILL-O0-NEXT:    rdvlenb a1
 ; SPILL-O0-NEXT:    sub sp, sp, a1
-; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -168(s0)
 ; SPILL-O0-NEXT:    sub sp, sp, a1
-; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -176(s0)
 ; SPILL-O0-NEXT:    lui a1, %hi(scratch)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(scratch)

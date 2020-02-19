@@ -11,7 +11,6 @@ define <vscale x 8 x i8> @foo_O0(<vscale x 8 x i1> %a) nounwind noinline optnone
 ; CHECK-NEXT:    addi s0, sp, 32
 ; CHECK-NEXT:    rdvlenb a0
 ; CHECK-NEXT:    sub sp, sp, a0
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -32(s0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -32(s0)
@@ -47,7 +46,6 @@ define <vscale x 8 x i8> @foo(<vscale x 8 x i1> %a) nounwind {
 ; CHECK-NEXT:    addi s0, sp, 32
 ; CHECK-NEXT:    rdvlenb a0
 ; CHECK-NEXT:    sub sp, sp, a0
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -32(s0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -32(s0)

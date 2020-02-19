@@ -16,19 +16,14 @@ define void @n1fv_32(double* %ri, double* %ii, double* %ro, double* %io, i64 %is
 ; CHECK-NEXT:    addi s0, sp, 112
 ; CHECK-NEXT:    rdvlenb a1
 ; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -72(s0)
 ; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -80(s0)
 ; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -88(s0)
 ; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -96(s0)
 ; CHECK-NEXT:    sub sp, sp, a1
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -104(s0)
 ; CHECK-NEXT:    mv s2, a5
 ; CHECK-NEXT:    mv s4, a4
