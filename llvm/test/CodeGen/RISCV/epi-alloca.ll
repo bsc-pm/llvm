@@ -11,7 +11,6 @@ define void @lmul1() nounwind optnone noinline {
 ; CHECK-NEXT:    addi s0, sp, 32
 ; CHECK-NEXT:    rdvlenb a0
 ; CHECK-NEXT:    sub sp, sp, a0
-; CHECK-NEXT:    andi sp, sp, -16
 ; CHECK-NEXT:    sd sp, -32(s0)
 ; CHECK-NEXT:    addi sp, s0, -32
 ; CHECK-NEXT:    ld s0, 16(sp)

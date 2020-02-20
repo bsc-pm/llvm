@@ -536,12 +536,12 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
   // FIXME: We're presuming in advance that this is all about VRs
-
   unsigned SizeOfVector = MRI.createVirtualRegister(&RISCV::GPRRegClass);
   BuildMI(MBB, MBBI, DL, TII.get(RISCV::PseudoReadVLENB), SizeOfVector);
 
-  // Do the actual allocation.
-  unsigned SPReg = getSPReg(STI);
+  // Classify the FIs.
+  std::array<llvm::SmallVector<int, 4>, 4> BinSizes;
+
   for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
        FI < EFI; FI++) {
     int8_t StackID = MFI.getStackID(FI);
@@ -549,22 +549,68 @@ void RISCVFrameLowering::prepareStorageSpilledVR(
       continue;
     if (MFI.isDeadObjectIndex(FI))
       continue;
-    assert(StackID == TargetStackID::EPIVector &&
-           "Unexpected StackID");
+    assert(StackID == TargetStackID::EPIVector && "Unexpected StackID");
 
-    // Grow the stack
-    BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
-        .addReg(SPReg)
-        .addReg(SizeOfVector);
-    // FIXME: We used to align the stack here but given that the default
-    // minimum alignment is already 16 bytes, we'd only need to keep it aligned
-    // if VLEN < 128 bits. We presume VLEN >= 128 bit in every implementation.
-    unsigned StoreOpcode =
-        RegInfo->getSpillSize(RISCV::GPRRegClass) == 4 ? RISCV::SW : RISCV::SD;
-    BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))
-        .addReg(SPReg)
-        .addFrameIndex(FI)
-        .addImm(0);
+    int64_t ObjectSize = MFI.getObjectSize(FI);
+
+    unsigned ShiftAmount;
+    // Mask objects may be logically smaller than the spill size of the VR
+    // class.
+    if (ObjectSize <= RegInfo->getSpillSize(RISCV::VRRegClass))
+      ShiftAmount = 0;
+    else if (ObjectSize == RegInfo->getSpillSize(RISCV::VR2RegClass))
+      ShiftAmount = 1;
+    else if (ObjectSize == RegInfo->getSpillSize(RISCV::VR4RegClass))
+      ShiftAmount = 2;
+    else if (ObjectSize == RegInfo->getSpillSize(RISCV::VR8RegClass))
+      ShiftAmount = 3;
+    else
+      llvm_unreachable("Unexpected object size");
+
+    BinSizes[ShiftAmount].push_back(FI);
+  }
+
+  // Do the actual allocation.
+  unsigned SPReg = getSPReg(STI);
+
+  for (const auto &Bin : BinSizes) {
+    if (Bin.empty())
+      continue;
+
+    unsigned FactorRegister = 0;
+    int ShiftAmount = &Bin - &BinSizes[0];
+    assert(0 <= ShiftAmount && ShiftAmount <= 3 && "Invalid shift amount!");
+    if (ShiftAmount > 0) {
+      FactorRegister = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+      BuildMI(MBB, MBBI, DL, TII.get(RISCV::SLLI), FactorRegister)
+          .addReg(SizeOfVector)
+          .addImm(ShiftAmount);
+    }
+
+    for (const int &FI : Bin) {
+      if (ShiftAmount > 0) {
+        assert(FactorRegister && "Invalid register!");
+        bool LastUse = &FI == &Bin.back();
+        BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
+            .addReg(SPReg)
+            .addReg(FactorRegister, LastUse ? RegState::Kill : 0);
+      } else
+        BuildMI(MBB, MBBI, DL, TII.get(RISCV::SUB), SPReg)
+            .addReg(SPReg)
+            .addReg(SizeOfVector);
+
+      // FIXME: We used to align the stack here but given that the default
+      // minimum alignment is already 16 bytes, we'd only need to keep it
+      // aligned if VLEN < 128 bits. We presume VLEN >= 128 bit in every
+      // implementation.
+      unsigned StoreOpcode = RegInfo->getSpillSize(RISCV::GPRRegClass) == 4
+                                 ? RISCV::SW
+                                 : RISCV::SD;
+      BuildMI(MBB, MBBI, DL, TII.get(StoreOpcode))
+          .addReg(SPReg)
+          .addFrameIndex(FI)
+          .addImm(0);
+    }
   }
 }
 

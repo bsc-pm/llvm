@@ -287,7 +287,7 @@ class VReg<list<ValueType> regTypes, dag regList, int Vlmul>
                   128,
                   regList> {
   int VLMul = Vlmul;
-  let Size = 64; // FIXME ELEN
+  int Size = !mul(Vlmul, 64); // FIXME: assuming ELEN=64
 }
 
 defset list<VReg> AllVRegs = {
