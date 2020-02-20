@@ -1091,6 +1091,14 @@ bool EarlyCSE::processNode(DomTreeNode *Node) {
             LLVM_DEBUG(dbgs() << "Skipping due to debug counter\n");
             continue;
           }
+
+          // We don't replace in @llvm.directive.region.entry
+          if (std::any_of(Inst->user_begin(), Inst->user_end(), [](User *U) {
+                return match(U,
+                             m_Intrinsic<Intrinsic::directive_region_entry>());
+              }))
+            continue;
+
           if (!Inst->use_empty())
             Inst->replaceAllUsesWith(Op);
           removeMSSA(Inst);
