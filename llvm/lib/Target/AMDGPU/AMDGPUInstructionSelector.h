@@ -94,6 +94,7 @@ private:
   bool selectG_EXTRACT(MachineInstr &I) const;
   bool selectG_MERGE_VALUES(MachineInstr &I) const;
   bool selectG_UNMERGE_VALUES(MachineInstr &I) const;
+  bool selectG_BUILD_VECTOR_TRUNC(MachineInstr &I) const;
   bool selectG_PTR_ADD(MachineInstr &I) const;
   bool selectG_IMPLICIT_DEF(MachineInstr &I) const;
   bool selectG_INSERT(MachineInstr &I) const;
@@ -126,7 +127,7 @@ private:
   bool selectG_INSERT_VECTOR_ELT(MachineInstr &I) const;
 
   std::pair<Register, unsigned>
-  selectVOP3ModsImpl(Register Src) const;
+  selectVOP3ModsImpl(MachineOperand &Root) const;
 
   InstructionSelector::ComplexRendererFns
   selectVCSRC(MachineOperand &Root) const;
