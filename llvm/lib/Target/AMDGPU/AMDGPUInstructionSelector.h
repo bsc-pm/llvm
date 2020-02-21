@@ -125,6 +125,7 @@ private:
   bool selectG_PTR_MASK(MachineInstr &I) const;
   bool selectG_EXTRACT_VECTOR_ELT(MachineInstr &I) const;
   bool selectG_INSERT_VECTOR_ELT(MachineInstr &I) const;
+  bool selectG_SHUFFLE_VECTOR(MachineInstr &I) const;
 
   std::pair<Register, unsigned>
   selectVOP3ModsImpl(MachineOperand &Root) const;
@@ -146,6 +147,15 @@ private:
 
   InstructionSelector::ComplexRendererFns
   selectVOP3Mods_nnan(MachineOperand &Root) const;
+
+  std::pair<Register, unsigned>
+  selectVOP3PModsImpl(Register Src, const MachineRegisterInfo &MRI) const;
+
+  InstructionSelector::ComplexRendererFns
+  selectVOP3PMods(MachineOperand &Root) const;
+
+  InstructionSelector::ComplexRendererFns
+  selectVOP3PMods0(MachineOperand &Root) const;
 
   InstructionSelector::ComplexRendererFns
   selectVOP3OpSelMods0(MachineOperand &Root) const;
