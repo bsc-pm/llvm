@@ -17,6 +17,7 @@
 #include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Vectorize/LoopVectorize.h"
@@ -962,8 +963,14 @@ bool LoopVectorizationLegality::blockCanBePredicated(
     }
     if (I.mayThrow())
       return false;
+  }
+  return true;
+}
 
-    // FIXME: This is awful
+void LoopVectorizationLegality::addMaskedVectorOps(BasicBlock *BB) {
+  for (Instruction &I : *BB) {
+    // FIXME: This is awful. We are just making all operations masked. Some
+    // might need careful reconsideration.
     auto IsVectorizableOpcode = [](unsigned Opcode) {
       switch (Opcode) {
       case Instruction::Add:
@@ -1014,8 +1021,6 @@ bool LoopVectorizationLegality::blockCanBePredicated(
       MaskedOp.insert(&I);
     }
   }
-
-  return true;
 }
 
 bool LoopVectorizationLegality::canVectorizeWithIfConvert() {
@@ -1322,6 +1327,11 @@ bool LoopVectorizationLegality::prepareToFoldTailByMasking() {
           BB->getTerminator());
       return false;
     }
+    // To use vector predication intrinsics, we need to add mask to all
+    // operations.
+    // TODO: May be do it only if the backend prefers using predicated vector
+    // intrinsics.
+    addMaskedVectorOps(BB);
   }
 
   LLVM_DEBUG(dbgs() << "LV: can fold tail by masking.\n");
