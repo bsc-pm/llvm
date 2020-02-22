@@ -496,6 +496,12 @@ public:
         return failure();
     return success();
   }
+  template <typename Operands>
+  ParseResult resolveOperands(Operands &&operands, Type type, llvm::SMLoc loc,
+                              SmallVectorImpl<Value> &result) {
+    return resolveOperands(std::forward<Operands>(operands),
+                           ArrayRef<Type>(type), loc, result);
+  }
   template <typename Operands, typename Types>
   ParseResult resolveOperands(Operands &&operands, Types &&types,
                               llvm::SMLoc loc, SmallVectorImpl<Value> &result) {
@@ -571,6 +577,11 @@ public:
   /// Parse a single operation successor and its operand list.
   virtual ParseResult
   parseSuccessorAndUseList(Block *&dest, SmallVectorImpl<Value> &operands) = 0;
+
+  /// Parse an optional operation successor and its operand list.
+  virtual OptionalParseResult
+  parseOptionalSuccessorAndUseList(Block *&dest,
+                                   SmallVectorImpl<Value> &operands) = 0;
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

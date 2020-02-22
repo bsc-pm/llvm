@@ -279,7 +279,7 @@ private:
   void InitializePythonHome() {
 #if LLDB_EMBED_PYTHON_HOME
 #if PY_MAJOR_VERSION >= 3
-    typedef const wchar_t* str_type;
+    typedef wchar_t* str_type;
 #else
     typedef char* str_type;
 #endif
