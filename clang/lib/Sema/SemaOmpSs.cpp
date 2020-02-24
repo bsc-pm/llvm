@@ -527,6 +527,7 @@ public:
       // inout(*p)/inout(p[0]) | firstprivate(p)  | int *p;
       // inout(s.x)            | shared(s)        | struct S s;
       // inout(ps->x)          | firstprivate(ps) | struct S *ps;
+      // inout([1]p)           | firstprivate(p)  | int *p;
       OmpSsClauseKind VKind = OSSC_shared;
       // FIXME?: There's an overlapping between IsDerefMemberArrayBase
       // and ArraySubscriptCnt
