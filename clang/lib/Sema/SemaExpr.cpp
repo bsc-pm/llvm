@@ -4636,7 +4636,7 @@ ExprResult Sema::ActOnOSSArraySectionExpr(Expr *Base, SourceLocation LBLoc,
   QualType OriginalTy = OSSArraySectionExpr::getBaseOriginalType(Base);
   QualType ResultTy;
   if (OriginalTy->isAnyPointerType()) {
-    if (const auto *OASE = dyn_cast<OSSArraySectionExpr>(Base)) {
+    if (const auto *OASE = dyn_cast<OSSArraySectionExpr>(Base->IgnoreParens())) {
       Diag(OASE->getExprLoc(), diag::err_oss_section_only_one_pointer_level)
         << OASE->getSourceRange();
       return ExprError();
@@ -4761,7 +4761,7 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
 
   if (!Base) {
     ErrorFound = true;
-  } else if (auto *OASE = dyn_cast<OSSArraySectionExpr>(Base)) {
+  } else if (auto *OASE = dyn_cast<OSSArraySectionExpr>(Base->IgnoreParens())) {
     Diag(OASE->getBeginLoc(), diag::err_oss_array_shaping_use_section)
       << OASE->getSourceRange();
     ErrorFound = true;
@@ -4770,7 +4770,16 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
   for (Expr *const &E : Shapes) {
     if (!E) {
       ErrorFound = true;
-    } else if (auto *OASE = dyn_cast<OSSArrayShapingExpr>(E)) {
+      break;
+    }
+    Expr *ShapeBase = E->IgnoreParens();
+    // ([1]p1)[:]]p
+    // ([1]p1)[3]]p
+    while (auto *OASE = dyn_cast<OSSArraySectionExpr>(ShapeBase->IgnoreParenImpCasts()))
+      ShapeBase = OASE->getBase();
+    while (auto *ASE = dyn_cast<ArraySubscriptExpr>(ShapeBase->IgnoreParenImpCasts()))
+      ShapeBase = ASE->getBase();
+    if (auto *OASE = dyn_cast<OSSArrayShapingExpr>(ShapeBase->IgnoreParenImpCasts())) {
       Diag(OASE->getBeginLoc(), diag::err_oss_array_shaping_use)
         << OASE->getSourceRange();
       ErrorFound = true;
