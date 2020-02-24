@@ -41,7 +41,6 @@ public:
     SuitableAlign = 128;
     WCharType = SignedInt;
     WIntType = UnsignedInt;
-    MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 32;
   }
 
   StringRef getABI() const override { return ABI; }
@@ -109,7 +108,6 @@ public:
     LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
     IntMaxType = Int64Type = SignedLong;
     resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
-    MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 64;
   }
 
   bool setABI(const std::string &Name) override {
