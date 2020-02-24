@@ -1329,9 +1329,8 @@ bool LoopVectorizationLegality::prepareToFoldTailByMasking() {
     }
     // To use vector predication intrinsics, we need to add mask to all
     // operations.
-    // TODO: May be do it only if the backend prefers using predicated vector
-    // intrinsics.
-    addMaskedVectorOps(BB);
+    if (TTI->preferPredicatedVectorOps())
+      addMaskedVectorOps(BB);
   }
 
   LLVM_DEBUG(dbgs() << "LV: can fold tail by masking.\n");

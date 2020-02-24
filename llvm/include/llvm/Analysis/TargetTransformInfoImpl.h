@@ -603,6 +603,8 @@ public:
   unsigned getGISelRematGlobalCost() const { return 1; }
 
   bool useScalableVectorType() const { return false; }
+  
+  bool preferPredicatedVectorOps() const { return false; }
 
   bool hasActiveVectorLength() const { return false; }
 

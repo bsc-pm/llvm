@@ -1797,6 +1797,8 @@ public:
 
   bool useScalableVectorType() const { return false; }
 
+  bool preferPredicatedVectorOps() const { return false; }
+
   /// @}
 };
 

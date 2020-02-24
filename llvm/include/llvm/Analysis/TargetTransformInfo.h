@@ -1155,6 +1155,10 @@ public:
 
   /// \returns True if the target wants to use Scalable vectors.
   bool useScalableVectorType() const;
+  
+  /// \returns True if the target prefers using vector predication for all Ops
+  /// instead of just loads and stores.
+  bool preferPredicatedVectorOps() const;
 
   /// \name Vector Predication Information
   /// @{
@@ -1445,6 +1449,7 @@ public:
   virtual bool hasActiveVectorLength() const = 0;
   virtual int getInstructionLatency(const Instruction *I) = 0;
   virtual bool useScalableVectorType() const = 0;
+  virtual bool preferPredicatedVectorOps() const = 0;
 };
 
 template <typename T>
@@ -1955,6 +1960,10 @@ public:
 
   bool useScalableVectorType() const override {
     return Impl.useScalableVectorType();
+  }
+
+  bool preferPredicatedVectorOps() const override {
+    return Impl.preferPredicatedVectorOps();
   }
 };
 

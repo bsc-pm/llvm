@@ -51,6 +51,7 @@ public:
   unsigned getNumberOfRegisters(unsigned ClassID) const;
   unsigned getMaxElementWidth() const;
   bool useScalableVectorType() const;
+  bool preferPredicatedVectorOps() const;
   bool useReductionIntrinsic(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
   bool shouldExpandReduction(const IntrinsicInst *II) const { return false; }

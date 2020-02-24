@@ -110,6 +110,10 @@ bool RISCVTTIImpl::useScalableVectorType() const {
   return ST->hasStdExtV();
 }
 
+bool RISCVTTIImpl::preferPredicatedVectorOps() const {
+  return (useScalableVectorType() && true);
+}
+
 bool RISCVTTIImpl::useReductionIntrinsic(unsigned Opcode, Type *Ty,
                                          TTI::ReductionFlags Flags) const {
   assert(isa<VectorType>(Ty) && "Expected Ty to be a vector type");
