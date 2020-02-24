@@ -296,16 +296,6 @@ cl::opt<bool> llvm::EnableLoopVectorization(
     "vectorize-loops", cl::init(true), cl::Hidden,
     cl::desc("Run the Loop vectorization passes"));
 
-/// A helper function for converting Scalar types to vector types.
-/// If the incoming type is void, we return void. If the VF is 1, we return
-/// the scalar type.
-static Type *ToVectorTy(Type *Scalar, unsigned VF, bool Scalable = false,
-                        bool ValidVF = true) {
-  if (Scalar->isVoidTy() || (VF == 1 && !Scalable) || !ValidVF)
-    return Scalar;
-  return VectorType::get(Scalar, VF, Scalable);
-}
-
 /// A helper function that returns the type of loaded or stored value.
 static Type *getMemInstValueType(Value *I) {
   assert((isa<LoadInst>(I) || isa<StoreInst>(I)) &&

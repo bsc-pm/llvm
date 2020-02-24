@@ -264,6 +264,16 @@ namespace Intrinsic {
 typedef unsigned ID;
 }
 
+/// A helper function for converting Scalar types to vector types.
+/// If the incoming type is void, we return void. If the VF is 1, we return
+/// the scalar type.
+inline Type *ToVectorTy(Type *Scalar, unsigned VF, bool Scalable = false,
+                        bool ValidVF = true) {
+  if (Scalar->isVoidTy() || (VF == 1 && !Scalable) || !ValidVF)
+    return Scalar;
+  return VectorType::get(Scalar, VF, Scalable);
+}
+
 /// Identify if the intrinsic is trivially vectorizable.
 /// This method returns true if the intrinsic's argument types are all scalars
 /// for the scalar form of the intrinsic and all vectors (or scalars handled by
