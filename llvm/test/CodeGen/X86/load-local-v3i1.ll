@@ -96,14 +96,13 @@ define void @local_load_v3i1(i32 addrspace(1)* %out, i32 addrspace(1)* %in, <3 x
 ; CHECK-NEXT:    pushq %rbx
 ; CHECK-NEXT:    pushq %rax
 ; CHECK-NEXT:    movq %rdi, %r14
-; CHECK-NEXT:    movzbl (%rdx), %ebp
-; CHECK-NEXT:    movl %ebp, %r15d
-; CHECK-NEXT:    andl $1, %r15d
-; CHECK-NEXT:    movl %ebp, %ebx
-; CHECK-NEXT:    shrl %ebx
-; CHECK-NEXT:    andl $1, %ebx
-; CHECK-NEXT:    shrl $2, %ebp
-; CHECK-NEXT:    andl $1, %ebp
+; CHECK-NEXT:    movb (%rdx), %al
+; CHECK-NEXT:    movl %eax, %ecx
+; CHECK-NEXT:    shrb $2, %cl
+; CHECK-NEXT:    movzbl %al, %r15d
+; CHECK-NEXT:    shrb %al
+; CHECK-NEXT:    movzbl %al, %ebx
+; CHECK-NEXT:    movzbl %cl, %ebp
 ; CHECK-NEXT:    movq %rsi, %rdi
 ; CHECK-NEXT:    movl %r15d, %esi
 ; CHECK-NEXT:    movl %ebx, %edx
