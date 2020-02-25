@@ -1155,7 +1155,7 @@ public:
 
   /// \returns True if the target wants to use Scalable vectors.
   bool useScalableVectorType() const;
-  
+
   /// \returns True if the target prefers using vector predication for all Ops
   /// instead of just loads and stores.
   bool preferPredicatedVectorOps() const;
