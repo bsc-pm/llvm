@@ -645,13 +645,22 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
       }
     }
 
+    std::unique_ptr<std::vector<Instruction *>> StackCopy;
+
     for (auto It = succ_begin(BB); It != succ_end(BB); ++It) {
       if (!Visited.count(*It)) {
         Worklist.push_back(*It);
         Visited.insert(*It);
         // Forward Stack, since we are setting visited here
         // we do this only once per BB
-        BBTaskStacks[*It].append(Stack.begin(), Stack.end());
+        if (!StackCopy) {
+          // We need to copy Stacki, otherwise &Stack as an iterator would be
+          // invalidated after BBTaskStacks[*It].
+          StackCopy.reset(
+              new std::vector<Instruction *>(Stack.begin(), Stack.end()));
+        }
+
+        BBTaskStacks[*It].append(StackCopy->begin(), StackCopy->end());
       }
     }
   }
