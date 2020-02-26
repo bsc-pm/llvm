@@ -3412,10 +3412,8 @@ bool InstCombiner::run() {
 
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I, &TLI)) {
-      LLVM_DEBUG(dbgs() << "IC: DCE: " << *I << '\n');
       eraseInstFromFunction(*I);
       ++NumDeadInst;
-      MadeIRChange = true;
       continue;
     }
 
