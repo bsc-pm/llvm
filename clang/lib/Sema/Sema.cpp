@@ -158,7 +158,8 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
       CurrentInstantiationScope(nullptr), DisableTypoCorrection(false),
       TyposCorrected(0), AnalysisWarnings(*this),
       ThreadSafetyDeclCache(nullptr), VarDataSharingAttributesStack(nullptr),
-      CurScope(nullptr), Ident_super(nullptr), Ident___float128(nullptr) {
+      VarDataSharingAttributesStackOmpSs(nullptr), CurScope(nullptr),
+      Ident_super(nullptr), Ident___float128(nullptr) {
   TUScope = nullptr;
   isConstantEvaluatedOverride = false;
 
@@ -382,6 +383,9 @@ Sema::~Sema() {
 
   // Destroys data sharing attributes stack for OpenMP
   DestroyDataSharingAttributesStack();
+
+  // Destroys data sharing attributes stack for OmpSs-2
+  DestroyDataSharingAttributesStackOmpSs();
 
   // Detach from the PP callback handler which outlives Sema since it's owned
   // by the preprocessor.

@@ -651,6 +651,8 @@ void Sema::InitDataSharingAttributesStackOmpSs() {
 
 #define DSAStack static_cast<DSAStackTy *>(VarDataSharingAttributesStackOmpSs)
 
+void Sema::DestroyDataSharingAttributesStackOmpSs() { delete DSAStack; }
+
 void Sema::StartOmpSsDSABlock(OmpSsDirectiveKind DKind,
                               Scope *CurScope, SourceLocation Loc) {
   DSAStack->push(DKind, CurScope, Loc);
