@@ -345,7 +345,7 @@ static bool insertUniqInstInProgramOrder(SmallVectorImpl<Instruction *> &InstLis
   while (It != InstList.end() && OI.dominates(*It, I))
     ++It;
 
-  if (*It == I)
+  if (It != InstList.end() && *It == I)
     return false;
   InstList.insert(It, I);
   return true;
