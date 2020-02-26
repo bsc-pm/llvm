@@ -101,7 +101,7 @@ public:
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
-  bool InTaskEmission;
+  bool InTaskEmission = false;
 
   // This is used to avoid creating the same generic funcion for constructors and
   // destructors, which will be stored in a bundle for each non-pod private/firstprivate
