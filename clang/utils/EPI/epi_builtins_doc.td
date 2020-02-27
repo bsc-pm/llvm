@@ -516,7 +516,7 @@ At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmadd` instruction.}];
   let Instruction = "vfmadd.vv";
 
-  let ParameterNames = ["b", "a", "c"];
+  let ParameterNames = ["a", "b", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -630,7 +630,7 @@ At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfmsub` instruction.}];
   let Instruction = "vfmsub.vv";
 
-  let ParameterNames = ["b", "a", "c"];
+  let ParameterNames = ["a", "b", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -820,7 +820,7 @@ At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmadd` instruction.}];
   let Instruction = "vfnmadd.vv";
 
-  let ParameterNames = ["b", "a", "c"];
+  let ParameterNames = ["a", "b", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
@@ -874,7 +874,7 @@ At low level, the parameter `a` will be located in a vector register that will
 be overwritten by the `vfnmsub` instruction.}];
   let Instruction = "vfnmsub.vv";
 
-  let ParameterNames = ["b", "a", "c"];
+  let ParameterNames = ["a", "b", "c"];
 
   let Operation = [{
     for element = 0 to gvl - 1
