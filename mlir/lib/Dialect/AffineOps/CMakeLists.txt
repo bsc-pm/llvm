@@ -1,22 +1,18 @@
-add_llvm_library(MLIRAffineOps
+add_mlir_dialect_library(MLIRAffineOps
   AffineOps.cpp
   AffineValueMap.cpp
   EDSC/Builders.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/AffineOps
+
+  LINK_LIBS
+  MLIREDSC
+  MLIRIR
+  MLIRStandardOps
+  LLVMSupport
   )
 add_dependencies(MLIRAffineOps
-
   MLIRAffineOpsIncGen
-  MLIREDSC
-  MLIRIR
   MLIRLoopLikeInterfaceIncGen
-  MLIRStandardOps
-  )
-target_link_libraries(MLIRAffineOps
-
-  MLIREDSC
-  MLIRIR
-  MLIRStandardOps
   )

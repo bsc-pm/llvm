@@ -1,16 +1,19 @@
-add_llvm_library(MLIRVectorToLoops
+add_mlir_conversion_library(MLIRVectorToLoops
   ConvertVectorToLoops.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Conversion/VectorToLoops
-)
-set(LIBS
+
+  LINK_LIBS
+  MLIRAffineOps
   MLIREDSC
+  MLIRIR
   MLIRLLVMIR
+  MLIRLoopOps
+  MLIRStandardOps
   MLIRTransforms
+  MLIRTransformUtils
+  MLIRVectorOps
   LLVMCore
   LLVMSupport
   )
-
-add_dependencies(MLIRVectorToLoops ${LIBS})
-target_link_libraries(MLIRVectorToLoops ${LIBS})
