@@ -1,5 +1,14 @@
-set(LIBS
+add_mlir_dialect_library(MLIRLinalgUtils
+  Utils.cpp
 
+  ADDITIONAL_HEADER_DIRS
+  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/Linalg
+
+  DEPENDS
+  intrinsics_gen
+
+  LINK_LIBS
+  MLIRAffineOps
   MLIREDSC
   MLIRIR
   MLIRLinalgOps
@@ -7,17 +16,5 @@ set(LIBS
   MLIRPass
   MLIRStandardOps
   MLIRTransformUtils
+  LLVMSupport
   )
-  
-add_llvm_library(MLIRLinalgUtils
-
-  Utils.cpp
-
-  ADDITIONAL_HEADER_DIRS
-  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/Linalg
-  DEPENDS
-  intrinsics_gen
-  )
-
-add_dependencies(MLIRLinalgUtils ${LIBS})
-target_link_libraries(MLIRLinalgUtils ${LIBS})

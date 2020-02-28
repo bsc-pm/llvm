@@ -1,22 +1,15 @@
-add_llvm_library(MLIRLoopToStandard
+add_mlir_conversion_library(MLIRLoopToStandard
   ConvertLoopToStandard.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Conversion/LoopToStandard
-)
-add_dependencies(
-  MLIRLoopToStandard
 
+  LINK_LIBS
+  MLIRIR
   MLIRLoopOps
+  MLIRPass
+  MLIRStandardOps
   MLIRTransforms
   LLVMCore
   LLVMSupport
-)
-target_link_libraries(
-  MLIRLoopToStandard
-
-  MLIRLoopOps
-  MLIRTransforms
-  LLVMCore
-  LLVMSupport
-)
+  )
