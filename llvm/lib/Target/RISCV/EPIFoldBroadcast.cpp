@@ -122,7 +122,7 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
         continue;
 
       // Check that the broadcasted value is used in the extended operand.
-      if (Broadcast != CSUser.getArgument(EII->ExtendedOperand - 1))
+      if (CSUser.getArgumentNo(&U) != EII->ExtendedOperand - 1)
         continue;
       // Note: we used to check that the GVL in both cases matches but
       // this seems unnecessary because:

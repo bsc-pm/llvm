@@ -76,3 +76,26 @@ entry:
 }
 
 declare <vscale x 1 x double> @llvm.epi.vfmacc.mask.nxv1f64.nxv1f64.nxv1i1(<vscale x 1 x double>, <vscale x 1 x double>, <vscale x 1 x double>, <vscale x 1 x i1>, i64)
+
+define dso_local <vscale x 1 x i64> @test_broadcast_twice(i64 %a, i64 %gvl) nounwind {
+; NOFOLD-LABEL: @test_broadcast_twice(
+; NOFOLD-NEXT:  entry:
+; NOFOLD-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 [[A:%.*]], i64 [[GVL:%.*]])
+; NOFOLD-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.nxv1i64(<vscale x 1 x i64> [[TMP0]], <vscale x 1 x i64> [[TMP0]], i64 [[GVL]])
+; NOFOLD-NEXT:    ret <vscale x 1 x i64> [[TMP1]]
+;
+; FOLD-LABEL: @test_broadcast_twice(
+; FOLD-NEXT:  entry:
+; FOLD-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 [[A:%.*]], i64 [[GVL:%.*]])
+; FOLD-NEXT:    [[TMP1:%.*]] = call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.i64(<vscale x 1 x i64> [[TMP0]], i64 [[A]], i64 [[GVL]])
+; FOLD-NEXT:    ret <vscale x 1 x i64> [[TMP1]]
+;
+entry:
+  %0 = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 %a, i64 %gvl)
+  %1 = tail call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.nxv1i64(<vscale x 1 x i64> %0, <vscale x 1 x i64> %0, i64 %gvl)
+  ret <vscale x 1 x i64> %1
+}
+
+declare <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64, i64)
+
+declare <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, i64)
