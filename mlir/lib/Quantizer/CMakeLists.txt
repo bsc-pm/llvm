@@ -9,8 +9,14 @@ add_llvm_library(MLIRQuantizerSupport
   Support/UniformSolvers.cpp
 
   ADDITIONAL_HEADER_DIRS
+  )
 
-  LINK_LIBS
+add_dependencies(MLIRQuantizerSupport
+                 MLIRIR
+                 MLIRQuantOps
+                 MLIRSupport
+                 MLIRStandardOps)
+target_link_libraries(MLIRQuantizerSupport
   MLIRIR
   MLIRQuantOps
   MLIRSupport
@@ -23,19 +29,16 @@ add_llvm_library(MLIRQuantizerFxpMathConfig
   Configurations/FxpMathConfig.cpp
 
   ADDITIONAL_HEADER_DIRS
+  )
 
-  LINK_LIBS
+add_dependencies(MLIRQuantizerFxpMathConfig
+                 MLIRFxpMathOpsIncGen
+                 MLIRQuantizerSupport)
+target_link_libraries(MLIRQuantizerFxpMathConfig
   MLIRIR
   MLIRFxpMathOps
   MLIRQuantOps
   MLIRQuantizerSupport
-  MLIRStandardOps
-  MLIRSupport
-  LLVMSupport
-  )
-
-add_dependencies(MLIRQuantizerFxpMathConfig
-  MLIRFxpMathOpsIncGen
   )
 
 # Transforms.
@@ -45,14 +48,16 @@ add_llvm_library(MLIRQuantizerTransforms
   Transforms/RemoveInstrumentationPass.cpp
 
   ADDITIONAL_HEADER_DIRS
-
-  LINK_LIBS
+  )
+add_dependencies(MLIRQuantizerTransforms
+  MLIRQuantizerFxpMathConfig
+  MLIRQuantizerSupport
+  MLIRPass)
+target_link_libraries(MLIRQuantizerTransforms
   MLIRIR
   MLIRQuantizerFxpMathConfig
   MLIRQuantizerSupport
   MLIRQuantOps
   MLIRPass
-  MLIRTransforms
-  MLIRTransformUtils
   LLVMSupport
   )
