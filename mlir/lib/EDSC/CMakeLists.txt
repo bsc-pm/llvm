@@ -8,11 +8,12 @@ add_llvm_library(MLIREDSC
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/EDSC
+  )
+target_link_libraries(MLIREDSC
+  PUBLIC
 
-  LINK_LIBS
   MLIRIR
   MLIRSupport
-  LLVMSupport
   )
 
 add_llvm_library(MLIREDSCInterface
@@ -20,10 +21,11 @@ add_llvm_library(MLIREDSCInterface
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/EDSC
-
-  LINK_LIBS
+  )
+add_dependencies(MLIREDSCInterface MLIRIR)
+target_link_libraries(MLIREDSCInterface
+  PUBLIC
   MLIRIR
   MLIRSupport
   MLIRParser
-  LLVMSupport
   )

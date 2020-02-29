@@ -22,18 +22,15 @@ add_llvm_library(MLIRAnalysis
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
-
-  LINK_LIBS
-  MLIRAffineOps
-  MLIRIR
-  MLIRLoopOps
-  MLIRSupport
-  LLVMSupport
   )
 add_dependencies(MLIRAnalysis
+  MLIRAffineOps
   MLIRCallOpInterfacesIncGen
   MLIRTypeInferOpInterfaceIncGen
+  MLIRLoopOps
   )
+
+target_link_libraries(MLIRAnalysis MLIRAffineOps MLIRLoopOps)
 
 add_llvm_library(MLIRLoopAnalysis
   AffineAnalysis.cpp
@@ -44,16 +41,12 @@ add_llvm_library(MLIRLoopAnalysis
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Analysis
-
-  LINK_LIBS
-  MLIRAffineOps
-  MLIRIR
-  MLIRLoopOps
-  MLIRStandardOps
-  MLIRSupport
-  LLVMSupport
   )
 add_dependencies(MLIRLoopAnalysis
+  MLIRAffineOps
   MLIRCallOpInterfacesIncGen
   MLIRTypeInferOpInterfaceIncGen
+  MLIRLoopOps
   )
+
+target_link_libraries(MLIRLoopAnalysis MLIRAffineOps MLIRLoopOps)
