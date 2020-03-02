@@ -60,6 +60,7 @@
 #include "VPlanHCFGBuilder.h"
 #include "VPlanPredicator.h"
 #include "VPlanTransforms.h"
+#include "VPlanValue.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -412,6 +413,11 @@ public:
   /// Widen a single instruction within the innermost loop.
   void widenInstruction(Instruction &I, VPUser &Operands,
                         VPTransformState &State);
+
+  /// Widen a single instruction within the innermost loop using vector
+  /// predicated intrinsics.
+  void widenPredicatedInstruction(Instruction &I, VPTransformState &State,
+                                  VPValue *BlockInMask = nullptr);
 
   /// Widen a single call instruction within the innermost loop.
   void widenCallInstruction(CallInst &I, VPUser &ArgOperands,
@@ -4443,6 +4449,57 @@ static bool mayDivideByZero(Instruction &I) {
   Value *Divisor = I.getOperand(1);
   auto *CInt = dyn_cast<ConstantInt>(Divisor);
   return !CInt || CInt->isZero();
+}
+
+// FIXME: This is an experimental function. It's functionality will either be
+// moved to VPlan or merged in widenInstruction.
+void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
+                                                     VPTransformState &State,
+                                                     VPValue *BlockInMask) {
+  if (!BlockInMask)
+    return widenInstruction(I);
+
+  auto VPIntrInstr = [](unsigned Opcode) {
+    switch (Opcode) {
+    case Instruction::Add:
+      return Intrinsic::vp_add;
+    case Instruction::Sub:
+      return Intrinsic::vp_sub;
+    }
+    return Intrinsic::not_intrinsic;
+  };
+
+  if (VPIntrInstr(I.getOpcode()) == Intrinsic::not_intrinsic)
+    return widenInstruction(I);
+
+  // Just widen unops and binops.
+  setDebugLocFromInst(Builder, &I);
+
+  for (unsigned Part = 0; Part < UF; ++Part) {
+    SmallVector<Value *, 2> Ops;
+    for (Value *Op : I.operands())
+      Ops.push_back(getOrCreateVectorValue(Op, Part));
+
+    // FIXME: Assumes Binary operations. Add valid checks for NAry Operations.
+    Type *OpTy = Ops[0]->getType();
+    assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
+           "Operands must be of identical vector types");
+    Value *BlockInMaskPart = State.get(BlockInMask, Part);
+
+    Function *VPIntr = Intrinsic::getDeclaration(
+        LoopVectorPreHeader->getModule(), VPIntrInstr(I.getOpcode()), OpTy);
+    Value *V = Builder.CreateCall(
+        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, Builder.getInt32(-1)},
+        "vp.op");
+
+    if (auto *VecOp = dyn_cast<Instruction>(V))
+      VecOp->copyIRFlags(&I);
+
+    // Use this vector value for all users of the original instruction.
+    VectorLoopValueMap.setVectorValue(&I, Part, V);
+    addMetadata(V, &I);
+    }
+
 }
 
 void InnerLoopVectorizer::widenInstruction(Instruction &I, VPUser &User,
