@@ -19297,8 +19297,9 @@ static SDValue formSplatFromShuffles(ShuffleVectorSDNode *OuterShuf,
 
     CombinedMask[i] = InnerMaskElt;
   }
-  assert(all_of(CombinedMask, [](int M) { return M == -1; }) ||
-         getSplatIndex(CombinedMask) != -1 && "Expected a splat mask");
+  assert((all_of(CombinedMask, [](int M) { return M == -1; }) ||
+          getSplatIndex(CombinedMask) != -1) &&
+         "Expected a splat mask");
 
   // TODO: The transform may be a win even if the mask is not legal.
   EVT VT = OuterShuf->getValueType(0);
