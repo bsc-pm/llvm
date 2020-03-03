@@ -303,14 +303,16 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::INTRINSIC_WO_CHAIN, VT, Custom);
   }
 
-  // Custom-legalize this node for illegal result types.
-  for (auto VT : {MVT::i8, MVT::i16, MVT::i32}) {
-    setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
-  }
+  if (Subtarget.hasStdExtV()) {
+    // Custom-legalize this node for illegal result types.
+    for (auto VT : {MVT::i8, MVT::i16, MVT::i32}) {
+      setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
+    }
 
-  // Custom-legalize this node for scalable vectors.
-  for (auto VT : {MVT::nxv1i64, MVT::nxv2i32, MVT::nxv4i16}) {
-    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
+    // Custom-legalize this node for scalable vectors.
+    for (auto VT : {MVT::nxv1i64, MVT::nxv2i32, MVT::nxv4i16}) {
+      setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Custom);
+    }
   }
 }
 
@@ -475,20 +477,22 @@ SDValue RISCVTargetLowering::lowerINTRINSIC_WO_CHAIN(SDValue Op,
     break;
   }
 
-  // Some EPI intrinsics may claim that they want an integer operand to be
-  // extended.
-  if (const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
-          RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(IntNo)) {
-    if (EII->ExtendedOperand) {
-      assert(EII->ExtendedOperand < Op.getNumOperands());
-      std::vector<SDValue> Operands(Op->op_begin(), Op->op_end());
-      SDValue &ScalarOp = Operands[EII->ExtendedOperand];
-      if (ScalarOp.getValueType() == MVT::i32 ||
-          ScalarOp.getValueType() == MVT::i16 ||
-          ScalarOp.getValueType() == MVT::i8) {
-        ScalarOp = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, ScalarOp);
-        return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
-                           Operands);
+  if (Subtarget.hasStdExtV()) {
+    // Some EPI intrinsics may claim that they want an integer operand to be
+    // extended.
+    if (const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
+            RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(IntNo)) {
+      if (EII->ExtendedOperand) {
+        assert(EII->ExtendedOperand < Op.getNumOperands());
+        std::vector<SDValue> Operands(Op->op_begin(), Op->op_end());
+        SDValue &ScalarOp = Operands[EII->ExtendedOperand];
+        if (ScalarOp.getValueType() == MVT::i32 ||
+            ScalarOp.getValueType() == MVT::i16 ||
+            ScalarOp.getValueType() == MVT::i8) {
+          ScalarOp = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, ScalarOp);
+          return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+                             Operands);
+        }
       }
     }
   }
