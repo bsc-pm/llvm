@@ -1164,6 +1164,60 @@ def int_ptrmask: Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty, llvm_anyint_ty],
 
 //===---------------- Vector Predication Intrinsics --------------===//
 
+// FIXME: TO BE REPLACED
+// The following Memory Intrinsics and Integer Comparison Intrinsic are copied
+// from the main Vector Predication proposal at revision id D57504, diff id
+// 246280, authored by Simon Moll.  Once these land in the reviewed subpatch,
+// they will be merged in normally and replace the code below. 
+
+// Be very careful while using these - Mask and VectorLength properties are
+// commented out because adding them will necessiate changes in other files that
+// will require significant effort to undo. 
+
+// Memory Intrinsics
+def int_vp_store : Intrinsic<[],
+                             [ llvm_anyvector_ty,
+                               LLVMAnyPointerType<LLVMMatchType<0>>,
+                               LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                               llvm_i32_ty],
+                             [ NoCapture<1>, IntrNoSync, IntrArgMemOnly,
+                               IntrWillReturn/*, Mask<2>, VectorLength<3>*/ ]>;
+
+def int_vp_load  : Intrinsic<[ llvm_anyvector_ty],
+                             [ LLVMAnyPointerType<LLVMMatchType<0>>,
+                               LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                               llvm_i32_ty],
+                             [ NoCapture<0>, IntrNoSync, IntrReadMem,
+                               IntrWillReturn, IntrArgMemOnly
+                               /*, Mask<1>, VectorLength<2>*/ ]>;
+
+def int_vp_gather: Intrinsic<[ llvm_anyvector_ty],
+                             [ LLVMVectorOfAnyPointersToElt<0>,
+                               LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                               llvm_i32_ty],
+                             [ IntrReadMem, IntrNoSync, IntrWillReturn,
+                               IntrArgMemOnly/*, Mask<1>, VectorLength<2>*/ ]>;
+
+def int_vp_scatter: Intrinsic<[],
+                              [ llvm_anyvector_ty,
+                                LLVMVectorOfAnyPointersToElt<0>,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty],
+                              [ IntrArgMemOnly, IntrNoSync, IntrWillReturn
+                                /*, Mask<2>, VectorLength<3>*/ ]>;
+// TODO allow IntrNoCapture for vectors of pointers
+// Comparison
+// The last argument is the comparison predicate 
+def int_vp_icmp : Intrinsic<[ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty> ],
+                            [ llvm_anyvector_ty,
+                              LLVMMatchType<0>,
+                              llvm_i8_ty,
+                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                              llvm_i32_ty ],
+                            [ IntrWillReturn, IntrNoSync, IntrNoMem,
+                              /*Mask<3>, VectorLength<4>,*/ ImmArg<2> ]>;
+// END FIXME: TO BE REPLACED
+
 // Binary operators
 let IntrProperties = [IntrNoMem, IntrNoSync, IntrWillReturn] in {
   def int_vp_add : Intrinsic<[ llvm_anyvector_ty ],
