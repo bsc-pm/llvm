@@ -121,8 +121,10 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
       if (!EII || !EII->ExtendedOperand || !EII->GVLOperand)
         continue;
 
+      assert(EII->ExtendedOperand > 0);
+      unsigned ExtendedOp = EII->ExtendedOperand - 1;
       // Check that the broadcasted value is used in the extended operand.
-      if (CSUser.getArgumentNo(&U) != EII->ExtendedOperand - 1)
+      if (CSUser.getArgumentNo(&U) != ExtendedOp)
         continue;
       // Note: we used to check that the GVL in both cases matches but
       // this seems unnecessary because:
@@ -135,6 +137,21 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
       //  producer, then the consumer will use more elements than those
       //  produced. Because we currently only fold unmasked broadcasts, this
       //  triggers undefined behaviour because elements beyond gvl are undef.
+
+      // If the broadcast is used in other arguments than the extended operand,
+      // this transformation is not beneficial.
+      bool HasOtherBroadcastUses = false;
+      for (unsigned Arg = 0, E = CSUser.getNumArgOperands();
+           Arg < E && !HasOtherBroadcastUses; Arg++) {
+        // This is the extended operand. Skip it.
+        if (Arg == ExtendedOp)
+          continue;
+
+        HasOtherBroadcastUses = (CSUser.getArgOperand(Arg) == Broadcast);
+      }
+
+      if (HasOtherBroadcastUses)
+        continue;
 
       LLVM_DEBUG(dbgs() << "Found a foldable use");
       LLVM_DEBUG(CSUser.getInstruction()->dump());

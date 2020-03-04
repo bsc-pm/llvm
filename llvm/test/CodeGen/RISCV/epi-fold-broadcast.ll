@@ -87,7 +87,7 @@ define dso_local <vscale x 1 x i64> @test_broadcast_twice(i64 %a, i64 %gvl) noun
 ; FOLD-LABEL: @test_broadcast_twice(
 ; FOLD-NEXT:  entry:
 ; FOLD-NEXT:    [[TMP0:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vmv.v.x.nxv1i64.i64(i64 [[A:%.*]], i64 [[GVL:%.*]])
-; FOLD-NEXT:    [[TMP1:%.*]] = call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.i64(<vscale x 1 x i64> [[TMP0]], i64 [[A]], i64 [[GVL]])
+; FOLD-NEXT:    [[TMP1:%.*]] = tail call <vscale x 1 x i64> @llvm.epi.vsll.nxv1i64.nxv1i64(<vscale x 1 x i64> [[TMP0]], <vscale x 1 x i64> [[TMP0]], i64 [[GVL]])
 ; FOLD-NEXT:    ret <vscale x 1 x i64> [[TMP1]]
 ;
 entry:
