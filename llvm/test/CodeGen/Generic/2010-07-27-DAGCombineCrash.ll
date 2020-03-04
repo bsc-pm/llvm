@@ -1,5 +1,4 @@
 ; RUN: llc < %s
-; XFAIL: riscv
 
 define float @test1()
 {
