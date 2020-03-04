@@ -39,6 +39,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -52,6 +53,9 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "epi-fold-broadcast"
+
+STATISTIC(NumFolds, "Number of EPI intrinsics with a scalar operand folded");
+STATISTIC(NumBroadcastsRemoved, "Number of EPI broadcast intrinsics removed");
 
 static cl::opt<bool>
     DisableFolding("no-epi-broadcast-folding", cl::init(false), cl::Hidden,
@@ -230,12 +234,14 @@ bool EPIFoldBroadcast::foldBroadcasts(Function &F) {
 
     CurrentCall->replaceAllUsesWith(NewCall);
     CurrentCall->eraseFromParent();
+    NumFolds++;
 
     if (isInstructionTriviallyDead(FI.Broadcast)) {
       LLVM_DEBUG(
           dbgs() << "Removing broadcast that has become trivially dead ");
       LLVM_DEBUG(FI.Broadcast->dump());
       FI.Broadcast->eraseFromParent();
+      NumBroadcastsRemoved++;
     }
 
     Changed = true;
