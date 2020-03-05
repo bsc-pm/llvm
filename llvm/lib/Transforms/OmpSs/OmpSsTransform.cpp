@@ -756,6 +756,9 @@ struct OmpSs : public ModulePass {
     // nanos6_unpacked_deps_* START
     TaskExtraTypeList.clear();
     TaskExtraNameList.clear();
+    // nanos6_loop_bounds_t *const loop_bounds
+    TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
+    TaskExtraNameList.push_back("loop_bounds");
     // void *handler
     TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
     TaskExtraNameList.push_back("handler");
