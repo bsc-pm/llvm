@@ -126,69 +126,6 @@ static void ResolveAddress(const ExecutionContext &exe_ctx, const Address &addr,
   resolved_addr = addr;
 }
 
-size_t Disassembler::Disassemble(Debugger &debugger, const ArchSpec &arch,
-                                 const char *plugin_name, const char *flavor,
-                                 const ExecutionContext &exe_ctx,
-                                 SymbolContextList &sc_list,
-                                 uint32_t num_instructions,
-                                 bool mixed_source_and_assembly,
-                                 uint32_t num_mixed_context_lines,
-                                 uint32_t options, Stream &strm) {
-  size_t success_count = 0;
-  const size_t count = sc_list.GetSize();
-  SymbolContext sc;
-  AddressRange range;
-  const uint32_t scope =
-      eSymbolContextBlock | eSymbolContextFunction | eSymbolContextSymbol;
-  const bool use_inline_block_range = true;
-  for (size_t i = 0; i < count; ++i) {
-    if (!sc_list.GetContextAtIndex(i, sc))
-      break;
-    for (uint32_t range_idx = 0;
-         sc.GetAddressRange(scope, range_idx, use_inline_block_range, range);
-         ++range_idx) {
-      if (Disassemble(debugger, arch, plugin_name, flavor, exe_ctx, range,
-                      num_instructions, mixed_source_and_assembly,
-                      num_mixed_context_lines, options, strm)) {
-        ++success_count;
-        strm.EOL();
-      }
-    }
-  }
-  return success_count;
-}
-
-bool Disassembler::Disassemble(
-    Debugger &debugger, const ArchSpec &arch, const char *plugin_name,
-    const char *flavor, const ExecutionContext &exe_ctx, ConstString name,
-    Module *module, uint32_t num_instructions, bool mixed_source_and_assembly,
-    uint32_t num_mixed_context_lines, uint32_t options, Stream &strm) {
-  // If no name is given there's nothing to disassemble.
-  if (!name)
-    return false;
-
-  const bool include_symbols = true;
-  const bool include_inlines = true;
-
-  // Find functions matching the given name.
-  SymbolContextList sc_list;
-  if (module) {
-    module->FindFunctions(name, CompilerDeclContext(), eFunctionNameTypeAuto,
-                          include_symbols, include_inlines, sc_list);
-  } else if (exe_ctx.GetTargetPtr()) {
-    exe_ctx.GetTargetPtr()->GetImages().FindFunctions(
-        name, eFunctionNameTypeAuto, include_symbols, include_inlines, sc_list);
-  }
-
-  // If no functions were found there's nothing to disassemble.
-  if (sc_list.IsEmpty())
-    return false;
-
-  return Disassemble(debugger, arch, plugin_name, flavor, exe_ctx, sc_list,
-                     num_instructions, mixed_source_and_assembly,
-                     num_mixed_context_lines, options, strm);
-}
-
 lldb::DisassemblerSP Disassembler::DisassembleRange(
     const ArchSpec &arch, const char *plugin_name, const char *flavor,
     const ExecutionContext &exe_ctx, const AddressRange &range,
@@ -262,9 +199,10 @@ bool Disassembler::Disassemble(Debugger &debugger, const ArchSpec &arch,
   if (bytes_disassembled == 0)
     return false;
 
-  return PrintInstructions(disasm_sp.get(), debugger, arch, exe_ctx,
-                           num_instructions, mixed_source_and_assembly,
-                           num_mixed_context_lines, options, strm);
+  disasm_sp->PrintInstructions(debugger, arch, exe_ctx, num_instructions,
+                               mixed_source_and_assembly,
+                               num_mixed_context_lines, options, strm);
+  return true;
 }
 
 bool Disassembler::Disassemble(Debugger &debugger, const ArchSpec &arch,
@@ -292,9 +230,10 @@ bool Disassembler::Disassemble(Debugger &debugger, const ArchSpec &arch,
   if (bytes_disassembled == 0)
     return false;
 
-  return PrintInstructions(disasm_sp.get(), debugger, arch, exe_ctx,
-                           num_instructions, mixed_source_and_assembly,
-                           num_mixed_context_lines, options, strm);
+  disasm_sp->PrintInstructions(debugger, arch, exe_ctx, num_instructions,
+                               mixed_source_and_assembly,
+                               num_mixed_context_lines, options, strm);
+  return true;
 }
 
 Disassembler::SourceLine
@@ -380,21 +319,20 @@ bool Disassembler::ElideMixedSourceAndDisassemblyLine(
   return false;
 }
 
-bool Disassembler::PrintInstructions(Disassembler *disasm_ptr,
-                                     Debugger &debugger, const ArchSpec &arch,
+void Disassembler::PrintInstructions(Debugger &debugger, const ArchSpec &arch,
                                      const ExecutionContext &exe_ctx,
                                      uint32_t num_instructions,
                                      bool mixed_source_and_assembly,
                                      uint32_t num_mixed_context_lines,
                                      uint32_t options, Stream &strm) {
   // We got some things disassembled...
-  size_t num_instructions_found = disasm_ptr->GetInstructionList().GetSize();
+  size_t num_instructions_found = GetInstructionList().GetSize();
 
   if (num_instructions > 0 && num_instructions < num_instructions_found)
     num_instructions_found = num_instructions;
 
   const uint32_t max_opcode_byte_size =
-      disasm_ptr->GetInstructionList().GetMaxOpcocdeByteSize();
+      GetInstructionList().GetMaxOpcocdeByteSize();
   SymbolContext sc;
   SymbolContext prev_sc;
   AddressRange current_source_line_range;
@@ -435,8 +373,7 @@ bool Disassembler::PrintInstructions(Disassembler *disasm_ptr,
 
   size_t address_text_size = 0;
   for (size_t i = 0; i < num_instructions_found; ++i) {
-    Instruction *inst =
-        disasm_ptr->GetInstructionList().GetInstructionAtIndex(i).get();
+    Instruction *inst = GetInstructionList().GetInstructionAtIndex(i).get();
     if (inst) {
       const Address &addr = inst->GetAddress();
       ModuleSP module_sp(addr.GetModule());
@@ -485,8 +422,7 @@ bool Disassembler::PrintInstructions(Disassembler *disasm_ptr,
   previous_symbol = nullptr;
   SourceLine previous_line;
   for (size_t i = 0; i < num_instructions_found; ++i) {
-    Instruction *inst =
-        disasm_ptr->GetInstructionList().GetInstructionAtIndex(i).get();
+    Instruction *inst = GetInstructionList().GetInstructionAtIndex(i).get();
 
     if (inst) {
       const Address &addr = inst->GetAddress();
@@ -646,8 +582,6 @@ bool Disassembler::PrintInstructions(Disassembler *disasm_ptr,
       break;
     }
   }
-
-  return true;
 }
 
 bool Disassembler::Disassemble(Debugger &debugger, const ArchSpec &arch,
