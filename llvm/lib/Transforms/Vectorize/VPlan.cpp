@@ -18,6 +18,7 @@
 
 #include "VPlan.h"
 #include "VPlanDominatorTree.h"
+#include "VPlanValue.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SmallVector.h"

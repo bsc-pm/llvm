@@ -417,7 +417,7 @@ public:
   /// Widen a single instruction within the innermost loop using vector
   /// predicated intrinsics.
   void widenPredicatedInstruction(Instruction &I, VPTransformState &State,
-                                  VPValue *BlockInMask = nullptr);
+                                  VPValue *BlockInMask, VPValue *EVL);
 
   /// Widen a single call instruction within the innermost loop.
   void widenCallInstruction(CallInst &I, VPUser &ArgOperands,
@@ -4455,10 +4455,8 @@ static bool mayDivideByZero(Instruction &I) {
 // moved to VPlan or merged in widenInstruction.
 void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
                                                      VPTransformState &State,
-                                                     VPValue *BlockInMask) {
-  if (!BlockInMask)
-    return widenInstruction(I);
-
+                                                     VPValue *BlockInMask,
+                                                     VPValue *EVL) {
   auto VPIntrInstr = [](unsigned Opcode) {
     switch (Opcode) {
     case Instruction::Add:
@@ -4485,12 +4483,12 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
            "Operands must be of identical vector types");
     Value *BlockInMaskPart = State.get(BlockInMask, Part);
+    Value *EVLPart = State.get(EVL, {Part, 0});
 
     Function *VPIntr = Intrinsic::getDeclaration(
         LoopVectorPreHeader->getModule(), VPIntrInstr(I.getOpcode()), OpTy);
     Value *V = Builder.CreateCall(
-        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, Builder.getInt32(-1)},
-        "vp.op");
+        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, EVLPart}, "vp.op");
 
     if (auto *VecOp = dyn_cast<Instruction>(V))
       VecOp->copyIRFlags(&I);
@@ -4499,7 +4497,6 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     VectorLoopValueMap.setVectorValue(&I, Part, V);
     addMetadata(V, &I);
     }
-
 }
 
 void InnerLoopVectorizer::widenInstruction(Instruction &I, VPUser &User,

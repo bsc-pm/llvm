@@ -39,7 +39,9 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Analysis/VectorUtils.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Type.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -620,6 +622,7 @@ public:
     VPWidenMemoryInstructionSC,
     VPWidenPHISC,
     VPWidenSC,
+    VPPredicatedWidenSC,
     VPWidenSelectSC
   };
 
@@ -791,6 +794,36 @@ public:
   /// Print the recipe.
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
+};
+
+class VPPredicatedWidenRecipe : public VPRecipeBase {
+private:
+  // TODO: For now keep a separate recipe for each instruction, instead of
+  // clubbing them together in a single recipe as is done in VPWidenRecipe.
+  Instruction &Instr;
+  VPUser PredInfo;
+
+public:
+  VPPredicatedWidenRecipe(Instruction &Instr, VPValue *Mask, VPValue *EVL)
+      : VPRecipeBase(VPPredicatedWidenSC), Instr(Instr), PredInfo({Mask, EVL}) {
+  }
+
+  /// Method to support type inquiry through isa, cast, and dyn_cast.
+  static inline bool classof(const VPRecipeBase *V) {
+    return V->getVPRecipeID() == VPRecipeBase::VPPredicatedWidenSC;
+  }
+
+  /// Return the mask used by this recipe.
+  VPValue *getMask() const { return PredInfo.getOperand(0); }
+
+  /// Return the explicit vector length used by this recipe.
+  VPValue *getEVL() const { return PredInfo.getOperand(1); }
+
+  /// Generate the wide load/store.
+  void execute(VPTransformState &State) override;
+
+  /// Print the recipe.
+  void print(raw_ostream &O, const Twine &Indent) const override;
 };
 
 /// A recipe for widening Call instructions.
