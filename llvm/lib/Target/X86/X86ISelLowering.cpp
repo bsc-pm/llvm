@@ -35074,6 +35074,31 @@ static SDValue combineTargetShuffle(SDValue N, SelectionDAG &DAG,
     return R;
 
   switch (Opcode) {
+  case X86ISD::MOVDDUP: {
+    SDValue Src = N.getOperand(0);
+    // Turn a 128-bit MOVDDUP of a full vector load into movddup+vzload.
+    if (VT == MVT::v2f64 && Src.hasOneUse() &&
+        ISD::isNormalLoad(Src.getNode())) {
+      LoadSDNode *LN = cast<LoadSDNode>(Src);
+      // Unless the load is volatile or atomic.
+      if (LN->isSimple()) {
+        SDVTList Tys = DAG.getVTList(MVT::v2f64, MVT::Other);
+        SDValue Ops[] = { LN->getChain(), LN->getBasePtr() };
+        SDValue VZLoad =
+            DAG.getMemIntrinsicNode(X86ISD::VZEXT_LOAD, DL, Tys, Ops, MVT::f64,
+                                    LN->getPointerInfo(),
+                                    LN->getAlignment(),
+                                    LN->getMemOperand()->getFlags());
+        SDValue Movddup = DAG.getNode(X86ISD::MOVDDUP, DL, MVT::v2f64, VZLoad);
+        DCI.CombineTo(N.getNode(), Movddup);
+        DAG.ReplaceAllUsesOfValueWith(SDValue(LN, 1), VZLoad.getValue(1));
+        DCI.recursivelyDeleteUnusedNodes(LN);
+        return N; // Return N so it doesn't get rechecked!
+      }
+    }
+
+    return SDValue();
+  }
   case X86ISD::VBROADCAST: {
     SDValue Src = N.getOperand(0);
     SDValue BC = peekThroughBitcasts(Src);
@@ -35144,6 +35169,42 @@ static SDValue combineTargetShuffle(SDValue N, SelectionDAG &DAG,
         DCI.CombineTo(LN, Scl, BcastLd.getValue(1));
       }
       return N; // Return N so it doesn't get rechecked!
+    }
+
+    // vbroadcast(vzload X) -> vbroadcast_load X
+    if (Src.getOpcode() == X86ISD::VZEXT_LOAD && Src.hasOneUse()) {
+      MemSDNode *LN = cast<MemIntrinsicSDNode>(Src);
+      if (LN->getMemoryVT().getSizeInBits() == VT.getScalarSizeInBits()) {
+        SDVTList Tys = DAG.getVTList(VT, MVT::Other);
+        SDValue Ops[] = { LN->getChain(), LN->getBasePtr() };
+        SDValue BcastLd =
+            DAG.getMemIntrinsicNode(X86ISD::VBROADCAST_LOAD, DL, Tys, Ops,
+                                    LN->getMemoryVT(), LN->getMemOperand());
+        DCI.CombineTo(N.getNode(), BcastLd);
+        DAG.ReplaceAllUsesOfValueWith(SDValue(LN, 1), BcastLd.getValue(1));
+        DCI.recursivelyDeleteUnusedNodes(LN);
+        return N; // Return N so it doesn't get rechecked!
+      }
+    }
+
+    // vbroadcast(vector load X) -> vbroadcast_load
+    if (SrcVT == MVT::v2f64 && Src.hasOneUse() &&
+        ISD::isNormalLoad(Src.getNode())) {
+      LoadSDNode *LN = cast<LoadSDNode>(Src);
+      // Unless the load is volatile or atomic.
+      if (LN->isSimple()) {
+        SDVTList Tys = DAG.getVTList(VT, MVT::Other);
+        SDValue Ops[] = { LN->getChain(), LN->getBasePtr() };
+        SDValue BcastLd =
+            DAG.getMemIntrinsicNode(X86ISD::VBROADCAST_LOAD, DL, Tys, Ops,
+                                    MVT::f64, LN->getPointerInfo(),
+                                    LN->getAlignment(),
+                                    LN->getMemOperand()->getFlags());
+        DCI.CombineTo(N.getNode(), BcastLd);
+        DAG.ReplaceAllUsesOfValueWith(SDValue(LN, 1), BcastLd.getValue(1));
+        DCI.recursivelyDeleteUnusedNodes(LN);
+        return N; // Return N so it doesn't get rechecked!
+      }
     }
 
     return SDValue();
@@ -35907,6 +35968,24 @@ static SDValue combineShuffle(SDNode *N, SelectionDAG &DAG,
                                   MachineMemOperand::MOLoad);
       DAG.ReplaceAllUsesOfValueWith(SDValue(LN, 1), VZLoad.getValue(1));
       return VZLoad;
+    }
+  }
+
+  // Turn (v2i64 (vzext_movl (scalar_to_vector (i64 X)))) into
+  // (v2i64 (bitcast (v4i32 (vzext_movl (scalar_to_vector (i32 (trunc X)))))))
+  // if the upper bits of the i64 are zero.
+  if (N->getOpcode() == X86ISD::VZEXT_MOVL && N->getOperand(0).hasOneUse() &&
+      N->getOperand(0)->getOpcode() == ISD::SCALAR_TO_VECTOR &&
+      N->getOperand(0).getOperand(0).hasOneUse() &&
+      N->getOperand(0).getOperand(0).getValueType() == MVT::i64) {
+    SDValue In = N->getOperand(0).getOperand(0);
+    APInt Mask = APInt::getHighBitsSet(64, 32);
+    if (DAG.MaskedValueIsZero(In, Mask)) {
+      SDValue Trunc = DAG.getNode(ISD::TRUNCATE, dl, MVT::i32, In);
+      MVT VecVT = MVT::getVectorVT(MVT::i32, VT.getVectorNumElements() * 2);
+      SDValue SclVec = DAG.getNode(ISD::SCALAR_TO_VECTOR, dl, VecVT, Trunc);
+      SDValue Movl = DAG.getNode(X86ISD::VZEXT_MOVL, dl, VecVT, SclVec);
+      return DAG.getBitcast(VT, Movl);
     }
   }
 
