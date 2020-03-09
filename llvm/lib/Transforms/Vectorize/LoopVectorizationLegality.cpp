@@ -968,7 +968,6 @@ bool LoopVectorizationLegality::blockCanBePredicated(
 }
 
 void LoopVectorizationLegality::addMaskedVectorOps(BasicBlock *BB) {
-  for (Instruction &I : *BB) {
     // FIXME: This is awful. We are just making all operations masked. Some
     // might need careful reconsideration.
     auto IsVectorizableOpcode = [](unsigned Opcode) {
@@ -1017,10 +1016,11 @@ void LoopVectorizationLegality::addMaskedVectorOps(BasicBlock *BB) {
       return false;
     };
 
-    if (IsVectorizableOpcode(I.getOpcode())) {
-      MaskedOp.insert(&I);
+    for (Instruction &I : *BB) {
+      if (IsVectorizableOpcode(I.getOpcode())) {
+        MaskedOp.insert(&I);
+      }
     }
-  }
 }
 
 bool LoopVectorizationLegality::canVectorizeWithIfConvert() {

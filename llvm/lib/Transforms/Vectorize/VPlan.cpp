@@ -734,6 +734,16 @@ void VPWidenRecipe::print(raw_ostream &O, const Twine &Indent,
   O << "\"  " << VPlanIngredient(&Ingredient) << "\\l\"";
 }
 
+void VPPredicatedWidenRecipe::print(raw_ostream &O, const Twine &Indent,
+                                    VPSlotTracker &SlotTracker) const {
+  O << " +\n" << Indent << "\"PREDICATED-WIDEN " << VPlanIngredient(&Instr);
+  O << ", ";
+  getMask()->printAsOperand(O, SlotTracker);
+  O << ", ";
+  getEVL()->printAsOperand(O, SlotTracker);
+  O << "\\l\"";
+}
+
 void VPWidenIntOrFpInductionRecipe::print(raw_ostream &O, const Twine &Indent,
                                           VPSlotTracker &SlotTracker) const {
   O << " +\n" << Indent << "\"WIDEN-INDUCTION";
