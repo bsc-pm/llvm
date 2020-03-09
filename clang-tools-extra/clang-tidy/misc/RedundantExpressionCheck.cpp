@@ -567,7 +567,7 @@ matchRelationalIntegerConstantExpr(StringRef Id) {
   std::string OverloadId = (Id + "-overload").str();
 
   const auto RelationalExpr = ignoringParenImpCasts(binaryOperator(
-      matchers::isComparisonOperator(), expr().bind(Id),
+      isComparisonOperator(), expr().bind(Id),
       anyOf(allOf(hasLHS(matchSymbolicExpr(Id)),
                   hasRHS(matchIntegerConstantExpr(Id))),
             allOf(hasLHS(matchIntegerConstantExpr(Id)),
@@ -836,9 +836,8 @@ void RedundantExpressionCheck::registerMatchers(MatchFinder *Finder) {
       binaryOperator(anyOf(hasOperatorName("-"), hasOperatorName("/"),
                            hasOperatorName("%"), hasOperatorName("|"),
                            hasOperatorName("&"), hasOperatorName("^"),
-                           matchers::isComparisonOperator(),
-                           hasOperatorName("&&"), hasOperatorName("||"),
-                           hasOperatorName("=")),
+                           isComparisonOperator(), hasOperatorName("&&"),
+                           hasOperatorName("||"), hasOperatorName("=")),
                      operandsAreEquivalent(),
                      // Filter noisy false positives.
                      unless(isInTemplateInstantiation()),
@@ -943,7 +942,7 @@ void RedundantExpressionCheck::registerMatchers(MatchFinder *Finder) {
   const auto SymRight = matchSymbolicExpr("rhs");
 
   // Match expressions like: x <op> 0xFF == 0xF00.
-  Finder->addMatcher(binaryOperator(matchers::isComparisonOperator(),
+  Finder->addMatcher(binaryOperator(isComparisonOperator(),
                                     hasEitherOperand(BinOpCstLeft),
                                     hasEitherOperand(CstRight))
                          .bind("binop-const-compare-to-const"),
@@ -951,14 +950,14 @@ void RedundantExpressionCheck::registerMatchers(MatchFinder *Finder) {
 
   // Match expressions like: x <op> 0xFF == x.
   Finder->addMatcher(
-      binaryOperator(matchers::isComparisonOperator(),
+      binaryOperator(isComparisonOperator(),
                      anyOf(allOf(hasLHS(BinOpCstLeft), hasRHS(SymRight)),
                            allOf(hasLHS(SymRight), hasRHS(BinOpCstLeft))))
           .bind("binop-const-compare-to-sym"),
       this);
 
   // Match expressions like: x <op> 10 == x <op> 12.
-  Finder->addMatcher(binaryOperator(matchers::isComparisonOperator(),
+  Finder->addMatcher(binaryOperator(isComparisonOperator(),
                                     hasLHS(BinOpCstLeft), hasRHS(BinOpCstRight),
                                     // Already reported as redundant.
                                     unless(operandsAreEquivalent()))
