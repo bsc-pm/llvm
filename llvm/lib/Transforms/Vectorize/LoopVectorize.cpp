@@ -7309,6 +7309,33 @@ VPBlendRecipe *VPRecipeBuilder::tryToBlend(PHINode *Phi, VPlanPtr &Plan) {
   return new VPBlendRecipe(Phi, Operands);
 }
 
+bool VPRecipeBuilder::tryToPredicatedWiden(Instruction *I, VPBasicBlock *VPBB,
+                                           VPlanPtr &Plan) {
+  // While checking loop vectorization legality we mark the instructions to be
+  // masked only if tail folding is enabled and TTI prefers predicated ops. Thus
+  // Legal->isMaskRequired(I) should return true only when these conditions
+  // are satisfied. Widening of memory instructions is handled separately.
+  if (Legal->isMaskRequired(I)) {
+    VPValue *Mask = createBlockInMask(I->getParent(), Plan);
+    // FIXME: Mask is nullptr if it represents an all-ones mask. Currently
+    // memory widening schemes generate masked instructions only if mask is not
+    // null. We need to support the case of all-ones mask and EVL < whole
+    // register length. Should we generate non-predicated instruction if the
+    // Mask is all-ones and EVL = whoel register length?
+    if (Mask) {
+      // FIXME: We only support default EVL to represent whole register for now.
+      VPValue *EVL = Plan->getOrAddVPValue(ConstantInt::getSigned(
+          IntegerType::get(I->getType()->getContext(), 32), -1));
+      VPPredicatedWidenRecipe *PredWidenRecipe =
+          new VPPredicatedWidenRecipe(*I, Mask, EVL);
+      setRecipe(I, PredWidenRecipe);
+      VPBB->appendRecipe(PredWidenRecipe);
+      return true;
+    }
+  }
+  return false;
+}
+
 VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(CallInst *CI, VFRange &Range,
                                                    VPlan &Plan) const {
 
@@ -7404,6 +7431,11 @@ VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VPlan &Plan) const {
 
   // Success: widen this instruction.
   return new VPWidenRecipe(*I, Plan.mapToVPValues(I->operands()));
+  ////FIX-AFTER-REBASE
+  // use PredicatedWiden Recipe if that is preferred.
+  if (tryToPredicatedWiden(I, VPBB, Plan))
+    return true;
+
 }
 
 VPBasicBlock *VPRecipeBuilder::handleReplication(
