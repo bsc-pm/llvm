@@ -22,6 +22,8 @@ struct TaskDSAInfo {
   SetVector<Value *> Shared;
   SetVector<Value *> Private;
   SetVector<Value *> Firstprivate;
+  // Map of Dependency symbols to Index
+  std::map<Value *, int> DepSymToIdx;
 };
 
 // <VLA, VLA_dims>
@@ -47,6 +49,12 @@ struct DependInfo {
   SmallVector<Value *, 4> Dims;
 };
 
+struct ReductionInfo {
+  Value *DSA;
+  Value *RedKind;
+  DependInfo DepInfo;
+};
+
 struct TaskDependsInfo {
   SmallVector<DependInfo, 4> Ins;
   SmallVector<DependInfo, 4> Outs;
@@ -56,6 +64,7 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakIns;
   SmallVector<DependInfo, 4> WeakOuts;
   SmallVector<DependInfo, 4> WeakInouts;
+  SmallVector<ReductionInfo, 4> Reductions;
 
   // Unique Instructions needed as a bridge between dependency and DSAs
   // Stored in program order
@@ -65,10 +74,21 @@ struct TaskDependsInfo {
   int NumSymbols;
 };
 
+struct ReductionInitCombInfo {
+  Value *Init;
+  Value *Comb;
+  // This is used to index the array of
+  // init/combiners
+  int ReductionIndex;
+};
+
+using TaskReductionsInitCombInfo = MapVector<Value *, ReductionInitCombInfo>;
+
 struct TaskInfo {
   TaskDSAInfo DSAInfo;
   TaskVLADimsInfo VLADimsInfo;
   TaskDependsInfo DependsInfo;
+  TaskReductionsInitCombInfo ReductionsInitCombInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Priority = nullptr;
@@ -101,8 +121,6 @@ struct TaskwaitFunctionInfo {
 struct TaskAnalysisInfo {
   SetVector<Value *> UsesBeforeEntry;
   SetVector<Value *> UsesAfterExit;
-  // Map of Dependency symbols to Index
-  std::map<Value *, int> DepSymToIdx;
 };
 
 struct TaskWithAnalysisInfo {

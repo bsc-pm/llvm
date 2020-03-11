@@ -181,6 +181,9 @@ public:
 
     /// This declaration is an OpenMP user defined mapper.
     IDNS_OMPMapper           = 0x2000,
+
+    /// This declaration is an OmpSs user defined reduction construction.
+    IDNS_OSSReduction        = 0x4000,
   };
 
   /// ObjCDeclQualifier - 'Qualifiers' written next to the return and
@@ -328,7 +331,7 @@ protected:
   unsigned FromASTFile : 1;
 
   /// IdentifierNamespace - This specifies what IDNS_* namespace this lives in.
-  unsigned IdentifierNamespace : 14;
+  unsigned IdentifierNamespace : 15;
 
   /// If 0, we have not computed the linkage of this declaration.
   /// Otherwise, it is the linkage + 1.
@@ -1259,6 +1262,7 @@ public:
 ///   ExternCContext
 ///   NamespaceDecl
 ///   TagDecl
+///   OSSDeclareReductionDecl
 ///   OMPDeclareReductionDecl
 ///   OMPDeclareMapperDecl
 ///   FunctionDecl
@@ -1456,6 +1460,22 @@ class DeclContext {
 
   /// Number of non-inherited bits in RecordDeclBitfields.
   enum { NumRecordDeclBits = 14 };
+
+  /// Stores the bits used by OSSDeclareReductionDecl.
+  /// If modified NumOSSDeclareReductionDeclBits and the accessor
+  /// methods in OSSDeclareReductionDecl should be updated appropriately.
+  class OSSDeclareReductionDeclBitfields {
+    friend class OSSDeclareReductionDecl;
+    /// For the bits in DeclContextBitfields
+    uint64_t : NumDeclContextBits;
+
+    /// Kind of initializer,
+    /// function call or omp_priv<init_expr> initializtion.
+    uint64_t InitializerKind : 2;
+  };
+
+  /// Number of non-inherited bits in OSSDeclareReductionDeclBitfields.
+  enum { NumOSSDeclareReductionDeclBits = 2 };
 
   /// Stores the bits used by OMPDeclareReductionDecl.
   /// If modified NumOMPDeclareReductionDeclBits and the accessor
@@ -1716,6 +1736,7 @@ protected:
     TagDeclBitfields TagDeclBits;
     EnumDeclBitfields EnumDeclBits;
     RecordDeclBitfields RecordDeclBits;
+    OSSDeclareReductionDeclBitfields OSSDeclareReductionDeclBits;
     OMPDeclareReductionDeclBitfields OMPDeclareReductionDeclBits;
     FunctionDeclBitfields FunctionDeclBits;
     CXXConstructorDeclBitfields CXXConstructorDeclBits;
@@ -1732,6 +1753,8 @@ protected:
                   "EnumDeclBitfields is larger than 8 bytes!");
     static_assert(sizeof(RecordDeclBitfields) <= 8,
                   "RecordDeclBitfields is larger than 8 bytes!");
+    static_assert(sizeof(OSSDeclareReductionDeclBitfields) <= 8,
+                  "OSSDeclareReductionDeclBitfields is larger than 8 bytes!");
     static_assert(sizeof(OMPDeclareReductionDeclBitfields) <= 8,
                   "OMPDeclareReductionDeclBitfields is larger than 8 bytes!");
     static_assert(sizeof(FunctionDeclBitfields) <= 8,

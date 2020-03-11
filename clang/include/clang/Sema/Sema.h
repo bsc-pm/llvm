@@ -156,6 +156,7 @@ namespace clang {
   class OMPRequiresDecl;
   class OMPDeclareReductionDecl;
   class OMPDeclareSimdDecl;
+  class OSSDeclareReductionDecl;
   class OSSTaskDecl;
   class OMPClause;
   class OSSClause;
@@ -3300,6 +3301,8 @@ public:
     LookupObjCImplicitSelfParam,
     /// Look up the name of an OpenMP user-defined reduction operation.
     LookupOMPReductionName,
+    /// Look up the name of an OmpSs user-defined reduction operation.
+    LookupOSSReductionName,
     /// Look up the name of an OpenMP user-defined mapper.
     LookupOMPMapperName,
     /// Look up any declaration with any name.
@@ -9929,6 +9932,30 @@ public:
   // can see DSA derived from 'depend' clauses
   void ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses);
 
+  /// Check if the specified type is allowed to be used in 'oss declare
+  /// reduction' construct.
+  QualType ActOnOmpSsDeclareReductionType(SourceLocation TyLoc,
+                                          TypeResult ParsedType);
+  /// Called on start of '#pragma oss declare reduction'.
+  DeclGroupPtrTy ActOnOmpSsDeclareReductionDirectiveStart(
+      Scope *S, DeclContext *DC, DeclarationName Name,
+      ArrayRef<std::pair<QualType, SourceLocation>> ReductionTypes,
+      AccessSpecifier AS, Decl *PrevDeclInScope = nullptr);
+  /// Initialize declare reduction construct initializer.
+  void ActOnOmpSsDeclareReductionCombinerStart(Scope *S, Decl *D);
+  /// Finish current declare reduction construct initializer.
+  void ActOnOmpSsDeclareReductionCombinerEnd(Decl *D, Expr *Combiner);
+  /// Initialize declare reduction construct initializer.
+  /// \return oss_priv variable.
+  VarDecl *ActOnOmpSsDeclareReductionInitializerStart(Scope *S, Decl *D);
+  /// Finish current declare reduction construct initializer.
+  void ActOnOmpSsDeclareReductionInitializerEnd(Decl *D, Expr *Initializer,
+                                                VarDecl *OssPrivParm);
+  /// Called at the end of '#pragma oss declare reduction'.
+  DeclGroupPtrTy ActOnOmpSsDeclareReductionDirectiveEnd(
+      Scope *S, DeclGroupPtrTy DeclReductions, bool IsValid);
+
+
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
       OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
 
@@ -10022,7 +10049,8 @@ public:
                          SourceLocation ColonLoc,
                          SourceLocation EndLoc,
                          CXXScopeSpec &ReductionIdScopeSpec,
-                         const DeclarationNameInfo &ReductionId);
+                         const DeclarationNameInfo &ReductionId,
+                         ArrayRef<Expr *> UnresolvedReductions = llvm::None);
 
   OSSClause *ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                         Expr *Expr,

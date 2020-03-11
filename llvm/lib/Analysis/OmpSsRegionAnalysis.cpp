@@ -36,7 +36,8 @@ enum PrintVerbosity {
   PV_DsaMissing,
   PV_DsaVLADimsMissing,
   PV_VLADimsCaptureMissing,
-  PV_NonPODDSAMissing
+  PV_NonPODDSAMissing,
+  PV_ReductionInitsCombiners
 };
 
 static cl::opt<PrintVerbosity>
@@ -50,7 +51,9 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA"),
   clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs"),
   clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture"),
-  clEnumValN(PV_NonPODDSAMissing, "non_pod_dsa_missing", "Print task layout with non-pod info without according DSA")));
+  clEnumValN(PV_NonPODDSAMissing, "non_pod_dsa_missing", "Print task layout with non-pod info without according DSA"),
+  clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print task layout with reduction init and combiner functions"))
+  );
 
 char OmpSsRegionAnalysisPass::ID = 0;
 
@@ -197,6 +200,17 @@ static void print_verbose(
         }
       }
     }
+    else if (PrintVerboseLevel == PV_ReductionInitsCombiners) {
+      for (auto &RedInfo : Info.ReductionsInitCombInfo) {
+        dbgs() << "\n";
+        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+        RedInfo.first->printAsOperand(dbgs(), false);
+        dbgs() << " ";
+        RedInfo.second.Init->printAsOperand(dbgs(), false);
+        dbgs() << " ";
+        RedInfo.second.Comb->printAsOperand(dbgs(), false);
+      }
+    }
     dbgs() << "\n";
   }
   for (auto II : TasksTree.lookup(Cur)) {
@@ -336,6 +350,46 @@ static void gatherVLADimsInfo(const IntrinsicInst *I, TaskInfo &TI) {
   }
 }
 
+// After gathering DSAInfo we can assert if we find a DEP.REDUCTION.INIT/COMBINE bundle
+// without its corresponding DSA
+static void gatherReductionsInitCombInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_reduction_init);
+  // Different reductions may have same init/comb, assign the same ReductionIndex
+  DenseMap<Value *, int> SeenInits;
+  int ReductionIndex = 0;
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    assert(OBDef.input_size() == 2 && "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
+      llvm_unreachable("Reduction init/combiner OperandBundle must have an associated DSA");
+
+    // This assert should not trigger since clang allows an unique reduction per DSA
+    assert(!TI.ReductionsInitCombInfo.count(OBArgs[0])
+           && "Two or morereductions of the same DSA in the same task are not allowed");
+    TI.ReductionsInitCombInfo[OBArgs[0]].Init = OBArgs[1];
+
+    if (SeenInits.count(OBArgs[1])) {
+      TI.ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = SeenInits[OBArgs[1]];
+    } else {
+      SeenInits[OBArgs[1]] = ReductionIndex;
+      TI.ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = ReductionIndex;
+      ReductionIndex++;
+    }
+  }
+
+  OpBundles.clear();
+  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_reduction_comb);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    assert(OBDef.input_size() == 2 && "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
+      llvm_unreachable("Reduction init/combiner OperandBundle must have an associated DSA");
+    TI.ReductionsInitCombInfo[OBArgs[0]].Comb = OBArgs[1];
+  }
+}
+
+
 // Inserts I into InstList ensuring program order if I it's not already in the list
 static bool insertUniqInstInProgramOrder(SmallVectorImpl<Instruction *> &InstList,
                                          Instruction *I,
@@ -351,7 +405,7 @@ static bool insertUniqInstInProgramOrder(SmallVectorImpl<Instruction *> &InstLis
   return true;
 }
 
-static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
+static void gatherUnpackInstructions(TaskDSAInfo &DSAInfo,
                                      const TaskCapturedInfo &CapturedInfo,
                                      const OrderedInstructions &OI,
                                      DependInfo &DI,
@@ -394,27 +448,23 @@ static void gatherUnpackInstructions(const TaskDSAInfo &DSAInfo,
     } else if (IsDSA && Dep == DI.Base) {
       // Found DSA associated with Dependency, assign SymbolIndex
       // Cur is the DSA Value
-      if (!TAI.DepSymToIdx.count(Cur)) {
-        TAI.DepSymToIdx[Cur] = TAI.DepSymToIdx.size();
+      if (!DSAInfo.DepSymToIdx.count(Cur)) {
+        DSAInfo.DepSymToIdx[Cur] = DSAInfo.DepSymToIdx.size();
       }
-      DI.SymbolIndex = TAI.DepSymToIdx[Cur];
+      DI.SymbolIndex = DSAInfo.DepSymToIdx[Cur];
     }
   }
 }
 
-// Process each OpBundle gathering dependency information
-static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef> &OpBundles,
+// Process OpBundle gathering dependency information
+static void gatherDependInfoFromBundle(ArrayRef<Value *> OBArgs,
                                     const OrderedInstructions &OI,
-                                    const TaskDSAInfo &DSAInfo,
+                                    TaskDSAInfo &DSAInfo,
                                     const TaskCapturedInfo &CapturedInfo,
                                     TaskAnalysisInfo &TAI,
-                                    SmallVectorImpl<DependInfo> &DependsList,
+                                    DependInfo &DI,
                                     SmallVectorImpl<Instruction *> &UnpackInsts,
                                     SetVector<ConstantExpr *> &UnpackConsts) {
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    DependInfo DI;
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-
     DI.SymbolIndex = -1;
     // TODO: Support RegionText stringifying clause content
     DI.RegionText = "";
@@ -424,15 +474,12 @@ static void gatherDependsInfoFromBundles(const SmallVectorImpl<OperandBundleDef>
     }
 
     gatherUnpackInstructions(DSAInfo, CapturedInfo, OI, DI, TAI, UnpackInsts, UnpackConsts);
-
-    DependsList.push_back(DI);
-  }
 }
 
 // Gathers dependencies needed information of type Id
 static void gatherDependsInfoWithID(const IntrinsicInst *I,
                                     const OrderedInstructions &OI,
-                                    const TaskDSAInfo &DSAInfo,
+                                    TaskDSAInfo &DSAInfo,
                                     const TaskCapturedInfo &CapturedInfo,
                                     TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList,
@@ -441,7 +488,43 @@ static void gatherDependsInfoWithID(const IntrinsicInst *I,
                                     uint64_t Id) {
   SmallVector<OperandBundleDef, 4> OpBundles;
   getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  gatherDependsInfoFromBundles(OpBundles, OI, DSAInfo, CapturedInfo, TAI, DependsList, UnpackInsts, UnpackConsts);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    DependInfo DI;
+
+    gatherDependInfoFromBundle(OBDef.inputs(), OI, DSAInfo, CapturedInfo,
+                               TAI, DI, UnpackInsts,
+                               UnpackConsts);
+
+    DependsList.push_back(DI);
+  }
+}
+
+// Gathers dependencies needed information of type Id
+static void gatherReductionsInfoWithID(const IntrinsicInst *I,
+                                        const OrderedInstructions &OI,
+                                        TaskDSAInfo &DSAInfo,
+                                        const TaskCapturedInfo &CapturedInfo,
+                                        TaskAnalysisInfo &TAI,
+                                        SmallVectorImpl<ReductionInfo> &ReductionsList,
+                                        SmallVectorImpl<Instruction *> &UnpackInsts,
+                                        SetVector<ConstantExpr *> &UnpackConsts,
+                                        uint64_t Id) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    ReductionInfo RI;
+
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+    RI.DSA = OBArgs[0];
+    RI.RedKind = OBArgs[1];
+
+    // Skip the first two param
+    gatherDependInfoFromBundle(OBArgs.drop_front(2), OI, DSAInfo, CapturedInfo,
+                               TAI, RI.DepInfo, UnpackInsts,
+                               UnpackConsts);
+
+    ReductionsList.push_back(RI);
+  }
 }
 
 // Gathers all dependencies needed information
@@ -491,7 +574,14 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                           TI.DependsInfo.UnpackInstructions,
                           TI.DependsInfo.UnpackConstants,
                           LLVMContext::OB_oss_dep_weakinout);
-  TI.DependsInfo.NumSymbols = TAI.DepSymToIdx.size();
+
+  gatherReductionsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+                              TI.DependsInfo.Reductions,
+                              TI.DependsInfo.UnpackInstructions,
+                              TI.DependsInfo.UnpackConstants,
+                              LLVMContext::OB_oss_dep_reduction);
+
+  TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
 }
 
 static void gatherIfFinalCostPrioInfo(const IntrinsicInst *I, TaskInfo &TI) {
@@ -592,6 +682,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
+          gatherReductionsInitCombInfo(II, T.Info);
           gatherIfFinalCostPrioInfo(II, T.Info);
 
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {

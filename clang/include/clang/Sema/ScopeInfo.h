@@ -123,6 +123,9 @@ public:
   /// True if current scope is for OpenMP declare reduction combiner.
   bool HasOMPDeclareReductionCombiner : 1;
 
+  /// True if current scope is for OmpSs declare reduction combiner.
+  bool HasOSSDeclareReductionCombiner : 1;
+
   /// Whether there is a fallthrough statement in this function.
   bool HasFallthroughStmt : 1;
 
@@ -366,6 +369,7 @@ public:
       : Kind(SK_Function), HasBranchProtectedScope(false),
         HasBranchIntoScope(false), HasIndirectGoto(false),
         HasDroppedStmt(false), HasOMPDeclareReductionCombiner(false),
+        HasOSSDeclareReductionCombiner(false),
         HasFallthroughStmt(false), HasPotentialAvailabilityViolations(false),
         ObjCShouldCallSuper(false), ObjCIsDesignatedInit(false),
         ObjCWarnForNoDesignatedInitChain(false), ObjCIsSecondaryInit(false),
@@ -411,6 +415,10 @@ public:
 
   void setHasOMPDeclareReductionCombiner() {
     HasOMPDeclareReductionCombiner = true;
+  }
+
+  void setHasOSSDeclareReductionCombiner() {
+    HasOSSDeclareReductionCombiner = true;
   }
 
   void setHasFallthroughStmt() {

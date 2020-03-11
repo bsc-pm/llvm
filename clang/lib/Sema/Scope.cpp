@@ -158,6 +158,7 @@ void Scope::dumpImpl(raw_ostream &OS) const {
       {SwitchScope, "SwitchScope"},
       {TryScope, "TryScope"},
       {FnTryCatchScope, "FnTryCatchScope"},
+      {OmpSsDirectiveScope, "OmpSsDirectiveScope"}, // Be able to dump the scope
       {OpenMPDirectiveScope, "OpenMPDirectiveScope"},
       {OpenMPLoopDirectiveScope, "OpenMPLoopDirectiveScope"},
       {OpenMPSimdDirectiveScope, "OpenMPSimdDirectiveScope"},

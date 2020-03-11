@@ -16,6 +16,7 @@
 
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/DeclOmpSs.h"
 #include "clang/AST/DeclOpenMP.h"
 #include "clang/Basic/ABI.h"
 #include "clang/Basic/LLVM.h"

@@ -18,6 +18,7 @@
 #include "clang/AST/CXXInheritance.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclOmpSs.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
@@ -149,6 +150,11 @@ public:
   }
   CXXThisExpr *getThisExpr() const {
     return isStackEmpty() ? nullptr : Stack.back().ThisExpr;
+  }
+  // Get the current scope. This is null when instantiating templates
+  // Used for Reductions
+  Scope *getCurScope() const {
+    return isStackEmpty() ? nullptr : Stack.back().CurScope;
   }
 };
 
@@ -339,11 +345,6 @@ public:
             llvm_unreachable("unexpected DSA from parent");
           }
       } else {
-
-        // QualType Type = VD->getType();
-        // if (!(Type.isPODType(SemaRef.Context) || Type->isReferenceType())) {
-        //   return;
-        // }
 
         OmpSsDirectiveKind DKind = Stack->getCurrentDirective();
         switch (Stack->getCurrentDefaultDataSharingAttributtes()) {
@@ -737,6 +738,288 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
   }
 }
 
+QualType Sema::ActOnOmpSsDeclareReductionType(SourceLocation TyLoc,
+                                              TypeResult ParsedType) {
+  assert(ParsedType.isUsable());
+
+  QualType ReductionType = GetTypeFromParser(ParsedType.get());
+  if (ReductionType.isNull())
+    return QualType();
+
+  // [OpenMP 4.0], 2.15 declare reduction Directive, Restrictions, C\C++
+  // A type name in a declare reduction directive cannot be a function type, an
+  // array type, a reference type, or a type qualified with const, volatile or
+  // restrict.
+  if (ReductionType.hasQualifiers()) {
+    Diag(TyLoc, diag::err_oss_reduction_wrong_type) << 0;
+    return QualType();
+  }
+
+  if (ReductionType->isFunctionType()) {
+    Diag(TyLoc, diag::err_oss_reduction_wrong_type) << 1;
+    return QualType();
+  }
+  if (ReductionType->isReferenceType()) {
+    Diag(TyLoc, diag::err_oss_reduction_wrong_type) << 2;
+    return QualType();
+  }
+  if (ReductionType->isArrayType()) {
+    Diag(TyLoc, diag::err_oss_reduction_wrong_type) << 3;
+    return QualType();
+  }
+  // [OmpSs] cannot be a POD, but here we cannot do the check.
+  // Example
+  //
+  // template <typename T> struct A; // incomplete
+  // #pragma omp declare reduction(foo : A<int>)
+  // template <typename T> struct A { }; // from here complete
+  return ReductionType;
+}
+
+Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareReductionDirectiveStart(
+    Scope *S, DeclContext *DC, DeclarationName Name,
+    ArrayRef<std::pair<QualType, SourceLocation>> ReductionTypes,
+    AccessSpecifier AS, Decl *PrevDeclInScope) {
+  SmallVector<Decl *, 8> Decls;
+  Decls.reserve(ReductionTypes.size());
+
+  LookupResult Lookup(*this, Name, SourceLocation(), LookupOSSReductionName,
+                      forRedeclarationInCurContext());
+  // [OpenMP 4.0], 2.15 declare reduction Directive, Restrictions
+  // A reduction-identifier may not be re-declared in the current scope for the
+  // same type or for a type that is compatible according to the base language
+  // rules.
+  llvm::DenseMap<QualType, SourceLocation> PreviousRedeclTypes;
+  OSSDeclareReductionDecl *PrevDRD = nullptr;
+  bool InCompoundScope = true;
+  // S == nullptr for templates
+  // and PrevDeclInScope is the Decl without instantiate, if any
+  if (S) {
+    // Find previous declaration with the same name not referenced in other
+    // declarations.
+    FunctionScopeInfo *ParentFn = getEnclosingFunction();
+    InCompoundScope = ParentFn && !ParentFn->CompoundScopes.empty();
+    LookupName(Lookup, S);
+    FilterLookupForScope(Lookup, DC, S, /*ConsiderLinkage=*/false,
+                         /*AllowInlineNamespace=*/false);
+    llvm::DenseMap<OSSDeclareReductionDecl *, bool> UsedAsPrevious;
+    LookupResult::Filter Filter = Lookup.makeFilter();
+    while (Filter.hasNext()) {
+      auto *PrevDecl = cast<OSSDeclareReductionDecl>(Filter.next());
+      if (InCompoundScope) {
+        auto I = UsedAsPrevious.find(PrevDecl);
+        // Build the Decl previous chain
+        // NOTE: Is this used because we do not trust Filter order?
+        // Example:
+        // declare reduction -> int, char
+        // declare reduction -> char (Current)
+        // This is translated in three separated decls
+        // int <- char <- char (Current)
+        // We may find the 'int' version before than the char version
+        // This ensures we will build the chain: int <- char <- char and
+        // not char <- int <- char
+        if (I == UsedAsPrevious.end())
+          UsedAsPrevious[PrevDecl] = false;
+        if (OSSDeclareReductionDecl *D = PrevDecl->getPrevDeclInScope())
+          UsedAsPrevious[D] = true;
+      }
+      // Record types of previous declare reductions with that name
+      PreviousRedeclTypes[PrevDecl->getType().getCanonicalType()] =
+          PrevDecl->getLocation();
+    }
+    Filter.done();
+    if (InCompoundScope) {
+      for (const auto &PrevData : UsedAsPrevious) {
+        if (!PrevData.second) {
+          PrevDRD = PrevData.first;
+          break;
+        }
+      }
+    }
+  } else if (PrevDeclInScope) {
+    // Since we have only the immediate previous decl, loop over all
+    // previous decls
+    auto *PrevDRDInScope = PrevDRD =
+        cast<OSSDeclareReductionDecl>(PrevDeclInScope);
+    do {
+      PreviousRedeclTypes[PrevDRDInScope->getType().getCanonicalType()] =
+          PrevDRDInScope->getLocation();
+      PrevDRDInScope = PrevDRDInScope->getPrevDeclInScope();
+    } while (PrevDRDInScope);
+  }
+  for (const auto &TyData : ReductionTypes) {
+    const auto I = PreviousRedeclTypes.find(TyData.first.getCanonicalType());
+    bool Invalid = false;
+    // Check for every type of the current declare reduction if there is
+    // a previous declaration of it
+    if (I != PreviousRedeclTypes.end()) {
+      Diag(TyData.second, diag::err_oss_declare_reduction_redefinition)
+          << TyData.first;
+      Diag(I->second, diag::note_previous_definition);
+      Invalid = true;
+    }
+    PreviousRedeclTypes[TyData.first.getCanonicalType()] = TyData.second;
+    // Create an OSSDeclareReductionDecl for each type and set previous
+    // declare to the one created before
+    auto *DRD = OSSDeclareReductionDecl::Create(Context, DC, TyData.second,
+                                                Name, TyData.first, PrevDRD);
+    DC->addDecl(DRD);
+    DRD->setAccess(AS);
+    Decls.push_back(DRD);
+    if (Invalid)
+      DRD->setInvalidDecl();
+    else
+      PrevDRD = DRD;
+  }
+
+  return DeclGroupPtrTy::make(
+      DeclGroupRef::Create(Context, Decls.begin(), Decls.size()));
+}
+
+void Sema::ActOnOmpSsDeclareReductionCombinerStart(Scope *S, Decl *D) {
+  auto *DRD = cast<OSSDeclareReductionDecl>(D);
+
+  // Enter new function scope.
+  PushFunctionScope();
+  setFunctionHasBranchProtectedScope();
+  getCurFunction()->setHasOSSDeclareReductionCombiner();
+
+  if (S)
+    PushDeclContext(S, DRD);
+  else // Template instantiation
+    CurContext = DRD;
+
+  PushExpressionEvaluationContext(
+      ExpressionEvaluationContext::PotentiallyEvaluated);
+
+  QualType ReductionType = DRD->getType();
+  // Create 'T* omp_parm;T omp_in;'. All references to 'omp_in' will
+  // be replaced by '*omp_parm' during codegen. This required because 'omp_in'
+  // uses semantics of argument handles by value, but it should be passed by
+  // reference. C lang does not support references, so pass all parameters as
+  // pointers.
+  // Create 'T omp_in;' variable.
+  VarDecl *OmpInParm =
+      buildVarDecl(*this, D->getLocation(), ReductionType, "omp_in");
+  // Create 'T* omp_parm;T omp_out;'. All references to 'omp_out' will
+  // be replaced by '*omp_parm' during codegen. This required because 'omp_out'
+  // uses semantics of argument handles by value, but it should be passed by
+  // reference. C lang does not support references, so pass all parameters as
+  // pointers.
+  // Create 'T omp_out;' variable.
+  VarDecl *OmpOutParm =
+      buildVarDecl(*this, D->getLocation(), ReductionType, "omp_out");
+  if (S) {
+    PushOnScopeChains(OmpInParm, S);
+    PushOnScopeChains(OmpOutParm, S);
+  } else {
+    DRD->addDecl(OmpInParm);
+    DRD->addDecl(OmpOutParm);
+  }
+  Expr *InE =
+      ::buildDeclRefExpr(*this, OmpInParm, ReductionType, D->getLocation());
+  Expr *OutE =
+      ::buildDeclRefExpr(*this, OmpOutParm, ReductionType, D->getLocation());
+  DRD->setCombinerData(InE, OutE);
+}
+
+void Sema::ActOnOmpSsDeclareReductionCombinerEnd(Decl *D, Expr *Combiner) {
+  auto *DRD = cast<OSSDeclareReductionDecl>(D);
+  DiscardCleanupsInEvaluationContext();
+  PopExpressionEvaluationContext();
+
+  PopDeclContext();
+  PopFunctionScopeInfo();
+
+  if (Combiner)
+    DRD->setCombiner(Combiner);
+  else
+    DRD->setInvalidDecl();
+}
+
+VarDecl *Sema::ActOnOmpSsDeclareReductionInitializerStart(Scope *S, Decl *D) {
+  auto *DRD = cast<OSSDeclareReductionDecl>(D);
+
+  // Enter new function scope.
+  PushFunctionScope();
+  setFunctionHasBranchProtectedScope();
+
+  if (S)
+    PushDeclContext(S, DRD);
+  else // Template instantiation
+    CurContext = DRD;
+
+  PushExpressionEvaluationContext(
+      ExpressionEvaluationContext::PotentiallyEvaluated);
+
+  QualType ReductionType = DRD->getType();
+  // Create 'T* omp_parm;T omp_priv;'. All references to 'omp_priv' will
+  // be replaced by '*omp_parm' during codegen. This required because 'omp_priv'
+  // uses semantics of argument handles by value, but it should be passed by
+  // reference. C lang does not support references, so pass all parameters as
+  // pointers.
+  // Create 'T omp_priv;' variable.
+  VarDecl *OmpPrivParm =
+      buildVarDecl(*this, D->getLocation(), ReductionType, "omp_priv");
+  // Create 'T* omp_parm;T omp_orig;'. All references to 'omp_orig' will
+  // be replaced by '*omp_parm' during codegen. This required because 'omp_orig'
+  // uses semantics of argument handles by value, but it should be passed by
+  // reference. C lang does not support references, so pass all parameters as
+  // pointers.
+  // Create 'T omp_orig;' variable.
+  VarDecl *OmpOrigParm =
+      buildVarDecl(*this, D->getLocation(), ReductionType, "omp_orig");
+  if (S) {
+    PushOnScopeChains(OmpPrivParm, S);
+    PushOnScopeChains(OmpOrigParm, S);
+  } else {
+    DRD->addDecl(OmpPrivParm);
+    DRD->addDecl(OmpOrigParm);
+  }
+  Expr *OrigE =
+      ::buildDeclRefExpr(*this, OmpOrigParm, ReductionType, D->getLocation());
+  Expr *PrivE =
+      ::buildDeclRefExpr(*this, OmpPrivParm, ReductionType, D->getLocation());
+  DRD->setInitializerData(OrigE, PrivE);
+  return OmpPrivParm;
+}
+
+void Sema::ActOnOmpSsDeclareReductionInitializerEnd(Decl *D, Expr *Initializer,
+                                                    VarDecl *OmpPrivParm) {
+  auto *DRD = cast<OSSDeclareReductionDecl>(D);
+  DiscardCleanupsInEvaluationContext();
+  PopExpressionEvaluationContext();
+
+  PopDeclContext();
+  PopFunctionScopeInfo();
+
+  if (Initializer) {
+    DRD->setInitializer(Initializer, OSSDeclareReductionDecl::CallInit);
+  } else if (OmpPrivParm->hasInit()) {
+    DRD->setInitializer(OmpPrivParm->getInit(),
+                        OmpPrivParm->isDirectInit()
+                            ? OSSDeclareReductionDecl::DirectInit
+                            : OSSDeclareReductionDecl::CopyInit);
+  } else {
+    DRD->setInvalidDecl();
+  }
+}
+
+Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareReductionDirectiveEnd(
+    Scope *S, DeclGroupPtrTy DeclReductions, bool IsValid) {
+  for (Decl *D : DeclReductions.get()) {
+    if (IsValid) {
+      if (S)
+        PushOnScopeChains(cast<OSSDeclareReductionDecl>(D), S,
+                          /*AddToContext=*/false);
+    } else {
+      D->setInvalidDecl();
+    }
+  }
+  return DeclReductions;
+}
+
+
 StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
 
@@ -793,6 +1076,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task:
     Res = ActOnOmpSsTaskDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_declare_reduction:
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
   }
@@ -991,7 +1275,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
 static std::pair<ValueDecl *, bool>
 getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
                SourceRange &ERange,
-               bool AllowArraySection = false) {
+               bool AllowArrayShaping = false) {
   if (RefExpr->containsUnexpandedParameterPack()) {
     S.Diag(RefExpr->getExprLoc(), diag::err_oss_variadic_templates_not_clause_allowed);
     return std::make_pair(nullptr, false);
@@ -1000,48 +1284,15 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
   }
 
   RefExpr = RefExpr->IgnoreParens();
-  enum {
-    NoArrayExpr = -1,
-    ArraySubscript = 0,
-    OSSArraySection = 1
-  } IsArrayExpr = NoArrayExpr;
-  if (AllowArraySection) {
-    if (auto *ASE = dyn_cast_or_null<ArraySubscriptExpr>(RefExpr)) {
-      Expr *Base = ASE->getBase()->IgnoreParenImpCasts();
-      while (1) {
-        // We can have:
-        // 1) OSSArrayShapingExpr
-        //    |- ArraySubscriptExpr
-        // 2) ArraySubscriptExpr
-        //    |- OSSArrayShapingExpr
-        if (auto *TempASE = dyn_cast<ArraySubscriptExpr>(Base))
-          Base = TempASE->getBase()->IgnoreParenImpCasts();
-        else if (auto *TempOASE = dyn_cast<OSSArrayShapingExpr>(Base))
-          Base = TempOASE->getBase()->IgnoreParenImpCasts();
-        else
-          break;
-      }
-      RefExpr = Base;
-      IsArrayExpr = ArraySubscript;
-    } else if (auto *OASE = dyn_cast_or_null<OSSArraySectionExpr>(RefExpr)) {
+  bool IsArrayShaping = false;
+  if (AllowArrayShaping) {
+    // We do not allow shaping expr of a subscript/section
+    if (auto OASE = dyn_cast_or_null<OSSArrayShapingExpr>(RefExpr)) {
       Expr *Base = OASE->getBase()->IgnoreParenImpCasts();
-      while (auto *TempOASE = dyn_cast<OSSArraySectionExpr>(Base))
+      while (auto *TempOASE = dyn_cast<OSSArrayShapingExpr>(Base))
         Base = TempOASE->getBase()->IgnoreParenImpCasts();
-      while (1) {
-        // We can have:
-        // 1) OSSArrayShapingExpr
-        //    |- ArraySubscriptExpr
-        // 2) ArraySubscriptExpr
-        //    |- OSSArrayShapingExpr
-        if (auto *TempASE = dyn_cast<ArraySubscriptExpr>(Base))
-          Base = TempASE->getBase()->IgnoreParenImpCasts();
-        else if (auto *TempOASE = dyn_cast<OSSArrayShapingExpr>(Base))
-          Base = TempOASE->getBase()->IgnoreParenImpCasts();
-        else
-          break;
-      }
       RefExpr = Base;
-      IsArrayExpr = OSSArraySection;
+      IsArrayShaping = true;
     }
   }
 
@@ -1058,15 +1309,15 @@ getPrivateItem(Sema &S, Expr *&RefExpr, SourceLocation &ELoc,
        !isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()) ||
        !cast<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts())->isImplicit() ||
        !isa<VarDecl>(ME->getMemberDecl()))) {
-    if (IsArrayExpr != NoArrayExpr) {
+    if (IsArrayShaping) {
       // int *get();
-      // reduction(+ : get()[3])
-      S.Diag(ELoc, diag::err_oss_expected_base_var_name) << IsArrayExpr
-                                                         << ERange;
+      // reduction(+ : [3](get()))
+      // reduction(+ : [3](p[4]))
+      S.Diag(ELoc, diag::err_oss_expected_base_var_name) << ERange;
     } else {
       S.Diag(ELoc,
-             AllowArraySection
-                 ? diag::err_oss_expected_var_name_member_expr_or_array_item
+             AllowArrayShaping
+                 ? diag::err_oss_expected_var_name_member_expr_or_array_shaping
                  : diag::err_oss_expected_var_name_member_expr)
           << (S.getCurrentThisType().isNull() ? 0 : 1) << ERange;
     }
@@ -1161,6 +1412,303 @@ bool Sema::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
   return true;
 }
 
+static bool isConstNotMutableType(Sema &SemaRef, QualType Type,
+                                  bool AcceptIfMutable = true,
+                                  bool *IsClassType = nullptr) {
+  ASTContext &Context = SemaRef.getASTContext();
+  Type = Type.getNonReferenceType().getCanonicalType();
+  bool IsConstant = Type.isConstant(Context);
+  Type = Context.getBaseElementType(Type);
+  const CXXRecordDecl *RD = AcceptIfMutable && SemaRef.getLangOpts().CPlusPlus
+                                ? Type->getAsCXXRecordDecl()
+                                : nullptr;
+  if (const auto *CTSD = dyn_cast_or_null<ClassTemplateSpecializationDecl>(RD))
+    if (const ClassTemplateDecl *CTD = CTSD->getSpecializedTemplate())
+      RD = CTD->getTemplatedDecl();
+  if (IsClassType)
+    *IsClassType = RD;
+  return IsConstant && !(SemaRef.getLangOpts().CPlusPlus && RD &&
+                         RD->hasDefinition() && RD->hasMutableFields());
+}
+
+static bool rejectConstNotMutableType(Sema &SemaRef, const ValueDecl *D,
+                                      QualType Type, OmpSsClauseKind CKind,
+                                      SourceLocation ELoc,
+                                      bool AcceptIfMutable = true,
+                                      bool ListItemNotVar = false) {
+  ASTContext &Context = SemaRef.getASTContext();
+  bool IsClassType;
+  if (isConstNotMutableType(SemaRef, Type, AcceptIfMutable, &IsClassType)) {
+    unsigned Diag = ListItemNotVar
+                        ? diag::err_omp_const_list_item
+                        : IsClassType ? diag::err_omp_const_not_mutable_variable
+                                      : diag::err_omp_const_variable;
+    SemaRef.Diag(ELoc, Diag) << getOmpSsClauseName(CKind);
+    if (!ListItemNotVar && D) {
+      const VarDecl *VD = dyn_cast<VarDecl>(D);
+      bool IsDecl = !VD || VD->isThisDeclarationADefinition(Context) ==
+                               VarDecl::DeclarationOnly;
+      SemaRef.Diag(D->getLocation(),
+                   IsDecl ? diag::note_previous_decl : diag::note_defined_here)
+          << D;
+    }
+    return true;
+  }
+  return false;
+}
+
+
+template <typename T, typename U>
+static T filterLookupForUDReductionAndMapper(
+    SmallVectorImpl<U> &Lookups, const llvm::function_ref<T(ValueDecl *)> Gen) {
+  for (U &Set : Lookups) {
+    for (auto *D : Set) {
+      if (T Res = Gen(cast<ValueDecl>(D)))
+        return Res;
+    }
+  }
+  return T();
+}
+
+static NamedDecl *findAcceptableDecl(Sema &SemaRef, NamedDecl *D) {
+  assert(!LookupResult::isVisible(SemaRef, D) && "not in slow case");
+
+  for (auto RD : D->redecls()) {
+    // Don't bother with extra checks if we already know this one isn't visible.
+    if (RD == D)
+      continue;
+
+    auto ND = cast<NamedDecl>(RD);
+    if (LookupResult::isVisible(SemaRef, ND))
+      return ND;
+  }
+
+  return nullptr;
+}
+
+// Perform ADL https://en.cppreference.com/w/cpp/language/adl
+// http://eel.is/c++draft/over.match.oper
+// http://eel.is/c++draft/basic.lookup.argdep
+// but instead of looking for functions look for pragmas
+static void
+argumentDependentLookup(Sema &SemaRef, const DeclarationNameInfo &Id,
+                        SourceLocation Loc, QualType Ty,
+                        SmallVectorImpl<UnresolvedSet<8>> &Lookups) {
+  // Find all of the associated namespaces and classes based on the
+  // arguments we have.
+  Sema::AssociatedNamespaceSet AssociatedNamespaces;
+  Sema::AssociatedClassSet AssociatedClasses;
+  OpaqueValueExpr OVE(Loc, Ty, VK_LValue);
+  SemaRef.FindAssociatedClassesAndNamespaces(Loc, &OVE, AssociatedNamespaces,
+                                             AssociatedClasses);
+
+  // C++ [basic.lookup.argdep]p3:
+  //   Let X be the lookup set produced by unqualified lookup (3.4.1)
+  //   and let Y be the lookup set produced by argument dependent
+  //   lookup (defined as follows). If X contains [...] then Y is
+  //   empty. Otherwise Y is the set of declarations found in the
+  //   namespaces associated with the argument types as described
+  //   below. The set of declarations found by the lookup of the name
+  //   is the union of X and Y.
+  //
+  // Here, we compute Y and add its members to the overloaded
+  // candidate set.
+  for (auto *NS : AssociatedNamespaces) {
+    //   When considering an associated namespace, the lookup is the
+    //   same as the lookup performed when the associated namespace is
+    //   used as a qualifier (3.4.3.2) except that:
+    //
+    //     -- Any using-directives in the associated namespace are
+    //        ignored.
+    //
+    //     -- Any namespace-scope friend functions declared in
+    //        associated classes are visible within their respective
+    //        namespaces even if they are not visible during an ordinary
+    //        lookup (11.4).
+    DeclContext::lookup_result R = NS->lookup(Id.getName());
+    for (auto *D : R) {
+      auto *Underlying = D;
+      if (auto *USD = dyn_cast<UsingShadowDecl>(D))
+        Underlying = USD->getTargetDecl();
+
+      if (!isa<OSSDeclareReductionDecl>(Underlying))
+        continue;
+
+      if (!SemaRef.isVisible(D)) {
+        D = findAcceptableDecl(SemaRef, D);
+        if (!D)
+          continue;
+        if (auto *USD = dyn_cast<UsingShadowDecl>(D))
+          Underlying = USD->getTargetDecl();
+      }
+      Lookups.emplace_back();
+      Lookups.back().addDecl(Underlying);
+    }
+  }
+}
+
+static ExprResult
+buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
+                         Scope *S, CXXScopeSpec &ReductionIdScopeSpec,
+                         const DeclarationNameInfo &ReductionId, QualType Ty,
+                         CXXCastPath &BasePath, Expr *UnresolvedReduction) {
+  if (ReductionIdScopeSpec.isInvalid())
+    return ExprError();
+  SmallVector<UnresolvedSet<8>, 4> Lookups;
+  if (S) {
+    LookupResult Lookup(SemaRef, ReductionId, Sema::LookupOSSReductionName);
+    // NOTE: OpenMP does this but we are not able to trigger an
+    // unexpected diagnostic disabling it
+    // Lookup.suppressDiagnostics();
+
+    // LookupParsedName fails when trying to lookup this code
+    //
+    // template <class T>
+    // class Class1 {
+    //  T a;
+    // public:
+    //   Class1() : a() {}
+    //   #pragma omp declare reduction(fun : T : temp)    // Error
+    // };
+    //
+    //
+    // template <class T>
+    // class Class2 : public Class1<T> {
+    // #pragma omp declare reduction(fun : T : omp_out += omp_in)
+    // };
+    //
+    // int main() {
+    //     int i;
+    //     #pragma omp parallel reduction (::Class2<int>::fun : i) // Error
+    //     {}
+    // }
+    //
+    // When that happens, ReductionIdScopeSpec is unset so we
+    // end up returning ExprEmpty()
+    while (S && SemaRef.LookupParsedName(Lookup, S, &ReductionIdScopeSpec)) {
+      NamedDecl *D = Lookup.getRepresentativeDecl();
+      do {
+        S = S->getParent();
+      } while (S && !S->isDeclScope(D));
+      if (S)
+        S = S->getParent();
+      Lookups.emplace_back();
+      Lookups.back().append(Lookup.begin(), Lookup.end());
+      Lookup.clear();
+    }
+  } else if (auto *ULE =
+                 cast_or_null<UnresolvedLookupExpr>(UnresolvedReduction)) {
+    Lookups.push_back(UnresolvedSet<8>());
+    Decl *PrevD = nullptr;
+    for (NamedDecl *D : ULE->decls()) {
+      // 1.
+      if (D == PrevD)
+        Lookups.push_back(UnresolvedSet<8>());
+      else if (auto *DRD = dyn_cast<OSSDeclareReductionDecl>(D))
+        Lookups.back().addDecl(DRD);
+      PrevD = D;
+    }
+  }
+  if (SemaRef.CurContext->isDependentContext() || Ty->isDependentType() ||
+      Ty->isInstantiationDependentType() ||
+      Ty->containsUnexpandedParameterPack() ||
+      filterLookupForUDReductionAndMapper<bool>(Lookups, [](ValueDecl *D) {
+        return !D->isInvalidDecl() &&
+               (D->getType()->isDependentType() ||
+                D->getType()->isInstantiationDependentType() ||
+                D->getType()->containsUnexpandedParameterPack());
+      })) {
+    UnresolvedSet<8> ResSet;
+    for (const UnresolvedSet<8> &Set : Lookups) {
+      if (Set.empty())
+        continue;
+      ResSet.append(Set.begin(), Set.end());
+      // The last item marks the end of all declarations at the specified scope.
+      // This is used becase here we're merging Sets, and we want to separate them      // in instantiation
+      // See 1.
+      ResSet.addDecl(Set[Set.size() - 1]);
+    }
+    return UnresolvedLookupExpr::Create(
+        SemaRef.Context, /*NamingClass=*/nullptr,
+        ReductionIdScopeSpec.getWithLocInContext(SemaRef.Context), ReductionId,
+        /*ADL=*/true, /*Overloaded=*/true, ResSet.begin(), ResSet.end());
+  }
+  // Lookup inside the classes.
+  // C++ [over.match.oper]p3:
+  //   For a unary operator @ with an operand of a type whose
+  //   cv-unqualified version is T1, and for a binary operator @ with
+  //   a left operand of a type whose cv-unqualified version is T1 and
+  //   a right operand of a type whose cv-unqualified version is T2,
+  //   three sets of candidate functions, designated member
+  //   candidates, non-member candidates and built-in candidates, are
+  //   constructed as follows:
+  //     -- If T1 is a complete class type or a class currently being
+  //        defined, the set of member candidates is the result of the
+  //        qualified lookup of T1::operator@ (13.3.1.1.1); otherwise,
+  //        the set of member candidates is empty.
+  LookupResult Lookup(SemaRef, ReductionId, Sema::LookupOSSReductionName);
+  // NOTE: OpenMP does this but we are not able to trigger an
+  // unexpected diagnostic disabling it
+  // Lookup.suppressDiagnostics();
+  if (const auto *TyRec = Ty->getAs<RecordType>()) {
+    // Complete the type if it can be completed.
+    // If the type is neither complete nor being defined, bail out now.
+    if (SemaRef.isCompleteType(Loc, Ty) || TyRec->isBeingDefined() ||
+        TyRec->getDecl()->getDefinition()) {
+      Lookup.clear();
+      SemaRef.LookupQualifiedName(Lookup, TyRec->getDecl());
+      if (Lookup.empty()) {
+        Lookups.emplace_back();
+        Lookups.back().append(Lookup.begin(), Lookup.end());
+      }
+    }
+  }
+  // Perform ADL.
+  if (SemaRef.getLangOpts().CPlusPlus)
+    argumentDependentLookup(SemaRef, ReductionId, Loc, Ty, Lookups);
+  if (auto *VD = filterLookupForUDReductionAndMapper<ValueDecl *>(
+          Lookups, [&SemaRef, Ty](ValueDecl *D) -> ValueDecl * {
+            if (!D->isInvalidDecl() &&
+                SemaRef.Context.hasSameType(D->getType(), Ty))
+              return D;
+            return nullptr;
+          }))
+    return SemaRef.BuildDeclRefExpr(VD, VD->getType().getNonReferenceType(),
+                                    VK_LValue, Loc);
+  // If the type is a derived class, then any reduction-identifier that matches its base classes is also a
+  // match, if there is no specific match for the type.
+  if (SemaRef.getLangOpts().CPlusPlus) {
+    if (auto *VD = filterLookupForUDReductionAndMapper<ValueDecl *>(
+            Lookups, [&SemaRef, Ty, Loc](ValueDecl *D) -> ValueDecl * {
+              if (!D->isInvalidDecl() &&
+                  SemaRef.IsDerivedFrom(Loc, Ty, D->getType()) &&
+                  !Ty.isMoreQualifiedThan(D->getType()))
+                return D;
+              return nullptr;
+            })) {
+      CXXBasePaths Paths(/*FindAmbiguities=*/true, /*RecordPaths=*/true,
+                         /*DetectVirtual=*/false);
+      if (SemaRef.IsDerivedFrom(Loc, Ty, VD->getType(), Paths)) {
+        if (!Paths.isAmbiguous(SemaRef.Context.getCanonicalType(
+                VD->getType().getUnqualifiedType()))) {
+          if (SemaRef.CheckBaseClassAccess(
+                  Loc, VD->getType(), Ty, Paths.front(),
+                  /*DiagID=*/0) != Sema::AR_inaccessible) {
+            SemaRef.BuildBasePathArray(Paths, BasePath);
+            return SemaRef.BuildDeclRefExpr(
+                VD, VD->getType().getNonReferenceType(), VK_LValue, Loc);
+          }
+        }
+      }
+    }
+  }
+  if (ReductionIdScopeSpec.isSet()) {
+    SemaRef.Diag(Loc, diag::err_oss_not_resolved_reduction_identifier) << Ty << Range;
+    return ExprError();
+  }
+  return ExprEmpty();
+}
+
 namespace {
 /// Data for the reduction-based clauses.
 struct ReductionData {
@@ -1168,71 +1716,59 @@ struct ReductionData {
   SmallVector<Expr *, 8> SimpleVars;
   /// List of original reduction items.
   SmallVector<Expr *, 8> Vars;
-  /// List of private copies of the reduction items.
-  SmallVector<Expr *, 8> Privates;
   /// LHS expressions for the reduction_op expressions.
   SmallVector<Expr *, 8> LHSs;
   /// RHS expressions for the reduction_op expressions.
   SmallVector<Expr *, 8> RHSs;
   /// Reduction operation expression.
   SmallVector<Expr *, 8> ReductionOps;
-  /// Taskgroup descriptors for the corresponding reduction items in
-  /// in_reduction clauses.
-  SmallVector<Expr *, 8> TaskgroupDescriptors;
-  /// List of captures for clause.
-  SmallVector<Decl *, 4> ExprCaptures;
-  /// List of postupdate expressions.
-  SmallVector<Expr *, 4> ExprPostUpdates;
+  /// Reduction operation kind. BO_Comma stands for UDR
+  SmallVector<BinaryOperatorKind, 8> ReductionKinds;
   ReductionData() = delete;
   /// Reserves required memory for the reduction data.
   ReductionData(unsigned Size) {
     SimpleVars.reserve(Size);
     Vars.reserve(Size);
-    Privates.reserve(Size);
     LHSs.reserve(Size);
     RHSs.reserve(Size);
     ReductionOps.reserve(Size);
-    TaskgroupDescriptors.reserve(Size);
-    ExprCaptures.reserve(Size);
-    ExprPostUpdates.reserve(Size);
+    ReductionKinds.reserve(Size);
   }
   /// Stores reduction item and reduction operation only (required for dependent
   /// reduction item).
   void push(Expr *Item, Expr *ReductionOp) {
     SimpleVars.emplace_back(nullptr);
     Vars.emplace_back(Item);
-    Privates.emplace_back(nullptr);
     LHSs.emplace_back(nullptr);
     RHSs.emplace_back(nullptr);
     ReductionOps.emplace_back(ReductionOp);
-    TaskgroupDescriptors.emplace_back(nullptr);
+    ReductionKinds.emplace_back(BO_Comma);
   }
   /// Stores reduction data.
-  void push(Expr *SimpleVar, Expr *Item, Expr *Private, Expr *LHS, Expr *RHS, Expr *ReductionOp,
-            Expr *TaskgroupDescriptor) {
+  void push(Expr *SimpleVar, Expr *Item, Expr *LHS, Expr *RHS, Expr *ReductionOp,
+            BinaryOperatorKind BOK) {
     SimpleVars.emplace_back(SimpleVar);
     Vars.emplace_back(Item);
-    Privates.emplace_back(Private);
     LHSs.emplace_back(LHS);
     RHSs.emplace_back(RHS);
     ReductionOps.emplace_back(ReductionOp);
-    TaskgroupDescriptors.emplace_back(TaskgroupDescriptor);
+    ReductionKinds.emplace_back(BOK);
   }
 };
 } // namespace
 
 static bool actOnOSSReductionKindClause(
-    Sema &S, OmpSsClauseKind ClauseKind,
+    Sema &S, DSAStackTy *Stack, OmpSsClauseKind ClauseKind,
     ArrayRef<Expr *> VarList, SourceLocation StartLoc, SourceLocation LParenLoc,
     SourceLocation ColonLoc, SourceLocation EndLoc,
     CXXScopeSpec &ReductionIdScopeSpec, const DeclarationNameInfo &ReductionId,
-    ReductionData &RD) {
+    ArrayRef<Expr *> UnresolvedReductions, ReductionData &RD) {
   DeclarationName DN = ReductionId.getName();
   OverloadedOperatorKind OOK = DN.getCXXOverloadedOperator();
   BinaryOperatorKind BOK = BO_Comma;
 
   ASTContext &Context = S.Context;
-  // OmpSs-2 [2.14.3.6, reduction clause]
+  // OpenMP [2.14.3.6, reduction clause]
   // C
   // reduction-identifier is either an identifier or one of the following
   // operators: +, -, *,  &, |, ^, && and ||
@@ -1317,68 +1853,130 @@ static bool actOnOSSReductionKindClause(
     ReductionIdRange.setBegin(ReductionId.getBeginLoc());
   ReductionIdRange.setEnd(ReductionId.getEndLoc());
 
+  auto IR = UnresolvedReductions.begin(), ER = UnresolvedReductions.end();
+  bool FirstIter = true;
   for (Expr *RefExpr : VarList) {
     assert(RefExpr && "nullptr expr in OmpSs reduction clause.");
-    // OmpSs [2.1, C/C++]
+    // OpenMP [2.1, C/C++]
     //  A list item is a variable or array section, subject to the restrictions
     //  specified in Section 2.4 on page 42 and in each of the sections
     // describing clauses and directives for which a list appears.
-    // OmpSs  [2.14.3.3, Restrictions, p.1]
+    // OpenMP  [2.14.3.3, Restrictions, p.1]
     //  A variable that is part of another variable (as an array or
     //  structure element) cannot appear in a private clause.
+    if (!FirstIter && IR != ER)
+      ++IR;
+    FirstIter = false;
     SourceLocation ELoc;
     SourceRange ERange;
     Expr *SimpleRefExpr = RefExpr;
     auto Res = getPrivateItem(S, SimpleRefExpr, ELoc, ERange,
-                              /*AllowArraySection=*/false);
+                              /*AllowArrayShaping=*/true);
     if (Res.second) {
-      // It will be analyzed later.
+      // Try to find 'declare reduction' corresponding construct before using
+      // builtin/overloaded operators.
+      QualType Type = Context.DependentTy;
+      CXXCastPath BasePath;
+      ExprResult DeclareReductionRef = buildDeclareReductionRef(
+          S, ELoc, ERange, Stack->getCurScope(), ReductionIdScopeSpec,
+          ReductionId, Type, BasePath, IR == ER ? nullptr : *IR);
       Expr *ReductionOp = nullptr;
+      if (S.CurContext->isDependentContext() &&
+          (DeclareReductionRef.isUnset() ||
+           isa<UnresolvedLookupExpr>(DeclareReductionRef.get())))
+        ReductionOp = DeclareReductionRef.get();
+      // It will be analyzed later.
       RD.push(RefExpr, ReductionOp);
     }
     ValueDecl *D = Res.first;
     if (!D)
       continue;
 
-    // Non-POD are not allowed in reductions
-    if (!D->getType().isPODType(S.Context)) {
-      S.Diag(ELoc, diag::err_oss_non_pod_reduction);
-      continue;
-    }
-
-    QualType Type;
-    auto *ASE = dyn_cast<ArraySubscriptExpr>(RefExpr->IgnoreParens());
-    auto *OASE = dyn_cast<OSSArraySectionExpr>(RefExpr->IgnoreParens());
-    if (ASE) {
-      // TODO: For now we're not going to handle this because of AllowArraySection=false
-      Type = ASE->getType().getNonReferenceType();
-    } else if (OASE) {
-      // TODO: For now we're not going to handle this because of AllowArraySection=false
-      QualType BaseType =
-          OSSArraySectionExpr::getBaseOriginalType(OASE->getBase());
-      // Get the type of the base so we can handle the pointer case
-      if (const auto *ATy = BaseType->getAsArrayTypeUnsafe())
-        Type = ATy->getElementType();
-      else
-        Type = BaseType->getPointeeType();
-      Type = Type.getNonReferenceType();
-    } else {
-      Type = Context.getBaseElementType(D->getType().getNonReferenceType());
-    }
+    // QualType Type = D->getType().getNonReferenceType();
+    QualType Type = Context.getBaseElementType(RefExpr->getType().getNonReferenceType());
     auto *VD = dyn_cast<VarDecl>(D);
 
-    // OmpSs [2.9.3.3, Restrictions, C/C++, p.3]
+    // OpenMP [2.9.3.3, Restrictions, C/C++, p.3]
     //  A variable that appears in a private clause must not have an incomplete
     //  type or a reference type.
     if (S.RequireCompleteType(ELoc, D->getType(),
                               diag::err_oss_incomplete_type))
       continue;
-    // OmpSs [2.14.3.6, reduction clause, Restrictions]
+    // OpenMP [2.14.3.6, reduction clause, Restrictions]
     // A list item that appears in a reduction clause must not be
     // const-qualified.
-    // if (rejectConstNotMutableType(S, D, Type, ClauseKind, ELoc,
-    //                               /*AcceptIfMutable*/ false, ASE || OASE))
-    //   continue;
+    if (rejectConstNotMutableType(S, D, Type, ClauseKind, ELoc,
+                                  /*AcceptIfMutable*/ false, /*ListItemNotVar=ASE || OASE*/ false))
+      continue;
+
+    // Non-POD and refs to Non-POD are not allowed in reductions
+    if (!Type.isPODType(S.Context)) {
+      S.Diag(ELoc, diag::err_oss_non_pod_reduction);
+      continue;
+    }
+
+    // Try to find 'declare reduction' corresponding construct before using
+    // builtin/overloaded operators.
+    CXXCastPath BasePath;
+    ExprResult DeclareReductionRef = buildDeclareReductionRef(
+        S, ELoc, ERange, Stack->getCurScope(), ReductionIdScopeSpec,
+        ReductionId, Type, BasePath, IR == ER ? nullptr : *IR);
+    // DeclareReductionRef.isInvalid() -> There was an error
+    // DeclareReductionRef.isUnset()   -> No declare reduction found
+    // DeclareReductionRef.isUsable()  -> declare reduction found
+    if (DeclareReductionRef.isInvalid())
+      continue;
+    if (S.CurContext->isDependentContext() &&
+        (DeclareReductionRef.isUnset() ||
+         isa<UnresolvedLookupExpr>(DeclareReductionRef.get()))) {
+      RD.push(RefExpr, DeclareReductionRef.get());
+      continue;
+    }
+    if (BOK == BO_Comma && DeclareReductionRef.isUnset()) {
+      // Not allowed reduction identifier is found.
+      S.Diag(ReductionId.getBeginLoc(),
+             diag::err_oss_unknown_reduction_identifier)
+          << Type << ReductionIdRange;
+      continue;
+    }
+
+    // OpenMP [2.14.3.6, reduction clause, Restrictions]
+    // The type of a list item that appears in a reduction clause must be valid
+    // for the reduction-identifier. For a max or min reduction in C, the type
+    // of the list item must be an allowed arithmetic data type: char, int,
+    // float, double, or _Bool, possibly modified with long, short, signed, or
+    // unsigned. For a max or min reduction in C++, the type of the list item
+    // must be an allowed arithmetic data type: char, wchar_t, int, float,
+    // double, or bool, possibly modified with long, short, signed, or unsigned.
+    if (DeclareReductionRef.isUnset()) {
+      if ((BOK == BO_GT || BOK == BO_LT) &&
+          !(Type->isScalarType() ||
+            (S.getLangOpts().CPlusPlus && Type->isArithmeticType()))) {
+        S.Diag(ELoc, diag::err_oss_clause_not_arithmetic_type_arg)
+            << getOmpSsClauseName(ClauseKind) << S.getLangOpts().CPlusPlus;
+        // if (!ASE && !OASE) {
+        //   bool IsDecl = !VD || VD->isThisDeclarationADefinition(Context) ==
+        //                            VarDecl::DeclarationOnly;
+        //   S.Diag(D->getLocation(),
+        //          IsDecl ? diag::note_previous_decl : diag::note_defined_here)
+        //       << D;
+        // }
+        continue;
+      }
+      if ((BOK == BO_OrAssign || BOK == BO_AndAssign || BOK == BO_XorAssign) &&
+          !S.getLangOpts().CPlusPlus && Type->isFloatingType()) {
+        S.Diag(ELoc, diag::err_oss_clause_floating_type_arg)
+            << getOmpSsClauseName(ClauseKind);
+        // if (!ASE && !OASE) {
+        //   bool IsDecl = !VD || VD->isThisDeclarationADefinition(Context) ==
+        //                            VarDecl::DeclarationOnly;
+        //   S.Diag(D->getLocation(),
+        //          IsDecl ? diag::note_previous_decl : diag::note_defined_here)
+        //       << D;
+        // }
+        continue;
+      }
+    }
 
     Type = Type.getNonLValueExprType(Context).getUnqualifiedType();
     VarDecl *LHSVD = buildVarDecl(S, ELoc, Type, ".reduction.lhs",
@@ -1386,125 +1984,128 @@ static bool actOnOSSReductionKindClause(
     VarDecl *RHSVD = buildVarDecl(S, ELoc, Type, D->getName(),
                                   D->hasAttrs() ? &D->getAttrs() : nullptr);
 
-    // Private copy.
-    VarDecl *PrivateVD =
-        buildVarDecl(S, ELoc, Type, D->getName(),
-                     D->hasAttrs() ? &D->getAttrs() : nullptr);
-        // buildVarDecl(S, ELoc, PrivateTy, D->getName(),
-        //              D->hasAttrs() ? &D->getAttrs() : nullptr,
-        //              VD ? cast<DeclRefExpr>(SimpleRefExpr) : nullptr);
-
     // Add initializer for private variable.
     Expr *Init = nullptr;
     DeclRefExpr *LHSDRE = buildDeclRefExpr(S, LHSVD, Type, ELoc);
     DeclRefExpr *RHSDRE = buildDeclRefExpr(S, RHSVD, Type, ELoc);
-    switch (BOK) {
-    case BO_Add:
-    case BO_Xor:
-    case BO_Or:
-    case BO_LOr:
-      // '+', '-', '^', '|', '||' reduction ops - initializer is '0'.
-      if (Type->isScalarType() || Type->isAnyComplexType())
-        Init = S.ActOnIntegerConstant(ELoc, /*Val=*/0).get();
-      break;
-    case BO_Mul:
-    case BO_LAnd:
-      if (Type->isScalarType() || Type->isAnyComplexType()) {
-        // '*' and '&&' reduction ops - initializer is '1'.
-        Init = S.ActOnIntegerConstant(ELoc, /*Val=*/1).get();
+    if (DeclareReductionRef.isUsable()) {
+      auto *DRDRef = DeclareReductionRef.getAs<DeclRefExpr>();
+      auto *DRD = cast<OSSDeclareReductionDecl>(DRDRef->getDecl());
+      if (DRD->getInitializer()) {
+        Init = DRDRef;
+        RHSVD->setInit(DRDRef);
+        RHSVD->setInitStyle(VarDecl::CallInit);
       }
-      break;
-    case BO_And: {
-      // '&' reduction op - initializer is '~0'.
-      QualType OrigType = Type;
-      if (auto *ComplexTy = OrigType->getAs<ComplexType>())
-        Type = ComplexTy->getElementType();
-      if (Type->isRealFloatingType()) {
-        llvm::APFloat InitValue =
-            llvm::APFloat::getAllOnesValue(Context.getTypeSize(Type),
-                                           /*isIEEE=*/true);
-        Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
-                                       Type, ELoc);
-      } else if (Type->isScalarType()) {
-        uint64_t Size = Context.getTypeSize(Type);
-        QualType IntTy = Context.getIntTypeForBitwidth(Size, /*Signed=*/0);
-        llvm::APInt InitValue = llvm::APInt::getAllOnesValue(Size);
-        Init = IntegerLiteral::Create(Context, InitValue, IntTy, ELoc);
-      }
-      if (Init && OrigType->isAnyComplexType()) {
-        // Init = 0xFFFF + 0xFFFFi;
-        auto *Im = new (Context) ImaginaryLiteral(Init, OrigType);
-        Init = S.CreateBuiltinBinOp(ELoc, BO_Add, Init, Im).get();
-      }
-      Type = OrigType;
-      break;
-    }
-    case BO_LT:
-    case BO_GT: {
-      // 'min' reduction op - initializer is 'Largest representable number in
-      // the reduction list item type'.
-      // 'max' reduction op - initializer is 'Least representable number in
-      // the reduction list item type'.
-      if (Type->isIntegerType() || Type->isPointerType()) {
-        bool IsSigned = Type->hasSignedIntegerRepresentation();
-        uint64_t Size = Context.getTypeSize(Type);
-        QualType IntTy =
-            Context.getIntTypeForBitwidth(Size, /*Signed=*/IsSigned);
-        llvm::APInt InitValue =
-            (BOK != BO_LT) ? IsSigned ? llvm::APInt::getSignedMinValue(Size)
-                                      : llvm::APInt::getMinValue(Size)
-                           : IsSigned ? llvm::APInt::getSignedMaxValue(Size)
-                                      : llvm::APInt::getMaxValue(Size);
-        Init = IntegerLiteral::Create(Context, InitValue, IntTy, ELoc);
-        if (Type->isPointerType()) {
-          // Cast to pointer type.
-          ExprResult CastExpr = S.BuildCStyleCastExpr(
-              ELoc, Context.getTrivialTypeSourceInfo(Type, ELoc), ELoc, Init);
-          if (CastExpr.isInvalid())
-            continue;
-          Init = CastExpr.get();
+    } else {
+      switch (BOK) {
+      case BO_Add:
+      case BO_Xor:
+      case BO_Or:
+      case BO_LOr:
+        // '+', '-', '^', '|', '||' reduction ops - initializer is '0'.
+        if (Type->isScalarType() || Type->isAnyComplexType())
+          Init = S.ActOnIntegerConstant(ELoc, /*Val=*/0).get();
+        break;
+      case BO_Mul:
+      case BO_LAnd:
+        if (Type->isScalarType() || Type->isAnyComplexType()) {
+          // '*' and '&&' reduction ops - initializer is '1'.
+          Init = S.ActOnIntegerConstant(ELoc, /*Val=*/1).get();
         }
-      } else if (Type->isRealFloatingType()) {
-        llvm::APFloat InitValue = llvm::APFloat::getLargest(
-            Context.getFloatTypeSemantics(Type), BOK != BO_LT);
-        Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
-                                       Type, ELoc);
+        break;
+      case BO_And: {
+        // '&' reduction op - initializer is '~0'.
+        QualType OrigType = Type;
+        if (auto *ComplexTy = OrigType->getAs<ComplexType>())
+          Type = ComplexTy->getElementType();
+        if (Type->isRealFloatingType()) {
+          llvm::APFloat InitValue =
+              llvm::APFloat::getAllOnesValue(Context.getTypeSize(Type),
+                                             /*isIEEE=*/true);
+          Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
+                                         Type, ELoc);
+        } else if (Type->isScalarType()) {
+          uint64_t Size = Context.getTypeSize(Type);
+          QualType IntTy = Context.getIntTypeForBitwidth(Size, /*Signed=*/0);
+          llvm::APInt InitValue = llvm::APInt::getAllOnesValue(Size);
+          Init = IntegerLiteral::Create(Context, InitValue, IntTy, ELoc);
+        }
+        if (Init && OrigType->isAnyComplexType()) {
+          // Init = 0xFFFF + 0xFFFFi;
+          auto *Im = new (Context) ImaginaryLiteral(Init, OrigType);
+          Init = S.CreateBuiltinBinOp(ELoc, BO_Add, Init, Im).get();
+        }
+        Type = OrigType;
+        break;
       }
-      break;
+      case BO_LT:
+      case BO_GT: {
+        // 'min' reduction op - initializer is 'Largest representable number in
+        // the reduction list item type'.
+        // 'max' reduction op - initializer is 'Least representable number in
+        // the reduction list item type'.
+        if (Type->isIntegerType() || Type->isPointerType()) {
+          bool IsSigned = Type->hasSignedIntegerRepresentation();
+          uint64_t Size = Context.getTypeSize(Type);
+          QualType IntTy =
+              Context.getIntTypeForBitwidth(Size, /*Signed=*/IsSigned);
+          llvm::APInt InitValue =
+              (BOK != BO_LT) ? IsSigned ? llvm::APInt::getSignedMinValue(Size)
+                                        : llvm::APInt::getMinValue(Size)
+                             : IsSigned ? llvm::APInt::getSignedMaxValue(Size)
+                                        : llvm::APInt::getMaxValue(Size);
+          Init = IntegerLiteral::Create(Context, InitValue, IntTy, ELoc);
+          if (Type->isPointerType()) {
+            // Cast to pointer type.
+            ExprResult CastExpr = S.BuildCStyleCastExpr(
+                ELoc, Context.getTrivialTypeSourceInfo(Type, ELoc), ELoc, Init);
+            if (CastExpr.isInvalid())
+              continue;
+            Init = CastExpr.get();
+          }
+        } else if (Type->isRealFloatingType()) {
+          llvm::APFloat InitValue = llvm::APFloat::getLargest(
+              Context.getFloatTypeSemantics(Type), BOK != BO_LT);
+          Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
+                                         Type, ELoc);
+        }
+        break;
+      }
+      case BO_PtrMemD:
+      case BO_PtrMemI:
+      case BO_MulAssign:
+      case BO_Div:
+      case BO_Rem:
+      case BO_Sub:
+      case BO_Shl:
+      case BO_Shr:
+      case BO_LE:
+      case BO_GE:
+      case BO_EQ:
+      case BO_NE:
+      case BO_Cmp:
+      case BO_AndAssign:
+      case BO_XorAssign:
+      case BO_OrAssign:
+      case BO_Assign:
+      case BO_AddAssign:
+      case BO_SubAssign:
+      case BO_DivAssign:
+      case BO_RemAssign:
+      case BO_ShlAssign:
+      case BO_ShrAssign:
+      case BO_Comma:
+        llvm_unreachable("Unexpected reduction operation");
+      }
     }
-    case BO_PtrMemD:
-    case BO_PtrMemI:
-    case BO_MulAssign:
-    case BO_Div:
-    case BO_Rem:
-    case BO_Sub:
-    case BO_Shl:
-    case BO_Shr:
-    case BO_LE:
-    case BO_GE:
-    case BO_EQ:
-    case BO_NE:
-    case BO_Cmp:
-    case BO_AndAssign:
-    case BO_XorAssign:
-    case BO_OrAssign:
-    case BO_Assign:
-    case BO_AddAssign:
-    case BO_SubAssign:
-    case BO_DivAssign:
-    case BO_RemAssign:
-    case BO_ShlAssign:
-    case BO_ShrAssign:
-    case BO_Comma:
-      llvm_unreachable("Unexpected reduction operation");
-    }
-    if (Init)
+    if (Init && DeclareReductionRef.isUnset())
       S.AddInitializerToDecl(RHSVD, Init, /*DirectInit=*/false);
-    else
+    else if (!Init)
       S.ActOnUninitializedDecl(RHSVD);
     if (RHSVD->isInvalidDecl())
       continue;
-    if (!RHSVD->hasInit()) {
+    if (!RHSVD->hasInit() &&
+        (DeclareReductionRef.isUnset() || !S.LangOpts.CPlusPlus)) {
       // C structs do not have initializer
       S.Diag(ELoc, diag::err_oss_reduction_id_not_compatible)
           << Type << ReductionIdRange;
@@ -1515,36 +2116,34 @@ static bool actOnOSSReductionKindClause(
           << D;
       continue;
     }
-    // Store initializer for single element in private copy. Will be used during
-    // codegen.
-    PrivateVD->setInit(RHSVD->getInit());
-    PrivateVD->setInitStyle(RHSVD->getInitStyle());
-    DeclRefExpr *PrivateDRE = buildDeclRefExpr(S, PrivateVD, Type, ELoc);
     ExprResult ReductionOp;
-    ReductionOp = S.BuildBinOp(
-        nullptr /*Stack->getCurScope()*/, ReductionId.getBeginLoc(), BOK, LHSDRE, RHSDRE);
-    if (ReductionOp.isUsable()) {
-      if (BOK != BO_LT && BOK != BO_GT) {
-        ReductionOp =
-            S.BuildBinOp(nullptr /*Stack->getCurScope()*/, ReductionId.getBeginLoc(),
-                         BO_Assign, LHSDRE, ReductionOp.get());
-      } else {
-        auto *ConditionalOp = new (Context)
-            ConditionalOperator(ReductionOp.get(), ELoc, LHSDRE, ELoc, RHSDRE,
-                                Type, VK_LValue, OK_Ordinary);
-        ReductionOp =
-            S.BuildBinOp(nullptr /*Stack->getCurScope()*/, ReductionId.getBeginLoc(),
-                         BO_Assign, LHSDRE, ConditionalOp);
+    if (DeclareReductionRef.isUsable()) {
+      ReductionOp = DeclareReductionRef;
+    } else {
+      ReductionOp = S.BuildBinOp(
+          Stack->getCurScope(), ReductionId.getBeginLoc(), BOK, LHSDRE, RHSDRE);
+      if (ReductionOp.isUsable()) {
+        if (BOK != BO_LT && BOK != BO_GT) {
+          ReductionOp =
+              S.BuildBinOp(Stack->getCurScope(), ReductionId.getBeginLoc(),
+                           BO_Assign, LHSDRE, ReductionOp.get());
+        } else {
+          auto *ConditionalOp = new (Context)
+              ConditionalOperator(ReductionOp.get(), ELoc, LHSDRE, ELoc, RHSDRE,
+                                  Type, VK_LValue, OK_Ordinary);
+          ReductionOp =
+              S.BuildBinOp(Stack->getCurScope(), ReductionId.getBeginLoc(),
+                           BO_Assign, LHSDRE, ConditionalOp);
+        }
+        if (ReductionOp.isUsable())
+          ReductionOp = S.ActOnFinishFullExpr(ReductionOp.get(),
+                                              /*DiscardedValue*/ false);
       }
-      if (ReductionOp.isUsable())
-        ReductionOp = S.ActOnFinishFullExpr(ReductionOp.get(),
-                                            /*DiscardedValue*/ false);
+      if (!ReductionOp.isUsable())
+        continue;
     }
-    if (!ReductionOp.isUsable())
-      continue;
 
-    RD.push(SimpleRefExpr, RefExpr->IgnoreParens(), PrivateDRE, LHSDRE, RHSDRE, ReductionOp.get(),
-            /*TaskgroupDescriptor=*/nullptr);
+    RD.push(SimpleRefExpr, RefExpr, LHSDRE, RHSDRE, ReductionOp.get(), BOK);
   }
   return RD.Vars.empty();
 }
@@ -1555,18 +2154,18 @@ Sema::ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
                        SourceLocation ColonLoc,
                        SourceLocation EndLoc,
                        CXXScopeSpec &ReductionIdScopeSpec,
-                       const DeclarationNameInfo &ReductionId) {
+                       const DeclarationNameInfo &ReductionId,
+                       ArrayRef<Expr *> UnresolvedReductions) {
   ReductionData RD(VarList.size());
-  if (actOnOSSReductionKindClause(*this, OSSC_reduction, VarList,
+  if (actOnOSSReductionKindClause(*this, DSAStack, OSSC_reduction, VarList,
                                   StartLoc, LParenLoc, ColonLoc, EndLoc,
-                                  ReductionIdScopeSpec, ReductionId, RD))
+                                  ReductionIdScopeSpec, ReductionId,
+                                  UnresolvedReductions, RD))
     return nullptr;
   return OSSReductionClause::Create(
       Context, StartLoc, LParenLoc, ColonLoc, EndLoc, RD.Vars,
       ReductionIdScopeSpec.getWithLocInContext(Context), ReductionId,
-      RD.SimpleVars, RD.Privates, RD.LHSs, RD.RHSs, RD.ReductionOps,
-      /*buildPreInits(Context, RD.ExprCaptures)*/nullptr,
-      /*buildPostUpdate(*this, RD.ExprPostUpdates)*/nullptr);
+      RD.SimpleVars, RD.LHSs, RD.RHSs, RD.ReductionOps, RD.ReductionKinds);
 }
 
 OSSClause *

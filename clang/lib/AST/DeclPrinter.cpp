@@ -105,6 +105,7 @@ namespace {
     void VisitOMPDeclareReductionDecl(OMPDeclareReductionDecl *D);
     void VisitOMPDeclareMapperDecl(OMPDeclareMapperDecl *D);
     void VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D);
+    void VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D);
 
     void printTemplateParameters(const TemplateParameterList *Params,
                                  bool OmitTemplateKW = false);
@@ -440,7 +441,8 @@ void DeclPrinter::VisitDeclContext(DeclContext *DC, bool Indent) {
     const char *Terminator = nullptr;
     if (isa<OMPThreadPrivateDecl>(*D) || isa<OMPDeclareReductionDecl>(*D) ||
         isa<OMPDeclareMapperDecl>(*D) || isa<OMPRequiresDecl>(*D) ||
-        isa<OMPAllocateDecl>(*D))
+        isa<OMPAllocateDecl>(*D) ||
+        isa<OSSDeclareReductionDecl>(*D))
       Terminator = nullptr;
     else if (isa<ObjCMethodDecl>(*D) && cast<ObjCMethodDecl>(*D)->hasBody())
       Terminator = nullptr;
@@ -1706,5 +1708,42 @@ void DeclPrinter::VisitOMPDeclareMapperDecl(OMPDeclareMapperDecl *D) {
 
 void DeclPrinter::VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D) {
   D->getInit()->printPretty(Out, nullptr, Policy, Indentation);
+}
+
+void DeclPrinter::VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D) {
+  if (!D->isInvalidDecl()) {
+    Out << "#pragma oss declare reduction (";
+    if (D->getDeclName().getNameKind() == DeclarationName::CXXOperatorName) {
+      const char *OpName =
+          getOperatorSpelling(D->getDeclName().getCXXOverloadedOperator());
+      assert(OpName && "not an overloaded operator");
+      Out << OpName;
+    } else {
+      assert(D->getDeclName().isIdentifier());
+      D->printName(Out);
+    }
+    Out << " : ";
+    D->getType().print(Out, Policy);
+    Out << " : ";
+    D->getCombiner()->printPretty(Out, nullptr, Policy, 0);
+    Out << ")";
+    if (auto *Init = D->getInitializer()) {
+      Out << " initializer(";
+      switch (D->getInitializerKind()) {
+      case OSSDeclareReductionDecl::DirectInit:
+        Out << "omp_priv(";
+        break;
+      case OSSDeclareReductionDecl::CopyInit:
+        Out << "omp_priv = ";
+        break;
+      case OSSDeclareReductionDecl::CallInit:
+        break;
+      }
+      Init->printPretty(Out, nullptr, Policy, 0);
+      if (D->getInitializerKind() == OSSDeclareReductionDecl::DirectInit)
+        Out << ")";
+      Out << ")";
+    }
+  }
 }
 

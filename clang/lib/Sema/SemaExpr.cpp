@@ -311,6 +311,19 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
     return true;
   }
 
+  // [OmpSs 4.0], 2.15 declare reduction Directive, Restrictions
+  // Only the variables omp_in and omp_out are allowed in the combiner.
+  // Only the variables omp_priv and omp_orig are allowed in the
+  // initializer-clause.
+  auto *DRDOSS = dyn_cast<OSSDeclareReductionDecl>(CurContext);
+  if (LangOpts.OmpSs && DRDOSS && !CurContext->containsDecl(D) &&
+      isa<VarDecl>(D)) {
+    Diag(Loc, diag::err_omp_wrong_var_in_declare_reduction)
+        << getCurFunction()->HasOSSDeclareReductionCombiner;
+    Diag(D->getLocation(), diag::note_entity_declared_at) << D;
+    return true;
+  }
+
   // [OpenMP 5.0], 2.19.7.3. declare mapper Directive, Restrictions
   //  List-items in map clauses on this construct may only refer to the declared
   //  variable var and entities that could be referenced by a procedure defined
@@ -3000,6 +3013,7 @@ ExprResult Sema::BuildDeclarationNameExpr(
     case Decl::UnresolvedUsingValue:
     case Decl::OMPDeclareReduction:
     case Decl::OMPDeclareMapper:
+    case Decl::OSSDeclareReduction:
       valueKind = VK_RValue;
       break;
 

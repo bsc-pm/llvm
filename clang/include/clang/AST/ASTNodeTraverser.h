@@ -47,6 +47,7 @@ struct {
   void Visit(const Decl *D);
   void Visit(const CXXCtorInitializer *Init);
   void Visit(const OMPClause *C);
+  void Visit(const OSSClause *C);
   void Visit(const BlockDecl::Capture &C);
   void Visit(const GenericSelectionExpr::ConstAssociation &A);
 };
@@ -431,6 +432,13 @@ public:
       Visit(E);
     for (const auto *C : D->clauselists())
       Visit(C);
+  }
+
+  // OmpSs
+  void VisitOSSDeclareReductionDecl(const OSSDeclareReductionDecl *D) {
+    Visit(D->getCombiner());
+    if (const auto *Initializer = D->getInitializer())
+      Visit(Initializer);
   }
 
   template <typename SpecializationDecl>

@@ -1470,8 +1470,12 @@ ExprResult Parser::ParseCastExpression(bool isUnaryExpression,
       Res = ParseLambdaExpression();
       break;
     }
-    if (getLangOpts().OmpSs)
-      return ParseOSSArrayShaping();
+    if (getLangOpts().OmpSs) {
+      Res = TryParseOSSArrayShaping();
+      // When we've guessed it's an array shape parse it and done
+      if (!Res.isInvalid())
+        return ParseOSSArrayShaping();
+    }
     if (getLangOpts().ObjC) {
       Res = ParseObjCMessageExpression();
       break;

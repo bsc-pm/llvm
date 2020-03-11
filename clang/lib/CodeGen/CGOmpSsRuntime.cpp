@@ -885,22 +885,27 @@ static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDat
   TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
 }
 
-/// Emits reduction initializer function:
-/// \code
-/// void @.red_init(void* %arg) {
-/// %0 = bitcast void* %arg to <type>*
-/// store <type> <init>, <type>* %0
-/// ret void
-/// }
-/// \endcode
+/// Check if the combiner is a call to UDR and if it is so return the
+/// UDR decl used for reduction.
+static const OSSDeclareReductionDecl *
+getReductionDecl(const Expr *ReductionOp) {
+  if (const auto *DRE = dyn_cast<DeclRefExpr>(ReductionOp))
+    if (const auto *DRD = dyn_cast<OSSDeclareReductionDecl>(DRE->getDecl()))
+      return DRD;
+  return nullptr;
+}
+
 static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
                                            const OSSReductionDataTy &Red) {
   ASTContext &C = CGM.getContext();
 
-  const DeclRefExpr *InitRef = cast<DeclRefExpr>(Red.Init);
-  const VarDecl *InitVD = cast<VarDecl>(InitRef->getDecl());
+  const DeclRefExpr *RHSRef = cast<DeclRefExpr>(Red.RHS);
+  const VarDecl *RHSVD = cast<VarDecl>(RHSRef->getDecl());
 
-  QualType PQ = C.getPointerType(InitVD->getType());
+  const OSSDeclareReductionDecl *DRD =
+      getReductionDecl(Red.ReductionOp);
+
+  QualType PQ = C.getPointerType(RHSVD->getType());
 
   FunctionArgList Args;
   ImplicitParamDecl PrivArg(C, PQ, ImplicitParamDecl::Other);
@@ -930,31 +935,48 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
                        NelemsArg.getType(), NelemsArg.getLocation());
 
-  // Emit the initializer:
-  // %0 = bitcast void* %arg to <type>*
-  // store <type> <init>, <type>* %0
-  CGF.EmitExprAsInit(InitVD->getInit(), InitVD,
-                     CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
-                     /*capturedByInit=*/false);
+  if (DRD && DRD->getInitializer()) {
+
+    const auto *PrivVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getInitPriv())->getDecl());
+    const auto *OrigVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getInitOrig())->getDecl());
+
+    CodeGenFunction::OSSPrivateScope InitScope(CGF);
+    InitScope.addPrivate(PrivVD, [PrivLV]() -> Address {
+      return PrivLV.getAddress();
+    });
+    InitScope.addPrivate(OrigVD, [OrigLV]() -> Address {
+      return OrigLV.getAddress();
+    });
+    (void)InitScope.Privatize();
+
+    if (PrivVD->hasInit()) {
+      // initializer(omp_priv = ...)
+      CGF.EmitExprAsInit(PrivVD->getInit(), PrivVD,
+                         CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
+                         /*capturedByInit=*/false);
+    } else {
+      // initializer(foo(&omp_priv, &omp_orig)
+      CGF.EmitIgnoredExpr(DRD->getInitializer());
+    }
+
+  } else {
+    assert(RHSVD->hasInit() && "RHSVD has no initializer");
+    CGF.EmitExprAsInit(RHSVD->getInit(), RHSVD,
+                       CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
+                       /*capturedByInit=*/false);
+  }
   CGF.FinishFunction();
   return Fn;
 }
 
-/// Emits reduction combiner function:
-/// \code
-/// void @.red_comb(void* %arg0, void* %arg1) {
-/// %lhs = bitcast void* %arg0 to <type>*
-/// %rhs = bitcast void* %arg1 to <type>*
-/// %2 = <ReductionOp>(<type>* %lhs, <type>* %rhs)
-/// store <type> %2, <type>* %lhs
-/// ret void
-/// }
-/// \endcode
 static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
                                            const OSSReductionDataTy &Red) {
   ASTContext &C = CGM.getContext();
   const auto *LHSVD = cast<VarDecl>(cast<DeclRefExpr>(Red.LHS)->getDecl());
   const auto *RHSVD = cast<VarDecl>(cast<DeclRefExpr>(Red.RHS)->getDecl());
+
+  const OSSDeclareReductionDecl *DRD =
+      getReductionDecl(Red.ReductionOp);
 
   QualType PQ = C.getPointerType(LHSVD->getType());
 
@@ -985,40 +1007,171 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   llvm::Value *NelemsValue =
       CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
                        NelemsArg.getType(), NelemsArg.getLocation());
+
   // Remap lhs and rhs variables to the addresses of the function arguments.
-  CodeGenFunction::OSSPrivateScope PrivateScope(CGF);
+  if (DRD) {
+    const auto *OutVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerOut())->getDecl());
+    const auto *InVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerIn())->getDecl());
+    CodeGenFunction::OSSPrivateScope CombScope(CGF);
+    CombScope.addPrivate(OutVD, [OutLV]() -> Address {
+      return OutLV.getAddress();
+    });
+    CombScope.addPrivate(InVD, [InLV]() -> Address {
+      return InLV.getAddress();
+    });
+    (void)CombScope.Privatize();
 
-  CodeGenFunction::OSSPrivateScope InitScope(CGF);
-  InitScope.addPrivate(LHSVD, [OutLV]() -> Address {
-    return OutLV.getAddress();
-  });
-  InitScope.addPrivate(RHSVD, [InLV]() -> Address {
-    return InLV.getAddress();
-  });
-  (void)InitScope.Privatize();
-  PrivateScope.Privatize();
+    CGF.EmitIgnoredExpr(DRD->getCombiner());
+  } else {
+    // Emit the combiner body:
+    // %2 = <ReductionOp>(<type> *%lhs, <type> *%rhs)
+    // store <type> %2, <type>* %lhs
+    CodeGenFunction::OSSPrivateScope CombScope(CGF);
+    CombScope.addPrivate(LHSVD, [OutLV]() -> Address {
+      return OutLV.getAddress();
+    });
+    CombScope.addPrivate(RHSVD, [InLV]() -> Address {
+      return InLV.getAddress();
+    });
+    (void)CombScope.Privatize();
 
-  // Emit the combiner body:
-  // %2 = <ReductionOp>(<type> *%lhs, <type> *%rhs)
-  // store <type> %2, <type>* %lhs
-  CGF.EmitIgnoredExpr(Red.ReductionOp);
+    CGF.EmitIgnoredExpr(Red.ReductionOp);
+  }
 
   CGF.FinishFunction();
   return Fn;
+}
+
+static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualType Q, BinaryOperatorKind BOK) {
+// enum ReductionType
+// {
+//   RED_TYPE_CHAR = 1000,
+//   RED_TYPE_SIGNED_CHAR = 2000,
+//   RED_TYPE_UNSIGNED_CHAR = 3000,
+//   RED_TYPE_SHORT = 4000,
+//   RED_TYPE_UNSIGNED_SHORT = 5000,
+//   RED_TYPE_INT = 6000,
+//   RED_TYPE_UNSIGNED_INT = 7000,
+//   RED_TYPE_LONG = 8000,
+//   RED_TYPE_UNSIGNED_LONG = 9000,
+//   RED_TYPE_LONG_LONG = 10000,
+//   RED_TYPE_UNSIGNED_LONG_LONG = 11000,
+//   RED_TYPE_FLOAT = 12000,
+//   RED_TYPE_DOUBLE = 13000,
+//   RED_TYPE_LONG_DOUBLE = 14000,
+//   RED_TYPE_COMPLEX_FLOAT = 15000,
+//   RED_TYPE_COMPLEX_DOUBLE = 16000,
+//   RED_TYPE_COMPLEX_LONG_DOUBLE = 17000,
+//   RED_TYPE_BOOLEAN = 18000,
+//   NUM_RED_TYPES = 19000
+// };
+// enum ReductionOperation
+// {
+//   RED_OP_ADDITION = 0,
+//   RED_OP_PRODUCT = 1,
+//   RED_OP_BITWISE_AND = 2,
+//   RED_OP_BITWISE_OR = 3,
+//   RED_OP_BITWISE_XOR = 4,
+//   RED_OP_LOGICAL_AND = 5,
+//   RED_OP_LOGICAL_OR = 6,
+//   RED_OP_LOGICAL_XOR = 7,
+//   RED_OP_LOGICAL_NXOR = 8,
+//   RED_OP_MAXIMUM = 9,
+//   RED_OP_MINIMUM = 10,
+//   NUM_RED_OPS = 11
+// };
+//
+// int Result = ReductionType + ReductionOperation
+//
+// In case of UDR return -1
+
+  llvm::Type *RedOpTy = CGF.ConvertType(CGF.getContext().IntTy);
+
+  if (BOK == BO_Comma)
+    return cast<llvm::ConstantInt>(llvm::ConstantInt::getSigned(RedOpTy, -1));
+
+  int ReductionType = -1;
+  int ReductionOperation = -1;
+  if (Q == CGF.getContext().CharTy)                   ReductionType = 1000;
+  else if (Q == CGF.getContext().SignedCharTy)        ReductionType = 2000;
+  else if (Q == CGF.getContext().UnsignedCharTy)      ReductionType = 3000;
+  else if (Q == CGF.getContext().ShortTy)             ReductionType = 4000;
+  else if (Q == CGF.getContext().UnsignedShortTy)     ReductionType = 5000;
+  else if (Q == CGF.getContext().IntTy)               ReductionType = 6000;
+  else if (Q == CGF.getContext().UnsignedIntTy)       ReductionType = 7000;
+  else if (Q == CGF.getContext().LongTy)              ReductionType = 8000;
+  else if (Q == CGF.getContext().UnsignedLongTy)      ReductionType = 9000;
+  else if (Q == CGF.getContext().LongLongTy)          ReductionType = 10000;
+  else if (Q == CGF.getContext().UnsignedLongLongTy)  ReductionType = 11000;
+  else if (Q == CGF.getContext().FloatTy)             ReductionType = 12000;
+  else if (Q == CGF.getContext().DoubleTy)            ReductionType = 13000;
+  else if (Q == CGF.getContext().LongDoubleTy)        ReductionType = 14000;
+  else if (Q == CGF.getContext().FloatComplexTy)      ReductionType = 15000;
+  else if (Q == CGF.getContext().DoubleComplexTy)     ReductionType = 16000;
+  else if (Q == CGF.getContext().LongDoubleComplexTy) ReductionType = 17000;
+  else if (Q == CGF.getContext().BoolTy)              ReductionType = 18000;
+  else llvm_unreachable("unhandled reduction type");
+
+  if (BOK == BO_Add)           ReductionOperation = 0;
+  else if (BOK == BO_Mul)      ReductionOperation = 1;
+  else if (BOK == BO_And)      ReductionOperation = 2;
+  else if (BOK == BO_Or)       ReductionOperation = 3;
+  else if (BOK == BO_Xor)      ReductionOperation = 4;
+  else if (BOK == BO_LAnd)     ReductionOperation = 5;
+  else if (BOK == BO_LOr)      ReductionOperation = 6;
+  // else if (BOK == BO_LXor)  ReductionOperation = 7;
+  // else if (BOK == BO_LNXor) ReductionOperation = 8;
+  else if (BOK == BO_GT)       ReductionOperation = 9;
+  else if (BOK == BO_LT)       ReductionOperation = 10;
+  else llvm_unreachable("unhandled reduction operation");
+
+  return cast<llvm::ConstantInt>(llvm::ConstantInt::getSigned(RedOpTy, ReductionType + ReductionOperation));
+
 }
 
 static void EmitReduction(StringRef RedName,
                           StringRef RedInitName,
                           StringRef RedCombName,
                           CodeGenFunction &CGF, const OSSReductionDataTy &Red,
-                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+                          CGOmpSsRuntime::BuiltinRedMapTy &BuiltinRedMap,
+                          CGOmpSsRuntime::UDRMapTy &UDRMap) {
   SmallVector<llvm::Value *, 4> List;
   llvm::Value *SimpleValue = CGF.EmitLValue(Red.SimpleRef).getPointer();
   List.push_back(SimpleValue);
+
+  llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
+  llvm::Value *RedInit = nullptr;
+  llvm::Value *RedComb = nullptr;
+  if (!RedKind->isMinusOne()) {
+    auto It = BuiltinRedMap.find(RedKind);
+    if (It == BuiltinRedMap.end()) {
+      RedInit = emitReduceInitFunction(CGF.CGM, Red);
+      RedComb = emitReduceCombFunction(CGF.CGM, Red);
+      BuiltinRedMap[RedKind] = {RedInit, RedComb};
+    } else {
+      RedInit = It->second.first;
+      RedComb = It->second.second;
+    }
+  } else {
+    const OSSDeclareReductionDecl *D = getReductionDecl(Red.ReductionOp);
+    auto It = UDRMap.find(getReductionDecl(Red.ReductionOp));
+    if (It == UDRMap.end()) {
+      RedInit = emitReduceInitFunction(CGF.CGM, Red);
+      RedComb = emitReduceCombFunction(CGF.CGM, Red);
+      UDRMap[D] = {RedInit, RedComb};
+    } else {
+      RedInit = It->second.first;
+      RedComb = It->second.second;
+    }
+  }
+  List.push_back(RedKind);
+
   EmitDependency(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
   TaskInfo.emplace_back(RedName, makeArrayRef(List));
-  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{SimpleValue, emitReduceInitFunction(CGF.CGM, Red)});
-  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{SimpleValue, emitReduceCombFunction(CGF.CGM, Red)});
+
+  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{SimpleValue, RedInit});
+  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{SimpleValue, RedComb});
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
@@ -1441,9 +1594,8 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     EmitReduction("QUAL.OSS.DEP.REDUCTION",
                   "QUAL.OSS.DEP.REDUCTION.INIT",
                   "QUAL.OSS.DEP.REDUCTION.COMBINE",
-                  CGF,
-                  Red,
-                  TaskInfo);
+                  CGF, Red, TaskInfo,
+                  BuiltinRedMap, UDRMap);
   }
 
   if (Data.If)

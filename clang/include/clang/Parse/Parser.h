@@ -2833,7 +2833,7 @@ private:
                                   ParsedType ObjectType,
                                   UnqualifiedId &Result);
   //===--------------------------------------------------------------------===//
-  // OpenSs: Directives and clauses.
+  // OmpSs: Directives and clauses.
 
   /// Parse clauses for '#pragma oss task'.
   DeclGroupPtrTy ParseOSSDeclareTaskClauses(DeclGroupPtrTy Ptr,
@@ -2845,6 +2845,11 @@ private:
       AccessSpecifier &AS, ParsedAttributesWithRange &Attrs,
       DeclSpec::TST TagType = DeclSpec::TST_unspecified,
       Decl *TagDecl = nullptr);
+  /// Parse 'oss declare reduction' construct.
+  DeclGroupPtrTy ParseOmpSsDeclareReductionDirective(AccessSpecifier AS);
+  /// Parses initializer for provided oss_priv declaration inside the reduction
+  /// initializer.
+  void ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm);
 
   StmtResult
   ParseOmpSsDeclarativeOrExecutableDirective(ParsedStmtContext Allowed);

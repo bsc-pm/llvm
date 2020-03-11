@@ -6286,6 +6286,7 @@ CXCursor clang_getCursorDefinition(CXCursor C) {
   case Decl::OMPDeclareReduction:
   case Decl::OMPDeclareMapper:
   case Decl::OMPRequires:
+  case Decl::OSSDeclareReduction:
   case Decl::ObjCTypeParam:
   case Decl::BuiltinTemplate:
   case Decl::PragmaComment:

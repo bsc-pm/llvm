@@ -5417,6 +5417,11 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
     EmitOMPDeclareMapper(cast<OMPDeclareMapperDecl>(D));
     break;
 
+  // OmpSs-2 declare reductions do not have to be emitted
+  // by themselves. OSSReductionClause does it
+  case Decl::OSSDeclareReduction:
+    break;
+
   case Decl::OMPRequires:
     EmitOMPRequiresDecl(cast<OMPRequiresDecl>(D));
     break;

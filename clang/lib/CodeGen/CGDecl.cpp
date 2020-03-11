@@ -107,6 +107,7 @@ void CodeGenFunction::EmitDecl(const Decl &D) {
   case Decl::OMPAllocate:
   case Decl::OMPCapturedExpr:
   case Decl::OMPRequires:
+  case Decl::OSSDeclareReduction:
   case Decl::Empty:
   case Decl::Concept:
     // None of these decls require codegen support.

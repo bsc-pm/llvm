@@ -40,6 +40,7 @@ add_clang_library(clangAST
   DeclGroup.cpp
   DeclObjC.cpp
   DeclOpenMP.cpp
+  DeclOmpSs.cpp
   DeclPrinter.cpp
   DeclTemplate.cpp
   Expr.cpp

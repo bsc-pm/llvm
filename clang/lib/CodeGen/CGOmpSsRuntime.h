@@ -69,10 +69,10 @@ struct OSSTaskDepDataTy final {
 struct OSSReductionDataTy {
   const Expr *SimpleRef;
   const Expr *Ref;
-  const Expr *Init;
   const Expr *LHS;
   const Expr *RHS;
   const Expr *ReductionOp;
+  const BinaryOperatorKind ReductionKind;
 };
 
 struct OSSTaskReductionDataTy final {
@@ -116,6 +116,15 @@ public:
   virtual void clear() {};
 
   bool InTaskEmission = false;
+
+  // TODO: try to integrate this better in the class, not as a direct public member
+  // Map of builtin reduction init/combiner <Nanos6 int value, <init, combiner>>
+  using BuiltinRedMapTy = llvm::DenseMap<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
+  // Map of UDR init/combiner <UDR, <init, combiner>>
+  using UDRMapTy = llvm::DenseMap<const OSSDeclareReductionDecl *, std::pair<llvm::Value *, llvm::Value *>>;
+
+  BuiltinRedMapTy BuiltinRedMap;
+  UDRMapTy UDRMap;
 
   // This is used to avoid creating the same generic funcion for constructors and
   // destructors, which will be stored in a bundle for each non-pod private/firstprivate

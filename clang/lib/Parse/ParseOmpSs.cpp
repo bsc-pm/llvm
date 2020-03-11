@@ -26,13 +26,59 @@ using namespace clang;
 // OmpSs declarative directives.
 //===----------------------------------------------------------------------===//
 
+namespace {
+// Keep the same order as in OmpSsKinds.h
+enum OmpSsDirectiveKindEx {
+  OSSD_declare = OSSD_unknown + 1,
+  OSSD_reduction,
+};
+} // namespace
+
+// Map token string to extended OMP token kind that are
+// OmpSsDirectiveKind + OmpSsDirectiveKindEx.
+static unsigned getOmpSsDirectiveKindEx(StringRef S) {
+  auto DKind = getOmpSsDirectiveKind(S);
+  if (DKind != OSSD_unknown)
+    return DKind;
+
+  return llvm::StringSwitch<unsigned>(S)
+      .Case("declare", OSSD_declare)
+      .Case("reduction", OSSD_reduction)
+      .Default(OSSD_unknown);
+}
+
 static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
+  // Array of foldings: F[i][0] F[i][1] ===> F[i][2].
+  // E.g.: OSSD_declare OSSD_reduction ===> OSSD_declare_reduction
+  // TODO: add other combined directives in topological order.
+  static const unsigned F[][3] = {
+      {OSSD_declare, OSSD_reduction, OSSD_declare_reduction},
+  };
   Token Tok = P.getCurToken();
   unsigned DKind =
       Tok.isAnnotation()
           ? static_cast<unsigned>(OSSD_unknown)
-          : getOmpSsDirectiveKind(P.getPreprocessor().getSpelling(Tok));
+          : getOmpSsDirectiveKindEx(P.getPreprocessor().getSpelling(Tok));
+  if (DKind == OSSD_unknown)
+    return OSSD_unknown;
 
+  for (unsigned I = 0; I < llvm::array_lengthof(F); ++I) {
+    if (DKind != F[I][0])
+      continue;
+
+    Tok = P.getPreprocessor().LookAhead(0);
+    unsigned SDKind =
+        Tok.isAnnotation()
+            ? static_cast<unsigned>(OSSD_unknown)
+            : getOmpSsDirectiveKindEx(P.getPreprocessor().getSpelling(Tok));
+    if (SDKind == OSSD_unknown)
+      continue;
+
+    if (SDKind == F[I][1]) {
+      P.ConsumeToken();
+      DKind = F[I][2];
+    }
+  }
   return DKind < OSSD_unknown ? static_cast<OmpSsDirectiveKind>(DKind)
                               : OSSD_unknown;
 }
@@ -360,6 +406,10 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
 ///         annot_pragma_ompss_end
 ///         <function declaration/definition>
 ///
+///       declare-reduction-directive:
+///        annot_pragma_ompss 'declare' 'reduction' [...]
+///        annot_pragma_ompss_end
+///
 Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     AccessSpecifier &AS, ParsedAttributesWithRange &Attrs,
     DeclSpec::TST TagType, Decl *Tag) {
@@ -415,6 +465,22 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
   case OSSD_taskwait:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
+    break;
+  case OSSD_declare_reduction:
+    ConsumeToken();
+    if (DeclGroupPtrTy Res = ParseOmpSsDeclareReductionDirective(AS)) {
+      // The last seen token is annot_pragma_ompss_end - need to check for
+      // extra tokens.
+      if (Tok.isNot(tok::annot_pragma_ompss_end)) {
+        Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
+            << getOmpSsDirectiveName(OSSD_declare_reduction);
+        while (Tok.isNot(tok::annot_pragma_ompss_end))
+          ConsumeAnyToken();
+      }
+      // Skip the last annot_pragma_ompss_end.
+      ConsumeAnnotationToken();
+      return Res;
+    }
     break;
   case OSSD_unknown:
     Diag(Tok, diag::err_oss_unknown_directive);
@@ -499,7 +565,24 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     break;
 
     }
-
+  case OSSD_declare_reduction:
+    ConsumeToken();
+    if (DeclGroupPtrTy Res =
+            ParseOmpSsDeclareReductionDirective(/*AS=*/AS_none)) {
+      // The last seen token is annot_pragma_ompss_end - need to check for
+      // extra tokens.
+      if (Tok.isNot(tok::annot_pragma_ompss_end)) {
+        Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
+            << getOmpSsDirectiveName(OSSD_declare_reduction);
+        while (Tok.isNot(tok::annot_pragma_ompss_end))
+          ConsumeAnyToken();
+      }
+      ConsumeAnyToken();
+      Directive = Actions.ActOnDeclStmt(Res, Loc, Tok.getLocation());
+    } else {
+      SkipUntil(tok::annot_pragma_ompss_end);
+    }
+    break;
   case OSSD_unknown:
     Diag(Tok, diag::err_oss_unknown_directive);
     SkipUntil(tok::annot_pragma_ompss_end);
@@ -620,6 +703,339 @@ static bool ParseReductionId(Parser &P, CXXScopeSpec &ReductionIdScopeSpec,
                               /*AllowConstructorName*/ false,
                               /*AllowDeductionGuide*/ false,
                               nullptr, nullptr, ReductionId);
+}
+
+static DeclarationName parseOmpSsDeclareReductionId(Parser &P) {
+  Token Tok = P.getCurToken();
+  Sema &Actions = P.getActions();
+  OverloadedOperatorKind OOK = OO_None;
+  // Allow to use 'operator' keyword for C++ operators
+  bool WithOperator = false;
+  if (Tok.is(tok::kw_operator)) {
+    P.ConsumeToken();
+    Tok = P.getCurToken();
+    WithOperator = true;
+  }
+  switch (Tok.getKind()) {
+  case tok::plus: // '+'
+    OOK = OO_Plus;
+    break;
+  case tok::minus: // '-'
+    OOK = OO_Minus;
+    break;
+  case tok::star: // '*'
+    OOK = OO_Star;
+    break;
+  case tok::amp: // '&'
+    OOK = OO_Amp;
+    break;
+  case tok::pipe: // '|'
+    OOK = OO_Pipe;
+    break;
+  case tok::caret: // '^'
+    OOK = OO_Caret;
+    break;
+  case tok::ampamp: // '&&'
+    OOK = OO_AmpAmp;
+    break;
+  case tok::pipepipe: // '||'
+    OOK = OO_PipePipe;
+    break;
+  case tok::identifier: // identifier
+    if (!WithOperator)
+      break;
+    LLVM_FALLTHROUGH;
+  default:
+    P.Diag(Tok.getLocation(), diag::err_oss_expected_reduction_identifier);
+    P.SkipUntil(tok::colon, tok::r_paren, tok::annot_pragma_ompss_end,
+                Parser::StopBeforeMatch);
+    return DeclarationName();
+  }
+  P.ConsumeToken();
+  auto &DeclNames = Actions.getASTContext().DeclarationNames;
+  return OOK == OO_None ? DeclNames.getIdentifier(Tok.getIdentifierInfo())
+                        : DeclNames.getCXXOperatorName(OOK);
+}
+
+/// Parse 'oss declare reduction' construct.
+///
+///       declare-reduction-directive:
+///        annot_pragma_ompss 'declare' 'reduction'
+///        '(' <reduction_id> ':' <type> {',' <type>} ':' <expression> ')'
+///        ['initializer' '(' ('omp_priv' '=' <expression>)|<function_call> ')']
+///        annot_pragma_ompss_end
+/// <reduction_id> is either a base language identifier or one of the following
+/// operators: '+', '-', '*', '&', '|', '^', '&&' and '||'.
+///
+Parser::DeclGroupPtrTy
+Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
+  // Parse '('.
+  BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
+  if (T.expectAndConsume(diag::err_expected_lparen_after,
+                         getOmpSsDirectiveName(OSSD_declare_reduction))) {
+    SkipUntil(tok::annot_pragma_ompss_end, StopBeforeMatch);
+    return DeclGroupPtrTy();
+  }
+
+  DeclarationName Name = parseOmpSsDeclareReductionId(*this);
+
+  // Keep parsing until no more can be done
+
+  if (Name.isEmpty() && Tok.is(tok::annot_pragma_ompss_end))
+    return DeclGroupPtrTy();
+
+  // Consume ':'.
+  bool IsCorrect = !ExpectAndConsume(tok::colon);
+
+  if (!IsCorrect && Tok.is(tok::annot_pragma_ompss_end))
+    return DeclGroupPtrTy();
+
+  IsCorrect = IsCorrect && !Name.isEmpty();
+
+  // Seeing a colon or annot_pragma_ompss_end finishes typename-list parsing
+  if (Tok.is(tok::colon) || Tok.is(tok::annot_pragma_ompss_end)) {
+    Diag(Tok.getLocation(), diag::err_expected_type);
+    IsCorrect = false;
+  }
+
+  if (!IsCorrect && Tok.is(tok::annot_pragma_ompss_end))
+    return DeclGroupPtrTy();
+
+  SmallVector<std::pair<QualType, SourceLocation>, 8> ReductionTypes;
+  // Here we have something valid
+  // declare reduction(fun : <token>
+  // Parse list of types until ':' token.
+  do {
+    ColonProtectionRAIIObject ColonRAII(*this);
+    SourceRange Range;
+    TypeResult TR =
+        ParseTypeName(&Range, DeclaratorContext::PrototypeContext, AS);
+    if (TR.isUsable()) {
+      QualType ReductionType =
+          Actions.ActOnOmpSsDeclareReductionType(Range.getBegin(), TR);
+      if (!ReductionType.isNull()) {
+        ReductionTypes.push_back(
+            std::make_pair(ReductionType, Range.getBegin()));
+      }
+    } else {
+      SkipUntil(tok::comma, tok::colon, tok::annot_pragma_ompss_end,
+                StopBeforeMatch);
+    }
+
+    // Seeing a colon or annot_pragma_ompss_end finishes typename-list parsing
+    if (Tok.is(tok::colon) || Tok.is(tok::annot_pragma_ompss_end))
+      break;
+
+    // Consume ','.
+    if (ExpectAndConsume(tok::comma)) {
+      IsCorrect = false;
+      if (Tok.is(tok::annot_pragma_ompss_end)) {
+        Diag(Tok.getLocation(), diag::err_expected_type);
+        return DeclGroupPtrTy();
+      }
+    }
+  } while (Tok.isNot(tok::annot_pragma_ompss_end));
+
+  if (ReductionTypes.empty()) {
+    SkipUntil(tok::annot_pragma_ompss_end, StopBeforeMatch);
+    return DeclGroupPtrTy();
+  }
+
+  // Parsed some type but failed parsing comma and now token is
+  // annot_pragma_ompss_end
+  // #pragma oss declare reduction(asdf :int. long,
+  if (!IsCorrect && Tok.is(tok::annot_pragma_ompss_end))
+    return DeclGroupPtrTy();
+
+  // Consume ':'.
+  if (ExpectAndConsume(tok::colon))
+    IsCorrect = false;
+
+  if (Tok.is(tok::annot_pragma_ompss_end)) {
+    Diag(Tok.getLocation(), diag::err_expected_expression);
+    return DeclGroupPtrTy();
+  }
+
+  DeclGroupPtrTy DRD = Actions.ActOnOmpSsDeclareReductionDirectiveStart(
+      getCurScope(), Actions.getCurLexicalContext(), Name, ReductionTypes, AS);
+
+  // Parse <combiner> expression and then parse initializer if any for each
+  // correct type.
+  unsigned I = 0, E = ReductionTypes.size();
+  for (Decl *D : DRD.get()) {
+    TentativeParsingAction TPA(*this);
+    ExprResult CombinerResult;
+    {
+      // Do not use Scope::OmpSsDirectiveScope since it may trigger a
+      // a construct definition for example.
+      // struct A {
+      //   A() {}
+      // };
+      // #pragma oss declare reduction(+ : A : omp_out) initializer(omp_priv = A())
+      ParseScope OSSDRScope(this, Scope::FnScope | Scope::DeclScope |
+                                      Scope::CompoundStmtScope);
+      // Parse <combiner> expression.
+      Actions.ActOnOmpSsDeclareReductionCombinerStart(getCurScope(), D);
+      CombinerResult =
+          Actions.ActOnFinishFullExpr(ParseAssignmentExpression().get(),
+                                      D->getLocation(), /*DiscardedValue*/ false);
+      Actions.ActOnOmpSsDeclareReductionCombinerEnd(D, CombinerResult.get());
+    }
+
+    if (CombinerResult.isInvalid() && Tok.isNot(tok::r_paren) &&
+        Tok.isNot(tok::annot_pragma_ompss_end)) {
+      TPA.Commit();
+      IsCorrect = false;
+      break;
+    }
+    IsCorrect = !T.consumeClose() && IsCorrect && CombinerResult.isUsable();
+    ExprResult InitializerResult;
+    if (Tok.isNot(tok::annot_pragma_ompss_end)) {
+      // Parse <initializer> expression.
+      if (Tok.is(tok::identifier) &&
+          Tok.getIdentifierInfo()->isStr("initializer")) {
+        ConsumeToken();
+      } else {
+        Diag(Tok.getLocation(), diag::err_expected) << "'initializer'";
+        TPA.Commit();
+        IsCorrect = false;
+        break;
+      }
+      // Parse '('.
+      BalancedDelimiterTracker T(*this, tok::l_paren,
+                                 tok::annot_pragma_ompss_end);
+      IsCorrect =
+          !T.expectAndConsume(diag::err_expected_lparen_after, "initializer") &&
+          IsCorrect;
+      if (Tok.isNot(tok::annot_pragma_ompss_end)) {
+        // Do not use Scope::OmpSsDirectiveScope since it may trigger a
+        // a construct definition for example.
+        // struct A {
+        //   A() {}
+        // };
+        // #pragma oss declare reduction(+ : A : omp_out) initializer(omp_priv = A())
+        ParseScope OSSDRScope(this, Scope::FnScope | Scope::DeclScope |
+                                        Scope::CompoundStmtScope);
+        // Parse expression.
+        VarDecl *OmpPrivParm =
+            Actions.ActOnOmpSsDeclareReductionInitializerStart(getCurScope(),
+                                                               D);
+        // Check if initializer is omp_priv <init_expr> or something else.
+        if (Tok.is(tok::identifier) &&
+            Tok.getIdentifierInfo()->isStr("omp_priv")) {
+          if (Actions.getLangOpts().CPlusPlus) {
+            InitializerResult = Actions.ActOnFinishFullExpr(
+                ParseAssignmentExpression().get(), D->getLocation(),
+                /*DiscardedValue*/ false);
+          } else {
+            ConsumeToken();
+            ParseOmpSsReductionInitializerForDecl(OmpPrivParm);
+          }
+        } else {
+          InitializerResult = Actions.ActOnFinishFullExpr(
+              ParseAssignmentExpression().get(), D->getLocation(),
+              /*DiscardedValue*/ false);
+        }
+        Actions.ActOnOmpSsDeclareReductionInitializerEnd(
+            D, InitializerResult.get(), OmpPrivParm);
+        if (InitializerResult.isInvalid() && Tok.isNot(tok::r_paren) &&
+            Tok.isNot(tok::annot_pragma_ompss_end)) {
+          TPA.Commit();
+          IsCorrect = false;
+          break;
+        }
+        IsCorrect =
+            !T.consumeClose() && IsCorrect && !InitializerResult.isInvalid();
+      }
+    }
+
+    ++I;
+    // Revert parsing if not the last type, otherwise accept it, we're done with
+    // parsing.
+    if (I != E)
+      TPA.Revert();
+    else
+      TPA.Commit();
+  }
+  return Actions.ActOnOmpSsDeclareReductionDirectiveEnd(getCurScope(), DRD,
+                                                        IsCorrect);
+}
+
+void Parser::ParseOmpSsReductionInitializerForDecl(VarDecl *OmpPrivParm) {
+  // Parse declarator '=' initializer.
+  // If a '==' or '+=' is found, suggest a fixit to '='.
+  if (isTokenEqualOrEqualTypo()) {
+    ConsumeToken();
+
+    if (Tok.is(tok::code_completion)) {
+      Actions.CodeCompleteInitializer(getCurScope(), OmpPrivParm);
+      Actions.FinalizeDeclaration(OmpPrivParm);
+      cutOffParsing();
+      return;
+    }
+
+    ExprResult Init(ParseInitializer());
+
+    if (Init.isInvalid()) {
+      SkipUntil(tok::r_paren, tok::annot_pragma_ompss_end, StopBeforeMatch);
+      Actions.ActOnInitializerError(OmpPrivParm);
+    } else {
+      Actions.AddInitializerToDecl(OmpPrivParm, Init.get(),
+                                   /*DirectInit=*/false);
+    }
+  } else if (Tok.is(tok::l_paren)) {
+    // Parse C++ direct initializer: '(' expression-list ')'
+    BalancedDelimiterTracker T(*this, tok::l_paren);
+    T.consumeOpen();
+
+    ExprVector Exprs;
+    CommaLocsTy CommaLocs;
+
+    SourceLocation LParLoc = T.getOpenLocation();
+    auto RunSignatureHelp = [this, OmpPrivParm, LParLoc, &Exprs]() {
+      QualType PreferredType = Actions.ProduceConstructorSignatureHelp(
+          getCurScope(), OmpPrivParm->getType()->getCanonicalTypeInternal(),
+          OmpPrivParm->getLocation(), Exprs, LParLoc);
+      CalledSignatureHelp = true;
+      return PreferredType;
+    };
+    if (ParseExpressionList(Exprs, CommaLocs, [&] {
+          PreferredType.enterFunctionArgument(Tok.getLocation(),
+                                              RunSignatureHelp);
+        })) {
+      if (PP.isCodeCompletionReached() && !CalledSignatureHelp)
+        RunSignatureHelp();
+      Actions.ActOnInitializerError(OmpPrivParm);
+      SkipUntil(tok::r_paren, tok::annot_pragma_ompss_end, StopBeforeMatch);
+    } else {
+      // Match the ')'.
+      SourceLocation RLoc = Tok.getLocation();
+      if (!T.consumeClose())
+        RLoc = T.getCloseLocation();
+
+      assert(!Exprs.empty() && Exprs.size() - 1 == CommaLocs.size() &&
+             "Unexpected number of commas!");
+
+      ExprResult Initializer =
+          Actions.ActOnParenListExpr(T.getOpenLocation(), RLoc, Exprs);
+      Actions.AddInitializerToDecl(OmpPrivParm, Initializer.get(),
+                                   /*DirectInit=*/true);
+    }
+  } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+    // Parse C++0x braced-init-list.
+    Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
+
+    ExprResult Init(ParseBraceInitializer());
+
+    if (Init.isInvalid()) {
+      Actions.ActOnInitializerError(OmpPrivParm);
+    } else {
+      Actions.AddInitializerToDecl(OmpPrivParm, Init.get(),
+                                   /*DirectInit=*/true);
+    }
+  } else {
+    Actions.ActOnUninitializedDecl(OmpPrivParm);
+  }
 }
 
 /// Parses clauses with list.

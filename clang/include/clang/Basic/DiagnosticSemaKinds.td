@@ -9890,23 +9890,34 @@ def err_oss_not_defined_dsa_when_default_none : Error<
   "expected explicit data-sharing for %0">;
 def err_oss_reduction_id_not_compatible : Error<
   "list item of type %0 is not valid for specified reduction operation: unable to provide default initialization value">;
+def err_oss_not_resolved_reduction_identifier : Error<
+  "unable to resolve declare reduction construct for type %0">;
+def err_oss_clause_floating_type_arg : Error<
+  "arguments of OmpSs-2 clause '%0' with bitwise operators cannot be of floating type">;
+def err_oss_unknown_reduction_identifier : Error<
+  "incorrect reduction identifier, expected one of '+', '-', '*', '&', '|', '^', "
+  "'&&', '||', 'min' or 'max' or declare reduction for type %0">;
+def err_oss_clause_not_arithmetic_type_arg : Error<
+  "arguments of OmpSs-2 clause '%0' for 'min' or 'max' must be of %select{scalar|arithmetic}1 type">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element, array shape or array section">;
 def err_oss_expected_dereference_or_array_item : Error<
   "expected dereference, array element, array shape or array section">;
-def err_oss_expected_var_name_member_expr_or_array_item : Error<
-  "expected variable name%select{|, data member of current class}0, array element or array section">;
+def err_oss_expected_var_name_member_expr_or_array_shaping : Error<
+  "expected variable name%select{|, data member of current class}0 or array shaping">;
 def err_oss_expected_var_name_member_expr : Error<
   "expected variable name%select{| or data member of current class}0">;
 def err_oss_expected_base_var_name : Error<
-  "expected variable name as a base of the array %select{subscript|section}0">;
+  "expected variable name as a base of the array shaping">;
+def err_oss_reduction_wrong_type : Error<"reduction type cannot be %select{qualified with 'const', 'volatile' or 'restrict'|a function|a reference|an array}0 type">;
+def err_oss_declare_reduction_redefinition : Error<"redefinition of user-defined reduction for type %0">;
 
 def err_oss_not_integral : Error<
   "expression must have integral or unscoped enumeration "
   "type, not %0">;
 def err_oss_incomplete_type : Error<
-  "expression has incomplete class type %0">;
+  "expression has incomplete type %0">;
 def err_oss_explicit_conversion : Error<
   "expression requires explicit conversion from %0 to %1">;
 def note_oss_conversion_here : Note<

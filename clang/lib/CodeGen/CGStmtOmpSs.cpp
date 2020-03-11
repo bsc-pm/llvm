@@ -155,18 +155,18 @@ static void AddPriorityData(const OSSTaskDirective &S, const Expr * &PriorityExp
 static void AddReductionData(const OSSTaskDirective &S, OSSTaskReductionDataTy &Reductions) {
   for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
     auto SimpleRef = C->simple_exprs().begin();
-    auto InitRef = C->privates().begin();
     auto LHSRef = C->lhs_exprs().begin();
     auto RHSRef = C->rhs_exprs().begin();
     auto RedOp = C->reduction_ops().begin();
+    auto RedKind = C->getReductionKinds().begin();
     for (const Expr *Ref : C->varlists()) {
-      Reductions.RedList.push_back({*SimpleRef, Ref, *InitRef, *LHSRef, *RHSRef, *RedOp});
+      Reductions.RedList.push_back({*SimpleRef, Ref, *LHSRef, *RHSRef, *RedOp, *RedKind});
 
       ++SimpleRef;
-      ++InitRef;
       ++LHSRef;
       ++RHSRef;
       ++RedOp;
+      ++RedKind;
     }
   }
 }

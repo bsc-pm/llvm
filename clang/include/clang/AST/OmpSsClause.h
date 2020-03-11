@@ -840,13 +840,13 @@ public:
 
 
 // TODO: fix doc
-/// This represents clause 'reduction' in the '#pragma omp ...'
-/// directives.
+/// This represents clause 'reduction' in the '#pragma oss task'
+/// directive.
 ///
 /// \code
-/// #pragma omp parallel reduction(+:a,b)
+/// #pragma oss task reduction(+:a,b)
 /// \endcode
-/// In this example directive '#pragma omp parallel' has clause 'reduction'
+/// In this example directive '#pragma oss task' has clause 'reduction'
 /// with operator '+' and the variables 'a' and 'b'.
 class OSSReductionClause final
     : public OSSVarListClause<OSSReductionClause>,
@@ -863,6 +863,8 @@ class OSSReductionClause final
 
   /// Name of custom operator.
   DeclarationNameInfo NameInfo;
+
+  SmallVector<BinaryOperatorKind, 4> ReductionKinds;
 
   /// Build clause with number of variables \a N.
   ///
@@ -1004,10 +1006,10 @@ public:
   static OSSReductionClause *
   Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
          SourceLocation ColonLoc, SourceLocation EndLoc, ArrayRef<Expr *> VL,
-         NestedNameSpecifierLoc QualifierLoc,
-         const DeclarationNameInfo &NameInfo, ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> Privates,
+         NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
+         ArrayRef<Expr *> SimpleExprs,
          ArrayRef<Expr *> LHSExprs, ArrayRef<Expr *> RHSExprs,
-         ArrayRef<Expr *> ReductionOps, Stmt *PreInit, Expr *PostUpdate);
+         ArrayRef<Expr *> ReductionOps, ArrayRef<BinaryOperatorKind> ReductionKinds);
 
   /// Creates an empty clause with the place for \a N variables.
   ///
@@ -1023,6 +1025,8 @@ public:
 
   /// Gets the nested name specifier.
   NestedNameSpecifierLoc getQualifierLoc() const { return QualifierLoc; }
+
+  ArrayRef<BinaryOperatorKind> getReductionKinds() const { return ReductionKinds; }
 
   using helper_expr_iterator = MutableArrayRef<Expr *>::iterator;
   using helper_expr_const_iterator = ArrayRef<const Expr *>::iterator;

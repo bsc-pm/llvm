@@ -13,6 +13,7 @@
 #include "clang/AST/TextNodeDumper.h"
 #include "clang/AST/DeclFriend.h"
 #include "clang/AST/DeclOpenMP.h"
+#include "clang/AST/DeclOmpSs.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/LocInfoType.h"
 
@@ -1514,6 +1515,34 @@ void TextNodeDumper::VisitOMPRequiresDecl(const OMPRequiresDecl *D) {
 void TextNodeDumper::VisitOMPCapturedExprDecl(const OMPCapturedExprDecl *D) {
   dumpName(D);
   dumpType(D->getType());
+}
+
+// OmpSs
+void TextNodeDumper::VisitOSSExecutableDirective(
+    const OSSExecutableDirective *D) {
+  OS << " ompss-2";
+}
+
+void TextNodeDumper::VisitOSSDeclareReductionDecl(
+    const OSSDeclareReductionDecl *D) {
+  dumpName(D);
+  dumpType(D->getType());
+  OS << " combiner";
+  dumpPointer(D->getCombiner());
+  if (const auto *Initializer = D->getInitializer()) {
+    OS << " initializer";
+    dumpPointer(Initializer);
+    switch (D->getInitializerKind()) {
+    case OSSDeclareReductionDecl::DirectInit:
+      OS << " omp_priv = ";
+      break;
+    case OSSDeclareReductionDecl::CopyInit:
+      OS << " omp_priv ()";
+      break;
+    case OSSDeclareReductionDecl::CallInit:
+      break;
+    }
+  }
 }
 
 void TextNodeDumper::VisitNamespaceDecl(const NamespaceDecl *D) {

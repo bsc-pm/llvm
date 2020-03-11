@@ -13,9 +13,9 @@ struct U {
 void bar() {}
 
 void foo(int *x) {
-  #pragma oss task reduction(+ : s.x, *x, bar) // expected-error 3 {{expected variable name}}
+  #pragma oss task reduction(+ : s.x, *x, bar) // expected-error 3 {{expected variable name or array shaping}}
   {}
-  #pragma oss task reduction(+ : x[0], [10]x, x[:1]) // expected-error 3 {{expected variable name}}
+  #pragma oss task reduction(+ : x[0], [10]x, x[:1]) // expected-error 2 {{expected variable name or array shaping}}
   {}
   #pragma oss task reduction(+ : s) // expected-error {{invalid operands to binary expression ('struct S' and 'struct S')}}
   {}
@@ -38,7 +38,7 @@ void foo(int *x) {
 
 template<typename T, class  ...Types>
 void foo1(T *t, Types ...args) {
-  #pragma oss task reduction(+ : t[0], [10]t, t[:1], args) // expected-error 3 {{expected variable name}} // expected-error {{variadic templates are not allowed in OmpSs-2 clauses}}
+  #pragma oss task reduction(+ : t[0], [10]t, t[:1], args) // expected-error 2 {{expected variable name or array shaping}} // expected-error {{variadic templates are not allowed in OmpSs-2 clauses}}
   {}
 }
 

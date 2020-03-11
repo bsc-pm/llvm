@@ -123,6 +123,21 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_dep_weakinout operand bundle id drifted!");
   (void)OSSDepWeakInoutEntry;
 
+  auto *OSSDepReductionEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.REDUCTION");
+  assert(OSSDepReductionEntry->second == LLVMContext::OB_oss_dep_reduction &&
+         "oss_dep_reduction operand bundle id drifted!");
+  (void)OSSDepReductionEntry;
+
+  auto *OSSDepReductionInitEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.REDUCTION.INIT");
+  assert(OSSDepReductionInitEntry->second == LLVMContext::OB_oss_reduction_init &&
+         "oss_dep_reduction operand bundle id drifted!");
+  (void)OSSDepReductionInitEntry;
+
+  auto *OSSDepReductionCombEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.REDUCTION.COMBINE");
+  assert(OSSDepReductionCombEntry->second == LLVMContext::OB_oss_reduction_comb &&
+         "oss_reduction_comb operand bundle id drifted!");
+  (void)OSSDepReductionCombEntry;
+
   auto *OSSFinalEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.FINAL");
   assert(OSSFinalEntry->second == LLVMContext::OB_oss_final &&
          "oss_final operand bundle id drifted!");

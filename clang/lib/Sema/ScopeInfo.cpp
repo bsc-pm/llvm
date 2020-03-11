@@ -28,6 +28,7 @@ void FunctionScopeInfo::Clear() {
   HasIndirectGoto = false;
   HasDroppedStmt = false;
   HasOMPDeclareReductionCombiner = false;
+  HasOSSDeclareReductionCombiner = false;
   HasFallthroughStmt = false;
   HasPotentialAvailabilityViolations = false;
   ObjCShouldCallSuper = false;

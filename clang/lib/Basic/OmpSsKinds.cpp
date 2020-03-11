@@ -165,6 +165,7 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
     }
     break;
   case OSSD_taskwait:
+  case OSSD_declare_reduction:
   case OSSD_unknown:
     break;
   }

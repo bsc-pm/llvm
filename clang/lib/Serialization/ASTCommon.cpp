@@ -400,6 +400,7 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::OMPCapturedExpr:
   case Decl::OMPDeclareReduction:
   case Decl::OMPDeclareMapper:
+  case Decl::OSSDeclareReduction:
   case Decl::BuiltinTemplate:
   case Decl::Decomposition:
   case Decl::Binding:

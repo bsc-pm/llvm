@@ -172,18 +172,18 @@ OSSReductionClause *OSSReductionClause::Create(
     const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
     SourceLocation EndLoc, SourceLocation ColonLoc, ArrayRef<Expr *> VL,
     NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
-    ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> Privates, ArrayRef<Expr *> LHSExprs,
-    ArrayRef<Expr *> RHSExprs, ArrayRef<Expr *> ReductionOps, Stmt *PreInit,
-    Expr *PostUpdate) {
+    ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> LHSExprs,
+    ArrayRef<Expr *> RHSExprs, ArrayRef<Expr *> ReductionOps,
+    ArrayRef<BinaryOperatorKind> ReductionKinds) {
   void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(6 * VL.size()));
   OSSReductionClause *Clause = new (Mem) OSSReductionClause(
       StartLoc, LParenLoc, EndLoc, ColonLoc, VL.size(), QualifierLoc, NameInfo);
   Clause->setVarRefs(VL);
   Clause->setSimpleExprs(SimpleExprs);
-  Clause->setPrivates(Privates);
   Clause->setLHSExprs(LHSExprs);
   Clause->setRHSExprs(RHSExprs);
   Clause->setReductionOps(ReductionOps);
+  Clause->ReductionKinds.append(ReductionKinds.begin(), ReductionKinds.end());
   return Clause;
 }
 

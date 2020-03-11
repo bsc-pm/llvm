@@ -40,6 +40,7 @@ def Named : Decl<"named declarations", 1>;
     def UnresolvedUsingValue : DDecl<Value>;
     def IndirectField : DDecl<Value>;
     def Binding : DDecl<Value>;
+    def OSSDeclareReduction : DDecl<Value>, DeclContext;
     def OMPDeclareReduction : DDecl<Value>, DeclContext;
     def OMPDeclareMapper : DDecl<Value>, DeclContext;
     def Declarator : DDecl<Value, "declarators", 1>;

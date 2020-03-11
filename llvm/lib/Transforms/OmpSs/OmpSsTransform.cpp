@@ -55,6 +55,13 @@ struct OmpSs : public ModulePass {
         instance.reset(new Nanos6TaskAddrTranslationEntry);
         instance->Ty = StructType::create(M.getContext(),
           "nanos6_address_translation_entry_t");
+
+        // size_t local_address
+        // size_t device_address
+        Type *LocalAddrTy = Type::getInt64Ty(M.getContext());
+        Type *DeviceAddrTy = Type::getInt64Ty(M.getContext());
+
+        instance->Ty->setBody({LocalAddrTy, DeviceAddrTy});
       }
       return *instance.get();
     }
@@ -221,18 +228,33 @@ struct OmpSs : public ModulePass {
   private:
     StringMap<FunctionCallee> DepNameToFuncCalleeMap;
 
-    FunctionType *BuildDepFuncType(Module &M, StringRef FullName, size_t Ndims) {
+    FunctionType *BuildDepFuncType(Module &M, StringRef FullName, size_t Ndims, bool IsReduction) {
       // void nanos6_register_region_X_depinfoY(
       //   void *handler, int symbol_index, char const *region_text,
       //   void *base_address,
       //   long dim1size, long dim1start, long dim1end,
       //   ...);
-      SmallVector<Type *, 8> Params = {
+      //
+      // Except for reductions
+      // void nanos6_register_region_reduction_depinfoY(
+      //   int reduction_operation, int reduction_index,
+      //   void *handler, int symbol_index, char const *region_text,
+      //   void *base_address,
+      //   long dim1size, long dim1start, long dim1end,
+      //   ...);
+      SmallVector<Type *, 8> Params;
+      if (IsReduction) {
+        Params.append({
+          Type::getInt32Ty(M.getContext()),
+          Type::getInt32Ty(M.getContext())
+        });
+      }
+      Params.append({
         Type::getInt8PtrTy(M.getContext()),
         Type::getInt32Ty(M.getContext()),
         Type::getInt8PtrTy(M.getContext()),
         Type::getInt8PtrTy(M.getContext())
-      };
+      });
       for (size_t i = 0; i < Ndims; ++i) {
         // long dimsize
         Params.push_back(Type::getInt64Ty(M.getContext()));
@@ -245,7 +267,7 @@ struct OmpSs : public ModulePass {
                                Params, /*IsVarArgs=*/false);
     }
   public:
-    FunctionCallee getMultidepFuncCallee(Module &M, StringRef &Name, size_t Ndims) {
+    FunctionCallee getMultidepFuncCallee(Module &M, StringRef Name, size_t Ndims, bool IsReduction=false) {
       std::string FullName = ("nanos6_register_region_" + Name + "_depinfo" + Twine(Ndims)).str();
 
       auto It = DepNameToFuncCalleeMap.find(FullName);
@@ -254,7 +276,7 @@ struct OmpSs : public ModulePass {
 
       assert(Ndims <= MAX_DEP_DIMS);
 
-      FunctionType *DepF = BuildDepFuncType(M, FullName, Ndims);
+      FunctionType *DepF = BuildDepFuncType(M, FullName, Ndims, IsReduction);
       FunctionCallee DepCallee = M.getOrInsertFunction(FullName, DepF);
       DepNameToFuncCalleeMap[FullName] = DepCallee;
       return DepCallee;
@@ -266,7 +288,8 @@ struct OmpSs : public ModulePass {
   FunctionCallee TaskSubmitFuncTy;
   FunctionCallee TaskInFinalFuncTy;
 
-  void unpackDepsAndRewrite(Module &M, TaskDependsInfo &TDI, Function *F, ArrayRef<Value *> TaskArgsList) {
+  void unpackDepsAndRewrite(Module &M, TaskDependsInfo &TDI, TaskReductionsInitCombInfo &TRI,
+                            Function *F, ArrayRef<Value *> TaskArgsList) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
     DenseMap<Value *, Value *> ConstExprToInst;
@@ -290,7 +313,7 @@ struct OmpSs : public ModulePass {
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
     // Insert RT call before replacing uses
-    unpackDepsCallToRT(M, ConstExprToInst, TDI, F);
+    unpackDepsCallToRT(M, ConstExprToInst, TDI, TRI, F);
 
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
@@ -389,9 +412,44 @@ struct OmpSs : public ModulePass {
     }
   }
 
+  void unpackCallToRTOfReduction(Module &M,
+                            DenseMap<Value *, Value *> &ConstExprToInst,
+                            const SmallVectorImpl<ReductionInfo> &ReductionsList,
+                            const TaskReductionsInitCombInfo &TRI,
+                            Function *F) {
+    for (const ReductionInfo &RI : ReductionsList) {
+      const DependInfo &DI = RI.DepInfo;
+      BasicBlock &Entry = F->getEntryBlock();
+      Instruction &RetI = Entry.back();
+      IRBuilder<> BBBuilder(&RetI);
+
+      Value *NewBase = DI.Base;
+      NewBase = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+
+      // This must not happen, it will be catched in analysis
+      assert(TRI.count(RI.DSA) && "Reduction dependency DSA has no init/combiner");
+
+      SmallVector<Value *, 4> TaskDepAPICall;
+      TaskDepAPICall.push_back(RI.RedKind);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), TRI.lookup(RI.DSA).ReductionIndex));
+      Value *Handler = &*(F->arg_end() - 1);
+      TaskDepAPICall.push_back(Handler);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
+      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+      TaskDepAPICall.push_back(NewBase);
+      assert(!(DI.Dims.size()%3));
+      size_t NumDims = DI.Dims.size()/3;
+      for (Value *V : DI.Dims) {
+        TaskDepAPICall.push_back(V);
+      }
+      BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, "reduction", NumDims, /*IsReduction=*/true), TaskDepAPICall);
+    }
+  }
+
   void unpackDepsCallToRT(Module &M,
                       DenseMap<Value *, Value *> &ConstExprToInst,
                       const TaskDependsInfo &TDI,
+                      const TaskReductionsInitCombInfo &TRI,
                       Function *F) {
     unpackCallToRTOfType(M, ConstExprToInst, TDI.Ins, F, "read");
     unpackCallToRTOfType(M, ConstExprToInst, TDI.Outs, F, "write");
@@ -401,6 +459,7 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakIns, F, "weak_read");
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakOuts, F, "weak_write");
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakInouts, F, "weak_readwrite");
+    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.Reductions, TRI, F);
   }
 
   // TypeList[i] <-> NameList[i]
@@ -436,6 +495,30 @@ struct OmpSs : public ModulePass {
     return FuncVar;
   }
 
+  void translateUnpackedDSA(IRBuilder<> &IRB, Value *DSA, Value *&UnpackedDSA,
+                            Value *AddrTranslationTable, const std::map<Value *, int> &DepSymToIdx) {
+    if (!DepSymToIdx.count(DSA))
+      return;
+
+    // Save the original the original type since we are going to cast...
+    Type *UnpackedDSAType = UnpackedDSA->getType();
+    Value *Idx[2];
+    Idx[0] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), DepSymToIdx.at(DSA));
+    Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
+    Value *LocalAddr = IRB.CreateGEP(
+        AddrTranslationTable, Idx, "local_lookup" + DSA->getName());
+    LocalAddr = IRB.CreateLoad(LocalAddr);
+
+    Idx[1] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 1);
+    Value *DeviceAddr = IRB.CreateGEP(
+        AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
+    DeviceAddr = IRB.CreateLoad(DeviceAddr);
+
+    UnpackedDSA = IRB.CreateNSWSub(IRB.CreatePtrToInt(UnpackedDSA, Type::getInt64Ty(IRB.getContext())), LocalAddr);
+    UnpackedDSA = IRB.CreateNSWAdd(UnpackedDSA, DeviceAddr);
+    UnpackedDSA = IRB.CreateIntToPtr(UnpackedDSA, UnpackedDSAType);
+  }
+
   // Given a Outline Function assuming that task args are the first parameter, and
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
   // with those Values, used to call Unpack Functions
@@ -444,12 +527,14 @@ struct OmpSs : public ModulePass {
                   const TaskVLADimsInfo &VLADimsInfo,
                   Function *OlFunc,
                   DenseMap<Value *, size_t> &StructToIdxMap,
-                  SmallVectorImpl<Value *> &UnpackedList) {
+                  SmallVectorImpl<Value *> &UnpackedList,
+                  bool IsTaskFunc) {
     UnpackedList.clear();
 
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
+    Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
     for (Value *V : DSAInfo.Shared) {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
@@ -457,6 +542,10 @@ struct OmpSs : public ModulePass {
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
       Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+
+      if (IsTaskFunc)
+        translateUnpackedDSA(BBBuilder, V, LGEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
+
       UnpackedList.push_back(LGEP);
     }
     for (Value *V : DSAInfo.Private) {
@@ -470,6 +559,9 @@ struct OmpSs : public ModulePass {
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
 
+      if (IsTaskFunc)
+        translateUnpackedDSA(BBBuilder, V, GEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
+
       UnpackedList.push_back(GEP);
     }
     for (Value *V : DSAInfo.Firstprivate) {
@@ -482,6 +574,9 @@ struct OmpSs : public ModulePass {
       // VLAs
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
+
+      if (IsTaskFunc)
+        translateUnpackedDSA(BBBuilder, V, GEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
 
       UnpackedList.push_back(GEP);
     }
@@ -502,7 +597,8 @@ struct OmpSs : public ModulePass {
                       const TaskCapturedInfo &CapturedInfo,
                       const TaskVLADimsInfo &VLADimsInfo,
                       DenseMap<Value *, size_t> &StructToIdxMap,
-                      Function *OlFunc, Function *UnpackFunc) {
+                      Function *OlFunc, Function *UnpackFunc,
+                      bool IsTaskFunc=false) {
     BasicBlock::Create(M.getContext(), "entry", OlFunc);
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
 
@@ -510,7 +606,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
-    unpackDSAsWithVLADims(M, DSAInfo, CapturedInfo, VLADimsInfo, OlFunc, StructToIdxMap, UnpackParams);
+    unpackDSAsWithVLADims(M, DSAInfo, CapturedInfo, VLADimsInfo, OlFunc, StructToIdxMap, UnpackParams, IsTaskFunc);
     while (AI != OlFunc->arg_end()) {
       UnpackParams.push_back(&*AI++);
     }
@@ -749,7 +845,7 @@ struct OmpSs : public ModulePass {
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
 
-    olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar);
+    olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar, /*IsTaskFunc=*/true);
 
     // nanos6_ol_task_region_* END
 
@@ -768,7 +864,7 @@ struct OmpSs : public ModulePass {
                                ("nanos6_unpacked_deps_" + F.getName() + Twine(taskNum)).str(),
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
-    unpackDepsAndRewrite(M, TI.DependsInfo, UnpackDepsFuncVar, TaskArgsList.getArrayRef());
+    unpackDepsAndRewrite(M, TI.DependsInfo, TI.ReductionsInitCombInfo, UnpackDepsFuncVar, TaskArgsList.getArrayRef());
 
     // nanos6_unpacked_deps_* END
 
@@ -879,11 +975,49 @@ struct OmpSs : public ModulePass {
       return GV;
     });
 
+    Constant *TaskRedInitsVar = M.getOrInsertGlobal(("nanos6_reduction_initializers_" + F.getName() + Twine(taskNum)).str(),
+                                      ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                      [&M, &F, &TI ,&taskNum] {
+      SmallVector<Constant *, 4> Inits;
+      for (auto &p : TI.ReductionsInitCombInfo) {
+        Inits.push_back(ConstantExpr::getPointerCast(cast<Constant>(p.second.Init),
+                        FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo()));
+      }
+
+      GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                              /*isConstant=*/true,
+                                              GlobalVariable::InternalLinkage,
+                                              ConstantArray::get(ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                                                 Inits),
+                                ("nanos6_reduction_initializers_" + F.getName() + Twine(taskNum)).str());
+      return GV;
+    });
+
+    Constant *TaskRedCombsVar = M.getOrInsertGlobal(("nanos6_reduction_combiners_" + F.getName() + Twine(taskNum)).str(),
+                                      ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                      [&M, &F, &TI, &taskNum] {
+      SmallVector<Constant *, 4> Combs;
+      for (auto &p : TI.ReductionsInitCombInfo) {
+        Combs.push_back(ConstantExpr::getPointerCast(cast<Constant>(p.second.Comb),
+                        FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo()));
+      }
+
+      GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                              /*isConstant=*/true,
+                                              GlobalVariable::InternalLinkage,
+                                              ConstantArray::get(ArrayType::get(FunctionType::get(Type::getVoidTy(M.getContext()), /*IsVarArgs=*/false)->getPointerTo(), TI.ReductionsInitCombInfo.size()),
+                                                                 Combs),
+                                ("nanos6_reduction_combiners_" + F.getName() + Twine(taskNum)).str());
+      return GV;
+    });
+
     Constant *TaskInfoVar = M.getOrInsertGlobal(("task_info_var_" + F.getName() + Twine(taskNum)).str(),
                                       Nanos6TaskInfo::getInstance(M).getType(),
                                       [&M, &F, &TI, &OlDepsFuncVar,
                                        &OlPriorityFuncVar,
-                                       &TaskImplInfoVar, &taskNum] {
+                                       &TaskImplInfoVar,
+                                       &TaskRedInitsVar, &TaskRedCombsVar,
+                                       &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInfo::getInstance(M).getType(),
                                 /*isConstant=*/true,
                                 GlobalVariable::InternalLinkage,
@@ -900,8 +1034,8 @@ struct OmpSs : public ModulePass {
                                                     ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(5)),
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(6))),
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))),
+                                                    ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
+                                                    ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))),
                                 ("task_info_var_" + F.getName() + Twine(taskNum)).str());
 
       GV->setAlignment(64);
@@ -994,6 +1128,16 @@ struct OmpSs : public ModulePass {
 
       Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(M, IRB, TI.VLADimsInfo);
       Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
+      int NumDependencies =
+        TI.DependsInfo.Ins.size()
+        + TI.DependsInfo.Outs.size()
+        + TI.DependsInfo.Inouts.size()
+        + TI.DependsInfo.Concurrents.size()
+        + TI.DependsInfo.Commutatives.size()
+        + TI.DependsInfo.WeakIns.size()
+        + TI.DependsInfo.WeakOuts.size()
+        + TI.DependsInfo.WeakInouts.size()
+        + TI.DependsInfo.Reductions.size();
       IRB.CreateCall(CreateTaskFuncTy, {TaskInfoVar,
                                   TaskInvInfoVar,
                                   TaskArgsSizeOf,
@@ -1001,8 +1145,7 @@ struct OmpSs : public ModulePass {
                                   TaskPtrVar,
                                   TaskFlagsVar,
                                   ConstantInt::get(IRB.getInt64Ty(),
-                                                   TI.DependsInfo.Ins.size()
-                                                   + TI.DependsInfo.Outs.size())}); // TaskNumDepsVar;
+                                                   NumDependencies)});
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);

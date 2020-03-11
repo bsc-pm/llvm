@@ -49,6 +49,7 @@ OMPSS_CLAUSE(firstprivate, OSSFirstprivateClause)
 OMPSS_CLAUSE(shared,  OSSSharedClause)
 OMPSS_CLAUSE(depend, OSSDependClause)
 OMPSS_CLAUSE(reduction, OSSReductionClause)
+OMPSS_DIRECTIVE_EXT(declare_reduction, "declare reduction")
 
 // Static attributes for 'default' clause.
 OMPSS_DEFAULT_KIND(none)
