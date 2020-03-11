@@ -639,6 +639,8 @@ def warn_redecl_library_builtin : Warning<
 def err_builtin_definition : Error<"definition of builtin function %0">;
 def err_builtin_redeclare : Error<"cannot redeclare builtin function %0">;
 def err_arm_invalid_specialreg : Error<"invalid special register for builtin">;
+def err_arm_invalid_coproc : Error<"coprocessor %0 must be configured as "
+  "%select{GCP|CDE}1">;
 def err_invalid_cpu_supports : Error<"invalid cpu feature string for builtin">;
 def err_invalid_cpu_is : Error<"invalid cpu name for builtin">;
 def err_invalid_cpu_specific_dispatch_value : Error<
@@ -5541,6 +5543,8 @@ def note_enters_block_captures_weak : Note<
 def note_enters_block_captures_non_trivial_c_struct : Note<
   "jump enters lifetime of block which captures a C struct that is non-trivial "
   "to destroy">;
+def note_enters_compound_literal_scope : Note<
+  "jump enters lifetime of a compound literal that is non-trivial to destruct">;
 
 def note_exits_cleanup : Note<
   "jump exits scope of variable with __attribute__((cleanup))">;
@@ -5584,6 +5588,8 @@ def note_exits_block_captures_weak : Note<
 def note_exits_block_captures_non_trivial_c_struct : Note<
   "jump exits lifetime of block which captures a C struct that is non-trivial "
   "to destroy">;
+def note_exits_compound_literal_scope : Note<
+  "jump exits lifetime of a compound literal that is non-trivial to destruct">;
 
 def err_func_returning_qualified_void : ExtWarn<
   "function cannot return qualified void type %0">,
@@ -6722,8 +6728,8 @@ def warn_objc_unsafe_perform_selector : Warning<
   InGroup<DiagGroup<"objc-unsafe-perform-selector">>;
 def note_objc_unsafe_perform_selector_method_declared_here :  Note<
   "method %0 that returns %1 declared here">;
-def err_attribute_arm_mve_alias : Error<
-  "'__clang_arm_mve_alias' attribute can only be applied to an ARM MVE builtin">;
+def err_attribute_arm_builtin_alias : Error<
+  "'__clang_arm_builtin_alias' attribute can only be applied to an ARM builtin">;
 def err_attribute_arm_mve_polymorphism : Error<
   "'__clang_arm_mve_strict_polymorphism' attribute can only be applied to an MVE/NEON vector type">;
 
