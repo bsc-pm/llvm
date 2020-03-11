@@ -483,8 +483,8 @@ public:
   }
 
   unsigned getGatherScatterOpCost(unsigned Opcode, Type *DataTy, Value *Ptr,
-                                  bool VariableMask,
-                                  unsigned Alignment) {
+                                  bool VariableMask, unsigned Alignment,
+                                  const Instruction *I = nullptr) {
     return 1;
   }
 
@@ -499,11 +499,13 @@ public:
 
   unsigned getIntrinsicInstrCost(Intrinsic::ID ID, Type *RetTy,
                                  ArrayRef<Type *> Tys, FastMathFlags FMF,
-                                 unsigned ScalarizationCostPassed) {
+                                 unsigned ScalarizationCostPassed,
+                                 const Instruction *I) {
     return 1;
   }
   unsigned getIntrinsicInstrCost(Intrinsic::ID ID, Type *RetTy,
-            ArrayRef<Value *> Args, FastMathFlags FMF, unsigned VF) {
+                                 ArrayRef<Value *> Args, FastMathFlags FMF,
+                                 unsigned VF, const Instruction *I) {
     return 1;
   }
 
