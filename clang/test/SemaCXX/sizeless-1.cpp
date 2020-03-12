@@ -10,6 +10,10 @@ struct type_info;
 typedef __SVInt8_t svint8_t;
 typedef __SVInt16_t svint16_t;
 
+svint8_t global_int8;          // expected-error {{non-local variable with sizeless type 'svint8_t'}}
+extern svint8_t extern_int8;   // expected-error {{non-local variable with sizeless type 'svint8_t'}}
+static svint8_t static_int8;   // expected-error {{non-local variable with sizeless type 'svint8_t'}}
+__thread svint8_t thread_int8; // expected-error {{non-local variable with sizeless type 'svint8_t'}}
 svint8_t *global_int8_ptr;
 extern svint8_t *extern_int8_ptr;
 static svint8_t *static_int8_ptr;
@@ -58,6 +62,8 @@ void unused() {
 struct incomplete_struct *incomplete_ptr;
 
 void func(int sel) {
+  static svint8_t static_int8; // expected-error {{non-local variable with sizeless type 'svint8_t'}}
+
   svint8_t local_int8;
   svint16_t local_int16;
 
@@ -98,6 +104,7 @@ void func(int sel) {
   const volatile svint8_t const_volatile_int8 = local_int8; // expected-note {{declared const here}}
   const volatile svint8_t uninit_const_volatile_int8;       // expected-error {{default initialization of an object of const type 'const volatile svint8_t'}}
 
+  _Atomic svint8_t atomic_int8;      // expected-error {{_Atomic cannot be applied to sizeless type 'svint8_t'}}
   __restrict svint8_t restrict_int8; // expected-error {{requires a pointer or reference}}
 
   bool test_int8 = init_int8; // expected-error {{cannot initialize a variable of type 'bool' with an lvalue of type 'svint8_t'}}

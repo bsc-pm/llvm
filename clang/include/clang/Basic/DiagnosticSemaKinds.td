@@ -1509,9 +1509,12 @@ def err_deleted_decl_not_first : Error<
 
 def err_deleted_override : Error<
   "deleted function %0 cannot override a non-deleted function">;
-
 def err_non_deleted_override : Error<
   "non-deleted function %0 cannot override a deleted function">;
+def err_consteval_override : Error<
+  "consteval function %0 cannot override a non-consteval function">;
+def err_non_consteval_override : Error<
+  "non-consteval function %0 cannot override a consteval function">;
 
 def warn_weak_vtable : Warning<
   "%0 has no out-of-line virtual method definitions; its vtable will be "
@@ -5925,7 +5928,7 @@ def err_func_def_incomplete_result : Error<
   "incomplete result type %0 in function definition">;
 def err_atomic_specifier_bad_type : Error<
   "_Atomic cannot be applied to "
-  "%select{incomplete |array |function |reference |atomic |qualified |}0type "
+  "%select{incomplete |array |function |reference |atomic |qualified |sizeless |}0type "
   "%1 %select{||||||which is not trivially copyable}0">;
 
 // Expressions.
@@ -9145,6 +9148,8 @@ def err_block_on_nonlocal : Error<
   "__block attribute not allowed, only allowed on local variables">;
 def err_block_on_vm : Error<
   "__block attribute not allowed on declaration with a variably modified type">;
+def err_sizeless_nonlocal : Error<
+  "non-local variable with sizeless type %0">;
 
 def err_vec_builtin_non_vector : Error<
  "first two arguments to %0 must be vectors">;
