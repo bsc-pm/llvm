@@ -19,10 +19,9 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O0-NEXT:    vle.v v0, (a0)
+; SPILL-O0-NEXT:    vle.v v1, (a0)
 ; SPILL-O0-NEXT:    mv a1, zero
 ; SPILL-O0-NEXT:    vsetvli a1, a1, e64,m1
-; SPILL-O0-NEXT:    vfadd.vv v1, v0, v0
 ; SPILL-O0-NEXT:    vfadd.vv v2, v1, v1
 ; SPILL-O0-NEXT:    vfadd.vv v3, v2, v2
 ; SPILL-O0-NEXT:    vfadd.vv v4, v3, v3
@@ -53,77 +52,78 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O0-NEXT:    vfadd.vv v29, v28, v28
 ; SPILL-O0-NEXT:    vfadd.vv v30, v29, v29
 ; SPILL-O0-NEXT:    vfadd.vv v31, v30, v30
-; SPILL-O0-NEXT:    ld a1, -40(s0)
-; SPILL-O0-NEXT:    vs1r.v v0, (a1)
 ; SPILL-O0-NEXT:    vfadd.vv v0, v31, v31
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O0-NEXT:    ld a1, -48(s0)
-; SPILL-O0-NEXT:    vs1r.v v1, (a1)
 ; SPILL-O0-NEXT:    ld a1, -40(s0)
-; SPILL-O0-NEXT:    vl1r.v v1, (a1)
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v1
+; SPILL-O0-NEXT:    vs1r.v v1, (a1)
+; SPILL-O0-NEXT:    vfadd.vv v1, v0, v0
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
 ; SPILL-O0-NEXT:    ld a1, -48(s0)
-; SPILL-O0-NEXT:    vl1r.v v1, (a1)
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v1
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v2
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v3
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v4
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v5
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v6
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v7
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v16
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v17
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v18
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v19
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v20
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v21
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v22
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v23
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v8
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v9
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v10
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v11
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v12
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v13
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v14
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v15
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v24
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v25
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v26
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v27
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v28
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v29
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v30
-; SPILL-O0-NEXT:    vfadd.vv v0, v0, v31
+; SPILL-O0-NEXT:    vs1r.v v2, (a1)
+; SPILL-O0-NEXT:    ld a1, -40(s0)
+; SPILL-O0-NEXT:    vl1r.v v2, (a1)
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v2
+; SPILL-O0-NEXT:    ld a1, -48(s0)
+; SPILL-O0-NEXT:    vl1r.v v2, (a1)
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v2
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v3
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v4
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v5
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v6
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v7
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v16
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v17
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v18
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v19
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v20
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v21
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v22
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v23
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v8
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v9
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v10
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v11
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v12
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v13
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v14
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v15
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v24
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v25
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v26
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v27
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v28
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v29
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v30
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v31
+; SPILL-O0-NEXT:    vfadd.vv v1, v1, v0
 ; SPILL-O0-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O0-NEXT:    vse.v v0, (a0)
+; SPILL-O0-NEXT:    vse.v v1, (a0)
 ; SPILL-O0-NEXT:    addi sp, s0, -48
 ; SPILL-O0-NEXT:    ld s0, 32(sp)
 ; SPILL-O0-NEXT:    ld ra, 40(sp)
@@ -144,16 +144,15 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O2-NEXT:    andi sp, sp, -16
 ; SPILL-O2-NEXT:    sd sp, -48(s0)
 ; SPILL-O2-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O2-NEXT:    vle.v v0, (a0)
+; SPILL-O2-NEXT:    vle.v v1, (a0)
 ; SPILL-O2-NEXT:    ld a1, -40(s0)
-; SPILL-O2-NEXT:    vs1r.v v0, (a1)
+; SPILL-O2-NEXT:    vs1r.v v1, (a1)
 ; SPILL-O2-NEXT:    mv a1, zero
 ; SPILL-O2-NEXT:    vsetvli a1, a1, e64,m1
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
 ; SPILL-O2-NEXT:    ld a1, -48(s0)
-; SPILL-O2-NEXT:    vs1r.v v0, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v2, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v3, v2, v2
+; SPILL-O2-NEXT:    vs1r.v v1, (a1)
+; SPILL-O2-NEXT:    vfadd.vv v3, v1, v1
 ; SPILL-O2-NEXT:    vfadd.vv v4, v3, v3
 ; SPILL-O2-NEXT:    vfadd.vv v5, v4, v4
 ; SPILL-O2-NEXT:    vfadd.vv v6, v5, v5
@@ -183,72 +182,73 @@ define void @builtins_f64(<vscale x 1 x double>* %vaddr) nounwind {
 ; SPILL-O2-NEXT:    vfadd.vv v30, v29, v29
 ; SPILL-O2-NEXT:    vfadd.vv v31, v30, v30
 ; SPILL-O2-NEXT:    vfadd.vv v0, v31, v31
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v0
+; SPILL-O2-NEXT:    vfadd.vv v1, v0, v0
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
 ; SPILL-O2-NEXT:    ld a1, -40(s0)
-; SPILL-O2-NEXT:    vl1r.v v1, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v1
+; SPILL-O2-NEXT:    vl1r.v v2, (a1)
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v2
 ; SPILL-O2-NEXT:    ld a1, -48(s0)
-; SPILL-O2-NEXT:    vl1r.v v1, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v1
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v2
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v3
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v4
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v5
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v6
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v7
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v16
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v17
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v18
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v19
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v20
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v21
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v22
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v23
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v8
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v9
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v10
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v11
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v12
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v13
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v14
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v15
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v24
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v25
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v26
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v27
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v28
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v29
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v30
-; SPILL-O2-NEXT:    vfadd.vv v0, v0, v31
+; SPILL-O2-NEXT:    vl1r.v v2, (a1)
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v2
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v3
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v4
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v5
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v6
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v7
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v16
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v17
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v18
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v19
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v20
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v21
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v22
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v23
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v8
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v9
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v10
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v11
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v12
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v13
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v14
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v15
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v24
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v25
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v26
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v27
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v28
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v29
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v30
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v31
+; SPILL-O2-NEXT:    vfadd.vv v1, v1, v0
 ; SPILL-O2-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O2-NEXT:    vse.v v0, (a0)
+; SPILL-O2-NEXT:    vse.v v1, (a0)
 ; SPILL-O2-NEXT:    addi sp, s0, -48
 ; SPILL-O2-NEXT:    ld s0, 32(sp)
 ; SPILL-O2-NEXT:    ld ra, 40(sp)

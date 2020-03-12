@@ -21,7 +21,7 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    andi sp, sp, -16
 ; SPILL-O0-NEXT:    sd sp, -48(s0)
 ; SPILL-O0-NEXT:    vsetvli a1, a0, e64,m1
-; SPILL-O0-NEXT:    vfadd.vv v0, v16, v17
+; SPILL-O0-NEXT:    vfadd.vv v1, v16, v17
 ; SPILL-O0-NEXT:    lui a1, %hi(.L.str)
 ; SPILL-O0-NEXT:    addi a1, a1, %lo(.L.str)
 ; SPILL-O0-NEXT:    sd a0, -32(s0)
@@ -29,16 +29,16 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O0-NEXT:    ld a1, -40(s0)
 ; SPILL-O0-NEXT:    vs1r.v v16, (a1)
 ; SPILL-O0-NEXT:    ld a1, -48(s0)
-; SPILL-O0-NEXT:    vs1r.v v0, (a1)
+; SPILL-O0-NEXT:    vs1r.v v1, (a1)
 ; SPILL-O0-NEXT:    call puts
 ; SPILL-O0-NEXT:    # kill: def $x10 killed $x10
 ; SPILL-O0-NEXT:    ld a0, -32(s0)
 ; SPILL-O0-NEXT:    vsetvli a0, a0, e64,m1
 ; SPILL-O0-NEXT:    ld a0, -40(s0)
-; SPILL-O0-NEXT:    vl1r.v v0, (a0)
-; SPILL-O0-NEXT:    ld a0, -48(s0)
 ; SPILL-O0-NEXT:    vl1r.v v1, (a0)
-; SPILL-O0-NEXT:    vfadd.vv v16, v0, v1
+; SPILL-O0-NEXT:    ld a0, -48(s0)
+; SPILL-O0-NEXT:    vl1r.v v2, (a0)
+; SPILL-O0-NEXT:    vfadd.vv v16, v1, v2
 ; SPILL-O0-NEXT:    addi sp, s0, -48
 ; SPILL-O0-NEXT:    ld s0, 32(sp)
 ; SPILL-O0-NEXT:    ld ra, 40(sp)
@@ -63,18 +63,18 @@ define <vscale x 1 x double> @foo(<vscale x 1 x double> %a, <vscale x 1 x double
 ; SPILL-O2-NEXT:    ld a1, -48(s0)
 ; SPILL-O2-NEXT:    vs1r.v v16, (a1)
 ; SPILL-O2-NEXT:    vsetvli a0, a0, e64,m1
-; SPILL-O2-NEXT:    vfadd.vv v0, v16, v17
+; SPILL-O2-NEXT:    vfadd.vv v1, v16, v17
 ; SPILL-O2-NEXT:    ld a0, -40(s0)
-; SPILL-O2-NEXT:    vs1r.v v0, (a0)
+; SPILL-O2-NEXT:    vs1r.v v1, (a0)
 ; SPILL-O2-NEXT:    lui a0, %hi(.L.str)
 ; SPILL-O2-NEXT:    addi a0, a0, %lo(.L.str)
 ; SPILL-O2-NEXT:    call puts
 ; SPILL-O2-NEXT:    vsetvli a0, s1, e64,m1
 ; SPILL-O2-NEXT:    ld a0, -40(s0)
-; SPILL-O2-NEXT:    vl1r.v v0, (a0)
-; SPILL-O2-NEXT:    ld a0, -48(s0)
 ; SPILL-O2-NEXT:    vl1r.v v1, (a0)
-; SPILL-O2-NEXT:    vfadd.vv v16, v1, v0
+; SPILL-O2-NEXT:    ld a0, -48(s0)
+; SPILL-O2-NEXT:    vl1r.v v2, (a0)
+; SPILL-O2-NEXT:    vfadd.vv v16, v2, v1
 ; SPILL-O2-NEXT:    addi sp, s0, -48
 ; SPILL-O2-NEXT:    ld s1, 24(sp)
 ; SPILL-O2-NEXT:    ld s0, 32(sp)

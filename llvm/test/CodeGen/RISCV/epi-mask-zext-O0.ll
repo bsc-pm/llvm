@@ -16,11 +16,11 @@ define <vscale x 8 x i8> @foo_O0(<vscale x 8 x i1> %a) nounwind noinline optnone
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    ld a0, -16(s0)
-; CHECK-NEXT:    vle.v v0, (a0)
+; CHECK-NEXT:    vle.v v1, (a0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
-; CHECK-NEXT:    vmv.v.i v1, 1
+; CHECK-NEXT:    vmv.v.i v2, 1
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
-; CHECK-NEXT:    vand.vv v16, v0, v1
+; CHECK-NEXT:    vand.vv v16, v1, v2
 ; CHECK-NEXT:    addi sp, s0, -16
 ; CHECK-NEXT:    addi sp, sp, 16
 ; CHECK-NEXT:    ret
@@ -47,9 +47,9 @@ define <vscale x 8 x i8> @foo(<vscale x 8 x i1> %a) nounwind {
 ; CHECK-NEXT:    ld a0, -16(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    ld a0, -16(s0)
-; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vmv.v.i v1, 1
-; CHECK-NEXT:    vand.vv v16, v0, v1
+; CHECK-NEXT:    vle.v v1, (a0)
+; CHECK-NEXT:    vmv.v.i v2, 1
+; CHECK-NEXT:    vand.vv v16, v1, v2
 ; CHECK-NEXT:    addi sp, s0, -16
 ; CHECK-NEXT:    addi sp, sp, 16
 ; CHECK-NEXT:    ret

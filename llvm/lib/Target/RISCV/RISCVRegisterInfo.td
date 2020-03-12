@@ -297,31 +297,34 @@ defset list<VReg> AllVRegs = {
                  nxv16i4, nxv32i2,
                  nxv1i1, nxv2i1, nxv4i1, nxv8i1, nxv16i1, nxv32i1, nxv64i1
                 ],
-                (add (sequence "V%u", 0, 7),
+                (add (sequence "V%u", 1, 7),
                      (sequence "V%u", 16, 23),
                      (sequence "V%u", 8, 15),
-                     (sequence "V%u", 24, 31)),
+                     (sequence "V%u", 24, 31),
+                     V0),
                 1>;
 
   def VR2 : VReg<[nxv2i64, nxv4i32, nxv8i16, nxv16i8, nxv2f64, nxv4f32],
                  // Prioritise caller-save and then callee-save
-                 (add (sequence "V%u_2", 0, 7, 2),
+                 (add (sequence "V%u_2", 2, 7, 2),
                       (sequence "V%u_2", 16, 23, 2),
                       (sequence "V%u_2", 8, 15, 2),
-                      (sequence "V%u_2", 24, 31, 2)),
+                      (sequence "V%u_2", 24, 31, 2),
+                      V0_2),
                  2>;
 
   def VR4 : VReg<[nxv4i64, nxv8i32, nxv16i16, nxv32i8, nxv4f64, nxv8f32],
                  // Prioritise caller-save and then callee-save
-                 (add (sequence "V%u_4", 0, 7, 4),
+                 (add (sequence "V%u_4", 4, 7, 4),
                       (sequence "V%u_4", 16, 23, 4),
                       (sequence "V%u_4", 8, 15, 4),
-                      (sequence "V%u_4", 24, 31, 4)),
+                      (sequence "V%u_4", 24, 31, 4),
+                      V0_4),
                  4>;
 
   def VR8 : VReg<[nxv8i64, nxv16i32, nxv32i16, /*FIXME nxv64i8 does not exist yet,*/ nxv8f64, nxv16f32],
                  // Prioritise caller-save and then callee-save
-                 (add V0_8, V16_8, V8_8, V24_8),
+                 (add V16_8, V8_8, V24_8, V0_8),
                  8>;
 }
 

@@ -29,12 +29,12 @@ define <vscale x 1 x double> @max_registers(
 ; CHECK-LABEL: max_registers:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
-; CHECK-NEXT:    vfadd.vv v0, v16, v17
-; CHECK-NEXT:    vfadd.vv v0, v0, v19
-; CHECK-NEXT:    vfadd.vv v0, v0, v20
-; CHECK-NEXT:    vfadd.vv v0, v0, v21
-; CHECK-NEXT:    vfadd.vv v0, v0, v22
-; CHECK-NEXT:    vfadd.vv v16, v0, v23
+; CHECK-NEXT:    vfadd.vv v1, v16, v17
+; CHECK-NEXT:    vfadd.vv v1, v1, v19
+; CHECK-NEXT:    vfadd.vv v1, v1, v20
+; CHECK-NEXT:    vfadd.vv v1, v1, v21
+; CHECK-NEXT:    vfadd.vv v1, v1, v22
+; CHECK-NEXT:    vfadd.vv v16, v1, v23
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v0,
                                  <vscale x 1 x double> %v1,
@@ -77,10 +77,10 @@ define <vscale x 1 x double> @too_many_registers_1(
 ; CHECK-LABEL: too_many_registers_1:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a3, zero, e64,m1
-; CHECK-NEXT:    vle.v v0, (a2)
-; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    vle.v v1, (a2)
+; CHECK-NEXT:    vle.v v2, (a1)
 ; CHECK-NEXT:    vsetvli a0, a0, e64,m1
-; CHECK-NEXT:    vfadd.vv v16, v1, v0
+; CHECK-NEXT:    vfadd.vv v16, v2, v1
 ; CHECK-NEXT:    ret
                                  i64 %gvl,
                                  <vscale x 1 x double> %v0,
@@ -105,10 +105,10 @@ define <vscale x 1 x double> @too_many_registers_2(
 ; CHECK-LABEL: too_many_registers_2:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    vsetvli a3, zero, e64,m1
-; CHECK-NEXT:    vle.v v0, (a1)
-; CHECK-NEXT:    vle.v v1, (a0)
+; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    vle.v v2, (a0)
 ; CHECK-NEXT:    vsetvli a0, a2, e64,m1
-; CHECK-NEXT:    vfadd.vv v16, v1, v0
+; CHECK-NEXT:    vfadd.vv v16, v2, v1
 ; CHECK-NEXT:    ret
                                  <vscale x 1 x double> %v0,
                                  <vscale x 1 x double> %v1,
@@ -135,10 +135,10 @@ define <vscale x 1 x double> @too_many_registers_3(
 ; CHECK-NEXT:    ld a0, 8(sp)
 ; CHECK-NEXT:    ld a1, 0(sp)
 ; CHECK-NEXT:    vsetvli a2, zero, e64,m1
-; CHECK-NEXT:    vle.v v0, (a0)
-; CHECK-NEXT:    vle.v v1, (a1)
+; CHECK-NEXT:    vle.v v1, (a0)
+; CHECK-NEXT:    vle.v v2, (a1)
 ; CHECK-NEXT:    vsetvli a0, a7, e64,m1
-; CHECK-NEXT:    vfadd.vv v16, v1, v0
+; CHECK-NEXT:    vfadd.vv v16, v2, v1
 ; CHECK-NEXT:    ret
                                  i64 %i0,
                                  i64 %i1,

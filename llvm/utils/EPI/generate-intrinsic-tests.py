@@ -238,7 +238,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
     i64 undef)
 
@@ -258,7 +258,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0.t
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${result_type_scale} x i1> undef,
@@ -326,7 +326,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]]
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     i64 undef)
@@ -347,7 +347,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef,
@@ -437,7 +437,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     i64 undef)
@@ -459,7 +459,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -549,7 +549,7 @@ define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, {{v[0-9]+}}
   %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     i64 undef)
@@ -570,7 +570,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0, v0.t
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, {{v[0-9]+}}, v0.t
   %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef,
@@ -667,7 +667,7 @@ define void @intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli zero, zero, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, {{v[0-9]+}}
   %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef)
 
@@ -687,7 +687,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli zero, zero, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${scalar_register}, v0, v0.t
+; CHECK:       ${instruction}.${suffix} ${scalar_register}, {{v[0-9]+}}, v0.t
   %a = call ${llvm_result_type} @llvm.epi.${intrinsic}.mask.${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef)
@@ -784,7 +784,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${prepend_extra_ops}v0, ${scalar_register}
+; CHECK:       ${instruction}.${suffix} ${prepend_extra_ops}{{v[0-9]+}}, ${scalar_register}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
     ${llvm_lhs_type} undef,
     i64 undef)
@@ -806,7 +806,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} ${prepend_extra_ops}v0, ${scalar_register}, v0.t
+; CHECK:       ${instruction}.${suffix} ${prepend_extra_ops}{{v[0-9]+}}, ${scalar_register}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_lhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     ${llvm_lhs_type} undef,
@@ -904,7 +904,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix}.v v0, v0
+; CHECK:       ${instruction}.${suffix}.v {{v[0-9]+}}, {{v[0-9]+}}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     i64 undef)
@@ -926,7 +926,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix}.v v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix}.v {{v[0-9]+}}, {{v[0-9]+}}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -1013,7 +1013,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix}.w v0, v0
+; CHECK:       ${instruction}.${suffix}.w {{v[0-9]+}}, {{v[0-9]+}}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     i64 undef)
@@ -1035,7 +1035,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix}.w v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix}.w {{v[0-9]+}}, {{v[0-9]+}}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.${suffix}.mask.nxv${result_type_scale}${value_result_type}.nxv${lhs_type_scale}${value_lhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -1123,7 +1123,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, [[VR:v[0-9]+]], [[VR]]
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1147,7 +1147,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, [[VR:v[0-9]+]], [[VR]], v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -1171,7 +1171,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, ${scalar_register}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1195,7 +1195,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}, v0.t
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, ${scalar_register}, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -1214,7 +1214,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, 9
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, 9
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
@@ -1231,7 +1231,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, 9, v0.t
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, 9, v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
@@ -1371,7 +1371,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]], v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1395,7 +1395,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], ${scalar_register}, v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1413,7 +1413,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, 9, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], 9, v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
@@ -1524,7 +1524,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]]
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1549,7 +1549,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0, v0.t
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]], v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1574,7 +1574,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, ${scalar_register}, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], ${scalar_register}, [[VR]]
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1599,7 +1599,7 @@ define void @intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${valu
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, ${scalar_register}, v0, v0.t
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], ${scalar_register}, [[VR]], v0.t
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1712,7 +1712,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, v0
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]]
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1736,7 +1736,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, ${scalar_register}
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], ${scalar_register}
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1754,7 +1754,7 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} v0, v0, 9
+; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], 9
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
