@@ -2253,23 +2253,6 @@ Constant *ConstantExpr::getInsertElement(Constant *Val, Constant *Elt,
   return pImpl->ExprConstants.getOrCreate(Val->getType(), Key);
 }
 
-// TODO:
-// Based on the fact that a scalable shuffle vector can be used as a constant
-// expression (See changes introduced by Master commit 381d3c5c45c5), it should
-// be safe to assume that we can create a Scalable Vector Splat as a constant
-// expression. This behaviour is likely to change in the future, given that only
-// documented scalable vector constants allowed are zeroinitializer and undef.
-// Use it with caution.
-Constant *ConstantExpr::getScalableSplat(ElementCount NumElts, Constant *Val) {
-  assert(ConstantDataArray::isElementTypeCompatible(Val->getType()) &&
-         "Element type not compatible with ConstantData");
-  auto *Undef = UndefValue::get(VectorType::get(Val->getType(), NumElts));
-  Type *I32Ty = Type::getInt32Ty(Val->getType()->getContext());
-  Constant *Insert = getInsertElement(Undef, Val, ConstantInt::get(I32Ty, 0));
-  Constant *Zeros = ConstantAggregateZero::get(VectorType::get(I32Ty, NumElts));
-  return getShuffleVector(Insert, Undef, Zeros);
-}
-
 Constant *ConstantExpr::getShuffleVector(Constant *V1, Constant *V2,
                                          Constant *Mask, Type *OnlyIfReducedTy) {
   assert(ShuffleVectorInst::isValidOperands(V1, V2, Mask) &&

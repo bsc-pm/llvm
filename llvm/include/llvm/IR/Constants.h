@@ -1202,7 +1202,6 @@ public:
                                      Type *OnlyIfReducedTy = nullptr);
   static Constant *getInsertElement(Constant *Vec, Constant *Elt, Constant *Idx,
                                     Type *OnlyIfReducedTy = nullptr);
-  static Constant *getScalableSplat(ElementCount NumElts, Constant *Val);
   static Constant *getShuffleVector(Constant *V1, Constant *V2, Constant *Mask,
                                     Type *OnlyIfReducedTy = nullptr);
   static Constant *getExtractValue(Constant *Agg, ArrayRef<unsigned> Idxs,
