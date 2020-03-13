@@ -13,7 +13,7 @@
 #ifndef LOOP_OPS
 #define LOOP_OPS
 
-include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffects.td"
 include "mlir/Transforms/LoopLikeInterface.td"
 
 def Loop_Dialect : Dialect {
@@ -360,7 +360,8 @@ def ReduceOp : Loop_Op<"reduce", [HasParent<"ParallelOp">]> {
 }
 
 def ReduceReturnOp :
-    Loop_Op<"reduce.return", [HasParent<"ReduceOp">, Terminator]> {
+    Loop_Op<"reduce.return", [HasParent<"ReduceOp">, NoSideEffect,
+                              Terminator]> {
   let summary = "terminator for reduce operation";
   let description = [{
     "loop.reduce.return" is a special terminator operation for the block inside
@@ -376,7 +377,7 @@ def ReduceReturnOp :
   let assemblyFormat = "$result attr-dict `:` type($result)";
 }
 
-def YieldOp : Loop_Op<"yield", [Terminator]> {
+def YieldOp : Loop_Op<"yield", [NoSideEffect, Terminator]> {
   let summary = "loop yield and termination operation";
   let description = [{
     "loop.yield" yields an SSA value from a loop dialect op region and
