@@ -707,9 +707,8 @@ static Constant *stripAndComputeConstantOffsets(const DataLayout &DL, Value *&V,
   Offset = Offset.sextOrTrunc(IntIdxTy->getIntegerBitWidth());
 
   Constant *OffsetIntPtr = ConstantInt::get(IntIdxTy, Offset);
-  if (V->getType()->isVectorTy())
-    return ConstantVector::getSplat(V->getType()->getVectorNumElements(),
-                                    OffsetIntPtr);
+  if (VectorType *VecTy = dyn_cast<VectorType>(V->getType()))
+    return ConstantVector::getSplat(VecTy->getElementCount(), OffsetIntPtr);
   return OffsetIntPtr;
 }
 
@@ -4081,12 +4080,6 @@ static Value *SimplifyGEPInst(Type *SrcTy, ArrayRef<Value *> Ops,
 
   if (isa<UndefValue>(Ops[0]))
     return UndefValue::get(GEPTy);
-
-  // FIXME: If GEPTy is a scalable vector type, we do not attempt to simplify
-  // further. It might be possible to change the following simplifications to
-  // adapt to scalable vectors.
-  if (GEPTy->isVectorTy() && GEPTy->getVectorIsScalable())
-    return nullptr;
 
   if (Ops.size() == 2) {
     // getelementptr P, 0 -> P.

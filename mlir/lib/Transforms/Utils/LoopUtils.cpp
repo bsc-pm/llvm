@@ -868,7 +868,7 @@ static LogicalResult hoistOpsBetween(loop::ForOp outer, loop::ForOp inner) {
   });
   LogicalResult status = success();
   SmallVector<Operation *, 8> toHoist;
-  for (auto &op : outer.getBody()->getOperations()) {
+  for (auto &op : outer.getBody()->without_terminator()) {
     // Stop when encountering the inner loop.
     if (&op == inner.getOperation())
       break;
@@ -887,7 +887,7 @@ static LogicalResult hoistOpsBetween(loop::ForOp outer, loop::ForOp inner) {
     }
     // Skip if op has side effects.
     // TODO(ntv): loads to immutable memory regions are ok.
-    if (!op.hasNoSideEffect()) {
+    if (!MemoryEffectOpInterface::hasNoEffect(&op)) {
       status = failure();
       continue;
     }

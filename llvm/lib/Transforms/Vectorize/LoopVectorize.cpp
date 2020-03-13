@@ -1761,11 +1761,10 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
   // FIXME: If the step is non-constant, we create the vector splat with
   //        IRBuilder. IRBuilder can constant-fold the multiply, but it doesn't
   //        handle a constant vector splat.
-
   Value *SplatVF;
   if (!isScalable()) {
     SplatVF = isa<Constant>(Mul)
-                  ? ConstantVector::getSplat(VF, cast<Constant>(Mul))
+                  ? ConstantVector::getSplat({VF, false}, cast<Constant>(Mul))
                   : Builder.CreateVectorSplat(VF, Mul);
   } else {
     SplatVF = Builder.CreateVectorSplat(
@@ -3920,9 +3919,7 @@ void InnerLoopVectorizer::fixReduction(PHINode *Phi) {
       // incoming scalar reduction.
       VectorStart = ReductionStartValue;
     } else {
-      Identity = isScalable() ? Builder.CreateVectorSplat(VF, Iden, "ident",
-                                                          isScalable())
-                              : ConstantVector::getSplat(VF, Iden);
+      Identity = ConstantVector::getSplat({VF, false}, Iden);
 
       // This vector is the Identity vector where the first element is the
       // incoming scalar reduction.
