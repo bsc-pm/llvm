@@ -432,8 +432,7 @@ Value *SCEVExpander::expandAddToGEP(const SCEV *const *op_begin,
     // If the scale size is not 0, attempt to factor out a scale for
     // array indexing.
     SmallVector<const SCEV *, 8> ScaledOps;
-    if (ElTy->isSized() &&
-        !(ElTy->isVectorTy() && ElTy->getVectorIsScalable())) {
+    if (ElTy->isSized()) {
       const SCEV *ElSize = SE.getSizeOfExpr(IntIdxTy, ElTy);
       if (!ElSize->isZero()) {
         SmallVector<const SCEV *, 8> NewOps;
