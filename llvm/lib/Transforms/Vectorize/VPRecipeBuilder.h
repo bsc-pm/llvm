@@ -13,6 +13,7 @@
 #include "VPlan.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instruction.h"
 
 namespace llvm {
 
@@ -63,6 +64,10 @@ class VPRecipeBuilder {
   /// recipe that takes an additional VPInstruction for the mask.
   VPWidenMemoryInstructionRecipe *
   tryToWidenMemory(Instruction *I, VFRange &Range, VPlanPtr &Plan);
+
+  /// Similar to tryToWidenMemory, but create a predicated recipe.
+  VPPredicatedWidenMemoryInstructionRecipe *
+  tryToPredicatedWidenMemory(Instruction *I, VFRange &Range, VPlanPtr &Plan);
 
   /// Check if an induction recipe should be constructed for \I. If so build and
   /// return it. If not, return null.
@@ -124,6 +129,10 @@ public:
   /// A helper function that computes the predicate of the edge between SRC
   /// and DST.
   VPValue *createEdgeMask(BasicBlock *Src, BasicBlock *Dst, VPlanPtr &Plan);
+
+  /// A helper function that validates if the memory instruction can be widened
+  /// and sets the widening decision.
+  bool validateWidenMemory(Instruction *I, VFRange &Range);
 
   /// Mark given ingredient for recording its recipe once one is created for
   /// it.

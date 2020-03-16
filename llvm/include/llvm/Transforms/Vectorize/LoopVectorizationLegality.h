@@ -318,6 +318,12 @@ public:
     return ConditionalAssumes;
   }
 
+  /// Returns true if TTI prefers widening vector ops using predicated vector
+  /// intrinsics.
+  bool preferPredicatedVectorOps() const {
+    return TTI->preferPredicatedVectorOps();
+  }
+
 private:
   /// Return true if the pre-header, exiting and latch blocks of \p Lp and all
   /// its nested loops are considered legal for vectorization. These legal

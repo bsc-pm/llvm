@@ -1169,6 +1169,8 @@ def int_ptrmask: Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty, llvm_anyint_ty],
 // from the main Vector Predication proposal at revision id D57504, diff id
 // 246280, authored by Simon Moll.  Once these land in the reviewed subpatch,
 // they will be merged in normally and replace the code below. 
+// The definitions in D57504 do not contain alignment argument (alignment is
+// handled via VPBuilder).
 
 // Be very careful while using these - Mask and VectorLength properties are
 // commented out because adding them will necessiate changes in other files that
@@ -1178,32 +1180,34 @@ def int_ptrmask: Intrinsic<[llvm_anyptr_ty], [llvm_anyptr_ty, llvm_anyint_ty],
 def int_vp_store : Intrinsic<[],
                              [ llvm_anyvector_ty,
                                LLVMAnyPointerType<LLVMMatchType<0>>,
+                               llvm_i32_ty,
                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                llvm_i32_ty],
                              [ NoCapture<1>, IntrNoSync, IntrArgMemOnly,
-                               IntrWillReturn/*, Mask<2>, VectorLength<3>*/ ]>;
+                               IntrWillReturn, ImmArg<2>/*, Mask<2>, VectorLength<3>*/ ]>;
 
 def int_vp_load  : Intrinsic<[ llvm_anyvector_ty],
                              [ LLVMAnyPointerType<LLVMMatchType<0>>,
+                               llvm_i32_ty,
                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                llvm_i32_ty],
                              [ NoCapture<0>, IntrNoSync, IntrReadMem,
-                               IntrWillReturn, IntrArgMemOnly
+                               IntrWillReturn, IntrArgMemOnly, ImmArg<1>
                                /*, Mask<1>, VectorLength<2>*/ ]>;
 
 def int_vp_gather: Intrinsic<[ llvm_anyvector_ty],
-                             [ LLVMVectorOfAnyPointersToElt<0>,
+                             [ LLVMVectorOfAnyPointersToElt<0>, llvm_i32_ty,
                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                llvm_i32_ty],
                              [ IntrReadMem, IntrNoSync, IntrWillReturn,
-                               IntrArgMemOnly/*, Mask<1>, VectorLength<2>*/ ]>;
+                               IntrArgMemOnly, ImmArg<1>/*, Mask<1>, VectorLength<2>*/ ]>;
 
 def int_vp_scatter: Intrinsic<[],
                               [ llvm_anyvector_ty,
-                                LLVMVectorOfAnyPointersToElt<0>,
+                                LLVMVectorOfAnyPointersToElt<0>, llvm_i32_ty,
                                 LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                 llvm_i32_ty],
-                              [ IntrArgMemOnly, IntrNoSync, IntrWillReturn
+                              [ IntrArgMemOnly, IntrNoSync, IntrWillReturn, ImmArg<2>
                                 /*, Mask<2>, VectorLength<3>*/ ]>;
 // TODO allow IntrNoCapture for vectors of pointers
 // Comparison

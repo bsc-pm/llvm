@@ -621,6 +621,7 @@ public:
     VPWidenGEPSC,
     VPWidenIntOrFpInductionSC,
     VPWidenMemoryInstructionSC,
+    VPPredicatedWidenMemoryInstructionSC,
     VPWidenPHISC,
     VPWidenSC,
     VPPredicatedWidenSC,
@@ -1216,6 +1217,43 @@ public:
            "Stored value only available for store instructions");
     return User.getOperand(1); // Stored value is the 2nd, mandatory operand.
   }
+
+  /// Generate the wide load/store.
+  void execute(VPTransformState &State) override;
+
+  /// Print the recipe.
+  void print(raw_ostream &O, const Twine &Indent,
+             VPSlotTracker &SlotTracker) const override;
+};
+
+class VPPredicatedWidenMemoryInstructionRecipe : public VPRecipeBase {
+private:
+  Instruction &Instr;
+  VPUser User;
+  VPUser PredInfo;
+
+public:
+  VPPredicatedWidenMemoryInstructionRecipe(Instruction &Instr, VPValue *Addr,
+                                           VPValue *Mask, VPValue *EVL)
+      : VPRecipeBase(VPPredicatedWidenMemoryInstructionSC), Instr(Instr),
+        User({Addr}), PredInfo({Mask, EVL}) {}
+
+  /// Method to support type inquiry through isa, cast, and dyn_cast.
+  static inline bool classof(const VPRecipeBase *V) {
+    return V->getVPRecipeID() ==
+           VPRecipeBase::VPPredicatedWidenMemoryInstructionSC;
+  }
+
+  /// Return the address accessed by this recipe.
+  VPValue *getAddr() const {
+    return User.getOperand(0); // Address is the 1st, mandatory operand.
+  }
+
+  /// Return the mask used by this recipe.
+  VPValue *getMask() const { return PredInfo.getOperand(0); }
+
+  /// Return the EVL used by this recipe.
+  VPValue *getEVL() const { return PredInfo.getOperand(1); }
 
   /// Generate the wide load/store.
   void execute(VPTransformState &State) override;

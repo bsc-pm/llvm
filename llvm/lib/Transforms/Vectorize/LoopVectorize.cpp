@@ -501,11 +501,11 @@ public:
 
   /// Vectorize Load and Store instructions with the base address given in \p
   /// Addr, optionally masking the vector operations if \p BlockInMask is
-  /// non-null. Use \p State to translate given VPValues to IR values in the
-  /// vectorized loop.
+  /// non-null or generate predicated intrinsic call if preferred. Use \p State
+  /// to translate given VPValues to IR values in the vectorized loop.
   void vectorizeMemoryInstruction(Instruction *Instr, VPTransformState &State,
                                   VPValue *Addr, VPValue *StoredValue,
-                                  VPValue *BlockInMask);
+                                  VPValue *BlockInMask, VPValue *EVL = nullptr);
 
   /// Set the debug location in the builder using the debug location in
   /// the instruction.
@@ -2482,7 +2482,8 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
                                                      VPTransformState &State,
                                                      VPValue *Addr,
                                                      VPValue *StoredValue,
-                                                     VPValue *BlockInMask) {
+                                                     VPValue *BlockInMask,
+                                                     VPValue *EVL) {
   // Attempt to issue a wide load.
   LoadInst *LI = dyn_cast<LoadInst>(Instr);
   StoreInst *SI = dyn_cast<StoreInst>(Instr);
@@ -2575,7 +2576,16 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     for (unsigned Part = 0; Part < UF; ++Part) {
       Instruction *NewSI = nullptr;
       Value *StoredVal = State.get(StoredValue, Part);
+      // If EVL is not nullptr, then EVL must be a valid value set during plan
+      // creation, possibly default value = whole vector register length. EVL is
+      // created only if TTI prefers predicated vectorization, thus if EVL is
+      // not nullptr it also implies preference for predicated vectorization.
+      Value *EVLPart = EVL ? State.get(EVL, {Part, 0}) : nullptr;
       if (CreateGatherScatter) {
+        // TODO: Support predicated scatter gather.
+        assert(
+            !EVL &&
+            "Predicated intrinsics for scatter and gather not supported yet");
         Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
         Value *VectorGep = State.get(Addr, Part);
         VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
@@ -2595,8 +2605,16 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
         }
         auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
         if (isMaskRequired)
-          NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
-                                            BlockInMaskParts[Part]);
+          if (EVLPart) {
+            Function *VPIntr = Intrinsic::getDeclaration(
+                LoopVectorPreHeader->getModule(), Intrinsic::vp_store,
+                {StoredVal->getType(), VecPtr->getType()});
+            NewSI = Builder.CreateCall(
+                VPIntr, {StoredVal, VecPtr, Builder.getInt32(Alignment.value()),
+                         BlockInMaskParts[Part], EVLPart});
+          } else
+            NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
+                                              BlockInMaskParts[Part]);
         else
           NewSI = Builder.CreateAlignedStore(StoredVal, VecPtr, Alignment);
       }
@@ -2610,6 +2628,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
   setDebugLocFromInst(Builder, LI);
   for (unsigned Part = 0; Part < UF; ++Part) {
     Value *NewLI;
+    Value *EVLPart = EVL ? State.get(EVL, {Part, 0}) : nullptr;
     if (CreateGatherScatter) {
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
@@ -2624,9 +2643,19 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     } else {
       auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
       if (isMaskRequired)
-        NewLI = Builder.CreateMaskedLoad(
-            VecPtr, Alignment, BlockInMaskParts[Part], UndefValue::get(DataTy),
-            "wide.masked.load");
+        if (EVLPart) {
+          Function *VPIntr = Intrinsic::getDeclaration(
+              LoopVectorPreHeader->getModule(), Intrinsic::vp_load,
+              {VecPtr->getType()->getPointerElementType(), VecPtr->getType()});
+          NewLI =
+              Builder.CreateCall(VPIntr,
+                                 {VecPtr, Builder.getInt32(Alignment.value()),
+                                  BlockInMaskParts[Part], EVLPart},
+                                 "vp.op.load");
+        } else
+          NewLI = Builder.CreateMaskedLoad(
+              VecPtr, Alignment, BlockInMaskParts[Part],
+              UndefValue::get(DataTy), "wide.masked.load");
       else
         NewLI =
             Builder.CreateAlignedLoad(DataTy, VecPtr, Alignment, "wide.load");
@@ -7216,9 +7245,7 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
   return BlockMaskCache[BB] = BlockMask;
 }
 
-VPWidenMemoryInstructionRecipe *
-VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
-                                  VPlanPtr &Plan) {
+bool VPRecipeBuilder::validateWidenMemory(Instruction *I, VFRange &Range) {
   assert((isa<LoadInst>(I) || isa<StoreInst>(I)) &&
          "Must be called with either a load or store");
 
@@ -7238,6 +7265,15 @@ VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
   };
 
   if (!LoopVectorizationPlanner::getDecisionAndClampRange(willWiden, Range))
+    return false;
+
+  return true;
+}
+
+VPWidenMemoryInstructionRecipe *
+VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
+                                  VPlanPtr &Plan) {
+  if (!validateWidenMemory(I, Range))
     return nullptr;
 
   VPValue *Mask = nullptr;
@@ -7251,6 +7287,30 @@ VPRecipeBuilder::tryToWidenMemory(Instruction *I, VFRange &Range,
   StoreInst *Store = cast<StoreInst>(I);
   VPValue *StoredValue = Plan->getOrAddVPValue(Store->getValueOperand());
   return new VPWidenMemoryInstructionRecipe(*Store, Addr, StoredValue, Mask);
+}
+
+VPPredicatedWidenMemoryInstructionRecipe *
+VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
+                                            VPlanPtr &Plan) {
+  if (!validateWidenMemory(I, Range))
+    return nullptr;
+
+  VPValue *Mask = Legal->isMaskRequired(I)
+                      ? createBlockInMask(I->getParent(), Plan)
+                      : nullptr;
+
+  // If tail folding by masking is enabled, memory instructions should be marked
+  // as masked ops ( LoopVectorizationLegality::blockCanBePredicated()).
+  // However, unlike general instructions (arithmetic, comparison, select,
+  // etc.), presence of mask does not guarantee TTI's preference to use
+  // predicated vector instructions.
+  if (Mask && Legal->preferPredicatedVectorOps()) {
+    VPValue *EVL = Plan->getOrAddVPValue(ConstantInt::getSigned(
+        IntegerType::get(I->getType()->getContext(), 32), -1));
+    VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
+    return new VPPredicatedWidenMemoryInstructionRecipe(*I, Addr, Mask, EVL);
+  }
+  return nullptr;
 }
 
 VPWidenIntOrFpInductionRecipe *
@@ -7990,6 +8050,12 @@ void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
   VPValue *StoredValue = isa<StoreInst>(Instr) ? getStoredValue() : nullptr;
   State.ILV->vectorizeMemoryInstruction(&Instr, State, getAddr(), StoredValue,
                                         getMask());
+}
+
+void VPPredicatedWidenMemoryInstructionRecipe::execute(
+    VPTransformState &State) {
+  State.ILV->vectorizeMemoryInstruction(&Instr, State, getAddr(), getMask(),
+                                        getEVL());
 }
 
 // Determine how to lower the scalar epilogue, which depends on 1) optimising
