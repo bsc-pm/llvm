@@ -60,7 +60,7 @@ def FeatureStdExtV
     : SubtargetFeature<"v", "HasStdExtV", "true",
                        "'V' (Vector Instructions)">;
 def HasStdExtV : Predicate<"Subtarget->hasStdExtV()">,
-                           AssemblerPredicate<"FeatureStdExtV",
+                           AssemblerPredicate<(all_of FeatureStdExtV),
                            "'V' (Vector Instructions)">;
 
 def Feature64Bit
