@@ -327,6 +327,7 @@ bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
                                              const CallInst &I,
                                              MachineFunction &MF,
                                              unsigned Intrinsic) const {
+  auto &DL = I.getModule()->getDataLayout();
   switch (Intrinsic) {
   default:
     return false;
@@ -338,7 +339,7 @@ bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
   case Intrinsic::riscv_masked_atomicrmw_min_i32:
   case Intrinsic::riscv_masked_atomicrmw_umax_i32:
   case Intrinsic::riscv_masked_atomicrmw_umin_i32:
-  case Intrinsic::riscv_masked_cmpxchg_i32:
+  case Intrinsic::riscv_masked_cmpxchg_i32: {
     PointerType *PtrTy = cast<PointerType>(I.getArgOperand(0)->getType());
     Info.opc = ISD::INTRINSIC_W_CHAIN;
     Info.memVT = MVT::getVT(PtrTy->getElementType());
@@ -348,6 +349,46 @@ bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     Info.flags = MachineMemOperand::MOLoad | MachineMemOperand::MOStore |
                  MachineMemOperand::MOVolatile;
     return true;
+  }
+  case Intrinsic::epi_vload:
+  case Intrinsic::epi_vload_strided:
+  case Intrinsic::epi_vload_indexed: {
+    PointerType *PtrTy = cast<PointerType>(I.getArgOperand(0)->getType());
+    Info.opc = ISD::INTRINSIC_W_CHAIN;
+    Info.memVT = MVT::getVT(PtrTy->getElementType());
+    Info.ptrVal = I.getArgOperand(0);
+    Info.offset = 0;
+    Info.align = MaybeAlign(DL.getABITypeAlignment(PtrTy->getElementType()));
+    Info.flags = MachineMemOperand::MOLoad;
+    return true;
+  }
+  case Intrinsic::epi_vload_mask:
+  case Intrinsic::epi_vload_strided_mask:
+  case Intrinsic::epi_vload_indexed_mask: {
+    PointerType *PtrTy = cast<PointerType>(I.getArgOperand(1)->getType());
+    Info.opc = ISD::INTRINSIC_W_CHAIN;
+    Info.memVT = MVT::getVT(PtrTy->getElementType());
+    Info.ptrVal = I.getArgOperand(1);
+    Info.offset = 0;
+    Info.align = MaybeAlign(DL.getABITypeAlignment(PtrTy->getElementType()));
+    Info.flags = MachineMemOperand::MOLoad;
+    return true;
+  }
+  case Intrinsic::epi_vstore:
+  case Intrinsic::epi_vstore_strided:
+  case Intrinsic::epi_vstore_indexed:
+  case Intrinsic::epi_vstore_mask:
+  case Intrinsic::epi_vstore_strided_mask:
+  case Intrinsic::epi_vstore_indexed_mask: {
+    PointerType *PtrTy = cast<PointerType>(I.getArgOperand(1)->getType());
+    Info.opc = ISD::INTRINSIC_VOID;
+    Info.memVT = MVT::getVT(PtrTy->getElementType());
+    Info.ptrVal = I.getArgOperand(1);
+    Info.offset = 0;
+    Info.align = MaybeAlign(DL.getABITypeAlignment(PtrTy->getElementType()));
+    Info.flags = MachineMemOperand::MOStore;
+    return true;
+  }
   }
 }
 

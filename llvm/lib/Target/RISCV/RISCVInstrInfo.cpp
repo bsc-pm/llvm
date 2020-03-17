@@ -42,6 +42,11 @@ unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     return 0;
+  case RISCV::PseudoVRELOAD:
+    assert(MI.getOperand(1).isFI());
+    FrameIndex = MI.getOperand(1).getIndex();
+    assert(MI.getOperand(0).isReg());
+    return MI.getOperand(0).getReg();
   case RISCV::LB:
   case RISCV::LBU:
   case RISCV::LH:
@@ -68,6 +73,11 @@ unsigned RISCVInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     return 0;
+  case RISCV::PseudoVSPILL:
+    assert(MI.getOperand(1).isFI());
+    FrameIndex = MI.getOperand(1).getIndex();
+    assert(MI.getOperand(0).isReg());
+    return MI.getOperand(0).getReg();
   case RISCV::SB:
   case RISCV::SH:
   case RISCV::SW:
