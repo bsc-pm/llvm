@@ -4907,8 +4907,9 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
     // See IsCForbiddenLValueType.
     if (!ResultType.hasQualifiers()) VK = VK_RValue;
   } else if (!ResultType->isDependentType() &&
-      RequireCompleteType(LLoc, ResultType,
-                          diag::err_subscript_incomplete_type, BaseExpr))
+             RequireCompleteSizedType(
+                 LLoc, ResultType,
+                 diag::err_subscript_incomplete_or_sizeless_type, BaseExpr))
     return ExprError();
 
   assert(VK == VK_RValue || LangOpts.CPlusPlus ||
@@ -9570,9 +9571,10 @@ static bool checkArithmeticIncompletePointerType(Sema &S, SourceLocation Loc,
 
   assert(ResType->isAnyPointerType() && !ResType->isDependentType());
   QualType PointeeTy = ResType->getPointeeType();
-  return S.RequireCompleteType(Loc, PointeeTy,
-                               diag::err_typecheck_arithmetic_incomplete_type,
-                               PointeeTy, Operand->getSourceRange());
+  return S.RequireCompleteSizedType(
+      Loc, PointeeTy,
+      diag::err_typecheck_arithmetic_incomplete_or_sizeless_type,
+      Operand->getSourceRange());
 }
 
 /// Check the validity of an arithmetic pointer operand.
