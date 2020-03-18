@@ -148,14 +148,14 @@ void RISCVFrameLowering::determineFrameLayout(MachineFunction &MF) const {
   uint64_t FrameSize = MFI.getStackSize();
 
   // Get the alignment.
-  uint64_t StackAlign = RI->needsStackRealignment(MF) ? MFI.getMaxAlignment()
-                                                      : getStackAlignment();
+  Align StackAlign =
+      RI->needsStackRealignment(MF) ? MFI.getMaxAlign() : getStackAlign();
 #if 0
   // Get the alignment.
-  unsigned StackAlign = getStackAlignment();
+  Align StackAlign = getStackAlign();
   if (RI->needsStackRealignment(MF)) {
-    unsigned MaxStackAlign = std::max(StackAlign, MFI.getMaxAlignment());
-    FrameSize += (MaxStackAlign - StackAlign);
+    Align MaxStackAlign = std::max(StackAlign, MFI.getMaxAlign());
+    FrameSize += (MaxStackAlign.value() - StackAlign.value());
     StackAlign = MaxStackAlign;
   }
 
@@ -427,15 +427,15 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
     // Realign Stack
     const RISCVRegisterInfo *RI = STI.getRegisterInfo();
     if (RI->needsStackRealignment(MF)) {
-      unsigned MaxAlignment = MFI.getMaxAlignment();
+      Align MaxAlignment = MFI.getMaxAlign();
 
       const RISCVInstrInfo *TII = STI.getInstrInfo();
-      if (isInt<12>(-(int)MaxAlignment)) {
+      if (isInt<12>(-(int)MaxAlignment.value())) {
         BuildMI(MBB, MBBI, DL, TII->get(RISCV::ANDI), SPReg)
             .addReg(SPReg)
-            .addImm(-(int)MaxAlignment);
+            .addImm(-(int)MaxAlignment.value());
       } else {
-        unsigned ShiftAmount = countTrailingZeros(MaxAlignment);
+        unsigned ShiftAmount = Log2(MaxAlignment);
         Register VR =
             MF.getRegInfo().createVirtualRegister(&RISCV::GPRRegClass);
         BuildMI(MBB, MBBI, DL, TII->get(RISCV::SRLI), VR)
