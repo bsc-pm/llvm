@@ -214,6 +214,27 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
         .addReg(SrcReg, getKillRegState(IsKill))
         .addFrameIndex(FI);
     return;
+  } else if (RISCV::VR2RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL_M2))
+        .addReg(SrcReg, getKillRegState(IsKill))
+        .addFrameIndex(FI);
+    return;
+  } else if (RISCV::VR4RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL_M4))
+        .addReg(SrcReg, getKillRegState(IsKill))
+        .addFrameIndex(FI);
+    return;
+  } else if (RISCV::VR8RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL_M8))
+        .addReg(SrcReg, getKillRegState(IsKill))
+        .addFrameIndex(FI);
+    return;
   } else
     llvm_unreachable("Can't store this register to stack slot");
 
@@ -249,6 +270,24 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     RVFI->setHasSpilledVR();
     FrameInfo.setStackID(FI, TargetStackID::EPIVector);
     BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD_M1), DstReg)
+        .addFrameIndex(FI);
+    return;
+  } else if (RISCV::VR2RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD_M2), DstReg)
+        .addFrameIndex(FI);
+    return;
+  } else if (RISCV::VR4RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD_M4), DstReg)
+        .addFrameIndex(FI);
+    return;
+  } else if (RISCV::VR8RegClass.hasSubClassEq(RC)) {
+    RVFI->setHasSpilledVR();
+    FrameInfo.setStackID(FI, TargetStackID::EPIVector);
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD_M8), DstReg)
         .addFrameIndex(FI);
     return;
   } else

@@ -160,6 +160,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   const RISCVInstrInfo *TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
   DebugLoc DL = MI.getDebugLoc();
 
+  const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
+
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   unsigned FrameReg;
   int Offset =
@@ -184,6 +186,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // The following two are handled later in this function
   case RISCV::PseudoVSPILL_M1:
   case RISCV::PseudoVRELOAD_M1:
+  case RISCV::PseudoVSPILL_M2:
+  case RISCV::PseudoVRELOAD_M2:
     NeedsIndirectAddressing =
         MFI.getStackID(FrameIndex) == TargetStackID::EPIVector;
     break;
@@ -220,7 +224,9 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
     // Handle vector spills here
     if (MI.getOpcode() == RISCV::PseudoVSPILL_M1 ||
-        MI.getOpcode() == RISCV::PseudoVRELOAD_M1) {
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M1 ||
+        MI.getOpcode() == RISCV::PseudoVSPILL_M2 ||
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M2) {
 
       // Make sure we spill/reload all the bits using whole register
       // instructions.
@@ -237,6 +243,42 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       case RISCV::PseudoVRELOAD_M1: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), OpReg.getReg())
             .addReg(HandleReg, RegState::Kill);
+        break;
+      }
+      case RISCV::PseudoVSPILL_M2: {
+        unsigned RegEven = RI.getSubReg(OpReg.getReg(), RISCV::vreven);
+        unsigned RegOdd = RI.getSubReg(OpReg.getReg(), RISCV::vrodd);
+
+        unsigned VLenBReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+        BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVLENB), VLenBReg);
+
+        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
+            .addReg(RegEven, getKillRegState(OpReg.isKill()))
+            .addReg(HandleReg);
+        unsigned HandleReg2 = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+        BuildMI(MBB, II, DL, TII->get(RISCV::ADD), HandleReg2)
+            .addReg(HandleReg, RegState::Kill)
+            .addReg(VLenBReg);
+        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
+            .addReg(RegOdd, getKillRegState(OpReg.isKill()))
+            .addReg(HandleReg2, RegState::Kill);
+        break;
+      }
+      case RISCV::PseudoVRELOAD_M2: {
+        unsigned RegEven = RI.getSubReg(OpReg.getReg(), RISCV::vreven);
+        unsigned RegOdd = RI.getSubReg(OpReg.getReg(), RISCV::vrodd);
+
+        unsigned VLenBReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+        BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVLENB), VLenBReg);
+
+        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), RegEven)
+            .addReg(HandleReg);
+        unsigned HandleReg2 = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+        BuildMI(MBB, II, DL, TII->get(RISCV::ADD), HandleReg2)
+            .addReg(HandleReg)
+            .addReg(VLenBReg);
+        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), RegOdd)
+            .addReg(HandleReg2, RegState::Kill);
         break;
       }
       }
