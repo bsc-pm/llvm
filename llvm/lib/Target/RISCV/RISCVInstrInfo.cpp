@@ -210,7 +210,7 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
     RVFI->setHasSpilledVR();
     FrameInfo.setStackID(FI, TargetStackID::EPIVector);
-    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL))
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVSPILL_M1))
         .addReg(SrcReg, getKillRegState(IsKill))
         .addFrameIndex(FI);
     return;
@@ -248,7 +248,7 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
     RVFI->setHasSpilledVR();
     FrameInfo.setStackID(FI, TargetStackID::EPIVector);
-    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD), DstReg)
+    BuildMI(MBB, I, DL, get(RISCV::PseudoVRELOAD_M1), DstReg)
         .addFrameIndex(FI);
     return;
   } else

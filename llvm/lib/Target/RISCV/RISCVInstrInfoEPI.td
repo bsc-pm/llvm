@@ -170,13 +170,22 @@ def : InstAlias<"vmnot.m $vd, $vs",
 // Pseudo instructions we need for SPILL and RELOAD
 //===----------------------------------------------------------------------===//
 
+multiclass pseudo_spill_reload<VReg reg_class, int vlmul> {
+
 let hasSideEffects = 1, mayLoad = 0, mayStore = 1, isCodeGenOnly = 1,
     Uses = [VL, VTYPE] in
-def PseudoVSPILL : Pseudo<(outs), (ins VR:$rs1, GPR:$rs2), []>;
+def PseudoVSPILL_M#vlmul : Pseudo<(outs), (ins reg_class:$rs1, GPR:$rs2), []>;
 
 let hasSideEffects = 1, mayLoad = 1, mayStore = 0, isCodeGenOnly = 1,
     Uses = [VL, VTYPE] in
-def PseudoVRELOAD : Pseudo<(outs VR:$rs1), (ins GPR:$rs2), []>;
+def PseudoVRELOAD_M#vlmul : Pseudo<(outs reg_class:$rs1), (ins GPR:$rs2), []>;
+
+}
+
+defm "" : pseudo_spill_reload<VR, 1>;
+defm "" : pseudo_spill_reload<VR2, 2>;
+defm "" : pseudo_spill_reload<VR4, 4>;
+defm "" : pseudo_spill_reload<VR8, 8>;
 
 }
 

@@ -182,8 +182,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   case RISCV::VLE_V:
   case RISCV::VSE_V:
     // The following two are handled later in this function
-  case RISCV::PseudoVSPILL:
-  case RISCV::PseudoVRELOAD:
+  case RISCV::PseudoVSPILL_M1:
+  case RISCV::PseudoVRELOAD_M1:
     NeedsIndirectAddressing =
         MFI.getStackID(FrameIndex) == TargetStackID::EPIVector;
     break;
@@ -219,8 +219,8 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
             .addImm(0);
 
     // Handle vector spills here
-    if (MI.getOpcode() == RISCV::PseudoVSPILL ||
-        MI.getOpcode() == RISCV::PseudoVRELOAD) {
+    if (MI.getOpcode() == RISCV::PseudoVSPILL_M1 ||
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M1) {
 
       // Make sure we spill/reload all the bits using whole register
       // instructions.
@@ -228,13 +228,13 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
       switch (MI.getOpcode()) {
       default:
         llvm_unreachable("Unexpected instruction");
-      case RISCV::PseudoVSPILL: {
+      case RISCV::PseudoVSPILL_M1: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
             .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
             .addReg(HandleReg, RegState::Kill);
         break;
       }
-      case RISCV::PseudoVRELOAD: {
+      case RISCV::PseudoVRELOAD_M1: {
         BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), OpReg.getReg())
             .addReg(HandleReg, RegState::Kill);
         break;
