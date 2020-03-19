@@ -74,6 +74,8 @@ OMPSS_CLAUSE_ALIAS(commutative, depend)
 OMPSS_CLAUSE_ALIAS(weakin, depend)
 OMPSS_CLAUSE_ALIAS(weakout, depend)
 OMPSS_CLAUSE_ALIAS(weakinout, depend)
+// OmpSs-2 'reduction' alias
+OMPSS_CLAUSE_ALIAS(weakreduction, reduction)
 
 // Clauses allowed for OmpSs directive 'task'.
 OMPSS_TASK_CLAUSE(if)
@@ -94,6 +96,7 @@ OMPSS_TASK_CLAUSE(commutative)
 OMPSS_TASK_CLAUSE(weakin)
 OMPSS_TASK_CLAUSE(weakout)
 OMPSS_TASK_CLAUSE(weakinout)
+OMPSS_TASK_CLAUSE(weakreduction)
 
 #undef OMPSS_DEPEND_KIND
 #undef OMPSS_DEFAULT_KIND

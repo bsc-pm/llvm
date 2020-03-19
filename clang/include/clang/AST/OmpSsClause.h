@@ -866,6 +866,8 @@ class OSSReductionClause final
 
   SmallVector<BinaryOperatorKind, 4> ReductionKinds;
 
+  bool IsWeak;
+
   /// Build clause with number of variables \a N.
   ///
   /// \param StartLoc Starting location of the clause.
@@ -878,11 +880,13 @@ class OSSReductionClause final
   OSSReductionClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                      SourceLocation ColonLoc, SourceLocation EndLoc, unsigned N,
                      NestedNameSpecifierLoc QualifierLoc,
-                     const DeclarationNameInfo &NameInfo)
+                     const DeclarationNameInfo &NameInfo,
+                     bool IsWeak)
       : OSSVarListClause<OSSReductionClause>(OSSC_reduction, StartLoc,
                                              LParenLoc, EndLoc, N),
         ColonLoc(ColonLoc),
-        QualifierLoc(QualifierLoc), NameInfo(NameInfo) {}
+        QualifierLoc(QualifierLoc), NameInfo(NameInfo),
+        IsWeak(IsWeak) {}
 
   /// Build an empty clause.
   ///
@@ -1009,7 +1013,8 @@ public:
          NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
          ArrayRef<Expr *> SimpleExprs,
          ArrayRef<Expr *> LHSExprs, ArrayRef<Expr *> RHSExprs,
-         ArrayRef<Expr *> ReductionOps, ArrayRef<BinaryOperatorKind> ReductionKinds);
+         ArrayRef<Expr *> ReductionOps, ArrayRef<BinaryOperatorKind> ReductionKinds,
+         bool IsWeak);
 
   /// Creates an empty clause with the place for \a N variables.
   ///
@@ -1027,6 +1032,8 @@ public:
   NestedNameSpecifierLoc getQualifierLoc() const { return QualifierLoc; }
 
   ArrayRef<BinaryOperatorKind> getReductionKinds() const { return ReductionKinds; }
+
+  bool isWeak() const { return IsWeak; }
 
   using helper_expr_iterator = MutableArrayRef<Expr *>::iterator;
   using helper_expr_const_iterator = ArrayRef<const Expr *>::iterator;

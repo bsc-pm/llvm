@@ -174,10 +174,10 @@ OSSReductionClause *OSSReductionClause::Create(
     NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
     ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> LHSExprs,
     ArrayRef<Expr *> RHSExprs, ArrayRef<Expr *> ReductionOps,
-    ArrayRef<BinaryOperatorKind> ReductionKinds) {
+    ArrayRef<BinaryOperatorKind> ReductionKinds, bool IsWeak) {
   void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(6 * VL.size()));
   OSSReductionClause *Clause = new (Mem) OSSReductionClause(
-      StartLoc, LParenLoc, EndLoc, ColonLoc, VL.size(), QualifierLoc, NameInfo);
+      StartLoc, LParenLoc, EndLoc, ColonLoc, VL.size(), QualifierLoc, NameInfo, IsWeak);
   Clause->setVarRefs(VL);
   Clause->setSimpleExprs(SimpleExprs);
   Clause->setLHSExprs(LHSExprs);

@@ -1092,6 +1092,11 @@ static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualTy
 
   int ReductionType = -1;
   int ReductionOperation = -1;
+
+  // Template instantiated types are not canonical
+  // See SubstTemplateTypeParmType
+  Q = Q.getCanonicalType();
+
   if (Q == CGF.getContext().CharTy)                   ReductionType = 1000;
   else if (Q == CGF.getContext().SignedCharTy)        ReductionType = 2000;
   else if (Q == CGF.getContext().UnsignedCharTy)      ReductionType = 3000;
@@ -1592,6 +1597,13 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
     EmitReduction("QUAL.OSS.DEP.REDUCTION",
+                  "QUAL.OSS.DEP.REDUCTION.INIT",
+                  "QUAL.OSS.DEP.REDUCTION.COMBINE",
+                  CGF, Red, TaskInfo,
+                  BuiltinRedMap, UDRMap);
+  }
+  for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
+    EmitReduction("QUAL.OSS.DEP.WEAKREDUCTION",
                   "QUAL.OSS.DEP.REDUCTION.INIT",
                   "QUAL.OSS.DEP.REDUCTION.COMBINE",
                   CGF, Red, TaskInfo,

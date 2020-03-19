@@ -2149,7 +2149,7 @@ static bool actOnOSSReductionKindClause(
 }
 
 OSSClause *
-Sema::ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
+Sema::ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
                        SourceLocation StartLoc, SourceLocation LParenLoc,
                        SourceLocation ColonLoc,
                        SourceLocation EndLoc,
@@ -2157,7 +2157,7 @@ Sema::ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
                        const DeclarationNameInfo &ReductionId,
                        ArrayRef<Expr *> UnresolvedReductions) {
   ReductionData RD(VarList.size());
-  if (actOnOSSReductionKindClause(*this, DSAStack, OSSC_reduction, VarList,
+  if (actOnOSSReductionKindClause(*this, DSAStack, Kind, VarList,
                                   StartLoc, LParenLoc, ColonLoc, EndLoc,
                                   ReductionIdScopeSpec, ReductionId,
                                   UnresolvedReductions, RD))
@@ -2165,7 +2165,8 @@ Sema::ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
   return OSSReductionClause::Create(
       Context, StartLoc, LParenLoc, ColonLoc, EndLoc, RD.Vars,
       ReductionIdScopeSpec.getWithLocInContext(Context), ReductionId,
-      RD.SimpleVars, RD.LHSs, RD.RHSs, RD.ReductionOps, RD.ReductionKinds);
+      RD.SimpleVars, RD.LHSs, RD.RHSs, RD.ReductionOps, RD.ReductionKinds,
+      Kind == OSSC_weakreduction);
 }
 
 OSSClause *
@@ -2255,7 +2256,8 @@ Sema::ActOnOmpSsVarListClause(
                                  StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_reduction:
-    Res = ActOnOmpSsReductionClause(Vars, StartLoc, LParenLoc, ColonLoc, EndLoc,
+  case OSSC_weakreduction:
+    Res = ActOnOmpSsReductionClause(Kind, Vars, StartLoc, LParenLoc, ColonLoc, EndLoc,
                                     ReductionIdScopeSpec, ReductionId);
     break;
   case OSSC_in:

@@ -38,21 +38,13 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 
 void foo(int n, int *v)
 {
-#ifdef __NANOS6__
     #pragma oss task weakreduction(+: [n]v) final(1)
-#else
-    #pragma oss task reduction(+: [n]v) final(1)
-#endif
     {
         #pragma oss task reduction(+: [n]v) final(1)
         {
             for(int i = 0; i < n; ++i)
                 v[i]++;
         }
-
-#ifndef __NANOS6__
-        #pragma oss taskwait
-#endif
     }
 
     #pragma oss task reduction(+: [n]v) final(1)
@@ -61,9 +53,6 @@ void foo(int n, int *v)
             v[i]++;
     }
 
-#ifndef __NANOS6__
-    #pragma oss taskwait
-#endif
 }
 
 int main()
@@ -81,11 +70,7 @@ int main()
 
     #pragma oss taskwait in(v)
 
-#ifdef __NANOS6__
     #pragma oss task weakreduction(+: [10]v) final(1)
-#else
-    #pragma oss task reduction(+: [10]v) final(1)
-#endif
     foo(10, v);
 
     foo(10, v);

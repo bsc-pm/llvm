@@ -60,20 +60,14 @@ int backtrack(int n)
     {
         for (int i = 0; i < n; ++i)
         {
-#ifdef __NANOS6__
             #pragma oss task weakreduction(+: global_var)  firstprivate(i)
-#else
-            #pragma oss task reduction(+: global_var)  firstprivate(i)
-#endif
             {
                 //  The function call to backtrack may modify the value of global_var, so firstly we
                 //  have to execute the task and then load the value of global_var
                 // global_var += backtrack(i); //KO
                 int res = backtrack(i);
 
-#ifdef __NANOS6__
                 #pragma oss task reduction(+: global_var)
-#endif
                 global_var += res;
             }
         }

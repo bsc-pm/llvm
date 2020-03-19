@@ -576,10 +576,16 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                           LLVMContext::OB_oss_dep_weakinout);
 
   gatherReductionsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
-                              TI.DependsInfo.Reductions,
-                              TI.DependsInfo.UnpackInstructions,
-                              TI.DependsInfo.UnpackConstants,
-                              LLVMContext::OB_oss_dep_reduction);
+                             TI.DependsInfo.Reductions,
+                             TI.DependsInfo.UnpackInstructions,
+                             TI.DependsInfo.UnpackConstants,
+                             LLVMContext::OB_oss_dep_reduction);
+
+  gatherReductionsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+                             TI.DependsInfo.WeakReductions,
+                             TI.DependsInfo.UnpackInstructions,
+                             TI.DependsInfo.UnpackConstants,
+                             LLVMContext::OB_oss_dep_weakreduction);
 
   TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
 }

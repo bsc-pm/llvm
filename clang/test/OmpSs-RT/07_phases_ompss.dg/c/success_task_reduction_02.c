@@ -48,15 +48,9 @@ int main()
 
     for (int i = 0; i < N; ++i)
     {
-#ifdef __NANOS6__
         #pragma oss task weakreduction(+: res) in(v) firstprivate(i)
-#else
-        #pragma oss task reduction(+: res) in(v) firstprivate(i)
-#endif
         {
-#ifdef __NANOS6__
             #pragma oss task reduction(+: res) in(v) firstprivate(i)
-#endif
             res  += v[i][0];
             for (int j = 0+1; j < N; ++j)
             {
@@ -65,11 +59,7 @@ int main()
                     res += v[i][j];
                 }
             }
-#ifndef __NANOS6__
-            #pragma oss taskwait
-#endif
         }
-
     }
 
     #pragma oss task in(res)

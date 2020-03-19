@@ -65,6 +65,7 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakOuts;
   SmallVector<DependInfo, 4> WeakInouts;
   SmallVector<ReductionInfo, 4> Reductions;
+  SmallVector<ReductionInfo, 4> WeakReductions;
 
   // Unique Instructions needed as a bridge between dependency and DSAs
   // Stored in program order

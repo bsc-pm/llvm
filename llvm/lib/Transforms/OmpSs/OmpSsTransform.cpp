@@ -416,7 +416,8 @@ struct OmpSs : public ModulePass {
                             DenseMap<Value *, Value *> &ConstExprToInst,
                             const SmallVectorImpl<ReductionInfo> &ReductionsList,
                             const TaskReductionsInitCombInfo &TRI,
-                            Function *F) {
+                            Function *F,
+                            StringRef RedType) {
     for (const ReductionInfo &RI : ReductionsList) {
       const DependInfo &DI = RI.DepInfo;
       BasicBlock &Entry = F->getEntryBlock();
@@ -442,7 +443,7 @@ struct OmpSs : public ModulePass {
       for (Value *V : DI.Dims) {
         TaskDepAPICall.push_back(V);
       }
-      BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, "reduction", NumDims, /*IsReduction=*/true), TaskDepAPICall);
+      BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, RedType, NumDims, /*IsReduction=*/true), TaskDepAPICall);
     }
   }
 
@@ -459,7 +460,8 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakIns, F, "weak_read");
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakOuts, F, "weak_write");
     unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakInouts, F, "weak_readwrite");
-    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.Reductions, TRI, F);
+    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.Reductions, TRI, F, "reduction");
+    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.WeakReductions, TRI, F, "weak_reduction");
   }
 
   // TypeList[i] <-> NameList[i]
@@ -506,7 +508,7 @@ struct OmpSs : public ModulePass {
     Idx[0] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), DepSymToIdx.at(DSA));
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
     Value *LocalAddr = IRB.CreateGEP(
-        AddrTranslationTable, Idx, "local_lookup" + DSA->getName());
+        AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
     LocalAddr = IRB.CreateLoad(LocalAddr);
 
     Idx[1] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 1);
@@ -514,6 +516,7 @@ struct OmpSs : public ModulePass {
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
     DeviceAddr = IRB.CreateLoad(DeviceAddr);
 
+    // Res = device_addr + (DSA_addr - local_addr)
     UnpackedDSA = IRB.CreateNSWSub(IRB.CreatePtrToInt(UnpackedDSA, Type::getInt64Ty(IRB.getContext())), LocalAddr);
     UnpackedDSA = IRB.CreateNSWAdd(UnpackedDSA, DeviceAddr);
     UnpackedDSA = IRB.CreateIntToPtr(UnpackedDSA, UnpackedDSAType);
@@ -1137,7 +1140,8 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.WeakIns.size()
         + TI.DependsInfo.WeakOuts.size()
         + TI.DependsInfo.WeakInouts.size()
-        + TI.DependsInfo.Reductions.size();
+        + TI.DependsInfo.Reductions.size()
+        + TI.DependsInfo.WeakReductions.size();
       IRB.CreateCall(CreateTaskFuncTy, {TaskInfoVar,
                                   TaskInvInfoVar,
                                   TaskArgsSizeOf,

@@ -759,7 +759,7 @@ void OSSClausePrinter::VisitOSSDependClause(OSSDependClause *Node) {
 
 void OSSClausePrinter::VisitOSSReductionClause(OSSReductionClause *Node) {
   if (!Node->varlist_empty()) {
-    OS << "reduction(";
+    OS << (Node->isWeak() ? "weakreduction" : "reduction") << "(";
     NestedNameSpecifier *QualifierLoc =
         Node->getQualifierLoc().getNestedNameSpecifier();
     OverloadedOperatorKind OOK =

@@ -128,6 +128,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_dep_reduction operand bundle id drifted!");
   (void)OSSDepReductionEntry;
 
+  auto *OSSDepWeakReductionEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKREDUCTION");
+  assert(OSSDepWeakReductionEntry->second == LLVMContext::OB_oss_dep_weakreduction &&
+         "oss_dep_weakreduction operand bundle id drifted!");
+  (void)OSSDepWeakReductionEntry;
+
   auto *OSSDepReductionInitEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.REDUCTION.INIT");
   assert(OSSDepReductionInitEntry->second == LLVMContext::OB_oss_reduction_init &&
          "oss_dep_reduction operand bundle id drifted!");

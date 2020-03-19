@@ -99,6 +99,7 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
+  case OSSC_weakreduction:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -144,6 +145,7 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
+  case OSSC_weakreduction:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");

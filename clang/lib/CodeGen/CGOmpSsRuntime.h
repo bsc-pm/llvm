@@ -77,6 +77,7 @@ struct OSSReductionDataTy {
 
 struct OSSTaskReductionDataTy final {
   SmallVector<OSSReductionDataTy, 4> RedList;
+  SmallVector<OSSReductionDataTy, 4> WeakRedList;
 };
 
 struct OSSTaskDataTy final {

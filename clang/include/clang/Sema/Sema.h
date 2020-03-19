@@ -10044,7 +10044,7 @@ public:
 
   /// Called on well-formed 'depend' clause.
   OSSClause *
-  ActOnOmpSsReductionClause(ArrayRef<Expr *> VarList,
+  ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
                          SourceLocation StartLoc, SourceLocation LParenLoc,
                          SourceLocation ColonLoc,
                          SourceLocation EndLoc,

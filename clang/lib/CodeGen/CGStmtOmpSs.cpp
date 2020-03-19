@@ -159,14 +159,16 @@ static void AddReductionData(const OSSTaskDirective &S, OSSTaskReductionDataTy &
     auto RHSRef = C->rhs_exprs().begin();
     auto RedOp = C->reduction_ops().begin();
     auto RedKind = C->getReductionKinds().begin();
-    for (const Expr *Ref : C->varlists()) {
-      Reductions.RedList.push_back({*SimpleRef, Ref, *LHSRef, *RHSRef, *RedOp, *RedKind});
-
-      ++SimpleRef;
-      ++LHSRef;
-      ++RHSRef;
-      ++RedOp;
-      ++RedKind;
+    if (!C->isWeak()) {
+      for (const Expr *Ref : C->varlists()) {
+        Reductions.RedList.push_back({*SimpleRef, Ref, *LHSRef, *RHSRef, *RedOp, *RedKind});
+        ++SimpleRef; ++LHSRef; ++RHSRef; ++RedOp; ++RedKind;
+      }
+    } else {
+      for (const Expr *Ref : C->varlists()) {
+        Reductions.WeakRedList.push_back({*SimpleRef, Ref, *LHSRef, *RHSRef, *RedOp, *RedKind});
+        ++SimpleRef; ++LHSRef; ++RHSRef; ++RedOp; ++RedKind;
+      }
     }
   }
 }

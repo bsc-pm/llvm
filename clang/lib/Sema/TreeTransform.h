@@ -1603,7 +1603,7 @@ public:
   /// By default, performs semantic analysis to build the new statement.
   /// Subclasses may override this routine to provide different behavior.
   OSSClause *
-  RebuildOSSReductionClause(ArrayRef<Expr *> VarList,
+  RebuildOSSReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
                             SourceLocation StartLoc,
                             SourceLocation LParenLoc,
                             SourceLocation ColonLoc,
@@ -1611,7 +1611,7 @@ public:
                             CXXScopeSpec &ReductionIdScopeSpec,
                             const DeclarationNameInfo &ReductionId,
                             ArrayRef<Expr *> UnresolvedReductions) {
-    return getSema().ActOnOmpSsReductionClause(
+    return getSema().ActOnOmpSsReductionClause(Kind,
         VarList, StartLoc, LParenLoc, ColonLoc, EndLoc, ReductionIdScopeSpec,
         ReductionId, UnresolvedReductions);
   }
@@ -9497,7 +9497,7 @@ TreeTransform<Derived>::TransformOSSReductionClause(OSSReductionClause *C) {
   llvm::SmallVector<Expr *, 16> Vars;
   Vars.reserve(C->varlist_size());
 
-  // We need to enable Shapings here since we're in a depend clause
+  // We need to enable Shapings here since we're in a reduction clause
   Sema::AllowShapingsRAII AllowShapings(getSema(), []() { return true; });
 
   for (auto *VE : C->varlists()) {
@@ -9538,6 +9538,7 @@ TreeTransform<Derived>::TransformOSSReductionClause(OSSReductionClause *C) {
       UnresolvedReductions.push_back(nullptr);
   }
   return getDerived().RebuildOSSReductionClause(
+      C->isWeak() ? OSSC_weakreduction : OSSC_reduction,
       Vars, C->getBeginLoc(), C->getLParenLoc(), C->getColonLoc(),
       C->getEndLoc(), ReductionIdScopeSpec, NameInfo, UnresolvedReductions);
 }

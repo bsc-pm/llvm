@@ -316,6 +316,7 @@ static bool parseDeclareTaskClauses(
       break;
     }
     case OSSC_reduction:
+    case OSSC_weakreduction:
     case OSSC_unknown:
       P.Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
           << getOmpSsDirectiveName(OSSD_task);
@@ -648,6 +649,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
+  case OSSC_weakreduction:
     Clause = ParseOmpSsVarListClause(DKind, CKind, WrongDirective);
     break;
   case OSSC_unknown:
@@ -1090,7 +1092,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
     } else {
       Diag(Tok, diag::warn_pragma_expected_colon) << "dependency type";
     }
-  } else if (Kind == OSSC_reduction) {
+  } else if (Kind == OSSC_reduction || Kind == OSSC_weakreduction) {
     ColonProtectionRAIIObject ColonRAII(*this);
     if (getLangOpts().CPlusPlus)
       ParseOptionalCXXScopeSpecifier(Data.ReductionIdScopeSpec,
@@ -1117,8 +1119,9 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
 
 
   // IsComma init determine if we got a well-formed clause
-  bool IsComma = (Kind != OSSC_depend && Kind != OSSC_reduction)
-                 || (Kind == OSSC_reduction && !InvalidReductionId)
+  bool IsComma = (Kind != OSSC_depend && Kind != OSSC_reduction && Kind != OSSC_weakreduction)
+                 || ((Kind == OSSC_reduction
+                      || Kind == OSSC_weakreduction) && !InvalidReductionId)
                  || (Kind == OSSC_depend && DepKindIt == Data.DepKinds.end());
   // We parse the locator-list when:
   // 1. If we found out something that seems a valid item regardless
@@ -1157,7 +1160,8 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
   //       we cannot analize anything because we need a valid reduction id
   return (Kind == OSSC_depend
           && DepKindIt == Data.DepKinds.end() && Vars.empty())
-          || (Kind == OSSC_reduction && InvalidReductionId);
+          || ((Kind == OSSC_reduction
+               || Kind == OSSC_weakreduction) && InvalidReductionId);
 }
 
 /// Parsing of OmpSs
