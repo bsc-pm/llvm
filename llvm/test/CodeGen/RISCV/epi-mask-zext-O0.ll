@@ -5,24 +5,28 @@
 define <vscale x 8 x i8> @foo_O0(<vscale x 8 x i1> %a) nounwind noinline optnone {
 ; CHECK-LABEL: foo_O0:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    addi sp, sp, -16
-; CHECK-NEXT:    addi s0, sp, 16
+; CHECK-NEXT:    addi sp, sp, -32
+; CHECK-NEXT:    sd ra, 24(sp)
+; CHECK-NEXT:    sd s0, 16(sp)
+; CHECK-NEXT:    addi s0, sp, 32
 ; CHECK-NEXT:    rdvlenb a0
 ; CHECK-NEXT:    sub sp, sp, a0
 ; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -16(s0)
+; CHECK-NEXT:    sd sp, -32(s0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
-; CHECK-NEXT:    ld a0, -16(s0)
+; CHECK-NEXT:    ld a0, -32(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
-; CHECK-NEXT:    ld a0, -16(s0)
+; CHECK-NEXT:    ld a0, -32(s0)
 ; CHECK-NEXT:    vle.v v1, (a0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vmv.v.i v2, 1
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
 ; CHECK-NEXT:    vand.vv v16, v1, v2
-; CHECK-NEXT:    addi sp, s0, -16
-; CHECK-NEXT:    addi sp, sp, 16
+; CHECK-NEXT:    addi sp, s0, -32
+; CHECK-NEXT:    ld s0, 16(sp)
+; CHECK-NEXT:    ld ra, 24(sp)
+; CHECK-NEXT:    addi sp, sp, 32
 ; CHECK-NEXT:    ret
 entry:
   %a.addr = alloca <vscale x 8 x i8>, align 1
@@ -37,21 +41,25 @@ entry:
 define <vscale x 8 x i8> @foo(<vscale x 8 x i1> %a) nounwind {
 ; CHECK-LABEL: foo:
 ; CHECK:       # %bb.0: # %entry
-; CHECK-NEXT:    addi sp, sp, -16
-; CHECK-NEXT:    addi s0, sp, 16
+; CHECK-NEXT:    addi sp, sp, -32
+; CHECK-NEXT:    sd ra, 24(sp)
+; CHECK-NEXT:    sd s0, 16(sp)
+; CHECK-NEXT:    addi s0, sp, 32
 ; CHECK-NEXT:    rdvlenb a0
 ; CHECK-NEXT:    sub sp, sp, a0
 ; CHECK-NEXT:    andi sp, sp, -16
-; CHECK-NEXT:    sd sp, -16(s0)
+; CHECK-NEXT:    sd sp, -32(s0)
 ; CHECK-NEXT:    vsetvli a0, zero, e8,m1
-; CHECK-NEXT:    ld a0, -16(s0)
+; CHECK-NEXT:    ld a0, -32(s0)
 ; CHECK-NEXT:    vse.v v0, (a0)
-; CHECK-NEXT:    ld a0, -16(s0)
+; CHECK-NEXT:    ld a0, -32(s0)
 ; CHECK-NEXT:    vle.v v1, (a0)
 ; CHECK-NEXT:    vmv.v.i v2, 1
 ; CHECK-NEXT:    vand.vv v16, v1, v2
-; CHECK-NEXT:    addi sp, s0, -16
-; CHECK-NEXT:    addi sp, sp, 16
+; CHECK-NEXT:    addi sp, s0, -32
+; CHECK-NEXT:    ld s0, 16(sp)
+; CHECK-NEXT:    ld ra, 24(sp)
+; CHECK-NEXT:    addi sp, sp, 32
 ; CHECK-NEXT:    ret
 entry:
   %a.addr = alloca <vscale x 8 x i8>, align 1

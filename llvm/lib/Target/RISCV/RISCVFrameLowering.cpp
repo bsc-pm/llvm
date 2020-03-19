@@ -714,6 +714,26 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
   const RISCVRegisterInfo *RI =
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
 
+  auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
+  // Go through all Stackslots coming from a VR alloca and make them VR_SPILL.
+  // We need to this early otherwise we may be answering hasFP false.
+  MachineFrameInfo &MFI = MF.getFrameInfo();
+  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
+       FI < EFI; FI++) {
+    // Get the (LLVM IR) allocation instruction
+    const AllocaInst *Alloca = MFI.getObjectAllocation(FI);
+
+    if (!Alloca)
+      continue;
+
+    const VectorType *VT =
+        dyn_cast<const VectorType>(Alloca->getType()->getElementType());
+    if (VT && VT->isScalable()) {
+      MFI.setStackID(FI, TargetStackID::EPIVector);
+      RVFI->setHasSpilledVR();
+    }
+  }
+
   // Unconditionally spill RA and FP only if the function uses a frame
   // pointer.
   if (hasFP(MF)) {
@@ -730,8 +750,6 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
   // If interrupt is enabled and there are calls in the handler,
   // unconditionally save all Caller-saved registers and
   // all FP registers, regardless whether they are used.
-  MachineFrameInfo &MFI = MF.getFrameInfo();
-
   if (MF.getFunction().hasFnAttribute("interrupt") && MFI.hasCalls()) {
 
     static const MCPhysReg CSRegs[] = { RISCV::X1,      /* ra */
@@ -764,23 +782,6 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
   MachineFrameInfo &MFI = MF.getFrameInfo();
   auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   const TargetRegisterClass *RC = &RISCV::GPRRegClass;
-
-  // Go through all Stackslots coming from an alloca and make them VR_SPILL.
-  for (int FI = MFI.getObjectIndexBegin(), EFI = MFI.getObjectIndexEnd();
-       FI < EFI; FI++) {
-    // Get the (LLVM IR) allocation instruction
-    const AllocaInst *Alloca = MFI.getObjectAllocation(FI);
-
-    if (!Alloca)
-      continue;
-
-    const VectorType *VT =
-        dyn_cast<const VectorType>(Alloca->getType()->getElementType());
-    if (VT && VT->isScalable()) {
-      MFI.setStackID(FI, TargetStackID::EPIVector);
-      RVFI->setHasSpilledVR();
-    }
-  }
 
   // estimateStackSize has been observed to under-estimate the final stack
   // size, so give ourselves wiggle-room by checking for stack size
