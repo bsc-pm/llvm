@@ -4,6 +4,8 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 </testinfo>
 */
 
+// RUN: %oss-cxx-compile-and-run
+
 namespace N
 {
     struct A
@@ -24,8 +26,6 @@ namespace N
     };
 
     void A::foo()
-// RUN: %oss-cxx-compile-and-run
-//XFAIL: *
     {
         int x = 0;
 
