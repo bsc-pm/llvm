@@ -905,16 +905,17 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   const OSSDeclareReductionDecl *DRD =
       getReductionDecl(Red.ReductionOp);
 
-  QualType PQ = C.getPointerType(RHSVD->getType());
+  QualType Q = RHSVD->getType();
+  QualType PQ = C.getPointerType(Q);
 
   FunctionArgList Args;
   ImplicitParamDecl PrivArg(C, PQ, ImplicitParamDecl::Other);
   ImplicitParamDecl OrigArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamDecl::Other);
 
   Args.emplace_back(&PrivArg);
   Args.emplace_back(&OrigArg);
-  Args.emplace_back(&NelemsArg);
+  Args.emplace_back(&NBytesArg);
 
   const auto &FnInfo =
       CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
@@ -931,9 +932,36 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
                                               PQ->castAs<PointerType>());
   LValue OrigLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&OrigArg),
                                               PQ->castAs<PointerType>());
-  llvm::Value *NelemsValue =
-      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
-                       NelemsArg.getType(), NelemsArg.getLocation());
+  llvm::Value *NBytesValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
+                       NBytesArg.getType(), NBytesArg.getLocation());
+
+  uint64_t BaseElementSize =
+             CGF.CGM
+               .getDataLayout()
+               .getTypeSizeInBits(CGF
+                                  .ConvertType(Q))/8;
+
+  llvm::Value *NelemsValue = CGF.Builder.CreateExactUDiv(NBytesValue,
+                                  llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()),
+                                                         BaseElementSize));
+
+  // Find the end of the array.
+  llvm::Value *OrigBegin = OrigLV.getPointer();
+  llvm::Value *PrivBegin = PrivLV.getPointer();
+  llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(PrivBegin, NelemsValue,
+                                                      "arrayctor.dst.end");
+
+  // Enter the loop, setting up a phi for the current location to initialize.
+  llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
+  llvm::BasicBlock *LoopBB = CGF.createBasicBlock("arrayctor.loop");
+  CGF.EmitBlock(LoopBB);
+  llvm::PHINode *PrivCur = CGF.Builder.CreatePHI(PrivBegin->getType(), 2,
+                                             "arrayctor.dst.cur");
+  llvm::PHINode *OrigCur = CGF.Builder.CreatePHI(OrigBegin->getType(), 2,
+                                             "arrayctor.src.cur");
+  PrivCur->addIncoming(PrivBegin, EntryBB);
+  OrigCur->addIncoming(OrigBegin, EntryBB);
 
   if (DRD && DRD->getInitializer()) {
 
@@ -941,11 +969,11 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
     const auto *OrigVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getInitOrig())->getDecl());
 
     CodeGenFunction::OSSPrivateScope InitScope(CGF);
-    InitScope.addPrivate(PrivVD, [PrivLV]() -> Address {
-      return PrivLV.getAddress();
+    InitScope.addPrivate(PrivVD, [PrivCur, PrivLV]() -> Address {
+      return Address(PrivCur, PrivLV.getAlignment());
     });
-    InitScope.addPrivate(OrigVD, [OrigLV]() -> Address {
-      return OrigLV.getAddress();
+    InitScope.addPrivate(OrigVD, [OrigCur, OrigLV]() -> Address {
+      return Address(OrigCur, OrigLV.getAlignment());
     });
     (void)InitScope.Privatize();
 
@@ -965,6 +993,25 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
                        CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
                        /*capturedByInit=*/false);
   }
+
+  // Go to the next element. Move OrigBegin too
+  llvm::Value *PrivNext =
+    CGF.Builder.CreateInBoundsGEP(PrivCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                              "arrayctor.dst.next");
+  PrivCur->addIncoming(PrivNext, CGF.Builder.GetInsertBlock());
+
+  llvm::Value *OrigDest =
+    CGF.Builder.CreateInBoundsGEP(OrigCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                                  "arrayctor.src.next");
+  OrigCur->addIncoming(OrigDest, CGF.Builder.GetInsertBlock());
+
+  // Check whether that's the end of the loop.
+  llvm::Value *Done = CGF.Builder.CreateICmpEQ(PrivNext, PrivEnd, "arrayctor.done");
+  llvm::BasicBlock *ContBB = CGF.createBasicBlock("arrayctor.cont");
+  CGF.Builder.CreateCondBr(Done, ContBB, LoopBB);
+
+  CGF.EmitBlock(ContBB);
+
   CGF.FinishFunction();
   return Fn;
 }
@@ -978,16 +1025,17 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
   const OSSDeclareReductionDecl *DRD =
       getReductionDecl(Red.ReductionOp);
 
-  QualType PQ = C.getPointerType(LHSVD->getType());
+  QualType Q = LHSVD->getType();
+  QualType PQ = C.getPointerType(Q);
 
   FunctionArgList Args;
   ImplicitParamDecl OutArg(C, PQ, ImplicitParamDecl::Other);
   ImplicitParamDecl InArg(C, PQ, ImplicitParamDecl::Other);
-  ImplicitParamDecl NelemsArg(C, C.getSizeType(), ImplicitParamDecl::Other);
+  ImplicitParamDecl NBytesArg(C, C.getSizeType(), ImplicitParamDecl::Other);
 
   Args.emplace_back(&OutArg);
   Args.emplace_back(&InArg);
-  Args.emplace_back(&NelemsArg);
+  Args.emplace_back(&NBytesArg);
 
   const auto &FnInfo =
       CGM.getTypes().arrangeBuiltinFunctionDeclaration(C.VoidTy, Args);
@@ -1004,20 +1052,47 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
                                               PQ->castAs<PointerType>());
   LValue InLV = CGF.EmitLoadOfPointerLValue(CGF.GetAddrOfLocalVar(&InArg),
                                               PQ->castAs<PointerType>());
-  llvm::Value *NelemsValue =
-      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NelemsArg), /*Volatile=*/false,
-                       NelemsArg.getType(), NelemsArg.getLocation());
+  llvm::Value *NBytesValue =
+      CGF.EmitLoadOfScalar(CGF.GetAddrOfLocalVar(&NBytesArg), /*Volatile=*/false,
+                       NBytesArg.getType(), NBytesArg.getLocation());
+
+  uint64_t BaseElementSize =
+             CGF.CGM
+               .getDataLayout()
+               .getTypeSizeInBits(CGF
+                                  .ConvertType(Q))/8;
+
+  llvm::Value *NelemsValue = CGF.Builder.CreateExactUDiv(NBytesValue,
+                                  llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()),
+                                                         BaseElementSize));
+
+  // Find the end of the array.
+  llvm::Value *InBegin = InLV.getPointer();
+  llvm::Value *OutBegin = OutLV.getPointer();
+  llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(OutBegin, NelemsValue,
+                                                      "arrayctor.dst.end");
+
+  // Enter the loop, setting up a phi for the current location to initialize.
+  llvm::BasicBlock *EntryBB = CGF.Builder.GetInsertBlock();
+  llvm::BasicBlock *LoopBB = CGF.createBasicBlock("arrayctor.loop");
+  CGF.EmitBlock(LoopBB);
+  llvm::PHINode *OutCur = CGF.Builder.CreatePHI(OutBegin->getType(), 2,
+                                             "arrayctor.dst.cur");
+  llvm::PHINode *InCur = CGF.Builder.CreatePHI(InBegin->getType(), 2,
+                                             "arrayctor.src.cur");
+  OutCur->addIncoming(OutBegin, EntryBB);
+  InCur->addIncoming(InBegin, EntryBB);
 
   // Remap lhs and rhs variables to the addresses of the function arguments.
   if (DRD) {
     const auto *OutVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerOut())->getDecl());
     const auto *InVD = cast<VarDecl>(cast<DeclRefExpr>(DRD->getCombinerIn())->getDecl());
     CodeGenFunction::OSSPrivateScope CombScope(CGF);
-    CombScope.addPrivate(OutVD, [OutLV]() -> Address {
-      return OutLV.getAddress();
+    CombScope.addPrivate(OutVD, [OutCur, OutLV]() -> Address {
+      return Address(OutCur, OutLV.getAlignment());
     });
-    CombScope.addPrivate(InVD, [InLV]() -> Address {
-      return InLV.getAddress();
+    CombScope.addPrivate(InVD, [InCur, InLV]() -> Address {
+      return Address(InCur, InLV.getAlignment());
     });
     (void)CombScope.Privatize();
 
@@ -1027,16 +1102,34 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
     // %2 = <ReductionOp>(<type> *%lhs, <type> *%rhs)
     // store <type> %2, <type>* %lhs
     CodeGenFunction::OSSPrivateScope CombScope(CGF);
-    CombScope.addPrivate(LHSVD, [OutLV]() -> Address {
-      return OutLV.getAddress();
+    CombScope.addPrivate(LHSVD, [OutCur, OutLV]() -> Address {
+      return Address(OutCur, OutLV.getAlignment());
     });
-    CombScope.addPrivate(RHSVD, [InLV]() -> Address {
-      return InLV.getAddress();
+    CombScope.addPrivate(RHSVD, [InCur, InLV]() -> Address {
+      return Address(InCur, InLV.getAlignment());
     });
     (void)CombScope.Privatize();
 
     CGF.EmitIgnoredExpr(Red.ReductionOp);
   }
+
+  // Go to the next element. Move InBegin too
+  llvm::Value *OutNext =
+    CGF.Builder.CreateInBoundsGEP(OutCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                              "arrayctor.dst.next");
+  OutCur->addIncoming(OutNext, CGF.Builder.GetInsertBlock());
+
+  llvm::Value *InDest =
+    CGF.Builder.CreateInBoundsGEP(InCur, llvm::ConstantInt::get(CGF.ConvertType(C.getSizeType()), 1),
+                                  "arrayctor.src.next");
+  InCur->addIncoming(InDest, CGF.Builder.GetInsertBlock());
+
+  // Check whether that's the end of the loop.
+  llvm::Value *Done = CGF.Builder.CreateICmpEQ(OutNext, OutEnd, "arrayctor.done");
+  llvm::BasicBlock *ContBB = CGF.createBasicBlock("arrayctor.cont");
+  CGF.Builder.CreateCondBr(Done, ContBB, LoopBB);
+
+  CGF.EmitBlock(ContBB);
 
   CGF.FinishFunction();
   return Fn;
