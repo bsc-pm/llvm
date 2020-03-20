@@ -388,15 +388,13 @@ define <vscale x 1 x double> @test8(i64 %avl, float %cond, <vscale x 1 x double>
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    fmv.w.x ft1, a1
 ; CHECK-NEXT:    vsetvli a1, a0, e64,m1
+; CHECK-NEXT:    vfadd.vv v16, v16, v17
 ; CHECK-NEXT:    lui a1, %hi(.LCPI7_0)
 ; CHECK-NEXT:    addi a1, a1, %lo(.LCPI7_0)
 ; CHECK-NEXT:    flw ft0, 0(a1)
-; CHECK-NEXT:    lui a1, %hi(.LCPI7_1)
-; CHECK-NEXT:    addi a1, a1, %lo(.LCPI7_1)
-; CHECK-NEXT:    flw ft2, 0(a1)
-; CHECK-NEXT:    vfadd.vv v16, v16, v17
 ; CHECK-NEXT:    lui a1, %hi(scratch)
 ; CHECK-NEXT:    addi a1, a1, %lo(scratch)
+; CHECK-NEXT:    fmv.w.x ft2, zero
 ; CHECK-NEXT:    j .LBB7_2
 ; CHECK-NEXT:  .LBB7_1: # %do.cond
 ; CHECK-NEXT:    # in Loop: Header=BB7_2 Depth=1
