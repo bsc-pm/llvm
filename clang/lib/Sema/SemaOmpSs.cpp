@@ -49,10 +49,13 @@ public:
     const Expr *RefExpr = nullptr;
     bool Ignore = false;
     bool Implicit = false;
+    OmpSsClauseKind CRestrict = OSSC_unknown;
     DSAVarData() = default;
     DSAVarData(OmpSsDirectiveKind DKind, OmpSsClauseKind CKind,
-               const Expr *RefExpr, bool Ignore)
-        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), Ignore(Ignore)
+               const Expr *RefExpr, bool Ignore,
+               OmpSsClauseKind CRestrict)
+        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), Ignore(Ignore),
+          CRestrict(CRestrict)
           {}
   };
 
@@ -62,6 +65,9 @@ private:
     const Expr * RefExpr;
     bool Ignore = false;
     bool Implicit = false;
+    // CRestrict is helper info to detect and diagnose
+    // variables conflicting between dependency and reductions
+    OmpSsClauseKind CRestrict;
   };
   using DeclSAMapTy = llvm::SmallDenseMap<const ValueDecl *, DSAInfo, 8>;
 
@@ -109,8 +115,10 @@ public:
   }
 
   /// Adds explicit data sharing attribute to the specified declaration.
+  // CRestrict tells what clause restriction the DSA has. Used
+  // to detect conflicts between dependency and reduction clause
   void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-              bool Ignore, bool Implicit);
+              bool Ignore, bool Implicit, OmpSsClauseKind CRestrict = OSSC_unknown);
 
   /// Returns data sharing attributes from top of the stack for the
   /// specified declaration.
@@ -191,6 +199,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
     DVar.Ignore = Data.Ignore;
     DVar.Implicit = Data.Implicit;
     DVar.CKind = Data.Attributes;
+    DVar.CRestrict = Data.CRestrict;
     return DVar;
   }
 
@@ -198,7 +207,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
 }
 
 void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-                        bool Ignore, bool Implicit) {
+                        bool Ignore, bool Implicit, OmpSsClauseKind CRestrict) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
   DSAInfo &Data = Stack.back().SharingMap[D];
@@ -206,6 +215,7 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
   Data.RefExpr = E;
   Data.Ignore = Ignore;
   Data.Implicit = Implicit;
+  Data.CRestrict = CRestrict;
 }
 
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
@@ -447,6 +457,7 @@ public:
 class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> {
   DSAStackTy *Stack;
   Sema &SemaRef;
+  OSSClause *CurClause;
   bool ErrorFound = false;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
@@ -546,6 +557,20 @@ public:
       SourceRange ERange = E->getSourceRange();
 
       DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
+
+      // CRestrict promotes from OSSC_depend to OSSC_reduction
+      OmpSsClauseKind CRestrict = CurClause->getClauseKind();
+      // Seen before  |      Current      | Result
+      //    depend    |     reduction     |   KO
+      //   reduction  |  depend/reduction |   KO
+      if (DVarCurrent.CRestrict == OSSC_reduction
+          || (DVarCurrent.CRestrict == OSSC_depend && CRestrict == OSSC_reduction)) {
+        ErrorFound = true;
+        CRestrict = OSSC_reduction;
+        SemaRef.Diag(ELoc, diag::err_oss_reduction_depend_conflict)
+          << E->getDecl();
+      }
+
       switch (DVarCurrent.CKind) {
       case OSSC_shared:
         // Do nothing
@@ -566,7 +591,8 @@ public:
 
             ImplicitShared.push_back(E);
             // Rewrite DSA
-            Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
+            Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true,
+                          CRestrict);
           } else {
             ErrorFound = true;
             SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
@@ -581,7 +607,8 @@ public:
         if (VKind == OSSC_firstprivate)
           ImplicitFirstprivate.push_back(E);
 
-        Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
+        Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true,
+                      CRestrict);
 
         break;
       default:
@@ -591,6 +618,7 @@ public:
   }
 
   void VisitClause(OSSClause *Clause) {
+    CurClause = Clause;
     for (Stmt *Child : Clause->children()) {
       if (Child)
         Visit(Child);

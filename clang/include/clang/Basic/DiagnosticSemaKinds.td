@@ -9899,6 +9899,8 @@ def err_oss_unknown_reduction_identifier : Error<
   "'&&', '||', 'min' or 'max' or declare reduction for type %0">;
 def err_oss_clause_not_arithmetic_type_arg : Error<
   "arguments of OmpSs-2 clause '%0' for 'min' or 'max' must be of %select{scalar|arithmetic}1 type">;
+def err_oss_reduction_depend_conflict : Error<
+  "variable %0 conflicts between dependency and reduction clause">;
 
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element, array shape or array section">;
