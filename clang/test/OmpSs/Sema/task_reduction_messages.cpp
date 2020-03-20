@@ -130,7 +130,7 @@ T tmain(T argc) {
   foo();
 #pragma oss task reduction(+ : o) // expected-error {{non-PODs value are not allowed in reductions}}
   foo();
-#pragma oss task reduction(+ : p), reduction(+ : p) // expected-error 2 {{variable can appear only once in OpenMP 'reduction' clause}} expected-note 2 {{previously referenced here}}
+#pragma oss task reduction(+ : p), reduction(+ : p) // expected-error 2 {{non-PODs value are not allowed in reductions}}
   foo();
 #pragma oss task reduction(+ : r) // expected-error 2 {{const-qualified variable cannot be reduction}}
   foo();
@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
   foo();
 #pragma oss task reduction(+ : o) // expected-error {{non-PODs value are not allowed in reductions}}
   foo();
-#pragma oss task reduction(+ : p), reduction(+ : p) // expected-error {{variable can appear only once in OpenMP 'reduction' clause}} expected-note {{previously referenced here}}
+#pragma oss task reduction(+ : p), reduction(+ : p) // expected-error 2 {{non-PODs value are not allowed in reductions}}
   foo();
 #pragma oss task reduction(+ : r) // expected-error {{const-qualified variable cannot be reduction}}
   foo();
