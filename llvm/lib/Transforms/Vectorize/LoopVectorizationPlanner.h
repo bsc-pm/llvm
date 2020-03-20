@@ -25,9 +25,13 @@
 #define LLVM_TRANSFORMS_VECTORIZE_LOOPVECTORIZATIONPLANNER_H
 
 #include "VPlan.h"
+#include "VPlanValue.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
 
 namespace llvm {
 
@@ -139,6 +143,13 @@ public:
 
   VPValue *createOr(VPValue *LHS, VPValue *RHS) {
     return createInstruction(Instruction::BinaryOps::Or, {LHS, RHS});
+  }
+
+  VPValue *createCallInstruction(Function *Callee, ArrayRef<VPValue *> Args) {
+    VPCallInstruction *CallInstr = new VPCallInstruction(Callee, Args);
+    if (BB)
+      BB->insert(CallInstr, InsertPt);
+    return CallInstr;
   }
 
   //===--------------------------------------------------------------------===//

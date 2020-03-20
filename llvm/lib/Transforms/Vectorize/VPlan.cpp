@@ -433,6 +433,26 @@ void VPInstruction::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
   }
 }
 
+void VPCallInstruction::print(raw_ostream &O, const Twine &Indent,
+                              VPSlotTracker &SlotTracker) const {
+  O << " +\n" << Indent << "\"EMIT ";
+  print(O, SlotTracker);
+  O << "\\l\"";
+}
+
+void VPCallInstruction::print(raw_ostream &O,
+                              VPSlotTracker &SlotTracker) const {
+  printAsOperand(O, SlotTracker);
+  O << " = ";
+  O << "call " << Callee->getName();
+  O << "(";
+  for (const VPValue *Operand : operands()) {
+    Operand->printAsOperand(O, SlotTracker);
+    O << ", ";
+  }
+  O << "\b\b)";
+}
+
 /// Generate the code inside the body of the vectorized loop. Assumes a single
 /// LoopVectorBody basic-block was created for this. Introduce additional
 /// basic-blocks as needed, and fill them all.

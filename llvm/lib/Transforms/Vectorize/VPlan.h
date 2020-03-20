@@ -768,6 +768,19 @@ public:
   }
 };
 
+class VPCallInstruction : public VPInstruction {
+private:
+  Function *Callee;
+
+public:
+  VPCallInstruction(Function *Callee, ArrayRef<VPValue *> Args)
+      : VPInstruction(Instruction::OtherOps::Call, Args), Callee(Callee) {}
+
+  void print(raw_ostream &O, const Twine &Indent,
+             VPSlotTracker &SlotTracker) const override;
+  void print(raw_ostream &O, VPSlotTracker &SlotTracker) const;
+};
+
 /// VPWidenRecipe is a recipe for producing a copy of vector type its
 /// ingredient. This recipe covers most of the traditional vectorization cases
 /// where each ingredient transforms into a vectorized version of itself.

@@ -115,6 +115,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsEPI.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -7245,6 +7246,40 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
   return BlockMaskCache[BB] = BlockMask;
 }
 
+VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
+  BasicBlock *BB = I->getParent();
+  assert(OrigLoop->contains(BB) && "Block is not a part of a loop");
+  EVLCacheTy::iterator EVLCEntryIt = EVLCache.find(BB);
+  if (EVLCEntryIt != EVLCache.end())
+    return EVLCEntryIt->second;
+
+  // TODO: In the current strategy, we just add a default EVL for the block.
+  // We set the default EVL to be the whole vector register width. The active
+  // lanes are actually taken care of by the mask.
+  VPValue *EVL = nullptr;
+  Function *IntrDecl = Intrinsic::getDeclaration(
+      BB->getModule(), Intrinsic::EPIIntrinsics::epi_vsetvlmax, {});
+  unsigned SmallestType, WidestType;
+  std::tie(SmallestType, WidestType) = CM.getSmallestAndWidestTypes();
+  const std::map<unsigned, unsigned> SEWArgMap = {
+      {8, 0}, {16, 1}, {32, 2}, {64, 3}};
+  const std::map<unsigned, unsigned> LMULArgMap = {
+      {1, 0}, {2, 1}, {4, 2}, {8, 3}};
+  assert(SEWArgMap.find(WidestType) != SEWArgMap.end() &&
+         SEWArgMap.find(SmallestType) != SEWArgMap.end() &&
+         "Cannot set vector length: Unsupported type");
+  unsigned SEW = SEWArgMap.at(WidestType);
+  unsigned LMUL = LMULArgMap.at(WidestType / SmallestType);
+
+  VPValue *SEWArg = Plan->getOrAddVPValue(
+      ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), SEW));
+  VPValue *LMULArg = Plan->getOrAddVPValue(
+      ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), LMUL));
+
+  EVL = Builder.createCallInstruction(IntrDecl, {SEWArg, LMULArg});
+  return EVLCache[BB] = EVL;
+}
+
 bool VPRecipeBuilder::validateWidenMemory(Instruction *I, VFRange &Range) {
   assert((isa<LoadInst>(I) || isa<StoreInst>(I)) &&
          "Must be called with either a load or store");
@@ -7305,8 +7340,7 @@ VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
   // etc.), presence of mask does not guarantee TTI's preference to use
   // predicated vector instructions.
   if (Mask && Legal->preferPredicatedVectorOps()) {
-    VPValue *EVL = Plan->getOrAddVPValue(ConstantInt::getSigned(
-        IntegerType::get(I->getType()->getContext(), 32), -1));
+    VPValue *EVL = getOrCreateEVL(I, Plan);
     VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
     return new VPPredicatedWidenMemoryInstructionRecipe(*I, Addr, Mask, EVL);
   }
@@ -7383,9 +7417,7 @@ bool VPRecipeBuilder::tryToPredicatedWiden(Instruction *I, VPBasicBlock *VPBB,
     // register length. Should we generate non-predicated instruction if the
     // Mask is all-ones and EVL = whoel register length?
     if (Mask) {
-      // FIXME: We only support default EVL to represent whole register for now.
-      VPValue *EVL = Plan->getOrAddVPValue(ConstantInt::getSigned(
-          IntegerType::get(I->getType()->getContext(), 32), -1));
+      VPValue *EVL = getOrCreateEVL(I, Plan);
       VPPredicatedWidenRecipe *PredWidenRecipe =
           new VPPredicatedWidenRecipe(*I, Mask, EVL);
       setRecipe(I, PredWidenRecipe);

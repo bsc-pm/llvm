@@ -49,6 +49,10 @@ class VPRecipeBuilder {
   EdgeMaskCacheTy EdgeMaskCache;
   BlockMaskCacheTy BlockMaskCache;
 
+  /// A cache to hold EVL per basic block.
+  using EVLCacheTy = DenseMap<BasicBlock *, VPValue *>;
+  EVLCacheTy EVLCache;
+
   // VPlan-VPlan transformations support: Hold a mapping from ingredients to
   // their recipe. To save on memory, only do so for selected ingredients,
   // marked by having a nullptr entry in this map.
@@ -129,6 +133,10 @@ public:
   /// A helper function that computes the predicate of the edge between SRC
   /// and DST.
   VPValue *createEdgeMask(BasicBlock *Src, BasicBlock *Dst, VPlanPtr &Plan);
+
+  /// A helper function that computes the EVL for the Instruction I. By default
+  /// it sets the EVL to whole vector register length.
+  VPValue *getOrCreateEVL(Instruction *I, VPlanPtr &Plan);
 
   /// A helper function that validates if the memory instruction can be widened
   /// and sets the widening decision.
