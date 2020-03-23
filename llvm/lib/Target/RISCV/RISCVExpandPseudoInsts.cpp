@@ -70,9 +70,6 @@ private:
   bool expandLoadTLSGDAddress(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator MBBI,
                               MachineBasicBlock::iterator &NextMBBI);
-  bool expandEPI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-                 unsigned BaseInstr, int VLIndex, int SEWIndex,
-                 int MergeOpIndex);
   bool expandVSETVL(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
 };
 
@@ -102,12 +99,6 @@ bool RISCVExpandPseudo::expandMBB(MachineBasicBlock &MBB) {
 bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MBBI,
                                  MachineBasicBlock::iterator &NextMBBI) {
-  if (const RISCVEPIPseudosTable::EPIPseudoInfo *EPI =
-          RISCVEPIPseudosTable::getEPIPseudoInfo(MBBI->getOpcode())) {
-    return expandEPI(MBB, MBBI, EPI->BaseInstr, EPI->getVLIndex(),
-                     EPI->getSEWIndex(), EPI->getMergeOpIndex());
-  }
-
   switch (MBBI->getOpcode()) {
   case RISCV::PseudoAtomicLoadNand32:
     return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 32,
@@ -716,75 +707,6 @@ bool RISCVExpandPseudo::expandLoadTLSGDAddress(
     MachineBasicBlock::iterator &NextMBBI) {
   return expandAuipcInstPair(MBB, MBBI, NextMBBI, RISCVII::MO_TLS_GD_HI,
                              RISCV::ADDI);
-}
-
-bool RISCVExpandPseudo::expandEPI(MachineBasicBlock &MBB,
-                                  MachineBasicBlock::iterator MBBI,
-                                  unsigned BaseInstr, int VLIndex, int SEWIndex,
-                                  int MergeOpIndex) {
-  MachineInstr &MI = *MBBI;
-  MachineFunction &MF = *MBB.getParent();
-  DebugLoc DL = MI.getDebugLoc();
-  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
-
-  const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
-
-  const MCInstrDesc *MCInstr = &TII.get(BaseInstr);
-
-  MachineInstrBuilder MIB = BuildMI(MBB, MI, DL, *MCInstr);
-  MachineInstr &MachineInstr = *MIB.getInstr();
-
-  // Remove implicit operands
-  for (MachineInstr::const_mop_iterator Op = MachineInstr.operands_end();
-       Op != MachineInstr.operands_begin(); Op--) {
-    MachineInstr::const_mop_iterator Base = Op - 1;
-    if (Base->isImplicit()) {
-      assert(Base->isReg());
-      MachineInstr.RemoveOperand(MachineInstr.getOperandNo(Base));
-    }
-  }
-
-  for (MachineInstr::const_mop_iterator Op = MI.operands_begin();
-       Op != MI.operands_end(); Op++) {
-    int OpNo = (int)MI.getOperandNo(Op);
-    assert(OpNo >= 0 && "Operand number doesn't fit in an 'int' type");
-
-    // Skip VL, SEW and MergeOp operands
-    if (OpNo == VLIndex || OpNo == SEWIndex || OpNo == MergeOpIndex)
-      continue;
-
-    // Nothing to do on operands other than registers, as well as NoRegister
-    // (used as vector mask operand on unmasked instructions)
-    if (!Op->isReg() || (Op->getReg() == RISCV::NoRegister)) {
-      MIB.add(*Op);
-      continue;
-    }
-
-    unsigned Reg = Op->getReg();
-
-    const TargetRegisterClass *RC = RI.getMinimalPhysRegClass(Reg);
-    if (RC->hasSuperClassEq(&RISCV::VR2RegClass) ||
-        RC->hasSuperClassEq(&RISCV::VR4RegClass) ||
-        RC->hasSuperClassEq(&RISCV::VR8RegClass)) {
-      Reg = RI.getSubReg(Reg, RISCV::vreven);
-      assert(Reg && "Subregister does not exist");
-    }
-
-    unsigned int Flags = 0;
-    if (Op->isImplicit())
-      Flags |= RegState::Implicit;
-
-    if (Op->isDef())
-      Flags |= RegState::Define;
-
-    if (Op->isUndef())
-      Flags |= RegState::Undef;
-
-    MIB.addReg(Reg, Flags);
-  }
-
-  MI.eraseFromParent(); // The pseudo instruction is gone now.
-  return true;
 }
 
 bool RISCVExpandPseudo::expandVSETVL(MachineBasicBlock &MBB,
