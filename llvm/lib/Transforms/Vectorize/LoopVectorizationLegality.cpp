@@ -1329,6 +1329,8 @@ bool LoopVectorizationLegality::prepareToFoldTailByMasking() {
     }
     // To use vector predication intrinsics, we need to add mask to all
     // operations.
+    // Unlike memory ops, mask on other ops guarantees preference for predicated
+    // vectorization.
     if (TTI->preferPredicatedVectorOps())
       addMaskedVectorOps(BB);
   }

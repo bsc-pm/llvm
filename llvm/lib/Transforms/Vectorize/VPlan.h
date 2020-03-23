@@ -768,13 +768,27 @@ public:
   }
 };
 
+enum class VPValueToValueLowering {
+  Vector,     /*Vectorize per part - State.get(V, Part)*/
+  ScalarPart, /*Scalar per part - State.get(V, {Part, 0})*/
+  Scalar      /*Scalar - State.get(V, {0, 0})*/
+};
+
 class VPCallInstruction : public VPInstruction {
 private:
   Function *Callee;
+  SmallVector<VPValueToValueLowering, 2> ArgLowering;
 
 public:
-  VPCallInstruction(Function *Callee, ArrayRef<VPValue *> Args)
-      : VPInstruction(Instruction::OtherOps::Call, Args), Callee(Callee) {}
+  VPCallInstruction(Function *Callee, ArrayRef<VPValue *> Args,
+                    ArrayRef<VPValueToValueLowering> ArgLoweringVals)
+      : VPInstruction(Instruction::OtherOps::Call, Args), Callee(Callee) {
+    for (VPValueToValueLowering Val : ArgLoweringVals)
+      ArgLowering.push_back(Val);
+  }
+
+  /// Generate the call instruction.
+  void execute(VPTransformState &State) override;
 
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;

@@ -145,8 +145,13 @@ public:
     return createInstruction(Instruction::BinaryOps::Or, {LHS, RHS});
   }
 
-  VPValue *createCallInstruction(Function *Callee, ArrayRef<VPValue *> Args) {
-    VPCallInstruction *CallInstr = new VPCallInstruction(Callee, Args);
+  VPValue *createCallInstruction(Function *Callee, ArrayRef<VPValue *> Args,
+                                 ArrayRef<VPValueToValueLowering> ArgLowering) {
+    assert(Args.size() == ArgLowering.size() &&
+           "Number of VPOperand to Value lowering types unequal to number of "
+           "Args");
+    VPCallInstruction *CallInstr =
+        new VPCallInstruction(Callee, Args, ArgLowering);
     if (BB)
       BB->insert(CallInstr, InsertPt);
     return CallInstr;

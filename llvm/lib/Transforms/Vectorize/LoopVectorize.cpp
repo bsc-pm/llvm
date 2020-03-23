@@ -2581,7 +2581,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       // creation, possibly default value = whole vector register length. EVL is
       // created only if TTI prefers predicated vectorization, thus if EVL is
       // not nullptr it also implies preference for predicated vectorization.
-      Value *EVLPart = EVL ? State.get(EVL, {Part, 0}) : nullptr;
+      Value *EVLPart = EVL ? State.get(EVL, Part) : nullptr;
       if (CreateGatherScatter) {
         // TODO: Support predicated scatter gather.
         assert(
@@ -2606,13 +2606,17 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
         }
         auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
         if (isMaskRequired)
+          // if EVLPart is not null, we can vectorize using predicated
+          // intrinsic.
           if (EVLPart) {
             Function *VPIntr = Intrinsic::getDeclaration(
                 LoopVectorPreHeader->getModule(), Intrinsic::vp_store,
                 {StoredVal->getType(), VecPtr->getType()});
+            Value *EVLPartTrunc = Builder.CreateTrunc(
+                EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
             NewSI = Builder.CreateCall(
                 VPIntr, {StoredVal, VecPtr, Builder.getInt32(Alignment.value()),
-                         BlockInMaskParts[Part], EVLPart});
+                         BlockInMaskParts[Part], EVLPartTrunc});
           } else
             NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
                                               BlockInMaskParts[Part]);
@@ -2629,7 +2633,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
   setDebugLocFromInst(Builder, LI);
   for (unsigned Part = 0; Part < UF; ++Part) {
     Value *NewLI;
-    Value *EVLPart = EVL ? State.get(EVL, {Part, 0}) : nullptr;
+    Value *EVLPart = EVL ? State.get(EVL, Part) : nullptr;
     if (CreateGatherScatter) {
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
@@ -2644,14 +2648,18 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     } else {
       auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
       if (isMaskRequired)
+        // if EVLPart is not null, we can vectorize using predicated
+        // intrinsic.
         if (EVLPart) {
           Function *VPIntr = Intrinsic::getDeclaration(
               LoopVectorPreHeader->getModule(), Intrinsic::vp_load,
               {VecPtr->getType()->getPointerElementType(), VecPtr->getType()});
+          Value *EVLPartTrunc = Builder.CreateTrunc(
+              EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
           NewLI =
               Builder.CreateCall(VPIntr,
                                  {VecPtr, Builder.getInt32(Alignment.value()),
-                                  BlockInMaskParts[Part], EVLPart},
+                                  BlockInMaskParts[Part], EVLPartTrunc},
                                  "vp.op.load");
         } else
           NewLI = Builder.CreateMaskedLoad(
@@ -4481,24 +4489,46 @@ static bool mayDivideByZero(Instruction &I) {
   return !CInt || CInt->isZero();
 }
 
-// FIXME: This is an experimental function. It's functionality will either be
-// moved to VPlan or merged in widenInstruction.
 void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
                                                      VPTransformState &State,
                                                      VPValue *BlockInMask,
                                                      VPValue *EVL) {
+  // TODO: Add support for other instructions as they are implemented by
+  // predicated vector intrinsics.
   auto VPIntrInstr = [](unsigned Opcode) {
     switch (Opcode) {
     case Instruction::Add:
       return Intrinsic::vp_add;
     case Instruction::Sub:
       return Intrinsic::vp_sub;
+    case Instruction::Mul:
+      return Intrinsic::vp_mul;
+    case Instruction::SDiv:
+      return Intrinsic::vp_sdiv;
+    case Instruction::UDiv:
+      return Intrinsic::vp_udiv;
+    case ::Instruction::SRem:
+      return Intrinsic::vp_srem;
+    case Instruction::URem:
+      return Intrinsic::vp_urem;
+    case Instruction::AShr:
+      return Intrinsic::vp_ashr;
+    case Instruction::LShr:
+      return Intrinsic::vp_lshr;
+    case Instruction::Shl:
+      return Intrinsic::vp_shl;
+    case Instruction::Or:
+      return Intrinsic::vp_or;
+    case Instruction::And:
+      return Intrinsic::vp_and;
+    case Instruction::Xor:
+      return Intrinsic::vp_xor;
     }
     return Intrinsic::not_intrinsic;
   };
 
-  if (VPIntrInstr(I.getOpcode()) == Intrinsic::not_intrinsic)
-    return widenInstruction(I);
+  assert(VPIntrInstr(I.getOpcode()) != Intrinsic::not_intrinsic &&
+         "Opcode does not have predicated vector intrinsic support yet");
 
   // Just widen unops and binops.
   setDebugLocFromInst(Builder, &I);
@@ -4513,12 +4543,14 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
            "Operands must be of identical vector types");
     Value *BlockInMaskPart = State.get(BlockInMask, Part);
-    Value *EVLPart = State.get(EVL, {Part, 0});
+    Value *EVLPart = State.get(EVL, Part);
 
     Function *VPIntr = Intrinsic::getDeclaration(
         LoopVectorPreHeader->getModule(), VPIntrInstr(I.getOpcode()), OpTy);
+    Value *EVLPartTrunc =
+        Builder.CreateTrunc(EVLPart, Type::getInt32Ty(OpTy->getContext()));
     Value *V = Builder.CreateCall(
-        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, EVLPart}, "vp.op");
+        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, EVLPartTrunc}, "vp.op");
 
     if (auto *VecOp = dyn_cast<Instruction>(V))
       VecOp->copyIRFlags(&I);
@@ -7276,7 +7308,9 @@ VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
   VPValue *LMULArg = Plan->getOrAddVPValue(
       ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), LMUL));
 
-  EVL = Builder.createCallInstruction(IntrDecl, {SEWArg, LMULArg});
+  EVL = Builder.createCallInstruction(
+      IntrDecl, {SEWArg, LMULArg},
+      {VPValueToValueLowering::Scalar, VPValueToValueLowering::Scalar});
   return EVLCache[BB] = EVL;
 }
 

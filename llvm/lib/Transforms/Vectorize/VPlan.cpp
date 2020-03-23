@@ -19,8 +19,10 @@
 #include "VPlan.h"
 #include "VPlanDominatorTree.h"
 #include "VPlanValue.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -381,6 +383,14 @@ void VPInstruction::generateInstruction(VPTransformState &State,
     State.set(this, V, Part);
     break;
   }
+
+  // TODO: This case can be removed when support for Call instruction is added
+  // to VPlan in upstream. For now it helps catch any use of VPInstruction for
+  // Call opcode that is now supported by the new VPCallInstruction recipe.
+  case Instruction::Call: {
+    llvm_unreachable("This opcode is handles by the VPCallInstruction recipe");
+  }
+
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -433,9 +443,26 @@ void VPInstruction::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
   }
 }
 
+void VPCallInstruction::execute(VPTransformState &State) {
+  IRBuilder<> &Builder = State.Builder;
+  for (unsigned Part = 0; Part < State.UF; ++Part) {
+    SmallVector<Value *, 2> Operands;
+    for (auto Operand : enumerate(operands())) {
+      if (ArgLowering[Operand.index()] == VPValueToValueLowering::Scalar)
+        Operands.push_back(State.get(Operand.value(), {0, 0}));
+      if (ArgLowering[Operand.index()] == VPValueToValueLowering::ScalarPart)
+        Operands.push_back(State.get(Operand.value(), {Part, 0}));
+      if (ArgLowering[Operand.index()] == VPValueToValueLowering::Vector)
+        Operands.push_back(State.get(Operand.value(), Part));
+    }
+    Value *V = Builder.CreateCall(Callee, Operands);
+    State.set(this, V, Part);
+  }
+}
+
 void VPCallInstruction::print(raw_ostream &O, const Twine &Indent,
                               VPSlotTracker &SlotTracker) const {
-  O << " +\n" << Indent << "\"EMIT ";
+  O << " +\n" << Indent << "\"EMIT-CALL ";
   print(O, SlotTracker);
   O << "\\l\"";
 }
