@@ -8325,13 +8325,15 @@ SDValue DAGCombiner::visitFunnelShift(SDNode *N) {
     // fold (fshr ld1, ld0, c) -> (ld0[ofs]) iff ld0 and ld1 are consecutive.
     // TODO - bigendian support once we have test coverage.
     // TODO - can we merge this with CombineConseutiveLoads/MatchLoadCombine?
+    // TODO - permit LHS EXTLOAD if extensions are shifted out.
     if ((BitWidth % 8) == 0 && (ShAmt % 8) == 0 && !VT.isVector() &&
         !DAG.getDataLayout().isBigEndian()) {
       auto *LHS = dyn_cast<LoadSDNode>(N0);
       auto *RHS = dyn_cast<LoadSDNode>(N1);
       if (LHS && RHS && LHS->isSimple() && RHS->isSimple() &&
           LHS->getAddressSpace() == RHS->getAddressSpace() &&
-          (LHS->hasOneUse() || RHS->hasOneUse()) && ISD::isNON_EXTLoad(RHS)) {
+          (LHS->hasOneUse() || RHS->hasOneUse()) && ISD::isNON_EXTLoad(RHS) &&
+          ISD::isNON_EXTLoad(LHS)) {
         if (DAG.areNonVolatileConsecutiveLoads(LHS, RHS, BitWidth / 8, 1)) {
           SDLoc DL(RHS);
           uint64_t PtrOff =
@@ -11955,6 +11957,7 @@ SDValue DAGCombiner::visitFSUBForFMACombine(SDNode *N) {
   // Always prefer FMAD to FMA for precision.
   unsigned PreferredFusedOpcode = HasFMAD ? ISD::FMAD : ISD::FMA;
   bool Aggressive = TLI.enableAggressiveFMAFusion(VT);
+  bool NoSignedZero = Options.NoSignedZerosFPMath || Flags.hasNoSignedZeros();
 
   // Is the node an FMUL and contractable either due to global flags or
   // SDNodeFlags.
@@ -12118,7 +12121,7 @@ SDValue DAGCombiner::visitFSUBForFMACombine(SDNode *N) {
     //   -> (fma (fneg y), z, (fma (fneg u), v, x))
     if (CanFuse && N1.getOpcode() == PreferredFusedOpcode &&
         isContractableFMUL(N1.getOperand(2)) &&
-        N1->hasOneUse()) {
+        N1->hasOneUse() && NoSignedZero) {
       SDValue N20 = N1.getOperand(2).getOperand(0);
       SDValue N21 = N1.getOperand(2).getOperand(1);
       return DAG.getNode(PreferredFusedOpcode, SL, VT,

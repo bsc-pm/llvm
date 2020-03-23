@@ -6330,7 +6330,6 @@ static bool canPassInRegisters(Sema &S, CXXRecordDecl *D,
 ///
 /// \param DiagID the primary error to report.
 /// \param MD the overriding method.
-/// \param OEK which overrides to include as notes.
 static bool
 ReportOverrides(Sema &S, unsigned DiagID, const CXXMethodDecl *MD,
                 llvm::function_ref<bool(const CXXMethodDecl *)> Report) {
