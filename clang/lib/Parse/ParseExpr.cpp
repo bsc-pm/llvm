@@ -3265,7 +3265,10 @@ ExprResult Parser::ParseAvailabilityCheckExpr(SourceLocation BeginLoc) {
                                                 Parens.getCloseLocation());
 }
 
+// Use TentativeParsingAction to ensure we're parsing a shaping expression
+// return: ExprEmpty() if shaping expression, ExprError() if not
 ExprResult Parser::TryParseOSSArrayShaping() {
+  assert(Tok.is(tok::l_square) && "expected '['");
   TentativeParsingAction TPA(*this);
   bool First = true;
 
@@ -3286,6 +3289,11 @@ ExprResult Parser::TryParseOSSArrayShaping() {
     }
 
     // Parse whatever between []
+    // FIXME: this allows to write assignment expressions like [x = 43]p
+    // NOTE: There's a bug in Lambda parsing that makes skip lambdas defined in a comma
+    // separated list.
+    // For example: auto l = [x](), m = [](){};
+    // skips 'm'
     Diags.setSuppressAllDiagnostics(true);
     Actions.CorrectDelayedTyposInExpr(ParseExpression());
     Diags.setSuppressAllDiagnostics(false);
@@ -3298,18 +3306,19 @@ ExprResult Parser::TryParseOSSArrayShaping() {
 
     ConsumeBracket();
   }
+
   // Not having a '(' after shapes means shaping expr.
   if (Tok.isNot(tok::l_paren)) {
     TPA.Revert();
     return ExprEmpty();
   }
 
-  ConsumeParen();
-
-  // Lambdas have ParameterDeclarationClause
-  TPResult TPR = TryParseParameterDeclarationClause();
-  if (TPR == TPResult::True
-      || TPR == TPResult::Ambiguous) {
+  // NOTE: Since we can parse a CompoundLiteralExpr ( (int *p) {} ), and the whole expression
+  // be like a lambda we classify this as a lambda
+  Diags.setSuppressAllDiagnostics(true);
+  ExprResult Base = Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+  Diags.setSuppressAllDiagnostics(false);
+  if (Base.isInvalid() || isa<CompoundLiteralExpr>(Base.get())) {
     TPA.Revert();
     return ExprError();
   }
@@ -3319,9 +3328,12 @@ ExprResult Parser::TryParseOSSArrayShaping() {
   return ExprEmpty();
 }
 
-/// FIXME comment
-/// '[' constant-expression[opt] ']'
-///
+/// cast-expression → shape-seq noshape-cast-expression
+/// shape-seq → shape
+///           | shape-seq shape
+/// shape     → '[' expression ']'
+/// noshape-cast-expression: unary-expression
+///           | '(' type_id ')' cast_expression
 ExprResult Parser::ParseOSSArrayShaping() {
   SourceLocation Loc, RLoc;
   SmallVector<Expr *, 2> ShapeList;

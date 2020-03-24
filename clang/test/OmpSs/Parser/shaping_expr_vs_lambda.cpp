@@ -31,6 +31,11 @@ void foo2(int x) {
   {}
 }
 
+void foo3(char *p) {
+  #pragma oss task depend(in : [10](int *)p)
+  {}
+}
+
 using T = int;
 void foo3() {
   auto l = [](T()) {};
