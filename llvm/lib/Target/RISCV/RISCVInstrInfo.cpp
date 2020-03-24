@@ -42,7 +42,10 @@ unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     return 0;
-  case RISCV::PseudoVRELOAD:
+  case RISCV::PseudoVRELOAD_M1:
+  case RISCV::PseudoVRELOAD_M2:
+  case RISCV::PseudoVRELOAD_M4:
+  case RISCV::PseudoVRELOAD_M8:
     assert(MI.getOperand(1).isFI());
     FrameIndex = MI.getOperand(1).getIndex();
     assert(MI.getOperand(0).isReg());
@@ -73,7 +76,10 @@ unsigned RISCVInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     return 0;
-  case RISCV::PseudoVSPILL:
+  case RISCV::PseudoVSPILL_M1:
+  case RISCV::PseudoVSPILL_M2:
+  case RISCV::PseudoVSPILL_M4:
+  case RISCV::PseudoVSPILL_M8:
     assert(MI.getOperand(1).isFI());
     FrameIndex = MI.getOperand(1).getIndex();
     assert(MI.getOperand(0).isReg());
