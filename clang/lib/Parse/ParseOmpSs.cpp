@@ -1204,7 +1204,8 @@ OSSClause *Parser::ParseOmpSsVarListClause(OmpSsDirectiveKind DKind,
     return Kind == OSSC_depend || Kind == OSSC_reduction
      || Kind == OSSC_in || Kind == OSSC_out || Kind == OSSC_inout
      || Kind == OSSC_concurrent || Kind == OSSC_commutative
-     || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout;
+     || Kind == OSSC_weakin || Kind == OSSC_weakout || Kind == OSSC_weakinout
+     || Kind == OSSC_weakreduction;
   });
 
   if (ParseOmpSsVarList(DKind, Kind, Vars, Data)) {

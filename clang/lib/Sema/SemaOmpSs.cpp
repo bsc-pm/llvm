@@ -1468,9 +1468,9 @@ static bool rejectConstNotMutableType(Sema &SemaRef, const ValueDecl *D,
   bool IsClassType;
   if (isConstNotMutableType(SemaRef, Type, AcceptIfMutable, &IsClassType)) {
     unsigned Diag = ListItemNotVar
-                        ? diag::err_omp_const_list_item
-                        : IsClassType ? diag::err_omp_const_not_mutable_variable
-                                      : diag::err_omp_const_variable;
+                        ? diag::err_oss_const_list_item
+                        : IsClassType ? diag::err_oss_const_not_mutable_variable
+                                      : diag::err_oss_const_variable;
     SemaRef.Diag(ELoc, Diag) << getOmpSsClauseName(CKind);
     if (!ListItemNotVar && D) {
       const VarDecl *VD = dyn_cast<VarDecl>(D);
@@ -1982,26 +1982,12 @@ static bool actOnOSSReductionKindClause(
             (S.getLangOpts().CPlusPlus && Type->isArithmeticType()))) {
         S.Diag(ELoc, diag::err_oss_clause_not_arithmetic_type_arg)
             << getOmpSsClauseName(ClauseKind) << S.getLangOpts().CPlusPlus;
-        // if (!ASE && !OASE) {
-        //   bool IsDecl = !VD || VD->isThisDeclarationADefinition(Context) ==
-        //                            VarDecl::DeclarationOnly;
-        //   S.Diag(D->getLocation(),
-        //          IsDecl ? diag::note_previous_decl : diag::note_defined_here)
-        //       << D;
-        // }
         continue;
       }
       if ((BOK == BO_OrAssign || BOK == BO_AndAssign || BOK == BO_XorAssign) &&
           !S.getLangOpts().CPlusPlus && Type->isFloatingType()) {
         S.Diag(ELoc, diag::err_oss_clause_floating_type_arg)
             << getOmpSsClauseName(ClauseKind);
-        // if (!ASE && !OASE) {
-        //   bool IsDecl = !VD || VD->isThisDeclarationADefinition(Context) ==
-        //                            VarDecl::DeclarationOnly;
-        //   S.Diag(D->getLocation(),
-        //          IsDecl ? diag::note_previous_decl : diag::note_defined_here)
-        //       << D;
-        // }
         continue;
       }
     }

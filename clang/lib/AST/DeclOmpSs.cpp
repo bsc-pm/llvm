@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 /// \file
-/// This file implements OSSThreadPrivateDecl, OSSCapturedExprDecl
+/// This file implements OSSDeclareReductionDecl
 /// classes.
 ///
 //===----------------------------------------------------------------------===//

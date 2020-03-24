@@ -366,7 +366,7 @@ static void gatherReductionsInitCombInfo(const IntrinsicInst *I, TaskInfo &TI) {
 
     // This assert should not trigger since clang allows an unique reduction per DSA
     assert(!TI.ReductionsInitCombInfo.count(OBArgs[0])
-           && "Two or morereductions of the same DSA in the same task are not allowed");
+           && "Two or more reductions of the same DSA in the same task are not allowed");
     TI.ReductionsInitCombInfo[OBArgs[0]].Init = OBArgs[1];
 
     if (SeenInits.count(OBArgs[1])) {

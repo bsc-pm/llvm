@@ -1,10 +1,10 @@
 int main() {
     int x;
-    #pragma oss task reduction(::operator+: x) 
+    #pragma oss task reduction(::operator+: x)
     {}
-    #pragma oss task reduction(operator+: x) 
+    #pragma oss task reduction(operator+: x)
     {}
-    #pragma oss task reduction(+: x) 
+    #pragma oss task reduction(+: x)
     {}
 }
 

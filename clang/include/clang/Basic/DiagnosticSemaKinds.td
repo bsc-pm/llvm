@@ -9915,6 +9915,12 @@ def err_oss_expected_base_var_name : Error<
 def err_oss_reduction_wrong_type : Error<"reduction type cannot be %select{qualified with 'const', 'volatile' or 'restrict'|a function|a reference|an array}0 type">;
 def err_oss_declare_reduction_redefinition : Error<"redefinition of user-defined reduction for type %0">;
 
+def err_oss_const_variable : Error<
+  "const-qualified variable cannot be %0">;
+def err_oss_const_not_mutable_variable : Error<
+  "const-qualified variable without mutable fields cannot be %0">;
+def err_oss_const_list_item : Error<
+  "const-qualified list item cannot be %0">;
 def err_oss_not_integral : Error<
   "expression must have integral or unscoped enumeration "
   "type, not %0">;

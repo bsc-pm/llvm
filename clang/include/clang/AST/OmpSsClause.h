@@ -839,7 +839,6 @@ public:
 };
 
 
-// TODO: fix doc
 /// This represents clause 'reduction' in the '#pragma oss task'
 /// directive.
 ///
@@ -864,8 +863,12 @@ class OSSReductionClause final
   /// Name of custom operator.
   DeclarationNameInfo NameInfo;
 
+  /// Reduction Kind for each variable
+  // TODO: this can be simplified since in a reduction clause
+  // all variables have the same kind
   SmallVector<BinaryOperatorKind, 4> ReductionKinds;
 
+  /// Tells if the reduction is weak 'weakreduction'
   bool IsWeak;
 
   /// Build clause with number of variables \a N.
@@ -877,6 +880,7 @@ class OSSReductionClause final
   /// \param N Number of the variables in the clause.
   /// \param QualifierLoc The nested-name qualifier with location information
   /// \param NameInfo The full name info for reduction identifier.
+  /// \param IsWeak Specifies if the reduction is weak.
   OSSReductionClause(SourceLocation StartLoc, SourceLocation LParenLoc,
                      SourceLocation ColonLoc, SourceLocation EndLoc, unsigned N,
                      NestedNameSpecifierLoc QualifierLoc,
@@ -1003,10 +1007,6 @@ public:
   /// \endcode
   /// Required for proper codegen of final reduction operation performed by the
   /// reduction clause.
-  /// \param PreInit Statement that must be executed before entering the OpenMP
-  /// region with this clause.
-  /// \param PostUpdate Expression that must be executed after exit from the
-  /// OpenMP region with this clause.
   static OSSReductionClause *
   Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
          SourceLocation ColonLoc, SourceLocation EndLoc, ArrayRef<Expr *> VL,
