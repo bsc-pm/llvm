@@ -924,29 +924,16 @@ class OSSReductionClause final
   }
 
   /// Set list of helper expressions, required for proper codegen of the
-  /// clause. These expressions represent private copy of the reduction
-  /// variable.
-  void setPrivates(ArrayRef<Expr *> Privates);
-
-  /// Get the list of helper privates.
-  MutableArrayRef<Expr *> getPrivates() {
-    return MutableArrayRef<Expr *>(getSimpleExprs().end(), varlist_size());
-  }
-  ArrayRef<const Expr *> getPrivates() const {
-    return llvm::makeArrayRef(getSimpleExprs().end(), varlist_size());
-  }
-
-  /// Set list of helper expressions, required for proper codegen of the
   /// clause. These expressions represent LHS expression in the final
   /// reduction expression performed by the reduction clause.
   void setLHSExprs(ArrayRef<Expr *> LHSExprs);
 
   /// Get the list of helper LHS expressions.
   MutableArrayRef<Expr *> getLHSExprs() {
-    return MutableArrayRef<Expr *>(getPrivates().end(), varlist_size());
+    return MutableArrayRef<Expr *>(getSimpleExprs().end(), varlist_size());
   }
   ArrayRef<const Expr *> getLHSExprs() const {
-    return llvm::makeArrayRef(getPrivates().end(), varlist_size());
+    return llvm::makeArrayRef(getSimpleExprs().end(), varlist_size());
   }
 
   /// Set list of helper expressions, required for proper codegen of the
@@ -988,14 +975,8 @@ public:
   /// \param VL The variables in the clause.
   /// \param QualifierLoc The nested-name qualifier with location information
   /// \param NameInfo The full name info for reduction identifier.
-  /// \param Privates List of helper expressions for proper generation of
-  /// private copies.
-  /// \param LHSExprs List of helper expressions for proper generation of
-  /// assignment operation required for copyprivate clause. This list represents
-  /// LHSs of the reduction expressions.
-  /// \param RHSExprs List of helper expressions for proper generation of
-  /// assignment operation required for copyprivate clause. This list represents
-  /// RHSs of the reduction expressions.
+  /// \param LHSExprs This list represents LHSs of the reduction expressions.
+  /// \param RHSExprs This list represents RHSs of the reduction expressions.
   /// Also, variables in these expressions are used for proper initialization of
   /// reduction copies.
   /// \param ReductionOps List of helper expressions that represents reduction
@@ -1003,7 +984,8 @@ public:
   /// \code
   /// LHSExprs binop RHSExprs;
   /// operator binop(LHSExpr, RHSExpr);
-  /// <CutomReduction>(LHSExpr, RHSExpr);
+  /// <CustomCombiner>(<CombinerOut>, <CombinerIn>);
+  /// <CustomInit>(<InitPriv>, <InitOrig>);
   /// \endcode
   /// Required for proper codegen of final reduction operation performed by the
   /// reduction clause.
@@ -1047,14 +1029,6 @@ public:
 
   helper_expr_range simple_exprs() {
     return helper_expr_range(getSimpleExprs().begin(), getSimpleExprs().end());
-  }
-
-  helper_expr_const_range privates() const {
-    return helper_expr_const_range(getPrivates().begin(), getPrivates().end());
-  }
-
-  helper_expr_range privates() {
-    return helper_expr_range(getPrivates().begin(), getPrivates().end());
   }
 
   helper_expr_const_range lhs_exprs() const {

@@ -141,17 +141,11 @@ void OSSReductionClause::setSimpleExprs(ArrayRef<Expr *> SimpleExprs) {
   std::copy(SimpleExprs.begin(), SimpleExprs.end(), varlist_end());
 }
 
-void OSSReductionClause::setPrivates(ArrayRef<Expr *> Privates) {
-  assert(Privates.size() == varlist_size() &&
-         "Number of private copies is not the same as the preallocated buffer");
-  std::copy(Privates.begin(), Privates.end(), getSimpleExprs().end());
-}
-
 void OSSReductionClause::setLHSExprs(ArrayRef<Expr *> LHSExprs) {
   assert(
       LHSExprs.size() == varlist_size() &&
       "Number of LHS expressions is not the same as the preallocated buffer");
-  std::copy(LHSExprs.begin(), LHSExprs.end(), getPrivates().end());
+  std::copy(LHSExprs.begin(), LHSExprs.end(), getSimpleExprs().end());
 }
 
 void OSSReductionClause::setRHSExprs(ArrayRef<Expr *> RHSExprs) {
@@ -175,7 +169,7 @@ OSSReductionClause *OSSReductionClause::Create(
     ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> LHSExprs,
     ArrayRef<Expr *> RHSExprs, ArrayRef<Expr *> ReductionOps,
     ArrayRef<BinaryOperatorKind> ReductionKinds, bool IsWeak) {
-  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(6 * VL.size()));
+  void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(5 * VL.size()));
   OSSReductionClause *Clause = new (Mem) OSSReductionClause(
       StartLoc, LParenLoc, EndLoc, ColonLoc, VL.size(), QualifierLoc, NameInfo, IsWeak);
   Clause->setVarRefs(VL);
