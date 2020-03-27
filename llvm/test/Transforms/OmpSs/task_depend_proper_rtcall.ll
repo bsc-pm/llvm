@@ -24,7 +24,7 @@ entry:
 
 ; Check we access properly a local variable, a global variable, a constant expression
 
-; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [20 x i32]]* %array, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [20 x i32]]* %array, i8* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = bitcast [10 x [20 x i32]]* %array to i8*
 ; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %0, i64 80, i64 0, i64 80, i64 10, i64 0, i64 10)
@@ -33,7 +33,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main1(%struct.S* %s, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main1(%struct.S* %s, i8* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = getelementptr inbounds %struct.S, %struct.S* %s, i32 0, i32 0
 ; CHECK-NEXT:   %1 = bitcast i32* %0 to i8*
@@ -45,7 +45,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main2(i32* %n, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main2(i32* %n, i8* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = bitcast i32* %n to i8*
 ; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %0, i64 4, i64 0, i64 4)
