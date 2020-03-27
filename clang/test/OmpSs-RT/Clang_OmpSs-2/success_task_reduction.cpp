@@ -25,7 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-cxx-compile-and-run
-// UNSUPPORTED: *
+// UNSUPPORTED:
 
 #include <cassert>
 #define N 10
