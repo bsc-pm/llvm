@@ -1331,7 +1331,7 @@ bool LoopVectorizationLegality::prepareToFoldTailByMasking() {
     // operations.
     // Unlike memory ops, mask on other ops guarantees preference for predicated
     // vectorization.
-    if (TTI->preferPredicatedVectorOps())
+    if (preferPredicatedVectorOps())
       addMaskedVectorOps(BB);
   }
 

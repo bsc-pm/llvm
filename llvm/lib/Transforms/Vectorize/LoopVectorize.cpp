@@ -3985,7 +3985,7 @@ void InnerLoopVectorizer::fixReduction(PHINode *Phi) {
       // incoming scalar reduction.
       VectorStart = ReductionStartValue;
     } else {
-      Identity = ConstantVector::getSplat({VF, false}, Iden);
+      Identity = ConstantVector::getSplat({VF, true}, Iden);
 
       // This vector is the Identity vector where the first element is the
       // incoming scalar reduction.
