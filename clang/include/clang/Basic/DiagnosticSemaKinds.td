@@ -7967,6 +7967,22 @@ def err_cuda_ovl_target : Error<
 def note_cuda_ovl_candidate_target_mismatch : Note<
     "candidate template ignored: target attributes do not match">;
 
+def err_cuda_device_builtin_surftex_cls_template : Error<
+    "illegal device builtin %select{surface|texture}0 reference "
+    "class template %1 declared here">;
+def note_cuda_device_builtin_surftex_cls_should_have_n_args : Note<
+    "%0 needs to have exactly %1 template parameters">;
+def note_cuda_device_builtin_surftex_cls_should_have_match_arg : Note<
+    "the %select{1st|2nd|3rd}1 template parameter of %0 needs to be "
+    "%select{a type|an integer or enum value}2">;
+
+def err_cuda_device_builtin_surftex_ref_decl : Error<
+    "illegal device builtin %select{surface|texture}0 reference "
+    "type %1 declared here">;
+def note_cuda_device_builtin_surftex_should_be_template_class : Note<
+    "%0 needs to be instantiated from a class template with proper "
+    "template arguments">;
+
 def warn_non_pod_vararg_with_format_string : Warning<
   "cannot pass %select{non-POD|non-trivial}0 object of type %1 to variadic "
   "%select{function|block|method|constructor}2; expected type from format "
@@ -10078,6 +10094,19 @@ def err_omp_depobj_single_clause_expected : Error<
   "exactly one of 'depend', 'destroy', or 'update' clauses is expected">;
 def err_omp_scan_single_clause_expected : Error<
   "exactly one of 'inclusive' or 'exclusive' clauses is expected">;
+def err_omp_inclusive_exclusive_not_reduction : Error<
+  "the list item must appear in 'reduction' clause with the 'inscan' modifier "
+  "of the parent directive">;
+def err_omp_reduction_not_inclusive_exclusive : Error<
+  "the inscan reduction list item must appear as a list item in an 'inclusive' or"
+  " 'exclusive' clause on an inner 'omp scan' directive">;
+def err_omp_wrong_inscan_reduction : Error<
+  "'inscan' modifier can be used only in 'omp for', 'omp simd', 'omp for simd',"
+  " 'omp parallel for', or 'omp parallel for simd' directive">;
+def err_omp_inscan_reduction_expected : Error<
+  "expected 'reduction' clause with the 'inscan' modifier">;
+def note_omp_previous_inscan_reduction : Note<
+  "'reduction' clause with 'inscan' modifier is used here">;
 def err_omp_expected_predefined_allocator : Error<
   "expected one of the predefined allocators for the variables with the static "
   "storage: 'omp_default_mem_alloc', 'omp_large_cap_mem_alloc', "
