@@ -51,20 +51,9 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeEPIRemoveRedundantVSETVLGlobalPass(*PR);
 }
 
-static StringRef computeDataLayout(const Triple &TT, StringRef FS) {
+static StringRef computeDataLayout(const Triple &TT) {
   if (TT.isArch64Bit()) {
-    std::vector<std::string> Split;
-    SubtargetFeatures::Split(Split, FS);
-
-    // Vectors in V-ext can be aligned to 16 bytes.
-    // FIXME: Assuming ELEN=64.
-    bool HasV = std::find(Split.begin(), Split.end(), "+v") != Split.end();
-
-    if (!HasV)
-      return "e-m:e-p:64:64-i64:64-i128:128-n64-S128";
-    else
-      return "e-m:e-p:64:64-i64:64-i128:128-n64-S128-v128:128:128-v256:128:128-"
-             "v512:128:128-v1024:128:128";
+    return "e-m:e-p:64:64-i64:64-i128:128-n64-S128";
   } else {
     assert(TT.isArch32Bit() && "only RV32 and RV64 are currently supported");
     return "e-m:e-p:32:32-i64:64-n32-S128";
@@ -84,7 +73,7 @@ RISCVTargetMachine::RISCVTargetMachine(const Target &T, const Triple &TT,
                                        Optional<Reloc::Model> RM,
                                        Optional<CodeModel::Model> CM,
                                        CodeGenOpt::Level OL, bool JIT)
-    : LLVMTargetMachine(T, computeDataLayout(TT, FS), TT, CPU, FS, Options,
+    : LLVMTargetMachine(T, computeDataLayout(TT), TT, CPU, FS, Options,
                         getEffectiveRelocModel(TT, RM),
                         getEffectiveCodeModel(CM, CodeModel::Small), OL),
       TLOF(std::make_unique<RISCVELFTargetObjectFile>()) {
