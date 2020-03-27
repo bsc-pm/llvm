@@ -5,7 +5,7 @@ test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatib
 */
 
 // RUN: %oss-cxx-compile-and-run
-// UNSUPPORTED:
+// UNSUPPORTED: true
 
 namespace N
 {

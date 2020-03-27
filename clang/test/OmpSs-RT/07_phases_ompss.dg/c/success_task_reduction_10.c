@@ -25,7 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
-// UNSUPPORTED:
+// UNSUPPORTED: true
 
 /*
 <testinfo>
