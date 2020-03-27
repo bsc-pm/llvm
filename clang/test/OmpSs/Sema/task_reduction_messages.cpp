@@ -4,8 +4,8 @@
 
 
 void xxx(int argc) {
-  int fp; // expected-note {{initialize the variable 'fp' to silence this warning}}
-#pragma oss task reduction(+:fp) // expected-warning {{variable 'fp' is uninitialized when used here}}
+  int fp; // NOTE: initialize the variable 'fp' to silence this warning
+#pragma oss task reduction(+:fp) // WARNING: variable 'fp' is uninitialized when used here
   for (int i = 0; i < 10; ++i)
     ;
 }
