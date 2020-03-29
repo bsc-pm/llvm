@@ -5435,6 +5435,11 @@ static bool isAnyInRange(ArrayRef<int> Mask, int Low, int Hi) {
   return llvm::any_of(Mask, [Low, Hi](int M) { return isInRange(M, Low, Hi); });
 }
 
+/// Return true if the value of any element in Mask is the zero sentinel value.
+static bool isAnyZero(ArrayRef<int> Mask) {
+  return llvm::any_of(Mask, [](int M) { return M == SM_SentinelZero; });
+}
+
 /// Return true if Val is undef or if its value falls within the
 /// specified range (L, H].
 static bool isUndefOrInRange(int Val, int Low, int Hi) {
@@ -33959,7 +33964,29 @@ static SDValue combineX86ShuffleChain(ArrayRef<SDValue> Inputs, SDValue Root,
     }
   }
 
-  // TODO - handle 128/256-bit lane shuffles of 512-bit vectors.
+  // Handle 128/256-bit lane shuffles of 512-bit vectors.
+  if (RootVT.is512BitVector() &&
+      (NumBaseMaskElts == 2 || NumBaseMaskElts == 4)) {
+    MVT ShuffleVT = (FloatDomain ? MVT::v8f64 : MVT::v8i64);
+
+    // If the upper subvectors are zeroable, then an extract+insert is more
+    // optimal than using X86ISD::SHUF128. The insertion is free, even if it has
+    // to zero the upper subvectors.
+    if (isUndefOrZeroInRange(BaseMask, 1, NumBaseMaskElts - 1)) {
+      if (Depth == 0 && Root.getOpcode() == ISD::INSERT_SUBVECTOR)
+        return SDValue(); // Nothing to do!
+      assert(isInRange(BaseMask[0], 0, NumBaseMaskElts) &&
+             "Unexpected lane shuffle");
+      Res = DAG.getBitcast(ShuffleVT, V1);
+      unsigned SubIdx = BaseMask[0] * (8 / NumBaseMaskElts);
+      bool UseZero = isAnyZero(BaseMask);
+      Res = extractSubVector(Res, SubIdx, DAG, DL, BaseMaskEltSizeInBits);
+      Res = widenSubVector(Res, UseZero, Subtarget, DAG, DL, RootSizeInBits);
+      return DAG.getBitcast(RootVT, Res);
+    }
+
+    // TODO - handle AVX512 cases with X86ISD::SHUF128.
+  }
 
   // Handle 128-bit lane shuffles of 256-bit vectors.
   if (RootVT.is256BitVector() && NumBaseMaskElts == 2) {
@@ -34231,8 +34258,7 @@ static SDValue combineX86ShuffleChain(ArrayRef<SDValue> Inputs, SDValue Root,
   int VariableShuffleDepth = Subtarget.hasFastVariableShuffle() ? 1 : 2;
   AllowVariableMask &= (Depth >= VariableShuffleDepth) || HasVariableMask;
 
-  bool MaskContainsZeros =
-      any_of(Mask, [](int M) { return M == SM_SentinelZero; });
+  bool MaskContainsZeros = isAnyZero(Mask);
 
   if (is128BitLaneCrossingShuffleMask(MaskVT, Mask)) {
     // If we have a single input lane-crossing shuffle then lower to VPERMV.
