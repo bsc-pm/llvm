@@ -37,6 +37,281 @@ using namespace clang;
 using namespace CodeGen;
 
 namespace {
+// This class gathers all the info needed for OSSDependVisitor to emit a dependency in
+// compute_dep.
+// The visitor walks and annotates the number of dimensions in the same way that OSSDependVisitor
+// NOTE: keep synchronized
+//
+// Additionally it gathers:
+// 1. all the shape expressions involved variables. Since a shaping expression may be a VLA, it's dimensions
+// have not been built yet. We need the involved variable to be able to emit them in compute_dep
+// 2. all the vla size expressions. We may have 'vla[sizeof(vla)]' which needs all the dimensions for example
+// 3. 'this'
+class OSSDependInfoGathering
+  : public ConstStmtVisitor<OSSDependInfoGathering, void> {
+
+  CodeGenFunction &CGF;
+  QualType OSSArgTy;
+
+  // List of vars (not references or globals)
+  // involved in the dependency
+  llvm::MapVector<const VarDecl *, LValue> ExprInvolvedVarList;
+  // Map of VLASizeExpr involved in the dependency.
+  llvm::MapVector<const Expr *, llvm::Value *> VLASizeInvolvedMap;
+  // Map of captures involved in the dependency.
+  // i.e. references and global variables
+  CGOmpSsRuntime::CaptureMapTy CaptureInvolvedMap;
+
+  Address CXXThisAddress = Address::invalid();
+
+  SmallVector<QualType, 4> RetTypes;
+
+  llvm::Value *Base = nullptr;
+
+  void AddDimStartEnd() {
+    RetTypes.push_back(OSSArgTy);
+    RetTypes.push_back(OSSArgTy);
+    RetTypes.push_back(OSSArgTy);
+  }
+
+public:
+
+  OSSDependInfoGathering(CodeGenFunction &CGF)
+    : CGF(CGF), OSSArgTy(CGF.getContext().LongTy)
+      {}
+
+  //===--------------------------------------------------------------------===//
+  //                               Utilities
+  //===--------------------------------------------------------------------===//
+
+  // This is used for DeclRefExpr, MemberExpr and Unary Deref
+  void FillBaseExprDims(const Expr *E) {
+    QualType TmpTy = E->getType();
+    // Add Dimensions
+    if (TmpTy->isPointerType() || !TmpTy->isArrayType()) {
+      // T * || T
+      AddDimStartEnd();
+    }
+    while (TmpTy->isArrayType()) {
+      // T []
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+        AddDimStartEnd();
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+        AddDimStartEnd();
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+  }
+
+  // This is used in the innermost Expr * in ArraySubscripts and OSSArraySection. Also in OSSArrayShaping
+  void FillDimsFromInnermostExpr(const Expr *E) {
+    // Go through the expression which may be a DeclRefExpr or MemberExpr or OSSArrayShapingExpr
+    E = E->IgnoreParenImpCasts();
+    QualType TmpTy = E->getType();
+    // Add Dimensions
+    if (TmpTy->isPointerType()) {
+      // T *
+      // We have added section dimension before
+      if (RetTypes.empty())
+        AddDimStartEnd();
+      TmpTy = TmpTy->getPointeeType();
+    }
+    while (TmpTy->isArrayType()) {
+      // T []
+      if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(TmpTy)) {
+        AddDimStartEnd();
+        TmpTy = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(TmpTy)) {
+        AddDimStartEnd();
+        TmpTy = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+  }
+
+  // Walk down into the type and look for VLA expressions.
+  void FillTypeVLASizes(const Expr *E) {
+    QualType type = E->getType();
+    while (type->isVariablyModifiedType()) {
+      if (type->isPointerType()) {
+        type = type->getPointeeType();
+      } else if (const ConstantArrayType *BaseArrayTy = CGF.getContext().getAsConstantArrayType(type)) {
+        type = BaseArrayTy->getElementType();
+      } else if (const VariableArrayType *BaseArrayTy = CGF.getContext().getAsVariableArrayType(type)) {
+        const Expr *VLASizeExpr = BaseArrayTy->getSizeExpr();
+        auto VlaSize = CGF.getVLAElements1D(BaseArrayTy);
+        VLASizeInvolvedMap[VLASizeExpr] = VlaSize.NumElts;
+
+        type = BaseArrayTy->getElementType();
+      } else {
+        llvm_unreachable("Unhandled array type");
+      }
+    }
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                            Visitor Methods
+  //===--------------------------------------------------------------------===//
+
+  void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+    if (RetTypes.empty()) {
+      // We want the original type, not the shaping expr. type
+      RetTypes.push_back(E->getBase()->getType());
+
+      // Annotate dims
+      FillDimsFromInnermostExpr(E);
+    }
+
+    Visit(E->getBase());
+
+    // Annotate all the variables involved in shape expr. We will
+    // emit its VLASizeExpr in compute_dep context
+    for (const Stmt *S : E->getShapes())
+      Visit(S);
+  }
+
+  void VisitDeclRefExpr(const DeclRefExpr *E) {
+    if (E->isNonOdrUse() == NOUR_Unevaluated)
+      return;
+
+    CodeGenFunction::ConstantEmission CE = CGF.tryEmitAsConstant(const_cast<DeclRefExpr*>(E));
+    if (CE && !CE.isReference())
+      // Constant value, no need to annotate it.
+      return;
+
+    if (RetTypes.empty()) {
+      RetTypes.push_back(CGF.getContext().getPointerType(E->getType()));
+      FillBaseExprDims(E);
+    }
+    FillTypeVLASizes(E);
+
+    llvm::Value *PossibleBase = nullptr;
+    const VarDecl *VD = cast<VarDecl>(E->getDecl());
+    if (VD->getType()->isReferenceType()) {
+      // Reuse the ref addr. got in DSA
+      LValue LV = CGF.EmitDeclRefLValue(E);
+      PossibleBase = LV.getPointer();
+      CaptureInvolvedMap.try_emplace(VD, LV.getAddress());
+    } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
+      PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
+      CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
+      Address Addr(PossibleBase, Alignment);
+      CaptureInvolvedMap.try_emplace(VD, Addr);
+    } else {
+      LValue LV = CGF.EmitDeclRefLValue(E);
+      PossibleBase = LV.getPointer();
+      ExprInvolvedVarList[VD] = LV;
+    }
+    // Since we prioritize visiting the base of the expression
+    // the first DeclRefExpr is always the Base
+    if (!Base)
+      Base = PossibleBase;
+  }
+
+  void VisitCXXThisExpr(const CXXThisExpr *ThisE) {
+    CXXThisAddress = CGF.LoadCXXThisAddress();
+    if (!Base)
+      Base = CXXThisAddress.getPointer();
+  }
+
+  void VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+    if (RetTypes.empty()) {
+      // Get the inner expr
+      const Expr *TmpE = E;
+      // First come OSSArraySection
+      while (const OSSArraySectionExpr *ASE = dyn_cast<OSSArraySectionExpr>(TmpE->IgnoreParenImpCasts())) {
+        // Stop in the innermost ArrayToPointerDecay
+        TmpE = ASE->getBase();
+        // If we see a Pointer we must to add one dimension and done
+        if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+          AddDimStartEnd();
+          break;
+        }
+      }
+      while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+        // Stop in the innermost ArrayToPointerDecay
+        TmpE = ASE->getBase();
+        // If we see a Pointer we must to add one dimension and done
+        if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+          AddDimStartEnd();
+          break;
+        }
+      }
+      RetTypes.insert(RetTypes.begin(), TmpE->getType());
+      FillDimsFromInnermostExpr(TmpE);
+    }
+
+    Visit(E->getBase());
+
+    if (E->getLowerBound())
+      Visit(E->getLowerBound());
+    if (E->getLengthUpper())
+      Visit(E->getLengthUpper());
+  }
+
+  void VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+    if (RetTypes.empty()) {
+      // Get the inner expr
+      const Expr *TmpE = E;
+      while (const ArraySubscriptExpr *ASE = dyn_cast<ArraySubscriptExpr>(TmpE->IgnoreParenImpCasts())) {
+        // Stop in the innermost ArrayToPointerDecay
+        TmpE = ASE->getBase();
+        // If we see a Pointer we must to add one dimension and done
+        if (TmpE->IgnoreParenImpCasts()->getType()->isPointerType()) {
+          AddDimStartEnd();
+          break;
+        }
+      }
+
+      RetTypes.insert(RetTypes.begin(), TmpE->getType());
+      FillDimsFromInnermostExpr(TmpE);
+    }
+
+    Visit(E->getBase());
+    Visit(E->getIdx());
+  }
+
+  void VisitMemberExpr(const MemberExpr *E) {
+    if (RetTypes.empty()) {
+      RetTypes.push_back(CGF.getContext().getPointerType(E->getType()));
+      FillBaseExprDims(E);
+    }
+
+    Visit(E->getBase());
+  }
+
+  void VisitUnaryDeref(const UnaryOperator *E) {
+    if (RetTypes.empty()) {
+      RetTypes.push_back(CGF.getContext().getPointerType(E->getType()));
+      FillBaseExprDims(E);
+    }
+
+    Visit(E->getSubExpr());
+  }
+
+  void VisitStmt(const Stmt *S) {
+    for (const Stmt *C : S->children()) {
+      if (C)
+        Visit(C);
+    }
+  }
+
+  const llvm::MapVector<const VarDecl *, LValue> &getInvolvedVarList() const { return ExprInvolvedVarList; }
+  const llvm::MapVector<const Expr *, llvm::Value *> &getVLASizeInvolvedMap() const { return VLASizeInvolvedMap; }
+  const CGOmpSsRuntime::CaptureMapTy &getCaptureInvolvedMap() const { return CaptureInvolvedMap; }
+  const Address getThisAddress() const { return CXXThisAddress; }
+  ArrayRef<QualType> getRetTypes() const { return RetTypes; }
+  llvm::Value *getBaseValue() const { assert(Base); return Base; }
+
+};
+
+} // namespace
+
+namespace {
 class OSSDependVisitor
   : public ConstStmtVisitor<OSSDependVisitor, void> {
   CodeGenFunction &CGF;
@@ -660,7 +935,7 @@ static void EmitDSAShared(
   CodeGenFunction &CGF, const Expr *E,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
   SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
+  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
 
   const std::string BundleName = "QUAL.OSS.SHARED";
 
@@ -670,7 +945,7 @@ static void EmitDSAShared(
     if (VD->getType()->isReferenceType()) {
       // Record Ref Address to be reused in task body and other clasues
       LValue LV = CGF.EmitDeclRefLValue(DRE);
-      RefMap.try_emplace(VD, LV.getAddress());
+      CaptureMap.try_emplace(VD, LV.getAddress());
       V = LV.getPointer();
       TaskInfo.emplace_back(BundleName, V);
     } else {
@@ -701,7 +976,7 @@ static void EmitDSAPrivate(
   CodeGenFunction &CGF, const OSSDSAPrivateDataTy &PDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
   SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
+  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
 
   const std::string BundleName = "QUAL.OSS.PRIVATE";
 
@@ -711,7 +986,7 @@ static void EmitDSAPrivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    RefMap.try_emplace(VD, LV.getAddress());
+    CaptureMap.try_emplace(VD, LV.getAddress());
     V = LV.getPointer();
     TaskInfo.emplace_back(BundleName, V);
   } else {
@@ -744,7 +1019,7 @@ static void EmitDSAFirstprivate(
   CodeGenFunction &CGF, const OSSDSAFirstprivateDataTy &FpDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
   SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &RefMap) {
+  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
 
   const std::string BundleName = "QUAL.OSS.FIRSTPRIVATE";
 
@@ -754,7 +1029,7 @@ static void EmitDSAFirstprivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    RefMap.try_emplace(VD, LV.getAddress());
+    CaptureMap.try_emplace(VD, LV.getAddress());
     V = LV.getPointer();
     TaskInfo.emplace_back(BundleName, V);
   } else {
@@ -790,98 +1065,277 @@ static void EmitDSAFirstprivate(
   }
 }
 
-static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List) {
-  // C long -> LLVM long
-  llvm::Type *OSSArgTy = CGF.ConvertType(CGF.getContext().LongTy);
+static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
+                                                const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
+                                                const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
+                                                const CGOmpSsRuntime::CaptureMapTy &CaptureInvolvedMap,
+                                                const Address CXXThisAddress,
+                                                ArrayRef<QualType> RetTypes,
+                                                CodeGenFunction &NewCGF,
+                                                DeclRefExpr *&StructRetDRE) {
+  ASTContext &C = CGF.CGM.getContext();
+  SmallVector<llvm::Type *, 4> ArgsTypeList;
+  SmallVector<llvm::Value *, 4> ArgsValueList;
 
-  OSSDependVisitor DepVisitor(CGF, Dep.OSSSyntax);
-  DepVisitor.Visit(Dep.E);
+  for (const auto p : ExprInvolvedVarList) {
+    llvm::Value *V = p.second.getPointer();
+    ArgsTypeList.push_back(V->getType());
+    ArgsValueList.push_back(V);
+  }
+  for (const auto p : VLASizeInvolvedMap) {
+    llvm::Value *V = p.second;
+    ArgsTypeList.push_back(V->getType());
+    ArgsValueList.push_back(V);
+  }
+  for (const auto p : CaptureInvolvedMap) {
+    Address Addr = p.second;
+    llvm::Value *V = Addr.getPointer();
+    ArgsTypeList.push_back(V->getType());
+    ArgsValueList.push_back(V);
+  }
+  if (CXXThisAddress.isValid()) {
+    llvm::Value *CXXThisValue = CXXThisAddress.getPointer();
+    ArgsTypeList.push_back(CXXThisValue->getType());
+    ArgsValueList.push_back(CXXThisValue);
+  }
+
+  RecordDecl *RD = RecordDecl::Create(C, TTK_Struct,
+                                      C.getTranslationUnitDecl(),
+                                      SourceLocation(), SourceLocation(),
+                                      &C.Idents.get("_depend_unpack_t"));
+  for (QualType RetQ : RetTypes) {
+    RD->addDecl(FieldDecl::Create(C, RD, SourceLocation(), SourceLocation(),
+                                  nullptr, RetQ, nullptr, nullptr, false,
+                                  ICIS_NoInit));
+  }
+  RD->completeDefinition();
+
+  QualType StructRetQ = C.getTagDeclType(RD);
+  llvm::StructType *StructRetTy = cast<llvm::StructType>(CGF.CGM.getTypes().ConvertType(StructRetQ));
+
+  auto *FuncType =
+    llvm::FunctionType::get(StructRetTy, ArgsTypeList, /*IsVarArgs=*/ false);
+
+  auto *FuncVar = llvm::Function::Create(
+      FuncType, llvm::GlobalValue::InternalLinkage, CGF.CurFn->getAddressSpace(),
+      "compute_dep", &CGF.CGM.getModule());
 
 
-  SmallVector<llvm::Value *, 4> Starts(
-      DepVisitor.getStarts().begin(),
-      DepVisitor.getStarts().end());
+  // Set names for arguments.
+  auto AI = FuncVar->arg_begin();
+  for (unsigned i = 0, e = ArgsValueList.size(); i != e; ++i, ++AI)
+    AI->setName(ArgsValueList[i]->getName());
 
-  SmallVector<llvm::Value *, 4> Ends(
-      DepVisitor.getEnds().begin(),
-      DepVisitor.getEnds().end());
+  llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(CGF.CGM.getModule().getContext(), "entry", FuncVar);
 
-  SmallVector<llvm::Value *, 4> Dims(
-      DepVisitor.getDims().begin(),
-      DepVisitor.getDims().end());
-  QualType BaseElementTy = DepVisitor.getBaseElementTy();
-  llvm::Value *Ptr = DepVisitor.getPtr();
+  // Create a marker to make it easy to insert allocas into the entryblock
+  // later.  Don't create this with the builder, because we don't want it
+  // folded.
 
-  uint64_t BaseElementSize =
-             CGF.CGM
-               .getDataLayout()
-               .getTypeSizeInBits(CGF
-                                  .ConvertType(BaseElementTy))/8;
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  llvm::Instruction *AllocaInsertPointer = new llvm::BitCastInst(Undef, CGF.Int32Ty, "allocapt", EntryBB);
 
-  List.push_back(Ptr);
-  bool First = true;
-  for (size_t i = Dims.size() - 1; i > 0; --i) {
-    llvm::Value *Dim = Dims[i];
+  NewCGF.AllocaInsertPt = AllocaInsertPointer;
+  NewCGF.Builder.SetInsertPoint(EntryBB);
+  NewCGF.CurFuncDecl = nullptr;
+  NewCGF.FnRetTy = StructRetQ;
+  NewCGF.CurFn = FuncVar;
+  NewCGF.CurFnInfo = CGF.CurFnInfo;
+  Address StructRetAddr = NewCGF.CreateMemTemp(StructRetQ, "return.val");
+  // Address StructRetAddr = Address(NewCGF.Builder.CreateAlloca(StructRetTy, nullptr, "return.val"), C.getTypeAlignInChars(StructRetQ));
+  NewCGF.ReturnValue = StructRetAddr;
+
+  return FuncVar;
+}
+
+static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List,
+                           SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
+  OSSDependInfoGathering DependInfoGathering(CGF);
+  DependInfoGathering.Visit(Dep.E);
+
+  CodeGenFunction NewCGF(CGF.CGM);
+  DeclRefExpr *StructRetDRE;
+  llvm::Function *ComputeDepFun = createComputeDepFunction(CGF, DependInfoGathering.getInvolvedVarList(),
+                                                           DependInfoGathering.getVLASizeInvolvedMap(),
+                                                           DependInfoGathering.getCaptureInvolvedMap(),
+                                                           DependInfoGathering.getThisAddress(),
+                                                           DependInfoGathering.getRetTypes(),
+                                                           NewCGF,
+                                                           StructRetDRE);
+
+  // TODO change name
+  {
+    CodeGenFunction::OSSPrivateScope InitScope(NewCGF);
+    auto ArgI = ComputeDepFun->arg_begin();
+    for (const auto p : DependInfoGathering.getInvolvedVarList()) {
+      const VarDecl *VD = p.first;
+      LValue LV = p.second;
+      InitScope.addPrivate(VD, [&ArgI, &LV]() -> Address {
+        return Address(ArgI, LV.getAlignment());
+      });
+
+      ++ArgI;
+    }
+    for (const auto p : DependInfoGathering.getVLASizeInvolvedMap()) {
+      const Expr *VLASizeExpr = p.first;
+      InitScope.addPrivateVLA(VLASizeExpr, [ArgI]() -> llvm::Value * {
+        return ArgI;
+      });
+
+      ++ArgI;
+    }
+    CGOmpSsRuntime::CaptureMapTy CaptureReplacedMap;
+    for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
+      const VarDecl *VD = p.first;
+      Address Addr = p.second;
+      Address NewAddr = Address(ArgI, Addr.getAlignment());
+      CaptureReplacedMap.try_emplace(VD, NewAddr);
+      ++ArgI;
+    }
+    CaptureMapStack.push_back(CaptureReplacedMap);
+
+    // Map 'this' to compute_dep param
+    const Address CXXThisAddress = DependInfoGathering.getThisAddress();
+    if (CXXThisAddress.isValid()) {
+      InitScope.setThis(Address(ArgI, CXXThisAddress.getAlignment()));
+      ++ArgI;
+    }
+
+    (void)InitScope.Privatize();
+
+    // C long -> LLVM long
+    llvm::Type *OSSArgTy = CGF.ConvertType(NewCGF.getContext().LongTy);
+
+    OSSDependVisitor DepVisitor(NewCGF, Dep.OSSSyntax);
+    DepVisitor.Visit(Dep.E);
+
+
+    SmallVector<llvm::Value *, 4> Starts(
+        DepVisitor.getStarts().begin(),
+        DepVisitor.getStarts().end());
+
+    SmallVector<llvm::Value *, 4> Ends(
+        DepVisitor.getEnds().begin(),
+        DepVisitor.getEnds().end());
+
+    SmallVector<llvm::Value *, 4> Dims(
+        DepVisitor.getDims().begin(),
+        DepVisitor.getDims().end());
+    QualType BaseElementTy = DepVisitor.getBaseElementTy();
+    llvm::Value *Ptr = DepVisitor.getPtr();
+
+    uint64_t BaseElementSize =
+               NewCGF.CGM
+                 .getDataLayout()
+                 .getTypeSizeInBits(NewCGF
+                                    .ConvertType(BaseElementTy))/8;
+
+    List.push_back(Ptr);
+    bool First = true;
+    for (size_t i = Dims.size() - 1; i > 0; --i) {
+      llvm::Value *Dim = Dims[i];
+      llvm::Value *IdxStart;
+      llvm::Value *IdxEnd;
+      // In arrays we have to output all dimensions, but
+      // the number of indices may be less than the number
+      // of dimensions (array[1] -> int array[10][20])
+      if (i < Starts.size()) {
+        IdxStart = Starts[Starts.size() - i - 1];
+        IdxEnd = Ends[Starts.size() - i - 1];
+      } else {
+        IdxStart = llvm::ConstantInt::getSigned(OSSArgTy, 0);
+        IdxEnd = Dim;
+      }
+      if (First) {
+        First = false;
+        Dim = NewCGF.Builder.CreateMul(Dim,
+                                    llvm::ConstantInt::getSigned(OSSArgTy,
+                                                                 BaseElementSize));
+        IdxStart = NewCGF.Builder.CreateMul(IdxStart,
+                                    llvm::ConstantInt::getSigned(OSSArgTy,
+                                                                 BaseElementSize));
+        IdxEnd = NewCGF.Builder.CreateMul(IdxEnd,
+                                    llvm::ConstantInt::getSigned(OSSArgTy,
+                                                                 BaseElementSize));
+      }
+      List.push_back(Dim);
+      List.push_back(IdxStart);
+      List.push_back(IdxEnd);
+    }
+    llvm::Value *Dim = Dims[0];
     llvm::Value *IdxStart;
     llvm::Value *IdxEnd;
-    // In arrays we have to output all dimensions, but
-    // the number of indices may be less than the number
-    // of dimensions (array[1] -> int array[10][20])
-    if (i < Starts.size()) {
-      IdxStart = Starts[Starts.size() - i - 1];
-      IdxEnd = Ends[Starts.size() - i - 1];
+    if (Starts.size() > 0) {
+      IdxStart = Starts[Starts.size() - 1];
+      IdxEnd = Ends[Starts.size() - 1];
     } else {
       IdxStart = llvm::ConstantInt::getSigned(OSSArgTy, 0);
       IdxEnd = Dim;
     }
+
     if (First) {
       First = false;
-      Dim = CGF.Builder.CreateMul(Dim,
+      Dim = NewCGF.Builder.CreateMul(Dim,
                                   llvm::ConstantInt::getSigned(OSSArgTy,
                                                                BaseElementSize));
-      IdxStart = CGF.Builder.CreateMul(IdxStart,
+      IdxStart = NewCGF.Builder.CreateMul(IdxStart,
                                   llvm::ConstantInt::getSigned(OSSArgTy,
                                                                BaseElementSize));
-      IdxEnd = CGF.Builder.CreateMul(IdxEnd,
+      IdxEnd = NewCGF.Builder.CreateMul(IdxEnd,
                                   llvm::ConstantInt::getSigned(OSSArgTy,
                                                                BaseElementSize));
     }
     List.push_back(Dim);
     List.push_back(IdxStart);
     List.push_back(IdxEnd);
-  }
-  llvm::Value *Dim = Dims[0];
-  llvm::Value *IdxStart;
-  llvm::Value *IdxEnd;
-  if (Starts.size() > 0) {
-    IdxStart = Starts[Starts.size() - 1];
-    IdxEnd = Ends[Starts.size() - 1];
-  } else {
-    IdxStart = llvm::ConstantInt::getSigned(OSSArgTy, 0);
-    IdxEnd = Dim;
+
+    Address RetAddr = NewCGF.ReturnValue;
+    for (size_t i = 0; i < List.size(); ++i) {
+      NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
+    }
+
+    NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
+
+    // After finishing the computedep function remove the alloca instruction
+    llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
+    NewCGF.AllocaInsertPt = nullptr;
+    AllocaInsertPointer->eraseFromParent();
   }
 
-  if (First) {
-    First = false;
-    Dim = CGF.Builder.CreateMul(Dim,
-                                llvm::ConstantInt::getSigned(OSSArgTy,
-                                                             BaseElementSize));
-    IdxStart = CGF.Builder.CreateMul(IdxStart,
-                                llvm::ConstantInt::getSigned(OSSArgTy,
-                                                             BaseElementSize));
-    IdxEnd = CGF.Builder.CreateMul(IdxEnd,
-                                llvm::ConstantInt::getSigned(OSSArgTy,
-                                                             BaseElementSize));
+  // Pop temporal empty refmap, we are not in compute_dep function anymore
+  CaptureMapStack.pop_back();
+
+  assert(List.size() == DependInfoGathering.getRetTypes().size());
+  List.clear();
+  // Fill the bundle
+
+  List.push_back(DependInfoGathering.getBaseValue());
+  List.push_back(ComputeDepFun);
+
+  for (const auto p : DependInfoGathering.getInvolvedVarList()) {
+    LValue LV = p.second;
+    List.push_back(LV.getPointer());
   }
-  List.push_back(Dim);
-  List.push_back(IdxStart);
-  List.push_back(IdxEnd);
+  for (const auto p : DependInfoGathering.getVLASizeInvolvedMap()) {
+    llvm::Value *VLASizeValue = p.second;
+    List.push_back(VLASizeValue);
+  }
+  for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
+    Address Addr = p.second;
+    llvm::Value *V = Addr.getPointer();
+    List.push_back(V);
+  }
+  const Address CXXThisAddress = DependInfoGathering.getThisAddress();
+  if (CXXThisAddress.isValid()) {
+    List.push_back(CXXThisAddress.getPointer());
+  }
 }
 
 static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+                           SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
   SmallVector<llvm::Value*, 4> DepData;
-  EmitDependency(CGF, Dep, DepData);
+  EmitDependency(CGF, Dep, DepData, CaptureMapStack);
   TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
 }
 
@@ -1233,10 +1687,9 @@ static void EmitReduction(StringRef RedName,
                           CodeGenFunction &CGF, const OSSReductionDataTy &Red,
                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
                           CGOmpSsRuntime::BuiltinRedMapTy &BuiltinRedMap,
-                          CGOmpSsRuntime::UDRMapTy &UDRMap) {
+                          CGOmpSsRuntime::UDRMapTy &UDRMap,
+                          SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
   SmallVector<llvm::Value *, 4> List;
-  llvm::Value *SimpleValue = CGF.EmitLValue(Red.SimpleRef).getPointer();
-  List.push_back(SimpleValue);
 
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
   llvm::Value *RedInit = nullptr;
@@ -1263,13 +1716,16 @@ static void EmitReduction(StringRef RedName,
       RedComb = It->second.second;
     }
   }
-  List.push_back(RedKind);
 
-  EmitDependency(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
+  EmitDependency(CGF, {/*OSSSyntax=*/true, Red.Ref}, List, CaptureMapStack);
+  // First operand has to be the DSA over the dependency is made
+  llvm::Value *DepBaseDSA = List[0];
+
+  List.insert(List.begin(), RedKind);
+
   TaskInfo.emplace_back(RedName, makeArrayRef(List));
-
-  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{SimpleValue, RedInit});
-  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{SimpleValue, RedComb});
+  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
+  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
@@ -1315,9 +1771,9 @@ Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
   return TaskStack.back().NormalCleanupDestSlot;
 }
 
-llvm::DenseMap<const VarDecl *, Address> &CGOmpSsRuntime::getTaskRefMap() {
-  assert(!RefMapStack.empty());
-  return RefMapStack.back();
+llvm::DenseMap<const VarDecl *, Address> &CGOmpSsRuntime::getTaskCaptureMap() {
+  assert(!CaptureMapStack.empty());
+  return CaptureMapStack.back();
 }
 
 void CGOmpSsRuntime::setTaskInsertPt(llvm::Instruction *I) {
@@ -1372,7 +1828,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   CodeGenFunction::OSSPrivateScope InitScope(CGF);
 
   InTaskEmission = true;
-  RefMapStack.push_back(RefMapTy());
+  CaptureMapStack.push_back(CaptureMapTy());
 
   auto ArgI = CE->arg_begin();
   auto ParI = FD->param_begin(); 
@@ -1447,14 +1903,14 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
     SmallVector<llvm::Value*, 4> CapturedList;
     for (const Expr *E : SharedCopies) {
-      EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskRefMap());
+      EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskCaptureMap());
     }
     for (const Expr *E : FirstprivateCopies) {
       OSSDSAFirstprivateDataTy FpDataTy;
       // Ignore ImplicitCast built for the new function call
       FpDataTy.Ref = E->IgnoreImpCasts();
       FpDataTy.Copy = FpDataTy.Init = nullptr;
-      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskRefMap());
+      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
     }
     if (const Expr *E = Attr->getIfExpr()) {
       TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(E));
@@ -1477,98 +1933,98 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->outs()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->inouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->concurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->commutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     // depend(in :)
     for (const Expr *E : Attr->depIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     if (!CapturedList.empty())
       TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
@@ -1618,7 +2074,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   // Pop Task Stack
   TaskStack.pop_back();
-  RefMapStack.pop_back();
+  CaptureMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
   return RV;
@@ -1637,17 +2093,17 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   SmallVector<llvm::Value*, 4> CapturedList;
 
   TaskStack.push_back(TaskContext());
-  RefMapStack.push_back(RefMapTy());
+  CaptureMapStack.push_back(CaptureMapTy());
 
   InTaskEmission = true;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskRefMap());
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskCaptureMap());
   }
   for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, getTaskRefMap());
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
   }
   for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskRefMap());
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
   }
 
   if (Data.Cost) {
@@ -1665,42 +2121,44 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
 
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
-    EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
-    EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
-    EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
-    EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
-    EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
-    EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo);
+    EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
     EmitReduction("QUAL.OSS.DEP.REDUCTION",
                   "QUAL.OSS.DEP.REDUCTION.INIT",
                   "QUAL.OSS.DEP.REDUCTION.COMBINE",
                   CGF, Red, TaskInfo,
-                  BuiltinRedMap, UDRMap);
+                  BuiltinRedMap, UDRMap,
+                  CaptureMapStack);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
     EmitReduction("QUAL.OSS.DEP.WEAKREDUCTION",
                   "QUAL.OSS.DEP.REDUCTION.INIT",
                   "QUAL.OSS.DEP.REDUCTION.COMBINE",
                   CGF, Red, TaskInfo,
-                  BuiltinRedMap, UDRMap);
+                  BuiltinRedMap, UDRMap,
+                  CaptureMapStack);
   }
 
   if (Data.If)
@@ -1734,7 +2192,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
 
   // Pop Task Stack
   TaskStack.pop_back();
-  RefMapStack.pop_back();
+  CaptureMapStack.pop_back();
   TaskAllocaInsertPt->eraseFromParent();
 
 }

@@ -105,11 +105,13 @@ private:
     Address NormalCleanupDestSlot = Address::invalid();
   };
 
-  using RefMapTy = llvm::DenseMap<const VarDecl *, Address>;
+public:
+  using CaptureMapTy = llvm::DenseMap<const VarDecl *, Address>;
+private:
 
   SmallVector<TaskContext, 2> TaskStack;
   // Map to reuse Addresses emited for data sharings
-  SmallVector<RefMapTy, 2> RefMapStack;
+  SmallVector<CaptureMapTy, 2> CaptureMapStack;
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
@@ -150,7 +152,7 @@ public:
   // returns the innermost nested task NormalCleanupDestSlot address
   Address getTaskNormalCleanupDestSlot();
   // returns the innermost nested task RefMap
-  RefMapTy &getTaskRefMap();
+  CaptureMapTy &getTaskCaptureMap();
 
   // sets the innermost nested task InsertPt instruction
   void setTaskInsertPt(llvm::Instruction *I);

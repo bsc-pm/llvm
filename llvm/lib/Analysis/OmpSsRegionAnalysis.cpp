@@ -47,7 +47,6 @@ PrintVerboseLevel("print-verbosity",
   cl::values(
   clEnumValN(PV_Task, "task", "Print task layout only"),
   clEnumValN(PV_Uses, "uses", "Print task layout with uses"),
-  clEnumValN(PV_UnpackAndConst, "unpack", "Print task layout with unpack instructions/constexprs needed in dependencies"),
   clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA"),
   clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs"),
   clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture"),
@@ -119,23 +118,6 @@ static void print_verbose(
           dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
           AnalysisInfo.UsesBeforeEntry[j]->printAsOperand(dbgs(), false);
         }
-      }
-    }
-    else if (PrintVerboseLevel == PV_UnpackAndConst) {
-      const SmallVector<Instruction *, 4> &UnpackInsts = Info.DependsInfo.UnpackInstructions;
-      const SetVector<ConstantExpr *> &UnpackConsts = Info.DependsInfo.UnpackConstants;
-
-      for (Instruction * const I : UnpackInsts) {
-        dbgs() << "\n";
-        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
-               << "[Inst] ";
-        I->printAsOperand(dbgs(), false);
-      }
-      for (ConstantExpr * const CE : UnpackConsts) {
-        dbgs() << "\n";
-        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
-               << "[Const] ";
-        CE->printAsOperand(dbgs(), false);
       }
     }
     else if (PrintVerboseLevel == PV_DsaVLADimsMissing) {
@@ -389,111 +371,48 @@ static void gatherReductionsInitCombInfo(const IntrinsicInst *I, TaskInfo &TI) {
   }
 }
 
-
-// Inserts I into InstList ensuring program order if I it's not already in the list
-static bool insertUniqInstInProgramOrder(SmallVectorImpl<Instruction *> &InstList,
-                                         Instruction *I,
-                                         const OrderedInstructions &OI) {
-
-  auto It = InstList.begin();
-  while (It != InstList.end() && OI.dominates(*It, I))
-    ++It;
-
-  if (It != InstList.end() && *It == I)
-    return false;
-  InstList.insert(It, I);
-  return true;
-}
-
-static void gatherUnpackInstructions(TaskDSAInfo &DSAInfo,
-                                     const TaskCapturedInfo &CapturedInfo,
-                                     const OrderedInstructions &OI,
-                                     DependInfo &DI,
-                                     TaskAnalysisInfo &TAI,
-                                     SmallVectorImpl<Instruction *> &UnpackInsts,
-                                     SetVector<ConstantExpr *> &UnpackConsts) {
-
-  // First element is the current instruction, second is
-  // the Instruction where we come from (origin of the dependency)
-  SmallVector<std::pair<Value *, Value *>, 4> WorkList;
-  WorkList.emplace_back(DI.Base, DI.Base);
-  for (Value *V : DI.Dims)
-    WorkList.emplace_back(V, V);
-
-  while (!WorkList.empty()) {
-    auto It = WorkList.begin();
-    Value *Cur = It->first;
-    Value *Dep = It->second;
-    WorkList.erase(It);
-    bool IsDSA = valueInDSABundles(DSAInfo, Cur);
-    bool IsCaptured = valueInCapturedBundle(CapturedInfo, Cur);
-    // Go over all uses until:
-    //  1. We get a DSA so assign a symbol index
-    //  2. We get a Capture value, so we're done. We don't want to move
-    //  instructions that generate this
-    if (!IsDSA && !IsCaptured) {
-      if (ConstantExpr *CE = dyn_cast<ConstantExpr>(Cur)) {
-        for (Use &U : CE->operands()) {
-          WorkList.emplace_back(U.get(), Dep);
-        }
-        UnpackConsts.insert(CE);
-      }
-
-      if (Instruction *I = dyn_cast<Instruction>(Cur)) {
-        for (Use &U : I->operands()) {
-          WorkList.emplace_back(U.get(), Dep);
-        }
-        insertUniqInstInProgramOrder(UnpackInsts, I, OI);
-      }
-    } else if (IsDSA && Dep == DI.Base) {
-      // Found DSA associated with Dependency, assign SymbolIndex
-      // Cur is the DSA Value
-      if (!DSAInfo.DepSymToIdx.count(Cur)) {
-        DSAInfo.DepSymToIdx[Cur] = DSAInfo.DepSymToIdx.size();
-      }
-      DI.SymbolIndex = DSAInfo.DepSymToIdx[Cur];
-    }
-  }
-}
-
 // Process OpBundle gathering dependency information
 static void gatherDependInfoFromBundle(ArrayRef<Value *> OBArgs,
-                                    const OrderedInstructions &OI,
-                                    TaskDSAInfo &DSAInfo,
-                                    const TaskCapturedInfo &CapturedInfo,
-                                    TaskAnalysisInfo &TAI,
-                                    DependInfo &DI,
-                                    SmallVectorImpl<Instruction *> &UnpackInsts,
-                                    SetVector<ConstantExpr *> &UnpackConsts) {
-    DI.SymbolIndex = -1;
-    // TODO: Support RegionText stringifying clause content
-    DI.RegionText = "";
-    DI.Base = OBArgs[0];
-    for (size_t i = 1; i < OBArgs.size(); ++i) {
-      DI.Dims.push_back(OBArgs[i]);
-    }
+                                       TaskDSAInfo &DSAInfo,
+                                       TaskCapturedInfo &CapturedInfo,
+                                       DependInfo &DI) {
+  // First operand has to be the DSA over the dependency is made
+  Value *DepBaseDSA = OBArgs[0];
+  assert(valueInDSABundles(DSAInfo, DepBaseDSA) && "Dependency has no associated DSA"); 
 
-    gatherUnpackInstructions(DSAInfo, CapturedInfo, OI, DI, TAI, UnpackInsts, UnpackConsts);
+  Function *ComputeDepFun = cast<Function>(OBArgs[1]);
+  DI.ComputeDepFun = ComputeDepFun;
+
+  // Gather compute_dep function params
+  for (size_t i = 2; i < OBArgs.size(); ++i) {
+    assert((valueInDSABundles(DSAInfo, OBArgs[i])
+            || valueInCapturedBundle(CapturedInfo, OBArgs[i]))
+           && "Dependency has no associated DSA or capture");
+    DI.Args.push_back(OBArgs[i]);
+  }
+
+  if (!DSAInfo.DepSymToIdx.count(DepBaseDSA)) {
+    DSAInfo.DepSymToIdx[DepBaseDSA] = DSAInfo.DepSymToIdx.size();
+  }
+  DI.SymbolIndex = DSAInfo.DepSymToIdx[DepBaseDSA];
+
+  // TODO: Support RegionText stringifying clause content
+  DI.RegionText = "";
 }
 
 // Gathers dependencies needed information of type Id
 static void gatherDependsInfoWithID(const IntrinsicInst *I,
-                                    const OrderedInstructions &OI,
-                                    TaskDSAInfo &DSAInfo,
-                                    const TaskCapturedInfo &CapturedInfo,
-                                    TaskAnalysisInfo &TAI,
                                     SmallVectorImpl<DependInfo> &DependsList,
-                                    SmallVectorImpl<Instruction *> &UnpackInsts,
-                                    SetVector<ConstantExpr *> &UnpackConsts,
+                                    TaskDSAInfo &DSAInfo,
+                                    TaskCapturedInfo &CapturedInfo,
                                     uint64_t Id) {
   SmallVector<OperandBundleDef, 4> OpBundles;
+  // TODO: maybe do a bundle gather with asserts?
   getOperandBundlesAsDefsWithID(I, OpBundles, Id);
   for (const OperandBundleDef &OBDef : OpBundles) {
     DependInfo DI;
 
-    gatherDependInfoFromBundle(OBDef.inputs(), OI, DSAInfo, CapturedInfo,
-                               TAI, DI, UnpackInsts,
-                               UnpackConsts);
+    gatherDependInfoFromBundle(OBDef.inputs(), DSAInfo, CapturedInfo, DI);
 
     DependsList.push_back(DI);
   }
@@ -501,27 +420,20 @@ static void gatherDependsInfoWithID(const IntrinsicInst *I,
 
 // Gathers dependencies needed information of type Id
 static void gatherReductionsInfoWithID(const IntrinsicInst *I,
-                                        const OrderedInstructions &OI,
-                                        TaskDSAInfo &DSAInfo,
-                                        const TaskCapturedInfo &CapturedInfo,
-                                        TaskAnalysisInfo &TAI,
-                                        SmallVectorImpl<ReductionInfo> &ReductionsList,
-                                        SmallVectorImpl<Instruction *> &UnpackInsts,
-                                        SetVector<ConstantExpr *> &UnpackConsts,
-                                        uint64_t Id) {
+                                       SmallVectorImpl<ReductionInfo> &ReductionsList,
+                                       TaskDSAInfo &DSAInfo,
+                                       TaskCapturedInfo &CapturedInfo,
+                                       uint64_t Id) {
   SmallVector<OperandBundleDef, 4> OpBundles;
   getOperandBundlesAsDefsWithID(I, OpBundles, Id);
   for (const OperandBundleDef &OBDef : OpBundles) {
     ReductionInfo RI;
 
     ArrayRef<Value *> OBArgs = OBDef.inputs();
-    RI.DSA = OBArgs[0];
-    RI.RedKind = OBArgs[1];
+    RI.RedKind = OBArgs[0];
 
-    // Skip the first two param
-    gatherDependInfoFromBundle(OBArgs.drop_front(2), OI, DSAInfo, CapturedInfo,
-                               TAI, RI.DepInfo, UnpackInsts,
-                               UnpackConsts);
+    // Skip the reduction kind
+    gatherDependInfoFromBundle(OBArgs.drop_front(1), DSAInfo, CapturedInfo, RI.DepInfo);
 
     ReductionsList.push_back(RI);
   }
@@ -531,60 +443,58 @@ static void gatherReductionsInfoWithID(const IntrinsicInst *I,
 static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                               TaskAnalysisInfo &TAI,
                               const OrderedInstructions &OI) {
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.Ins,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_in);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.Outs,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_out);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.Inouts,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_inout);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.Concurrents,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_concurrent);
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.Commutatives,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_commutative);
-
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.WeakIns,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_weakin);
-
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.WeakOuts,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_weakout);
-
-  gatherDependsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherDependsInfoWithID(I,
                           TI.DependsInfo.WeakInouts,
-                          TI.DependsInfo.UnpackInstructions,
-                          TI.DependsInfo.UnpackConstants,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_weakinout);
 
-  gatherReductionsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherReductionsInfoWithID(I,
                              TI.DependsInfo.Reductions,
-                             TI.DependsInfo.UnpackInstructions,
-                             TI.DependsInfo.UnpackConstants,
+                             TI.DSAInfo,
+                             TI.CapturedInfo,
                              LLVMContext::OB_oss_dep_reduction);
 
-  gatherReductionsInfoWithID(I, OI, TI.DSAInfo, TI.CapturedInfo, TAI,
+  gatherReductionsInfoWithID(I,
                              TI.DependsInfo.WeakReductions,
-                             TI.DependsInfo.UnpackInstructions,
-                             TI.DependsInfo.UnpackConstants,
+                             TI.DSAInfo,
+                             TI.CapturedInfo,
                              LLVMContext::OB_oss_dep_weakreduction);
 
   TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();

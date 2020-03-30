@@ -320,7 +320,7 @@ public:
     if (E->isTypeDependent() || E->isValueDependent() ||
         E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
       return;
-    if (E->isNonOdrUse())
+    if (E->isNonOdrUse() == NOUR_Unevaluated)
       return;
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
@@ -530,7 +530,8 @@ public:
     if (E->isTypeDependent() || E->isValueDependent() ||
         E->containsUnexpandedParameterPack() || E->isInstantiationDependent())
       return;
-
+    if (E->isNonOdrUse() == NOUR_Unevaluated)
+      return;
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
       // inout(x)              | shared(x)        | int x;
@@ -2237,7 +2238,7 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     }
     if (InvalidArraySection)
       continue;
-    ClauseVars.push_back(RefExpr);
+    ClauseVars.push_back(RefExpr->IgnoreParenImpCasts());
   }
   return OSSDependClause::Create(Context, StartLoc, LParenLoc, EndLoc,
                                  DepKinds, DepKindsOrdered,

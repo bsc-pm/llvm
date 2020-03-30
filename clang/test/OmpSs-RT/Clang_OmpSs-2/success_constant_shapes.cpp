@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------
-  (C) Copyright 2006-2012 Barcelona Supercomputing Center
+  (C) Copyright 2006-2013 Barcelona Supercomputing Center
                           Centro Nacional de Supercomputacion
   
   This file is part of Mercurium C/C++ source-to-source compiler.
@@ -24,28 +24,47 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-cxx-compile-and-run
+// RUN: %oss-compile
 
-/*
-<testinfo>
-test_generator=(config/mercurium-ompss "config/mercurium-ompss-2 openmp-compatibility")
-</testinfo>
-*/
+struct P {
+    constexpr P() {};
+    static constexpr int M = 9;
+};
+struct S {
+    static constexpr int N = 4;
+    static constexpr const P& p = P();
+};
 
-#pragma oss task inout(*var) cost(*var)
-void foo(int* var)
+struct Q {
+    enum { X = 4 };
+};
+
+static constexpr int Z = 33;
+int R = 77;
+int &rR = R;
+
+int main(int argc, char *argv[])
 {
-    var++;
-}
+    int n = 3;
+    int v[3];
+    int *p = v;
+    S s;
+    Q q;
 
-int main()
-{
-    int a;
-    foo(&a);
+    #pragma oss task inout([s.N]v)
+    {}
+    #pragma oss task inout([s.p.M]v)
+    {}
+    // #pragma oss task inout([S::N]v)
+    // {}
+    #pragma oss task inout([rR]v, [Z]v)
+    {}
+    #pragma oss task inout([q.X]v)
+    {}
+    #pragma oss task inout([sizeof(int)]p)
+    {}
+    #pragma oss task inout([sizeof(n)]p)
+    {}
 
-    #pragma oss task cost(0)
-    {
-    }
-
-    #pragma oss taskwait
+    return 0;
 }

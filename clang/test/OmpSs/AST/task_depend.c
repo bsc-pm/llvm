@@ -5,7 +5,7 @@ int main() {
     int a;
     int b[5];
     int *c;
-    #pragma oss task depend(in : a, b[0], *c)
+    #pragma oss task depend(in : (a), b[0], *c)
     { a = b[0] = *c; }
 }
 

@@ -23,6 +23,11 @@ target triple = "x86_64-unknown-linux-gnu"
 ;     foo1(3);
 ; }
 
+%struct._depend_unpack_t = type { i32*, i64, i64, i64 }
+%struct._depend_unpack_t.0 = type { i32*, i64, i64, i64 }
+%struct._depend_unpack_t.1 = type { i32*, i64, i64, i64 }
+%struct._depend_unpack_t.2 = type { i32*, i64, i64, i64 }
+
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local void @foo(i32 %n) #0 !dbg !6 {
 entry:
@@ -36,12 +41,10 @@ entry:
   store i8* %2, i8** %saved_stack, align 8, !dbg !9
   %vla = alloca i32, i64 %1, align 16, !dbg !9
   store i64 %1, i64* %__vla_expr0, align 8, !dbg !9
-  %3 = mul i64 %1, 4, !dbg !10
-  %4 = mul i64 %1, 4, !dbg !10
-  %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32* %n.addr, i32 -1, i32* %n.addr, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32* %vla, i32 -1, i32* %vla, i64 %3, i64 0, i64 %4), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb) ], !dbg !10
-  call void @llvm.directive.region.exit(token %5), !dbg !11
-  %6 = load i8*, i8** %saved_stack, align 8, !dbg !12
-  call void @llvm.stackrestore(i8* %6), !dbg !12
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %n.addr, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %vla, %struct._depend_unpack_t.0 (i32*, i64)* @compute_dep.1, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb) ], !dbg !10
+  call void @llvm.directive.region.exit(token %3), !dbg !11
+  %4 = load i8*, i8** %saved_stack, align 8, !dbg !12
+  call void @llvm.stackrestore(i8* %4), !dbg !12
   ret void, !dbg !12
 }
 
@@ -49,38 +52,58 @@ entry:
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_n.addr = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_n.addr = load i32*, i32** %gep_n.addr
-; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
-; CHECK-NEXT:   %0 = load i64, i64* %local_lookup_n.addr
-; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
-; CHECK-NEXT:   %1 = load i64, i64* %device_lookup_n.addr
-; CHECK-NEXT:   %2 = ptrtoint i32* %load_gep_n.addr to i64
-; CHECK-NEXT:   %3 = sub nsw i64 %2, %0
-; CHECK-NEXT:   %4 = add nsw i64 %3, %1
-; CHECK-NEXT:   %5 = inttoptr i64 %4 to i32*
 ; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 1
 ; CHECK-NEXT:   %load_gep_vla = load i32*, i32** %gep_vla
-; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
-; CHECK-NEXT:   %6 = load i64, i64* %local_lookup_vla
-; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
-; CHECK-NEXT:   %7 = load i64, i64* %device_lookup_vla
-; CHECK-NEXT:   %8 = ptrtoint i32* %load_gep_vla to i64
-; CHECK-NEXT:   %9 = sub nsw i64 %8, %6
-; CHECK-NEXT:   %10 = add nsw i64 %9, %7
-; CHECK-NEXT:   %11 = inttoptr i64 %10 to i32*
 ; CHECK-NEXT:   %capt_gep = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 2
 ; CHECK-NEXT:   %load_capt_gep = load i64, i64* %capt_gep
-; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo0(i32* %5, i32* %11, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
+; CHECK-NEXT:   %0 = call %struct._depend_unpack_t @compute_dep(i32* %load_gep_n.addr)
+; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t %0, 0
+; CHECK-NEXT:   %2 = alloca i32*
+; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
+; CHECK-NEXT:   %3 = load i64, i64* %local_lookup_n.addr
+; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
+; CHECK-NEXT:   %4 = load i64, i64* %device_lookup_n.addr
+; CHECK-NEXT:   %5 = bitcast i32* %1 to i8*
+; CHECK-NEXT:   %6 = sub i64 0, %3
+; CHECK-NEXT:   %7 = getelementptr i8, i8* %5, i64 %6
+; CHECK-NEXT:   %8 = getelementptr i8, i8* %7, i64 %4
+; CHECK-NEXT:   %9 = bitcast i8* %8 to i32*
+; CHECK-NEXT:   store i32* %9, i32** %2
+; CHECK-NEXT:   %10 = load i32*, i32** %2
+; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %load_gep_vla, i64 %load_capt_gep)
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %11, 0
+; CHECK-NEXT:   %13 = alloca i32*
+; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
+; CHECK-NEXT:   %14 = load i64, i64* %local_lookup_vla
+; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
+; CHECK-NEXT:   %15 = load i64, i64* %device_lookup_vla
+; CHECK-NEXT:   %16 = bitcast i32* %12 to i8*
+; CHECK-NEXT:   %17 = sub i64 0, %14
+; CHECK-NEXT:   %18 = getelementptr i8, i8* %16, i64 %17
+; CHECK-NEXT:   %19 = getelementptr i8, i8* %18, i64 %15
+; CHECK-NEXT:   %20 = bitcast i8* %19 to i32*
+; CHECK-NEXT:   store i32* %20, i32** %13
+; CHECK-NEXT:   %21 = load i32*, i32** %13
+; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo0(i32* %10, i32* %21, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %n.addr, i32* %vla, i64 %0, i8* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   %1 = mul i64 %0, 4, !dbg !10
-; CHECK-NEXT:   %2 = mul i64 %0, 4, !dbg !10
-; CHECK-NEXT:   %3 = bitcast i32* %n.addr to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 0, i8* null, i8* %3, i64 4, i64 0, i64 4)
-; CHECK-NEXT:   %4 = bitcast i32* %vla to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 1, i8* null, i8* %4, i64 %1, i64 0, i64 %2)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep(i32* %n.addr)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %1, 0
+; CHECK-NEXT:   %3 = bitcast i32* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %1, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %1, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %1, 3
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %vla, i64 %0)
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t.0 %7, 0
+; CHECK-NEXT:   %9 = bitcast i32* %8 to i8*
+; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.0 %7, 1
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.0 %7, 2
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %7, 3
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 1, i8* null, i8* %9, i64 %10, i64 %11, i64 %12)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -154,6 +177,38 @@ arrayctor.cont:                                   ; preds = %arrayctor.loop
   ret void, !dbg !18
 }
 
+define internal %struct._depend_unpack_t @compute_dep(i32* %n.addr) {
+entry:
+  %return.val = alloca %struct._depend_unpack_t, align 8
+  %0 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 0
+  store i32* %n.addr, i32** %0, align 8
+  %1 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 1
+  store i64 4, i64* %1, align 8
+  %2 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 2
+  store i64 0, i64* %2, align 8
+  %3 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 3
+  store i64 4, i64* %3, align 8
+  %4 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, align 8
+  ret %struct._depend_unpack_t %4
+}
+
+define internal %struct._depend_unpack_t.0 @compute_dep.1(i32* %vla, i64 %0) {
+entry:
+  %return.val = alloca %struct._depend_unpack_t.0, align 8
+  %1 = mul i64 %0, 4
+  %2 = mul i64 %0, 4
+  %3 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 0
+  store i32* %vla, i32** %3, align 8
+  %4 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 1
+  store i64 %1, i64* %4, align 8
+  %5 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 2
+  store i64 0, i64* %5, align 8
+  %6 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 3
+  store i64 %2, i64* %6, align 8
+  %7 = load %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, align 8
+  ret %struct._depend_unpack_t.0 %7
+}
+
 ; Function Attrs: nounwind
 declare void @llvm.stackrestore(i8*) #1
 
@@ -170,12 +225,10 @@ entry:
   store i8* %2, i8** %saved_stack, align 8, !dbg !21
   %vla = alloca i32, i64 %1, align 16, !dbg !21
   store i64 %1, i64* %__vla_expr0, align 8, !dbg !21
-  %3 = mul i64 %1, 4, !dbg !22
-  %4 = mul i64 %1, 4, !dbg !22
-  %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32* %n.addr, i32 6000, i32* %n.addr, i64 4, i64 0, i64 4), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init.1), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb.2), "QUAL.OSS.DEP.REDUCTION"(i32* %vla, i32 6000, i32* %vla, i64 %3, i64 0, i64 %4), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init.1), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb.2) ], !dbg !22
-  call void @llvm.directive.region.exit(token %5), !dbg !23
-  %6 = load i8*, i8** %saved_stack, align 8, !dbg !24
-  call void @llvm.stackrestore(i8* %6), !dbg !24
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %n.addr, %struct._depend_unpack_t.1 (i32*)* @compute_dep.4, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb.3), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %vla, %struct._depend_unpack_t.2 (i32*, i64)* @compute_dep.5, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb.3) ], !dbg !22
+  call void @llvm.directive.region.exit(token %3), !dbg !23
+  %4 = load i8*, i8** %saved_stack, align 8, !dbg !24
+  call void @llvm.stackrestore(i8* %4), !dbg !24
   ret void, !dbg !24
 }
 
@@ -183,43 +236,63 @@ entry:
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_n.addr = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_n.addr = load i32*, i32** %gep_n.addr
-; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
-; CHECK-NEXT:   %0 = load i64, i64* %local_lookup_n.addr
-; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
-; CHECK-NEXT:   %1 = load i64, i64* %device_lookup_n.addr
-; CHECK-NEXT:   %2 = ptrtoint i32* %load_gep_n.addr to i64
-; CHECK-NEXT:   %3 = sub nsw i64 %2, %0
-; CHECK-NEXT:   %4 = add nsw i64 %3, %1
-; CHECK-NEXT:   %5 = inttoptr i64 %4 to i32*
 ; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 1
 ; CHECK-NEXT:   %load_gep_vla = load i32*, i32** %gep_vla
-; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
-; CHECK-NEXT:   %6 = load i64, i64* %local_lookup_vla
-; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
-; CHECK-NEXT:   %7 = load i64, i64* %device_lookup_vla
-; CHECK-NEXT:   %8 = ptrtoint i32* %load_gep_vla to i64
-; CHECK-NEXT:   %9 = sub nsw i64 %8, %6
-; CHECK-NEXT:   %10 = add nsw i64 %9, %7
-; CHECK-NEXT:   %11 = inttoptr i64 %10 to i32*
 ; CHECK-NEXT:   %capt_gep = getelementptr %nanos6_task_args_foo10, %nanos6_task_args_foo10* %task_args, i32 0, i32 2
 ; CHECK-NEXT:   %load_capt_gep = load i64, i64* %capt_gep
-; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo10(i32* %5, i32* %11, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
+; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.1 @compute_dep.4(i32* %load_gep_n.addr)
+; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.1 %0, 0
+; CHECK-NEXT:   %2 = alloca i32*
+; CHECK-NEXT:   %local_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 0
+; CHECK-NEXT:   %3 = load i64, i64* %local_lookup_n.addr
+; CHECK-NEXT:   %device_lookup_n.addr = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 0, i32 1
+; CHECK-NEXT:   %4 = load i64, i64* %device_lookup_n.addr
+; CHECK-NEXT:   %5 = bitcast i32* %1 to i8*
+; CHECK-NEXT:   %6 = sub i64 0, %3
+; CHECK-NEXT:   %7 = getelementptr i8, i8* %5, i64 %6
+; CHECK-NEXT:   %8 = getelementptr i8, i8* %7, i64 %4
+; CHECK-NEXT:   %9 = bitcast i8* %8 to i32*
+; CHECK-NEXT:   store i32* %9, i32** %2
+; CHECK-NEXT:   %10 = load i32*, i32** %2
+; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %load_gep_vla, i64 %load_capt_gep)
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.2 %11, 0
+; CHECK-NEXT:   %13 = alloca i32*
+; CHECK-NEXT:   %local_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 0
+; CHECK-NEXT:   %14 = load i64, i64* %local_lookup_vla
+; CHECK-NEXT:   %device_lookup_vla = getelementptr %nanos6_address_translation_entry_t, %nanos6_address_translation_entry_t* %address_translation_table, i32 1, i32 1
+; CHECK-NEXT:   %15 = load i64, i64* %device_lookup_vla
+; CHECK-NEXT:   %16 = bitcast i32* %12 to i8*
+; CHECK-NEXT:   %17 = sub i64 0, %14
+; CHECK-NEXT:   %18 = getelementptr i8, i8* %16, i64 %17
+; CHECK-NEXT:   %19 = getelementptr i8, i8* %18, i64 %15
+; CHECK-NEXT:   %20 = bitcast i8* %19 to i32*
+; CHECK-NEXT:   store i32* %20, i32** %13
+; CHECK-NEXT:   %21 = load i32*, i32** %13
+; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo10(i32* %10, i32* %21, i64 %load_capt_gep, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_deps_foo10(i32* %n.addr, i32* %vla, i64 %0, i8* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   %1 = mul i64 %0, 4, !dbg !21
-; CHECK-NEXT:   %2 = mul i64 %0, 4, !dbg !21
-; CHECK-NEXT:   %3 = bitcast i32* %n.addr to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 0, i8* null, i8* %3, i64 4, i64 0, i64 4)
-; CHECK-NEXT:   %4 = bitcast i32* %vla to i8*
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 1, i8* null, i8* %4, i64 %1, i64 0, i64 %2)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t.1 @compute_dep.4(i32* %n.addr)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t.1 %1, 0
+; CHECK-NEXT:   %3 = bitcast i32* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.1 %1, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.1 %1, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.1 %1, 3
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %vla, i64 %0)
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t.2 %7, 0
+; CHECK-NEXT:   %9 = bitcast i32* %8 to i8*
+; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.2 %7, 1
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.2 %7, 2
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.2 %7, 3
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 1, i8* null, i8* %9, i64 %10, i64 %11, i64 %12)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; Function Attrs: noinline norecurse nounwind uwtable
-define internal void @red_init.1(i32* %0, i32* %1, i64 %2) #2 !dbg !25 {
+define internal void @red_init.2(i32* %0, i32* %1, i64 %2) #2 !dbg !25 {
 entry:
   %.addr = alloca i32*, align 8
   %.addr1 = alloca i32*, align 8
@@ -248,7 +321,7 @@ arrayctor.cont:                                   ; preds = %arrayctor.loop
 }
 
 ; Function Attrs: noinline norecurse nounwind uwtable
-define internal void @red_comb.2(i32* %0, i32* %1, i64 %2) #2 !dbg !27 {
+define internal void @red_comb.3(i32* %0, i32* %1, i64 %2) #2 !dbg !27 {
 entry:
   %.addr = alloca i32*, align 8
   %.addr1 = alloca i32*, align 8
@@ -277,6 +350,38 @@ arrayctor.loop:                                   ; preds = %arrayctor.loop, %en
 
 arrayctor.cont:                                   ; preds = %arrayctor.loop
   ret void, !dbg !28
+}
+
+define internal %struct._depend_unpack_t.1 @compute_dep.4(i32* %n.addr) {
+entry:
+  %return.val = alloca %struct._depend_unpack_t.1, align 8
+  %0 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 0
+  store i32* %n.addr, i32** %0, align 8
+  %1 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 1
+  store i64 4, i64* %1, align 8
+  %2 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 2
+  store i64 0, i64* %2, align 8
+  %3 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 3
+  store i64 4, i64* %3, align 8
+  %4 = load %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, align 8
+  ret %struct._depend_unpack_t.1 %4
+}
+
+define internal %struct._depend_unpack_t.2 @compute_dep.5(i32* %vla, i64 %0) {
+entry:
+  %return.val = alloca %struct._depend_unpack_t.2, align 8
+  %1 = mul i64 %0, 4
+  %2 = mul i64 %0, 4
+  %3 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 0
+  store i32* %vla, i32** %3, align 8
+  %4 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 1
+  store i64 %1, i64* %4, align 8
+  %5 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 2
+  store i64 0, i64* %5, align 8
+  %6 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 3
+  store i64 %2, i64* %6, align 8
+  %7 = load %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, align 8
+  ret %struct._depend_unpack_t.2 %7
 }
 
 ; Function Attrs: noinline nounwind optnone uwtable

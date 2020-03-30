@@ -2527,14 +2527,14 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
 
   if (const auto *VD = dyn_cast<VarDecl>(ND)) {
 
-    // OmpSs: Reuse Address from already emited references if found
+    // OmpSs: Reuse Address from captured variables
+    // i.e. globals an references
     if (getLangOpts().OmpSs
         && (CGM.getOmpSsRuntime().inTaskBody()
-            || CGM.getOmpSsRuntime().InTaskEmission)
-        && VD->getType()->isReferenceType()) {
+            || CGM.getOmpSsRuntime().InTaskEmission)) {
 
-      auto it = CGM.getOmpSsRuntime().getTaskRefMap().find(VD);
-      if (it != CGM.getOmpSsRuntime().getTaskRefMap().end()) {
+      auto it = CGM.getOmpSsRuntime().getTaskCaptureMap().find(VD);
+      if (it != CGM.getOmpSsRuntime().getTaskCaptureMap().end()) {
         return MakeAddrLValue(it->second, T, AlignmentSource::Decl);
       }
     }

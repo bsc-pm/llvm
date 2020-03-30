@@ -43,14 +43,14 @@ struct TaskNonPODsInfo {
 };
 
 struct DependInfo {
+  Value *Base;
+  Function *ComputeDepFun;
+  SmallVector<Value *, 4> Args;
   int SymbolIndex;
   std::string RegionText;
-  Value *Base;
-  SmallVector<Value *, 4> Dims;
 };
 
 struct ReductionInfo {
-  Value *DSA;
   Value *RedKind;
   DependInfo DepInfo;
 };
@@ -67,11 +67,6 @@ struct TaskDependsInfo {
   SmallVector<ReductionInfo, 4> Reductions;
   SmallVector<ReductionInfo, 4> WeakReductions;
 
-  // Unique Instructions needed as a bridge between dependency and DSAs
-  // Stored in program order
-  SmallVector<Instruction *, 4> UnpackInstructions;
-  // Unique ConstantExpr needed between dependency and DSAs
-  SetVector<ConstantExpr *> UnpackConstants;
   int NumSymbols;
 };
 

@@ -288,48 +288,30 @@ struct OmpSs : public ModulePass {
   FunctionCallee TaskSubmitFuncTy;
   FunctionCallee TaskInFinalFuncTy;
 
-  void unpackDepsAndRewrite(Module &M, TaskDependsInfo &TDI, TaskReductionsInitCombInfo &TRI,
-                            Function *F, ArrayRef<Value *> TaskArgsList) {
+  void unpackDepsAndRewrite(Module &M, const TaskInfo &TI,
+                            Function *F,
+                            const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
-    DenseMap<Value *, Value *> ConstExprToInst;
-    DenseMap<Value *, Value *> InstToClone;
-    for (ConstantExpr * const &CE : TDI.UnpackConstants) {
-      Instruction *I = CE->getAsInstruction();
-      Entry.getInstList().push_back(I);
 
-      // TODO: make a use case that have two or more same constants
-      ConstExprToInst[CE] = I;
-    }
-    for (Instruction * const &I : TDI.UnpackInstructions) {
-      Instruction *IClone = I->clone();
-      if (I->hasName())
-        IClone->setName(I->getName());
-      Entry.getInstList().push_back(IClone);
-      InstToClone[I] = IClone;
-    }
     // Once we have inserted the cloned instructions and the ConstantExpr instructions
     // add the terminator so IRBuilder inserts just before it
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
     // Insert RT call before replacing uses
-    unpackDepsCallToRT(M, ConstExprToInst, TDI, TRI, F);
+    unpackDepsCallToRT(M, TI, F);
 
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
-        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
-      }
-      for (auto &p : ConstExprToInst) {
-        I.replaceUsesOfWith(p.first, p.second);
-      }
-      for (auto &p : InstToClone) {
-        I.replaceUsesOfWith(p.first, p.second);
+      for (auto It = StructToIdxMap.begin();
+             It != StructToIdxMap.end(); ++It, ++AI) {
+        I.replaceUsesOfWith(It->first, &*AI);
       }
     }
   }
 
-  void unpackCostAndRewrite(Module &M, Value *Cost, Function *F, ArrayRef<Value *> TaskArgsList) {
+  void unpackCostAndRewrite(Module &M, Value *Cost, Function *F,
+                            const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
@@ -345,13 +327,16 @@ struct OmpSs : public ModulePass {
     BBBuilder.CreateStore(CostCast, GEPConstraints);
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
-        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
+      for (auto It = StructToIdxMap.begin();
+             It != StructToIdxMap.end(); ++It, ++AI) {
+        if (auto IIt = dyn_cast<Instruction>(It->first))
+          I.replaceUsesOfWith(IIt, &*AI);
       }
     }
   }
 
-  void unpackPriorityAndRewrite(Module &M, Value *Priority, Function *F, ArrayRef<Value *> TaskArgsList) {
+  void unpackPriorityAndRewrite(Module &M, Value *Priority, Function *F,
+                                const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
@@ -361,14 +346,15 @@ struct OmpSs : public ModulePass {
     BBBuilder.CreateStore(PrioritySExt, PriorityArg);
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i, ++AI) {
-        I.replaceUsesOfWith(TaskArgsList[i], &*AI);
+      for (auto It = StructToIdxMap.begin();
+             It != StructToIdxMap.end(); ++It, ++AI) {
+        if (auto IIt = dyn_cast<Instruction>(It->first))
+          I.replaceUsesOfWith(IIt, &*AI);
       }
     }
   }
 
   void unpackCallToRTOfType(Module &M,
-                            DenseMap<Value *, Value *> &ConstExprToInst,
                             const SmallVectorImpl<DependInfo> &DependList,
                             Function *F,
                             StringRef DepType) {
@@ -377,43 +363,30 @@ struct OmpSs : public ModulePass {
       Instruction &RetI = Entry.back();
       IRBuilder<> BBBuilder(&RetI);
 
-      Value *NewBase = DI.Base;
-      // Possible cases when generating the final Value for dependency base.
-      // 1. ConstantExpr: We gathered this in analysis so it's safe to replace here
-      // 2. GlobLVal: This will make a ConstantExpr for the BitCast, so we must to register it
-      // 3. Instruction: With the BitCast we are done here
-      if (isa<ConstantExpr>(NewBase))
-        NewBase = ConstExprToInst[NewBase];
+      Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
+      CallInst *CallComputeDep = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
 
-      NewBase = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
+      size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
 
-      if (auto *CE = dyn_cast<ConstantExpr>(NewBase)) {
-        if (!ConstExprToInst.count(CE)) {
-          // ConstantExpr may be used more than once. Reuse the instruction
-          Instruction *I = CE->getAsInstruction();
-          BBBuilder.Insert(I);
-
-          ConstExprToInst[CE] = I;
-        }
-      }
+      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDep, 0);
 
       SmallVector<Value *, 4> TaskDepAPICall;
       Value *Handler = &*(F->arg_end() - 1);
       TaskDepAPICall.push_back(Handler);
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
-      TaskDepAPICall.push_back(NewBase);
-      assert(!(DI.Dims.size()%3));
-      size_t NumDims = DI.Dims.size()/3;
-      for (Value *V : DI.Dims) {
-        TaskDepAPICall.push_back(V);
+      TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
+      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ++i) {
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i));
       }
+
       BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, DepType, NumDims), TaskDepAPICall);
     }
   }
 
   void unpackCallToRTOfReduction(Module &M,
-                            DenseMap<Value *, Value *> &ConstExprToInst,
                             const SmallVectorImpl<ReductionInfo> &ReductionsList,
                             const TaskReductionsInitCombInfo &TRI,
                             Function *F,
@@ -424,44 +397,51 @@ struct OmpSs : public ModulePass {
       Instruction &RetI = Entry.back();
       IRBuilder<> BBBuilder(&RetI);
 
-      Value *NewBase = DI.Base;
-      NewBase = BBBuilder.CreateBitCast(NewBase, Type::getInt8PtrTy(M.getContext()));
+      // Do remove ComputeDep, we're going to use it in ol_task_region
+      Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
+      CallInst *CallComputeDep = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
 
+      llvm::Value *DepBaseDSA = DI.Args[0];
       // This must not happen, it will be catched in analysis
-      assert(TRI.count(RI.DSA) && "Reduction dependency DSA has no init/combiner");
+      assert(TRI.count(DepBaseDSA) && "Reduction dependency DSA has no init/combiner");
+
+      assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
+      size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
+
+      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDep, 0);
 
       SmallVector<Value *, 4> TaskDepAPICall;
       TaskDepAPICall.push_back(RI.RedKind);
-      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), TRI.lookup(RI.DSA).ReductionIndex));
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), TRI.lookup(Base).ReductionIndex));
       Value *Handler = &*(F->arg_end() - 1);
       TaskDepAPICall.push_back(Handler);
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
-      TaskDepAPICall.push_back(NewBase);
-      assert(!(DI.Dims.size()%3));
-      size_t NumDims = DI.Dims.size()/3;
-      for (Value *V : DI.Dims) {
-        TaskDepAPICall.push_back(V);
+      TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
+      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ++i) {
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i));
       }
       BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, RedType, NumDims, /*IsReduction=*/true), TaskDepAPICall);
     }
   }
 
   void unpackDepsCallToRT(Module &M,
-                      DenseMap<Value *, Value *> &ConstExprToInst,
-                      const TaskDependsInfo &TDI,
-                      const TaskReductionsInitCombInfo &TRI,
+                      const TaskInfo &TI,
                       Function *F) {
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.Ins, F, "read");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.Outs, F, "write");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.Inouts, F, "readwrite");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.Concurrents, F, "concurrent");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.Commutatives, F, "commutative");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakIns, F, "weak_read");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakOuts, F, "weak_write");
-    unpackCallToRTOfType(M, ConstExprToInst, TDI.WeakInouts, F, "weak_readwrite");
-    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.Reductions, TRI, F, "reduction");
-    unpackCallToRTOfReduction(M, ConstExprToInst, TDI.WeakReductions, TRI, F, "weak_reduction");
+    const TaskDependsInfo &TDI = TI.DependsInfo;
+    const TaskReductionsInitCombInfo &TRI = TI.ReductionsInitCombInfo;
+
+    unpackCallToRTOfType(M, TDI.Ins, F, "read");
+    unpackCallToRTOfType(M, TDI.Outs, F, "write");
+    unpackCallToRTOfType(M, TDI.Inouts, F, "readwrite");
+    unpackCallToRTOfType(M, TDI.Concurrents, F, "concurrent");
+    unpackCallToRTOfType(M, TDI.Commutatives, F, "commutative");
+    unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
+    unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
+    unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
+    unpackCallToRTOfReduction(M, TDI.Reductions, TRI, F, "reduction");
+    unpackCallToRTOfReduction(M, TDI.WeakReductions, TRI, F, "weak_reduction");
   }
 
   // TypeList[i] <-> NameList[i]
@@ -497,13 +477,23 @@ struct OmpSs : public ModulePass {
     return FuncVar;
   }
 
-  void translateUnpackedDSA(IRBuilder<> &IRB, Value *DSA, Value *&UnpackedDSA,
-                            Value *AddrTranslationTable, const std::map<Value *, int> &DepSymToIdx) {
-    if (!DepSymToIdx.count(DSA))
-      return;
+  // Build a new storage for the translated reduction
+  // returns the storage of the translated reduction
+  void translateReductionUnpackedDSA(IRBuilder<> &IRB, const DependInfo &DI,
+                                     Value *DSA, Value *&UnpackedDSA,
+                                     Value *AddrTranslationTable,
+                                     const std::map<Value *, int> &DepSymToIdx) {
+    Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
+    CallInst *CallComputeDep = IRB.CreateCall(ComputeDepFun, DI.Args);
+    llvm::Value *Base = IRB.CreateExtractValue(CallComputeDep, 0);
 
-    // Save the original the original type since we are going to cast...
+    // Save the original type since we are going to cast...
     Type *UnpackedDSAType = UnpackedDSA->getType();
+    Type *BaseType = Base->getType();
+
+    // Storage of the translated DSA
+    AllocaInst *UnpackedDSATranslated = IRB.CreateAlloca(BaseType);
+
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), DepSymToIdx.at(DSA));
     Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
@@ -517,60 +507,67 @@ struct OmpSs : public ModulePass {
     DeviceAddr = IRB.CreateLoad(DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
-    UnpackedDSA = IRB.CreateNSWSub(IRB.CreatePtrToInt(UnpackedDSA, Type::getInt64Ty(IRB.getContext())), LocalAddr);
-    UnpackedDSA = IRB.CreateNSWAdd(UnpackedDSA, DeviceAddr);
-    UnpackedDSA = IRB.CreateIntToPtr(UnpackedDSA, UnpackedDSAType);
+    UnpackedDSA = IRB.CreateGEP(IRB.CreateBitCast(Base, Type::getInt8PtrTy(IRB.getContext())),
+                                IRB.CreateNeg(LocalAddr));
+    UnpackedDSA = IRB.CreateGEP(UnpackedDSA, DeviceAddr);
+    UnpackedDSA = IRB.CreateBitCast(UnpackedDSA, BaseType );
+
+    IRB.CreateStore(UnpackedDSA, UnpackedDSATranslated);
+
+   // FIXME: Since we have no info about if we have to pass to unpack a load of the alloca
+   // or not, check if the type has changed after call to compute_dep.
+   // Pointers -> no load
+   // basic types/structs/arrays/vla -> load
+   if (UnpackedDSAType == BaseType)
+      UnpackedDSA = IRB.CreateLoad(UnpackedDSATranslated);
+   else
+      UnpackedDSA = UnpackedDSATranslated;
   }
 
   // Given a Outline Function assuming that task args are the first parameter, and
   // DSAInfo and VLADimsInfo, it unpacks task args in Outline and fills UnpackedList
   // with those Values, used to call Unpack Functions
-  void unpackDSAsWithVLADims(Module &M, const TaskDSAInfo &DSAInfo,
-                  const TaskCapturedInfo &CapturedInfo,
-                  const TaskVLADimsInfo &VLADimsInfo,
+  void unpackDSAsWithVLADims(Module &M, const TaskInfo &TI,
                   Function *OlFunc,
-                  DenseMap<Value *, size_t> &StructToIdxMap,
+                  const MapVector<Value *, size_t> &StructToIdxMap,
                   SmallVectorImpl<Value *> &UnpackedList,
                   bool IsTaskFunc) {
     UnpackedList.clear();
 
+    const TaskDSAInfo &DSAInfo = TI.DSAInfo;
+    const TaskCapturedInfo &CapturedInfo = TI.CapturedInfo;
+    const TaskVLADimsInfo &VLADimsInfo = TI.VLADimsInfo;
+
     IRBuilder<> BBBuilder(&OlFunc->getEntryBlock());
     Function::arg_iterator AI = OlFunc->arg_begin();
     Value *OlDepsFuncTaskArgs = &*AI++;
-    Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
     for (Value *V : DSAInfo.Shared) {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
       Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
-
-      if (IsTaskFunc)
-        translateUnpackedDSA(BBBuilder, V, LGEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
 
       UnpackedList.push_back(LGEP);
     }
     for (Value *V : DSAInfo.Private) {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
       // VLAs
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
-
-      if (IsTaskFunc)
-        translateUnpackedDSA(BBBuilder, V, GEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
 
       UnpackedList.push_back(GEP);
     }
     for (Value *V : DSAInfo.Firstprivate) {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "gep_" + V->getName());
 
@@ -578,15 +575,12 @@ struct OmpSs : public ModulePass {
       if (VLADimsInfo.count(V))
         GEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
 
-      if (IsTaskFunc)
-        translateUnpackedDSA(BBBuilder, V, GEP, AddrTranslationTable, DSAInfo.DepSymToIdx);
-
       UnpackedList.push_back(GEP);
     }
     for (Value *V : CapturedInfo) {
       Value *Idx[2];
       Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
-      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap[V]);
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), StructToIdxMap.lookup(V));
       Value *GEP = BBBuilder.CreateGEP(
           OlDepsFuncTaskArgs, Idx, "capt_gep" + V->getName());
       Value *LGEP = BBBuilder.CreateLoad(GEP, "load_" + GEP->getName());
@@ -596,10 +590,8 @@ struct OmpSs : public ModulePass {
 
   // Given an Outline and Unpack Functions it unpacks DSAs in Outline
   // and builds a call to Unpack
-  void olCallToUnpack(Module &M, const TaskDSAInfo &DSAInfo,
-                      const TaskCapturedInfo &CapturedInfo,
-                      const TaskVLADimsInfo &VLADimsInfo,
-                      DenseMap<Value *, size_t> &StructToIdxMap,
+  void olCallToUnpack(Module &M, const TaskInfo &TI,
+                      MapVector<Value *, size_t> &StructToIdxMap,
                       Function *OlFunc, Function *UnpackFunc,
                       bool IsTaskFunc=false) {
     BasicBlock::Create(M.getContext(), "entry", OlFunc);
@@ -609,7 +601,40 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
-    unpackDSAsWithVLADims(M, DSAInfo, CapturedInfo, VLADimsInfo, OlFunc, StructToIdxMap, UnpackParams, IsTaskFunc);
+    unpackDSAsWithVLADims(M, TI, OlFunc, StructToIdxMap, UnpackParams, IsTaskFunc);
+
+    if (IsTaskFunc) {
+      // Build call to compute_dep in order to have get the base dependency of
+      // the reduction. The result is passed to unpack
+      ArrayRef<ReductionInfo> Reds = TI.DependsInfo.Reductions;
+      ArrayRef<ReductionInfo> WeakReds = TI.DependsInfo.WeakReductions;
+      // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
+      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
+      // Preserve the params before translation. And replace used after build all
+      // compute_dep calls
+      SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
+      for (auto &RedInfo : Reds) {
+        Value *DepBaseDSA = RedInfo.DepInfo.Args[0];
+        translateReductionUnpackedDSA(BBBuilder, RedInfo.DepInfo, DepBaseDSA,
+                                      UnpackParams[StructToIdxMap[DepBaseDSA]],
+                                      AddrTranslationTable, TI.DSAInfo.DepSymToIdx);
+      }
+      for (auto &RedInfo : WeakReds) {
+        Value *DepBaseDSA = RedInfo.DepInfo.Args[0];
+        translateReductionUnpackedDSA(BBBuilder, RedInfo.DepInfo, DepBaseDSA,
+                                      UnpackParams[StructToIdxMap[DepBaseDSA]],
+                                      AddrTranslationTable, TI.DSAInfo.DepSymToIdx);
+      }
+      for (Instruction &I : *BBBuilder.GetInsertBlock()) {
+        auto UnpackedIt = UnpackParamsCopy.begin();
+        for (auto It = StructToIdxMap.begin();
+               It != StructToIdxMap.end(); ++It, ++UnpackedIt) {
+          if (auto IIt = dyn_cast<Instruction>(It->first))
+            I.replaceUsesOfWith(IIt, *UnpackedIt);
+        }
+      }
+    }
+
     while (AI != OlFunc->arg_end()) {
       UnpackParams.push_back(&*AI++);
     }
@@ -634,10 +659,11 @@ struct OmpSs : public ModulePass {
   }
 
   StructType *createTaskArgsType(Module &M,
-                                 const TaskDSAInfo &DSAInfo,
-                                 const TaskCapturedInfo &CapturedInfo,
-                                 const TaskVLADimsInfo &VLADimsInfo,
-                                 DenseMap<Value *, size_t> &StructToIdxMap, StringRef Str) {
+                                 const TaskInfo &TI,
+                                 MapVector<Value *, size_t> &StructToIdxMap, StringRef Str) {
+    const TaskDSAInfo &DSAInfo = TI.DSAInfo;
+    const TaskCapturedInfo &CapturedInfo = TI.CapturedInfo;
+    const TaskVLADimsInfo &VLADimsInfo = TI.VLADimsInfo;
     // Private and Firstprivate must be stored in the struct
     // Captured values (i.e. VLA dimensions) are not pointers
     SmallVector<Type *, 4> TaskArgsMemberTy;
@@ -799,23 +825,16 @@ struct OmpSs : public ModulePass {
 
     // Create nanos6_task_args_* START
     SmallVector<Type *, 4> TaskArgsMemberTy;
-    DenseMap<Value *, size_t> TaskArgsToStructIdxMap;
-    StructType *TaskArgsTy = createTaskArgsType(M, TI.DSAInfo,
-                                                 TI.CapturedInfo,
-                                                 TI.VLADimsInfo,
-                                                 TaskArgsToStructIdxMap,
+    MapVector<Value *, size_t> TaskArgsToStructIdxMap;
+    StructType *TaskArgsTy = createTaskArgsType(M, TI, TaskArgsToStructIdxMap,
                                                  ("nanos6_task_args_" + F.getName() + Twine(taskNum)).str());
     // Create nanos6_task_args_* END
 
-    SetVector<Value *> TaskArgsList;
-    TaskArgsList.insert(TI.DSAInfo.Shared.begin(), TI.DSAInfo.Shared.end());
-    TaskArgsList.insert(TI.DSAInfo.Private.begin(), TI.DSAInfo.Private.end());
-    TaskArgsList.insert(TI.DSAInfo.Firstprivate.begin(), TI.DSAInfo.Firstprivate.end());
-    TaskArgsList.insert(TI.CapturedInfo.begin(), TI.CapturedInfo.end());
-
     SmallVector<Type *, 4> TaskTypeList;
     SmallVector<StringRef, 4> TaskNameList;
-    for (Value *V : TaskArgsList) {
+    for (auto It = TaskArgsToStructIdxMap.begin();
+           It != TaskArgsToStructIdxMap.end(); ++It) {
+      Value *V = It->first;
       TaskTypeList.push_back(V->getType());
       TaskNameList.push_back(V->getName());
     }
@@ -848,7 +867,7 @@ struct OmpSs : public ModulePass {
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
 
-    olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar, /*IsTaskFunc=*/true);
+    olCallToUnpack(M, TI, TaskArgsToStructIdxMap, OlTaskFuncVar, UnpackTaskFuncVar, /*IsTaskFunc=*/true);
 
     // nanos6_ol_task_region_* END
 
@@ -867,7 +886,7 @@ struct OmpSs : public ModulePass {
                                ("nanos6_unpacked_deps_" + F.getName() + Twine(taskNum)).str(),
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
-    unpackDepsAndRewrite(M, TI.DependsInfo, TI.ReductionsInitCombInfo, UnpackDepsFuncVar, TaskArgsList.getArrayRef());
+    unpackDepsAndRewrite(M, TI, UnpackDepsFuncVar, TaskArgsToStructIdxMap);
 
     // nanos6_unpacked_deps_* END
 
@@ -878,7 +897,7 @@ struct OmpSs : public ModulePass {
                                ("nanos6_ol_deps_" + F.getName() + Twine(taskNum)).str(),
                                {TaskArgsTy->getPointerTo()}, {"task_args"},
                                TaskExtraTypeList, TaskExtraNameList);
-    olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar);
+    olCallToUnpack(M, TI, TaskArgsToStructIdxMap, OlDepsFuncVar, UnpackDepsFuncVar);
 
     // nanos6_ol_deps_* END
 
@@ -895,7 +914,7 @@ struct OmpSs : public ModulePass {
                                  ("nanos6_unpacked_constraints_" + F.getName() + Twine(taskNum)).str(),
                                  TaskTypeList, TaskNameList,
                                  TaskExtraTypeList, TaskExtraNameList);
-      unpackCostAndRewrite(M, TI.Cost, UnpackConstraintsFuncVar, TaskArgsList.getArrayRef());
+      unpackCostAndRewrite(M, TI.Cost, UnpackConstraintsFuncVar, TaskArgsToStructIdxMap);
       // nanos6_unpacked_constraints_* END
 
       // nanos6_ol_constraints_* START
@@ -905,7 +924,7 @@ struct OmpSs : public ModulePass {
                                  ("nanos6_ol_constraints_" + F.getName() + Twine(taskNum)).str(),
                                  {TaskArgsTy->getPointerTo()}, {"task_args"},
                                  TaskExtraTypeList, TaskExtraNameList);
-      olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar);
+      olCallToUnpack(M, TI, TaskArgsToStructIdxMap, OlConstraintsFuncVar, UnpackConstraintsFuncVar);
 
       // nanos6_ol_constraints_* END
     }
@@ -924,7 +943,7 @@ struct OmpSs : public ModulePass {
                                  ("nanos6_unpacked_priority_" + F.getName() + Twine(taskNum)).str(),
                                  TaskTypeList, TaskNameList,
                                  TaskExtraTypeList, TaskExtraNameList);
-      unpackPriorityAndRewrite(M, TI.Priority, UnpackPriorityFuncVar, TaskArgsList.getArrayRef());
+      unpackPriorityAndRewrite(M, TI.Priority, UnpackPriorityFuncVar, TaskArgsToStructIdxMap);
       // nanos6_unpacked_priority_* END
 
       // nanos6_ol_priority_* START
@@ -934,7 +953,7 @@ struct OmpSs : public ModulePass {
                                  ("nanos6_ol_priority_" + F.getName() + Twine(taskNum)).str(),
                                  {TaskArgsTy->getPointerTo()}, {"task_args"},
                                  TaskExtraTypeList, TaskExtraNameList);
-      olCallToUnpack(M, TI.DSAInfo, TI.CapturedInfo, TI.VLADimsInfo, TaskArgsToStructIdxMap, OlPriorityFuncVar, UnpackPriorityFuncVar);
+      olCallToUnpack(M, TI, TaskArgsToStructIdxMap, OlPriorityFuncVar, UnpackPriorityFuncVar);
 
       // nanos6_ol_priority_* END
     }
@@ -1046,7 +1065,7 @@ struct OmpSs : public ModulePass {
     });
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
-      = [&UnpackTaskFuncVar, &TaskArgsList](BasicBlock *header,
+      = [&UnpackTaskFuncVar, &TaskArgsToStructIdxMap](BasicBlock *header,
                                             BasicBlock *newRootNode,
                                             BasicBlock *newHeader,
                                             Function *oldFunction,
@@ -1056,16 +1075,18 @@ struct OmpSs : public ModulePass {
 
       // Create an iterator to name all of the arguments we inserted.
       Function::arg_iterator AI = UnpackTaskFuncVar->arg_begin();
-      // Rewrite all users of the TaskArgsList in the extracted region to use the
+      // Rewrite all users of the TaskArgsToStructIdxMap in the extracted region to use the
       // arguments (or appropriate addressing into struct) instead.
-      for (unsigned i = 0, e = TaskArgsList.size(); i != e; ++i) {
+      for (auto It = TaskArgsToStructIdxMap.begin();
+             It != TaskArgsToStructIdxMap.end(); ++It) {
         Value *RewriteVal = &*AI++;
+        Value *Val = It->first;
 
-        std::vector<User *> Users(TaskArgsList[i]->user_begin(), TaskArgsList[i]->user_end());
+        std::vector<User *> Users(Val->user_begin(), Val->user_end());
         for (User *use : Users)
           if (Instruction *inst = dyn_cast<Instruction>(use))
             if (Blocks.count(inst->getParent()))
-              inst->replaceUsesOfWith(TaskArgsList[i], RewriteVal);
+              inst->replaceUsesOfWith(Val, RewriteVal);
       }
 
       // Rewrite branches from basic blocks outside of the task region to blocks
