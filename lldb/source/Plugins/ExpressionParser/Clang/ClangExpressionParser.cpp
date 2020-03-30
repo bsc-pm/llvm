@@ -214,17 +214,12 @@ public:
       auto new_diagnostic = std::make_unique<ClangDiagnostic>(
           stripped_output, severity, Info.getID());
 
-      // Don't store away warning fixits, since the compiler doesn't have
-      // enough context in an expression for the warning to be useful.
       // FIXME: Should we try to filter out FixIts that apply to our generated
       // code, and not the user's expression?
-      if (severity == eDiagnosticSeverityError) {
-        size_t num_fixit_hints = Info.getNumFixItHints();
-        for (size_t i = 0; i < num_fixit_hints; i++) {
-          const clang::FixItHint &fixit = Info.getFixItHint(i);
-          if (!fixit.isNull())
-            new_diagnostic->AddFixitHint(fixit);
-        }
+      for (const clang::FixItHint &fixit : Info.getFixItHints()) {
+        if (fixit.isNull())
+          continue;
+        new_diagnostic->AddFixitHint(fixit);
       }
 
       m_manager->AddDiagnostic(std::move(new_diagnostic));
@@ -1071,6 +1066,28 @@ ClangExpressionParser::GetClangTargetABI(const ArchSpec &target_arch) {
   return abi;
 }
 
+/// Applies the given Fix-It hint to the given commit.
+static void ApplyFixIt(const FixItHint &fixit, clang::edit::Commit &commit) {
+  // This is cobbed from clang::Rewrite::FixItRewriter.
+  if (fixit.CodeToInsert.empty()) {
+    if (fixit.InsertFromRange.isValid()) {
+      commit.insertFromRange(fixit.RemoveRange.getBegin(),
+                             fixit.InsertFromRange, /*afterToken=*/false,
+                             fixit.BeforePreviousInsertions);
+      return;
+    }
+    commit.remove(fixit.RemoveRange);
+    return;
+  }
+  if (fixit.RemoveRange.isTokenRange() ||
+      fixit.RemoveRange.getBegin() != fixit.RemoveRange.getEnd()) {
+    commit.replace(fixit.RemoveRange, fixit.CodeToInsert);
+    return;
+  }
+  commit.insert(fixit.RemoveRange.getBegin(), fixit.CodeToInsert,
+                /*afterToken=*/false, fixit.BeforePreviousInsertions);
+}
+
 bool ClangExpressionParser::RewriteExpression(
     DiagnosticManager &diagnostic_manager) {
   clang::SourceManager &source_manager = m_compiler->getSourceManager();
@@ -1102,26 +1119,16 @@ bool ClangExpressionParser::RewriteExpression(
 
   for (const auto &diag : diagnostic_manager.Diagnostics()) {
     const auto *diagnostic = llvm::dyn_cast<ClangDiagnostic>(diag.get());
-    if (diagnostic && diagnostic->HasFixIts()) {
-      for (const FixItHint &fixit : diagnostic->FixIts()) {
-        // This is cobbed from clang::Rewrite::FixItRewriter.
-        if (fixit.CodeToInsert.empty()) {
-          if (fixit.InsertFromRange.isValid()) {
-            commit.insertFromRange(fixit.RemoveRange.getBegin(),
-                                   fixit.InsertFromRange, /*afterToken=*/false,
-                                   fixit.BeforePreviousInsertions);
-          } else
-            commit.remove(fixit.RemoveRange);
-        } else {
-          if (fixit.RemoveRange.isTokenRange() ||
-              fixit.RemoveRange.getBegin() != fixit.RemoveRange.getEnd())
-            commit.replace(fixit.RemoveRange, fixit.CodeToInsert);
-          else
-            commit.insert(fixit.RemoveRange.getBegin(), fixit.CodeToInsert,
-                          /*afterToken=*/false, fixit.BeforePreviousInsertions);
-        }
-      }
-    }
+    if (!diagnostic)
+      continue;
+    if (!diagnostic->HasFixIts())
+      continue;
+    // Don't apply warning Fix-Its, since the compiler doesn't have enough
+    // context in an expression for the warning to be useful.
+    if (diagnostic->GetSeverity() != eDiagnosticSeverityError)
+      continue;
+    for (const FixItHint &fixit : diagnostic->FixIts())
+      ApplyFixIt(fixit, commit);
   }
 
   // FIXME - do we want to try to propagate specific errors here?
