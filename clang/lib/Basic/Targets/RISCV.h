@@ -112,7 +112,15 @@ public:
       : RISCVTargetInfo(Triple, Opts) {
     LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
     IntMaxType = Int64Type = SignedLong;
-    resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
+
+    // Vectors in V-ext can be aligned to 16 bytes.
+    // FIXME: Assuming ELEN=64.
+    bool HasV = llvm::is_contained(Opts.FeaturesAsWritten, "+v");
+    if (HasV)
+      resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128-v128:128:128-"
+                      "v256:128:128-v512:128:128-v1024:128:128");
+    else
+      resetDataLayout("e-m:e-p:64:64-i64:64-i128:128-n64-S128");
   }
 
   bool setABI(const std::string &Name) override {
