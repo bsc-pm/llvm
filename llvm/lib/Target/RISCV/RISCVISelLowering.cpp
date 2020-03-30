@@ -280,6 +280,7 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
 
   setOperationAction(ISD::TRAP, MVT::Other, Legal);
   setOperationAction(ISD::DEBUGTRAP, MVT::Other, Legal);
+  setOperationAction(ISD::INTRINSIC_WO_CHAIN, MVT::Other, Custom);
 
   if (Subtarget.hasStdExtA()) {
     setMaxAtomicSizeInBitsSupported(Subtarget.getXLen());
@@ -519,39 +520,6 @@ static unsigned getBranchOpcodeForIntCondCode(ISD::CondCode CC) {
   }
 }
 
-SDValue RISCVTargetLowering::lowerINTRINSIC_WO_CHAIN(SDValue Op,
-                                                     SelectionDAG &DAG) const {
-  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
-  SDLoc DL(Op);
-  switch (IntNo) {
-    // By default we do not lower any intrinsic.
-  default:
-    break;
-  }
-
-  if (Subtarget.hasStdExtV()) {
-    // Some EPI intrinsics may claim that they want an integer operand to be
-    // extended.
-    if (const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
-            RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(IntNo)) {
-      if (EII->ExtendedOperand) {
-        assert(EII->ExtendedOperand < Op.getNumOperands());
-        std::vector<SDValue> Operands(Op->op_begin(), Op->op_end());
-        SDValue &ScalarOp = Operands[EII->ExtendedOperand];
-        if (ScalarOp.getValueType() == MVT::i32 ||
-            ScalarOp.getValueType() == MVT::i16 ||
-            ScalarOp.getValueType() == MVT::i8) {
-          ScalarOp = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, ScalarOp);
-          return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
-                             Operands);
-        }
-      }
-    }
-  }
-
-  return SDValue();
-}
-
 SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
                                                  SelectionDAG &DAG) const {
   SDLoc DL(Op);
@@ -672,7 +640,7 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return FPConv;
   }
   case ISD::INTRINSIC_WO_CHAIN:
-    return lowerINTRINSIC_WO_CHAIN(Op, DAG);
+    return LowerINTRINSIC_WO_CHAIN(Op, DAG);
   case ISD::VECTOR_SHUFFLE:
     return lowerVECTOR_SHUFFLE(Op, DAG);
   case ISD::BUILD_VECTOR:
@@ -1080,6 +1048,41 @@ SDValue RISCVTargetLowering::lowerShiftRightParts(SDValue Op, SelectionDAG &DAG,
 
   SDValue Parts[2] = {Lo, Hi};
   return DAG.getMergeValues(Parts, DL);
+}
+
+SDValue RISCVTargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
+                                                     SelectionDAG &DAG) const {
+  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  SDLoc DL(Op);
+
+  if (Subtarget.hasStdExtV()) {
+    // Some EPI intrinsics may claim that they want an integer operand to be
+    // extended.
+    if (const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
+            RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(IntNo)) {
+      if (EII->ExtendedOperand) {
+        assert(EII->ExtendedOperand < Op.getNumOperands());
+        std::vector<SDValue> Operands(Op->op_begin(), Op->op_end());
+        SDValue &ScalarOp = Operands[EII->ExtendedOperand];
+        if (ScalarOp.getValueType() == MVT::i32 ||
+            ScalarOp.getValueType() == MVT::i16 ||
+            ScalarOp.getValueType() == MVT::i8) {
+          ScalarOp = DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, ScalarOp);
+          return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+                             Operands);
+        }
+      }
+    }
+  }
+
+  switch (IntNo) {
+  default:
+    return SDValue();    // Don't custom lower most intrinsics.
+  case Intrinsic::thread_pointer: {
+    EVT PtrVT = getPointerTy(DAG.getDataLayout());
+    return DAG.getRegister(RISCV::X4, PtrVT);
+  }
+  }
 }
 
 // Returns the opcode of the target-specific SDNode that implements the 32-bit
