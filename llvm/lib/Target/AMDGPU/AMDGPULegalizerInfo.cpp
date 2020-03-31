@@ -3551,7 +3551,11 @@ static void packImageA16AddressToDwords(MachineIRBuilder &B, MachineInstr &MI,
   const LLT V2S16 = LLT::vector(2, 16);
 
   for (int I = AddrIdx; I < AddrIdx + NumVAddrs; ++I) {
-    Register AddrReg = MI.getOperand(I).getReg();
+    MachineOperand &SrcOp = MI.getOperand(I);
+    if (!SrcOp.isReg())
+      continue; // _L to _LZ may have eliminated this.
+
+    Register AddrReg = SrcOp.getReg();
 
     if (I < DimIdx) {
       AddrReg = B.buildBitcast(V2S16, AddrReg).getReg(0);
@@ -3562,7 +3566,9 @@ static void packImageA16AddressToDwords(MachineIRBuilder &B, MachineInstr &MI,
       if (((I + 1) >= (AddrIdx + NumVAddrs)) ||
           ((NumGradients / 2) % 2 == 1 &&
            (I == DimIdx + (NumGradients / 2) - 1 ||
-            I == DimIdx + NumGradients - 1))) {
+            I == DimIdx + NumGradients - 1)) ||
+          // Check for _L to _LZ optimization
+          !MI.getOperand(I + 1).isReg()) {
         PackedAddrs.push_back(
             B.buildBuildVector(V2S16, {AddrReg, B.buildUndef(S16).getReg(0)})
                 .getReg(0));
@@ -3580,44 +3586,37 @@ static void packImageA16AddressToDwords(MachineIRBuilder &B, MachineInstr &MI,
 /// and replace the remaining operands with $noreg.
 static void convertImageAddrToPacked(MachineIRBuilder &B, MachineInstr &MI,
                                      int DimIdx, int NumVAddrs) {
-  SmallVector<Register, 8> AddrRegs(NumVAddrs);
+  const LLT S32 = LLT::scalar(32);
+
+  SmallVector<Register, 8> AddrRegs;
   for (int I = 0; I != NumVAddrs; ++I) {
-    AddrRegs[I] = MI.getOperand(DimIdx + I).getReg();
-    assert(B.getMRI()->getType(AddrRegs[I]) == LLT::scalar(32));
+    MachineOperand &SrcOp = MI.getOperand(DimIdx + I);
+    if (SrcOp.isReg()) {
+      AddrRegs.push_back(SrcOp.getReg());
+      assert(B.getMRI()->getType(SrcOp.getReg()) == S32);
+    }
   }
 
-  auto VAddr = B.buildBuildVector(LLT::vector(NumVAddrs, 32), AddrRegs);
-  MI.getOperand(DimIdx).setReg(VAddr.getReg(0));
-  for (int I = 1; I != NumVAddrs; ++I)
-    MI.getOperand(DimIdx + I).setReg(AMDGPU::NoRegister);
-}
+  int NumAddrRegs = AddrRegs.size();
+  if (NumAddrRegs != 1) {
+    // Round up to 8 elements for v5-v7
+    // FIXME: Missing intermediate sized register classes and instructions.
+    if (NumAddrRegs > 4 && !isPowerOf2_32(NumAddrRegs)) {
+      const int RoundedNumRegs = NextPowerOf2(NumAddrRegs);
+      auto Undef = B.buildUndef(S32);
+      AddrRegs.append(RoundedNumRegs - NumAddrRegs, Undef.getReg(0));
+      NumAddrRegs = RoundedNumRegs;
+    }
 
-/// Return number of address arguments, and the number of gradients
-static std::pair<int, int>
-getImageNumVAddr(const AMDGPU::ImageDimIntrinsicInfo *ImageDimIntr,
-                 const AMDGPU::MIMGBaseOpcodeInfo *BaseOpcode) {
-  const AMDGPU::MIMGDimInfo *DimInfo
-    = AMDGPU::getMIMGDimInfo(ImageDimIntr->Dim);
+    auto VAddr = B.buildBuildVector(LLT::vector(NumAddrRegs, 32), AddrRegs);
+    MI.getOperand(DimIdx).setReg(VAddr.getReg(0));
+  }
 
-  int NumGradients = BaseOpcode->Gradients ? DimInfo->NumGradients : 0;
-  int NumCoords = BaseOpcode->Coordinates ? DimInfo->NumCoords : 0;
-  int NumLCM = BaseOpcode->LodOrClampOrMip ? 1 : 0;
-  int NumVAddr = BaseOpcode->NumExtraArgs + NumGradients + NumCoords + NumLCM;
-  return {NumVAddr, NumGradients};
-}
-
-static int getDMaskIdx(const AMDGPU::MIMGBaseOpcodeInfo *BaseOpcode,
-                       int NumDefs) {
-  assert(!BaseOpcode->Atomic);
-  return NumDefs + 1 + (BaseOpcode->Store ? 1 : 0);
-}
-
-/// Return first address operand index in an image intrinsic.
-static int getImageVAddrIdxBegin(const AMDGPU::MIMGBaseOpcodeInfo *BaseOpcode,
-                                 int NumDefs) {
-  if (BaseOpcode->Atomic)
-    return NumDefs + 1 + (BaseOpcode->AtomicX2 ? 2 : 1);
-  return getDMaskIdx(BaseOpcode, NumDefs) + 1;
+  for (int I = 1; I != NumVAddrs; ++I) {
+    MachineOperand &SrcOp = MI.getOperand(DimIdx + I);
+    if (SrcOp.isReg())
+      MI.getOperand(DimIdx + I).setReg(AMDGPU::NoRegister);
+  }
 }
 
 /// Rewrite image intrinsics to use register layouts expected by the subtarget.
@@ -3699,6 +3698,59 @@ bool AMDGPULegalizerInfo::legalizeImageIntrinsic(
     MI.getOperand(DMaskIdx).setImm(DMask);
   }
 
+  if (BaseOpcode->Atomic) {
+    Register VData0 = MI.getOperand(2).getReg();
+    LLT Ty = MRI->getType(VData0);
+
+    // TODO: Allow atomic swap and bit ops for v2s16/v4s16
+    if (Ty.isVector())
+      return false;
+
+    if (BaseOpcode->AtomicX2) {
+      Register VData1 = MI.getOperand(3).getReg();
+      // The two values are packed in one register.
+      LLT PackedTy = LLT::vector(2, Ty);
+      auto Concat = B.buildBuildVector(PackedTy, {VData0, VData1});
+      MI.getOperand(2).setReg(Concat.getReg(0));
+      MI.getOperand(3).setReg(AMDGPU::NoRegister);
+    }
+  }
+
+  int CorrectedNumVAddrs = NumVAddrs;
+
+  // Optimize _L to _LZ when _L is zero
+  if (const AMDGPU::MIMGLZMappingInfo *LZMappingInfo =
+        AMDGPU::getMIMGLZMappingInfo(ImageDimIntr->BaseOpcode)) {
+    const ConstantFP *ConstantLod;
+    const int LodIdx = AddrIdx + NumVAddrs - 1;
+
+    // FIXME: This isn't the cleanest way to handle this, but it's the easiest
+    // option the current infrastructure gives. We really should be changing the
+    // base intrinsic opcode, but the current searchable tables only gives us
+    // the final MI opcode. Eliminate the register here, and track with an
+    // immediate 0 so the final selection will know to do the opcode change.
+    if (mi_match(MI.getOperand(LodIdx).getReg(), *MRI, m_GFCst(ConstantLod))) {
+      if (ConstantLod->isZero() || ConstantLod->isNegative()) {
+        MI.getOperand(LodIdx).ChangeToImmediate(0);
+        --CorrectedNumVAddrs;
+      }
+    }
+  }
+
+  // Optimize _mip away, when 'lod' is zero
+  if (const AMDGPU::MIMGMIPMappingInfo *MIPMappingInfo =
+        AMDGPU::getMIMGMIPMappingInfo(ImageDimIntr->BaseOpcode)) {
+    int64_t ConstantLod;
+    const int LodIdx = AddrIdx + NumVAddrs - 1;
+
+    if (mi_match(MI.getOperand(LodIdx).getReg(), *MRI, m_ICst(ConstantLod))) {
+      if (ConstantLod == 0) {
+        MI.getOperand(LodIdx).ChangeToImmediate(0);
+        --CorrectedNumVAddrs;
+      }
+    }
+  }
+
   // If the register allocator cannot place the address registers contiguously
   // without introducing moves, then using the non-sequential address encoding
   // is always preferable, since it saves VALU instructions and is usually a
@@ -3710,8 +3762,7 @@ bool AMDGPULegalizerInfo::legalizeImageIntrinsic(
   //
   // SIShrinkInstructions will convert NSA encodings to non-NSA after register
   // allocation when possible.
-  const bool UseNSA = NumVAddrs >= 3 &&
-                      ST.hasFeature(AMDGPU::FeatureNSAEncoding);
+  const bool UseNSA = CorrectedNumVAddrs >= 3 && ST.hasNSAEncoding();
 
   // Rewrite the addressing register layout before doing anything else.
   if (IsA16) {
@@ -3734,17 +3785,24 @@ bool AMDGPULegalizerInfo::legalizeImageIntrinsic(
 
       const int NumPacked = PackedRegs.size();
       for (int I = 0; I != NumVAddrs; ++I) {
-        assert(MI.getOperand(AddrIdx + I).getReg() != AMDGPU::NoRegister);
+        MachineOperand &SrcOp = MI.getOperand(AddrIdx + I);
+        if (!SrcOp.isReg()) {
+          assert(SrcOp.isImm() && SrcOp.getImm() == 0);
+          continue;
+        }
+
+        assert(SrcOp.getReg() != AMDGPU::NoRegister);
 
         if (I < NumPacked)
-          MI.getOperand(AddrIdx + I).setReg(PackedRegs[I]);
+          SrcOp.setReg(PackedRegs[I]);
         else
-          MI.getOperand(AddrIdx + I).setReg(AMDGPU::NoRegister);
+          SrcOp.setReg(AMDGPU::NoRegister);
       }
     }
   } else if (!UseNSA && NumVAddrs > 1) {
     convertImageAddrToPacked(B, MI, AddrIdx, NumVAddrs);
   }
+
 
   if (BaseOpcode->Store) { // No TFE for stores?
     // TODO: Handle dmask trim
