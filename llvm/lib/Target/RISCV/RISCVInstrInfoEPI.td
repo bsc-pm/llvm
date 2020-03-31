@@ -730,6 +730,20 @@ multiclass pseudo_binary_w_vv_vx {
   }
 }
 
+multiclass pseudo_binary_w_wv_wx {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegToWidePairs in
+  {
+    let VLMul = evr.RegClass.VLMul in
+    {
+      defm _WV : pseudo_binary<evr.WideRegClass, evr.WideRegClass, evr.RegClass,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+      defm _WX : pseudo_binary<evr.WideRegClass, evr.WideRegClass, GPR,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+    }
+  }
+}
+
 multiclass pseudo_binary_m_vv_vx {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
@@ -810,6 +824,20 @@ multiclass pseudo_binary_w_vv_vf {
       defm _VV : pseudo_binary<evr.WideRegClass, evr.RegClass, evr.RegClass,
                                evr.RegClass.VLMul, "@earlyclobber $rd">;
       defm _VF : pseudo_binary<evr.WideRegClass, evr.RegClass, FPR32,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+    }
+  }
+}
+
+multiclass pseudo_binary_w_wv_wf {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegToWidePairs in
+  {
+    let VLMul = evr.RegClass.VLMul in
+    {
+      defm _WV : pseudo_binary<evr.WideRegClass, evr.WideRegClass, evr.RegClass,
+                               evr.RegClass.VLMul, "@earlyclobber $rd">;
+      defm _WF : pseudo_binary<evr.WideRegClass, evr.WideRegClass, FPR32,
                                evr.RegClass.VLMul, "@earlyclobber $rd">;
     }
   }
@@ -1000,9 +1028,13 @@ defm PseudoVMACC       : pseudo_ternary_v_vv_vx;
 defm PseudoVNMSAC      : pseudo_ternary_v_vv_vx;
 
 defm PseudoVWADDU      : pseudo_binary_w_vv_vx;
+defm PseudoVWADDU      : pseudo_binary_w_wv_wx;
 defm PseudoVWADD       : pseudo_binary_w_vv_vx;
+defm PseudoVWADD       : pseudo_binary_w_wv_wx;
 defm PseudoVWSUBU      : pseudo_binary_w_vv_vx;
+defm PseudoVWSUBU      : pseudo_binary_w_wv_wx;
 defm PseudoVWSUB       : pseudo_binary_w_vv_vx;
+defm PseudoVWSUB       : pseudo_binary_w_wv_wx;
 
 defm PseudoVWMULU      : pseudo_binary_w_vv_vx;
 defm PseudoVWMULSU     : pseudo_binary_w_vv_vx;
@@ -1061,7 +1093,9 @@ defm PseudoVFNMACC     : pseudo_ternary_v_vv_vf;
 defm PseudoVFNMSAC     : pseudo_ternary_v_vv_vf;
 
 defm PseudoVFWADD      : pseudo_binary_w_vv_vf;
+defm PseudoVFWADD      : pseudo_binary_w_wv_wf;
 defm PseudoVFWSUB      : pseudo_binary_w_vv_vf;
+defm PseudoVFWSUB      : pseudo_binary_w_wv_wf;
 defm PseudoVFWMUL      : pseudo_binary_w_vv_vf;
 // FIXME EDIV instructions disabled
 //defm PseudoVFDOT       : pseudo_binary_v_vv;
@@ -1617,6 +1651,25 @@ multiclass pat_intrinsic_binary_int_w_vv_vx<string intrinsic_name,
   }
 }
 
+multiclass pat_intrinsic_binary_int_w_wv_wx<string intrinsic_name,
+                                            string instruction_name>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WV",
+                                wti.Vector, wti.Vector, vti.Vector, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, wti.RegClass,
+                                wti.RegClass, vti.RegClass>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WX",
+                                wti.Vector, wti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, wti.RegClass,
+                                wti.RegClass, GPR>;
+  }
+}
+
 multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
                                                           string instruction_name>
 {
@@ -1823,6 +1876,26 @@ multiclass pat_intrinsic_binary_fp_w_vv_vf<string intrinsic_name,
                                 fwti.Vector, fvti.Vector, fvti.Scalar,
                                 fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
                                 fwti.RegClass, fvti.RegClass,
+                                fvti.ScalarRegClass>;
+  }
+}
+
+multiclass pat_intrinsic_binary_fp_w_wv_wf<string intrinsic_name,
+                                           string instruction_name>
+{
+  foreach fvtiToFWti = AllWideableFloatVectors in
+  {
+    defvar fvti = fvtiToFWti.FVti;
+    defvar fwti = fvtiToFWti.FWti;
+
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WV",
+                                fwti.Vector, fwti.Vector, fvti.Vector,
+                                fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
+                                fwti.RegClass, fwti.RegClass, fvti.RegClass>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WF",
+                                fwti.Vector, fwti.Vector, fvti.Scalar,
+                                fvti.Mask, fvti.SEW, fvti.RegClass.VLMul,
+                                fwti.RegClass, fwti.RegClass,
                                 fvti.ScalarRegClass>;
   }
 }
@@ -2459,15 +2532,13 @@ defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vmacc", "PseudoVMACC">;
 defm "" : pat_intrinsic_ternary_int_v_vv_vx<"int_epi_vnmsac", "PseudoVNMSAC">;
 
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwaddu", "PseudoVWADDU">;
+defm "" : pat_intrinsic_binary_int_w_wv_wx<"int_epi_vwaddu_w", "PseudoVWADDU">;
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwadd", "PseudoVWADD">;
+defm "" : pat_intrinsic_binary_int_w_wv_wx<"int_epi_vwadd_w", "PseudoVWADD">;
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwsubu", "PseudoVWSUBU">;
+defm "" : pat_intrinsic_binary_int_w_wv_wx<"int_epi_vwsubu_w", "PseudoVWSUBU">;
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwsub", "PseudoVWSUB">;
-
-//// FIXME: These patterns are wrong
-//defm "" : pat_intrinsic_binary_int_wv_wx<"int_epi_vwaddu_w", "VWADDU">;
-//defm "" : pat_intrinsic_binary_int_wv_wx<"int_epi_vwadd_w", "VWADD">;
-//defm "" : pat_intrinsic_binary_int_wv_wx<"int_epi_vwsubu_w", "VWSUBU">;
-//defm "" : pat_intrinsic_binary_int_wv_wx<"int_epi_vwsub_w", "VWSUB">;
+defm "" : pat_intrinsic_binary_int_w_wv_wx<"int_epi_vwsub_w", "PseudoVWSUB">;
 
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwmulu", "PseudoVWMULU">;
 defm "" : pat_intrinsic_binary_int_w_vv_vx<"int_epi_vwmulsu", "PseudoVWMULSU">;
@@ -2544,11 +2615,11 @@ defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfmsac", "PseudoVFMSAC">;
 defm "" : pat_intrinsic_ternary_fp_v_vv_vf<"int_epi_vfnmsac", "PseudoVFNMSAC">;
 
 defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwadd", "PseudoVFWADD">;
+defm "" : pat_intrinsic_binary_fp_w_wv_wf<"int_epi_vfwadd_w", "PseudoVFWADD">;
 //defm "" : pat_intrinsic_binary_fp_vs<"int_epi_vfwredsum", "VFWREDSUM">;
 defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwsub", "PseudoVFWSUB">;
+defm "" : pat_intrinsic_binary_fp_w_wv_wf<"int_epi_vfwsub_w", "PseudoVFWSUB">;
 //defm "" : pat_intrinsic_binary_fp_vs<"int_epi_vfwredosum", "VFWREDOSUM">;
-//defm "" : pat_intrinsic_binary_fp_wv_wf<"int_epi_vfwadd_w", "VFWADD">;
-//defm "" : pat_intrinsic_binary_fp_wv_wf<"int_epi_vfwsub_w", "VFWSUB">;
 defm "" : pat_intrinsic_binary_fp_w_vv_vf<"int_epi_vfwmul", "PseudoVFWMUL">;
 // FIXME EDIV patterns disabled
 //defm "" : pat_intrinsic_binary_fp_v_vv<"int_epi_vfdot", "PseudoVFDOT">;
