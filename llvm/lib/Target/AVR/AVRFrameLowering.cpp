@@ -52,7 +52,6 @@ bool AVRFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
 void AVRFrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator MBBI = MBB.begin();
-  CallingConv::ID CallConv = MF.getFunction().getCallingConv();
   DebugLoc DL = (MBBI != MBB.end()) ? MBBI->getDebugLoc() : DebugLoc();
   const AVRSubtarget &STI = MF.getSubtarget<AVRSubtarget>();
   const AVRInstrInfo &TII = *STI.getInstrInfo();
@@ -60,7 +59,7 @@ void AVRFrameLowering::emitPrologue(MachineFunction &MF,
   bool HasFP = hasFP(MF);
 
   // Interrupt handlers re-enable interrupts in function entry.
-  if (AFI->isInterruptHandler() && CallConv != CallingConv::AVR_SIGNAL) {
+  if (AFI->isInterruptHandler()) {
     BuildMI(MBB, MBBI, DL, TII.get(AVR::BSETs))
         .addImm(0x07)
         .setMIFlag(MachineInstr::FrameSetup);
@@ -75,7 +74,7 @@ void AVRFrameLowering::emitPrologue(MachineFunction &MF,
 
   // Emit special prologue code to save R1, R0 and SREG in interrupt/signal
   // handlers before saving any other registers.
-  if (AFI->isInterruptHandler()) {
+  if (AFI->isInterruptOrSignalHandler()) {
     BuildMI(MBB, MBBI, DL, TII.get(AVR::PUSHWRr))
         .addReg(AVR::R1R0, RegState::Kill)
         .setMIFlag(MachineInstr::FrameSetup);
@@ -145,7 +144,7 @@ void AVRFrameLowering::emitEpilogue(MachineFunction &MF,
 
   // Early exit if the frame pointer is not needed in this function except for
   // signal/interrupt handlers where special code generation is required.
-  if (!hasFP(MF) && !AFI->isInterruptHandler()) {
+  if (!hasFP(MF) && !AFI->isInterruptOrSignalHandler()) {
     return;
   }
 
@@ -161,7 +160,7 @@ void AVRFrameLowering::emitEpilogue(MachineFunction &MF,
 
   // Emit special epilogue code to restore R1, R0 and SREG in interrupt/signal
   // handlers at the very end of the function, just before reti.
-  if (AFI->isInterruptHandler()) {
+  if (AFI->isInterruptOrSignalHandler()) {
     BuildMI(MBB, MBBI, DL, TII.get(AVR::POPRd), AVR::R0);
     BuildMI(MBB, MBBI, DL, TII.get(AVR::OUTARr))
         .addImm(0x3f)
