@@ -3563,9 +3563,9 @@ static void RenderDiagnosticsOptions(const Driver &D, const ArgList &Args,
     CmdArgs.push_back("-fno-diagnostics-fixit-info");
 
   // Enable -fdiagnostics-show-option by default.
-  if (Args.hasFlag(options::OPT_fdiagnostics_show_option,
-                   options::OPT_fno_diagnostics_show_option))
-    CmdArgs.push_back("-fdiagnostics-show-option");
+  if (!Args.hasFlag(options::OPT_fdiagnostics_show_option,
+                    options::OPT_fno_diagnostics_show_option, true))
+    CmdArgs.push_back("-fno-diagnostics-show-option");
 
   if (const Arg *A =
           Args.getLastArg(options::OPT_fdiagnostics_show_category_EQ)) {
@@ -4657,9 +4657,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // Decide whether to use verbose asm. Verbose assembly is the default on
   // toolchains which have the integrated assembler on by default.
   bool IsIntegratedAssemblerDefault = TC.IsIntegratedAssemblerDefault();
-  if (Args.hasFlag(options::OPT_fverbose_asm, options::OPT_fno_verbose_asm,
-                   IsIntegratedAssemblerDefault))
-    CmdArgs.push_back("-masm-verbose");
+  if (!Args.hasFlag(options::OPT_fverbose_asm, options::OPT_fno_verbose_asm,
+                    IsIntegratedAssemblerDefault))
+    CmdArgs.push_back("-fno-verbose-asm");
 
   if (!TC.useIntegratedAs())
     CmdArgs.push_back("-no-integrated-as");
@@ -5626,7 +5626,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_fexperimental_new_pass_manager,
                   options::OPT_fno_experimental_new_pass_manager);
 
-  ObjCRuntime Runtime = AddObjCRuntimeArgs(Args, CmdArgs, rewriteKind);
+  ObjCRuntime Runtime = AddObjCRuntimeArgs(Args, Inputs, CmdArgs, rewriteKind);
   RenderObjCOptions(TC, D, RawTriple, Args, Runtime, rewriteKind != RK_None,
                     Input, CmdArgs);
 
@@ -6270,6 +6270,7 @@ Clang::~Clang() {}
 ///
 /// Returns true if the runtime is non-fragile.
 ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
+                                      const InputInfoList &inputs,
                                       ArgStringList &cmdArgs,
                                       RewriteKind rewriteKind) const {
   // Look for the controlling runtime option.
@@ -6393,8 +6394,11 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
       runtime = ObjCRuntime(ObjCRuntime::GCC, VersionTuple());
   }
 
-  cmdArgs.push_back(
-      args.MakeArgString("-fobjc-runtime=" + runtime.getAsString()));
+  if (llvm::any_of(inputs, [](const InputInfo &input) {
+        return types::isObjC(input.getType());
+      }))
+    cmdArgs.push_back(
+        args.MakeArgString("-fobjc-runtime=" + runtime.getAsString()));
   return runtime;
 }
 
