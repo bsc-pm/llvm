@@ -132,6 +132,10 @@ public:
     return ISD::SIGN_EXTEND;
   }
 
+  ISD::NodeType getExtendForAtomicCmpSwapArg() const override {
+    return ISD::SIGN_EXTEND;
+  }
+
   bool shouldExpandShift(SelectionDAG &DAG, SDNode *N) const override {
     if (DAG.getMachineFunction().getFunction().hasMinSize())
       return false;

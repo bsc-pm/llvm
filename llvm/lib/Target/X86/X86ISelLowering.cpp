@@ -8133,11 +8133,11 @@ static SDValue LowerAsSplatVectorLoad(SDValue SrcOp, MVT VT, const SDLoc &dl,
 
     // FIXME: 256-bit vector instructions don't require a strict alignment,
     // improve this code to support it better.
-    unsigned RequiredAlign = VT.getSizeInBits()/8;
+    Align RequiredAlign(VT.getSizeInBits() / 8);
     SDValue Chain = LD->getChain();
     // Make sure the stack object alignment is at least 16 or 32.
     MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
-    if (DAG.InferPtrAlignment(Ptr) < RequiredAlign) {
+    if (DAG.InferPtrAlign(Ptr) < RequiredAlign) {
       if (MFI.isFixedObjectIndex(FI)) {
         // Can't change the alignment. FIXME: It's possible to compute
         // the exact stack offset and reference FI + adjust offset instead.
@@ -8152,9 +8152,9 @@ static SDValue LowerAsSplatVectorLoad(SDValue SrcOp, MVT VT, const SDLoc &dl,
     // Ptr + (Offset & ~15).
     if (Offset < 0)
       return SDValue();
-    if ((Offset % RequiredAlign) & 3)
+    if ((Offset % RequiredAlign.value()) & 3)
       return SDValue();
-    int64_t StartOffset = Offset & ~int64_t(RequiredAlign - 1);
+    int64_t StartOffset = Offset & ~int64_t(RequiredAlign.value() - 1);
     if (StartOffset) {
       SDLoc DL(Ptr);
       Ptr = DAG.getNode(ISD::ADD, DL, Ptr.getValueType(), Ptr,
@@ -11328,20 +11328,21 @@ static int canLowerByDroppingEvenElements(ArrayRef<int> Mask,
 
 // X86 has dedicated pack instructions that can handle specific truncation
 // operations: PACKSS and PACKUS.
+// TODO: Add support for matching multiple PACKSS/PACKUS stages.
 static bool matchShuffleWithPACK(MVT VT, MVT &SrcVT, SDValue &V1, SDValue &V2,
                                  unsigned &PackOpcode, ArrayRef<int> TargetMask,
                                  SelectionDAG &DAG,
                                  const X86Subtarget &Subtarget) {
   unsigned NumElts = VT.getVectorNumElements();
   unsigned BitSize = VT.getScalarSizeInBits();
-  MVT PackSVT = MVT::getIntegerVT(BitSize * 2);
-  MVT PackVT = MVT::getVectorVT(PackSVT, NumElts / 2);
 
-  auto MatchPACK = [&](SDValue N1, SDValue N2) {
+  auto MatchPACK = [&](SDValue N1, SDValue N2, MVT PackVT) {
+    unsigned NumSrcBits = PackVT.getScalarSizeInBits();
+    unsigned NumPackedBits = NumSrcBits - BitSize;
     SDValue VV1 = DAG.getBitcast(PackVT, N1);
     SDValue VV2 = DAG.getBitcast(PackVT, N2);
-    if (Subtarget.hasSSE41() || PackSVT == MVT::i16) {
-      APInt ZeroMask = APInt::getHighBitsSet(BitSize * 2, BitSize);
+    if (Subtarget.hasSSE41() || BitSize == 8) {
+      APInt ZeroMask = APInt::getHighBitsSet(NumSrcBits, NumPackedBits);
       if ((N1.isUndef() || DAG.MaskedValueIsZero(VV1, ZeroMask)) &&
           (N2.isUndef() || DAG.MaskedValueIsZero(VV2, ZeroMask))) {
         V1 = VV1;
@@ -11351,8 +11352,8 @@ static bool matchShuffleWithPACK(MVT VT, MVT &SrcVT, SDValue &V1, SDValue &V2,
         return true;
       }
     }
-    if ((N1.isUndef() || DAG.ComputeNumSignBits(VV1) > BitSize) &&
-        (N2.isUndef() || DAG.ComputeNumSignBits(VV2) > BitSize)) {
+    if ((N1.isUndef() || DAG.ComputeNumSignBits(VV1) > NumPackedBits) &&
+        (N2.isUndef() || DAG.ComputeNumSignBits(VV2) > NumPackedBits)) {
       V1 = VV1;
       V2 = VV2;
       SrcVT = PackVT;
@@ -11362,18 +11363,21 @@ static bool matchShuffleWithPACK(MVT VT, MVT &SrcVT, SDValue &V1, SDValue &V2,
     return false;
   };
 
+  MVT PackSVT = MVT::getIntegerVT(BitSize * 2);
+  MVT PackVT = MVT::getVectorVT(PackSVT, NumElts / 2);
+
   // Try binary shuffle.
   SmallVector<int, 32> BinaryMask;
   createPackShuffleMask(VT, BinaryMask, false);
   if (isTargetShuffleEquivalent(TargetMask, BinaryMask, V1, V2))
-    if (MatchPACK(V1, V2))
+    if (MatchPACK(V1, V2, PackVT))
       return true;
 
   // Try unary shuffle.
   SmallVector<int, 32> UnaryMask;
   createPackShuffleMask(VT, UnaryMask, true);
   if (isTargetShuffleEquivalent(TargetMask, UnaryMask, V1))
-    if (MatchPACK(V1, V1))
+    if (MatchPACK(V1, V1, PackVT))
       return true;
 
   return false;
@@ -39832,13 +39836,19 @@ static SDValue combinePTESTCC(SDValue EFLAGS, X86::CondCode &CC,
     }
   }
 
-  // TODO: TESTZ(X,~Y) == TESTC(Y,X)
-
-  // TESTZ(X,-1) == TESTZ(X,X)
-  // TESTZ(-1,X) == TESTZ(X,X)
   if (CC == X86::COND_E || CC == X86::COND_NE) {
+    // TESTZ(X,~Y) == TESTC(Y,X)
+    if (SDValue NotOp1 = IsNOT(Op1, DAG)) {
+      CC = (CC == X86::COND_E ? X86::COND_B : X86::COND_AE);
+      return DAG.getNode(EFLAGS.getOpcode(), SDLoc(EFLAGS), VT,
+                         DAG.getBitcast(OpVT, NotOp1), Op0);
+    }
+
+    // TESTZ(-1,X) == TESTZ(X,X)
     if (ISD::isBuildVectorAllOnes(Op0.getNode()))
       return DAG.getNode(EFLAGS.getOpcode(), SDLoc(EFLAGS), VT, Op1, Op1);
+
+    // TESTZ(X,-1) == TESTZ(X,X)
     if (ISD::isBuildVectorAllOnes(Op1.getNode()))
       return DAG.getNode(EFLAGS.getOpcode(), SDLoc(EFLAGS), VT, Op0, Op0);
   }
