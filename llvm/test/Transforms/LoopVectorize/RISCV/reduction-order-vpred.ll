@@ -27,6 +27,38 @@ define internal i64 @foo(i32* %t0) !prof !1 {
 ; NO-PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; NO-PRED-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], undef
 ; NO-PRED-NEXT:    br i1 [[TMP6]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !prof !1, !llvm.loop !2
+; NO-PRED:       middle.block:
+; NO-PRED-NEXT:    [[RDX_SHUF4:%.*]] = shufflevector <4 x i32> [[TMP5]], <4 x i32> undef, <4 x i32> <i32 2, i32 3, i32 undef, i32 undef>
+; NO-PRED-NEXT:    [[BIN_RDX5:%.*]] = add <4 x i32> [[TMP5]], [[RDX_SHUF4]]
+; NO-PRED-NEXT:    [[RDX_SHUF6:%.*]] = shufflevector <4 x i32> [[BIN_RDX5]], <4 x i32> undef, <4 x i32> <i32 1, i32 undef, i32 undef, i32 undef>
+; NO-PRED-NEXT:    [[BIN_RDX7:%.*]] = add <4 x i32> [[BIN_RDX5]], [[RDX_SHUF6]]
+; NO-PRED-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[BIN_RDX7]], i32 0
+; NO-PRED-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x i32> [[TMP4]], <4 x i32> undef, <4 x i32> <i32 2, i32 3, i32 undef, i32 undef>
+; NO-PRED-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[TMP4]], [[RDX_SHUF]]
+; NO-PRED-NEXT:    [[RDX_SHUF2:%.*]] = shufflevector <4 x i32> [[BIN_RDX]], <4 x i32> undef, <4 x i32> <i32 1, i32 undef, i32 undef, i32 undef>
+; NO-PRED-NEXT:    [[BIN_RDX3:%.*]] = add <4 x i32> [[BIN_RDX]], [[RDX_SHUF2]]
+; NO-PRED-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[BIN_RDX3]], i32 0
+; NO-PRED-NEXT:    br i1 true, label [[T17:%.*]], label [[SCALAR_PH]]
+; NO-PRED:       scalar.ph:
+; NO-PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ undef, [[MIDDLE_BLOCK]] ], [ 0, [[T16:%.*]] ]
+; NO-PRED-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ 0, [[T16]] ], [ [[TMP8]], [[MIDDLE_BLOCK]] ]
+; NO-PRED-NEXT:    [[BC_MERGE_RDX8:%.*]] = phi i32 [ 0, [[T16]] ], [ [[TMP7]], [[MIDDLE_BLOCK]] ]
+; NO-PRED-NEXT:    br label [[T20:%.*]]
+; NO-PRED:       t17:
+; NO-PRED-NEXT:    [[T18:%.*]] = phi i32 [ [[T24:%.*]], [[T20]] ], [ [[TMP7]], [[MIDDLE_BLOCK]] ]
+; NO-PRED-NEXT:    [[T19:%.*]] = phi i32 [ [[T28:%.*]], [[T20]] ], [ [[TMP8]], [[MIDDLE_BLOCK]] ]
+; NO-PRED-NEXT:    br label [[T31:%.*]]
+; NO-PRED:       t20:
+; NO-PRED-NEXT:    [[T21:%.*]] = phi i64 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[T29:%.*]], [[T20]] ]
+; NO-PRED-NEXT:    [[T22:%.*]] = phi i32 [ [[BC_MERGE_RDX]], [[SCALAR_PH]] ], [ [[T28]], [[T20]] ]
+; NO-PRED-NEXT:    [[T23:%.*]] = phi i32 [ [[BC_MERGE_RDX8]], [[SCALAR_PH]] ], [ [[T24]], [[T20]] ]
+; NO-PRED-NEXT:    [[T24]] = add i32 3, [[T23]]
+; NO-PRED-NEXT:    [[T28]] = add i32 [[T22]], 5
+; NO-PRED-NEXT:    [[T29]] = add nuw nsw i64 [[T21]], 1
+; NO-PRED-NEXT:    [[T30:%.*]] = icmp eq i64 [[T29]], undef
+; NO-PRED-NEXT:    br i1 [[T30]], label [[T17]], label [[T20]], !prof !4, !llvm.loop !5
+; NO-PRED:       t31:
+; NO-PRED-NEXT:    ret i64 undef
 ;
 ; PRED-LABEL: @foo(
 ; PRED-NEXT:  t16:
@@ -46,32 +78,55 @@ define internal i64 @foo(i32* %t0) !prof !1 {
 ; PRED-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <vscale x 2 x i32> [[BROADCAST_SPLATINSERT5]], <vscale x 2 x i32> undef, <vscale x 2 x i32> zeroinitializer
 ; PRED-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <vscale x 2 x i32> undef, i32 5, i32 0
 ; PRED-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <vscale x 2 x i32> [[BROADCAST_SPLATINSERT7]], <vscale x 2 x i32> undef, <vscale x 2 x i32> zeroinitializer
-; PRED-NEXT:    [[IDENT_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i32> undef, i32 0, i32 0
-; PRED-NEXT:    [[IDENT_SPLAT:%.*]] = shufflevector <vscale x 2 x i32> [[IDENT_SPLATINSERT]], <vscale x 2 x i32> undef, <vscale x 2 x i32> zeroinitializer
-; PRED-NEXT:    [[TMP3:%.*]] = insertelement <vscale x 2 x i32> [[IDENT_SPLAT]], i32 0, i32 0
-; PRED-NEXT:    [[IDENT_SPLATINSERT9:%.*]] = insertelement <vscale x 2 x i32> undef, i32 0, i32 0
-; PRED-NEXT:    [[IDENT_SPLAT10:%.*]] = shufflevector <vscale x 2 x i32> [[IDENT_SPLATINSERT9]], <vscale x 2 x i32> undef, <vscale x 2 x i32> zeroinitializer
-; PRED-NEXT:    [[TMP4:%.*]] = insertelement <vscale x 2 x i32> [[IDENT_SPLAT10]], i32 0, i32 0
+; PRED-NEXT:    [[TMP3:%.*]] = insertelement <vscale x 2 x i32> zeroinitializer, i32 0, i32 0
+; PRED-NEXT:    [[TMP4:%.*]] = insertelement <vscale x 2 x i32> zeroinitializer, i32 0, i32 0
 ; PRED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; PRED:       vector.body:
 ; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; PRED-NEXT:    [[VEC_PHI:%.*]] = phi <vscale x 2 x i32> [ [[TMP3]], [[VECTOR_PH]] ], [ [[TMP8:%.*]], [[VECTOR_BODY]] ]
-; PRED-NEXT:    [[VEC_PHI2:%.*]] = phi <vscale x 2 x i32> [ [[TMP4]], [[VECTOR_PH]] ], [ [[TMP7:%.*]], [[VECTOR_BODY]] ]
+; PRED-NEXT:    [[VEC_PHI:%.*]] = phi <vscale x 2 x i32> [ [[TMP3]], [[VECTOR_PH]] ], [ [[VP_OP9:%.*]], [[VECTOR_BODY]] ]
+; PRED-NEXT:    [[VEC_PHI2:%.*]] = phi <vscale x 2 x i32> [ [[TMP4]], [[VECTOR_PH]] ], [ [[VP_OP:%.*]], [[VECTOR_BODY]] ]
 ; PRED-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> undef, i64 [[INDEX]], i32 0
 ; PRED-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> undef, <vscale x 2 x i32> zeroinitializer
 ; PRED-NEXT:    [[STEPVEC_BASE:%.*]] = call <vscale x 2 x i64> @llvm.experimental.vector.stepvector.nxv2i64()
 ; PRED-NEXT:    [[INDUCTION:%.*]] = add <vscale x 2 x i64> [[BROADCAST_SPLAT]], [[STEPVEC_BASE]]
 ; PRED-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 0
 ; PRED-NEXT:    [[TMP6:%.*]] = icmp ule <vscale x 2 x i64> [[INDUCTION]], [[BROADCAST_SPLAT4]]
-; PRED-NEXT:    [[TMP7]] = add <vscale x 2 x i32> [[BROADCAST_SPLAT6]], [[VEC_PHI2]]
-; PRED-NEXT:    [[TMP8]] = add <vscale x 2 x i32> [[VEC_PHI]], [[BROADCAST_SPLAT8]]
-; PRED-NEXT:    [[TMP9:%.*]] = select <vscale x 2 x i1> [[TMP6]], <vscale x 2 x i32> [[TMP8]], <vscale x 2 x i32> [[VEC_PHI]]
-; PRED-NEXT:    [[TMP10:%.*]] = select <vscale x 2 x i1> [[TMP6]], <vscale x 2 x i32> [[TMP7]], <vscale x 2 x i32> [[VEC_PHI2]]
-; PRED-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vscale.i64()
-; PRED-NEXT:    [[INDEX_VSCALE:%.*]] = mul i64 [[TMP11]], 2
+; PRED-NEXT:    [[TMP7:%.*]] = call i64 @llvm.epi.vsetvlmax(i64 2, i64 0)
+; PRED-NEXT:    [[TMP8:%.*]] = trunc i64 [[TMP7]] to i32
+; PRED-NEXT:    [[VP_OP]] = call <vscale x 2 x i32> @llvm.vp.add.nxv2i32(<vscale x 2 x i32> [[BROADCAST_SPLAT6]], <vscale x 2 x i32> [[VEC_PHI2]], <vscale x 2 x i1> [[TMP6]], i32 [[TMP8]])
+; PRED-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP7]] to i32
+; PRED-NEXT:    [[VP_OP9]] = call <vscale x 2 x i32> @llvm.vp.add.nxv2i32(<vscale x 2 x i32> [[VEC_PHI]], <vscale x 2 x i32> [[BROADCAST_SPLAT8]], <vscale x 2 x i1> [[TMP6]], i32 [[TMP9]])
+; PRED-NEXT:    [[TMP10:%.*]] = select <vscale x 2 x i1> [[TMP6]], <vscale x 2 x i32> [[VP_OP9]], <vscale x 2 x i32> [[VEC_PHI]]
+; PRED-NEXT:    [[TMP11:%.*]] = select <vscale x 2 x i1> [[TMP6]], <vscale x 2 x i32> [[VP_OP]], <vscale x 2 x i32> [[VEC_PHI2]]
+; PRED-NEXT:    [[TMP12:%.*]] = call i64 @llvm.vscale.i64()
+; PRED-NEXT:    [[INDEX_VSCALE:%.*]] = mul i64 [[TMP12]], 2
 ; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[INDEX_VSCALE]]
-; PRED-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; PRED-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !prof !1, !llvm.loop !2
+; PRED-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; PRED-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !prof !1, !llvm.loop !2
+; PRED:       middle.block:
+; PRED-NEXT:    [[TMP14:%.*]] = call i32 @llvm.experimental.vector.reduce.add.nxv2i32(<vscale x 2 x i32> [[TMP11]])
+; PRED-NEXT:    [[TMP15:%.*]] = call i32 @llvm.experimental.vector.reduce.add.nxv2i32(<vscale x 2 x i32> [[TMP10]])
+; PRED-NEXT:    br i1 true, label [[T17:%.*]], label [[SCALAR_PH]]
+; PRED:       scalar.ph:
+; PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[T16:%.*]] ]
+; PRED-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ 0, [[T16]] ], [ [[TMP15]], [[MIDDLE_BLOCK]] ]
+; PRED-NEXT:    [[BC_MERGE_RDX10:%.*]] = phi i32 [ 0, [[T16]] ], [ [[TMP14]], [[MIDDLE_BLOCK]] ]
+; PRED-NEXT:    br label [[T20:%.*]]
+; PRED:       t17:
+; PRED-NEXT:    [[T18:%.*]] = phi i32 [ [[T24:%.*]], [[T20]] ], [ [[TMP14]], [[MIDDLE_BLOCK]] ]
+; PRED-NEXT:    [[T19:%.*]] = phi i32 [ [[T28:%.*]], [[T20]] ], [ [[TMP15]], [[MIDDLE_BLOCK]] ]
+; PRED-NEXT:    br label [[T31:%.*]]
+; PRED:       t20:
+; PRED-NEXT:    [[T21:%.*]] = phi i64 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[T29:%.*]], [[T20]] ]
+; PRED-NEXT:    [[T22:%.*]] = phi i32 [ [[BC_MERGE_RDX]], [[SCALAR_PH]] ], [ [[T28]], [[T20]] ]
+; PRED-NEXT:    [[T23:%.*]] = phi i32 [ [[BC_MERGE_RDX10]], [[SCALAR_PH]] ], [ [[T24]], [[T20]] ]
+; PRED-NEXT:    [[T24]] = add i32 3, [[T23]]
+; PRED-NEXT:    [[T28]] = add i32 [[T22]], 5
+; PRED-NEXT:    [[T29]] = add nuw nsw i64 [[T21]], 1
+; PRED-NEXT:    [[T30:%.*]] = icmp eq i64 [[T29]], undef
+; PRED-NEXT:    br i1 [[T30]], label [[T17]], label [[T20]], !prof !4, !llvm.loop !5
+; PRED:       t31:
+; PRED-NEXT:    ret i64 undef
 ;
 t16:
   br label %t20

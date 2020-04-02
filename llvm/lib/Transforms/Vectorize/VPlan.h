@@ -827,8 +827,6 @@ public:
 
 class VPPredicatedWidenRecipe : public VPRecipeBase {
 private:
-  // TODO: For now keep a separate recipe for each instruction, instead of
-  // clubbing them together in a single recipe as is done in VPWidenRecipe.
   Instruction &Instr;
   VPUser PredInfo;
 
@@ -1260,10 +1258,16 @@ private:
   VPUser PredInfo;
 
 public:
-  VPPredicatedWidenMemoryInstructionRecipe(Instruction &Instr, VPValue *Addr,
+  VPPredicatedWidenMemoryInstructionRecipe(LoadInst &Load, VPValue *Addr,
                                            VPValue *Mask, VPValue *EVL)
-      : VPRecipeBase(VPPredicatedWidenMemoryInstructionSC), Instr(Instr),
+      : VPRecipeBase(VPPredicatedWidenMemoryInstructionSC), Instr(Load),
         User({Addr}), PredInfo({Mask, EVL}) {}
+
+  VPPredicatedWidenMemoryInstructionRecipe(StoreInst &Store, VPValue *Addr,
+                                           VPValue *StoredValue, VPValue *Mask,
+                                           VPValue *EVL)
+      : VPRecipeBase(VPWidenMemoryInstructionSC), Instr(Store),
+        User({Addr, StoredValue}), PredInfo({Mask, EVL}) {}
 
   /// Method to support type inquiry through isa, cast, and dyn_cast.
   static inline bool classof(const VPRecipeBase *V) {
@@ -1281,6 +1285,13 @@ public:
 
   /// Return the EVL used by this recipe.
   VPValue *getEVL() const { return PredInfo.getOperand(1); }
+
+  /// Return the address accessed by this recipe.
+  VPValue *getStoredValue() const {
+    assert(isa<StoreInst>(Instr) &&
+           "Stored value only available for store instructions");
+    return User.getOperand(1); // Stored value is the 2nd, mandatory operand.
+  }
 
   /// Generate the wide load/store.
   void execute(VPTransformState &State) override;

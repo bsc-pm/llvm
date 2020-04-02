@@ -3985,7 +3985,7 @@ void InnerLoopVectorizer::fixReduction(PHINode *Phi) {
       // incoming scalar reduction.
       VectorStart = ReductionStartValue;
     } else {
-      Identity = ConstantVector::getSplat({VF, true}, Iden);
+      Identity = ConstantVector::getSplat({VF, isScalable()}, Iden);
 
       // This vector is the Identity vector where the first element is the
       // incoming scalar reduction.
@@ -7376,7 +7376,14 @@ VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
   if (Mask && Legal->preferPredicatedVectorOps()) {
     VPValue *EVL = getOrCreateEVL(I, Plan);
     VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
-    return new VPPredicatedWidenMemoryInstructionRecipe(*I, Addr, Mask, EVL);
+    if (LoadInst *Load = dyn_cast<LoadInst>(I))
+      return new VPPredicatedWidenMemoryInstructionRecipe(*Load, Addr, Mask,
+                                                          EVL);
+
+    StoreInst *Store = cast<StoreInst>(I);
+    VPValue *StoredValue = Plan->getOrAddVPValue(Store->getValueOperand());
+    return new VPPredicatedWidenMemoryInstructionRecipe(*Store, Addr,
+                                                        StoredValue, Mask, EVL);
   }
   return nullptr;
 }
@@ -7971,6 +7978,10 @@ void VPWidenRecipe::execute(VPTransformState &State) {
   State.ILV->widenInstruction(Ingredient, User, State);
 }
 
+void VPPredicatedWidenRecipe::execute(VPTransformState &State) {
+  State.ILV->widenPredicatedInstruction(Instr, State, getMask(), getEVL());
+}
+
 void VPWidenGEPRecipe::execute(VPTransformState &State) {
   State.ILV->widenGEP(GEP, State.UF, State.VF, IsPtrLoopInvariant,
                       IsIndexLoopInvariant);
@@ -8120,8 +8131,9 @@ void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
 
 void VPPredicatedWidenMemoryInstructionRecipe::execute(
     VPTransformState &State) {
-  State.ILV->vectorizeMemoryInstruction(&Instr, State, getAddr(), getMask(),
-                                        getEVL());
+  VPValue *StoredValue = isa<StoreInst>(Instr) ? getStoredValue() : nullptr;
+  State.ILV->vectorizeMemoryInstruction(&Instr, State, getAddr(), StoredValue,
+                                        getMask(), getEVL());
 }
 
 // Determine how to lower the scalar epilogue, which depends on 1) optimising
