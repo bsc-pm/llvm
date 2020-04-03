@@ -1670,6 +1670,31 @@ multiclass pat_intrinsic_binary_int_w_wv_wx<string intrinsic_name,
   }
 }
 
+// This is the narrowing form.
+multiclass pat_intrinsic_binary_int_v_wv_wx_wi<string intrinsic_name,
+                                               string instruction_name,
+                                               Operand imm_type = simm5>
+{
+  foreach vtiToWti = AllWideableIntVectors in
+  {
+    defvar vti = vtiToWti.Vti;
+    defvar wti = vtiToWti.Wti;
+
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WV",
+                                vti.Vector, wti.Vector, vti.Vector, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, vti.RegClass,
+                                wti.RegClass, vti.RegClass>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WX",
+                                vti.Vector, wti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, vti.RegClass,
+                                wti.RegClass, GPR>;
+    defm : pat_intrinsic_binary<intrinsic_name, instruction_name, "WI",
+                                vti.Vector, wti.Vector, XLenVT, vti.Mask,
+                                vti.SEW, vti.RegClass.VLMul, vti.RegClass,
+                                wti.RegClass, imm_type>;
+  }
+}
+
 multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
                                                           string instruction_name>
 {
@@ -2426,9 +2451,10 @@ defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vssra", "PseudoVSSRA", ui
 
 defm "" : pat_intrinsic_binary_int_v_vvm_vxm_vim<"int_epi_vmerge", "PseudoVMERGE">;
 
+defm "" : pat_intrinsic_binary_int_v_wv_wx_wi<"int_epi_vnsrl", "PseudoVNSRL", uimm5>;
+defm "" : pat_intrinsic_binary_int_v_wv_wx_wi<"int_epi_vnsra", "PseudoVNSRA", uimm5>;
+
 //// FIXME: These patterns are wrong
-//defm "" : pat_intrinsic_binary_int_vv_vx_vi<"int_epi_vnsrl", "VNSRL", uimm5>;
-//defm "" : pat_intrinsic_binary_int_vv_vx_vi<"int_epi_vnsra", "VNSRA", uimm5>;
 //defm "" : pat_intrinsic_binary_int_vv_vx_vi<"int_epi_vnclipu", "VNCLIPU", uimm5>;
 //defm "" : pat_intrinsic_binary_int_vv_vx_vi<"int_epi_vnclip", "VNCLIP", uimm5>;
 

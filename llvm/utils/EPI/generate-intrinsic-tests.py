@@ -1945,8 +1945,8 @@ intrinsics = [
         BinaryIntrinsic("vsrl", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
         BinaryIntrinsic("vsra", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
 
-        # BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
-        # BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
+        BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
+        BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
 
         BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
         BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
