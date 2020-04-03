@@ -84,7 +84,7 @@ def generate_binary_integer_types_widened_rhs():
         yield IntrinsicType(integer_types[i + 1], \
                 [integer_types[i + 1], integer_types[i]])
 
-def generate_binary_integer_types_narrowed():
+def generate_binary_integer_types_narrowed_lhs():
     for i in range(0, len(integer_types) - 1):
         yield IntrinsicType(integer_types[i], \
                 [integer_types[i + 1], integer_types[i]])
@@ -1114,7 +1114,7 @@ entry:
 
 class BinaryIntrinsic(Intrinsic):
     pattern_vv = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.nxv${rhs_type_scale}${value_rhs_type}(
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
   i64);
@@ -1124,7 +1124,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, {{v[0-9]+}}
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
     i64 undef)
@@ -1136,7 +1136,7 @@ entry:
 }
 """
     pattern_vv_mask = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.nxv${rhs_type_scale}${value_rhs_type}(
   <vscale x ${result_type_scale} x ${llvm_result_type}>,
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
@@ -1148,7 +1148,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, {{v[0-9]+}}, v0.t
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
@@ -1162,7 +1162,7 @@ entry:
 }
 """
     pattern_vx = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   ${llvm_rhs_type},
   i64);
@@ -1172,7 +1172,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, ${scalar_register}
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
     i64 undef)
@@ -1184,7 +1184,7 @@ entry:
 }
 """
     pattern_vx_mask = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
   <vscale x ${result_type_scale} x ${llvm_result_type}>,
   <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
   ${llvm_rhs_type},
@@ -1196,7 +1196,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, ${scalar_register}, v0.t
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
@@ -1215,7 +1215,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, 9
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
     i64 undef)
@@ -1232,7 +1232,7 @@ entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_mask_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
 ; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, 9, v0.t
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
+  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.mask.nxv${result_type_scale}${value_result_type}${vector_value_lhs_type}.${value_rhs_type}(
     <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
@@ -1248,6 +1248,8 @@ entry:
 
     def __init__(self, intr_name, type_generator, **extra_info):
         self.generates_mask = extra_info.get("generates_mask", False)
+        self.is_widening = extra_info.get("widening", False)
+        self.is_narrowing = extra_info.get("narrowing", False)
         super(BinaryIntrinsic, self).__init__(intr_name, type_generator, **extra_info)
 
     def get_template(self, variant):
@@ -1260,7 +1262,7 @@ entry:
             result += BinaryIntrinsic.pattern_vx
             if self.mask:
                 result += BinaryIntrinsic.pattern_vx_mask
-        elif variant == "vi":
+        elif variant in ["vi", "wi"]:
             result += BinaryIntrinsic.pattern_vi
             if self.mask:
                 result += BinaryIntrinsic.pattern_vi_mask
@@ -1292,6 +1294,8 @@ entry:
                 subs["llvm_rhs_type"] = rhs.llvm_type
                 subs["value_lhs_type"] = lhs.value_type
                 subs["value_rhs_type"] = rhs.value_type
+
+                subs["vector_value_lhs_type"] = ""
 
                 if v in ["vf", "wf"]:
                     subs["scalar_register"] = "ft0"
@@ -1356,6 +1360,9 @@ entry:
                                         subs["llvm_result_type"], \
                                         subs["result_type_scale"], \
                                         subs["llvm_store_type"])
+
+                    if self.is_widening or self.is_narrowing:
+                        subs["vector_value_lhs_type"] = ".nxv{}{}".format(subs["lhs_type_scale"], subs["value_lhs_type"])
 
                     print template.substitute(subs)
 
@@ -1866,6 +1873,7 @@ vv_vx_vi = ["vv", "vx", "vi"]
 vvm_vxm_vim = ["vvm", "vxm", "vim"]
 vv_vx = ["vv", "vx"]
 wv_wx = ["wv", "wx"]
+wv_wx_wi = ["wv", "wx", "wi"]
 vx_vi = ["vx", "vi"]
 vv_vf = ["vv", "vf"]
 wv_wf = ["wv", "wf"]
@@ -1917,14 +1925,14 @@ intrinsics = [
 
         BinaryIntrinsic("vrsub", type_generator = generate_binary_integer_types, variants = vx_vi),
 
-        BinaryIntrinsic("vwaddu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
-        BinaryIntrinsic("vwadd", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
+        BinaryIntrinsic("vwaddu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
+        BinaryIntrinsic("vwadd", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
 
         BinaryIntrinsic("vwaddu.w", type_generator = generate_binary_integer_types_widened_rhs, variants = wv_wx, instruction = "vwaddu", vlmul_values = [1, 2, 4]),
         BinaryIntrinsic("vwadd.w", type_generator = generate_binary_integer_types_widened_rhs, variants = wv_wx, instruction = "vwadd", vlmul_values = [1, 2, 4]),
 
-        BinaryIntrinsic("vwsubu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
-        BinaryIntrinsic("vwsub", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
+        BinaryIntrinsic("vwsubu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
+        BinaryIntrinsic("vwsub", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
 
         BinaryIntrinsic("vwsubu.w", type_generator = generate_binary_integer_types_widened_rhs, variants = wv_wx, instruction = "vwsubu", vlmul_values = [1, 2, 4]),
         BinaryIntrinsic("vwsub.w", type_generator = generate_binary_integer_types_widened_rhs, variants = wv_wx, instruction = "vwsub", vlmul_values = [1, 2, 4]),
@@ -1937,8 +1945,8 @@ intrinsics = [
         BinaryIntrinsic("vsrl", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
         BinaryIntrinsic("vsra", type_generator = generate_binary_integer_types, variants = vv_vx_vi),
 
-        #BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed, variants = vv_vx_vi),
-        #BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed, variants = vv_vx_vi),
+        # BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
+        # BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
 
         BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
         BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
@@ -1961,9 +1969,9 @@ intrinsics = [
         BinaryIntrinsic("vmulhu", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vmulhsu", type_generator = generate_binary_integer_types, variants = vv_vx),
 
-        BinaryIntrinsic("vwmul", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
-        BinaryIntrinsic("vwmulu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
-        BinaryIntrinsic("vwmulsu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4]),
+        BinaryIntrinsic("vwmul", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
+        BinaryIntrinsic("vwmulu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
+        BinaryIntrinsic("vwmulsu", type_generator = generate_binary_integer_types_widened, variants = vv_vx, vlmul_values = [1, 2, 4], widening = True),
 
         BinaryIntrinsic("vdivu", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vdiv", type_generator = generate_binary_integer_types, variants = vv_vx),
@@ -1990,8 +1998,8 @@ intrinsics = [
 
         BinaryIntrinsic("vfadd", type_generator = generate_binary_float_types, variants = vv_vf),
         BinaryIntrinsic("vfsub", type_generator = generate_binary_float_types, variants = vv_vf),
-        BinaryIntrinsic("vfwadd", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4]),
-        BinaryIntrinsic("vfwsub", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4]),
+        BinaryIntrinsic("vfwadd", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4], widening = True),
+        BinaryIntrinsic("vfwsub", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4], widening = True),
 
         BinaryIntrinsic("vfwadd.w", type_generator = generate_binary_float_types_widened_rhs, variants = wv_wf, instruction = "vfwadd", vlmul_values = [1, 2, 4]),
         BinaryIntrinsic("vfwsub.w", type_generator = generate_binary_float_types_widened_rhs, variants = wv_wf, instruction = "vfwsub", vlmul_values = [1, 2, 4]),
@@ -2000,7 +2008,7 @@ intrinsics = [
         BinaryIntrinsic("vfdiv", type_generator = generate_binary_float_types, variants = vv_vf),
         BinaryIntrinsic("vfrdiv", type_generator = generate_binary_float_types, variants = vf),
 
-        BinaryIntrinsic("vfwmul", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4]),
+        BinaryIntrinsic("vfwmul", type_generator = generate_binary_float_types_widened, variants = vv_vf, vlmul_values = [1, 2, 4], widening = True),
 
         BinaryIntrinsic("vfmin", type_generator = generate_binary_float_types, variants = vv_vf),
         BinaryIntrinsic("vfmax", type_generator = generate_binary_float_types, variants = vv_vf),
