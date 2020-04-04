@@ -24,7 +24,7 @@ ThreadPlan::ThreadPlan(ThreadPlanKind kind, const char *name, Thread &thread,
     : m_process(*thread.GetProcess().get()), m_tid(thread.GetID()),
       m_stop_vote(stop_vote), m_run_vote(run_vote),
       m_takes_iteration_count(false), m_could_not_resolve_hw_bp(false),
-      m_kind(kind), m_thread(&thread), m_name(name), m_plan_complete_mutex(),
+      m_thread(&thread), m_kind(kind), m_name(name), m_plan_complete_mutex(),
       m_cached_plan_explains_stop(eLazyBoolCalculate), m_plan_complete(false),
       m_plan_private(false), m_okay_to_discard(true), m_is_master_plan(false),
       m_plan_succeeded(true) {
@@ -240,7 +240,7 @@ bool ThreadPlanNull::DoPlanExplainsStop(Event *event_ptr) {
   fprintf(stderr,
           "error: %s called on thread that has been destroyed (tid = 0x%" PRIx64
           ", ptid = 0x%" PRIx64 ")",
-          LLVM_PRETTY_FUNCTION, m_thread.GetID(), m_thread.GetProtocolID());
+          LLVM_PRETTY_FUNCTION, GetThread().GetID(), GetThread().GetProtocolID());
 #else
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_THREAD));
   if (log)
