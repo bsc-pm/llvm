@@ -293,9 +293,15 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   // Effectively disable jump table generation.
   setMinimumJumpTableEntries(INT_MAX);
 
-  // EPI intrinsics may have illegal operands/results
+  // EPI & VPred intrinsics may have illegal operands/results
   for (auto VT : {MVT::i1, MVT::i8, MVT::i16, MVT::i32, MVT::nxv1i32}) {
     setOperationAction(ISD::INTRINSIC_WO_CHAIN, VT, Custom);
+  }
+
+  // VPred intrinsics may have illegal operands/results
+  for (auto VT : {MVT::i32}) {
+    setOperationAction(ISD::INTRINSIC_W_CHAIN, VT, Custom);
+    setOperationAction(ISD::INTRINSIC_VOID, VT, Custom);
   }
 
   if (Subtarget.hasStdExtV()) {
@@ -594,6 +600,15 @@ SDValue RISCVTargetLowering::lowerSIGN_EXTEND_INREG(SDValue Op,
   return SextInreg;
 }
 
+void RISCVTargetLowering::LowerOperationWrapper(
+    SDNode *N, SmallVectorImpl<SDValue> &Results, SelectionDAG &DAG) const {
+  SDValue Result = LowerOperation(SDValue(N, 0), DAG);
+
+  if (Result)
+    for (unsigned I = 0, E = Result->getNumValues(); I != E; ++I)
+      Results.push_back(Result.getValue(I));
+}
+
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
@@ -634,6 +649,10 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
   }
   case ISD::INTRINSIC_WO_CHAIN:
     return LowerINTRINSIC_WO_CHAIN(Op, DAG);
+  case ISD::INTRINSIC_W_CHAIN:
+    return LowerINTRINSIC_W_CHAIN(Op, DAG);
+  case ISD::INTRINSIC_VOID:
+    return LowerINTRINSIC_VOID(Op, DAG);
   case ISD::VECTOR_SHUFFLE:
     return lowerVECTOR_SHUFFLE(Op, DAG);
   case ISD::SPLAT_VECTOR:
@@ -1043,6 +1062,66 @@ SDValue RISCVTargetLowering::lowerShiftRightParts(SDValue Op, SelectionDAG &DAG,
   return DAG.getMergeValues(Parts, DL);
 }
 
+static SDValue LowerVPINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) {
+  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
+  SDLoc DL(Op);
+  unsigned EPIIntNo;
+  switch (IntNo) {
+  default:
+    llvm_unreachable("Unexpected intrinsic");
+  case Intrinsic::vp_add:
+    EPIIntNo = Intrinsic::epi_vadd_mask;
+    break;
+  case Intrinsic::vp_sub:
+    EPIIntNo = Intrinsic::epi_vsub_mask;
+    break;
+  case Intrinsic::vp_mul:
+    EPIIntNo = Intrinsic::epi_vmul_mask;
+    break;
+  case Intrinsic::vp_sdiv:
+    EPIIntNo = Intrinsic::epi_vdiv_mask;
+    break;
+  case Intrinsic::vp_srem:
+    EPIIntNo = Intrinsic::epi_vrem_mask;
+    break;
+  case Intrinsic::vp_udiv:
+    EPIIntNo = Intrinsic::epi_vdivu_mask;
+    break;
+  case Intrinsic::vp_urem:
+    EPIIntNo = Intrinsic::epi_vremu_mask;
+    break;
+  case Intrinsic::vp_and:
+    EPIIntNo = Intrinsic::epi_vand_mask;
+    break;
+  case Intrinsic::vp_or:
+    EPIIntNo = Intrinsic::epi_vor_mask;
+    break;
+  case Intrinsic::vp_xor:
+    EPIIntNo = Intrinsic::epi_vxor_mask;
+    break;
+  case Intrinsic::vp_ashr:
+    EPIIntNo = Intrinsic::epi_vsra_mask;
+    break;
+  case Intrinsic::vp_lshr:
+    EPIIntNo = Intrinsic::epi_vsrl_mask;
+    break;
+  case Intrinsic::vp_shl:
+    EPIIntNo = Intrinsic::epi_vsll_mask;
+    break;
+  }
+
+  assert(Op.getOperand(4).getValueType() == MVT::i32 && "Unexpected operand");
+  SDValue Operands[] = {
+      DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
+      DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
+      Op.getOperand(1),                                            // Op 1.
+      Op.getOperand(2),                                            // Op 2.
+      Op.getOperand(3),                                            // Mask.
+      DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
+  };
+  return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(), Operands);
+}
+
 SDValue RISCVTargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
                                                      SelectionDAG &DAG) const {
   unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
@@ -1075,7 +1154,80 @@ SDValue RISCVTargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
     EVT PtrVT = getPointerTy(DAG.getDataLayout());
     return DAG.getRegister(RISCV::X4, PtrVT);
   }
+  case Intrinsic::vp_add:
+  case Intrinsic::vp_sub:
+  case Intrinsic::vp_mul:
+  case Intrinsic::vp_sdiv:
+  case Intrinsic::vp_srem:
+  case Intrinsic::vp_udiv:
+  case Intrinsic::vp_urem:
+  case Intrinsic::vp_and:
+  case Intrinsic::vp_or:
+  case Intrinsic::vp_xor:
+  case Intrinsic::vp_ashr:
+  case Intrinsic::vp_lshr:
+  case Intrinsic::vp_shl:
+    return LowerVPINTRINSIC_WO_CHAIN(Op, DAG);
   }
+}
+
+SDValue RISCVTargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
+                                                    SelectionDAG &DAG) const {
+  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(1))->getZExtValue();
+  SDLoc DL(Op);
+  switch (IntNo) {
+    // By default we do not lower any intrinsic.
+  default:
+    break;
+  case Intrinsic::vp_load: {
+    assert(Op.getOperand(4).getValueType() == MVT::i32 && "Unexpected operand");
+    SDValue Operands[] = {
+        Op.getOperand(0),                                            // Chain.
+        DAG.getTargetConstant(Intrinsic::epi_vload_mask, DL,
+                              MVT::i64),
+        DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
+        Op.getOperand(2),                                            // Address.
+        Op.getOperand(3),                                            // Mask.
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
+    };
+
+    SDValue Result =
+        DAG.getNode(ISD::INTRINSIC_W_CHAIN, DL, Op->getVTList(), Operands);
+    return DAG.getMergeValues({Result, Result.getValue(1)}, DL);
+    break;
+  }
+  }
+
+  return SDValue();
+}
+
+SDValue RISCVTargetLowering::LowerINTRINSIC_VOID(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(1))->getZExtValue();
+  SDLoc DL(Op);
+  switch (IntNo) {
+    // By default we do not lower any intrinsic.
+  default:
+    break;
+  case Intrinsic::vp_store: {
+    assert(Op.getOperand(5).getValueType() == MVT::i32 && "Unexpected operand");
+    SDValue Operands[] = {
+        Op.getOperand(0),                                     // Chain.
+        DAG.getTargetConstant(Intrinsic::epi_vstore_mask, DL,
+                              MVT::i64),
+        Op.getOperand(2),                                     // Value.
+        Op.getOperand(3),                                     // Address.
+        Op.getOperand(4),                                     // Mask.
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                    Op.getOperand(5)),                        // EVL.
+    };
+
+    return DAG.getNode(ISD::INTRINSIC_VOID, DL, Op->getVTList(), Operands);
+    break;
+  }
+  }
+
+  return SDValue();
 }
 
 // Returns the opcode of the target-specific SDNode that implements the 32-bit
