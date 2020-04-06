@@ -3144,6 +3144,48 @@ foreach vti = AllIllegalIntegerVectors in {
 }
 
 //===----------------------------------------------------------------------===//
+// Patterns. Full vector relational operations
+//===----------------------------------------------------------------------===//
+
+multiclass pat_vop_binary_relational_common<SDNode vop,
+                                            string instruction_name,
+                                            list<VectorTypeInfo> vtilist,
+                                            bit swap = 0>
+{
+  foreach vti = vtilist in
+  {
+    defm : pat_vop_binary<vop, instruction_name,
+                          vti.Mask, vti.Vector, vti.Mask, vti.SEW,
+                          vti.RegClass.VLMul, VR, vti.RegClass, swap>;
+  }
+}
+
+let Predicates = [HasStdExtV] in {
+
+defm "" : pat_vop_binary_relational_common<seteq, "PseudoVMSEQ",
+                                           AllIntegerVectors>;
+defm "" : pat_vop_binary_relational_common<setne, "PseudoVMSNE",
+                                           AllIntegerVectors>;
+defm "" : pat_vop_binary_relational_common<setugt, "PseudoVMSLEU",
+                                           AllIntegerVectors, /* swapped */ 1>;
+defm "" : pat_vop_binary_relational_common<setuge, "PseudoVMSLTU",
+                                           AllIntegerVectors, /* swapped */ 1>;
+defm "" : pat_vop_binary_relational_common<setult, "PseudoVMSLTU",
+                                           AllIntegerVectors>;
+defm "" : pat_vop_binary_relational_common<setule, "PseudoVMSLEU",
+                                           AllIntegerVectors>;
+defm "" : pat_vop_binary_relational_common<setgt, "PseudoVMSLE",
+                                           AllIntegerVectors, /* swapped */ 1>;
+defm "" : pat_vop_binary_relational_common<setge, "PseudoVMSLT",
+                                           AllIntegerVectors, /* swapped */ 1>;
+defm "" : pat_vop_binary_relational_common<setlt, "PseudoVMSLT",
+                                           AllIntegerVectors>;
+defm "" : pat_vop_binary_relational_common<setle, "PseudoVMSLE",
+                                           AllIntegerVectors>;
+
+}
+
+//===----------------------------------------------------------------------===//
 // Patterns. Load/store
 //===----------------------------------------------------------------------===//
 
@@ -3208,7 +3250,6 @@ multiclass pat_load<string width> {
                vti.SEW)>;
   }
 }
-
 
 multiclass pat_store<string width> {
   foreach vti = AllVectors in {
