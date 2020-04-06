@@ -139,14 +139,18 @@ bool removeDeadVSETVLInstructions(MachineBasicBlock &MBB,
       assert(MI->getNumExplicitOperands() == 3);
       assert(MI->getNumOperands() == 5);
 
-      const MachineOperand &GVLOp = MI->getOperand(0);
+      MachineOperand GVLOp = MI->getOperand(0);
+      GVLOp.clearParent();
       assert(GVLOp.isReg());
 
-      const MachineOperand &AVLOp = MI->getOperand(1);
+      MachineOperand AVLOp = MI->getOperand(1);
+      AVLOp.clearParent();
       assert(AVLOp.isReg());
 
-      const MachineOperand &ImplVLOp = MI->getOperand(3);
-      const MachineOperand &ImplVTypeOp = MI->getOperand(4);
+      MachineOperand ImplVLOp = MI->getOperand(3);
+      ImplVLOp.clearParent();
+      MachineOperand ImplVTypeOp = MI->getOperand(4);
+      ImplVTypeOp.clearParent();
 
       assert(ImplVLOp.isImplicit() && ImplVLOp.isReg());
       assert(ImplVTypeOp.isImplicit() && ImplVTypeOp.isReg());
