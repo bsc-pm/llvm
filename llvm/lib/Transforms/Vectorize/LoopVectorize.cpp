@@ -4614,7 +4614,7 @@ void InnerLoopVectorizer::widenCallInstruction(CallInst &I) {
     if (UseVectorIntrinsic) {
       // Use vector version of the intrinsic.
       Type *TysForDecl[] = {CI->getType()};
-      if (VF > 1)
+      if (VF > 1 || Cost->isScalable())
         TysForDecl[0] = VectorType::get(CI->getType()->getScalarType(), VF,
                                         Cost->isScalable());
       VectorF = Intrinsic::getDeclaration(M, ID, TysForDecl);
