@@ -521,17 +521,6 @@ public:
   /// If the pointer isn't an i8*, it will be converted. If a TBAA tag is
   /// specified, it will be added to the instruction. Likewise with alias.scope
   /// and noalias tags.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateElementUnorderedAtomicMemSet(
-          Value *Ptr, Value *Val, uint64_t Size, unsigned Alignment,
-          uint32_t ElementSize, MDNode *TBAATag = nullptr,
-          MDNode *ScopeTag = nullptr, MDNode *NoAliasTag = nullptr),
-      "Use the version that takes Align instead of this one") {
-    return CreateElementUnorderedAtomicMemSet(Ptr, Val, getInt64(Size),
-                                              Align(Alignment), ElementSize,
-                                              TBAATag, ScopeTag, NoAliasTag);
-  }
-
   CallInst *CreateElementUnorderedAtomicMemSet(Value *Ptr, Value *Val,
                                                uint64_t Size, Align Alignment,
                                                uint32_t ElementSize,
@@ -541,17 +530,6 @@ public:
     return CreateElementUnorderedAtomicMemSet(Ptr, Val, getInt64(Size),
                                               Align(Alignment), ElementSize,
                                               TBAATag, ScopeTag, NoAliasTag);
-  }
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateElementUnorderedAtomicMemSet(
-          Value *Ptr, Value *Val, Value *Size, unsigned Alignment,
-          uint32_t ElementSize, MDNode *TBAATag = nullptr,
-          MDNode *ScopeTag = nullptr, MDNode *NoAliasTag = nullptr),
-      "Use the version that takes Align instead of this one") {
-    return CreateElementUnorderedAtomicMemSet(Ptr, Val, Size, Align(Alignment),
-                                              ElementSize, TBAATag, ScopeTag,
-                                              NoAliasTag);
   }
 
   CallInst *CreateElementUnorderedAtomicMemSet(Value *Ptr, Value *Val,
@@ -566,19 +544,6 @@ public:
   /// If the pointers aren't i8*, they will be converted.  If a TBAA tag is
   /// specified, it will be added to the instruction. Likewise with alias.scope
   /// and noalias tags.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateMemCpy(Value *Dst, unsigned DstAlign, Value *Src,
-                             unsigned SrcAlign, uint64_t Size,
-                             bool isVolatile = false, MDNode *TBAATag = nullptr,
-                             MDNode *TBAAStructTag = nullptr,
-                             MDNode *ScopeTag = nullptr,
-                             MDNode *NoAliasTag = nullptr),
-      "Use the version that takes MaybeAlign instead") {
-    return CreateMemCpy(Dst, MaybeAlign(DstAlign), Src, MaybeAlign(SrcAlign),
-                        getInt64(Size), isVolatile, TBAATag, TBAAStructTag,
-                        ScopeTag, NoAliasTag);
-  }
-
   CallInst *CreateMemCpy(Value *Dst, MaybeAlign DstAlign, Value *Src,
                          MaybeAlign SrcAlign, uint64_t Size,
                          bool isVolatile = false, MDNode *TBAATag = nullptr,
@@ -590,14 +555,6 @@ public:
                         NoAliasTag);
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateMemCpy(Value *Dst, unsigned DstAlign, Value *Src,
-                             unsigned SrcAlign, Value *Size,
-                             bool isVolatile = false, MDNode *TBAATag = nullptr,
-                             MDNode *TBAAStructTag = nullptr,
-                             MDNode *ScopeTag = nullptr,
-                             MDNode *NoAliasTag = nullptr),
-      "Use the version that takes MaybeAlign instead");
   CallInst *CreateMemCpy(Value *Dst, MaybeAlign DstAlign, Value *Src,
                          MaybeAlign SrcAlign, Value *Size,
                          bool isVolatile = false, MDNode *TBAATag = nullptr,
@@ -648,16 +605,6 @@ public:
         TBAAStructTag, ScopeTag, NoAliasTag);
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateMemMove(
-          Value *Dst, unsigned DstAlign, Value *Src, unsigned SrcAlign,
-          uint64_t Size, bool isVolatile = false, MDNode *TBAATag = nullptr,
-          MDNode *ScopeTag = nullptr, MDNode *NoAliasTag = nullptr),
-      "Use the version that takes MaybeAlign") {
-    return CreateMemMove(Dst, MaybeAlign(DstAlign), Src, MaybeAlign(SrcAlign),
-                         getInt64(Size), isVolatile, TBAATag, ScopeTag,
-                         NoAliasTag);
-  }
   CallInst *CreateMemMove(Value *Dst, MaybeAlign DstAlign, Value *Src,
                           MaybeAlign SrcAlign, uint64_t Size,
                           bool isVolatile = false, MDNode *TBAATag = nullptr,
@@ -667,15 +614,6 @@ public:
                          isVolatile, TBAATag, ScopeTag, NoAliasTag);
   }
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      CallInst *CreateMemMove(
-          Value *Dst, unsigned DstAlign, Value *Src, unsigned SrcAlign,
-          Value *Size, bool isVolatile = false, MDNode *TBAATag = nullptr,
-          MDNode *ScopeTag = nullptr, MDNode *NoAliasTag = nullptr),
-      "Use the version that takes MaybeAlign") {
-    return CreateMemMove(Dst, MaybeAlign(DstAlign), Src, MaybeAlign(SrcAlign),
-                         Size, isVolatile, TBAATag, ScopeTag, NoAliasTag);
-  }
   CallInst *CreateMemMove(Value *Dst, MaybeAlign DstAlign, Value *Src,
                           MaybeAlign SrcAlign, Value *Size,
                           bool isVolatile = false, MDNode *TBAATag = nullptr,
