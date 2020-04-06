@@ -1183,8 +1183,9 @@ def int_vp_store : Intrinsic<[],
                                llvm_i32_ty,
                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                llvm_i32_ty],
-                             [ NoCapture<1>, IntrNoSync, IntrArgMemOnly,
-                               IntrWillReturn, ImmArg<2>/*, Mask<2>, VectorLength<3>*/ ]>;
+                             [ NoCapture<1>, IntrNoSync, IntrWriteMem,
+                               IntrArgMemOnly, IntrWillReturn, ImmArg<2>
+                               /*, Mask<2>, VectorLength<3>*/ ]>;
 
 def int_vp_load  : Intrinsic<[ llvm_anyvector_ty],
                              [ LLVMAnyPointerType<LLVMMatchType<0>>,
@@ -1207,7 +1208,8 @@ def int_vp_scatter: Intrinsic<[],
                                 LLVMVectorOfAnyPointersToElt<0>, llvm_i32_ty,
                                 LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                                 llvm_i32_ty],
-                              [ IntrArgMemOnly, IntrNoSync, IntrWillReturn, ImmArg<2>
+                              [ IntrWriteMem, IntrArgMemOnly, IntrNoSync,
+                                IntrWillReturn, ImmArg<2>
                                 /*, Mask<2>, VectorLength<3>*/ ]>;
 // TODO allow IntrNoCapture for vectors of pointers
 
