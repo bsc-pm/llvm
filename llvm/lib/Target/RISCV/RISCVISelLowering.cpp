@@ -1794,6 +1794,86 @@ static MachineBasicBlock *emitComputeVSCALE(MachineInstr &MI,
   return BB;
 }
 
+static MachineBasicBlock *emitComputeVMSET(MachineInstr &MI,
+                                           MachineBasicBlock *BB) {
+  MachineFunction &MF = *BB->getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  unsigned VLMul;
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instruction");
+  case RISCV::PseudoVMSET_M1:
+    VLMul = 1;
+    break;
+  case RISCV::PseudoVMSET_M2:
+    VLMul = 2;
+    break;
+  case RISCV::PseudoVMSET_M4:
+    VLMul = 4;
+    break;
+  case RISCV::PseudoVMSET_M8:
+    VLMul = 8;
+    break;
+  }
+
+  Register DestReg = MI.getOperand(0).getReg();
+  unsigned SEW = MI.getOperand(2).getImm();
+
+  MachineInstr *NewMI =
+      BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoVMXNOR_MM_M1), DestReg)
+          .addReg(DestReg, RegState::Undef)
+          .addReg(DestReg, RegState::Undef)
+          .addReg(MI.getOperand(1).getReg())
+          .addImm(SEW);
+
+  // The pseudo instruction is gone now.
+  MI.eraseFromParent();
+
+  return addEPISetVL(*NewMI, BB, /* VLIndex */ 3, /* SEWIndex */ 4, VLMul);
+}
+
+static MachineBasicBlock *emitComputeVMCLR(MachineInstr &MI,
+                                           MachineBasicBlock *BB) {
+  MachineFunction &MF = *BB->getParent();
+  DebugLoc DL = MI.getDebugLoc();
+  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+
+  unsigned VLMul;
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instruction");
+  case RISCV::PseudoVMCLR_M1:
+    VLMul = 1;
+    break;
+  case RISCV::PseudoVMCLR_M2:
+    VLMul = 2;
+    break;
+  case RISCV::PseudoVMCLR_M4:
+    VLMul = 4;
+    break;
+  case RISCV::PseudoVMCLR_M8:
+    VLMul = 8;
+    break;
+  }
+
+  Register DestReg = MI.getOperand(0).getReg();
+  unsigned SEW = MI.getOperand(2).getImm();
+
+  MachineInstr *NewMI =
+      BuildMI(*BB, MI, DL, TII.get(RISCV::PseudoVMXOR_MM_M1), DestReg)
+          .addReg(DestReg, RegState::Undef)
+          .addReg(DestReg, RegState::Undef)
+          .addReg(MI.getOperand(1).getReg())
+          .addImm(SEW);
+
+  // The pseudo instruction is gone now.
+  MI.eraseFromParent();
+
+  return addEPISetVL(*NewMI, BB, /* VLIndex */ 3, /* SEWIndex */ 4, VLMul);
+}
+
 MachineBasicBlock *
 RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                  MachineBasicBlock *BB) const {
@@ -1814,6 +1894,16 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     break;
   case RISCV::PseudoVSCALE:
     return emitComputeVSCALE(MI, BB);
+  case RISCV::PseudoVMSET_M1:
+  case RISCV::PseudoVMSET_M2:
+  case RISCV::PseudoVMSET_M4:
+  case RISCV::PseudoVMSET_M8:
+    return emitComputeVMSET(MI, BB);
+  case RISCV::PseudoVMCLR_M1:
+  case RISCV::PseudoVMCLR_M2:
+  case RISCV::PseudoVMCLR_M4:
+  case RISCV::PseudoVMCLR_M8:
+    return emitComputeVMCLR(MI, BB);
   }
 
   switch (MI.getOpcode()) {

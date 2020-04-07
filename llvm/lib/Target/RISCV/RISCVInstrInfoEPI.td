@@ -108,6 +108,13 @@ def PseudoVSETVLI : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, VTypeIOp:$vtypei), []>
 def PseudoVSETVL : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, GPR:$rs2), []>;
 }
 
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, usesCustomInserter = 1,
+    Uses = [VL, VTYPE] in
+foreach vlmul = [1, 2, 4, 8] in {
+def "PseudoVMCLR_M"#vlmul : Pseudo<(outs VR:$rd), (ins GPR:$vl, ixlenimm:$sew), []>;
+def "PseudoVMSET_M"#vlmul : Pseudo<(outs VR:$rd), (ins GPR:$vl, ixlenimm:$sew), []>;
+}
+
 //===----------------------------------------------------------------------===//
 // Assembler Pseudo instructions
 //===----------------------------------------------------------------------===//
@@ -3031,6 +3038,13 @@ foreach vti = AllIntegerVectors in
              (vti.Vector zero_reg),
              (vti.Mask zero_reg),
              VLMax, vti.SEW)>;
+}
+
+foreach mti = AllMasks in {
+  def : Pat<(mti.Mask (riscv_vmv_v_x (i64 1))),
+            (!cast<Instruction>("PseudoVMSET_M"#mti.VLMul) VLMax, mti.SEW)>;
+  def : Pat<(mti.Mask (riscv_vmv_v_x (i64 0))),
+            (!cast<Instruction>("PseudoVMCLR_M"#mti.VLMul) VLMax, mti.SEW)>;
 }
 
 // FIXME We should use extractelt here, since vector_extract is deprecated.
