@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "PassDetail.h"
 #include "mlir/Dialect/Affine/EDSC/Intrinsics.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -21,8 +22,6 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/STLExtras.h"
 #include "mlir/Transforms/FoldUtils.h"
@@ -230,13 +229,8 @@ static void promoteSubViews(FuncOp f, bool dynamicBuffers) {
 }
 
 namespace {
-struct LinalgPromotionPass : public FunctionPass<LinalgPromotionPass> {
-/// Include the generated pass utilities.
-#define GEN_PASS_LinalgPromotion
-#include "mlir/Dialect/Linalg/Passes.h.inc"
-
+struct LinalgPromotionPass : public LinalgPromotionBase<LinalgPromotionPass> {
   LinalgPromotionPass() = default;
-  LinalgPromotionPass(const LinalgPromotionPass &) {}
   LinalgPromotionPass(bool dynamicBuffers) {
     this->dynamicBuffers = dynamicBuffers;
   }
@@ -247,10 +241,10 @@ struct LinalgPromotionPass : public FunctionPass<LinalgPromotionPass> {
 };
 } // namespace
 
-std::unique_ptr<OpPassBase<FuncOp>>
+std::unique_ptr<OperationPass<FuncOp>>
 mlir::createLinalgPromotionPass(bool dynamicBuffers) {
   return std::make_unique<LinalgPromotionPass>(dynamicBuffers);
 }
-std::unique_ptr<OpPassBase<FuncOp>> mlir::createLinalgPromotionPass() {
+std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgPromotionPass() {
   return std::make_unique<LinalgPromotionPass>();
 }
