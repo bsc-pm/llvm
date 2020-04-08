@@ -134,7 +134,7 @@ static const std::map<unsigned, int> FixedCSRFIMap = {
 };
 
 bool RISCVRegisterInfo::hasReservedSpillSlot(const MachineFunction &MF,
-                                             unsigned Reg,
+                                             Register Reg,
                                              int &FrameIdx) const {
   const auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
   if (!RVFI->useSaveRestoreLibCalls())
@@ -163,7 +163,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
-  unsigned FrameReg;
+  Register FrameReg;
   int Offset =
       getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg);
 

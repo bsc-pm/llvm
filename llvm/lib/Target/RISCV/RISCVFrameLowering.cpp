@@ -693,7 +693,7 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
 
 int RISCVFrameLowering::getFrameIndexReference(const MachineFunction &MF,
                                                int FI,
-                                               unsigned &FrameReg) const {
+                                               Register &FrameReg) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const RISCVRegisterInfo *RI =
       MF.getSubtarget<RISCVSubtarget>().getRegisterInfo();
