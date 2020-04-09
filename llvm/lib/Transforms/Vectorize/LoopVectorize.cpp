@@ -6585,6 +6585,7 @@ void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
                          &ILV,   CallbackILV};
   State.CFG.PrevBB = ILV.createVectorizedLoopSkeleton();
   State.TripCount = ILV.getOrCreateTripCount(nullptr);
+  State.CanonicalIV = ILV.Induction;
 
   //===------------------------------------------------===//
   //
@@ -6771,7 +6772,15 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
 
     // Introduce the early-exit compare IV <= BTC to form header block mask.
     // This is used instead of IV < TC because TC may wrap, unlike BTC.
-    VPValue *IV = Plan->getVPValue(Legal->getPrimaryInduction());
+    // Start by constructing the desired canonical IV.
+    VPValue *IV = nullptr;
+    if (Legal->getPrimaryInduction())
+      IV = Plan->getVPValue(Legal->getPrimaryInduction());
+    else {
+      auto IVRecipe = new VPWidenCanonicalIVRecipe();
+      Builder.getInsertBlock()->appendRecipe(IVRecipe);
+      IV = IVRecipe->getVPValue();
+    }
     VPValue *BTC = Plan->getOrCreateBackedgeTakenCount();
     BlockMask = Builder.createNaryOp(VPInstruction::ICmpULE, {IV, BTC});
     return BlockMaskCache[BB] = BlockMask;
@@ -6875,17 +6884,18 @@ VPBlendRecipe *VPRecipeBuilder::tryToBlend(Instruction *I, VPlanPtr &Plan) {
   // duplications since this is a simple recursive scan, but future
   // optimizations will clean it up.
 
-  SmallVector<VPValue *, 2> Masks;
+  SmallVector<VPValue *, 2> Operands;
   unsigned NumIncoming = Phi->getNumIncomingValues();
   for (unsigned In = 0; In < NumIncoming; In++) {
     VPValue *EdgeMask =
       createEdgeMask(Phi->getIncomingBlock(In), Phi->getParent(), Plan);
     assert((EdgeMask || NumIncoming == 1) &&
            "Multiple predecessors with one having a full mask");
+    Operands.push_back(Plan->getOrAddVPValue(Phi->getIncomingValue(In)));
     if (EdgeMask)
-      Masks.push_back(EdgeMask);
+      Operands.push_back(EdgeMask);
   }
-  return new VPBlendRecipe(Phi, Masks);
+  return new VPBlendRecipe(Phi, Operands);
 }
 
 VPWidenCallRecipe *
@@ -7130,12 +7140,13 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(unsigned MinVF,
       NeedDef.insert(Branch->getCondition());
   }
 
-  // If the tail is to be folded by masking, the primary induction variable
-  // needs to be represented in VPlan for it to model early-exit masking.
+  // If the tail is to be folded by masking, the primary induction variable, if
+  // exists needs to be represented in VPlan for it to model early-exit masking.
   // Also, both the Phi and the live-out instruction of each reduction are
   // required in order to introduce a select between them in VPlan.
   if (CM.foldTailByMasking()) {
-    NeedDef.insert(Legal->getPrimaryInduction());
+    if (Legal->getPrimaryInduction())
+      NeedDef.insert(Legal->getPrimaryInduction());
     for (auto &Reduction : Legal->getReductionVars()) {
       NeedDef.insert(Reduction.first);
       NeedDef.insert(Reduction.second.getLoopExitInstr());
@@ -7426,10 +7437,8 @@ void VPBlendRecipe::execute(VPTransformState &State) {
   // duplications since this is a simple recursive scan, but future
   // optimizations will clean it up.
 
-  unsigned NumIncoming = Phi->getNumIncomingValues();
+  unsigned NumIncoming = getNumIncomingValues();
 
-  assert((User || NumIncoming == 1) &&
-         "Multiple predecessors with predecessors having a full mask");
   // Generate a sequence of selects of the form:
   // SELECT(Mask3, In3,
   //      SELECT(Mask2, In2,
@@ -7439,14 +7448,13 @@ void VPBlendRecipe::execute(VPTransformState &State) {
     for (unsigned Part = 0; Part < State.UF; ++Part) {
       // We might have single edge PHIs (blocks) - use an identity
       // 'select' for the first PHI operand.
-      Value *In0 =
-          State.ILV->getOrCreateVectorValue(Phi->getIncomingValue(In), Part);
+      Value *In0 = State.get(getIncomingValue(In), Part);
       if (In == 0)
         Entry[Part] = In0; // Initialize with the first incoming value.
       else {
         // Select between the current value and the previous incoming edge
         // based on the incoming mask.
-        Value *Cond = State.get(User->getOperand(In), Part);
+        Value *Cond = State.get(getMask(In), Part);
         Entry[Part] =
             State.Builder.CreateSelect(Cond, In0, Entry[Part], "predphi");
       }
@@ -7572,9 +7580,8 @@ static ScalarEpilogueLowering getScalarEpilogueLowering(
                               !PreferPredicateOverEpilog;
 
   // 2) Next, if disabling predication is requested on the command line, honour
-  // this and request a scalar epilogue. Also do this if we don't have a
-  // primary induction variable, which is required for predication.
-  if (PredicateOptDisabled || !LVL.getPrimaryInduction())
+  // this and request a scalar epilogue.
+  if (PredicateOptDisabled)
     return CM_ScalarEpilogueAllowed;
 
   // 3) and 4) look if enabling predication is requested on the command line,
