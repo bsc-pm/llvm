@@ -410,7 +410,8 @@ public:
   void widenInstruction(Instruction &I);
 
   /// Widen a single call instruction within the innermost loop.
-  void widenCallInstruction(CallInst &I);
+  void widenCallInstruction(CallInst &I, VPUser &ArgOperands,
+                            VPTransformState &State);
 
   /// Fix the vectorized code, taking care of header phi's, live-outs, and more.
   void fixVectorizedLoop();
@@ -4359,12 +4360,10 @@ void InnerLoopVectorizer::widenInstruction(Instruction &I) {
   } // end of switch.
 }
 
-void InnerLoopVectorizer::widenCallInstruction(CallInst &I) {
-  // Ignore dbg intrinsics.
-  // TODO: Debug intrinsics should be skipped/handled during VPlan construction
-  // rather than dropping them here.
-  if (isa<DbgInfoIntrinsic>(I))
-    return;
+void InnerLoopVectorizer::widenCallInstruction(CallInst &I, VPUser &ArgOperands,
+                                               VPTransformState &State) {
+  assert(!isa<DbgInfoIntrinsic>(I) &&
+         "DbgInfoIntrinsic should have been dropped during VPlan construction");
   setDebugLocFromInst(Builder, &I);
 
   Module *M = I.getParent()->getParent()->getParent();
@@ -4388,12 +4387,14 @@ void InnerLoopVectorizer::widenCallInstruction(CallInst &I) {
 
   for (unsigned Part = 0; Part < UF; ++Part) {
     SmallVector<Value *, 4> Args;
-    for (unsigned i = 0, ie = CI->getNumArgOperands(); i != ie; ++i) {
-      Value *Arg = CI->getArgOperand(i);
+    for (auto &I : enumerate(ArgOperands.operands())) {
       // Some intrinsics have a scalar argument - don't replace it with a
       // vector.
-      if (!UseVectorIntrinsic || !hasVectorInstrinsicScalarOpd(ID, i))
-        Arg = getOrCreateVectorValue(CI->getArgOperand(i), Part);
+      Value *Arg;
+      if (!UseVectorIntrinsic || !hasVectorInstrinsicScalarOpd(ID, I.index()))
+        Arg = State.get(I.value(), Part);
+      else
+        Arg = State.get(I.value(), {0, 0});
       Args.push_back(Arg);
     }
 
@@ -6887,8 +6888,8 @@ VPBlendRecipe *VPRecipeBuilder::tryToBlend(Instruction *I, VPlanPtr &Plan) {
   return new VPBlendRecipe(Phi, Masks);
 }
 
-VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(Instruction *I,
-                                                   VFRange &Range) {
+VPWidenCallRecipe *
+VPRecipeBuilder::tryToWidenCall(Instruction *I, VFRange &Range, VPlan &Plan) {
 
   bool IsPredicated = LoopVectorizationPlanner::getDecisionAndClampRange(
       [&](unsigned VF) { return CM.isScalarWithPredication(I, VF); }, Range);
@@ -6919,7 +6920,11 @@ VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(Instruction *I,
     return nullptr;
 
   // Success: widen this call.
-  return new VPWidenCallRecipe(*CI);
+  auto VPValues = map_range(CI->arg_operands(), [&Plan](Value *Op) {
+    return Plan.getOrAddVPValue(Op);
+  });
+
+  return new VPWidenCallRecipe(*CI, VPValues);
 }
 
 VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VFRange &Range) {
@@ -7071,7 +7076,7 @@ bool VPRecipeBuilder::tryToCreateRecipe(Instruction *Instr, VFRange &Range,
 
   // First, check for specific widening recipes that deal with calls, memory
   // operations, inductions and Phi nodes.
-  if ((Recipe = tryToWidenCall(Instr, Range)) ||
+  if ((Recipe = tryToWidenCall(Instr, Range, *Plan)) ||
       (Recipe = tryToWidenMemory(Instr, Range, Plan)) ||
       (Recipe = tryToOptimizeInduction(Instr, Range)) ||
       (Recipe = tryToBlend(Instr, Plan)) ||
@@ -7239,6 +7244,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
     Builder.setInsertPoint(VPBB);
 
     // Introduce each ingredient into VPlan.
+    // TODO: Model and preserve debug instrinsics in VPlan.
     for (Instruction &I : BB->instructionsWithoutDebug()) {
       Instruction *Instr = &I;
 
@@ -7390,7 +7396,7 @@ void VPInterleaveRecipe::print(raw_ostream &O, const Twine &Indent,
 }
 
 void VPWidenCallRecipe::execute(VPTransformState &State) {
-  State.ILV->widenCallInstruction(Ingredient);
+  State.ILV->widenCallInstruction(Ingredient, User, State);
 }
 
 void VPWidenRecipe::execute(VPTransformState &State) {
