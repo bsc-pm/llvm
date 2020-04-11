@@ -15,15 +15,30 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "mir-strip-debug"
 
 using namespace llvm;
 
 namespace {
+cl::opt<bool>
+    OnlyDebugifiedDefault("mir-strip-debugify-only",
+                          cl::desc("Should mir-strip-debug only strip debug "
+                                   "info from debugified modules by default"),
+                          cl::init(true));
 
 struct StripDebugMachineModule : public ModulePass {
   bool runOnModule(Module &M) override {
+    if (OnlyDebugified) {
+      NamedMDNode *DebugifyMD = M.getNamedMetadata("llvm.debugify");
+      if (!DebugifyMD) {
+        LLVM_DEBUG(dbgs() << "Not stripping debug info"
+                             " (debugify metadata not found)?\n");
+        return false;
+      }
+    }
+
     MachineModuleInfo &MMI =
         getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
 
@@ -89,14 +104,20 @@ struct StripDebugMachineModule : public ModulePass {
     return Changed;
   }
 
-  StripDebugMachineModule() : ModulePass(ID) {}
+  StripDebugMachineModule() : StripDebugMachineModule(OnlyDebugifiedDefault) {}
+  StripDebugMachineModule(bool OnlyDebugified)
+      : ModulePass(ID), OnlyDebugified(OnlyDebugified) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<MachineModuleInfoWrapperPass>();
     AU.addPreserved<MachineModuleInfoWrapperPass>();
+    AU.setPreservesCFG();
   }
 
   static char ID; // Pass identification.
+
+protected:
+  bool OnlyDebugified;
 };
 char StripDebugMachineModule::ID = 0;
 
@@ -107,6 +128,6 @@ INITIALIZE_PASS_BEGIN(StripDebugMachineModule, DEBUG_TYPE,
 INITIALIZE_PASS_END(StripDebugMachineModule, DEBUG_TYPE,
                     "Machine Strip Debug Module", false, false)
 
-ModulePass *createStripDebugMachineModulePass() {
-  return new StripDebugMachineModule();
+ModulePass *llvm::createStripDebugMachineModulePass(bool OnlyDebugified) {
+  return new StripDebugMachineModule(OnlyDebugified);
 }
