@@ -98,9 +98,11 @@ class VPRecipeBuilder {
   /// that widening should be performed.
   VPWidenRecipe *tryToWiden(Instruction *I, VPlan &Plan) const;
 
-  /// Similar to \p tryToWiden but widen instructions using vector predication
+  /// Similar to \p tryToWiden but widen instruction using vector predication
   /// intrinsics.
-  bool tryToPredicatedWiden(Instruction *I, VPBasicBlock *VPBB, VPlanPtr &Plan);
+  VPPredicatedWidenRecipe *tryToPredicatedWiden(Instruction *I, VFRange &Range,
+                                                VPlanPtr &Plan);
+
 
 public:
   VPRecipeBuilder(Loop *OrigLoop, const TargetLibraryInfo *TLI,

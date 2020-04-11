@@ -353,9 +353,14 @@ void VPInstruction::generateInstruction(VPTransformState &State,
                                         unsigned Part) {
   IRBuilder<> &Builder = State.Builder;
 
+  auto getUnderlyingValue =
+      [&State, Scalar = Scalar](VPValue *Operand, unsigned Part) -> Value * {
+    return Scalar ? State.get(Operand, {0, 0}) : State.get(Operand, Part);
+  };
+
   if (Instruction::isBinaryOp(getOpcode())) {
-    Value *A = State.get(getOperand(0), Part);
-    Value *B = State.get(getOperand(1), Part);
+    Value *A = getUnderlyingValue(getOperand(0), Part);
+    Value *B = getUnderlyingValue(getOperand(1), Part);
     Value *V = Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B);
     State.set(this, V, Part);
     return;
@@ -363,22 +368,22 @@ void VPInstruction::generateInstruction(VPTransformState &State,
 
   switch (getOpcode()) {
   case VPInstruction::Not: {
-    Value *A = State.get(getOperand(0), Part);
+    Value *A = getUnderlyingValue(getOperand(0), Part);
     Value *V = Builder.CreateNot(A);
     State.set(this, V, Part);
     break;
   }
   case VPInstruction::ICmpULE: {
-    Value *IV = State.get(getOperand(0), Part);
-    Value *TC = State.get(getOperand(1), Part);
+    Value *IV = getUnderlyingValue(getOperand(0), Part);
+    Value *TC = getUnderlyingValue(getOperand(1), Part);
     Value *V = Builder.CreateICmpULE(IV, TC);
     State.set(this, V, Part);
     break;
   }
   case Instruction::Select: {
-    Value *Cond = State.get(getOperand(0), Part);
-    Value *Op1 = State.get(getOperand(1), Part);
-    Value *Op2 = State.get(getOperand(2), Part);
+    Value *Cond = getUnderlyingValue(getOperand(0), Part);
+    Value *Op1 = getUnderlyingValue(getOperand(1), Part);
+    Value *Op2 = getUnderlyingValue(getOperand(2), Part);
     Value *V = Builder.CreateSelect(Cond, Op1, Op2);
     State.set(this, V, Part);
     break;
@@ -405,6 +410,8 @@ void VPInstruction::execute(VPTransformState &State) {
 void VPInstruction::print(raw_ostream &O, const Twine &Indent,
                           VPSlotTracker &SlotTracker) const {
   O << " +\n" << Indent << "\"EMIT ";
+  if (Scalar)
+    O << "\b-SCALAR ";
   print(O, SlotTracker);
   O << "\\l\"";
 }
@@ -484,6 +491,12 @@ void VPCallInstruction::print(raw_ostream &O,
 /// LoopVectorBody basic-block was created for this. Introduce additional
 /// basic-blocks as needed, and fill them all.
 void VPlan::execute(VPTransformState *State) {
+  // -2. Check if the trip count is needed, and if so build it.
+  if (TripCount && TripCount->getNumUsers()) {
+    Value *TC = State->TripCount;
+    Value2VPValue[TC] = TripCount;
+  }
+
   // -1. Check if the backedge taken count is needed, and if so build it.
   if (BackedgeTakenCount && BackedgeTakenCount->getNumUsers()) {
     Value *TC = State->TripCount;
@@ -630,10 +643,17 @@ void VPlanPrinter::dump() {
   OS << "graph [labelloc=t, fontsize=30; label=\"Vectorization Plan";
   if (!Plan.getName().empty())
     OS << "\\n" << DOT::EscapeString(Plan.getName());
-  if (Plan.BackedgeTakenCount) {
+  if (Plan.BackedgeTakenCount || Plan.TripCount) {
     OS << ", where:\\n";
-    Plan.BackedgeTakenCount->print(OS, SlotTracker);
-    OS << " := BackedgeTakenCount";
+    if (Plan.BackedgeTakenCount) {
+      Plan.BackedgeTakenCount->print(OS, SlotTracker);
+      OS << " := BackedgeTakenCount, ";
+    }
+    if (Plan.TripCount) {
+      Plan.TripCount->print(OS, SlotTracker);
+      OS << " := TripCount";
+    } else
+      OS << "\b\b";
   }
   OS << "\"]\n";
   OS << "node [shape=rect, fontname=Courier, fontsize=30]\n";
@@ -1022,6 +1042,9 @@ void VPSlotTracker::assignSlots(const VPlan &Plan) {
 
   if (Plan.BackedgeTakenCount)
     assignSlot(Plan.BackedgeTakenCount);
+
+  if (Plan.TripCount)
+    assignSlot(Plan.TripCount);
 
   ReversePostOrderTraversal<const VPBlockBase *> RPOT(Plan.getEntry());
   for (const VPBlockBase *Block : RPOT)

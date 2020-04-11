@@ -7285,12 +7285,9 @@ VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
   if (EVLCEntryIt != EVLCache.end())
     return EVLCEntryIt->second;
 
-  // TODO: In the current strategy, we just add a default EVL for the block.
-  // We set the default EVL to be the whole vector register width. The active
-  // lanes are actually taken care of by the mask.
   VPValue *EVL = nullptr;
   Function *IntrDecl = Intrinsic::getDeclaration(
-      BB->getModule(), Intrinsic::EPIIntrinsics::epi_vsetvlmax, {});
+      BB->getModule(), Intrinsic::EPIIntrinsics::epi_vsetvl, {});
   unsigned SmallestType, WidestType;
   std::tie(SmallestType, WidestType) = CM.getSmallestAndWidestTypes();
   const std::map<unsigned, unsigned> SEWArgMap = {
@@ -7308,9 +7305,20 @@ VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
   VPValue *LMULArg = Plan->getOrAddVPValue(
       ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), LMUL));
 
-  EVL = Builder.createCallInstruction(
-      IntrDecl, {SEWArg, LMULArg},
-      {VPValueToValueLowering::Scalar, VPValueToValueLowering::Scalar});
+  // Compute TC - IV as the RVL(requested vector length). vsetvl() returns a
+  // GVL(granted vector length) that is the number of lanes processed for the
+  // given vector iteration. At the end of the vector iteration increment the IV
+  // by the GVL. This is guaranteed to exit since at some point RVL will be
+  // equal to GVL and IV = TC.
+  // FIXME: The caveat with this approach is that TC may wrap. This should not
+  // be a big problem for EPI (or other 64-bit) architectures.
+  VPValue *IV = Plan->getVPValue(Legal->getPrimaryInduction());
+  VPValue *TC = Plan->getOrCreateTripCount();
+  VPValue *RVLArg = Builder.createScalarNaryOp(Instruction::Sub, {TC, IV});
+  EVL = Builder.createCallInstruction(IntrDecl, {RVLArg, SEWArg, LMULArg},
+                                      {VPValueToValueLowering::ScalarPart,
+                                       VPValueToValueLowering::Scalar,
+                                       VPValueToValueLowering::Scalar});
   return EVLCache[BB] = EVL;
 }
 
@@ -7517,7 +7525,13 @@ bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
                                                              Range);
 }
 
-VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VPlan &Plan) const {
+bool VPRecipeBuilder::validateWiden(Instruction *I, VFRange &Range) {
+  bool IsPredicated = LoopVectorizationPlanner::getDecisionAndClampRange(
+      [&](unsigned VF) { return CM.isScalarWithPredication(I, VF); }, Range);
+
+  if (IsPredicated)
+    return false;
+
   auto IsVectorizableOpcode = [](unsigned Opcode) {
     switch (Opcode) {
     case Instruction::Add:
@@ -7560,15 +7574,36 @@ VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VPlan &Plan) const {
   };
 
   if (!IsVectorizableOpcode(I->getOpcode()))
+    return false;
+
+  return true;
+}
+
+VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VPlan &Plan) const {
+  return validateWiden(I, Range) ? new VPWidenRecipe(*I) : nullptr;
+}
+
+VPPredicatedWidenRecipe *VPRecipeBuilder::tryToPredicatedWiden(Instruction *I,
+                                                               VFRange &Range,
+                                                               VPlanPtr &Plan) {
+  if (!validateWiden(I, Range))
     return nullptr;
 
-  // Success: widen this instruction.
-  return new VPWidenRecipe(*I, Plan.mapToVPValues(I->operands()));
-  ////FIX-AFTER-REBASE
-  // use PredicatedWiden Recipe if that is preferred.
-  if (tryToPredicatedWiden(I, VPBB, Plan))
-    return true;
+  // While checking loop vectorization legality we mark the instructions to be
+  // masked only if tail folding is enabled and TTI prefers predicated ops. Thus
+  // Legal->isMaskRequired(I) should return true only when these conditions
+  // are satisfied. Widening of memory instructions is handled separately.
+  VPValue *Mask = nullptr;
+  if (Legal->isMaskRequired(I))
+    Mask = createBlockInMask(I->getParent(), Plan);
 
+  // FIXME: Mask is nullptr if it represents an all-ones mask. Currently
+  // memory widening schemes generate masked instructions only if mask is not
+  // null. We need to support the case of all-ones mask and EVL < whole
+  // register length. Should we generate non-predicated instruction if the
+  // Mask is all-ones and EVL = whoel register length?
+  return Mask ? new VPPredicatedWidenRecipe(*I, Mask, getOrCreateEVL(I, Plan))
+              : nullptr;
 }
 
 VPBasicBlock *VPRecipeBuilder::handleReplication(

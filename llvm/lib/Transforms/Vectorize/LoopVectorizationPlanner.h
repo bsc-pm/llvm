@@ -45,16 +45,18 @@ class VPBuilder {
   VPBasicBlock::iterator InsertPt = VPBasicBlock::iterator();
 
   VPInstruction *createInstruction(unsigned Opcode,
-                                   ArrayRef<VPValue *> Operands) {
-    VPInstruction *Instr = new VPInstruction(Opcode, Operands);
+                                   ArrayRef<VPValue *> Operands,
+                                   bool Scalar = false) {
+    VPInstruction *Instr = new VPInstruction(Opcode, Operands, Scalar);
     if (BB)
       BB->insert(Instr, InsertPt);
     return Instr;
   }
 
   VPInstruction *createInstruction(unsigned Opcode,
-                                   std::initializer_list<VPValue *> Operands) {
-    return createInstruction(Opcode, ArrayRef<VPValue *>(Operands));
+                                   std::initializer_list<VPValue *> Operands,
+                                   bool Scalar = false) {
+    return createInstruction(Opcode, ArrayRef<VPValue *>(Operands), Scalar);
   }
 
 public:
@@ -131,6 +133,17 @@ public:
                         std::initializer_list<VPValue *> Operands,
                         Instruction *Inst = nullptr) {
     return createNaryOp(Opcode, ArrayRef<VPValue *>(Operands), Inst);
+  }
+  VPValue *createScalarNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
+                              Instruction *Inst = nullptr) {
+    VPInstruction *NewVPInst = createInstruction(Opcode, Operands, true);
+    NewVPInst->setUnderlyingValue(Inst);
+    return NewVPInst;
+  }
+  VPValue *createScalarNaryOp(unsigned Opcode,
+                              std::initializer_list<VPValue *> Operands,
+                              Instruction *Inst = nullptr) {
+    return createScalarNaryOp(Opcode, ArrayRef<VPValue *>(Operands), Inst);
   }
 
   VPValue *createNot(VPValue *Operand) {

@@ -281,6 +281,19 @@ struct VPTransformState {
   /// that as per-lane Defs are still created by ILV and managed in its ValueMap
   /// this method currently just delegates the call to ILV.
   Value *get(VPValue *Def, const VPIteration &Instance) {
+    // FIXME: We use Data.PerPartOutput to also store
+    // scalar Values underlying VPValues created in VPlan. We are making them
+    // accessible via this get method that is currently used to access scalar
+    // values in the loop by passing in Instance = {Part, 0}.
+    // This should change when VPlan natively supports recording scalars.
+    // (Currently State.set is only used to set VPValues created by
+    // VPInstruction recipe, which only supports vector instructions).
+    if (Data.PerPartOutput.count(Def)) {
+      Value *V = Data.PerPartOutput[Def][Instance.Part];
+      assert(V && !V->getType()->isVectorTy() &&
+             "Expecting value underlying an iteration instance to be scalar.");
+      return V;
+    }
     return Callback.getOrCreateScalarValue(VPValue2Value[Def], Instance);
   }
 
@@ -689,6 +702,7 @@ public:
 private:
   typedef unsigned char OpcodeTy;
   OpcodeTy Opcode;
+  bool Scalar;
 
   /// Utility method serving execute(): generates a single instance of the
   /// modeled instruction.
@@ -702,12 +716,15 @@ protected:
   void setUnderlyingInstr(Instruction *I) { setUnderlyingValue(I); }
 
 public:
-  VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands)
+  VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
+                bool Scalar = false)
       : VPUser(VPValue::VPInstructionSC, Operands),
-        VPRecipeBase(VPRecipeBase::VPInstructionSC), Opcode(Opcode) {}
+        VPRecipeBase(VPRecipeBase::VPInstructionSC), Opcode(Opcode),
+        Scalar(Scalar) {}
 
-  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands)
-      : VPInstruction(Opcode, ArrayRef<VPValue *>(Operands)) {}
+  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands,
+                bool Scalar = false)
+      : VPInstruction(Opcode, ArrayRef<VPValue *>(Operands), Scalar) {}
 
   /// Method to support type inquiry through isa, cast, and dyn_cast.
   static inline bool classof(const VPValue *V) {
@@ -774,6 +791,12 @@ enum class VPValueToValueLowering {
   Scalar      /*Scalar - State.get(V, {0, 0})*/
 };
 
+// TODO:
+// 1. In line with the effort to have all values in VPlan as VPValues, is it
+// possible to store Callee as a VPValue?
+// 2. Can we get rid of VPValueToValueLowering and somehow access argument types
+// of the callee to determine how to expand the args? Perhaps use
+// hasVectorInstrinsicScalarOpd in VectorUtils.
 class VPCallInstruction : public VPInstruction {
 private:
   Function *Callee;
@@ -1643,6 +1666,10 @@ class VPlan {
   /// the tail.
   VPValue *BackedgeTakenCount = nullptr;
 
+  /// Represents the trip count of the original loop. It binds to Value
+  /// (VPTransformState)State.TripCount.
+  VPValue *TripCount = nullptr;
+
   /// Holds a mapping between Values and their corresponding VPValue inside
   /// VPlan.
   Value2VPValueTy Value2VPValue;
@@ -1666,6 +1693,8 @@ public:
       delete MapEntry.second;
     if (BackedgeTakenCount)
       delete BackedgeTakenCount;
+    if (TripCount)
+      delete TripCount;
     for (VPValue *Def : VPExternalDefs)
       delete Def;
     for (VPValue *CBV : VPCBVs)
@@ -1689,6 +1718,13 @@ public:
     if (!BackedgeTakenCount)
       BackedgeTakenCount = new VPValue();
     return BackedgeTakenCount;
+  }
+
+  /// The trip count for the original loop.
+  VPValue *getOrCreateTripCount() {
+    if (!TripCount)
+      TripCount = new VPValue();
+    return TripCount;
   }
 
   void addVF(unsigned VF) { VFs.insert(VF); }
