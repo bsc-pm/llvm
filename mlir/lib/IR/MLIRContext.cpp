@@ -28,7 +28,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
@@ -210,7 +210,7 @@ public:
   DenseMap<TypeID, Dialect *> registeredDialectSymbols;
 
   /// These are identifiers uniqued into this MLIRContext.
-  llvm::StringMap<char, llvm::BumpPtrAllocator &> identifiers;
+  llvm::StringSet<llvm::BumpPtrAllocator &> identifiers;
 
   //===--------------------------------------------------------------------===//
   // Affine uniquing
@@ -493,10 +493,6 @@ const AbstractOperation *AbstractOperation::lookup(StringRef opName,
 
 /// Return an identifier for the specified string.
 Identifier Identifier::get(StringRef str, MLIRContext *context) {
-  assert(!str.empty() && "Cannot create an empty identifier");
-  assert(str.find('\0') == StringRef::npos &&
-         "Cannot create an identifier with a nul character");
-
   auto &impl = context->getImpl();
 
   { // Check for an existing identifier in read-only mode.
@@ -506,9 +502,16 @@ Identifier Identifier::get(StringRef str, MLIRContext *context) {
       return Identifier(it->getKeyData());
   }
 
+  // Check invariants after seeing if we already have something in the
+  // identifier table - if we already had it in the table, then it already
+  // passed invariant checks.
+  assert(!str.empty() && "Cannot create an empty identifier");
+  assert(str.find('\0') == StringRef::npos &&
+         "Cannot create an identifier with a nul character");
+
   // Acquire a writer-lock so that we can safely create the new instance.
   llvm::sys::SmartScopedWriter<true> contextLock(impl.identifierMutex);
-  auto it = impl.identifiers.insert({str, char()}).first;
+  auto it = impl.identifiers.insert(str).first;
   return Identifier(it->getKeyData());
 }
 
@@ -621,16 +624,15 @@ StorageUniquer &MLIRContext::getAttributeUniquer() {
   return getImpl().attributeUniquer;
 }
 
-/// Returns a functor used to initialize new attribute storage instances.
-std::function<void(AttributeStorage *)>
-AttributeUniquer::getInitFn(MLIRContext *ctx, TypeID attrID) {
-  return [ctx, attrID](AttributeStorage *storage) {
-    storage->initializeDialect(lookupDialectForSymbol(ctx, attrID));
+/// Initialize the given attribute storage instance.
+void AttributeUniquer::initializeAttributeStorage(AttributeStorage *storage,
+                                                  MLIRContext *ctx,
+                                                  TypeID attrID) {
+  storage->initializeDialect(lookupDialectForSymbol(ctx, attrID));
 
-    // If the attribute did not provide a type, then default to NoneType.
-    if (!storage->getType())
-      storage->setType(NoneType::get(ctx));
-  };
+  // If the attribute did not provide a type, then default to NoneType.
+  if (!storage->getType())
+    storage->setType(NoneType::get(ctx));
 }
 
 BoolAttr BoolAttr::get(bool value, MLIRContext *context) {
