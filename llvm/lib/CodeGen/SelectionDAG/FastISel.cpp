@@ -1139,7 +1139,7 @@ bool FastISel::lowerCallTo(const CallInst *CI, MCSymbol *Symbol,
   TLI.markLibCallAttributes(MF, CI->getCallingConv(), Args);
 
   CallLoweringInfo CLI;
-  CLI.setCallee(RetTy, FTy, Symbol, std::move(Args), CI, NumArgs);
+  CLI.setCallee(RetTy, FTy, Symbol, std::move(Args), *CI, NumArgs);
 
   return lowerCallTo(CLI);
 }
@@ -1245,12 +1245,12 @@ bool FastISel::lowerCallTo(CallLoweringInfo &CLI) {
   assert(CLI.Call && "No call instruction specified.");
   CLI.Call->setPhysRegsDeadExcept(CLI.InRegs, TRI);
 
-  if (CLI.NumResultRegs && CLI.CS)
-    updateValueMap(CLI.CS.getInstruction(), CLI.ResultReg, CLI.NumResultRegs);
+  if (CLI.NumResultRegs && CLI.CB)
+    updateValueMap(CLI.CB, CLI.ResultReg, CLI.NumResultRegs);
 
   // Set labels for heapallocsite call.
-  if (CLI.CS)
-    if (MDNode *MD = CLI.CS.getInstruction()->getMetadata("heapallocsite"))
+  if (CLI.CB)
+    if (MDNode *MD = CLI.CB->getMetadata("heapallocsite"))
       CLI.Call->setHeapAllocMarker(*MF, MD);
 
   return true;
@@ -1282,7 +1282,7 @@ bool FastISel::lowerCall(const CallInst *CI) {
   // Check if target-independent constraints permit a tail call here.
   // Target-dependent constraints are checked within fastLowerCall.
   bool IsTailCall = CI->isTailCall();
-  if (IsTailCall && !isInTailCallPosition(CI, TM))
+  if (IsTailCall && !isInTailCallPosition(*CI, TM))
     IsTailCall = false;
   if (IsTailCall && MF->getFunction()
                             .getFnAttribute("disable-tail-calls")
@@ -1290,7 +1290,7 @@ bool FastISel::lowerCall(const CallInst *CI) {
     IsTailCall = false;
 
   CallLoweringInfo CLI;
-  CLI.setCallee(RetTy, FuncTy, CI->getCalledValue(), std::move(Args), CI)
+  CLI.setCallee(RetTy, FuncTy, CI->getCalledValue(), std::move(Args), *CI)
       .setTailCall(IsTailCall);
 
   return lowerCallTo(CLI);
