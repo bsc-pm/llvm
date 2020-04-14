@@ -1903,7 +1903,7 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
     // If the element type has zero size then any index over it is equivalent
     // to an index of zero, so replace it with zero if it is not zero already.
     Type *EltTy = GTI.getIndexedType();
-    if (EltTy->isSized() && DL.getTypeAllocSize(EltTy) == 0)
+    if (EltTy->isSized() && DL.getTypeAllocSize(EltTy).isZero())
       if (!isa<Constant>(*I) || !match(I->get(), m_Zero())) {
         *I = Constant::getNullValue(NewIndexType);
         MadeChange = true;
@@ -2710,7 +2710,7 @@ static Instruction *tryToMoveFreeBeforeNullTest(CallInst &FI,
   // If there are more than 2 instructions, check that they are noops
   // i.e., they won't hurt the performance of the generated code.
   if (FreeInstrBB->size() != 2) {
-    for (const Instruction &Inst : *FreeInstrBB) {
+    for (const Instruction &Inst : FreeInstrBB->instructionsWithoutDebug()) {
       if (&Inst == &FI || &Inst == FreeInstrBBTerminator)
         continue;
       auto *Cast = dyn_cast<CastInst>(&Inst);

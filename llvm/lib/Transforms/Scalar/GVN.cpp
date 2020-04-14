@@ -1587,10 +1587,10 @@ bool GVN::processLoad(LoadInst *L) {
   if (!MD)
     return false;
 
-  if (auto *VecTy = dyn_cast<VectorType>(L->getType())) {
-    if (VecTy->isScalable())
-      return false;
-  }
+  // if (auto *VecTy = dyn_cast<VectorType>(L->getType())) {
+  //   if (VecTy->isScalable())
+  //     return false;
+  // }
 
   // This code hasn't been audited for ordered or volatile memory access
   if (!L->isUnordered())

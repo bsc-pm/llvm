@@ -140,6 +140,9 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
   if (HasC)
     Builder.defineMacro("__riscv_compressed");
 
+  if (HasB)
+    Builder.defineMacro("__riscv_bitmanip");
+
   if (HasV) {
     Builder.defineMacro("__riscv_vector");
     // Version computed as: major*100^2 + minor*100 + patch
@@ -168,6 +171,7 @@ bool RISCVTargetInfo::hasFeature(StringRef Feature) const {
       .Case("d", HasD)
       .Case("c", HasC)
       .Case("v", HasV)
+      .Case("experimental-b", HasB)
       .Default(false);
 }
 
@@ -187,6 +191,8 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasC = true;
     else if (Feature == "+v")
       HasV = true;
+    else if (Feature == "+experimental-b")
+      HasB = true;
   }
 
   return true;

@@ -428,6 +428,11 @@ namespace llvm {
     /// lower (IDX=1) half of v4f32 to v2f64.
     FP_EXTEND_HALF,
 
+    /// MAT_PCREL_ADDR = Materialize a PC Relative address. This can be done
+    /// either through an add like PADDI or through a PC Relative load like
+    /// PLD.
+    MAT_PCREL_ADDR,
+
     /// CHAIN = STBRX CHAIN, GPRC, Ptr, Type - This is a
     /// byte-swapping store instruction.  It byte-swaps the low "Type" bits of
     /// the GPRC input, then stores it through Ptr.  Type can be either i16 or
@@ -729,6 +734,10 @@ namespace llvm {
     /// represented as an indexed [r+r] operation.
     bool SelectAddressRegRegOnly(SDValue N, SDValue &Base, SDValue &Index,
                                  SelectionDAG &DAG) const;
+
+    /// SelectAddressPCRel - Represent the specified address as pc relative to
+    /// be represented as [pc+imm]
+    bool SelectAddressPCRel(SDValue N, SDValue &Base) const;
 
     Sched::Preference getSchedulingPreference(SDNode *N) const override;
 
@@ -1044,15 +1053,10 @@ namespace llvm {
                                       const SmallVectorImpl<ISD::InputArg> &Ins,
                                       SelectionDAG& DAG) const;
 
-    bool
-    IsEligibleForTailCallOptimization_64SVR4(
-                                    SDValue Callee,
-                                    CallingConv::ID CalleeCC,
-                                    ImmutableCallSite CS,
-                                    bool isVarArg,
-                                    const SmallVectorImpl<ISD::OutputArg> &Outs,
-                                    const SmallVectorImpl<ISD::InputArg> &Ins,
-                                    SelectionDAG& DAG) const;
+    bool IsEligibleForTailCallOptimization_64SVR4(
+        SDValue Callee, CallingConv::ID CalleeCC, const CallBase *CB,
+        bool isVarArg, const SmallVectorImpl<ISD::OutputArg> &Outs,
+        const SmallVectorImpl<ISD::InputArg> &Ins, SelectionDAG &DAG) const;
 
     SDValue EmitTailCallLoadFPAndRetAddr(SelectionDAG &DAG, int SPDiff,
                                          SDValue Chain, SDValue &LROpOut,
@@ -1119,7 +1123,7 @@ namespace llvm {
                        SDValue &Callee, int SPDiff, unsigned NumBytes,
                        const SmallVectorImpl<ISD::InputArg> &Ins,
                        SmallVectorImpl<SDValue> &InVals,
-                       ImmutableCallSite CS) const;
+                       const CallBase *CB) const;
 
     SDValue
     LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv, bool isVarArg,
@@ -1172,28 +1176,28 @@ namespace llvm {
                              const SmallVectorImpl<ISD::InputArg> &Ins,
                              const SDLoc &dl, SelectionDAG &DAG,
                              SmallVectorImpl<SDValue> &InVals,
-                             ImmutableCallSite CS) const;
+                             const CallBase *CB) const;
     SDValue LowerCall_64SVR4(SDValue Chain, SDValue Callee, CallFlags CFlags,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<SDValue> &OutVals,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
                              const SDLoc &dl, SelectionDAG &DAG,
                              SmallVectorImpl<SDValue> &InVals,
-                             ImmutableCallSite CS) const;
+                             const CallBase *CB) const;
     SDValue LowerCall_32SVR4(SDValue Chain, SDValue Callee, CallFlags CFlags,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<SDValue> &OutVals,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
                              const SDLoc &dl, SelectionDAG &DAG,
                              SmallVectorImpl<SDValue> &InVals,
-                             ImmutableCallSite CS) const;
+                             const CallBase *CB) const;
     SDValue LowerCall_AIX(SDValue Chain, SDValue Callee, CallFlags CFlags,
                           const SmallVectorImpl<ISD::OutputArg> &Outs,
                           const SmallVectorImpl<SDValue> &OutVals,
                           const SmallVectorImpl<ISD::InputArg> &Ins,
                           const SDLoc &dl, SelectionDAG &DAG,
                           SmallVectorImpl<SDValue> &InVals,
-                          ImmutableCallSite CS) const;
+                          const CallBase *CB) const;
 
     SDValue lowerEH_SJLJ_SETJMP(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG) const;

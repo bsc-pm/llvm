@@ -1007,28 +1007,6 @@ public:
                         NormalDest, UnwindDest, Args, Name);
   }
 
-  // Deprecated [opaque pointer types]
-  InvokeInst *CreateInvoke(Value *Callee, BasicBlock *NormalDest,
-                           BasicBlock *UnwindDest, ArrayRef<Value *> Args,
-                           ArrayRef<OperandBundleDef> OpBundles,
-                           const Twine &Name = "") {
-    return CreateInvoke(
-        cast<FunctionType>(
-            cast<PointerType>(Callee->getType())->getElementType()),
-        Callee, NormalDest, UnwindDest, Args, OpBundles, Name);
-  }
-
-  // Deprecated [opaque pointer types]
-  InvokeInst *CreateInvoke(Value *Callee, BasicBlock *NormalDest,
-                           BasicBlock *UnwindDest,
-                           ArrayRef<Value *> Args = None,
-                           const Twine &Name = "") {
-    return CreateInvoke(
-        cast<FunctionType>(
-            cast<PointerType>(Callee->getType())->getElementType()),
-        Callee, NormalDest, UnwindDest, Args, Name);
-  }
-
   /// \brief Create a callbr instruction.
   CallBrInst *CreateCallBr(FunctionType *Ty, Value *Callee,
                            BasicBlock *DefaultDest,
@@ -1597,28 +1575,32 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
 
   AllocaInst *CreateAlloca(Type *Ty, unsigned AddrSpace,
                            Value *ArraySize = nullptr, const Twine &Name = "") {
-    return Insert(new AllocaInst(Ty, AddrSpace, ArraySize), Name);
+    const DataLayout &DL = BB->getModule()->getDataLayout();
+    Align AllocaAlign = DL.getPrefTypeAlign(Ty);
+    return Insert(new AllocaInst(Ty, AddrSpace, ArraySize, AllocaAlign), Name);
   }
 
   AllocaInst *CreateAlloca(Type *Ty, Value *ArraySize = nullptr,
                            const Twine &Name = "") {
-    const DataLayout &DL = BB->getParent()->getParent()->getDataLayout();
-    return Insert(new AllocaInst(Ty, DL.getAllocaAddrSpace(), ArraySize), Name);
+    const DataLayout &DL = BB->getModule()->getDataLayout();
+    Align AllocaAlign = DL.getPrefTypeAlign(Ty);
+    unsigned AddrSpace = DL.getAllocaAddrSpace();
+    return Insert(new AllocaInst(Ty, AddrSpace, ArraySize, AllocaAlign), Name);
   }
 
   /// Provided to resolve 'CreateLoad(Ty, Ptr, "...")' correctly, instead of
   /// converting the string to 'bool' for the isVolatile parameter.
   LoadInst *CreateLoad(Type *Ty, Value *Ptr, const char *Name) {
-    return Insert(new LoadInst(Ty, Ptr), Name);
+    return CreateAlignedLoad(Ty, Ptr, MaybeAlign(), Name);
   }
 
   LoadInst *CreateLoad(Type *Ty, Value *Ptr, const Twine &Name = "") {
-    return Insert(new LoadInst(Ty, Ptr), Name);
+    return CreateAlignedLoad(Ty, Ptr, MaybeAlign(), Name);
   }
 
   LoadInst *CreateLoad(Type *Ty, Value *Ptr, bool isVolatile,
                        const Twine &Name = "") {
-    return Insert(new LoadInst(Ty, Ptr, Twine(), isVolatile), Name);
+    return CreateAlignedLoad(Ty, Ptr, MaybeAlign(), isVolatile, Name);
   }
 
   // Deprecated [opaque pointer types]
@@ -1638,7 +1620,7 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
   }
 
   StoreInst *CreateStore(Value *Val, Value *Ptr, bool isVolatile = false) {
-    return Insert(new StoreInst(Val, Ptr, isVolatile));
+    return CreateAlignedStore(Val, Ptr, MaybeAlign(), isVolatile);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr,
@@ -1649,9 +1631,7 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
   }
   LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
                               const char *Name) {
-    LoadInst *LI = CreateLoad(Ty, Ptr, Name);
-    LI->setAlignment(Align);
-    return LI;
+    return CreateAlignedLoad(Ty, Ptr, Align, /*isVolatile*/false, Name);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr,
@@ -1662,9 +1642,7 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
   }
   LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
                               const Twine &Name = "") {
-    LoadInst *LI = CreateLoad(Ty, Ptr, Name);
-    LI->setAlignment(Align);
-    return LI;
+    return CreateAlignedLoad(Ty, Ptr, Align, /*isVolatile*/false, Name);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr,
@@ -1676,9 +1654,11 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
   }
   LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
                               bool isVolatile, const Twine &Name = "") {
-    LoadInst *LI = CreateLoad(Ty, Ptr, isVolatile, Name);
-    LI->setAlignment(Align);
-    return LI;
+    if (!Align) {
+      const DataLayout &DL = BB->getModule()->getDataLayout();
+      Align = DL.getABITypeAlign(Ty);
+    }
+    return Insert(new LoadInst(Ty, Ptr, Twine(), isVolatile, *Align), Name);
   }
 
   // Deprecated [opaque pointer types]
@@ -1732,9 +1712,11 @@ Value *CreateNot(Value *V, const Twine &Name = "") {
   }
   StoreInst *CreateAlignedStore(Value *Val, Value *Ptr, MaybeAlign Align,
                                 bool isVolatile = false) {
-    StoreInst *SI = CreateStore(Val, Ptr, isVolatile);
-    SI->setAlignment(Align);
-    return SI;
+    if (!Align) {
+      const DataLayout &DL = BB->getModule()->getDataLayout();
+      Align = DL.getABITypeAlign(Val->getType());
+    }
+    return Insert(new StoreInst(Val, Ptr, isVolatile, Align));
   }
   FenceInst *CreateFence(AtomicOrdering Ordering,
                          SyncScope::ID SSID = SyncScope::System,
@@ -2354,23 +2336,6 @@ public:
                        const Twine &Name = "", MDNode *FPMathTag = nullptr) {
     return CreateCall(Callee.getFunctionType(), Callee.getCallee(), Args,
                       OpBundles, Name, FPMathTag);
-  }
-
-  // Deprecated [opaque pointer types]
-  CallInst *CreateCall(Value *Callee, ArrayRef<Value *> Args = None,
-                       const Twine &Name = "", MDNode *FPMathTag = nullptr) {
-    return CreateCall(
-        cast<FunctionType>(Callee->getType()->getPointerElementType()), Callee,
-        Args, Name, FPMathTag);
-  }
-
-  // Deprecated [opaque pointer types]
-  CallInst *CreateCall(Value *Callee, ArrayRef<Value *> Args,
-                       ArrayRef<OperandBundleDef> OpBundles,
-                       const Twine &Name = "", MDNode *FPMathTag = nullptr) {
-    return CreateCall(
-        cast<FunctionType>(Callee->getType()->getPointerElementType()), Callee,
-        Args, OpBundles, Name, FPMathTag);
   }
 
   CallInst *CreateConstrainedFPCall(
