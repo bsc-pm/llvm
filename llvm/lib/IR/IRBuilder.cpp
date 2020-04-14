@@ -525,7 +525,8 @@ CallInst *IRBuilderBase::CreateMaskedGather(Value *Ptrs, Align Alignment,
   auto PtrsTy = cast<VectorType>(Ptrs->getType());
   auto PtrTy = cast<PointerType>(PtrsTy->getElementType());
   unsigned NumElts = PtrsTy->getNumElements();
-  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts);
+  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts,
+                                 PtrsTy->getVectorIsScalable());
 
   if (DataTy->getVectorIsScalable())
     assert(Mask && Mask->getType()->getVectorIsScalable() &&
