@@ -186,8 +186,6 @@ class LoadUnloadTestCase(TestBase):
                     substrs=[os.path.basename(old_dylib)],
                     matching=True)
 
-        self.runCmd(env_cmd_string)
-
         lldbutil.run_break_set_by_file_and_line(
             self, "d.cpp", self.line_d_function, num_expected_locations=1)
         # After run, make sure the non-hidden library is picked up.
@@ -345,15 +343,11 @@ class LoadUnloadTestCase(TestBase):
                     substrs=[' resolved, hit count = 2'])
 
     @skipIfFreeBSD  # llvm.org/pr14424 - missing FreeBSD Makefiles/testcase support
-    @expectedFailureAll(archs="aarch64", oslist="linux",
-                        bugnumber="https://bugs.llvm.org/show_bug.cgi?id=27806")
     def test_step_over_load(self):
         self.setSvr4Support(False)
         self.run_step_over_load()
 
     @skipIfFreeBSD  # llvm.org/pr14424 - missing FreeBSD Makefiles/testcase support
-    @expectedFailureAll(archs="aarch64", oslist="linux",
-                        bugnumber="https://bugs.llvm.org/show_bug.cgi?id=27806")
     def test_step_over_load_with_svr4(self):
         self.setSvr4Support(True)
         self.run_step_over_load()
