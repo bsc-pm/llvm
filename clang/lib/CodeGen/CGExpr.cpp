@@ -2729,6 +2729,12 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
   if (const auto *BD = dyn_cast<BindingDecl>(ND))
     return EmitLValue(BD->getBinding());
 
+  // We can form DeclRefExprs naming GUID declarations when reconstituting
+  // non-type template parameters into expressions.
+  if (const auto *GD = dyn_cast<MSGuidDecl>(ND))
+    return MakeAddrLValue(CGM.GetAddrOfMSGuidDecl(GD), T,
+                          AlignmentSource::Decl);
+
   llvm_unreachable("Unhandled DeclRefExpr");
 }
 
@@ -4835,7 +4841,7 @@ CodeGenFunction::EmitCXXTypeidLValue(const CXXTypeidExpr *E) {
 }
 
 Address CodeGenFunction::EmitCXXUuidofExpr(const CXXUuidofExpr *E) {
-  return Builder.CreateElementBitCast(CGM.GetAddrOfUuidDescriptor(E),
+  return Builder.CreateElementBitCast(CGM.GetAddrOfMSGuidDecl(E->getGuidDecl()),
                                       ConvertType(E->getType()));
 }
 
