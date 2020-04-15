@@ -1064,7 +1064,7 @@ static void print(spirv::BranchConditionalOp branchOp, OpAsmPrinter &printer) {
 
   if (auto weights = branchOp.branch_weights()) {
     printer << " [";
-    interleaveComma(weights->getValue(), printer, [&](Attribute a) {
+    llvm::interleaveComma(weights->getValue(), printer, [&](Attribute a) {
       printer << a.cast<IntegerAttr>().getInt();
     });
     printer << "]";
@@ -1465,7 +1465,7 @@ static void print(spirv::EntryPointOp entryPointOp, OpAsmPrinter &printer) {
   auto interfaceVars = entryPointOp.interface().getValue();
   if (!interfaceVars.empty()) {
     printer << ", ";
-    interleaveComma(interfaceVars, printer);
+    llvm::interleaveComma(interfaceVars, printer);
   }
 }
 
@@ -1521,7 +1521,7 @@ static void print(spirv::ExecutionModeOp execModeOp, OpAsmPrinter &printer) {
   if (!values.size())
     return;
   printer << ", ";
-  interleaveComma(values, printer, [&](Attribute a) {
+  llvm::interleaveComma(values, printer, [&](Attribute a) {
     printer << a.cast<IntegerAttr>().getInt();
   });
 }
@@ -1956,7 +1956,7 @@ static void print(spirv::LoopOp loopOp, OpAsmPrinter &printer) {
 /// given `dstBlock`.
 static inline bool hasOneBranchOpTo(Block &srcBlock, Block &dstBlock) {
   // Check that there is only one op in the `srcBlock`.
-  if (!has_single_element(srcBlock))
+  if (!llvm::hasSingleElement(srcBlock))
     return false;
 
   auto branchOp = dyn_cast<spirv::BranchOp>(srcBlock.back());
