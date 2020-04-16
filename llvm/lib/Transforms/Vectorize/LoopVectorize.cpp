@@ -428,7 +428,7 @@ public:
   void widenSelectInstruction(SelectInst &I, bool InvariantCond);
 
   /// Fix the vectorized code, taking care of header phi's, live-outs, and more.
-  void fixVectorizedLoop();
+  void fixVectorizedLoop(VPValue *EVL, VPTransformState &State);
 
   // Return true if any runtime check is added.
   bool areSafetyChecksAdded() { return AddedSafetyChecks; }
@@ -536,6 +536,9 @@ protected:
   PHINode *createInductionVariable(Loop *L, Value *Start, Value *End,
                                    Value *Step, Instruction *DL);
 
+  /// increment induction by EVL if using predicated vectorization.
+  void fixEVLInduction(VPValue *EVL, VPTransformState &State);
+
   /// Handle all cross-iteration phis in the header.
   void fixCrossIterationPHIs();
 
@@ -603,6 +606,9 @@ protected:
 
   /// Returns true if the target uses scalable vector type.
   bool isScalable() const { return TTI->useScalableVectorType(); }
+
+  /// Returns true if vectorization prefers using predicated vector intrinsics.
+  bool preferPredicatedVectorOps() const;
 
   /// If there is a cast involved in the induction variable \p ID, which should
   /// be ignored in the vectorized loop body, this function records the
@@ -775,6 +781,9 @@ protected:
 
   /// Trip count of the widened loop (TripCount - TripCount % (VF*UF))
   Value *VectorTripCount = nullptr;
+
+  /// EVL per part of the widened loop using vector predication (vsetvl())
+  SmallVector<Value *, 2> EVLParts;
 
   /// The legality analysis.
   LoopVectorizationLegality *Legal;
@@ -2261,6 +2270,10 @@ Value *InnerLoopVectorizer::reverseVector(Value *Vec) {
                                      ShuffleMask, "reverse");
 }
 
+bool InnerLoopVectorizer::preferPredicatedVectorOps() const {
+  return Cost->foldTailByMasking() && TTI->preferPredicatedVectorOps();
+}
+
 // Return whether we allow using masked interleave-groups (for dealing with
 // strided loads/stores that reside in predicated blocks, or for dealing
 // with gaps).
@@ -2736,8 +2749,11 @@ PHINode *InnerLoopVectorizer::createInductionVariable(Loop *L, Value *Start,
 
   // Create i+1 and fill the PHINode.
   // If using scalable vectors, multiply step size by vscale.
+  // If using predicated vector ops, index.next will be later fixed to
+  // index.next = index + EVL (EVL is the result from call to vsetvl)
+  // At that point index.vscale def will be dead.
   Value *ScaleStep = Step;
-  if (TTI->useScalableVectorType()) {
+  if (TTI->useScalableVectorType() && !preferPredicatedVectorOps()) {
     Function *VscaleFunc = Intrinsic::getDeclaration(
         Header->getModule(), Intrinsic::vscale,
         Step->getType());
@@ -2807,6 +2823,9 @@ Value *InnerLoopVectorizer::getOrCreateTripCount(Loop *L) {
 Value *InnerLoopVectorizer::getOrCreateVectorTripCount(Loop *L) {
   if (VectorTripCount)
     return VectorTripCount;
+
+  if (preferPredicatedVectorOps())
+    return VectorTripCount = getOrCreateTripCount(L);
 
   Value *TC = getOrCreateTripCount(L);
   IRBuilder<> Builder(L->getLoopPreheader()->getTerminator());
@@ -3681,7 +3700,13 @@ void InnerLoopVectorizer::truncateToMinimalBitwidths() {
   }
 }
 
-void InnerLoopVectorizer::fixVectorizedLoop() {
+void InnerLoopVectorizer::fixVectorizedLoop(VPValue *EVL,
+                                            VPTransformState &State) {
+  // If using predicated vector ops, we need to increment index for the next
+  // vector iteration by the EVL used in current iteration.
+  if (preferPredicatedVectorOps())
+    fixEVLInduction(EVL, State);
+
   // Insert truncates and extends for any truncated instructions as hints to
   // InstCombine.
   if (VF > 1 || isScalable())
@@ -3728,6 +3753,15 @@ void InnerLoopVectorizer::fixVectorizedLoop() {
   setProfileInfoAfterUnrolling(LI->getLoopFor(LoopScalarBody),
                                LI->getLoopFor(LoopVectorBody),
                                LI->getLoopFor(LoopScalarBody), VF * UF);
+}
+
+void InnerLoopVectorizer::fixEVLInduction(VPValue *EVL,
+                                          VPTransformState &State) {
+  Instruction *IndexNext = dyn_cast<Instruction>(
+      Induction->getIncomingValueForBlock(LoopVectorBody));
+  ReplaceInstWithInst(IndexNext, BinaryOperator::Create(
+                                     Instruction::Add, IndexNext->getOperand(0),
+                                     State.get(EVL, {0, 0})));
 }
 
 void InnerLoopVectorizer::fixCrossIterationPHIs() {
@@ -7075,7 +7109,9 @@ void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
 
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
   //    predication, updating analyses.
-  ILV.fixVectorizedLoop();
+  // TODO: We should not need to pass Plan->getEVL() once State is refactored to
+  // cache widened EVL values.
+  ILV.fixVectorizedLoop(VPlans.front()->getEVL(), State);
 }
 
 void LoopVectorizationPlanner::collectTriviallyDeadInstructions(
@@ -7279,13 +7315,14 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
 }
 
 VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
+  // TODO : Refactor this method directly into Plan, instead of RecipeBuilder.
   BasicBlock *BB = I->getParent();
-  assert(OrigLoop->contains(BB) && "Block is not a part of a loop");
-  EVLCacheTy::iterator EVLCEntryIt = EVLCache.find(BB);
-  if (EVLCEntryIt != EVLCache.end())
-    return EVLCEntryIt->second;
+  assert(OrigLoop->contains(BB) && "Block is not a part of a loop.");
 
   VPValue *EVL = nullptr;
+  if ((EVL = Plan->getEVL()))
+    return EVL;
+
   Function *IntrDecl = Intrinsic::getDeclaration(
       BB->getModule(), Intrinsic::EPIIntrinsics::epi_vsetvl, {});
   unsigned SmallestType, WidestType;
@@ -7319,7 +7356,7 @@ VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
                                       {VPValueToValueLowering::ScalarPart,
                                        VPValueToValueLowering::Scalar,
                                        VPValueToValueLowering::Scalar});
-  return EVLCache[BB] = EVL;
+  return Plan->createEVL(EVL);
 }
 
 bool VPRecipeBuilder::validateWidenMemory(Instruction *I, VFRange &Range) {

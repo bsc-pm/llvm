@@ -49,10 +49,6 @@ class VPRecipeBuilder {
   EdgeMaskCacheTy EdgeMaskCache;
   BlockMaskCacheTy BlockMaskCache;
 
-  /// A cache to hold EVL per basic block.
-  using EVLCacheTy = DenseMap<BasicBlock *, VPValue *>;
-  EVLCacheTy EVLCache;
-
   // VPlan-VPlan transformations support: Hold a mapping from ingredients to
   // their recipe. To save on memory, only do so for selected ingredients,
   // marked by having a nullptr entry in this map.

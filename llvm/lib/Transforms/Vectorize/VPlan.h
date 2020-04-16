@@ -1680,6 +1680,9 @@ class VPlan {
   /// Holds the condition bit values built during VPInstruction to VPRecipe transformation.
   SmallVector<VPValue *, 4> VPCBVs;
 
+  /// EVL for widening by predicated vectorization.
+  VPValue *EVL = nullptr;
+
 public:
   VPlan(VPBlockBase *Entry = nullptr) : Entry(Entry) {
     if (Entry)
@@ -1764,6 +1767,10 @@ public:
       addVPValue(V);
     return getVPValue(V);
   }
+
+  VPValue *getEVL() { return EVL; }
+
+  VPValue *createEVL(VPValue *EVLVal) { return EVL = EVLVal; }
 
   /// Return the VPLoopInfo analysis for this VPlan.
   VPLoopInfo &getVPLoopInfo() { return VPLInfo; }
