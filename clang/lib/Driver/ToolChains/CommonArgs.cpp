@@ -1256,11 +1256,12 @@ static void AddLibgcc(const ToolChain &TC, const Driver &D,
 }
 
 static void AddLibatomic(const ToolChain &TC, const Driver &D,
-                          ArgStringList &CmdArgs, const ArgList &Args) {
+                         ArgStringList &CmdArgs, const ArgList &Args) {
   const llvm::Triple::ArchType Arch = TC.getArch();
 
-  // RISC-V may need libatomic
-  if (Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64) {
+  // RISC-V may need libatomic in Linux.
+  if (TC.getTriple().getOS() == llvm::Triple::Linux &&
+      (Arch == llvm::Triple::riscv32 || Arch == llvm::Triple::riscv64)) {
     CmdArgs.push_back("--as-needed");
     CmdArgs.push_back("-latomic");
     CmdArgs.push_back("--no-as-needed");
