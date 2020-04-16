@@ -148,6 +148,76 @@ bool RISCVRegisterInfo::hasReservedSpillSlot(const MachineFunction &MF,
   return true;
 }
 
+static Register computeVRSpillReloadInstructions(
+    MachineBasicBlock::iterator II, const Register &VReg,
+    const Register &HandleReg, unsigned LMUL, bool IsReload, bool KillVReg,
+    Register VLenBReg = 0, bool KillHandle = false) {
+  MachineBasicBlock &MBB = *II->getParent();
+  MachineFunction &MF = *MBB.getParent();
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
+  const RISCVInstrInfo &TII = *MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
+  DebugLoc DL = II->getDebugLoc();
+
+  if (LMUL == 1) {
+    if (IsReload)
+      BuildMI(MBB, II, DL, TII.get(RISCV::VL1R_V), VReg)
+          .addReg(HandleReg, getKillRegState(KillHandle || !VLenBReg));
+    else
+      BuildMI(MBB, II, DL, TII.get(RISCV::VS1R_V))
+          .addReg(VReg, getKillRegState(KillVReg))
+          .addReg(HandleReg, getKillRegState(KillHandle || !VLenBReg));
+
+    return HandleReg;
+  }
+
+  Register VRegEven, VRegOdd;
+  switch (LMUL) {
+  default:
+    llvm_unreachable("Unexpected LMUL value");
+  case 2:
+    VRegEven = RI.getSubReg(VReg, RISCV::vreven);
+    VRegOdd = RI.getSubReg(VReg, RISCV::vrodd);
+    break;
+  case 4:
+    VRegEven = RI.getSubReg(VReg, RISCV::vr2even);
+    VRegOdd = RI.getSubReg(VReg, RISCV::vr2odd);
+    break;
+  case 8:
+    VRegEven = RI.getSubReg(VReg, RISCV::vr4even);
+    VRegOdd = RI.getSubReg(VReg, RISCV::vr4odd);
+    break;
+  }
+
+  // Compute VLENB if it hasn't been computed.
+  if (!VLenBReg) {
+    VLenBReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    BuildMI(MBB, II, DL, TII.get(RISCV::PseudoReadVLENB), VLenBReg);
+
+    // The handle should only be killed in the VS1R/VL1R for the last register
+    // in the register group. This boolean is forwarded through the odd
+    // recursive calls only.
+    // Since VLENB hasn't been computed this must be the toplevel recursive
+    // call.
+    KillHandle = true;
+  }
+
+  // Recursive call on the even subregister. The handle corresponding to the
+  // latest spill/reload in the recursion is returned as a result.
+  Register LastHandleReg = computeVRSpillReloadInstructions(
+      II, VRegEven, HandleReg, LMUL / 2, IsReload, KillVReg, VLenBReg);
+
+  Register HandleRegOdd = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+  BuildMI(MBB, II, DL, TII.get(RISCV::ADD), HandleRegOdd)
+      .addReg(LastHandleReg, RegState::Kill)
+      .addReg(VLenBReg);
+
+  // Recursive call on the odd subregister. Return latest spill/reload handle.
+  return computeVRSpillReloadInstructions(II, VRegOdd, HandleRegOdd, LMUL / 2,
+                                          IsReload, KillVReg, VLenBReg,
+                                          KillHandle);
+}
+
 void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                             int SPAdj, unsigned FIOperandNum,
                                             RegScavenger *RS) const {
@@ -159,8 +229,6 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const RISCVInstrInfo *TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
   DebugLoc DL = MI.getDebugLoc();
-
-  const TargetRegisterInfo &RI = *MF.getSubtarget().getRegisterInfo();
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   Register FrameReg;
@@ -188,6 +256,10 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   case RISCV::PseudoVRELOAD_M1:
   case RISCV::PseudoVSPILL_M2:
   case RISCV::PseudoVRELOAD_M2:
+  case RISCV::PseudoVSPILL_M4:
+  case RISCV::PseudoVRELOAD_M4:
+  case RISCV::PseudoVSPILL_M8:
+  case RISCV::PseudoVRELOAD_M8:
     NeedsIndirectAddressing =
         MFI.getStackID(FrameIndex) == TargetStackID::EPIVector;
     break;
@@ -216,7 +288,7 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // replacing the FI above.
     unsigned LoadHandleOpcode =
         getRegSizeInBits(RISCV::GPRRegClass) == 32 ? RISCV::LW : RISCV::LD;
-    unsigned HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+    Register HandleReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
     MachineInstr *LoadHandle =
         BuildMI(MBB, II, DL, TII->get(LoadHandleOpcode), HandleReg)
             .add(SlotAddr)
@@ -226,62 +298,39 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     if (MI.getOpcode() == RISCV::PseudoVSPILL_M1 ||
         MI.getOpcode() == RISCV::PseudoVRELOAD_M1 ||
         MI.getOpcode() == RISCV::PseudoVSPILL_M2 ||
-        MI.getOpcode() == RISCV::PseudoVRELOAD_M2) {
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M2 ||
+        MI.getOpcode() == RISCV::PseudoVSPILL_M4 ||
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M4 ||
+        MI.getOpcode() == RISCV::PseudoVSPILL_M8 ||
+        MI.getOpcode() == RISCV::PseudoVRELOAD_M8) {
 
       // Make sure we spill/reload all the bits using whole register
       // instructions.
       MachineOperand &OpReg = MI.getOperand(0);
+      bool IsReload;
+      unsigned LMUL;
       switch (MI.getOpcode()) {
       default:
         llvm_unreachable("Unexpected instruction");
-      case RISCV::PseudoVSPILL_M1: {
-        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
-            .addReg(OpReg.getReg(), getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg, RegState::Kill);
-        break;
+      case RISCV::PseudoVSPILL_M1:
+        IsReload = false; LMUL = 1; break;
+      case RISCV::PseudoVRELOAD_M1:
+        IsReload = true;  LMUL = 1; break;
+      case RISCV::PseudoVSPILL_M2:
+        IsReload = false; LMUL = 2; break;
+      case RISCV::PseudoVRELOAD_M2:
+        IsReload = true;  LMUL = 2; break;
+      case RISCV::PseudoVSPILL_M4:
+        IsReload = false; LMUL = 4; break;
+      case RISCV::PseudoVRELOAD_M4:
+        IsReload = true;  LMUL = 4; break;
+      case RISCV::PseudoVSPILL_M8:
+        IsReload = false; LMUL = 8; break;
+      case RISCV::PseudoVRELOAD_M8:
+        IsReload = true;  LMUL = 8; break;
       }
-      case RISCV::PseudoVRELOAD_M1: {
-        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), OpReg.getReg())
-            .addReg(HandleReg, RegState::Kill);
-        break;
-      }
-      case RISCV::PseudoVSPILL_M2: {
-        unsigned RegEven = RI.getSubReg(OpReg.getReg(), RISCV::vreven);
-        unsigned RegOdd = RI.getSubReg(OpReg.getReg(), RISCV::vrodd);
-
-        unsigned VLenBReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-        BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVLENB), VLenBReg);
-
-        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
-            .addReg(RegEven, getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg);
-        unsigned HandleReg2 = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-        BuildMI(MBB, II, DL, TII->get(RISCV::ADD), HandleReg2)
-            .addReg(HandleReg, RegState::Kill)
-            .addReg(VLenBReg);
-        BuildMI(MBB, II, DL, TII->get(RISCV::VS1R_V))
-            .addReg(RegOdd, getKillRegState(OpReg.isKill()))
-            .addReg(HandleReg2, RegState::Kill);
-        break;
-      }
-      case RISCV::PseudoVRELOAD_M2: {
-        unsigned RegEven = RI.getSubReg(OpReg.getReg(), RISCV::vreven);
-        unsigned RegOdd = RI.getSubReg(OpReg.getReg(), RISCV::vrodd);
-
-        unsigned VLenBReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-        BuildMI(MBB, II, DL, TII->get(RISCV::PseudoReadVLENB), VLenBReg);
-
-        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), RegEven)
-            .addReg(HandleReg);
-        unsigned HandleReg2 = MRI.createVirtualRegister(&RISCV::GPRRegClass);
-        BuildMI(MBB, II, DL, TII->get(RISCV::ADD), HandleReg2)
-            .addReg(HandleReg)
-            .addReg(VLenBReg);
-        BuildMI(MBB, II, DL, TII->get(RISCV::VL1R_V), RegOdd)
-            .addReg(HandleReg2, RegState::Kill);
-        break;
-      }
-      }
+      computeVRSpillReloadInstructions(II, OpReg.getReg(), HandleReg, LMUL,
+                                       IsReload, /* KillVReg */ OpReg.isKill());
 
       // Remove the pseudo
       MI.eraseFromParent();

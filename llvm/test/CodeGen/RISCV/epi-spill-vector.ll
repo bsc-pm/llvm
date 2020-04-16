@@ -4,350 +4,304 @@
 ; RUN: llc -mtriple=riscv64 -mattr=+v -verify-machineinstrs -O2 < %s \
 ; RUN:    | FileCheck --check-prefix=SPILL-O2 %s
 
-define void @builtins_f64(<vscale x 1 x double>* %vaddr, i64 %gvl) nounwind {
-; SPILL-O0-LABEL: builtins_f64:
+define <vscale x 1 x i64> @spill_lmul_1(<vscale x 1 x i64> %va) nounwind {
+; SPILL-O0-LABEL: spill_lmul_1:
 ; SPILL-O0:       # %bb.0: # %entry
 ; SPILL-O0-NEXT:    addi sp, sp, -48
 ; SPILL-O0-NEXT:    sd ra, 40(sp)
 ; SPILL-O0-NEXT:    sd s0, 32(sp)
 ; SPILL-O0-NEXT:    addi s0, sp, 48
-; SPILL-O0-NEXT:    rdvlenb a2
-; SPILL-O0-NEXT:    sub sp, sp, a2
+; SPILL-O0-NEXT:    rdvlenb a0
+; SPILL-O0-NEXT:    sub sp, sp, a0
 ; SPILL-O0-NEXT:    sd sp, -40(s0)
-; SPILL-O0-NEXT:    sub sp, sp, a2
-; SPILL-O0-NEXT:    sd sp, -48(s0)
-; SPILL-O0-NEXT:    vsetvli a2, zero, e64,m1
-; SPILL-O0-NEXT:    vle.v v1, (a0)
-; SPILL-O0-NEXT:    vsetvli a1, a1, e64,m1
-; SPILL-O0-NEXT:    vfadd.vv v2, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v3, v2, v2
-; SPILL-O0-NEXT:    vfadd.vv v4, v3, v3
-; SPILL-O0-NEXT:    vfadd.vv v5, v4, v4
-; SPILL-O0-NEXT:    vfadd.vv v6, v5, v5
-; SPILL-O0-NEXT:    vfadd.vv v7, v6, v6
-; SPILL-O0-NEXT:    vfadd.vv v16, v7, v7
-; SPILL-O0-NEXT:    vfadd.vv v17, v16, v16
-; SPILL-O0-NEXT:    vfadd.vv v18, v17, v17
-; SPILL-O0-NEXT:    vfadd.vv v19, v18, v18
-; SPILL-O0-NEXT:    vfadd.vv v20, v19, v19
-; SPILL-O0-NEXT:    vfadd.vv v21, v20, v20
-; SPILL-O0-NEXT:    vfadd.vv v22, v21, v21
-; SPILL-O0-NEXT:    vfadd.vv v23, v22, v22
-; SPILL-O0-NEXT:    vfadd.vv v8, v23, v23
-; SPILL-O0-NEXT:    vfadd.vv v9, v8, v8
-; SPILL-O0-NEXT:    vfadd.vv v10, v9, v9
-; SPILL-O0-NEXT:    vfadd.vv v11, v10, v10
-; SPILL-O0-NEXT:    vfadd.vv v12, v11, v11
-; SPILL-O0-NEXT:    vfadd.vv v13, v12, v12
-; SPILL-O0-NEXT:    vfadd.vv v14, v13, v13
-; SPILL-O0-NEXT:    vfadd.vv v15, v14, v14
-; SPILL-O0-NEXT:    vfadd.vv v24, v15, v15
-; SPILL-O0-NEXT:    vfadd.vv v25, v24, v24
-; SPILL-O0-NEXT:    vfadd.vv v26, v25, v25
-; SPILL-O0-NEXT:    vfadd.vv v27, v26, v26
-; SPILL-O0-NEXT:    vfadd.vv v28, v27, v27
-; SPILL-O0-NEXT:    vfadd.vv v29, v28, v28
-; SPILL-O0-NEXT:    vfadd.vv v30, v29, v29
-; SPILL-O0-NEXT:    vfadd.vv v31, v30, v30
-; SPILL-O0-NEXT:    vfadd.vv v0, v31, v31
-; SPILL-O0-NEXT:    ld a1, -40(s0)
-; SPILL-O0-NEXT:    vs1r.v v1, (a1)
-; SPILL-O0-NEXT:    vfadd.vv v1, v0, v0
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O0-NEXT:    ld a1, -48(s0)
-; SPILL-O0-NEXT:    vs1r.v v2, (a1)
-; SPILL-O0-NEXT:    ld a1, -40(s0)
-; SPILL-O0-NEXT:    vl1r.v v2, (a1)
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v2
-; SPILL-O0-NEXT:    ld a1, -48(s0)
-; SPILL-O0-NEXT:    vl1r.v v2, (a1)
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v2
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v3
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v4
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v5
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v6
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v7
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v16
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v17
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v18
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v19
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v20
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v21
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v22
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v23
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v8
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v9
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v10
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v11
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v12
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v13
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v14
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v15
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v24
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v25
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v26
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v27
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v28
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v29
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v30
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v31
-; SPILL-O0-NEXT:    vfadd.vv v1, v1, v0
-; SPILL-O0-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O0-NEXT:    vse.v v1, (a0)
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    vs1r.v v16, (a0)
+; SPILL-O0-NEXT:    #APP
+; SPILL-O0-NEXT:    #NO_APP
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    vl1r.v v16, (a0)
 ; SPILL-O0-NEXT:    addi sp, s0, -48
 ; SPILL-O0-NEXT:    ld s0, 32(sp)
 ; SPILL-O0-NEXT:    ld ra, 40(sp)
 ; SPILL-O0-NEXT:    addi sp, sp, 48
 ; SPILL-O0-NEXT:    ret
 ;
-; SPILL-O2-LABEL: builtins_f64:
+; SPILL-O2-LABEL: spill_lmul_1:
 ; SPILL-O2:       # %bb.0: # %entry
 ; SPILL-O2-NEXT:    addi sp, sp, -48
 ; SPILL-O2-NEXT:    sd ra, 40(sp)
 ; SPILL-O2-NEXT:    sd s0, 32(sp)
 ; SPILL-O2-NEXT:    addi s0, sp, 48
-; SPILL-O2-NEXT:    rdvlenb a2
-; SPILL-O2-NEXT:    sub sp, sp, a2
+; SPILL-O2-NEXT:    rdvlenb a0
+; SPILL-O2-NEXT:    sub sp, sp, a0
 ; SPILL-O2-NEXT:    sd sp, -40(s0)
-; SPILL-O2-NEXT:    sub sp, sp, a2
-; SPILL-O2-NEXT:    sd sp, -48(s0)
-; SPILL-O2-NEXT:    vsetvli a2, zero, e64,m1
-; SPILL-O2-NEXT:    vle.v v1, (a0)
-; SPILL-O2-NEXT:    ld a2, -40(s0)
-; SPILL-O2-NEXT:    vs1r.v v1, (a2)
-; SPILL-O2-NEXT:    vsetvli a1, a1, e64,m1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    ld a1, -48(s0)
-; SPILL-O2-NEXT:    vs1r.v v1, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v3, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v4, v3, v3
-; SPILL-O2-NEXT:    vfadd.vv v5, v4, v4
-; SPILL-O2-NEXT:    vfadd.vv v6, v5, v5
-; SPILL-O2-NEXT:    vfadd.vv v7, v6, v6
-; SPILL-O2-NEXT:    vfadd.vv v16, v7, v7
-; SPILL-O2-NEXT:    vfadd.vv v17, v16, v16
-; SPILL-O2-NEXT:    vfadd.vv v18, v17, v17
-; SPILL-O2-NEXT:    vfadd.vv v19, v18, v18
-; SPILL-O2-NEXT:    vfadd.vv v20, v19, v19
-; SPILL-O2-NEXT:    vfadd.vv v21, v20, v20
-; SPILL-O2-NEXT:    vfadd.vv v22, v21, v21
-; SPILL-O2-NEXT:    vfadd.vv v23, v22, v22
-; SPILL-O2-NEXT:    vfadd.vv v8, v23, v23
-; SPILL-O2-NEXT:    vfadd.vv v9, v8, v8
-; SPILL-O2-NEXT:    vfadd.vv v10, v9, v9
-; SPILL-O2-NEXT:    vfadd.vv v11, v10, v10
-; SPILL-O2-NEXT:    vfadd.vv v12, v11, v11
-; SPILL-O2-NEXT:    vfadd.vv v13, v12, v12
-; SPILL-O2-NEXT:    vfadd.vv v14, v13, v13
-; SPILL-O2-NEXT:    vfadd.vv v15, v14, v14
-; SPILL-O2-NEXT:    vfadd.vv v24, v15, v15
-; SPILL-O2-NEXT:    vfadd.vv v25, v24, v24
-; SPILL-O2-NEXT:    vfadd.vv v26, v25, v25
-; SPILL-O2-NEXT:    vfadd.vv v27, v26, v26
-; SPILL-O2-NEXT:    vfadd.vv v28, v27, v27
-; SPILL-O2-NEXT:    vfadd.vv v29, v28, v28
-; SPILL-O2-NEXT:    vfadd.vv v30, v29, v29
-; SPILL-O2-NEXT:    vfadd.vv v31, v30, v30
-; SPILL-O2-NEXT:    vfadd.vv v0, v31, v31
-; SPILL-O2-NEXT:    vfadd.vv v1, v0, v0
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v1
-; SPILL-O2-NEXT:    ld a1, -40(s0)
-; SPILL-O2-NEXT:    vl1r.v v2, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v2
-; SPILL-O2-NEXT:    ld a1, -48(s0)
-; SPILL-O2-NEXT:    vl1r.v v2, (a1)
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v2
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v3
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v4
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v5
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v6
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v7
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v16
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v17
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v18
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v19
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v20
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v21
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v22
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v23
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v8
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v9
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v10
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v11
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v12
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v13
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v14
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v15
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v24
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v25
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v26
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v27
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v28
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v29
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v30
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v31
-; SPILL-O2-NEXT:    vfadd.vv v1, v1, v0
-; SPILL-O2-NEXT:    vsetvli a1, zero, e64,m1
-; SPILL-O2-NEXT:    vse.v v1, (a0)
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    vs1r.v v16, (a0)
+; SPILL-O2-NEXT:    #APP
+; SPILL-O2-NEXT:    #NO_APP
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    vl1r.v v16, (a0)
 ; SPILL-O2-NEXT:    addi sp, s0, -48
 ; SPILL-O2-NEXT:    ld s0, 32(sp)
 ; SPILL-O2-NEXT:    ld ra, 40(sp)
 ; SPILL-O2-NEXT:    addi sp, sp, 48
 ; SPILL-O2-NEXT:    ret
 entry:
-  %v10 = load <vscale x 1 x double>, <vscale x 1 x double>* %vaddr, align 8
+  call void asm sideeffect "",
+  "~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31}"()
 
-  %v11 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v10, <vscale x 1 x double> %v10, i64 %gvl)
-  %v12 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v11, <vscale x 1 x double> %v11, i64 %gvl)
-  %v13 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v12, <vscale x 1 x double> %v12, i64 %gvl)
-  %v14 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v13, <vscale x 1 x double> %v13, i64 %gvl)
-  %v15 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v14, <vscale x 1 x double> %v14, i64 %gvl)
-  %v16 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v15, <vscale x 1 x double> %v15, i64 %gvl)
-  %v17 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v16, <vscale x 1 x double> %v16, i64 %gvl)
-  %v18 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v17, <vscale x 1 x double> %v17, i64 %gvl)
-  %v19 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v18, <vscale x 1 x double> %v18, i64 %gvl)
-  %v20 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v19, <vscale x 1 x double> %v19, i64 %gvl)
-  %v21 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v20, <vscale x 1 x double> %v20, i64 %gvl)
-  %v22 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v21, <vscale x 1 x double> %v21, i64 %gvl)
-  %v23 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v22, <vscale x 1 x double> %v22, i64 %gvl)
-  %v24 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v23, <vscale x 1 x double> %v23, i64 %gvl)
-  %v25 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v24, <vscale x 1 x double> %v24, i64 %gvl)
-  %v26 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v25, <vscale x 1 x double> %v25, i64 %gvl)
-  %v27 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v26, <vscale x 1 x double> %v26, i64 %gvl)
-  %v28 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v27, <vscale x 1 x double> %v27, i64 %gvl)
-  %v29 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v28, <vscale x 1 x double> %v28, i64 %gvl)
-  %v30 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v29, <vscale x 1 x double> %v29, i64 %gvl)
-  %v31 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v30, <vscale x 1 x double> %v30, i64 %gvl)
-  %v32 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v31, <vscale x 1 x double> %v31, i64 %gvl)
-  %v33 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v32, <vscale x 1 x double> %v32, i64 %gvl)
-  %v34 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v33, <vscale x 1 x double> %v33, i64 %gvl)
-  %v35 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v34, <vscale x 1 x double> %v34, i64 %gvl)
-  %v36 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v35, <vscale x 1 x double> %v35, i64 %gvl)
-  %v37 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v36, <vscale x 1 x double> %v36, i64 %gvl)
-  %v38 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v37, <vscale x 1 x double> %v37, i64 %gvl)
-  %v39 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v38, <vscale x 1 x double> %v38, i64 %gvl)
-  %v40 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v39, <vscale x 1 x double> %v39, i64 %gvl)
-  %v41 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v40, <vscale x 1 x double> %v40, i64 %gvl)
-  %v42 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v41, <vscale x 1 x double> %v41, i64 %gvl)
-  %v43 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v42, <vscale x 1 x double> %v42, i64 %gvl)
-  %v44 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v43, <vscale x 1 x double> %v43, i64 %gvl)
-  %v45 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v44, <vscale x 1 x double> %v44, i64 %gvl)
-  %v46 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v45, <vscale x 1 x double> %v45, i64 %gvl)
-  %v47 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v46, <vscale x 1 x double> %v46, i64 %gvl)
-  %v48 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v47, <vscale x 1 x double> %v47, i64 %gvl)
-  %v49 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v48, <vscale x 1 x double> %v48, i64 %gvl)
-  %v50 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v49, <vscale x 1 x double> %v49, i64 %gvl)
-  %v51 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v50, <vscale x 1 x double> %v50, i64 %gvl)
-  %v52 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v51, <vscale x 1 x double> %v51, i64 %gvl)
-  %v53 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v52, <vscale x 1 x double> %v52, i64 %gvl)
-  %v54 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v53, <vscale x 1 x double> %v53, i64 %gvl)
-  %v55 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v54, <vscale x 1 x double> %v54, i64 %gvl)
-  %v56 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v55, <vscale x 1 x double> %v55, i64 %gvl)
-  %v57 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v56, <vscale x 1 x double> %v56, i64 %gvl)
-  %v58 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v57, <vscale x 1 x double> %v57, i64 %gvl)
-  %v59 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v58, <vscale x 1 x double> %v58, i64 %gvl)
-  %v60 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v59, <vscale x 1 x double> %v59, i64 %gvl)
-  %v61 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v60, <vscale x 1 x double> %v60, i64 %gvl)
-  %v62 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v61, <vscale x 1 x double> %v61, i64 %gvl)
-  %v63 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v62, <vscale x 1 x double> %v62, i64 %gvl)
-  %v64 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v63, <vscale x 1 x double> %v63, i64 %gvl)
-  %v65 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v64, <vscale x 1 x double> %v64, i64 %gvl)
-  %v66 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v65, <vscale x 1 x double> %v65, i64 %gvl)
-  %v67 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v66, <vscale x 1 x double> %v66, i64 %gvl)
-  %v68 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v67, <vscale x 1 x double> %v67, i64 %gvl)
-  %v69 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v68, <vscale x 1 x double> %v68, i64 %gvl)
-  %v70 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v69, <vscale x 1 x double> %v69, i64 %gvl)
-
-  %v71 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v70, <vscale x 1 x double> %v10, i64 %gvl)
-  %v72 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v71, <vscale x 1 x double> %v11, i64 %gvl)
-  %v73 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v72, <vscale x 1 x double> %v12, i64 %gvl)
-  %v74 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v73, <vscale x 1 x double> %v13, i64 %gvl)
-  %v75 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v74, <vscale x 1 x double> %v14, i64 %gvl)
-  %v76 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v75, <vscale x 1 x double> %v15, i64 %gvl)
-  %v77 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v76, <vscale x 1 x double> %v16, i64 %gvl)
-  %v78 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v77, <vscale x 1 x double> %v17, i64 %gvl)
-  %v79 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v78, <vscale x 1 x double> %v18, i64 %gvl)
-  %v80 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v79, <vscale x 1 x double> %v19, i64 %gvl)
-  %v81 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v80, <vscale x 1 x double> %v20, i64 %gvl)
-  %v82 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v81, <vscale x 1 x double> %v21, i64 %gvl)
-  %v83 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v82, <vscale x 1 x double> %v22, i64 %gvl)
-  %v84 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v83, <vscale x 1 x double> %v23, i64 %gvl)
-  %v85 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v84, <vscale x 1 x double> %v24, i64 %gvl)
-  %v86 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v85, <vscale x 1 x double> %v25, i64 %gvl)
-  %v87 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v86, <vscale x 1 x double> %v26, i64 %gvl)
-  %v88 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v87, <vscale x 1 x double> %v27, i64 %gvl)
-  %v89 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v88, <vscale x 1 x double> %v28, i64 %gvl)
-  %v90 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v89, <vscale x 1 x double> %v29, i64 %gvl)
-  %v91 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v90, <vscale x 1 x double> %v30, i64 %gvl)
-  %v92 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v91, <vscale x 1 x double> %v31, i64 %gvl)
-  %v93 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v92, <vscale x 1 x double> %v32, i64 %gvl)
-  %v94 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v93, <vscale x 1 x double> %v33, i64 %gvl)
-  %v95 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v94, <vscale x 1 x double> %v34, i64 %gvl)
-  %v96 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v95, <vscale x 1 x double> %v35, i64 %gvl)
-  %v97 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v96, <vscale x 1 x double> %v36, i64 %gvl)
-  %v98 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v97, <vscale x 1 x double> %v37, i64 %gvl)
-  %v99 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v98, <vscale x 1 x double> %v38, i64 %gvl)
-  %v100 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v99, <vscale x 1 x double> %v39, i64 %gvl)
-  %v101 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v100, <vscale x 1 x double> %v40, i64 %gvl)
-  %v102 = call <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double> %v101, <vscale x 1 x double> %v41, i64 %gvl)
-
-  store <vscale x 1 x double> %v102, <vscale x 1 x double>* %vaddr, align 8
-  ret void
+  ret <vscale x 1 x i64> %va
 }
 
-; Function Attrs: nounwind readnone
-declare <vscale x 1 x double> @llvm.epi.vfadd.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>, i64)
+define <vscale x 2 x i64> @spill_lmul_2(<vscale x 2 x i64> %va) nounwind {
+; SPILL-O0-LABEL: spill_lmul_2:
+; SPILL-O0:       # %bb.0: # %entry
+; SPILL-O0-NEXT:    addi sp, sp, -48
+; SPILL-O0-NEXT:    sd ra, 40(sp)
+; SPILL-O0-NEXT:    sd s0, 32(sp)
+; SPILL-O0-NEXT:    addi s0, sp, 48
+; SPILL-O0-NEXT:    rdvlenb a0
+; SPILL-O0-NEXT:    slli a0, a0, 1
+; SPILL-O0-NEXT:    sub sp, sp, a0
+; SPILL-O0-NEXT:    sd sp, -40(s0)
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vs1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v17, (a0)
+; SPILL-O0-NEXT:    #APP
+; SPILL-O0-NEXT:    #NO_APP
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vl1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v17, (a0)
+; SPILL-O0-NEXT:    addi sp, s0, -48
+; SPILL-O0-NEXT:    ld s0, 32(sp)
+; SPILL-O0-NEXT:    ld ra, 40(sp)
+; SPILL-O0-NEXT:    addi sp, sp, 48
+; SPILL-O0-NEXT:    ret
+;
+; SPILL-O2-LABEL: spill_lmul_2:
+; SPILL-O2:       # %bb.0: # %entry
+; SPILL-O2-NEXT:    addi sp, sp, -48
+; SPILL-O2-NEXT:    sd ra, 40(sp)
+; SPILL-O2-NEXT:    sd s0, 32(sp)
+; SPILL-O2-NEXT:    addi s0, sp, 48
+; SPILL-O2-NEXT:    rdvlenb a0
+; SPILL-O2-NEXT:    slli a0, a0, 1
+; SPILL-O2-NEXT:    sub sp, sp, a0
+; SPILL-O2-NEXT:    sd sp, -40(s0)
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vs1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v17, (a0)
+; SPILL-O2-NEXT:    #APP
+; SPILL-O2-NEXT:    #NO_APP
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vl1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v17, (a0)
+; SPILL-O2-NEXT:    addi sp, s0, -48
+; SPILL-O2-NEXT:    ld s0, 32(sp)
+; SPILL-O2-NEXT:    ld ra, 40(sp)
+; SPILL-O2-NEXT:    addi sp, sp, 48
+; SPILL-O2-NEXT:    ret
+entry:
+  call void asm sideeffect "",
+  "~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31}"()
+
+  ret <vscale x 2 x i64> %va
+}
+
+define <vscale x 4 x i64> @spill_lmul_4(<vscale x 4 x i64> %va) nounwind {
+; SPILL-O0-LABEL: spill_lmul_4:
+; SPILL-O0:       # %bb.0: # %entry
+; SPILL-O0-NEXT:    addi sp, sp, -48
+; SPILL-O0-NEXT:    sd ra, 40(sp)
+; SPILL-O0-NEXT:    sd s0, 32(sp)
+; SPILL-O0-NEXT:    addi s0, sp, 48
+; SPILL-O0-NEXT:    rdvlenb a0
+; SPILL-O0-NEXT:    slli a0, a0, 2
+; SPILL-O0-NEXT:    sub sp, sp, a0
+; SPILL-O0-NEXT:    sd sp, -40(s0)
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vs1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v17, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v18, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v19, (a0)
+; SPILL-O0-NEXT:    #APP
+; SPILL-O0-NEXT:    #NO_APP
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vl1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v17, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v18, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v19, (a0)
+; SPILL-O0-NEXT:    addi sp, s0, -48
+; SPILL-O0-NEXT:    ld s0, 32(sp)
+; SPILL-O0-NEXT:    ld ra, 40(sp)
+; SPILL-O0-NEXT:    addi sp, sp, 48
+; SPILL-O0-NEXT:    ret
+;
+; SPILL-O2-LABEL: spill_lmul_4:
+; SPILL-O2:       # %bb.0: # %entry
+; SPILL-O2-NEXT:    addi sp, sp, -48
+; SPILL-O2-NEXT:    sd ra, 40(sp)
+; SPILL-O2-NEXT:    sd s0, 32(sp)
+; SPILL-O2-NEXT:    addi s0, sp, 48
+; SPILL-O2-NEXT:    rdvlenb a0
+; SPILL-O2-NEXT:    slli a0, a0, 2
+; SPILL-O2-NEXT:    sub sp, sp, a0
+; SPILL-O2-NEXT:    sd sp, -40(s0)
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vs1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v17, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v18, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v19, (a0)
+; SPILL-O2-NEXT:    #APP
+; SPILL-O2-NEXT:    #NO_APP
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vl1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v17, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v18, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v19, (a0)
+; SPILL-O2-NEXT:    addi sp, s0, -48
+; SPILL-O2-NEXT:    ld s0, 32(sp)
+; SPILL-O2-NEXT:    ld ra, 40(sp)
+; SPILL-O2-NEXT:    addi sp, sp, 48
+; SPILL-O2-NEXT:    ret
+entry:
+  call void asm sideeffect "",
+  "~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31}"()
+
+  ret <vscale x 4 x i64> %va
+}
+
+define <vscale x 8 x i64> @spill_lmul_8(<vscale x 8 x i64> %va) nounwind {
+; SPILL-O0-LABEL: spill_lmul_8:
+; SPILL-O0:       # %bb.0: # %entry
+; SPILL-O0-NEXT:    addi sp, sp, -48
+; SPILL-O0-NEXT:    sd ra, 40(sp)
+; SPILL-O0-NEXT:    sd s0, 32(sp)
+; SPILL-O0-NEXT:    addi s0, sp, 48
+; SPILL-O0-NEXT:    rdvlenb a0
+; SPILL-O0-NEXT:    slli a0, a0, 3
+; SPILL-O0-NEXT:    sub sp, sp, a0
+; SPILL-O0-NEXT:    sd sp, -40(s0)
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vs1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v17, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v18, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v19, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v20, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v21, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v22, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vs1r.v v23, (a0)
+; SPILL-O0-NEXT:    #APP
+; SPILL-O0-NEXT:    #NO_APP
+; SPILL-O0-NEXT:    ld a0, -40(s0)
+; SPILL-O0-NEXT:    rdvlenb a1
+; SPILL-O0-NEXT:    vl1r.v v16, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v17, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v18, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v19, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v20, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v21, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v22, (a0)
+; SPILL-O0-NEXT:    add a0, a0, a1
+; SPILL-O0-NEXT:    vl1r.v v23, (a0)
+; SPILL-O0-NEXT:    addi sp, s0, -48
+; SPILL-O0-NEXT:    ld s0, 32(sp)
+; SPILL-O0-NEXT:    ld ra, 40(sp)
+; SPILL-O0-NEXT:    addi sp, sp, 48
+; SPILL-O0-NEXT:    ret
+;
+; SPILL-O2-LABEL: spill_lmul_8:
+; SPILL-O2:       # %bb.0: # %entry
+; SPILL-O2-NEXT:    addi sp, sp, -48
+; SPILL-O2-NEXT:    sd ra, 40(sp)
+; SPILL-O2-NEXT:    sd s0, 32(sp)
+; SPILL-O2-NEXT:    addi s0, sp, 48
+; SPILL-O2-NEXT:    rdvlenb a0
+; SPILL-O2-NEXT:    slli a0, a0, 3
+; SPILL-O2-NEXT:    sub sp, sp, a0
+; SPILL-O2-NEXT:    sd sp, -40(s0)
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vs1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v17, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v18, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v19, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v20, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v21, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v22, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vs1r.v v23, (a0)
+; SPILL-O2-NEXT:    #APP
+; SPILL-O2-NEXT:    #NO_APP
+; SPILL-O2-NEXT:    ld a0, -40(s0)
+; SPILL-O2-NEXT:    rdvlenb a1
+; SPILL-O2-NEXT:    vl1r.v v16, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v17, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v18, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v19, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v20, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v21, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v22, (a0)
+; SPILL-O2-NEXT:    add a0, a0, a1
+; SPILL-O2-NEXT:    vl1r.v v23, (a0)
+; SPILL-O2-NEXT:    addi sp, s0, -48
+; SPILL-O2-NEXT:    ld s0, 32(sp)
+; SPILL-O2-NEXT:    ld ra, 40(sp)
+; SPILL-O2-NEXT:    addi sp, sp, 48
+; SPILL-O2-NEXT:    ret
+entry:
+  call void asm sideeffect "",
+  "~{v0},~{v1},~{v2},~{v3},~{v4},~{v5},~{v6},~{v7},~{v8},~{v9},~{v10},~{v11},~{v12},~{v13},~{v14},~{v15},~{v16},~{v17},~{v18},~{v19},~{v20},~{v21},~{v22},~{v23},~{v24},~{v25},~{v26},~{v27},~{v28},~{v29},~{v30},~{v31}"()
+
+  ret <vscale x 8 x i64> %va
+}
