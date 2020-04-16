@@ -53,7 +53,7 @@ static void printName(raw_ostream &OS, StringRef Name) {
 void MCSectionELF::PrintSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
                                         raw_ostream &OS,
                                         const MCExpr *Subsection) const {
-  if (ShouldOmitSectionDirective(SectionName, MAI)) {
+  if (ShouldOmitSectionDirective(getName(), MAI)) {
     OS << '\t' << getName();
     if (Subsection) {
       OS << '\t';
@@ -196,3 +196,5 @@ bool MCSectionELF::UseCodeAlign() const {
 bool MCSectionELF::isVirtualSection() const {
   return getType() == ELF::SHT_NOBITS;
 }
+
+StringRef MCSectionELF::getVirtualSectionKind() const { return "SHT_NOBITS"; }
