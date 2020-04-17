@@ -21,6 +21,8 @@ public:
 
   virtual void emitDirectiveOptionPush() = 0;
   virtual void emitDirectiveOptionPop() = 0;
+  virtual void emitDirectiveOptionPIC() = 0;
+  virtual void emitDirectiveOptionNoPIC() = 0;
   virtual void emitDirectiveOptionRVC() = 0;
   virtual void emitDirectiveOptionNoRVC() = 0;
   virtual void emitDirectiveOptionPIC() = 0;
@@ -51,6 +53,8 @@ public:
 
   void emitDirectiveOptionPush() override;
   void emitDirectiveOptionPop() override;
+  void emitDirectiveOptionPIC() override;
+  void emitDirectiveOptionNoPIC() override;
   void emitDirectiveOptionRVC() override;
   void emitDirectiveOptionNoRVC() override;
   void emitDirectiveOptionPIC() override;
