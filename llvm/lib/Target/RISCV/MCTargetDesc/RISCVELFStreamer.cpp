@@ -11,9 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCVELFStreamer.h"
-#include "RISCVMCExpr.h"
-#include "RISCVMCTargetDesc.h"
 #include "MCTargetDesc/RISCVAsmBackend.h"
+#include "RISCVMCTargetDesc.h"
 #include "Utils/RISCVBaseInfo.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCContext.h"
@@ -71,8 +70,6 @@ void RISCVTargetELFStreamer::emitDirectiveOptionPIC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoPIC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionRVC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoRVC() {}
-void RISCVTargetELFStreamer::emitDirectiveOptionPIC() {}
-void RISCVTargetELFStreamer::emitDirectiveOptionNoPIC() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionRelax() {}
 void RISCVTargetELFStreamer::emitDirectiveOptionNoRelax() {}
 
