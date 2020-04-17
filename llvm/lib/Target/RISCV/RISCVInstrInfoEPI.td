@@ -1343,19 +1343,13 @@ let Predicates = [HasStdExtV] in {
                  (vti.Vector vti.RegClass:$rs1), 1,
                  (vti.Mask zero_reg),
                  VLMax, vti.SEW),
-                (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
-                 (vti.Vector zero_reg),
-                 (vti.Vector (IMPLICIT_DEF)), 0,
-                 (vti.Mask zero_reg),
+                (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul) 0,
                  VLMax, vti.SEW),
                 (vti.Mask zero_reg),
                 VLMax, vti.SEW)>;
      def : Pat<(vti.Vector (zext (vti.Mask V0))),
                (!cast<Instruction>("PseudoVMERGE_VIM_M"#vti.RegClass.VLMul)
-                (!cast<Instruction>("PseudoVAND_VI_M"#vti.RegClass.VLMul)
-                 (vti.Vector zero_reg),
-                 (vti.Vector (IMPLICIT_DEF)), 0,
-                 (vti.Mask zero_reg),
+                (!cast<Instruction>("PseudoVMV_V_I_M"#vti.RegClass.VLMul) 0,
                  VLMax, vti.SEW),
                 1,
                 (vti.Mask V0),
