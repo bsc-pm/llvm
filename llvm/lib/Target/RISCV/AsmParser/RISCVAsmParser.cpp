@@ -51,10 +51,17 @@ STATISTIC(RISCVNumInstrsCompressed,
 namespace {
 struct RISCVOperand;
 
+struct ParserOptionsSet {
+  bool IsPicEnabled;
+};
+
 class RISCVAsmParser : public MCTargetAsmParser {
   SmallVector<FeatureBitset, 4> FeatureBitStack;
   // FIXME: I think this has to got to MCSubtargetInfo
   bool IsPicEnabled;
+
+  SmallVector<ParserOptionsSet, 4> ParserOptionsStack;
+  ParserOptionsSet ParserOptions;
 
   SMLoc getLoc() const { return getParser().getTok().getLoc(); }
   bool isRV64() const { return getSTI().hasFeature(RISCV::Feature64Bit); }
@@ -177,16 +184,23 @@ class RISCVAsmParser : public MCTargetAsmParser {
   }
 
   void pushFeatureBits() {
+    assert(FeatureBitStack.size() == ParserOptionsStack.size() &&
+           "These two stacks must be kept synchronized");
     FeatureBitStack.push_back(getSTI().getFeatureBits());
+    ParserOptionsStack.push_back(ParserOptions);
   }
 
   bool popFeatureBits() {
+    assert(FeatureBitStack.size() == ParserOptionsStack.size() &&
+           "These two stacks must be kept synchronized");
     if (FeatureBitStack.empty())
       return true;
 
     FeatureBitset FeatureBits = FeatureBitStack.pop_back_val();
     copySTI().setFeatureBits(FeatureBits);
     setAvailableFeatures(ComputeAvailableFeatures(FeatureBits));
+
+    ParserOptions = ParserOptionsStack.pop_back_val();
 
     return false;
   }
@@ -229,7 +243,8 @@ public:
                 "target-abi)\n";
     }
 
-    IsPicEnabled = getContext().getObjectFileInfo()->isPositionIndependent();
+    const MCObjectFileInfo *MOFI = Parser.getContext().getObjectFileInfo();
+    ParserOptions.IsPicEnabled = MOFI->isPositionIndependent();
   }
 };
 
@@ -1945,7 +1960,7 @@ bool RISCVAsmParser::parseDirectiveOption() {
       return Error(Parser.getTok().getLoc(),
                    "unexpected token, expected end of statement");
 
-    IsPicEnabled = true;
+    ParserOptions.IsPicEnabled = true;
     return false;
   }
 
@@ -1957,7 +1972,7 @@ bool RISCVAsmParser::parseDirectiveOption() {
       return Error(Parser.getTok().getLoc(),
                    "unexpected token, expected end of statement");
 
-    IsPicEnabled = false;
+    ParserOptions.IsPicEnabled = false;
     return false;
   }
 
@@ -2224,7 +2239,7 @@ void RISCVAsmParser::emitLoadAddress(MCInst &Inst, SMLoc IDLoc,
   const MCExpr *Symbol = Inst.getOperand(1).getExpr();
   unsigned SecondOpcode;
   RISCVMCExpr::VariantKind VKHi;
-  if (IsPicEnabled) {
+  if (ParserOptions.IsPicEnabled) {
     SecondOpcode = isRV64() ? RISCV::LD : RISCV::LW;
     VKHi = RISCVMCExpr::VK_RISCV_GOT_HI;
   } else {
