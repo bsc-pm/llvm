@@ -315,7 +315,10 @@ EVT RISCVTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
                                             EVT VT) const {
   if (!VT.isVector())
     return getPointerTy(DL);
-  return VT.changeVectorElementTypeToInteger();
+  if (Subtarget.hasStdExtV())
+    return MVT::getVectorVT(MVT::i1, VT.getVectorElementCount());
+  else
+    return VT.changeVectorElementTypeToInteger();
 }
 
 bool RISCVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
