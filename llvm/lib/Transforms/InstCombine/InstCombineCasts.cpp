@@ -93,7 +93,7 @@ Instruction *InstCombiner::PromoteCastOfAllocation(BitCastInst &CI,
   Type *CastElTy = PTy->getElementType();
   if (!AllocElTy->isSized() || !CastElTy->isSized()) return nullptr;
 
-  if (CastElTy->isVectorTy() && CastElTy->getVectorIsScalable())
+  if (isa<VectorType>(CastElTy) && cast<VectorType>(CastElTy)->isScalable())
     return nullptr;
 
   unsigned AllocElTyAlign = DL.getABITypeAlignment(AllocElTy);
@@ -696,9 +696,8 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
   Type *DestTy = CI.getType(), *SrcTy = Src->getType();
   ConstantInt *Cst;
 
-  bool IsScalable =
-      CI.getType()->isVectorTy() && CI.getType()->getVectorIsScalable();
-  if (IsScalable)
+  if (isa<VectorType>(CI.getType()) &&
+      cast<VectorType>(CI.getType())->isScalable())
     return nullptr;
 
   // Attempt to truncate the entire input expression tree to the destination
@@ -1143,9 +1142,8 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   Value *Src = CI.getOperand(0);
   Type *SrcTy = Src->getType(), *DestTy = CI.getType();
 
-  bool IsScalable =
-      CI.getType()->isVectorTy() && CI.getType()->getVectorIsScalable();
-  if (IsScalable)
+  if (isa<VectorType>(CI.getType()) &&
+      cast<VectorType>(CI.getType())->isScalable())
     return nullptr;
 
   // Try to extend the entire expression tree to the wide destination type.

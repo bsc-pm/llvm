@@ -2910,7 +2910,8 @@ static unsigned ComputeNumSignBitsImpl(const Value *V,
 
       // For scalable vectors, we do not know all the elements. Return the
       // default conservative result.
-      if (U->getType()->getVectorIsScalable())
+      if (isa<VectorType>(U->getType()) &&
+          cast<VectorType>(U->getType())->isScalable())
         return 1;
 
       auto *Shuf = cast<ShuffleVectorInst>(U);

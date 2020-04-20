@@ -906,7 +906,7 @@ public:
     // Assuming that all loads of legal types cost 1.
     unsigned Cost = LT.first;
 
-    if (Src->isVectorTy() && !Src->getVectorIsScalable() &&
+    if (isa<VectorType>(Src) && cast<VectorType>(Src)->isScalable() &&
         Src->getPrimitiveSizeInBits() < LT.second.getSizeInBits()) {
       // This is a vector load that legalizes to a larger type than the vector
       // itself. Unless the corresponding extending load or truncating store is

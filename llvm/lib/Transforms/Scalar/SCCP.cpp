@@ -399,17 +399,13 @@ private:
     return true;
   }
 
+  /// Merge \p MergeWithV into \p IV and push \p V to the worklist, if \p IV
+  /// changes.
   bool mergeInValue(ValueLatticeElement &IV, Value *V,
-                    ValueLatticeElement MergeWithV, bool Widen = true) {
-    // Do a simple form of widening, to avoid extending a range repeatedly in a
-    // loop. If IV is a constant range, it means we already set it once. If
-    // MergeWithV would extend IV, mark V as overdefined.
-    if (Widen && IV.isConstantRange() && MergeWithV.isConstantRange() &&
-        !IV.getConstantRange().contains(MergeWithV.getConstantRange())) {
-      markOverdefined(IV, V);
-      return true;
-    }
-    if (IV.mergeIn(MergeWithV)) {
+                    ValueLatticeElement MergeWithV,
+                    ValueLatticeElement::MergeOptions Opts = {
+                        /*MayIncludeUndef=*/false, /*CheckWiden=*/true}) {
+    if (IV.mergeIn(MergeWithV, Opts)) {
       pushToWorkList(IV, V);
       LLVM_DEBUG(dbgs() << "Merged " << MergeWithV << " into " << *V << " : "
                         << IV << "\n");
@@ -419,10 +415,11 @@ private:
   }
 
   bool mergeInValue(Value *V, ValueLatticeElement MergeWithV,
-                    bool Widen = true) {
+                    ValueLatticeElement::MergeOptions Opts = {
+                        /*MayIncludeUndef=*/false, /*CheckWiden=*/true}) {
     assert(!V->getType()->isStructTy() &&
            "non-structs should use markConstant");
-    return mergeInValue(ValueState[V], V, MergeWithV, Widen);
+    return mergeInValue(ValueState[V], V, MergeWithV, Opts);
   }
 
   /// getValueState - Return the ValueLatticeElement object that corresponds to
@@ -754,11 +751,6 @@ void SCCPSolver::visitPHINode(PHINode &PN) {
 void SCCPSolver::visitReturnInst(ReturnInst &I) {
   if (I.getNumOperands() == 0) return;  // ret void
 
-  // ResolvedUndefsIn might mark I as overdefined. Bail out, even if we would
-  // discover a concrete value later.
-  if (isOverdefined(ValueState[&I]))
-    return (void)markOverdefined(&I);
-
   Function *F = I.getParent()->getParent();
   Value *ResultOp = I.getOperand(0);
 
@@ -1074,11 +1066,6 @@ void SCCPSolver::visitStoreInst(StoreInst &SI) {
   if (TrackedGlobals.empty() || !isa<GlobalVariable>(SI.getOperand(1)))
     return;
 
-  // ResolvedUndefsIn might mark I as overdefined. Bail out, even if we would
-  // discover a concrete value later.
-  if (isOverdefined(ValueState[&SI]))
-    return (void)markOverdefined(&SI);
-
   GlobalVariable *GV = cast<GlobalVariable>(SI.getOperand(1));
   auto I = TrackedGlobals.find(GV);
   if (I == TrackedGlobals.end())
@@ -1221,7 +1208,8 @@ void SCCPSolver::handleCallArguments(CallSite CS) {
           mergeInValue(getStructValueState(&*AI, i), &*AI, CallArg);
         }
       } else
-        mergeInValue(&*AI, getValueState(*CAI), false);
+        mergeInValue(&*AI, getValueState(*CAI),
+                     ValueLatticeElement::MergeOptions().setCheckWiden(false));
     }
   }
 }

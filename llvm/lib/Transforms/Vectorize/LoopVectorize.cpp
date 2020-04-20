@@ -1348,6 +1348,13 @@ public:
   /// Returns true if the target uses scalable vector type.
   bool isScalable() const { return TTI.useScalableVectorType(); }
 
+  /// Invalidates decisions already taken by the cost model.
+  void invalidateCostModelingDecisions() {
+    WideningDecisions.clear();
+    Uniforms.clear();
+    Scalars.clear();
+  }
+
 private:
   unsigned NumPredStores = 0;
 
@@ -2231,7 +2238,8 @@ void InnerLoopVectorizer::packScalarIntoVectorValue(
 Value *InnerLoopVectorizer::reverseVector(Value *Vec) {
   assert(Vec->getType()->isVectorTy() && "Invalid type");
 
-  if (Vec->getType()->getVectorIsScalable()) {
+  if (isa<VectorType>(Vec->getType()) &&
+      cast<VectorType>(Vec->getType())->isScalable()) {
     Function *ReverseFunc = Intrinsic::getDeclaration(
         LoopVectorPreHeader->getModule(),
         Intrinsic::experimental_vector_reverse, {Vec->getType()});
@@ -2565,9 +2573,9 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
         Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
         Value *VectorGep = State.get(Addr, Part);
         VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-        if (!MaskPart && VectorGepTy->getVectorIsScalable()) {
+        if (!MaskPart && VectorGepTy->isScalable()) {
           MaskPart = Builder.CreateVectorSplat(
-              VectorGepTy->getVectorNumElements(), Builder.getTrue(), "", true);
+              VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
         }
         NewSI = Builder.CreateMaskedScatter(StoredVal, VectorGep, Alignment,
                                             MaskPart);
@@ -2600,9 +2608,9 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
       VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-      if (!MaskPart && VectorGepTy->getVectorIsScalable()) {
+      if (!MaskPart && VectorGepTy->isScalable()) {
         MaskPart = Builder.CreateVectorSplat(
-            VectorGepTy->getVectorNumElements(), Builder.getTrue(), "", true);
+            VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
       }
       NewLI = Builder.CreateMaskedGather(VectorGep, Alignment, MaskPart,
                                          nullptr, "wide.masked.gather");
@@ -5202,8 +5210,13 @@ Optional<unsigned> LoopVectorizationCostModel::computeMaxVF() {
 
   // Invalidate interleave groups that require an epilogue if we can't mask
   // the interleave-group.
-  if (!useMaskedInterleavedAccesses(TTI))
+  if (!useMaskedInterleavedAccesses(TTI)) {
+    assert(WideningDecisions.empty() && Uniforms.empty() && Scalars.empty() &&
+           "No decisions should have been taken at this point");
+    // Note: There is no need to invalidate any cost modeling decisions here, as
+    // non where taken so far.
     InterleaveInfo.invalidateGroupsRequiringScalarEpilogue();
+  }
 
   Optional<unsigned> MaxVF =
       isScalable() ? computeFeasibleScalableMaxVF() : computeFeasibleMaxVF(TC);
@@ -6831,7 +6844,11 @@ Optional<VectorizationFactor> LoopVectorizationPlanner::plan(unsigned UserVF) {
         dbgs()
         << "LV: Invalidate all interleaved groups due to fold-tail by masking "
            "which requires masked-interleaved support.\n");
-    CM.InterleaveInfo.reset();
+    if (CM.InterleaveInfo.invalidateGroups())
+      // Invalidating interleave groups also requires invalidating all decisions
+      // based on them, which includes widening decisions and uniform and scalar
+      // values.
+      CM.invalidateCostModelingDecisions();
   }
 
   if (UserVF) {

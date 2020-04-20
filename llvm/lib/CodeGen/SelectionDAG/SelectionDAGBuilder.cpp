@@ -3885,7 +3885,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   auto &DL = DAG.getDataLayout();
   // FIXME: This is a gross hack but it is unclear what do we want
   // to happen here?
-  uint64_t TySize = (Ty->isVectorTy() && Ty->getVectorIsScalable())
+  uint64_t TySize = (Ty->isVectorTy() && cast<VectorType>(Ty)->isScalable())
                         ? 1
                         : DL.getTypeAllocSize(Ty);
   MaybeAlign Alignment = max(DL.getPrefTypeAlign(Ty), I.getAlign());
@@ -3978,7 +3978,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     Root = getMemoryRoot();
   else if (AA && AA->pointsToConstantMemory(MemoryLocation(
                      SV,
-                     Ty->isVectorTy() && Ty->getVectorIsScalable()
+                     Ty->isVectorTy() && cast<VectorType>(Ty)->isScalable()
                          ? LocationSize::unknown()
                          : LocationSize::precise(
                                DAG.getDataLayout().getTypeStoreSize(Ty)),
@@ -4270,7 +4270,7 @@ static bool getUniformBase(const Value *Ptr, SDValue &Base, SDValue &Index,
 
     Base = SDB->getValue(C);
 
-    unsigned NumElts = Ptr->getType()->getVectorNumElements();
+    unsigned NumElts = cast<VectorType>(Ptr->getType())->getNumElements();
     EVT VT = EVT::getVectorVT(*DAG.getContext(), TLI.getPointerTy(DL), NumElts);
     Index = DAG.getConstant(0, SDB->getCurSDLoc(), VT);
     IndexType = ISD::SIGNED_SCALED;

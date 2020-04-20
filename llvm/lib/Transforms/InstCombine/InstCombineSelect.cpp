@@ -425,12 +425,12 @@ Instruction *InstCombiner::foldSelectIntoOp(SelectInst &SI, Value *TrueVal,
   auto ConstIntOrVector = [&](Value *OOp, APInt CI) -> Value * {
     Value *C;
     Type *OOpTy = OOp->getType();
-    if (OOpTy->isVectorTy() && OOpTy->getVectorIsScalable()) {
+    if (isa<VectorType>(OOpTy) && cast<VectorType>(OOpTy)->isScalable()) {
       VectorType *VTy = dyn_cast<VectorType>(OOp->getType());
-      C = Builder.CreateVectorSplat(OOpTy->getVectorNumElements(),
+      C = Builder.CreateVectorSplat(cast<VectorType>(OOpTy)->getNumElements(),
                                     ConstantInt::get(VTy->getContext(), CI),
                                     "constant.splat",
-                                    OOpTy->getVectorIsScalable());
+                                    cast<VectorType>(OOpTy)->isScalable());
     } else {
       C = ConstantInt::get(OOpTy, CI);
     }

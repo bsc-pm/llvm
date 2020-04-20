@@ -28,11 +28,6 @@ bool canCoerceMustAliasedValueToLoad(Value *StoredVal, Type *LoadTy,
       isFirstClassAggregateOrScalableType(StoredTy))
     return false;
 
-  // We can't bitcast to/from integer scalable vector types either.
-  if ((LoadTy->isVectorTy() && LoadTy->getVectorIsScalable())
-      || (StoredTy->isVectorTy() && StoredTy->getVectorIsScalable()))
-    return false;
-
   uint64_t StoreSize = DL.getTypeSizeInBits(StoredTy).getFixedSize();
 
   // The store size must be byte-aligned to support future type casts.

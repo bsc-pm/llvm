@@ -1543,7 +1543,7 @@ public:
 
 Value *CreateNot(Value *V, const Twine &Name = "") {
   Type *VTy = V->getType();
-  if (VTy->isVectorTy() && VTy->getVectorIsScalable()) {
+  if (isa<VectorType>(VTy) && cast<VectorType>(VTy)->isScalable()) {
     Value *Ones = getAllOnesValue(VTy);
     return Insert(BinaryOperator::Create(Instruction::Xor, V, Ones, Name,
                                          static_cast<Instruction *>(nullptr)));
@@ -2365,7 +2365,8 @@ public:
 
   Value *CreateInsertElement(Value *Vec, Value *NewElt, Value *Idx,
                              const Twine &Name = "") {
-    if (Vec->getType()->getVectorIsScalable())
+    if (isa<VectorType>(Vec->getType()) &&
+        cast<VectorType>(Vec->getType())->isScalable())
       return Insert(InsertElementInst::Create(Vec, NewElt, Idx), Name);
     if (auto *VC = dyn_cast<Constant>(Vec))
       if (auto *NC = dyn_cast<Constant>(NewElt))
@@ -2387,8 +2388,10 @@ public:
     return CreateShuffleVector(V1, V2, IntMask, Name);
   }
 
-  Value *CreateShuffleVector(Value *V1, Value *V2, ArrayRef<uint32_t> Mask,
-                             const Twine &Name = "") {
+  LLVM_ATTRIBUTE_DEPRECATED(Value *CreateShuffleVector(Value *V1, Value *V2,
+                                                       ArrayRef<uint32_t> Mask,
+                                                       const Twine &Name = ""),
+                            "Pass indices as 'int' instead") {
     SmallVector<int, 16> IntMask;
     IntMask.assign(Mask.begin(), Mask.end());
     return CreateShuffleVector(V1, V2, IntMask, Name);
@@ -2472,7 +2475,8 @@ public:
   /// elements and type as given vector type argument.
   Value *getAllOnesValue(Type *Ty) {
     VectorType *VTy = dyn_cast<VectorType>(Ty);
-    if (VTy && Ty->getVectorIsScalable()){
+    if (isa_and_nonnull<VectorType>(VTy) &&
+        cast<VectorType>(VTy)->isScalable()) {
       Constant *Ones = Constant::getAllOnesValue(VTy->getElementType());
       return CreateVectorSplat(VTy->getNumElements(), Ones, "", true);
     }
