@@ -282,16 +282,16 @@ declare void @test_byval_mem4(i32, %struct_S31* byval(%struct_S31) align 1, %str
 ; ASM32BIT-DAG:   lbz [[REG3:[0-9]+]], 30([[REG1]])
 ; ASM32BIT-DAG:   stb [[REG3]], 58(1)
 ; ASM32BIT-DAG:   addi 3, 1, 60
-; ASM32BIT-DAG:   4, LC{{[0-9]+}}(2)
+; ASM32BIT-DAG:   lwz 4, LC{{[0-9]+}}(2)
 ; ASM32BIT-DAG:   li 5, 256
 ; ASM32BIT-NEXT:  bl .memcpy
-; ASM32BIT-DAG:   lwz 4, 0(13)
-; ASM32BIT-DAG:   lwz 5, 4(13)
-; ASM32BIT-DAG:   lwz 6, 8(13)
-; ASM32BIT-DAG:   lwz 7, 12(13)
-; ASM32BIT-DAG:   lwz 8, 16(13)
-; ASM32BIT-DAG:   lwz 9, 20(13)
-; ASM32BIT-DAG:   lwz 10, 24(13)
+; ASM32BIT-DAG:   lwz 4, 0([[BASE:[0-9]+]])
+; ASM32BIT-DAG:   lwz 5, 4([[BASE]])
+; ASM32BIT-DAG:   lwz 6, 8([[BASE]])
+; ASM32BIT-DAG:   lwz 7, 12([[BASE]])
+; ASM32BIT-DAG:   lwz 8, 16([[BASE]])
+; ASM32BIT-DAG:   lwz 9, 20([[BASE]])
+; ASM32BIT-DAG:   lwz 10, 24([[BASE]])
 ; ASM32BIT:       bl .test_byval_mem4
 ; ASM32BIT:       addi 1, 1, 320
 
