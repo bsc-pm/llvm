@@ -805,7 +805,11 @@ void VPPredicatedWidenRecipe::print(raw_ostream &O, const Twine &Indent,
                                     VPSlotTracker &SlotTracker) const {
   O << " +\n" << Indent << "\"PREDICATED-WIDEN " << VPlanIngredient(&Instr);
   O << ", ";
-  getMask()->printAsOperand(O, SlotTracker);
+  VPValue *Mask = getMask();
+  if (Mask)
+    Mask->printAsOperand(O, SlotTracker);
+  else
+    O << "ALL-ONES";
   O << ", ";
   getEVL()->printAsOperand(O, SlotTracker);
   O << "\\l\"";
@@ -918,7 +922,11 @@ void VPPredicatedWidenMemoryInstructionRecipe::print(
   O << ", ";
   getAddr()->printAsOperand(O, SlotTracker);
   O << ", ";
-  getMask()->printAsOperand(O, SlotTracker);
+  VPValue *Mask = getMask();
+  if (Mask)
+    Mask->printAsOperand(O, SlotTracker);
+  else
+    O << "ALL-ONES";
   O << ", ";
   getEVL()->printAsOperand(O, SlotTracker);
   O << "\\l\"";

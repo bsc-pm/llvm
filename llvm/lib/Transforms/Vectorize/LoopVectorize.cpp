@@ -2618,21 +2618,27 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
           // another expression. So don't call resetVectorValue(StoredVal).
         }
         auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
-        if (isMaskRequired)
+        if (EVLPart) {
+          Function *VPIntr = Intrinsic::getDeclaration(
+              LoopVectorPreHeader->getModule(), Intrinsic::vp_store,
+              {StoredVal->getType(), VecPtr->getType()});
+
+          Value *BlockInMaskPart =
+              isMaskRequired ? BlockInMaskParts[Part]
+                             : Builder.CreateVectorSplat(
+                                   StoredVal->getType()->getVectorNumElements(),
+                                   Builder.getTrue(), "all.ones", true);
+
+          Value *EVLPartTrunc = Builder.CreateTrunc(
+              EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
+          NewSI = Builder.CreateCall(
+              VPIntr, {StoredVal, VecPtr, Builder.getInt32(Alignment.value()),
+                       BlockInMaskPart, EVLPartTrunc});
+        } else if (isMaskRequired)
           // if EVLPart is not null, we can vectorize using predicated
           // intrinsic.
-          if (EVLPart) {
-            Function *VPIntr = Intrinsic::getDeclaration(
-                LoopVectorPreHeader->getModule(), Intrinsic::vp_store,
-                {StoredVal->getType(), VecPtr->getType()});
-            Value *EVLPartTrunc = Builder.CreateTrunc(
-                EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
-            NewSI = Builder.CreateCall(
-                VPIntr, {StoredVal, VecPtr, Builder.getInt32(Alignment.value()),
-                         BlockInMaskParts[Part], EVLPartTrunc});
-          } else
-            NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
-                                              BlockInMaskParts[Part]);
+          NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
+                                            BlockInMaskParts[Part]);
         else
           NewSI = Builder.CreateAlignedStore(StoredVal, VecPtr, Alignment);
       }
@@ -2660,21 +2666,28 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       addMetadata(NewLI, LI);
     } else {
       auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
-      if (isMaskRequired)
+      if (EVLPart) {
+        Function *VPIntr = Intrinsic::getDeclaration(
+            LoopVectorPreHeader->getModule(), Intrinsic::vp_load,
+            {VecPtr->getType()->getPointerElementType(), VecPtr->getType()});
+
+        VectorType *VecTy =
+            cast<VectorType>(VecPtr->getType()->getPointerElementType());
+        Value *BlockInMaskPart = isMaskRequired
+                                     ? BlockInMaskParts[Part]
+                                     : Builder.CreateVectorSplat(
+                                           VecTy->getVectorNumElements(),
+                                           Builder.getTrue(), "all.ones", true);
+
+        Value *EVLPartTrunc = Builder.CreateTrunc(
+            EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
+        NewLI = Builder.CreateCall(VPIntr,
+                                   {VecPtr, Builder.getInt32(Alignment.value()),
+                                    BlockInMaskPart, EVLPartTrunc},
+                                   "vp.op.load");
+      } else if (isMaskRequired)
         // if EVLPart is not null, we can vectorize using predicated
         // intrinsic.
-        if (EVLPart) {
-          Function *VPIntr = Intrinsic::getDeclaration(
-              LoopVectorPreHeader->getModule(), Intrinsic::vp_load,
-              {VecPtr->getType()->getPointerElementType(), VecPtr->getType()});
-          Value *EVLPartTrunc = Builder.CreateTrunc(
-              EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
-          NewLI =
-              Builder.CreateCall(VPIntr,
-                                 {VecPtr, Builder.getInt32(Alignment.value()),
-                                  BlockInMaskParts[Part], EVLPartTrunc},
-                                 "vp.op.load");
-        } else
           NewLI = Builder.CreateMaskedLoad(
               VecPtr, Alignment, BlockInMaskParts[Part],
               UndefValue::get(DataTy), "wide.masked.load");
@@ -4576,7 +4589,11 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     Type *OpTy = Ops[0]->getType();
     assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
            "Operands must be of identical vector types");
-    Value *BlockInMaskPart = State.get(BlockInMask, Part);
+    Value *BlockInMaskPart =
+        BlockInMask
+            ? State.get(BlockInMask, Part)
+            : Builder.CreateVectorSplat(OpTy->getVectorNumElements(),
+                                        Builder.getTrue(), "all.ones", true);
     Value *EVLPart = State.get(EVL, Part);
 
     Function *VPIntr = Intrinsic::getDeclaration(
@@ -7281,6 +7298,9 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
     if (!CM.blockNeedsPredication(BB))
       return BlockMaskCache[BB] = BlockMask; // Loop incoming mask is all-one.
 
+    if (CM.foldTailByMasking() && Legal->preferPredicatedVectorOps())
+      return BlockMaskCache[BB] = BlockMask; // Loop incoming mask is all-one.
+
     // Introduce the early-exit compare IV <= BTC to form header block mask.
     // This is used instead of IV < TC because TC may wrap, unlike BTC.
     // Start by constructing the desired canonical IV.
@@ -7409,28 +7429,25 @@ VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
   if (!validateWidenMemory(I, Range))
     return nullptr;
 
-  VPValue *Mask = Legal->isMaskRequired(I)
-                      ? createBlockInMask(I->getParent(), Plan)
-                      : nullptr;
+  if (!(CM.foldTailByMasking() && Legal->preferPredicatedVectorOps()))
+    return nullptr;
+
+  VPValue *Mask = createBlockInMask(I->getParent(), Plan);
 
   // If tail folding by masking is enabled, memory instructions should be marked
   // as masked ops ( LoopVectorizationLegality::blockCanBePredicated()).
   // However, unlike general instructions (arithmetic, comparison, select,
   // etc.), presence of mask does not guarantee TTI's preference to use
   // predicated vector instructions.
-  if (Mask && Legal->preferPredicatedVectorOps()) {
-    VPValue *EVL = getOrCreateEVL(I, Plan);
-    VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
-    if (LoadInst *Load = dyn_cast<LoadInst>(I))
-      return new VPPredicatedWidenMemoryInstructionRecipe(*Load, Addr, Mask,
-                                                          EVL);
+  VPValue *EVL = getOrCreateEVL(I, Plan);
+  VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
+  if (LoadInst *Load = dyn_cast<LoadInst>(I))
+    return new VPPredicatedWidenMemoryInstructionRecipe(*Load, Addr, Mask, EVL);
 
-    StoreInst *Store = cast<StoreInst>(I);
-    VPValue *StoredValue = Plan->getOrAddVPValue(Store->getValueOperand());
-    return new VPPredicatedWidenMemoryInstructionRecipe(*Store, Addr,
-                                                        StoredValue, Mask, EVL);
-  }
-  return nullptr;
+  StoreInst *Store = cast<StoreInst>(I);
+  VPValue *StoredValue = Plan->getOrAddVPValue(Store->getValueOperand());
+  return new VPPredicatedWidenMemoryInstructionRecipe(*Store, Addr, StoredValue,
+                                                      Mask, EVL);
 }
 
 VPWidenIntOrFpInductionRecipe *
@@ -7626,21 +7643,11 @@ VPPredicatedWidenRecipe *VPRecipeBuilder::tryToPredicatedWiden(Instruction *I,
   if (!validateWiden(I, Range))
     return nullptr;
 
-  // While checking loop vectorization legality we mark the instructions to be
-  // masked only if tail folding is enabled and TTI prefers predicated ops. Thus
-  // Legal->isMaskRequired(I) should return true only when these conditions
-  // are satisfied. Widening of memory instructions is handled separately.
-  VPValue *Mask = nullptr;
-  if (Legal->isMaskRequired(I))
-    Mask = createBlockInMask(I->getParent(), Plan);
+  if (!(CM.foldTailByMasking() && Legal->preferPredicatedVectorOps()))
+    return nullptr;
 
-  // FIXME: Mask is nullptr if it represents an all-ones mask. Currently
-  // memory widening schemes generate masked instructions only if mask is not
-  // null. We need to support the case of all-ones mask and EVL < whole
-  // register length. Should we generate non-predicated instruction if the
-  // Mask is all-ones and EVL = whoel register length?
-  return Mask ? new VPPredicatedWidenRecipe(*I, Mask, getOrCreateEVL(I, Plan))
-              : nullptr;
+  VPValue *Mask = createBlockInMask(I->getParent(), Plan);
+  return new VPPredicatedWidenRecipe(*I, Mask, getOrCreateEVL(I, Plan));
 }
 
 VPBasicBlock *VPRecipeBuilder::handleReplication(

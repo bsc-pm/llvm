@@ -853,9 +853,16 @@ private:
   Instruction &Instr;
   VPUser PredInfo;
 
+  void setMask(VPValue *Mask) {
+    if (!Mask)
+      return;
+    PredInfo.addOperand(Mask);
+  }
+
 public:
   VPPredicatedWidenRecipe(Instruction &Instr, VPValue *Mask, VPValue *EVL)
-      : VPRecipeBase(VPPredicatedWidenSC), Instr(Instr), PredInfo({Mask, EVL}) {
+      : VPRecipeBase(VPPredicatedWidenSC), Instr(Instr), PredInfo({EVL}) {
+    setMask(Mask);
   }
 
   /// Method to support type inquiry through isa, cast, and dyn_cast.
@@ -864,10 +871,12 @@ public:
   }
 
   /// Return the mask used by this recipe.
-  VPValue *getMask() const { return PredInfo.getOperand(0); }
+  VPValue *getMask() const {
+    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(0) : nullptr;
+  }
 
   /// Return the explicit vector length used by this recipe.
-  VPValue *getEVL() const { return PredInfo.getOperand(1); }
+  VPValue *getEVL() const { return PredInfo.getOperand(0); }
 
   /// Generate the wide load/store.
   void execute(VPTransformState &State) override;
@@ -1275,22 +1284,31 @@ public:
 };
 
 class VPPredicatedWidenMemoryInstructionRecipe : public VPRecipeBase {
-private:
   Instruction &Instr;
   VPUser User;
   VPUser PredInfo;
+
+  void setMask(VPValue *Mask) {
+    if (!Mask)
+      return;
+    PredInfo.addOperand(Mask);
+  }
 
 public:
   VPPredicatedWidenMemoryInstructionRecipe(LoadInst &Load, VPValue *Addr,
                                            VPValue *Mask, VPValue *EVL)
       : VPRecipeBase(VPPredicatedWidenMemoryInstructionSC), Instr(Load),
-        User({Addr}), PredInfo({Mask, EVL}) {}
+        User({Addr}), PredInfo({EVL}) {
+    setMask(Mask);
+  }
 
   VPPredicatedWidenMemoryInstructionRecipe(StoreInst &Store, VPValue *Addr,
                                            VPValue *StoredValue, VPValue *Mask,
                                            VPValue *EVL)
       : VPRecipeBase(VPWidenMemoryInstructionSC), Instr(Store),
-        User({Addr, StoredValue}), PredInfo({Mask, EVL}) {}
+        User({Addr, StoredValue}), PredInfo({EVL}) {
+    setMask(Mask);
+  }
 
   /// Method to support type inquiry through isa, cast, and dyn_cast.
   static inline bool classof(const VPRecipeBase *V) {
@@ -1304,10 +1322,12 @@ public:
   }
 
   /// Return the mask used by this recipe.
-  VPValue *getMask() const { return PredInfo.getOperand(0); }
+  VPValue *getMask() const {
+    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(0) : nullptr;
+  }
 
   /// Return the EVL used by this recipe.
-  VPValue *getEVL() const { return PredInfo.getOperand(1); }
+  VPValue *getEVL() const { return PredInfo.getOperand(0); }
 
   /// Return the address accessed by this recipe.
   VPValue *getStoredValue() const {
