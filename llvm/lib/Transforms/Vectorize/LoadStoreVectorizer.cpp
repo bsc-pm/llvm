@@ -1016,11 +1016,11 @@ bool Vectorizer::vectorizeStoreChain(
              vectorizeStoreChain(Chains.second, InstructionsProcessed);
     }
 
-    unsigned NewAlign = getOrEnforceKnownAlignment(S0->getPointerOperand(),
-                                                   StackAdjustedAlignment,
-                                                   DL, S0, nullptr, &DT);
-    if (NewAlign >= Alignment.value())
-      Alignment = Align(NewAlign);
+    Align NewAlign = getOrEnforceKnownAlignment(S0->getPointerOperand(),
+                                                Align(StackAdjustedAlignment),
+                                                DL, S0, nullptr, &DT);
+    if (NewAlign >= Alignment)
+      Alignment = NewAlign;
     else
       return false;
   }
@@ -1162,10 +1162,11 @@ bool Vectorizer::vectorizeLoadChain(
              vectorizeLoadChain(Chains.second, InstructionsProcessed);
     }
 
-    unsigned NewAlign = getOrEnforceKnownAlignment(
-      L0->getPointerOperand(), StackAdjustedAlignment, DL, L0, nullptr, &DT);
-    if (NewAlign >= Alignment.value())
-      Alignment = Align(NewAlign);
+    Align NewAlign = getOrEnforceKnownAlignment(L0->getPointerOperand(),
+                                                Align(StackAdjustedAlignment),
+                                                DL, L0, nullptr, &DT);
+    if (NewAlign >= Alignment)
+      Alignment = NewAlign;
     else
       return false;
   }
