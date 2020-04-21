@@ -1066,59 +1066,75 @@ static SDValue LowerVPINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) {
   unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
   SDLoc DL(Op);
   unsigned EPIIntNo;
+
+  const SDValue &MaskOp = Op.getOperand(3);
+  ConstantSDNode *C;
+  bool Unmasked = MaskOp.getOpcode() == ISD::SPLAT_VECTOR &&
+                  (C = dyn_cast<ConstantSDNode>(MaskOp.getOperand(0))) &&
+                  C->getZExtValue() == 1;
+
   switch (IntNo) {
   default:
     llvm_unreachable("Unexpected intrinsic");
   case Intrinsic::vp_add:
-    EPIIntNo = Intrinsic::epi_vadd_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vadd : Intrinsic::epi_vadd_mask;
     break;
   case Intrinsic::vp_sub:
-    EPIIntNo = Intrinsic::epi_vsub_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vsub : Intrinsic::epi_vsub_mask;
     break;
   case Intrinsic::vp_mul:
-    EPIIntNo = Intrinsic::epi_vmul_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vmul : Intrinsic::epi_vmul_mask;
     break;
   case Intrinsic::vp_sdiv:
-    EPIIntNo = Intrinsic::epi_vdiv_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vdiv : Intrinsic::epi_vdiv_mask;
     break;
   case Intrinsic::vp_srem:
-    EPIIntNo = Intrinsic::epi_vrem_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vrem : Intrinsic::epi_vrem_mask;
     break;
   case Intrinsic::vp_udiv:
-    EPIIntNo = Intrinsic::epi_vdivu_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vdivu : Intrinsic::epi_vdivu_mask;
     break;
   case Intrinsic::vp_urem:
-    EPIIntNo = Intrinsic::epi_vremu_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vremu : Intrinsic::epi_vremu_mask;
     break;
   case Intrinsic::vp_and:
-    EPIIntNo = Intrinsic::epi_vand_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vand : Intrinsic::epi_vand_mask;
     break;
   case Intrinsic::vp_or:
-    EPIIntNo = Intrinsic::epi_vor_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vor : Intrinsic::epi_vor_mask;
     break;
   case Intrinsic::vp_xor:
-    EPIIntNo = Intrinsic::epi_vxor_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vxor : Intrinsic::epi_vxor_mask;
     break;
   case Intrinsic::vp_ashr:
-    EPIIntNo = Intrinsic::epi_vsra_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vsra : Intrinsic::epi_vsra_mask;
     break;
   case Intrinsic::vp_lshr:
-    EPIIntNo = Intrinsic::epi_vsrl_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vsrl : Intrinsic::epi_vsrl_mask;
     break;
   case Intrinsic::vp_shl:
-    EPIIntNo = Intrinsic::epi_vsll_mask;
+    EPIIntNo = Unmasked ? Intrinsic::epi_vsll : Intrinsic::epi_vsll_mask;
     break;
   }
 
   assert(Op.getOperand(4).getValueType() == MVT::i32 && "Unexpected operand");
-  SDValue Operands[] = {
-      DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
-      DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
-      Op.getOperand(1),                                            // Op 1.
-      Op.getOperand(2),                                            // Op 2.
-      Op.getOperand(3),                                            // Mask.
-      DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
-  };
+  std::vector<SDValue> Operands;
+  if (Unmasked)
+    Operands = {
+        DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
+        Op.getOperand(1),                                            // Op 1.
+        Op.getOperand(2),                                            // Op 2.
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
+    };
+  else
+    Operands = {
+        DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
+        DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
+        Op.getOperand(1),                                            // Op 1.
+        Op.getOperand(2),                                            // Op 2.
+        MaskOp,                                                      // Mask.
+        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
+    };
   return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(), Operands);
 }
 
@@ -1180,16 +1196,35 @@ SDValue RISCVTargetLowering::LowerINTRINSIC_W_CHAIN(SDValue Op,
   default:
     break;
   case Intrinsic::vp_load: {
-    assert(Op.getOperand(4).getValueType() == MVT::i32 && "Unexpected operand");
-    SDValue Operands[] = {
-        Op.getOperand(0),                                            // Chain.
-        DAG.getTargetConstant(Intrinsic::epi_vload_mask, DL,
-                              MVT::i64),
-        DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
-        Op.getOperand(2),                                            // Address.
-        Op.getOperand(3),                                            // Mask.
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
-    };
+    assert(Op.getOperand(5).getValueType() == MVT::i32 && "Unexpected operand");
+
+    std::vector<SDValue> Operands;
+    const SDValue &MaskOp = Op.getOperand(4);
+    ConstantSDNode *C;
+    if (MaskOp.getOpcode() == ISD::SPLAT_VECTOR &&
+        (C = dyn_cast<ConstantSDNode>(MaskOp.getOperand(0))) &&
+        C->getZExtValue() == 1)
+      // Unmasked.
+      Operands = {
+          Op.getOperand(0),                                          // Chain.
+          DAG.getTargetConstant(Intrinsic::epi_vload, DL, MVT::i64),
+          Op.getOperand(2),                                          // Address.
+          // FIXME Alignment ignored.
+          DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                      Op.getOperand(5))                              // EVL.
+      };
+    else
+      Operands = {
+          Op.getOperand(0),                                          // Chain.
+          DAG.getTargetConstant(Intrinsic::epi_vload_mask, DL,
+                                MVT::i64),
+          DAG.getRegister(RISCV::NoRegister, Op.getValueType()),     // Merge.
+          Op.getOperand(2),                                          // Address.
+          // FIXME Alignment ignored.
+          Op.getOperand(4),                                          // Mask.
+          DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                      Op.getOperand(5))                              // EVL.
+      };
 
     SDValue Result =
         DAG.getNode(ISD::INTRINSIC_W_CHAIN, DL, Op->getVTList(), Operands);
@@ -1210,17 +1245,37 @@ SDValue RISCVTargetLowering::LowerINTRINSIC_VOID(SDValue Op,
   default:
     break;
   case Intrinsic::vp_store: {
-    assert(Op.getOperand(5).getValueType() == MVT::i32 && "Unexpected operand");
-    SDValue Operands[] = {
-        Op.getOperand(0),                                     // Chain.
-        DAG.getTargetConstant(Intrinsic::epi_vstore_mask, DL,
-                              MVT::i64),
-        Op.getOperand(2),                                     // Value.
-        Op.getOperand(3),                                     // Address.
-        Op.getOperand(4),                                     // Mask.
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
-                    Op.getOperand(5)),                        // EVL.
-    };
+    assert(Op.getOperand(6).getValueType() == MVT::i32 && "Unexpected operand");
+
+    std::vector<SDValue> Operands;
+    const SDValue &MaskOp = Op.getOperand(5);
+    ConstantSDNode *C;
+    if (MaskOp.getOpcode() == ISD::SPLAT_VECTOR &&
+        (C = dyn_cast<ConstantSDNode>(MaskOp.getOperand(0))) &&
+        C->getZExtValue() == 1)
+      // Unmasked.
+      Operands = {
+          Op.getOperand(0),                                     // Chain.
+          DAG.getTargetConstant(Intrinsic::epi_vstore, DL,
+                                MVT::i64),
+          Op.getOperand(2),                                     // Value.
+          Op.getOperand(3),                                     // Address.
+          // FIXME Alignment ignored.
+          DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                      Op.getOperand(6)),                        // EVL.
+      };
+    else
+      Operands = {
+          Op.getOperand(0),                                     // Chain.
+          DAG.getTargetConstant(Intrinsic::epi_vstore_mask, DL,
+                                MVT::i64),
+          Op.getOperand(2),                                     // Value.
+          Op.getOperand(3),                                     // Address.
+          // FIXME Alignment ignored.
+          MaskOp,                                               // Mask.
+          DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                      Op.getOperand(6)),                        // EVL.
+      };
 
     return DAG.getNode(ISD::INTRINSIC_VOID, DL, Op->getVTList(), Operands);
     break;

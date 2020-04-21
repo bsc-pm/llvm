@@ -146,8 +146,8 @@ define void @test_vp_int(<vscale x 1 x i64>* %a0, <vscale x 1 x i64>* %a1, <vsca
 ; CHECK-O2-NEXT:    ret
   %store_addr = bitcast i8* @scratch to <vscale x 1 x i64>*
 
-  %i0 = call <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>* %a0, <vscale x 1 x i1> %m, i32 %n)
-  %i1 = call <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>* %a1, <vscale x 1 x i1> %m, i32 %n)
+  %i0 = call <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>* %a0, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  %i1 = call <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>* %a1, i32 8, <vscale x 1 x i1> %m, i32 %n)
 
   %r0 = call <vscale x 1 x i64> @llvm.vp.add.nxv1i64(<vscale x 1 x i64> %i0, <vscale x 1 x i64> %i1, <vscale x 1 x i1> %m, i32 %n)
   %r1 = call <vscale x 1 x i64> @llvm.vp.sub.nxv1i64(<vscale x 1 x i64> %i0, <vscale x 1 x i64> %i1, <vscale x 1 x i1> %m, i32 %n)
@@ -163,19 +163,19 @@ define void @test_vp_int(<vscale x 1 x i64>* %a0, <vscale x 1 x i64>* %a1, <vsca
   %r11 = call <vscale x 1 x i64> @llvm.vp.lshr.nxv1i64(<vscale x 1 x i64> %i0, <vscale x 1 x i64> %i1, <vscale x 1 x i1> %m, i32 %n)
   %r12 = call <vscale x 1 x i64> @llvm.vp.shl.nxv1i64(<vscale x 1 x i64> %i0, <vscale x 1 x i64> %i1, <vscale x 1 x i1> %m, i32 %n)
 
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r0, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r1, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r2, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r3, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r4, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r5, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r6, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r7, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r8, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r9, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r10, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r11, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r12, <vscale x 1 x i64>* %store_addr, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r0, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r1, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r2, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r3, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r4, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r5, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r6, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r7, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r8, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r9, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r10, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r11, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv1i64(<vscale x 1 x i64> %r12, <vscale x 1 x i64>* %store_addr, i32 8, <vscale x 1 x i1> %m, i32 %n)
 
   ret void
 }
@@ -288,8 +288,8 @@ define void @test_vp_int_2(<vscale x 2 x i32>* %a0, <vscale x 2 x i32>* %a1, i32
 
   %store_addr = bitcast i8* @scratch to <vscale x 2 x i32>*
 
-  %i0 = call <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>* %a0, <vscale x 2 x i1> %allones, i32 %n)
-  %i1 = call <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>* %a1, <vscale x 2 x i1> %allones, i32 %n)
+  %i0 = call <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>* %a0, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  %i1 = call <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>* %a1, i32 4, <vscale x 2 x i1> %allones, i32 %n)
 
   %r0 = call <vscale x 2 x i32> @llvm.vp.add.nxv2i32(<vscale x 2 x i32> %i0, <vscale x 2 x i32> %i1, <vscale x 2 x i1> %allones, i32 %n)
   %r1 = call <vscale x 2 x i32> @llvm.vp.sub.nxv2i32(<vscale x 2 x i32> %i0, <vscale x 2 x i32> %i1, <vscale x 2 x i1> %allones, i32 %n)
@@ -305,19 +305,19 @@ define void @test_vp_int_2(<vscale x 2 x i32>* %a0, <vscale x 2 x i32>* %a1, i32
   %r11 = call <vscale x 2 x i32> @llvm.vp.lshr.nxv2i32(<vscale x 2 x i32> %i0, <vscale x 2 x i32> %i1, <vscale x 2 x i1> %allones, i32 %n)
   %r12 = call <vscale x 2 x i32> @llvm.vp.shl.nxv2i32(<vscale x 2 x i32> %i0, <vscale x 2 x i32> %i1, <vscale x 2 x i1> %allones, i32 %n)
 
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r0, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r1, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r2, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r3, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r4, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r5, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r6, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r7, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r8, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r9, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r10, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r11, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
-  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r12, <vscale x 2 x i32>* %store_addr, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r0, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r1, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r2, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r3, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r4, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r5, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r6, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r7, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r8, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r9, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r10, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r11, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
+  call void @llvm.vp.store.nxv2i32(<vscale x 2 x i32> %r12, <vscale x 2 x i32>* %store_addr, i32 4, <vscale x 2 x i1> %allones, i32 %n)
 
   ret void
 }
@@ -462,8 +462,8 @@ define void @test_vp_int_3(<vscale x 2 x i64>* %a0, <vscale x 2 x i64>* %a1, <vs
 ; CHECK-O2-NEXT:    ret
   %store_addr = bitcast i8* @scratch to <vscale x 2 x i64>*
 
-  %i0 = call <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>* %a0, <vscale x 2 x i1> %m, i32 %n)
-  %i1 = call <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>* %a1, <vscale x 2 x i1> %m, i32 %n)
+  %i0 = call <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>* %a0, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  %i1 = call <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>* %a1, i32 8, <vscale x 2 x i1> %m, i32 %n)
 
   %r0 = call <vscale x 2 x i64> @llvm.vp.add.nxv2i64(<vscale x 2 x i64> %i0, <vscale x 2 x i64> %i1, <vscale x 2 x i1> %m, i32 %n)
   %r1 = call <vscale x 2 x i64> @llvm.vp.sub.nxv2i64(<vscale x 2 x i64> %i0, <vscale x 2 x i64> %i1, <vscale x 2 x i1> %m, i32 %n)
@@ -480,26 +480,26 @@ define void @test_vp_int_3(<vscale x 2 x i64>* %a0, <vscale x 2 x i64>* %a1, <vs
   %r11 = call <vscale x 2 x i64> @llvm.vp.lshr.nxv2i64(<vscale x 2 x i64> %i0, <vscale x 2 x i64> %i1, <vscale x 2 x i1> %m, i32 %n)
   %r12 = call <vscale x 2 x i64> @llvm.vp.shl.nxv2i64(<vscale x 2 x i64> %i0, <vscale x 2 x i64> %i1, <vscale x 2 x i1> %m, i32 %n)
 
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r0, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r1, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r2, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r3, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r4, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r5, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r6, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r7, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r8, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r9, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r10, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r11, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
-  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r12, <vscale x 2 x i64>* %store_addr, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r0, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r1, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r2, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r3, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r4, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r5, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r6, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r7, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r8, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r9, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r10, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r11, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
+  call void @llvm.vp.store.nxv2i64(<vscale x 2 x i64> %r12, <vscale x 2 x i64>* %store_addr, i32 8, <vscale x 2 x i1> %m, i32 %n)
 
   ret void
 }
 
 ; load/store (i64, m1)
-declare <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>*, <vscale x 1 x i1>, i32)
-declare void @llvm.vp.store.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>*, <vscale x 1 x i1>, i32)
+declare <vscale x 1 x i64> @llvm.vp.load.nxv1i64(<vscale x 1 x i64>*, i32, <vscale x 1 x i1>, i32)
+declare void @llvm.vp.store.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>*, i32, <vscale x 1 x i1>, i32)
 ; integer arith (i64, m1)
 declare <vscale x 1 x i64> @llvm.vp.add.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i1>, i32)
 declare <vscale x 1 x i64> @llvm.vp.sub.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i1>, i32)
@@ -517,8 +517,8 @@ declare <vscale x 1 x i64> @llvm.vp.lshr.nxv1i64(<vscale x 1 x i64>, <vscale x 1
 declare <vscale x 1 x i64> @llvm.vp.shl.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>, <vscale x 1 x i1>, i32)
 
 ; load/store (i32, m1)
-declare <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>*, <vscale x 2 x i1>, i32)
-declare void @llvm.vp.store.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>*, <vscale x 2 x i1>, i32)
+declare <vscale x 2 x i32> @llvm.vp.load.nxv2i32(<vscale x 2 x i32>*, i32, <vscale x 2 x i1>, i32)
+declare void @llvm.vp.store.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>*, i32, <vscale x 2 x i1>, i32)
 ; integer arith (i32, m1)
 declare <vscale x 2 x i32> @llvm.vp.add.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>, <vscale x 2 x i1>, i32)
 declare <vscale x 2 x i32> @llvm.vp.sub.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>, <vscale x 2 x i1>, i32)
@@ -536,8 +536,8 @@ declare <vscale x 2 x i32> @llvm.vp.lshr.nxv2i32(<vscale x 2 x i32>, <vscale x 2
 declare <vscale x 2 x i32> @llvm.vp.shl.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>, <vscale x 2 x i1>, i32)
 
 ; load/store (i64, m2)
-declare <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>*, <vscale x 2 x i1>, i32)
-declare void @llvm.vp.store.nxv2i64(<vscale x 2 x i64>, <vscale x 2 x i64>*, <vscale x 2 x i1>, i32)
+declare <vscale x 2 x i64> @llvm.vp.load.nxv2i64(<vscale x 2 x i64>*, i32, <vscale x 2 x i1>, i32)
+declare void @llvm.vp.store.nxv2i64(<vscale x 2 x i64>, <vscale x 2 x i64>*, i32, <vscale x 2 x i1>, i32)
 ; integer arith (i64, m2)
 declare <vscale x 2 x i64> @llvm.vp.add.nxv2i64(<vscale x 2 x i64>, <vscale x 2 x i64>, <vscale x 2 x i1>, i32)
 declare <vscale x 2 x i64> @llvm.vp.sub.nxv2i64(<vscale x 2 x i64>, <vscale x 2 x i64>, <vscale x 2 x i1>, i32)
