@@ -1291,6 +1291,8 @@ SIRegisterInfo::getVGPRClassForBitWidth(unsigned BitWidth) {
     return &AMDGPU::VReg_128RegClass;
   case 160:
     return &AMDGPU::VReg_160RegClass;
+  case 192:
+    return &AMDGPU::VReg_192RegClass;
   case 256:
     return &AMDGPU::VReg_256RegClass;
   case 512:
@@ -1309,8 +1311,16 @@ SIRegisterInfo::getAGPRClassForBitWidth(unsigned BitWidth) {
     return &AMDGPU::AGPR_32RegClass;
   case 64:
     return &AMDGPU::AReg_64RegClass;
+  case 96:
+    return &AMDGPU::AReg_96RegClass;
   case 128:
     return &AMDGPU::AReg_128RegClass;
+  case 160:
+    return &AMDGPU::AReg_160RegClass;
+  case 192:
+    return &AMDGPU::AReg_192RegClass;
+  case 256:
+    return &AMDGPU::AReg_256RegClass;
   case 512:
     return &AMDGPU::AReg_512RegClass;
   case 1024:
@@ -1335,6 +1345,8 @@ SIRegisterInfo::getSGPRClassForBitWidth(unsigned BitWidth) {
     return &AMDGPU::SReg_128RegClass;
   case 160:
     return &AMDGPU::SReg_160RegClass;
+  case 192:
+    return &AMDGPU::SReg_192RegClass;
   case 256:
     return &AMDGPU::SReg_256RegClass;
   case 512:
@@ -1362,13 +1374,19 @@ SIRegisterInfo::getPhysRegClass(MCRegister Reg) const {
     &AMDGPU::AReg_64RegClass,
     &AMDGPU::VReg_96RegClass,
     &AMDGPU::SReg_96RegClass,
+    &AMDGPU::AReg_96RegClass,
     &AMDGPU::VReg_128RegClass,
     &AMDGPU::SReg_128RegClass,
     &AMDGPU::AReg_128RegClass,
     &AMDGPU::VReg_160RegClass,
     &AMDGPU::SReg_160RegClass,
+    &AMDGPU::AReg_160RegClass,
+    &AMDGPU::VReg_192RegClass,
+    &AMDGPU::SReg_192RegClass,
+    &AMDGPU::AReg_192RegClass,
     &AMDGPU::VReg_256RegClass,
     &AMDGPU::SReg_256RegClass,
+    &AMDGPU::AReg_256RegClass,
     &AMDGPU::VReg_512RegClass,
     &AMDGPU::SReg_512RegClass,
     &AMDGPU::AReg_512RegClass,

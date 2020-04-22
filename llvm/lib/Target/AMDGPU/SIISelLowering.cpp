@@ -10608,6 +10608,9 @@ SITargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
       case 160:
         RC = &AMDGPU::SReg_160RegClass;
         break;
+      case 192:
+        RC = &AMDGPU::SReg_192RegClass;
+        break;
       case 256:
         RC = &AMDGPU::SReg_256RegClass;
         break;
@@ -10636,6 +10639,9 @@ SITargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
       case 160:
         RC = &AMDGPU::VReg_160RegClass;
         break;
+      case 192:
+        RC = &AMDGPU::VReg_192RegClass;
+        break;
       case 256:
         RC = &AMDGPU::VReg_256RegClass;
         break;
@@ -10657,8 +10663,20 @@ SITargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
       case 64:
         RC = &AMDGPU::AReg_64RegClass;
         break;
+      case 96:
+        RC = &AMDGPU::AReg_96RegClass;
+        break;
       case 128:
         RC = &AMDGPU::AReg_128RegClass;
+        break;
+      case 160:
+        RC = &AMDGPU::AReg_160RegClass;
+        break;
+      case 192:
+        RC = &AMDGPU::AReg_192RegClass;
+        break;
+      case 256:
+        RC = &AMDGPU::AReg_256RegClass;
         break;
       case 512:
         RC = &AMDGPU::AReg_512RegClass;
