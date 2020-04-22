@@ -63,12 +63,17 @@
 // d: default
 // c: const pointer type
 // P: predicate type
+// a: scalar of element type (splat to vector type)
 // e: 1/2 width unsigned elements, 2x element count
 // h: 1/2 width elements, 2x element count
 // q: 1/4 width elements, 4x element count
 // o: 4x width elements, 1/4 element count
 //
 // i: constant uint64_t
+// k: int32_t
+// l: int64_t
+// m: uint32_t
+// n: uint64_t
 //
 // I: Predicate Pattern (sv_pattern)
 
@@ -149,6 +154,12 @@ def FirstMergeTypeMask        : FlagType<0x00000080>;
 //      :                                     :
 //      :                                     :
 def MergeTypeMask             : FlagType<0x00000380>;
+def FirstSplatOperand         : FlagType<0x00000400>;
+//      :                                     :
+// These flags are used to specify which scalar operand
+// needs to be duplicated/splatted into a vector.
+//      :                                     :
+def SplatOperandMask          : FlagType<0x00001C00>;
 def IsLoad                    : FlagType<0x00002000>;
 def IsStore                   : FlagType<0x00004000>;
 def IsGatherLoad              : FlagType<0x00008000>;
@@ -156,6 +167,8 @@ def IsScatterStore            : FlagType<0x00010000>;
 def IsStructLoad              : FlagType<0x00020000>;
 def IsStructStore             : FlagType<0x00040000>;
 def IsZExtReturn              : FlagType<0x00080000>; // Return value is sign-extend by default
+def IsOverloadNone            : FlagType<0x00100000>; // Intrinsic does not take any overloaded types.
+def OverloadKindMask          : FlagType<0x00E00000>; // When the masked values are all '0', the default type is used as overload type.
 //      :                                     :
 //      :                                     :
 def IsByteIndexed             : FlagType<0x02000000>;
@@ -473,6 +486,10 @@ multiclass SInstZPZZ<string name, string types, string intrinsic, list<FlagType>
   def _M   : SInst<name # "[_{d}]",   "dPdd", types, MergeOp1,  intrinsic, flags>;
   def _X   : SInst<name # "[_{d}]",   "dPdd", types, MergeAny,  intrinsic, flags>;
   def _Z   : SInst<name # "[_{d}]",   "dPdd", types, MergeZero, intrinsic, flags>;
+
+  def _N_M : SInst<name # "[_n_{d}]", "dPda", types, MergeOp1,  intrinsic, flags>;
+  def _N_X : SInst<name # "[_n_{d}]", "dPda", types, MergeAny,  intrinsic, flags>;
+  def _N_Z : SInst<name # "[_n_{d}]", "dPda", types, MergeZero, intrinsic, flags>;
 }
 
 defm SVABD_S  : SInstZPZZ<"svabd",  "csil",         "aarch64_sve_sabd">;
@@ -531,6 +548,20 @@ def SVCMLA_M : SInst<"svcmla[_{d}]", "dPdddi", "hfd", MergeOp1,  "aarch64_sve_fc
 def SVQDECH_S : SInst<"svqdech_pat[_{d}]",   "ddIi", "s", MergeNone, "aarch64_sve_sqdech", [], [ImmCheck<2, ImmCheck1_16>]>;
 def SVQDECH_U : SInst<"svqdech_pat[_{d}]",   "ddIi", "Us", MergeNone, "aarch64_sve_uqdech", [], [ImmCheck<2, ImmCheck1_16>]>;
 
+
+////////////////////////////////////////////////////////////////////////////////
+// Predicate creation
+
+def SVPFALSE : SInst<"svpfalse[_b]", "P", "", MergeNone, "", [IsOverloadNone]>;
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Counting elements
+
+def SVCNTB_PAT : SInst<"svcntb_pat", "nI", "", MergeNone, "aarch64_sve_cntb", [IsOverloadNone]>;
+def SVCNTH_PAT : SInst<"svcnth_pat", "nI", "", MergeNone, "aarch64_sve_cnth", [IsOverloadNone]>;
+def SVCNTW_PAT : SInst<"svcntw_pat", "nI", "", MergeNone, "aarch64_sve_cntw", [IsOverloadNone]>;
+def SVCNTD_PAT : SInst<"svcntd_pat", "nI", "", MergeNone, "aarch64_sve_cntd", [IsOverloadNone]>;
 ////////////////////////////////////////////////////////////////////////////////
 // Integer arithmetic
 def SVDOT_LANE_S : SInst<"svdot_lane[_{d}]",  "ddqqi",  "il",   MergeNone, "aarch64_sve_sdot_lane", [], [ImmCheck<3, ImmCheckLaneIndexDot, 2>]>;
