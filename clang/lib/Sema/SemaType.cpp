@@ -2630,7 +2630,7 @@ bool Sema::CheckFunctionReturnType(QualType T, SourceLocation Loc) {
 
   // C++2a [dcl.fct]p12:
   //   A volatile-qualified return type is deprecated
-  if (T.isVolatileQualified() && getLangOpts().CPlusPlus2a)
+  if (T.isVolatileQualified() && getLangOpts().CPlusPlus20)
     Diag(Loc, diag::warn_deprecated_volatile_return) << T;
 
   return false;
@@ -2715,7 +2715,7 @@ QualType Sema::BuildFunctionType(QualType T,
 
     // C++2a [dcl.fct]p4:
     //   A parameter with volatile-qualified type is deprecated
-    if (ParamType.isVolatileQualified() && getLangOpts().CPlusPlus2a)
+    if (ParamType.isVolatileQualified() && getLangOpts().CPlusPlus20)
       Diag(Loc, diag::warn_deprecated_volatile_param) << ParamType;
 
     ParamTypes[Idx] = ParamType;
@@ -3216,7 +3216,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
       InventedTemplateParameterInfo *Info = nullptr;
       if (D.getContext() == DeclaratorContext::PrototypeContext) {
         // With concepts we allow 'auto' in function parameters.
-        if (!SemaRef.getLangOpts().CPlusPlus2a || !Auto ||
+        if (!SemaRef.getLangOpts().CPlusPlus20 || !Auto ||
             Auto->getKeyword() != AutoTypeKeyword::Auto) {
           Error = 0;
           break;
@@ -4849,7 +4849,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
             // An error occurred parsing the trailing return type.
             T = Context.IntTy;
             D.setInvalidType(true);
-          } else if (S.getLangOpts().CPlusPlus2a)
+          } else if (S.getLangOpts().CPlusPlus20)
             // Handle cases like: `auto f() -> auto` or `auto f() -> C auto`.
             if (AutoType *Auto = T->getContainedAutoType())
               if (S.getCurScope()->isFunctionDeclarationScope())
@@ -4958,7 +4958,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
 
         // C++2a [dcl.fct]p12:
         //   A volatile-qualified return type is deprecated
-        if (T.isVolatileQualified() && S.getLangOpts().CPlusPlus2a)
+        if (T.isVolatileQualified() && S.getLangOpts().CPlusPlus20)
           S.Diag(DeclType.Loc, diag::warn_deprecated_volatile_return) << T;
       }
 
@@ -5449,7 +5449,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
 
   // C++2a [dcl.fct]p4:
   //   A parameter with volatile-qualified type is deprecated
-  if (T.isVolatileQualified() && S.getLangOpts().CPlusPlus2a &&
+  if (T.isVolatileQualified() && S.getLangOpts().CPlusPlus20 &&
       (D.getContext() == DeclaratorContext::PrototypeContext ||
        D.getContext() == DeclaratorContext::LambdaExprParameterContext))
     S.Diag(D.getIdentifierLoc(), diag::warn_deprecated_volatile_param) << T;
@@ -5475,7 +5475,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       // We represent function parameter packs as function parameters whose
       // type is a pack expansion.
       if (!T->containsUnexpandedParameterPack() &&
-          (!LangOpts.CPlusPlus2a || !T->getContainedAutoType())) {
+          (!LangOpts.CPlusPlus20 || !T->getContainedAutoType())) {
         S.Diag(D.getEllipsisLoc(),
              diag::err_function_parameter_pack_without_parameter_packs)
           << T <<  D.getSourceRange();
@@ -8538,7 +8538,7 @@ bool Sema::RequireLiteralType(SourceLocation Loc, QualType T,
         return true;
       }
     }
-  } else if (getLangOpts().CPlusPlus2a ? !RD->hasConstexprDestructor()
+  } else if (getLangOpts().CPlusPlus20 ? !RD->hasConstexprDestructor()
                                        : !RD->hasTrivialDestructor()) {
     // All fields and bases are of literal types, so have trivial or constexpr
     // destructors. If this class's destructor is non-trivial / non-constexpr,
@@ -8548,7 +8548,7 @@ bool Sema::RequireLiteralType(SourceLocation Loc, QualType T,
     if (!Dtor)
       return true;
 
-    if (getLangOpts().CPlusPlus2a) {
+    if (getLangOpts().CPlusPlus20) {
       Diag(Dtor->getLocation(), diag::note_non_literal_non_constexpr_dtor)
           << RD;
     } else {
