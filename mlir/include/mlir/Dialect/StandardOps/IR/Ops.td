@@ -697,7 +697,7 @@ def CallIndirectOp : Std_Op<"call_indirect", [
     types of the call must match the specified function type.
 
     Function values can be created with the
-    [`constant` operation](#constant-operation).
+    [`constant` operation](#stdconstant-constantop).
 
     Example:
 
@@ -1516,8 +1516,8 @@ def LoadOp : Std_Op<"load",
 
     In an `affine.if` or `affine.for` body, the indices of a load are restricted
     to SSA values bound to surrounding loop induction variables,
-    [symbols](../LangRef.md#dimensions-and-symbols), results of a
-    [`constant` operation](#constant-operation), or the result of an
+    [symbols](../Affine.md#dimensions-and-symbols), results of a
+    [`constant` operation](#stdconstant-constantop), or the result of an
     `affine.apply` operation that can in turn take as arguments all of the
     aforementioned SSA values or the recursively result of such an
     `affine.apply` operation.
@@ -1537,7 +1537,7 @@ def LoadOp : Std_Op<"load",
     **Context:** The `load` and `store` operations are specifically crafted to
     fully resolve a reference to an element of a memref, and (in affine
     `affine.if` and `affine.for` operations) the compiler can follow use-def
-    chains (e.g. through [`affine.apply`](Affine.md#affineapply-operation)
+    chains (e.g. through [`affine.apply`](Affine.md#affineapply-affineapplyop)
     operations) to precisely analyze references at compile-time using polyhedral
     techniques. This is possible because of the
     [restrictions on dimensions and symbols](Affine.md#restrictions-on-dimensions-and-symbols)
@@ -1915,11 +1915,8 @@ def RsqrtOp : FloatUnaryOp<"rsqrt"> {
 // SelectOp
 //===----------------------------------------------------------------------===//
 
-def SelectOp : Std_Op<"select", [NoSideEffect, SameOperandsAndResultShape,
-     AllTypesMatch<["true_value", "false_value", "result"]>,
-     TypesMatchWith<"condition type matches i1 equivalent of result type",
-                     "result", "condition",
-                     "getI1SameShape($_self)">]> {
+def SelectOp : Std_Op<"select", [NoSideEffect,
+     AllTypesMatch<["true_value", "false_value", "result"]>]> {
   let summary = "select operation";
   let description = [{
     The `select` operation chooses one value based on a binary condition
@@ -1930,9 +1927,10 @@ def SelectOp : Std_Op<"select", [NoSideEffect, SameOperandsAndResultShape,
     The operation applies to vectors and tensors elementwise given the _shape_
     of all operands is identical. The choice is made for each element
     individually based on the value at the same position as the element in the
-    condition operand.
+    condition operand. If an i1 is provided as the condition, the entire vector
+    or tensor is chosen.
 
-    The `select` operation combined with [`cmpi`](#std-cmpi) can be used
+    The `select` operation combined with [`cmpi`](#stdcmpi-cmpiop) can be used
     to implement `min` and `max` with signed or unsigned comparison semantics.
 
     Example:
@@ -1944,17 +1942,18 @@ def SelectOp : Std_Op<"select", [NoSideEffect, SameOperandsAndResultShape,
     // Generic form of the same operation.
     %x = "std.select"(%cond, %true, %false) : (i1, i32, i32) -> i32
 
-    // Vector selection is element-wise
-    %vx = "std.select"(%vcond, %vtrue, %vfalse)
-        : (vector<42xi1>, vector<42xf32>, vector<42xf32>) -> vector<42xf32>
+    // Element-wise vector selection.
+    %vx = std.select %vcond, %vtrue, %vfalse : vector<42xi1>, vector<42xf32>
+
+    // Full vector selection.
+    %vx = std.select %cond, %vtrue, %vfalse : vector<42xf32>
     ```
   }];
 
   let arguments = (ins BoolLike:$condition,
-                       SignlessIntegerOrFloatLike:$true_value,
-                       SignlessIntegerOrFloatLike:$false_value);
-  let results = (outs SignlessIntegerOrFloatLike:$result);
-  let verifier = ?;
+                       AnyType:$true_value,
+                       AnyType:$false_value);
+  let results = (outs AnyType:$result);
 
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, Value condition,"
@@ -1970,10 +1969,6 @@ def SelectOp : Std_Op<"select", [NoSideEffect, SameOperandsAndResultShape,
   }];
 
   let hasFolder = 1;
-
-  let assemblyFormat = [{
-    $condition `,` $true_value `,` $false_value attr-dict `:` type($result)
-  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -2245,8 +2240,8 @@ def StoreOp : Std_Op<"store",
     In an affine context, the indices of a store are restricted to SSA values
     bound to surrounding loop induction variables,
     [symbols](Affine.md#restrictions-on-dimensions-and-symbols), results of a
-    [`constant` operation](#constant-operation), or the result of an
-    [`affine.apply`](Affine.md#affineapply-operation) operation that can in turn
+    [`constant` operation](#stdconstant-constantop), or the result of an
+    [`affine.apply`](Affine.md#affineapply-affineapplyop) operation that can in turn
     take as arguments all of the aforementioned SSA values or the recursively
     result of such an `affine.apply` operation.
 
@@ -2259,7 +2254,7 @@ def StoreOp : Std_Op<"store",
     **Context:** The `load` and `store` operations are specifically crafted to
     fully resolve a reference to an element of a memref, and (in polyhedral
     `affine.if` and `affine.for` operations) the compiler can follow use-def
-    chains (e.g. through [`affine.apply`](Affine.md#affineapply-operation)
+    chains (e.g. through [`affine.apply`](Affine.md#affineapply-affineapplyop)
     operations) to precisely analyze references at compile-time using polyhedral
     techniques. This is possible because of the
     [restrictions on dimensions and symbols](Affine.md#restrictions-on-dimensions-and-symbols)

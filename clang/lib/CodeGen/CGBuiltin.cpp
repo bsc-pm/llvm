@@ -7816,6 +7816,9 @@ CodeGenFunction::getSVEOverloadTypes(SVETypeFlags TypeFlags,
   if (TypeFlags.isOverloadWhileRW())
     return {getSVEPredType(TypeFlags), Ops[0]->getType()};
 
+  if (TypeFlags.isOverloadCvt())
+    return {Ops[0]->getType(), Ops.back()->getType()};
+
   assert(TypeFlags.isOverloadDefault() && "Unexpected value for overloads");
   return {DefaultType};
 }
