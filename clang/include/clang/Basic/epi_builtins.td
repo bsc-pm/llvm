@@ -372,10 +372,15 @@ def vwsubu_w : EPIBinBuiltin<"w", "wwv", "csi">;
 def vwadd_w : EPIBinBuiltin<"w", "wwv", "csi">;
 def vwsub_w : EPIBinBuiltin<"w", "wwv", "csi">;
 
-def vadc : EPIBuiltin<"v", "vvvm", "csil">;
-def vmadc : EPIBuiltin<"v", "mvvm", "csil">;
-def vsbc : EPIBuiltin<"v", "vvvm", "csil">;
-def vmsbc : EPIBuiltin<"v", "mvvm", "csil">;
+let HasMask = 0 in {
+def vadc : EPIBinMaskInBuiltin<"v", "vvvm", "csil">;
+def vmadc : EPIRelBuiltin<"v", "mvv", "csil">;
+def vmadc_carry_in : EPIRelBuiltin<"v", "mvvm", "csil">;
+
+def vsbc : EPIBinMaskInBuiltin<"v", "vvvm", "csil">;
+def vmsbc : EPIRelBuiltin<"v", "mvv", "csil">;
+def vmsbc_borrow_in : EPIRelBuiltin<"v", "mvvm", "csil">;
+}
 
 def vand : EPIBinBuiltin<"v", "vvv", "csil">;
 def vor : EPIBinBuiltin<"v", "vvv", "csil">;

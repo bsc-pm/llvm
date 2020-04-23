@@ -112,24 +112,20 @@ def DocEPIMaskOperations : DocEPIBuiltinCategory
 let Undocumented = 1 in
 {
   def : DocEPIBuiltin<vaadd>;
-  def : DocEPIBuiltin<vadc>;
   def : DocEPIBuiltin<vasub>;
   // FIXME EDIV builtins disabled
   //def : DocEPIBuiltin<vdot>;
   //def : DocEPIBuiltin<vdotu>;
   //def : DocEPIBuiltin<vfdot>;
   def : DocEPIBuiltin<vmacc>;
-  def : DocEPIBuiltin<vmadc>;
   def : DocEPIBuiltin<vmadd>;
   def : DocEPIBuiltin<vnmsac>;
-  def : DocEPIBuiltin<vmsbc>;
   def : DocEPIBuiltin<vnmsub>;
   def : DocEPIBuiltin<vnclip>;
   def : DocEPIBuiltin<vnclipu>;
   def : DocEPIBuiltin<vrsub>;
   def : DocEPIBuiltin<vsadd>;
   def : DocEPIBuiltin<vsaddu>;
-  def : DocEPIBuiltin<vsbc>;
   def : DocEPIBuiltin<vsmul>;
   def : DocEPIBuiltin<vssra>;
   def : DocEPIBuiltin<vssrl>;
@@ -3879,4 +3875,100 @@ elements.}];
        else
          result[element] = merge[element]
   }];
+}
+
+def : DocEPIBuiltin<vadc>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise addition with carry-in";
+  let Description = [{Use these builtins to compute the elementwise addition of
+two integer vectors and a carry in.}];
+  let Instruction = "vadc.vvm";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = a[element] + b[element] + carry_in[element]
+  }];
+
+  let ParameterNames = ["a", "b", "carry_in"];
+}
+
+def : DocEPIBuiltin<vmadc>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise carry-out of addition";
+  let Description = [{Use these builtins to compute the carry-out of an
+elementwise addition of two integer vectors.}];
+  let Instruction = "vmadc.vv";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = carry_out(a[element] + b[element])
+  }];
+}
+
+def : DocEPIBuiltin<vmadc_carry_in>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise carry-out of addition with given carry-in";
+  let Description = [{Use these builtins to compute the carry-out of the
+addition of two integer vectors and a carry-in.
+
+This operation is useful to compute wider-than-ELEN integer vector addition.}];
+  let Instruction = "vmadc.vvm";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = carry_out(a[element] + b[element] + carry_in[element])
+  }];
+
+  let ParameterNames = ["a", "b", "carry_in"];
+}
+
+def : DocEPIBuiltin<vsbc>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise subtraction with borrow-in";
+  let Description = [{Use these builtins to compute the elementwise subtraction of
+two integer vectors and a borrow in.}];
+  let Instruction = "vsbc.vvm";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = a[element] - b[element] - borrow_in[element]
+  }];
+
+  let ParameterNames = ["a", "b", "borrow_in"];
+}
+
+def : DocEPIBuiltin<vmsbc>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise borrow-out of subtraction";
+  let Description = [{Use these builtins to compute the borrow-out of an
+elementwise subtraction of two integer vectors.}];
+  let Instruction = "vmsbc.vv";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = borrow_out(a[element] - b[element])
+  }];
+}
+
+def : DocEPIBuiltin<vmsbc_borrow_in>
+{
+  let Category = DocEPIIntegerArithmetic;
+  let Title = "Elementwise borrow-out of subtraction with given borrow-in";
+  let Description = [{Use these builtins to compute the borrow-out of the
+subtraction of two integer vectors and a borrow-in.
+
+This operation is useful to compute wider-than-ELEN integer vector subtraction.}];
+  let Instruction = "vmsbc.vvm";
+
+  let Operation = [{
+    for element = 0 to gvl - 1
+       result[element] = borrow_out(a[element] - b[element] - borrow_in[element])
+  }];
+
+  let ParameterNames = ["a", "b", "borrow_in"];
 }

@@ -32,6 +32,7 @@ class EPIIntrinsicClassID;
 def EPICIDBinary : EPIIntrinsicClassID;
 def EPICIDBinaryMask : EPIIntrinsicClassID;
 def EPICIDBinaryMaskIn : EPIIntrinsicClassID;
+def EPICIDBinaryMaskInOut : EPIIntrinsicClassID;
 def EPICIDBinaryRelational : EPIIntrinsicClassID;
 def EPICIDBinaryRelationalMask : EPIIntrinsicClassID;
 def EPICIDBinaryWide : EPIIntrinsicClassID;
@@ -127,6 +128,20 @@ multiclass epi_binary_mask_in {
   def "int_epi_" # NAME : EPIBinaryMaskIn;
 }
 
+class EPIBinaryMaskInOut : Intrinsic< [ llvm_anyvector_ty ],
+                                      [ llvm_anyvector_ty, llvm_any_ty,
+                                        LLVMMatchType<0>, llvm_i64_ty ],
+                                      [ IntrNoMem ] >,
+                           EPIIntrinsic<EPICIDBinaryMaskInOut>
+{
+  let ExtendOperand = 2;
+  let MaskOperand = 3;
+  let GVLOperand = 4;
+}
+multiclass epi_binary_mask_in_out {
+  def "int_epi_" # NAME : EPIBinaryMaskInOut;
+}
+
 class EPIBinaryWideCommon<EPIIntrinsicClassID EPICID>
       : Intrinsic< [ llvm_anyvector_ty ],
                    [ llvm_anyvector_ty, llvm_any_ty, llvm_i64_ty ],
@@ -174,6 +189,9 @@ class EPIBinaryRelationalMask : Intrinsic< [ llvm_anyvector_ty ],
 multiclass epi_relational {
   def "int_epi_" # NAME : EPIBinaryRelational;
   def "int_epi_" # NAME # "_mask" : EPIBinaryRelationalMask;
+}
+multiclass epi_relational_nomask {
+  def "int_epi_" # NAME : EPIBinaryRelational;
 }
 
 class EPIUnary : Intrinsic< [ llvm_anyvector_ty ],
@@ -287,10 +305,13 @@ defm vwsub : epi_binary_wide;
 defm vwsubu_w : epi_binary;
 defm vwsub_w : epi_binary;
 
-defm vadc : epi_ternary;
-defm vmadc : epi_ternary;
-defm vsbc : epi_ternary;
-defm vmsbc : epi_ternary;
+defm vadc : epi_binary_mask_in;
+defm vmadc : epi_relational_nomask;
+defm vmadc_carry_in : epi_binary_mask_in_out;
+
+defm vsbc : epi_binary_mask_in;
+defm vmsbc : epi_relational_nomask;
+defm vmsbc_borrow_in : epi_binary_mask_in_out;
 
 defm vand : epi_binary;
 defm vor : epi_binary;

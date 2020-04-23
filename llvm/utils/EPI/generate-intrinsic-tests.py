@@ -69,7 +69,7 @@ def generate_binary_integer_types():
     for x in integer_types:
         yield IntrinsicType(x, [x] * 2)
 
-def generate_binary_integer_types_relational():
+def generate_binary_integer_types_mask_out():
     for x in integer_types:
         assert(len(mask_types) == 1)
         yield IntrinsicType(mask_types[0], [x] * 2)
@@ -123,7 +123,7 @@ def generate_binary_float_types():
     for x in float_types:
         yield IntrinsicType(x, [x, x])
 
-def generate_binary_float_types_relational():
+def generate_binary_float_types_mask_out():
     for x in float_types:
         assert(len(mask_types) == 1)
         yield IntrinsicType(mask_types[0], [x, x])
@@ -1378,15 +1378,15 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]], v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, {{v[0-9]+}}, v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -1402,15 +1402,15 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], ${scalar_register}, v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, ${scalar_register}, v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} undef,
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
@@ -1420,21 +1420,22 @@ define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_res
 entry:
 ; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
 ; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], 9, v0
+; CHECK:       ${instruction}.${suffix} {{v[0-9]+}}, {{v[0-9]+}}, 9, v0
   %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
     <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
     ${llvm_rhs_type} 9,
     <vscale x ${lhs_type_scale} x i1> undef,
     i64 undef)
 
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
+  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_store_type}>*${store_code}
+  store <vscale x ${result_type_scale} x ${llvm_store_type}> %a${store_variable_version}, <vscale x ${result_type_scale} x ${llvm_store_type}>* %p
 
   ret void
 }
 """
 
     def __init__(self, intr_name, type_generator, **extra_info):
+        self.generates_mask = extra_info.get("generates_mask", False)
         super(BinaryIntrinsicMaskIn, self).__init__(intr_name, type_generator, **extra_info)
 
     def get_template(self, variant):
@@ -1465,6 +1466,9 @@ entry:
                 subs["instruction"] = self.instruction
                 subs["value_result_type"] = result.value_type
                 subs["llvm_result_type"] = result.llvm_type
+                subs["llvm_store_type"] = result.llvm_type
+                subs["store_code"] = ""
+                subs["store_variable_version"] = ""
 
                 subs["llvm_lhs_type"] = lhs.llvm_type
                 subs["llvm_rhs_type"] = rhs.llvm_type
@@ -1516,6 +1520,15 @@ entry:
                     subs["result_type_scale"] = max_scale*vlmul
                     subs["lhs_type_scale"] = max_scale*vlmul
                     subs["rhs_type_scale"] = max_scale*vlmul
+
+                    if self.generates_mask:
+                        subs["store_variable_version"] = ".zext"
+                        subs["llvm_store_type"] = "i{}".format(64 / (max_scale * vlmul))
+                        subs["store_code"] = "\n  %a.zext = zext <vscale x {} x {}> %a to <vscale x {} x {}>"\
+                                .format(subs["result_type_scale"], \
+                                        subs["llvm_result_type"], \
+                                        subs["result_type_scale"], \
+                                        subs["llvm_store_type"])
 
                     print template.substitute(subs)
 
@@ -1707,170 +1720,13 @@ entry:
 
                     print template.substitute(subs)
 
-class TernaryIntrinsicSwap(Intrinsic):
-    pattern_vv = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
-  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
-  <vscale x ${rhs_type_scale} x ${llvm_rhs_type}>,
-  <vscale x ${result_type_scale} x ${llvm_result_type}>,
-  i64);
-
-define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_nxv${rhs_type_scale}${value_rhs_type}
-; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], [[VR]]
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.nxv${rhs_type_scale}${value_rhs_type}(
-    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
-    <vscale x ${rhs_type_scale} x ${llvm_rhs_type}> undef,
-    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
-
-  ret void
-}
-"""
-    pattern_vx = """
-declare <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
-  <vscale x ${lhs_type_scale} x ${llvm_lhs_type}>,
-  ${llvm_rhs_type},
-  <vscale x ${result_type_scale} x ${llvm_result_type}>,
-  i64);
-
-define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
-; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], ${scalar_register}
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
-    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
-    ${llvm_rhs_type} undef,
-    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
-
-  ret void
-}
-"""
-    pattern_vi = """
-define void @intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}() nounwind {
-entry:
-; CHECK-LABEL: intrinsic_${intrinsic}_${suffix}_nxv${result_type_scale}${value_result_type}_nxv${lhs_type_scale}${value_lhs_type}_${value_rhs_type}
-; CHECK:       vsetvli {{.*}}, a0, ${sew},${vlmul}
-; CHECK:       ${instruction}.${suffix} [[VR:v[0-9]+]], [[VR]], 9
-  %a = call <vscale x ${result_type_scale} x ${llvm_result_type}> @llvm.epi.${intrinsic}.nxv${result_type_scale}${value_result_type}.${value_rhs_type}(
-    <vscale x ${lhs_type_scale} x ${llvm_lhs_type}> undef,
-    ${llvm_rhs_type} 9,
-    <vscale x ${result_type_scale} x ${llvm_result_type}> undef,
-    i64 undef)
-
-  %p = bitcast i8* @scratch to <vscale x ${result_type_scale} x ${llvm_result_type}>*
-  store <vscale x ${result_type_scale} x ${llvm_result_type}> %a, <vscale x ${result_type_scale} x ${llvm_result_type}>* %p
-
-  ret void
-}
-"""
-    def __init__(self, intr_name, type_generator, **extra_info):
-        super(TernaryIntrinsicSwap, self).__init__(intr_name, type_generator, **extra_info)
-
-    def get_template(self, variant):
-        result = ""
-        if variant in ["vv"]:
-            result = TernaryIntrinsicSwap.pattern_vv
-            if self.mask:
-                raise Exception("Template for 'vv' and mask not implemented")
-        elif variant in ["vx", "vf"]:
-            result = TernaryIntrinsicSwap.pattern_vx
-            if self.mask:
-                raise Exception("Template for 'vx/vf' and mask not implemented")
-        elif variant in ["vi"]:
-            result = TernaryIntrinsicSwap.pattern_vi
-            if self.mask:
-                raise Exception("Template for 'vi' and mask not implemented")
-        else:
-            raise Exception("Unhandled variant '{}' for intrinsic '{}'".format(variant, intr.intr_name))
-        return string.Template(result)
-
-    def render(self):
-        for v in self.variants:
-            template = self.get_template(v)
-
-            op_subs = {}
-            op_subs["intrinsic"] = self.intr_name
-            op_subs["suffix"] = v
-            for intrinsic_type in self.type_generator():
-                result = intrinsic_type.result
-                lhs = intrinsic_type.operands[0]
-                rhs = intrinsic_type.operands[1]
-
-                subs = op_subs.copy()
-                subs["instruction"] = self.instruction
-                subs["value_result_type"] = result.value_type
-                subs["llvm_result_type"] = result.llvm_type
-
-                subs["llvm_lhs_type"] = lhs.llvm_type
-                subs["llvm_rhs_type"] = rhs.llvm_type
-                subs["value_lhs_type"] = lhs.value_type
-                subs["value_rhs_type"] = rhs.value_type
-
-                if v in ["vf", "wf"]:
-                    subs["scalar_register"] = "ft0"
-                elif v in ["vx", "wx"]:
-                    subs["scalar_register"] = "a0"
-
-                sew = MAX_SEW
-                if not result.is_mask_type:
-                    sew = min(sew, result.sew)
-                if not lhs.is_mask_type:
-                    sew = min(sew, lhs.sew)
-                if not rhs.is_mask_type:
-                    sew = min(sew, rhs.sew)
-                subs["sew"] = "e" + str(sew)
-
-                for vlmul in self.vlmul_values:
-                    # vlmul here is 'base' vlmul, vlmul for SEW operand
-                    # (as opposed to 2*SEW operand)
-                    subs["vlmul"] = "m" + str(vlmul)
-
-                    # Ensure all operands have the same scale (ie. number of elements)
-                    result_scale = result.get_base_scale()
-                    lhs_scale = lhs.get_base_scale()
-                    rhs_scale = rhs.get_base_scale()
-                    max_scale = max(result_scale, lhs_scale, rhs_scale)
-
-                    # Check legal VLMUL for non-mask types
-                    if (not result.is_mask_type) and (result_scale != max_scale):
-                        result_vlmul = vlmul*(max_scale/result_scale)
-                        assert(result_vlmul <= MAX_VLMUL)
-
-                    if (not lhs.is_mask_type) and (lhs_scale != max_scale):
-                        lhs_vlmul = vlmul*(max_scale/lhs_scale)
-                        assert(lhs_vlmul <= MAX_VLMUL)
-
-                    if (not rhs.is_mask_type) and (rhs_scale != max_scale):
-                        rhs_vlmul = vlmul*(max_scale/rhs_scale)
-                        assert(rhs_vlmul <= MAX_VLMUL)
-
-                    # FIXME: nxv64T types not defined (ie. nxv64i8)
-                    if max_scale*vlmul >= 64:
-                        continue
-
-                    subs["result_type_scale"] = max_scale*vlmul
-                    subs["lhs_type_scale"] = max_scale*vlmul
-                    subs["rhs_type_scale"] = max_scale*vlmul
-
-                    print template.substitute(subs)
-
 ################################################################################
 ################################################################################
 ################################################################################
 
 vv_vx_vi = ["vv", "vx", "vi"]
 vvm_vxm_vim = ["vvm", "vxm", "vim"]
+vvm_vxm = ["vvm", "vxm"]
 vv_vx = ["vv", "vx"]
 wv_wx = ["wv", "wx"]
 wv_wx_wi = ["wv", "wx", "wi"]
@@ -1948,16 +1804,16 @@ intrinsics = [
         BinaryIntrinsic("vnsrl", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
         BinaryIntrinsic("vnsra", type_generator = generate_binary_integer_types_narrowed_lhs, variants = wv_wx_wi, vlmul_values = [1, 2, 4], narrowing = True),
 
-        BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
-        BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
-        BinaryIntrinsic("vmsltu", type_generator = generate_binary_integer_types_relational, variants = vv_vx, generates_mask = True),
-        BinaryIntrinsic("vmslt", type_generator = generate_binary_integer_types_relational, variants = vv_vx, generates_mask = True),
-        BinaryIntrinsic("vmsleu", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
-        BinaryIntrinsic("vmsle", type_generator = generate_binary_integer_types_relational, variants = vv_vx_vi, generates_mask = True),
-        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmsltu", generates_mask = True),
-        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_relational, variants = vx_vi, generates_mask = True),
-        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vv, instruction = "vmslt", generates_mask = True),
-        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_relational, variants = vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmseq", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsne", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsltu", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx, generates_mask = True),
+        BinaryIntrinsic("vmslt", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx, generates_mask = True),
+        BinaryIntrinsic("vmsleu", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsle", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_mask_out, variants = vv, instruction = "vmsltu", generates_mask = True),
+        BinaryIntrinsic("vmsgtu", type_generator = generate_binary_integer_types_mask_out, variants = vx_vi, generates_mask = True),
+        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_mask_out, variants = vv, instruction = "vmslt", generates_mask = True),
+        BinaryIntrinsic("vmsgt", type_generator = generate_binary_integer_types_mask_out, variants = vx_vi, generates_mask = True),
 
         BinaryIntrinsic("vminu", type_generator = generate_binary_integer_types, variants = vv_vx),
         BinaryIntrinsic("vmin", type_generator = generate_binary_integer_types, variants = vv_vx),
@@ -2017,14 +1873,14 @@ intrinsics = [
         BinaryIntrinsic("vfsgnjn", type_generator = generate_binary_float_types, variants = vv_vf),
         BinaryIntrinsic("vfsgnjx", type_generator = generate_binary_float_types, variants = vv_vf),
 
-        BinaryIntrinsic("vmfeq", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
-        BinaryIntrinsic("vmfne", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
-        BinaryIntrinsic("vmflt", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
-        BinaryIntrinsic("vmfle", type_generator = generate_binary_float_types_relational, variants = vv_vf, generates_mask = True),
-        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmflt", generates_mask = True),
-        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
-        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vv, instruction = "vmfle", generates_mask = True),
-        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_relational, variants = vf, generates_mask = True),
+        BinaryIntrinsic("vmfeq", type_generator = generate_binary_float_types_mask_out, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfne", type_generator = generate_binary_float_types_mask_out, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmflt", type_generator = generate_binary_float_types_mask_out, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfle", type_generator = generate_binary_float_types_mask_out, variants = vv_vf, generates_mask = True),
+        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_mask_out, variants = vv, instruction = "vmflt", generates_mask = True),
+        BinaryIntrinsic("vmfgt", type_generator = generate_binary_float_types_mask_out, variants = vf, generates_mask = True),
+        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_mask_out, variants = vv, instruction = "vmfle", generates_mask = True),
+        BinaryIntrinsic("vmfge", type_generator = generate_binary_float_types_mask_out, variants = vf, generates_mask = True),
 
         BinaryIntrinsicMaskIn("vfmerge", type_generator = generate_binary_float_types, variants = vfm),
 
@@ -2066,8 +1922,13 @@ intrinsics = [
         BinaryIntrinsic("vslide1up", type_generator = generate_binary_any_and_integer_types, variants = vx),
         BinaryIntrinsic("vslide1down", type_generator = generate_binary_any_and_integer_types, variants = vx),
 
-        #TernaryIntrinsicSwap("vadc", type_generator = generate_ternary_integer_types, variants = vv_vx_vi, mask = False),
-        #TernaryIntrinsicSwap("vsbc", type_generator = generate_ternary_integer_types, variants = vv_vx, mask = False),
+        BinaryIntrinsicMaskIn("vadc", type_generator = generate_binary_integer_types, variants = vvm_vxm_vim),
+        BinaryIntrinsicMaskIn("vmadc.carry.in", type_generator = generate_binary_integer_types_mask_out, variants = vvm_vxm_vim, instruction = "vmadc", generates_mask = True),
+        BinaryIntrinsic("vmadc", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx_vi, mask = False, generates_mask = True),
+
+        BinaryIntrinsicMaskIn("vsbc", type_generator = generate_binary_integer_types, variants = vvm_vxm),
+        BinaryIntrinsicMaskIn("vmsbc.borrow.in", type_generator = generate_binary_integer_types_mask_out, variants = vvm_vxm, instruction = "vmsbc", generates_mask = True),
+        BinaryIntrinsic("vmsbc", type_generator = generate_binary_integer_types_mask_out, variants = vv_vx, mask = False, generates_mask = True),
 
         TernaryIntrinsic("vmacc", type_generator = generate_ternary_integer_types, variants = vv_vx),
         TernaryIntrinsic("vnmsac", type_generator = generate_ternary_integer_types, variants = vv_vx),

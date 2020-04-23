@@ -710,6 +710,18 @@ multiclass pseudo_binary_v_wv_wx_wi<Operand imm_type = simm5> {
   }
 }
 
+multiclass pseudo_binary_v_vvm_vxm {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VVM : pseudo_binary_mask_in<evr, evr, evr, evr.VLMul>;
+      defm _VXM : pseudo_binary_mask_in<evr, evr, GPR, evr.VLMul>;
+    }
+  }
+}
+
 multiclass pseudo_binary_v_vvm_vxm_vim {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
@@ -719,6 +731,33 @@ multiclass pseudo_binary_v_vvm_vxm_vim {
       defm _VVM : pseudo_binary_mask_in<evr, evr, evr, evr.VLMul>;
       defm _VXM : pseudo_binary_mask_in<evr, evr, GPR, evr.VLMul>;
       defm _VIM : pseudo_binary_mask_in<evr, evr, simm5, evr.VLMul>;
+    }
+  }
+}
+
+multiclass pseudo_binary_m_vvm_vxm {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      // These instructions generate a mask register so their result is a VR.
+      defm _VVM : pseudo_binary_mask_in<VR, evr, evr, evr.VLMul>;
+      defm _VXM : pseudo_binary_mask_in<VR, evr, GPR, evr.VLMul>;
+    }
+  }
+}
+
+multiclass pseudo_binary_m_vvm_vxm_vim {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      // These instructions generate a mask register so their result is a VR.
+      defm _VVM : pseudo_binary_mask_in<VR, evr, evr, evr.VLMul>;
+      defm _VXM : pseudo_binary_mask_in<VR, evr, GPR, evr.VLMul>;
+      defm _VIM : pseudo_binary_mask_in<VR, evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -763,6 +802,18 @@ multiclass pseudo_binary_m_vv_vx {
   }
 }
 
+multiclass pseudo_binary_m_vv_vx_nomask {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VV : pseudo_binary_nomask<VR, evr, evr, evr.VLMul>;
+      defm _VX : pseudo_binary_nomask<VR, evr, GPR, evr.VLMul>;
+    }
+  }
+}
+
 multiclass pseudo_binary_m_vx_vi {
   let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
   foreach evr = AllVRegs in
@@ -784,6 +835,19 @@ multiclass pseudo_binary_m_vv_vx_vi {
       defm _VV : pseudo_binary<VR, evr, evr, evr.VLMul>;
       defm _VX : pseudo_binary<VR, evr, GPR, evr.VLMul>;
       defm _VI : pseudo_binary<VR, evr, simm5, evr.VLMul>;
+    }
+  }
+}
+
+multiclass pseudo_binary_m_vv_vx_vi_nomask {
+  let mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in
+  foreach evr = AllVRegs in
+  {
+    let VLMul = evr.VLMul in
+    {
+      defm _VV : pseudo_binary_nomask<VR, evr, evr, evr.VLMul>;
+      defm _VX : pseudo_binary_nomask<VR, evr, GPR, evr.VLMul>;
+      defm _VI : pseudo_binary_nomask<VR, evr, simm5, evr.VLMul>;
     }
   }
 }
@@ -1042,6 +1106,14 @@ defm PseudoVWSUBU      : pseudo_binary_w_vv_vx;
 defm PseudoVWSUBU      : pseudo_binary_w_wv_wx;
 defm PseudoVWSUB       : pseudo_binary_w_vv_vx;
 defm PseudoVWSUB       : pseudo_binary_w_wv_wx;
+
+defm PseudoVADC        : pseudo_binary_v_vvm_vxm_vim;
+defm PseudoVMADC       : pseudo_binary_m_vvm_vxm_vim;
+defm PseudoVMADC       : pseudo_binary_m_vv_vx_vi_nomask;
+
+defm PseudoVSBC        : pseudo_binary_v_vvm_vxm;
+defm PseudoVMSBC       : pseudo_binary_m_vvm_vxm;
+defm PseudoVMSBC       : pseudo_binary_m_vv_vx_nomask;
 
 defm PseudoVWMULU      : pseudo_binary_w_vv_vx;
 defm PseudoVWMULSU     : pseudo_binary_w_vv_vx;
@@ -1599,6 +1671,23 @@ multiclass pat_intrinsic_binary_int_v_vv_vx_vi<string intrinsic_name,
   }
 }
 
+multiclass pat_intrinsic_binary_int_v_vvm_vxm<string intrinsic_name,
+                                              string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VVM",
+                                        vti.Vector, vti.Vector, vti.Vector,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass,
+                                        vti.RegClass>;
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VXM",
+                                        vti.Vector, vti.Vector, XLenVT,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass, GPR>;
+  }
+}
+
 multiclass pat_intrinsic_binary_int_v_vvm_vxm_vim<string intrinsic_name,
                                                   string instruction_name>
 {
@@ -1620,6 +1709,79 @@ multiclass pat_intrinsic_binary_int_v_vvm_vxm_vim<string intrinsic_name,
   }
 }
 
+multiclass pat_intrinsic_binary_int_m_vvm_vxm<string intrinsic_name,
+                                              string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VVM",
+                                        vti.Mask, vti.Vector, vti.Vector,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass,
+                                        vti.RegClass>;
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VXM",
+                                        vti.Mask, vti.Vector, XLenVT,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass, GPR>;
+  }
+}
+
+multiclass pat_intrinsic_binary_int_m_vvm_vxm_vim<string intrinsic_name,
+                                                  string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VVM",
+                                        vti.Mask, vti.Vector, vti.Vector,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass,
+                                        vti.RegClass>;
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VXM",
+                                        vti.Mask, vti.Vector, XLenVT,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass, GPR>;
+    defm : pat_intrinsic_binary_mask_in<intrinsic_name, instruction_name, "VIM",
+                                        vti.Mask, vti.Vector, XLenVT,
+                                        vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                        vti.RegClass, vti.RegClass, simm5>;
+  }
+}
+
+multiclass pat_intrinsic_binary_int_m_vv_vx_nomask<string intrinsic_name,
+                                                   string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "VV",
+                                       vti.Mask, vti.Vector, vti.Vector,
+                                       vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                       vti.RegClass, vti.RegClass>;
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "VX",
+                                       vti.Mask, vti.Vector, XLenVT,
+                                       vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                       vti.RegClass, GPR>;
+  }
+}
+
+multiclass pat_intrinsic_binary_int_m_vv_vx_vi_nomask<string intrinsic_name,
+                                                      string instruction_name>
+{
+  foreach vti = AllIntegerVectors in
+  {
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "VV",
+                                       vti.Mask, vti.Vector, vti.Vector,
+                                       vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                       vti.RegClass, vti.RegClass>;
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "VX",
+                                       vti.Mask, vti.Vector, XLenVT,
+                                       vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                       vti.RegClass, GPR>;
+    defm : pat_intrinsic_binary_nomask<intrinsic_name, instruction_name, "VI",
+                                       vti.Mask, vti.Vector, XLenVT,
+                                       vti.Mask, vti.SEW, vti.RegClass.VLMul,
+                                       vti.RegClass, simm5>;
+  }
+}
 
 multiclass pat_intrinsic_binary_int_v_vs<string intrinsic_name,
                                          string instruction_name>
@@ -1696,8 +1858,8 @@ multiclass pat_intrinsic_binary_int_v_wv_wx_wi<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
-                                                          string instruction_name>
+multiclass pat_intrinsic_binary_int_m_vv_vx_vi<string intrinsic_name,
+                                               string instruction_name>
 {
   foreach vti = AllIntegerVectors in
   {
@@ -1714,8 +1876,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx_vi<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_int_m_vv_vx<string intrinsic_name,
-                                                       string instruction_name>
+multiclass pat_intrinsic_binary_int_m_vv_vx<string intrinsic_name,
+                                           string instruction_name>
 {
   foreach vti = AllIntegerVectors in
   {
@@ -1729,8 +1891,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_vx<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
-                                                       string instruction_name>
+multiclass pat_intrinsic_binary_int_m_vx_vi<string intrinsic_name,
+                                            string instruction_name>
 {
   foreach vti = AllIntegerVectors in
   {
@@ -1743,8 +1905,8 @@ multiclass pat_intrinsic_binary_relational_int_m_vx_vi<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_int_m_vv_swapped<string intrinsic_name,
-                                                            string instruction_name>
+multiclass pat_intrinsic_binary_int_m_vv_swapped<string intrinsic_name,
+                                                 string instruction_name>
 {
   foreach vti = AllIntegerVectors in
   {
@@ -1754,57 +1916,6 @@ multiclass pat_intrinsic_binary_relational_int_m_vv_swapped<string intrinsic_nam
                                 vti.RegClass, vti.RegClass, /* swapped */ 1>;
   }
 }
-
-//multiclass pat_intrinsic_binary_with_mask_input_vv_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), (op_type VR:$rs2), (op_type V0))),
-//            (!cast<Instruction>(instruction_name # "_VV")
-//               VR:$rs1, VR:$rs2)>;
-//}
-
-//multiclass pat_intrinsic_binary_with_mask_input_vx_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), GPR:$rs2, (op_type V0))),
-//            (!cast<Instruction>(instruction_name # "_VX")
-//               VR:$rs1, GPR:$rs2)>;
-//}
-
-//multiclass pat_intrinsic_binary_with_mask_input_vi_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), simm5:$imm5, (op_type V0))),
-//            (!cast<Instruction>(instruction_name # "_VI")
-//               VR:$rs1, simm5:$imm5)>;
-//}
-
-//multiclass pat_intrinsic_binary_with_mask_input_int_vv_vx_vi_nomask<string intrinsic_name,
-//                                    string instruction_name>
-//{
-//  foreach vtp = AllIntegerVectors
-//  in {
-//    defm : pat_intrinsic_binary_with_mask_input_vv_nomask<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//    defm : pat_intrinsic_binary_with_mask_input_vx_nomask<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//    defm : pat_intrinsic_binary_with_mask_input_vi_nomask<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//  }
-//}
-
-//multiclass pat_intrinsic_binary_with_mask_input_int_vv_vx_nomask<string intrinsic_name,
-//                                    string instruction_name>
-//{
-//  foreach vtp = AllIntegerVectors
-//  in {
-//    defm : pat_intrinsic_binary_with_mask_input_vv_nomask<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//    defm : pat_intrinsic_binary_with_mask_input_vx_nomask<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//  }
-//}
 
 multiclass pat_intrinsic_binary_fp_v_vv<string intrinsic_name,
                                         string instruction_name>
@@ -1926,8 +2037,8 @@ multiclass pat_intrinsic_binary_fp_w_wv_wf<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_fp_m_vv_vf<string intrinsic_name,
-                                                      string instruction_name>
+multiclass pat_intrinsic_binary_fp_m_vv_vf<string intrinsic_name,
+                                           string instruction_name>
 {
   foreach fvti = AllFloatVectors in
   {
@@ -1942,8 +2053,8 @@ multiclass pat_intrinsic_binary_relational_fp_m_vv_vf<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
-                                                   string instruction_name>
+multiclass pat_intrinsic_binary_fp_m_vf<string intrinsic_name,
+                                        string instruction_name>
 {
   foreach fvti = AllFloatVectors in
   {
@@ -1954,8 +2065,8 @@ multiclass pat_intrinsic_binary_relational_fp_m_vf<string intrinsic_name,
   }
 }
 
-multiclass pat_intrinsic_binary_relational_fp_m_vv_swapped<string intrinsic_name,
-                                                           string instruction_name>
+multiclass pat_intrinsic_binary_fp_m_vv_swapped<string intrinsic_name,
+                                                string instruction_name>
 {
   foreach fvti = AllFloatVectors in
   {
@@ -2050,106 +2161,6 @@ multiclass pat_intrinsic_ternary_fp_v_vv_vf<string intrinsic_name,
                                  fvti.RegClass>;
   }
 }
-
-//multiclass pat_intrinsic_binary_wv_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), (op_type VR:$rs2))),
-//            (!cast<Instruction>(instruction_name # "_WV")
-//               VR:$rs1, VR:$rs2)>;
-//}
-
-//multiclass pat_intrinsic_binary_wv<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  defm "" : pat_intrinsic_binary_wv_nomask<intrinsic_name, instruction_name,
-//                                           op_type, result_type>;
-
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
-//                         (op_type VR:$rs1),
-//                         (op_type VR:$rs2), V0)),
-//            (!cast<Instruction>(instruction_name # "_WV_MASK")
-//               VR:$rs1, VR:$rs2, vmask_only_true.Value)>;
-//}
-
-//multiclass pat_intrinsic_binary_wf_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType op_scalar,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), (op_scalar EPIFPR:$rs2))),
-//            (!cast<Instruction>(instruction_name # "_WF")
-//               VR:$rs1, EPIFPR:$rs2)>;
-//}
-
-//multiclass pat_intrinsic_binary_wf<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType op_scalar,
-//                                   ValueType result_type>
-//{
-//  defm "" : pat_intrinsic_binary_wf_nomask<intrinsic_name,
-//                   instruction_name, op_type, op_scalar, result_type>;
-
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
-//                         (op_type VR:$rs1),
-//                         (op_scalar EPIFPR:$rs2), V0)),
-//            (!cast<Instruction>(instruction_name # "_WF_MASK")
-//               VR:$rs1, EPIFPR:$rs2, vmask_only_true.Value)>;
-//}
-
-//multiclass pat_intrinsic_binary_fp_wv_wf<string intrinsic_name,
-//                                         string instruction_name>
-//{
-//  foreach vtp = AllFloatVectors
-//  in {
-//    defm : pat_intrinsic_binary_wv<intrinsic_name, instruction_name,
-//                                          vtp.Vector, vtp.Vector>;
-//    defm : pat_intrinsic_binary_wf<intrinsic_name, instruction_name,
-//                                          vtp.Vector, vtp.Scalar, vtp.Vector>;
-//  }
-//}
-
-
-//multiclass pat_intrinsic_binary_wx_nomask<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name) (op_type VR:$rs1), GPR:$rs2)),
-//            (!cast<Instruction>(instruction_name # "_WX")
-//               VR:$rs1, GPR:$rs2)>;
-//}
-
-//multiclass pat_intrinsic_binary_wx<string intrinsic_name,
-//                                   string instruction_name,
-//                                   ValueType op_type,
-//                                   ValueType result_type>
-//{
-//  defm "" : pat_intrinsic_binary_wx_nomask<intrinsic_name, instruction_name,
-//                                           op_type, result_type>;
-
-//  def : Pat<(result_type (!cast<Intrinsic>(intrinsic_name # "_mask")
-//                         (op_type VR:$rs1),
-//                         GPR:$rs2, V0)),
-//            (!cast<Instruction>(instruction_name # "_WX_MASK")
-//               VR:$rs1, GPR:$rs2, vmask_only_true.Value)>;
-//}
-
-//multiclass pat_intrinsic_binary_int_wv_wx<string intrinsic_name,
-//                                    string instruction_name>
-//{
-//  foreach vtp = AllIntegerVectors
-//  in {
-//    defm : pat_intrinsic_binary_wv<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//    defm : pat_intrinsic_binary_wx<intrinsic_name, instruction_name, vtp.Vector, vtp.Vector>;
-//  }
-//}
 
 multiclass pat_intrinsic_binary_any_and_int_v_vx<string intrinsic_name,
                                                  string instruction_name>
@@ -2419,23 +2430,28 @@ defm "" : pat_intrinsic_binary_any_and_int_v_vv_vx_vi<"int_epi_vrgather", "Pseud
 defm "" : pat_intrinsic_binary_any_and_int_v_vx_vi<"int_epi_vslideup", "PseudoVSLIDEUP", uimm5>;
 defm "" : pat_intrinsic_binary_any_and_int_v_vx_vi<"int_epi_vslidedown", "PseudoVSLIDEDOWN", uimm5>;
 
-//defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_vi_nomask<"int_epi_vadc", "VADC">;
-//defm "" : pat_intrinsic_binary_with_mask_input_int_vv_vx_nomask<"int_epi_vsbc", "VSBC">;
+defm "" : pat_intrinsic_binary_int_v_vvm_vxm_vim<"int_epi_vadc", "PseudoVADC">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_vi_nomask<"int_epi_vmadc", "PseudoVMADC">;
+defm "" : pat_intrinsic_binary_int_m_vvm_vxm_vim<"int_epi_vmadc_carry_in", "PseudoVMADC">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmseq", "PseudoVMSEQ">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsne", "PseudoVMSNE">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmsltu", "PseudoVMSLTU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx<"int_epi_vmslt", "PseudoVMSLT">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsleu", "PseudoVMSLEU">;
-defm "" : pat_intrinsic_binary_relational_int_m_vv_vx_vi<"int_epi_vmsle", "PseudoVMSLE">;
+defm "" : pat_intrinsic_binary_int_v_vvm_vxm<"int_epi_vsbc", "PseudoVSBC">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_nomask<"int_epi_vmsbc", "PseudoVMSBC">;
+defm "" : pat_intrinsic_binary_int_m_vvm_vxm<"int_epi_vmsbc_borrow_in", "PseudoVMSBC">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vmsgtu", "PseudoVMSGTU">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_vi<"int_epi_vmseq", "PseudoVMSEQ">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_vi<"int_epi_vmsne", "PseudoVMSNE">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx<"int_epi_vmsltu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx<"int_epi_vmslt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_vi<"int_epi_vmsleu", "PseudoVMSLEU">;
+defm "" : pat_intrinsic_binary_int_m_vv_vx_vi<"int_epi_vmsle", "PseudoVMSLE">;
+
+defm "" : pat_intrinsic_binary_int_m_vx_vi<"int_epi_vmsgtu", "PseudoVMSGTU">;
 // Select (int_epi_vmsgtu reg:$rs1, reg:$rs2) as (PseudoVMSLTU reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_m_vv_swapped<"int_epi_vmsgtu", "PseudoVMSLTU">;
+defm "" : pat_intrinsic_binary_int_m_vv_swapped<"int_epi_vmsgtu", "PseudoVMSLTU">;
 
-defm "" : pat_intrinsic_binary_relational_int_m_vx_vi<"int_epi_vmsgt", "PseudoVMSGT">;
+defm "" : pat_intrinsic_binary_int_m_vx_vi<"int_epi_vmsgt", "PseudoVMSGT">;
 // Select (int_epi_vmsgt reg:$rs1, reg:$rs2) as (PseudoVMSLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_int_m_vv_swapped<"int_epi_vmsgt", "PseudoVMSLT">;
+defm "" : pat_intrinsic_binary_int_m_vv_swapped<"int_epi_vmsgt", "PseudoVMSLT">;
 
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsaddu", "PseudoVSADDU">;
 defm "" : pat_intrinsic_binary_int_v_vv_vx_vi<"int_epi_vsadd", "PseudoVSADD">;
@@ -2611,18 +2627,18 @@ foreach fvti = NoGroupFloatVectors in
              (NoX0 GPR:$vl), fvti.SEW)>;
 }
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfeq", "PseudoVMFEQ">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfle", "PseudoVMFLE">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmflt", "PseudoVMFLT">;
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_vf<"int_epi_vmfne", "PseudoVMFNE">;
+defm "" : pat_intrinsic_binary_fp_m_vv_vf<"int_epi_vmfeq", "PseudoVMFEQ">;
+defm "" : pat_intrinsic_binary_fp_m_vv_vf<"int_epi_vmfle", "PseudoVMFLE">;
+defm "" : pat_intrinsic_binary_fp_m_vv_vf<"int_epi_vmflt", "PseudoVMFLT">;
+defm "" : pat_intrinsic_binary_fp_m_vv_vf<"int_epi_vmfne", "PseudoVMFNE">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vmfgt", "PseudoVMFGT">;
+defm "" : pat_intrinsic_binary_fp_m_vf<"int_epi_vmfgt", "PseudoVMFGT">;
 // Select (int_epi_vmfgt reg:$rs1, reg:$rs2) as (PseudoVMFLT reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vmfgt", "PseudoVMFLT">;
+defm "" : pat_intrinsic_binary_fp_m_vv_swapped<"int_epi_vmfgt", "PseudoVMFLT">;
 
-defm "" : pat_intrinsic_binary_relational_fp_m_vf<"int_epi_vmfge", "PseudoVMFGE">;
+defm "" : pat_intrinsic_binary_fp_m_vf<"int_epi_vmfge", "PseudoVMFGE">;
 // Select (int_epi_vmfge reg:$rs1, reg:$rs2) as (PseudoVMFLE reg:$rs2, reg:$rs1)
-defm "" : pat_intrinsic_binary_relational_fp_m_vv_swapped<"int_epi_vmfge", "PseudoVMFLE">;
+defm "" : pat_intrinsic_binary_fp_m_vv_swapped<"int_epi_vmfge", "PseudoVMFLE">;
 
 defm "" : pat_intrinsic_binary_fp_v_vv_vf<"int_epi_vfdiv", "PseudoVFDIV">;
 defm "" : pat_intrinsic_binary_fp_v_vf<"int_epi_vfrdiv", "PseudoVFRDIV">;
