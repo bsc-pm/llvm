@@ -45,18 +45,16 @@ class VPBuilder {
   VPBasicBlock::iterator InsertPt = VPBasicBlock::iterator();
 
   VPInstruction *createInstruction(unsigned Opcode,
-                                   ArrayRef<VPValue *> Operands,
-                                   bool Scalar = false) {
-    VPInstruction *Instr = new VPInstruction(Opcode, Operands, Scalar);
+                                   ArrayRef<VPValue *> Operands) {
+    VPInstruction *Instr = new VPInstruction(Opcode, Operands);
     if (BB)
       BB->insert(Instr, InsertPt);
     return Instr;
   }
 
   VPInstruction *createInstruction(unsigned Opcode,
-                                   std::initializer_list<VPValue *> Operands,
-                                   bool Scalar = false) {
-    return createInstruction(Opcode, ArrayRef<VPValue *>(Operands), Scalar);
+                                   std::initializer_list<VPValue *> Operands) {
+    return createInstruction(Opcode, ArrayRef<VPValue *>(Operands));
   }
 
 public:
@@ -129,21 +127,11 @@ public:
     NewVPInst->setUnderlyingValue(Inst);
     return NewVPInst;
   }
+
   VPValue *createNaryOp(unsigned Opcode,
                         std::initializer_list<VPValue *> Operands,
                         Instruction *Inst = nullptr) {
     return createNaryOp(Opcode, ArrayRef<VPValue *>(Operands), Inst);
-  }
-  VPValue *createScalarNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                              Instruction *Inst = nullptr) {
-    VPInstruction *NewVPInst = createInstruction(Opcode, Operands, true);
-    NewVPInst->setUnderlyingValue(Inst);
-    return NewVPInst;
-  }
-  VPValue *createScalarNaryOp(unsigned Opcode,
-                              std::initializer_list<VPValue *> Operands,
-                              Instruction *Inst = nullptr) {
-    return createScalarNaryOp(Opcode, ArrayRef<VPValue *>(Operands), Inst);
   }
 
   VPValue *createNot(VPValue *Operand) {
@@ -156,18 +144,6 @@ public:
 
   VPValue *createOr(VPValue *LHS, VPValue *RHS) {
     return createInstruction(Instruction::BinaryOps::Or, {LHS, RHS});
-  }
-
-  VPValue *createCallInstruction(Function *Callee, ArrayRef<VPValue *> Args,
-                                 ArrayRef<VPValueToValueLowering> ArgLowering) {
-    assert(Args.size() == ArgLowering.size() &&
-           "Number of VPOperand to Value lowering types unequal to number of "
-           "Args");
-    VPCallInstruction *CallInstr =
-        new VPCallInstruction(Callee, Args, ArgLowering);
-    if (BB)
-      BB->insert(CallInstr, InsertPt);
-    return CallInstr;
   }
 
   //===--------------------------------------------------------------------===//

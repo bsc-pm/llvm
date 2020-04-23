@@ -428,7 +428,7 @@ public:
   void widenSelectInstruction(SelectInst &I, bool InvariantCond);
 
   /// Fix the vectorized code, taking care of header phi's, live-outs, and more.
-  void fixVectorizedLoop(VPValue *EVL, VPTransformState &State);
+  void fixVectorizedLoop(VPTransformState &State);
 
   // Return true if any runtime check is added.
   bool areSafetyChecksAdded() { return AddedSafetyChecks; }
@@ -515,6 +515,12 @@ public:
   /// Fix the non-induction PHIs in the OrigPHIsToFix vector.
   void fixNonInductionPHIs(void);
 
+  /// Generate instructions to compute EVL.
+  Value *createEVL();
+
+  /// Hold EVL VPValue.
+  void setEVL(VPValue *VPEVL) { EVL = VPEVL; }
+
 protected:
   friend class LoopVectorizationPlanner;
 
@@ -537,7 +543,7 @@ protected:
                                    Value *Step, Instruction *DL);
 
   /// increment induction by EVL if using predicated vectorization.
-  void fixEVLInduction(VPValue *EVL, VPTransformState &State);
+  void fixEVLInduction(VPTransformState &State);
 
   /// Handle all cross-iteration phis in the header.
   void fixCrossIterationPHIs();
@@ -782,8 +788,8 @@ protected:
   /// Trip count of the widened loop (TripCount - TripCount % (VF*UF))
   Value *VectorTripCount = nullptr;
 
-  /// EVL per part of the widened loop using vector predication (vsetvl())
-  SmallVector<Value *, 2> EVLParts;
+  /// EVL of the widened loop using vector predication (vsetvl())
+  VPValue *EVL;
 
   /// The legality analysis.
   LoopVectorizationLegality *Legal;
@@ -3713,12 +3719,11 @@ void InnerLoopVectorizer::truncateToMinimalBitwidths() {
   }
 }
 
-void InnerLoopVectorizer::fixVectorizedLoop(VPValue *EVL,
-                                            VPTransformState &State) {
+void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
   // If using predicated vector ops, we need to increment index for the next
   // vector iteration by the EVL used in current iteration.
   if (preferPredicatedVectorOps())
-    fixEVLInduction(EVL, State);
+    fixEVLInduction(State);
 
   // Insert truncates and extends for any truncated instructions as hints to
   // InstCombine.
@@ -3768,13 +3773,13 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPValue *EVL,
                                LI->getLoopFor(LoopScalarBody), VF * UF);
 }
 
-void InnerLoopVectorizer::fixEVLInduction(VPValue *EVL,
-                                          VPTransformState &State) {
+void InnerLoopVectorizer::fixEVLInduction(VPTransformState &State) {
   Instruction *IndexNext = dyn_cast<Instruction>(
       Induction->getIncomingValueForBlock(LoopVectorBody));
+  // FIXME: Add support for interleaving.
   ReplaceInstWithInst(IndexNext, BinaryOperator::Create(
                                      Instruction::Add, IndexNext->getOperand(0),
-                                     State.get(EVL, {0, 0})));
+                                     State.get(EVL, 0)));
 }
 
 void InnerLoopVectorizer::fixCrossIterationPHIs() {
@@ -7128,7 +7133,7 @@ void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
   //    predication, updating analyses.
   // TODO: We should not need to pass Plan->getEVL() once State is refactored to
   // cache widened EVL values.
-  ILV.fixVectorizedLoop(VPlans.front()->getEVL(), State);
+  ILV.fixVectorizedLoop(State);
 }
 
 void LoopVectorizationPlanner::collectTriviallyDeadInstructions(
@@ -7334,49 +7339,13 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlanPtr &Plan) {
   return BlockMaskCache[BB] = BlockMask;
 }
 
-VPValue *VPRecipeBuilder::getOrCreateEVL(Instruction *I, VPlanPtr &Plan) {
-  // TODO : Refactor this method directly into Plan, instead of RecipeBuilder.
-  BasicBlock *BB = I->getParent();
-  assert(OrigLoop->contains(BB) && "Block is not a part of a loop.");
-
-  VPValue *EVL = nullptr;
-  if ((EVL = Plan->getEVL()))
-    return EVL;
-
-  Function *IntrDecl = Intrinsic::getDeclaration(
-      BB->getModule(), Intrinsic::EPIIntrinsics::epi_vsetvl, {});
-  unsigned SmallestType, WidestType;
-  std::tie(SmallestType, WidestType) = CM.getSmallestAndWidestTypes();
-  const std::map<unsigned, unsigned> SEWArgMap = {
-      {8, 0}, {16, 1}, {32, 2}, {64, 3}};
-  const std::map<unsigned, unsigned> LMULArgMap = {
-      {1, 0}, {2, 1}, {4, 2}, {8, 3}};
-  assert(SEWArgMap.find(WidestType) != SEWArgMap.end() &&
-         SEWArgMap.find(SmallestType) != SEWArgMap.end() &&
-         "Cannot set vector length: Unsupported type");
-  unsigned SEW = SEWArgMap.at(WidestType);
-  unsigned LMUL = LMULArgMap.at(WidestType / SmallestType);
-
-  VPValue *SEWArg = Plan->getOrAddVPValue(
-      ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), SEW));
-  VPValue *LMULArg = Plan->getOrAddVPValue(
-      ConstantInt::get(IntegerType::get(I->getType()->getContext(), 64), LMUL));
-
-  // Compute TC - IV as the RVL(requested vector length). vsetvl() returns a
-  // GVL(granted vector length) that is the number of lanes processed for the
-  // given vector iteration. At the end of the vector iteration increment the IV
-  // by the GVL. This is guaranteed to exit since at some point RVL will be
-  // equal to GVL and IV = TC.
-  // FIXME: The caveat with this approach is that TC may wrap. This should not
-  // be a big problem for EPI (or other 64-bit) architectures.
-  VPValue *IV = Plan->getVPValue(Legal->getPrimaryInduction());
-  VPValue *TC = Plan->getOrCreateTripCount();
-  VPValue *RVLArg = Builder.createScalarNaryOp(Instruction::Sub, {TC, IV});
-  EVL = Builder.createCallInstruction(IntrDecl, {RVLArg, SEWArg, LMULArg},
-                                      {VPValueToValueLowering::ScalarPart,
-                                       VPValueToValueLowering::Scalar,
-                                       VPValueToValueLowering::Scalar});
-  return Plan->createEVL(EVL);
+VPValue *VPRecipeBuilder::getOrCreateEVL(VPlanPtr &Plan) {
+  if (!EVL) {
+    auto EVLRecipe = new VPWidenEVLRecipe();
+    Builder.getInsertBlock()->appendRecipe(EVLRecipe);
+    EVL = EVLRecipe->getEVL();
+  }
+  return EVL;
 }
 
 bool VPRecipeBuilder::validateWidenMemory(Instruction *I, VFRange &Range) {
@@ -7439,7 +7408,7 @@ VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
   // However, unlike general instructions (arithmetic, comparison, select,
   // etc.), presence of mask does not guarantee TTI's preference to use
   // predicated vector instructions.
-  VPValue *EVL = getOrCreateEVL(I, Plan);
+  VPValue *EVL = getOrCreateEVL(Plan);
   VPValue *Addr = Plan->getOrAddVPValue(getLoadStorePointerOperand(I));
   if (LoadInst *Load = dyn_cast<LoadInst>(I))
     return new VPPredicatedWidenMemoryInstructionRecipe(*Load, Addr, Mask, EVL);
@@ -7647,7 +7616,7 @@ VPPredicatedWidenRecipe *VPRecipeBuilder::tryToPredicatedWiden(Instruction *I,
     return nullptr;
 
   VPValue *Mask = createBlockInMask(I->getParent(), Plan);
-  return new VPPredicatedWidenRecipe(*I, Mask, getOrCreateEVL(I, Plan));
+  return new VPPredicatedWidenRecipe(*I, Mask, getOrCreateEVL(Plan));
 }
 
 VPBasicBlock *VPRecipeBuilder::handleReplication(
@@ -8059,6 +8028,47 @@ void VPWidenRecipe::execute(VPTransformState &State) {
 
 void VPPredicatedWidenRecipe::execute(VPTransformState &State) {
   State.ILV->widenPredicatedInstruction(Instr, State, getMask(), getEVL());
+}
+
+void VPWidenEVLRecipe::execute(VPTransformState &State) {
+  // FIXME: We do not support interleaved scalar vectorization yet. Fix EVL
+  // computation when we do.
+  for (unsigned Part = 0; Part < State.UF; Part++)
+    State.set(getEVL(), State.ILV->createEVL(), Part);
+  State.ILV->setEVL(getEVL());
+}
+
+Value *InnerLoopVectorizer::createEVL() {
+  Function *IntrDecl =
+      Intrinsic::getDeclaration(LoopVectorPreHeader->getModule(),
+                                Intrinsic::EPIIntrinsics::epi_vsetvl, {});
+  unsigned SmallestType, WidestType;
+  std::tie(SmallestType, WidestType) = Cost->getSmallestAndWidestTypes();
+  const std::map<unsigned, unsigned> SEWArgMap = {
+      {8, 0}, {16, 1}, {32, 2}, {64, 3}};
+  const std::map<unsigned, unsigned> LMULArgMap = {
+      {1, 0}, {2, 1}, {4, 2}, {8, 3}};
+  assert(SEWArgMap.find(WidestType) != SEWArgMap.end() &&
+         SEWArgMap.find(SmallestType) != SEWArgMap.end() &&
+         "Cannot set vector length: Unsupported type");
+  unsigned SEW = SEWArgMap.at(WidestType);
+  unsigned LMUL = LMULArgMap.at(WidestType / SmallestType);
+  Constant *SEWArg =
+      ConstantInt::get(IntegerType::get(Builder.getContext(), 64), SEW);
+  Constant *LMULArg =
+      ConstantInt::get(IntegerType::get(Builder.getContext(), 64), LMUL);
+
+  // Compute TC - IV as the RVL(requested vector length). vsetvl() returns a
+  // GVL(granted vector length) that is the number of lanes processed for the
+  // given vector iteration. At the end of the vector iteration increment the IV
+  // by the GVL. This is guaranteed to exit since at some point RVL will be
+  // equal to GVL and IV = TC.
+  // FIXME: The caveat with this approach is that TC
+  // may wrap. This should not be a big problem for EPI (or other 64-bit)
+  // architectures.
+  Value *RVLArg = Builder.CreateSub(TripCount, Induction);
+  Value *EVL = Builder.CreateCall(IntrDecl, {RVLArg, SEWArg, LMULArg});
+  return EVL;
 }
 
 void VPWidenGEPRecipe::execute(VPTransformState &State) {

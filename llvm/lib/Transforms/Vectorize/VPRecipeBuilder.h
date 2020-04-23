@@ -39,6 +39,8 @@ class VPRecipeBuilder {
 
   VPBuilder &Builder;
 
+  VPValue *EVL = nullptr;
+
   /// When we if-convert we need to create edge masks. We have to cache values
   /// so that we don't end up with exponential recursion/IR. Note that
   /// if-conversion currently takes place during VPlan-construction, so these
@@ -134,7 +136,7 @@ public:
 
   /// A helper function that computes the EVL for the Instruction I. By default
   /// it sets the EVL to whole vector register length.
-  VPValue *getOrCreateEVL(Instruction *I, VPlanPtr &Plan);
+  VPValue *getOrCreateEVL(VPlanPtr &Plan);
 
   /// A helper function that validates if the memory instruction can be widened
   /// and sets the widening decision.

@@ -353,14 +353,9 @@ void VPInstruction::generateInstruction(VPTransformState &State,
                                         unsigned Part) {
   IRBuilder<> &Builder = State.Builder;
 
-  auto getUnderlyingValue =
-      [&State, Scalar = Scalar](VPValue *Operand, unsigned Part) -> Value * {
-    return Scalar ? State.get(Operand, {0, 0}) : State.get(Operand, Part);
-  };
-
   if (Instruction::isBinaryOp(getOpcode())) {
-    Value *A = getUnderlyingValue(getOperand(0), Part);
-    Value *B = getUnderlyingValue(getOperand(1), Part);
+    Value *A = State.get(getOperand(0), Part);
+    Value *B = State.get(getOperand(1), Part);
     Value *V = Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B);
     State.set(this, V, Part);
     return;
@@ -368,22 +363,22 @@ void VPInstruction::generateInstruction(VPTransformState &State,
 
   switch (getOpcode()) {
   case VPInstruction::Not: {
-    Value *A = getUnderlyingValue(getOperand(0), Part);
+    Value *A = State.get(getOperand(0), Part);
     Value *V = Builder.CreateNot(A);
     State.set(this, V, Part);
     break;
   }
   case VPInstruction::ICmpULE: {
-    Value *IV = getUnderlyingValue(getOperand(0), Part);
-    Value *TC = getUnderlyingValue(getOperand(1), Part);
+    Value *IV = State.get(getOperand(0), Part);
+    Value *TC = State.get(getOperand(1), Part);
     Value *V = Builder.CreateICmpULE(IV, TC);
     State.set(this, V, Part);
     break;
   }
   case Instruction::Select: {
-    Value *Cond = getUnderlyingValue(getOperand(0), Part);
-    Value *Op1 = getUnderlyingValue(getOperand(1), Part);
-    Value *Op2 = getUnderlyingValue(getOperand(2), Part);
+    Value *Cond = State.get(getOperand(0), Part);
+    Value *Op1 = State.get(getOperand(1), Part);
+    Value *Op2 = State.get(getOperand(2), Part);
     Value *V = Builder.CreateSelect(Cond, Op1, Op2);
     State.set(this, V, Part);
     break;
@@ -410,8 +405,6 @@ void VPInstruction::execute(VPTransformState &State) {
 void VPInstruction::print(raw_ostream &O, const Twine &Indent,
                           VPSlotTracker &SlotTracker) const {
   O << " +\n" << Indent << "\"EMIT ";
-  if (Scalar)
-    O << "\b-SCALAR ";
   print(O, SlotTracker);
   O << "\\l\"";
 }
@@ -448,43 +441,6 @@ void VPInstruction::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
     O << " ";
     Operand->printAsOperand(O, SlotTracker);
   }
-}
-
-void VPCallInstruction::execute(VPTransformState &State) {
-  IRBuilder<> &Builder = State.Builder;
-  for (unsigned Part = 0; Part < State.UF; ++Part) {
-    SmallVector<Value *, 2> Operands;
-    for (auto Operand : enumerate(operands())) {
-      if (ArgLowering[Operand.index()] == VPValueToValueLowering::Scalar)
-        Operands.push_back(State.get(Operand.value(), {0, 0}));
-      if (ArgLowering[Operand.index()] == VPValueToValueLowering::ScalarPart)
-        Operands.push_back(State.get(Operand.value(), {Part, 0}));
-      if (ArgLowering[Operand.index()] == VPValueToValueLowering::Vector)
-        Operands.push_back(State.get(Operand.value(), Part));
-    }
-    Value *V = Builder.CreateCall(Callee, Operands);
-    State.set(this, V, Part);
-  }
-}
-
-void VPCallInstruction::print(raw_ostream &O, const Twine &Indent,
-                              VPSlotTracker &SlotTracker) const {
-  O << " +\n" << Indent << "\"EMIT-CALL ";
-  print(O, SlotTracker);
-  O << "\\l\"";
-}
-
-void VPCallInstruction::print(raw_ostream &O,
-                              VPSlotTracker &SlotTracker) const {
-  printAsOperand(O, SlotTracker);
-  O << " = ";
-  O << "call " << Callee->getName();
-  O << "(";
-  for (const VPValue *Operand : operands()) {
-    Operand->printAsOperand(O, SlotTracker);
-    O << ", ";
-  }
-  O << "\b\b)";
 }
 
 /// Generate the code inside the body of the vectorized loop. Assumes a single
@@ -809,7 +765,7 @@ void VPPredicatedWidenRecipe::print(raw_ostream &O, const Twine &Indent,
   if (Mask)
     Mask->printAsOperand(O, SlotTracker);
   else
-    O << "ALL-ONES";
+    O << "ALL-ONES-MASK";
   O << ", ";
   getEVL()->printAsOperand(O, SlotTracker);
   O << "\\l\"";
@@ -916,6 +872,13 @@ void VPWidenCanonicalIVRecipe::print(raw_ostream &O, const Twine &Indent,
   O << " = WIDEN-CANONICAL-INDUCTION \\l\"";
 }
 
+void VPWidenEVLRecipe::print(raw_ostream &O, const Twine &Indent,
+                             VPSlotTracker &SlotTracker) const {
+  O << " +\n" << Indent << "\"EMIT ";
+  getEVL()->printAsOperand(O, SlotTracker);
+  O << " = GENERATE-EXPLICIT-VECTOR-LENGTH \\l\"";
+}
+
 void VPPredicatedWidenMemoryInstructionRecipe::print(
     raw_ostream &O, const Twine &Indent, VPSlotTracker &SlotTracker) const {
   O << " +\n" << Indent << "\"PREDICATED-WIDEN " << VPlanIngredient(&Instr);
@@ -926,7 +889,7 @@ void VPPredicatedWidenMemoryInstructionRecipe::print(
   if (Mask)
     Mask->printAsOperand(O, SlotTracker);
   else
-    O << "ALL-ONES";
+    O << "ALL-ONES-MASK";
   O << ", ";
   getEVL()->printAsOperand(O, SlotTracker);
   O << "\\l\"";
@@ -1033,6 +996,8 @@ void VPSlotTracker::assignSlots(const VPBasicBlock *VPBB) {
       assignSlot(VPI);
     else if (const auto *VPIV = dyn_cast<VPWidenCanonicalIVRecipe>(&Recipe))
       assignSlot(VPIV->getVPValue());
+    else if (const auto *VPEVL = dyn_cast<VPWidenEVLRecipe>(&Recipe))
+      assignSlot(VPEVL->getEVL());
   }
 }
 

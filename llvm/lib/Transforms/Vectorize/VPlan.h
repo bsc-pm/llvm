@@ -281,19 +281,6 @@ struct VPTransformState {
   /// that as per-lane Defs are still created by ILV and managed in its ValueMap
   /// this method currently just delegates the call to ILV.
   Value *get(VPValue *Def, const VPIteration &Instance) {
-    // FIXME: We use Data.PerPartOutput to also store
-    // scalar Values underlying VPValues created in VPlan. We are making them
-    // accessible via this get method that is currently used to access scalar
-    // values in the loop by passing in Instance = {Part, 0}.
-    // This should change when VPlan natively supports recording scalars.
-    // (Currently State.set is only used to set VPValues created by
-    // VPInstruction recipe, which only supports vector instructions).
-    if (Data.PerPartOutput.count(Def)) {
-      Value *V = Data.PerPartOutput[Def][Instance.Part];
-      assert(V && !V->getType()->isVectorTy() &&
-             "Expecting value underlying an iteration instance to be scalar.");
-      return V;
-    }
     return Callback.getOrCreateScalarValue(VPValue2Value[Def], Instance);
   }
 
@@ -628,16 +615,17 @@ public:
     VPInstructionSC,
     VPInterleaveSC,
     VPPredInstPHISC,
+    VPPredicatedWidenMemoryInstructionSC,
+    VPPredicatedWidenSC,
     VPReplicateSC,
     VPWidenCallSC,
     VPWidenCanonicalIVSC,
+    VPWidenEVLSC,
     VPWidenGEPSC,
     VPWidenIntOrFpInductionSC,
     VPWidenMemoryInstructionSC,
-    VPPredicatedWidenMemoryInstructionSC,
     VPWidenPHISC,
     VPWidenSC,
-    VPPredicatedWidenSC,
     VPWidenSelectSC
   };
 
@@ -702,7 +690,6 @@ public:
 private:
   typedef unsigned char OpcodeTy;
   OpcodeTy Opcode;
-  bool Scalar;
 
   /// Utility method serving execute(): generates a single instance of the
   /// modeled instruction.
@@ -716,15 +703,12 @@ protected:
   void setUnderlyingInstr(Instruction *I) { setUnderlyingValue(I); }
 
 public:
-  VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                bool Scalar = false)
+  VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands)
       : VPUser(VPValue::VPInstructionSC, Operands),
-        VPRecipeBase(VPRecipeBase::VPInstructionSC), Opcode(Opcode),
-        Scalar(Scalar) {}
+        VPRecipeBase(VPRecipeBase::VPInstructionSC), Opcode(Opcode) {}
 
-  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands,
-                bool Scalar = false)
-      : VPInstruction(Opcode, ArrayRef<VPValue *>(Operands), Scalar) {}
+  VPInstruction(unsigned Opcode, std::initializer_list<VPValue *> Operands)
+      : VPInstruction(Opcode, ArrayRef<VPValue *>(Operands)) {}
 
   /// Method to support type inquiry through isa, cast, and dyn_cast.
   static inline bool classof(const VPValue *V) {
@@ -783,39 +767,6 @@ public:
       return true;
     }
   }
-};
-
-enum class VPValueToValueLowering {
-  Vector,     /*Vectorize per part - State.get(V, Part)*/
-  ScalarPart, /*Scalar per part - State.get(V, {Part, 0})*/
-  Scalar      /*Scalar - State.get(V, {0, 0})*/
-};
-
-// TODO:
-// 1. In line with the effort to have all values in VPlan as VPValues, is it
-// possible to store Callee as a VPValue?
-// 2. Can we get rid of VPValueToValueLowering and somehow access argument types
-// of the callee to determine how to expand the args? Perhaps use
-// hasVectorInstrinsicScalarOpd in VectorUtils.
-class VPCallInstruction : public VPInstruction {
-private:
-  Function *Callee;
-  SmallVector<VPValueToValueLowering, 2> ArgLowering;
-
-public:
-  VPCallInstruction(Function *Callee, ArrayRef<VPValue *> Args,
-                    ArrayRef<VPValueToValueLowering> ArgLoweringVals)
-      : VPInstruction(Instruction::OtherOps::Call, Args), Callee(Callee) {
-    for (VPValueToValueLowering Val : ArgLoweringVals)
-      ArgLowering.push_back(Val);
-  }
-
-  /// Generate the call instruction.
-  void execute(VPTransformState &State) override;
-
-  void print(raw_ostream &O, const Twine &Indent,
-             VPSlotTracker &SlotTracker) const override;
-  void print(raw_ostream &O, VPSlotTracker &SlotTracker) const;
 };
 
 /// VPWidenRecipe is a recipe for producing a copy of vector type its
@@ -1373,6 +1324,33 @@ public:
              VPSlotTracker &SlotTracker) const override;
 };
 
+/// A recipe to generate Explicit Vector Length (EVL) value to be used with
+/// VPred intrinsics.
+class VPWidenEVLRecipe : public VPRecipeBase {
+  /// A VPValue representing the EVL.
+  VPValue EVL;
+
+public:
+  VPWidenEVLRecipe() : VPRecipeBase(VPWidenEVLSC) {}
+  ~VPWidenEVLRecipe() override = default;
+
+  /// Return the VPValue representing EVL.
+  const VPValue *getEVL() const { return &EVL; }
+  VPValue *getEVL() { return &EVL; }
+
+  /// Method to support type inquiry through isa, cast, and dyn_cast.
+  static inline bool classof(const VPRecipeBase *V) {
+    return V->getVPRecipeID() == VPRecipeBase::VPWidenEVLSC;
+  }
+
+  /// Generate the instructions to compute EVL.
+  void execute(VPTransformState &State) override;
+
+  /// Print the recipe.
+  void print(raw_ostream &O, const Twine &Indent,
+             VPSlotTracker &SlotTracker) const override;
+};
+
 /// VPBasicBlock serves as the leaf of the Hierarchical Control-Flow Graph. It
 /// holds a sequence of zero or more VPRecipe's each representing a sequence of
 /// output IR instructions.
@@ -1700,9 +1678,6 @@ class VPlan {
   /// Holds the condition bit values built during VPInstruction to VPRecipe transformation.
   SmallVector<VPValue *, 4> VPCBVs;
 
-  /// EVL for widening by predicated vectorization.
-  VPValue *EVL = nullptr;
-
 public:
   VPlan(VPBlockBase *Entry = nullptr) : Entry(Entry) {
     if (Entry)
@@ -1787,10 +1762,6 @@ public:
       addVPValue(V);
     return getVPValue(V);
   }
-
-  VPValue *getEVL() { return EVL; }
-
-  VPValue *createEVL(VPValue *EVLVal) { return EVL = EVLVal; }
 
   /// Return the VPLoopInfo analysis for this VPlan.
   VPLoopInfo &getVPLoopInfo() { return VPLInfo; }
