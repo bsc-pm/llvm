@@ -1197,9 +1197,9 @@ static bool matchIntrinsicType(
                                 DeferredChecks, IsDeferredCheck);
     }
     case IITDescriptor::ScalableVector: {
-      VectorType *VT = dyn_cast<ScalableVectorType>(Ty);
-      return !VT || VT->getNumElements() != D.Vector_Width ||
-             matchIntrinsicType(VT->getElementType(), Infos, ArgTys,
+      ScalableVectorType *SVT = dyn_cast<ScalableVectorType>(Ty);
+      return !SVT || SVT->getNumElements() != D.Vector_Width ||
+             matchIntrinsicType(SVT->getElementType(), Infos, ArgTys,
                                 DeferredChecks, IsDeferredCheck);
     }
     case IITDescriptor::Pointer: {

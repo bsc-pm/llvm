@@ -2497,7 +2497,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
 
   if (VectorType *DestVTy = dyn_cast<VectorType>(DestTy)) {
     if (DestVTy->getNumElements() == 1 && !SrcTy->isVectorTy() &&
-        isa<ScalableVectorType>(DestVTy)) {
+        !isa<ScalableVectorType>(DestVTy)) {
       Value *Elem = Builder.CreateBitCast(Src, DestVTy->getElementType());
       return InsertElementInst::Create(UndefValue::get(DestTy), Elem,
                      Constant::getNullValue(Type::getInt32Ty(CI.getContext())));
@@ -2526,7 +2526,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   }
 
   if (VectorType *SrcVTy = dyn_cast<VectorType>(SrcTy)) {
-    if (SrcVTy->getNumElements() == 1 && isa<ScalableVectorType>(SrcVTy)) {
+    if (SrcVTy->getNumElements() == 1 && !isa<ScalableVectorType>(SrcVTy)) {
       // If our destination is not a vector, then make this a straight
       // scalar-scalar cast.
       if (!DestTy->isVectorTy()) {

@@ -3884,7 +3884,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   auto &DL = DAG.getDataLayout();
   // FIXME: This is a gross hack but it is unclear what do we want
   // to happen here?
-  uint64_t TySize = (Ty->isVectorTy() && cast<ScalableVectorType>(Ty))
+  uint64_t TySize = (Ty->isVectorTy() && isa<ScalableVectorType>(Ty))
                         ? 1
                         : DL.getTypeAllocSize(Ty);
   MaybeAlign Alignment = max(DL.getPrefTypeAlign(Ty), I.getAlign());
