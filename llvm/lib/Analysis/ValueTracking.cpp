@@ -2913,7 +2913,11 @@ static unsigned ComputeNumSignBitsImpl(const Value *V,
           cast<VectorType>(U->getType())->isScalable())
         return 1;
 
-      auto *Shuf = cast<ShuffleVectorInst>(U);
+      auto *Shuf = dyn_cast<ShuffleVectorInst>(U);
+      if (!Shuf) {
+        // FIXME: Add support for shufflevector constant expressions.
+        return 1;
+      }
       APInt DemandedLHS, DemandedRHS;
       // For undef elements, we don't know anything about the common state of
       // the shuffle result.
