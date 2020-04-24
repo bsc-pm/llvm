@@ -526,11 +526,11 @@ CallInst *IRBuilderBase::CreateMaskedGather(Value *Ptrs, Align Alignment,
   auto PtrTy = cast<PointerType>(PtrsTy->getElementType());
   unsigned NumElts = PtrsTy->getNumElements();
   Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts,
-                                 PtrsTy->isScalable());
+                                 isa<ScalableVectorType>(PtrsTy));
 
-  if (cast<VectorType>(DataTy)->isScalable())
+  if (isa<ScalableVectorType>(DataTy))
     assert(Mask && isa<VectorType>(Mask->getType()) &&
-           cast<VectorType>(Mask->getType())->isScalable() &&
+           isa<ScalableVectorType>(Mask->getType()) &&
            "Scalable vector mask required");
 
   if (!Mask)
@@ -569,9 +569,8 @@ CallInst *IRBuilderBase::CreateMaskedScatter(Value *Data, Value *Ptrs,
          "Incompatible pointer and data types");
 #endif
 
-  if (cast<VectorType>(DataTy)->isScalable())
-    assert(Mask && isa<VectorType>(Mask->getType()) &&
-           cast<VectorType>(Mask->getType())->isScalable() &&
+  if (isa<ScalableVectorType>(DataTy))
+    assert(Mask && isa<ScalableVectorType>(Mask->getType()) &&
            "Scalable vector mask required");
 
   if (!Mask)

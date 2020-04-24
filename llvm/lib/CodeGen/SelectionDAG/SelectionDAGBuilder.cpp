@@ -3884,7 +3884,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   auto &DL = DAG.getDataLayout();
   // FIXME: This is a gross hack but it is unclear what do we want
   // to happen here?
-  uint64_t TySize = (Ty->isVectorTy() && cast<VectorType>(Ty)->isScalable())
+  uint64_t TySize = (Ty->isVectorTy() && cast<ScalableVectorType>(Ty))
                         ? 1
                         : DL.getTypeAllocSize(Ty);
   MaybeAlign Alignment = max(DL.getPrefTypeAlign(Ty), I.getAlign());
@@ -3977,7 +3977,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     Root = getMemoryRoot();
   else if (AA && AA->pointsToConstantMemory(MemoryLocation(
                      SV,
-                     Ty->isVectorTy() && cast<VectorType>(Ty)->isScalable()
+                     Ty->isVectorTy() && isa<ScalableVectorType>(Ty)
                          ? LocationSize::unknown()
                          : LocationSize::precise(
                                DAG.getDataLayout().getTypeStoreSize(Ty)),

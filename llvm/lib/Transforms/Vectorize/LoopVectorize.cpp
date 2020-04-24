@@ -2238,8 +2238,7 @@ void InnerLoopVectorizer::packScalarIntoVectorValue(
 Value *InnerLoopVectorizer::reverseVector(Value *Vec) {
   assert(Vec->getType()->isVectorTy() && "Invalid type");
 
-  if (isa<VectorType>(Vec->getType()) &&
-      cast<VectorType>(Vec->getType())->isScalable()) {
+  if (isa<ScalableVectorType>(Vec->getType())) {
     Function *ReverseFunc = Intrinsic::getDeclaration(
         LoopVectorPreHeader->getModule(),
         Intrinsic::experimental_vector_reverse, {Vec->getType()});
@@ -2573,7 +2572,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
         Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
         Value *VectorGep = State.get(Addr, Part);
         VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-        if (!MaskPart && VectorGepTy->isScalable()) {
+        if (!MaskPart && isa<ScalableVectorType>(VectorGepTy)) {
           MaskPart = Builder.CreateVectorSplat(
               VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
         }
@@ -2608,7 +2607,7 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
       VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-      if (!MaskPart && VectorGepTy->isScalable()) {
+      if (!MaskPart && isa<ScalableVectorType>(VectorGepTy)) {
         MaskPart = Builder.CreateVectorSplat(
             VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
       }

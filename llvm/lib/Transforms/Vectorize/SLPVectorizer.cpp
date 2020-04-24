@@ -5911,8 +5911,7 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
 
   Instruction *I0 = cast<Instruction>(S.OpValue);
   // Ignore scalable vectors for now.
-  if (isa<VectorType>(I0->getType()) &&
-      cast<VectorType>(I0->getType())->isScalable())
+  if (isa<ScalableVectorType>(I0->getType()))
     return false;
 
   // Make sure invalid types (including vector type) are rejected before

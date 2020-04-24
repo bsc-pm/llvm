@@ -4469,8 +4469,7 @@ static Value *foldIdentityShuffles(int DestElt, Value *Op0, Value *Op1,
   if (!MaxRecurse--)
     return nullptr;
 
-  if (isa<VectorType>(Op0->getType()) &&
-      cast<VectorType>(Op0->getType())->isScalable())
+  if (isa<ScalableVectorType>(Op0->getType()))
     return nullptr;
 
   // Bail out if any mask value is undefined. That kind of shuffle may be

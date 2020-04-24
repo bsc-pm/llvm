@@ -1543,7 +1543,7 @@ public:
 
 Value *CreateNot(Value *V, const Twine &Name = "") {
   Type *VTy = V->getType();
-  if (isa<VectorType>(VTy) && cast<VectorType>(VTy)->isScalable()) {
+  if (isa<ScalableVectorType>(VTy)) {
     Value *Ones = getAllOnesValue(VTy);
     return Insert(BinaryOperator::Create(Instruction::Xor, V, Ones, Name,
                                          static_cast<Instruction *>(nullptr)));
@@ -2365,8 +2365,7 @@ public:
 
   Value *CreateInsertElement(Value *Vec, Value *NewElt, Value *Idx,
                              const Twine &Name = "") {
-    if (isa<VectorType>(Vec->getType()) &&
-        cast<VectorType>(Vec->getType())->isScalable())
+    if (isa<ScalableVectorType>(Vec->getType()))
       return Insert(InsertElementInst::Create(Vec, NewElt, Idx), Name);
     if (auto *VC = dyn_cast<Constant>(Vec))
       if (auto *NC = dyn_cast<Constant>(NewElt))
@@ -2475,8 +2474,7 @@ public:
   /// elements and type as given vector type argument.
   Value *getAllOnesValue(Type *Ty) {
     VectorType *VTy = dyn_cast<VectorType>(Ty);
-    if (isa_and_nonnull<VectorType>(VTy) &&
-        cast<VectorType>(VTy)->isScalable()) {
+    if (isa_and_nonnull<ScalableVectorType>(VTy)) {
       Constant *Ones = Constant::getAllOnesValue(VTy->getElementType());
       return CreateVectorSplat(VTy->getNumElements(), Ones, "", true);
     }

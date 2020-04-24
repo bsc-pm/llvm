@@ -93,7 +93,7 @@ Instruction *InstCombiner::PromoteCastOfAllocation(BitCastInst &CI,
   Type *CastElTy = PTy->getElementType();
   if (!AllocElTy->isSized() || !CastElTy->isSized()) return nullptr;
 
-  if (isa<VectorType>(CastElTy) && cast<VectorType>(CastElTy)->isScalable())
+  if (isa<ScalableVectorType>(CastElTy))
     return nullptr;
 
   unsigned AllocElTyAlign = DL.getABITypeAlignment(AllocElTy);
@@ -696,8 +696,7 @@ Instruction *InstCombiner::visitTrunc(TruncInst &CI) {
   Type *DestTy = CI.getType(), *SrcTy = Src->getType();
   ConstantInt *Cst;
 
-  if (isa<VectorType>(CI.getType()) &&
-      cast<VectorType>(CI.getType())->isScalable())
+  if (isa<ScalableVectorType>(CI.getType()))
     return nullptr;
 
   // Attempt to truncate the entire input expression tree to the destination
@@ -1142,8 +1141,7 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
   Value *Src = CI.getOperand(0);
   Type *SrcTy = Src->getType(), *DestTy = CI.getType();
 
-  if (isa<VectorType>(CI.getType()) &&
-      cast<VectorType>(CI.getType())->isScalable())
+  if (isa<ScalableVectorType>(CI.getType()))
     return nullptr;
 
   // Try to extend the entire expression tree to the wide destination type.
@@ -2107,7 +2105,7 @@ static bool collectInsertionElements(Value *V, unsigned Shift,
 static Value *optimizeIntegerToVectorInsertions(BitCastInst &CI,
                                                 InstCombiner &IC) {
   VectorType *DestVecTy = cast<VectorType>(CI.getType());
-  if (DestVecTy->isScalable())
+  if (isa<ScalableVectorType>(DestVecTy))
     return nullptr;
 
   Value *IntInput = CI.getOperand(0);
@@ -2499,7 +2497,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
 
   if (VectorType *DestVTy = dyn_cast<VectorType>(DestTy)) {
     if (DestVTy->getNumElements() == 1 && !SrcTy->isVectorTy() &&
-        !DestVTy->isScalable()) {
+        isa<ScalableVectorType>(DestVTy)) {
       Value *Elem = Builder.CreateBitCast(Src, DestVTy->getElementType());
       return InsertElementInst::Create(UndefValue::get(DestTy), Elem,
                      Constant::getNullValue(Type::getInt32Ty(CI.getContext())));
@@ -2528,7 +2526,7 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
   }
 
   if (VectorType *SrcVTy = dyn_cast<VectorType>(SrcTy)) {
-    if (SrcVTy->getNumElements() == 1 && !SrcVTy->isScalable()) {
+    if (SrcVTy->getNumElements() == 1 && isa<ScalableVectorType>(SrcVTy)) {
       // If our destination is not a vector, then make this a straight
       // scalar-scalar cast.
       if (!DestTy->isVectorTy()) {

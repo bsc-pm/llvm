@@ -456,7 +456,7 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
 
     // Try to get the store size for the type.
     auto AccessSize =
-        isa<VectorType>(AccessTy) && cast<VectorType>(AccessTy)->isScalable()
+        isa<ScalableVectorType>(AccessTy)
             ? LocationSize::unknown()
             : LocationSize::precise(DL.getTypeStoreSize(AccessTy));
 

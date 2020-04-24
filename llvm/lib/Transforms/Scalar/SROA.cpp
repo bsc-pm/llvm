@@ -790,9 +790,8 @@ private:
         LI.getPointerAddressSpace() != DL.getAllocaAddrSpace())
       return PI.setAborted(&LI);
 
-    if (auto *VTy = dyn_cast<VectorType>(LI.getType())) {
-      if (VTy->isScalable())
-        return PI.setAborted(&LI);
+    if (isa<ScalableVectorType>(LI.getType())) {
+      return PI.setAborted(&LI);
     }
 
     uint64_t Size = DL.getTypeStoreSize(LI.getType()).getFixedSize();
@@ -810,10 +809,8 @@ private:
         SI.getPointerAddressSpace() != DL.getAllocaAddrSpace())
       return PI.setAborted(&SI);
 
-    if (auto *VTy = dyn_cast<VectorType>(SI.getValueOperand()->getType())) {
-      if (VTy->isScalable()) {
-        return PI.setAborted(&SI);
-      }
+    if (isa<ScalableVectorType>(SI.getValueOperand()->getType())) {
+      return PI.setAborted(&SI);
     }
 
     uint64_t Size = DL.getTypeStoreSize(ValOp->getType()).getFixedSize();
@@ -4491,9 +4488,8 @@ bool SROA::runOnAlloca(AllocaInst &AI) {
   }
   const DataLayout &DL = AI.getModule()->getDataLayout();
 
-  if (auto *VTy = dyn_cast<VectorType>(AI.getAllocatedType())) {
-    if (VTy->isScalable())
-      return false;
+  if (isa<ScalableVectorType>(AI.getAllocatedType())) {
+    return false;
   }
 
   // Skip alloca forms that this analysis can't handle.

@@ -771,9 +771,8 @@ void RISCVFrameLowering::determineCalleeSaves(MachineFunction &MF,
     if (!Alloca)
       continue;
 
-    const VectorType *VT =
-        dyn_cast<const VectorType>(Alloca->getType()->getElementType());
-    if (VT && VT->isScalable()) {
+    if (const ScalableVectorType *VT = dyn_cast<const ScalableVectorType>(
+            Alloca->getType()->getElementType())) {
       MFI.setStackID(FI, TargetStackID::EPIVector);
       RVFI->setHasSpilledVR();
     }

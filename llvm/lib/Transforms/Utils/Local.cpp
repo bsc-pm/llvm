@@ -1258,8 +1258,7 @@ static bool PhiHasDebugValue(DILocalVariable *DIVar,
 static bool valueCoversEntireFragment(Type *ValTy, DbgVariableIntrinsic *DII) {
   const DataLayout &DL = DII->getModule()->getDataLayout();
   // We can't really tell.
-  if (isa<VectorType>(ValTy) &&
-      cast<VectorType>(ValTy)->isScalable())
+  if (isa<ScalableVectorType>(ValTy))
     return false;
   uint64_t ValueSize = DL.getTypeAllocSizeInBits(ValTy);
   if (auto FragmentSize = DII->getFragmentSizeInBits())

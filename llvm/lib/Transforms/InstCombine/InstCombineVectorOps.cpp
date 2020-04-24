@@ -1016,8 +1016,7 @@ Instruction *InstCombiner::visitInsertElementInst(InsertElementInst &IE) {
   // Do not InstCombine if the instruction is of scalable vector type. 
   // TODO: It may be possible to have more finegrained control over how
   // InstCombine handles scalable vector types. For now we just disable it.
-  if (isa<VectorType>(IE.getType()) &&
-      cast<VectorType>(IE.getType())->isScalable())
+  if (isa<ScalableVectorType>(IE.getType()))
     return nullptr;
 
   Value *VecOp    = IE.getOperand(0);
@@ -1779,8 +1778,7 @@ static Instruction *foldIdentityExtractShuffle(ShuffleVectorInst &Shuf) {
 static Instruction *foldShuffleWithInsert(ShuffleVectorInst &Shuf,
                                           InstCombiner &IC) {
   // Do not fold if shuffle is a scalable vector.
-  if (isa<VectorType>(Shuf.getType()) &&
-      cast<VectorType>(Shuf.getType())->isScalable())
+  if (isa<ScalableVectorType>(Shuf.getType()))
     return nullptr;
 
   Value *V0 = Shuf.getOperand(0), *V1 = Shuf.getOperand(1);
@@ -1936,8 +1934,7 @@ static Instruction *foldIdentityPaddedShuffles(ShuffleVectorInst &Shuf) {
 Instruction *InstCombiner::visitShuffleVectorInst(ShuffleVectorInst &SVI) {
   //Disable InstCombine for shuffle vectors if they are of scalable vector type.
   //TODO: Disable selectively at more fine grained level. 
-  if (isa<VectorType>(SVI.getType()) &&
-      cast<VectorType>(SVI.getType())->isScalable())
+  if (isa<ScalableVectorType>(SVI.getType()))
     return nullptr;
   Value *LHS = SVI.getOperand(0);
   Value *RHS = SVI.getOperand(1);
