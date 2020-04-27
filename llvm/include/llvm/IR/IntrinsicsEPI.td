@@ -562,19 +562,19 @@ multiclass epi_load {
                                   [ LLVMMatchType<0>,
                                     LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_anyvector_ty, llvm_i64_ty ],
-                                  [ NoCapture<0>, IntrReadMem ]>;
+                                  [ NoCapture<1>, IntrReadMem ]>;
   def "_strided_mask" : Intrinsic<[ llvm_anyvector_ty ],
                                   [ LLVMMatchType<0>,
                                     LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_i64_ty, llvm_anyvector_ty,
                                     llvm_i64_ty ],
-                                  [ NoCapture<0>, IntrReadMem ]>;
+                                  [ NoCapture<1>, IntrReadMem ]>;
   def "_indexed_mask" : Intrinsic<[ llvm_anyvector_ty ],
                                   [ LLVMMatchType<0>,
                                     LLVMPointerType<LLVMMatchType<0>>,
                                     llvm_anyvector_ty, llvm_anyvector_ty,
                                     llvm_i64_ty ],
-                                  [ NoCapture<0>, IntrReadMem ]>;
+                                  [ NoCapture<1>, IntrReadMem ]>;
 }
 
 defm int_epi_vload : epi_load;

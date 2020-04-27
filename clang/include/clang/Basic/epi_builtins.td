@@ -270,14 +270,30 @@ let ManualCodegen = [{
   IntrinsicTypes = {ResultType};
   Ops[0] = Builder.CreateBitCast(Ops[0],
       llvm::PointerType::getUnqual(ResultType));
-}], IntrinsicNameMask = "" in
+}], ManualCodegenMask = [{
+  IntrinsicTypes = {ResultType, Ops[2]->getType()};
+  Ops[1] = Builder.CreateBitCast(Ops[1],
+      llvm::PointerType::getUnqual(ResultType));
+}] in
 {
   def vload : EPIBuiltin<"v", "vPCe", "csilfd">;
-  let IntrinsicName = "vload" in
+  let IntrinsicName = "vload", IntrinsicNameMask = "vload_mask" in
     def vload_unsigned : EPIBuiltin<"v", "vPCUe", "csil">;
+}
 
+let ManualCodegen = [{
+  IntrinsicTypes = {ResultType};
+  Ops[0] = Builder.CreateBitCast(Ops[0],
+      llvm::PointerType::getUnqual(ResultType));
+}], ManualCodegenMask = [{
+  IntrinsicTypes = {ResultType, Ops[3]->getType()};
+  Ops[1] = Builder.CreateBitCast(Ops[1],
+      llvm::PointerType::getUnqual(ResultType));
+}] in
+{
   def vload_strided : EPIBuiltin<"v", "vPCes", "csilfd">;
-  let IntrinsicName = "vload_strided" in
+  let IntrinsicName = "vload_strided",
+      IntrinsicNameMask = "vload_strided_mask" in
     def vload_strided_unsigned : EPIBuiltin<"v", "vPCUes", "csil">;
 }
 
@@ -285,12 +301,30 @@ let ManualCodegen = [{
   IntrinsicTypes = {ResultType, Ops[1]->getType()};
   Ops[0] = Builder.CreateBitCast(Ops[0],
       llvm::PointerType::getUnqual(ResultType));
-}], IntrinsicNameMask = "" in
+}], ManualCodegenMask = [{
+  IntrinsicTypes = {ResultType, Ops[2]->getType(), Ops[3]->getType()};
+  Ops[1] = Builder.CreateBitCast(Ops[1],
+      llvm::PointerType::getUnqual(ResultType));
+}] in
 {
   def vload_indexed : EPIBuiltin<"v", "vPCeIv", "csilfd">;
-  let IntrinsicName = "vload_indexed" in
+  let IntrinsicName = "vload_indexed",
+      IntrinsicNameMask = "vload_indexed_mask" in
     def vload_indexed_unsigned : EPIBuiltin<"v", "vPCUeIv", "csil">;
 }
+
+// Load mask.
+let Name = "vload", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
+    ManualCodegen = [{ {
+        clang::CharUnits Align =
+            getNaturalPointeeTypeAlignment(E->getArg(0)->getType());
+        llvm::Type *MemType = ConvertTypeForMem(E->getType());
+        Ops[0] = Builder.CreateBitCast(Ops[0],
+                                       llvm::PointerType::getUnqual(MemType));
+        llvm::Value *Load = Builder.CreateAlignedLoad(Ops[0], Align);
+        return Builder.CreateTrunc(Load, ResultType);
+    } }] in
+def vload_mask : EPIBuiltin<"m", "mPCUe", "csil">;
 
 let HasMergeOperand = 0 in
 {
@@ -300,14 +334,36 @@ let HasMergeOperand = 0 in
     Ops[1] = Builder.CreateBitCast(Ops[1],
         llvm::PointerType::getUnqual(Ops[0]->getType()));
     IntrinsicTypes = {Ops[0]->getType()};
+  }], ManualCodegenMask = [{
+    assert(Ops.size() >= 2);
+    std::swap(Ops[0], Ops[1]);
+    Ops[1] = Builder.CreateBitCast(Ops[1],
+        llvm::PointerType::getUnqual(Ops[0]->getType()));
+    IntrinsicTypes = {Ops[0]->getType(), Ops[2]->getType()};
   }] in
   {
     def vstore : EPIBuiltin<"v", "0Pev", "csilfd">;
-    let IntrinsicName = "vstore", IntrinsicNameMask = "" in
+    let IntrinsicName = "vstore", IntrinsicNameMask = "vstore_mask" in
       def vstore_unsigned : EPIBuiltin<"v", "0PUev", "csil">;
+  }
 
+  let ManualCodegen = [{
+    assert(Ops.size() >= 2);
+    std::swap(Ops[0], Ops[1]);
+    Ops[1] = Builder.CreateBitCast(Ops[1],
+        llvm::PointerType::getUnqual(Ops[0]->getType()));
+    IntrinsicTypes = {Ops[0]->getType()};
+  }], ManualCodegenMask = [{
+    assert(Ops.size() >= 2);
+    std::swap(Ops[0], Ops[1]);
+    Ops[1] = Builder.CreateBitCast(Ops[1],
+        llvm::PointerType::getUnqual(Ops[0]->getType()));
+    IntrinsicTypes = {Ops[0]->getType(), Ops[3]->getType()};
+  }] in
+  {
     def vstore_strided : EPIBuiltin<"v", "0Pevs", "csilfd">;
-    let IntrinsicName = "vstore_strided", IntrinsicNameMask = "" in
+    let IntrinsicName = "vstore_strided",
+        IntrinsicNameMask = "vstore_strided_mask" in
       def vstore_strided_unsigned : EPIBuiltin<"v", "0PUevs", "csil">;
   }
 
@@ -317,10 +373,17 @@ let HasMergeOperand = 0 in
     Ops[1] = Builder.CreateBitCast(Ops[1],
         llvm::PointerType::getUnqual(Ops[0]->getType()));
     IntrinsicTypes = {Ops[0]->getType(), Ops[2]->getType()};
-  }], IntrinsicNameMask = "" in
+  }], ManualCodegenMask = [{
+    assert(Ops.size() >= 2);
+    std::swap(Ops[0], Ops[1]);
+    Ops[1] = Builder.CreateBitCast(Ops[1],
+        llvm::PointerType::getUnqual(Ops[0]->getType()));
+    IntrinsicTypes = {Ops[0]->getType(), Ops[2]->getType(), Ops[3]->getType()};
+  }] in
   {
     def vstore_indexed : EPIBuiltin<"v", "0PevIv", "csilfd">;
-    let IntrinsicName = "vstore_indexed" in
+    let IntrinsicName = "vstore_indexed",
+        IntrinsicNameMask = "vstore_indexed_mask" in
       def vstore_indexed_unsigned : EPIBuiltin<"v", "0PUevIv", "csil">;
   }
 
@@ -341,19 +404,6 @@ let HasMergeOperand = 0 in
   } }] in
   def vstore_mask : EPIBuiltin<"m", "0PUem", "csil">;
 }
-
-// Load mask.
-let Name = "vload", IntrinsicName = "", HasVL = 0, HasMask = 0, LMUL = [1],
-    ManualCodegen = [{ {
-        clang::CharUnits Align =
-            getNaturalPointeeTypeAlignment(E->getArg(0)->getType());
-        llvm::Type *MemType = ConvertTypeForMem(E->getType());
-        Ops[0] = Builder.CreateBitCast(Ops[0],
-                                       llvm::PointerType::getUnqual(MemType));
-        llvm::Value *Load = Builder.CreateAlignedLoad(Ops[0], Align);
-        return Builder.CreateTrunc(Load, ResultType);
-    } }] in
-def vload_mask : EPIBuiltin<"m", "mPCUe", "csil">;
 
 def vadd : EPIBinBuiltin<"v", "vvv", "csil">;
 def vsub : EPIBinBuiltin<"v", "vvv", "csil">;
