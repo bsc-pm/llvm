@@ -29,8 +29,8 @@
 // - Some operations are commutable and may have the broadcasted value in the
 // first operand rather than the second. It should be possible to swap the
 // operands to make the fold effective.
-// - This analysis could be extended to phis. The uses of a phi whose all incoming values
-// are broadcasts with the same gvl is eligible for folding.
+// - This analysis could be extended to phis. The uses of a phi whose all
+// incoming values are broadcasts with the same gvl is eligible for folding.
 //
 //===----------------------------------------------------------------------===//
 
@@ -40,7 +40,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Intrinsics.h"
@@ -112,10 +111,10 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
   for (auto &U : Broadcast->uses()) {
     User *R = U.getUser();
     // TODO: Extend this algorithm through phis
-    if (auto CSUser = CallSite(R)) {
+    if (auto *CBUser = dyn_cast<CallBase>(R)) {
       LLVM_DEBUG(dbgs() << "This is used in a call\n");
       LLVM_DEBUG(R->dump());
-      Intrinsic::ID II = CSUser.getIntrinsicID();
+      Intrinsic::ID II = CBUser->getIntrinsicID();
       if (II == Intrinsic::not_intrinsic)
         continue;
 
@@ -128,7 +127,7 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
       assert(EII->ExtendedOperand > 0);
       unsigned ExtendedOp = EII->ExtendedOperand - 1;
       // Check that the broadcasted value is used in the extended operand.
-      if (CSUser.getArgumentNo(&U) != ExtendedOp)
+      if (CBUser->getDataOperandNo(&U) != ExtendedOp)
         continue;
       // Note: we used to check that the GVL in both cases matches but
       // this seems unnecessary because:
@@ -145,20 +144,20 @@ void EPIFoldBroadcast::determineFoldableUses(Instruction *Broadcast,
       // If the broadcast is used in other arguments than the extended operand,
       // this transformation is not beneficial.
       bool HasOtherBroadcastUses = false;
-      for (unsigned Arg = 0, E = CSUser.getNumArgOperands();
+      for (unsigned Arg = 0, E = CBUser->getNumArgOperands();
            Arg < E && !HasOtherBroadcastUses; Arg++) {
         // This is the extended operand. Skip it.
         if (Arg == ExtendedOp)
           continue;
 
-        HasOtherBroadcastUses = (CSUser.getArgOperand(Arg) == Broadcast);
+        HasOtherBroadcastUses = (CBUser->getArgOperand(Arg) == Broadcast);
       }
 
       if (HasOtherBroadcastUses)
         continue;
 
       LLVM_DEBUG(dbgs() << "Found a foldable use");
-      LLVM_DEBUG(CSUser.getInstruction()->dump());
+      LLVM_DEBUG(CBUser->dump());
       FoldInfo FI;
       FI.Scalar = Scalar;
       FI.Broadcast = Broadcast;
@@ -172,21 +171,21 @@ bool EPIFoldBroadcast::foldBroadcasts(Function &F) {
   bool Changed = false;
 
   for (auto &FI : FoldableUses) {
-    auto CSUser = CallSite(FI.User);
-    assert(CSUser && "This must be a call");
+    auto *CBUser = dyn_cast<CallBase>(FI.User);
+    assert(CBUser && "This must be a call");
 
-    Intrinsic::ID II = CSUser.getIntrinsicID();
+    Intrinsic::ID II = CBUser->getIntrinsicID();
     assert(II != Intrinsic::not_intrinsic &&
            "This must be a call to an intrinsic");
     const RISCVEPIIntrinsicsTable::EPIIntrinsicInfo *EII =
         RISCVEPIIntrinsicsTable::getEPIIntrinsicInfo(II);
     assert(EII && "This must be a known EPI intrinsic");
 
-    FunctionType *FTy = CSUser.getCalledFunction()->getFunctionType();
+    FunctionType *FTy = CBUser->getCalledFunction()->getFunctionType();
 
     Type *ScalarTy = FI.Scalar->getType();
 
-    LLVM_DEBUG(CSUser->print(dbgs()); dbgs() << "\n");
+    LLVM_DEBUG(CBUser->print(dbgs()); dbgs() << "\n");
 
     SmallVector<Type *, 4> NewIntrinsicTypes;
     SmallVector<Value *, 4> NewOps;
@@ -194,25 +193,27 @@ bool EPIFoldBroadcast::foldBroadcasts(Function &F) {
     case RISCVEPIIntrinsicsTable::EPICIDBinary:
       LLVM_DEBUG(dbgs() << "Binary intrinsic\n");
       NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy};
-      NewOps = {CSUser.getArgument(0), FI.Scalar, CSUser.getArgument(2)};
+      NewOps = {CBUser->getArgOperand(0), FI.Scalar, CBUser->getArgOperand(2)};
       break;
     case RISCVEPIIntrinsicsTable::EPICIDBinaryMask:
       LLVM_DEBUG(dbgs() << "Binary intrinsic with mask\n");
-      NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy, FTy->getParamType(3)};
-      NewOps = {CSUser.getArgument(0), CSUser.getArgument(1), FI.Scalar,
-             CSUser.getArgument(3), CSUser.getArgument(4)};
+      NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy,
+                           FTy->getParamType(3)};
+      NewOps = {CBUser->getArgOperand(0), CBUser->getArgOperand(1), FI.Scalar,
+                CBUser->getArgOperand(3), CBUser->getArgOperand(4)};
       break;
     case RISCVEPIIntrinsicsTable::EPICIDTernary:
       LLVM_DEBUG(dbgs() << "Ternary intrinsic\n");
       NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy};
-      NewOps = {CSUser.getArgument(0), FI.Scalar, CSUser.getArgument(2),
-                CSUser.getArgument(3)};
+      NewOps = {CBUser->getArgOperand(0), FI.Scalar, CBUser->getArgOperand(2),
+                CBUser->getArgOperand(3)};
       break;
     case RISCVEPIIntrinsicsTable::EPICIDTernaryMask:
       LLVM_DEBUG(dbgs() << "Ternary intrinsic with mask\n");
-      NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy, FTy->getParamType(3)};
-      NewOps = {CSUser.getArgument(0), FI.Scalar, CSUser.getArgument(2),
-                CSUser.getArgument(3), CSUser.getArgument(4)};
+      NewIntrinsicTypes = {FTy->getReturnType(), ScalarTy,
+                           FTy->getParamType(3)};
+      NewOps = {CBUser->getArgOperand(0), FI.Scalar, CBUser->getArgOperand(2),
+                CBUser->getArgOperand(3), CBUser->getArgOperand(4)};
       break;
     default:
       // We don't handle this class of intrinsics yet.
@@ -260,10 +261,10 @@ bool EPIFoldBroadcast::runOnFunction(Function &F) {
 
   for (auto &BB : F) {
     for (auto &I : BB) {
-      if (auto CS = CallSite(&I)) {
-        if (CS.getIntrinsicID() == Intrinsic::epi_vmv_v_x ||
-            CS.getIntrinsicID() == Intrinsic::epi_vfmv_v_f) {
-          determineFoldableUses(CS.getInstruction(), CS.getArgument(0));
+      if (auto *CB = dyn_cast<CallBase>(&I)) {
+        if (CB->getIntrinsicID() == Intrinsic::epi_vmv_v_x ||
+            CB->getIntrinsicID() == Intrinsic::epi_vfmv_v_f) {
+          determineFoldableUses(CB, CB->getArgOperand(0));
         }
       }
     }
