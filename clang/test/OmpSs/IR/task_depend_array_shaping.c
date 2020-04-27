@@ -278,3 +278,116 @@ void foo4(int x, int y, int z) {
     #pragma oss task inout([c]([a][b]vla[sizeof(vla)]))
     {}
 }
+
+// CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.FIRSTPRIVATE"(i32* %a), "QUAL.OSS.FIRSTPRIVATE"(i32* %b), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.INOUT"(i32* %vla, %struct._depend_unpack_t.9 (i32*, i32*, i32*, i64, i64, i64)* @compute_dep.10, i32* %vla, i32* %a, i32* %b, i64 %1, i64 %3, i64 %5) ]
+// CHECK: %10 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.FIRSTPRIVATE"(i32* %a), "QUAL.OSS.FIRSTPRIVATE"(i32* %b), "QUAL.OSS.FIRSTPRIVATE"(i32* %c), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.INOUT"(i32* %vla, %struct._depend_unpack_t.10 (i32*, i32*, i32*, i32*, i64, i64, i64)* @compute_dep.11, i32* %vla, i32* %a, i32* %b, i32* %c, i64 %1, i64 %3, i64 %5) ]
+// CHECK: %11 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.FIRSTPRIVATE"(i32* %a), "QUAL.OSS.FIRSTPRIVATE"(i32* %b), "QUAL.OSS.FIRSTPRIVATE"(i32* %c), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.INOUT"(i32* %vla, %struct._depend_unpack_t.11 (i32*, i32*, i32*, i32*, i64, i64, i64)* @compute_dep.12, i32* %vla, i32* %a, i32* %b, i32* %c, i64 %1, i64 %3, i64 %5) ]
+
+// CHECK: define internal %struct._depend_unpack_t.9 @compute_dep.10(i32* %vla, i32* %a, i32* %b, i64 %0, i64 %1, i64 %2) {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.9, align 8
+// CHECK-NEXT:   %3 = load i32, i32* %b, align 4
+// CHECK-NEXT:   %4 = sext i32 %3 to i64
+// CHECK-NEXT:   %5 = add i64 %4, 1
+// CHECK-NEXT:   %6 = mul nuw i64 %1, %2
+// CHECK-NEXT:   %7 = mul nsw i64 2, %6
+// CHECK-NEXT:   %arrayidx = getelementptr inbounds i32, i32* %vla, i64 %7
+// CHECK-NEXT:   %8 = load i32, i32* %a, align 4
+// CHECK-NEXT:   %9 = zext i32 %8 to i64
+// CHECK-NEXT:   %10 = mul i64 %2, 4
+// CHECK-NEXT:   %11 = mul i64 %2, 4
+// CHECK-NEXT:   %12 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 0
+// CHECK-NEXT:   store i32* %arrayidx, i32** %12, align 8
+// CHECK-NEXT:   %13 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 1
+// CHECK-NEXT:   store i64 %10, i64* %13, align 8
+// CHECK-NEXT:   %14 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %14, align 8
+// CHECK-NEXT:   %15 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 3
+// CHECK-NEXT:   store i64 %11, i64* %15, align 8
+// CHECK-NEXT:   %16 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 4
+// CHECK-NEXT:   store i64 %9, i64* %16, align 8
+// CHECK-NEXT:   %17 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 5
+// CHECK-NEXT:   store i64 %4, i64* %17, align 8
+// CHECK-NEXT:   %18 = getelementptr inbounds %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, i32 0, i32 6
+// CHECK-NEXT:   store i64 %5, i64* %18, align 8
+// CHECK-NEXT:   %19 = load %struct._depend_unpack_t.9, %struct._depend_unpack_t.9* %return.val, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.9 %19
+// CHECK-NEXT: }
+
+// CHECK: define internal %struct._depend_unpack_t.10 @compute_dep.11(i32* %vla, i32* %a, i32* %b, i32* %c, i64 %0, i64 %1, i64 %2) {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.10, align 8
+// CHECK-NEXT:   %3 = load i32, i32* %c, align 4
+// CHECK-NEXT:   %4 = zext i32 %3 to i64
+// CHECK-NEXT:   %5 = load i32, i32* %b, align 4
+// CHECK-NEXT:   %6 = zext i32 %5 to i64
+// CHECK-NEXT:   %7 = mul i64 %2, 4
+// CHECK-NEXT:   %8 = mul i64 %2, 4
+// CHECK-NEXT:   %9 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 0
+// CHECK-NEXT:   store i32* %vla, i32** %9, align 8
+// CHECK-NEXT:   %10 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 1
+// CHECK-NEXT:   store i64 %7, i64* %10, align 8
+// CHECK-NEXT:   %11 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %11, align 8
+// CHECK-NEXT:   %12 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 3
+// CHECK-NEXT:   store i64 %8, i64* %12, align 8
+// CHECK-NEXT:   %13 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 4
+// CHECK-NEXT:   store i64 %1, i64* %13, align 8
+// CHECK-NEXT:   %14 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 5
+// CHECK-NEXT:   store i64 0, i64* %14, align 8
+// CHECK-NEXT:   %15 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 6
+// CHECK-NEXT:   store i64 %1, i64* %15, align 8
+// CHECK-NEXT:   %16 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 7
+// CHECK-NEXT:   store i64 %6, i64* %16, align 8
+// CHECK-NEXT:   %17 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 8
+// CHECK-NEXT:   store i64 0, i64* %17, align 8
+// CHECK-NEXT:   %18 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 9
+// CHECK-NEXT:   store i64 %6, i64* %18, align 8
+// CHECK-NEXT:   %19 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 10
+// CHECK-NEXT:   store i64 %4, i64* %19, align 8
+// CHECK-NEXT:   %20 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 11
+// CHECK-NEXT:   store i64 0, i64* %20, align 8
+// CHECK-NEXT:   %21 = getelementptr inbounds %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, i32 0, i32 12
+// CHECK-NEXT:   store i64 %4, i64* %21, align 8
+// CHECK-NEXT:   %22 = load %struct._depend_unpack_t.10, %struct._depend_unpack_t.10* %return.val, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.10 %22
+// CHECK-NEXT: }
+
+// CHECK: define internal %struct._depend_unpack_t.11 @compute_dep.12(i32* %vla, i32* %a, i32* %b, i32* %c, i64 %0, i64 %1, i64 %2) {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.11, align 8
+// CHECK-NEXT:   %3 = mul nuw i64 %0, %1
+// CHECK-NEXT:   %4 = mul nuw i64 %3, %2
+// CHECK-NEXT:   %5 = mul nuw i64 4, %4
+// CHECK-NEXT:   %6 = mul nuw i64 %1, %2
+// CHECK-NEXT:   %7 = mul nsw i64 %5, %6
+// CHECK-NEXT:   %arrayidx = getelementptr inbounds i32, i32* %vla, i64 %7
+// CHECK-NEXT:   %8 = load i32, i32* %c, align 4
+// CHECK-NEXT:   %9 = zext i32 %8 to i64
+// CHECK-NEXT:   %10 = load i32, i32* %b, align 4
+// CHECK-NEXT:   %11 = zext i32 %10 to i64
+// CHECK-NEXT:   %12 = mul i64 %2, 4
+// CHECK-NEXT:   %13 = mul i64 %2, 4
+// CHECK-NEXT:   %14 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 0
+// CHECK-NEXT:   store i32* %arrayidx, i32** %14, align 8
+// CHECK-NEXT:   %15 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 1
+// CHECK-NEXT:   store i64 %12, i64* %15, align 8
+// CHECK-NEXT:   %16 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %16, align 8
+// CHECK-NEXT:   %17 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 3
+// CHECK-NEXT:   store i64 %13, i64* %17, align 8
+// CHECK-NEXT:   %18 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 4
+// CHECK-NEXT:   store i64 %11, i64* %18, align 8
+// CHECK-NEXT:   %19 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 5
+// CHECK-NEXT:   store i64 0, i64* %19, align 8
+// CHECK-NEXT:   %20 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 6
+// CHECK-NEXT:   store i64 %11, i64* %20, align 8
+// CHECK-NEXT:   %21 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 7
+// CHECK-NEXT:   store i64 %9, i64* %21, align 8
+// CHECK-NEXT:   %22 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 8
+// CHECK-NEXT:   store i64 0, i64* %22, align 8
+// CHECK-NEXT:   %23 = getelementptr inbounds %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, i32 0, i32 9
+// CHECK-NEXT:   store i64 %9, i64* %23, align 8
+// CHECK-NEXT:   %24 = load %struct._depend_unpack_t.11, %struct._depend_unpack_t.11* %return.val, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.11 %24
+// CHECK-NEXT: }
