@@ -333,6 +333,6032 @@ entry:
 }
 
 
+declare <vscale x 8 x i8> @llvm.epi.vload.nxv8i8(
+  <vscale x 8 x i8>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.nxv8i8(
+    <vscale x 8 x i8>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i8> @llvm.epi.vload.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i8> @llvm.epi.vload.nxv16i8(
+  <vscale x 16 x i8>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.nxv16i8(
+    <vscale x 16 x i8>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i8> @llvm.epi.vload.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i8> @llvm.epi.vload.nxv32i8(
+  <vscale x 32 x i8>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.nxv32i8(
+    <vscale x 32 x i8>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i8> @llvm.epi.vload.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i16> @llvm.epi.vload.nxv4i16(
+  <vscale x 4 x i16>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.nxv4i16(
+    <vscale x 4 x i16>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i16> @llvm.epi.vload.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i16> @llvm.epi.vload.nxv8i16(
+  <vscale x 8 x i16>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.nxv8i16(
+    <vscale x 8 x i16>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i16> @llvm.epi.vload.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i16> @llvm.epi.vload.nxv16i16(
+  <vscale x 16 x i16>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.nxv16i16(
+    <vscale x 16 x i16>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i16> @llvm.epi.vload.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i16> @llvm.epi.vload.nxv32i16(
+  <vscale x 32 x i16>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.nxv32i16(
+    <vscale x 32 x i16>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i16> @llvm.epi.vload.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i32> @llvm.epi.vload.nxv2i32(
+  <vscale x 2 x i32>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.nxv2i32(
+    <vscale x 2 x i32>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i32> @llvm.epi.vload.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i32> @llvm.epi.vload.nxv4i32(
+  <vscale x 4 x i32>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.nxv4i32(
+    <vscale x 4 x i32>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i32> @llvm.epi.vload.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i32> @llvm.epi.vload.nxv8i32(
+  <vscale x 8 x i32>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.nxv8i32(
+    <vscale x 8 x i32>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i32> @llvm.epi.vload.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i32> @llvm.epi.vload.nxv16i32(
+  <vscale x 16 x i32>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.nxv16i32(
+    <vscale x 16 x i32>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i32> @llvm.epi.vload.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(
+  <vscale x 1 x i64>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(
+    <vscale x 1 x i64>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x i64> @llvm.epi.vload.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i64> @llvm.epi.vload.nxv2i64(
+  <vscale x 2 x i64>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.nxv2i64(
+    <vscale x 2 x i64>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i64> @llvm.epi.vload.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i64> @llvm.epi.vload.nxv4i64(
+  <vscale x 4 x i64>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.nxv4i64(
+    <vscale x 4 x i64>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i64> @llvm.epi.vload.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i64> @llvm.epi.vload.nxv8i64(
+  <vscale x 8 x i64>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.nxv8i64(
+    <vscale x 8 x i64>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i64> @llvm.epi.vload.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x float> @llvm.epi.vload.nxv2f32(
+  <vscale x 2 x float>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 2 x float> @llvm.epi.vload.nxv2f32(
+    <vscale x 2 x float>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x float> @llvm.epi.vload.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 2 x float> @llvm.epi.vload.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x float> @llvm.epi.vload.nxv4f32(
+  <vscale x 4 x float>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 4 x float> @llvm.epi.vload.nxv4f32(
+    <vscale x 4 x float>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x float> @llvm.epi.vload.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 4 x float> @llvm.epi.vload.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x float> @llvm.epi.vload.nxv8f32(
+  <vscale x 8 x float>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x float> @llvm.epi.vload.nxv8f32(
+    <vscale x 8 x float>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x float> @llvm.epi.vload.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x float> @llvm.epi.vload.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x float> @llvm.epi.vload.nxv16f32(
+  <vscale x 16 x float>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 16 x float> @llvm.epi.vload.nxv16f32(
+    <vscale x 16 x float>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x float> @llvm.epi.vload.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 16 x float> @llvm.epi.vload.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x double> @llvm.epi.vload.nxv1f64(
+  <vscale x 1 x double>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(
+    <vscale x 1 x double>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x double> @llvm.epi.vload.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 1 x double> @llvm.epi.vload.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x double> @llvm.epi.vload.nxv2f64(
+  <vscale x 2 x double>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 2 x double> @llvm.epi.vload.nxv2f64(
+    <vscale x 2 x double>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x double> @llvm.epi.vload.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 2 x double> @llvm.epi.vload.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x double> @llvm.epi.vload.nxv4f64(
+  <vscale x 4 x double>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 4 x double> @llvm.epi.vload.nxv4f64(
+    <vscale x 4 x double>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x double> @llvm.epi.vload.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 4 x double> @llvm.epi.vload.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x double> @llvm.epi.vload.nxv8f64(
+  <vscale x 8 x double>*,
+  i64);
+
+define void @intrinsic_vload_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0)
+  %a = call <vscale x 8 x double> @llvm.epi.vload.nxv8f64(
+    <vscale x 8 x double>* undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x double> @llvm.epi.vload.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vle.v {{v[0-9]+}}, (a0), v0.t
+  %a = call <vscale x 8 x double> @llvm.epi.vload.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  i64);
+
+define void @intrinsic_vstore_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0)
+  call void @llvm.epi.vstore.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vse.v {{v[0-9]+}}, (a0), v0.t
+  call void @llvm.epi.vstore.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare <vscale x 8 x i8> @llvm.epi.vload.strided.nxv8i8(
+  <vscale x 8 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.strided.nxv8i8(
+    <vscale x 8 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i8> @llvm.epi.vload.strided.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.strided.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i8> @llvm.epi.vload.strided.nxv16i8(
+  <vscale x 16 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.strided.nxv16i8(
+    <vscale x 16 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i8> @llvm.epi.vload.strided.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.strided.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i8> @llvm.epi.vload.strided.nxv32i8(
+  <vscale x 32 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.strided.nxv32i8(
+    <vscale x 32 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i8> @llvm.epi.vload.strided.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  i64,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.strided.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    i64 undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i16> @llvm.epi.vload.strided.nxv4i16(
+  <vscale x 4 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.strided.nxv4i16(
+    <vscale x 4 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i16> @llvm.epi.vload.strided.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.strided.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i16> @llvm.epi.vload.strided.nxv8i16(
+  <vscale x 8 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.strided.nxv8i16(
+    <vscale x 8 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i16> @llvm.epi.vload.strided.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.strided.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i16> @llvm.epi.vload.strided.nxv16i16(
+  <vscale x 16 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.strided.nxv16i16(
+    <vscale x 16 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i16> @llvm.epi.vload.strided.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.strided.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i16> @llvm.epi.vload.strided.nxv32i16(
+  <vscale x 32 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.strided.nxv32i16(
+    <vscale x 32 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i16> @llvm.epi.vload.strided.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  i64,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.strided.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    i64 undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i32> @llvm.epi.vload.strided.nxv2i32(
+  <vscale x 2 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.strided.nxv2i32(
+    <vscale x 2 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i32> @llvm.epi.vload.strided.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.strided.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i32> @llvm.epi.vload.strided.nxv4i32(
+  <vscale x 4 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.strided.nxv4i32(
+    <vscale x 4 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i32> @llvm.epi.vload.strided.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.strided.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i32> @llvm.epi.vload.strided.nxv8i32(
+  <vscale x 8 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.strided.nxv8i32(
+    <vscale x 8 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i32> @llvm.epi.vload.strided.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.strided.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i32> @llvm.epi.vload.strided.nxv16i32(
+  <vscale x 16 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.strided.nxv16i32(
+    <vscale x 16 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i32> @llvm.epi.vload.strided.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.strided.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x i64> @llvm.epi.vload.strided.nxv1i64(
+  <vscale x 1 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.strided.nxv1i64(
+    <vscale x 1 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x i64> @llvm.epi.vload.strided.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  i64,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.strided.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    i64 undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i64> @llvm.epi.vload.strided.nxv2i64(
+  <vscale x 2 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.strided.nxv2i64(
+    <vscale x 2 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i64> @llvm.epi.vload.strided.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.strided.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i64> @llvm.epi.vload.strided.nxv4i64(
+  <vscale x 4 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.strided.nxv4i64(
+    <vscale x 4 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i64> @llvm.epi.vload.strided.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.strided.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i64> @llvm.epi.vload.strided.nxv8i64(
+  <vscale x 8 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.strided.nxv8i64(
+    <vscale x 8 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i64> @llvm.epi.vload.strided.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.strided.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x float> @llvm.epi.vload.strided.nxv2f32(
+  <vscale x 2 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 2 x float> @llvm.epi.vload.strided.nxv2f32(
+    <vscale x 2 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x float> @llvm.epi.vload.strided.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 2 x float> @llvm.epi.vload.strided.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x float> @llvm.epi.vload.strided.nxv4f32(
+  <vscale x 4 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 4 x float> @llvm.epi.vload.strided.nxv4f32(
+    <vscale x 4 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x float> @llvm.epi.vload.strided.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 4 x float> @llvm.epi.vload.strided.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x float> @llvm.epi.vload.strided.nxv8f32(
+  <vscale x 8 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x float> @llvm.epi.vload.strided.nxv8f32(
+    <vscale x 8 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x float> @llvm.epi.vload.strided.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x float> @llvm.epi.vload.strided.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x float> @llvm.epi.vload.strided.nxv16f32(
+  <vscale x 16 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 16 x float> @llvm.epi.vload.strided.nxv16f32(
+    <vscale x 16 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x float> @llvm.epi.vload.strided.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 16 x float> @llvm.epi.vload.strided.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x double> @llvm.epi.vload.strided.nxv1f64(
+  <vscale x 1 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 1 x double> @llvm.epi.vload.strided.nxv1f64(
+    <vscale x 1 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x double> @llvm.epi.vload.strided.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  i64,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 1 x double> @llvm.epi.vload.strided.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    i64 undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x double> @llvm.epi.vload.strided.nxv2f64(
+  <vscale x 2 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 2 x double> @llvm.epi.vload.strided.nxv2f64(
+    <vscale x 2 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x double> @llvm.epi.vload.strided.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 2 x double> @llvm.epi.vload.strided.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x double> @llvm.epi.vload.strided.nxv4f64(
+  <vscale x 4 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 4 x double> @llvm.epi.vload.strided.nxv4f64(
+    <vscale x 4 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x double> @llvm.epi.vload.strided.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 4 x double> @llvm.epi.vload.strided.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x double> @llvm.epi.vload.strided.nxv8f64(
+  <vscale x 8 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vload.strided_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0
+  %a = call <vscale x 8 x double> @llvm.epi.vload.strided.nxv8f64(
+    <vscale x 8 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x double> @llvm.epi.vload.strided.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.strided_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.strided_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlse.v {{v[0-9]+}}, (a0), a0, v0.t
+  %a = call <vscale x 8 x double> @llvm.epi.vload.strided.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  i64,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    i64 undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  i64,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    i64 undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  i64,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    i64 undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  i64,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    i64 undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  i64,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    i64 undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  i64,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    i64 undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  i64,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    i64 undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.strided.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  i64,
+  i64);
+
+define void @intrinsic_vstore.strided_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0
+  call void @llvm.epi.vstore.strided.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    i64 undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.strided.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  i64,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.strided_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.strided_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsse.v {{v[0-9]+}}, (a0), a0, v0.t
+  call void @llvm.epi.vstore.strided.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    i64 undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare <vscale x 8 x i8> @llvm.epi.vload.indexed.nxv8i8(
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i8>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.indexed.nxv8i8(
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i8> @llvm.epi.vload.indexed.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i8>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x i8> @llvm.epi.vload.indexed.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i8>*
+  store <vscale x 8 x i8> %a, <vscale x 8 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i8> @llvm.epi.vload.indexed.nxv16i8(
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i8>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.indexed.nxv16i8(
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i8> @llvm.epi.vload.indexed.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i8>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 16 x i8> @llvm.epi.vload.indexed.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i8>*
+  store <vscale x 16 x i8> %a, <vscale x 16 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i8> @llvm.epi.vload.indexed.nxv32i8(
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i8>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.indexed.nxv32i8(
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i8> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i8> @llvm.epi.vload.indexed.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i8>,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 32 x i8> @llvm.epi.vload.indexed.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i8>*
+  store <vscale x 32 x i8> %a, <vscale x 32 x i8>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i16> @llvm.epi.vload.indexed.nxv4i16(
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i16>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.indexed.nxv4i16(
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i16> @llvm.epi.vload.indexed.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i16>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 4 x i16> @llvm.epi.vload.indexed.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i16>*
+  store <vscale x 4 x i16> %a, <vscale x 4 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i16> @llvm.epi.vload.indexed.nxv8i16(
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i16>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.indexed.nxv8i16(
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i16> @llvm.epi.vload.indexed.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i16>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x i16> @llvm.epi.vload.indexed.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i16>*
+  store <vscale x 8 x i16> %a, <vscale x 8 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i16> @llvm.epi.vload.indexed.nxv16i16(
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i16>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.indexed.nxv16i16(
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i16> @llvm.epi.vload.indexed.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i16>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 16 x i16> @llvm.epi.vload.indexed.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i16>*
+  store <vscale x 16 x i16> %a, <vscale x 16 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 32 x i16> @llvm.epi.vload.indexed.nxv32i16(
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i16>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.indexed.nxv32i16(
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i16> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+declare <vscale x 32 x i16> @llvm.epi.vload.indexed.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i16>,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 32 x i16> @llvm.epi.vload.indexed.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 32 x i16>*
+  store <vscale x 32 x i16> %a, <vscale x 32 x i16>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i32> @llvm.epi.vload.indexed.nxv2i32(
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.indexed.nxv2i32(
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i32> @llvm.epi.vload.indexed.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i32>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 2 x i32> @llvm.epi.vload.indexed.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i32>*
+  store <vscale x 2 x i32> %a, <vscale x 2 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i32> @llvm.epi.vload.indexed.nxv4i32(
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.indexed.nxv4i32(
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i32> @llvm.epi.vload.indexed.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i32>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 4 x i32> @llvm.epi.vload.indexed.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i32>*
+  store <vscale x 4 x i32> %a, <vscale x 4 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i32> @llvm.epi.vload.indexed.nxv8i32(
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.indexed.nxv8i32(
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i32> @llvm.epi.vload.indexed.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i32>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x i32> @llvm.epi.vload.indexed.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i32>*
+  store <vscale x 8 x i32> %a, <vscale x 8 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x i32> @llvm.epi.vload.indexed.nxv16i32(
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.indexed.nxv16i32(
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x i32> @llvm.epi.vload.indexed.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i32>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 16 x i32> @llvm.epi.vload.indexed.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x i32>*
+  store <vscale x 16 x i32> %a, <vscale x 16 x i32>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x i64> @llvm.epi.vload.indexed.nxv1i64(
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.indexed.nxv1i64(
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x i64> @llvm.epi.vload.indexed.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i64>,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 1 x i64> @llvm.epi.vload.indexed.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x i64>*
+  store <vscale x 1 x i64> %a, <vscale x 1 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x i64> @llvm.epi.vload.indexed.nxv2i64(
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.indexed.nxv2i64(
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x i64> @llvm.epi.vload.indexed.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i64>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 2 x i64> @llvm.epi.vload.indexed.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x i64>*
+  store <vscale x 2 x i64> %a, <vscale x 2 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x i64> @llvm.epi.vload.indexed.nxv4i64(
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.indexed.nxv4i64(
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x i64> @llvm.epi.vload.indexed.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i64>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 4 x i64> @llvm.epi.vload.indexed.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x i64>*
+  store <vscale x 4 x i64> %a, <vscale x 4 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x i64> @llvm.epi.vload.indexed.nxv8i64(
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.indexed.nxv8i64(
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x i64> @llvm.epi.vload.indexed.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i64>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x i64> @llvm.epi.vload.indexed.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x i64>*
+  store <vscale x 8 x i64> %a, <vscale x 8 x i64>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x float> @llvm.epi.vload.indexed.nxv2f32(
+  <vscale x 2 x float>*,
+  <vscale x 2 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 2 x float> @llvm.epi.vload.indexed.nxv2f32(
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x float> @llvm.epi.vload.indexed.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  <vscale x 2 x i32>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 2 x float> @llvm.epi.vload.indexed.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x float>*
+  store <vscale x 2 x float> %a, <vscale x 2 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x float> @llvm.epi.vload.indexed.nxv4f32(
+  <vscale x 4 x float>*,
+  <vscale x 4 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 4 x float> @llvm.epi.vload.indexed.nxv4f32(
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x float> @llvm.epi.vload.indexed.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  <vscale x 4 x i32>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 4 x float> @llvm.epi.vload.indexed.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x float>*
+  store <vscale x 4 x float> %a, <vscale x 4 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x float> @llvm.epi.vload.indexed.nxv8f32(
+  <vscale x 8 x float>*,
+  <vscale x 8 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x float> @llvm.epi.vload.indexed.nxv8f32(
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x float> @llvm.epi.vload.indexed.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  <vscale x 8 x i32>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x float> @llvm.epi.vload.indexed.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x float>*
+  store <vscale x 8 x float> %a, <vscale x 8 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 16 x float> @llvm.epi.vload.indexed.nxv16f32(
+  <vscale x 16 x float>*,
+  <vscale x 16 x i32>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 16 x float> @llvm.epi.vload.indexed.nxv16f32(
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i32> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+declare <vscale x 16 x float> @llvm.epi.vload.indexed.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  <vscale x 16 x i32>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 16 x float> @llvm.epi.vload.indexed.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 16 x float>*
+  store <vscale x 16 x float> %a, <vscale x 16 x float>* %p
+
+  ret void
+}
+
+
+declare <vscale x 1 x double> @llvm.epi.vload.indexed.nxv1f64(
+  <vscale x 1 x double>*,
+  <vscale x 1 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 1 x double> @llvm.epi.vload.indexed.nxv1f64(
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 1 x double> @llvm.epi.vload.indexed.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  <vscale x 1 x i64>,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 1 x double> @llvm.epi.vload.indexed.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 1 x double>*
+  store <vscale x 1 x double> %a, <vscale x 1 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 2 x double> @llvm.epi.vload.indexed.nxv2f64(
+  <vscale x 2 x double>*,
+  <vscale x 2 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 2 x double> @llvm.epi.vload.indexed.nxv2f64(
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 2 x double> @llvm.epi.vload.indexed.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  <vscale x 2 x i64>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 2 x double> @llvm.epi.vload.indexed.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 2 x double>*
+  store <vscale x 2 x double> %a, <vscale x 2 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 4 x double> @llvm.epi.vload.indexed.nxv4f64(
+  <vscale x 4 x double>*,
+  <vscale x 4 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 4 x double> @llvm.epi.vload.indexed.nxv4f64(
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 4 x double> @llvm.epi.vload.indexed.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  <vscale x 4 x i64>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 4 x double> @llvm.epi.vload.indexed.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 4 x double>*
+  store <vscale x 4 x double> %a, <vscale x 4 x double>* %p
+
+  ret void
+}
+
+
+declare <vscale x 8 x double> @llvm.epi.vload.indexed.nxv8f64(
+  <vscale x 8 x double>*,
+  <vscale x 8 x i64>,
+  i64);
+
+define void @intrinsic_vload.indexed_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  %a = call <vscale x 8 x double> @llvm.epi.vload.indexed.nxv8f64(
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i64> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+declare <vscale x 8 x double> @llvm.epi.vload.indexed.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  <vscale x 8 x i64>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vload.indexed_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vload.indexed_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vlxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  %a = call <vscale x 8 x double> @llvm.epi.vload.indexed.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  %p = bitcast i8* @scratch to <vscale x 8 x double>*
+  store <vscale x 8 x double> %a, <vscale x 8 x double>* %p
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i8>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i8> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8i8(
+  <vscale x 8 x i8>,
+  <vscale x 8 x i8>*,
+  <vscale x 8 x i8>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8i8_nxv8i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8i8_nxv8i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8i8(
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i8>* undef,
+    <vscale x 8 x i8> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i8>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i8> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv16i8(
+  <vscale x 16 x i8>,
+  <vscale x 16 x i8>*,
+  <vscale x 16 x i8>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv16i8_nxv16i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv16i8_nxv16i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv16i8(
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i8>* undef,
+    <vscale x 16 x i8> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i8>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i8> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv32i8(
+  <vscale x 32 x i8>,
+  <vscale x 32 x i8>*,
+  <vscale x 32 x i8>,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv32i8_nxv32i8() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv32i8_nxv32i8
+; CHECK:       vsetvli {{.*}}, a0, e8,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv32i8(
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i8>* undef,
+    <vscale x 32 x i8> undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i16>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i16> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv4i16(
+  <vscale x 4 x i16>,
+  <vscale x 4 x i16>*,
+  <vscale x 4 x i16>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv4i16_nxv4i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv4i16_nxv4i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv4i16(
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i16>* undef,
+    <vscale x 4 x i16> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i16>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i16> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8i16(
+  <vscale x 8 x i16>,
+  <vscale x 8 x i16>*,
+  <vscale x 8 x i16>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8i16_nxv8i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8i16_nxv8i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8i16(
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i16>* undef,
+    <vscale x 8 x i16> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i16>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i16> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv16i16(
+  <vscale x 16 x i16>,
+  <vscale x 16 x i16>*,
+  <vscale x 16 x i16>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv16i16_nxv16i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv16i16_nxv16i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv16i16(
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i16>* undef,
+    <vscale x 16 x i16> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i16>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i16> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv32i16(
+  <vscale x 32 x i16>,
+  <vscale x 32 x i16>*,
+  <vscale x 32 x i16>,
+  <vscale x 32 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv32i16_nxv32i16() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv32i16_nxv32i16
+; CHECK:       vsetvli {{.*}}, a0, e16,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv32i16(
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i16>* undef,
+    <vscale x 32 x i16> undef,
+    <vscale x 32 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv2i32(
+  <vscale x 2 x i32>,
+  <vscale x 2 x i32>*,
+  <vscale x 2 x i32>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv2i32_nxv2i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv2i32_nxv2i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv2i32(
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i32>* undef,
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv4i32(
+  <vscale x 4 x i32>,
+  <vscale x 4 x i32>*,
+  <vscale x 4 x i32>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv4i32_nxv4i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv4i32_nxv4i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv4i32(
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i32>* undef,
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8i32(
+  <vscale x 8 x i32>,
+  <vscale x 8 x i32>*,
+  <vscale x 8 x i32>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8i32_nxv8i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8i32_nxv8i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8i32(
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i32>* undef,
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv16i32(
+  <vscale x 16 x i32>,
+  <vscale x 16 x i32>*,
+  <vscale x 16 x i32>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv16i32_nxv16i32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv16i32_nxv16i32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv16i32(
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i32>* undef,
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv1i64(
+  <vscale x 1 x i64>,
+  <vscale x 1 x i64>*,
+  <vscale x 1 x i64>,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv1i64_nxv1i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv1i64_nxv1i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv1i64(
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i64>* undef,
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv2i64(
+  <vscale x 2 x i64>,
+  <vscale x 2 x i64>*,
+  <vscale x 2 x i64>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv2i64_nxv2i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv2i64_nxv2i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv2i64(
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i64>* undef,
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv4i64(
+  <vscale x 4 x i64>,
+  <vscale x 4 x i64>*,
+  <vscale x 4 x i64>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv4i64_nxv4i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv4i64_nxv4i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv4i64(
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i64>* undef,
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8i64(
+  <vscale x 8 x i64>,
+  <vscale x 8 x i64>*,
+  <vscale x 8 x i64>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8i64_nxv8i64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8i64_nxv8i64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8i64(
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i64>* undef,
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  <vscale x 2 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv2f32(
+  <vscale x 2 x float>,
+  <vscale x 2 x float>*,
+  <vscale x 2 x i32>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv2f32_nxv2f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv2f32_nxv2f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv2f32(
+    <vscale x 2 x float> undef,
+    <vscale x 2 x float>* undef,
+    <vscale x 2 x i32> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  <vscale x 4 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv4f32(
+  <vscale x 4 x float>,
+  <vscale x 4 x float>*,
+  <vscale x 4 x i32>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv4f32_nxv4f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv4f32_nxv4f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv4f32(
+    <vscale x 4 x float> undef,
+    <vscale x 4 x float>* undef,
+    <vscale x 4 x i32> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  <vscale x 8 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8f32(
+  <vscale x 8 x float>,
+  <vscale x 8 x float>*,
+  <vscale x 8 x i32>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8f32_nxv8f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8f32_nxv8f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8f32(
+    <vscale x 8 x float> undef,
+    <vscale x 8 x float>* undef,
+    <vscale x 8 x i32> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  <vscale x 16 x i32>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i32> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv16f32(
+  <vscale x 16 x float>,
+  <vscale x 16 x float>*,
+  <vscale x 16 x i32>,
+  <vscale x 16 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv16f32_nxv16f32() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv16f32_nxv16f32
+; CHECK:       vsetvli {{.*}}, a0, e32,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv16f32(
+    <vscale x 16 x float> undef,
+    <vscale x 16 x float>* undef,
+    <vscale x 16 x i32> undef,
+    <vscale x 16 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  <vscale x 1 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv1f64(
+  <vscale x 1 x double>,
+  <vscale x 1 x double>*,
+  <vscale x 1 x i64>,
+  <vscale x 1 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv1f64_nxv1f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv1f64_nxv1f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m1
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv1f64(
+    <vscale x 1 x double> undef,
+    <vscale x 1 x double>* undef,
+    <vscale x 1 x i64> undef,
+    <vscale x 1 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  <vscale x 2 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv2f64(
+  <vscale x 2 x double>,
+  <vscale x 2 x double>*,
+  <vscale x 2 x i64>,
+  <vscale x 2 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv2f64_nxv2f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv2f64_nxv2f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m2
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv2f64(
+    <vscale x 2 x double> undef,
+    <vscale x 2 x double>* undef,
+    <vscale x 2 x i64> undef,
+    <vscale x 2 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  <vscale x 4 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv4f64(
+  <vscale x 4 x double>,
+  <vscale x 4 x double>*,
+  <vscale x 4 x i64>,
+  <vscale x 4 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv4f64_nxv4f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv4f64_nxv4f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m4
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv4f64(
+    <vscale x 4 x double> undef,
+    <vscale x 4 x double>* undef,
+    <vscale x 4 x i64> undef,
+    <vscale x 4 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
+declare void @llvm.epi.vstore.indexed.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  <vscale x 8 x i64>,
+  i64);
+
+define void @intrinsic_vstore.indexed_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}
+  call void @llvm.epi.vstore.indexed.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i64> undef,
+    i64 undef)
+
+  ret void
+}
+
+declare void @llvm.epi.vstore.indexed.mask.nxv8f64(
+  <vscale x 8 x double>,
+  <vscale x 8 x double>*,
+  <vscale x 8 x i64>,
+  <vscale x 8 x i1>,
+  i64);
+
+define void @intrinsic_vstore.indexed_mask_v_nxv8f64_nxv8f64() nounwind {
+entry:
+; CHECK-LABEL: intrinsic_vstore.indexed_mask_v_nxv8f64_nxv8f64
+; CHECK:       vsetvli {{.*}}, a0, e64,m8
+; CHECK:       vsxe.v {{v[0-9]+}}, (a0), {{v[0-9]+}}, v0.t
+  call void @llvm.epi.vstore.indexed.mask.nxv8f64(
+    <vscale x 8 x double> undef,
+    <vscale x 8 x double>* undef,
+    <vscale x 8 x i64> undef,
+    <vscale x 8 x i1> undef,
+    i64 undef)
+
+  ret void
+}
+
+
 declare <vscale x 2 x float> @llvm.epi.vfsqrt.nxv2f32(
   <vscale x 2 x float>,
   i64);
