@@ -3288,15 +3288,7 @@ ExprResult Parser::TryParseOSSArrayShaping() {
       return ExprError();
     }
 
-    // Parse whatever between []
-    // FIXME: this allows to write assignment expressions like [x = 43]p
-    // NOTE: There's a bug in Lambda parsing that makes skip lambdas defined in a comma
-    // separated list.
-    // For example: auto l = [x](), m = [](){};
-    // skips 'm'
-    Diags.setSuppressAllDiagnostics(true);
-    Actions.CorrectDelayedTyposInExpr(ParseExpression());
-    Diags.setSuppressAllDiagnostics(false);
+    SkipUntil(tok::r_square, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
 
     // After that we're supposed to be at ]
     if (Tok.isNot(tok::r_square)) {
@@ -3313,12 +3305,32 @@ ExprResult Parser::TryParseOSSArrayShaping() {
     return ExprEmpty();
   }
 
-  // NOTE: Since we can parse a CompoundLiteralExpr ( (int *p) {} ), and the whole expression
-  // be like a lambda we classify this as a lambda
-  Diags.setSuppressAllDiagnostics(true);
-  ExprResult Base = Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
-  Diags.setSuppressAllDiagnostics(false);
-  if (Base.isInvalid() || isa<CompoundLiteralExpr>(Base.get())) {
+  ConsumeParen();
+
+  // Lambdas have ParameterDeclarationClause
+  TPResult TPR = TryParseParameterDeclarationClause();
+  if ((TPR == TPResult::Ambiguous && Tok.isNot(tok::r_paren))
+      || (TPR == TPResult::False || TPR == TPResult::Error)) {
+    TPA.Revert();
+    return ExprEmpty();
+  } else if (TPR == TPResult::Ambiguous && Tok.is(tok::r_paren)) {
+    // ()
+    TPA.Revert();
+    return ExprError();
+  }
+
+  SkipUntil(tok::r_paren, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
+  if (Tok.isNot(tok::r_paren)) {
+    TPA.Revert();
+    return ExprError();
+  }
+
+  ConsumeParen();
+
+  // TODO: check lambda attribues stuff
+  SkipUntil(tok::l_brace, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
+
+  if (Tok.is(tok::l_brace)) {
     TPA.Revert();
     return ExprError();
   }

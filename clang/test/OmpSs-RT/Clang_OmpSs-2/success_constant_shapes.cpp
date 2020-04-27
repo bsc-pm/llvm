@@ -55,9 +55,10 @@ int main(int argc, char *argv[])
     {}
     #pragma oss task inout([s.p.M]v)
     {}
-    // #pragma oss task inout([S::N]v)
+    // constant expressions bug #64
+    // #pragma oss task inout([S::N]v, [Z]v)
     // {}
-    #pragma oss task inout([rR]v, [Z]v)
+    #pragma oss task inout([rR]v)
     {}
     #pragma oss task inout([q.X]v)
     {}
