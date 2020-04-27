@@ -255,27 +255,27 @@ def vr4even : SubRegIndex<0, -1>;
 let SubRegIndices = [vreven, vrodd] in
 {
   foreach Index = 0-15 in {
-    def "V"#!shl(#Index, 1)#"_2" : RegisterWithSubRegs<"",
-      [!cast<Register>("V"#!shl(#Index, 1)),
-       !cast<Register>("V"#!add(!shl(#Index, 1), 1))]>;
+    def "V"#!shl(Index, 1)#"_2" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(Index, 1)),
+       !cast<Register>("V"#!add(!shl(Index, 1), 1))]>;
   }
 }
 
 let SubRegIndices = [vr2even, vr2odd] in
 {
   foreach Index = 0-7 in {
-    def "V"#!shl(#Index, 2)#"_4" : RegisterWithSubRegs<"",
-      [!cast<Register>("V"#!shl(#Index, 2)#"_2"),
-       !cast<Register>("V"#!add(!shl(#Index, 2), 2)#"_2")]>;
+    def "V"#!shl(Index, 2)#"_4" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(Index, 2)#"_2"),
+       !cast<Register>("V"#!add(!shl(Index, 2), 2)#"_2")]>;
   }
 }
 
 let SubRegIndices = [vr4even, vr4odd] in
 {
   foreach Index = 0-3 in {
-    def "V"#!shl(#Index, 3)#"_8" : RegisterWithSubRegs<"",
-      [!cast<Register>("V"#!shl(#Index, 3)#"_4"),
-       !cast<Register>("V"#!add(!shl(#Index, 3), 4)#"_4")]>;
+    def "V"#!shl(Index, 3)#"_8" : RegisterWithSubRegs<"",
+      [!cast<Register>("V"#!shl(Index, 3)#"_4"),
+       !cast<Register>("V"#!add(!shl(Index, 3), 4)#"_4")]>;
   }
 }
 } // Namespace = "RISCV"

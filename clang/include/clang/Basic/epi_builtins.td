@@ -102,7 +102,7 @@ class EPIBuiltin<string suffix, string prototype,
 {
   // Base name that will be prepended __builtin_epi_ and appended the computed
   // Suffix.
-  string Name = #NAME;
+  string Name = NAME;
   // If not empty, each instantiated builtin will have this appended after an
   // underscore (_). Suffix is instantiated like Prototype.
   string Suffix = suffix;
@@ -148,8 +148,8 @@ class EPIBuiltin<string suffix, string prototype,
 
   // If these names are not empty, this is the ID of the LLVM intrinsic
   // we want to lower to.
-  string IntrinsicName = #NAME;
-  string IntrinsicNameMask = #NAME # "_mask";
+  string IntrinsicName = NAME;
+  string IntrinsicNameMask = NAME # "_mask";
 }
 
 //===----------------------------------------------------------------------===//
