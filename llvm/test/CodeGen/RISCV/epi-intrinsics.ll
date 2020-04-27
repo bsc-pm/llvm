@@ -64,20 +64,20 @@ define void @test_load_stores() nounwind
 ; CHECK-NEXT:    vse.v v1, (a0)
 ; CHECK-NEXT:    ret
 {
-  %a1 = call <vscale x 8 x i8> @llvm.epi.vload.nxv1i8(<vscale x 8 x i8>* undef, i64 undef)
-  call void @llvm.epi.vstore.nxv1i8(<vscale x 8 x i8> %a1, <vscale x 8 x i8>* undef, i64 undef)
+  %a1 = call <vscale x 8 x i8> @llvm.epi.vload.nxv8i8(<vscale x 8 x i8>* undef, i64 undef)
+  call void @llvm.epi.vstore.nxv8i8(<vscale x 8 x i8> %a1, <vscale x 8 x i8>* undef, i64 undef)
 
-  %a2 = call <vscale x 4 x i16> @llvm.epi.vload.nxv1i16(<vscale x 4 x i16>* undef, i64 undef)
-  call void @llvm.epi.vstore.nxv1i16(<vscale x 4 x i16> %a2, <vscale x 4 x i16>* undef, i64 undef)
+  %a2 = call <vscale x 4 x i16> @llvm.epi.vload.nxv4i16(<vscale x 4 x i16>* undef, i64 undef)
+  call void @llvm.epi.vstore.nxv4i16(<vscale x 4 x i16> %a2, <vscale x 4 x i16>* undef, i64 undef)
 
-  %a3 = call <vscale x 2 x i32> @llvm.epi.vload.nxv1i32(<vscale x 2 x i32>* undef, i64 undef)
-  call void @llvm.epi.vstore.nxv1i32(<vscale x 2 x i32> %a3, <vscale x 2 x i32>* undef, i64 undef)
+  %a3 = call <vscale x 2 x i32> @llvm.epi.vload.nxv2i32(<vscale x 2 x i32>* undef, i64 undef)
+  call void @llvm.epi.vstore.nxv2i32(<vscale x 2 x i32> %a3, <vscale x 2 x i32>* undef, i64 undef)
 
   %a4 = call <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>* undef, i64 undef)
   call void @llvm.epi.vstore.nxv1i64(<vscale x 1 x i64> %a4, <vscale x 1 x i64>* undef, i64 undef)
 
-  %a5 = call <vscale x 2 x float> @llvm.epi.vload.nxv1f32(<vscale x 2 x float>* undef, i64 undef)
-  call void @llvm.epi.vstore.nxv1f32(<vscale x 2 x float> %a5, <vscale x 2 x float>* undef, i64 undef)
+  %a5 = call <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>* undef, i64 undef)
+  call void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float> %a5, <vscale x 2 x float>* undef, i64 undef)
 
   %a6 = call <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>* undef, i64 undef)
   call void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double> %a6, <vscale x 1 x double>* undef, i64 undef)
@@ -85,20 +85,20 @@ define void @test_load_stores() nounwind
   ret void
 }
 
-declare <vscale x 8 x i8> @llvm.epi.vload.nxv1i8(<vscale x 8 x i8>*, i64)
-declare void @llvm.epi.vstore.nxv1i8(<vscale x 8 x i8>, <vscale x 8 x i8>*, i64)
+declare <vscale x 8 x i8> @llvm.epi.vload.nxv8i8(<vscale x 8 x i8>*, i64)
+declare void @llvm.epi.vstore.nxv8i8(<vscale x 8 x i8>, <vscale x 8 x i8>*, i64)
 
-declare <vscale x 4 x i16> @llvm.epi.vload.nxv1i16(<vscale x 4 x i16>*, i64)
-declare void @llvm.epi.vstore.nxv1i16(<vscale x 4 x i16>, <vscale x 4 x i16>*, i64)
+declare <vscale x 4 x i16> @llvm.epi.vload.nxv4i16(<vscale x 4 x i16>*, i64)
+declare void @llvm.epi.vstore.nxv4i16(<vscale x 4 x i16>, <vscale x 4 x i16>*, i64)
 
-declare <vscale x 2 x i32> @llvm.epi.vload.nxv1i32(<vscale x 2 x i32>*, i64)
-declare void @llvm.epi.vstore.nxv1i32(<vscale x 2 x i32>, <vscale x 2 x i32>*, i64)
+declare <vscale x 2 x i32> @llvm.epi.vload.nxv2i32(<vscale x 2 x i32>*, i64)
+declare void @llvm.epi.vstore.nxv2i32(<vscale x 2 x i32>, <vscale x 2 x i32>*, i64)
 
 declare <vscale x 1 x i64> @llvm.epi.vload.nxv1i64(<vscale x 1 x i64>*, i64)
 declare void @llvm.epi.vstore.nxv1i64(<vscale x 1 x i64>, <vscale x 1 x i64>*, i64)
 
-declare <vscale x 2 x float> @llvm.epi.vload.nxv1f32(<vscale x 2 x float>*, i64)
-declare void @llvm.epi.vstore.nxv1f32(<vscale x 2 x float>, <vscale x 2 x float>*, i64)
+declare <vscale x 2 x float> @llvm.epi.vload.nxv2f32(<vscale x 2 x float>*, i64)
+declare void @llvm.epi.vstore.nxv2f32(<vscale x 2 x float>, <vscale x 2 x float>*, i64)
 
 declare <vscale x 1 x double> @llvm.epi.vload.nxv1f64(<vscale x 1 x double>*, i64)
 declare void @llvm.epi.vstore.nxv1f64(<vscale x 1 x double>, <vscale x 1 x double>*, i64)
