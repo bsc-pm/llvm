@@ -227,7 +227,7 @@ private:
   SDValue lowerShiftRightParts(SDValue Op, SelectionDAG &DAG, bool IsSRA) const;
   SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const;
-  SDValue lowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerSPLAT_VECTOR(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerSIGN_EXTEND_INREG(SDValue Op, SelectionDAG &DAG) const;
 
   bool isEligibleForTailCallOptimization(

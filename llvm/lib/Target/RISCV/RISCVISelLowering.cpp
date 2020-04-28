@@ -142,18 +142,12 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setBooleanVectorContents(ZeroOrOneBooleanContent);
 
     for (auto VT : MVT::integer_scalable_vector_valuetypes()) {
-      // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
-      // All integer vector types need special shuffle treatment because
-      // their element types may not be legal (e.g. a vector of i8).
+      setOperationAction(ISD::SPLAT_VECTOR, VT, Custom);
       setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
-      setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
     }
     for (auto VT : MVT::fp_scalable_vector_valuetypes()) {
-      // FIXME: This will go away once ISD::SPLAT_VECTOR is added.
-      // For consistency handle shuffles of floating types the same way as
-      // integers.
+      setOperationAction(ISD::SPLAT_VECTOR, VT, Custom);
       setOperationAction(ISD::VECTOR_SHUFFLE, VT, Custom);
-      setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
     }
   }
 
@@ -554,22 +548,18 @@ SDValue RISCVTargetLowering::lowerVECTOR_SHUFFLE(SDValue Op,
   return DAG.getNode(OpCode, DL, VT, ScalarValue);
 }
 
-SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op,
+SDValue RISCVTargetLowering::lowerSPLAT_VECTOR(SDValue Op,
                                                SelectionDAG &DAG) const {
   SDLoc DL(Op);
   EVT VT = Op.getValueType();
 
-  BuildVectorSDNode *BV = cast<BuildVectorSDNode>(Op.getNode());
+  SDValue V = Op.getOperand(0);
 
-  if (SDValue V = BV->getSplatValue()) {
-    RISCVISD::NodeType OpCode = V.getValueType().isFloatingPoint()
-                                    ? RISCVISD::VFMV_V_F
-                                    : RISCVISD::VMV_V_X;
+  RISCVISD::NodeType OpCode = V.getValueType().isFloatingPoint()
+                                  ? RISCVISD::VFMV_V_F
+                                  : RISCVISD::VMV_V_X;
 
-    return DAG.getNode(OpCode, DL, VT, V);
-  }
-
-  return SDValue();
+  return DAG.getNode(OpCode, DL, VT, V);
 }
 
 SDValue RISCVTargetLowering::lowerSIGN_EXTEND_INREG(SDValue Op,
@@ -643,8 +633,8 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return LowerINTRINSIC_WO_CHAIN(Op, DAG);
   case ISD::VECTOR_SHUFFLE:
     return lowerVECTOR_SHUFFLE(Op, DAG);
-  case ISD::BUILD_VECTOR:
-    return lowerBUILD_VECTOR(Op, DAG);
+  case ISD::SPLAT_VECTOR:
+    return lowerSPLAT_VECTOR(Op, DAG);
   case ISD::SIGN_EXTEND_INREG:
     return lowerSIGN_EXTEND_INREG(Op, DAG);
   }
