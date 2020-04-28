@@ -7,8 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "SyntheticSections.h"
+#include "Config.h"
 #include "InputFiles.h"
 #include "OutputSegment.h"
+#include "SymbolTable.h"
 #include "Symbols.h"
 #include "Writer.h"
 
@@ -44,7 +46,7 @@ void MachHeaderSection::writeTo(uint8_t *buf) {
   hdr->magic = MH_MAGIC_64;
   hdr->cputype = CPU_TYPE_X86_64;
   hdr->cpusubtype = CPU_SUBTYPE_X86_64_ALL | CPU_SUBTYPE_LIB64;
-  hdr->filetype = MH_EXECUTE;
+  hdr->filetype = config->outputType;
   hdr->ncmds = loadCommands.size();
   hdr->sizeofcmds = sizeOfCmds;
   hdr->flags = MH_NOUNDEFS | MH_DYLDLINK | MH_TWOLEVEL;
@@ -126,6 +128,98 @@ void BindingSection::finalizeContents() {
 
 void BindingSection::writeTo(uint8_t *buf) {
   memcpy(buf, contents.data(), contents.size());
+}
+
+ExportSection::ExportSection() {
+  segname = segment_names::linkEdit;
+  name = section_names::export_;
+}
+
+void ExportSection::finalizeContents() {
+  raw_svector_ostream os{contents};
+  std::vector<const Defined *> exported;
+  // TODO: We should check symbol visibility.
+  for (const Symbol *sym : symtab->getSymbols())
+    if (auto *defined = dyn_cast<Defined>(sym))
+      exported.push_back(defined);
+
+  if (exported.empty())
+    return;
+
+  if (exported.size() > 1) {
+    error("TODO: Unable to export more than 1 symbol");
+    return;
+  }
+
+  const Defined *sym = exported.front();
+  os << (char)0; // Indicates non-leaf node
+  os << (char)1; // # of children
+  os << sym->getName() << '\0';
+  encodeULEB128(sym->getName().size() + 4, os); // Leaf offset
+
+  // Leaf node
+  uint64_t addr = sym->getVA() + ImageBase;
+  os << (char)(1 + getULEB128Size(addr));
+  os << (char)0; // Flags
+  encodeULEB128(addr, os);
+  os << (char)0; // Terminator
+}
+
+void ExportSection::writeTo(uint8_t *buf) {
+  memcpy(buf, contents.data(), contents.size());
+}
+
+SymtabSection::SymtabSection(StringTableSection &stringTableSection)
+    : stringTableSection(stringTableSection) {
+  segname = segment_names::linkEdit;
+  name = section_names::symbolTable;
+}
+
+size_t SymtabSection::getSize() const {
+  return symbols.size() * sizeof(nlist_64);
+}
+
+void SymtabSection::finalizeContents() {
+  // TODO support other symbol types
+  for (Symbol *sym : symtab->getSymbols())
+    if (isa<Defined>(sym))
+      symbols.push_back({sym, stringTableSection.addString(sym->getName())});
+}
+
+void SymtabSection::writeTo(uint8_t *buf) {
+  auto *nList = reinterpret_cast<nlist_64 *>(buf);
+  for (const SymtabEntry &entry : symbols) {
+    nList->n_strx = entry.strx;
+    // TODO support other symbol types
+    // TODO populate n_desc
+    if (auto defined = dyn_cast<Defined>(entry.sym)) {
+      nList->n_type = N_EXT | N_SECT;
+      nList->n_sect = defined->isec->sectionIndex;
+      // For the N_SECT symbol type, n_value is the address of the symbol
+      nList->n_value = defined->value + defined->isec->addr;
+    }
+    ++nList;
+  }
+}
+
+StringTableSection::StringTableSection() {
+  segname = segment_names::linkEdit;
+  name = section_names::stringTable;
+}
+
+uint32_t StringTableSection::addString(StringRef str) {
+  uint32_t strx = size;
+  strings.push_back(str);
+  size += str.size() + 1; // account for null terminator
+  return strx;
+}
+
+void StringTableSection::writeTo(uint8_t *buf) {
+  uint32_t off = 0;
+  for (StringRef str : strings) {
+    memcpy(buf + off, str.data(), str.size());
+    off += str.size() + 1; // account for null terminator
+  }
 }
 
 InStruct in;
