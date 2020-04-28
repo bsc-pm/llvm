@@ -1220,6 +1220,70 @@ def int_vp_icmp : Intrinsic<[ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty> ],
                               llvm_i32_ty ],
                             [ IntrWillReturn, IntrNoSync, IntrNoMem,
                               /*Mask<3>, VectorLength<4>,*/ ImmArg<2> ]>;
+
+// standard fp-math intrinsics.
+// Rounding mode and exception control arguments are included in the intrinsics
+// but the only allowed values are the default llvm values, i.e
+// "fpround.tonearest" and "fpexcept.ignore".
+def int_vp_fneg : Intrinsic<[ llvm_anyvector_ty ],
+                            [ LLVMMatchType<0>,
+                              llvm_metadata_ty,
+                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                              llvm_i32_ty],
+                            [ IntrNoMem, IntrWillReturn/*, Mask<2>, VectorLength<3>*/ ]>;
+
+let IntrProperties = [ IntrNoMem, IntrWillReturn/*, Mask<4>, VectorLength<5>*/ ] in {
+  // These intrinsics are sensitive to the rounding mode so we need constrained
+  // versions of each of them.  When strict rounding and exception control are
+  // not required the non-constrained versions of these intrinsics should be
+  // used.
+  def int_vp_fadd : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_metadata_ty,
+                                llvm_metadata_ty,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty ]>;
+  def int_vp_fsub : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_metadata_ty,
+                                llvm_metadata_ty,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty ]>;
+  def int_vp_fmul : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_metadata_ty,
+                                llvm_metadata_ty,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty ]>;
+  def int_vp_fdiv : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_metadata_ty,
+                                llvm_metadata_ty,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty ]>;
+  def int_vp_frem : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_metadata_ty,
+                                llvm_metadata_ty,
+                                LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                llvm_i32_ty ]>;
+}
+
+def int_vp_fma : Intrinsic<[ llvm_anyvector_ty ],
+                           [ LLVMMatchType<0>,
+                             LLVMMatchType<0>,
+                             LLVMMatchType<0>,
+                             llvm_metadata_ty,
+                             llvm_metadata_ty,
+                             LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                             llvm_i32_ty ],
+                           [ IntrNoMem, IntrNoSync, IntrWillReturn/*, Mask<5>, VectorLength<6>*/ ]>;
+
 // END FIXME: TO BE REPLACED
 
 // Binary operators

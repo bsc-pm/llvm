@@ -18,9 +18,13 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/LLVMContext.h"
 #include <stdint.h>
 
 namespace llvm {
+
+class LLVMContext;
+class Value;
 
 namespace fp {
 
@@ -35,7 +39,7 @@ enum ExceptionBehavior : uint8_t {
   ebStrict   ///< This corresponds to "fpexcept.strict".
 };
 
-}
+} // namespace fp
 
 /// Returns a valid RoundingMode enumerator when given a string
 /// that is valid as input in constrained intrinsic rounding mode
@@ -53,5 +57,12 @@ Optional<fp::ExceptionBehavior> StrToExceptionBehavior(StringRef);
 /// For any ExceptionBehavior enumerator, returns a string valid as
 /// input in constrained intrinsic exception behavior metadata.
 Optional<StringRef> ExceptionBehaviorToStr(fp::ExceptionBehavior);
-}
+
+/// Return the IR Value representation of any ExceptionBehavior.
+Value *getConstrainedFPExcept(LLVMContext &, fp::ExceptionBehavior);
+
+/// Return the IR Value representation of any RoundingMode.
+Value *getConstrainedFPRounding(LLVMContext &, RoundingMode);
+
+} // namespace llvm
 #endif

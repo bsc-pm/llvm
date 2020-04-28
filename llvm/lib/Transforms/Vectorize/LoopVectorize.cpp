@@ -108,6 +108,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/FPEnv.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
@@ -4545,68 +4546,89 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
                                                      VPTransformState &State,
                                                      VPValue *BlockInMask,
                                                      VPValue *EVL) {
-  // TODO: Add support for other instructions as they are implemented by
-  // predicated vector intrinsics.
-  auto VPIntrInstr = [](unsigned Opcode) {
-    switch (Opcode) {
-    case Instruction::Add:
-      return Intrinsic::vp_add;
-    case Instruction::Sub:
-      return Intrinsic::vp_sub;
-    case Instruction::Mul:
-      return Intrinsic::vp_mul;
-    case Instruction::SDiv:
-      return Intrinsic::vp_sdiv;
-    case Instruction::UDiv:
-      return Intrinsic::vp_udiv;
-    case ::Instruction::SRem:
-      return Intrinsic::vp_srem;
-    case Instruction::URem:
-      return Intrinsic::vp_urem;
-    case Instruction::AShr:
-      return Intrinsic::vp_ashr;
-    case Instruction::LShr:
-      return Intrinsic::vp_lshr;
-    case Instruction::Shl:
-      return Intrinsic::vp_shl;
-    case Instruction::Or:
-      return Intrinsic::vp_or;
-    case Instruction::And:
-      return Intrinsic::vp_and;
-    case Instruction::Xor:
-      return Intrinsic::vp_xor;
-    }
-    return Intrinsic::not_intrinsic;
+  struct VPIntrinsicAndKind {
+    unsigned Intr;
+    bool IsFP;
   };
 
-  assert(VPIntrInstr(I.getOpcode()) != Intrinsic::not_intrinsic &&
+  // TODO: Add support for other instructions as they are implemented by
+  // predicated vector intrinsics.
+  auto VPIntrInstr = [](unsigned Opcode) -> VPIntrinsicAndKind {
+    switch (Opcode) {
+    case Instruction::Add:
+      return {Intrinsic::vp_add, false};
+    case Instruction::FAdd:
+      return {Intrinsic::vp_fadd, true};
+    case Instruction::Sub:
+      return {Intrinsic::vp_sub, false};
+    case Instruction::FSub:
+      return {Intrinsic::vp_fsub, true};
+    case Instruction::Mul:
+      return {Intrinsic::vp_mul, false};
+    case Instruction::SDiv:
+      return {Intrinsic::vp_sdiv, false};
+    case Instruction::UDiv:
+      return {Intrinsic::vp_udiv, false};
+    case ::Instruction::SRem:
+      return {Intrinsic::vp_srem, false};
+    case Instruction::URem:
+      return {Intrinsic::vp_urem, false};
+    case Instruction::AShr:
+      return {Intrinsic::vp_ashr, false};
+    case Instruction::LShr:
+      return {Intrinsic::vp_lshr, false};
+    case Instruction::Shl:
+      return {Intrinsic::vp_shl, false};
+    case Instruction::Or:
+      return {Intrinsic::vp_or, false};
+    case Instruction::And:
+      return {Intrinsic::vp_and, false};
+    case Instruction::Xor:
+      return {Intrinsic::vp_xor, false};
+    }
+    return {Intrinsic::not_intrinsic, false};
+  };
+
+  assert(VPIntrInstr(I.getOpcode()).Intr != Intrinsic::not_intrinsic &&
          "Opcode does not have predicated vector intrinsic support yet");
 
   // Just widen unops and binops.
   setDebugLocFromInst(Builder, &I);
 
   for (unsigned Part = 0; Part < UF; ++Part) {
-    SmallVector<Value *, 2> Ops;
+    SmallVector<Value *, 4> Ops;
     for (Value *Op : I.operands())
       Ops.push_back(getOrCreateVectorValue(Op, Part));
 
-    // FIXME: Assumes Binary operations. Add valid checks for NAry Operations.
+    // FIXME: Add valid checks for NAry Operations.
+    assert(Ops.size() == 2 &&
+           "Vector Predication does not support N-ary Ops yet.");
     Type *OpTy = Ops[0]->getType();
     assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
            "Operands must be of identical vector types");
+
+    // Add rounding mode and exception control args.
+    // TODO: Add support for non-default values.
+    if (VPIntrInstr(I.getOpcode()).IsFP) {
+      Ops.push_back(getConstrainedFPRounding(Builder.getContext(),
+                                             RoundingMode::NearestTiesToEven));
+      Ops.push_back(getConstrainedFPExcept(Builder.getContext(),
+                                           fp::ExceptionBehavior::ebIgnore));
+    }
+
     Value *BlockInMaskPart =
         BlockInMask
             ? State.get(BlockInMask, Part)
             : Builder.CreateVectorSplat(OpTy->getVectorNumElements(),
                                         Builder.getTrue(), "all.ones", true);
+    Ops.push_back(BlockInMaskPart);
     Value *EVLPart = State.get(EVL, Part);
-
-    Function *VPIntr = Intrinsic::getDeclaration(
-        LoopVectorPreHeader->getModule(), VPIntrInstr(I.getOpcode()), OpTy);
     Value *EVLPartTrunc =
         Builder.CreateTrunc(EVLPart, Type::getInt32Ty(OpTy->getContext()));
-    Value *V = Builder.CreateCall(
-        VPIntr, {Ops[0], Ops[1], BlockInMaskPart, EVLPartTrunc}, "vp.op");
+    Ops.push_back(EVLPartTrunc);
+
+    Value *V = Builder.CreateIntrinsic(VPIntrInstr(I.getOpcode()).Intr, {OpTy},
+                                       Ops, nullptr, "vp.op");
 
     if (auto *VecOp = dyn_cast<Instruction>(V))
       VecOp->copyIRFlags(&I);
@@ -4614,7 +4636,7 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     // Use this vector value for all users of the original instruction.
     VectorLoopValueMap.setVectorValue(&I, Part, V);
     addMetadata(V, &I);
-    }
+  }
 }
 
 void InnerLoopVectorizer::widenInstruction(Instruction &I, VPUser &User,

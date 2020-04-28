@@ -26,6 +26,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/FPEnv.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstrTypes.h"
@@ -1126,11 +1127,7 @@ private:
     if (Rounding.hasValue())
       UseRounding = Rounding.getValue();
 
-    Optional<StringRef> RoundingStr = RoundingModeToStr(UseRounding);
-    assert(RoundingStr.hasValue() && "Garbage strict rounding mode!");
-    auto *RoundingMDS = MDString::get(Context, RoundingStr.getValue());
-
-    return MetadataAsValue::get(Context, RoundingMDS);
+    return llvm::getConstrainedFPRounding(Context, UseRounding);
   }
 
   Value *getConstrainedFPExcept(Optional<fp::ExceptionBehavior> Except) {
@@ -1139,11 +1136,7 @@ private:
     if (Except.hasValue())
       UseExcept = Except.getValue();
 
-    Optional<StringRef> ExceptStr = ExceptionBehaviorToStr(UseExcept);
-    assert(ExceptStr.hasValue() && "Garbage strict exception behavior!");
-    auto *ExceptMDS = MDString::get(Context, ExceptStr.getValue());
-
-    return MetadataAsValue::get(Context, ExceptMDS);
+    return llvm::getConstrainedFPExcept(Context, UseExcept);
   }
 
   Value *getConstrainedFPPredicate(CmpInst::Predicate Predicate) {
