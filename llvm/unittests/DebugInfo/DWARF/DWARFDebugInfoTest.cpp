@@ -2022,8 +2022,9 @@ TEST(DWARFDebugInfo, TestDwarfVerifyInvalidRanges) {
   ASSERT_TRUE((bool)ErrOrSections);
   std::unique_ptr<DWARFContext> DwarfContext =
       DWARFContext::create(*ErrOrSections, 8);
-  VerifyError(*DwarfContext,
-              "error: DW_AT_ranges offset is beyond .debug_ranges bounds:");
+  VerifyError(
+      *DwarfContext,
+      "error: DW_AT_ranges offset is beyond .debug_ranges bounds: 0x00001000");
 }
 
 TEST(DWARFDebugInfo, TestDwarfVerifyInvalidStmtList) {
