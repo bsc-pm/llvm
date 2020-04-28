@@ -26,6 +26,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 using namespace llvm;
 
@@ -190,8 +191,6 @@ struct OmpSs : public ModulePass {
         Type *GetPriorityFuncTy =
           FunctionType::get(Type::getVoidTy(M.getContext()),
                             /*IsVarArgs=*/false)->getPointerTo();
-        // const char *type_identifier;
-        Type *TypeIdTy = Type::getInt8PtrTy(M.getContext());
         // int implementation_count;
         Type *ImplCountTy = Type::getInt32Ty(M.getContext());
         // nanos6_task_implementation_info_t *implementations;
@@ -212,10 +211,14 @@ struct OmpSs : public ModulePass {
         Type *ReductCombsFuncTy =
           FunctionType::get(Type::getVoidTy(M.getContext()),
                             /*IsVarArgs=*/false)->getPointerTo()->getPointerTo();
+        // void *task_type_data;
+        Type *TaskTypeDataTy =
+          Type::getInt8PtrTy(M.getContext());
 
-        instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, GetPriorityFuncTy, TypeIdTy,
+        instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, GetPriorityFuncTy,
                                ImplCountTy, TaskImplInfoTy, DestroyArgsBlockFuncTy,
                                DuplicateArgsBlockFuncTy, ReductInitsFuncTy, ReductCombsFuncTy,
+                               TaskTypeDataTy
                               });
       }
       return *instance.get();
@@ -287,6 +290,18 @@ struct OmpSs : public ModulePass {
   FunctionCallee CreateTaskFuncTy;
   FunctionCallee TaskSubmitFuncTy;
   FunctionCallee TaskInFinalFuncTy;
+  FunctionCallee TaskInfoRegisterFuncTy;
+  FunctionCallee TaskInfoRegisterCtorFuncTy;
+
+  // Insert a new nanos6 task info registration in
+  // the constructor (global ctor inserted) function
+  void registerTaskInfo(Module &M, Value *TaskInfoVar) {
+    Function *Func = cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee());
+    BasicBlock &Entry = Func->getEntryBlock();
+
+    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    BBBuilder.CreateCall(TaskInfoRegisterFuncTy, TaskInfoVar);
+  }
 
   void unpackDepsAndRewrite(Module &M, const TaskInfo &TI,
                             Function *F,
@@ -1043,7 +1058,7 @@ struct OmpSs : public ModulePass {
                                        &TaskRedInitsVar, &TaskRedCombsVar,
                                        &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInfo::getInstance(M).getType(),
-                                /*isConstant=*/true,
+                                /*isConstant=*/false,
                                 GlobalVariable::InternalLinkage,
                                 ConstantStruct::get(Nanos6TaskInfo::getInstance(M).getType(),
                                                     // TODO: Add support for devices
@@ -1053,18 +1068,19 @@ struct OmpSs : public ModulePass {
                                                       ? ConstantExpr::getPointerCast(OlPriorityFuncVar,
                                                                                      Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))
                                                       : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))),
-                                                    ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(4), 1),
-                                                    ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(5)),
+                                                    ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3), 1),
+                                                    ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(4)),
+                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(5))),
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(6))),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
-                                                    ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
-                                                    ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))),
+                                                    ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
+                                                    ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
+                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))),
                                 ("task_info_var_" + F.getName() + Twine(taskNum)).str());
 
       GV->setAlignment(64);
       return GV;
     });
+    registerTaskInfo(M, TaskInfoVar);
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
       = [&UnpackTaskFuncVar, &TaskArgsToStructIdxMap](BasicBlock *header,
@@ -1416,31 +1432,54 @@ struct OmpSs : public ModulePass {
   }
 
   void buildNanos6Types(Module &M) {
-
-    // Create function types
-    // nanos6_create_task
-    // nanos6_submit_task
-    // nanos6_in_final
-
+    // void nanos6_create_task(
+    //         nanos6_task_info_t *task_info,
+    //         nanos6_task_invocation_info_t *task_invocation_info,
+    //         size_t args_block_size,
+    //         /* OUT */ void **args_block_pointer,
+    //         /* OUT */ void **task_pointer,
+    //         size_t flags,
+    //         size_t num_deps
+    // );
     CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),
-        Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),   // nanos6_task_info_t *task_info
-        Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),// nanos6_task_invocation_info_t *task_invocation_info
-        Type::getInt64Ty(M.getContext()),                         // size_t args_lock_size
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),       // void **args_block_pointer
-        Type::getInt8PtrTy(M.getContext())->getPointerTo(),       // void **task_pointer
-        Type::getInt64Ty(M.getContext()),                         // size_t flags
-        Type::getInt64Ty(M.getContext())                          // size_t num_deps
+        Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
+        Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext())
     );
 
+    // void nanos6_submit_task(void *task);
     TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
         Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()) // void *task
+        Type::getInt8PtrTy(M.getContext())
     );
 
+    // int nanos6_in_final(void);
     TaskInFinalFuncTy = M.getOrInsertFunction("nanos6_in_final",
         Type::getInt32Ty(M.getContext())
     );
+
+    // void nanos6_register_task_info(nanos6_task_info_t *task_info);
+    TaskInfoRegisterFuncTy = M.getOrInsertFunction("nanos6_register_task_info",
+        Type::getVoidTy(M.getContext()),
+        Nanos6TaskInfo::getInstance(M).getType()->getPointerTo()
+    );
+
+    // void nanos6_constructor_register_task_info(void);
+    // NOTE: This does not belong to nanos6 API
+    TaskInfoRegisterCtorFuncTy =
+      M.getOrInsertFunction("nanos6_constructor_register_task_info",
+        Type::getVoidTy(M.getContext())
+      );
+    BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
+      cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee()));
+    EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
+
+    appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee()), 65535);
   }
 
   bool runOnModule(Module &M) override {
