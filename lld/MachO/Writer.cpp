@@ -19,6 +19,7 @@
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
 #include "llvm/BinaryFormat/MachO.h"
+#include "llvm/Support/LEB128.h"
 #include "llvm/Support/MathExtras.h"
 
 using namespace llvm;
@@ -52,12 +53,16 @@ public:
   uint64_t fileOff = 0;
   MachHeaderSection *headerSection = nullptr;
   BindingSection *bindingSection = nullptr;
+  ExportSection *exportSection = nullptr;
+  StringTableSection *stringTableSection = nullptr;
+  SymtabSection *symtabSection = nullptr;
 };
 
 // LC_DYLD_INFO_ONLY stores the offsets of symbol import/export information.
 class LCDyldInfo : public LoadCommand {
 public:
-  LCDyldInfo(BindingSection *bindingSection) : bindingSection(bindingSection) {}
+  LCDyldInfo(BindingSection *bindingSection, ExportSection *exportSection)
+      : bindingSection(bindingSection), exportSection(exportSection) {}
 
   uint32_t getSize() const override { return sizeof(dyld_info_command); }
 
@@ -69,13 +74,14 @@ public:
       c->bind_off = bindingSection->getFileOffset();
       c->bind_size = bindingSection->getFileSize();
     }
-    c->export_off = exportOff;
-    c->export_size = exportSize;
+    if (exportSection->isNeeded()) {
+      c->export_off = exportSection->getFileOffset();
+      c->export_size = exportSection->getFileSize();
+    }
   }
 
   BindingSection *bindingSection;
-  uint64_t exportOff = 0;
-  uint64_t exportSize = 0;
+  ExportSection *exportSection;
 };
 
 class LCDysymtab : public LoadCommand {
@@ -163,13 +169,23 @@ class LCMain : public LoadCommand {
 
 class LCSymtab : public LoadCommand {
 public:
+  LCSymtab(SymtabSection *symtabSection, StringTableSection *stringTableSection)
+      : symtabSection(symtabSection), stringTableSection(stringTableSection) {}
+
   uint32_t getSize() const override { return sizeof(symtab_command); }
 
   void writeTo(uint8_t *buf) const override {
     auto *c = reinterpret_cast<symtab_command *>(buf);
     c->cmd = LC_SYMTAB;
     c->cmdsize = getSize();
+    c->symoff = symtabSection->getFileOffset();
+    c->nsyms = symtabSection->getNumSymbols();
+    c->stroff = stringTableSection->getFileOffset();
+    c->strsize = stringTableSection->getFileSize();
   }
+
+  SymtabSection *symtabSection = nullptr;
+  StringTableSection *stringTableSection = nullptr;
 };
 
 class LCLoadDylib : public LoadCommand {
@@ -194,6 +210,30 @@ public:
 
 private:
   StringRef path;
+};
+
+class LCIdDylib : public LoadCommand {
+public:
+  LCIdDylib(StringRef name) : name(name) {}
+
+  uint32_t getSize() const override {
+    return alignTo(sizeof(dylib_command) + name.size() + 1, 8);
+  }
+
+  void writeTo(uint8_t *buf) const override {
+    auto *c = reinterpret_cast<dylib_command *>(buf);
+    buf += sizeof(dylib_command);
+
+    c->cmd = LC_ID_DYLIB;
+    c->cmdsize = getSize();
+    c->dylib.name = sizeof(dylib_command);
+
+    memcpy(buf, name.data(), name.size());
+    buf[name.size()] = '\0';
+  }
+
+private:
+  StringRef name;
 };
 
 class LCLoadDylinker : public LoadCommand {
@@ -238,7 +278,13 @@ public:
         {defaultPosition, {}},
         // Make sure __LINKEDIT is the last segment (i.e. all its hidden
         // sections must be ordered after other sections).
-        {segment_names::linkEdit, {section_names::binding}},
+        {segment_names::linkEdit,
+         {
+             section_names::binding,
+             section_names::export_,
+             section_names::symbolTable,
+             section_names::stringTable,
+         }},
     };
 
     for (uint32_t i = 0, n = ordering.size(); i < n; ++i) {
@@ -292,11 +338,23 @@ void Writer::scanRelocations() {
 }
 
 void Writer::createLoadCommands() {
-  headerSection->addLoadCommand(make<LCDyldInfo>(bindingSection));
-  headerSection->addLoadCommand(make<LCLoadDylinker>());
-  headerSection->addLoadCommand(make<LCSymtab>());
+  headerSection->addLoadCommand(
+      make<LCDyldInfo>(bindingSection, exportSection));
+  headerSection->addLoadCommand(
+      make<LCSymtab>(symtabSection, stringTableSection));
   headerSection->addLoadCommand(make<LCDysymtab>());
-  headerSection->addLoadCommand(make<LCMain>());
+
+  switch (config->outputType) {
+  case MH_EXECUTE:
+    headerSection->addLoadCommand(make<LCMain>());
+    headerSection->addLoadCommand(make<LCLoadDylinker>());
+    break;
+  case MH_DYLIB:
+    headerSection->addLoadCommand(make<LCIdDylib>(config->installName));
+    break;
+  default:
+    llvm_unreachable("unhandled output file type");
+  }
 
   uint8_t segIndex = 0;
   for (OutputSegment *seg : outputSegments) {
@@ -323,7 +381,19 @@ void Writer::createLoadCommands() {
 void Writer::createHiddenSections() {
   headerSection = createInputSection<MachHeaderSection>();
   bindingSection = createInputSection<BindingSection>();
-  createInputSection<PageZeroSection>();
+  stringTableSection = createInputSection<StringTableSection>();
+  symtabSection = createInputSection<SymtabSection>(*stringTableSection);
+  exportSection = createInputSection<ExportSection>();
+
+  switch (config->outputType) {
+  case MH_EXECUTE:
+    createInputSection<PageZeroSection>();
+    break;
+  case MH_DYLIB:
+    break;
+  default:
+    llvm_unreachable("unhandled output file type");
+  }
 }
 
 void Writer::sortSections() {
@@ -351,6 +421,9 @@ void Writer::assignAddresses(OutputSegment *seg) {
     ArrayRef<InputSection *> sections = p.second;
     for (InputSection *isec : sections) {
       addr = alignTo(addr, isec->align);
+      // We must align the file offsets too to avoid misaligned writes of
+      // structs.
+      fileOff = alignTo(fileOff, isec->align);
       isec->addr = addr;
       addr += isec->getSize();
       fileOff += isec->getFileSize();
@@ -376,6 +449,7 @@ void Writer::writeSections() {
     uint64_t fileOff = seg->fileOff;
     for (auto &sect : seg->getSections()) {
       for (InputSection *isec : sect.second) {
+        fileOff = alignTo(fileOff, isec->align);
         isec->writeTo(buf + fileOff);
         fileOff += isec->getFileSize();
       }
@@ -405,6 +479,8 @@ void Writer::run() {
 
   // Fill __LINKEDIT contents.
   bindingSection->finalizeContents();
+  exportSection->finalizeContents();
+  symtabSection->finalizeContents();
 
   // Now that __LINKEDIT is filled out, do a proper calculation of its
   // addresses and offsets. We don't have to recalculate the other segments
