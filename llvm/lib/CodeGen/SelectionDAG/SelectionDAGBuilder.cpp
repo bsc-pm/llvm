@@ -4682,6 +4682,12 @@ void SelectionDAGBuilder::visitTargetIntrinsic(const CallInst &I,
   // Add all operands of the call to the operand list.
   for (unsigned i = 0, e = I.getNumArgOperands(); i != e; ++i) {
     const Value *Arg = I.getArgOperand(i);
+
+    // FIXME Skip metadata args for now.
+    const MetadataAsValue *MD = dyn_cast<MetadataAsValue>(Arg);
+    if (MD && isa<MDString>(MD->getMetadata()))
+      continue;
+
     if (!I.paramHasAttr(i, Attribute::ImmArg)) {
       Ops.push_back(getValue(Arg));
       continue;

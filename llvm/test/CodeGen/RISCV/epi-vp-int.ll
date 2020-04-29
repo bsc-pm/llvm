@@ -184,104 +184,72 @@ define void @test_vp_int_2(<vscale x 2 x i32>* %a0, <vscale x 2 x i32>* %a1, i32
 ; CHECK-O0-LABEL: test_vp_int_2:
 ; CHECK-O0:       # %bb.0:
 ; CHECK-O0-NEXT:    # kill: def $x13 killed $x12
-; CHECK-O0-NEXT:    vsetvli a3, zero, e32,m1
-; CHECK-O0-NEXT:    vmset.m v1
 ; CHECK-O0-NEXT:    lui a3, %hi(scratch)
 ; CHECK-O0-NEXT:    addi a3, a3, %lo(scratch)
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
 ; CHECK-O0-NEXT:    vsetvli a2, a2, e32,m1
-; CHECK-O0-NEXT:    vle.v v2, (a0), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vle.v v3, (a1), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vadd.vv v4, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vsub.vv v5, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vmul.vv v6, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vdiv.vv v7, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vrem.vv v16, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vdivu.vv v17, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vremu.vv v18, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vand.vv v19, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vor.vv v20, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vxor.vv v21, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vsra.vv v22, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vsrl.vv v23, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vsll.vv v2, v2, v3, v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v4, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v5, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v6, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v7, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v16, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v17, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v18, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v19, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v20, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v21, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v22, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v23, (a3), v0.t
-; CHECK-O0-NEXT:    vmv1r.v v0, v1
-; CHECK-O0-NEXT:    vse.v v2, (a3), v0.t
+; CHECK-O0-NEXT:    vle.v v1, (a0)
+; CHECK-O0-NEXT:    vle.v v2, (a1)
+; CHECK-O0-NEXT:    vadd.vv v3, v1, v2
+; CHECK-O0-NEXT:    vsub.vv v4, v1, v2
+; CHECK-O0-NEXT:    vmul.vv v5, v1, v2
+; CHECK-O0-NEXT:    vdiv.vv v6, v1, v2
+; CHECK-O0-NEXT:    vrem.vv v7, v1, v2
+; CHECK-O0-NEXT:    vdivu.vv v16, v1, v2
+; CHECK-O0-NEXT:    vremu.vv v17, v1, v2
+; CHECK-O0-NEXT:    vand.vv v18, v1, v2
+; CHECK-O0-NEXT:    vor.vv v19, v1, v2
+; CHECK-O0-NEXT:    vxor.vv v20, v1, v2
+; CHECK-O0-NEXT:    vsra.vv v21, v1, v2
+; CHECK-O0-NEXT:    vsrl.vv v22, v1, v2
+; CHECK-O0-NEXT:    vsll.vv v1, v1, v2
+; CHECK-O0-NEXT:    vse.v v3, (a3)
+; CHECK-O0-NEXT:    vse.v v4, (a3)
+; CHECK-O0-NEXT:    vse.v v5, (a3)
+; CHECK-O0-NEXT:    vse.v v6, (a3)
+; CHECK-O0-NEXT:    vse.v v7, (a3)
+; CHECK-O0-NEXT:    vse.v v16, (a3)
+; CHECK-O0-NEXT:    vse.v v17, (a3)
+; CHECK-O0-NEXT:    vse.v v18, (a3)
+; CHECK-O0-NEXT:    vse.v v19, (a3)
+; CHECK-O0-NEXT:    vse.v v20, (a3)
+; CHECK-O0-NEXT:    vse.v v21, (a3)
+; CHECK-O0-NEXT:    vse.v v22, (a3)
+; CHECK-O0-NEXT:    vse.v v1, (a3)
 ; CHECK-O0-NEXT:    ret
 ;
 ; CHECK-O2-LABEL: test_vp_int_2:
 ; CHECK-O2:       # %bb.0:
-; CHECK-O2-NEXT:    vsetvli a3, zero, e32,m1
-; CHECK-O2-NEXT:    vmset.m v0
 ; CHECK-O2-NEXT:    vsetvli a2, a2, e32,m1
-; CHECK-O2-NEXT:    vle.v v1, (a0), v0.t
-; CHECK-O2-NEXT:    vle.v v2, (a1), v0.t
+; CHECK-O2-NEXT:    vle.v v1, (a0)
+; CHECK-O2-NEXT:    vle.v v2, (a1)
 ; CHECK-O2-NEXT:    lui a0, %hi(scratch)
 ; CHECK-O2-NEXT:    addi a0, a0, %lo(scratch)
-; CHECK-O2-NEXT:    vadd.vv v3, v1, v2, v0.t
-; CHECK-O2-NEXT:    vsub.vv v4, v1, v2, v0.t
-; CHECK-O2-NEXT:    vmul.vv v5, v1, v2, v0.t
-; CHECK-O2-NEXT:    vdiv.vv v6, v1, v2, v0.t
-; CHECK-O2-NEXT:    vrem.vv v7, v1, v2, v0.t
-; CHECK-O2-NEXT:    vdivu.vv v16, v1, v2, v0.t
-; CHECK-O2-NEXT:    vremu.vv v17, v1, v2, v0.t
-; CHECK-O2-NEXT:    vand.vv v18, v1, v2, v0.t
-; CHECK-O2-NEXT:    vor.vv v19, v1, v2, v0.t
-; CHECK-O2-NEXT:    vxor.vv v20, v1, v2, v0.t
-; CHECK-O2-NEXT:    vsra.vv v21, v1, v2, v0.t
-; CHECK-O2-NEXT:    vsrl.vv v22, v1, v2, v0.t
-; CHECK-O2-NEXT:    vsll.vv v1, v1, v2, v0.t
-; CHECK-O2-NEXT:    vse.v v3, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v4, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v5, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v6, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v7, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v16, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v17, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v18, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v19, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v20, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v21, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v22, (a0), v0.t
-; CHECK-O2-NEXT:    vse.v v1, (a0), v0.t
+; CHECK-O2-NEXT:    vadd.vv v3, v1, v2
+; CHECK-O2-NEXT:    vsub.vv v4, v1, v2
+; CHECK-O2-NEXT:    vmul.vv v5, v1, v2
+; CHECK-O2-NEXT:    vdiv.vv v6, v1, v2
+; CHECK-O2-NEXT:    vrem.vv v7, v1, v2
+; CHECK-O2-NEXT:    vdivu.vv v16, v1, v2
+; CHECK-O2-NEXT:    vremu.vv v17, v1, v2
+; CHECK-O2-NEXT:    vand.vv v18, v1, v2
+; CHECK-O2-NEXT:    vor.vv v19, v1, v2
+; CHECK-O2-NEXT:    vxor.vv v20, v1, v2
+; CHECK-O2-NEXT:    vsra.vv v21, v1, v2
+; CHECK-O2-NEXT:    vsrl.vv v22, v1, v2
+; CHECK-O2-NEXT:    vsll.vv v1, v1, v2
+; CHECK-O2-NEXT:    vse.v v3, (a0)
+; CHECK-O2-NEXT:    vse.v v4, (a0)
+; CHECK-O2-NEXT:    vse.v v5, (a0)
+; CHECK-O2-NEXT:    vse.v v6, (a0)
+; CHECK-O2-NEXT:    vse.v v7, (a0)
+; CHECK-O2-NEXT:    vse.v v16, (a0)
+; CHECK-O2-NEXT:    vse.v v17, (a0)
+; CHECK-O2-NEXT:    vse.v v18, (a0)
+; CHECK-O2-NEXT:    vse.v v19, (a0)
+; CHECK-O2-NEXT:    vse.v v20, (a0)
+; CHECK-O2-NEXT:    vse.v v21, (a0)
+; CHECK-O2-NEXT:    vse.v v22, (a0)
+; CHECK-O2-NEXT:    vse.v v1, (a0)
 ; CHECK-O2-NEXT:    ret
   %head = insertelement <vscale x 2 x i1> undef, i1 1, i32 0
   %allones = shufflevector <vscale x 2 x i1> %head, <vscale x 2 x i1> undef, <vscale x 2 x i32> zeroinitializer

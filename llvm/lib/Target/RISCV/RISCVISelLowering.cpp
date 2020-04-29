@@ -1065,76 +1065,173 @@ SDValue RISCVTargetLowering::lowerShiftRightParts(SDValue Op, SelectionDAG &DAG,
 static SDValue LowerVPINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) {
   unsigned IntNo = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
   SDLoc DL(Op);
+
+  auto IsSplatOfOne = [](const SDValue &MaskOp) {
+    ConstantSDNode *C;
+    return MaskOp.getOpcode() == ISD::SPLAT_VECTOR &&
+           (C = dyn_cast<ConstantSDNode>(MaskOp.getOperand(0))) &&
+           C->getZExtValue() == 1;
+  };
+
+  unsigned NumOperands;
+  unsigned MaskOpNo;
+  unsigned EVLOpNo;
+  bool IsMasked;
   unsigned EPIIntNo;
-
-  const SDValue &MaskOp = Op.getOperand(3);
-  ConstantSDNode *C;
-  bool Unmasked = MaskOp.getOpcode() == ISD::SPLAT_VECTOR &&
-                  (C = dyn_cast<ConstantSDNode>(MaskOp.getOperand(0))) &&
-                  C->getZExtValue() == 1;
-
   switch (IntNo) {
   default:
     llvm_unreachable("Unexpected intrinsic");
   case Intrinsic::vp_add:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vadd : Intrinsic::epi_vadd_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vadd_mask : Intrinsic::epi_vadd;
     break;
   case Intrinsic::vp_sub:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vsub : Intrinsic::epi_vsub_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vsub_mask : Intrinsic::epi_vsub;
     break;
   case Intrinsic::vp_mul:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vmul : Intrinsic::epi_vmul_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vmul_mask : Intrinsic::epi_vmul;
     break;
   case Intrinsic::vp_sdiv:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vdiv : Intrinsic::epi_vdiv_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vdiv_mask : Intrinsic::epi_vdiv;
     break;
   case Intrinsic::vp_srem:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vrem : Intrinsic::epi_vrem_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vrem_mask : Intrinsic::epi_vrem;
     break;
   case Intrinsic::vp_udiv:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vdivu : Intrinsic::epi_vdivu_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vdivu_mask : Intrinsic::epi_vdivu;
     break;
   case Intrinsic::vp_urem:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vremu : Intrinsic::epi_vremu_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vremu_mask : Intrinsic::epi_vremu;
     break;
   case Intrinsic::vp_and:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vand : Intrinsic::epi_vand_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vand_mask : Intrinsic::epi_vand;
     break;
   case Intrinsic::vp_or:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vor : Intrinsic::epi_vor_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vor_mask : Intrinsic::epi_vor;
     break;
   case Intrinsic::vp_xor:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vxor : Intrinsic::epi_vxor_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vxor_mask : Intrinsic::epi_vxor;
     break;
   case Intrinsic::vp_ashr:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vsra : Intrinsic::epi_vsra_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vsra_mask : Intrinsic::epi_vsra;
     break;
   case Intrinsic::vp_lshr:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vsrl : Intrinsic::epi_vsrl_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vsrl_mask : Intrinsic::epi_vsrl;
     break;
   case Intrinsic::vp_shl:
-    EPIIntNo = Unmasked ? Intrinsic::epi_vsll : Intrinsic::epi_vsll_mask;
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vsll_mask : Intrinsic::epi_vsll;
+    break;
+  case Intrinsic::vp_fadd:
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vfadd_mask : Intrinsic::epi_vfadd;
+    break;
+  case Intrinsic::vp_fsub:
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vfsub_mask : Intrinsic::epi_vfsub;
+    break;
+  case Intrinsic::vp_fmul:
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vfmul_mask : Intrinsic::epi_vfmul;
+    break;
+  case Intrinsic::vp_fdiv:
+    NumOperands = 2;
+    MaskOpNo = 3;
+    EVLOpNo = 4;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vfdiv_mask : Intrinsic::epi_vfdiv;
+    break;
+  case Intrinsic::vp_frem:
+    // FIXME Needs to be expanded.
+    report_fatal_error("Unimplemented intrinsic");
+    break;
+  case Intrinsic::vp_fma:
+    NumOperands = 3;
+    MaskOpNo = 4;
+    EVLOpNo = 5;
+    IsMasked = !IsSplatOfOne(Op.getOperand(MaskOpNo));
+    EPIIntNo = IsMasked ? Intrinsic::epi_vfmacc_mask : Intrinsic::epi_vfmacc;
+    break;
+  case Intrinsic::vp_fneg:
+    // FIXME Needs to be expanded.
+    report_fatal_error("Unimplemented intrinsic");
     break;
   }
 
-  assert(Op.getOperand(4).getValueType() == MVT::i32 && "Unexpected operand");
   std::vector<SDValue> Operands;
-  if (Unmasked)
-    Operands = {
-        DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
-        Op.getOperand(1),                                            // Op 1.
-        Op.getOperand(2),                                            // Op 2.
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
-    };
-  else
-    Operands = {
-        DAG.getTargetConstant(EPIIntNo, DL, MVT::i64),
-        DAG.getRegister(RISCV::NoRegister, Op.getValueType()),       // Merge.
-        Op.getOperand(1),                                            // Op 1.
-        Op.getOperand(2),                                            // Op 2.
-        MaskOp,                                                      // Mask.
-        DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, Op.getOperand(4)) // EVL.
-    };
+  Operands.reserve(2 + NumOperands + IsMasked * 2);
+  Operands.push_back(DAG.getTargetConstant(EPIIntNo, DL, MVT::i64));
+  if (IsMasked && IntNo != Intrinsic::vp_fma)
+    Operands.push_back(
+        DAG.getRegister(RISCV::NoRegister, Op.getValueType())); // Merge.
+  for (unsigned i = 1; i <= NumOperands; i++)
+    Operands.push_back(Op.getOperand(i));
+  if (IsMasked)
+    Operands.push_back(Op.getOperand(MaskOpNo)); // Mask.
+  assert(Op.getOperand(EVLOpNo).getValueType() == MVT::i32 &&
+         "Unexpected operand");
+  Operands.push_back(DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64,
+                                 Op.getOperand(EVLOpNo))); // EVL.
+
   return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(), Operands);
 }
 
@@ -1183,6 +1280,13 @@ SDValue RISCVTargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
   case Intrinsic::vp_ashr:
   case Intrinsic::vp_lshr:
   case Intrinsic::vp_shl:
+  case Intrinsic::vp_fadd:
+  case Intrinsic::vp_fsub:
+  case Intrinsic::vp_fmul:
+  case Intrinsic::vp_fdiv:
+  case Intrinsic::vp_frem:
+  case Intrinsic::vp_fma:
+  case Intrinsic::vp_fneg:
     return LowerVPINTRINSIC_WO_CHAIN(Op, DAG);
   }
 }
