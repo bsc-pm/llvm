@@ -1210,16 +1210,6 @@ def int_vp_scatter: Intrinsic<[],
                               [ IntrArgMemOnly, IntrNoSync, IntrWillReturn, ImmArg<2>
                                 /*, Mask<2>, VectorLength<3>*/ ]>;
 // TODO allow IntrNoCapture for vectors of pointers
-// Comparison
-// The last argument is the comparison predicate 
-def int_vp_icmp : Intrinsic<[ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty> ],
-                            [ llvm_anyvector_ty,
-                              LLVMMatchType<0>,
-                              llvm_i8_ty,
-                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
-                              llvm_i32_ty ],
-                            [ IntrWillReturn, IntrNoSync, IntrNoMem,
-                              /*Mask<3>, VectorLength<4>,*/ ImmArg<2> ]>;
 
 // standard fp-math intrinsics.
 // Rounding mode and exception control arguments are included in the intrinsics
@@ -1282,7 +1272,38 @@ def int_vp_fma : Intrinsic<[ llvm_anyvector_ty ],
                              llvm_metadata_ty,
                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
                              llvm_i32_ty ],
-                           [ IntrNoMem, IntrNoSync, IntrWillReturn/*, Mask<5>, VectorLength<6>*/ ]>;
+                           [ IntrNoMem, IntrNoSync, IntrWillReturn
+                             /*, Mask<5>, VectorLength<6>*/ ]>;
+
+// Comparison
+// TODO add signalling fcmp
+// The last argument is the comparison predicate 
+def int_vp_icmp : Intrinsic<[ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty> ],
+                            [ llvm_anyvector_ty,
+                              LLVMMatchType<0>,
+                              llvm_i8_ty,
+                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                              llvm_i32_ty ],
+                            [ IntrWillReturn, IntrNoSync, IntrNoMem,
+                              /*Mask<3>, VectorLength<4>,*/ ImmArg<2> ]>;
+
+def int_vp_fcmp : Intrinsic<[ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty> ],
+                            [ llvm_anyvector_ty,
+                              LLVMMatchType<0>,
+                              llvm_i8_ty,
+                              LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                              llvm_i32_ty ],
+                            [ IntrWillReturn, IntrNoSync, IntrNoMem,
+                              /*Mask<3>, VectorLength<4>,*/ ImmArg<2> ]>;
+
+// Select
+def int_vp_select : Intrinsic<[ llvm_anyvector_ty ],
+                              [ LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>,
+                                LLVMMatchType<0>,
+                                LLVMMatchType<0>,
+                                llvm_i32_ty],
+                              [ IntrNoMem, IntrNoSync, IntrWillReturn
+                                /*, Passthru<2>, Mask<0>, VectorLength<3>*/ ]>;
 
 // END FIXME: TO BE REPLACED
 

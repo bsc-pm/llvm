@@ -135,6 +135,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TypeSize.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/InjectTLIMappings.h"
@@ -4553,14 +4554,20 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
       return {Intrinsic::vp_fsub, true};
     case Instruction::Mul:
       return {Intrinsic::vp_mul, false};
+    case Instruction::FMul:
+      return {Intrinsic::vp_fmul, true};
     case Instruction::SDiv:
       return {Intrinsic::vp_sdiv, false};
     case Instruction::UDiv:
       return {Intrinsic::vp_udiv, false};
+    case Instruction::FDiv:
+      return {Intrinsic::vp_fdiv, true};
     case ::Instruction::SRem:
       return {Intrinsic::vp_srem, false};
     case Instruction::URem:
       return {Intrinsic::vp_urem, false};
+    case Instruction::FRem:
+      return {Intrinsic::vp_frem, true};
     case Instruction::AShr:
       return {Intrinsic::vp_ashr, false};
     case Instruction::LShr:
@@ -4573,12 +4580,71 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
       return {Intrinsic::vp_and, false};
     case Instruction::Xor:
       return {Intrinsic::vp_xor, false};
+    case Instruction::FNeg:
+      return {Intrinsic::vp_fneg, true};
+    case Intrinsic::fma:
+      return {Intrinsic::vp_fma, true};
     }
     return {Intrinsic::not_intrinsic, false};
   };
 
-  assert(VPIntrInstr(I.getOpcode()).Intr != Intrinsic::not_intrinsic &&
-         "Opcode does not have predicated vector intrinsic support yet");
+  auto MaskValue = [&](unsigned Part, ElementCount EC) -> Value * {
+    return BlockInMask ? State.get(BlockInMask, Part)
+                       : Builder.getTrueVector(EC);
+  };
+
+  auto EVLValue = [&](unsigned Part) -> Value * {
+    Value *EVLPart = State.get(EVL, Part);
+    return Builder.CreateTrunc(EVLPart, Type::getInt32Ty(Builder.getContext()));
+  };
+
+  auto Opcode = I.getOpcode();
+
+  if (Opcode == Instruction::ICmp || Opcode == Instruction::FCmp) {
+    // Widen compares. Generate vector compares.
+    bool FCmp = (I.getOpcode() == Instruction::FCmp);
+    auto *Cmp = cast<CmpInst>(&I);
+    setDebugLocFromInst(Builder, Cmp);
+    for (unsigned Part = 0; Part < UF; ++Part) {
+      Value *A = getOrCreateVectorValue(Cmp->getOperand(0), Part);
+      Value *B = getOrCreateVectorValue(Cmp->getOperand(1), Part);
+      Value *C = nullptr;
+
+      VectorType *OpTy = cast<VectorType>(A->getType());
+      Value *MaskArg = MaskValue(Part, OpTy->getElementCount());
+      Value *EVLArg = EVLValue(Part);
+      Value *PredArg = Builder.getInt8(Cmp->getPredicate());
+
+      if (FCmp) {
+        IRBuilder<>::FastMathFlagGuard FMFG(Builder);
+        Builder.setFastMathFlags(Cmp->getFastMathFlags());
+        C = Builder.CreateIntrinsic(Intrinsic::vp_fcmp, {OpTy},
+                                    {A, B, PredArg, MaskArg, EVLArg}, Cmp,
+                                    "vp.op");
+      } else {
+        C = Builder.CreateIntrinsic(Intrinsic::vp_icmp, {OpTy},
+                                    {A, B, PredArg, MaskArg, EVLArg}, Cmp,
+                                    "vp.op");
+      }
+      // The result of vp_icmp or vp_fcmp may contain lanes that are undef due
+      // to the mask. We don't need undef boolean values.
+      // Convert undef lanes to false by inserting a vp_select.
+      Value *V = Builder.CreateIntrinsic(
+          Intrinsic::vp_select, {cast<VectorType>(C->getType())},
+          {MaskArg, C, MaskArg, EVLArg}, nullptr, "vp.op");
+
+      VectorLoopValueMap.setVectorValue(&I, Part, V);
+      addMetadata(V, &I);
+    }
+    return;
+  }
+
+  assert(VPIntrInstr(Opcode).Intr != Intrinsic::not_intrinsic &&
+         "Opcode does not have predicated vector intrinsic support.");
+
+  assert(((Instruction::isBinaryOp(Opcode) && I.getNumOperands() == 2) ||
+          (Instruction::isUnaryOp(Opcode) && I.getNumOperands() == 1)) &&
+         "Invalid number of operands.");
 
   // Just widen unops and binops.
   setDebugLocFromInst(Builder, &I);
@@ -4588,34 +4654,21 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     for (Value *Op : I.operands())
       Ops.push_back(getOrCreateVectorValue(Op, Part));
 
-    // FIXME: Add valid checks for NAry Operations.
-    assert(Ops.size() == 2 &&
-           "Vector Predication does not support N-ary Ops yet.");
-    Type *OpTy = Ops[0]->getType();
-    assert(OpTy->isVectorTy() && OpTy == Ops[1]->getType() &&
-           "Operands must be of identical vector types");
-
     // Add rounding mode and exception control args.
     // TODO: Add support for non-default values.
-    if (VPIntrInstr(I.getOpcode()).IsFP) {
+    if (VPIntrInstr(Opcode).IsFP) {
       Ops.push_back(getConstrainedFPRounding(Builder.getContext(),
                                              RoundingMode::NearestTiesToEven));
       Ops.push_back(getConstrainedFPExcept(Builder.getContext(),
                                            fp::ExceptionBehavior::ebIgnore));
     }
 
-    Value *BlockInMaskPart =
-        BlockInMask
-            ? State.get(BlockInMask, Part)
-            : Builder.getTrueVector(cast<VectorType>(OpTy)->getElementCount());
-    Ops.push_back(BlockInMaskPart);
-    Value *EVLPart = State.get(EVL, Part);
-    Value *EVLPartTrunc =
-        Builder.CreateTrunc(EVLPart, Type::getInt32Ty(OpTy->getContext()));
-    Ops.push_back(EVLPartTrunc);
+    VectorType *OpTy = cast<VectorType>(Ops[0]->getType());
+    Ops.push_back(MaskValue(Part, OpTy->getElementCount()));
+    Ops.push_back(EVLValue(Part));
 
-    Value *V = Builder.CreateIntrinsic(VPIntrInstr(I.getOpcode()).Intr, {OpTy},
-                                       Ops, nullptr, "vp.op");
+    Value *V = Builder.CreateIntrinsic(VPIntrInstr(Opcode).Intr, {OpTy}, Ops,
+                                       nullptr, "vp.op");
 
     if (auto *VecOp = dyn_cast<Instruction>(V))
       VecOp->copyIRFlags(&I);
