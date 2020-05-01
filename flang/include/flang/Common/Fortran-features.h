@@ -25,8 +25,8 @@ ENUM_CLASS(LanguageFeature, BackslashEscapes, OldDebugLines,
     Carriagecontrol, Convert, Dispose, IOListLeadingComma,
     AbbreviatedEditDescriptor, ProgramParentheses, PercentRefAndVal,
     OmitFunctionDummies, CrayPointer, Hollerith, ArithmeticIF, Assign,
-    AssignedGOTO, Pause, OpenACC, OpenMP, CruftAfterAmpersand, ClassicCComments,
-    AdditionalFormats, BigIntLiterals, RealDoControls,
+    AssignedGOTO, Pause, OpenACC, OpenMP, OmpSs, CruftAfterAmpersand,
+    ClassicCComments, AdditionalFormats, BigIntLiterals, RealDoControls,
     EquivalenceNumericWithCharacter, AdditionalIntrinsics, AnonymousParents,
     OldLabelDoEndStatements, LogicalIntegerAssignment, EmptySourceFile,
     ProgramReturn, ImplicitNoneTypeNever, ImplicitNoneTypeAlways)
@@ -40,6 +40,7 @@ public:
     disable_.set(LanguageFeature::OldDebugLines);
     disable_.set(LanguageFeature::OpenACC);
     disable_.set(LanguageFeature::OpenMP);
+    disable_.set(LanguageFeature::OmpSs);
     disable_.set(LanguageFeature::ImplicitNoneTypeNever);
     disable_.set(LanguageFeature::ImplicitNoneTypeAlways);
     // These features, if enabled, conflict with valid standard usage,
@@ -55,7 +56,7 @@ public:
   bool IsEnabled(LanguageFeature f) const { return !disable_.test(f); }
   bool ShouldWarn(LanguageFeature f) const {
     return (warnAll_ && f != LanguageFeature::OpenMP &&
-               f != LanguageFeature::OpenACC) ||
+               f != LanguageFeature::OpenACC && f != LanguageFeature::OmpSs) ||
         warn_.test(f);
   }
   // Return all spellings of operators names, depending on features enabled

@@ -264,6 +264,8 @@ struct OpenMPConstruct;
 struct OpenMPDeclarativeConstruct;
 struct OmpEndLoopDirective;
 
+struct OmpSsConstruct;
+
 // Cooked character stream locations
 using Location = const char *;
 
@@ -520,7 +522,8 @@ struct ExecutableConstruct {
       common::Indirection<OpenACCConstruct>,
       common::Indirection<AccEndCombinedDirective>,
       common::Indirection<OpenMPConstruct>,
-      common::Indirection<OmpEndLoopDirective>>
+      common::Indirection<OmpEndLoopDirective>,
+      common::Indirection<OmpSsConstruct>>
       u;
 };
 
@@ -4031,6 +4034,123 @@ struct OpenACCConstruct {
       OpenACCLoopConstruct, OpenACCStandaloneConstruct, OpenACCRoutineConstruct,
       OpenACCCacheConstruct, OpenACCWaitConstruct, OpenACCAtomicConstruct>
       u;
+};
+
+// ----------------------------------------------------------------------------
+// OmpSs-2
+// ----------------------------------------------------------------------------
+
+struct OSSObject {
+  UNION_CLASS_BOILERPLATE(OSSObject);
+  std::variant<Designator, /*common block*/ Name> u;
+};
+
+WRAPPER_CLASS(OSSObjectList, std::list<OSSObject>);
+
+struct OSSDefaultClause {
+  ENUM_CLASS(Type, Private, Firstprivate, Shared, None)
+  WRAPPER_CLASS_BOILERPLATE(OSSDefaultClause, Type);
+};
+
+struct OSSDependSinkVecLength {
+  TUPLE_CLASS_BOILERPLATE(OSSDependSinkVecLength);
+  std::tuple<DefinedOperator, ScalarIntConstantExpr> t;
+};
+
+struct OSSDependSinkVec {
+  TUPLE_CLASS_BOILERPLATE(OSSDependSinkVec);
+  std::tuple<Name, std::optional<OSSDependSinkVecLength>> t;
+};
+
+struct OSSDependenceType {
+  ENUM_CLASS(Type, In, Out, Inout, Source, Sink)
+  WRAPPER_CLASS_BOILERPLATE(OSSDependenceType, Type);
+};
+
+struct OSSDependClause {
+  UNION_CLASS_BOILERPLATE(OSSDependClause);
+  EMPTY_CLASS(Source);
+  WRAPPER_CLASS(Sink, std::list<OSSDependSinkVec>);
+  struct InOut {
+    TUPLE_CLASS_BOILERPLATE(InOut);
+    std::tuple<OSSDependenceType, std::list<Designator>> t;
+  };
+  std::variant<Source, Sink, InOut> u;
+};
+
+struct OSSReductionOperator {
+  UNION_CLASS_BOILERPLATE(OSSReductionOperator);
+  std::variant<DefinedOperator, ProcedureDesignator> u;
+};
+
+struct OSSReductionClause {
+  TUPLE_CLASS_BOILERPLATE(OSSReductionClause);
+  std::tuple<OSSReductionOperator, std::list<Designator>> t;
+};
+
+struct OSSClause {
+  UNION_CLASS_BOILERPLATE(OSSClause);
+  WRAPPER_CLASS(Final, ScalarLogicalExpr);
+  WRAPPER_CLASS(Firstprivate, OSSObjectList);
+  WRAPPER_CLASS(Private, OSSObjectList);
+  WRAPPER_CLASS(Shared, OSSObjectList);
+  WRAPPER_CLASS(If, ScalarLogicalExpr);
+  WRAPPER_CLASS(Cost, ScalarIntExpr);
+  CharBlock source;
+  std::variant<Final, Firstprivate, Private, Shared, If, Cost, OSSDefaultClause,
+      OSSReductionClause, OSSDependClause>
+      u;
+};
+
+struct OSSClauseList {
+  WRAPPER_CLASS_BOILERPLATE(OSSClauseList, std::list<OSSClause>);
+  CharBlock source;
+};
+
+struct OSSSimpleStandaloneDirective {
+  ENUM_CLASS(Directive, Taskwait)
+  WRAPPER_CLASS_BOILERPLATE(OSSSimpleStandaloneDirective, Directive);
+  CharBlock source;
+};
+
+struct OmpSsSimpleStandaloneConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsSimpleStandaloneConstruct);
+  CharBlock source;
+  std::tuple<OSSSimpleStandaloneDirective, OSSClauseList> t;
+};
+
+struct OmpSsStandaloneConstruct {
+  UNION_CLASS_BOILERPLATE(OmpSsStandaloneConstruct);
+  CharBlock source;
+  std::variant<OmpSsSimpleStandaloneConstruct> u;
+};
+
+struct OSSBlockDirective {
+  ENUM_CLASS(Directive, Task);
+  WRAPPER_CLASS_BOILERPLATE(OSSBlockDirective, Directive);
+  CharBlock source;
+};
+
+struct OSSBeginBlockDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSBeginBlockDirective);
+  std::tuple<OSSBlockDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OSSEndBlockDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSEndBlockDirective);
+  std::tuple<OSSBlockDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OmpSsBlockConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsBlockConstruct);
+  std::tuple<OSSBeginBlockDirective, Block, OSSEndBlockDirective> t;
+};
+
+struct OmpSsConstruct {
+  UNION_CLASS_BOILERPLATE(OmpSsConstruct);
+  std::variant<OmpSsStandaloneConstruct, OmpSsBlockConstruct> u;
 };
 
 } // namespace Fortran::parser

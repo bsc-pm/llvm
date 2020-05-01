@@ -74,8 +74,13 @@ const SourceFile *Parsing::Prescan(const std::string &path, Options options) {
   }
   if (options.features.IsEnabled(LanguageFeature::OpenMP)) {
     prescanner.AddCompilerDirectiveSentinel("$omp");
-    prescanner.AddCompilerDirectiveSentinel("$"); // OMP conditional line
   }
+  if (options.features.IsEnabled(LanguageFeature::OmpSs)) {
+    prescanner.AddCompilerDirectiveSentinel("$oss");
+  }
+  if (options.features.IsEnabled(LanguageFeature::OpenMP) ||
+      options.features.IsEnabled(LanguageFeature::OmpSs))
+    prescanner.AddCompilerDirectiveSentinel("$"); // OMP/OSS conditional line
   ProvenanceRange range{allSources.AddIncludedFile(
       *sourceFile, ProvenanceRange{}, options.isModuleFile)};
   prescanner.Prescan(range);

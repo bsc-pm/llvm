@@ -701,6 +701,48 @@ public:
   NODE(parser, WhereConstructStmt)
   NODE(parser, WhereStmt)
   NODE(parser, WriteStmt)
+
+  // OmpSs-2
+  NODE(parser, OSSObject)
+  NODE(parser, OSSObjectList)
+
+  NODE(parser, OSSClause)
+  NODE(parser, OSSClauseList)
+  NODE(OSSClause, Cost)
+  NODE(OSSClause, Final)
+  NODE(OSSClause, Firstprivate)
+  NODE(OSSClause, If)
+  NODE(OSSClause, Private)
+  NODE(OSSClause, Shared)
+
+  NODE(parser, OSSDependClause)
+  NODE(OSSDependClause, InOut)
+  NODE(OSSDependClause, Sink)
+  NODE(OSSDependClause, Source)
+  NODE(parser, OSSDependenceType)
+  NODE_ENUM(OSSDependenceType, Type)
+  NODE(parser, OSSDependSinkVec)
+  NODE(parser, OSSDependSinkVecLength)
+
+  NODE(parser, OSSDefaultClause)
+  NODE_ENUM(OSSDefaultClause, Type)
+
+  NODE(parser, OSSReductionOperator)
+  NODE(parser, OSSReductionClause)
+
+  NODE(parser, OSSSimpleStandaloneDirective)
+  NODE_ENUM(OSSSimpleStandaloneDirective, Directive)
+
+  NODE(parser, OSSBlockDirective)
+  NODE_ENUM(OSSBlockDirective, Directive)
+  NODE(parser, OSSBeginBlockDirective)
+  NODE(parser, OSSEndBlockDirective)
+
+  NODE(parser, OmpSsSimpleStandaloneConstruct)
+  NODE(parser, OmpSsStandaloneConstruct)
+  NODE(parser, OmpSsBlockConstruct)
+
+  NODE(parser, OmpSsConstruct)
 #undef NODE
 #undef NODE_NAME
 

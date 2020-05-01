@@ -13,6 +13,7 @@ add_flang_library(FortranParser
   message.cpp
   openacc-parsers.cpp
   openmp-parsers.cpp
+  ompss-parsers.cpp
   parse-tree.cpp
   parsing.cpp
   preprocessor.cpp

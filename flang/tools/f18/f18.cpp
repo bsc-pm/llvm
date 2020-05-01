@@ -484,6 +484,9 @@ int main(int argc, char *const argv[]) {
     } else if (arg == "-fopenmp") {
       options.features.Enable(Fortran::common::LanguageFeature::OpenMP);
       options.predefinitions.emplace_back("_OPENMP", "201511");
+    } else if (arg == "-fompss-2") {
+      options.features.Enable(Fortran::common::LanguageFeature::OmpSs);
+      options.predefinitions.emplace_back("_OMPSS", "1");
     } else if (arg == "-Werror") {
       driver.warningsAreErrors = true;
     } else if (arg == "-ed") {
