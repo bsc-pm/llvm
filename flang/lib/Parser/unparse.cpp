@@ -2557,6 +2557,47 @@ public:
   WALK_NESTED_ENUM(OmpCancelType, Type) // OMP cancel-type
 #undef WALK_NESTED_ENUM
 
+  void Unparse(const OSSClauseList &x) { Walk(" ", x.v, " "); }
+
+  void Unparse(const OSSBlockDirective &x) {
+    switch (x.v) {
+    case OSSBlockDirective::Directive::Task:
+      Word("TASK ");
+      break;
+    }
+  }
+
+  void Unparse(const OSSSimpleStandaloneDirective &x) {
+    switch (x.v) {
+    case OSSSimpleStandaloneDirective::Directive::Taskwait:
+      Word("TASKWAIT ");
+      break;
+    }
+  }
+
+  void Unparse(const OmpSsSimpleStandaloneConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSSimpleStandaloneDirective>(x.t));
+    Walk(std::get<OSSClauseList>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
+  void Unparse(const OmpSsBlockConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSBeginBlockDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+    Walk(std::get<Block>(x.t), "");
+    BeginOmpSs();
+    Word("!$OSS END ");
+    Walk(std::get<OSSEndBlockDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
   void Done() const { CHECK(indent_ == 0); }
 
 private:
@@ -2576,6 +2617,9 @@ private:
   void EndOpenMP() { openmpDirective_ = false; }
   void BeginOpenACC() { openaccDirective_ = true; }
   void EndOpenACC() { openaccDirective_ = false; }
+
+  void BeginOmpSs() { ompssDirective_ = true; }
+  void EndOmpSs() { ompssDirective_ = false; }
 
   // Call back to the traversal framework.
   template <typename T> void Walk(const T &x) {
@@ -2647,6 +2691,7 @@ private:
   bool capitalizeKeywords_{true};
   bool openaccDirective_{false};
   bool openmpDirective_{false};
+  bool ompssDirective_{false};
   bool backslashEscapes_{false};
   preStatementType *preStatement_{nullptr};
   AnalyzedObjectsAsFortran *asFortran_{nullptr};
@@ -2654,7 +2699,7 @@ private:
 
 void UnparseVisitor::Put(char ch) {
   int sav = indent_;
-  if (openmpDirective_ || openaccDirective_) {
+  if (openmpDirective_ || openaccDirective_ || ompssDirective_) {
     indent_ = 0;
   }
   if (column_ <= 1) {
@@ -2677,6 +2722,8 @@ void UnparseVisitor::Put(char ch) {
       column_ = 8;
     } else if (openaccDirective_) {
       out_ << "!$ACC&";
+    } else if (ompssDirective_) {
+      out_ << "!$OSS&";
       column_ = 8;
     } else {
       out_ << '&';
@@ -2684,7 +2731,7 @@ void UnparseVisitor::Put(char ch) {
     }
   }
   out_ << ch;
-  if (openmpDirective_ || openaccDirective_) {
+  if (openmpDirective_ || openaccDirective_ || ompssDirective_) {
     indent_ = sav;
   }
 }
