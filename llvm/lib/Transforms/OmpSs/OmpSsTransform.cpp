@@ -440,6 +440,8 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
     unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
     unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
+    unpackCallToRTOfType(M, TDI.WeakConcurrents, F, "weak_concurrent");
+    unpackCallToRTOfType(M, TDI.WeakCommutatives, F, "weak_commutative");
     unpackCallToRTOfReduction(M, TDI.Reductions, TRI, F, "reduction");
     unpackCallToRTOfReduction(M, TDI.WeakReductions, TRI, F, "weak_reduction");
   }
@@ -1161,6 +1163,8 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.WeakIns.size()
         + TI.DependsInfo.WeakOuts.size()
         + TI.DependsInfo.WeakInouts.size()
+        + TI.DependsInfo.WeakConcurrents.size()
+        + TI.DependsInfo.WeakCommutatives.size()
         + TI.DependsInfo.Reductions.size()
         + TI.DependsInfo.WeakReductions.size();
       IRB.CreateCall(CreateTaskFuncTy, {TaskInfoVar,

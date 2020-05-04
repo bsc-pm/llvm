@@ -10,10 +10,14 @@ void foo3(int *p) {}
 #pragma oss task
 void foo4(int *p) {}
 
-// TODO?: maybe we want to emit a better diagnostic
-#pragma oss task shared(p) private(p) firstprivate(p) default(none) // expected-error {{unexpected OmpSs-2 clause 'shared' in directive '#pragma oss task'}}
+#pragma oss task shared(p) private(p) firstprivate(p) default(none) // expected-error {{unexpected OmpSs-2 clause 'shared' in directive '#pragma oss task'}} expected-error {{unexpected OmpSs-2 clause 'private' in directive '#pragma oss task'}} expected-error {{unexpected OmpSs-2 clause 'firstprivate' in directive '#pragma oss task'}} expected-error {{unexpected OmpSs-2 clause 'default' in directive '#pragma oss task'}}
 void foo5(int *p) {}
 #pragma oss task depend(in: p[0 ; 5]) // expected-error {{array section form is not valid in 'depend' clause}}
 void foo6(int *p) {}
+
+#pragma oss task weakconcurrent(*p) weakcommutative(*p) // expected-error {{unexpected OmpSs-2 clause 'weakconcurrent' in directive '#pragma oss task'}}
+void foo7(int *p) {}
+#pragma oss task reduction(+: *p) weakreduction(+: *p) // expected-error {{unexpected OmpSs-2 clause 'reduction' in directive '#pragma oss task'}} expected-error {{unexpected OmpSs-2 clause 'weakreduction' in directive '#pragma oss task'}}
+void foo8(int *p) {}
 
 #pragma oss task // expected-error {{function declaration is expected after 'task' function directive}}

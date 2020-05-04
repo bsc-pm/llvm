@@ -484,6 +484,16 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                           TI.DSAInfo,
                           TI.CapturedInfo,
                           LLVMContext::OB_oss_dep_weakinout);
+  gatherDependsInfoWithID(I,
+                          TI.DependsInfo.WeakConcurrents,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_dep_weakconcurrent);
+  gatherDependsInfoWithID(I,
+                          TI.DependsInfo.WeakCommutatives,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_dep_weakcommutative);
 
   gatherReductionsInfoWithID(I,
                              TI.DependsInfo.Reductions,

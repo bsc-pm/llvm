@@ -123,6 +123,16 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
          "oss_dep_weakinout operand bundle id drifted!");
   (void)OSSDepWeakInoutEntry;
 
+  auto *OSSDepWeakConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKCONCURRENT");
+  assert(OSSDepWeakConcurrentEntry->second == LLVMContext::OB_oss_dep_weakconcurrent &&
+         "oss_dep_weakconcurrent operand bundle id drifted!");
+  (void)OSSDepWeakConcurrentEntry;
+
+  auto *OSSDepWeakCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.WEAKCOMMUTATIVE");
+  assert(OSSDepWeakCommutativeEntry->second == LLVMContext::OB_oss_dep_weakcommutative &&
+         "oss_dep_weakcommutative operand bundle id drifted!");
+  (void)OSSDepWeakCommutativeEntry;
+
   auto *OSSDepReductionEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DEP.REDUCTION");
   assert(OSSDepReductionEntry->second == LLVMContext::OB_oss_dep_reduction &&
          "oss_dep_reduction operand bundle id drifted!");

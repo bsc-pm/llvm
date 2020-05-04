@@ -24,6 +24,9 @@
 #ifndef OMPSS_TASK_CLAUSE
 #  define OMPSS_TASK_CLAUSE(Name)
 #endif
+#ifndef OMPSS_DECLARE_TASK_CLAUSE
+#  define OMPSS_DECLARE_TASK_CLAUSE(Name)
+#endif
 #ifndef OMPSS_DEFAULT_KIND
 #  define OMPSS_DEFAULT_KIND(Name)
 #endif
@@ -50,6 +53,7 @@ OMPSS_CLAUSE(shared,  OSSSharedClause)
 OMPSS_CLAUSE(depend, OSSDependClause)
 OMPSS_CLAUSE(reduction, OSSReductionClause)
 OMPSS_DIRECTIVE_EXT(declare_reduction, "declare reduction")
+OMPSS_DIRECTIVE_EXT(declare_task, "task")
 
 // Static attributes for 'default' clause.
 OMPSS_DEFAULT_KIND(none)
@@ -60,9 +64,9 @@ OMPSS_DEPEND_KIND(in)
 OMPSS_DEPEND_KIND(out)
 OMPSS_DEPEND_KIND(inout)
 // Concurrent
-OMPSS_DEPEND_KIND(mutexinoutset)
-// Commutative
 OMPSS_DEPEND_KIND(inoutset)
+// Commutative
+OMPSS_DEPEND_KIND(mutexinoutset)
 OMPSS_DEPEND_KIND(weak)
 
 // OmpSs-2 'depend' syntax aliases
@@ -74,6 +78,8 @@ OMPSS_CLAUSE_ALIAS(commutative, depend)
 OMPSS_CLAUSE_ALIAS(weakin, depend)
 OMPSS_CLAUSE_ALIAS(weakout, depend)
 OMPSS_CLAUSE_ALIAS(weakinout, depend)
+OMPSS_CLAUSE_ALIAS(weakconcurrent, depend)
+OMPSS_CLAUSE_ALIAS(weakcommutative, depend)
 // OmpSs-2 'reduction' alias
 OMPSS_CLAUSE_ALIAS(weakreduction, reduction)
 
@@ -96,7 +102,24 @@ OMPSS_TASK_CLAUSE(commutative)
 OMPSS_TASK_CLAUSE(weakin)
 OMPSS_TASK_CLAUSE(weakout)
 OMPSS_TASK_CLAUSE(weakinout)
+OMPSS_TASK_CLAUSE(weakcommutative)
 OMPSS_TASK_CLAUSE(weakreduction)
+
+// Clauses allowed for OmpSs directive 'task' declaration/outline.
+OMPSS_DECLARE_TASK_CLAUSE(if)
+OMPSS_DECLARE_TASK_CLAUSE(final)
+OMPSS_DECLARE_TASK_CLAUSE(cost)
+OMPSS_DECLARE_TASK_CLAUSE(priority)
+OMPSS_DECLARE_TASK_CLAUSE(depend)
+OMPSS_DECLARE_TASK_CLAUSE(in)
+OMPSS_DECLARE_TASK_CLAUSE(out)
+OMPSS_DECLARE_TASK_CLAUSE(inout)
+OMPSS_DECLARE_TASK_CLAUSE(concurrent)
+OMPSS_DECLARE_TASK_CLAUSE(commutative)
+OMPSS_DECLARE_TASK_CLAUSE(weakin)
+OMPSS_DECLARE_TASK_CLAUSE(weakout)
+OMPSS_DECLARE_TASK_CLAUSE(weakinout)
+OMPSS_DECLARE_TASK_CLAUSE(weakcommutative)
 
 #undef OMPSS_DEPEND_KIND
 #undef OMPSS_DEFAULT_KIND
@@ -104,4 +127,5 @@ OMPSS_TASK_CLAUSE(weakreduction)
 #undef OMPSS_DIRECTIVE_EXT
 #undef OMPSS_CLAUSE_ALIAS
 #undef OMPSS_CLAUSE
+#undef OMPSS_DECLARE_TASK_CLAUSE
 #undef OMPSS_TASK_CLAUSE

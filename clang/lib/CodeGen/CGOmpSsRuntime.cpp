@@ -1977,6 +1977,18 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       Dep.E = E;
       EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
     }
+    for (const Expr *E : Attr->weakConcurrents()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+    }
+    for (const Expr *E : Attr->weakCommutatives()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = true;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+    }
     // depend(in :)
     for (const Expr *E : Attr->depIns()) {
       OSSDepDataTy Dep;
@@ -2025,6 +2037,18 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       Dep.OSSSyntax = false;
       Dep.E = E;
       EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+    }
+    for (const Expr *E : Attr->depWeakConcurrents()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+    }
+    for (const Expr *E : Attr->depWeakCommutatives()) {
+      OSSDepDataTy Dep;
+      Dep.OSSSyntax = false;
+      Dep.E = E;
+      EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     if (!CapturedList.empty())
       TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
@@ -2143,6 +2167,12 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
     EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
+    EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
+    EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
     EmitReduction("QUAL.OSS.DEP.REDUCTION",

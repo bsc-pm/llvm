@@ -62,6 +62,8 @@ struct OSSTaskDepDataTy final {
   SmallVector<OSSDepDataTy, 4> Ins;
   SmallVector<OSSDepDataTy, 4> Outs;
   SmallVector<OSSDepDataTy, 4> Inouts;
+  SmallVector<OSSDepDataTy, 4> WeakConcurrents;
+  SmallVector<OSSDepDataTy, 4> WeakCommutatives;
   SmallVector<OSSDepDataTy, 4> Concurrents;
   SmallVector<OSSDepDataTy, 4> Commutatives;
 };

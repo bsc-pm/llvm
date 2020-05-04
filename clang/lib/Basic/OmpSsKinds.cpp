@@ -99,6 +99,8 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
+  case OSSC_weakconcurrent:
+  case OSSC_weakcommutative:
   case OSSC_weakreduction:
     break;
   }
@@ -145,6 +147,8 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakin:
   case OSSC_weakout:
   case OSSC_weakinout:
+  case OSSC_weakconcurrent:
+  case OSSC_weakcommutative:
   case OSSC_weakreduction:
     break;
   }
@@ -159,6 +163,16 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
   case OSSD_task:
     switch (CKind) {
 #define OMPSS_TASK_CLAUSE(Name)                                               \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_declare_task:
+    switch (CKind) {
+#define OMPSS_DECLARE_TASK_CLAUSE(Name)                                       \
   case OSSC_##Name:                                                            \
     return true;
 #include "clang/Basic/OmpSsKinds.def"

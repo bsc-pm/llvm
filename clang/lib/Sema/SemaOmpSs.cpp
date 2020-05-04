@@ -1105,6 +1105,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task:
     Res = ActOnOmpSsTaskDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_declare_task:
   case OSSD_declare_reduction:
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
@@ -1169,10 +1170,13 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
     ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
     ArrayRef<Expr *> WeakInouts,
+    ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
     ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
     ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
     ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
-    ArrayRef<Expr *> DepWeakInouts, SourceRange SR) {
+    ArrayRef<Expr *> DepWeakInouts,
+    ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+    SourceRange SR) {
   if (!DG || DG.get().isNull())
     return DeclGroupPtrTy();
 
@@ -1251,6 +1255,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   for (Expr *RefExpr : WeakInouts) {
     checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
   }
+  for (Expr *RefExpr : WeakConcurrents) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
+  for (Expr *RefExpr : WeakCommutatives) {
+    checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
+  }
   for (Expr *RefExpr : DepIns) {
     checkOutlineDependency(*this, RefExpr);
   }
@@ -1275,6 +1285,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   for (Expr *RefExpr : DepWeakInouts) {
     checkOutlineDependency(*this, RefExpr);
   }
+  for (Expr *RefExpr : DepWeakConcurrents) {
+    checkOutlineDependency(*this, RefExpr);
+  }
+  for (Expr *RefExpr : DepWeakCommutatives) {
+    checkOutlineDependency(*this, RefExpr);
+  }
 
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
@@ -1287,6 +1303,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<Expr **>(WeakIns.data()), WeakIns.size(),
     const_cast<Expr **>(WeakOuts.data()), WeakOuts.size(),
     const_cast<Expr **>(WeakInouts.data()), WeakInouts.size(),
+    const_cast<Expr **>(WeakConcurrents.data()), WeakConcurrents.size(),
+    const_cast<Expr **>(WeakCommutatives.data()), WeakCommutatives.size(),
     const_cast<Expr **>(DepIns.data()), DepIns.size(),
     const_cast<Expr **>(DepOuts.data()), DepOuts.size(),
     const_cast<Expr **>(DepInouts.data()), DepInouts.size(),
@@ -1295,6 +1313,8 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     const_cast<Expr **>(DepWeakIns.data()), DepWeakIns.size(),
     const_cast<Expr **>(DepWeakOuts.data()), DepWeakOuts.size(),
     const_cast<Expr **>(DepWeakInouts.data()), DepWeakInouts.size(),
+    const_cast<Expr **>(DepWeakConcurrents.data()), DepWeakConcurrents.size(),
+    const_cast<Expr **>(DepWeakCommutatives.data()), DepWeakCommutatives.size(),
     SR);
   ADecl->addAttr(NewAttr);
   return DG;
@@ -1364,13 +1384,10 @@ bool Sema::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
   if (DepKinds.size() == 2) {
     int numWeaks = 0;
     int numUnk = 0;
-    // This is for concurrent and commutative. For now we don't allow combination
-    // with 'weak'
+
+    // concurrent (inoutset) cannot be combined with other modifiers
     int numNoWeakCompats = 0;
-    if (DepKinds[0] == OSSC_DEPEND_mutexinoutset
-        || DepKinds[0] == OSSC_DEPEND_inoutset)
-      ++numNoWeakCompats;
-    if (DepKinds[1] == OSSC_DEPEND_mutexinoutset
+    if (DepKinds[0] == OSSC_DEPEND_inoutset
         || DepKinds[1] == OSSC_DEPEND_inoutset)
       ++numNoWeakCompats;
 
@@ -1383,15 +1400,14 @@ bool Sema::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
     else if (DepKinds[1] == OSSC_DEPEND_unknown)
       ++numUnk;
 
-    // concurrent/commutative cannot be combined with other modifiers
+    // concurrent (inoutset) cannot be combined with other modifiers
     if (numNoWeakCompats) {
-        SmallString<256> Buffer;
-        llvm::raw_svector_ostream Out(Buffer);
-        Out << "'" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_mutexinoutset) << "'"
-          << ", '" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_inoutset) << "'";
-        Diag(DepLoc, diag::err_oss_depend_no_weak_compatible)
-          << Out.str();
-        return false;
+      SmallString<256> Buffer;
+      llvm::raw_svector_ostream Out(Buffer);
+      Out << "'" << getOmpSsSimpleClauseTypeName(OSSC_depend, OSSC_DEPEND_inoutset) << "'";
+      Diag(DepLoc, diag::err_oss_depend_no_weak_compatible)
+        << Out.str() << 1;
+      return false;
     }
 
     if (numWeaks == 0) {
@@ -2288,11 +2304,11 @@ Sema::ActOnOmpSsVarListClause(
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   case OSSC_concurrent:
-    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inoutset }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   case OSSC_commutative:
-    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inoutset }, DepLoc, ColonLoc, Vars,
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   case OSSC_weakin:
@@ -2308,6 +2324,14 @@ Sema::ActOnOmpSsVarListClause(
   case OSSC_weakinout:
     Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inout, OSSC_DEPEND_weak },
                                  DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_weakconcurrent:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_inoutset, OSSC_DEPEND_weak }, DepLoc, ColonLoc, Vars,
+                                 StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
+    break;
+  case OSSC_weakcommutative:
+    Res = ActOnOmpSsDependClause({ OSSC_DEPEND_mutexinoutset, OSSC_DEPEND_weak }, DepLoc, ColonLoc, Vars,
                                  StartLoc, LParenLoc, EndLoc, /*OSSSyntax=*/true);
     break;
   default:

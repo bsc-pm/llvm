@@ -9979,10 +9979,13 @@ public:
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
       ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
       ArrayRef<Expr *> WeakInouts,
+      ArrayRef<Expr *> WeakConcurrents, ArrayRef<Expr *> WeakCommutatives,
       ArrayRef<Expr *> DepIns, ArrayRef<Expr *> DepOuts, ArrayRef<Expr *> DepInouts,
       ArrayRef<Expr *> DepConcurrents, ArrayRef<Expr *> DepCommutatives,
       ArrayRef<Expr *> DepWeakIns, ArrayRef<Expr *> DepWeakOuts,
-      ArrayRef<Expr *> DepWeakInouts, SourceRange SR);
+      ArrayRef<Expr *> DepWeakInouts,
+      ArrayRef<Expr *> DepWeakConcurrents, ArrayRef<Expr *> DepWeakCommutatives,
+      SourceRange SR);
 
   OSSClause *ActOnOmpSsVarListClause(
       OmpSsClauseKind Kind, ArrayRef<Expr *> Vars,

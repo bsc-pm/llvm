@@ -64,6 +64,8 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakIns;
   SmallVector<DependInfo, 4> WeakOuts;
   SmallVector<DependInfo, 4> WeakInouts;
+  SmallVector<DependInfo, 4> WeakConcurrents;
+  SmallVector<DependInfo, 4> WeakCommutatives;
   SmallVector<ReductionInfo, 4> Reductions;
   SmallVector<ReductionInfo, 4> WeakReductions;
 

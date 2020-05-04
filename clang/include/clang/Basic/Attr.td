@@ -3138,12 +3138,14 @@ def OSSTaskDecl : Attr {
     VariadicExprArgument<"Concurrents">, VariadicExprArgument<"Commutatives">,
     VariadicExprArgument<"WeakIns">, VariadicExprArgument<"WeakOuts">,
     VariadicExprArgument<"WeakInouts">,
+    VariadicExprArgument<"WeakConcurrents">, VariadicExprArgument<"WeakCommutatives">,
     // depend(in : )
     VariadicExprArgument<"DepIns">, VariadicExprArgument<"DepOuts">,
     VariadicExprArgument<"DepInouts">,
     VariadicExprArgument<"DepConcurrents">, VariadicExprArgument<"DepCommutatives">,
     VariadicExprArgument<"DepWeakIns">, VariadicExprArgument<"DepWeakOuts">,
-    VariadicExprArgument<"DepWeakInouts">
+    VariadicExprArgument<"DepWeakInouts">,
+    VariadicExprArgument<"DepWeakConcurrents">, VariadicExprArgument<"DepWeakCommutatives">
   ];
   let AdditionalMembers = [{
     void printPrettyPragma(raw_ostream & OS, const PrintingPolicy &Policy)
@@ -3170,14 +3172,18 @@ def OSSTaskDecl : Attr {
       l("weakin", "(", weakIns_size(), weakIns_begin(), weakIns_end(), OS, Policy);
       l("weakout", "(", weakOuts_size(), weakOuts_begin(), weakOuts_end(), OS, Policy);
       l("weakinout", "(", weakInouts_size(), weakInouts_begin(), weakInouts_end(), OS, Policy);
+      l("weakconcurrent", "(", weakConcurrents_size(), weakConcurrents_begin(), weakConcurrents_end(), OS, Policy);
+      l("weakcommutative", "(", weakCommutatives_size(), weakCommutatives_begin(), weakCommutatives_end(), OS, Policy);
       l("depend(in", ":", depIns_size(), depIns_begin(), depIns_end(), OS, Policy);
       l("depend(out", ":", depOuts_size(), depOuts_begin(), depOuts_end(), OS, Policy);
       l("depend(inout", ":", depInouts_size(), depInouts_begin(), depInouts_end(), OS, Policy);
-      l("depend(mutexinoutset", ":", depConcurrents_size(), depConcurrents_begin(), depConcurrents_end(), OS, Policy);
-      l("depend(inoutset", ":", depCommutatives_size(), depCommutatives_begin(), depCommutatives_end(), OS, Policy);
+      l("depend(inoutset", ":", depConcurrents_size(), depConcurrents_begin(), depConcurrents_end(), OS, Policy);
+      l("depend(mutexinoutset", ":", depCommutatives_size(), depCommutatives_begin(), depCommutatives_end(), OS, Policy);
       l("depend(weak, in", ":", depWeakIns_size(), depWeakIns_begin(), depWeakIns_end(), OS, Policy);
       l("depend(weak, out", ":", depWeakOuts_size(), depWeakOuts_begin(), depWeakOuts_end(), OS, Policy);
       l("depend(weak, inout", ":", depWeakInouts_size(), depWeakInouts_begin(), depWeakInouts_end(), OS, Policy);
+      l("depend(weak, inoutset", ":", depWeakConcurrents_size(), depWeakConcurrents_begin(), depWeakConcurrents_end(), OS, Policy);
+      l("depend(weak, mutexinoutset", ":", depWeakCommutatives_size(), depWeakCommutatives_begin(), depWeakCommutatives_end(), OS, Policy);
       if (auto *E = getIfExpr()) {
         OS << " if(";
         E->printPretty(OS, nullptr, Policy);

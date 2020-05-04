@@ -3,12 +3,12 @@
 
 void foo1(int a) {
     // concurrent
-    #pragma oss task depend(mutexinoutset: a)
+    #pragma oss task depend(inoutset: a)
     {}
     #pragma oss task concurrent(a)
     {}
     // commutative
-    #pragma oss task depend(inoutset: a)
+    #pragma oss task depend(mutexinoutset: a)
     {}
     #pragma oss task commutative(a)
     {}

@@ -28,9 +28,9 @@ int main(int argc, char **argv, char *env[]) {
   int array[10][20];
 
   #pragma oss task depend // expected-error {{expected '(' after 'depend'}}
-  #pragma oss task depend ( // expected-error {{expected 'in', 'out', 'inout', 'mutexinoutset' or 'inoutset' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss task depend () // expected-error {{expected 'in', 'out', 'inout', 'mutexinoutset' or 'inoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss task depend (argc // expected-error {{expected 'in', 'out', 'inout', 'mutexinoutset' or 'inoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}} expected-error {{expected ')'}} expected-note {{to match this '('}}
+  #pragma oss task depend ( // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss task depend () // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss task depend (argc // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}} expected-warning {{missing ':' after dependency type - ignoring}} expected-error {{expected ')'}} expected-note {{to match this '('}}
   #pragma oss task depend (in : argc)) // expected-warning {{extra tokens at the end of '#pragma oss task' are ignored}}
   #pragma oss task depend (out: ) // expected-error {{expected expression}}
   #pragma oss task depend (out :S1) // expected-error {{'S1' does not refer to a value}}
@@ -89,9 +89,9 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task depend(out, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss task depend(weak, in: 1) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task depend(weak, in: S2::s2)
-  #pragma oss task depend(weak, mutexinoutset: argc) // expected-error {{dependency types 'mutexinoutset', 'inoutset' cannot be combined with others}}
-  #pragma oss task depend(kk, inoutset: argc) // expected-error {{dependency types 'mutexinoutset', 'inoutset' cannot be combined with others}}
-  #pragma oss task depend(kk: argc) // expected-error {{expected 'in', 'out', 'inout', 'mutexinoutset' or 'inoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(weak, mutexinoutset: argc)
+  #pragma oss task depend(kk, inoutset: argc) // expected-error {{dependency type 'inoutset' cannot be combined with others}}
+  #pragma oss task depend(kk: argc) // expected-error {{expected 'in', 'out', 'inout', 'inoutset' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
   foo();
 
   return 0;

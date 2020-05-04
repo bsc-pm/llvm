@@ -2894,6 +2894,18 @@ public:
   /// \param RLoc Returned location of right paren.
   ExprResult ParseOmpSsParensExpr(StringRef ClauseName, SourceLocation &RLoc);
 
+  /// Data used for parsing simple clause.
+  struct OmpSsSimpleClauseDataTy {
+    unsigned Type;
+    SourceLocation TypeLoc;
+    SourceLocation LOpen;
+    SourceLocation Loc;
+    SourceLocation RLoc;
+  };
+  /// Parses simple clauses, like 'default'.
+  bool ParseOmpSsSimpleClauseImpl(OmpSsClauseKind Kind,
+                                  OmpSsSimpleClauseDataTy &Data);
+
   /// Data used for parsing list of variables in OmpSs clauses.
   struct OmpSsVarListDataTy {
     SourceLocation ColonLoc;
