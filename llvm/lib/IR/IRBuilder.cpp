@@ -23,13 +23,14 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Operator.h"
 #include "llvm/IR/NoFolder.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/Statepoint.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/TypeSize.h"
 #include <cassert>
 #include <cstdint>
 #include <vector>
@@ -524,18 +525,11 @@ CallInst *IRBuilderBase::CreateMaskedGather(Value *Ptrs, Align Alignment,
                                             const Twine &Name) {
   auto PtrsTy = cast<VectorType>(Ptrs->getType());
   auto PtrTy = cast<PointerType>(PtrsTy->getElementType());
-  unsigned NumElts = PtrsTy->getNumElements();
-  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts,
-                                 isa<ScalableVectorType>(PtrsTy));
-
-  if (isa<ScalableVectorType>(DataTy))
-    assert(Mask && isa<VectorType>(Mask->getType()) &&
-           isa<ScalableVectorType>(Mask->getType()) &&
-           "Scalable vector mask required");
+  ElementCount NumElts = PtrsTy->getElementCount();
+  Type *DataTy = VectorType::get(PtrTy->getElementType(), NumElts);
 
   if (!Mask)
-    Mask = Constant::getAllOnesValue(
-        VectorType::get(Type::getInt1Ty(Context), NumElts));
+    Mask = getTrueVector(NumElts);
 
   if (!PassThru)
     PassThru = UndefValue::get(DataTy);
@@ -560,22 +554,17 @@ CallInst *IRBuilderBase::CreateMaskedScatter(Value *Data, Value *Ptrs,
                                              Align Alignment, Value *Mask) {
   auto PtrsTy = cast<VectorType>(Ptrs->getType());
   auto DataTy = cast<VectorType>(Data->getType());
-  unsigned NumElts = PtrsTy->getNumElements();
+  ElementCount NumElts = PtrsTy->getElementCount();
 
 #ifndef NDEBUG
   auto PtrTy = cast<PointerType>(PtrsTy->getElementType());
-  assert(NumElts == DataTy->getNumElements() &&
+  assert(NumElts == DataTy->getElementCount() &&
          PtrTy->getElementType() == DataTy->getElementType() &&
          "Incompatible pointer and data types");
 #endif
 
-  if (isa<ScalableVectorType>(DataTy))
-    assert(Mask && isa<ScalableVectorType>(Mask->getType()) &&
-           "Scalable vector mask required");
-
   if (!Mask)
-    Mask = Constant::getAllOnesValue(
-        VectorType::get(Type::getInt1Ty(Context), NumElts));
+    Mask = getTrueVector(NumElts);
 
   Type *OverloadedTypes[] = {DataTy, PtrsTy};
   Value *Ops[] = {Data, Ptrs, getInt32(Alignment.value()), Mask};
@@ -972,20 +961,18 @@ Value *IRBuilderBase::CreateStripInvariantGroup(Value *Ptr) {
   return Fn;
 }
 
-Value *IRBuilderBase::CreateVectorSplat(unsigned NumElts, Value *V,
-                                        const Twine &Name, bool Scalable) {
-  assert(NumElts > 0 && "Cannot splat to an empty vector!");
+Value *IRBuilderBase::CreateVectorSplat(ElementCount NumElts, Value *V,
+                                        const Twine &Name) {
+  assert(NumElts.Min > 0 && "Cannot splat to an empty vector!");
 
   // First insert it into an undef vector so we can shuffle it.
   Type *I32Ty = getInt32Ty();
-  Value *Undef =
-      UndefValue::get(VectorType::get(V->getType(), NumElts, Scalable));
+  Value *Undef = UndefValue::get(VectorType::get(V->getType(), NumElts));
   V = CreateInsertElement(Undef, V, ConstantInt::get(I32Ty, 0),
                           Name + ".splatinsert");
 
   // Shuffle the value across the desired number of elements.
-  Value *Zeros =
-      ConstantAggregateZero::get(VectorType::get(I32Ty, NumElts, Scalable));
+  Value *Zeros = ConstantAggregateZero::get(VectorType::get(I32Ty, NumElts));
   return CreateShuffleVector(V, Undef, Zeros, Name + ".splat");
 }
 

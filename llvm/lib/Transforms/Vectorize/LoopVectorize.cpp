@@ -1752,7 +1752,7 @@ Value *InnerLoopVectorizer::getBroadcastInstrs(Value *V) {
     Builder.SetInsertPoint(LoopVectorPreHeader->getTerminator());
 
   // Broadcast the scalar into all locations in the vector.
-  Value *Shuf = Builder.CreateVectorSplat(VF, V, "broadcast", isScalable());
+  Value *Shuf = Builder.CreateVectorSplat({VF, isScalable()}, V, "broadcast");
 
   return Shuf;
 }
@@ -1773,7 +1773,7 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
     Step = Builder.CreateTrunc(Step, TruncType);
     Start = Builder.CreateCast(Instruction::Trunc, Start, TruncType);
   }
-  Value *SplatStart = Builder.CreateVectorSplat(VF, Start, "", isScalable());
+  Value *SplatStart = Builder.CreateVectorSplat({VF, isScalable()}, Start, "");
   Value *SteppedStart =
       getStepVector(SplatStart, 0, Step, II.getInductionOpcode());
 
@@ -1806,11 +1806,11 @@ void InnerLoopVectorizer::createVectorIntOrFpInductionPHI(
                   : Builder.CreateVectorSplat(VF, Mul);
   } else {
     SplatVF = Builder.CreateVectorSplat(
-        VF,
+        {VF, isScalable()},
         Builder.CreateMul(
             Mul, emitVscaleCall(Builder, OrigLoop->getHeader()->getModule(),
                                 Mul->getType())),
-        "", isScalable());
+        "");
   }
 
   Builder.restoreIP(CurrIP);
@@ -1998,7 +1998,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
                                           Instruction::BinaryOps BinOp) {
   // Create and check the types.
   auto *ValVTy = cast<VectorType>(Val->getType());
-  int VLen = ValVTy->getNumElements();
+  unsigned VLen = ValVTy->getNumElements();
 
   Type *STy = Val->getType()->getScalarType();
   assert((STy->isIntegerTy() || STy->isFloatingPointTy()) &&
@@ -2023,7 +2023,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
         Value *ScaledStartIdx = Builder.CreateMul(
             Vscale, ConstantInt::get(STy, StartIdx), "startidx.vscale");
         Value *StartIdxSplat = Builder.CreateVectorSplat(
-            VLen, ScaledStartIdx, "stepvec.start", isScalable());
+            {VLen, isScalable()}, ScaledStartIdx, "stepvec.start");
         Indices = Builder.CreateAdd(Indices, StartIdxSplat);
       }
 
@@ -2031,7 +2031,7 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
       // flags, which can be found from the original scalar operations.
       if (!isa<Constant>(Step) || !cast<Constant>(Step)->isOneValue()) {
         Step =
-            Builder.CreateVectorSplat(VLen, Step, "splat.step", isScalable());
+            Builder.CreateVectorSplat({VLen, isScalable()}, Step, "splat.step");
         assert(Step->getType() == Val->getType() && "Invalid step vec");
         Step = Builder.CreateMul(Indices, Step, "stepvec.scaled");
       } else {
@@ -2039,13 +2039,13 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
       }
     } else {
       SmallVector<Constant *, 8> Indices;
-      for (int i = 0; i < VLen; ++i)
+      for (unsigned i = 0; i < VLen; ++i)
         Indices.push_back(ConstantInt::get(STy, StartIdx + i));
 
       // Add the consecutive indices to the vector value.
       Constant *Cv = ConstantVector::get(Indices);
       assert(Cv->getType() == Val->getType() && "Invalid consecutive vec");
-      Step = Builder.CreateVectorSplat(VLen, Step, "", isScalable());
+      Step = Builder.CreateVectorSplat({VLen, isScalable()}, Step, "");
       assert(Step->getType() == Val->getType() && "Invalid step vec");
       // FIXME: The newly created binary instructions should contain nsw/nuw
       // flags, which can be found from the original scalar operations.
@@ -2064,13 +2064,13 @@ Value *InnerLoopVectorizer::getStepVector(Value *Val, int StartIdx, Value *Step,
     assert((BinOp == Instruction::FAdd || BinOp == Instruction::FSub) &&
            "Binary Opcode should be specified for FP induction");
     // Create a vector of consecutive numbers from zero to VF.
-    for (int i = 0; i < VLen; ++i)
+    for (unsigned i = 0; i < VLen; ++i)
       Indices.push_back(ConstantFP::get(STy, (double)(StartIdx + i)));
 
     // Add the consecutive indices to the vector value.
     Constant *Cv = ConstantVector::get(Indices);
 
-    Step = Builder.CreateVectorSplat(VLen, Step, "", isScalable());
+    Step = Builder.CreateVectorSplat({VLen, isScalable()}, Step, "");
 
     // Floating point operations had to be 'fast' to enable the induction.
     FastMathFlags Flags;
@@ -2609,11 +2609,6 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
             "Predicated intrinsics for scatter and gather not supported yet");
         Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
         Value *VectorGep = State.get(Addr, Part);
-        VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-        if (!MaskPart && isa<ScalableVectorType>(VectorGepTy)) {
-          MaskPart = Builder.CreateVectorSplat(
-              VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
-        }
         NewSI = Builder.CreateMaskedScatter(StoredVal, VectorGep, Alignment,
                                             MaskPart);
       } else {
@@ -2626,15 +2621,15 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
         }
         auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
         if (EVLPart) {
+          VectorType *StoredValTy = cast<VectorType>(StoredVal->getType());
           Function *VPIntr = Intrinsic::getDeclaration(
               LoopVectorPreHeader->getModule(), Intrinsic::vp_store,
-              {StoredVal->getType(), VecPtr->getType()});
+              {StoredValTy, VecPtr->getType()});
 
           Value *BlockInMaskPart =
-              isMaskRequired ? BlockInMaskParts[Part]
-                             : Builder.CreateVectorSplat(
-                                   StoredVal->getType()->getVectorNumElements(),
-                                   Builder.getTrue(), "all.ones", true);
+              isMaskRequired
+                  ? BlockInMaskParts[Part]
+                  : Builder.getTrueVector(StoredValTy->getElementCount());
 
           Value *EVLPartTrunc = Builder.CreateTrunc(
               EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
@@ -2663,11 +2658,6 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
     if (CreateGatherScatter) {
       Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
       Value *VectorGep = State.get(Addr, Part);
-      VectorType *VectorGepTy = cast<VectorType>(VectorGep->getType());
-      if (!MaskPart && isa<ScalableVectorType>(VectorGepTy)) {
-        MaskPart = Builder.CreateVectorSplat(
-            VectorGepTy->getNumElements(), Builder.getTrue(), "", true);
-      }
       NewLI = Builder.CreateMaskedGather(VectorGep, Alignment, MaskPart,
                                          nullptr, "wide.masked.gather");
       addMetadata(NewLI, LI);
@@ -2680,11 +2670,9 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
 
         VectorType *VecTy =
             cast<VectorType>(VecPtr->getType()->getPointerElementType());
-        Value *BlockInMaskPart = isMaskRequired
-                                     ? BlockInMaskParts[Part]
-                                     : Builder.CreateVectorSplat(
-                                           VecTy->getVectorNumElements(),
-                                           Builder.getTrue(), "all.ones", true);
+        Value *BlockInMaskPart =
+            isMaskRequired ? BlockInMaskParts[Part]
+                           : Builder.getTrueVector(VecTy->getElementCount());
 
         Value *EVLPartTrunc = Builder.CreateTrunc(
             EVLPart, Type::getInt32Ty(VecPtr->getType()->getContext()));
@@ -4026,7 +4014,7 @@ void InnerLoopVectorizer::fixReduction(PHINode *Phi) {
       VectorStart = Identity = ReductionStartValue;
     } else {
       VectorStart = Identity = Builder.CreateVectorSplat(
-          VF, ReductionStartValue, "minmax.ident", isScalable());
+          {VF, isScalable()}, ReductionStartValue, "minmax.ident");
     }
   } else {
     // Handle other reduction kinds:
@@ -4374,7 +4362,7 @@ void InnerLoopVectorizer::widenGEP(GetElementPtrInst *GEP, unsigned UF,
     //       the lane-zero scalar value.
     auto *Clone = Builder.Insert(GEP->clone());
     for (unsigned Part = 0; Part < UF; ++Part) {
-      Value *EntryPart = Builder.CreateVectorSplat(VF, Clone, "", isScalable());
+      Value *EntryPart = Builder.CreateVectorSplat({VF, isScalable()}, Clone);
       VectorLoopValueMap.setVectorValue(GEP, Part, EntryPart);
       addMetadata(EntryPart, GEP);
     }
@@ -4489,7 +4477,7 @@ void InnerLoopVectorizer::widenPHIInstruction(Instruction *PN, unsigned UF,
       // However if the phi-node is uniform after vectorization, we do not
       // want to use a step vector and we also do not need to generate a vector
       // GEP.
-      Value *PtrIndSplat = Builder.CreateVectorSplat(VF, PtrInd, "", true);
+      Value *PtrIndSplat = Builder.CreateVectorSplat({VF, true}, PtrInd);
       for (unsigned Part = 0; Part < UF; ++Part) {
         SCEVExpander Exp(*PSE.getSE(), DL, "induction");
         Value *Step = Exp.expandCodeFor(II.getStep(), II.getStep()->getType(),
@@ -4619,8 +4607,7 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
     Value *BlockInMaskPart =
         BlockInMask
             ? State.get(BlockInMask, Part)
-            : Builder.CreateVectorSplat(OpTy->getVectorNumElements(),
-                                        Builder.getTrue(), "all.ones", true);
+            : Builder.getTrueVector(cast<VectorType>(OpTy)->getElementCount());
     Ops.push_back(BlockInMaskPart);
     Value *EVLPart = State.get(EVL, Part);
     Value *EVLPartTrunc =
@@ -7420,9 +7407,6 @@ VPRecipeBuilder::tryToPredicatedWidenMemory(Instruction *I, VFRange &Range,
   if (!validateWidenMemory(I, Range))
     return nullptr;
 
-  if (!(CM.foldTailByMasking() && Legal->preferPredicatedVectorOps()))
-    return nullptr;
-
   VPValue *Mask = createBlockInMask(I->getParent(), Plan);
 
   // If tail folding by masking is enabled, memory instructions should be marked
@@ -7497,31 +7481,6 @@ VPBlendRecipe *VPRecipeBuilder::tryToBlend(PHINode *Phi, VPlanPtr &Plan) {
   return new VPBlendRecipe(Phi, Operands);
 }
 
-bool VPRecipeBuilder::tryToPredicatedWiden(Instruction *I, VPBasicBlock *VPBB,
-                                           VPlanPtr &Plan) {
-  // While checking loop vectorization legality we mark the instructions to be
-  // masked only if tail folding is enabled and TTI prefers predicated ops. Thus
-  // Legal->isMaskRequired(I) should return true only when these conditions
-  // are satisfied. Widening of memory instructions is handled separately.
-  if (Legal->isMaskRequired(I)) {
-    VPValue *Mask = createBlockInMask(I->getParent(), Plan);
-    // FIXME: Mask is nullptr if it represents an all-ones mask. Currently
-    // memory widening schemes generate masked instructions only if mask is not
-    // null. We need to support the case of all-ones mask and EVL < whole
-    // register length. Should we generate non-predicated instruction if the
-    // Mask is all-ones and EVL = whoel register length?
-    if (Mask) {
-      VPValue *EVL = getOrCreateEVL(I, Plan);
-      VPPredicatedWidenRecipe *PredWidenRecipe =
-          new VPPredicatedWidenRecipe(*I, Mask, EVL);
-      setRecipe(I, PredWidenRecipe);
-      VPBB->appendRecipe(PredWidenRecipe);
-      return true;
-    }
-  }
-  return false;
-}
-
 VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(CallInst *CI, VFRange &Range,
                                                    VPlan &Plan) const {
 
@@ -7570,13 +7529,11 @@ bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
                                                              Range);
 }
 
-bool VPRecipeBuilder::validateWiden(Instruction *I, VFRange &Range) {
-  bool IsPredicated = LoopVectorizationPlanner::getDecisionAndClampRange(
-      [&](unsigned VF) { return CM.isScalarWithPredication(I, VF); }, Range);
+bool VPRecipeBuilder::preferPredicatedWiden() {
+  return CM.foldTailByMasking() && Legal->preferPredicatedVectorOps();
+}
 
-  if (IsPredicated)
-    return false;
-
+bool VPRecipeBuilder::validateWiden(Instruction *I) const {
   auto IsVectorizableOpcode = [](unsigned Opcode) {
     switch (Opcode) {
     case Instruction::Add:
@@ -7625,16 +7582,15 @@ bool VPRecipeBuilder::validateWiden(Instruction *I, VFRange &Range) {
 }
 
 VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I, VPlan &Plan) const {
-  return validateWiden(I, Range) ? new VPWidenRecipe(*I) : nullptr;
+  if (!validateWiden(I))
+    return nullptr;
+
+  return new VPWidenRecipe(*I, Plan.mapToVPValues(I->operands()));
 }
 
 VPPredicatedWidenRecipe *VPRecipeBuilder::tryToPredicatedWiden(Instruction *I,
-                                                               VFRange &Range,
                                                                VPlanPtr &Plan) {
-  if (!validateWiden(I, Range))
-    return nullptr;
-
-  if (!(CM.foldTailByMasking() && Legal->preferPredicatedVectorOps()))
+  if (!validateWiden(I))
     return nullptr;
 
   VPValue *Mask = createBlockInMask(I->getParent(), Plan);
@@ -7717,8 +7673,11 @@ VPRecipeBase *VPRecipeBuilder::tryToCreateWidenRecipe(Instruction *Instr,
   if (auto *CI = dyn_cast<CallInst>(Instr))
     return tryToWidenCall(CI, Range, *Plan);
 
-  if (isa<LoadInst>(Instr) || isa<StoreInst>(Instr))
+  if (isa<LoadInst>(Instr) || isa<StoreInst>(Instr)) {
+    if (preferPredicatedWiden())
+      return tryToPredicatedWidenMemory(Instr, Range, Plan);
     return tryToWidenMemory(Instr, Range, Plan);
+  }
 
   VPRecipeBase *Recipe;
   if (auto Phi = dyn_cast<PHINode>(Instr)) {
@@ -7746,6 +7705,8 @@ VPRecipeBase *VPRecipeBuilder::tryToCreateWidenRecipe(Instruction *Instr,
     return new VPWidenSelectRecipe(*SI, InvariantCond);
   }
 
+  if (preferPredicatedWiden())
+    return tryToPredicatedWiden(Instr, Plan);
   return tryToWiden(Instr, *Plan);
 }
 

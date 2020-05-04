@@ -2469,20 +2469,34 @@ public:
   /// address space before call and casted back to Ptr type after call.
   Value *CreateStripInvariantGroup(Value *Ptr);
 
+  /// Method to support Vector Splat for FixedVectors using unsigned NumElts
+  /// instead of ElementCount.
+  Value *CreateVectorSplat(unsigned NumElts, Value *V, const Twine &Name = "") {
+    return CreateVectorSplat({NumElts, false}, V, Name);
+  }
+
   /// Return a vector value that contains \arg V broadcasted to \p
   /// NumElts elements.
-  Value *CreateVectorSplat(unsigned NumElts, Value *V, const Twine &Name = "",
-                           bool Scalable = false);
+  Value *CreateVectorSplat(ElementCount NumElts, Value *V,
+                           const Twine &Name = "");
 
-  /// Helper function that creates a vector of all ones with the same number of
-  /// elements and type as given vector type argument.
+private:
+  /// Return an integer or a vector of integer constant of given type that has
+  /// all bits set to true.
   Value *getAllOnesValue(Type *Ty) {
     VectorType *VTy = dyn_cast<VectorType>(Ty);
     if (isa_and_nonnull<ScalableVectorType>(VTy)) {
       Constant *Ones = Constant::getAllOnesValue(VTy->getElementType());
-      return CreateVectorSplat(VTy->getNumElements(), Ones, "", true);
+      return CreateVectorSplat(VTy->getElementCount(), Ones, "");
     }
     return Constant::getAllOnesValue(Ty);
+  }
+
+public:
+  /// Return an all true boolean vector of size and scalability \p NumElts.
+  /// If not scalable, then the returned vector is a Constant Value.
+  Value *getTrueVector(ElementCount NumElts) {
+    return getAllOnesValue(VectorType::get(Type::getInt1Ty(Context), NumElts));
   }
 
   /// Return a value that has been extracted from a larger integer type.

@@ -427,9 +427,9 @@ Instruction *InstCombiner::foldSelectIntoOp(SelectInst &SI, Value *TrueVal,
     Type *OOpTy = OOp->getType();
     if (isa<ScalableVectorType>(OOpTy)) {
       VectorType *VTy = dyn_cast<VectorType>(OOp->getType());
-      C = Builder.CreateVectorSplat(cast<VectorType>(OOpTy)->getNumElements(),
+      C = Builder.CreateVectorSplat(cast<VectorType>(OOpTy)->getElementCount(),
                                     ConstantInt::get(VTy->getContext(), CI),
-                                    "constant.splat", /* Scalable */ true);
+                                    "constant.splat");
     } else {
       C = ConstantInt::get(OOpTy, CI);
     }
