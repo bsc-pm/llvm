@@ -207,9 +207,15 @@ static void computeKnownBits(const Value *V, const APInt &DemandedElts,
 static void computeKnownBits(const Value *V, KnownBits &Known, unsigned Depth,
                              const Query &Q) {
   Type *Ty = V->getType();
+
+  // FIXME computeKnownBits isn't prepared to deal with scalable vectors yet,
+  // bail out.
+  if (isa<ScalableVectorType>(Ty))
+    return;
+
   APInt DemandedElts =
       Ty->isVectorTy()
-          ? APInt::getAllOnesValue(cast<VectorType>(Ty)->getNumElements())
+          ? APInt::getAllOnesValue(cast<FixedVectorType>(Ty)->getNumElements())
           : APInt(1, 1);
   computeKnownBits(V, DemandedElts, Known, Depth, Q);
 }
