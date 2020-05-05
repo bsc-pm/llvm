@@ -2003,6 +2003,12 @@ void Clang::AddRISCVTargetArgs(const ArgList &Args,
 
   if (Args.hasArg(options::OPT_mepi)) {
     CmdArgs.push_back("-mepi");
+    // Predicates are preferred when vectorising in EPI.
+    CmdArgs.push_back("-mllvm");
+    if (Args.hasArg(options::OPT_mno_prefer_predicate_over_epilog))
+      CmdArgs.push_back("-prefer-predicate-over-epilog=false");
+    else
+      CmdArgs.push_back("-prefer-predicate-over-epilog=true");
   }
 }
 

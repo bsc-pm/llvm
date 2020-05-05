@@ -2341,6 +2341,9 @@ def mno_save_restore : Flag<["-"], "mno-save-restore">, Group<m_riscv_Features_G
   HelpText<"Disable using library calls for save and restore">;
 def mepi : Flag<["-"], "mepi">, Flags<[CC1Option]>,
   HelpText<"Enable EPI extensions">;
+def mno_prefer_predicate_over_epilog : Flag<["-"], "mno-prefer-predicate-over-epilog">,
+  Flags<[CC1Option]>,
+  HelpText<"Indicate that an epilogue is desired and shouldn't be replaced by predication">;
 def mcmodel_EQ_medlow : Flag<["-"], "mcmodel=medlow">, Group<m_riscv_Features_Group>,
   Flags<[CC1Option]>, Alias<mcmodel_EQ>, AliasArgs<["small"]>,
   HelpText<"Equivalent to -mcmodel=small, compatible with RISC-V gcc.">;
