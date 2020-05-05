@@ -75,6 +75,21 @@ fi
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_BUILD_TYPE=${BUILD_TYPE}")
 
 ################################################################################
+# Install type
+################################################################################
+
+if [ "${INSTALL_TYPE}" = "Distribution" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_INSTALL_TOOLCHAIN_ONLY=ON")
+  info "Distribution installation type"
+elif [ -n "${INSTALL_TYPE}" ];
+then
+  info "Unknown install type '${INSTALL_TYPE}'. Ignoring."
+else
+  info "Developer installation type (default)"
+fi
+
+################################################################################
 # Detection of build system
 ################################################################################
 
