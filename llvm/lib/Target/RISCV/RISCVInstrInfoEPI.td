@@ -2924,6 +2924,30 @@ multiclass pat_vop_binary<SDNode vop,
               swap>.Value>;
 }
 
+multiclass pat_vop_binary_nomask<SDNode vop,
+                                 string instruction_name,
+                                 string kind,
+                                 ValueType result_type,
+                                 ValueType op_type,
+                                 int sew,
+                                 int vlmul,
+                                 VReg op_reg_class,
+                                 bit swap = 0>
+{
+  foreach instruction = [!cast<Instruction>(instruction_name#_#kind#"_M"#vlmul)] in
+  def : Pat<(result_type (vop
+                          (op_type op_reg_class:$rs1),
+                          (op_type op_reg_class:$rs2))),
+            swap_helper<
+              (instruction), // empty prefix
+              (instruction op_reg_class:$rs1),
+              (instruction op_reg_class:$rs2),
+              (instruction
+               VLMax,
+               sew),
+              swap>.Value>;
+}
+
 multiclass pat_vop_binary_common<SDNode vop,
                                  string instruction_name,
                                  list<VectorTypeInfo> vtilist>
@@ -3182,6 +3206,28 @@ defm "" : pat_vop_binary_relational_common<setlt, "PseudoVMSLT",
                                            AllIntegerVectors>;
 defm "" : pat_vop_binary_relational_common<setle, "PseudoVMSLE",
                                            AllIntegerVectors>;
+
+}
+
+//===----------------------------------------------------------------------===//
+// Patterns. Full vector mask logical operations
+//===----------------------------------------------------------------------===//
+
+multiclass pat_vop_binary_mask_logical_common<SDNode vop,
+                                              string instruction_name>
+{
+  foreach mti = AllMasks in
+  {
+    defm : pat_vop_binary_nomask<vop, instruction_name, "MM", mti.Mask,
+                                 mti.Mask, mti.SEW, mti.VLMul, VR>;
+  }
+}
+
+let Predicates = [HasStdExtV] in {
+
+defm "" : pat_vop_binary_mask_logical_common<and, "PseudoVMAND">;
+defm "" : pat_vop_binary_mask_logical_common<xor, "PseudoVMXOR">;
+defm "" : pat_vop_binary_mask_logical_common<or, "PseudoVMOR">;
 
 }
 
