@@ -2621,6 +2621,8 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
           // another expression. So don't call resetVectorValue(StoredVal).
         }
         auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
+        // if EVLPart is not null, we can vectorize using predicated
+        // intrinsic.
         if (EVLPart) {
           VectorType *StoredValTy = cast<VectorType>(StoredVal->getType());
           Function *VPIntr = Intrinsic::getDeclaration(
@@ -2638,8 +2640,6 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
               VPIntr, {StoredVal, VecPtr, Builder.getInt32(Alignment.value()),
                        BlockInMaskPart, EVLPartTrunc});
         } else if (isMaskRequired)
-          // if EVLPart is not null, we can vectorize using predicated
-          // intrinsic.
           NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
                                             BlockInMaskParts[Part]);
         else
@@ -2664,6 +2664,8 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
       addMetadata(NewLI, LI);
     } else {
       auto *VecPtr = CreateVecPtr(Part, State.get(Addr, {0, 0}));
+      // if EVLPart is not null, we can vectorize using predicated
+      // intrinsic.
       if (EVLPart) {
         Function *VPIntr = Intrinsic::getDeclaration(
             LoopVectorPreHeader->getModule(), Intrinsic::vp_load,
@@ -2682,8 +2684,6 @@ void InnerLoopVectorizer::vectorizeMemoryInstruction(Instruction *Instr,
                                     BlockInMaskPart, EVLPartTrunc},
                                    "vp.op.load");
       } else if (isMaskRequired)
-        // if EVLPart is not null, we can vectorize using predicated
-        // intrinsic.
           NewLI = Builder.CreateMaskedLoad(
               VecPtr, Alignment, BlockInMaskParts[Part],
               UndefValue::get(DataTy), "wide.masked.load");
@@ -3764,8 +3764,8 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
 }
 
 void InnerLoopVectorizer::fixEVLInduction(VPTransformState &State) {
-  Instruction *IndexNext = dyn_cast<Instruction>(
-      Induction->getIncomingValueForBlock(LoopVectorBody));
+  Instruction *IndexNext =
+      cast<Instruction>(Induction->getIncomingValueForBlock(LoopVectorBody));
   // FIXME: Add support for interleaving.
   ReplaceInstWithInst(IndexNext, BinaryOperator::Create(
                                      Instruction::Add, IndexNext->getOperand(0),
@@ -4619,19 +4619,19 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
         IRBuilder<>::FastMathFlagGuard FMFG(Builder);
         Builder.setFastMathFlags(Cmp->getFastMathFlags());
         C = Builder.CreateIntrinsic(Intrinsic::vp_fcmp, {OpTy},
-                                    {A, B, PredArg, MaskArg, EVLArg}, Cmp,
-                                    "vp.op");
+                                    {A, B, PredArg, MaskArg, EVLArg}, nullptr,
+                                    "vp.op.fcmp");
       } else {
         C = Builder.CreateIntrinsic(Intrinsic::vp_icmp, {OpTy},
-                                    {A, B, PredArg, MaskArg, EVLArg}, Cmp,
-                                    "vp.op");
+                                    {A, B, PredArg, MaskArg, EVLArg}, nullptr,
+                                    "vp.op.icmp");
       }
       // The result of vp_icmp or vp_fcmp may contain lanes that are undef due
       // to the mask. We don't need undef boolean values.
       // Convert undef lanes to false by inserting a vp_select.
       Value *V = Builder.CreateIntrinsic(
           Intrinsic::vp_select, {cast<VectorType>(C->getType())},
-          {MaskArg, C, MaskArg, EVLArg}, nullptr, "vp.op");
+          {MaskArg, C, MaskArg, EVLArg}, nullptr, "vp.op.select");
 
       VectorLoopValueMap.setVectorValue(&I, Part, V);
       addMetadata(V, &I);

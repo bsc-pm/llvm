@@ -388,7 +388,7 @@ void VPInstruction::generateInstruction(VPTransformState &State,
   // to VPlan in upstream. For now it helps catch any use of VPInstruction for
   // Call opcode that is now supported by the new VPCallInstruction recipe.
   case Instruction::Call: {
-    llvm_unreachable("This opcode is handles by the VPCallInstruction recipe");
+    llvm_unreachable("This opcode is handled by the VPCallInstruction recipe");
   }
 
   default:
