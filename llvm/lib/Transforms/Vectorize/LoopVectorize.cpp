@@ -427,7 +427,8 @@ public:
                             VPTransformState &State);
 
   /// Widen a single select instruction within the innermost loop.
-  void widenSelectInstruction(SelectInst &I, bool InvariantCond);
+  void widenSelectInstruction(SelectInst &I, bool InvariantCond,
+                              VPTransformState &State);
 
   /// Fix the vectorized code, taking care of header phi's, live-outs, and more.
   void fixVectorizedLoop(VPTransformState &State);
@@ -4857,13 +4858,18 @@ void InnerLoopVectorizer::widenCallInstruction(CallInst &I, VPUser &ArgOperands,
 }
 
 void InnerLoopVectorizer::widenSelectInstruction(SelectInst &I,
-                                                 bool InvariantCond) {
+                                                 bool InvariantCond,
+                                                 VPTransformState &State) {
   setDebugLocFromInst(Builder, &I);
 
   // The condition can be loop invariant  but still defined inside the
   // loop. This means that we can't just use the original 'cond' value.
   // We have to take the 'vectorized' value and pick the first lane.
   // Instcombine will make this a no-op.
+  auto EVLValue = [&](unsigned Part) -> Value * {
+    Value *EVLPart = State.get(EVL, Part);
+    return Builder.CreateTrunc(EVLPart, Type::getInt32Ty(Builder.getContext()));
+  };
 
   auto *ScalarCond = getOrCreateScalarValue(I.getOperand(0), {0, 0});
 
@@ -4871,8 +4877,14 @@ void InnerLoopVectorizer::widenSelectInstruction(SelectInst &I,
     Value *Cond = getOrCreateVectorValue(I.getOperand(0), Part);
     Value *Op0 = getOrCreateVectorValue(I.getOperand(1), Part);
     Value *Op1 = getOrCreateVectorValue(I.getOperand(2), Part);
-    Value *Sel =
-        Builder.CreateSelect(InvariantCond ? ScalarCond : Cond, Op0, Op1);
+    Value *Sel = nullptr;
+    if (Legal->preferPredicatedVectorOps()) {
+      Sel = Builder.CreateIntrinsic(
+          Intrinsic::vp_select, {cast<VectorType>(Op0->getType())},
+          {Cond, Op0, Op1, EVLValue(Part)}, nullptr, "vp.op.select");
+    } else {
+      Sel = Builder.CreateSelect(InvariantCond ? ScalarCond : Cond, Op0, Op1);
+    }
     VectorLoopValueMap.setVectorValue(&I, Part, Sel);
     addMetadata(Sel, &I);
   }
@@ -8055,7 +8067,7 @@ void VPWidenCallRecipe::execute(VPTransformState &State) {
 }
 
 void VPWidenSelectRecipe::execute(VPTransformState &State) {
-  State.ILV->widenSelectInstruction(Ingredient, InvariantCond);
+  State.ILV->widenSelectInstruction(Ingredient, InvariantCond, State);
 }
 
 void VPWidenRecipe::execute(VPTransformState &State) {
