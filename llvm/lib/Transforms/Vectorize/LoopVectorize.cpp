@@ -7180,6 +7180,9 @@ void LoopVectorizationPlanner::setBestPlan(unsigned VF, unsigned UF) {
 
 void LoopVectorizationPlanner::executePlan(InnerLoopVectorizer &ILV,
                                            DominatorTree *DT) {
+  // FIXME: If UF > 1 and isScalable, bail out early.
+  if (ILV.isScalable())
+    assert(BestUF == 1 && "Interleaving not supported for scalable vectors.");
 
   // 1. Create a new empty loop. Unlink the old loop and connect the new one.
   VPCallbackILV CallbackILV(ILV);
