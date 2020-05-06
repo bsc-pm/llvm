@@ -2499,6 +2499,12 @@ public:
     return getAllOnesValue(VectorType::get(Type::getInt1Ty(Context), NumElts));
   }
 
+  /// Return an all false boolean vector of size and scalability \p NumElts.
+  Value *getFalseVector(ElementCount NumElts) {
+    return ConstantAggregateZero::get(
+        VectorType::get(Type::getInt1Ty(Context), NumElts));
+  }
+
   /// Return a value that has been extracted from a larger integer type.
   Value *CreateExtractInteger(const DataLayout &DL, Value *From,
                               IntegerType *ExtractedTy, uint64_t Offset,

@@ -4630,9 +4630,15 @@ void InnerLoopVectorizer::widenPredicatedInstruction(Instruction &I,
       // The result of vp_icmp or vp_fcmp may contain lanes that are undef due
       // to the mask. We don't need undef boolean values.
       // Convert undef lanes to false by inserting a vp_select.
-      Value *V = Builder.CreateIntrinsic(
-          Intrinsic::vp_select, {cast<VectorType>(C->getType())},
-          {MaskArg, C, MaskArg, EVLArg}, nullptr, "vp.op.select");
+      // FIXME: For now we create a whole-register select to ensure correctness
+      // for other whole-register instructions that use the compare as input
+      // arg. See issue at
+      // repo.hca.bsc.es/gitlab/EPI/System-Software/llvm-mono/-/issues/124
+      // Value *V = Builder.CreateIntrinsic(
+      //    Intrinsic::vp_select, {cast<VectorType>(C->getType())},
+      //    {MaskArg, C, AllFalse, EVLArg}, nullptr, "vp.op.select");
+      Value *AllFalse = Builder.getFalseVector(OpTy->getElementCount());
+      Value *V = Builder.CreateSelect(MaskArg, C, AllFalse);
 
       VectorLoopValueMap.setVectorValue(&I, Part, V);
       addMetadata(V, &I);
