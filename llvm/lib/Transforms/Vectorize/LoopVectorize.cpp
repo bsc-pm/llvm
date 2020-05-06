@@ -6003,7 +6003,7 @@ int LoopVectorizationCostModel::computePredInstDiscount(
     // and phi nodes.
     if (isScalarWithPredication(I) && !I->getType()->isVoidTy()) {
       ScalarCost += TTI.getScalarizationOverhead(
-          ToVectorTy(I->getType(), VF, isScalable()),
+          cast<VectorType>(ToVectorTy(I->getType(), VF, isScalable())),
           APInt::getAllOnesValue(VF), true, false);
       ScalarCost += VF * TTI.getCFInstrCost(Instruction::PHI);
     }
@@ -6020,7 +6020,7 @@ int LoopVectorizationCostModel::computePredInstDiscount(
           Worklist.push_back(J);
         else if (needsExtract(J, VF))
           ScalarCost += TTI.getScalarizationOverhead(
-              ToVectorTy(J->getType(), VF, isScalable()),
+              cast<VectorType>(ToVectorTy(J->getType(), VF, isScalable())),
               APInt::getAllOnesValue(VF), false, true);
       }
 
@@ -6323,8 +6323,8 @@ unsigned LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
   Type *RetTy = ToVectorTy(I->getType(), VF, isScalable());
   if (!RetTy->isVoidTy() &&
       (!isa<LoadInst>(I) || !TTI.supportsEfficientVectorElementLoadStore()))
-    Cost += TTI.getScalarizationOverhead(RetTy, APInt::getAllOnesValue(VF),
-                                         true, false);
+    Cost += TTI.getScalarizationOverhead(
+        cast<VectorType>(RetTy), APInt::getAllOnesValue(VF), true, false);
 
   // Some targets keep addresses scalar.
   if (isa<LoadInst>(I) && !TTI.prefersVectorizedAddressing())
@@ -6532,7 +6532,7 @@ unsigned LoopVectorizationCostModel::getInstructionCost(Instruction *I,
 
     if (ScalarPredicatedBB) {
       // Return cost for branches around scalarized and predicated blocks.
-      Type *Vec_i1Ty = VectorType::get(
+      VectorType *Vec_i1Ty = VectorType::get(
           IntegerType::getInt1Ty(RetTy->getContext()), VF, isScalable());
       return (TTI.getScalarizationOverhead(Vec_i1Ty, APInt::getAllOnesValue(VF),
                                            false, true) +
