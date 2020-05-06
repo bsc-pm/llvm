@@ -823,7 +823,7 @@ public:
 
   /// Return the mask used by this recipe.
   VPValue *getMask() const {
-    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(0) : nullptr;
+    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(1) : nullptr;
   }
 
   /// Return the explicit vector length used by this recipe.
@@ -1274,7 +1274,7 @@ public:
 
   /// Return the mask used by this recipe.
   VPValue *getMask() const {
-    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(0) : nullptr;
+    return PredInfo.getNumOperands() == 2 ? PredInfo.getOperand(1) : nullptr;
   }
 
   /// Return the EVL used by this recipe.
