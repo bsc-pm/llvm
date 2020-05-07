@@ -2197,8 +2197,8 @@ TEST_F(VFSFromYAMLTest, YAMLVFSWriterTest) {
   ScopedFile _cd(TestDirectory + "/c/d", "");
   ScopedDir _e(TestDirectory + "/e");
   ScopedDir _ef(TestDirectory + "/e/f");
-  ScopedDir _g(TestDirectory + "/g");
-  ScopedFile _h(TestDirectory + "/h", "");
+  ScopedFile _g(TestDirectory + "/g", "");
+  ScopedDir _h(TestDirectory + "/h");
 
   vfs::YAMLVFSWriter VFSWriter;
   VFSWriter.addDirectoryMapping(_a.Path, "//root/a");
@@ -2223,8 +2223,8 @@ TEST_F(VFSFromYAMLTest, YAMLVFSWriterTest) {
   Lower->addRegularFile("//root/c/d");
   Lower->addDirectory("//root/e");
   Lower->addDirectory("//root/e/f");
-  Lower->addDirectory("//root/g");
-  Lower->addRegularFile("//root/h");
+  Lower->addRegularFile("//root/g");
+  Lower->addDirectory("//root/h");
 
   IntrusiveRefCntPtr<vfs::FileSystem> FS = getFromYAMLRawString(Buffer, Lower);
   ASSERT_TRUE(FS.get() != nullptr);
@@ -2237,4 +2237,91 @@ TEST_F(VFSFromYAMLTest, YAMLVFSWriterTest) {
   EXPECT_TRUE(FS->exists(_ef.Path));
   EXPECT_TRUE(FS->exists(_g.Path));
   EXPECT_TRUE(FS->exists(_h.Path));
+}
+
+TEST_F(VFSFromYAMLTest, YAMLVFSWriterTestHandleDirs) {
+  ScopedDir TestDirectory("virtual-file-system-test", /*Unique*/ true);
+  ScopedDir _a(TestDirectory + "/a");
+  ScopedDir _b(TestDirectory + "/b");
+  ScopedDir _c(TestDirectory + "/c");
+
+  vfs::YAMLVFSWriter VFSWriter;
+  VFSWriter.addDirectoryMapping(_a.Path, "//root/a");
+  VFSWriter.addDirectoryMapping(_b.Path, "//root/b");
+  VFSWriter.addDirectoryMapping(_c.Path, "//root/c");
+
+  std::string Buffer;
+  raw_string_ostream OS(Buffer);
+  VFSWriter.write(OS);
+  OS.flush();
+
+  // We didn't add a single file - only directories.
+  EXPECT_TRUE(Buffer.find("'type': 'file'") == std::string::npos);
+
+  IntrusiveRefCntPtr<ErrorDummyFileSystem> Lower(new ErrorDummyFileSystem());
+  Lower->addDirectory("//root/a");
+  Lower->addDirectory("//root/b");
+  Lower->addDirectory("//root/c");
+  // canaries
+  Lower->addRegularFile("//root/a/a");
+  Lower->addRegularFile("//root/b/b");
+  Lower->addRegularFile("//root/c/c");
+
+  IntrusiveRefCntPtr<vfs::FileSystem> FS = getFromYAMLRawString(Buffer, Lower);
+  ASSERT_TRUE(FS.get() != nullptr);
+
+  EXPECT_FALSE(FS->exists(_a.Path + "/a"));
+  EXPECT_FALSE(FS->exists(_b.Path + "/b"));
+  EXPECT_FALSE(FS->exists(_c.Path + "/c"));
+}
+
+TEST_F(VFSFromYAMLTest, YAMLVFSWriterTestNestedDirs) {
+  ScopedDir TestDirectory("virtual-file-system-test", /*Unique*/ true);
+  ScopedDir a(TestDirectory + "/a");
+  ScopedDir _a_aa(TestDirectory + "/a/aa");
+  ScopedDir b(TestDirectory + "/b");
+  ScopedDir _b_bb(TestDirectory + "/b/bb");
+  ScopedDir c(TestDirectory + "/c");
+  ScopedDir _c_cc(TestDirectory + "/c/cc");
+
+  vfs::YAMLVFSWriter VFSWriter;
+  VFSWriter.addDirectoryMapping(a.Path, "//root/a");
+  VFSWriter.addDirectoryMapping(_a_aa.Path, "//root/a/aa");
+  VFSWriter.addDirectoryMapping(b.Path, "//root/b");
+  VFSWriter.addDirectoryMapping(_b_bb.Path, "//root/b/bb");
+  VFSWriter.addDirectoryMapping(c.Path, "//root/c");
+  VFSWriter.addDirectoryMapping(_c_cc.Path, "//root/c/cc");
+
+  std::string Buffer;
+  raw_string_ostream OS(Buffer);
+  VFSWriter.write(OS);
+  OS.flush();
+
+  IntrusiveRefCntPtr<ErrorDummyFileSystem> Lower(new ErrorDummyFileSystem());
+  Lower->addDirectory("//root/a");
+  Lower->addDirectory("//root/a/aa");
+  Lower->addDirectory("//root/b");
+  Lower->addDirectory("//root/b/bb");
+  Lower->addDirectory("//root/c");
+  Lower->addDirectory("//root/c/cc");
+
+  IntrusiveRefCntPtr<vfs::FileSystem> FS = getFromYAMLRawString(Buffer, Lower);
+  ASSERT_TRUE(FS.get() != nullptr);
+
+  EXPECT_TRUE(FS->exists(a.Path));
+  EXPECT_TRUE(FS->exists(_a_aa.Path));
+  EXPECT_TRUE(FS->exists(b.Path));
+  EXPECT_TRUE(FS->exists(_b_bb.Path));
+  EXPECT_TRUE(FS->exists(c.Path));
+  EXPECT_TRUE(FS->exists(_c_cc.Path));
+}
+
+TEST(YAMLVFSWriterTest, HandleRootAsVPath) {
+  llvm::vfs::YAMLVFSWriter W;
+  W.addDirectoryMapping("/", "/tmp");
+  W.addDirectoryMapping("/foo", "/tmp/bar");
+  std::string Dump;
+  llvm::raw_string_ostream ToBeIgnored(Dump);
+
+  EXPECT_NO_FATAL_FAILURE(W.write(ToBeIgnored));
 }
