@@ -81,6 +81,8 @@ public:
                             DiagnosticsEngine &Diags) override;
 
   void adjust(LangOptions &Opts) override;
+
+  bool hasExtIntType() const override { return true; }
 };
 class LLVM_LIBRARY_VISIBILITY RISCV32TargetInfo : public RISCVTargetInfo {
 public:
