@@ -47980,7 +47980,6 @@ X86TargetLowering::getConstraintType(StringRef Constraint) const {
     case 'y':
     case 'x':
     case 'v':
-    case 'Y':
     case 'l':
     case 'k': // AVX512 masking registers.
       return C_RegisterClass;
@@ -48017,7 +48016,6 @@ X86TargetLowering::getConstraintType(StringRef Constraint) const {
       default:
         break;
       case 'z':
-      case '0':
         return C_Register;
       case 'i':
       case 'm':
@@ -48073,18 +48071,14 @@ TargetLowering::ConstraintWeight
     if (type->isX86_MMXTy() && Subtarget.hasMMX())
       weight = CW_SpecificReg;
     break;
-  case 'Y': {
-    unsigned Size = StringRef(constraint).size();
-    // Pick 'i' as the next char as 'Yi' and 'Y' are synonymous, when matching 'Y'
-    char NextChar = Size == 2 ? constraint[1] : 'i';
-    if (Size > 2)
+  case 'Y':
+    if (StringRef(constraint).size() != 2)
       break;
-    switch (NextChar) {
+    switch (constraint[1]) {
       default:
         return CW_Invalid;
       // XMM0
       case 'z':
-      case '0':
         if (((type->getPrimitiveSizeInBits() == 128) && Subtarget.hasSSE1()) ||
             ((type->getPrimitiveSizeInBits() == 256) && Subtarget.hasAVX()) ||
             ((type->getPrimitiveSizeInBits() == 512) && Subtarget.hasAVX512()))
@@ -48100,7 +48094,7 @@ TargetLowering::ConstraintWeight
         if (type->isX86_MMXTy() && Subtarget.hasMMX())
           return weight;
         return CW_Invalid;
-      // Any SSE reg when ISA >= SSE2, same as 'Y'
+      // Any SSE reg when ISA >= SSE2, same as 'x'
       case 'i':
       case 't':
       case '2':
@@ -48108,9 +48102,7 @@ TargetLowering::ConstraintWeight
           return CW_Invalid;
         break;
     }
-    // Fall through (handle "Y" constraint).
-    LLVM_FALLTHROUGH;
-  }
+    break;
   case 'v':
     if ((type->getPrimitiveSizeInBits() == 512) && Subtarget.hasAVX512())
       weight = CW_Register;
@@ -48192,8 +48184,6 @@ LowerXConstraint(EVT ConstraintVT) const {
   // FP X constraints get lowered to SSE1/2 registers if available, otherwise
   // 'f' like normal targets.
   if (ConstraintVT.isFloatingPoint()) {
-    if (Subtarget.hasSSE2())
-      return "Y";
     if (Subtarget.hasSSE1())
       return "x";
   }
@@ -48492,9 +48482,6 @@ X86TargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
     case 'y':   // MMX_REGS if MMX allowed.
       if (!Subtarget.hasMMX()) break;
       return std::make_pair(0U, &X86::VR64RegClass);
-    case 'Y':   // SSE_REGS if SSE2 allowed
-      if (!Subtarget.hasSSE2()) break;
-      LLVM_FALLTHROUGH;
     case 'v':
     case 'x':   // SSE_REGS if SSE1 allowed or AVX_REGS if AVX allowed
       if (!Subtarget.hasSSE1()) break;
@@ -48557,12 +48544,11 @@ X86TargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
     case 'i':
     case 't':
     case '2':
-      return getRegForInlineAsmConstraint(TRI, "Y", VT);
+      return getRegForInlineAsmConstraint(TRI, "x", VT);
     case 'm':
       if (!Subtarget.hasMMX()) break;
       return std::make_pair(0U, &X86::VR64RegClass);
     case 'z':
-    case '0':
       if (!Subtarget.hasSSE1()) break;
       switch (VT.SimpleTy) {
       default: break;
