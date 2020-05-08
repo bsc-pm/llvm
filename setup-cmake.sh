@@ -103,6 +103,9 @@ NINJA_BIN=${NINJA_BIN:-$(which ninja)}
 if [ -z "${NINJA_BIN}" ];
 then
   info "Using Makefiles as build system because 'ninja' wasn't found in your PATH. You can override the location setting the NINJA_BIN environment variable"
+elif [ -n "${NINJA_DISABLED}" ];
+then
+  info "Not using ninja even if it was found in ${NINJA_BIN} per request"
 elif [ ! -x "${NINJA_BIN}" ];
 then
   info "Using Makefiles as build system because '${NINJA_BIN}' is not executable."
