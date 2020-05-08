@@ -1042,12 +1042,6 @@ static Instruction *foldConstantInsEltIntoShuffle(InsertElementInst &InsElt) {
 }
 
 Instruction *InstCombiner::visitInsertElementInst(InsertElementInst &IE) {
-  // Do not InstCombine if the instruction is of scalable vector type. 
-  // TODO: It may be possible to have more finegrained control over how
-  // InstCombine handles scalable vector types. For now we just disable it.
-  if (isa<ScalableVectorType>(IE.getType()))
-    return nullptr;
-
   Value *VecOp    = IE.getOperand(0);
   Value *ScalarOp = IE.getOperand(1);
   Value *IdxOp    = IE.getOperand(2);
