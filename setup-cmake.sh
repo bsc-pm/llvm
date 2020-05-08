@@ -210,6 +210,8 @@ then
  else
    info "Using GNU ld because we didn't find lld"
  fi
+ info "Using split DWARF because we are using clang"
+ CMAKE_INVOCATION_EXTRA_FLAGS+=(-DLLVM_USE_SPLIT_DWARF=ON)
 else
   info "Using GNU ld because we are using gcc"
 fi
@@ -287,7 +289,6 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DLLVM_ENABLE_PROJECTS=clang \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
-   -DLLVM_USE_SPLIT_DWARF=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
 
 if [ $? = 0 ];
