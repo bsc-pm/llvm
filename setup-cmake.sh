@@ -223,21 +223,26 @@ fi
 
 if [ "$BUILD_SYSTEM" = "Ninja" ];
 then
-  NUM_LINK_JOBS=0
-  if [ -n "$(which nproc)" ];
+  if [ -z "${LLVM_PARALLEL_LINK_JOBS}" ];
   then
-    # Note these are heuristics based on experimentation
-    if [ "$LINKER" = "lld" ];
+    NUM_LINK_JOBS=0
+    if [ -n "$(which nproc)" ];
     then
-      NUM_LINK_JOBS=$(($(nproc)/4))
-    else
-      # GNU linker uses a lot of memory
-      NUM_LINK_JOBS=$(($(nproc)/8))
+      # Note these are heuristics based on experimentation
+      if [ "$LINKER" = "lld" ];
+      then
+        NUM_LINK_JOBS=$(($(nproc)/4))
+      else
+        # GNU linker uses a lot of memory
+        NUM_LINK_JOBS=$(($(nproc)/8))
+      fi
     fi
+    # At least 1
+    NUM_LINK_JOBS=$((${NUM_LINK_JOBS} + 1))
+  else
+    NUM_LINK_JOBS=${LLVM_PARALLEL_LINK_JOBS}
   fi
-  # At least 1
-  NUM_LINK_JOBS=$((${NUM_LINK_JOBS} + 1))
-  info "Limiting concurrent linking jobs to ${NUM_LINK_JOBS}"
+  info "Setting concurrent linking jobs to ${NUM_LINK_JOBS}"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_LINK_JOBS=${NUM_LINK_JOBS}")
 else
   warning "Makefiles do not allow limiting the concurrent linking jobs"
