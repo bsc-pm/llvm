@@ -26,10 +26,6 @@ define dso_local void @vfadd32(float* noalias nocapture %dz, float* noalias noca
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> undef, i64 [[INDEX]], i32 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> undef, <vscale x 2 x i32> zeroinitializer
-; CHECK-NEXT:    [[STEPVEC_BASE:%.*]] = call <vscale x 2 x i64> @llvm.experimental.vector.stepvector.nxv2i64()
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 2 x i64> [[BROADCAST_SPLAT]], [[STEPVEC_BASE]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds float, float* [[DX:%.*]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds float, float* [[TMP3]], i32 0
