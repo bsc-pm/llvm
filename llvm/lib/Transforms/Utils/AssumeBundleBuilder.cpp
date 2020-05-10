@@ -7,9 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Utils/AssumeBundleBuilder.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Analysis/AssumeBundleQueries.h"
 #include "llvm/Analysis/AssumptionCache.h"
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -30,29 +32,6 @@ cl::opt<bool> EnableKnowledgeRetention(
 
 namespace {
 
-/// Deterministically compare OperandBundleDef.
-/// The ordering is:
-/// - by the attribute's name aka operand bundle tag, (doesn't change)
-/// - then by the numeric Value of the argument, (doesn't change)
-/// - lastly by the Name of the current Value it WasOn. (may change)
-/// This order is deterministic and allows looking for the right kind of
-/// attribute with binary search. However finding the right WasOn needs to be
-/// done via linear search because values can get replaced.
-bool isLowerOpBundle(const OperandBundleDef &LHS, const OperandBundleDef &RHS) {
-  auto getTuple = [](const OperandBundleDef &Op) {
-    return std::make_tuple(
-        Op.getTag(),
-        Op.input_size() <= ABA_Argument
-            ? 0
-            : cast<ConstantInt>(*(Op.input_begin() + ABA_Argument))
-                  ->getZExtValue(),
-        Op.input_size() <= ABA_WasOn
-            ? StringRef("")
-            : (*(Op.input_begin() + ABA_WasOn))->getName());
-  };
-  return getTuple(LHS) < getTuple(RHS);
-}
-
 bool isUsefullToPreserve(Attribute::AttrKind Kind) {
   switch (Kind) {
     case Attribute::NonNull:
@@ -72,12 +51,47 @@ struct AssumeBuilderState {
   Module *M;
 
   using MapKey = std::pair<Value *, Attribute::AttrKind>;
-  SmallDenseMap<MapKey, unsigned, 8> AssumedKnowledgeMap;
+  SmallMapVector<MapKey, unsigned, 8> AssumedKnowledgeMap;
   Instruction *InsertBeforeInstruction = nullptr;
+  AssumptionCache* AC = nullptr;
+  DominatorTree* DT = nullptr;
 
-  AssumeBuilderState(Module *M) : M(M) {}
+  AssumeBuilderState(Module *M, Instruction *I = nullptr,
+                     AssumptionCache *AC = nullptr, DominatorTree *DT = nullptr)
+      : M(M), InsertBeforeInstruction(I), AC(AC), DT(DT) {}
+
+  bool tryToPreserveWithoutAddingAssume(RetainedKnowledge RK) {
+    if (!InsertBeforeInstruction || !AC || !RK.WasOn)
+      return false;
+    bool HasBeenPreserved = false;
+    Use* ToUpdate = nullptr;
+    getKnowledgeForValue(
+        RK.WasOn, {RK.AttrKind}, AC,
+        [&](RetainedKnowledge RKOther, Instruction *Assume,
+            const CallInst::BundleOpInfo *Bundle) {
+          if (!isValidAssumeForContext(Assume, InsertBeforeInstruction, DT))
+            return false;
+          if (RKOther.ArgValue >= RK.ArgValue) {
+            HasBeenPreserved = true;
+            return true;
+          } else if (isValidAssumeForContext(InsertBeforeInstruction, Assume,
+                                             DT)) {
+            HasBeenPreserved = true;
+            IntrinsicInst *Intr = cast<IntrinsicInst>(Assume);
+            ToUpdate = &Intr->op_begin()[Bundle->Begin + ABA_Argument];
+            return true;
+          }
+          return false;
+        });
+    if (ToUpdate)
+      ToUpdate->set(
+          ConstantInt::get(Type::getInt64Ty(M->getContext()), RK.ArgValue));
+    return HasBeenPreserved;
+  }
 
   void addKnowledge(RetainedKnowledge RK) {
+    if (tryToPreserveWithoutAddingAssume(RK))
+      return;
     MapKey Key{RK.WasOn, RK.AttrKind};
     auto Lookup = AssumedKnowledgeMap.find(Key);
     if (Lookup == AssumedKnowledgeMap.end()) {
@@ -138,7 +152,6 @@ struct AssumeBuilderState {
           std::string(Attribute::getNameFromAttrKind(MapElem.first.second)),
           Args));
     }
-    llvm::sort(OpBundle, isLowerOpBundle);
     return cast<IntrinsicInst>(CallInst::Create(
         FnAssume, ArrayRef<Value *>({ConstantInt::getTrue(C)}), OpBundle));
   }
@@ -185,11 +198,10 @@ IntrinsicInst *llvm::buildAssumeFromInst(Instruction *I) {
   return Builder.build();
 }
 
-void llvm::salvageKnowledge(Instruction *I, AssumptionCache *AC) {
+void llvm::salvageKnowledge(Instruction *I, AssumptionCache *AC, DominatorTree* DT) {
   if (!EnableKnowledgeRetention)
     return;
-  AssumeBuilderState Builder(I->getModule());
-  Builder.InsertBeforeInstruction = I;
+  AssumeBuilderState Builder(I->getModule(), I, AC, DT);
   Builder.addInstruction(I);
   if (IntrinsicInst *Intr = Builder.build()) {
     Intr->insertBefore(I);
@@ -200,8 +212,9 @@ void llvm::salvageKnowledge(Instruction *I, AssumptionCache *AC) {
 
 PreservedAnalyses AssumeBuilderPass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
+  AssumptionCache* AC = AM.getCachedResult<AssumptionAnalysis>(F);
+  DominatorTree* DT = AM.getCachedResult<DominatorTreeAnalysis>(F);
   for (Instruction &I : instructions(F))
-    if (Instruction *Assume = buildAssumeFromInst(&I))
-      Assume->insertBefore(&I);
+    salvageKnowledge(&I, AC, DT);
   return PreservedAnalyses::all();
 }
