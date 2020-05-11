@@ -524,8 +524,8 @@ struct OmpSs : public ModulePass {
     DeviceAddr = IRB.CreateLoad(DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
-    UnpackedDSA = IRB.CreateGEP(IRB.CreateBitCast(Base, Type::getInt8PtrTy(IRB.getContext())),
-                                IRB.CreateNeg(LocalAddr));
+    Base = IRB.CreateBitCast(Base, Type::getInt8PtrTy(IRB.getContext()));
+    UnpackedDSA = IRB.CreateGEP(Base, IRB.CreateNeg(LocalAddr));
     UnpackedDSA = IRB.CreateGEP(UnpackedDSA, DeviceAddr);
     UnpackedDSA = IRB.CreateBitCast(UnpackedDSA, BaseType );
 
