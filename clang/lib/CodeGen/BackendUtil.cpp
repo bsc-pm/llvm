@@ -46,6 +46,7 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
@@ -529,9 +530,7 @@ static Optional<GCOVOptions> getGCOVOptions(const CodeGenOptions &CodeGenOpts) {
   Options.EmitNotes = CodeGenOpts.EmitGcovNotes;
   Options.EmitData = CodeGenOpts.EmitGcovArcs;
   llvm::copy(CodeGenOpts.CoverageVersion, std::begin(Options.Version));
-  Options.UseCfgChecksum = CodeGenOpts.CoverageExtraChecksum;
   Options.NoRedZone = CodeGenOpts.DisableRedZone;
-  Options.FunctionNamesInData = !CodeGenOpts.CoverageNoFunctionNamesInData;
   Options.Filter = CodeGenOpts.ProfileFilterFiles;
   Options.Exclude = CodeGenOpts.ProfileExcludeFiles;
   Options.ExitBlockBeforeBody = CodeGenOpts.CoverageExitBlockBeforeBody;
@@ -1331,7 +1330,9 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
         CodeGenOpts.SanitizeCoverageIndirectCalls ||
         CodeGenOpts.SanitizeCoverageTraceCmp) {
       auto SancovOpts = getSancovOptsFromCGOpts(CodeGenOpts);
-      MPM.addPass(ModuleSanitizerCoveragePass(SancovOpts));
+      MPM.addPass(ModuleSanitizerCoveragePass(
+          SancovOpts, CodeGenOpts.SanitizeCoverageWhitelistFiles,
+          CodeGenOpts.SanitizeCoverageBlacklistFiles));
     }
 
     if (LangOpts.Sanitize.has(SanitizerKind::HWAddress)) {
