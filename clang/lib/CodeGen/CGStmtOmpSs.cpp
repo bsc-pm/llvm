@@ -84,7 +84,7 @@ static void AddDSAData(const OSSTaskDirective &S, OSSTaskDSADataTy &DSAs) {
   AddDSASharedData(S, DSAs.Shareds);
   AddDSAPrivateData(S, DSAs.Privates);
   AddDSAFirstprivateData(S, DSAs.Firstprivates);
-};
+}
 
 static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
   for (const auto *C : S.getClausesOfKind<OSSDependClause>()) {
@@ -118,7 +118,7 @@ static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
       }
     }
   }
-};
+}
 
 static void AddIfData(const OSSTaskDirective &S, const Expr *&IfExpr) {
   bool Found = false;
