@@ -66,6 +66,16 @@ typedef unsigned long long uint64_t;
 
 /* #define DEBUG_GCDAPROFILING */
 
+enum {
+  GCOV_DATA_MAGIC = 0x67636461, // "gcda"
+
+  GCOV_TAG_FUNCTION = 0x01000000,
+  GCOV_TAG_COUNTER_ARCS = 0x01a10000,
+  // GCOV_TAG_OBJECT_SUMMARY superseded GCOV_TAG_PROGRAM_SUMMARY in GCC 9.
+  GCOV_TAG_OBJECT_SUMMARY = 0xa1000000,
+  GCOV_TAG_PROGRAM_SUMMARY = 0xa3000000,
+};
+
 /*
  * --- GCOV file format I/O primitives ---
  */
@@ -224,18 +234,6 @@ static uint32_t read_32bit_value() {
 
   val = *(uint32_t*)&write_buffer[cur_pos];
   cur_pos += 4;
-  return val;
-}
-
-static uint32_t read_le_32bit_value() {
-  uint32_t val = 0;
-  int i;
-
-  if (new_file)
-    return (uint32_t)-1;
-
-  for (i = 0; i < 4; i++)
-    val |= write_buffer[cur_pos++] << (8*i);
   return val;
 }
 
@@ -427,7 +425,7 @@ void llvm_gcda_start_file(const char *orig_filename, const char version[4],
                      : (version[0] - '0') * 10 + version[2] - '0';
 #endif
 
-  write_bytes("adcg", 4);
+  write_32bit_value(GCOV_DATA_MAGIC);
   write_bytes(version, 4);
   write_32bit_value(checksum);
 
@@ -476,7 +474,7 @@ void llvm_gcda_emit_function(uint32_t ident, uint32_t func_checksum,
   if (!output_file) return;
 
   /* function tag */
-  write_bytes("\0\0\0\1", 4);
+  write_32bit_value(GCOV_TAG_FUNCTION);
   write_32bit_value(len);
   write_32bit_value(ident);
   write_32bit_value(func_checksum);
@@ -493,11 +491,11 @@ void llvm_gcda_emit_arcs(uint32_t num_counters, uint64_t *counters) {
 
   if (!output_file) return;
 
-  val = read_le_32bit_value();
+  val = read_32bit_value();
 
   if (val != (uint32_t)-1) {
     /* There are counters present in the file. Merge them. */
-    if (val != 0x01a10000) {
+    if (val != GCOV_TAG_COUNTER_ARCS) {
       fprintf(stderr, "profiling: %s: cannot merge previous GCDA file: "
                       "corrupt arc tag (0x%08x)\n",
               filename, val);
@@ -520,7 +518,7 @@ void llvm_gcda_emit_arcs(uint32_t num_counters, uint64_t *counters) {
   cur_pos = save_cur_pos;
 
   /* Counter #1 (arcs) tag */
-  write_bytes("\0\0\xa1\1", 4);
+  write_32bit_value(GCOV_TAG_COUNTER_ARCS);
   write_32bit_value(num_counters * 2);
   for (i = 0; i < num_counters; ++i) {
     counters[i] += (old_ctrs ? old_ctrs[i] : 0);
@@ -538,8 +536,6 @@ void llvm_gcda_emit_arcs(uint32_t num_counters, uint64_t *counters) {
 
 COMPILER_RT_VISIBILITY
 void llvm_gcda_summary_info() {
-  const uint32_t obj_summary_len = 9; /* Length for gcov compatibility. */
-  uint32_t i;
   uint32_t runs = 1;
   static uint32_t run_counted = 0; // We only want to increase the run count once.
   uint32_t val = 0;
@@ -547,46 +543,47 @@ void llvm_gcda_summary_info() {
 
   if (!output_file) return;
 
-  val = read_le_32bit_value();
+  val = read_32bit_value();
 
   if (val != (uint32_t)-1) {
     /* There are counters present in the file. Merge them. */
-    if (val != 0xa1000000) {
-      fprintf(stderr, "profiling: %s: cannot merge previous run count: "
-                      "corrupt object tag (0x%08x)\n",
+    if (val != (gcov_version >= 90 ? GCOV_TAG_OBJECT_SUMMARY
+                                   : GCOV_TAG_PROGRAM_SUMMARY)) {
+      fprintf(stderr,
+              "profiling: %s: cannot merge previous run count: "
+              "corrupt object tag (0x%08x)\n",
               filename, val);
       return;
     }
 
     val = read_32bit_value(); /* length */
-    if (val != obj_summary_len) {
-      fprintf(stderr, "profiling: %s: cannot merge previous run count: "
-                      "mismatched object length (%d)\n",
-              filename, val);
-      return;
-    }
-
-    read_32bit_value(); /* checksum, unused */
-    read_32bit_value(); /* num, unused */
+    read_32bit_value();
+    if (gcov_version < 90)
+      read_32bit_value();
     uint32_t prev_runs = read_32bit_value();
+    for (uint32_t i = gcov_version < 90 ? 3 : 2; i < val; ++i)
+      read_32bit_value();
     /* Add previous run count to new counter, if not already counted before. */
     runs = run_counted ? prev_runs : prev_runs + 1;
   }
 
   cur_pos = save_cur_pos;
 
-  /* Object summary tag */
-  write_bytes("\0\0\0\xa1", 4);
-  write_32bit_value(obj_summary_len);
-  write_32bit_value(0); /* checksum, unused */
-  write_32bit_value(0); /* num, unused */
-  write_32bit_value(runs);
-  for (i = 3; i < obj_summary_len; ++i)
+  if (gcov_version >= 90) {
+    write_32bit_value(GCOV_TAG_OBJECT_SUMMARY);
+    write_32bit_value(2);
+    write_32bit_value(runs);
+    write_32bit_value(0); // sum_max
+  } else {
+    // Before gcov 4.8 (r190952), GCOV_TAG_SUMMARY_LENGTH was 9. r190952 set
+    // GCOV_TAG_SUMMARY_LENGTH to 22. We simply use the smallest length which
+    // can make gcov read "Runs:".
+    write_32bit_value(GCOV_TAG_PROGRAM_SUMMARY);
+    write_32bit_value(3);
     write_32bit_value(0);
-
-  /* Program summary tag */
-  write_bytes("\0\0\0\xa3", 4); /* tag indicates 1 program */
-  write_32bit_value(0); /* 0 length */
+    write_32bit_value(0);
+    write_32bit_value(runs);
+  }
 
   run_counted = 1;
 
