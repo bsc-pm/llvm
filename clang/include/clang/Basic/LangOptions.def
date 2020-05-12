@@ -359,6 +359,8 @@ LANGOPT(PaddingOnUnsignedFixedPoint, 1, 0,
 
 LANGOPT(RegisterStaticDestructors, 1, 1, "Register C++ static destructors")
 
+LANGOPT(MatrixTypes, 1, 0, "Enable or disable the builtin matrix type")
+
 COMPATIBLE_VALUE_LANGOPT(MaxTokens, 32, 0, "Max number of tokens per TU or 0")
 
 ENUM_LANGOPT(SignReturnAddressScope, SignReturnAddressScopeKind, 2, SignReturnAddressScopeKind::None,
@@ -366,6 +368,8 @@ ENUM_LANGOPT(SignReturnAddressScope, SignReturnAddressScopeKind, 2, SignReturnAd
 ENUM_LANGOPT(SignReturnAddressKey, SignReturnAddressKeyKind, 1, SignReturnAddressKeyKind::AKey,
              "Key used for return address signing")
 LANGOPT(BranchTargetEnforcement, 1, 0, "Branch-target enforcement enabled")
+
+LANGOPT(SpeculativeLoadHardening, 1, 0, "Speculative load hardening enabled")
 
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT
