@@ -70,23 +70,12 @@ public:
                       SourceLocation ColonLoc, SourceLocation RBracketLoc,
                       bool ColonForm)
       : Expr(
-            OSSArraySectionExprClass, Type, VK, OK,
-            Base->isTypeDependent() ||
-                (LowerBound && LowerBound->isTypeDependent()) ||
-                (LengthUpper && LengthUpper->isTypeDependent()),
-            Base->isValueDependent() ||
-                (LowerBound && LowerBound->isValueDependent()) ||
-                (LengthUpper && LengthUpper->isValueDependent()),
-            Base->isInstantiationDependent() ||
-                (LowerBound && LowerBound->isInstantiationDependent()) ||
-                (LengthUpper && LengthUpper->isInstantiationDependent()),
-            Base->containsUnexpandedParameterPack() ||
-                (LowerBound && LowerBound->containsUnexpandedParameterPack()) ||
-                (LengthUpper && LengthUpper->containsUnexpandedParameterPack())),
+            OSSArraySectionExprClass, Type, VK, OK),
         ColonLoc(ColonLoc), RBracketLoc(RBracketLoc), ColonForm(ColonForm) {
     SubExprs[BASE] = Base;
     SubExprs[LOWER_BOUND] = LowerBound;
     SubExprs[LENGTH_UPPER] = LengthUpper;
+    setDependence(computeDependence(this));
   }
 
   /// Create an empty array section expression.
@@ -155,7 +144,7 @@ public:
 // TODO: documentation
 class OSSArrayShapingExpr final
   : public Expr,
-    private llvm::TrailingObjects<OSSArrayShapingExpr, Stmt *> {
+    private llvm::TrailingObjects<OSSArrayShapingExpr, Expr *> {
 
   friend TrailingObjects;
 
@@ -165,31 +154,19 @@ class OSSArrayShapingExpr final
   SourceLocation EndLoc;
 
   size_t numTrailingObjects(OverloadToken<Stmt *>) const {
-    return NumShapes;
+    // Add an extra one for the base expression.
+    return NumShapes + 1;
   }
 
   OSSArrayShapingExpr(QualType Type, Expr *Base, ArrayRef<Expr *> ShapeList,
                       ExprValueKind VK, ExprObjectKind OK, unsigned N,
                       SourceLocation BeginLoc, SourceLocation EndLoc)
-      : Expr( OSSArrayShapingExprClass, Type, VK, OK,
-            false, false, false, false),
-            NumShapes(N), BeginLoc(BeginLoc), EndLoc(EndLoc)
-      {
-        bool isTypeDependent = Base->isTypeDependent();
-        bool isValueDependent = Base->isValueDependent();
-        bool isInstantiationDependent = Base->isInstantiationDependent();
-        bool containsUnexpandedParameterPack = Base->containsUnexpandedParameterPack();
-        for (Expr *E : ShapeList) {
-          isTypeDependent |= E->isTypeDependent();
-          isValueDependent |= E->isValueDependent();
-          isInstantiationDependent |= E->isInstantiationDependent();
-          containsUnexpandedParameterPack |= E->containsUnexpandedParameterPack();
-        }
-        setTypeDependent(isTypeDependent);
-        setValueDependent(isValueDependent);
-        setInstantiationDependent(isInstantiationDependent);
-        setContainsUnexpandedParameterPack(containsUnexpandedParameterPack);
-      }
+      : Expr( OSSArrayShapingExprClass, Type, VK, OK),
+            NumShapes(N), BeginLoc(BeginLoc), EndLoc(EndLoc) {
+    setBase(Base);
+    setShapes(ShapeList);
+    setDependence(computeDependence(this));
+  }
 
   /// Create an empty array section expression.
   explicit OSSArrayShapingExpr(EmptyShell Shell, unsigned N)
@@ -205,33 +182,31 @@ public:
                                  ArrayRef<Expr *> ShapeList,
                                  SourceLocation BeginLoc,
                                  SourceLocation EndLoc) {
-    void *Mem = C.Allocate(totalSizeToAlloc<Stmt *>(ShapeList.size() + 1));
+    void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(ShapeList.size() + 1));
     OSSArrayShapingExpr *Clause = new (Mem)
         OSSArrayShapingExpr(Type, Base, ShapeList, VK, OK, ShapeList.size(), BeginLoc, EndLoc);
-    Clause->setBase(Base);
-    Clause->setShapes(ShapeList);
     return Clause;
   }
 
   /// Get base of the array section.
-  Expr *getBase() { return cast<Expr>(getTrailingObjects<Stmt *>()[0]); }
-  const Expr *getBase() const { return cast<Expr>(getTrailingObjects<Stmt *>()[0]); }
+  Expr *getBase() { return getTrailingObjects<Expr *>()[0]; }
+  const Expr *getBase() const { return getTrailingObjects<Expr *>()[0]; }
   /// Set base of the array section.
-  void setBase(Expr *E) { getTrailingObjects<Stmt *>()[0] = E; }
+  void setBase(Expr *E) { getTrailingObjects<Expr *>()[0] = E; }
 
   /// Get the shape of array shaping.
-  MutableArrayRef<Stmt *> getShapes() {
-    return MutableArrayRef<Stmt *>(
-        getTrailingObjects<Stmt *>() + 1, NumShapes);
+  MutableArrayRef<Expr *> getShapes() {
+    return MutableArrayRef<Expr *>(
+        getTrailingObjects<Expr *>() + 1, NumShapes);
   }
-  ArrayRef<const Stmt *> getShapes() const {
-    return ArrayRef<Stmt *>(
-        getTrailingObjects<Stmt *>() + 1, NumShapes);
+  ArrayRef<const Expr *> getShapes() const {
+    return ArrayRef<Expr *>(
+        getTrailingObjects<Expr *>() + 1, NumShapes);
   }
   /// Set the shape of the array shaping.
   void setShapes(ArrayRef<Expr *> VL) {
     std::copy(VL.begin(), VL.end(),
-              getTrailingObjects<Stmt *>() + 1);
+              getTrailingObjects<Expr *>() + 1);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
@@ -247,11 +222,14 @@ public:
   }
 
   child_range children() {
-    return child_range(getTrailingObjects<Stmt *>(), getTrailingObjects<Stmt *>() + NumShapes + 1);
+    Stmt **Begin = reinterpret_cast<Stmt **>(getTrailingObjects<Expr *>());
+    return child_range(Begin, Begin + NumShapes + 1);
   }
 
   const_child_range children() const {
-    return const_child_range(getTrailingObjects<Stmt *>(), getTrailingObjects<Stmt *>() + NumShapes + 1);
+    Stmt *const *Begin =
+        reinterpret_cast<Stmt *const *>(getTrailingObjects<Expr *>());
+    return const_child_range(Begin, Begin + NumShapes + 1);
   }
 };
 } // end namespace clang

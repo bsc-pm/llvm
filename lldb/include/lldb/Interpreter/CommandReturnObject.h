@@ -6,10 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_CommandReturnObject_h_
-#define liblldb_CommandReturnObject_h_
+#ifndef LLDB_INTERPRETER_COMMANDRETURNOBJECT_H
+#define LLDB_INTERPRETER_COMMANDRETURNOBJECT_H
 
-#include "lldb/Core/STLUtils.h"
 #include "lldb/Core/StreamFile.h"
 #include "lldb/Utility/StreamString.h"
 #include "lldb/Utility/StreamTee.h"
@@ -31,14 +30,14 @@ public:
   llvm::StringRef GetOutputData() {
     lldb::StreamSP stream_sp(m_out_stream.GetStreamAtIndex(eStreamStringIndex));
     if (stream_sp)
-      return static_pointer_cast<StreamString>(stream_sp)->GetString();
+      return std::static_pointer_cast<StreamString>(stream_sp)->GetString();
     return llvm::StringRef();
   }
 
   llvm::StringRef GetErrorData() {
     lldb::StreamSP stream_sp(m_err_stream.GetStreamAtIndex(eStreamStringIndex));
     if (stream_sp)
-      return static_pointer_cast<StreamString>(stream_sp)->GetString();
+      return std::static_pointer_cast<StreamString>(stream_sp)->GetString();
     return llvm::StringRef();
   }
 
@@ -62,13 +61,13 @@ public:
     return m_err_stream;
   }
 
-  void SetImmediateOutputFile(FILE *fh, bool transfer_fh_ownership = false) {
-    lldb::StreamSP stream_sp(new StreamFile(fh, transfer_fh_ownership));
+  void SetImmediateOutputFile(lldb::FileSP file_sp) {
+    lldb::StreamSP stream_sp(new StreamFile(file_sp));
     m_out_stream.SetStreamAtIndex(eImmediateStreamIndex, stream_sp);
   }
 
-  void SetImmediateErrorFile(FILE *fh, bool transfer_fh_ownership = false) {
-    lldb::StreamSP stream_sp(new StreamFile(fh, transfer_fh_ownership));
+  void SetImmediateErrorFile(lldb::FileSP file_sp) {
+    lldb::StreamSP stream_sp(new StreamFile(file_sp));
     m_err_stream.SetStreamAtIndex(eImmediateStreamIndex, stream_sp);
   }
 
@@ -158,4 +157,4 @@ private:
 
 } // namespace lldb_private
 
-#endif // liblldb_CommandReturnObject_h_
+#endif // LLDB_INTERPRETER_COMMANDRETURNOBJECT_H

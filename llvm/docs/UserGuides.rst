@@ -2,7 +2,7 @@ User Guides
 ===========
 
 NOTE: If you are a user who is only interested in using an LLVM-based compiler,
-you should look into `Clang <http://clang.llvm.org>`_ instead. The
+you should look into `Clang <https://clang.llvm.org>`_ instead. The
 documentation here is intended for users who have a need to work with the
 intermediate LLVM representation.
 
@@ -19,6 +19,7 @@ intermediate LLVM representation.
    Benchmarking
    BigEndianNEON
    BuildingADistribution
+   CFIVerify
    CMake
    CMakePrimer
    CodeGenerator
@@ -37,6 +38,7 @@ intermediate LLVM representation.
    LinkTimeOptimization
    LoopTerminology
    MarkdownQuickstartTemplate
+   MemorySSA
    MergeFunctions
    MCJITDesignAndImplementation
    NVPTXUsage
@@ -44,8 +46,9 @@ intermediate LLVM representation.
    Passes
    ReportingGuide
    Remarks
-   StackSafetyAnalysis
    SourceLevelDebugging
+   StackSafetyAnalysis
+   SupportLibrary
    TableGen/index
    TableGenFundamentals
    Vectorizers
@@ -68,10 +71,13 @@ Clang
 `How to build the C, C++, ObjC, and ObjC++ front end`__
    Instructions for building the clang front-end from source.
 
-   .. __: http://clang.llvm.org/get_started.html
+   .. __: https://clang.llvm.org/get_started.html
 
 :doc:`CoverageMappingFormat`
   This describes the format and encoding used for LLVM’s code coverage mapping.
+
+:doc:`CFIVerify`
+  A description of the verification tool for Control Flow Integrity.
 
 LLVM Builds and Distributions
 -----------------------------
@@ -86,6 +92,10 @@ LLVM Builds and Distributions
 
 :doc:`Docker`
    A reference for using Dockerfiles provided with LLVM.
+
+:doc:`Support Library <SupportLibrary>`
+   This document describes the LLVM Support Library (``lib/Support``) and
+   how to keep LLVM source code portable
 
 Optimizations
 -------------
@@ -106,6 +116,9 @@ Optimizations
 :doc:`AliasAnalysis`
    Information on how to write a new alias analysis implementation or how to
    use existing analyses.
+
+:doc:`MemorySSA`
+   Information about the MemorySSA utility in LLVM, as well as how to use it.
 
 :doc:`LoopTerminology`
   A document describing Loops and associated terms as used in LLVM.
@@ -180,3 +193,7 @@ Additional Topics
 
 :doc:`AMDGPUUsage`
    This document describes using the AMDGPU backend to compile GPU kernels.
+
+:doc:`AMDGPUDwarfProposalForHeterogeneousDebugging`
+   This document describes a DWARF proposal to support heterogeneous debugging
+   for targets such as the AMDGPU backend.

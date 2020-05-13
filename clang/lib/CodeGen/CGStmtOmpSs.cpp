@@ -18,7 +18,6 @@
 #include "TargetInfo.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtOmpSs.h"
-#include "llvm/IR/CallSite.h"
 using namespace clang;
 using namespace CodeGen;
 

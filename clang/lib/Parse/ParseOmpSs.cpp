@@ -739,11 +739,12 @@ static bool ParseReductionId(Parser &P, CXXScopeSpec &ReductionIdScopeSpec,
       return false;
     }
   }
-  return P.ParseUnqualifiedId(ReductionIdScopeSpec, /*EnteringContext*/ false,
-                              /*AllowDestructorName*/ false,
-                              /*AllowConstructorName*/ false,
-                              /*AllowDeductionGuide*/ false,
-                              nullptr, nullptr, ReductionId);
+  return P.ParseUnqualifiedId(
+      ReductionIdScopeSpec, /*ObjectType=*/nullptr,
+      /*ObjectHadErrors=*/false, /*EnteringContext*/ false,
+      /*AllowDestructorName*/ false,
+      /*AllowConstructorName*/ false,
+      /*AllowDeductionGuide*/ false, nullptr, ReductionId);
 }
 
 static DeclarationName parseOmpSsDeclareReductionId(Parser &P) {
@@ -1136,6 +1137,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
     if (getLangOpts().CPlusPlus)
       ParseOptionalCXXScopeSpecifier(Data.ReductionIdScopeSpec,
                                      /*ObjectType=*/nullptr,
+                                     /*ObjectHadErrors=*/false,
                                      /*EnteringContext=*/false);
     InvalidReductionId = ParseReductionId(
         *this, Data.ReductionIdScopeSpec, UnqualifiedReductionId);
@@ -1272,7 +1274,7 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
 
   SourceLocation ELoc = Tok.getLocation();
   ExprResult LHS(ParseCastExpression(
-      /*isUnaryExpression=*/false, /*isAddressOfOperand=*/false, NotTypeCast));
+      AnyCastExpr, /*isAddressOfOperand=*/false, NotTypeCast));
   ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
 

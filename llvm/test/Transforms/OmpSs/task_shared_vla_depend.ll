@@ -48,16 +48,16 @@ define dso_local void @foo(i32 %x, i32 %y, i32 %z) #0 !dbg !6 {
 ; CHECK-NEXT:    store i64 [[TMP5]], i64* [[__VLA_EXPR2]], align 8, !dbg !10
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !15
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP9:%.*]] = alloca %nanos6_task_args_foo0*, !dbg !15
+; CHECK-NEXT:    [[TMP9:%.*]] = alloca %nanos6_task_args_foo0*, align 8, !dbg !15
 ; CHECK-NEXT:    [[TMP10:%.*]] = bitcast %nanos6_task_args_foo0** [[TMP9]] to i8**, !dbg !15
-; CHECK-NEXT:    [[TMP11:%.*]] = alloca i8*, !dbg !15
+; CHECK-NEXT:    [[TMP11:%.*]] = alloca i8*, align 8, !dbg !15
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul nuw i64 4, [[TMP1]], !dbg !15
 ; CHECK-NEXT:    [[TMP13:%.*]] = mul nuw i64 [[TMP12]], [[TMP3]], !dbg !15
 ; CHECK-NEXT:    [[TMP14:%.*]] = mul nuw i64 [[TMP13]], [[TMP5]], !dbg !15
 ; CHECK-NEXT:    [[TMP15:%.*]] = add nuw i64 0, [[TMP14]], !dbg !15
 ; CHECK-NEXT:    [[TMP16:%.*]] = add nuw i64 32, [[TMP15]], !dbg !15
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 [[TMP16]], i8** [[TMP10]], i8** [[TMP11]], i64 0, i64 1), !dbg !15
-; CHECK-NEXT:    [[TMP17:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP9]], !dbg !15
+; CHECK-NEXT:    [[TMP17:%.*]] = load %nanos6_task_args_foo0*, %nanos6_task_args_foo0** [[TMP9]], align 8, !dbg !15
 ; CHECK-NEXT:    [[TMP18:%.*]] = bitcast %nanos6_task_args_foo0* [[TMP17]] to i8*, !dbg !15
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP18]], i64 32, !dbg !15
 ; CHECK-NEXT:    [[GEP_VLA:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0:%.*]], %nanos6_task_args_foo0* [[TMP17]], i32 0, i32 0, !dbg !15
@@ -68,14 +68,14 @@ define dso_local void @foo(i32 %x, i32 %y, i32 %z) #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP22:%.*]] = mul nuw i64 [[TMP21]], [[TMP5]], !dbg !15
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr i8, i8* [[ARGS_END]], i64 [[TMP22]], !dbg !15
 ; CHECK-NEXT:    [[GEP_VLA1:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP17]], i32 0, i32 0, !dbg !15
-; CHECK-NEXT:    store i32* [[VLA]], i32** [[GEP_VLA1]], !dbg !15
+; CHECK-NEXT:    store i32* [[VLA]], i32** [[GEP_VLA1]], align 8, !dbg !15
 ; CHECK-NEXT:    [[CAPT_GEP_:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP17]], i32 0, i32 1, !dbg !15
-; CHECK-NEXT:    store i64 [[TMP1]], i64* [[CAPT_GEP_]], !dbg !15
+; CHECK-NEXT:    store i64 [[TMP1]], i64* [[CAPT_GEP_]], align 8, !dbg !15
 ; CHECK-NEXT:    [[CAPT_GEP_2:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP17]], i32 0, i32 2, !dbg !15
-; CHECK-NEXT:    store i64 [[TMP3]], i64* [[CAPT_GEP_2]], !dbg !15
+; CHECK-NEXT:    store i64 [[TMP3]], i64* [[CAPT_GEP_2]], align 8, !dbg !15
 ; CHECK-NEXT:    [[CAPT_GEP_3:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOO0]], %nanos6_task_args_foo0* [[TMP17]], i32 0, i32 3, !dbg !15
-; CHECK-NEXT:    store i64 [[TMP5]], i64* [[CAPT_GEP_3]], !dbg !15
-; CHECK-NEXT:    [[TMP24:%.*]] = load i8*, i8** [[TMP11]], !dbg !15
+; CHECK-NEXT:    store i64 [[TMP5]], i64* [[CAPT_GEP_3]], align 8, !dbg !15
+; CHECK-NEXT:    [[TMP24:%.*]] = load i8*, i8** [[TMP11]], align 8, !dbg !15
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP24]]), !dbg !15
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !15
 ; CHECK:       final.end:
@@ -202,17 +202,17 @@ entry:
   ret %struct._depend_unpack_t %15
 }
 
-; CHECK: define internal void @nanos6_unpacked_task_region_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK: define internal void @nanos6_unpacked_task_region_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !19 {
 ; CHECK-NEXT: newFuncRoot:
-; CHECK-NEXT:   br label %3, !dbg !17
+; CHECK-NEXT:   br label %3, !dbg !20
 ; CHECK: 3:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %size = alloca i32, align 4
-; CHECK-NEXT:   %4 = mul nuw i64 %0, %1, !dbg !17
-; CHECK-NEXT:   %5 = mul nuw i64 %4, %2, !dbg !17
-; CHECK-NEXT:   %6 = mul nuw i64 4, %5, !dbg !17
-; CHECK-NEXT:   %conv = trunc i64 %6 to i32, !dbg !17
-; CHECK-NEXT:   store i32 %conv, i32* %size, align 4, !dbg !18
-; CHECK-NEXT:   ret void, !dbg !16
+; CHECK-NEXT:   %4 = mul nuw i64 %0, %1, !dbg !20
+; CHECK-NEXT:   %5 = mul nuw i64 %4, %2, !dbg !20
+; CHECK-NEXT:   %6 = mul nuw i64 4, %5, !dbg !20
+; CHECK-NEXT:   %conv = trunc i64 %6 to i32, !dbg !20
+; CHECK-NEXT:   store i32 %conv, i32* %size, align 4, !dbg !21
+; CHECK-NEXT:   ret void, !dbg !22
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_ol_task_region_foo0(%nanos6_task_args_foo0* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {

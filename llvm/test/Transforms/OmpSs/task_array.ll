@@ -13,31 +13,31 @@ define dso_local void @_Z9pod_arrayv() !dbg !6 {
 ; CHECK-NEXT:    [[ARRAY:%.*]] = alloca [10 x i32], align 16
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !8
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args__Z9pod_arrayv0*, !dbg !8
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args__Z9pod_arrayv0*, align 8, !dbg !8
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args__Z9pod_arrayv0** [[TMP0]] to i8**, !dbg !8
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, !dbg !8
+; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, !dbg !8
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var__Z9pod_arrayv0, %nanos6_task_invocation_info_t* @task_invocation_info__Z9pod_arrayv0, i64 48, i8** [[TMP1]], i8** [[TMP2]], i64 0, i64 0), !dbg !8
-; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args__Z9pod_arrayv0*, %nanos6_task_args__Z9pod_arrayv0** [[TMP0]], !dbg !8
+; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args__Z9pod_arrayv0*, %nanos6_task_args__Z9pod_arrayv0** [[TMP0]], align 8, !dbg !8
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args__Z9pod_arrayv0* [[TMP3]] to i8*, !dbg !8
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP4]], i64 48, !dbg !8
-; CHECK-NEXT:    [[TMP5:%.*]] = load i8*, i8** [[TMP2]], !dbg !8
+; CHECK-NEXT:    [[TMP5:%.*]] = load i8*, i8** [[TMP2]], align 8, !dbg !8
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP5]]), !dbg !8
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !8
 ; CHECK:       final.end:
 ; CHECK-NEXT:    br label [[FINAL_COND2:%.*]], !dbg !9
 ; CHECK:       codeRepl4:
-; CHECK-NEXT:    [[TMP6:%.*]] = alloca %nanos6_task_args__Z9pod_arrayv1*, !dbg !9
+; CHECK-NEXT:    [[TMP6:%.*]] = alloca %nanos6_task_args__Z9pod_arrayv1*, align 8, !dbg !9
 ; CHECK-NEXT:    [[TMP7:%.*]] = bitcast %nanos6_task_args__Z9pod_arrayv1** [[TMP6]] to i8**, !dbg !9
-; CHECK-NEXT:    [[TMP8:%.*]] = alloca i8*, !dbg !9
+; CHECK-NEXT:    [[TMP8:%.*]] = alloca i8*, align 8, !dbg !9
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var__Z9pod_arrayv1, %nanos6_task_invocation_info_t* @task_invocation_info__Z9pod_arrayv1, i64 48, i8** [[TMP7]], i8** [[TMP8]], i64 0, i64 0), !dbg !9
-; CHECK-NEXT:    [[TMP9:%.*]] = load %nanos6_task_args__Z9pod_arrayv1*, %nanos6_task_args__Z9pod_arrayv1** [[TMP6]], !dbg !9
+; CHECK-NEXT:    [[TMP9:%.*]] = load %nanos6_task_args__Z9pod_arrayv1*, %nanos6_task_args__Z9pod_arrayv1** [[TMP6]], align 8, !dbg !9
 ; CHECK-NEXT:    [[TMP10:%.*]] = bitcast %nanos6_task_args__Z9pod_arrayv1* [[TMP9]] to i8*, !dbg !9
 ; CHECK-NEXT:    [[ARGS_END5:%.*]] = getelementptr i8, i8* [[TMP10]], i64 48, !dbg !9
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z9POD_ARRAYV1:%.*]], %nanos6_task_args__Z9pod_arrayv1* [[TMP9]], i32 0, i32 0, !dbg !9
 ; CHECK-NEXT:    [[TMP11:%.*]] = bitcast [10 x i32]* [[GEP_ARRAY]] to i8*, !dbg !9
 ; CHECK-NEXT:    [[TMP12:%.*]] = bitcast [10 x i32]* [[ARRAY]] to i8*, !dbg !9
 ; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP11]], i8* align 4 [[TMP12]], i64 40, i1 false), !dbg !9
-; CHECK-NEXT:    [[TMP13:%.*]] = load i8*, i8** [[TMP8]], !dbg !9
+; CHECK-NEXT:    [[TMP13:%.*]] = load i8*, i8** [[TMP8]], align 8, !dbg !9
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP13]]), !dbg !9
 ; CHECK-NEXT:    br label [[FINAL_END1:%.*]], !dbg !9
 ; CHECK:       final.end1:
@@ -82,34 +82,34 @@ define dso_local void @_Z13non_pod_arrayv() !dbg !13 {
 ; CHECK:       arrayctor.cont:
 ; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !13
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args__Z13non_pod_arrayv0*, !dbg !13
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args__Z13non_pod_arrayv0*, align 8, !dbg !13
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args__Z13non_pod_arrayv0** [[TMP0]] to i8**, !dbg !13
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, !dbg !13
+; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, !dbg !13
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var__Z13non_pod_arrayv0, %nanos6_task_invocation_info_t* @task_invocation_info__Z13non_pod_arrayv0, i64 48, i8** [[TMP1]], i8** [[TMP2]], i64 0, i64 0), !dbg !13
-; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args__Z13non_pod_arrayv0*, %nanos6_task_args__Z13non_pod_arrayv0** [[TMP0]], !dbg !13
+; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args__Z13non_pod_arrayv0*, %nanos6_task_args__Z13non_pod_arrayv0** [[TMP0]], align 8, !dbg !13
 ; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args__Z13non_pod_arrayv0* [[TMP3]] to i8*, !dbg !13
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP4]], i64 48, !dbg !13
 ; CHECK-NEXT:    [[GEP_ARRAY:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYV0:%.*]], %nanos6_task_args__Z13non_pod_arrayv0* [[TMP3]], i32 0, i32 0, !dbg !13
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast [10 x %struct.S]* [[GEP_ARRAY]] to %struct.S*, !dbg !13
 ; CHECK-NEXT:    call void @oss_ctor_ZN1SC1Ev(%struct.S* [[TMP5]], i64 10), !dbg !13
-; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP2]], !dbg !13
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP2]], align 8, !dbg !13
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), !dbg !13
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !13
 ; CHECK:       final.end:
 ; CHECK-NEXT:    br label [[FINAL_COND2:%.*]], !dbg !14
 ; CHECK:       codeRepl4:
-; CHECK-NEXT:    [[TMP7:%.*]] = alloca %nanos6_task_args__Z13non_pod_arrayv1*, !dbg !14
+; CHECK-NEXT:    [[TMP7:%.*]] = alloca %nanos6_task_args__Z13non_pod_arrayv1*, align 8, !dbg !14
 ; CHECK-NEXT:    [[TMP8:%.*]] = bitcast %nanos6_task_args__Z13non_pod_arrayv1** [[TMP7]] to i8**, !dbg !14
-; CHECK-NEXT:    [[TMP9:%.*]] = alloca i8*, !dbg !14
+; CHECK-NEXT:    [[TMP9:%.*]] = alloca i8*, align 8, !dbg !14
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var__Z13non_pod_arrayv1, %nanos6_task_invocation_info_t* @task_invocation_info__Z13non_pod_arrayv1, i64 48, i8** [[TMP8]], i8** [[TMP9]], i64 0, i64 0), !dbg !14
-; CHECK-NEXT:    [[TMP10:%.*]] = load %nanos6_task_args__Z13non_pod_arrayv1*, %nanos6_task_args__Z13non_pod_arrayv1** [[TMP7]], !dbg !14
+; CHECK-NEXT:    [[TMP10:%.*]] = load %nanos6_task_args__Z13non_pod_arrayv1*, %nanos6_task_args__Z13non_pod_arrayv1** [[TMP7]], align 8, !dbg !14
 ; CHECK-NEXT:    [[TMP11:%.*]] = bitcast %nanos6_task_args__Z13non_pod_arrayv1* [[TMP10]] to i8*, !dbg !14
 ; CHECK-NEXT:    [[ARGS_END5:%.*]] = getelementptr i8, i8* [[TMP11]], i64 48, !dbg !14
 ; CHECK-NEXT:    [[GEP_ARRAY6:%.*]] = getelementptr [[NANOS6_TASK_ARGS__Z13NON_POD_ARRAYV1:%.*]], %nanos6_task_args__Z13non_pod_arrayv1* [[TMP10]], i32 0, i32 0, !dbg !14
 ; CHECK-NEXT:    [[TMP12:%.*]] = bitcast [10 x %struct.S]* [[GEP_ARRAY6]] to %struct.S*, !dbg !14
 ; CHECK-NEXT:    [[TMP13:%.*]] = bitcast [10 x %struct.S]* [[ARRAY]] to %struct.S*, !dbg !14
 ; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* [[TMP13]], %struct.S* [[TMP12]], i64 10), !dbg !14
-; CHECK-NEXT:    [[TMP14:%.*]] = load i8*, i8** [[TMP9]], !dbg !14
+; CHECK-NEXT:    [[TMP14:%.*]] = load i8*, i8** [[TMP9]], align 8, !dbg !14
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP14]]), !dbg !14
 ; CHECK-NEXT:    br label [[FINAL_END1:%.*]], !dbg !14
 ; CHECK:       final.end1:
@@ -149,11 +149,11 @@ arrayctor.cont:                                   ; preds = %arrayctor.loop
 
 }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv0([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv0([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !20 {
 ; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %1, i64 10)
 ; CHECK: }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv1([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
+; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayv1([10 x %struct.S]* %array, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !22 {
 ; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %1, i64 10)
 ; CHECK: }
 

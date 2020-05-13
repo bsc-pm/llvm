@@ -475,8 +475,8 @@ public:
     IsDerefMemberArrayBase = false;
 
     ArraySubscriptCnt++;
-    for (Stmt *S : E->getShapes())
-      Visit(S);
+    for (Expr *E : E->getShapes())
+      Visit(E);
     ArraySubscriptCnt--;
   }
 
@@ -716,7 +716,7 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
     else if (I != Bound + 1 - Skipped)
       Out << ", ";
   }
-  return Out.str();
+  return std::string(Out.str());
 }
 
 void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses) {

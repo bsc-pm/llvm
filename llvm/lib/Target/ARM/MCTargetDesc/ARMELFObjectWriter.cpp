@@ -79,6 +79,9 @@ unsigned ARMELFObjectWriter::GetRelocTypeInner(const MCValue &Target,
                                                const MCFixup &Fixup,
                                                bool IsPCRel,
                                                MCContext &Ctx) const {
+  unsigned Kind = Fixup.getTargetKind();
+  if (Kind >= FirstLiteralRelocationKind)
+    return Kind - FirstLiteralRelocationKind;
   MCSymbolRefExpr::VariantKind Modifier = Target.getAccessVariant();
 
   if (IsPCRel) {
@@ -90,8 +93,15 @@ unsigned ARMELFObjectWriter::GetRelocTypeInner(const MCValue &Target,
       switch (Modifier) {
       default:
         llvm_unreachable("Unsupported Modifier");
-      case MCSymbolRefExpr::VK_None:
+      case MCSymbolRefExpr::VK_None: {
+        if (const MCSymbolRefExpr *SymRef = Target.getSymA()) {
+          // For GNU AS compatibility expressions such as
+          // _GLOBAL_OFFSET_TABLE_ - label emit a R_ARM_BASE_PREL relocation.
+          if (SymRef->getSymbol().getName() == "_GLOBAL_OFFSET_TABLE_")
+            return ELF::R_ARM_BASE_PREL;
+        }
         return ELF::R_ARM_REL32;
+      }
       case MCSymbolRefExpr::VK_GOTTPOFF:
         return ELF::R_ARM_TLS_IE32;
       case MCSymbolRefExpr::VK_ARM_GOT_PREL:
@@ -145,11 +155,9 @@ unsigned ARMELFObjectWriter::GetRelocTypeInner(const MCValue &Target,
       return ELF::R_ARM_THM_BF18;
     }
   }
-  switch (Fixup.getTargetKind()) {
+  switch (Kind) {
   default:
     Ctx.reportFatalError(Fixup.getLoc(), "unsupported relocation on symbol");
-    return ELF::R_ARM_NONE;
-  case FK_NONE:
     return ELF::R_ARM_NONE;
   case FK_Data_1:
     switch (Modifier) {
@@ -255,8 +263,11 @@ void ARMELFObjectWriter::addTargetSectionFlags(MCContext &Ctx,
   // execute-only section in the object.
   MCSectionELF *TextSection =
       static_cast<MCSectionELF *>(Ctx.getObjectFileInfo()->getTextSection());
-  if (Sec.getKind().isExecuteOnly() && !TextSection->hasInstructions() &&
-      !TextSection->hasData()) {
+  if (Sec.getKind().isExecuteOnly() && !TextSection->hasInstructions()) {
+    for (auto &F : TextSection->getFragmentList())
+      if (auto *DF = dyn_cast<MCDataFragment>(&F))
+        if (!DF->getContents().empty())
+          return;
     TextSection->setFlags(TextSection->getFlags() | ELF::SHF_ARM_PURECODE);
   }
 }

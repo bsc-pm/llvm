@@ -24,7 +24,6 @@
 #include "clang/Basic/BitmaskEnum.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Value.h"
@@ -32,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/SemaDiagnostic.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/IntrinsicsOmpSs.h"
 
 using namespace clang;
 using namespace CodeGen;
@@ -170,7 +170,7 @@ public:
 
     // Annotate all the variables involved in shape expr. We will
     // emit its VLASizeExpr in compute_dep context
-    for (const Stmt *S : E->getShapes())
+    for (const Expr *S : E->getShapes())
       Visit(S);
   }
 
@@ -194,8 +194,8 @@ public:
     if (VD->getType()->isReferenceType()) {
       // Reuse the ref addr. got in DSA
       LValue LV = CGF.EmitDeclRefLValue(E);
-      PossibleBase = LV.getPointer();
-      CaptureInvolvedMap.try_emplace(VD, LV.getAddress());
+      PossibleBase = LV.getPointer(CGF);
+      CaptureInvolvedMap.try_emplace(VD, LV.getAddress(CGF));
     } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
       PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
       CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
@@ -203,7 +203,7 @@ public:
       CaptureInvolvedMap.try_emplace(VD, Addr);
     } else {
       LValue LV = CGF.EmitDeclRefLValue(E);
-      PossibleBase = LV.getPointer();
+      PossibleBase = LV.getPointer(CGF);
       ExprInvolvedVarList[VD] = LV;
     }
     // Since we prioritize visiting the base of the expression
@@ -422,7 +422,7 @@ public:
 
   void VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
     BaseElementTy = GetInnermostElementType(E->getType());
-    Ptr = CGF.EmitLValue(E).getPointer();
+    Ptr = CGF.EmitLValue(E).getPointer(CGF);
     if (E->getType()->isVariablyModifiedType()) {
       CGF.EmitVariablyModifiedType(E->getType());
     }
@@ -431,7 +431,7 @@ public:
 
   // l-values.
   void VisitDeclRefExpr(const DeclRefExpr *E) {
-    Ptr = CGF.EmitDeclRefLValue(E).getPointer();
+    Ptr = CGF.EmitDeclRefLValue(E).getPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
@@ -578,12 +578,12 @@ public:
   }
 
   void VisitMemberExpr(const MemberExpr *E) {
-    Ptr = CGF.EmitMemberExpr(E).getPointer();
+    Ptr = CGF.EmitMemberExpr(E).getPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
   void VisitUnaryDeref(const UnaryOperator *E) {
-    Ptr = CGF.EmitUnaryOpLValue(E).getPointer();
+    Ptr = CGF.EmitUnaryOpLValue(E).getPointer(CGF);
     FillBaseExprDimsAndType(E);
   }
 
@@ -697,8 +697,8 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
                        NelemsArg.getType(), NelemsArg.getLocation());
 
   // Find the end of the array.
-  llvm::Value *SrcBegin = SrcLV.getPointer();
-  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *SrcBegin = SrcLV.getPointer(CGF);
+  llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
                                                       "arrayctor.dst.end");
 
@@ -801,7 +801,7 @@ static void EmitCtorFunc(CodeGenModule &CGM,
                        NelemsArg.getType(), NelemsArg.getLocation());
 
   // Find the end of the array.
-  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
                                                       "arrayctor.dst.end");
 
@@ -895,7 +895,7 @@ static void EmitDtorFunc(CodeGenModule &CGM,
                        NelemsArg.getType(), NelemsArg.getLocation());
 
   // Find the end of the array.
-  llvm::Value *DstBegin = DstLV.getPointer();
+  llvm::Value *DstBegin = DstLV.getPointer(CGF);
   llvm::Value *DstEnd = CGF.Builder.CreateInBoundsGEP(DstBegin, NelemsValue,
                                                       "arraydtor.dst.end");
 
@@ -945,11 +945,11 @@ static void EmitDSAShared(
     if (VD->getType()->isReferenceType()) {
       // Record Ref Address to be reused in task body and other clasues
       LValue LV = CGF.EmitDeclRefLValue(DRE);
-      CaptureMap.try_emplace(VD, LV.getAddress());
-      V = LV.getPointer();
+      CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+      V = LV.getPointer(CGF);
       TaskInfo.emplace_back(BundleName, V);
     } else {
-      V = CGF.EmitDeclRefLValue(DRE).getPointer();
+      V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
       TaskInfo.emplace_back(BundleName, V);
     }
     QualType Q = VD->getType();
@@ -963,7 +963,7 @@ static void EmitDSAShared(
       GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
     if (!DimsWithValue.empty())
-      TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
+      TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
 
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
     TaskInfo.emplace_back(BundleName, CGF.EmitScalarExpr(ThisE));
@@ -986,11 +986,11 @@ static void EmitDSAPrivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMap.try_emplace(VD, LV.getAddress());
-    V = LV.getPointer();
+    CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+    V = LV.getPointer(CGF);
     TaskInfo.emplace_back(BundleName, V);
   } else {
-    V = CGF.EmitDeclRefLValue(DRE).getPointer();
+    V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
@@ -1004,7 +1004,7 @@ static void EmitDSAPrivate(
     GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
-    TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
+    TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
 
   const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
   const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
@@ -1029,11 +1029,11 @@ static void EmitDSAFirstprivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMap.try_emplace(VD, LV.getAddress());
-    V = LV.getPointer();
+    CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+    V = LV.getPointer(CGF);
     TaskInfo.emplace_back(BundleName, V);
   } else {
-    V = CGF.EmitDeclRefLValue(DRE).getPointer();
+    V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
     TaskInfo.emplace_back(BundleName, V);
   }
   QualType Q = VD->getType();
@@ -1047,7 +1047,7 @@ static void EmitDSAFirstprivate(
     GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
-    TaskInfo.emplace_back("QUAL.OSS.VLA.DIMS", DimsWithValue);
+    TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
 
   // TODO: is this sufficient to skip COPY/DEINIT? (task functions)
   if (FpDataTy.Copy) {
@@ -1078,7 +1078,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
   SmallVector<llvm::Value *, 4> ArgsValueList;
 
   for (const auto p : ExprInvolvedVarList) {
-    llvm::Value *V = p.second.getPointer();
+    llvm::Value *V = p.second.getPointer(CGF);
     ArgsTypeList.push_back(V->getType());
     ArgsValueList.push_back(V);
   }
@@ -1314,7 +1314,7 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
 
   for (const auto p : DependInfoGathering.getInvolvedVarList()) {
     LValue LV = p.second;
-    List.push_back(LV.getPointer());
+    List.push_back(LV.getPointer(CGF));
   }
   for (const auto p : DependInfoGathering.getVLASizeInvolvedMap()) {
     llvm::Value *VLASizeValue = p.second;
@@ -1336,7 +1336,7 @@ static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDat
                            SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
   SmallVector<llvm::Value*, 4> DepData;
   EmitDependency(CGF, Dep, DepData, CaptureMapStack);
-  TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
+  TaskInfo.emplace_back(std::string(Name), llvm::makeArrayRef(DepData));
 }
 
 /// Check if the combiner is a call to UDR and if it is so return the
@@ -1401,8 +1401,8 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
                                                          BaseElementSize));
 
   // Find the end of the array.
-  llvm::Value *OrigBegin = OrigLV.getPointer();
-  llvm::Value *PrivBegin = PrivLV.getPointer();
+  llvm::Value *OrigBegin = OrigLV.getPointer(CGF);
+  llvm::Value *PrivBegin = PrivLV.getPointer(CGF);
   llvm::Value *PrivEnd = CGF.Builder.CreateInBoundsGEP(PrivBegin, NelemsValue,
                                                       "arrayctor.dst.end");
 
@@ -1434,7 +1434,7 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
     if (PrivVD->hasInit()) {
       // initializer(omp_priv = ...)
       CGF.EmitExprAsInit(PrivVD->getInit(), PrivVD,
-                         CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
+                         CGF.MakeAddrLValue(PrivLV.getPointer(CGF), PrivLV.getType(), PrivLV.getAlignment()),
                          /*capturedByInit=*/false);
     } else {
       // initializer(foo(&omp_priv, &omp_orig)
@@ -1444,7 +1444,7 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
   } else {
     assert(RHSVD->hasInit() && "RHSVD has no initializer");
     CGF.EmitExprAsInit(RHSVD->getInit(), RHSVD,
-                       CGF.MakeAddrLValue(PrivLV.getPointer(), PrivLV.getType(), PrivLV.getAlignment()),
+                       CGF.MakeAddrLValue(PrivLV.getPointer(CGF), PrivLV.getType(), PrivLV.getAlignment()),
                        /*capturedByInit=*/false);
   }
 
@@ -1521,8 +1521,8 @@ static llvm::Value *emitReduceCombFunction(CodeGenModule &CGM,
                                                          BaseElementSize));
 
   // Find the end of the array.
-  llvm::Value *InBegin = InLV.getPointer();
-  llvm::Value *OutBegin = OutLV.getPointer();
+  llvm::Value *InBegin = InLV.getPointer(CGF);
+  llvm::Value *OutBegin = OutLV.getPointer(CGF);
   llvm::Value *OutEnd = CGF.Builder.CreateInBoundsGEP(OutBegin, NelemsValue,
                                                       "arrayctor.dst.end");
 
@@ -1723,17 +1723,17 @@ static void EmitReduction(StringRef RedName,
 
   List.insert(List.begin(), RedKind);
 
-  TaskInfo.emplace_back(RedName, makeArrayRef(List));
-  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
-  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
+  TaskInfo.emplace_back(std::string(RedName), makeArrayRef(List));
+  TaskInfo.emplace_back(std::string(RedInitName), ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
+  TaskInfo.emplace_back(std::string(RedCombName), ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                       SourceLocation Loc) {
-  llvm::Value *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
   CGF.Builder.CreateCall(Callee,
                          {},
-                         {llvm::OperandBundleDef("DIR.OSS",
+                         {llvm::OperandBundleDef(std::string("DIR.OSS"),
                                                  llvm::ConstantDataArray::getString(CGM.getLLVMContext(),
                                                                                     "TASKWAIT"))});
 }
@@ -1875,17 +1875,17 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
     LValue ParmLV = CGF.EmitLValue(ParmRef);
 
-    InitScope.addPrivate(*ParI, [&ParmLV]() -> Address { return ParmLV.getAddress(); });
+    InitScope.addPrivate(*ParI, [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
     // We do need to do this every time because the next param may use the previous one
     (void)InitScope.Privatize();
 
     ++ArgI;
     ++ParI;
   }
-  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
-  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
+  llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+  llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
-  TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+  TaskInfo.emplace_back(std::string("DIR.OSS"), llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
   TaskStack.push_back(TaskContext());
 
@@ -1896,7 +1896,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     const MemberExpr *ME = cast<MemberExpr>(callee);
     const Expr *Base = ME->getBase();
     LValue This = CGF.EmitLValue(Base);
-    TaskInfo.emplace_back("QUAL.OSS.FIRSTPRIVATE", This.getPointer());
+    TaskInfo.emplace_back(std::string("QUAL.OSS.FIRSTPRIVATE"), This.getPointer(CGF));
   }
 
   // NOTE: this should do only one iteration
@@ -1913,20 +1913,20 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
     }
     if (const Expr *E = Attr->getIfExpr()) {
-      TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(E));
+      TaskInfo.emplace_back(std::string("QUAL.OSS.IF"), CGF.EvaluateExprAsBool(E));
     }
     if (const Expr *E = Attr->getFinalExpr()) {
-      TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(E));
+      TaskInfo.emplace_back(std::string("QUAL.OSS.FINAL"), CGF.EvaluateExprAsBool(E));
     }
     if (const Expr *E = Attr->getCostExpr()) {
       llvm::Value *V = CGF.EmitScalarExpr(E);
       CapturedList.push_back(V);
-      TaskInfo.emplace_back("QUAL.OSS.COST", V);
+      TaskInfo.emplace_back(std::string("QUAL.OSS.COST"), V);
     }
     if (const Expr *E = Attr->getPriorityExpr()) {
       llvm::Value *V = CGF.EmitScalarExpr(E);
       CapturedList.push_back(V);
-      TaskInfo.emplace_back("QUAL.OSS.PRIORITY", V);
+      TaskInfo.emplace_back(std::string("QUAL.OSS.PRIORITY"), V);
     }
     // in()
     for (const Expr *E : Attr->ins()) {
@@ -2051,7 +2051,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
     }
     if (!CapturedList.empty())
-      TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
+      TaskInfo.emplace_back(std::string("QUAL.OSS.CAPTURED"), CapturedList);
   }
   InTaskEmission = false;
 
@@ -2109,10 +2109,10 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
                                   SourceLocation Loc,
                                   const OSSTaskDataTy &Data) {
 
-  llvm::Value *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
-  llvm::Value *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
+  llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+  llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
-  TaskInfo.emplace_back("DIR.OSS", llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+  TaskInfo.emplace_back(std::string("DIR.OSS"), llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
 
   SmallVector<llvm::Value*, 4> CapturedList;
 
@@ -2133,16 +2133,16 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   if (Data.Cost) {
     llvm::Value *V = CGF.EmitScalarExpr(Data.Cost);
     CapturedList.push_back(V);
-    TaskInfo.emplace_back("QUAL.OSS.COST", V);
+    TaskInfo.emplace_back(std::string("QUAL.OSS.COST"), V);
   }
   if (Data.Priority) {
     llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
     CapturedList.push_back(V);
-    TaskInfo.emplace_back("QUAL.OSS.PRIORITY", V);
+    TaskInfo.emplace_back(std::string("QUAL.OSS.PRIORITY"), V);
   }
 
   if (!CapturedList.empty())
-    TaskInfo.emplace_back("QUAL.OSS.CAPTURED", CapturedList);
+    TaskInfo.emplace_back(std::string("QUAL.OSS.CAPTURED"), CapturedList);
 
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
     EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);

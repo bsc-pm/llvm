@@ -17,6 +17,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Use.h"
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/CBindingWrapping.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
@@ -71,8 +72,6 @@ using ValueName = StringMapEntry<Value *>;
 /// objects that watch it and listen to RAUW and Destroy events.  See
 /// llvm/IR/ValueHandle.h for details.
 class Value {
-  // The least-significant bit of the first word of Value *must* be zero:
-  //   http://www.llvm.org/docs/ProgrammersManual.html#the-waymarking-algorithm
   Type *VTy;
   Use *UseList;
 
@@ -443,6 +442,34 @@ public:
   /// This is logically equivalent to getNumUses() >= N.
   bool hasNUsesOrMore(unsigned N) const;
 
+  /// Return true if there is exactly one user of this value that cannot be
+  /// dropped.
+  ///
+  /// This is specialized because it is a common request and does not require
+  /// traversing the whole use list.
+  Use *getSingleUndroppableUse();
+
+  /// Return true if there this value.
+  ///
+  /// This is specialized because it is a common request and does not require
+  /// traversing the whole use list.
+  bool hasNUndroppableUses(unsigned N) const;
+
+  /// Return true if this value has N users or more.
+  ///
+  /// This is logically equivalent to getNumUses() >= N.
+  bool hasNUndroppableUsesOrMore(unsigned N) const;
+
+  /// Remove every uses that can safely be removed.
+  ///
+  /// This will remove for example uses in llvm.assume.
+  /// This should be used when performing want to perform a tranformation but
+  /// some Droppable uses pervent it.
+  /// This function optionally takes a filter to only remove some droppable
+  /// uses.
+  void dropDroppableUses(llvm::function_ref<bool(const Use *)> ShouldDrop =
+                             [](const Use *) { return true; });
+
   /// Check if this value is used in the specified basic block.
   bool isUsedInBasicBlock(const BasicBlock *BB) const;
 
@@ -631,7 +658,7 @@ public:
   ///
   /// Returns an alignment which is either specified explicitly, e.g. via
   /// align attribute of a function argument, or guaranteed by DataLayout.
-  unsigned getPointerAlignment(const DataLayout &DL) const;
+  MaybeAlign getPointerAlignment(const DataLayout &DL) const;
 
   /// Translate PHI node to its predecessor from the given basic block.
   ///

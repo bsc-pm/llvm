@@ -1110,7 +1110,7 @@ public:
 };
 
 template <typename T>
-using const_ptr = typename std::add_pointer<typename std::add_const<T>::type>;
+using const_ptr = std::add_pointer_t<std::add_const_t<T>>;
 
 template<class ImplClass, typename RetTy = void>
 class OSSClauseVisitor :

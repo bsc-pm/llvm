@@ -243,6 +243,13 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
   case BuiltinType::OMPArraySection:
     ID = PREDEF_TYPE_OMP_ARRAY_SECTION;
     break;
+  case BuiltinType::OMPArrayShaping:
+    ID = PREDEF_TYPE_OMP_ARRAY_SHAPING;
+    break;
+  case BuiltinType::OMPIterator:
+    ID = PREDEF_TYPE_OMP_ITERATOR;
+    break;
+  // OmpSs
   case BuiltinType::OSSArraySection:
     ID = PREDEF_TYPE_OSS_ARRAY_SECTION;
     break;
@@ -368,6 +375,7 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::IndirectField:
   case Decl::Field:
   case Decl::MSProperty:
+  case Decl::MSGuid:
   case Decl::ObjCIvar:
   case Decl::ObjCAtDefsField:
   case Decl::NonTypeTemplateParm:
@@ -405,6 +413,8 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::Decomposition:
   case Decl::Binding:
   case Decl::Concept:
+  case Decl::LifetimeExtendedTemporary:
+  case Decl::RequiresExprBody:
     return false;
 
   // These indirectly derive from Redeclarable<T> but are not actually

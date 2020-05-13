@@ -38,6 +38,7 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -303,7 +304,7 @@ static bool shouldConvertUse(const Constant *Cst, const Instruction *Instr,
 
   // Do not mess with inline asm.
   const CallInst *CI = dyn_cast<const CallInst>(Instr);
-  return !(CI && isa<const InlineAsm>(CI->getCalledValue()));
+  return !(CI && CI->isInlineAsm());
 }
 
 /// Check if the given Cst should be converted into

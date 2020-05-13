@@ -311,6 +311,9 @@ def runScanBuild(Args, Dir, SBOutputDir, PBuildLogFile):
                 ExtraEnv['ANALYZER_CONFIG'] = generateAnalyzerConfig(Args)
                 continue
 
+            if Command.startswith("#"):
+                continue
+
             # If using 'make', auto imply a -jX argument
             # to speed up analysis.  xcodebuild will
             # automatically use the maximum number of cores.

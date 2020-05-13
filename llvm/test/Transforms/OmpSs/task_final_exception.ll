@@ -59,16 +59,16 @@ terminate.lpad:                                   ; preds = %entry
 ; CHECK-NEXT:   call void @_ZN1SC2Ev(%struct.S* %s), !dbg !8
 ; CHECK-NEXT:   br label %final.cond, !dbg !9
 ; CHECK: codeRepl:                                         ; preds = %final.cond
-; CHECK-NEXT:   %0 = alloca %nanos6_task_args_main0*, !dbg !9
+; CHECK-NEXT:   %0 = alloca %nanos6_task_args_main0*, align 8, !dbg !9
 ; CHECK-NEXT:   %1 = bitcast %nanos6_task_args_main0** %0 to i8**, !dbg !9
-; CHECK-NEXT:   %2 = alloca i8*, !dbg !9
+; CHECK-NEXT:   %2 = alloca i8*, align 8, !dbg !9
 ; CHECK-NEXT:   call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** %1, i8** %2, i64 0, i64 0), !dbg !9
-; CHECK-NEXT:   %3 = load %nanos6_task_args_main0*, %nanos6_task_args_main0** %0, !dbg !9
+; CHECK-NEXT:   %3 = load %nanos6_task_args_main0*, %nanos6_task_args_main0** %0, align 8, !dbg !9
 ; CHECK-NEXT:   %4 = bitcast %nanos6_task_args_main0* %3 to i8*, !dbg !9
 ; CHECK-NEXT:   %args_end = getelementptr i8, i8* %4, i64 16, !dbg !9
 ; CHECK-NEXT:   %gep_s = getelementptr %nanos6_task_args_main0, %nanos6_task_args_main0* %3, i32 0, i32 0, !dbg !9
 ; CHECK-NEXT:   call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* %s, %struct.S* %gep_s, i64 1), !dbg !9
-; CHECK-NEXT:   %5 = load i8*, i8** %2, !dbg !9
+; CHECK-NEXT:   %5 = load i8*, i8** %2, align 8, !dbg !9
 ; CHECK-NEXT:   call void @nanos6_submit_task(i8* %5), !dbg !9
 ; CHECK-NEXT:   br label %final.end, !dbg !9
 ; CHECK: final.end:                                        ; preds = %codeRepl, %invoke.cont.clone
@@ -116,7 +116,7 @@ declare dso_local i32 @__gxx_personality_v0(...)
 ; Function Attrs: noinline noreturn nounwind
 declare void @__clang_call_terminate(i8* %0)
 
-; CHECK: define internal void @nanos6_unpacked_task_region_main0(%struct.S* %s, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) {
+; CHECK: define internal void @nanos6_unpacked_task_region_main0(%struct.S* %s, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !12 {
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
 ; CHECK: 0:                                                ; preds = %newFuncRoot

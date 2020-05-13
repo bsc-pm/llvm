@@ -468,6 +468,10 @@ public:
 
   ASTContext &getASTContext() const LLVM_READONLY;
 
+  /// Helper to get the language options from the ASTContext.
+  /// Defined out of line to avoid depending on ASTContext.h.
+  const LangOptions &getLangOpts() const LLVM_READONLY;
+
   void setAccess(AccessSpecifier AS) {
     Access = AS;
     assert(AccessDeclContextSanity());
@@ -629,7 +633,16 @@ protected:
     setModuleOwnershipKind(ModuleOwnershipKind::ModulePrivate);
   }
 
-  /// Set the owning module ID.
+public:
+  /// Set the FromASTFile flag. This indicates that this declaration
+  /// was deserialized and not parsed from source code and enables
+  /// features such as module ownership information.
+  void setFromASTFile() {
+    FromASTFile = true;
+  }
+
+  /// Set the owning module ID.  This may only be called for
+  /// deserialized Decls.
   void setOwningModuleID(unsigned ID) {
     assert(isFromASTFile() && "Only works on a deserialized declaration");
     *((unsigned*)this - 2) = ID;
@@ -859,14 +872,15 @@ public:
     return getParentFunctionOrMethod() == nullptr;
   }
 
-  /// Returns true if this declaration lexically is inside a function.
-  /// It recognizes non-defining declarations as well as members of local
-  /// classes:
+  /// Returns true if this declaration is lexically inside a function or inside
+  /// a variable initializer. It recognizes non-defining declarations as well
+  /// as members of local classes and lambdas:
   /// \code
   ///     void foo() { void bar(); }
   ///     void foo2() { class ABC { void bar(); }; }
+  ///     inline int x = [](){ return 0; }();
   /// \endcode
-  bool isLexicallyWithinFunctionOrMethod() const;
+  bool isInLocalScope() const;
 
   /// If this decl is defined inside a function/method/block it returns
   /// the corresponding DeclContext, otherwise it returns null.
@@ -1521,10 +1535,9 @@ class DeclContext {
     /// constructor or a destructor.
     uint64_t IsTrivialForCall : 1;
 
-    /// Used by CXXMethodDecl
     uint64_t IsDefaulted : 1;
-    /// Used by CXXMethodDecl
     uint64_t IsExplicitlyDefaulted : 1;
+    uint64_t HasDefaultedFunctionInfo : 1;
     uint64_t HasImplicitReturnZero : 1;
     uint64_t IsLateTemplateParsed : 1;
 
@@ -1554,10 +1567,13 @@ class DeclContext {
 
     /// Store the ODRHash after first calculation.
     uint64_t HasODRHash : 1;
+
+    /// Indicates if the function uses Floating Point Constrained Intrinsics
+    uint64_t UsesFPIntrin : 1;
   };
 
   /// Number of non-inherited bits in FunctionDeclBitfields.
-  enum { NumFunctionDeclBits = 25 };
+  enum { NumFunctionDeclBits = 27 };
 
   /// Stores the bits used by CXXConstructorDecl. If modified
   /// NumCXXConstructorDeclBits and the accessor
@@ -1574,7 +1590,7 @@ class DeclContext {
     /// exactly 64 bits and thus the width of NumCtorInitializers
     /// will need to be shrunk if some bit is added to NumDeclContextBitfields,
     /// NumFunctionDeclBitfields or CXXConstructorDeclBitfields.
-    uint64_t NumCtorInitializers : 23;
+    uint64_t NumCtorInitializers : 21;
     uint64_t IsInheritingConstructor : 1;
 
     /// Whether this constructor has a trail-allocated explicit specifier.
@@ -1609,6 +1625,9 @@ class DeclContext {
 
     /// True if this method is the getter or setter for an explicit property.
     uint64_t IsPropertyAccessor : 1;
+
+    /// True if this method is a synthesized property accessor stub.
+    uint64_t IsSynthesizedAccessorStub : 1;
 
     /// Method has a definition.
     uint64_t IsDefined : 1;

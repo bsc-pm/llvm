@@ -1,5 +1,6 @@
 set(LLVM_LINK_COMPONENTS
-  support
+  FrontendOpenMP
+  Support
   )
 
 get_filename_component(CLANG_LINT_SOURCE_DIR
@@ -7,6 +8,7 @@ get_filename_component(CLANG_LINT_SOURCE_DIR
 include_directories(${CLANG_LINT_SOURCE_DIR})
 
 add_extra_unittest(ClangTidyTests
+  AddConstTest.cpp
   ClangTidyDiagnosticConsumerTest.cpp
   ClangTidyOptionsTest.cpp
   IncludeInserterTest.cpp
@@ -31,7 +33,7 @@ clang_target_link_libraries(ClangTidyTests
   clangSerialization
   clangTooling
   clangToolingCore
-  clangToolingRefactoring
+  clangTransformer
   )
 target_link_libraries(ClangTidyTests
   PRIVATE

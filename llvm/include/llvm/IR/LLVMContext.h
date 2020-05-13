@@ -17,7 +17,6 @@
 #include "llvm-c/Types.h"
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/Support/CBindingWrapping.h"
-#include "llvm/Support/Options.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -32,11 +31,16 @@ class LLVMContextImpl;
 class Module;
 class OptPassGate;
 template <typename T> class SmallVectorImpl;
+template <typename T> class StringMapEntry;
 class SMDiagnostic;
 class StringRef;
 class Twine;
-class RemarkStreamer;
+class LLVMRemarkStreamer;
 class raw_ostream;
+
+namespace remarks {
+class RemarkStreamer;
+}
 
 namespace SyncScope {
 
@@ -80,38 +84,41 @@ public:
   /// Known operand bundle tag IDs, which always have the same value.  All
   /// operand bundle tags that LLVM has special knowledge of are listed here.
   /// Additionally, this scheme allows LLVM to efficiently check for specific
-  /// operand bundle tags without comparing strings.
+  /// operand bundle tags without comparing strings. Keep this in sync with
+  /// LLVMContext::LLVMContext().
   enum : unsigned {
     OB_deopt = 0,         // "deopt"
     OB_funclet = 1,       // "funclet"
     OB_gc_transition = 2, // "gc-transition"
+    OB_cfguardtarget = 3, // "cfguardtarget"
+    OB_preallocated = 4,  // "preallocated"
     // OmpSs IDs
-    OB_oss_shared = 3,                 // "oss_shared"
-    OB_oss_private = 4,                // "oss_private"
-    OB_oss_firstprivate = 5,           // "oss_firstprivate"
-    OB_oss_vla_dims = 6,               // "oss_vla_dims"
-    OB_oss_dep_in = 7,                 // "OB_oss_dep_in"
-    OB_oss_dep_out = 8,                // "OB_oss_dep_out"
-    OB_oss_dep_inout = 9,              // "OB_oss_dep_inout"
-    OB_oss_dep_concurrent = 10,        // "OB_oss_dep_concurrent"
-    OB_oss_dep_commutative = 11,       // "OB_oss_dep_commutative"
-    OB_oss_dep_weakin = 12,            // "OB_oss_dep_weakin"
-    OB_oss_dep_weakout = 13,           // "OB_oss_dep_weakout"
-    OB_oss_dep_weakinout = 14,         // "OB_oss_dep_weakinout"
-    OB_oss_dep_weakconcurrent = 15,    // "OB_oss_dep_weakconcurrent"
-    OB_oss_dep_weakcommutative = 16,   // "OB_oss_dep_weakcommutative"
-    OB_oss_dep_reduction = 17,         // "OB_oss_dep_reduction"
-    OB_oss_dep_weakreduction = 18,     // "OB_oss_dep_weakreduction"
-    OB_oss_reduction_init = 19,        // "OB_oss_reduction_init"
-    OB_oss_reduction_comb = 20,        // "OB_oss_reduction_comb"
-    OB_oss_final = 21,                 // "OB_oss_final"
-    OB_oss_if = 22,                    // "OB_oss_if"
-    OB_oss_cost = 23,                  // "OB_oss_cost"
-    OB_oss_priority = 24,              // "OB_oss_priority"
-    OB_oss_captured = 25,              // "OB_oss_captured"
-    OB_oss_init = 26,                  // "OB_oss_init"
-    OB_oss_deinit = 27,                // "OB_oss_deinit"
-    OB_oss_copy = 28,                  // "OB_oss_copy"
+    OB_oss_shared = 5,                 // "oss_shared"
+    OB_oss_private = 6,                // "oss_private"
+    OB_oss_firstprivate = 7,           // "oss_firstprivate"
+    OB_oss_vla_dims = 8,               // "oss_vla_dims"
+    OB_oss_dep_in = 9,                 // "OB_oss_dep_in"
+    OB_oss_dep_out = 10,                // "OB_oss_dep_out"
+    OB_oss_dep_inout = 11,              // "OB_oss_dep_inout"
+    OB_oss_dep_concurrent = 12,        // "OB_oss_dep_concurrent"
+    OB_oss_dep_commutative = 13,       // "OB_oss_dep_commutative"
+    OB_oss_dep_weakin = 14,            // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 15,           // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 16,         // "OB_oss_dep_weakinout"
+    OB_oss_dep_weakconcurrent = 17,    // "OB_oss_dep_weakconcurrent"
+    OB_oss_dep_weakcommutative = 18,   // "OB_oss_dep_weakcommutative"
+    OB_oss_dep_reduction = 19,         // "OB_oss_dep_reduction"
+    OB_oss_dep_weakreduction = 20,     // "OB_oss_dep_weakreduction"
+    OB_oss_reduction_init = 21,        // "OB_oss_reduction_init"
+    OB_oss_reduction_comb = 22,        // "OB_oss_reduction_comb"
+    OB_oss_final = 23,                 // "OB_oss_final"
+    OB_oss_if = 24,                    // "OB_oss_if"
+    OB_oss_cost = 25,                  // "OB_oss_cost"
+    OB_oss_priority = 26,              // "OB_oss_priority"
+    OB_oss_captured = 27,              // "OB_oss_captured"
+    OB_oss_init = 28,                  // "OB_oss_init"
+    OB_oss_deinit = 29,                // "OB_oss_deinit"
+    OB_oss_copy = 30,                  // "OB_oss_copy"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
@@ -127,6 +134,10 @@ public:
   /// by increasing bundle IDs.
   /// \see LLVMContext::getOperandBundleTagID
   void getOperandBundleTags(SmallVectorImpl<StringRef> &Result) const;
+
+  /// getOrInsertBundleTag - Returns the Tag to use for an operand bundle of
+  /// name TagName.
+  StringMapEntry<uint32_t> *getOrInsertBundleTag(StringRef TagName) const;
 
   /// getOperandBundleTagID - Maps a bundle tag to an integer ID.  Every bundle
   /// tag registered with an LLVMContext has an unique ID.
@@ -245,23 +256,27 @@ public:
   /// included in optimization diagnostics.
   void setDiagnosticsHotnessThreshold(uint64_t Threshold);
 
-  /// Return the streamer used by the backend to save remark diagnostics. If it
-  /// does not exist, diagnostics are not saved in a file but only emitted via
-  /// the diagnostic handler.
-  RemarkStreamer *getRemarkStreamer();
-  const RemarkStreamer *getRemarkStreamer() const;
+  /// The "main remark streamer" used by all the specialized remark streamers.
+  /// This streamer keeps generic remark metadata in memory throughout the life
+  /// of the LLVMContext. This metadata may be emitted in a section in object
+  /// files depending on the format requirements.
+  ///
+  /// All specialized remark streamers should convert remarks to
+  /// llvm::remarks::Remark and emit them through this streamer.
+  remarks::RemarkStreamer *getMainRemarkStreamer();
+  const remarks::RemarkStreamer *getMainRemarkStreamer() const;
+  void setMainRemarkStreamer(
+      std::unique_ptr<remarks::RemarkStreamer> MainRemarkStreamer);
 
-  /// Set the diagnostics output used for optimization diagnostics.
-  /// This filename may be embedded in a section for tools to find the
-  /// diagnostics whenever they're needed.
+  /// The "LLVM remark streamer" used by LLVM to serialize remark diagnostics
+  /// comming from IR and MIR passes.
   ///
-  /// If a remark streamer is already set, it will be replaced with
-  /// \p RemarkStreamer.
-  ///
-  /// By default, diagnostics are not saved in a file but only emitted via the
-  /// diagnostic handler.  Even if an output file is set, the handler is invoked
-  /// for each diagnostic message.
-  void setRemarkStreamer(std::unique_ptr<RemarkStreamer> RemarkStreamer);
+  /// If it does not exist, diagnostics are not saved in a file but only emitted
+  /// via the diagnostic handler.
+  LLVMRemarkStreamer *getLLVMRemarkStreamer();
+  const LLVMRemarkStreamer *getLLVMRemarkStreamer() const;
+  void
+  setLLVMRemarkStreamer(std::unique_ptr<LLVMRemarkStreamer> RemarkStreamer);
 
   /// Get the prefix that should be printed in front of a diagnostic of
   ///        the given \p Severity
@@ -313,14 +328,6 @@ public:
   void emitError(unsigned LocCookie, const Twine &ErrorStr);
   void emitError(const Instruction *I, const Twine &ErrorStr);
   void emitError(const Twine &ErrorStr);
-
-  /// Query for a debug option's value.
-  ///
-  /// This function returns typed data populated from command line parsing.
-  template <typename ValT, typename Base, ValT(Base::*Mem)>
-  ValT getOption() const {
-    return OptionRegistry::instance().template get<ValT, Base, Mem>();
-  }
 
   /// Access the object which can disable optional passes and individual
   /// optimizations at compile time.

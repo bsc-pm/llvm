@@ -10,6 +10,7 @@
 
 #include "SnippetRepetitor.h"
 #include "Target.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -21,6 +22,7 @@
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/MCInstrInfo.h"
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
@@ -28,6 +30,7 @@ namespace exegesis {
 
 static constexpr const char ModuleID[] = "ExegesisInfoTest";
 static constexpr const char FunctionID[] = "foo";
+static const Align kFunctionAlignment(4096);
 
 // Fills the given basic block with register setup code, and returns true if
 // all registers could be setup correctly.
@@ -67,7 +70,7 @@ static bool addPass(PassManagerBase &PM, StringRef PassName,
   return false;
 }
 
-MachineFunction &createVoidVoidPtrMachineFunction(StringRef FunctionID,
+MachineFunction &createVoidVoidPtrMachineFunction(StringRef FunctionName,
                                                   Module *Module,
                                                   MachineModuleInfo *MMI) {
   Type *const ReturnType = Type::getInt32Ty(Module->getContext());
@@ -76,7 +79,7 @@ MachineFunction &createVoidVoidPtrMachineFunction(StringRef FunctionID,
   FunctionType *FunctionType =
       FunctionType::get(ReturnType, {MemParamType}, false);
   Function *const F = Function::Create(
-      FunctionType, GlobalValue::InternalLinkage, FunctionID, Module);
+      FunctionType, GlobalValue::InternalLinkage, FunctionName, Module);
   // Making sure we can create a MachineFunction out of this Function even if it
   // contains no IR.
   F->setIsMaterializable(true);
@@ -164,18 +167,18 @@ BitVector getFunctionReservedRegs(const TargetMachine &TM) {
   return MF.getSubtarget().getRegisterInfo()->getReservedRegs(MF);
 }
 
-void assembleToStream(const ExegesisTarget &ET,
-                      std::unique_ptr<LLVMTargetMachine> TM,
-                      ArrayRef<unsigned> LiveIns,
-                      ArrayRef<RegisterValue> RegisterInitialValues,
-                      const FillFunction &Fill, raw_pwrite_stream &AsmStream) {
-  std::unique_ptr<LLVMContext> Context = std::make_unique<LLVMContext>();
+Error assembleToStream(const ExegesisTarget &ET,
+                       std::unique_ptr<LLVMTargetMachine> TM,
+                       ArrayRef<unsigned> LiveIns,
+                       ArrayRef<RegisterValue> RegisterInitialValues,
+                       const FillFunction &Fill, raw_pwrite_stream &AsmStream) {
+  auto Context = std::make_unique<LLVMContext>();
   std::unique_ptr<Module> Module =
       createModule(Context, TM->createDataLayout());
-  std::unique_ptr<MachineModuleInfoWrapperPass> MMIWP =
-      std::make_unique<MachineModuleInfoWrapperPass>(TM.get());
+  auto MMIWP = std::make_unique<MachineModuleInfoWrapperPass>(TM.get());
   MachineFunction &MF = createVoidVoidPtrMachineFunction(
       FunctionID, Module.get(), &MMIWP.get()->getMMI());
+  MF.ensureAlignment(kFunctionAlignment);
 
   // We need to instruct the passes that we're done with SSA and virtual
   // registers.
@@ -225,19 +228,21 @@ void assembleToStream(const ExegesisTarget &ET,
   ET.addTargetSpecificPasses(PM);
   TPC->printAndVerify("After ExegesisTarget::addTargetSpecificPasses");
   // Adding the following passes:
+  // - postrapseudos: expands pseudo return instructions used on some targets.
   // - machineverifier: checks that the MachineFunction is well formed.
   // - prologepilog: saves and restore callee saved registers.
-  for (const char *PassName : {"machineverifier", "prologepilog"})
+  for (const char *PassName :
+       {"postrapseudos", "machineverifier", "prologepilog"})
     if (addPass(PM, PassName, *TPC))
-      report_fatal_error("Unable to add a mandatory pass");
+      return make_error<Failure>("Unable to add a mandatory pass");
   TPC->setInitialized();
 
   // AsmPrinter is responsible for generating the assembly into AsmBuffer.
-  if (TM->addAsmPrinter(PM, AsmStream, nullptr, TargetMachine::CGFT_ObjectFile,
-                        MCContext))
-    report_fatal_error("Cannot add AsmPrinter passes");
+  if (TM->addAsmPrinter(PM, AsmStream, nullptr, CGFT_ObjectFile, MCContext))
+    return make_error<Failure>("Cannot add AsmPrinter passes");
 
   PM.run(*Module); // Run all the passes
+  return Error::success();
 }
 
 object::OwningBinary<object::ObjectFile>
@@ -305,9 +310,11 @@ ExecutableFunction::ExecutableFunction(
   // executable page.
   ExecEngine->addObjectFile(std::move(ObjectFileHolder));
   // Fetching function bytes.
-  FunctionBytes = StringRef(reinterpret_cast<const char *>(
-                                ExecEngine->getFunctionAddress(FunctionID)),
-                            CodeSize);
+  const uint64_t FunctionAddress = ExecEngine->getFunctionAddress(FunctionID);
+  assert(isAligned(kFunctionAlignment, FunctionAddress) &&
+         "function is not properly aligned");
+  FunctionBytes =
+      StringRef(reinterpret_cast<const char *>(FunctionAddress), CodeSize);
 }
 
 } // namespace exegesis

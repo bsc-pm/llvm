@@ -35,21 +35,21 @@ for.end:                                          ; preds = %for.cond
 }
 
 ; CHECK:   %i = alloca i32, align 4
-; CHECK-NEXT:   store i32 0, i32* %i, align 4, !dbg !10
-; CHECK-NEXT:   br label %for.cond, !dbg !11
+; CHECK-NEXT:   store i32 0, i32* %i, align 4, !dbg !19
+; CHECK-NEXT:   br label %for.cond, !dbg !20
 ; CHECK: for.cond:                                         ; preds = %for.inc, %0
-; CHECK-NEXT:   %1 = load i32, i32* %i, align 4, !dbg !12
-; CHECK-NEXT:   %cmp = icmp slt i32 %1, 10, !dbg !13
-; CHECK-NEXT:   br i1 %cmp, label %for.body, label %for.end, !dbg !14
+; CHECK-NEXT:   %1 = load i32, i32* %i, align 4, !dbg !21
+; CHECK-NEXT:   %cmp = icmp slt i32 %1, 10, !dbg !22
+; CHECK-NEXT:   br i1 %cmp, label %for.body, label %for.end, !dbg !23
 ; CHECK: for.body:                                         ; preds = %for.cond
-; CHECK-NEXT:   br label %for.inc, !dbg !15
+; CHECK-NEXT:   br label %for.inc, !dbg !24
 ; CHECK: for.end:                                          ; preds = %for.cond
-; CHECK-NEXT:   ret void, !dbg !9
+; CHECK-NEXT:   ret void, !dbg !25
 ; CHECK: for.inc:                                          ; preds = %for.body
-; CHECK-NEXT:   %2 = load i32, i32* %i, align 4, !dbg !16
-; CHECK-NEXT:   %inc = add nsw i32 %2, 1, !dbg !16
-; CHECK-NEXT:   store i32 %inc, i32* %i, align 4, !dbg !16
-; CHECK-NEXT:   br label %for.cond, !dbg !14, !llvm.loop !17
+; CHECK-NEXT:   %2 = load i32, i32* %i, align 4, !dbg !26
+; CHECK-NEXT:   %inc = add nsw i32 %2, 1, !dbg !26
+; CHECK-NEXT:   store i32 %inc, i32* %i, align 4, !dbg !26
+; CHECK-NEXT:   br label %for.cond, !dbg !23, !llvm.loop !27
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

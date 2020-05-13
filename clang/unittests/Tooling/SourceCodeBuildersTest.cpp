@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Tooling/Refactoring/SourceCodeBuilders.h"
+#include "clang/Tooling/Transformer/SourceCodeBuilders.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Tooling/Tooling.h"
@@ -133,7 +133,7 @@ static void testBuilder(
   ASSERT_TRUE(StmtMatch);
   EXPECT_THAT(Builder(*StmtMatch->Result.Nodes.getNodeAs<Expr>("expr"),
                       *StmtMatch->Result.Context),
-              ValueIs(Expected));
+              ValueIs(std::string(Expected)));
 }
 
 TEST(SourceCodeBuildersTest, BuildParensUnaryOp) {

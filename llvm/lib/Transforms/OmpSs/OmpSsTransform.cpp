@@ -12,6 +12,7 @@
 
 #include "llvm/Pass.h"
 #include "llvm/ADT/DepthFirstIterator.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/DebugInfo.h"
@@ -20,6 +21,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/IntrinsicsOmpSs.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -287,20 +289,20 @@ struct OmpSs : public ModulePass {
   };
   Nanos6MultidepFactory MultidepFactory;
 
-  FunctionCallee CreateTaskFuncTy;
-  FunctionCallee TaskSubmitFuncTy;
-  FunctionCallee TaskInFinalFuncTy;
-  FunctionCallee TaskInfoRegisterFuncTy;
-  FunctionCallee TaskInfoRegisterCtorFuncTy;
+  FunctionCallee CreateTaskFuncCallee;
+  FunctionCallee TaskSubmitFuncCallee;
+  FunctionCallee TaskInFinalFuncCallee;
+  FunctionCallee TaskInfoRegisterFuncCallee;
+  FunctionCallee TaskInfoRegisterCtorFuncCallee;
 
   // Insert a new nanos6 task info registration in
   // the constructor (global ctor inserted) function
   void registerTaskInfo(Module &M, Value *TaskInfoVar) {
-    Function *Func = cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee());
+    Function *Func = cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee());
     BasicBlock &Entry = Func->getEntryBlock();
 
     IRBuilder<> BBBuilder(&Entry.getInstList().back());
-    BBBuilder.CreateCall(TaskInfoRegisterFuncTy, TaskInfoVar);
+    BBBuilder.CreateCall(TaskInfoRegisterFuncCallee, TaskInfoVar);
   }
 
   void unpackDepsAndRewrite(Module &M, const TaskInfo &TI,
@@ -786,7 +788,7 @@ struct OmpSs : public ModulePass {
 
     IRB.SetInsertPoint(FinalCondBB);
     // if (nanos6_in_final())
-    Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncTy, {}), IRB.getInt32(0));
+    Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncCallee, {}), IRB.getInt32(0));
     IRB.CreateCondBr(Cond, CopyEntryBB, EntryBB);
   }
 
@@ -985,7 +987,7 @@ struct OmpSs : public ModulePass {
                                 ConstantStruct::get(Nanos6TaskInvInfo::getInstance(M).getType(),
                                                     Nanos6TaskLocStr),
                                 ("task_invocation_info_" + F.getName() + Twine(taskNum)).str());
-      GV->setAlignment(64);
+      GV->setAlignment(Align(64));
       return GV;
     });
 
@@ -1010,7 +1012,7 @@ struct OmpSs : public ModulePass {
                                                                        ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(5))))),
                                 ("implementations_var_" + F.getName() + Twine(taskNum)).str());
 
-      GV->setAlignment(64);
+      GV->setAlignment(Align(64));
       return GV;
     });
 
@@ -1077,7 +1079,7 @@ struct OmpSs : public ModulePass {
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))),
                                 ("task_info_var_" + F.getName() + Twine(taskNum)).str());
 
-      GV->setAlignment(64);
+      GV->setAlignment(Align(64));
       return GV;
     });
     registerTaskInfo(M, TaskInfoVar);
@@ -1183,7 +1185,7 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.WeakCommutatives.size()
         + TI.DependsInfo.Reductions.size()
         + TI.DependsInfo.WeakReductions.size();
-      IRB.CreateCall(CreateTaskFuncTy, {TaskInfoVar,
+      IRB.CreateCall(CreateTaskFuncCallee, {TaskInfoVar,
                                   TaskInvInfoVar,
                                   TaskArgsSizeOf,
                                   TaskArgsVarCast,
@@ -1204,7 +1206,7 @@ struct OmpSs : public ModulePass {
       // First point VLAs to its according space in task args
       for (const VLAAlign& VAlign : VLAAlignsInfo) {
         Value *const V = VAlign.V;
-        size_t Align = VAlign.Align;
+        unsigned TyAlign = VAlign.Align;
 
         Type *Ty = V->getType()->getPointerElementType();
 
@@ -1216,7 +1218,7 @@ struct OmpSs : public ModulePass {
 
         // Point VLA in task args to an aligned position of the extra space allocated
         Value *GEPi8 = IRB.CreateBitCast(GEP, IRB.getInt8PtrTy()->getPointerTo());
-        IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEPi8, Align);
+        IRB.CreateAlignedStore(TaskArgsVarLi8IdxGEP, GEPi8, Align(TyAlign));
         // Skip current VLA size
         unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
         Value *VLASize = ConstantInt::get(IRB.getInt64Ty(), SizeB);
@@ -1268,12 +1270,12 @@ struct OmpSs : public ModulePass {
           // Cast to %struct.S*
           GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
 
-          IRB.CreateCall(It->second, ArrayRef<Value*>{GEP, NSize});
+          IRB.CreateCall(FunctionCallee(cast<Function>(It->second)), ArrayRef<Value*>{GEP, NSize});
         }
       }
       for (Value *V : TI.DSAInfo.Firstprivate) {
         Type *Ty = V->getType()->getPointerElementType();
-        unsigned Align = M.getDataLayout().getPrefTypeAlignment(Ty);
+        unsigned TyAlign = M.getDataLayout().getPrefTypeAlignment(Ty);
 
         // Compute num elements
         Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
@@ -1311,11 +1313,12 @@ struct OmpSs : public ModulePass {
           GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
           V = IRB.CreateBitCast(V, Ty->getPointerTo());
 
-          IRB.CreateCall(It->second, ArrayRef<Value*>{/*Src=*/V, /*Dst=*/GEP, NSize});
+          llvm::Function *Func = cast<Function>(It->second); 
+          IRB.CreateCall(Func, ArrayRef<Value*>{/*Src=*/V, /*Dst=*/GEP, NSize});
         } else {
           unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
           Value *NSizeB = IRB.CreateNUWMul(NSize, ConstantInt::get(IRB.getInt64Ty(), SizeB));
-          IRB.CreateMemCpy(GEP, Align, V, Align, NSizeB);
+          IRB.CreateMemCpy(GEP, Align(TyAlign), V, Align(TyAlign), NSizeB);
         }
       }
       for (Value *V : TI.CapturedInfo) {
@@ -1328,7 +1331,7 @@ struct OmpSs : public ModulePass {
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
-      CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncTy, TaskPtrVarL);
+      CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
 
       // Add a branch to the next basic block after the task region
       // and replace the terminator that exits the task region
@@ -1399,7 +1402,8 @@ struct OmpSs : public ModulePass {
         // Cast to %struct.S*
         Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
 
-        IRB.CreateCall(It->second, ArrayRef<Value*>{FArg, NSize});
+        llvm::Function *Func = cast<Function>(It->second); 
+        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
       }
     }
     for (Value *V : TI.DSAInfo.Firstprivate) {
@@ -1426,7 +1430,8 @@ struct OmpSs : public ModulePass {
         // Cast to %struct.S*
         Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
 
-        IRB.CreateCall(It->second, ArrayRef<Value*>{FArg, NSize});
+        llvm::Function *Func = cast<Function>(It->second); 
+        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
       }
     }
   }
@@ -1441,7 +1446,7 @@ struct OmpSs : public ModulePass {
     //         size_t flags,
     //         size_t num_deps
     // );
-    CreateTaskFuncTy = M.getOrInsertFunction("nanos6_create_task",
+    CreateTaskFuncCallee = M.getOrInsertFunction("nanos6_create_task",
         Type::getVoidTy(M.getContext()),
         Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
         Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
@@ -1453,33 +1458,33 @@ struct OmpSs : public ModulePass {
     );
 
     // void nanos6_submit_task(void *task);
-    TaskSubmitFuncTy = M.getOrInsertFunction("nanos6_submit_task",
+    TaskSubmitFuncCallee = M.getOrInsertFunction("nanos6_submit_task",
         Type::getVoidTy(M.getContext()),
         Type::getInt8PtrTy(M.getContext())
     );
 
     // int nanos6_in_final(void);
-    TaskInFinalFuncTy = M.getOrInsertFunction("nanos6_in_final",
+    TaskInFinalFuncCallee= M.getOrInsertFunction("nanos6_in_final",
         Type::getInt32Ty(M.getContext())
     );
 
     // void nanos6_register_task_info(nanos6_task_info_t *task_info);
-    TaskInfoRegisterFuncTy = M.getOrInsertFunction("nanos6_register_task_info",
+    TaskInfoRegisterFuncCallee = M.getOrInsertFunction("nanos6_register_task_info",
         Type::getVoidTy(M.getContext()),
         Nanos6TaskInfo::getInstance(M).getType()->getPointerTo()
     );
 
     // void nanos6_constructor_register_task_info(void);
     // NOTE: This does not belong to nanos6 API
-    TaskInfoRegisterCtorFuncTy =
+    TaskInfoRegisterCtorFuncCallee =
       M.getOrInsertFunction("nanos6_constructor_register_task_info",
         Type::getVoidTy(M.getContext())
       );
     BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
-      cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee()));
+      cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()));
     EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncTy.getCallee()), 65535);
+    appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()), 65535);
   }
 
   bool runOnModule(Module &M) override {

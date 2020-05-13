@@ -11,6 +11,7 @@
 
 #include "clang/Driver/ToolChain.h"
 #include "clang/Driver/Tool.h"
+#include "AMDGPU.h"
 
 namespace clang {
 namespace driver {
@@ -58,7 +59,8 @@ private:
                                   const llvm::opt::ArgList &Args,
                                   llvm::StringRef SubArchName,
                                   llvm::StringRef OutputFilePrefix,
-                                  const char *InputFileName) const;
+                                  const char *InputFileName,
+                                  bool OutputIsAsm = false) const;
 
   void constructLldCommand(Compilation &C, const JobAction &JA,
                            const InputInfoList &Inputs, const InputInfo &Output,
@@ -71,7 +73,7 @@ private:
 
 namespace toolchains {
 
-class LLVM_LIBRARY_VISIBILITY HIPToolChain : public ToolChain {
+class LLVM_LIBRARY_VISIBILITY HIPToolChain final : public ROCMToolChain {
 public:
   HIPToolChain(const Driver &D, const llvm::Triple &Triple,
                 const ToolChain &HostTC, const llvm::opt::ArgList &Args);
@@ -112,7 +114,7 @@ public:
   computeMSVCVersion(const Driver *D,
                      const llvm::opt::ArgList &Args) const override;
 
-  unsigned GetDefaultDwarfVersion() const override { return 2; }
+  unsigned GetDefaultDwarfVersion() const override { return 4; }
 
   const ToolChain &HostTC;
 
