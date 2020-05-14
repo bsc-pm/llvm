@@ -1239,20 +1239,24 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
   return FuncVar;
 }
 
-static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List,
-                           SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
+void CGOmpSsRuntime::EmitDependencyList(
+    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::Value *> &List) {
+
   OSSDependInfoGathering DependInfoGathering(CGF);
   DependInfoGathering.Visit(Dep.E);
 
   CodeGenFunction NewCGF(CGF.CGM);
   DeclRefExpr *StructRetDRE;
-  llvm::Function *ComputeDepFun = createComputeDepFunction(CGF, DependInfoGathering.getInvolvedVarList(),
-                                                           DependInfoGathering.getVLASizeInvolvedMap(),
-                                                           DependInfoGathering.getCaptureInvolvedMap(),
-                                                           DependInfoGathering.getThisAddress(),
-                                                           DependInfoGathering.getRetTypes(),
-                                                           NewCGF,
-                                                           StructRetDRE);
+
+  llvm::Function *ComputeDepFun =
+    createComputeDepFunction(
+      CGF, DependInfoGathering.getInvolvedVarList(),
+      DependInfoGathering.getVLASizeInvolvedMap(),
+      DependInfoGathering.getCaptureInvolvedMap(),
+      DependInfoGathering.getThisAddress(),
+      DependInfoGathering.getRetTypes(),
+      NewCGF, StructRetDRE);
 
   // TODO change name
   {
@@ -1275,7 +1279,7 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
 
       ++ArgI;
     }
-    llvm::DenseMap<const VarDecl *, Address> CaptureReplacedMap;
+    CaptureMapTy CaptureReplacedMap;
     for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
       const VarDecl *VD = p.first;
       Address Addr = p.second;
@@ -1422,11 +1426,12 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
   }
 }
 
-static void EmitDependency(std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
-                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-                           SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
+void CGOmpSsRuntime::EmitDependency(
+    std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
   SmallVector<llvm::Value*, 4> DepData;
-  EmitDependency(CGF, Dep, DepData, CaptureMapStack);
+  EmitDependencyList(CGF, Dep, DepData);
   TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
 }
 
@@ -1772,14 +1777,10 @@ static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualTy
 
 }
 
-static void EmitReduction(std::string RedName,
-                          std::string RedInitName,
-                          std::string RedCombName,
-                          CodeGenFunction &CGF, const OSSReductionDataTy &Red,
-                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-                          CGOmpSsRuntime::BuiltinRedMapTy &BuiltinRedMap,
-                          CGOmpSsRuntime::UDRMapTy &UDRMap,
-                          SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
+void CGOmpSsRuntime::EmitReduction(
+    std::string RedName, std::string RedInitName, std::string RedCombName,
+    CodeGenFunction &CGF, const OSSReductionDataTy &Red,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
   SmallVector<llvm::Value *, 4> List;
 
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
@@ -1808,7 +1809,7 @@ static void EmitReduction(std::string RedName,
     }
   }
 
-  EmitDependency(CGF, {/*OSSSyntax=*/true, Red.Ref}, List, CaptureMapStack);
+  EmitDependencyList(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
   // First operand has to be the DSA over the dependency is made
   llvm::Value *DepBaseDSA = List[0];
 
@@ -2033,122 +2034,122 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->outs()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->inouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->concurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->commutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->weakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
     }
     // depend(in :)
     for (const Expr *E : Attr->depIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
     }
     for (const Expr *E : Attr->depWeakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
     }
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
@@ -2247,50 +2248,46 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
     TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
 
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
-    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
-    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
-    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
-    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
-    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
-    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
-    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
-    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
-    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
-    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
     EmitReduction(getBundleStr(OSSB_reduction),
                   getBundleStr(OSSB_redinit),
                   getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo,
-                  BuiltinRedMap, UDRMap,
-                  CaptureMapStack);
+                  CGF, Red, TaskInfo);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
     EmitReduction(getBundleStr(OSSB_weakreduction),
                   getBundleStr(OSSB_redinit),
                   getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo,
-                  BuiltinRedMap, UDRMap,
-                  CaptureMapStack);
+                  CGF, Red, TaskInfo);
   }
 
   if (Data.If)

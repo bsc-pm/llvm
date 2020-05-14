@@ -114,6 +114,14 @@ private:
   using CaptureMapTy = llvm::DenseMap<const VarDecl *, Address>;
   SmallVector<CaptureMapTy, 2> CaptureMapStack;
 
+  // Map of builtin reduction init/combiner <Nanos6 int value, <init, combiner>>
+  using BuiltinRedMapTy = llvm::DenseMap<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
+  BuiltinRedMapTy BuiltinRedMap;
+
+  // Map of UDR init/combiner <UDR, <init, combiner>>
+  using UDRMapTy = llvm::DenseMap<const OSSDeclareReductionDecl *, std::pair<llvm::Value *, llvm::Value *>>;
+  UDRMapTy UDRMap;
+
   void EmitDSAShared(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -129,21 +137,25 @@ private:
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
     SmallVectorImpl<llvm::Value*> &CapturedList);
 
+  void EmitDependencyList(
+    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::Value *> &List);
+
+  void EmitDependency(
+    std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  void EmitReduction(
+    std::string RedName, std::string RedInitName, std::string RedCombName,
+    CodeGenFunction &CGF, const OSSReductionDataTy &Red,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
   bool InTaskEmission = false;
-
-  // TODO: try to integrate this better in the class, not as a direct public member
-  // Map of builtin reduction init/combiner <Nanos6 int value, <init, combiner>>
-  using BuiltinRedMapTy = llvm::DenseMap<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
-  // Map of UDR init/combiner <UDR, <init, combiner>>
-  using UDRMapTy = llvm::DenseMap<const OSSDeclareReductionDecl *, std::pair<llvm::Value *, llvm::Value *>>;
-
-  BuiltinRedMapTy BuiltinRedMap;
-  UDRMapTy UDRMap;
 
   // This is used to avoid creating the same generic funcion for constructors and
   // destructors, which will be stored in a bundle for each non-pod private/firstprivate
