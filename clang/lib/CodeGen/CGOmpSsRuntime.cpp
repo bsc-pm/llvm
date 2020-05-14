@@ -744,17 +744,16 @@ static void GatherVLADims(CodeGenFunction &CGF, llvm::Value *V, QualType Q,
   }
 }
 
-static void EmitCopyCtorFunc(CodeGenModule &CGM,
-                             llvm::Value *V,
-                             const CXXConstructExpr *CtorE,
-                             const VarDecl *CopyD,
-                             const VarDecl *InitD,
-                             SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+void CGOmpSsRuntime::EmitCopyCtorFunc(
+    llvm::Value *DSAValue, const CXXConstructExpr *CtorE,
+    const VarDecl *CopyD, const VarDecl *InitD,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
   const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
   // If we have already created the function we're done
-  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
-  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{V, It->second});
+  auto It = GenericCXXNonPodMethodDefs.find(CtorD);
+  if (It != GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{DSAValue, It->second});
     return;
   }
 
@@ -846,25 +845,24 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
 
   CGF.FinishFunction();
 
-  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
+  GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
-  TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{DSAValue, Fn});
 
 }
 
-static void EmitCtorFunc(CodeGenModule &CGM,
-                         llvm::Value *V,
-                         const VarDecl *CopyD,
-                         SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+void CGOmpSsRuntime::EmitCtorFunc(
+    llvm::Value *DSAValue, const VarDecl *CopyD,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
   const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getInit());
   const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
 
   GlobalDecl CtorGD(CtorD, Ctor_Complete);
   llvm::Value *CtorValue = CGM.getAddrOfCXXStructor(CtorGD);
 
-  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
-  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{V, It->second});
+  auto It = GenericCXXNonPodMethodDefs.find(CtorD);
+  if (It != GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{DSAValue, It->second});
     return;
   }
 
@@ -932,15 +930,15 @@ static void EmitCtorFunc(CodeGenModule &CGM,
 
   CGF.FinishFunction();
 
-  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
+  GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
-  TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{DSAValue, Fn});
 }
 
-static void EmitDtorFunc(CodeGenModule &CGM,
-                         llvm::Value *V,
-                         const VarDecl *CopyD,
-                         SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+void CGOmpSsRuntime::EmitDtorFunc(
+    llvm::Value *DSAValue, const VarDecl *CopyD,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
   QualType Q = CopyD->getType();
 
   const RecordType *RT = Q->getAs<RecordType>();
@@ -954,9 +952,9 @@ static void EmitDtorFunc(CodeGenModule &CGM,
   GlobalDecl DtorGD(DtorD, Dtor_Complete);
   llvm::Value *DtorValue = CGM.getAddrOfCXXStructor(DtorGD);
 
-  auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(DtorD);
-  if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{V, It->second});
+  auto It = GenericCXXNonPodMethodDefs.find(DtorD);
+  if (It != GenericCXXNonPodMethodDefs.end()) {
+    TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{DSAValue, It->second});
     return;
   }
 
@@ -1024,9 +1022,9 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 
   CGF.FinishFunction();
 
-  CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[DtorD] = Fn;
+  GenericCXXNonPodMethodDefs[DtorD] = Fn;
 
-  TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{DSAValue, Fn});
 }
 
 void CGOmpSsRuntime::EmitDSAShared(
@@ -1036,16 +1034,16 @@ void CGOmpSsRuntime::EmitDSAShared(
 
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
-    llvm::Value *V;
+    llvm::Value *DSAValue;
     if (VD->getType()->isReferenceType()) {
       // Record Ref Address to be reused in task body and other clasues
       LValue LV = CGF.EmitDeclRefLValue(DRE);
       CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-      V = LV.getPointer(CGF);
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), V);
+      DSAValue = LV.getPointer(CGF);
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSAValue);
     } else {
-      V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-      TaskInfo.emplace_back(getBundleStr(OSSB_shared), V);
+      DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), DSAValue);
     }
     QualType Q = VD->getType();
     // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1055,7 +1053,7 @@ void CGOmpSsRuntime::EmitDSAShared(
       Q = Q->getPointeeType();
     }
     if (Q->isVariableArrayType())
-      GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+      GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
 
     if (!DimsWithValue.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
@@ -1076,16 +1074,16 @@ void CGOmpSsRuntime::EmitDSAPrivate(
 
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
-  llvm::Value *V;
+  llvm::Value *DSAValue;
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-    V = LV.getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), V);
+    DSAValue = LV.getPointer(CGF);
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSAValue);
   } else {
-    V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_private), V);
+    DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), DSAValue);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1095,7 +1093,7 @@ void CGOmpSsRuntime::EmitDSAPrivate(
     Q = Q->getPointeeType();
   }
   if (Q->isVariableArrayType())
-    GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+    GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
@@ -1104,8 +1102,8 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
 
   if (!CopyD->getType().isPODType(CGF.getContext())) {
-    EmitCtorFunc(CGF.CGM, V, CopyD, TaskInfo);
-    EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+    EmitCtorFunc(DSAValue, CopyD, TaskInfo);
+    EmitDtorFunc(DSAValue, CopyD, TaskInfo);
   }
 }
 
@@ -1116,16 +1114,16 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
 
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
-  llvm::Value *V;
+  llvm::Value *DSAValue;
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
-    V = LV.getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), V);
+    DSAValue = LV.getPointer(CGF);
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSAValue);
   } else {
-    V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), V);
+    DSAValue = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), DSAValue);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1135,7 +1133,7 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     Q = Q->getPointeeType();
   }
   if (Q->isVariableArrayType())
-    GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
+    GatherVLADims(CGF, DSAValue, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
@@ -1150,8 +1148,8 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     if (!CopyD->getType().isPODType(CGF.getContext())) {
       const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
 
-      EmitCopyCtorFunc(CGF.CGM, V, CtorE, CopyD, InitD, TaskInfo);
-      EmitDtorFunc(CGF.CGM, V, CopyD, TaskInfo);
+      EmitCopyCtorFunc(DSAValue, CtorE, CopyD, InitD, TaskInfo);
+      EmitDtorFunc(DSAValue, CopyD, TaskInfo);
     }
   }
 }

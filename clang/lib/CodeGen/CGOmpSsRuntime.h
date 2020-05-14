@@ -122,6 +122,12 @@ private:
   using UDRMapTy = llvm::DenseMap<const OSSDeclareReductionDecl *, std::pair<llvm::Value *, llvm::Value *>>;
   UDRMapTy UDRMap;
 
+  // This is used to avoid creating the same generic funcion for constructors and
+  // destructors, which will be stored in a bundle for each non-pod private/firstprivate
+  // data-sharing
+  using GenericCXXNonPodMethodDefsTy = llvm::DenseMap<const CXXMethodDecl *, llvm::Function *>;
+  GenericCXXNonPodMethodDefsTy GenericCXXNonPodMethodDefs;
+
   void EmitDSAShared(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -150,18 +156,22 @@ private:
     CodeGenFunction &CGF, const OSSReductionDataTy &Red,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
+  void EmitCopyCtorFunc(llvm::Value *DSAValue, const CXXConstructExpr *CtorE,
+      const VarDecl *CopyD, const VarDecl *InitD,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  void EmitCtorFunc(llvm::Value *DSAValue, const VarDecl *CopyD,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  void EmitDtorFunc(llvm::Value *DSAValue, const VarDecl *CopyD,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
   bool InTaskEmission = false;
-
-  // This is used to avoid creating the same generic funcion for constructors and
-  // destructors, which will be stored in a bundle for each non-pod private/firstprivate
-  // data-sharing
-  // TODO: try to integrate this better in the class, not as a direct public member
-  llvm::DenseMap<const CXXMethodDecl *, llvm::Function *> GenericCXXNonPodMethodDefs;
 
   // returns true if we're emitting code inside a task context (entry/exit)
   bool inTaskBody();
