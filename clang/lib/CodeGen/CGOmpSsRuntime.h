@@ -69,7 +69,6 @@ struct OSSTaskDepDataTy final {
 };
 
 struct OSSReductionDataTy {
-  const Expr *SimpleRef;
   const Expr *Ref;
   const Expr *LHS;
   const Expr *RHS;

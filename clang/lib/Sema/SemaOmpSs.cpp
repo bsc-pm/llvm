@@ -475,8 +475,8 @@ public:
     IsDerefMemberArrayBase = false;
 
     ArraySubscriptCnt++;
-    for (Expr *E : E->getShapes())
-      Visit(E);
+    for (Expr *S : E->getShapes())
+      Visit(S);
     ArraySubscriptCnt--;
   }
 
@@ -1757,8 +1757,6 @@ buildDeclareReductionRef(Sema &SemaRef, SourceLocation Loc, SourceRange Range,
 namespace {
 /// Data for the reduction-based clauses.
 struct ReductionData {
-  /// List of simple vars of the reduction items. (data-sharings)
-  SmallVector<Expr *, 8> SimpleVars;
   /// List of original reduction items.
   SmallVector<Expr *, 8> Vars;
   /// LHS expressions for the reduction_op expressions.
@@ -1772,7 +1770,6 @@ struct ReductionData {
   ReductionData() = delete;
   /// Reserves required memory for the reduction data.
   ReductionData(unsigned Size) {
-    SimpleVars.reserve(Size);
     Vars.reserve(Size);
     LHSs.reserve(Size);
     RHSs.reserve(Size);
@@ -1782,7 +1779,6 @@ struct ReductionData {
   /// Stores reduction item and reduction operation only (required for dependent
   /// reduction item).
   void push(Expr *Item, Expr *ReductionOp) {
-    SimpleVars.emplace_back(nullptr);
     Vars.emplace_back(Item);
     LHSs.emplace_back(nullptr);
     RHSs.emplace_back(nullptr);
@@ -1790,9 +1786,8 @@ struct ReductionData {
     ReductionKinds.emplace_back(BO_Comma);
   }
   /// Stores reduction data.
-  void push(Expr *SimpleVar, Expr *Item, Expr *LHS, Expr *RHS, Expr *ReductionOp,
+  void push(Expr *Item, Expr *LHS, Expr *RHS, Expr *ReductionOp,
             BinaryOperatorKind BOK) {
-    SimpleVars.emplace_back(SimpleVar);
     Vars.emplace_back(Item);
     LHSs.emplace_back(LHS);
     RHSs.emplace_back(RHS);
@@ -2174,7 +2169,7 @@ static bool actOnOSSReductionKindClause(
         continue;
     }
 
-    RD.push(SimpleRefExpr, RefExpr, LHSDRE, RHSDRE, ReductionOp.get(), BOK);
+    RD.push(RefExpr, LHSDRE, RHSDRE, ReductionOp.get(), BOK);
   }
   return RD.Vars.empty();
 }
@@ -2196,7 +2191,7 @@ Sema::ActOnOmpSsReductionClause(OmpSsClauseKind Kind, ArrayRef<Expr *> VarList,
   return OSSReductionClause::Create(
       Context, StartLoc, LParenLoc, ColonLoc, EndLoc, RD.Vars,
       ReductionIdScopeSpec.getWithLocInContext(Context), ReductionId,
-      RD.SimpleVars, RD.LHSs, RD.RHSs, RD.ReductionOps, RD.ReductionKinds,
+      RD.LHSs, RD.RHSs, RD.ReductionOps, RD.ReductionKinds,
       Kind == OSSC_weakreduction);
 }
 

@@ -915,14 +915,6 @@ class OSSReductionClause final
   /// variable.
   void setSimpleExprs(ArrayRef<Expr *> SimpleExprs);
 
-  /// Get the list of helper data-sharings.
-  MutableArrayRef<Expr *> getSimpleExprs() {
-    return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
-  }
-  ArrayRef<const Expr *> getSimpleExprs() const {
-    return llvm::makeArrayRef(varlist_end(), varlist_size());
-  }
-
   /// Set list of helper expressions, required for proper codegen of the
   /// clause. These expressions represent LHS expression in the final
   /// reduction expression performed by the reduction clause.
@@ -930,10 +922,10 @@ class OSSReductionClause final
 
   /// Get the list of helper LHS expressions.
   MutableArrayRef<Expr *> getLHSExprs() {
-    return MutableArrayRef<Expr *>(getSimpleExprs().end(), varlist_size());
+    return MutableArrayRef<Expr *>(varlist_end(), varlist_size());
   }
   ArrayRef<const Expr *> getLHSExprs() const {
-    return llvm::makeArrayRef(getSimpleExprs().end(), varlist_size());
+    return llvm::makeArrayRef(varlist_end(), varlist_size());
   }
 
   /// Set list of helper expressions, required for proper codegen of the
@@ -993,7 +985,6 @@ public:
   Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
          SourceLocation ColonLoc, SourceLocation EndLoc, ArrayRef<Expr *> VL,
          NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
-         ArrayRef<Expr *> SimpleExprs,
          ArrayRef<Expr *> LHSExprs, ArrayRef<Expr *> RHSExprs,
          ArrayRef<Expr *> ReductionOps, ArrayRef<BinaryOperatorKind> ReductionKinds,
          bool IsWeak);
@@ -1022,14 +1013,6 @@ public:
   using helper_expr_range = llvm::iterator_range<helper_expr_iterator>;
   using helper_expr_const_range =
       llvm::iterator_range<helper_expr_const_iterator>;
-
-  helper_expr_const_range simple_exprs() const {
-    return helper_expr_const_range(getSimpleExprs().begin(), getSimpleExprs().end());
-  }
-
-  helper_expr_range simple_exprs() {
-    return helper_expr_range(getSimpleExprs().begin(), getSimpleExprs().end());
-  }
 
   helper_expr_const_range lhs_exprs() const {
     return helper_expr_const_range(getLHSExprs().begin(), getLHSExprs().end());

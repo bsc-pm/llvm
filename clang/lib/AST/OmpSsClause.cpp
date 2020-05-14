@@ -135,17 +135,11 @@ OSSDependClause *OSSDependClause::CreateEmpty(const ASTContext &C, unsigned N) {
   return new (Mem) OSSDependClause(N);
 }
 
-void OSSReductionClause::setSimpleExprs(ArrayRef<Expr *> SimpleExprs) {
-  assert(SimpleExprs.size() == varlist_size() &&
-         "Number of private copies is not the same as the preallocated buffer");
-  std::copy(SimpleExprs.begin(), SimpleExprs.end(), varlist_end());
-}
-
 void OSSReductionClause::setLHSExprs(ArrayRef<Expr *> LHSExprs) {
   assert(
       LHSExprs.size() == varlist_size() &&
       "Number of LHS expressions is not the same as the preallocated buffer");
-  std::copy(LHSExprs.begin(), LHSExprs.end(), getSimpleExprs().end());
+  std::copy(LHSExprs.begin(), LHSExprs.end(), varlist_end());
 }
 
 void OSSReductionClause::setRHSExprs(ArrayRef<Expr *> RHSExprs) {
@@ -166,14 +160,13 @@ OSSReductionClause *OSSReductionClause::Create(
     const ASTContext &C, SourceLocation StartLoc, SourceLocation LParenLoc,
     SourceLocation EndLoc, SourceLocation ColonLoc, ArrayRef<Expr *> VL,
     NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
-    ArrayRef<Expr *> SimpleExprs, ArrayRef<Expr *> LHSExprs,
+    ArrayRef<Expr *> LHSExprs,
     ArrayRef<Expr *> RHSExprs, ArrayRef<Expr *> ReductionOps,
     ArrayRef<BinaryOperatorKind> ReductionKinds, bool IsWeak) {
   void *Mem = C.Allocate(totalSizeToAlloc<Expr *>(5 * VL.size()));
   OSSReductionClause *Clause = new (Mem) OSSReductionClause(
       StartLoc, LParenLoc, EndLoc, ColonLoc, VL.size(), QualifierLoc, NameInfo, IsWeak);
   Clause->setVarRefs(VL);
-  Clause->setSimpleExprs(SimpleExprs);
   Clause->setLHSExprs(LHSExprs);
   Clause->setRHSExprs(RHSExprs);
   Clause->setReductionOps(ReductionOps);

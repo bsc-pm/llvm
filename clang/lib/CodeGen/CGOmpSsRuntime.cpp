@@ -37,6 +37,108 @@ using namespace clang;
 using namespace CodeGen;
 
 namespace {
+
+enum OmpSsBundleKind {
+  OSSB_directive,
+  OSSB_task,
+  OSSB_taskwait,
+  OSSB_shared,
+  OSSB_private,
+  OSSB_firstprivate,
+  OSSB_if,
+  OSSB_final,
+  OSSB_cost,
+  OSSB_priority,
+  OSSB_in,
+  OSSB_out,
+  OSSB_inout,
+  OSSB_concurrent,
+  OSSB_commutative,
+  OSSB_reduction,
+  OSSB_redinit,
+  OSSB_redcomb,
+  OSSB_weakin,
+  OSSB_weakout,
+  OSSB_weakinout,
+  OSSB_weakconcurrent,
+  OSSB_weakcommutative,
+  OSSB_weakreduction,
+  OSSB_init,
+  OSSB_copy,
+  OSSB_deinit,
+  OSSB_vladims,
+  OSSB_captured,
+  OSSC_unknown
+};
+
+const char *getBundleStr(OmpSsBundleKind Kind) {
+  switch (Kind) {
+  case OSSB_directive:
+    return "DIR.OSS";
+  case OSSB_task:
+    return "TASK";
+  case OSSB_taskwait:
+    return "TASKWAIT";
+  case OSSB_shared:
+    return "QUAL.OSS.SHARED";
+  case OSSB_private:
+    return "QUAL.OSS.PRIVATE";
+  case OSSB_firstprivate:
+    return "QUAL.OSS.FIRSTPRIVATE";
+  case OSSB_if:
+    return "QUAL.OSS.IF";
+  case OSSB_final:
+    return "QUAL.OSS.FINAL";
+  case OSSB_cost:
+    return "QUAL.OSS.COST";
+  case OSSB_priority:
+    return "QUAL.OSS.PRIORITY";
+  case OSSB_in:
+    return "QUAL.OSS.DEP.IN";
+  case OSSB_out:
+    return "QUAL.OSS.DEP.OUT";
+  case OSSB_inout:
+    return "QUAL.OSS.DEP.INOUT";
+  case OSSB_concurrent:
+    return "QUAL.OSS.DEP.CONCURRENT";
+  case OSSB_commutative:
+    return "QUAL.OSS.DEP.COMMUTATIVE";
+  case OSSB_reduction:
+    return "QUAL.OSS.DEP.REDUCTION";
+  case OSSB_redinit:
+    return "QUAL.OSS.DEP.REDUCTION.INIT";
+  case OSSB_redcomb:
+    return "QUAL.OSS.DEP.REDUCTION.COMBINE";
+  case OSSB_weakin:
+    return "QUAL.OSS.DEP.WEAKIN";
+  case OSSB_weakout:
+    return "QUAL.OSS.DEP.WEAKOUT";
+  case OSSB_weakinout:
+    return "QUAL.OSS.DEP.WEAKINOUT";
+  case OSSB_weakconcurrent:
+    return "QUAL.OSS.DEP.WEAKCONCURRENT";
+  case OSSB_weakcommutative:
+    return "QUAL.OSS.DEP.WEAKCOMMUTATIVE";
+  case OSSB_weakreduction:
+    return "QUAL.OSS.DEP.WEAKREDUCTION";
+  case OSSB_init:
+    return "QUAL.OSS.INIT";
+  case OSSB_copy:
+    return "QUAL.OSS.COPY";
+  case OSSB_deinit:
+    return "QUAL.OSS.DEINIT";
+  case OSSB_vladims:
+    return "QUAL.OSS.VLA.DIMS";
+  case OSSB_captured:
+    return "QUAL.OSS.CAPTURED";
+  default:
+    llvm_unreachable("Invalid OmpSs bundle kind");
+  }
+}
+
+} // namespace
+
+namespace {
 // This class gathers all the info needed for OSSDependVisitor to emit a dependency in
 // compute_dep.
 // The visitor walks and annotates the number of dimensions in the same way that OSSDependVisitor
@@ -648,12 +750,11 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
                              const VarDecl *CopyD,
                              const VarDecl *InitD,
                              SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
-  const std::string BundleCopyName = "QUAL.OSS.COPY";
   const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
   // If we have already created the function we're done
   auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
   if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(BundleCopyName, ArrayRef<llvm::Value*>{V, It->second});
+    TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{V, It->second});
     return;
   }
 
@@ -747,7 +848,7 @@ static void EmitCopyCtorFunc(CodeGenModule &CGM,
 
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
-  TaskInfo.emplace_back(BundleCopyName, ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_copy), ArrayRef<llvm::Value*>{V, Fn});
 
 }
 
@@ -755,7 +856,6 @@ static void EmitCtorFunc(CodeGenModule &CGM,
                          llvm::Value *V,
                          const VarDecl *CopyD,
                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
-  const std::string BundleInitName = "QUAL.OSS.INIT";
   const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getInit());
   const CXXConstructorDecl *CtorD = cast<CXXConstructorDecl>(CtorE->getConstructor());
 
@@ -764,7 +864,7 @@ static void EmitCtorFunc(CodeGenModule &CGM,
 
   auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(CtorD);
   if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(BundleInitName, ArrayRef<llvm::Value*>{V, It->second});
+    TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{V, It->second});
     return;
   }
 
@@ -834,15 +934,13 @@ static void EmitCtorFunc(CodeGenModule &CGM,
 
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[CtorD] = Fn;
 
-  TaskInfo.emplace_back(BundleInitName, ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_init), ArrayRef<llvm::Value*>{V, Fn});
 }
 
 static void EmitDtorFunc(CodeGenModule &CGM,
                          llvm::Value *V,
                          const VarDecl *CopyD,
                          SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
-  const std::string BundleDeinitName = "QUAL.OSS.DEINIT";
-
   QualType Q = CopyD->getType();
 
   const RecordType *RT = Q->getAs<RecordType>();
@@ -858,7 +956,7 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 
   auto It = CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.find(DtorD);
   if (It != CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs.end()) {
-    TaskInfo.emplace_back(BundleDeinitName, ArrayRef<llvm::Value*>{V, It->second});
+    TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{V, It->second});
     return;
   }
 
@@ -928,7 +1026,7 @@ static void EmitDtorFunc(CodeGenModule &CGM,
 
   CGM.getOmpSsRuntime().GenericCXXNonPodMethodDefs[DtorD] = Fn;
 
-  TaskInfo.emplace_back(BundleDeinitName, ArrayRef<llvm::Value*>{V, Fn});
+  TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{V, Fn});
 }
 
 static void EmitDSAShared(
@@ -936,8 +1034,6 @@ static void EmitDSAShared(
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
   SmallVectorImpl<llvm::Value*> &CapturedList,
   llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
-
-  const std::string BundleName = "QUAL.OSS.SHARED";
 
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
@@ -947,10 +1043,10 @@ static void EmitDSAShared(
       LValue LV = CGF.EmitDeclRefLValue(DRE);
       CaptureMap.try_emplace(VD, LV.getAddress(CGF));
       V = LV.getPointer(CGF);
-      TaskInfo.emplace_back(BundleName, V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), V);
     } else {
       V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-      TaskInfo.emplace_back(BundleName, V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_shared), V);
     }
     QualType Q = VD->getType();
     // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -963,10 +1059,12 @@ static void EmitDSAShared(
       GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
     if (!DimsWithValue.empty())
-      TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
+      TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
 
   } else if (const CXXThisExpr *ThisE = dyn_cast<CXXThisExpr>(E)) {
-    TaskInfo.emplace_back(BundleName, CGF.EmitScalarExpr(ThisE));
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_shared),
+        CGF.EmitScalarExpr(ThisE));
   } else {
     llvm_unreachable("Unhandled expression");
   }
@@ -978,8 +1076,6 @@ static void EmitDSAPrivate(
   SmallVectorImpl<llvm::Value*> &CapturedList,
   llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
 
-  const std::string BundleName = "QUAL.OSS.PRIVATE";
-
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *V;
@@ -988,10 +1084,10 @@ static void EmitDSAPrivate(
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMap.try_emplace(VD, LV.getAddress(CGF));
     V = LV.getPointer(CGF);
-    TaskInfo.emplace_back(BundleName, V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), V);
   } else {
     V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(BundleName, V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_private), V);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1004,7 +1100,7 @@ static void EmitDSAPrivate(
     GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
-    TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
+    TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
 
   const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
   const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
@@ -1021,8 +1117,6 @@ static void EmitDSAFirstprivate(
   SmallVectorImpl<llvm::Value*> &CapturedList,
   llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
 
-  const std::string BundleName = "QUAL.OSS.FIRSTPRIVATE";
-
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *V;
@@ -1031,10 +1125,10 @@ static void EmitDSAFirstprivate(
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMap.try_emplace(VD, LV.getAddress(CGF));
     V = LV.getPointer(CGF);
-    TaskInfo.emplace_back(BundleName, V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), V);
   } else {
     V = CGF.EmitDeclRefLValue(DRE).getPointer(CGF);
-    TaskInfo.emplace_back(BundleName, V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), V);
   }
   QualType Q = VD->getType();
   // int (**p)[sizex][sizey] -> we need to capture sizex sizey only
@@ -1047,7 +1141,7 @@ static void EmitDSAFirstprivate(
     GatherVLADims(CGF, V, Q, DimsWithValue, CapturedList, IsPtr);
 
   if (!DimsWithValue.empty())
-    TaskInfo.emplace_back(std::string("QUAL.OSS.VLA.DIMS"), DimsWithValue);
+    TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
 
   // TODO: is this sufficient to skip COPY/DEINIT? (task functions)
   if (FpDataTy.Copy) {
@@ -1331,12 +1425,12 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
   }
 }
 
-static void EmitDependency(StringRef Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+static void EmitDependency(std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
                            SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
                            SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
   SmallVector<llvm::Value*, 4> DepData;
   EmitDependency(CGF, Dep, DepData, CaptureMapStack);
-  TaskInfo.emplace_back(std::string(Name), llvm::makeArrayRef(DepData));
+  TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
 }
 
 /// Check if the combiner is a call to UDR and if it is so return the
@@ -1681,9 +1775,9 @@ static llvm::ConstantInt *reductionKindToNanos6Enum(CodeGenFunction &CGF, QualTy
 
 }
 
-static void EmitReduction(StringRef RedName,
-                          StringRef RedInitName,
-                          StringRef RedCombName,
+static void EmitReduction(std::string RedName,
+                          std::string RedInitName,
+                          std::string RedCombName,
                           CodeGenFunction &CGF, const OSSReductionDataTy &Red,
                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
                           CGOmpSsRuntime::BuiltinRedMapTy &BuiltinRedMap,
@@ -1723,19 +1817,22 @@ static void EmitReduction(StringRef RedName,
 
   List.insert(List.begin(), RedKind);
 
-  TaskInfo.emplace_back(std::string(RedName), makeArrayRef(List));
-  TaskInfo.emplace_back(std::string(RedInitName), ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
-  TaskInfo.emplace_back(std::string(RedCombName), ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
+  TaskInfo.emplace_back(RedName, makeArrayRef(List));
+  TaskInfo.emplace_back(RedInitName, ArrayRef<llvm::Value *>{DepBaseDSA, RedInit});
+  TaskInfo.emplace_back(RedCombName, ArrayRef<llvm::Value *>{DepBaseDSA, RedComb});
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
                                       SourceLocation Loc) {
   llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
-  CGF.Builder.CreateCall(Callee,
-                         {},
-                         {llvm::OperandBundleDef(std::string("DIR.OSS"),
-                                                 llvm::ConstantDataArray::getString(CGM.getLLVMContext(),
-                                                                                    "TASKWAIT"))});
+  CGF.Builder.CreateCall(
+      Callee, {},
+      {
+        llvm::OperandBundleDef(
+          std::string(getBundleStr(OSSB_directive)),
+          llvm::ConstantDataArray::getString(
+            CGM.getLLVMContext(), getBundleStr(OSSB_taskwait)))
+      });
 }
 
 // We're in task body context once we set InsertPt
@@ -1885,7 +1982,9 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
-  TaskInfo.emplace_back(std::string("DIR.OSS"), llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+  TaskInfo.emplace_back(
+      getBundleStr(OSSB_directive),
+      llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(OSSB_task)));
 
   TaskStack.push_back(TaskContext());
 
@@ -1896,7 +1995,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     const MemberExpr *ME = cast<MemberExpr>(callee);
     const Expr *Base = ME->getBase();
     LValue This = CGF.EmitLValue(Base);
-    TaskInfo.emplace_back(std::string("QUAL.OSS.FIRSTPRIVATE"), This.getPointer(CGF));
+    TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), This.getPointer(CGF));
   }
 
   // NOTE: this should do only one iteration
@@ -1913,145 +2012,145 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
     }
     if (const Expr *E = Attr->getIfExpr()) {
-      TaskInfo.emplace_back(std::string("QUAL.OSS.IF"), CGF.EvaluateExprAsBool(E));
+      TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(E));
     }
     if (const Expr *E = Attr->getFinalExpr()) {
-      TaskInfo.emplace_back(std::string("QUAL.OSS.FINAL"), CGF.EvaluateExprAsBool(E));
+      TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(E));
     }
     if (const Expr *E = Attr->getCostExpr()) {
       llvm::Value *V = CGF.EmitScalarExpr(E);
       CapturedList.push_back(V);
-      TaskInfo.emplace_back(std::string("QUAL.OSS.COST"), V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_cost), V);
     }
     if (const Expr *E = Attr->getPriorityExpr()) {
       llvm::Value *V = CGF.EmitScalarExpr(E);
       CapturedList.push_back(V);
-      TaskInfo.emplace_back(std::string("QUAL.OSS.PRIORITY"), V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
     }
     // in()
     for (const Expr *E : Attr->ins()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->outs()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->inouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->concurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->commutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->weakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = true;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     // depend(in :)
     for (const Expr *E : Attr->depIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakIns()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakOuts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakInouts()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakConcurrents()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     for (const Expr *E : Attr->depWeakCommutatives()) {
       OSSDepDataTy Dep;
       Dep.OSSSyntax = false;
       Dep.E = E;
-      EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+      EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
     }
     if (!CapturedList.empty())
-      TaskInfo.emplace_back(std::string("QUAL.OSS.CAPTURED"), CapturedList);
+      TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
   }
   InTaskEmission = false;
 
@@ -2112,7 +2211,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
-  TaskInfo.emplace_back(std::string("DIR.OSS"), llvm::ConstantDataArray::getString(CGM.getLLVMContext(), "TASK"));
+  TaskInfo.emplace_back(
+      getBundleStr(OSSB_directive),
+      llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(OSSB_task)));
 
   SmallVector<llvm::Value*, 4> CapturedList;
 
@@ -2133,68 +2234,68 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   if (Data.Cost) {
     llvm::Value *V = CGF.EmitScalarExpr(Data.Cost);
     CapturedList.push_back(V);
-    TaskInfo.emplace_back(std::string("QUAL.OSS.COST"), V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_cost), V);
   }
   if (Data.Priority) {
     llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
     CapturedList.push_back(V);
-    TaskInfo.emplace_back(std::string("QUAL.OSS.PRIORITY"), V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
   }
 
   if (!CapturedList.empty())
-    TaskInfo.emplace_back(std::string("QUAL.OSS.CAPTURED"), CapturedList);
+    TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
 
   for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
-    EmitDependency("QUAL.OSS.DEP.IN", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
-    EmitDependency("QUAL.OSS.DEP.OUT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
-    EmitDependency("QUAL.OSS.DEP.INOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
-    EmitDependency("QUAL.OSS.DEP.CONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
-    EmitDependency("QUAL.OSS.DEP.COMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
-    EmitDependency("QUAL.OSS.DEP.WEAKIN", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
-    EmitDependency("QUAL.OSS.DEP.WEAKINOUT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
-    EmitDependency("QUAL.OSS.DEP.WEAKCONCURRENT", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
-    EmitDependency("QUAL.OSS.DEP.WEAKCOMMUTATIVE", CGF, Dep, TaskInfo, CaptureMapStack);
+    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo, CaptureMapStack);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
-    EmitReduction("QUAL.OSS.DEP.REDUCTION",
-                  "QUAL.OSS.DEP.REDUCTION.INIT",
-                  "QUAL.OSS.DEP.REDUCTION.COMBINE",
+    EmitReduction(getBundleStr(OSSB_reduction),
+                  getBundleStr(OSSB_redinit),
+                  getBundleStr(OSSB_redcomb),
                   CGF, Red, TaskInfo,
                   BuiltinRedMap, UDRMap,
                   CaptureMapStack);
   }
   for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
-    EmitReduction("QUAL.OSS.DEP.WEAKREDUCTION",
-                  "QUAL.OSS.DEP.REDUCTION.INIT",
-                  "QUAL.OSS.DEP.REDUCTION.COMBINE",
+    EmitReduction(getBundleStr(OSSB_weakreduction),
+                  getBundleStr(OSSB_redinit),
+                  getBundleStr(OSSB_redcomb),
                   CGF, Red, TaskInfo,
                   BuiltinRedMap, UDRMap,
                   CaptureMapStack);
   }
 
   if (Data.If)
-    TaskInfo.emplace_back("QUAL.OSS.IF", CGF.EvaluateExprAsBool(Data.If));
+    TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
-    TaskInfo.emplace_back("QUAL.OSS.FINAL", CGF.EvaluateExprAsBool(Data.Final));
+    TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
 
   InTaskEmission = false;
 
