@@ -2620,9 +2620,9 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
         && (CGM.getOmpSsRuntime().inTaskBody()
             || CGM.getOmpSsRuntime().InTaskEmission)) {
 
-      auto it = CGM.getOmpSsRuntime().getTaskCaptureMap().find(VD);
-      if (it != CGM.getOmpSsRuntime().getTaskCaptureMap().end()) {
-        return MakeAddrLValue(it->second, T, AlignmentSource::Decl);
+      Address Addr = CGM.getOmpSsRuntime().getTaskCaptureAddr(VD);
+      if (Addr.isValid()) {
+        return MakeAddrLValue(Addr, T, AlignmentSource::Decl);
       }
     }
 

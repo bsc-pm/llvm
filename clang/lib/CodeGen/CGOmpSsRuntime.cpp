@@ -162,7 +162,7 @@ class OSSDependInfoGathering
   llvm::MapVector<const Expr *, llvm::Value *> VLASizeInvolvedMap;
   // Map of captures involved in the dependency.
   // i.e. references and global variables
-  CGOmpSsRuntime::CaptureMapTy CaptureInvolvedMap;
+  llvm::DenseMap<const VarDecl *, Address> CaptureInvolvedMap;
 
   Address CXXThisAddress = Address::invalid();
 
@@ -404,7 +404,7 @@ public:
 
   const llvm::MapVector<const VarDecl *, LValue> &getInvolvedVarList() const { return ExprInvolvedVarList; }
   const llvm::MapVector<const Expr *, llvm::Value *> &getVLASizeInvolvedMap() const { return VLASizeInvolvedMap; }
-  const CGOmpSsRuntime::CaptureMapTy &getCaptureInvolvedMap() const { return CaptureInvolvedMap; }
+  const llvm::DenseMap<const VarDecl *, Address> &getCaptureInvolvedMap() const { return CaptureInvolvedMap; }
   const Address getThisAddress() const { return CXXThisAddress; }
   ArrayRef<QualType> getRetTypes() const { return RetTypes; }
   llvm::Value *getBaseValue() const { assert(Base); return Base; }
@@ -1029,11 +1029,10 @@ static void EmitDtorFunc(CodeGenModule &CGM,
   TaskInfo.emplace_back(getBundleStr(OSSB_deinit), ArrayRef<llvm::Value*>{V, Fn});
 }
 
-static void EmitDSAShared(
+void CGOmpSsRuntime::EmitDSAShared(
   CodeGenFunction &CGF, const Expr *E,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
 
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
@@ -1041,7 +1040,7 @@ static void EmitDSAShared(
     if (VD->getType()->isReferenceType()) {
       // Record Ref Address to be reused in task body and other clasues
       LValue LV = CGF.EmitDeclRefLValue(DRE);
-      CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+      CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
       V = LV.getPointer(CGF);
       TaskInfo.emplace_back(getBundleStr(OSSB_shared), V);
     } else {
@@ -1070,11 +1069,10 @@ static void EmitDSAShared(
   }
 }
 
-static void EmitDSAPrivate(
+void CGOmpSsRuntime::EmitDSAPrivate(
   CodeGenFunction &CGF, const OSSDSAPrivateDataTy &PDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
 
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
@@ -1082,7 +1080,7 @@ static void EmitDSAPrivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+    CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     V = LV.getPointer(CGF);
     TaskInfo.emplace_back(getBundleStr(OSSB_private), V);
   } else {
@@ -1111,11 +1109,10 @@ static void EmitDSAPrivate(
   }
 }
 
-static void EmitDSAFirstprivate(
+void CGOmpSsRuntime::EmitDSAFirstprivate(
   CodeGenFunction &CGF, const OSSDSAFirstprivateDataTy &FpDataTy,
   SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-  SmallVectorImpl<llvm::Value*> &CapturedList,
-  llvm::DenseMap<const VarDecl *, Address> &CaptureMap) {
+  SmallVectorImpl<llvm::Value*> &CapturedList) {
 
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
@@ -1123,7 +1120,7 @@ static void EmitDSAFirstprivate(
   if (VD->getType()->isReferenceType()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
-    CaptureMap.try_emplace(VD, LV.getAddress(CGF));
+    CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     V = LV.getPointer(CGF);
     TaskInfo.emplace_back(getBundleStr(OSSB_firstprivate), V);
   } else {
@@ -1162,7 +1159,7 @@ static void EmitDSAFirstprivate(
 static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
                                                 const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
                                                 const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
-                                                const CGOmpSsRuntime::CaptureMapTy &CaptureInvolvedMap,
+                                                const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
                                                 const Address CXXThisAddress,
                                                 ArrayRef<QualType> RetTypes,
                                                 CodeGenFunction &NewCGF,
@@ -1243,7 +1240,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
 }
 
 static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallVectorImpl<llvm::Value *> &List,
-                           SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
+                           SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
   OSSDependInfoGathering DependInfoGathering(CGF);
   DependInfoGathering.Visit(Dep.E);
 
@@ -1278,7 +1275,7 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
 
       ++ArgI;
     }
-    CGOmpSsRuntime::CaptureMapTy CaptureReplacedMap;
+    llvm::DenseMap<const VarDecl *, Address> CaptureReplacedMap;
     for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
       const VarDecl *VD = p.first;
       Address Addr = p.second;
@@ -1427,7 +1424,7 @@ static void EmitDependency(CodeGenFunction &CGF, const OSSDepDataTy &Dep, SmallV
 
 static void EmitDependency(std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
                            SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
-                           SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
+                           SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
   SmallVector<llvm::Value*, 4> DepData;
   EmitDependency(CGF, Dep, DepData, CaptureMapStack);
   TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
@@ -1782,7 +1779,7 @@ static void EmitReduction(std::string RedName,
                           SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
                           CGOmpSsRuntime::BuiltinRedMapTy &BuiltinRedMap,
                           CGOmpSsRuntime::UDRMapTy &UDRMap,
-                          SmallVectorImpl<CGOmpSsRuntime::CaptureMapTy> &CaptureMapStack) {
+                          SmallVectorImpl<llvm::DenseMap<const VarDecl *, Address>> &CaptureMapStack) {
   SmallVector<llvm::Value *, 4> List;
 
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
@@ -1868,9 +1865,13 @@ Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
   return TaskStack.back().NormalCleanupDestSlot;
 }
 
-llvm::DenseMap<const VarDecl *, Address> &CGOmpSsRuntime::getTaskCaptureMap() {
-  assert(!CaptureMapStack.empty());
-  return CaptureMapStack.back();
+Address CGOmpSsRuntime::getTaskCaptureAddr(const VarDecl *VD) {
+  auto it = CaptureMapStack.back().find(VD);
+  Address Addr = Address::invalid();
+  if (it != CaptureMapStack.back().end()) {
+    Addr = it->second;
+  }
+  return Addr;
 }
 
 void CGOmpSsRuntime::setTaskInsertPt(llvm::Instruction *I) {
@@ -2002,14 +2003,14 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
     SmallVector<llvm::Value*, 4> CapturedList;
     for (const Expr *E : SharedCopies) {
-      EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskCaptureMap());
+      EmitDSAShared(CGF, E, TaskInfo, CapturedList);
     }
     for (const Expr *E : FirstprivateCopies) {
       OSSDSAFirstprivateDataTy FpDataTy;
       // Ignore ImplicitCast built for the new function call
       FpDataTy.Ref = E->IgnoreImpCasts();
       FpDataTy.Copy = FpDataTy.Init = nullptr;
-      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
+      EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
     }
     if (const Expr *E = Attr->getIfExpr()) {
       TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(E));
@@ -2222,13 +2223,13 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
 
   InTaskEmission = true;
   for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList, getTaskCaptureMap());
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList);
   }
   for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
   }
   for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList, getTaskCaptureMap());
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
   }
 
   if (Data.Cost) {
