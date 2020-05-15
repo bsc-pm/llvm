@@ -288,7 +288,7 @@ fi
 # JUnit and timeout
 ################################################################################
 
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_LIT_ARGS=-sv --timeout=240 --xunit-xml-output=xunit.xml")
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml")
 
 ################################################################################
 # Sanitizer build
