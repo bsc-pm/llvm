@@ -1415,16 +1415,15 @@ bool Sema::ActOnOmpSsDependKinds(ArrayRef<OmpSsDependClauseKind> DepKinds,
         Diag(DepLoc, diag::err_oss_depend_weak_required);
         return false;
       } else if (numUnk == 2) {
-        unsigned Except[] = {OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
-                                       /*Last=*/OSSC_DEPEND_unknown, Except)
+                                       /*Last=*/OSSC_DEPEND_unknown)
             << getOmpSsClauseName(OSSC_depend);
         return false;
       }
     } else if ((numWeaks == 1 && numUnk == 1)
                || (numWeaks == 2 && numUnk == 0)) {
-        unsigned Except[] = {OSSC_DEPEND_weak, OSSC_DEPEND_inoutset, OSSC_DEPEND_mutexinoutset};
+        unsigned Except[] = {OSSC_DEPEND_weak, OSSC_DEPEND_inoutset};
         Diag(DepLoc, diag::err_oss_unexpected_clause_value)
             << getListOfPossibleValues(OSSC_depend, /*First=*/0,
                                        /*Last=*/OSSC_DEPEND_unknown, Except)
@@ -2045,9 +2044,9 @@ static bool actOnOSSReductionKindClause(
         if (auto *ComplexTy = OrigType->getAs<ComplexType>())
           Type = ComplexTy->getElementType();
         if (Type->isRealFloatingType()) {
-          llvm::APFloat InitValue =
-              llvm::APFloat::getAllOnesValue(Context.getTypeSize(Type),
-                                             /*isIEEE=*/true);
+          llvm::APFloat InitValue = llvm::APFloat::getAllOnesValue(
+              Context.getFloatTypeSemantics(Type),
+              Context.getTypeSize(Type));
           Init = FloatingLiteral::Create(Context, InitValue, /*isexact=*/true,
                                          Type, ELoc);
         } else if (Type->isScalarType()) {

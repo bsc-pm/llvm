@@ -77,14 +77,14 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task inoutset(argc) // expected-warning {{extra tokens at the end of '#pragma oss task' are ignored}}
 
   #pragma oss task depend(in : arr[0])
-  #pragma oss task depend(, // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
-  #pragma oss task depend(, : // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}}
-  #pragma oss task depend(, : ) // expected-error {{expected 'in', 'out', 'inout' or 'weak' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(, // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}} expected-warning {{missing ':' after dependency type - ignoring}}
+  #pragma oss task depend(, : // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}} expected-error {{expected ')'}} expected-note {{to match this '('}}
+  #pragma oss task depend(, : ) // expected-error {{expected 'in', 'out', 'inout', 'inoutset', 'mutexinoutset' or 'weak' in OmpSs-2 clause 'depend'}}
   #pragma oss task depend(in, weak: ) // expected-error {{expected expression}}
   #pragma oss task depend(weak, in: ) // expected-error {{expected expression}}
-  #pragma oss task depend(, weak: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
-  #pragma oss task depend(weak, : argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
-  #pragma oss task depend(weak, weak: argc) // expected-error {{expected 'in', 'out' or 'inout' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(, weak: argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(weak, : argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
+  #pragma oss task depend(weak, weak: argc) // expected-error {{expected 'in', 'out', 'inout' or 'mutexinoutset' in OmpSs-2 clause 'depend'}}
   #pragma oss task depend(in, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss task depend(out, in: argc) // expected-error {{expected 'weak' dependency type}}
   #pragma oss task depend(weak, in: 1) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}

@@ -1166,17 +1166,17 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
   SmallVector<llvm::Type *, 4> ArgsTypeList;
   SmallVector<llvm::Value *, 4> ArgsValueList;
 
-  for (const auto p : ExprInvolvedVarList) {
+  for (const auto &p : ExprInvolvedVarList) {
     llvm::Value *V = p.second.getPointer(CGF);
     ArgsTypeList.push_back(V->getType());
     ArgsValueList.push_back(V);
   }
-  for (const auto p : VLASizeInvolvedMap) {
+  for (const auto &p : VLASizeInvolvedMap) {
     llvm::Value *V = p.second;
     ArgsTypeList.push_back(V->getType());
     ArgsValueList.push_back(V);
   }
-  for (const auto p : CaptureInvolvedMap) {
+  for (const auto &p : CaptureInvolvedMap) {
     Address Addr = p.second;
     llvm::Value *V = Addr.getPointer();
     ArgsTypeList.push_back(V->getType());
@@ -1260,7 +1260,7 @@ void CGOmpSsRuntime::EmitDependencyList(
   {
     CodeGenFunction::OSSPrivateScope InitScope(NewCGF);
     auto ArgI = ComputeDepFun->arg_begin();
-    for (const auto p : DependInfoGathering.getInvolvedVarList()) {
+    for (const auto &p : DependInfoGathering.getInvolvedVarList()) {
       const VarDecl *VD = p.first;
       LValue LV = p.second;
       InitScope.addPrivate(VD, [&ArgI, &LV]() -> Address {
@@ -1269,7 +1269,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
       ++ArgI;
     }
-    for (const auto p : DependInfoGathering.getVLASizeInvolvedMap()) {
+    for (const auto &p : DependInfoGathering.getVLASizeInvolvedMap()) {
       const Expr *VLASizeExpr = p.first;
       InitScope.addPrivateVLA(VLASizeExpr, [ArgI]() -> llvm::Value * {
         return ArgI;
@@ -1278,7 +1278,7 @@ void CGOmpSsRuntime::EmitDependencyList(
       ++ArgI;
     }
     CaptureMapTy CaptureReplacedMap;
-    for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
+    for (const auto &p : DependInfoGathering.getCaptureInvolvedMap()) {
       const VarDecl *VD = p.first;
       Address Addr = p.second;
       Address NewAddr = Address(ArgI, Addr.getAlignment());
@@ -1405,15 +1405,15 @@ void CGOmpSsRuntime::EmitDependencyList(
   List.push_back(DependInfoGathering.getBaseValue());
   List.push_back(ComputeDepFun);
 
-  for (const auto p : DependInfoGathering.getInvolvedVarList()) {
+  for (const auto &p : DependInfoGathering.getInvolvedVarList()) {
     LValue LV = p.second;
     List.push_back(LV.getPointer(CGF));
   }
-  for (const auto p : DependInfoGathering.getVLASizeInvolvedMap()) {
+  for (const auto &p : DependInfoGathering.getVLASizeInvolvedMap()) {
     llvm::Value *VLASizeValue = p.second;
     List.push_back(VLASizeValue);
   }
-  for (const auto p : DependInfoGathering.getCaptureInvolvedMap()) {
+  for (const auto &p : DependInfoGathering.getCaptureInvolvedMap()) {
     Address Addr = p.second;
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
