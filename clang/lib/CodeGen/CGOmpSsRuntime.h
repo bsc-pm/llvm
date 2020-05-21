@@ -48,6 +48,11 @@ struct OSSTaskDSADataTy final {
   SmallVector<const Expr *, 4> Shareds;
   SmallVector<OSSDSAPrivateDataTy, 4> Privates;
   SmallVector<OSSDSAFirstprivateDataTy, 4> Firstprivates;
+
+  bool empty() const {
+    return Shareds.empty() && Privates.empty()
+      && Firstprivates.empty();
+  }
 };
 
 struct OSSDepDataTy {
@@ -66,6 +71,13 @@ struct OSSTaskDepDataTy final {
   SmallVector<OSSDepDataTy, 4> WeakCommutatives;
   SmallVector<OSSDepDataTy, 4> Concurrents;
   SmallVector<OSSDepDataTy, 4> Commutatives;
+
+  bool empty() const {
+  return WeakIns.empty() && WeakOuts.empty() && WeakInouts.empty()
+    && Ins.empty() && Outs.empty() && Inouts.empty()
+    && WeakConcurrents.empty() && WeakCommutatives.empty()
+    && Concurrents.empty() && Commutatives.empty();
+  }
 };
 
 struct OSSReductionDataTy {
@@ -79,6 +91,10 @@ struct OSSReductionDataTy {
 struct OSSTaskReductionDataTy final {
   SmallVector<OSSReductionDataTy, 4> RedList;
   SmallVector<OSSReductionDataTy, 4> WeakRedList;
+
+  bool empty() const {
+    return RedList.empty() && WeakRedList.empty();
+  }
 };
 
 struct OSSTaskDataTy final {
@@ -89,6 +105,12 @@ struct OSSTaskDataTy final {
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;
   const Expr *Priority = nullptr;
+
+  bool empty() const {
+    return DSAs.empty() && Deps.empty() &&
+      Reductions.empty() &&
+      !If && !Final && !Cost && !Priority;
+  }
 };
 
 class CGOmpSsRuntime {
@@ -166,6 +188,10 @@ private:
   void EmitDtorFunc(llvm::Value *DSAValue, const VarDecl *CopyD,
       SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
+  // Build bundles for all info inside Data
+  void EmitTaskData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
   virtual ~CGOmpSsRuntime() {};
@@ -213,7 +239,9 @@ public:
                           ReturnValueSlot ReturnValue);
 
   /// Emit code for 'taskwait' directive.
-  virtual void emitTaskwaitCall(CodeGenFunction &CGF, SourceLocation Loc);
+  virtual void emitTaskwaitCall(CodeGenFunction &CGF,
+                                SourceLocation Loc,
+                                const OSSTaskDataTy &Data);
   /// Emit code for 'task' directive.
   virtual void emitTaskCall(CodeGenFunction &CGF,
                             const OSSExecutableDirective &D,

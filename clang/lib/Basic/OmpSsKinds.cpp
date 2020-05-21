@@ -181,6 +181,15 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
     }
     break;
   case OSSD_taskwait:
+    switch (CKind) {
+#define OMPSS_TASKWAIT_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
   case OSSD_declare_reduction:
   case OSSD_unknown:
     break;

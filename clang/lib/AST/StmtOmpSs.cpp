@@ -23,18 +23,23 @@ void OSSExecutableDirective::setClauses(ArrayRef<OSSClause *> Clauses) {
   std::copy(Clauses.begin(), Clauses.end(), getClauses().begin());
 }
 
-OSSTaskwaitDirective *OSSTaskwaitDirective::Create(const ASTContext &C,
-                                                   SourceLocation StartLoc,
-                                                   SourceLocation EndLoc) {
-  void *Mem = C.Allocate(sizeof(OSSTaskwaitDirective));
-  OSSTaskwaitDirective *Dir = new (Mem) OSSTaskwaitDirective(StartLoc, EndLoc);
+OSSTaskwaitDirective *
+OSSTaskwaitDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                             SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskwaitDirective), alignof(OSSClause *));
+  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * Clauses.size());
+  OSSTaskwaitDirective *Dir =
+      new (Mem) OSSTaskwaitDirective(StartLoc, EndLoc, Clauses.size());
+  Dir->setClauses(Clauses);
   return Dir;
 }
 
 OSSTaskwaitDirective *OSSTaskwaitDirective::CreateEmpty(const ASTContext &C,
+                                                        unsigned NumClauses,
                                                         EmptyShell) {
-  void *Mem = C.Allocate(sizeof(OSSTaskwaitDirective));
-  return new (Mem) OSSTaskwaitDirective();
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskwaitDirective), alignof(OSSClause *));
+  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * NumClauses);
+  return new (Mem) OSSTaskwaitDirective(NumClauses);
 }
 
 OSSTaskDirective *

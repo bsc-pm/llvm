@@ -2,6 +2,6 @@
 
 int main(void) {
   int a;
-  #pragma oss taskwait depend(in: a) // expected-error {{unexpected OmpSs-2 clause 'depend' in directive '#pragma oss taskwait'}}
+  #pragma oss taskwait if(0) // expected-error {{unexpected OmpSs-2 clause 'if' in directive '#pragma oss taskwait'}}
 }
 

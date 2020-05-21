@@ -236,16 +236,19 @@ class OSSTaskwaitDirective : public OSSExecutableDirective {
   ///
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
   ///
-  OSSTaskwaitDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+  OSSTaskwaitDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
       : OSSExecutableDirective(this, OSSTaskwaitDirectiveClass, OSSD_taskwait,
-                               StartLoc, EndLoc, 0, 0) {}
+                               StartLoc, EndLoc, NumClauses, 0) {}
 
   /// Build an empty directive.
   ///
-  explicit OSSTaskwaitDirective()
+  /// \param NumClauses Number of clauses.
+  ///
+  explicit OSSTaskwaitDirective(unsigned NumClauses)
       : OSSExecutableDirective(this, OSSTaskwaitDirectiveClass, OSSD_taskwait,
-                               SourceLocation(), SourceLocation(), 0, 0) {}
+                               SourceLocation(), SourceLocation(), NumClauses, 0) {}
 
 public:
   /// Creates directive.
@@ -253,15 +256,19 @@ public:
   /// \param C AST context.
   /// \param StartLoc Starting location of the directive kind.
   /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
   ///
   static OSSTaskwaitDirective *
-  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc);
+  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc,
+         ArrayRef<OSSClause *> Clauses);
 
   /// Creates an empty directive.
   ///
   /// \param C AST context.
+  /// \param NumClauses Number of clauses.
   ///
-  static OSSTaskwaitDirective *CreateEmpty(const ASTContext &C, EmptyShell);
+  static OSSTaskwaitDirective *CreateEmpty(const ASTContext &C, unsigned NumClauses,
+                                           EmptyShell);
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OSSTaskwaitDirectiveClass;

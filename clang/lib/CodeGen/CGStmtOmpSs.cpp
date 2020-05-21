@@ -21,11 +21,7 @@
 using namespace clang;
 using namespace CodeGen;
 
-void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
-  CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc());
-}
-
-static void AddDSASharedData(const OSSTaskDirective &S, SmallVectorImpl<const Expr *> &Data) {
+static void AddDSASharedData(const OSSExecutableDirective &S, SmallVectorImpl<const Expr *> &Data) {
   // All DSAs are DeclRefExpr or CXXThisExpr
   llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
   for (const auto *C : S.getClausesOfKind<OSSSharedClause>()) {
@@ -42,7 +38,7 @@ static void AddDSASharedData(const OSSTaskDirective &S, SmallVectorImpl<const Ex
   }
 }
 
-static void AddDSAPrivateData(const OSSTaskDirective &S, SmallVectorImpl<OSSDSAPrivateDataTy> &PList) {
+static void AddDSAPrivateData(const OSSExecutableDirective &S, SmallVectorImpl<OSSDSAPrivateDataTy> &PList) {
   // All DSA are DeclRefExpr
   llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
   for (const auto *C : S.getClausesOfKind<OSSPrivateClause>()) {
@@ -59,7 +55,7 @@ static void AddDSAPrivateData(const OSSTaskDirective &S, SmallVectorImpl<OSSDSAP
   }
 }
 
-static void AddDSAFirstprivateData(const OSSTaskDirective &S,
+static void AddDSAFirstprivateData(const OSSExecutableDirective &S,
                                    SmallVectorImpl<OSSDSAFirstprivateDataTy> &FpList) {
   // All DSA are DeclRefExpr
   llvm::SmallSet<const ValueDecl *, 8> DeclExpr;
@@ -79,13 +75,13 @@ static void AddDSAFirstprivateData(const OSSTaskDirective &S,
   }
 }
 
-static void AddDSAData(const OSSTaskDirective &S, OSSTaskDSADataTy &DSAs) {
+static void AddDSAData(const OSSExecutableDirective &S, OSSTaskDSADataTy &DSAs) {
   AddDSASharedData(S, DSAs.Shareds);
   AddDSAPrivateData(S, DSAs.Privates);
   AddDSAFirstprivateData(S, DSAs.Firstprivates);
 }
 
-static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
+static void AddDepData(const OSSExecutableDirective &S, OSSTaskDepDataTy &Deps) {
   for (const auto *C : S.getClausesOfKind<OSSDependClause>()) {
     ArrayRef<OmpSsDependClauseKind> DepKindsOrdered = C->getDependencyKindsOrdered();
     if (DepKindsOrdered.size() == 2) {
@@ -119,7 +115,7 @@ static void AddDepData(const OSSTaskDirective &S, OSSTaskDepDataTy &Deps) {
   }
 }
 
-static void AddIfData(const OSSTaskDirective &S, const Expr *&IfExpr) {
+static void AddIfData(const OSSExecutableDirective &S, const Expr *&IfExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSIfClause>()) {
     assert(!Found);
@@ -128,7 +124,7 @@ static void AddIfData(const OSSTaskDirective &S, const Expr *&IfExpr) {
   }
 }
 
-static void AddFinalData(const OSSTaskDirective &S, const Expr * &FinalExpr) {
+static void AddFinalData(const OSSExecutableDirective &S, const Expr * &FinalExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSFinalClause>()) {
     assert(!Found);
@@ -137,7 +133,7 @@ static void AddFinalData(const OSSTaskDirective &S, const Expr * &FinalExpr) {
   }
 }
 
-static void AddCostData(const OSSTaskDirective &S, const Expr * &CostExpr) {
+static void AddCostData(const OSSExecutableDirective &S, const Expr * &CostExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSCostClause>()) {
     assert(!Found);
@@ -146,7 +142,7 @@ static void AddCostData(const OSSTaskDirective &S, const Expr * &CostExpr) {
   }
 }
 
-static void AddPriorityData(const OSSTaskDirective &S, const Expr * &PriorityExpr) {
+static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &PriorityExpr) {
   bool Found = false;
   for (const auto *C : S.getClausesOfKind<OSSPriorityClause>()) {
     assert(!Found);
@@ -155,7 +151,7 @@ static void AddPriorityData(const OSSTaskDirective &S, const Expr * &PriorityExp
   }
 }
 
-static void AddReductionData(const OSSTaskDirective &S, OSSTaskReductionDataTy &Reductions) {
+static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDataTy &Reductions) {
   for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
     auto LHSRef = C->lhs_exprs().begin();
     auto RHSRef = C->rhs_exprs().begin();
@@ -173,6 +169,14 @@ static void AddReductionData(const OSSTaskDirective &S, OSSTaskReductionDataTy &
       }
     }
   }
+}
+
+void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
+  OSSTaskDataTy Data;
+
+  AddDSAData(S, Data.DSAs);
+  AddDepData(S, Data.Deps);
+  CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc(), Data);
 }
 
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {

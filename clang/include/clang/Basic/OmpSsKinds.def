@@ -24,6 +24,9 @@
 #ifndef OMPSS_TASK_CLAUSE
 #  define OMPSS_TASK_CLAUSE(Name)
 #endif
+#ifndef OMPSS_TASKWAIT_CLAUSE
+#  define OMPSS_TASKWAIT_CLAUSE(Name)
+#endif
 #ifndef OMPSS_DECLARE_TASK_CLAUSE
 #  define OMPSS_DECLARE_TASK_CLAUSE(Name)
 #endif
@@ -105,6 +108,12 @@ OMPSS_TASK_CLAUSE(weakinout)
 OMPSS_TASK_CLAUSE(weakcommutative)
 OMPSS_TASK_CLAUSE(weakreduction)
 
+// Clauses allowed for OmpSs directive 'taskwait'.
+OMPSS_TASKWAIT_CLAUSE(depend)
+OMPSS_TASKWAIT_CLAUSE(in)
+OMPSS_TASKWAIT_CLAUSE(out)
+OMPSS_TASKWAIT_CLAUSE(inout)
+
 // Clauses allowed for OmpSs directive 'task' declaration/outline.
 OMPSS_DECLARE_TASK_CLAUSE(if)
 OMPSS_DECLARE_TASK_CLAUSE(final)
@@ -128,4 +137,5 @@ OMPSS_DECLARE_TASK_CLAUSE(weakcommutative)
 #undef OMPSS_CLAUSE_ALIAS
 #undef OMPSS_CLAUSE
 #undef OMPSS_DECLARE_TASK_CLAUSE
+#undef OMPSS_TASKWAIT_CLAUSE
 #undef OMPSS_TASK_CLAUSE

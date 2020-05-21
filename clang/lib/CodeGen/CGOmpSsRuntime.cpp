@@ -1819,16 +1819,48 @@ void CGOmpSsRuntime::EmitReduction(
 }
 
 void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
-                                      SourceLocation Loc) {
-  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
-  CGF.Builder.CreateCall(
-      Callee, {},
-      {
-        llvm::OperandBundleDef(
-          std::string(getBundleStr(OSSB_directive)),
-          llvm::ConstantDataArray::getString(
-            CGM.getLLVMContext(), getBundleStr(OSSB_taskwait)))
-      });
+                                      SourceLocation Loc,
+                                      const OSSTaskDataTy &Data) {
+  if (Data.empty()) {
+    // Regular taskwait
+    llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+    CGF.Builder.CreateCall(
+        Callee, {},
+        {
+          llvm::OperandBundleDef(
+            std::string(getBundleStr(OSSB_directive)),
+            llvm::ConstantDataArray::getString(
+              CGM.getLLVMContext(), getBundleStr(OSSB_taskwait)))
+        });
+  } else {
+    // taskwait with deps -> task with deps if(0)
+    llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+    llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
+    SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_directive),
+        llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(OSSB_task)));
+
+    // Add if(0) flag
+    llvm::Type *Int1Ty = CGF.ConvertType(CGF.getContext().BoolTy);
+    TaskInfo.emplace_back(getBundleStr(OSSB_if), llvm::ConstantInt::getSigned(Int1Ty, 0));
+
+    // Push Task Stack
+    TaskStack.push_back(TaskContext());
+    CaptureMapStack.push_back(CaptureMapTy());
+
+    InTaskEmission = true;
+    EmitTaskData(CGF, Data, TaskInfo);
+    InTaskEmission = false;
+
+    llvm::Instruction *Result =
+      CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+    CGF.Builder.CreateCall(ExitCallee, Result);
+
+    // Pop Task Stack
+    TaskStack.pop_back();
+    CaptureMapStack.pop_back();
+  }
 }
 
 // We're in task body context once we set InsertPt
@@ -1907,6 +1939,85 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB->use_empty())
     return CGF.CurFn->getBasicBlockList().push_back(BB);
   delete BB;
+}
+
+void CGOmpSsRuntime::EmitTaskData(
+    CodeGenFunction &CGF,
+    const OSSTaskDataTy &Data,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
+  SmallVector<llvm::Value*, 4> CapturedList;
+  for (const Expr *E : Data.DSAs.Shareds) {
+    EmitDSAShared(CGF, E, TaskInfo, CapturedList);
+  }
+  for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
+    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
+  }
+  for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
+    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
+  }
+
+  if (Data.Cost) {
+    llvm::Value *V = CGF.EmitScalarExpr(Data.Cost);
+    CapturedList.push_back(V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_cost), V);
+  }
+  if (Data.Priority) {
+    llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
+    CapturedList.push_back(V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
+  }
+
+  if (!CapturedList.empty())
+    TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
+
+  for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
+    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
+    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
+    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
+    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
+    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
+    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
+    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
+    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
+    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
+  }
+  for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
+    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
+  }
+  for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
+    EmitReduction(getBundleStr(OSSB_reduction),
+                  getBundleStr(OSSB_redinit),
+                  getBundleStr(OSSB_redcomb),
+                  CGF, Red, TaskInfo);
+  }
+  for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
+    EmitReduction(getBundleStr(OSSB_weakreduction),
+                  getBundleStr(OSSB_redinit),
+                  getBundleStr(OSSB_redcomb),
+                  CGF, Red, TaskInfo);
+  }
+
+  if (Data.If)
+    TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
+  if (Data.Final)
+    TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
 }
 
 RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
@@ -2215,90 +2326,17 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
       getBundleStr(OSSB_directive),
       llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(OSSB_task)));
 
-  SmallVector<llvm::Value*, 4> CapturedList;
-
+  // Push Task Stack
   TaskStack.push_back(TaskContext());
   CaptureMapStack.push_back(CaptureMapTy());
 
   InTaskEmission = true;
-  for (const Expr *E : Data.DSAs.Shareds) {
-    EmitDSAShared(CGF, E, TaskInfo, CapturedList);
-  }
-  for (const OSSDSAPrivateDataTy &PDataTy : Data.DSAs.Privates) {
-    EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
-  }
-  for (const OSSDSAFirstprivateDataTy &FpDataTy : Data.DSAs.Firstprivates) {
-    EmitDSAFirstprivate(CGF, FpDataTy, TaskInfo, CapturedList);
-  }
-
-  if (Data.Cost) {
-    llvm::Value *V = CGF.EmitScalarExpr(Data.Cost);
-    CapturedList.push_back(V);
-    TaskInfo.emplace_back(getBundleStr(OSSB_cost), V);
-  }
-  if (Data.Priority) {
-    llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
-    CapturedList.push_back(V);
-    TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
-  }
-
-  if (!CapturedList.empty())
-    TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
-
-  for (const OSSDepDataTy &Dep : Data.Deps.Ins) {
-    EmitDependency(getBundleStr(OSSB_in), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.Outs) {
-    EmitDependency(getBundleStr(OSSB_out), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.Inouts) {
-    EmitDependency(getBundleStr(OSSB_inout), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.Concurrents) {
-    EmitDependency(getBundleStr(OSSB_concurrent), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.Commutatives) {
-    EmitDependency(getBundleStr(OSSB_commutative), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.WeakIns) {
-    EmitDependency(getBundleStr(OSSB_weakin), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.WeakOuts) {
-    EmitDependency(getBundleStr(OSSB_weakout), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.WeakInouts) {
-    EmitDependency(getBundleStr(OSSB_weakinout), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.WeakConcurrents) {
-    EmitDependency(getBundleStr(OSSB_weakconcurrent), CGF, Dep, TaskInfo);
-  }
-  for (const OSSDepDataTy &Dep : Data.Deps.WeakCommutatives) {
-    EmitDependency(getBundleStr(OSSB_weakcommutative), CGF, Dep, TaskInfo);
-  }
-  for (const OSSReductionDataTy &Red : Data.Reductions.RedList) {
-    EmitReduction(getBundleStr(OSSB_reduction),
-                  getBundleStr(OSSB_redinit),
-                  getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo);
-  }
-  for (const OSSReductionDataTy &Red : Data.Reductions.WeakRedList) {
-    EmitReduction(getBundleStr(OSSB_weakreduction),
-                  getBundleStr(OSSB_redinit),
-                  getBundleStr(OSSB_redcomb),
-                  CGF, Red, TaskInfo);
-  }
-
-  if (Data.If)
-    TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
-  if (Data.Final)
-    TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
-
+  EmitTaskData(CGF, Data, TaskInfo);
   InTaskEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
 
-  // Push Task Stack
   llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
   llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
   setTaskInsertPt(TaskAllocaInsertPt);
