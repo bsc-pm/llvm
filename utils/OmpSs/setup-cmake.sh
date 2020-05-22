@@ -1,5 +1,5 @@
 #!/bin/bash
-# This is a convenience script to set up cmake in the EPI project.
+# This is used for CI. This is not the recommended method to build LLVM/OmpSs-2.
 
 function nice_message()
 {
