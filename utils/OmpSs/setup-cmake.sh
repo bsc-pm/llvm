@@ -1,5 +1,8 @@
 #!/bin/bash
 # This is used for CI. This is not the recommended method to build LLVM/OmpSs-2.
+# NOTE: This script must be located in <llvm-src>/utils/OmpSs. If you change
+# its location, update the variable SRCDIR below so it correctly computes the
+# top-level source directory of LLVM.
 
 function nice_message()
 {
@@ -47,7 +50,8 @@ function run()
 ################################################################################
 
 BUILDDIR=$(readlink -f $(pwd))
-SRCDIR=$(dirname $(readlink -f $0))
+# See note at the beginning.
+SRCDIR=$(readlink -f $(dirname $(readlink -f $0))/../..)
 
 info "Using the current directory '${BUILDDIR}' as the build-dir"
 info "Using '${SRCDIR}' as the source-dir"
