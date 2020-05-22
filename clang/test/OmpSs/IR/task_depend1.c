@@ -11,7 +11,7 @@ void foo(void) {
 
 // CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %i), "QUAL.OSS.SHARED"(i32** %pi), "QUAL.OSS.SHARED"([5 x i32]* %ai), "QUAL.OSS.DEP.IN"(i32* %i, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %i), "QUAL.OSS.DEP.IN"(i32** %pi, %struct._depend_unpack_t.0 (i32**)* @compute_dep.1, i32** %pi), "QUAL.OSS.DEP.IN"([5 x i32]* %ai, %struct._depend_unpack_t.1 ([5 x i32]*)* @compute_dep.2, [5 x i32]* %ai) ]
 // CHECK-NEXT: %arrayidx = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 2
-// CHECK-NEXT: %1 = load i32, i32* %arrayidx, align 8
+// CHECK-NEXT: %1 = load i32, i32* %arrayidx, align
 // CHECK-NEXT: %2 = load i32*, i32** %pi, align 8
 // CHECK-NEXT: store i32 %1, i32* %2, align 4
 // CHECK-NEXT: store i32 %1, i32* %i, align 4

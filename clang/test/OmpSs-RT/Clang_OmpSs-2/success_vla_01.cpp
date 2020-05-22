@@ -1,3 +1,5 @@
+// REQUIRES: x86_64-linux
+
 /*--------------------------------------------------------------------
   (C) Copyright 2006-2013 Barcelona Supercomputing Center
                           Centro Nacional de Supercomputacion

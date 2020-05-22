@@ -22,7 +22,7 @@ int main(void) {
 // CHECK-NEXT: %x = getelementptr inbounds %struct.A, %struct.A* %sa, i32 0, i32 0
 // CHECK-NEXT: %1 = load i32, i32* %x, align 4
 // CHECK-NEXT: %arrayidx = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 2
-// CHECK-NEXT: store i32 %1, i32* %arrayidx, align 8
+// CHECK-NEXT: store i32 %1, i32* %arrayidx, align
 // CHECK-NEXT: %2 = load i32*, i32** %pi, align 8
 // CHECK-NEXT: store i32 %1, i32* %2, align 4
 // CHECK-NEXT: store i32 %1, i32* %i, align 4
@@ -32,7 +32,7 @@ int main(void) {
 // CHECK-NEXT: %x1 = getelementptr inbounds %struct.A, %struct.A* %sa, i32 0, i32 0
 // CHECK-NEXT: %4 = load i32, i32* %x1, align 4
 // CHECK-NEXT: %arrayidx2 = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 2
-// CHECK-NEXT: store i32 %4, i32* %arrayidx2, align 8
+// CHECK-NEXT: store i32 %4, i32* %arrayidx2, align
 // CHECK-NEXT: %5 = load i32*, i32** %pi, align 8
 // CHECK-NEXT: store i32 %4, i32* %5, align 4
 // CHECK-NEXT: store i32 %4, i32* %i, align 4
@@ -42,7 +42,7 @@ int main(void) {
 // CHECK-NEXT: %x3 = getelementptr inbounds %struct.A, %struct.A* %sa, i32 0, i32 0
 // CHECK-NEXT: %7 = load i32, i32* %x3, align 4
 // CHECK-NEXT: %arrayidx4 = getelementptr inbounds [5 x i32], [5 x i32]* %ai, i64 0, i64 2
-// CHECK-NEXT: store i32 %7, i32* %arrayidx4, align 8
+// CHECK-NEXT: store i32 %7, i32* %arrayidx4, align
 // CHECK-NEXT: %8 = load i32*, i32** %pi, align 8
 // CHECK-NEXT: store i32 %7, i32* %8, align 4
 // CHECK-NEXT: store i32 %7, i32* %i, align 4

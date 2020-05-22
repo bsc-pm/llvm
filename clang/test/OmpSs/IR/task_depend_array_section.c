@@ -13,7 +13,7 @@ void foo(int x) {
     {}
 }
 
-// CHECK: %aFix = alloca [10 x [10 x i32*]], align 16
+// CHECK: %aFix = alloca [10 x [10 x i32*]], align
 // CHECK-NEXT: %saved_stack = alloca i8*, align 8
 // CHECK-NEXT: %__vla_expr0 = alloca i64, align 8
 // CHECK-NEXT: store i32 %x, i32* %x.addr, align 4
@@ -21,7 +21,7 @@ void foo(int x) {
 // CHECK-NEXT: %1 = zext i32 %0 to i64, !dbg !9
 // CHECK-NEXT: %2 = call i8* @llvm.stacksave(), !dbg !9
 // CHECK-NEXT: store i8* %2, i8** %saved_stack, align 8, !dbg !9
-// CHECK-NEXT: %vla = alloca [7 x i32], i64 %1, align 16, !dbg !9
+// CHECK-NEXT: %vla = alloca [7 x i32], i64 %1, align {{.*}}, !dbg !9
 // CHECK-NEXT: store i64 %1, i64* %__vla_expr0, align 8, !dbg !9
 // CHECK-NEXT: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t ([10 x [10 x i32*]]*)* @compute_dep, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.0 ([10 x [10 x i32*]]*)* @compute_dep.1, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.1 ([10 x [10 x i32*]]*)* @compute_dep.2, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.2 ([10 x [10 x i32*]]*)* @compute_dep.3, [10 x [10 x i32*]]* %aFix) ]
 // CHECK-NEXT: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.3 ([10 x [10 x i32*]]*)* @compute_dep.4, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.4 ([10 x [10 x i32*]]*)* @compute_dep.5, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.5 ([10 x [10 x i32*]]*)* @compute_dep.6, [10 x [10 x i32*]]* %aFix), "QUAL.OSS.DEP.IN"([10 x [10 x i32*]]* %aFix, %struct._depend_unpack_t.6 ([10 x [10 x i32*]]*)* @compute_dep.7, [10 x [10 x i32*]]* %aFix) ]

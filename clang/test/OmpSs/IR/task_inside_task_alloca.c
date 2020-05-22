@@ -32,7 +32,7 @@ void foo(int x) {
 // CHECK-NEXT:   %1 = zext i32 %0 to i64
 // CHECK-NEXT:   %2 = call i8* @llvm.stacksave()
 // CHECK-NEXT:   store i8* %2, i8** %saved_stack, align 8
-// CHECK-NEXT:   %vla = alloca i32, i64 %1, align 16
+// CHECK-NEXT:   %vla = alloca i32, i64 %1, align
 // CHECK-NEXT:   store i64 %1, i64* %__vla_expr0, align 8
 
 // CHECK:        %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %x.addr) ]
@@ -45,7 +45,7 @@ void foo(int x) {
 // CHECK-NEXT:     %5 = zext i32 %4 to i64
 // CHECK-NEXT:     %6 = call i8* @llvm.stacksave()
 // CHECK-NEXT:     store i8* %6, i8** %saved_stack1, align 8
-// CHECK-NEXT:     %vla2 = alloca i32, i64 %5, align 16
+// CHECK-NEXT:     %vla2 = alloca i32, i64 %5, align
 // CHECK-NEXT:     store i64 %5, i64* %__vla_expr1, align 8
 
 // CHECK:          %7 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00") ]

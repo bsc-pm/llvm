@@ -1,4 +1,5 @@
-// RUN: %clang_cc1 -verify -fompss-2 -disable-llvm-passes -ferror-limit 100 %s -S -emit-llvm -o - | FileCheck %s
+// REQUIRES: x86-registered-target
+// RUN: %clang_cc1 -triple x86_64 -verify -fompss-2 -disable-llvm-passes -ferror-limit 100 %s -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 int y = 0;
 int &ry = y;
