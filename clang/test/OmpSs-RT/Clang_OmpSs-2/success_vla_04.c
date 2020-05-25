@@ -25,6 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
+// RUN: %oss-O2-compile-and-run
 
 // This test checks that CodeGen is able to build the shaped
 // VLA dimension in compute_dep function context

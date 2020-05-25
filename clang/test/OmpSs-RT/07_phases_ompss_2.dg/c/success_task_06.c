@@ -1,4 +1,5 @@
 // RUN: %oss-compile-and-run
+// RUN: %oss-O2-compile-and-run
 // XFAIL: *
 /*
 <testinfo>

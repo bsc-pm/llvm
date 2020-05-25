@@ -25,6 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile
+// RUN: %oss-O2-compile
 
 // This test checks that VLASizeMap is filled properly when CodeGen
 // changes to compute_dep function. In reality we do not need 'a'

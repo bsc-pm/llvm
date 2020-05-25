@@ -25,11 +25,11 @@
 --------------------------------------------------------------------*/
 
 // The bug triggers when compiled with -O1 or more
-// EarlyCSE fucks the code up when reuses intermediate values between tasks
+// EarlyCSE reuses intermediate values between tasks breaking the
+// OmpSs-2 analysis
 // See #72
 
-// RUN: %oss-compile -O2
-// RUN: %oss-run
+// RUN: %oss-O2-compile-and-run
 // XFAIL: *
 
 int main() {

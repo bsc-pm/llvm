@@ -25,6 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
+// RUN: %oss-O2-compile-and-run
 
 // This test checks that we're generating code properly for the compute_dep
 // function. the shape expr type of task A is int [c], but we need b to compute

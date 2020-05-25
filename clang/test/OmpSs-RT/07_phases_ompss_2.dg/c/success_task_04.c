@@ -1,4 +1,5 @@
 // RUN: %oss-compile
+// RUN: %oss-O2-compile
 /*
 <testinfo>
 test_generator=config/mercurium-ompss-2

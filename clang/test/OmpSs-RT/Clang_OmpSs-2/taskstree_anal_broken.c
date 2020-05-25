@@ -25,6 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-compile-and-run
+// RUN: %oss-O2-compile-and-run
 
 #include <stdio.h>
 void foo(int n) {

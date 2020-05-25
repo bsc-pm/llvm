@@ -25,6 +25,7 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-cxx-compile-and-run | FileCheck %s
+// RUN: %oss-cxx-O2-compile-and-run | FileCheck %s
 
 #include <iostream>       // std::cout
 #include <exception>      // std::exception_ptr, std::current_exception, std::rethrow_exception
