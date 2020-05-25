@@ -27,6 +27,9 @@
 --------------------------------------------------------------------*/
 
 // RUN: %oss-cxx-compile-and-run | FileCheck %s
+// XFAIL: *
+
+// See #72
 
 #include <stdint.h>
 #include <stdio.h>
