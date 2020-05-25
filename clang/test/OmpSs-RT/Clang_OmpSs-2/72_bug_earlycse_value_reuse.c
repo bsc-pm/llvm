@@ -30,7 +30,7 @@
 // See #72
 
 // RUN: %oss-O2-compile-and-run
-// XFAIL: *
+// UNSUPPORTED: true
 
 int main() {
     int array[10];
