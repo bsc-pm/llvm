@@ -896,25 +896,11 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
   KMP_DEBUG_ASSERT(taskdata->td_flags.started == 1);
   KMP_DEBUG_ASSERT(taskdata->td_flags.freed == 0);
 
-  bool detach = false;
-  if (taskdata->td_flags.detachable == TASK_DETACHABLE) {
-    if (taskdata->td_allow_completion_event.type ==
-        KMP_EVENT_ALLOW_COMPLETION) {
-      // event hasn't been fulfilled yet. Try to detach task.
-      __kmp_acquire_tas_lock(&taskdata->td_allow_completion_event.lock, gtid);
-      if (taskdata->td_allow_completion_event.type ==
-          KMP_EVENT_ALLOW_COMPLETION) {
-        // task finished execution
-        KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
-        taskdata->td_flags.executing = 0; // suspend the finishing task
-        // no access to taskdata after this point!
-        // __kmp_fulfill_event might free taskdata at any time from now
-        taskdata->td_flags.proxy = TASK_PROXY; // proxify!
-        detach = true;
-      }
-      __kmp_release_tas_lock(&taskdata->td_allow_completion_event.lock, gtid);
-    }
-  }
+  // Remove task finish event
+  kmp_uint32 pending_events_count
+    = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
+
+  bool detach = pending_events_count != 1;
 
   if (!detach) {
     taskdata->td_flags.complete = 1; // mark the task as completed
@@ -1077,7 +1063,10 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
 
   task->td_depnode = NULL;
   task->td_last_tied = task;
-  task->td_allow_completion_event.type = KMP_EVENT_UNINITIALIZED;
+
+  // Initialize counter to -1 event, considering that cannot have pending events
+  task->td_allow_completion_event.pending_events_count = -1;
+  task->td_allow_completion_event.ed.task = nullptr;
 
   if (set_curr_task) { // only do this init first time thread is created
     KMP_ATOMIC_ST_REL(&task->td_incomplete_child_tasks, 0);
@@ -1151,6 +1140,50 @@ static size_t __kmp_round_up_to_val(size_t size, size_t val) {
   return size;
 } // __kmp_round_up_to_va
 
+// __kmp_enable_tasking_in_serial_mode: This is used when a TASK_PROXY or TASK_DETACHABLE
+// is allocated to ensure we have tasking enabled. Also is used by TAMPI to tell the
+// runtime tasks with events will be made
+//
+// loc_ref: source location information
+// gtid: global thread number.
+void __kmp_enable_tasking_in_serial_mode(ident_t *loc_ref, kmp_int32 gtid) {
+  kmp_info_t *thread = __kmp_threads[gtid];
+  kmp_team_t *team = thread->th.th_team;
+
+  /* are we running in a sequential parallel or tskm_immediate_exec... we need
+     tasking support enabled */
+  if ((thread->th.th_task_team) == NULL) {
+    /* This should only happen if the team is serialized
+        setup a task team and propagate it to the thread */
+    KMP_DEBUG_ASSERT(team->t.t_serialized);
+    KA_TRACE(30,
+             ("T#%d creating task team in __kmp_task_alloc for proxy task\n",
+              gtid));
+    __kmp_task_team_setup(
+        thread, team,
+        1); // 1 indicates setup the current team regardless of nthreads
+    thread->th.th_task_team = team->t.t_task_team[thread->th.th_task_state];
+  }
+  kmp_task_team_t *task_team = thread->th.th_task_team;
+
+  /* tasking must be enabled now as the task might not be pushed */
+  if (!KMP_TASKING_ENABLED(task_team)) {
+    KA_TRACE(
+        30,
+        ("T#%d enabling tasking in __kmp_task_alloc for proxy task\n", gtid));
+    __kmp_enable_tasking(task_team, thread);
+    kmp_int32 tid = thread->th.th_info.ds.ds_tid;
+    kmp_thread_data_t *thread_data = &task_team->tt.tt_threads_data[tid];
+    // No lock needed since only owner can allocate
+    if (thread_data->td.td_deque == NULL) {
+      __kmp_alloc_task_deque(thread, thread_data);
+    }
+  }
+
+  if (task_team->tt.tt_found_proxy_tasks == FALSE)
+    TCW_4(task_team->tt.tt_found_proxy_tasks, TRUE);
+}
+
 // __kmp_task_alloc: Allocate the taskdata and task data structures for a task
 //
 // loc_ref: source location information
@@ -1202,38 +1235,7 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
       flags->tiedness = TASK_UNTIED;
       flags->merged_if0 = 1;
     }
-    /* are we running in a sequential parallel or tskm_immediate_exec... we need
-       tasking support enabled */
-    if ((thread->th.th_task_team) == NULL) {
-      /* This should only happen if the team is serialized
-          setup a task team and propagate it to the thread */
-      KMP_DEBUG_ASSERT(team->t.t_serialized);
-      KA_TRACE(30,
-               ("T#%d creating task team in __kmp_task_alloc for proxy task\n",
-                gtid));
-      __kmp_task_team_setup(
-          thread, team,
-          1); // 1 indicates setup the current team regardless of nthreads
-      thread->th.th_task_team = team->t.t_task_team[thread->th.th_task_state];
-    }
-    kmp_task_team_t *task_team = thread->th.th_task_team;
-
-    /* tasking must be enabled now as the task might not be pushed */
-    if (!KMP_TASKING_ENABLED(task_team)) {
-      KA_TRACE(
-          30,
-          ("T#%d enabling tasking in __kmp_task_alloc for proxy task\n", gtid));
-      __kmp_enable_tasking(task_team, thread);
-      kmp_int32 tid = thread->th.th_info.ds.ds_tid;
-      kmp_thread_data_t *thread_data = &task_team->tt.tt_threads_data[tid];
-      // No lock needed since only owner can allocate
-      if (thread_data->td.td_deque == NULL) {
-        __kmp_alloc_task_deque(thread, thread_data);
-      }
-    }
-
-    if (task_team->tt.tt_found_proxy_tasks == FALSE)
-      TCW_4(task_team->tt.tt_found_proxy_tasks, TRUE);
+    __kmp_enable_tasking_in_serial_mode(loc_ref, gtid);
   }
 
   // Calculate shared structure offset including padding after kmp_task_t struct
@@ -1336,7 +1338,11 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     taskdata->td_last_tied = NULL; // will be set when the task is scheduled
   else
     taskdata->td_last_tied = taskdata;
-  taskdata->td_allow_completion_event.type = KMP_EVENT_UNINITIALIZED;
+
+  // Initialize counter to 1 event, the task finish event
+  taskdata->td_allow_completion_event.pending_events_count = 1;
+  taskdata->td_allow_completion_event.ed.task = task;
+
 #if OMPT_SUPPORT
   if (UNLIKELY(ompt_enabled.enabled))
     __ompt_task_init(taskdata, gtid);
@@ -2827,6 +2833,7 @@ static inline int __kmp_execute_tasks_template(
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
+      handleServices();
       task = NULL;
       if (use_own_tasks) { // check on own queue first
         task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
@@ -3848,44 +3855,50 @@ void __kmpc_proxy_task_completed_ooo(kmp_task_t *ptask) {
 kmp_event_t *__kmpc_task_allow_completion_event(ident_t *loc_ref, int gtid,
                                                 kmp_task_t *task) {
   kmp_taskdata_t *td = KMP_TASK_TO_TASKDATA(task);
-  if (td->td_allow_completion_event.type == KMP_EVENT_UNINITIALIZED) {
-    td->td_allow_completion_event.type = KMP_EVENT_ALLOW_COMPLETION;
-    td->td_allow_completion_event.ed.task = task;
-    __kmp_init_tas_lock(&td->td_allow_completion_event.lock);
-  }
+
+  KMP_DEBUG_ASSERT(td->td_allow_completion_event.ed.task != nullptr);
+  KMP_DEBUG_ASSERT(td->td_allow_completion_event.pending_events_count != -1);
+
+  kmp_uint32 pending_events_count
+    = KMP_TEST_THEN_ADD32( &td->td_allow_completion_event.pending_events_count, 1);
+
+  KMP_DEBUG_ASSERT(pending_events_count != 0);
+
   return &td->td_allow_completion_event;
 }
 
 void __kmp_fulfill_event(kmp_event_t *event) {
-  if (event->type == KMP_EVENT_ALLOW_COMPLETION) {
-    kmp_task_t *ptask = event->ed.task;
-    kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(ptask);
-    bool detached = false;
-    int gtid = __kmp_get_gtid();
 
-    // The associated task might have completed or could be completing at this
-    // point.
-    // We need to take the lock to avoid races
-    __kmp_acquire_tas_lock(&event->lock, gtid);
-    if (taskdata->td_flags.proxy == TASK_PROXY)
-      detached = true;
-    event->type = KMP_EVENT_UNINITIALIZED;
-    __kmp_release_tas_lock(&event->lock, gtid);
+  KMP_DEBUG_ASSERT(event->ed.task != nullptr);
 
-    if (detached) {
-      // If the task detached complete the proxy task
-      if (gtid >= 0) {
-        kmp_team_t *team = taskdata->td_team;
-        kmp_info_t *thread = __kmp_get_thread();
-        if (thread->th.th_team == team) {
-          __kmpc_proxy_task_completed(gtid, ptask);
-          return;
-        }
+  kmp_task_t *ptask = event->ed.task;
+  kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(ptask);
+  int gtid = __kmp_get_gtid();
+
+  kmp_uint32 pending_events_count
+    = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
+
+  KMP_DEBUG_ASSERT(pending_events_count != 0);
+
+  bool fulfilled = pending_events_count == 1;
+
+  if (fulfilled) {
+    // task finished execution
+    KMP_DEBUG_ASSERT(taskdata->td_flags.executing == 1);
+    taskdata->td_flags.executing = 0; // suspend the finishing task
+    taskdata->td_flags.proxy = TASK_PROXY; // proxify!
+
+    // If the task detached complete the proxy task
+    if (gtid >= 0) {
+      kmp_team_t *team = taskdata->td_team;
+      kmp_info_t *thread = __kmp_get_thread();
+      if (thread->th.th_team == team) {
+        __kmpc_proxy_task_completed(gtid, ptask);
+        return;
       }
-
-      // fallback
-      __kmpc_proxy_task_completed_ooo(ptask);
     }
+    // fallback
+    __kmpc_proxy_task_completed_ooo(ptask);
   }
 }
 

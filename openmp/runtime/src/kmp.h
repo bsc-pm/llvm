@@ -2196,14 +2196,8 @@ typedef struct kmp_task_affinity_info {
   } flags;
 } kmp_task_affinity_info_t;
 
-typedef enum kmp_event_type_t {
-  KMP_EVENT_UNINITIALIZED = 0,
-  KMP_EVENT_ALLOW_COMPLETION = 1
-} kmp_event_type_t;
-
 typedef struct {
-  kmp_event_type_t type;
-  kmp_tas_lock_t lock;
+  kmp_uint32 pending_events_count;
   union {
     kmp_task_t *task;
   } ed;
@@ -3588,6 +3582,29 @@ extern int __kmp_invoke_microtask(microtask_t pkfn, int gtid, int npr, int argc,
                                   );
 
 /* ------------------------------------------------------------------------ */
+//
+// Polling service API
+//
+typedef int (*nanos6_polling_service_t)(void *data);
+KMP_EXPORT void nanos6_register_polling_service(char const *name,
+                                                nanos6_polling_service_t service,
+                                                void *data);
+KMP_EXPORT void nanos6_unregister_polling_service(char const *name,
+                                                  nanos6_polling_service_t service,
+                                                  void *data);
+
+/* Events API */
+KMP_EXPORT void *nanos6_get_current_event_counter();
+KMP_EXPORT void nanos6_increase_current_task_event_counter(void *event_counter,
+                                                           unsigned int increment);
+KMP_EXPORT void nanos6_decrease_task_event_counter(void *event_counter,
+                                                   unsigned int decrement);
+KMP_EXPORT void nanos6_notify_task_event_counter_api();
+
+/* ------------------------------------------------------------------------ */
+
+
+
 
 KMP_EXPORT void __kmpc_begin(ident_t *, kmp_int32 flags);
 KMP_EXPORT void __kmpc_end(ident_t *);
@@ -3649,6 +3666,11 @@ KMP_EXPORT void __kmpc_copyprivate(ident_t *loc, kmp_int32 global_tid,
                                    size_t cpy_size, void *cpy_data,
                                    void (*cpy_func)(void *, void *),
                                    kmp_int32 didit);
+
+// TAMPI polling service checker
+KMP_EXPORT void handleServices();
+KMP_EXPORT void __kmp_enable_tasking_in_serial_mode(ident_t *loc_ref, kmp_int32 gtid);
+
 
 extern void KMPC_SET_NUM_THREADS(int arg);
 extern void KMPC_SET_DYNAMIC(int flag);
