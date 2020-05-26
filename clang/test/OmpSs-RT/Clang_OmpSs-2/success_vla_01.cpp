@@ -28,7 +28,6 @@
 
 // RUN: %oss-cxx-compile-and-run | FileCheck %s
 // RUN: %oss-cxx-O2-compile-and-run | FileCheck %s
-// UNSUPPORTED: true
 
 // See #72
 
