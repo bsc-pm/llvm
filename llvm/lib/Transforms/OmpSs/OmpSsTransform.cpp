@@ -1480,6 +1480,7 @@ struct OmpSs : public ModulePass {
       M.getOrInsertFunction("nanos6_constructor_register_task_info",
         Type::getVoidTy(M.getContext())
       );
+    cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee())->setLinkage(GlobalValue::InternalLinkage);
     BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
       cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()));
     EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
