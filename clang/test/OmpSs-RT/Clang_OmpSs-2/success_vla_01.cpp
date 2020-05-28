@@ -70,14 +70,15 @@ void pod_test() {
     // array    10*sizeof(uint32_t) |
     // vlap     sizeof(uint32_t *)  |
     // vla1p    sizeof(uint32_t *)  |
-    // n        sizeof(uint32_t)    | 76 rounded to 80
+    // n        sizeof(uint32_t)    | 80
+    // (align to 8): +4             |
     // vladim   sizeof(uint64_t)    |
     // vla1dim  sizeof(uint64_t)  <-|
     // vladata  4*sizeof(uint32_t)
     // vla1data 4*sizeof(uint32_t)
     // TOTAL:   112
 
-    #pragma oss task firstprivate(array, vla, vla1)
+    #pragma oss task firstprivate(array, vla, vla1, n)
     {
         printf("%ld\n", (uintptr_t)&vla1[n] - (uintptr_t)array);
         printf("T1: vla: %d %d %d\n", vla[0], vla[1], vla[2]);
@@ -85,12 +86,9 @@ void pod_test() {
         printf("T1: array: %d %d %d\n", array[0], array[1], array[2]);
     }
     #pragma oss taskwait
-    #pragma oss task private(array, vla, vla1)
+    #pragma oss task private(array, vla, vla1) firstprivate(n)
     {
         printf("%ld\n", (uintptr_t)&vla1[n] - (uintptr_t)array);
-        printf("T2: vla: %d %d %d \n", vla[0], vla[1], vla[2]);
-        printf("T2: vla1: %d %d %d \n", vla1[0], vla1[1], vla1[2]);
-        printf("T2: array: %d %d %d \n", array[0], array[1], array[2]);
     }
     #pragma oss taskwait
 }
@@ -104,11 +102,12 @@ void nonpod_private_test() {
     }
     // array    4*sizeof(S)          |
     // vlap     sizeof(S *)          |
-    // n        sizeof(uint32_t)     | 36 rounded to 48
+    // n        sizeof(uint32_t)     | 40 round to 48
+    // (align to 8): +4              |
     // vladim   sizeof(uint64_t)   <-|
     // vladata  4*sizeof(S)
     // TOTAL:   64
-    #pragma oss task private(array, vla)
+    #pragma oss task private(array, vla) firstprivate(n)
     {
         // printf("%d\n", (uintptr_t)array%sizeof(uint32_t));
         printf("%ld\n", (uintptr_t)&vla[n] - (uintptr_t)array);
@@ -163,9 +162,6 @@ int main() {
 // CHECK-NEXT: T1: array: 11 11 11
 
 // CHECK: 112
-// CHECK-NEXT: T2: vla: 0 0 0
-// CHECK-NEXT: T2: vla1: 0 0 0
-// CHECK-NEXT: T2: array: 0 0 0
 
 // CHECK: 64
 // CHECK-NEXT: -1 -1
