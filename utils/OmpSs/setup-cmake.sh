@@ -319,7 +319,7 @@ fi
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
-   -DLLVM_ENABLE_PROJECTS="clang;openmp;compiler-rt" \
+   -DLLVM_ENABLE_PROJECTS="clang;openmp" \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
