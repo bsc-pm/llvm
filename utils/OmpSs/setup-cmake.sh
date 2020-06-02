@@ -313,6 +313,17 @@ then
 fi
 
 ################################################################################
+# Compiler-rt for installations
+################################################################################
+
+if [ "${ENABLE_COMPILER_RT}" = 1 ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_ENABLE_RUNTIMES=compiler-rt")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_CAN_EXECUTE_TESTS=OFF")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_INCLUDE_TESTS=OFF")
+fi
+
+################################################################################
 # cmake
 ################################################################################
 
