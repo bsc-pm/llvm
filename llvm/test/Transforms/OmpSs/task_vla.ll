@@ -5,6 +5,29 @@ source_filename = "task_vla.ll"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
+; void pod_array(int n) {
+;     int array[n];
+;     #pragma oss task private(array)
+;     {}
+;     #pragma oss task firstprivate(array)
+;     {}
+; }
+;
+; struct S {
+;     int x;
+;     S();
+;     S(const S&s);
+;     ~S();
+; };
+;
+; void non_pod_array(int n) {
+;     S array[n];
+;     #pragma oss task private(array)
+;     {}
+;     #pragma oss task firstprivate(array)
+;     {}
+; }
+
 %struct.S = type { i32 }
 
 define dso_local void @_Z9pod_arrayi(i32 %n) !dbg !6 {
@@ -265,13 +288,19 @@ arraydestroy.done1:                               ; preds = %arraydestroy.body, 
   ret void, !dbg !23
 }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi0(%struct.S* %vla, i64 %0, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !24 {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %2), !dbg !25
-; CHECK: }
+; CHECK: define internal void @nanos6_unpacked_destroy__Z13non_pod_arrayi0(%struct.S* %vla, i64 %0) {
+; CHECK: entry:
+; CHECK-NEXT:   %1 = mul nuw i64 1, %0
+; CHECK-NEXT:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %1)
+; CHECK-NEXT:   ret void
+; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_task_region__Z13non_pod_arrayi1(%struct.S* %vla, i64 %0, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !26 {
-; CHECK:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %2), !dbg !27
-; CHECK: }
+; CHECK: define internal void @nanos6_unpacked_destroy__Z13non_pod_arrayi1(%struct.S* %vla, i64 %0) {
+; CHECK: entry:
+; CHECK-NEXT:   %1 = mul nuw i64 1, %0
+; CHECK-NEXT:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %vla, i64 %1)
+; CHECK-NEXT:   ret void
+; CHECK-NEXT: }
 
 declare i8* @llvm.stacksave()
 declare token @llvm.directive.region.entry()

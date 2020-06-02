@@ -116,6 +116,12 @@ declare dso_local i32 @__gxx_personality_v0(...)
 ; Function Attrs: noinline noreturn nounwind
 declare void @__clang_call_terminate(i8* %0)
 
+; CHECK: define internal void @nanos6_unpacked_destroy_main0(%struct.S* %s) {
+; CHECK: entry:
+; CHECK-NEXT:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %s, i64 1)
+; CHECK-NEXT:   ret void
+; CHECK-NEXT: }
+
 ; CHECK: define internal void @nanos6_unpacked_task_region_main0(%struct.S* %s, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !12 {
 ; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %0
@@ -123,7 +129,6 @@ declare void @__clang_call_terminate(i8* %0)
 ; CHECK-NEXT:   invoke void @_Z3fooRK1S(%struct.S* dereferenceable(4) %s)
 ; CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 ; CHECK: invoke.cont:                                      ; preds = %0
-; CHECK-NEXT:   call void @oss_dtor_ZN1SD1Ev(%struct.S* %s, i64 1)
 ; CHECK-NEXT:   ret void
 ; CHECK: terminate.lpad:                                   ; preds = %0
 ; CHECK-NEXT:   %1 = landingpad { i8*, i32 }
