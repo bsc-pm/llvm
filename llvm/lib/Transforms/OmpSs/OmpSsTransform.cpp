@@ -305,6 +305,74 @@ struct OmpSs : public ModulePass {
     BBBuilder.CreateCall(TaskInfoRegisterFuncCallee, TaskInfoVar);
   }
 
+  void unpackDestroyArgsAndRewrite(
+      Module &M, const TaskInfo &TI, Function *F,
+      const MapVector<Value *, size_t> &StructToIdxMap) {
+
+    BasicBlock::Create(M.getContext(), "entry", F);
+    BasicBlock &Entry = F->getEntryBlock();
+    IRBuilder<> IRB(&Entry);
+
+    for (Value *V : TI.DSAInfo.Private) {
+      // Call custom destructor in clang in non-pods
+      auto It = TI.NonPODsInfo.Deinits.find(V);
+      if (It != TI.NonPODsInfo.Deinits.end()) {
+        Type *Ty = V->getType()->getPointerElementType();
+        // Compute num elements
+        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+        if (isa<ArrayType>(Ty)) {
+          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+            // Constant array
+            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                               ArrTy->getNumElements());
+            NSize = IRB.CreateNUWMul(NSize, NumElems);
+            Ty = ArrTy->getElementType();
+          }
+        } else if (TI.VLADimsInfo.count(V)) {
+          for (Value *Dim : TI.VLADimsInfo.lookup(V))
+            NSize = IRB.CreateNUWMul(NSize, F->getArg(StructToIdxMap.lookup(Dim)));
+        }
+
+        // Regular arrays have types like [10 x %struct.S]*
+        // Cast to %struct.S*
+        Value *FArg = IRB.CreateBitCast(F->getArg(StructToIdxMap.lookup(V)), Ty->getPointerTo());
+
+        llvm::Function *Func = cast<Function>(It->second);
+        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
+      }
+    }
+    for (Value *V : TI.DSAInfo.Firstprivate) {
+      // Call custom destructor in clang in non-pods
+      auto It = TI.NonPODsInfo.Deinits.find(V);
+      if (It != TI.NonPODsInfo.Deinits.end()) {
+        Type *Ty = V->getType()->getPointerElementType();
+        // Compute num elements
+        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
+        if (isa<ArrayType>(Ty)) {
+          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
+            // Constant array
+            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
+                                               ArrTy->getNumElements());
+            NSize = IRB.CreateNUWMul(NSize, NumElems);
+            Ty = ArrTy->getElementType();
+          }
+        } else if (TI.VLADimsInfo.count(V)) {
+          for (Value *Dim : TI.VLADimsInfo.lookup(V))
+            NSize = IRB.CreateNUWMul(NSize, F->getArg(StructToIdxMap.lookup(Dim)));
+        }
+
+        // Regular arrays have types like [10 x %struct.S]*
+        // Cast to %struct.S*
+        Value *FArg = IRB.CreateBitCast(F->getArg(StructToIdxMap.lookup(V)), Ty->getPointerTo());
+
+        llvm::Function *Func = cast<Function>(It->second);
+        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
+      }
+    }
+    IRB.CreateRetVoid();
+  }
+
+
   void unpackDepsAndRewrite(Module &M, const TaskInfo &TI,
                             Function *F,
                             const MapVector<Value *, size_t> &StructToIdxMap) {
@@ -861,6 +929,30 @@ struct OmpSs : public ModulePass {
     SmallVector<Type *, 4> TaskExtraTypeList;
     SmallVector<StringRef, 4> TaskExtraNameList;
 
+    // nanos6_unpacked_destroy_* START
+    TaskExtraTypeList.clear();
+    TaskExtraNameList.clear();
+
+    Function *UnpackDestroyArgsFuncVar
+      = createUnpackOlFunction(M, F,
+                               ("nanos6_unpacked_destroy_" + F.getName() + Twine(taskNum)).str(),
+                               TaskTypeList, TaskNameList,
+                               TaskExtraTypeList, TaskExtraNameList);
+    unpackDestroyArgsAndRewrite(M, TI, UnpackDestroyArgsFuncVar, TaskArgsToStructIdxMap);
+
+    // nanos6_unpacked_destroy_* END
+
+    // nanos6_ol_destroy_* START
+
+    Function *OlDestroyArgsFuncVar
+      = createUnpackOlFunction(M, F,
+                               ("nanos6_ol_destroy_" + F.getName() + Twine(taskNum)).str(),
+                               {TaskArgsTy->getPointerTo()}, {"task_args"},
+                               TaskExtraTypeList, TaskExtraNameList);
+    olCallToUnpack(M, TI, TaskArgsToStructIdxMap, OlDestroyArgsFuncVar, UnpackDestroyArgsFuncVar);
+
+    // nanos6_ol_destroy_* END
+
     // void *device_env
     TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
     TaskExtraNameList.push_back("device_env");
@@ -1057,6 +1149,7 @@ struct OmpSs : public ModulePass {
                                       [&M, &F, &TI, &OlDepsFuncVar,
                                        &OlPriorityFuncVar,
                                        &TaskImplInfoVar,
+                                       &OlDestroyArgsFuncVar,
                                        &TaskRedInitsVar, &TaskRedCombsVar,
                                        &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, Nanos6TaskInfo::getInstance(M).getType(),
@@ -1072,7 +1165,7 @@ struct OmpSs : public ModulePass {
                                                       : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))),
                                                     ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3), 1),
                                                     ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(4)),
-                                                    ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(5))),
+                                                    ConstantExpr::getPointerCast(OlDestroyArgsFuncVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(5))),
                                                     ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(6))),
                                                     ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
                                                     ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
@@ -1313,7 +1406,7 @@ struct OmpSs : public ModulePass {
           GEP = IRB.CreateBitCast(GEP, Ty->getPointerTo());
           V = IRB.CreateBitCast(V, Ty->getPointerTo());
 
-          llvm::Function *Func = cast<Function>(It->second); 
+          llvm::Function *Func = cast<Function>(It->second);
           IRB.CreateCall(Func, ArrayRef<Value*>{/*Src=*/V, /*Dst=*/GEP, NSize});
         } else {
           unsigned SizeB = M.getDataLayout().getTypeAllocSize(Ty);
@@ -1364,76 +1457,6 @@ struct OmpSs : public ModulePass {
     CodeExtractorAnalysisCache CEAC(F);
     CodeExtractor CE(TaskBBs.getArrayRef(), rewriteUsesBrAndGetOmpSsUnpackFunc, emitOmpSsCaptureAndSubmitTask);
     CE.extractCodeRegion(CEAC);
-
-    // Call Dtors
-    // Find 'ret' instr.
-    // TODO: We assume there will be only one
-    Instruction *RetI = nullptr;
-    for (auto I = inst_begin(UnpackTaskFuncVar); I != inst_end(UnpackTaskFuncVar); ++I) {
-      if (isa<ReturnInst>(*I)) {
-        RetI = &*I;
-        break;
-      }
-    }
-    assert(RetI && "UnpackTaskFunc does not have a terminator 'ret'");
-
-    IRBuilder<> IRB(RetI);
-    for (Value *V : TI.DSAInfo.Private) {
-      // Call custom destructor in clang in non-pods
-      auto It = TI.NonPODsInfo.Deinits.find(V);
-      if (It != TI.NonPODsInfo.Deinits.end()) {
-        Type *Ty = V->getType()->getPointerElementType();
-        // Compute num elements
-        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
-        if (isa<ArrayType>(Ty)) {
-          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
-            // Constant array
-            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
-                                               ArrTy->getNumElements());
-            NSize = IRB.CreateNUWMul(NSize, NumElems);
-            Ty = ArrTy->getElementType();
-          }
-        } else if (TI.VLADimsInfo.count(V)) {
-          for (Value *const &Dim : TI.VLADimsInfo[V])
-            NSize = IRB.CreateNUWMul(NSize, UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[Dim]));
-        }
-
-        // Regular arrays have types like [10 x %struct.S]*
-        // Cast to %struct.S*
-        Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
-
-        llvm::Function *Func = cast<Function>(It->second); 
-        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
-      }
-    }
-    for (Value *V : TI.DSAInfo.Firstprivate) {
-      // Call custom destructor in clang in non-pods
-      auto It = TI.NonPODsInfo.Deinits.find(V);
-      if (It != TI.NonPODsInfo.Deinits.end()) {
-        Type *Ty = V->getType()->getPointerElementType();
-        // Compute num elements
-        Value *NSize = ConstantInt::get(IRB.getInt64Ty(), 1);
-        if (isa<ArrayType>(Ty)) {
-          while (ArrayType *ArrTy = dyn_cast<ArrayType>(Ty)) {
-            // Constant array
-            Value *NumElems = ConstantInt::get(IRB.getInt64Ty(),
-                                               ArrTy->getNumElements());
-            NSize = IRB.CreateNUWMul(NSize, NumElems);
-            Ty = ArrTy->getElementType();
-          }
-        } else if (TI.VLADimsInfo.count(V)) {
-          for (Value *const &Dim : TI.VLADimsInfo[V])
-            NSize = IRB.CreateNUWMul(NSize, UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[Dim]));
-        }
-
-        // Regular arrays have types like [10 x %struct.S]*
-        // Cast to %struct.S*
-        Value *FArg = IRB.CreateBitCast(UnpackTaskFuncVar->getArg(TaskArgsToStructIdxMap[V]), Ty->getPointerTo());
-
-        llvm::Function *Func = cast<Function>(It->second); 
-        IRB.CreateCall(Func, ArrayRef<Value*>{FArg, NSize});
-      }
-    }
   }
 
   void buildNanos6Types(Module &M) {
