@@ -3326,7 +3326,9 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
   }
   if (SubstReductionType.isNull())
     return nullptr;
-  bool IsCorrect = !SubstReductionType.isNull();
+  Expr *Combiner = D->getCombiner();
+  Expr *Init = D->getInitializer();
+  bool IsCorrect = true;
   // Create instantiated copy.
   std::pair<QualType, SourceLocation> ReductionTypes[] = {
       std::make_pair(SubstReductionType, D->getLocation())};
@@ -3341,23 +3343,10 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
       PrevDeclInScope);
   auto *NewDRD = cast<OSSDeclareReductionDecl>(DRD.get().getSingleDecl());
   SemaRef.CurrentInstantiationScope->InstantiatedLocal(D, NewDRD);
-  if (!RequiresInstantiation) {
-    if (Expr *Combiner = D->getCombiner()) {
-      NewDRD->setCombinerData(D->getCombinerIn(), D->getCombinerOut());
-      NewDRD->setCombiner(Combiner);
-      if (Expr *Init = D->getInitializer()) {
-        NewDRD->setInitializerData(D->getInitOrig(), D->getInitPriv());
-        NewDRD->setInitializer(Init, D->getInitializerKind());
-      }
-    }
-    (void)SemaRef.ActOnOmpSsDeclareReductionDirectiveEnd(
-        /*S=*/nullptr, DRD, IsCorrect && !D->isInvalidDecl());
-    return NewDRD;
-  }
   Expr *SubstCombiner = nullptr;
   Expr *SubstInitializer = nullptr;
   // Combiners instantiation sequence.
-  if (D->getCombiner()) {
+  if (Combiner) {
     SemaRef.ActOnOmpSsDeclareReductionCombinerStart(
         /*S=*/nullptr, NewDRD);
     SemaRef.CurrentInstantiationScope->InstantiatedLocal(
@@ -3369,46 +3358,41 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
     auto *ThisContext = dyn_cast_or_null<CXXRecordDecl>(Owner);
     Sema::CXXThisScopeRAII ThisScope(SemaRef, ThisContext, Qualifiers(),
                                      ThisContext);
-    SubstCombiner = SemaRef.SubstExpr(D->getCombiner(), TemplateArgs).get();
+    SubstCombiner = SemaRef.SubstExpr(Combiner, TemplateArgs).get();
     SemaRef.ActOnOmpSsDeclareReductionCombinerEnd(NewDRD, SubstCombiner);
-    // Initializers instantiation sequence.
-    if (D->getInitializer()) {
-      VarDecl *OmpPrivParm =
-          SemaRef.ActOnOmpSsDeclareReductionInitializerStart(
-              /*S=*/nullptr, NewDRD);
-      SemaRef.CurrentInstantiationScope->InstantiatedLocal(
-          cast<DeclRefExpr>(D->getInitOrig())->getDecl(),
-          cast<DeclRefExpr>(NewDRD->getInitOrig())->getDecl());
-      SemaRef.CurrentInstantiationScope->InstantiatedLocal(
-          cast<DeclRefExpr>(D->getInitPriv())->getDecl(),
-          cast<DeclRefExpr>(NewDRD->getInitPriv())->getDecl());
-      if (D->getInitializerKind() == OSSDeclareReductionDecl::CallInit) {
-        SubstInitializer =
-            SemaRef.SubstExpr(D->getInitializer(), TemplateArgs).get();
-      } else {
-        auto *OldPrivParm =
-            cast<VarDecl>(cast<DeclRefExpr>(D->getInitPriv())->getDecl());
-        IsCorrect = IsCorrect && OldPrivParm->hasInit();
-        if (IsCorrect)
-          SemaRef.InstantiateVariableInitializer(OmpPrivParm, OldPrivParm,
-                                                 TemplateArgs);
-      }
-      SemaRef.ActOnOmpSsDeclareReductionInitializerEnd(
-          NewDRD, SubstInitializer, OmpPrivParm);
-    }
-    IsCorrect =
-        IsCorrect && SubstCombiner &&
-        (!D->getInitializer() ||
-         (D->getInitializerKind() == OSSDeclareReductionDecl::CallInit &&
-          SubstInitializer) ||
-         (D->getInitializerKind() != OSSDeclareReductionDecl::CallInit &&
-          !SubstInitializer && !SubstInitializer));
-  } else {
-    IsCorrect = false;
   }
+  // Initializers instantiation sequence.
+  if (Init) {
+    VarDecl *OmpPrivParm = SemaRef.ActOnOmpSsDeclareReductionInitializerStart(
+        /*S=*/nullptr, NewDRD);
+    SemaRef.CurrentInstantiationScope->InstantiatedLocal(
+        cast<DeclRefExpr>(D->getInitOrig())->getDecl(),
+        cast<DeclRefExpr>(NewDRD->getInitOrig())->getDecl());
+    SemaRef.CurrentInstantiationScope->InstantiatedLocal(
+        cast<DeclRefExpr>(D->getInitPriv())->getDecl(),
+        cast<DeclRefExpr>(NewDRD->getInitPriv())->getDecl());
+    if (D->getInitializerKind() == OSSDeclareReductionDecl::CallInit) {
+      SubstInitializer = SemaRef.SubstExpr(Init, TemplateArgs).get();
+    } else {
+      auto *OldPrivParm =
+          cast<VarDecl>(cast<DeclRefExpr>(D->getInitPriv())->getDecl());
+      IsCorrect = IsCorrect && OldPrivParm->hasInit();
+      if (IsCorrect)
+        SemaRef.InstantiateVariableInitializer(OmpPrivParm, OldPrivParm,
+                                               TemplateArgs);
+    }
+    SemaRef.ActOnOmpSsDeclareReductionInitializerEnd(NewDRD, SubstInitializer,
+                                                      OmpPrivParm);
+  }
+  IsCorrect = IsCorrect && SubstCombiner &&
+              (!Init ||
+               (D->getInitializerKind() == OSSDeclareReductionDecl::CallInit &&
+                SubstInitializer) ||
+               (D->getInitializerKind() != OSSDeclareReductionDecl::CallInit &&
+                !SubstInitializer));
 
-  (void)SemaRef.ActOnOmpSsDeclareReductionDirectiveEnd(/*S=*/nullptr, DRD,
-                                                        IsCorrect);
+  (void)SemaRef.ActOnOmpSsDeclareReductionDirectiveEnd(
+      /*S=*/nullptr, DRD, IsCorrect && !D->isInvalidDecl());
 
   return NewDRD;
 }
