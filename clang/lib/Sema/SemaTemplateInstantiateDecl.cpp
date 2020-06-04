@@ -3386,7 +3386,12 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
         SubstInitializer =
             SemaRef.SubstExpr(D->getInitializer(), TemplateArgs).get();
       } else {
-        IsCorrect = IsCorrect && OmpPrivParm->hasInit();
+        auto *OldPrivParm =
+            cast<VarDecl>(cast<DeclRefExpr>(D->getInitPriv())->getDecl());
+        IsCorrect = IsCorrect && OldPrivParm->hasInit();
+        if (IsCorrect)
+          SemaRef.InstantiateVariableInitializer(OmpPrivParm, OldPrivParm,
+                                                 TemplateArgs);
       }
       SemaRef.ActOnOmpSsDeclareReductionInitializerEnd(
           NewDRD, SubstInitializer, OmpPrivParm);
