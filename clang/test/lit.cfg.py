@@ -51,6 +51,9 @@ config.substitutions.append(
 llvm_config.with_system_environment(
     ['ASAN_SYMBOLIZER_PATH', 'MSAN_SYMBOLIZER_PATH'])
 
+# Propagate info for Nanos6
+llvm_config.with_system_environment(['NANOS6_CUDA_STREAMS'])
+
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 
 
