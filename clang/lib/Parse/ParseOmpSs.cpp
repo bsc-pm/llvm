@@ -443,13 +443,44 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
 ///        annot_pragma_ompss_end
 ///
 Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
-    AccessSpecifier &AS, ParsedAttributesWithRange &Attrs,
+    AccessSpecifier &AS, ParsedAttributesWithRange &Attrs, bool Delayed,
     DeclSpec::TST TagType, Decl *Tag) {
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
-  SourceLocation Loc = ConsumeAnnotationToken();
-  OmpSsDirectiveKind DKind = parseOmpSsDirectiveKind(*this);
+  SourceLocation Loc;
+  OmpSsDirectiveKind DKind;
+  if (Delayed) {
+    TentativeParsingAction TPA(*this);
+    Loc = ConsumeAnnotationToken();
+    DKind = parseOmpSsDirectiveKind(*this);
+    if (DKind == OSSD_declare_reduction) {
+      // Need to delay parsing until completion of the parent class.
+      TPA.Revert();
+      CachedTokens Toks;
+      unsigned Cnt = 1;
+      Toks.push_back(Tok);
+      while (Cnt && Tok.isNot(tok::eof)) {
+        (void)ConsumeAnyToken();
+        if (Tok.is(tok::annot_pragma_ompss))
+          ++Cnt;
+        else if (Tok.is(tok::annot_pragma_ompss_end))
+          --Cnt;
+        Toks.push_back(Tok);
+      }
+      // Skip last annot_pragma_ompss_end.
+      if (Cnt == 0)
+        (void)ConsumeAnyToken();
+      auto *LP = new LateParsedPragma(this, AS);
+      LP->takeToks(Toks);
+      getCurrentClass().LateParsedDeclarations.push_back(LP);
+      return nullptr;
+    }
+    TPA.Commit();
+  } else {
+    Loc = ConsumeAnnotationToken();
+    DKind = parseOmpSsDirectiveKind(*this);
+  }
 
   switch (DKind) {
   case OSSD_task: {
@@ -918,9 +949,8 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
                                       Scope::CompoundStmtScope);
       // Parse <combiner> expression.
       Actions.ActOnOmpSsDeclareReductionCombinerStart(getCurScope(), D);
-      CombinerResult =
-          Actions.ActOnFinishFullExpr(ParseAssignmentExpression().get(),
-                                      D->getLocation(), /*DiscardedValue*/ false);
+      CombinerResult = Actions.ActOnFinishFullExpr(
+          ParseExpression().get(), D->getLocation(), /*DiscardedValue*/ false);
       Actions.ActOnOmpSsDeclareReductionCombinerEnd(D, CombinerResult.get());
     }
 

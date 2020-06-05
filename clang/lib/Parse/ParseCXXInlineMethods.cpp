@@ -694,6 +694,12 @@ void Parser::ParseLexedPragma(LateParsedPragma &LP) {
     (void)ParseOpenMPDeclarativeDirectiveWithExtDecl(AS, Attrs);
     break;
   }
+  case tok::annot_pragma_ompss: {
+    AccessSpecifier AS = LP.getAccessSpecifier();
+    ParsedAttributesWithRange Attrs(AttrFactory);
+    (void)ParseOmpSsDeclarativeDirectiveWithExtDecl(AS, Attrs);
+    break;
+  }
   default:
     llvm_unreachable("Unexpected token.");
   }

@@ -22,9 +22,18 @@ template <class T>
 class SSS {
 public:
 #pragma oss declare reduction(fun : T : omp_out += omp_in) initializer(omp_priv = omp_orig + 15)
-  // CHECK: #pragma oss declare reduction (fun : T : omp_out += omp_in) initializer(omp_priv = omp_orig + 15)
-  // CHECK: #pragma oss declare reduction (fun : int : omp_out += omp_in) initializer(omp_priv = omp_orig + 15)
+#pragma oss declare reduction(fun1 : T : omp_out=1, omp_out=foo(omp_in)) initializer(omp_priv = omp_orig + 14)
+  static T foo(T &);
 };
+
+// CHECK: template <class T> class SSS {
+// CHECK: #pragma oss declare reduction (fun : T : omp_out += omp_in) initializer(omp_priv = omp_orig + 15)
+// CHECK: #pragma oss declare reduction (fun1 : T : omp_out = 1 , omp_out = foo(omp_in)) initializer(omp_priv = omp_orig + 14)
+// CHECK: };
+// CHECK: template<> class SSS<int> {
+// CHECK: #pragma oss declare reduction (fun : int : omp_out += omp_in) initializer(omp_priv = omp_orig + 15)
+// CHECK: #pragma oss declare reduction (fun1 : int : omp_out = 1 , omp_out = foo(omp_in)) initializer(omp_priv = omp_orig + 14)
+// CHECK: };
 
 SSS<int> d;
 

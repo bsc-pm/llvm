@@ -3028,7 +3028,7 @@ private:
   /// Parses declarative OmpSs directives.
   DeclGroupPtrTy ParseOmpSsDeclarativeDirectiveWithExtDecl(
       AccessSpecifier &AS, ParsedAttributesWithRange &Attrs,
-      DeclSpec::TST TagType = DeclSpec::TST_unspecified,
+      bool Delayed = false, DeclSpec::TST TagType = DeclSpec::TST_unspecified,
       Decl *TagDecl = nullptr);
   /// Parse 'oss declare reduction' construct.
   DeclGroupPtrTy ParseOmpSsDeclareReductionDirective(AccessSpecifier AS);
