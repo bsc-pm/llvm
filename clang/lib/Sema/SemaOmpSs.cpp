@@ -702,7 +702,6 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
                         ArrayRef<unsigned> Exclude = llvm::None) {
   SmallString<256> Buffer;
   llvm::raw_svector_ostream Out(Buffer);
-  unsigned Bound = Last >= 2 ? Last - 2 : 0;
   unsigned Skipped = Exclude.size();
   auto S = Exclude.begin(), E = Exclude.end();
   for (unsigned I = First; I < Last; ++I) {
@@ -711,9 +710,9 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
       continue;
     }
     Out << "'" << getOmpSsSimpleClauseTypeName(K, I) << "'";
-    if (I == Bound - Skipped)
+    if (I + Skipped + 2 == Last)
       Out << " or ";
-    else if (I != Bound + 1 - Skipped)
+    else if (I + Skipped + 1 != Last)
       Out << ", ";
   }
   return std::string(Out.str());
