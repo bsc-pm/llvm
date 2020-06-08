@@ -3690,33 +3690,30 @@ ExprResult Parser::TryParseOSSArrayShaping() {
     ConsumeBracket();
   }
 
-  // Not having a '(' after shapes means shaping expr.
-  if (Tok.isNot(tok::l_paren)) {
-    TPA.Revert();
-    return ExprEmpty();
+  // Having a '(' after shapes means we may have a ParameterDeclarationClause.
+  if (Tok.is(tok::l_paren)) {
+    ConsumeParen();
+
+    // Lambdas have ParameterDeclarationClause
+    TPResult TPR = TryParseParameterDeclarationClause();
+    if ((TPR == TPResult::Ambiguous && Tok.isNot(tok::r_paren))
+        || (TPR == TPResult::False || TPR == TPResult::Error)) {
+      TPA.Revert();
+      return ExprEmpty();
+    } else if (TPR == TPResult::Ambiguous && Tok.is(tok::r_paren)) {
+      // ()
+      TPA.Revert();
+      return ExprError();
+    }
+
+    SkipUntil(tok::r_paren, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
+    if (Tok.isNot(tok::r_paren)) {
+      TPA.Revert();
+      return ExprError();
+    }
+
+    ConsumeParen();
   }
-
-  ConsumeParen();
-
-  // Lambdas have ParameterDeclarationClause
-  TPResult TPR = TryParseParameterDeclarationClause();
-  if ((TPR == TPResult::Ambiguous && Tok.isNot(tok::r_paren))
-      || (TPR == TPResult::False || TPR == TPResult::Error)) {
-    TPA.Revert();
-    return ExprEmpty();
-  } else if (TPR == TPResult::Ambiguous && Tok.is(tok::r_paren)) {
-    // ()
-    TPA.Revert();
-    return ExprError();
-  }
-
-  SkipUntil(tok::r_paren, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
-  if (Tok.isNot(tok::r_paren)) {
-    TPA.Revert();
-    return ExprError();
-  }
-
-  ConsumeParen();
 
   // TODO: check lambda attribues stuff
   SkipUntil(tok::l_brace, tok::comma, tok::annot_pragma_ompss_end, StopBeforeMatch);
