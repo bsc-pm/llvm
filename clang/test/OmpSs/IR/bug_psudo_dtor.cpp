@@ -1,0 +1,9 @@
+// RUN: %clang_cc1 -verify -fompss-2 -disable-llvm-passes -ferror-limit 100 %s -S -emit-llvm -o -
+// expected-no-diagnostics
+
+// Pseudo Dtor callee decl (getCalleeDecl()) is nullptr
+
+int main() {
+  using T = int;
+  0 .T::~T();       // OK, no effect
+}

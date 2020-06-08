@@ -4731,7 +4731,7 @@ RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
                                      ReturnValueSlot ReturnValue) {
   // OmpSs
   if (getLangOpts().OmpSs) {
-    if (const auto *FD = dyn_cast<FunctionDecl>(E->getCalleeDecl())) {
+    if (const auto *FD = dyn_cast_or_null<FunctionDecl>(E->getCalleeDecl())) {
       if (FD->hasAttr<OSSTaskDeclAttr>()) {
         // FD->dump();
         return CGM.getOmpSsRuntime().emitTaskFunction(*this, FD, E, ReturnValue);
