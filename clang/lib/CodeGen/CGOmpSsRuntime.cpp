@@ -1035,7 +1035,8 @@ void CGOmpSsRuntime::EmitDSAShared(
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
     llvm::Value *DSAValue;
-    if (VD->getType()->isReferenceType()) {
+    if (VD->getType()->isReferenceType()
+        && !getTaskCaptureAddr(VD).isValid()) {
       // Record Ref Address to be reused in task body and other clasues
       LValue LV = CGF.EmitDeclRefLValue(DRE);
       CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
@@ -1075,7 +1076,8 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
-  if (VD->getType()->isReferenceType()) {
+  if (VD->getType()->isReferenceType()
+      && !getTaskCaptureAddr(VD).isValid()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
@@ -1115,7 +1117,8 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
-  if (VD->getType()->isReferenceType()) {
+  if (VD->getType()->isReferenceType()
+      && !getTaskCaptureAddr(VD).isValid()) {
     // Record Ref Address to be reused in task body and other clauses
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
@@ -1897,12 +1900,14 @@ Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
 }
 
 Address CGOmpSsRuntime::getTaskCaptureAddr(const VarDecl *VD) {
-  auto it = CaptureMapStack.back().find(VD);
-  Address Addr = Address::invalid();
-  if (it != CaptureMapStack.back().end()) {
-    Addr = it->second;
+  for (auto ItMap = CaptureMapStack.rbegin();
+       ItMap != CaptureMapStack.rend(); ++ItMap) {
+    auto it = ItMap->find(VD);
+    if (it != ItMap->end()) {
+      return it->second;
+    }
   }
-  return Addr;
+  return Address::invalid();
 }
 
 void CGOmpSsRuntime::setTaskInsertPt(llvm::Instruction *I) {
