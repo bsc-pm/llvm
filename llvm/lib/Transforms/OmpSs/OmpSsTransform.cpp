@@ -295,6 +295,10 @@ struct OmpSs : public ModulePass {
   FunctionCallee TaskInfoRegisterFuncCallee;
   FunctionCallee TaskInfoRegisterCtorFuncCallee;
 
+  static bool isReplaceableValue(Value *V) {
+    return isa<Instruction>(V) || isa<Argument>(V) || isa<GlobalValue>(V);
+  }
+
   // Insert a new nanos6 task info registration in
   // the constructor (global ctor inserted) function
   void registerTaskInfo(Module &M, Value *TaskInfoVar) {
@@ -390,7 +394,8 @@ struct OmpSs : public ModulePass {
       Function::arg_iterator AI = F->arg_begin();
       for (auto It = StructToIdxMap.begin();
              It != StructToIdxMap.end(); ++It, ++AI) {
-        I.replaceUsesOfWith(It->first, &*AI);
+        if (isReplaceableValue(It->first))
+          I.replaceUsesOfWith(It->first, &*AI);
       }
     }
   }
@@ -414,8 +419,8 @@ struct OmpSs : public ModulePass {
       Function::arg_iterator AI = F->arg_begin();
       for (auto It = StructToIdxMap.begin();
              It != StructToIdxMap.end(); ++It, ++AI) {
-        if (auto IIt = dyn_cast<Instruction>(It->first))
-          I.replaceUsesOfWith(IIt, &*AI);
+        if (isReplaceableValue(It->first))
+          I.replaceUsesOfWith(It->first, &*AI);
       }
     }
   }
@@ -433,8 +438,8 @@ struct OmpSs : public ModulePass {
       Function::arg_iterator AI = F->arg_begin();
       for (auto It = StructToIdxMap.begin();
              It != StructToIdxMap.end(); ++It, ++AI) {
-        if (auto IIt = dyn_cast<Instruction>(It->first))
-          I.replaceUsesOfWith(IIt, &*AI);
+        if (isReplaceableValue(It->first))
+          I.replaceUsesOfWith(It->first, &*AI);
       }
     }
   }
@@ -617,8 +622,7 @@ struct OmpSs : public ModulePass {
   void unpackDSAsWithVLADims(Module &M, const TaskInfo &TI,
                   Function *OlFunc,
                   const MapVector<Value *, size_t> &StructToIdxMap,
-                  SmallVectorImpl<Value *> &UnpackedList,
-                  bool IsTaskFunc) {
+                  SmallVectorImpl<Value *> &UnpackedList) {
     UnpackedList.clear();
 
     const TaskDSAInfo &DSAInfo = TI.DSAInfo;
@@ -688,7 +692,7 @@ struct OmpSs : public ModulePass {
     Function::arg_iterator AI = OlFunc->arg_begin();
     AI++;
     SmallVector<Value *, 4> UnpackParams;
-    unpackDSAsWithVLADims(M, TI, OlFunc, StructToIdxMap, UnpackParams, IsTaskFunc);
+    unpackDSAsWithVLADims(M, TI, OlFunc, StructToIdxMap, UnpackParams);
 
     if (IsTaskFunc) {
       // Build call to compute_dep in order to have get the base dependency of
@@ -716,8 +720,8 @@ struct OmpSs : public ModulePass {
         auto UnpackedIt = UnpackParamsCopy.begin();
         for (auto It = StructToIdxMap.begin();
                It != StructToIdxMap.end(); ++It, ++UnpackedIt) {
-          if (auto IIt = dyn_cast<Instruction>(It->first))
-            I.replaceUsesOfWith(IIt, *UnpackedIt);
+          if (isReplaceableValue(It->first))
+            I.replaceUsesOfWith(It->first, *UnpackedIt);
         }
       }
     }
