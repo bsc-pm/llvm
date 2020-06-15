@@ -10114,6 +10114,13 @@ OSSClause *TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause 
 
 template <typename Derived>
 OSSClause *
+TreeTransform<Derived>::TransformOSSWaitClause(OSSWaitClause *C) {
+  // No need to rebuild this clause, no template-dependent parameters.
+  return C;
+}
+
+template <typename Derived>
+OSSClause *
 TreeTransform<Derived>::TransformOSSDefaultClause(OSSDefaultClause *C) {
   // No need to rebuild this clause, no template-dependent parameters.
   return C;

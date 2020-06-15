@@ -210,6 +210,7 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 ///    clause:
 ///       depend-clause | if-clause | final-clause
 ///       | cost-clause | priority-clause
+///       | wait-clause
 ///       | default-clause | in-clause | out-clause
 ///       | inout-clause | concurrent-clause | commutative-clause
 ///       | weakin-clause | weakout-clause | weakinout-clause
@@ -218,6 +219,7 @@ static bool parseDeclareTaskClauses(
     Parser &P,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
+    bool &Wait,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
     SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
     SmallVectorImpl<Expr *> &Commutatives, SmallVectorImpl<Expr *> &WeakIns,
@@ -280,6 +282,18 @@ static bool parseDeclareTaskClauses(
       if (SingleClause->isInvalid())
         IsError = true;
 
+      FirstClauses[CKind] = true;
+      break;
+    }
+    case OSSC_wait: {
+      SourceLocation Loc = Tok.getLocation();
+      P.ConsumeToken();
+      if (FirstClauses[CKind]) {
+        P.Diag(Loc, diag::err_oss_more_one_clause)
+            << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
+        IsError = true;
+      }
+      Wait = true;
       FirstClauses[CKind] = true;
       break;
     }
@@ -371,6 +385,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult FinalRes;
   ExprResult CostRes;
   ExprResult PriorityRes;
+  bool Wait = false;
   SmallVector<Expr *, 4> Ins;
   SmallVector<Expr *, 4> Outs;
   SmallVector<Expr *, 4> Inouts;
@@ -396,6 +411,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       parseDeclareTaskClauses(*this,
                               IfRes, FinalRes,
                               CostRes, PriorityRes,
+                              Wait,
                               Ins, Outs, Inouts,
                               Concurrents, Commutatives,
                               WeakIns, WeakOuts, WeakInouts,
@@ -419,6 +435,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
+      Wait,
       Ins, Outs, Inouts,
       Concurrents, Commutatives,
       WeakIns, WeakOuts, WeakInouts,
@@ -665,6 +682,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 ///    clause:
 ///       depend-clause | if-clause | final-clause
 ///       | cost-clause | priority-clause
+///       | wait-clause
 ///       | default-clause | shared-clause | private-clause
 ///       | firstprivate-clause | in-clause | out-clause
 ///       | inout-clause | weakin-clause | weakout-clause
@@ -694,6 +712,14 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
       ErrorFound = true;
     }
     Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
+    break;
+  case OSSC_wait:
+    if (!FirstClause) {
+      Diag(Tok, diag::err_oss_more_one_clause)
+          << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
+      ErrorFound = true;
+    }
+    Clause = ParseOmpSsClause(CKind, WrongDirective);
     break;
   case OSSC_default:
     // These clauses cannot appear more than once
@@ -1378,3 +1404,16 @@ OSSClause *Parser::ParseOmpSsSimpleClause(OmpSsClauseKind Kind,
   return Actions.ActOnOmpSsSimpleClause(Kind, Data.Type, Data.TypeLoc, Data.LOpen, Data.Loc, Data.RLoc);
 }
 
+/// Parsing of OmpSs clauses like 'wait'.
+///
+///    wait-clause:
+///         'wait'
+///
+OSSClause *Parser::ParseOmpSsClause(OmpSsClauseKind Kind, bool ParseOnly) {
+  SourceLocation Loc = Tok.getLocation();
+  ConsumeAnyToken();
+
+  if (ParseOnly)
+    return nullptr;
+  return Actions.ActOnOmpSsClause(Kind, Loc, Tok.getLocation());
+}

@@ -512,11 +512,12 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
   TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
 }
 
-static void gatherIfFinalCostPrioInfo(const IntrinsicInst *I, TaskInfo &TI) {
+static void gatherIfFinalCostPrioWaitInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
   getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
   getValueFromOperandBundleWithID(I, TI.Cost, LLVMContext::OB_oss_cost);
   getValueFromOperandBundleWithID(I, TI.Priority, LLVMContext::OB_oss_priority);
+  getValueFromOperandBundleWithID(I, TI.Wait, LLVMContext::OB_oss_wait);
 }
 
 // It's expected to have VLA dims info before calling this
@@ -611,7 +612,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
           gatherReductionsInitCombInfo(II, T.Info);
-          gatherIfFinalCostPrioInfo(II, T.Info);
+          gatherIfFinalCostPrioWaitInfo(II, T.Info);
 
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
           if (Stack.empty())

@@ -10898,6 +10898,7 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+      bool Wait,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
       ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
@@ -11000,6 +11001,13 @@ public:
   OSSClause *ActOnOmpSsPriorityClause(Expr *E, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
+
+  OSSClause *ActOnOmpSsClause(OmpSsClauseKind Kind, SourceLocation StartLoc,
+                              SourceLocation EndLoc);
+  /// Called on well-formed 'wait' clause.
+  OSSClause *ActOnOmpSsWaitClause(SourceLocation StartLoc,
+                                    SourceLocation EndLoc);
+
 
   /// The kind of conversion being performed.
   enum CheckedConversionKind {

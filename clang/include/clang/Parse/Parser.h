@@ -3073,6 +3073,14 @@ private:
   ///
   OSSClause *ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                         bool ParseOnly);
+
+  /// Parses clause without any additional arguments.
+  ///
+  /// \param Kind Kind of current clause.
+  /// \param ParseOnly true to skip the clause's semantic actions and return
+  /// nullptr.
+  ///
+  OSSClause *ParseOmpSsClause(OmpSsClauseKind Kind, bool ParseOnly = false);
 public:
   /// Parses simple expression in parens for single-expression clauses of OmpSs
   /// constructs.

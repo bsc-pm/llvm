@@ -371,6 +371,43 @@ public:
   }
 };
 
+/// This represents 'wait' clause in the '#pragma oss task' directive.
+///
+/// \code
+/// #pragma oss task wait
+/// \endcode
+class OSSWaitClause : public OSSClause {
+public:
+  /// Build 'wait' clause.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSWaitClause(SourceLocation StartLoc, SourceLocation EndLoc)
+      : OSSClause(OSSC_wait, StartLoc, EndLoc) {}
+
+  /// Build an empty clause.
+  OSSWaitClause()
+      : OSSClause(OSSC_wait, SourceLocation(), SourceLocation()) {}
+
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  child_range used_children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+  const_child_range used_children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_wait;
+  }
+};
 
 /// This represents 'default' clause in the '#pragma oss ...' directive.
 ///

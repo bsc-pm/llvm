@@ -151,6 +151,15 @@ static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &Prior
   }
 }
 
+static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
+  assert(!Wait);
+  Wait = false;
+  for (const auto *C : S.getClausesOfKind<OSSWaitClause>()) {
+    assert(!Wait);
+    Wait = true;
+  }
+}
+
 static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDataTy &Reductions) {
   for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
     auto LHSRef = C->lhs_exprs().begin();
@@ -188,6 +197,7 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   AddFinalData(S, Data.Final);
   AddCostData(S, Data.Cost);
   AddPriorityData(S, Data.Priority);
+  AddWaitData(S, Data.Wait);
   AddReductionData(S, Data.Reductions);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);

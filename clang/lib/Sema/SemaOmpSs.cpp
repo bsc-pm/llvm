@@ -1166,6 +1166,7 @@ static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false)
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+    bool Wait,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
     ArrayRef<Expr *> WeakIns, ArrayRef<Expr *> WeakOuts,
@@ -1295,6 +1296,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
+    Wait,
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
     const_cast<Expr **>(Inouts.data()), Inouts.size(),
@@ -2751,4 +2753,23 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     llvm_unreachable("Clause is not allowed.");
   }
   return Res;
+}
+
+OSSClause *Sema::ActOnOmpSsClause(OmpSsClauseKind Kind,
+                                  SourceLocation StartLoc,
+                                  SourceLocation EndLoc) {
+  OSSClause *Res = nullptr;
+  switch (Kind) {
+  case OSSC_wait:
+    Res = ActOnOmpSsWaitClause(StartLoc, EndLoc);
+    break;
+  default:
+    llvm_unreachable("Clause is not allowed.");
+  }
+  return Res;
+}
+
+OSSClause *Sema::ActOnOmpSsWaitClause(SourceLocation StartLoc,
+                                      SourceLocation EndLoc) {
+  return new (Context) OSSWaitClause(StartLoc, EndLoc);
 }

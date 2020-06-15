@@ -1233,7 +1233,7 @@ struct OmpSs : public ModulePass {
 
       AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
-      // TaskFlagsVar = !If << 1 | Final
+      // TaskFlagsVar = Wait << 4 | !If << 1 | Final
       Value *TaskFlagsVar = ConstantInt::get(IRB.getInt64Ty(), 0);
       if (TI.Final) {
         TaskFlagsVar =
@@ -1251,6 +1251,16 @@ struct OmpSs : public ModulePass {
                 IRB.CreateICmpEQ(TI.If, IRB.getFalse()),
                 IRB.getInt64Ty()),
                 1));
+      }
+      if (TI.Wait) {
+        TaskFlagsVar =
+          IRB.CreateOr(
+            TaskFlagsVar,
+            IRB.CreateShl(
+              IRB.CreateZExt(
+                TI.Wait,
+                IRB.getInt64Ty()),
+                4));
       }
       Value *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
 

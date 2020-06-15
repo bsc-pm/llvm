@@ -180,6 +180,8 @@ void OSSTaskDeclAttr::printPrettyPragma(
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }
+  if (getWait())
+      OS << " wait";
 }
 
 void OMPDeclareTargetDeclAttr::printPrettyPragma(

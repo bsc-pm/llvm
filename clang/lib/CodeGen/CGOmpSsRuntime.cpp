@@ -49,6 +49,7 @@ enum OmpSsBundleKind {
   OSSB_final,
   OSSB_cost,
   OSSB_priority,
+  OSSB_wait,
   OSSB_in,
   OSSB_out,
   OSSB_inout,
@@ -93,6 +94,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.COST";
   case OSSB_priority:
     return "QUAL.OSS.PRIORITY";
+  case OSSB_wait:
+    return "QUAL.OSS.WAIT";
   case OSSB_in:
     return "QUAL.OSS.DEP.IN";
   case OSSB_out:
@@ -1971,6 +1974,11 @@ void CGOmpSsRuntime::EmitTaskData(
     llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
     CapturedList.push_back(V);
     TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
+  }
+  if (Data.Wait) {
+    TaskInfo.emplace_back(
+        getBundleStr(OSSB_wait),
+        llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
   }
 
   if (!CapturedList.empty())

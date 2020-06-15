@@ -699,6 +699,10 @@ void OSSClausePrinter::VisitOSSPriorityClause(OSSPriorityClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
+  OS << "wait";
+}
+
 void OSSClausePrinter::VisitOSSDefaultClause(OSSDefaultClause *Node) {
   OS << "default("
      << getOmpSsSimpleClauseTypeName(OSSC_default, Node->getDefaultKind())
