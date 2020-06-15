@@ -427,6 +427,12 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
     K = CXCursor_OMPArrayShapingExpr;
     break;
 
+    // OmpSs
+  case Stmt::OSSArrayShapingExprClass:
+  case Stmt::OSSArraySectionExprClass:
+    llvm_unreachable("unsupported");
+    break;
+
   case Stmt::OMPIteratorExprClass:
     K = CXCursor_OMPIteratorExpr;
     break;
@@ -795,6 +801,11 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
     break;
   case Stmt::OMPTargetTeamsDistributeSimdDirectiveClass:
     K = CXCursor_OMPTargetTeamsDistributeSimdDirective;
+    break;
+    // OmpSs
+  case Stmt::OSSTaskDirectiveClass:
+  case Stmt::OSSTaskwaitDirectiveClass:
+    llvm_unreachable("unsupported");
     break;
   case Stmt::BuiltinBitCastExprClass:
     K = CXCursor_BuiltinBitCastExpr;
