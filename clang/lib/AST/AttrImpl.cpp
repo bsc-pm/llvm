@@ -176,7 +176,7 @@ void OSSTaskDeclAttr::printPrettyPragma(
     OS << ")";
   }
   if (auto *E = getPriorityExpr()) {
-    OS << "priority(";
+    OS << " priority(";
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }
