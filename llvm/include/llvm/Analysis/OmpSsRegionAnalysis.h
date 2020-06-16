@@ -90,6 +90,7 @@ struct TaskInfo {
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Priority = nullptr;
+  Value *Label = nullptr;
   Value *Cost = nullptr;
   Value *Wait = nullptr;
   TaskCapturedInfo CapturedInfo;

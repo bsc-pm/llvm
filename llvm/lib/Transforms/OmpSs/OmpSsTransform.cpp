@@ -1091,6 +1091,7 @@ struct OmpSs : public ModulePass {
                                       ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
                                       [&M, &F, &OlTaskFuncVar,
                                        &OlConstraintsFuncVar, &Nanos6TaskLocStr,
+                                       &TI,
                                        &taskNum] {
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
                                 /*isConstant=*/true,
@@ -1099,9 +1100,12 @@ struct OmpSs : public ModulePass {
                                                    ConstantStruct::get(Nanos6TaskImplInfo::getInstance(M).getType(),
                                                                        ConstantInt::get(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(0), 0),
                                                                        ConstantExpr::getPointerCast(OlTaskFuncVar, Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(1)),
-                                                                       ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
                                                                        OlConstraintsFuncVar
                                                                          ? ConstantExpr::getPointerCast(OlConstraintsFuncVar,
+                                                                                                        Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))
+                                                                         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
+                                                                       TI.Label
+                                                                         ? ConstantExpr::getPointerCast(cast<Constant>(TI.Label),
                                                                                                         Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
                                                                          : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
                                                                        Nanos6TaskLocStr,

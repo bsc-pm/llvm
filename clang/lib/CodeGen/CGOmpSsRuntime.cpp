@@ -49,6 +49,7 @@ enum OmpSsBundleKind {
   OSSB_final,
   OSSB_cost,
   OSSB_priority,
+  OSSB_label,
   OSSB_wait,
   OSSB_in,
   OSSB_out,
@@ -94,6 +95,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.COST";
   case OSSB_priority:
     return "QUAL.OSS.PRIORITY";
+  case OSSB_label:
+    return "QUAL.OSS.LABEL";
   case OSSB_wait:
     return "QUAL.OSS.WAIT";
   case OSSB_in:
@@ -1974,6 +1977,12 @@ void CGOmpSsRuntime::EmitTaskData(
     llvm::Value *V = CGF.EmitScalarExpr(Data.Priority);
     CapturedList.push_back(V);
     TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
+  }
+  if (Data.Label) {
+    LValue LV = CGF.EmitLValue(Data.Label);
+    // TODO: do we need to capture stmt for variables? First guess, yes
+    // CapturedList.push_back(V);
+    TaskInfo.emplace_back(getBundleStr(OSSB_label), LV.getPointer(CGF));
   }
   if (Data.Wait) {
     TaskInfo.emplace_back(

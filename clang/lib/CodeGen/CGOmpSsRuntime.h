@@ -105,6 +105,7 @@ struct OSSTaskDataTy final {
   const Expr *Final = nullptr;
   const Expr *Cost = nullptr;
   const Expr *Priority = nullptr;
+  const Expr *Label = nullptr;
   bool Wait = false;
 
   bool empty() const {

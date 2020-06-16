@@ -115,11 +115,12 @@ public:
     OB_oss_if = 24,                    // "OB_oss_if"
     OB_oss_cost = 25,                  // "OB_oss_cost"
     OB_oss_priority = 26,              // "OB_oss_priority"
-    OB_oss_wait = 27,                  // "OB_oss_wait"
-    OB_oss_captured = 28,              // "OB_oss_captured"
-    OB_oss_init = 29,                  // "OB_oss_init"
-    OB_oss_deinit = 30,                // "OB_oss_deinit"
-    OB_oss_copy = 31,                  // "OB_oss_copy"
+    OB_oss_label = 27,                 // "OB_oss_label"
+    OB_oss_wait = 28,                  // "OB_oss_wait"
+    OB_oss_captured = 29,              // "OB_oss_captured"
+    OB_oss_init = 30,                  // "OB_oss_init"
+    OB_oss_deinit = 31,                // "OB_oss_deinit"
+    OB_oss_copy = 32,                  // "OB_oss_copy"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

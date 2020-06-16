@@ -180,6 +180,11 @@ void OSSTaskDeclAttr::printPrettyPragma(
     E->printPretty(OS, nullptr, Policy);
     OS << ")";
   }
+  if (auto *E = getLabelExpr()) {
+    OS << " label(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
   if (getWait())
       OS << " wait";
 }

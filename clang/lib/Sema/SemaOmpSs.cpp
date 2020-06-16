@@ -1166,6 +1166,7 @@ static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false)
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+    Expr *Label,
     bool Wait,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -1232,6 +1233,10 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   if (Priority) {
     PriorityRes = CheckSignedIntegerValue(Priority);
   }
+  if (Label) {
+    if (!isa<StringLiteral>(Label))
+      Diag(Label->getExprLoc(), diag::err_expr_not_string_literal);
+  }
   for (Expr *RefExpr : Ins) {
     checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
   }
@@ -1296,6 +1301,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
+    Label,
     Wait,
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -2731,6 +2737,17 @@ OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
   return new (Context) OSSPriorityClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
+                                       SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc) {
+  if (!isa<StringLiteral>(E)) {
+    Diag(E->getExprLoc(), diag::err_expr_not_string_literal);
+    return nullptr;
+  }
+  return new (Context) OSSLabelClause(E, StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
                                             SourceLocation StartLoc,
                                             SourceLocation LParenLoc,
@@ -2748,6 +2765,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_priority:
     Res = ActOnOmpSsPriorityClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_label:
+    Res = ActOnOmpSsLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");

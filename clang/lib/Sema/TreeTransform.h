@@ -1621,6 +1621,17 @@ public:
                                           EndLoc);
   }
 
+  /// Build a new OmpSs 'label' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSLabelClause(Expr *E, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsLabelClause(E, StartLoc, LParenLoc,
+                                           EndLoc);
+  }
+
   /// Build a new OmpSs 'depend' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -10110,6 +10121,16 @@ OSSClause *TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause 
     return nullptr;
   return getDerived().RebuildOSSPriorityClause(E.get(), C->getBeginLoc(),
                                                C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSLabelClause(OSSLabelClause *C) {
+  // TODO: do we really need to transform?
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSLabelClause(E.get(), C->getBeginLoc(),
+                                            C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

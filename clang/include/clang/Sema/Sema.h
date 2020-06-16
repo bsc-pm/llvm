@@ -10898,6 +10898,7 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
+      Expr *Label,
       bool Wait,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -11001,6 +11002,10 @@ public:
   OSSClause *ActOnOmpSsPriorityClause(Expr *E, SourceLocation StartLoc,
                                       SourceLocation LParenLoc,
                                       SourceLocation EndLoc);
+  /// Called on well-formed 'label' clause.
+  OSSClause *ActOnOmpSsLabelClause(Expr *E, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc);
 
   OSSClause *ActOnOmpSsClause(OmpSsClauseKind Kind, SourceLocation StartLoc,
                               SourceLocation EndLoc);

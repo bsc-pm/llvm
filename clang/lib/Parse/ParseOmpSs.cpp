@@ -145,12 +145,14 @@ public:
 static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
     ExprResult &IfRes, ExprResult &FinalRes,
-    ExprResult &CostRes, ExprResult &PriorityRes) {
+    ExprResult &CostRes, ExprResult &PriorityRes,
+    ExprResult &LabelRes) {
 
     if (CKind == OSSC_if) return &IfRes;
     if (CKind == OSSC_final) return &FinalRes;
     if (CKind == OSSC_cost) return &CostRes;
     if (CKind == OSSC_priority) return &PriorityRes;
+    if (CKind == OSSC_label) return &LabelRes;
     return nullptr;
 }
 
@@ -209,7 +211,7 @@ static OmpSsClauseKind getOmpSsClauseFromDependKinds(ArrayRef<OmpSsDependClauseK
 ///
 ///    clause:
 ///       depend-clause | if-clause | final-clause
-///       | cost-clause | priority-clause
+///       | cost-clause | priority-clause | label-clause
 ///       | wait-clause
 ///       | default-clause | in-clause | out-clause
 ///       | inout-clause | concurrent-clause | commutative-clause
@@ -219,6 +221,7 @@ static bool parseDeclareTaskClauses(
     Parser &P,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
+    ExprResult &LabelRes,
     bool &Wait,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
     SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
@@ -267,7 +270,8 @@ static bool parseDeclareTaskClauses(
     case OSSC_if:
     case OSSC_final:
     case OSSC_cost:
-    case OSSC_priority: {
+    case OSSC_priority:
+    case OSSC_label: {
       P.ConsumeToken();
       if (FirstClauses[CKind]) {
         P.Diag(Tok, diag::err_oss_more_one_clause)
@@ -276,7 +280,8 @@ static bool parseDeclareTaskClauses(
       }
       SourceLocation RLoc;
       SingleClause = getSingleClause(CKind, IfRes, FinalRes,
-                                     CostRes, PriorityRes);
+                                     CostRes, PriorityRes,
+                                     LabelRes);
       *SingleClause = P.ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -385,6 +390,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult FinalRes;
   ExprResult CostRes;
   ExprResult PriorityRes;
+  ExprResult LabelRes;
   bool Wait = false;
   SmallVector<Expr *, 4> Ins;
   SmallVector<Expr *, 4> Outs;
@@ -411,6 +417,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       parseDeclareTaskClauses(*this,
                               IfRes, FinalRes,
                               CostRes, PriorityRes,
+                              LabelRes,
                               Wait,
                               Ins, Outs, Inouts,
                               Concurrents, Commutatives,
@@ -435,6 +442,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
+      LabelRes.get(),
       Wait,
       Ins, Outs, Inouts,
       Concurrents, Commutatives,
@@ -681,7 +689,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 ///
 ///    clause:
 ///       depend-clause | if-clause | final-clause
-///       | cost-clause | priority-clause
+///       | cost-clause | priority-clause | label-clause
 ///       | wait-clause
 ///       | default-clause | shared-clause | private-clause
 ///       | firstprivate-clause | in-clause | out-clause
@@ -706,6 +714,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_final:
   case OSSC_cost:
   case OSSC_priority:
+  case OSSC_label:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
@@ -1347,6 +1356,9 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
 ///
 ///    if-clause:
 ///      'if' '(' expression ')'
+///
+///    label-clause:
+///      'label' '(' expression ')'
 OSSClause *Parser::ParseOmpSsSingleExprClause(OmpSsClauseKind Kind,
                                               bool ParseOnly) {
   SourceLocation Loc = ConsumeToken();

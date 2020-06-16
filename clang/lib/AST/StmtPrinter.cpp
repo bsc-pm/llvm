@@ -699,6 +699,12 @@ void OSSClausePrinter::VisitOSSPriorityClause(OSSPriorityClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSLabelClause(OSSLabelClause *Node) {
+  OS << "label(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
   OS << "wait";
 }

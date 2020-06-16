@@ -151,6 +151,15 @@ static void AddPriorityData(const OSSExecutableDirective &S, const Expr * &Prior
   }
 }
 
+static void AddLabelData(const OSSExecutableDirective &S, const Expr * &LabelExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSLabelClause>()) {
+    assert(!Found);
+    Found = true;
+    LabelExpr = C->getExpression();
+  }
+}
+
 static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   assert(!Wait);
   Wait = false;
@@ -197,6 +206,7 @@ void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   AddFinalData(S, Data.Final);
   AddCostData(S, Data.Cost);
   AddPriorityData(S, Data.Priority);
+  AddLabelData(S, Data.Label);
   AddWaitData(S, Data.Wait);
   AddReductionData(S, Data.Reductions);
 

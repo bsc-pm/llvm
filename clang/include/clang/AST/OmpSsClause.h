@@ -371,6 +371,58 @@ public:
   }
 };
 
+/// This represents 'label' clause in the '#pragma oss ...' directive.
+///
+/// \code
+/// #pragma oss task label("string-literal") // T1
+/// #pragma oss task label(s)                // T2
+/// \endcode
+/// In this example directive '#pragma oss task' T1 has a 'label' 'string-literal' and
+/// a T2 a 'label' the string contained in variable 's'
+class OSSLabelClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'label' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'label' clause with expression \a E.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param E Expression of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSLabelClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(OSSC_label, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(E) {}
+
+  /// Build an empty clause.
+  OSSLabelClause()
+      : OSSClause(OSSC_label, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_label;
+  }
+};
+
 /// This represents 'wait' clause in the '#pragma oss task' directive.
 ///
 /// \code

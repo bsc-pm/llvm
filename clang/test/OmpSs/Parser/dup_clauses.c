@@ -10,6 +10,8 @@ void task_cost();
 void task_priority();
 #pragma oss task wait wait // expected-error {{directive '#pragma oss task' cannot contain more than one 'wait' clause}}
 void task_wait();
+#pragma oss task label("L1") label("L2") // expected-error {{directive '#pragma oss task' cannot contain more than one 'label' clause}}
+void task_label();
 
 void bar() {
   #pragma oss task if(1) if(0) // expected-error {{directive '#pragma oss task' cannot contain more than one 'if' clause}}
@@ -18,5 +20,6 @@ void bar() {
   #pragma oss task priority(1) priority(0) // expected-error {{directive '#pragma oss task' cannot contain more than one 'priority' clause}}
   #pragma oss task wait wait // expected-error {{directive '#pragma oss task' cannot contain more than one 'wait' clause}}
   #pragma oss task default(none) default(shared) // expected-error {{directive '#pragma oss task' cannot contain more than one 'default' clause}}
+  #pragma oss task label("L1") label("L2") // expected-error {{directive '#pragma oss task' cannot contain more than one 'label' clause}}
   {}
 }

@@ -512,11 +512,13 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
   TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
 }
 
+// TODO: change function name for this
 static void gatherIfFinalCostPrioWaitInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
   getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
   getValueFromOperandBundleWithID(I, TI.Cost, LLVMContext::OB_oss_cost);
   getValueFromOperandBundleWithID(I, TI.Priority, LLVMContext::OB_oss_priority);
+  getValueFromOperandBundleWithID(I, TI.Label, LLVMContext::OB_oss_label);
   getValueFromOperandBundleWithID(I, TI.Wait, LLVMContext::OB_oss_wait);
 }
 
