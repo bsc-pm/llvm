@@ -10842,6 +10842,8 @@ public:
                                bool StrictlyPositive);
   ExprResult
   CheckSignedIntegerValue(Expr *ValExpr);
+  ExprResult
+  CheckIsConstCharPtrConvertibleExpr(Expr *E);
   /// Called on start of new data sharing attribute block.
   void StartOmpSsDSABlock(OmpSsDirectiveKind K,
                           Scope *CurScope,

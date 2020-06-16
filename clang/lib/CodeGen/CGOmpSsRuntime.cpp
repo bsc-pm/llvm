@@ -1979,10 +1979,8 @@ void CGOmpSsRuntime::EmitTaskData(
     TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
   }
   if (Data.Label) {
-    LValue LV = CGF.EmitLValue(Data.Label);
-    // TODO: do we need to capture stmt for variables? First guess, yes
-    // CapturedList.push_back(V);
-    TaskInfo.emplace_back(getBundleStr(OSSB_label), LV.getPointer(CGF));
+    llvm::Value *V = CGF.EmitScalarExpr(Data.Label);
+    TaskInfo.emplace_back(getBundleStr(OSSB_label), V);
   }
   if (Data.Wait) {
     TaskInfo.emplace_back(
@@ -2159,6 +2157,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       llvm::Value *V = CGF.EmitScalarExpr(E);
       CapturedList.push_back(V);
       TaskInfo.emplace_back(getBundleStr(OSSB_priority), V);
+    }
+    if (const Expr *E = Attr->getLabelExpr()) {
+      llvm::Value *V = CGF.EmitScalarExpr(E);
+      TaskInfo.emplace_back(getBundleStr(OSSB_label), V);
     }
     // in()
     for (const Expr *E : Attr->ins()) {

@@ -1219,7 +1219,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, LabelRes;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -1234,8 +1234,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     PriorityRes = CheckSignedIntegerValue(Priority);
   }
   if (Label) {
-    if (!isa<StringLiteral>(Label))
-      Diag(Label->getExprLoc(), diag::err_expr_not_string_literal);
+    LabelRes = CheckIsConstCharPtrConvertibleExpr(Label);
   }
   for (Expr *RefExpr : Ins) {
     checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
@@ -1301,7 +1300,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   auto *NewAttr = OSSTaskDeclAttr::CreateImplicit(
     Context,
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
-    Label,
+    LabelRes.get(),
     Wait,
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
@@ -2674,6 +2673,27 @@ ExprResult Sema::VerifyBooleanConditionWithCleanups(
   return Condition;
 }
 
+ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
+  const QualType &ConstCharPtrTy =
+      Context.getPointerType(Context.CharTy.withConst());
+
+  if (!E->isValueDependent() && !E->isTypeDependent() &&
+      !E->isInstantiationDependent() &&
+      !E->containsUnexpandedParameterPack()) {
+
+    VarDecl *LabelVD =
+        buildVarDecl(*this, E->getExprLoc(), ConstCharPtrTy, ".tmp.label");
+    AddInitializerToDecl(LabelVD,
+                         DefaultLvalueConversion(E).get(),
+                         /*DirectInit=*/false);
+    if (!LabelVD->hasInit())
+      return ExprError();
+
+    return LabelVD->getInit();
+  }
+  return E;
+}
+
 OSSClause *Sema::ActOnOmpSsIfClause(Expr *Condition,
                                     SourceLocation StartLoc,
                                     SourceLocation LParenLoc,
@@ -2741,11 +2761,11 @@ OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
                                        SourceLocation StartLoc,
                                        SourceLocation LParenLoc,
                                        SourceLocation EndLoc) {
-  if (!isa<StringLiteral>(E)) {
-    Diag(E->getExprLoc(), diag::err_expr_not_string_literal);
+  ExprResult Res = CheckIsConstCharPtrConvertibleExpr(E);
+  if (Res.isInvalid())
     return nullptr;
-  }
-  return new (Context) OSSLabelClause(E, StartLoc, LParenLoc, EndLoc);
+
+  return new (Context) OSSLabelClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,

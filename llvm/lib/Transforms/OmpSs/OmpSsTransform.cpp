@@ -1093,8 +1093,9 @@ struct OmpSs : public ModulePass {
                                        &OlConstraintsFuncVar, &Nanos6TaskLocStr,
                                        &TI,
                                        &taskNum] {
+      bool IsConstLabelOrNull = !TI.Label || isa<Constant>(TI.Label);
       GlobalVariable *GV = new GlobalVariable(M, ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1),
-                                /*isConstant=*/true,
+                                /*isConstant=*/IsConstLabelOrNull,
                                 GlobalVariable::InternalLinkage,
                                 ConstantArray::get(ArrayType::get(Nanos6TaskImplInfo::getInstance(M).getType(), 1), // TODO: More than one implementations?
                                                    ConstantStruct::get(Nanos6TaskImplInfo::getInstance(M).getType(),
@@ -1104,7 +1105,7 @@ struct OmpSs : public ModulePass {
                                                                          ? ConstantExpr::getPointerCast(OlConstraintsFuncVar,
                                                                                                         Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))
                                                                          : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(2))),
-                                                                       TI.Label
+                                                                       TI.Label && isa<Constant>(TI.Label)
                                                                          ? ConstantExpr::getPointerCast(cast<Constant>(TI.Label),
                                                                                                         Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
                                                                          : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
@@ -1227,9 +1228,10 @@ struct OmpSs : public ModulePass {
     auto emitOmpSsCaptureAndSubmitTask
       = [this, &M, &DLoc, &TaskArgsTy,
          &TI, &TaskArgsToStructIdxMap,
-         &TaskInfoVar, &TaskInvInfoVar](Function *newFunction,
-                                        BasicBlock *codeReplacer,
-                                        const SetVector<BasicBlock *> &Blocks) {
+         &TaskInfoVar, &TaskImplInfoVar,
+         &TaskInvInfoVar](Function *newFunction,
+                          BasicBlock *codeReplacer,
+                          const SetVector<BasicBlock *> &Blocks) {
 
       IRBuilder<> IRB(codeReplacer);
       // Set debug info from the task entry to all instructions
@@ -1296,6 +1298,17 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.WeakCommutatives.size()
         + TI.DependsInfo.Reductions.size()
         + TI.DependsInfo.WeakReductions.size();
+
+      // Store label if it's not a string literal (i.e label("L1"))
+      if (TI.Label && !isa<Constant>(TI.Label)) {
+        Value *Idx[3];
+        Idx[0] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
+        Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
+        Idx[2] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 3);
+        Value *LabelField = IRB.CreateGEP(TaskImplInfoVar, Idx, "ASDF");
+        IRB.CreateStore(TI.Label, LabelField);
+      }
+
       IRB.CreateCall(CreateTaskFuncCallee, {TaskInfoVar,
                                   TaskInvInfoVar,
                                   TaskArgsSizeOf,

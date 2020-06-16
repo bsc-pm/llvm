@@ -4,6 +4,10 @@
 #pragma oss task label("hola")
 void foo();
 
+const char text[] = "asdf";
+#pragma oss task label(text)
+void foo1();
+
 void bar() {
     #pragma oss task label("caracola")
     {}
@@ -11,6 +15,9 @@ void bar() {
 
 // CHECK: #pragma oss task label("hola")
 // CHECK-NEXT: void foo();
+
+// CHECK: #pragma oss task label(text)
+// CHECK-NEXT: void foo1();
 
 // CHECK: void bar() {
 // CHECK-NEXT:     #pragma oss task label("caracola")

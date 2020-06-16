@@ -10125,7 +10125,6 @@ OSSClause *TreeTransform<Derived>::TransformOSSPriorityClause(OSSPriorityClause 
 
 template <typename Derived>
 OSSClause *TreeTransform<Derived>::TransformOSSLabelClause(OSSLabelClause *C) {
-  // TODO: do we really need to transform?
   ExprResult E = getDerived().TransformExpr(C->getExpression());
   if (E.isInvalid())
     return nullptr;
