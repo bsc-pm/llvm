@@ -1009,22 +1009,15 @@ struct OmpSs : public ModulePass {
     return FuncVar;
   }
 
-  // Build a new storage for the translated reduction
-  // returns the storage of the translated reduction
-  void translateReductionUnpackedDSA(IRBuilder<> &IRB, const DependInfo *DepInfo,
-                                     Value *DSA, Value *&UnpackedDSA,
-                                     Value *AddrTranslationTable,
-                                     const std::map<Value *, int> &DepSymToIdx) {
+  // Rewrites task_args using address_translation
+  void translateDep(
+      IRBuilder<> &IRB, const DependInfo *DepInfo, Value *DSA,
+      Value *&UnpackedDSA, Value *AddrTranslationTable,
+      const std::map<Value *, int> &DepSymToIdx) {
+
     Function *ComputeDepFun = cast<Function>(DepInfo->ComputeDepFun);
     CallInst *CallComputeDep = IRB.CreateCall(ComputeDepFun, DepInfo->Args);
-    llvm::Value *Base = IRB.CreateExtractValue(CallComputeDep, 0);
-
-    // Save the original type since we are going to cast...
-    Type *UnpackedDSAType = UnpackedDSA->getType();
-    Type *BaseType = Base->getType();
-
-    // Storage of the translated DSA
-    AllocaInst *UnpackedDSATranslated = IRB.CreateAlloca(BaseType);
+    llvm::Value *DepBase = IRB.CreateExtractValue(CallComputeDep, 0);
 
     Value *Idx[2];
     Idx[0] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), DepSymToIdx.at(DSA));
@@ -1039,21 +1032,20 @@ struct OmpSs : public ModulePass {
     DeviceAddr = IRB.CreateLoad(DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
-    Base = IRB.CreateBitCast(Base, Type::getInt8PtrTy(IRB.getContext()));
-    UnpackedDSA = IRB.CreateGEP(Base, IRB.CreateNeg(LocalAddr));
-    UnpackedDSA = IRB.CreateGEP(UnpackedDSA, DeviceAddr);
-    UnpackedDSA = IRB.CreateBitCast(UnpackedDSA, BaseType );
+    Value *Translation = IRB.CreateBitCast(DepBase, Type::getInt8PtrTy(IRB.getContext()));
+    Translation = IRB.CreateGEP(Translation, IRB.CreateNeg(LocalAddr));
+    Translation = IRB.CreateGEP(Translation, DeviceAddr);
 
-    IRB.CreateStore(UnpackedDSA, UnpackedDSATranslated);
-
-   // FIXME: Since we have no info about if we have to pass to unpack a load of the alloca
-   // or not, check if the type has changed after call to compute_dep.
-   // Pointers -> no load
-   // basic types/structs/arrays/vla -> load
-   if (UnpackedDSAType == BaseType)
-      UnpackedDSA = IRB.CreateLoad(UnpackedDSATranslated);
-   else
-      UnpackedDSA = UnpackedDSATranslated;
+    // Store the translation in task_args
+    if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
+      Translation = IRB.CreateBitCast(Translation, LUnpackedDSA->getType());
+      IRB.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
+      // Reload what we have translated
+      UnpackedDSA = IRB.CreateLoad(LUnpackedDSA->getPointerOperand());
+    } else {
+      Translation = IRB.CreateBitCast(Translation, UnpackedDSA->getType()->getPointerElementType());
+      IRB.CreateStore(Translation, UnpackedDSA);
+    }
   }
 
   // Given a Outline Function assuming that task args are the first parameter, and
@@ -1147,10 +1139,11 @@ struct OmpSs : public ModulePass {
       SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
       for (auto &DepInfo : DependsInfo.List) {
         if (DepInfo->isReduction()) {
-          Value *DepBaseDSA = DepInfo->Args[0];
-          translateReductionUnpackedDSA(BBBuilder, DepInfo.get(), DepBaseDSA,
-                                        UnpackParams[StructToIdxMap.lookup(DepBaseDSA)],
-                                        AddrTranslationTable, DirInfo.DirEnv.DepSymToIdx);
+          Value *DepBaseDSA = DepInfo->Base;
+          translateDep(
+            BBBuilder, DepInfo.get(), DepBaseDSA,
+            UnpackParams[StructToIdxMap.lookup(DepBaseDSA)],
+            AddrTranslationTable, DirInfo.DirEnv.DepSymToIdx);
         }
       }
       for (Instruction &I : *BBBuilder.GetInsertBlock()) {

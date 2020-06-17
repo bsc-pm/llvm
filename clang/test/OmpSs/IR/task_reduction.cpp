@@ -9,7 +9,7 @@ void foo(int &rx) {
 // CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %0), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %0, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %0), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %0, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %0, void (i32*, i32*, i64)* @red_comb) ]
 
 // CHECK: define internal void @red_init(i32* %0, i32* %1, i64 %2)
-// CHECK: store i32 0, i32* %3, align 4
+// CHECK: store i32 0, i32* %arrayctor.dst.cur, align 4
 
 // CHECK: define internal void @red_comb(i32* %0, i32* %1, i64 %2)
 // CHECK: %add = add nsw i32 %7, %8

@@ -1820,13 +1820,13 @@ static llvm::Value *emitReduceInitFunction(CodeGenModule &CGM,
       // initializer(omp_priv = ...)
       // initializer(omp_priv(...))
       CGF.EmitExprAsInit(PrivVD->getInit(), PrivVD,
-                         CGF.MakeAddrLValue(PrivLV.getPointer(CGF), PrivLV.getType(), PrivLV.getAlignment()),
+                         CGF.MakeAddrLValue(PrivCur, PrivLV.getType(), PrivLV.getAlignment()),
                          /*capturedByInit=*/false);
     }
   } else {
     assert(RHSVD->hasInit() && "RHSVD has no initializer");
     CGF.EmitExprAsInit(RHSVD->getInit(), RHSVD,
-                       CGF.MakeAddrLValue(PrivLV.getPointer(CGF), PrivLV.getType(), PrivLV.getAlignment()),
+                       CGF.MakeAddrLValue(PrivCur, PrivLV.getType(), PrivLV.getAlignment()),
                        /*capturedByInit=*/false);
   }
 
