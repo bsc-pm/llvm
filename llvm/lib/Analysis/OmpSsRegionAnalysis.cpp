@@ -381,6 +381,7 @@ static void gatherDependInfoFromBundle(ArrayRef<Value *> OBArgs,
   // First operand has to be the DSA over the dependency is made
   Value *DepBaseDSA = OBArgs[0];
   assert(valueInDSABundles(DSAInfo, DepBaseDSA) && "Dependency has no associated DSA"); 
+  DI.Base = DepBaseDSA;
 
   Function *ComputeDepFun = cast<Function>(OBArgs[1]);
   DI.ComputeDepFun = ComputeDepFun;
