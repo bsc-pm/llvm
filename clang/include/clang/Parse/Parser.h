@@ -434,6 +434,7 @@ public:
   const TargetInfo &getTargetInfo() const { return PP.getTargetInfo(); }
   Preprocessor &getPreprocessor() const { return PP; }
   Sema &getActions() const { return Actions; }
+  DiagnosticsEngine &getDiags() const { return Diags; }
   AttributeFactory &getAttrFactory() { return AttrFactory; }
 
   const Token &getCurToken() const { return Tok; }

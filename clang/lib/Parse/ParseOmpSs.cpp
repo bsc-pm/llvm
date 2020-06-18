@@ -273,7 +273,12 @@ static bool parseDeclareTaskClauses(
     case OSSC_priority:
     case OSSC_label: {
       P.ConsumeToken();
-      if (FirstClauses[CKind]) {
+      bool IsLabel = CKind == OSSC_label;
+      if (IsLabel) {
+        P.Diag(Tok, diag::warn_oss_ignoring_clause)
+          << getOmpSsClauseName(CKind) << getOmpSsDirectiveName(OSSD_declare_task);
+      }
+      if (FirstClauses[CKind] && !IsLabel) {
         P.Diag(Tok, diag::err_oss_more_one_clause)
             << getOmpSsDirectiveName(OSSD_declare_task) << getOmpSsClauseName(CKind) << 0;
         IsError = true;
@@ -282,9 +287,11 @@ static bool parseDeclareTaskClauses(
       SingleClause = getSingleClause(CKind, IfRes, FinalRes,
                                      CostRes, PriorityRes,
                                      LabelRes);
+      P.getDiags().setSuppressAllDiagnostics(IsLabel);
       *SingleClause = P.ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
+      P.getDiags().setSuppressAllDiagnostics(false);
 
-      if (SingleClause->isInvalid())
+      if (SingleClause->isInvalid() && !IsLabel)
         IsError = true;
 
       FirstClauses[CKind] = true;
@@ -714,14 +721,22 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_final:
   case OSSC_cost:
   case OSSC_priority:
-  case OSSC_label:
-    if (!FirstClause) {
+  case OSSC_label: {
+    bool IsLabel = CKind == OSSC_label;
+    if (IsLabel) {
+      Diag(Tok, diag::warn_oss_ignoring_clause)
+        << getOmpSsClauseName(CKind) << getOmpSsDirectiveName(OSSD_task);
+    }
+    if (!FirstClause && !IsLabel) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;
       ErrorFound = true;
     }
+    Diags.setSuppressAllDiagnostics(IsLabel);
     Clause = ParseOmpSsSingleExprClause(CKind, WrongDirective);
+    Diags.setSuppressAllDiagnostics(false);
     break;
+  }
   case OSSC_wait:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
