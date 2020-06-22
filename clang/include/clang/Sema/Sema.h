@@ -10844,6 +10844,7 @@ public:
   CheckSignedIntegerValue(Expr *ValExpr);
   ExprResult
   CheckIsConstCharPtrConvertibleExpr(Expr *E);
+  OmpSsDirectiveKind GetCurrentOmpSsDirective() const;
   /// Called on start of new data sharing attribute block.
   void StartOmpSsDSABlock(OmpSsDirectiveKind K,
                           Scope *CurScope,
@@ -10855,6 +10856,12 @@ public:
   // This must happen before parsing the statement (if any) so child tasks
   // can see DSA derived from 'depend' clauses
   void ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses);
+
+  /// Check if the current region is an OmpSs loop region and if it is,
+  /// mark loop control variable, used in \p Init for loop initialization, as
+  /// private by default.
+  /// \param Init First part of the for loop.
+  void ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init);
 
   /// Check if the specified type is allowed to be used in 'oss declare
   /// reduction' construct.
@@ -10894,6 +10901,24 @@ public:
                                      Stmt *AStmt,
                                      SourceLocation StartLoc,
                                      SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss task for' after parsing of the
+  /// associated statement.
+  StmtResult
+  ActOnOmpSsTaskForDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                             SourceLocation StartLoc, SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss taskloop' after parsing of the
+  /// associated statement.
+  StmtResult
+  ActOnOmpSsTaskLoopDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                              SourceLocation StartLoc, SourceLocation EndLoc);
+
+  /// Called on well-formed '\#pragma oss taskloop for' after parsing of the
+  /// associated statement.
+  StmtResult
+  ActOnOmpSsTaskLoopForDirective(ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                                 SourceLocation StartLoc, SourceLocation EndLoc);
 
   /// Called on well-formed '\#pragma oss task' after parsing of
   /// the associated method/function.

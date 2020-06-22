@@ -189,6 +189,29 @@ static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDa
   }
 }
 
+// Convenience function to add all info from a task directive
+static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData) {
+  AddDSAData(S, TaskData.DSAs);
+  AddDepData(S, TaskData.Deps);
+  AddIfData(S, TaskData.If);
+  AddFinalData(S, TaskData.Final);
+  AddCostData(S, TaskData.Cost);
+  AddPriorityData(S, TaskData.Priority);
+  AddLabelData(S, TaskData.Label);
+  AddWaitData(S, TaskData.Wait);
+  AddReductionData(S, TaskData.Reductions);
+}
+
+// Convenience function to add all info from a loop directive
+static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
+  LoopData.IndVar = S.getIterationVariable();
+  LoopData.LB = S.getLowerBound();
+  LoopData.UB = S.getUpperBound();
+  LoopData.Step = S.getStep();
+  LoopData.TestIsLessOp = S.getIsLessOp();
+  LoopData.TestIsStrictOp = S.getIsStrictOp();
+}
+
 void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   OSSTaskDataTy Data;
 
@@ -200,16 +223,38 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 
-  AddDSAData(S, Data.DSAs);
-  AddDepData(S, Data.Deps);
-  AddIfData(S, Data.If);
-  AddFinalData(S, Data.Final);
-  AddCostData(S, Data.Cost);
-  AddPriorityData(S, Data.Priority);
-  AddLabelData(S, Data.Label);
-  AddWaitData(S, Data.Wait);
-  AddReductionData(S, Data.Reductions);
+  AddTaskData(S, Data);
 
   CGM.getOmpSsRuntime().emitTaskCall(*this, S, S.getBeginLoc(), Data);
+}
+
+void CodeGenFunction::EmitOSSTaskForDirective(const OSSTaskForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
+}
+
+void CodeGenFunction::EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective &S) {
+  OSSTaskDataTy Data;
+  OSSLoopDataTy LoopData;
+
+  AddTaskData(S, Data);
+  AddLoopData(S, LoopData);
+
+  CGM.getOmpSsRuntime().emitLoopCall(*this, S, S.getBeginLoc(), Data, LoopData);
 }
 

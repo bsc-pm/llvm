@@ -1,6 +1,6 @@
 // RUN: %oss-compile-and-run
 // RUN: %oss-O2-compile-and-run
-// XFAIL: *
+
 /*
 <testinfo>
 test_generator="config/mercurium-ompss-2"

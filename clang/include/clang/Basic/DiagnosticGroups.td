@@ -1103,6 +1103,10 @@ def ASM : DiagGroup<"asm", [
 // OmpSs warnings.
 def SourceUsesOmpSs : DiagGroup<"source-uses-ompss-2">;
 def OmpSsClauses : DiagGroup<"ompss-2-clauses">;
+def OmpSsLoopForm : DiagGroup<"ompss-2-loop-form">;
+def OmpSs : DiagGroup<"ompss-2", [
+    SourceUsesOmpSs, OmpSsClauses, OmpSsLoopForm
+  ]>;
 
 // OpenMP warnings.
 def SourceUsesOpenMP : DiagGroup<"source-uses-openmp">;

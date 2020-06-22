@@ -1093,12 +1093,28 @@ StmtProfiler::VisitOSSExecutableDirective(const OSSExecutableDirective *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitOSSLoopDirective(const OSSLoopDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *S) {
   VisitOSSExecutableDirective(S);
 }
 
 void StmtProfiler::VisitOSSTaskDirective(const OSSTaskDirective *S) {
   VisitOSSExecutableDirective(S);
+}
+
+void StmtProfiler::VisitOSSTaskForDirective(const OSSTaskForDirective *S) {
+  VisitOSSLoopDirective(S);
+}
+
+void StmtProfiler::VisitOSSTaskLoopDirective(const OSSTaskLoopDirective *S) {
+  VisitOSSLoopDirective(S);
+}
+
+void StmtProfiler::VisitOSSTaskLoopForDirective(const OSSTaskLoopForDirective *S) {
+  VisitOSSLoopDirective(S);
 }
 
 void StmtProfiler::VisitExpr(const Expr *S) {

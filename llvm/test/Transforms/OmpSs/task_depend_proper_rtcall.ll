@@ -209,7 +209,7 @@ entry:
 
 ; Check we access properly a local variable, a global variable, a constant expression
 
-; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [20 x i32]]* %array, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [20 x i32]]* %array, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t @compute_dep([10 x [20 x i32]]* %array)
 ; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t %0, 0
@@ -244,7 +244,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main1(%struct.S* %s, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main1(%struct.S* %s, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.2 @compute_dep.3(%struct.S* %s)
 ; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.2 %0, 0
@@ -270,7 +270,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_main2(i32* %n, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_main2(i32* %n, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.5 @compute_dep.6(i32* %n)
 ; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.5 %0, 0

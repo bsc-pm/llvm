@@ -7540,6 +7540,11 @@ TreeTransform<Derived>::TransformForStmt(ForStmt *S) {
   if (getSema().getLangOpts().OpenMP && Init.isUsable())
     getSema().ActOnOpenMPLoopInitialization(S->getForLoc(), Init.get());
 
+  // In OmpSs loop region loop control variable must be captured and be
+  // private. Perform analysis of first part (if any).
+  if (getSema().getLangOpts().OmpSs && Init.isUsable())
+    getSema().ActOnOmpSsLoopInitialization(S->getForLoc(), Init.get());
+
   // Transform the condition
   Sema::ConditionResult Cond = getDerived().TransformCondition(
       S->getForLoc(), S->getConditionVariable(), S->getCond(),
@@ -10077,6 +10082,37 @@ TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOmpSsDSABlock(OSSD_task, nullptr,
                                             D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskForDirective(OSSTaskForDirective *D) {
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_task_for, nullptr,
+                                             D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskLoopDirective(OSSTaskLoopDirective *D) {
+  DeclarationNameInfo DirName;
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_taskloop, nullptr,
+                                             D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformOSSTaskLoopForDirective(OSSTaskLoopForDirective *D) {
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_taskloop_for, nullptr,
+                                             D->getBeginLoc());
   StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
   getDerived().getSema().EndOmpSsDSABlock(Res.get());
   return Res;

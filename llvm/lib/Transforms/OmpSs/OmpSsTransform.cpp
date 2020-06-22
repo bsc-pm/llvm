@@ -43,6 +43,39 @@ struct OmpSs : public ModulePass {
 
   bool Initialized = false;
 
+  class Nanos6LoopBounds {
+  private:
+    StructType *Ty;
+
+    Nanos6LoopBounds(){};
+    Nanos6LoopBounds(const Nanos6LoopBounds&){};
+  public:
+    ~Nanos6LoopBounds(){};
+
+    static auto getInstance(Module &M) -> Nanos6LoopBounds& {
+      static auto instance = std::unique_ptr<Nanos6LoopBounds>(nullptr);
+      if (!instance) {
+        instance.reset(new Nanos6LoopBounds);
+        instance->Ty = StructType::create(M.getContext(),
+          "nanos6_loop_bounds_t");
+
+        // size_t lower_bound;
+        // size_t upper_bound;
+        // size_t grainsize;
+        // size_t chunksize;
+
+        Type *LBoundTy = Type::getInt64Ty(M.getContext());
+        Type *UBoundTy = Type::getInt64Ty(M.getContext());
+        Type *GrainsizeTy = Type::getInt64Ty(M.getContext());
+        Type *ChunkSizeTy = Type::getInt64Ty(M.getContext());
+
+        instance->Ty->setBody({LBoundTy, UBoundTy, GrainsizeTy, ChunkSizeTy});
+      }
+      return *instance.get();
+    }
+    StructType *getType() { return Ty; }
+  };
+
   class Nanos6TaskAddrTranslationEntry {
   private:
     StructType *Ty;
@@ -291,12 +324,113 @@ struct OmpSs : public ModulePass {
 
   FunctionCallee CreateTaskFuncCallee;
   FunctionCallee TaskSubmitFuncCallee;
+  FunctionCallee RegisterLoopFuncCallee;
   FunctionCallee TaskInFinalFuncCallee;
   FunctionCallee TaskInfoRegisterFuncCallee;
   FunctionCallee TaskInfoRegisterCtorFuncCallee;
 
+  // Data used to build final code.
+  // We use Instructions instead of BasicBlocks because
+  // BasicBlock pointers/iterators are invalidated after
+  // splitBasicBlock
+  struct FinalBodyInfo {
+    Instruction *CloneEntry;
+    Instruction *CloneExit;
+    TaskInfo *TI;
+  };
+
+
   static bool isReplaceableValue(Value *V) {
     return isa<Instruction>(V) || isa<Argument>(V) || isa<GlobalValue>(V);
+  }
+
+  static void rewriteUsesInBlocksWithPred(
+      Value *Orig, Value *New, llvm::function_ref<bool(Instruction *)> Pred) {
+
+    std::vector<User *> Users(Orig->user_begin(), Orig->user_end());
+    for (User *use : Users)
+      if (Instruction *inst = dyn_cast<Instruction>(use))
+        if (Pred(inst))
+          inst->replaceUsesOfWith(Orig, New);
+  }
+
+  void buildLoopForTaskImpl(Module &M, Function &F, Instruction *Entry,
+                        Instruction *Exit, TaskLoopInfo &LoopInfo,
+                        BasicBlock *&LoopEntryBB, BasicBlock *&BodyBB) {
+
+    IRBuilder<> IRB(Entry);
+
+    IRB.CreateStore(LoopInfo.LBound, LoopInfo.IndVar);
+
+    BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
+    CondBB->setName("for.cond");
+
+    // The new entry is the start of the loop
+    LoopEntryBB = CondBB->getUniquePredecessor();
+
+    IRB.SetInsertPoint(Entry);
+
+    Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    Value *LoopCmp = nullptr;
+    switch (LoopInfo.LoopType) {
+    case TaskLoopInfo::SLT:
+      LoopCmp = IRB.CreateICmpSLT(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::SLE:
+      LoopCmp = IRB.CreateICmpSLE(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::SGT:
+      LoopCmp = IRB.CreateICmpSGT(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::SGE:
+      LoopCmp = IRB.CreateICmpSGE(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::ULT:
+      LoopCmp = IRB.CreateICmpULT(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::ULE:
+      LoopCmp = IRB.CreateICmpULE(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::UGT:
+      LoopCmp = IRB.CreateICmpUGT(IndVarVal, LoopInfo.UBound);
+      break;
+    case TaskLoopInfo::UGE:
+      LoopCmp = IRB.CreateICmpUGE(IndVarVal, LoopInfo.UBound);
+      break;
+    default:
+      llvm_unreachable("unexpected loop type");
+    }
+    BodyBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
+    BodyBB->setName("for.body");
+
+    // Replace default br. by a conditional br. to task.body or task end
+    Instruction *OldTerminator = CondBB->getTerminator();
+    IRB.SetInsertPoint(OldTerminator);
+    IRB.CreateCondBr(LoopCmp, BodyBB, Exit->getParent()->getUniqueSuccessor());
+    OldTerminator->eraseFromParent();
+
+    BasicBlock *IncrBB = BasicBlock::Create(M.getContext(), "for.incr", &F);
+
+    // Add a br. to for.cond
+    IRB.SetInsertPoint(IncrBB);
+    IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    IndVarVal = IRB.CreateAdd(IndVarVal, LoopInfo.Step);
+    IRB.CreateStore(IndVarVal, LoopInfo.IndVar);
+    IRB.CreateBr(CondBB);
+
+    // Replace task end br. by a br. to for.incr
+    OldTerminator = Exit->getParent()->getTerminator();
+    assert(OldTerminator->getNumSuccessors() == 1);
+    OldTerminator->setSuccessor(0, IncrBB);
+  }
+
+  BasicBlock *buildLoopForTask(
+      Module &M, Function &F, Instruction *Entry,
+      Instruction *Exit, TaskLoopInfo &LoopInfo) {
+    BasicBlock *EntryBB = nullptr;
+    BasicBlock *LoopEntryBB = nullptr;
+    buildLoopForTaskImpl(M, F, Entry, Exit, LoopInfo, LoopEntryBB, EntryBB);
+    return LoopEntryBB;
   }
 
   // Insert a new nanos6 task info registration in
@@ -389,6 +523,34 @@ struct OmpSs : public ModulePass {
 
     // Insert RT call before replacing uses
     unpackDepsCallToRT(M, TI, F);
+
+    if (!TI.LoopInfo.empty()) {
+      Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
+
+      IRBuilder<> IRB(&Entry.front());
+      Value *LoopBounds = &*(F->arg_end() - 2);
+
+      Value *Idx[2];
+      Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+      Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
+      LBoundField = IRB.CreateLoad(LBoundField);
+      LBoundField = IRB.CreateTrunc(LBoundField, IndVarTy, "lb");
+
+      Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
+      Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
+      UBoundField = IRB.CreateLoad(UBoundField);
+      UBoundField = IRB.CreateTrunc(UBoundField, IndVarTy);
+      UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
+
+      // Replace loop bounds
+      for (Instruction &I : Entry) {
+        if (isReplaceableValue(TI.LoopInfo.LBound))
+          I.replaceUsesOfWith(TI.LoopInfo.LBound, LBoundField);
+        if (isReplaceableValue(TI.LoopInfo.UBound))
+        I.replaceUsesOfWith(TI.LoopInfo.UBound, UBoundField);
+      }
+    }
 
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
@@ -829,28 +991,41 @@ struct OmpSs : public ModulePass {
     TwI.I->eraseFromParent();
   }
 
-  void buildFinalCondCFG(BasicBlock *EntryBB, BasicBlock *ExitBB,
-                         DenseMap<BasicBlock *, BasicBlock *> &CopyBBs,
-                         Function &F, Module &M) {
-    ExitBB->setName("final.end");
-    assert(EntryBB->getSinglePredecessor());
+  // This must be called before erasing original entry/exit
+  void buildFinalCondCFG(
+      Module &M, Function &F, ArrayRef<FinalBodyInfo> FinalInfos) {
+    // Lower final inner tasks
+
+    // Skip first since its the current task
+    for (size_t i = 1; i < FinalInfos.size(); ++i) {
+      // Build loop for taskloop/taskfor
+      if (!FinalInfos[i].TI->LoopInfo.empty()) {
+        buildLoopForTask(M, F, FinalInfos[i].CloneEntry, FinalInfos[i].CloneExit, FinalInfos[i].TI->LoopInfo);
+      }
+      FinalInfos[i].CloneExit->eraseFromParent();
+      FinalInfos[i].CloneEntry->eraseFromParent();
+    }
+
+    BasicBlock *OrigEntryBB = FinalInfos[0].TI->Entry->getParent();
+    BasicBlock *OrigExitBB = FinalInfos[0].TI->Exit->getParent()->getUniqueSuccessor();
+
+    BasicBlock *CloneEntryBB = FinalInfos[0].CloneEntry->getParent();
+    if (!FinalInfos[0].TI->LoopInfo.empty()) {
+      CloneEntryBB = buildLoopForTask(M, F, FinalInfos[0].CloneEntry, FinalInfos[0].CloneExit, FinalInfos[0].TI->LoopInfo);
+    }
+
+    FinalInfos[0].CloneExit->eraseFromParent();
+    FinalInfos[0].CloneEntry->eraseFromParent();
+
+    OrigExitBB->setName("final.end");
+    assert(OrigEntryBB->getSinglePredecessor());
     BasicBlock *FinalCondBB = BasicBlock::Create(M.getContext(), "final.cond", &F);
 
-    BasicBlock *CopyEntryBB = nullptr;
-    // There is only one CopyBB that has no predecessors,
-    // this is the entry
-    for (auto &p : CopyBBs) {
-      BasicBlock *&CopyBB = p.second;
-      if (CopyBB->hasNPredecessors(0)) {
-        assert(!CopyEntryBB);
-        CopyEntryBB = CopyBB;
-      }
-    }
-    assert(CopyEntryBB);
+    BasicBlock *CopyEntryBB = CloneEntryBB;
     CopyEntryBB->setName("final.then");
 
     // We are now just before the branch to task body
-    Instruction *EntryBBTerminator = EntryBB->getSinglePredecessor()->getTerminator();
+    Instruction *EntryBBTerminator = OrigEntryBB->getSinglePredecessor()->getTerminator();
 
     IRBuilder<> IRB(EntryBBTerminator);
 
@@ -861,14 +1036,15 @@ struct OmpSs : public ModulePass {
     IRB.SetInsertPoint(FinalCondBB);
     // if (nanos6_in_final())
     Value *Cond = IRB.CreateICmpNE(IRB.CreateCall(TaskInFinalFuncCallee, {}), IRB.getInt32(0));
-    IRB.CreateCondBr(Cond, CopyEntryBB, EntryBB);
+    IRB.CreateCondBr(Cond, CopyEntryBB, OrigEntryBB);
+
   }
 
   void lowerTask(TaskInfo &TI,
                  Function &F,
                  size_t taskNum,
                  Module &M,
-                 SmallVectorImpl<DenseMap<BasicBlock *, BasicBlock *>> &TaskCopyBBs) {
+                 DenseMap<TaskInfo *, SmallVector<FinalBodyInfo, 4>> &TaskFinalInfo) {
 
     DebugLoc DLoc = TI.Entry->getDebugLoc();
     unsigned Line = DLoc.getLine();
@@ -879,27 +1055,35 @@ struct OmpSs : public ModulePass {
 
     Constant *Nanos6TaskLocStr = IRBuilder<>(TI.Entry).CreateGlobalStringPtr(FileNamePlusLoc);
 
-    // 1. Split BB
-    BasicBlock *EntryBB = TI.Entry->getParent();
-    // EntryBB = EntryBB->splitBasicBlock(TI.Entry);
+    buildFinalCondCFG(M, F, TaskFinalInfo[&TI]);
 
-    BasicBlock *ExitBB = TI.Exit->getParent()->getNextNode();
-    // Assuming well-formed BB
-    // ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
+    BasicBlock *EntryBB = TI.Entry->getParent();
+    BasicBlock *ExitBB = TI.Exit->getParent()->getUniqueSuccessor();
+
+    // In loop constructs this will be the starting loop BB
+    BasicBlock *NewEntryBB = EntryBB;
+    TaskLoopInfo NewLoopInfo = TI.LoopInfo;
+    if (!TI.LoopInfo.empty()) {
+      Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
+      NewLoopInfo.IndVar =
+        IRBuilder<>(TI.Entry).CreateAlloca(IndVarTy, nullptr, "loop." + TI.LoopInfo.IndVar->getName());
+      // unpacked_task_region loops are always SLT and step 1
+      NewLoopInfo.LoopType = TaskLoopInfo::SLT;
+      NewLoopInfo.Step = ConstantInt::get(IndVarTy, 1);
+      buildLoopForTaskImpl(M, F, TI.Entry, TI.Exit, NewLoopInfo, NewEntryBB, EntryBB);
+    }
 
     TI.Exit->eraseFromParent();
     TI.Entry->eraseFromParent();
+
     SetVector<BasicBlock *> TaskBBs;
-
-    buildFinalCondCFG(EntryBB, ExitBB, TaskCopyBBs[taskNum], F, M);
-
-    // 2. Gather BB between entry and exit (is there any function/util to do this?)
     SmallVector<BasicBlock*, 8> Worklist;
     SmallPtrSet<BasicBlock*, 8> Visited;
 
-    Worklist.push_back(EntryBB);
-    Visited.insert(EntryBB);
-    TaskBBs.insert(EntryBB);
+    // 2. Gather BB between entry and exit (is there any function/util to do this?)
+    Worklist.push_back(NewEntryBB);
+    Visited.insert(NewEntryBB);
+    TaskBBs.insert(NewEntryBB);
     while (!Worklist.empty()) {
       auto WIt = Worklist.begin();
       BasicBlock *BB = *WIt;
@@ -957,9 +1141,15 @@ struct OmpSs : public ModulePass {
 
     // nanos6_ol_destroy_* END
 
-    // void *device_env
-    TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
-    TaskExtraNameList.push_back("device_env");
+    if (!TI.LoopInfo.empty()) {
+      TaskExtraTypeList.push_back(
+        Nanos6LoopBounds::getInstance(M).getType()->getPointerTo());
+      TaskExtraNameList.push_back("loop_bounds");
+    } else {
+      // void *device_env
+      TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
+      TaskExtraNameList.push_back("device_env");
+    }
     // nanos6_address_translation_entry_t *address_translation_table
     TaskExtraTypeList.push_back(
       Nanos6TaskAddrTranslationEntry::getInstance(M).getType()->getPointerTo());
@@ -972,7 +1162,6 @@ struct OmpSs : public ModulePass {
                                ("nanos6_unpacked_task_region_" + F.getName() + Twine(taskNum)).str(),
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
-
     // nanos6_unpacked_task_region_* END
 
     // nanos6_ol_task_region_* START
@@ -990,7 +1179,8 @@ struct OmpSs : public ModulePass {
     TaskExtraTypeList.clear();
     TaskExtraNameList.clear();
     // nanos6_loop_bounds_t *const loop_bounds
-    TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
+    TaskExtraTypeList.push_back(
+      Nanos6LoopBounds::getInstance(M).getType()->getPointerTo());
     TaskExtraNameList.push_back("loop_bounds");
     // void *handler
     TaskExtraTypeList.push_back(Type::getInt8PtrTy(M.getContext()));
@@ -1187,13 +1377,50 @@ struct OmpSs : public ModulePass {
     registerTaskInfo(M, TaskInfoVar);
 
     auto rewriteUsesBrAndGetOmpSsUnpackFunc
-      = [&UnpackTaskFuncVar, &TaskArgsToStructIdxMap](BasicBlock *header,
+      = [&M, &TI, &EntryBB, &NewLoopInfo, &UnpackTaskFuncVar, &TaskArgsToStructIdxMap](BasicBlock *header,
                                             BasicBlock *newRootNode,
                                             BasicBlock *newHeader,
                                             Function *oldFunction,
                                             const SetVector<BasicBlock *> &Blocks) {
-
       UnpackTaskFuncVar->getBasicBlockList().push_back(newRootNode);
+
+      if (!TI.LoopInfo.empty()) {
+        Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
+
+        IRBuilder<> IRB(&header->front());
+        Value *LoopBounds = &*(UnpackTaskFuncVar->arg_end() - 2);
+
+        Value *Idx[2];
+        Idx[0] = Constant::getNullValue(Type::getInt32Ty(M.getContext()));
+        Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+        Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
+        LBoundField = IRB.CreateLoad(LBoundField);
+        LBoundField = IRB.CreateTrunc(LBoundField, IndVarTy, "lb");
+
+        Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
+        Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
+        UBoundField = IRB.CreateLoad(UBoundField);
+        UBoundField = IRB.CreateTrunc(UBoundField, IndVarTy, "ub");
+
+        // Replace loop bounds
+        if (isReplaceableValue(TI.LoopInfo.LBound)) {
+          rewriteUsesInBlocksWithPred(
+            TI.LoopInfo.LBound, LBoundField,
+            [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
+        }
+        if (isReplaceableValue(TI.LoopInfo.UBound)) {
+          rewriteUsesInBlocksWithPred(
+            TI.LoopInfo.UBound, UBoundField,
+            [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
+        }
+
+        // Now we can set BodyIndVar = (LoopIndVar * Step) + LBound
+        IRBuilder<> LoopBodyIRB(&EntryBB->front());
+        Value *NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar);
+        NormVal = LoopBodyIRB.CreateMul(NormVal, TI.LoopInfo.Step);
+        NormVal = LoopBodyIRB.CreateAdd(NormVal, TI.LoopInfo.LBound);
+        LoopBodyIRB.CreateStore(NormVal, TI.LoopInfo.IndVar);
+      }
 
       // Create an iterator to name all of the arguments we inserted.
       Function::arg_iterator AI = UnpackTaskFuncVar->arg_begin();
@@ -1204,24 +1431,22 @@ struct OmpSs : public ModulePass {
         Value *RewriteVal = &*AI++;
         Value *Val = It->first;
 
-        std::vector<User *> Users(Val->user_begin(), Val->user_end());
-        for (User *use : Users)
-          if (Instruction *inst = dyn_cast<Instruction>(use))
-            if (Blocks.count(inst->getParent()))
-              inst->replaceUsesOfWith(Val, RewriteVal);
+        if (isReplaceableValue(Val)) {
+          rewriteUsesInBlocksWithPred(
+            Val, RewriteVal,
+            [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
+        }
       }
 
       // Rewrite branches from basic blocks outside of the task region to blocks
       // inside the region to use the new label (newHeader) since the task region
       // will be outlined
-      std::vector<User *> Users(header->user_begin(), header->user_end());
-      for (unsigned i = 0, e = Users.size(); i != e; ++i)
-        // The BasicBlock which contains the branch is not in the region
-        // modify the branch target to a new block
-        if (Instruction *I = dyn_cast<Instruction>(Users[i]))
-          if (I->isTerminator() && !Blocks.count(I->getParent()) &&
-              I->getParent()->getParent() == oldFunction)
-            I->replaceUsesOfWith(header, newHeader);
+      rewriteUsesInBlocksWithPred(
+        header, newHeader,
+        [&Blocks, &oldFunction](Instruction *I) {
+          return (I->isTerminator() && !Blocks.count(I->getParent()) &&
+                  I->getParent()->getParent() == oldFunction);
+        });
 
       return UnpackTaskFuncVar;
     };
@@ -1239,7 +1464,22 @@ struct OmpSs : public ModulePass {
 
       AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
-      // TaskFlagsVar = Wait << 4 | !If << 1 | Final
+      // typedef enum {
+      //         //! Specifies that the task will be a final task
+      //         nanos6_final_task = (1 << 0),
+      //         //! Specifies that the task is in "if(0)" mode → !If
+      //         nanos6_if_0_task = (1 << 1),
+      //         //! Specifies that the task is really a taskloop
+      //         nanos6_taskloop_task = (1 << 2),
+      //         //! Specifies that the task is really a taskfor
+      //         nanos6_taskfor_task = (1 << 3),
+      //         //! Specifies that the task has the "wait" clause
+      //         nanos6_waiting_task = (1 << 4),
+      //         //! Specifies that the args_block is preallocated from user side
+      //         nanos6_preallocated_args_block = (1 << 5),
+      //         //! Specifies that the task has been verified by the user, hence it doesn't need runtime linting
+      //         nanos6_verified_task = (1 << 6)
+      // } nanos6_task_flag_t;
       Value *TaskFlagsVar = ConstantInt::get(IRB.getInt64Ty(), 0);
       if (TI.Final) {
         TaskFlagsVar =
@@ -1257,6 +1497,26 @@ struct OmpSs : public ModulePass {
                 IRB.CreateICmpEQ(TI.If, IRB.getFalse()),
                 IRB.getInt64Ty()),
                 1));
+      }
+      if (!TI.LoopInfo.empty()) {
+        if (TI.TaskKind == TaskInfo::OSSD_taskloop
+            || TI.TaskKind == TaskInfo::OSSD_taskloop_for) {
+          TaskFlagsVar =
+            IRB.CreateOr(
+              TaskFlagsVar,
+              IRB.CreateShl(
+                  ConstantInt::get(IRB.getInt64Ty(), 1),
+                  2));
+        }
+        if (TI.TaskKind == TaskInfo::OSSD_task_for
+            || TI.TaskKind == TaskInfo::OSSD_taskloop_for) {
+          TaskFlagsVar =
+            IRB.CreateOr(
+              TaskFlagsVar,
+              IRB.CreateShl(
+                  ConstantInt::get(IRB.getInt64Ty(), 1),
+                  3));
+        }
       }
       if (TI.Wait) {
         TaskFlagsVar =
@@ -1298,6 +1558,12 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.WeakCommutatives.size()
         + TI.DependsInfo.Reductions.size()
         + TI.DependsInfo.WeakReductions.size();
+
+      // If taskloop NumDeps = -1
+      if (!TI.LoopInfo.empty() &&
+          (TI.TaskKind == TaskInfo::OSSD_taskloop
+           || TI.TaskKind == TaskInfo::OSSD_taskloop_for))
+        NumDependencies = -1;
 
       // Store label if it's not a string literal (i.e label("L1"))
       if (TI.Label && !isa<Constant>(TI.Label)) {
@@ -1455,31 +1721,73 @@ struct OmpSs : public ModulePass {
       }
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
-      CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
 
+      if (!TI.LoopInfo.empty()) {
+        // <      0, (ub - 1 - lb) / step + 1
+        // <=     0, (ub - lb)     / step + 1
+        // >      0, (ub + 1 - lb) / step + 1
+        // >=     0, (ub - lb)     / step + 1
+        Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
+        Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
+        Value *RegisterUpperB = IRB.CreateSub(TI.LoopInfo.UBound, TI.LoopInfo.LBound);
+        // TODO: support clauses
+        Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
+        Value *RegisterChunkSize = ConstantInt::get(IndVarTy, 0);
+        switch (TI.LoopInfo.LoopType) {
+        case TaskLoopInfo::SLT:
+        case TaskLoopInfo::ULT:
+          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+          break;
+        case TaskLoopInfo::SGT:
+        case TaskLoopInfo::UGT:
+          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+          break;
+        case TaskLoopInfo::SLE:
+        case TaskLoopInfo::ULE:
+        case TaskLoopInfo::SGE:
+        case TaskLoopInfo::UGE:
+          break;
+        default:
+          llvm_unreachable("unexpected loop type");
+        }
+        // TODO: should we handle sdiv/udiv depending on loop type?
+        RegisterUpperB = IRB.CreateSDiv(RegisterUpperB, TI.LoopInfo.Step);
+        RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+        IRB.CreateCall(
+          RegisterLoopFuncCallee,
+          {
+            TaskPtrVarL,
+            IRB.CreateSExt(RegisterLowerB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(0)),
+            IRB.CreateSExt(RegisterUpperB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(1)),
+            IRB.CreateSExt(RegisterGrainsize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(2)),
+            IRB.CreateSExt(RegisterChunkSize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(3))
+          }
+        );
+      }
+
+      CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
       // Add a branch to the next basic block after the task region
       // and replace the terminator that exits the task region
       // Since this is a single entry single exit region this should
       // be done once.
-      Instruction *OldT = nullptr;
+      BasicBlock *NewRetBB = nullptr;
       for (BasicBlock *Block : Blocks) {
         Instruction *TI = Block->getTerminator();
         for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i)
           if (!Blocks.count(TI->getSuccessor(i))) {
-            assert(!OldT && "More than one exit in task code");
+            assert(!NewRetBB && "More than one exit in task code");
 
             BasicBlock *OldTarget = TI->getSuccessor(i);
-
             // Create branch to next BB after the task region
             IRB.CreateBr(OldTarget);
 
-            IRBuilder<> BNewTerminatorI(TI);
-            BNewTerminatorI.CreateRetVoid();
+            NewRetBB = BasicBlock::Create(M.getContext(), ".exitStub", newFunction);
+            IRBuilder<> (NewRetBB).CreateRetVoid();
 
-            OldT = TI;
+            // rewrite the original branch instruction with this new target
+            TI->setSuccessor(i, NewRetBB);
           }
       }
-      OldT->eraseFromParent();
 
       return TaskSubmitFuncCall;
     };
@@ -1520,6 +1828,18 @@ struct OmpSs : public ModulePass {
     // int nanos6_in_final(void);
     TaskInFinalFuncCallee= M.getOrInsertFunction("nanos6_in_final",
         Type::getInt32Ty(M.getContext())
+    );
+
+    // void nanos6_register_loop_bounds(
+    //     void *taskHandle, size_t lower_bound, size_t upper_bound,
+    //     size_t grainsize, size_t chunksize)
+    RegisterLoopFuncCallee = M.getOrInsertFunction("nanos6_register_loop_bounds",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext())
     );
 
     // void nanos6_register_task_info(nanos6_task_info_t *task_info);
@@ -1563,31 +1883,33 @@ struct OmpSs : public ModulePass {
     }
 
     for (auto *F : Functs) {
-      SmallVector<DenseMap<BasicBlock *, BasicBlock *>, 4> TaskCopyBBs;
-
       FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
       TaskFunctionInfo &TFI = FI.TaskFuncInfo;
       TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
 
+      DenseMap<TaskInfo *, SmallVector<FinalBodyInfo, 4>> TaskFinalInfo;
+
       // First sweep to clone BBs
-      for (TaskInfo &TI : TFI.PostOrder) {
+      for (TaskInfo *pTI : TFI.PostOrder) {
+        TaskInfo &TI = *pTI;
         // 1. Split BB
         BasicBlock *EntryBB = TI.Entry->getParent();
         EntryBB = EntryBB->splitBasicBlock(TI.Entry);
 
         BasicBlock *ExitBB = TI.Exit->getParent();
-        // Assuming well-formed BB
         ExitBB = ExitBB->splitBasicBlock(TI.Exit->getNextNode());
-        // TI.Exit->eraseFromParent();
 
-        // 2. Gather BB between entry and exit (is there any function/util to do this?)
         SmallVector<BasicBlock*, 8> Worklist;
         SmallPtrSet<BasicBlock*, 8> Visited;
-        SetVector<BasicBlock *> TaskBBs;
+        DenseMap<BasicBlock *, BasicBlock *> CopyBBs;
+        ValueToValueMapTy VMap;
 
+        // 2. Clone BBs between entry and exit (is there any function/util to do this?)
         Worklist.push_back(EntryBB);
         Visited.insert(EntryBB);
-        TaskBBs.insert(EntryBB);
+
+        CopyBBs[EntryBB] = CloneBasicBlock(EntryBB, VMap, ".clone", F);
+        VMap[EntryBB] = CopyBBs[EntryBB];
         while (!Worklist.empty()) {
           auto WIt = Worklist.begin();
           BasicBlock *BB = *WIt;
@@ -1597,19 +1919,26 @@ struct OmpSs : public ModulePass {
             if (!Visited.count(*It) && *It != ExitBB) {
               Worklist.push_back(*It);
               Visited.insert(*It);
-              TaskBBs.insert(*It);
+
+              CopyBBs[*It] = CloneBasicBlock(*It, VMap, ".clone", F);
+              VMap[*It] = CopyBBs[*It];
             }
           }
         }
-        DenseMap<BasicBlock *, BasicBlock *> CopyBBs;
-        ValueToValueMapTy VMap;
-        // 1. Clone BBs
-        for (BasicBlock *BB : TaskBBs) {
-          BasicBlock *CopyBB = CloneBasicBlock(BB, VMap, ".clone", F);
-          CopyBBs[BB] = CopyBB;
-          // Map the BBs too
-          VMap[BB] = CopyBB;
+
+        Instruction *OrigEntry = TI.Entry;
+        Instruction *OrigExit = TI.Exit;
+        Instruction *CloneEntry = cast<Instruction>(VMap[OrigEntry]);
+        Instruction *CloneExit = cast<Instruction>(VMap[OrigExit]);
+        TaskFinalInfo[&TI].push_back({CloneEntry, CloneExit, &TI});
+        for (TaskInfo *InnerTI : TI.InnerTaskInfos) {
+          OrigEntry = InnerTI->Entry;
+          OrigExit = InnerTI->Exit;
+          CloneEntry = cast<Instruction>(VMap[OrigEntry]);
+          CloneExit = cast<Instruction>(VMap[OrigExit]);
+          TaskFinalInfo[&TI].push_back({CloneEntry, CloneExit, &TI});
         }
+
         // 2. Rewrite ops and branches to cloned ones.
         //    Intrinsic exit is mapped to the original entry, so before removing it
         //    we must to map it to the cloned entry.
@@ -1617,19 +1946,11 @@ struct OmpSs : public ModulePass {
           BasicBlock *& CopyBB = p.second;
           for (BasicBlock::iterator II = CopyBB->begin(), E = CopyBB->end(); II != E;) {
             Instruction &I = *II++;
-            // Remove OmpSs-2 intrinsics before, since RemapInstruction will crash.
-            // This happers because VMap has the map <IEntry, IcloneEntry>, we erase IcloneEntry
-            // but the map is kept. When remapping IcloneExit that entry is used...
+            // Remove OmpSs-2 intrinsics directive_marker. Cloned entries/exits will be removed
+            // when building final stuff
             if (auto *IIntr = dyn_cast<IntrinsicInst>(&I)) {
               Intrinsic::ID IID = IIntr->getIntrinsicID();
-              if (IID == Intrinsic::directive_region_entry
-                  || IID == Intrinsic::directive_region_exit
-                  || IID == Intrinsic::directive_marker) {
-                if (!IIntr->use_empty())
-                  IIntr->replaceAllUsesWith(UndefValue::get(IIntr->getType()));
-
-                assert(IIntr->getParent() &&
-                       "BB containing IIntr deleted unexpectedly!");
+              if (IID == Intrinsic::directive_marker) {
                 IIntr->eraseFromParent();
                 continue;
               }
@@ -1637,7 +1958,6 @@ struct OmpSs : public ModulePass {
             RemapInstruction(&I, VMap, RF_NoModuleLevelChanges | RF_IgnoreMissingLocals);
           }
         }
-        TaskCopyBBs.push_back(CopyBBs);
       }
 
       for (TaskwaitInfo& TwI : TwFI.PostOrder) {
@@ -1645,8 +1965,9 @@ struct OmpSs : public ModulePass {
       }
 
       size_t taskNum = 0;
-      for (TaskInfo &TI : TFI.PostOrder) {
-        lowerTask(TI, *F, taskNum++, M, TaskCopyBBs);
+      for (TaskInfo *pTI : TFI.PostOrder) {
+        TaskInfo &TI = *pTI;
+        lowerTask(TI, *F, taskNum++, M, TaskFinalInfo);
       }
 
     }

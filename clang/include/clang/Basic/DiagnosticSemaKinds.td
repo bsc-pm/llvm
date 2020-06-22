@@ -10739,6 +10739,34 @@ def err_oss_non_pod_parm_task : Error<
   "non-PODs by value are not allowed in task outline">;
 def err_oss_non_pod_reduction : Error<
   "non-PODs value are not allowed in reductions">;
+
+def err_oss_loop_cannot_use_stmt : Error<
+  "'%0' statement cannot be used in OmpSs-2 for loop">;
+def err_oss_not_for : Error<
+  "statement after '#pragma oss %0' must be a for loop">;
+def err_oss_loop_incr_not_compatible : Error<
+  "increment expression must cause %0 to %select{decrease|increase}1 "
+  "on each iteration of OmpSs-2 for loop">;
+def note_oss_loop_cond_requres_compatible_incr : Note<
+  "loop step is expected to be %select{negative|positive}0 due to this condition">;
+def err_oss_stmt_depends_on_loop_counter : Error<
+  "the loop %select{initializer|condition}0 expression depends on the current loop control variable">;
+def err_oss_loop_not_canonical_init : Error<
+  "initialization clause of OmpSs-2 for loop is not in canonical form "
+  "('var = init' or 'T var = init')">;
+def err_oss_loop_this_expr_init : Error<
+  "induction variable cannot be a member in OmpSs-2 for loop">;
+def err_oss_loop_variable_type : Error<
+  "variable must be of integer type">;
+def ext_oss_loop_not_canonical_init : ExtWarn<
+  "initialization clause of OmpSs-2 for loop is not in canonical form "
+  "('var = init' or 'T var = init')">, InGroup<OmpSsLoopForm>;
+def err_oss_loop_not_canonical_cond : Error<
+  "condition of OmpSs-2 for loop must be a relational comparison "
+  "('<', '<=', '>', or '>=') of loop variable %0">;
+def err_oss_loop_not_canonical_incr : Error<
+  "increment clause of OmpSs-2 for loop must perform simple addition "
+  "or subtraction on loop variable %0">;
 } // end of OmpSs component.
 
 

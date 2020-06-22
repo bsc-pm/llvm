@@ -79,6 +79,8 @@ private:
     OmpSsDirectiveKind Directive = OSSD_unknown;
     Scope *CurScope = nullptr;
     CXXThisExpr *ThisExpr = nullptr;
+    const ValueDecl *LoopICVDecl = nullptr;
+    const Expr *LoopICVExpr = nullptr;
     SourceLocation ConstructLoc;
     SharingMapTy(OmpSsDirectiveKind DKind,
                  Scope *CurScope, SourceLocation Loc)
@@ -120,6 +122,8 @@ public:
   void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
               bool Ignore, bool Implicit, OmpSsClauseKind CRestrict = OSSC_unknown);
 
+  void addLoopControlVariable(const ValueDecl *D, const Expr *E);
+
   /// Returns data sharing attributes from top of the stack for the
   /// specified declaration.
   const DSAVarData getTopDSA(ValueDecl *D, bool FromParent);
@@ -159,6 +163,14 @@ public:
   CXXThisExpr *getThisExpr() const {
     return isStackEmpty() ? nullptr : Stack.back().ThisExpr;
   }
+  const ValueDecl *getCurrentLoopICVDecl() const {
+    return isStackEmpty() ? nullptr : Stack.back().LoopICVDecl;
+  }
+
+  const Expr *getCurrentLoopICVExpr() const {
+    return isStackEmpty() ? nullptr : Stack.back().LoopICVExpr;
+  }
+
   // Get the current scope. This is null when instantiating templates
   // Used for Reductions
   Scope *getCurScope() const {
@@ -167,6 +179,25 @@ public:
 };
 
 } // namespace
+
+static const Expr *getExprAsWritten(const Expr *E) {
+  if (const auto *FE = dyn_cast<FullExpr>(E))
+    E = FE->getSubExpr();
+
+  if (const auto *MTE = dyn_cast<MaterializeTemporaryExpr>(E))
+    E = MTE->getSubExpr();
+
+  while (const auto *Binder = dyn_cast<CXXBindTemporaryExpr>(E))
+    E = Binder->getSubExpr();
+
+  if (const auto *ICE = dyn_cast<ImplicitCastExpr>(E))
+    E = ICE->getSubExprAsWritten();
+  return E->IgnoreParens();
+}
+
+static Expr *getExprAsWritten(Expr *E) {
+  return const_cast<Expr *>(getExprAsWritten(const_cast<const Expr *>(E)));
+}
 
 static const ValueDecl *getCanonicalDecl(const ValueDecl *D) {
   const auto *VD = dyn_cast<VarDecl>(D);
@@ -218,6 +249,14 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
   Data.CRestrict = CRestrict;
 }
 
+void DSAStackTy::addLoopControlVariable(const ValueDecl *D, const Expr *E) {
+  D = getCanonicalDecl(D);
+  assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
+  assert(!Stack.back().LoopICVDecl && "This directive already has a loop control variable");
+  Stack.back().LoopICVDecl = D;
+  Stack.back().LoopICVExpr = E;
+}
+
 const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
                                                    bool FromParent) {
   D = getCanonicalDecl(D);
@@ -225,7 +264,7 @@ const DSAStackTy::DSAVarData DSAStackTy::getTopDSA(ValueDecl *D,
 
   auto *VD = dyn_cast<VarDecl>(D);
 
-  auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return Dir == OSSD_task; };
+  auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return true; };
   auto &&AnyClause = [](OmpSsClauseKind Clause) { return Clause != OSSC_shared; };
   if (VD) {
     DSAVarData DVarTemp = hasDSA(D, AnyClause, IsTaskDir, FromParent);
@@ -242,7 +281,7 @@ const DSAStackTy::DSAVarData DSAStackTy::getCurrentDSA(ValueDecl *D) {
 
   auto *VD = dyn_cast<VarDecl>(D);
 
-  auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return Dir == OSSD_task; };
+  auto &&IsTaskDir = [](OmpSsDirectiveKind Dir) { return true; };
   auto &&AnyClause = [](OmpSsClauseKind Clause) { return true; };
   iterator I = Stack.rbegin();
   iterator EndI = Stack.rend();
@@ -433,13 +472,8 @@ public:
 
   bool isErrorFound() const { return ErrorFound; }
 
-  ArrayRef<Expr *> getImplicitShared() const {
-    return ImplicitShared;
-  }
-
-  ArrayRef<Expr *> getImplicitFirstprivate() const {
-    return ImplicitFirstprivate;
-  }
+  ArrayRef<Expr *> getImplicitShared() const { return ImplicitShared; }
+  ArrayRef<Expr *> getImplicitFirstprivate() const { return ImplicitFirstprivate; }
 
   DSAAttrChecker(DSAStackTy *S, Sema &SemaRef, Stmt *CS)
       : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
@@ -683,6 +717,10 @@ void Sema::InitDataSharingAttributesStackOmpSs() {
 #define DSAStack static_cast<DSAStackTy *>(VarDataSharingAttributesStackOmpSs)
 
 void Sema::DestroyDataSharingAttributesStackOmpSs() { delete DSAStack; }
+
+OmpSsDirectiveKind Sema::GetCurrentOmpSsDirective() const {
+  return DSAStack->getCurrentDirective();
+}
 
 void Sema::StartOmpSsDSABlock(OmpSsDirectiveKind DKind,
                               Scope *CurScope, SourceLocation Loc) {
@@ -1059,6 +1097,18 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     // Check default data sharing attributes for referenced variables.
     DSAAttrChecker DSAChecker(DSAStack, *this, AStmt);
     Stmt *S = AStmt;
+
+    if (isOmpSsLoopDirective(Kind)) {
+      auto *For = dyn_cast_or_null<ForStmt>(AStmt);
+      if (!For) {
+        Diag(AStmt->getBeginLoc(), diag::err_oss_not_for)
+          << getOmpSsDirectiveName(Kind);
+        return StmtError();
+      }
+      assert((For && For->getBody()) && "No loop body.");
+      S = For->getBody();
+    }
+
     DSAChecker.Visit(S);
     if (DSAChecker.isErrorFound())
       ErrorFound = true;
@@ -1077,6 +1127,18 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
               SourceLocation(), /*isImplicit=*/true)) {
         ClausesWithImplicit.push_back(Implicit);
         if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
+          ErrorFound = true;
+      } else {
+        ErrorFound = true;
+      }
+    }
+
+    if (isOmpSsLoopDirective(Kind) && DSAStack->getCurrentLoopICVExpr()) {
+      if (OSSClause *Implicit = ActOnOmpSsPrivateClause(
+            const_cast<Expr *>(DSAStack->getCurrentLoopICVExpr()), SourceLocation(), SourceLocation(),
+            SourceLocation())) {
+        ClausesWithImplicit.push_back(Implicit);
+        if (cast<OSSPrivateClause>(Implicit)->varlist_size() != 1)
           ErrorFound = true;
       } else {
         ErrorFound = true;
@@ -1104,11 +1166,22 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   case OSSD_task:
     Res = ActOnOmpSsTaskDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
     break;
+  case OSSD_task_for:
+    Res = ActOnOmpSsTaskForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
+  case OSSD_taskloop:
+    Res = ActOnOmpSsTaskLoopDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
+  case OSSD_taskloop_for:
+    Res = ActOnOmpSsTaskLoopForDirective(ClausesWithImplicit, AStmt, StartLoc, EndLoc);
+    break;
   case OSSD_declare_task:
   case OSSD_declare_reduction:
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
   }
+
+  ErrorFound = ErrorFound || Res.isInvalid();
 
   if (ErrorFound)
     return StmtError();
@@ -1129,6 +1202,654 @@ StmtResult Sema::ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,
   if (!AStmt)
     return StmtError();
   return OSSTaskDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt);
+}
+
+namespace {
+// NOTE: Port from OpenMP
+/// Helper class for checking canonical form of the OmpSs loops and
+/// extracting iteration space of each loop in the loop nest, that will be used
+/// for IR generation.
+class OmpSsIterationSpaceChecker {
+  /// Reference to Sema.
+  Sema &SemaRef;
+  /// Data-sharing stack.
+  DSAStackTy &Stack;
+  /// A location for diagnostics (when there is no some better location).
+  SourceLocation DefaultLoc;
+  /// A location for diagnostics (when increment is not compatible).
+  SourceLocation ConditionLoc;
+  /// A source location for referring to loop init later.
+  SourceRange InitSrcRange;
+  /// A source location for referring to condition later.
+  SourceRange ConditionSrcRange;
+  /// A source location for referring to increment later.
+  SourceRange IncrementSrcRange;
+  /// Loop variable.
+  ValueDecl *LCDecl = nullptr;
+  /// Reference to loop variable.
+  Expr *LCRef = nullptr;
+  /// Lower bound (initializer for the var).
+  Expr *LB = nullptr;
+  /// Upper bound.
+  Expr *UB = nullptr;
+  /// Loop step (increment).
+  Expr *Step = nullptr;
+  /// This flag is true when condition is one of:
+  ///   Var <  UB
+  ///   Var <= UB
+  ///   UB  >  Var
+  ///   UB  >= Var
+  /// This will have no value when the condition is !=
+  llvm::Optional<bool> TestIsLessOp;
+  /// This flag is true when condition is strict ( < or > ).
+  bool TestIsStrictOp = false;
+  /// Checks if the provide statement depends on the loop counter.
+  // true if depends on the loop counter
+  bool doesDependOnLoopCounter(const Stmt *S, bool IsInitializer);
+  /// Original condition required for checking of the exit condition for
+  /// non-rectangular loop.
+  Expr *Condition = nullptr;
+
+public:
+  OmpSsIterationSpaceChecker(Sema &SemaRef, DSAStackTy &Stack,
+                              SourceLocation DefaultLoc)
+      : SemaRef(SemaRef), Stack(Stack), DefaultLoc(DefaultLoc),
+        ConditionLoc(DefaultLoc) {}
+  /// Check init-expr for canonical loop form and save loop counter
+  /// variable - #Var and its initialization value - #LB.
+  bool checkAndSetInit(Stmt *S, bool EmitDiags = true);
+  /// Check test-expr for canonical form, save upper-bound (#UB), flags
+  /// for less/greater and for strict/non-strict comparison.
+  bool checkAndSetCond(Expr *S);
+  /// Check incr-expr for canonical loop form and return true if it
+  /// does not conform, otherwise save loop step (#Step).
+  bool checkAndSetInc(Expr *S);
+  /// Return the loop counter variable.
+  ValueDecl *getLoopDecl() const { return LCDecl; }
+  /// Return the reference expression to loop counter variable.
+  Expr *getLoopDeclRefExpr() const { return LCRef; }
+  /// Return the Lower bound expression
+  Expr *getLoopLowerBoundExpr() const { return LB; }
+  /// Return the Upper bound expression
+  Expr *getLoopUpperBoundExpr() const { return UB; }
+  /// Return the Step expression
+  Expr *getLoopStepExpr() const { return Step; }
+  /// Return true if < or <=, false if >= or >. No value means !=
+  llvm::Optional<bool> getLoopIsLessOp() const { return TestIsLessOp; }
+  /// Return true is strict comparison
+  bool getLoopIsStrictOp() const { return TestIsStrictOp; }
+  /// Source range of the loop init.
+  SourceRange getInitSrcRange() const { return InitSrcRange; }
+  /// Source range of the loop condition.
+  SourceRange getConditionSrcRange() const { return ConditionSrcRange; }
+  /// Source range of the loop increment.
+  SourceRange getIncrementSrcRange() const { return IncrementSrcRange; }
+  /// True, if the compare operator is strict (<, > or !=).
+  bool isStrictTestOp() const { return TestIsStrictOp; }
+  /// Return true if any expression is dependent.
+  bool dependent() const;
+
+private:
+  /// Check the right-hand side of an assignment in the increment
+  /// expression.
+  bool checkAndSetIncRHS(Expr *RHS);
+  /// Helper to set loop counter variable and its initializer.
+  bool setLCDeclAndLB(ValueDecl *NewLCDecl, Expr *NewDeclRefExpr, Expr *NewLB,
+                      bool EmitDiags);
+  /// Helper to set upper bound.
+  bool setUB(Expr *NewUB, llvm::Optional<bool> LessOp, bool StrictOp,
+             SourceRange SR, SourceLocation SL);
+  /// Helper to set loop increment.
+  bool setStep(Expr *NewStep, bool Subtract);
+};
+
+bool OmpSsIterationSpaceChecker::dependent() const {
+  if (!LCDecl) {
+    assert(!LB && !UB && !Step);
+    return false;
+  }
+  return LCDecl->getType()->isDependentType() ||
+         (LB && LB->isValueDependent()) || (UB && UB->isValueDependent()) ||
+         (Step && Step->isValueDependent());
+}
+
+bool OmpSsIterationSpaceChecker::setLCDeclAndLB(ValueDecl *NewLCDecl,
+                                                 Expr *NewLCRefExpr,
+                                                 Expr *NewLB, bool EmitDiags) {
+  // State consistency checking to ensure correct usage.
+  assert(LCDecl == nullptr && LB == nullptr && LCRef == nullptr &&
+         UB == nullptr && Step == nullptr && !TestIsLessOp && !TestIsStrictOp);
+  if (!NewLCDecl || !NewLB)
+    return true;
+  LCDecl = getCanonicalDecl(NewLCDecl);
+  LCRef = NewLCRefExpr;
+  if (auto *CE = dyn_cast_or_null<CXXConstructExpr>(NewLB))
+    if (const CXXConstructorDecl *Ctor = CE->getConstructor())
+      if ((Ctor->isCopyOrMoveConstructor() ||
+           Ctor->isConvertingConstructor(/*AllowExplicit=*/false)) &&
+          CE->getNumArgs() > 0 && CE->getArg(0) != nullptr)
+        NewLB = CE->getArg(0)->IgnoreParenImpCasts();
+  LB = NewLB;
+  if (EmitDiags)
+    doesDependOnLoopCounter(LB, /*IsInitializer=*/true);
+  return false;
+}
+
+bool OmpSsIterationSpaceChecker::setUB(Expr *NewUB,
+                                        llvm::Optional<bool> LessOp,
+                                        bool StrictOp, SourceRange SR,
+                                        SourceLocation SL) {
+  // State consistency checking to ensure correct usage.
+  assert(LCDecl != nullptr && LB != nullptr && UB == nullptr &&
+         Step == nullptr && !TestIsLessOp && !TestIsStrictOp);
+  if (!NewUB)
+    return true;
+  UB = NewUB;
+  TestIsLessOp = LessOp;
+  TestIsStrictOp = StrictOp;
+  ConditionSrcRange = SR;
+  ConditionLoc = SL;
+  doesDependOnLoopCounter(UB, /*IsInitializer=*/false);
+  return false;
+}
+
+bool OmpSsIterationSpaceChecker::setStep(Expr *NewStep, bool Subtract) {
+  // State consistency checking to ensure correct usage.
+  assert(LCDecl != nullptr && LB != nullptr && Step == nullptr);
+  if (!NewStep)
+    return true;
+  if (!NewStep->isValueDependent()) {
+    // Check that the step is integer expression.
+    SourceLocation StepLoc = NewStep->getBeginLoc();
+    ExprResult Val = SemaRef.PerformOmpSsImplicitIntegerConversion(
+        StepLoc, getExprAsWritten(NewStep));
+    if (Val.isInvalid())
+      return true;
+    NewStep = Val.get();
+
+    // OmpSs [2.6, Canonical Loop Form, Restrictions]
+    //  If test-expr is of form var relational-op b and relational-op is < or
+    //  <= then incr-expr must cause var to increase on each iteration of the
+    //  loop. If test-expr is of form var relational-op b and relational-op is
+    //  > or >= then incr-expr must cause var to decrease on each iteration of
+    //  the loop.
+    //  If test-expr is of form b relational-op var and relational-op is < or
+    //  <= then incr-expr must cause var to decrease on each iteration of the
+    //  loop. If test-expr is of form b relational-op var and relational-op is
+    //  > or >= then incr-expr must cause var to increase on each iteration of
+    //  the loop.
+    llvm::APSInt Result;
+    bool IsConstant = NewStep->isIntegerConstantExpr(Result, SemaRef.Context);
+    bool IsUnsigned = !NewStep->getType()->hasSignedIntegerRepresentation();
+    bool IsConstNeg =
+        IsConstant && Result.isSigned() && (Subtract != Result.isNegative());
+    bool IsConstPos =
+        IsConstant && Result.isSigned() && (Subtract == Result.isNegative());
+    bool IsConstZero = IsConstant && !Result.getBoolValue();
+
+    if (UB && (IsConstZero ||
+               (TestIsLessOp.getValue() ?
+                  (IsConstNeg || (IsUnsigned && Subtract)) :
+                  (IsConstPos || (IsUnsigned && !Subtract))))) {
+      SemaRef.Diag(NewStep->getExprLoc(),
+                   diag::err_oss_loop_incr_not_compatible)
+          << LCDecl << TestIsLessOp.getValue() << NewStep->getSourceRange();
+      SemaRef.Diag(ConditionLoc,
+                   diag::note_oss_loop_cond_requres_compatible_incr)
+          << TestIsLessOp.getValue() << ConditionSrcRange;
+      return true;
+    }
+    if (Subtract) {
+      NewStep =
+          SemaRef.CreateBuiltinUnaryOp(NewStep->getExprLoc(), UO_Minus, NewStep)
+              .get();
+    }
+  }
+
+  Step = NewStep;
+  return false;
+}
+
+namespace {
+/// Checker for the non-rectangular loops. Checks if the initializer or
+/// condition expression references loop counter variable.
+class LoopCounterRefChecker final
+    : public ConstStmtVisitor<LoopCounterRefChecker, bool> {
+  Sema &SemaRef;
+  DSAStackTy &Stack;
+  const ValueDecl *CurLCDecl = nullptr;
+  bool IsInitializer = true;
+  bool checkDecl(const Expr *E, const ValueDecl *VD) {
+    if (getCanonicalDecl(VD) == getCanonicalDecl(CurLCDecl)) {
+      SemaRef.Diag(E->getExprLoc(), diag::err_oss_stmt_depends_on_loop_counter)
+          << (IsInitializer ? 0 : 1);
+      return false;
+    }
+    return true;
+  }
+
+public:
+  bool VisitDeclRefExpr(const DeclRefExpr *E) {
+    const ValueDecl *VD = E->getDecl();
+    if (isa<VarDecl>(VD))
+      return checkDecl(E, VD);
+    return false;
+  }
+  bool VisitMemberExpr(const MemberExpr *E) {
+    if (isa<CXXThisExpr>(E->getBase()->IgnoreParens())) {
+      const ValueDecl *VD = E->getMemberDecl();
+      if (isa<VarDecl>(VD) || isa<FieldDecl>(VD))
+        return checkDecl(E, VD);
+    }
+    return false;
+  }
+  bool VisitStmt(const Stmt *S) {
+    bool Res = false;
+    for (const Stmt *Child : S->children())
+      Res = (Child && Visit(Child)) || Res;
+    return Res;
+  }
+  explicit LoopCounterRefChecker(Sema &SemaRef, DSAStackTy &Stack,
+                                 const ValueDecl *CurLCDecl, bool IsInitializer)
+      : SemaRef(SemaRef), Stack(Stack), CurLCDecl(CurLCDecl),
+        IsInitializer(IsInitializer) {}
+};
+} // namespace
+
+bool
+OmpSsIterationSpaceChecker::doesDependOnLoopCounter(const Stmt *S,
+                                                     bool IsInitializer) {
+  // Check for the non-rectangular loops.
+  LoopCounterRefChecker LoopStmtChecker(SemaRef, Stack, LCDecl, IsInitializer);
+  return !LoopStmtChecker.Visit(S);
+}
+
+bool OmpSsIterationSpaceChecker::checkAndSetInit(Stmt *S, bool EmitDiags) {
+  // Check init-expr for canonical loop form and save loop counter
+  // variable - #Var and its initialization value - #LB.
+  // OmpSs [2.6] Canonical loop form. init-expr may be one of the following:
+  //   var = lb
+  //   integer-type var = lb
+  //
+  if (!S) {
+    if (EmitDiags)
+      SemaRef.Diag(DefaultLoc, diag::err_oss_loop_not_canonical_init);
+    return true;
+  }
+  if (auto *ExprTemp = dyn_cast<ExprWithCleanups>(S))
+    if (!ExprTemp->cleanupsHaveSideEffects())
+      S = ExprTemp->getSubExpr();
+
+  InitSrcRange = S->getSourceRange();
+  bool IsThisMemberExpr = false;
+  if (Expr *E = dyn_cast<Expr>(S))
+    S = E->IgnoreParens();
+  if (auto *BO = dyn_cast<BinaryOperator>(S)) {
+    if (BO->getOpcode() == BO_Assign) {
+      Expr *LHS = BO->getLHS()->IgnoreParens();
+      if (auto *DRE = dyn_cast<DeclRefExpr>(LHS)) {
+        return setLCDeclAndLB(DRE->getDecl(), DRE, BO->getRHS(),
+                              EmitDiags);
+      }
+      if (auto *ME = dyn_cast<MemberExpr>(LHS)) {
+        if (ME->isArrow() &&
+            isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()))
+          IsThisMemberExpr = true;
+      }
+    }
+  } else if (auto *DS = dyn_cast<DeclStmt>(S)) {
+    if (DS->isSingleDecl()) {
+      if (auto *Var = dyn_cast_or_null<VarDecl>(DS->getSingleDecl())) {
+        if (Var->hasInit() && !Var->getType()->isReferenceType()) {
+          // Accept non-canonical init form here (i.e. int i{0}) but emit ext. warning.
+          if (Var->getInitStyle() != VarDecl::CInit && EmitDiags)
+            SemaRef.Diag(S->getBeginLoc(),
+                         diag::ext_oss_loop_not_canonical_init)
+                << S->getSourceRange();
+          return setLCDeclAndLB(
+              Var,
+              buildDeclRefExpr(SemaRef, Var,
+                               Var->getType().getNonReferenceType(),
+                               DS->getBeginLoc()),
+              Var->getInit(), EmitDiags);
+        }
+      }
+    }
+  } else if (auto *CE = dyn_cast<CXXOperatorCallExpr>(S)) {
+    if (CE->getOperator() == OO_Equal) {
+      Expr *LHS = CE->getArg(0);
+      if (auto *DRE = dyn_cast<DeclRefExpr>(LHS)) {
+        return setLCDeclAndLB(DRE->getDecl(), DRE, CE->getArg(1), EmitDiags);
+      }
+      if (auto *ME = dyn_cast<MemberExpr>(LHS)) {
+        if (ME->isArrow() &&
+            isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()))
+          IsThisMemberExpr = true;
+      }
+    }
+  }
+
+  if (dependent() || SemaRef.CurContext->isDependentContext())
+    return false;
+  if (EmitDiags) {
+    SemaRef.Diag(S->getBeginLoc(), diag::err_oss_loop_not_canonical_init)
+        << S->getSourceRange();
+    if (IsThisMemberExpr)
+      SemaRef.Diag(S->getBeginLoc(), diag::err_oss_loop_this_expr_init)
+          << S->getSourceRange();
+  }
+  return true;
+}
+
+/// Ignore parenthesizes, implicit casts, copy constructor and return the
+/// variable (which may be the loop variable) if possible.
+static const ValueDecl *getInitLCDecl(const Expr *E) {
+  if (!E)
+    return nullptr;
+  E = getExprAsWritten(E);
+  if (const auto *CE = dyn_cast_or_null<CXXConstructExpr>(E))
+    if (const CXXConstructorDecl *Ctor = CE->getConstructor())
+      if ((Ctor->isCopyOrMoveConstructor() ||
+           Ctor->isConvertingConstructor(/*AllowExplicit=*/false)) &&
+          CE->getNumArgs() > 0 && CE->getArg(0) != nullptr)
+        E = CE->getArg(0)->IgnoreParenImpCasts();
+  if (const auto *DRE = dyn_cast_or_null<DeclRefExpr>(E)) {
+    if (const auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
+      return getCanonicalDecl(VD);
+  }
+  if (const auto *ME = dyn_cast_or_null<MemberExpr>(E))
+    if (ME->isArrow() && isa<CXXThisExpr>(ME->getBase()->IgnoreParenImpCasts()))
+      return getCanonicalDecl(ME->getMemberDecl());
+  return nullptr;
+}
+
+bool OmpSsIterationSpaceChecker::checkAndSetCond(Expr *S) {
+  // Check test-expr for canonical form, save upper-bound UB, flags for
+  // less/greater and for strict/non-strict comparison.
+  // OmpSs [2.9] Canonical loop form. Test-expr may be one of the following:
+  //   var relational-op b
+  //   b relational-op var
+  //
+  if (!S) {
+    SemaRef.Diag(DefaultLoc, diag::err_oss_loop_not_canonical_cond)
+        << LCDecl;
+    return true;
+  }
+  Condition = S;
+  S = getExprAsWritten(S);
+  SourceLocation CondLoc = S->getBeginLoc();
+  if (auto *BO = dyn_cast<BinaryOperator>(S)) {
+    if (BO->isRelationalOp()) {
+      if (getInitLCDecl(BO->getLHS()) == LCDecl)
+        return setUB(BO->getRHS(),
+                     (BO->getOpcode() == BO_LT || BO->getOpcode() == BO_LE),
+                     (BO->getOpcode() == BO_LT || BO->getOpcode() == BO_GT),
+                     BO->getSourceRange(), BO->getOperatorLoc());
+      if (getInitLCDecl(BO->getRHS()) == LCDecl)
+        return setUB(BO->getLHS(),
+                     (BO->getOpcode() == BO_GT || BO->getOpcode() == BO_GE),
+                     (BO->getOpcode() == BO_LT || BO->getOpcode() == BO_GT),
+                     BO->getSourceRange(), BO->getOperatorLoc());
+    }
+  } else if (auto *CE = dyn_cast<CXXOperatorCallExpr>(S)) {
+    if (CE->getNumArgs() == 2) {
+      auto Op = CE->getOperator();
+      switch (Op) {
+      case OO_Greater:
+      case OO_GreaterEqual:
+      case OO_Less:
+      case OO_LessEqual:
+        if (getInitLCDecl(CE->getArg(0)) == LCDecl)
+          return setUB(CE->getArg(1), Op == OO_Less || Op == OO_LessEqual,
+                       Op == OO_Less || Op == OO_Greater, CE->getSourceRange(),
+                       CE->getOperatorLoc());
+        if (getInitLCDecl(CE->getArg(1)) == LCDecl)
+          return setUB(CE->getArg(0), Op == OO_Greater || Op == OO_GreaterEqual,
+                       Op == OO_Less || Op == OO_Greater, CE->getSourceRange(),
+                       CE->getOperatorLoc());
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  if (dependent() || SemaRef.CurContext->isDependentContext())
+    return false;
+  SemaRef.Diag(CondLoc, diag::err_oss_loop_not_canonical_cond)
+      << S->getSourceRange() << LCDecl;
+  return true;
+}
+
+bool OmpSsIterationSpaceChecker::checkAndSetIncRHS(Expr *RHS) {
+  // RHS of canonical loop form increment can be:
+  //   var + incr
+  //   incr + var
+  //   var - incr
+  //
+  RHS = RHS->IgnoreParenImpCasts();
+  if (auto *BO = dyn_cast<BinaryOperator>(RHS)) {
+    if (BO->isAdditiveOp()) {
+      bool IsAdd = BO->getOpcode() == BO_Add;
+      // The following cases are handled here
+      // var + incr
+      // var + -incr
+      // var - incr
+      if (getInitLCDecl(BO->getLHS()) == LCDecl)
+        return setStep(BO->getRHS(), !IsAdd);
+      // The following cases are handled here
+      // incr + var
+      // -incr + var 
+      if (IsAdd && getInitLCDecl(BO->getRHS()) == LCDecl)
+        return setStep(BO->getLHS(), /*Subtract=*/false);
+    }
+  } else if (auto *CE = dyn_cast<CXXOperatorCallExpr>(RHS)) {
+    bool IsAdd = CE->getOperator() == OO_Plus;
+    if ((IsAdd || CE->getOperator() == OO_Minus) && CE->getNumArgs() == 2) {
+      if (getInitLCDecl(CE->getArg(0)) == LCDecl)
+        return setStep(CE->getArg(1), !IsAdd);
+      if (IsAdd && getInitLCDecl(CE->getArg(1)) == LCDecl)
+        return setStep(CE->getArg(0), /*Subtract=*/false);
+    }
+  }
+  if (dependent() || SemaRef.CurContext->isDependentContext())
+    return false;
+  // The following cases are handled here
+  //  incr - var
+  //  -incr - var
+  SemaRef.Diag(RHS->getBeginLoc(), diag::err_oss_loop_not_canonical_incr)
+      << RHS->getSourceRange() << LCDecl;
+  return true;
+}
+
+bool OmpSsIterationSpaceChecker::checkAndSetInc(Expr *S) {
+  // Check incr-expr for canonical loop form and return true if it
+  // does not conform.
+  // OmpSs [2.6] Canonical loop form. Test-expr may be one of the following:
+  //   ++var
+  //   var++
+  //   --var
+  //   var--
+  //   var += incr
+  //   var -= incr
+  //   var = var + incr
+  //   var = incr + var
+  //   var = var - incr
+  //
+  if (!S) {
+    SemaRef.Diag(DefaultLoc, diag::err_oss_loop_not_canonical_incr) << LCDecl;
+    return true;
+  }
+  if (auto *ExprTemp = dyn_cast<ExprWithCleanups>(S))
+    if (!ExprTemp->cleanupsHaveSideEffects())
+      S = ExprTemp->getSubExpr();
+
+  IncrementSrcRange = S->getSourceRange();
+  S = S->IgnoreParens();
+  if (auto *UO = dyn_cast<UnaryOperator>(S)) {
+    if (UO->isIncrementDecrementOp() &&
+        getInitLCDecl(UO->getSubExpr()) == LCDecl)
+      return setStep(SemaRef
+                         .ActOnIntegerConstant(UO->getBeginLoc(),
+                                               (UO->isDecrementOp() ? -1 : 1))
+                         .get(),
+                     /*Subtract=*/false);
+  } else if (auto *BO = dyn_cast<BinaryOperator>(S)) {
+    switch (BO->getOpcode()) {
+    case BO_AddAssign:
+    case BO_SubAssign:
+      if (getInitLCDecl(BO->getLHS()) == LCDecl)
+        return setStep(BO->getRHS(), BO->getOpcode() == BO_SubAssign);
+      break;
+    case BO_Assign:
+      if (getInitLCDecl(BO->getLHS()) == LCDecl)
+        return checkAndSetIncRHS(BO->getRHS());
+      break;
+    default:
+      break;
+    }
+  } else if (auto *CE = dyn_cast<CXXOperatorCallExpr>(S)) {
+    switch (CE->getOperator()) {
+    case OO_PlusPlus:
+    case OO_MinusMinus:
+      if (getInitLCDecl(CE->getArg(0)) == LCDecl)
+        return setStep(SemaRef
+                           .ActOnIntegerConstant(
+                               CE->getBeginLoc(),
+                               ((CE->getOperator() == OO_MinusMinus) ? -1 : 1))
+                           .get(),
+                       /*Subtract=*/false);
+      break;
+    case OO_PlusEqual:
+    case OO_MinusEqual:
+      if (getInitLCDecl(CE->getArg(0)) == LCDecl)
+        return setStep(CE->getArg(1), CE->getOperator() == OO_MinusEqual);
+      break;
+    case OO_Equal:
+      if (getInitLCDecl(CE->getArg(0)) == LCDecl)
+        return checkAndSetIncRHS(CE->getArg(1));
+      break;
+    default:
+      break;
+    }
+  }
+  if (dependent() || SemaRef.CurContext->isDependentContext())
+    return false;
+  SemaRef.Diag(S->getBeginLoc(), diag::err_oss_loop_not_canonical_incr)
+      << S->getSourceRange() << LCDecl;
+  return true;
+}
+
+} // namespace
+
+void Sema::ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init) {
+  assert(getLangOpts().OmpSs && "OmpSs is not active.");
+  assert(Init && "Expected loop in canonical form.");
+
+  OmpSsDirectiveKind DKind = DSAStack->getCurrentDirective();
+
+  if (isOmpSsLoopDirective(DKind) && !DSAStack->getCurrentLoopICVDecl()) {
+    OmpSsIterationSpaceChecker ISC(*this, *DSAStack, ForLoc);
+    if (!ISC.checkAndSetInit(Init, /*EmitDiags=*/false)) {
+      if (ValueDecl *D = ISC.getLoopDecl()) {
+        const Expr *E = ISC.getLoopDeclRefExpr();
+        auto *VD = dyn_cast<VarDecl>(D);
+
+        DSAStackTy::DSAVarData DVar = DSAStack->getCurrentDSA(D);
+        if (DVar.CKind != OSSC_unknown && DVar.CKind != OSSC_private &&
+            DVar.RefExpr) {
+          Diag(E->getExprLoc(), diag::err_oss_wrong_dsa)
+            << getOmpSsClauseName(DVar.CKind)
+            << getOmpSsClauseName(OSSC_private);
+            return;
+        }
+
+        // Register loop control variable
+        DSAStack->addLoopControlVariable(VD, E);
+        DSAStack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*Implicit=*/true);
+      }
+    }
+  }
+}
+
+static bool checkOmpSsLoop(
+    OmpSsDirectiveKind DKind, Stmt *AStmt,
+    Sema &SemaRef, DSAStackTy &Stack,
+    OSSLoopDirective::HelperExprs &B) {
+
+  // OmpSs [2.9.1, Canonical Loop Form]
+  //   for (init-expr; test-expr; incr-expr) structured-block
+  auto *For = cast<ForStmt>(AStmt);
+  OmpSsIterationSpaceChecker ISC(SemaRef, Stack, For->getForLoc());
+
+  // Check init.
+  Stmt *Init = For->getInit();
+  if (ISC.checkAndSetInit(Init))
+    return true;
+
+  bool HasErrors = false;
+
+  // Check loop variable's type.
+  if (ValueDecl *LCDecl = ISC.getLoopDecl()) {
+    // OmpSs [2.6, Canonical Loop Form]
+    // Var is one of the following:
+    //   A variable of signed or unsigned integer type.
+    QualType VarType = LCDecl->getType().getNonReferenceType();
+    if (!VarType->isDependentType() && !VarType->isIntegerType()) {
+      SemaRef.Diag(Init->getBeginLoc(), diag::err_oss_loop_variable_type);
+      HasErrors = true;
+    }
+
+    // Check test-expr.
+    HasErrors |= ISC.checkAndSetCond(For->getCond());
+
+    // Check incr-expr.
+    HasErrors |= ISC.checkAndSetInc(For->getInc());
+  }
+
+  B.IndVar = ISC.getLoopDeclRefExpr();
+  B.LB = ISC.getLoopLowerBoundExpr();
+  B.UB = ISC.getLoopUpperBoundExpr();
+  B.Step = ISC.getLoopStepExpr();
+  B.TestIsLessOp = ISC.getLoopIsLessOp();
+  B.TestIsStrictOp = ISC.getLoopIsStrictOp();
+
+  if (ISC.dependent() || SemaRef.CurContext->isDependentContext() || HasErrors)
+    return HasErrors;
+
+  return false;
+}
+
+StmtResult Sema::ActOnOmpSsTaskForDirective(
+    ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  OSSLoopDirective::HelperExprs B;
+  if (checkOmpSsLoop(OSSD_task_for, AStmt, *this, *DSAStack, B))
+    return StmtError();
+  return OSSTaskForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
+}
+
+StmtResult Sema::ActOnOmpSsTaskLoopDirective(
+    ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  OSSLoopDirective::HelperExprs B;
+  if (checkOmpSsLoop(OSSD_taskloop, AStmt, *this, *DSAStack, B))
+    return StmtError();
+  return OSSTaskLoopDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
+}
+
+StmtResult Sema::ActOnOmpSsTaskLoopForDirective(
+    ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+    SourceLocation StartLoc, SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+  OSSLoopDirective::HelperExprs B;
+  if (checkOmpSsLoop(OSSD_taskloop_for, AStmt, *this, *DSAStack, B))
+    return StmtError();
+  return OSSTaskLoopForDirective::Create(Context, StartLoc, EndLoc, Clauses, AStmt, B);
 }
 
 static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false) {

@@ -137,6 +137,9 @@ public:
 
     /// This is the scope of OmpSs executable directive.
     OmpSsDirectiveScope = 0x2000000,
+
+    /// This is the scope of some OmpSs loop directive.
+    OmpSsLoopDirectiveScope = 0x4000000,
   };
 
 private:
@@ -432,6 +435,17 @@ public:
     return false;
   }
 
+  /// Determine whether this scope is some OmpSs loop directive scope
+  /// (for example, 'oss task for', 'oss taskloop').
+  bool isOmpSsLoopDirectiveScope() const {
+    if (getFlags() & Scope::OmpSsLoopDirectiveScope) {
+      assert(isOmpSsDirectiveScope() &&
+             "OmpSs loop directive scope is not a directive scope");
+      return true;
+    }
+    return false;
+  }
+
   /// Determine whether this scope is (or is nested into) some OpenMP
   /// loop simd directive scope (for example, 'omp simd', 'omp for simd').
   bool isOpenMPSimdDirectiveScope() const {
@@ -443,6 +457,13 @@ public:
   bool isOpenMPLoopScope() const {
     const Scope *P = getParent();
     return P && P->isOpenMPLoopDirectiveScope();
+  }
+
+  /// Determine whether this scope is a loop having OmpSs loop
+  /// directive attached.
+  bool isOmpSsLoopScope() const {
+    const Scope *P = getParent();
+    return P && P->isOmpSsLoopDirectiveScope();
   }
 
   /// Determine whether this scope is a C++ 'try' block.

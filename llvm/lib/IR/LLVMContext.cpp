@@ -74,6 +74,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   (void)PreallocatedEntry;
 
   // OmpSs IDs
+  auto *OSSDirEntry = pImpl->getOrInsertBundleTag("DIR.OSS");
+  assert(OSSDirEntry->second == LLVMContext::OB_oss_dir &&
+         "oss_dir operand bundle id drifted!");
+  (void)OSSDirEntry;
+
   auto *OSSSharedEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.SHARED");
   assert(OSSSharedEntry->second == LLVMContext::OB_oss_shared &&
          "oss_shared operand bundle id drifted!");
@@ -213,6 +218,31 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSCopyEntry->second == LLVMContext::OB_oss_copy &&
          "oss_copy operand bundle id drifted!");
   (void)OSSCopyEntry;
+
+  auto *OSSLoopTypeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.TYPE");
+  assert(OSSLoopTypeEntry->second == LLVMContext::OB_oss_loop_type &&
+         "oss_loop_type operand bundle id drifted!");
+  (void)OSSLoopTypeEntry;
+
+  auto *OSSLoopIndVarEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.IND.VAR");
+  assert(OSSLoopIndVarEntry->second == LLVMContext::OB_oss_loop_ind_var &&
+         "oss_loop_ind_var operand bundle id drifted!");
+  (void)OSSLoopIndVarEntry;
+
+  auto *OSSLoopLowerBoundEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.LOWER.BOUND");
+  assert(OSSLoopLowerBoundEntry->second == LLVMContext::OB_oss_loop_lower_bound &&
+         "oss_loop_lower_bound operand bundle id drifted!");
+  (void)OSSLoopLowerBoundEntry;
+
+  auto *OSSLoopUpperBoundEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.UPPER.BOUND");
+  assert(OSSLoopUpperBoundEntry->second == LLVMContext::OB_oss_loop_upper_bound &&
+         "oss_loop_upper_bound operand bundle id drifted!");
+  (void)OSSLoopUpperBoundEntry;
+
+  auto *OSSLoopStepEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.STEP");
+  assert(OSSLoopStepEntry->second == LLVMContext::OB_oss_loop_step &&
+         "oss_loop_step operand bundle id drifted!");
+  (void)OSSLoopStepEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

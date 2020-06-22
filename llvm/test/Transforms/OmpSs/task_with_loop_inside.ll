@@ -34,7 +34,13 @@ for.end:                                          ; preds = %for.cond
   ret i32 %3, !dbg !18
 }
 
-; CHECK:   %i = alloca i32, align 4
+; CHECK: define internal void @nanos6_unpacked_task_region_main0(i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !18 {
+; CHECK: newFuncRoot:
+; CHECK-NEXT:   br label %0, !dbg !19
+; CHECK: .exitStub:                                        ; preds = %for.end
+; CHECK-NEXT:   ret void
+; CHECK: 0:                                                ; preds = %newFuncRoot
+; CHECK-NEXT:   %i = alloca i32, align 4
 ; CHECK-NEXT:   store i32 0, i32* %i, align 4, !dbg !19
 ; CHECK-NEXT:   br label %for.cond, !dbg !20
 ; CHECK: for.cond:                                         ; preds = %for.inc, %0
@@ -44,12 +50,13 @@ for.end:                                          ; preds = %for.cond
 ; CHECK: for.body:                                         ; preds = %for.cond
 ; CHECK-NEXT:   br label %for.inc, !dbg !24
 ; CHECK: for.end:                                          ; preds = %for.cond
-; CHECK-NEXT:   ret void, !dbg !25
+; CHECK-NEXT:   br label %.exitStub, !dbg !25
 ; CHECK: for.inc:                                          ; preds = %for.body
 ; CHECK-NEXT:   %2 = load i32, i32* %i, align 4, !dbg !26
 ; CHECK-NEXT:   %inc = add nsw i32 %2, 1, !dbg !26
 ; CHECK-NEXT:   store i32 %inc, i32* %i, align 4, !dbg !26
 ; CHECK-NEXT:   br label %for.cond, !dbg !23, !llvm.loop !27
+; CHECK-NEXT: }
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

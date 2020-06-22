@@ -63,3 +63,90 @@ OSSTaskDirective *OSSTaskDirective::CreateEmpty(const ASTContext &C,
       C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
   return new (Mem) OSSTaskDirective(NumClauses);
 }
+
+OSSTaskForDirective *
+OSSTaskForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                         const HelperExprs &Exprs) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskForDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
+  OSSTaskForDirective *Dir =
+      new (Mem) OSSTaskForDirective(StartLoc, EndLoc, Clauses.size());
+  Dir->setClauses(Clauses);
+  Dir->setAssociatedStmt(AStmt);
+  Dir->setIterationVariable(Exprs.IndVar);
+  Dir->setLowerBound(Exprs.LB);
+  Dir->setUpperBound(Exprs.UB);
+  Dir->setStep(Exprs.Step);
+  Dir->setIsLessOp(Exprs.TestIsLessOp);
+  Dir->setIsStrictOp(Exprs.TestIsStrictOp);
+  return Dir;
+}
+
+OSSTaskForDirective *OSSTaskForDirective::CreateEmpty(const ASTContext &C,
+                                                unsigned NumClauses,
+                                                EmptyShell) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskForDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
+  return new (Mem) OSSTaskForDirective(NumClauses);
+}
+
+OSSTaskLoopDirective *
+OSSTaskLoopDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                         const HelperExprs &Exprs) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
+  OSSTaskLoopDirective *Dir =
+      new (Mem) OSSTaskLoopDirective(StartLoc, EndLoc, Clauses.size());
+  Dir->setClauses(Clauses);
+  Dir->setAssociatedStmt(AStmt);
+  Dir->setIterationVariable(Exprs.IndVar);
+  Dir->setLowerBound(Exprs.LB);
+  Dir->setUpperBound(Exprs.UB);
+  Dir->setStep(Exprs.Step);
+  Dir->setIsLessOp(Exprs.TestIsLessOp);
+  Dir->setIsStrictOp(Exprs.TestIsStrictOp);
+  return Dir;
+}
+
+OSSTaskLoopDirective *OSSTaskLoopDirective::CreateEmpty(const ASTContext &C,
+                                                unsigned NumClauses,
+                                                EmptyShell) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
+  return new (Mem) OSSTaskLoopDirective(NumClauses);
+}
+
+OSSTaskLoopForDirective *
+OSSTaskLoopForDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                         SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt,
+                         const HelperExprs &Exprs) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopForDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * Clauses.size() + sizeof(Stmt *));
+  OSSTaskLoopForDirective *Dir =
+      new (Mem) OSSTaskLoopForDirective(StartLoc, EndLoc, Clauses.size());
+  Dir->setClauses(Clauses);
+  Dir->setAssociatedStmt(AStmt);
+  Dir->setIterationVariable(Exprs.IndVar);
+  Dir->setLowerBound(Exprs.LB);
+  Dir->setUpperBound(Exprs.UB);
+  Dir->setStep(Exprs.Step);
+  Dir->setIsLessOp(Exprs.TestIsLessOp);
+  Dir->setIsStrictOp(Exprs.TestIsStrictOp);
+  return Dir;
+}
+
+OSSTaskLoopForDirective *OSSTaskLoopForDirective::CreateEmpty(const ASTContext &C,
+                                                unsigned NumClauses,
+                                                EmptyShell) {
+  unsigned Size = llvm::alignTo(sizeof(OSSTaskLoopForDirective), alignof(OSSClause *));
+  void *Mem =
+      C.Allocate(Size + sizeof(OSSClause *) * NumClauses + sizeof(Stmt *));
+  return new (Mem) OSSTaskLoopForDirective(NumClauses);
+}

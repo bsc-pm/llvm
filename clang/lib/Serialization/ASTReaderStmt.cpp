@@ -2676,11 +2676,27 @@ void ASTStmtReader::VisitOSSExecutableDirective(OSSExecutableDirective *E) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtReader::VisitOSSLoopDirective(OSSLoopDirective *E) {
+  llvm_unreachable("Not supported yet");
+}
+
 void ASTStmtReader::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
 void ASTStmtReader::VisitOSSTaskDirective(OSSTaskDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtReader::VisitOSSTaskForDirective(OSSTaskForDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtReader::VisitOSSTaskLoopDirective(OSSTaskLoopDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
+void ASTStmtReader::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 

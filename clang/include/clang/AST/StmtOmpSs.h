@@ -322,6 +322,261 @@ public:
   }
 };
 
+/// This is a common base class for loop directives ('oss task for',
+/// oss taskloop', 'oss taskloop for' etc.).
+/// It is responsible for the loop code generation.
+///
+class OSSLoopDirective : public OSSExecutableDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  /// The Induction variable of the loop directive
+  Expr *IndVarExpr;
+  /// The lower bound of the loop directive
+  Expr *LowerBoundExpr;
+  /// The upper bound of the loop directive
+  Expr *UpperBoundExpr;
+  /// The step of the loop directive
+  Expr *StepExpr;
+  /// The type of comparison used in the loop (<, <=, >=, >)
+  /// NOTE: optional is used to handle the != eventually
+  llvm::Optional<bool> TestIsLessOp;
+  /// The type of comparison is strict (<, >)
+  bool TestIsStrictOp;
+protected:
+  /// Build instance of loop directive of class \a Kind.
+  ///
+  /// \param SC Statement class.
+  /// \param Kind Kind of OpenMP directive.
+  /// \param StartLoc Starting location of the directive (directive keyword).
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  template <typename T>
+  OSSLoopDirective(const T *That, StmtClass SC, OmpSsDirectiveKind Kind,
+                   SourceLocation StartLoc, SourceLocation EndLoc,
+                   unsigned NumClauses)
+      : OSSExecutableDirective(That, SC, Kind, StartLoc, EndLoc, NumClauses, 1)
+        {}
+
+  /// Sets the iteration variable used in the loop.
+  ///
+  /// \param IV The induction variable expression.
+  ///
+  void setIterationVariable(Expr *IV) { IndVarExpr = IV; }
+  /// Sets the lower bound used in the loop.
+  ///
+  /// \param LB The lower bound expression.
+  ///
+  void setLowerBound(Expr *LB) { LowerBoundExpr = LB; }
+  /// Sets the upper bound used in the loop.
+  ///
+  /// \param UB The upper bound expression.
+  ///
+  void setUpperBound(Expr *LB) { UpperBoundExpr = LB; }
+  /// Sets the step used in the loop.
+  ///
+  /// \param Step The step expression.
+  ///
+  void setStep(Expr *Step) { StepExpr = Step; }
+  /// Sets the loop comparison type.
+  ///
+  /// \param IsLessOp True if is < or <=. false otherwise
+  ///
+  void setIsLessOp(llvm::Optional<bool> IsLessOp) {
+    TestIsLessOp = IsLessOp;
+  }
+  /// Sets if the loop comparison type is strict.
+  ///
+  /// \param IsStrict True < or >. false otherwise
+  ///
+  void setIsStrictOp(bool IsStrictOp) { TestIsStrictOp = IsStrictOp; }
+
+public:
+  struct HelperExprs {
+    Expr *IndVar;
+    Expr *LB;
+    Expr *UB;
+    Expr *Step;
+    llvm::Optional<bool> TestIsLessOp;
+    bool TestIsStrictOp;
+  };
+
+  /// Returns the induction variable expression of the loop.
+  Expr *getIterationVariable() const { return IndVarExpr; }
+  /// Returns the lower bound expression of the loop.
+  Expr *getLowerBound() const { return LowerBoundExpr; }
+  /// Returns the upper bound expression of the loop.
+  Expr *getUpperBound() const { return UpperBoundExpr; }
+  /// Returns the step expression of the loop.
+  Expr *getStep() const { return StepExpr; }
+  /// Returns True is the loop comparison type is < or <=.
+  llvm::Optional<bool> getIsLessOp() const { return TestIsLessOp; }
+  /// Returns True is the loop comparison type is < or >.
+  bool getIsStrictOp() const { return TestIsStrictOp; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSTaskForDirectiveClass ||
+           T->getStmtClass() == OSSTaskLoopDirectiveClass ||
+           T->getStmtClass() == OSSTaskLoopForDirectiveClass;
+  }
+};
+
+class OSSTaskForDirective : public OSSLoopDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  OSSTaskForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
+                         StartLoc, EndLoc, NumClauses) {}
+
+  /// Build an empty directive.
+  ///
+  /// \param NumClauses Number of clauses.
+  ///
+  explicit OSSTaskForDirective(unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskForDirectiveClass, OSSD_task_for,
+                         SourceLocation(), SourceLocation(), NumClauses) {}
+
+public:
+  /// Creates directive with a list of \a Clauses.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  /// \param AStmt Statement, associated with the directive.
+  /// \param Exprs Helper expressions for CodeGen.
+  ///
+  static OSSTaskForDirective *Create(const ASTContext &C, SourceLocation StartLoc,
+                                  SourceLocation EndLoc,
+                                  ArrayRef<OSSClause *> Clauses,
+                                  Stmt *AStmt,
+                                  const HelperExprs &Exprs);
+
+  /// Creates an empty directive with the place for \a NumClauses
+  /// clauses.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSTaskForDirective *CreateEmpty(
+      const ASTContext &C, unsigned NumClauses, EmptyShell);
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSTaskForDirectiveClass;
+  }
+};
+
+class OSSTaskLoopDirective : public OSSLoopDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  OSSTaskLoopDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
+                         StartLoc, EndLoc, NumClauses) {}
+
+  /// Build an empty directive.
+  ///
+  /// \param NumClauses Number of clauses.
+  ///
+  explicit OSSTaskLoopDirective(unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskLoopDirectiveClass, OSSD_taskloop,
+                         SourceLocation(), SourceLocation(), NumClauses) {}
+
+public:
+  /// Creates directive with a list of \a Clauses.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  /// \param AStmt Statement, associated with the directive.
+  /// \param Exprs Helper expressions for CodeGen.
+  ///
+  static OSSTaskLoopDirective *Create(const ASTContext &C, SourceLocation StartLoc,
+                                  SourceLocation EndLoc,
+                                  ArrayRef<OSSClause *> Clauses,
+                                  Stmt *AStmt,
+                                  const HelperExprs &Exprs);
+
+  /// Creates an empty directive with the place for \a NumClauses
+  /// clauses.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSTaskLoopDirective *CreateEmpty(
+      const ASTContext &C, unsigned NumClauses, EmptyShell);
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSTaskLoopDirectiveClass;
+  }
+};
+
+class OSSTaskLoopForDirective : public OSSLoopDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  OSSTaskLoopForDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+                         StartLoc, EndLoc, NumClauses) {}
+
+  /// Build an empty directive.
+  ///
+  /// \param NumClauses Number of clauses.
+  ///
+  explicit OSSTaskLoopForDirective(unsigned NumClauses)
+      : OSSLoopDirective(this, OSSTaskLoopForDirectiveClass, OSSD_taskloop_for,
+                         SourceLocation(), SourceLocation(), NumClauses) {}
+
+public:
+  /// Creates directive with a list of \a Clauses.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  /// \param AStmt Statement, associated with the directive.
+  /// \param Exprs Helper expressions for CodeGen.
+  ///
+  static OSSTaskLoopForDirective *Create(const ASTContext &C, SourceLocation StartLoc,
+                                  SourceLocation EndLoc,
+                                  ArrayRef<OSSClause *> Clauses,
+                                  Stmt *AStmt,
+                                  const HelperExprs &Exprs);
+
+  /// Creates an empty directive with the place for \a NumClauses
+  /// clauses.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSTaskLoopForDirective *CreateEmpty(
+      const ASTContext &C, unsigned NumClauses,
+      EmptyShell);
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSTaskLoopForDirectiveClass;
+  }
+};
+
 } // end namespace clang
 
 #endif

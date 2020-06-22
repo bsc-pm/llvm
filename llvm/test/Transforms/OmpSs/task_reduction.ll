@@ -88,7 +88,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %n.addr, i32* %vla, i64 %0, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %n.addr, i32* %vla, i64 %0, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep(i32* %n.addr)
 ; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %1, 0
@@ -272,7 +272,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_foo10(i32* %n.addr, i32* %vla, i64 %0, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_foo10(i32* %n.addr, i32* %vla, i64 %0, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %1 = call %struct._depend_unpack_t.1 @compute_dep.4(i32* %n.addr)
 ; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t.1 %1, 0

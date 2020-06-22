@@ -3020,6 +3020,75 @@ private:
   //===--------------------------------------------------------------------===//
   // OmpSs: Directives and clauses.
 
+  // Tokens to be handled in another scope, like clauses in taskloop
+  // and taskloop for
+  CachedTokens OSSLateParsedToks;
+  // Stack of directive clauses. Needed because we parse clauses in other place
+  // than ParseOmpSsDeclarativeOrExecutableDirective
+  using OSSClauseList = SmallVector<OSSClause *, 4>;
+  SmallVector<OSSClauseList, 2> StackClauses;
+
+  /// RAII that recreates function context for correct parsing of clauses of
+  /// 'declare simd' construct.
+  /// OpenMP, 2.8.2 declare simd Construct
+  /// The expressions appearing in the clauses of this directive are evaluated in
+  /// the scope of the arguments of the function declaration or definition.
+  // NOTE: This was taken from OpenMP as is
+  class OSSFNContextRAII final {
+    Parser &P;
+    Sema::CXXThisScopeRAII *ThisScope;
+    Parser::ParseScope *TempScope;
+    Parser::ParseScope *FnScope;
+    bool HasTemplateScope = false;
+    bool HasFunScope = false;
+    bool HasDeclGroup = false;
+    OSSFNContextRAII() = delete;
+    OSSFNContextRAII(const OSSFNContextRAII &) = delete;
+    OSSFNContextRAII &operator=(const OSSFNContextRAII &) = delete;
+
+  public:
+    OSSFNContextRAII(Parser &P, Parser::DeclGroupPtrTy Ptr) : P(P), HasDeclGroup(Ptr) {
+      if (HasDeclGroup) {
+        Decl *D = *Ptr.get().begin();
+        NamedDecl *ND = dyn_cast<NamedDecl>(D);
+        RecordDecl *RD = dyn_cast_or_null<RecordDecl>(D->getDeclContext());
+        Sema &Actions = P.getActions();
+
+        // Allow 'this' within late-parsed attributes.
+        ThisScope = new Sema::CXXThisScopeRAII(Actions, RD, Qualifiers(),
+                                               ND && ND->isCXXInstanceMember());
+
+        // If the Decl is templatized, add template parameters to scope.
+        HasTemplateScope = D->isTemplateDecl();
+        TempScope =
+            new Parser::ParseScope(&P, Scope::TemplateParamScope, HasTemplateScope);
+        if (HasTemplateScope)
+          Actions.ActOnReenterTemplateScope(Actions.getCurScope(), D);
+
+        // If the Decl is on a function, add function parameters to the scope.
+        HasFunScope = D->isFunctionOrFunctionTemplate();
+        FnScope = new Parser::ParseScope(
+            &P, Scope::FnScope | Scope::DeclScope | Scope::CompoundStmtScope,
+            HasFunScope);
+        if (HasFunScope)
+          Actions.ActOnReenterFunctionContext(Actions.getCurScope(), D);
+      }
+    }
+    ~OSSFNContextRAII() {
+      if (HasDeclGroup) {
+        if (HasFunScope) {
+          P.getActions().ActOnExitFunctionContext();
+          FnScope->Exit(); // Pop scope, and remove Decls from IdResolver
+        }
+        if (HasTemplateScope)
+          TempScope->Exit();
+        delete FnScope;
+        delete TempScope;
+        delete ThisScope;
+      }
+    }
+  };
+
   /// Parse clauses for '#pragma oss task'.
   DeclGroupPtrTy ParseOSSDeclareTaskClauses(DeclGroupPtrTy Ptr,
                                             CachedTokens &Toks,
@@ -3038,6 +3107,8 @@ private:
 
   StmtResult
   ParseOmpSsDeclarativeOrExecutableDirective(ParsedStmtContext Allowed);
+
+  OSSClauseList ParseOmpSsClauses(OmpSsDirectiveKind DKind, SourceLocation &EndLoc);
 
   /// Parses clause of kind \a CKind for directive of a kind \a Kind.
   ///

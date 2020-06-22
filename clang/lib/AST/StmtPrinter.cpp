@@ -133,6 +133,7 @@ namespace {
                                      bool ForceNoStmt = false);
     // OmpSs
     void PrintOSSExecutableDirective(OSSExecutableDirective *S);
+    void PrintOSSLoopDirective(OSSLoopDirective *S);
 
     void PrintExpr(Expr *E) {
       if (E)
@@ -1125,6 +1126,10 @@ void StmtPrinter::PrintOSSExecutableDirective(OSSExecutableDirective *S) {
   return;
 }
 
+void StmtPrinter::PrintOSSLoopDirective(OSSLoopDirective *S) {
+  PrintOSSExecutableDirective(S);
+}
+
 void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
   Indent() << "#pragma oss taskwait";
   PrintOSSExecutableDirective(Node);
@@ -1133,6 +1138,21 @@ void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
 void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
   Indent() << "#pragma oss task";
   PrintOSSExecutableDirective(Node);
+}
+
+void StmtPrinter::VisitOSSTaskForDirective(OSSTaskForDirective *Node) {
+  Indent() << "#pragma oss task for";
+  PrintOSSLoopDirective(Node);
+}
+
+void StmtPrinter::VisitOSSTaskLoopDirective(OSSTaskLoopDirective *Node) {
+  Indent() << "#pragma oss taskloop";
+  PrintOSSLoopDirective(Node);
+}
+
+void StmtPrinter::VisitOSSTaskLoopForDirective(OSSTaskLoopForDirective *Node) {
+  Indent() << "#pragma oss taskloop for";
+  PrintOSSLoopDirective(Node);
 }
 
 //===----------------------------------------------------------------------===//

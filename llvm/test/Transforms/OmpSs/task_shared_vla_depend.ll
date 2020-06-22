@@ -203,8 +203,10 @@ entry:
 }
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) !dbg !19 {
-; CHECK-NEXT: newFuncRoot:
+; CHECK: newFuncRoot:
 ; CHECK-NEXT:   br label %3, !dbg !20
+; CHECK: .exitStub:                                        ; preds = %3
+; CHECK-NEXT:   ret void
 ; CHECK: 3:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   %size = alloca i32, align 4
 ; CHECK-NEXT:   %4 = mul nuw i64 %0, %1, !dbg !20
@@ -212,7 +214,7 @@ entry:
 ; CHECK-NEXT:   %6 = mul nuw i64 4, %5, !dbg !20
 ; CHECK-NEXT:   %conv = trunc i64 %6 to i32, !dbg !20
 ; CHECK-NEXT:   store i32 %conv, i32* %size, align 4, !dbg !21
-; CHECK-NEXT:   ret void, !dbg !22
+; CHECK-NEXT:   br label %.exitStub, !dbg !22
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_ol_task_region_foo0(%nanos6_task_args_foo0* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
@@ -229,7 +231,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %3 = call %struct._depend_unpack_t @compute_dep(i32* %vla, i64 %0, i64 %1, i64 %2)
 ; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %3, 0
@@ -247,7 +249,7 @@ entry:
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
-; CHECK: define internal void @nanos6_ol_deps_foo0(%nanos6_task_args_foo0* %task_args, i8* %loop_bounds, i8* %handler) {
+; CHECK: define internal void @nanos6_ol_deps_foo0(%nanos6_task_args_foo0* %task_args, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %gep_vla = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 0
 ; CHECK-NEXT:   %load_gep_vla = load i32*, i32** %gep_vla
@@ -257,7 +259,7 @@ entry:
 ; CHECK-NEXT:   %load_capt_gep1 = load i64, i64* %capt_gep1
 ; CHECK-NEXT:   %capt_gep2 = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 3
 ; CHECK-NEXT:   %load_capt_gep2 = load i64, i64* %capt_gep2
-; CHECK-NEXT:   call void @nanos6_unpacked_deps_foo0(i32* %load_gep_vla, i64 %load_capt_gep, i64 %load_capt_gep1, i64 %load_capt_gep2, i8* %loop_bounds, i8* %handler)
+; CHECK-NEXT:   call void @nanos6_unpacked_deps_foo0(i32* %load_gep_vla, i64 %load_capt_gep, i64 %load_capt_gep1, i64 %load_capt_gep2, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

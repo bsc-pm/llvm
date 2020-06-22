@@ -1793,7 +1793,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
   MaybeParseCXX11Attributes(attrs);
 
   SourceLocation EmptyInitStmtSemiLoc;
-
+  DeclGroupPtrTy DG;
   // Parse the first part of the for specifier.
   if (Tok.is(tok::semi)) {  // for (;
     ProhibitAttributes(attrs);
@@ -1836,7 +1836,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
     ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
 
     SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
-    DeclGroupPtrTy DG = ParseSimpleDeclaration(
+    DG = ParseSimpleDeclaration(
         DeclaratorContext::ForContext, DeclEnd, attrs, false,
         MightBeForRangeStmt ? &ForRangeInfo : nullptr);
     FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
@@ -2015,6 +2015,32 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
     // private. Perform analysis of first part (if any).
     if (getLangOpts().OpenMP && FirstPart.isUsable()) {
       Actions.ActOnOpenMPLoopInitialization(ForLoc, FirstPart.get());
+    }
+
+    // In OmpSs loop region loop control variable must be captured and be
+    // private. Perform analysis of first part (if any).
+    if (getLangOpts().OmpSs) {
+      OmpSsDirectiveKind DKind = Actions.GetCurrentOmpSsDirective();
+      if (isOmpSsLoopDirective(DKind) && FirstPart.isUsable()) {
+        // Gather InductionVar if we are a loop clause
+        Actions.ActOnOmpSsLoopInitialization(ForLoc, FirstPart.get());
+        if (isOmpSsTaskLoopDirective(DKind)) {
+
+          // Parse late clause tokens
+          OSSFNContextRAII FnContext(*this, DG);
+          PP.EnterToken(Tok, /*IsReinject*/ true);
+          PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
+                              /*IsReinject*/ true);
+          OSSLateParsedToks.clear();
+
+          // Consume the previously pushed token.
+          ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+          ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
+
+          SourceLocation EndLoc;
+          StackClauses.back() = ParseOmpSsClauses(DKind, EndLoc);
+        }
+      }
     }
   }
 

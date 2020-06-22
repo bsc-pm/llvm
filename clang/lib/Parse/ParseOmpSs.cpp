@@ -31,6 +31,7 @@ namespace {
 enum OmpSsDirectiveKindEx {
   OSSD_declare = OSSD_unknown + 1,
   OSSD_reduction,
+  OSSD_for,
 };
 } // namespace
 
@@ -44,6 +45,7 @@ static unsigned getOmpSsDirectiveKindEx(StringRef S) {
   return llvm::StringSwitch<unsigned>(S)
       .Case("declare", OSSD_declare)
       .Case("reduction", OSSD_reduction)
+      .Case("for", OSSD_for)
       .Default(OSSD_unknown);
 }
 
@@ -53,6 +55,8 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
   // TODO: add other combined directives in topological order.
   static const unsigned F[][3] = {
       {OSSD_declare, OSSD_reduction, OSSD_declare_reduction},
+      {OSSD_task, OSSD_for, OSSD_task_for},
+      {OSSD_taskloop, OSSD_for, OSSD_taskloop_for},
   };
   Token Tok = P.getCurToken();
   unsigned DKind =
@@ -82,65 +86,6 @@ static OmpSsDirectiveKind parseOmpSsDirectiveKind(Parser &P) {
   return DKind < OSSD_unknown ? static_cast<OmpSsDirectiveKind>(DKind)
                               : OSSD_unknown;
 }
-
-namespace {
-// NOTE: This was taken from OpenMP as is
-
-/// RAII that recreates function context for correct parsing of clauses of
-/// 'declare simd' construct.
-/// OpenMP, 2.8.2 declare simd Construct
-/// The expressions appearing in the clauses of this directive are evaluated in
-/// the scope of the arguments of the function declaration or definition.
-class FNContextRAII final {
-  Parser &P;
-  Sema::CXXThisScopeRAII *ThisScope;
-  Parser::ParseScope *TempScope;
-  Parser::ParseScope *FnScope;
-  bool HasTemplateScope = false;
-  bool HasFunScope = false;
-  FNContextRAII() = delete;
-  FNContextRAII(const FNContextRAII &) = delete;
-  FNContextRAII &operator=(const FNContextRAII &) = delete;
-
-public:
-  FNContextRAII(Parser &P, Parser::DeclGroupPtrTy Ptr) : P(P) {
-    Decl *D = *Ptr.get().begin();
-    NamedDecl *ND = dyn_cast<NamedDecl>(D);
-    RecordDecl *RD = dyn_cast_or_null<RecordDecl>(D->getDeclContext());
-    Sema &Actions = P.getActions();
-
-    // Allow 'this' within late-parsed attributes.
-    ThisScope = new Sema::CXXThisScopeRAII(Actions, RD, Qualifiers(),
-                                           ND && ND->isCXXInstanceMember());
-
-    // If the Decl is templatized, add template parameters to scope.
-    HasTemplateScope = D->isTemplateDecl();
-    TempScope =
-        new Parser::ParseScope(&P, Scope::TemplateParamScope, HasTemplateScope);
-    if (HasTemplateScope)
-      Actions.ActOnReenterTemplateScope(Actions.getCurScope(), D);
-
-    // If the Decl is on a function, add function parameters to the scope.
-    HasFunScope = D->isFunctionOrFunctionTemplate();
-    FnScope = new Parser::ParseScope(
-        &P, Scope::FnScope | Scope::DeclScope | Scope::CompoundStmtScope,
-        HasFunScope);
-    if (HasFunScope)
-      Actions.ActOnReenterFunctionContext(Actions.getCurScope(), D);
-  }
-  ~FNContextRAII() {
-    if (HasFunScope) {
-      P.getActions().ActOnExitFunctionContext();
-      FnScope->Exit(); // Pop scope, and remove Decls from IdResolver
-    }
-    if (HasTemplateScope)
-      TempScope->Exit();
-    delete FnScope;
-    delete TempScope;
-    delete ThisScope;
-  }
-};
-} // namespace
 
 static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
@@ -384,7 +329,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
   ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
 
-  FNContextRAII FnContext(*this, Ptr);
+  OSSFNContextRAII FnContext(*this, Ptr);
 
   ExprResult IfRes;
   ExprResult FinalRes;
@@ -551,6 +496,9 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     return Ret;
   }
   case OSSD_declare_task:
+  case OSSD_task_for:
+  case OSSD_taskloop:
+  case OSSD_taskloop_for:
   case OSSD_taskwait:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
@@ -595,10 +543,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
                         Scope::CompoundStmtScope | Scope::OmpSsDirectiveScope;
   SourceLocation Loc = ConsumeAnnotationToken(), EndLoc;
 
-  SmallVector<OSSClause *, 5> Clauses;
-  SmallVector<llvm::PointerIntPair<OSSClause *, 1, bool>, OSSC_unknown + 1>
-    FirstClauses(OSSC_unknown + 1);
-
+  OSSClauseList Clauses;
   OmpSsDirectiveKind DKind = parseOmpSsDirectiveKind(*this);
   StmtResult Directive = StmtError();
   bool HasAssociatedStatement = true;
@@ -606,41 +551,52 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   case OSSD_taskwait:
     HasAssociatedStatement = false;
     LLVM_FALLTHROUGH;
+  case OSSD_task_for:
+  case OSSD_taskloop:
+  case OSSD_taskloop_for:
   case OSSD_task: {
-    ConsumeToken();
+
+    if (isOmpSsLoopDirective(DKind))
+      ScopeFlags |= Scope::OmpSsLoopDirectiveScope;
+
     ParseScope OSSDirectiveScope(this, ScopeFlags);
 
     Actions.StartOmpSsDSABlock(DKind, Actions.getCurScope(), Loc);
-    while (Tok.isNot(tok::annot_pragma_ompss_end)) {
-      OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
 
-      // Track which clauses have appeared so we can throw an error in case
-      // a clause cannot appear again
-      OSSClause *Clause =
-          ParseOmpSsClause(DKind, CKind, !FirstClauses[CKind].getInt());
-      FirstClauses[CKind].setInt(true);
-      if (Clause) {
-        FirstClauses[CKind].setPointer(Clause);
-        Clauses.push_back(Clause);
+    if (isOmpSsTaskLoopDirective(DKind)) {
+      // in taskloop we parse clauses later
+      OSSLateParsedToks.push_back(Tok);
+      ConsumeToken();
+      while(Tok.isNot(tok::annot_pragma_ompss_end)) {
+        OSSLateParsedToks.push_back(Tok);
+        ConsumeAnyToken();
       }
+      OSSLateParsedToks.push_back(Tok);
+      ConsumeAnyToken();
 
-      // Skip ',' if any.
-      if (Tok.is(tok::comma))
-        ConsumeToken();
+    } else {
+      ConsumeToken();
 
+      Clauses = ParseOmpSsClauses(DKind, EndLoc);
     }
+    StackClauses.push_back(Clauses);
 
-    // End location of the directive.
-    EndLoc = Tok.getLocation();
-    // Consume final annot_pragma_ompss_end.
-    ConsumeAnnotationToken();
-
-    Actions.ActOnOmpSsAfterClauseGathering(Clauses);
+    if (isOmpSsLoopDirective(DKind)) {
+      if (Tok.isNot(tok::kw_for)) {
+        // loop clauses start by 'for'
+        // Our strategy is to just drop the tokens if we do not guess
+        // a for is comming.
+        OSSLateParsedToks.clear();
+      }
+    }
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
     }
+
+    Clauses = StackClauses.back();
+    StackClauses.pop_back();
 
     Directive = Actions.ActOnOmpSsExecutableDirective(Clauses,
                                                       DKind,
@@ -683,6 +639,41 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     break;
   }
   return Directive;
+}
+
+/// Parsing of all OmpSs clauses of a directive.
+Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, SourceLocation &EndLoc) {
+  OSSClauseList Clauses;
+  SmallVector<llvm::PointerIntPair<OSSClause *, 1, bool>, OSSC_unknown + 1>
+    FirstClauses(OSSC_unknown + 1);
+
+  while (Tok.isNot(tok::annot_pragma_ompss_end)) {
+    OmpSsClauseKind CKind = getOmpSsClauseKind(PP.getSpelling(Tok));
+
+    // Track which clauses have appeared so we can throw an error in case
+    // a clause cannot appear again
+    OSSClause *Clause =
+        ParseOmpSsClause(DKind, CKind, !FirstClauses[CKind].getInt());
+    FirstClauses[CKind].setInt(true);
+    if (Clause) {
+      FirstClauses[CKind].setPointer(Clause);
+      Clauses.push_back(Clause);
+    }
+
+    // Skip ',' if any.
+    if (Tok.is(tok::comma))
+      ConsumeToken();
+
+  }
+
+  // End location of the directive.
+  EndLoc = Tok.getLocation();
+  // Consume final annot_pragma_ompss_end.
+  ConsumeAnnotationToken();
+
+  Actions.ActOnOmpSsAfterClauseGathering(Clauses);
+
+  return Clauses;
 }
 
 /// Parsing of OmpSs clauses.

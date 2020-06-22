@@ -124,12 +124,14 @@ declare void @__clang_call_terminate(i8* %0)
 
 ; CHECK: define internal void @nanos6_unpacked_task_region_main0(%struct.S* %s, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) personality i8* bitcast (i32 (...)* @__gxx_personality_v0 to i8*) !dbg !12 {
 ; CHECK: newFuncRoot:
-; CHECK-NEXT:   br label %0
+; CHECK-NEXT:  br label %0, !dbg !13
+; CHECK: .exitStub:                                        ; preds = %invoke.cont
+; CHECK-NEXT:  ret void
 ; CHECK: 0:                                                ; preds = %newFuncRoot
 ; CHECK-NEXT:   invoke void @_Z3fooRK1S(%struct.S* dereferenceable(4) %s)
-; CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
+; CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad, !dbg !13
 ; CHECK: invoke.cont:                                      ; preds = %0
-; CHECK-NEXT:   ret void
+; CHECK-NEXT:   br label %.exitStub, !dbg !14
 ; CHECK: terminate.lpad:                                   ; preds = %0
 ; CHECK-NEXT:   %1 = landingpad { i8*, i32 }
 ; CHECK-NEXT:           catch i8* null

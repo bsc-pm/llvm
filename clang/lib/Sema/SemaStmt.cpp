@@ -2693,6 +2693,11 @@ StmtResult Sema::BuildCXXForRangeStmt(SourceLocation ForLoc,
   if (getLangOpts().OpenMP >= 50 && BeginDeclStmt.isUsable())
     ActOnOpenMPLoopInitialization(ForLoc, BeginDeclStmt.get());
 
+  // In OmpSs loop region loop control variable must be private. Perform
+  // analysis of first part (if any).
+  if (getLangOpts().OmpSs && BeginDeclStmt.isUsable())
+    ActOnOmpSsLoopInitialization(ForLoc, BeginDeclStmt.get());
+
   return new (Context) CXXForRangeStmt(
       InitStmt, RangeDS, cast_or_null<DeclStmt>(BeginDeclStmt.get()),
       cast_or_null<DeclStmt>(EndDeclStmt.get()), NotEqExpr.get(),
@@ -2977,6 +2982,9 @@ Sema::ActOnBreakStmt(SourceLocation BreakLoc, Scope *CurScope) {
   }
   if (S->isOpenMPLoopScope())
     return StmtError(Diag(BreakLoc, diag::err_omp_loop_cannot_use_stmt)
+                     << "break");
+  if (S->isOmpSsLoopScope())
+    return StmtError(Diag(BreakLoc, diag::err_oss_loop_cannot_use_stmt)
                      << "break");
   CheckJumpOutOfSEHFinally(*this, BreakLoc, *S);
 

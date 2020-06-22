@@ -3232,6 +3232,9 @@ public:
   // OmpSs statements
   void EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S);
   void EmitOSSTaskDirective(const OSSTaskDirective &S);
+  void EmitOSSTaskForDirective(const OSSTaskForDirective &S);
+  void EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S);
+  void EmitOSSTaskLoopForDirective(const OSSTaskLoopForDirective &S);
 
   /// Emit simple code for OpenMP directives in Simd-only mode.
   void EmitSimpleOMPExecutableDirective(const OMPExecutableDirective &D);

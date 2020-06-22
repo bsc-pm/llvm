@@ -209,6 +209,12 @@ void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
 
 FunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return FuncInfo; }
 
+static bool isOmpSsLoopDirective(TaskInfo::OmpSsTaskKind TaskKind) {
+  return TaskKind == TaskInfo::OSSD_task_for ||
+         TaskKind == TaskInfo::OSSD_taskloop ||
+         TaskKind == TaskInfo::OSSD_taskloop_for;
+}
+
 static void getOperandBundlesAsDefsWithID(const IntrinsicInst *I,
                                           SmallVectorImpl<OperandBundleDef> &OpBundles,
                                           uint32_t Id) {
@@ -257,6 +263,26 @@ static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
   for (OperandBundleDef &OBDef : OpBundles) {
     Values.insert(OBDef.input_begin(), OBDef.input_end());
   }
+}
+
+static void gatherTaskKindInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  Value *TaskKindValue = nullptr;
+  getValueFromOperandBundleWithID(I, TaskKindValue, LLVMContext::OB_oss_dir);
+  assert(TaskKindValue && "Expected task kind value in bundles");
+  ConstantDataArray *TaskKindDataArray = cast<ConstantDataArray>(TaskKindValue);
+  assert(TaskKindDataArray->isCString() && "Task kind must be a C string");
+  StringRef TaskKindStringRef = TaskKindDataArray->getAsCString();
+
+  if (TaskKindStringRef == "TASK")
+    TI.TaskKind = TaskInfo::OSSD_task;
+  else if (TaskKindStringRef == "TASK.FOR")
+    TI.TaskKind = TaskInfo::OSSD_task_for;
+  else if (TaskKindStringRef == "TASKLOOP")
+    TI.TaskKind = TaskInfo::OSSD_taskloop;
+  else if (TaskKindStringRef == "TASKLOOP.FOR")
+    TI.TaskKind = TaskInfo::OSSD_taskloop_for;
+  else
+    llvm_unreachable("Unhandled TaskKind string");
 }
 
 static void gatherDSAInfo(const IntrinsicInst *I, TaskInfo &TI) {
@@ -380,7 +406,7 @@ static void gatherDependInfoFromBundle(ArrayRef<Value *> OBArgs,
                                        DependInfo &DI) {
   // First operand has to be the DSA over the dependency is made
   Value *DepBaseDSA = OBArgs[0];
-  assert(valueInDSABundles(DSAInfo, DepBaseDSA) && "Dependency has no associated DSA"); 
+  assert(valueInDSABundles(DSAInfo, DepBaseDSA) && "Dependency has no associated DSA");
   DI.Base = DepBaseDSA;
 
   Function *ComputeDepFun = cast<Function>(OBArgs[1]);
@@ -537,6 +563,21 @@ static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
   }
 }
 
+static void gatherLoopInfo(const IntrinsicInst *I, TaskInfo &TI) {
+  assert(isOmpSsLoopDirective(TI.TaskKind) && "gatherLoopInfo expects a loop directive");
+  // TODO: assert or something if its a taskloop/task for without these info
+  Value *LoopType;
+  getValueFromOperandBundleWithID(I, LoopType, LLVMContext::OB_oss_loop_type);
+  if (LoopType)
+    TI.LoopInfo.LoopType = cast<ConstantInt>(LoopType)->getSExtValue();
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.IndVar, LLVMContext::OB_oss_loop_ind_var);
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.LBound, LLVMContext::OB_oss_loop_lower_bound);
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.UBound, LLVMContext::OB_oss_loop_upper_bound);
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.Step, LLVMContext::OB_oss_loop_step);
+  if (TI.LoopInfo.empty())
+    llvm_unreachable("LoopInfo is missing some information");
+}
+
 // in: TasksTree, Cur
 // out: tasks are ordered in post order, which means that
 // child tasks will be placed before its parent tasks
@@ -544,16 +585,29 @@ static void convertTasksTreeToVectorImpl(
   MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
   MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
   Instruction *Cur,
-  SmallVectorImpl<TaskInfo> &PostOrder) {
+  SmallVectorImpl<TaskInfo *> &PostOrder,
+  SmallVectorImpl<Instruction *> &Stack) {
+
+  if (Cur)
+    Stack.push_back(Cur);
 
   // TODO: Why using operator[] does weird things?
   // for (auto II : TasksTree[Cur]) {
   for (auto II : TasksTree.lookup(Cur)) {
     convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
-                                 TasksTree, II, PostOrder);
+                                 TasksTree, II, PostOrder, Stack);
   }
-  if (Cur)
-    PostOrder.push_back(TEntryToTaskWithAnalysisInfo[Cur].Info);
+  if (Cur) {
+    Stack.pop_back();
+
+    TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[Cur];
+    for (Instruction *I : Stack) {
+      // Annotate the current task as inner of all tasks in stack
+      TaskWithAnalysisInfo &TStack = TEntryToTaskWithAnalysisInfo[I];
+      TStack.Info.InnerTaskInfos.push_back(&T.Info);
+    }
+    PostOrder.push_back(&T.Info);
+  }
 }
 
 // in: TasksTree, Cur
@@ -562,10 +616,12 @@ static void convertTasksTreeToVectorImpl(
 static void convertTasksTreeToVector(
   MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
   MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
-  SmallVectorImpl<TaskInfo> &PostOrder) {
+  SmallVectorImpl<TaskInfo*> &PostOrder) {
+
+  SmallVector<Instruction *, 4> Stack;
 
   convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
-                               TasksTree, nullptr, PostOrder);
+                               TasksTree, nullptr, PostOrder, Stack);
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
@@ -609,6 +665,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           T.Info.Entry = II;
           T.Info.Exit = Exit;
 
+          gatherTaskKindInfo(II, T.Info);
           gatherDSAInfo(II, T.Info);
           gatherNonPODInfo(II, T.Info);
           gatherVLADimsInfo(II, T.Info);
@@ -616,7 +673,9 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
           gatherReductionsInitCombInfo(II, T.Info);
           gatherIfFinalCostPrioWaitInfo(II, T.Info);
-
+          if (isOmpSsLoopDirective(T.Info.TaskKind))
+            gatherLoopInfo(II, T.Info);
+          // TODO: missing grainsize, chunksize
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
           if (Stack.empty())
             llvm_unreachable("Task exit hit without and entry.");
@@ -653,7 +712,6 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
                                "OperandBundle not found.");
             }
           }
-          // T.TaskBodyIns.push_back(&I);
         }
         for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {

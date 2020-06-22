@@ -174,6 +174,36 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
       break;
     }
     break;
+  case OSSD_task_for:
+    switch (CKind) {
+#define OMPSS_TASK_FOR_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskloop:
+    switch (CKind) {
+#define OMPSS_TASKLOOP_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
+  case OSSD_taskloop_for:
+    switch (CKind) {
+#define OMPSS_TASKLOOP_FOR_CLAUSE(Name)                                       \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
   case OSSD_declare_task:
     switch (CKind) {
 #define OMPSS_DECLARE_TASK_CLAUSE(Name)                                       \
@@ -206,6 +236,15 @@ bool clang::isOmpSsPrivate(OmpSsClauseKind Kind) {
 }
 
 bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
-  return Kind == OSSD_task;
+  return Kind == OSSD_task || isOmpSsLoopDirective(Kind);
+}
+
+bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {
+  return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for ||
+         Kind == OSSD_task_for;
+}
+
+bool clang::isOmpSsTaskLoopDirective(OmpSsDirectiveKind Kind) {
+  return Kind == OSSD_taskloop || Kind == OSSD_taskloop_for;
 }
 

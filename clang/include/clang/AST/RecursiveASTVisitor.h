@@ -548,6 +548,7 @@ private:
 
   // OmpSs
   bool TraverseOSSExecutableDirective(OSSExecutableDirective *S);
+  bool TraverseOSSLoopDirective(OSSLoopDirective *S);
 
   bool dataTraverseNode(Stmt *S, DataRecursionQueue *Queue);
   bool PostVisitStmt(Stmt *S);
@@ -3603,11 +3604,26 @@ bool RecursiveASTVisitor<Derived>::TraverseOSSExecutableDirective(
   return true;
 }
 
+template <typename Derived>
+bool
+RecursiveASTVisitor<Derived>::TraverseOSSLoopDirective(OSSLoopDirective *S) {
+  return TraverseOSSExecutableDirective(S);
+}
+
 DEF_TRAVERSE_STMT(OSSTaskwaitDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
 DEF_TRAVERSE_STMT(OSSTaskDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
+DEF_TRAVERSE_STMT(OSSTaskForDirective,
+                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+
+DEF_TRAVERSE_STMT(OSSTaskLoopDirective,
+                  { TRY_TO(TraverseOSSLoopDirective(S)); })
+
+DEF_TRAVERSE_STMT(OSSTaskLoopForDirective,
+                  { TRY_TO(TraverseOSSLoopDirective(S)); })
 
 #undef DEF_TRAVERSE_STMT
 #undef TRAVERSE_STMT

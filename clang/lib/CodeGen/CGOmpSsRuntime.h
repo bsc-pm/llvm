@@ -115,6 +115,19 @@ struct OSSTaskDataTy final {
   }
 };
 
+struct OSSLoopDataTy final {
+  Expr *IndVar = nullptr;
+  Expr *LB = nullptr;
+  Expr *UB = nullptr;
+  Expr *Step = nullptr;
+  llvm::Optional<bool> TestIsLessOp;
+  bool TestIsStrictOp;
+  bool empty() const {
+    return !IndVar &&
+          !LB && !UB && !Step;
+  }
+};
+
 class CGOmpSsRuntime {
 protected:
   CodeGenModule &CGM;
@@ -191,8 +204,9 @@ private:
       SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // Build bundles for all info inside Data
-  void EmitTaskData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
-      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+  void EmitDirectiveData(CodeGenFunction &CGF, const OSSTaskDataTy &Data,
+      SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+      const OSSLoopDataTy &LoopData = OSSLoopDataTy());
 
 public:
   explicit CGOmpSsRuntime(CodeGenModule &CGM) : CGM(CGM) {}
@@ -249,6 +263,13 @@ public:
                             const OSSExecutableDirective &D,
                             SourceLocation Loc,
                             const OSSTaskDataTy &Data);
+
+  /// Emit code for 'task' directive.
+  virtual void emitLoopCall(CodeGenFunction &CGF,
+                            const OSSLoopDirective &D,
+                            SourceLocation Loc,
+                            const OSSTaskDataTy &Data,
+                            const OSSLoopDataTy &LoopData);
 
 };
 

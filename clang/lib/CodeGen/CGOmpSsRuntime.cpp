@@ -41,6 +41,9 @@ namespace {
 enum OmpSsBundleKind {
   OSSB_directive,
   OSSB_task,
+  OSSB_task_for,
+  OSSB_taskloop,
+  OSSB_taskloop_for,
   OSSB_taskwait,
   OSSB_shared,
   OSSB_private,
@@ -70,7 +73,12 @@ enum OmpSsBundleKind {
   OSSB_deinit,
   OSSB_vladims,
   OSSB_captured,
-  OSSC_unknown
+  OSSB_loop_type,
+  OSSB_loop_indvar,
+  OSSB_loop_lowerbound,
+  OSSB_loop_upperbound,
+  OSSB_loop_step,
+  OSSB_unknown
 };
 
 const char *getBundleStr(OmpSsBundleKind Kind) {
@@ -79,6 +87,12 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "DIR.OSS";
   case OSSB_task:
     return "TASK";
+  case OSSB_task_for:
+    return "TASK.FOR";
+  case OSSB_taskloop:
+    return "TASKLOOP";
+  case OSSB_taskloop_for:
+    return "TASKLOOP.FOR";
   case OSSB_taskwait:
     return "TASKWAIT";
   case OSSB_shared:
@@ -137,6 +151,16 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.VLA.DIMS";
   case OSSB_captured:
     return "QUAL.OSS.CAPTURED";
+  case OSSB_loop_type:
+    return "QUAL.OSS.LOOP.TYPE";
+  case OSSB_loop_indvar:
+    return "QUAL.OSS.LOOP.IND.VAR";
+  case OSSB_loop_lowerbound:
+    return "QUAL.OSS.LOOP.LOWER.BOUND";
+  case OSSB_loop_upperbound:
+    return "QUAL.OSS.LOOP.UPPER.BOUND";
+  case OSSB_loop_step:
+    return "QUAL.OSS.LOOP.STEP";
   default:
     llvm_unreachable("Invalid OmpSs bundle kind");
   }
@@ -1869,7 +1893,7 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
     CaptureMapStack.push_back(CaptureMapTy());
 
     InTaskEmission = true;
-    EmitTaskData(CGF, Data, TaskInfo);
+    EmitDirectiveData(CGF, Data, TaskInfo);
     InTaskEmission = false;
 
     llvm::Instruction *Result =
@@ -1962,10 +1986,29 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   delete BB;
 }
 
-void CGOmpSsRuntime::EmitTaskData(
-    CodeGenFunction &CGF,
-    const OSSTaskDataTy &Data,
-    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+// returns an integer representing the loop type
+// SLT → signed(<)    → 0
+// SLE → signed(<=)   → 1
+// SGT → signed(>)    → 2
+// SGE → signed(>=)   → 3
+// ULT → unsigned(<)  → 4
+// ULE → unsigned(<=) → 5
+// UGT → unsigned(>)  → 6
+// UGE → unsigned(>=) → 7
+static int getLoopType(
+    QualType IndVarTy, llvm::Optional<bool> TestIsLessOp,
+    bool TestIsStrictOp) {
+  int IsUnsigned = !IndVarTy->isSignedIntegerOrEnumerationType() * 4;
+  int IsLessOp = !(*TestIsLessOp) * 2;
+  int IsStrictOp = !TestIsStrictOp * 1;
+
+  return IsUnsigned + IsLessOp + IsStrictOp;
+}
+
+void CGOmpSsRuntime::EmitDirectiveData(
+    CodeGenFunction &CGF, const OSSTaskDataTy &Data,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
+    const OSSLoopDataTy &LoopData) {
 
   SmallVector<llvm::Value*, 4> CapturedList;
   for (const Expr *E : Data.DSAs.Shareds) {
@@ -1996,6 +2039,23 @@ void CGOmpSsRuntime::EmitTaskData(
     TaskInfo.emplace_back(
         getBundleStr(OSSB_wait),
         llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
+  }
+
+  if (!LoopData.empty()) {
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_indvar), CGF.EmitLValue(LoopData.IndVar).getPointer(CGF));
+    llvm::Value *LB = CGF.EmitScalarExpr(LoopData.LB);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_lowerbound), LB);
+    CapturedList.push_back(LB);
+    llvm::Value *UB = CGF.EmitScalarExpr(LoopData.UB);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_upperbound), UB);
+    CapturedList.push_back(UB);
+    llvm::Value *Step = CGF.EmitScalarExpr(LoopData.Step);
+    TaskInfo.emplace_back(getBundleStr(OSSB_loop_step), Step);
+    CapturedList.push_back(Step);
+    TaskInfo.emplace_back(
+      getBundleStr(OSSB_loop_type),
+      llvm::ConstantInt::getSigned(CGF.Int64Ty,
+          getLoopType(LoopData.IndVar->getType(), LoopData.TestIsLessOp, LoopData.TestIsStrictOp)));
   }
 
   if (!CapturedList.empty())
@@ -2365,7 +2425,7 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   CaptureMapStack.push_back(CaptureMapTy());
 
   InTaskEmission = true;
-  EmitTaskData(CGF, Data, TaskInfo);
+  EmitDirectiveData(CGF, Data, TaskInfo);
   InTaskEmission = false;
 
   llvm::Instruction *Result =
@@ -2379,6 +2439,65 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   // longjmp() and throw() must not violate the entry/exit criteria.
   CGF.EHStack.pushTerminate();
   CGF.EmitStmt(D.getAssociatedStmt());
+  CGF.EHStack.popTerminate();
+
+  // TODO: do we need this? we're pushing a terminate...
+  // EmitIfUsed(*this, EHResumeBlock);
+  EmitIfUsed(CGF, TaskStack.back().TerminateLandingPad);
+  EmitIfUsed(CGF, TaskStack.back().TerminateHandler);
+  EmitIfUsed(CGF, TaskStack.back().UnreachableBlock);
+
+  CGF.Builder.CreateCall(ExitCallee, Result);
+
+  // Pop Task Stack
+  TaskStack.pop_back();
+  CaptureMapStack.pop_back();
+  TaskAllocaInsertPt->eraseFromParent();
+
+}
+
+void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
+                                  const OSSLoopDirective &D,
+                                  SourceLocation Loc,
+                                  const OSSTaskDataTy &Data,
+                                  const OSSLoopDataTy &LoopData) {
+
+  llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
+  llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
+  SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
+
+  OmpSsBundleKind LoopDirectiveBundleKind = OSSB_unknown;
+  if (isa<OSSTaskForDirective>(D)) LoopDirectiveBundleKind = OSSB_task_for;
+  else if (isa<OSSTaskLoopDirective>(D)) LoopDirectiveBundleKind = OSSB_taskloop;
+  else if (isa<OSSTaskLoopForDirective>(D)) LoopDirectiveBundleKind = OSSB_taskloop_for;
+  else llvm_unreachable("Unexpected loop directive in codegen");
+
+  TaskInfo.emplace_back(
+      getBundleStr(OSSB_directive),
+      llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(LoopDirectiveBundleKind)));
+
+  // Emit for-init before task entry
+  CGF.EmitStmt(cast<ForStmt>(D.getAssociatedStmt())->getInit());
+
+  // Push Task Stack
+  TaskStack.push_back(TaskContext());
+  CaptureMapStack.push_back(CaptureMapTy());
+
+  InTaskEmission = true;
+  EmitDirectiveData(CGF, Data, TaskInfo, LoopData);
+  InTaskEmission = false;
+
+  llvm::Instruction *Result =
+    CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
+
+  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
+  llvm::Instruction *TaskAllocaInsertPt = new llvm::BitCastInst(Undef, CGF.Int32Ty, "taskallocapt", Result->getParent());
+  setTaskInsertPt(TaskAllocaInsertPt);
+
+  // The point of exit cannot be a branch out of the structured block.
+  // longjmp() and throw() must not violate the entry/exit criteria.
+  CGF.EHStack.pushTerminate();
+  CGF.EmitStmt(cast<ForStmt>(D.getAssociatedStmt())->getBody());
   CGF.EHStack.popTerminate();
 
   // TODO: do we need this? we're pushing a terminate...

@@ -82,7 +82,29 @@ struct ReductionInitCombInfo {
 
 using TaskReductionsInitCombInfo = MapVector<Value *, ReductionInitCombInfo>;
 
+struct TaskLoopInfo {
+  // TODO document this
+  enum { SLT, SLE, SGT, SGE, ULT, ULE, UGT, UGE};
+  int64_t LoopType;
+  Value *IndVar = nullptr;
+  Value *LBound = nullptr;
+  Value *UBound = nullptr;
+  Value *Step = nullptr;
+  bool empty() const {
+    return !IndVar && !LBound &&
+           !UBound && !Step;
+  }
+};
+
 struct TaskInfo {
+  enum OmpSsTaskKind {
+    OSSD_task = 0,
+    OSSD_task_for,
+    OSSD_taskloop,
+    OSSD_taskloop_for,
+    OSSD_unknown
+  };
+  OmpSsTaskKind TaskKind = OSSD_unknown;
   TaskDSAInfo DSAInfo;
   TaskVLADimsInfo VLADimsInfo;
   TaskDependsInfo DependsInfo;
@@ -95,15 +117,17 @@ struct TaskInfo {
   Value *Wait = nullptr;
   TaskCapturedInfo CapturedInfo;
   TaskNonPODsInfo NonPODsInfo;
+  // This is not taskloop only info
+  TaskLoopInfo LoopInfo;
+  // Used to lower directives in final context.
+  // Used to build loops of taskloop/taskfor
+  SmallVector<TaskInfo *, 4> InnerTaskInfos;
   Instruction *Entry;
   Instruction *Exit;
-  // Used in final(), since once we transform
-  // one task we cannot distinguish the original code
-  // SmallVector<Instruction *> TaskBodyIns;
 };
 
 struct TaskFunctionInfo {
-  SmallVector<TaskInfo, 4> PostOrder;
+  SmallVector<TaskInfo *, 4> PostOrder;
 };
 // End Task data structures
 
