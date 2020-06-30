@@ -1333,10 +1333,22 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
     return ExprError();
 
   SourceLocation ELoc = Tok.getLocation();
+
+  // 1. Disable diagnostics for label clause. Emit a warning and keep going
+  if (ClauseName == "label")
+    Diags.setSuppressAllDiagnostics(true);
+
   ExprResult LHS(ParseCastExpression(
       AnyCastExpr, /*isAddressOfOperand=*/false, NotTypeCast));
   ExprResult Val(ParseRHSOfBinaryExpression(LHS, prec::Conditional));
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
+
+  // See 1.
+  if (ClauseName == "label")
+    Diags.setSuppressAllDiagnostics(false);
+
+  if (Val.isInvalid())
+    Diag(ELoc, diag::warn_oss_label_error);
 
   // Parse ')'.
   RLoc = Tok.getLocation();

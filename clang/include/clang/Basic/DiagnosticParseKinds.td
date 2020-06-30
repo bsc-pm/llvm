@@ -1216,6 +1216,8 @@ def err_openclcxx_virtual_function : Error<
   "virtual functions are not supported in C++ for OpenCL">;
 
 // OmpSs support.
+def warn_oss_label_error : Warning<
+  "expecting an expression convertible to 'const char *', ignoring">;
 def warn_pragma_oss_ignored : Warning<
   "unexpected '#pragma oss ...' in program">, InGroup<SourceUsesOmpSs>, DefaultIgnore;
 def err_oss_unexpected_directive : Error<
