@@ -558,6 +558,10 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
 
 void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
                             const ArgList &Args) {
+  // -fdo-not-use-nanos6 means ignoring nanos6
+  if (Args.getLastArg(options::OPT_fdo_not_use_nanos6))
+    return;
+
   std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
   Optional<std::string> RuntimeHome =
     llvm::sys::Process::GetEnv("NANOS6_HOME");
