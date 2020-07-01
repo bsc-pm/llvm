@@ -299,7 +299,8 @@ public:
 
     llvm::Value *PossibleBase = nullptr;
     const VarDecl *VD = cast<VarDecl>(E->getDecl());
-    if (VD->getType()->isReferenceType()) {
+    if (VD->getType()->isReferenceType()
+        || E->refersToEnclosingVariableOrCapture()) {
       // Reuse the ref addr. got in DSA
       LValue LV = CGF.EmitDeclRefLValue(E);
       PossibleBase = LV.getPointer(CGF);
@@ -1041,9 +1042,12 @@ void CGOmpSsRuntime::EmitDSAShared(
   if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
     llvm::Value *DSAValue;
-    if (VD->getType()->isReferenceType()
+    if ((VD->getType()->isReferenceType()
+         || DRE->refersToEnclosingVariableOrCapture())
         && !getTaskCaptureAddr(VD).isValid()) {
-      // Record Ref Address to be reused in task body and other clasues
+      // 1. Record Ref Address to be reused in task body and other clasues
+      // 2. Record Addr of lambda captured variables to be reused in task body and
+      //    other clauses.
       LValue LV = CGF.EmitDeclRefLValue(DRE);
       CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
       DSAValue = LV.getPointer(CGF);
@@ -1082,9 +1086,12 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(PDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
-  if (VD->getType()->isReferenceType()
+  if ((VD->getType()->isReferenceType()
+       || DRE->refersToEnclosingVariableOrCapture())
       && !getTaskCaptureAddr(VD).isValid()) {
-    // Record Ref Address to be reused in task body and other clauses
+    // 1. Record Ref Address to be reused in task body and other clasues
+    // 2. Record Addr of lambda captured variables to be reused in task body and
+    //    other clauses.
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
@@ -1123,9 +1130,12 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
   const DeclRefExpr *DRE = cast<DeclRefExpr>(FpDataTy.Ref);
   const VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   llvm::Value *DSAValue;
-  if (VD->getType()->isReferenceType()
+  if ((VD->getType()->isReferenceType()
+       || DRE->refersToEnclosingVariableOrCapture())
       && !getTaskCaptureAddr(VD).isValid()) {
-    // Record Ref Address to be reused in task body and other clauses
+    // 1. Record Ref Address to be reused in task body and other clasues
+    // 2. Record Addr of lambda captured variables to be reused in task body and
+    //    other clauses.
     LValue LV = CGF.EmitDeclRefLValue(DRE);
     CaptureMapStack.back().try_emplace(VD, LV.getAddress(CGF));
     DSAValue = LV.getPointer(CGF);
