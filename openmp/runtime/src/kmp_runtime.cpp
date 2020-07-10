@@ -3584,6 +3584,9 @@ static int __kmp_expand_threads(int nNeed) {
   return added;
 }
 
+// FIXME
+static kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid);
+
 /* Register the current thread as a root thread and obtain our gtid. We must
    have the __kmp_initz_lock held at this point. Argument TRUE only if are the
    thread that calls from __kmp_do_serial_initialize() */
@@ -3813,6 +3816,15 @@ int __kmp_register_root(int initial_thread) {
     ompt_set_thread_state(root_thread, ompt_state_work_serial);
   }
 #endif
+
+  /* Allocate unshackled threads here */
+  // FIXME: Do not hardcode number of unshackled
+  root->r.num_unshackled_threads = 4;
+  root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
+      sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
+  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
+    root->r.unshackled_threads[i] = __kmp_allocate_unshackled_thread(root, i);
+  }
 
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
@@ -4185,14 +4197,15 @@ static void __kmp_initialize_info(kmp_info_t *this_thr, kmp_team_t *team,
    thread from the thread pool. if none is available, we will fork a new one
    assuming we are able to create a new one. this should be assured, as the
    caller should check on this first. */
-kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
+   static
+kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
                                   int new_tid) {
   kmp_team_t *serial_team;
   kmp_info_t *new_thr;
   int new_gtid;
 
   KA_TRACE(20, ("__kmp_allocate_thread: T#%d\n", __kmp_get_gtid()));
-  KMP_DEBUG_ASSERT(root && team);
+  KMP_DEBUG_ASSERT(root);
 #if !KMP_NESTED_HOT_TEAMS
   KMP_DEBUG_ASSERT(KMP_MASTER_GTID(__kmp_get_gtid()));
 #endif
@@ -4306,6 +4319,7 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   }
 
   // add the reserve serialized team, initialized from the team's master thread
+  if (team)
   {
     kmp_internal_control_t r_icvs = __kmp_get_x_global_icvs(team);
     KF_TRACE(10, ("__kmp_allocate_thread: before th_serial/serial_team\n"));
@@ -4316,7 +4330,6 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 #endif
                                           proc_bind_default, &r_icvs,
                                           0 USE_NESTED_HOT_ARG(NULL));
-  }
   KMP_ASSERT(serial_team);
   serial_team->t.t_serialized = 0; // AC: the team created in reserve, not for
   // execution (it is unused for now).
@@ -4327,6 +4340,7 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 
   /* setup the thread structures */
   __kmp_initialize_info(new_thr, team, new_tid, new_gtid);
+  }
 
 #if USE_FAST_MEMORY
   __kmp_initialize_fast_memory(new_thr);
@@ -4412,6 +4426,17 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
                 new_gtid));
   KMP_MB();
   return new_thr;
+}
+
+kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
+                                  int new_tid) {
+  KMP_DEBUG_ASSERT(root && team);
+  return __kmp_allocate_thread_common(root, team, new_tid);
+}
+
+static
+kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
+  return __kmp_allocate_thread_common(root, NULL, new_tid);
 }
 
 /* Reinitialize team for reuse.
@@ -6840,6 +6865,9 @@ static void __kmp_do_middle_initialize(void) {
     for (i = 0; i < __kmp_threads_capacity; i++) {
       kmp_info_t *thread = __kmp_threads[i];
       if (thread == NULL)
+        continue;
+      // Unshackled thread?
+      if (!thread->th.th_current_task)
         continue;
       if (thread->th.th_current_task->td_icvs.nproc != 0)
         continue;
