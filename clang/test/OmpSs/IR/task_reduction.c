@@ -1,6 +1,8 @@
 // RUN: %clang_cc1 -verify -fompss-2 -disable-llvm-passes -ferror-limit 100 %s -S -emit-llvm -o - | FileCheck %s
 // expected-no-diagnostics
 
+// UNSUPPORTED: true
+
 void foo(int x) {
   #pragma oss task reduction(+: x)
   {}

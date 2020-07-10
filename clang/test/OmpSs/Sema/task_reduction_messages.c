@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 150 -o - %s
 
+// UNSUPPORTED: true
+
 int incomplete[];
 
 void test() {

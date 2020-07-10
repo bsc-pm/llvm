@@ -2,6 +2,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -std=c++98 %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -std=c++11 %s -Wuninitialized
 
+// UNSUPPORTED: true
 
 
 

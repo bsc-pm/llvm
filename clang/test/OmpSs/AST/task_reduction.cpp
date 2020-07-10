@@ -1,6 +1,8 @@
 // RUN: %clang_cc1 -x c++ -verify -fompss-2 -ast-dump -ferror-limit 100 %s | FileCheck %s
 // expected-no-diagnostics
 
+// UNSUPPORTED: true
+
 template<typename T>
 void foo(T x) {
   #pragma oss task reduction(max : x)

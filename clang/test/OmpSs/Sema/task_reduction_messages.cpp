@@ -2,6 +2,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -std=c++98 -ferror-limit 150 -o - %s -Wuninitialized
 // RUN: %clang_cc1 -verify -fompss-2 -std=c++11 -ferror-limit 150 -o - %s -Wuninitialized
 
+// UNSUPPORTED: true
 
 void xxx(int argc) {
   int fp; // NOTE: initialize the variable 'fp' to silence this warning

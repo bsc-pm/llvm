@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 %s -Wuninitialized
 
+// UNSUPPORTED: true
 
 
 int temp; // expected-note 6 {{'temp' declared here}}

@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - %s
 
+// UNSUPPORTED: true
+
 struct S {
   int x;
 } s;  // expected-note {{'s' defined here}}

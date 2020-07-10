@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 -o - -std=c++11 %s
 
+// UNSUPPORTED: true
+
 struct S {
   int x;
 } s;
