@@ -90,6 +90,8 @@ struct TaskLoopInfo {
   Value *LBound = nullptr;
   Value *UBound = nullptr;
   Value *Step = nullptr;
+  Value *Chunksize = nullptr;
+  Value *Grainsize = nullptr;
   bool empty() const {
     return !IndVar && !LBound &&
            !UBound && !Step;

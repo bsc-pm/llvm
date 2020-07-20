@@ -116,10 +116,12 @@ struct OSSTaskDataTy final {
 };
 
 struct OSSLoopDataTy final {
-  Expr *IndVar = nullptr;
-  Expr *LB = nullptr;
-  Expr *UB = nullptr;
-  Expr *Step = nullptr;
+  const Expr *IndVar = nullptr;
+  const Expr *LB = nullptr;
+  const Expr *UB = nullptr;
+  const Expr *Step = nullptr;
+  const Expr *Chunksize = nullptr;
+  const Expr *Grainsize = nullptr;
   llvm::Optional<bool> TestIsLessOp;
   bool TestIsStrictOp;
   bool empty() const {

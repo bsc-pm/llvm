@@ -1632,6 +1632,28 @@ public:
                                            EndLoc);
   }
 
+  /// Build a new OmpSs 'chunksize' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSChunksizeClause(
+      Expr *Condition, SourceLocation StartLoc,
+      SourceLocation LParenLoc, SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsChunksizeClause(
+      Condition, StartLoc, LParenLoc, EndLoc);
+  }
+
+  /// Build a new OmpSs 'grainsize' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSGrainsizeClause(
+      Expr *Condition, SourceLocation StartLoc,
+      SourceLocation LParenLoc, SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsGrainsizeClause(
+      Condition, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OmpSs 'depend' pseudo clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -10166,6 +10188,24 @@ OSSClause *TreeTransform<Derived>::TransformOSSLabelClause(OSSLabelClause *C) {
     return nullptr;
   return getDerived().RebuildOSSLabelClause(E.get(), C->getBeginLoc(),
                                             C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSChunksizeClause(OSSChunksizeClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSChunksizeClause(
+    E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSGrainsizeClause(OSSGrainsizeClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSGrainsizeClause(
+    E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

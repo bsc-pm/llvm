@@ -104,6 +104,8 @@ unsigned clang::getOmpSsSimpleClauseType(OmpSsClauseKind Kind,
   case OSSC_weakconcurrent:
   case OSSC_weakcommutative:
   case OSSC_weakreduction:
+  case OSSC_chunksize:
+  case OSSC_grainsize:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");
@@ -154,6 +156,8 @@ const char *clang::getOmpSsSimpleClauseTypeName(OmpSsClauseKind Kind,
   case OSSC_weakconcurrent:
   case OSSC_weakcommutative:
   case OSSC_weakreduction:
+  case OSSC_chunksize:
+  case OSSC_grainsize:
     break;
   }
   llvm_unreachable("Invalid OmpSs simple clause kind");

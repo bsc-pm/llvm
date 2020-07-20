@@ -3489,6 +3489,32 @@ OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
   return new (Context) OSSLabelClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsChunksizeClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+  // The parameter of the chunksize() clause must be > 0
+  // expression.
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_chunksize, /*StrictlyPositive=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSChunksizeClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
+OSSClause *Sema::ActOnOmpSsGrainsizeClause(
+    Expr *E, SourceLocation StartLoc,
+    SourceLocation LParenLoc, SourceLocation EndLoc) {
+  // The parameter of the grainsize() clause must be > 0
+  // expression.
+  ExprResult Res = CheckNonNegativeIntegerValue(
+    E, OSSC_grainsize, /*StrictlyPositive=*/false);
+  if (Res.isInvalid())
+    return nullptr;
+
+  return new (Context) OSSGrainsizeClause(Res.get(), StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
                                             SourceLocation StartLoc,
                                             SourceLocation LParenLoc,
@@ -3509,6 +3535,12 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_label:
     Res = ActOnOmpSsLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_chunksize:
+    Res = ActOnOmpSsChunksizeClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_grainsize:
+    Res = ActOnOmpSsGrainsizeClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   default:
     llvm_unreachable("Clause is not allowed.");

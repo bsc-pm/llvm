@@ -22,4 +22,12 @@ void bar() {
   #pragma oss task default(none) default(shared) // expected-error {{directive '#pragma oss task' cannot contain more than one 'default' clause}}
   #pragma oss task label("L1") label("L2") // expected-error {{directive '#pragma oss task' cannot contain more than one 'label' clause}}
   {}
+  #pragma oss task for chunksize(0) chunksize(0) // expected-error {{directive '#pragma oss task for' cannot contain more than one 'chunksize' clause}}
+  for (int i = 0; i < 10; ++i) {}
+  #pragma oss taskloop grainsize(0) grainsize(0) // expected-error {{directive '#pragma oss taskloop' cannot contain more than one 'grainsize' clause}}
+  for (int i = 0; i < 10; ++i) {}
+  #pragma oss taskloop for chunksize(0) chunksize(0) // expected-error {{directive '#pragma oss taskloop for' cannot contain more than one 'chunksize' clause}}
+  for (int i = 0; i < 10; ++i) {}
+  #pragma oss taskloop for grainsize(0) grainsize(0) // expected-error {{directive '#pragma oss taskloop for' cannot contain more than one 'grainsize' clause}}
+  for (int i = 0; i < 10; ++i) {}
 }

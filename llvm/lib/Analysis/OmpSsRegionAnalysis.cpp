@@ -565,7 +565,6 @@ static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
 
 static void gatherLoopInfo(const IntrinsicInst *I, TaskInfo &TI) {
   assert(isOmpSsLoopDirective(TI.TaskKind) && "gatherLoopInfo expects a loop directive");
-  // TODO: assert or something if its a taskloop/task for without these info
   Value *LoopType;
   getValueFromOperandBundleWithID(I, LoopType, LLVMContext::OB_oss_loop_type);
   if (LoopType)
@@ -574,6 +573,9 @@ static void gatherLoopInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.LoopInfo.LBound, LLVMContext::OB_oss_loop_lower_bound);
   getValueFromOperandBundleWithID(I, TI.LoopInfo.UBound, LLVMContext::OB_oss_loop_upper_bound);
   getValueFromOperandBundleWithID(I, TI.LoopInfo.Step, LLVMContext::OB_oss_loop_step);
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.Chunksize, LLVMContext::OB_oss_loop_chunksize);
+  getValueFromOperandBundleWithID(I, TI.LoopInfo.Grainsize, LLVMContext::OB_oss_loop_grainsize);
+
   if (TI.LoopInfo.empty())
     llvm_unreachable("LoopInfo is missing some information");
 }

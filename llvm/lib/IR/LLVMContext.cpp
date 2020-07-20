@@ -243,6 +243,16 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSLoopStepEntry->second == LLVMContext::OB_oss_loop_step &&
          "oss_loop_step operand bundle id drifted!");
   (void)OSSLoopStepEntry;
+
+  auto *OSSLoopChunksizeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.CHUNKSIZE");
+  assert(OSSLoopChunksizeEntry->second == LLVMContext::OB_oss_loop_chunksize &&
+         "oss_loop_chunksize operand bundle id drifted!");
+  (void)OSSLoopChunksizeEntry;
+
+  auto *OSSLoopGrainsizeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.LOOP.GRAINSIZE");
+  assert(OSSLoopGrainsizeEntry->second == LLVMContext::OB_oss_loop_grainsize &&
+         "oss_loop_grainsize operand bundle id drifted!");
+  (void)OSSLoopGrainsizeEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

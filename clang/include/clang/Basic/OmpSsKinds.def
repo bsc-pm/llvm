@@ -67,6 +67,8 @@ OMPSS_CLAUSE(firstprivate, OSSFirstprivateClause)
 OMPSS_CLAUSE(shared,  OSSSharedClause)
 OMPSS_CLAUSE(depend, OSSDependClause)
 OMPSS_CLAUSE(reduction, OSSReductionClause)
+OMPSS_CLAUSE(chunksize, OSSChunksizeClause)
+OMPSS_CLAUSE(grainsize, OSSGrainsizeClause)
 OMPSS_DIRECTIVE_EXT(declare_reduction, "declare reduction")
 OMPSS_DIRECTIVE_EXT(declare_task, "task")
 OMPSS_DIRECTIVE_EXT(task_for, "task for")
@@ -147,7 +149,7 @@ OMPSS_TASK_FOR_CLAUSE(weakout)
 OMPSS_TASK_FOR_CLAUSE(weakinout)
 OMPSS_TASK_FOR_CLAUSE(weakcommutative)
 OMPSS_TASK_FOR_CLAUSE(weakreduction)
-// TODO: add chunksize
+OMPSS_TASK_FOR_CLAUSE(chunksize)
 
 // Clauses allowed for OmpSs directive 'taskloop'.
 OMPSS_TASKLOOP_CLAUSE(if)
@@ -172,7 +174,7 @@ OMPSS_TASKLOOP_CLAUSE(weakout)
 OMPSS_TASKLOOP_CLAUSE(weakinout)
 OMPSS_TASKLOOP_CLAUSE(weakcommutative)
 OMPSS_TASKLOOP_CLAUSE(weakreduction)
-// TODO: add grainsize
+OMPSS_TASKLOOP_CLAUSE(grainsize)
 
 // Clauses allowed for OmpSs directive 'taskloop for'.
 OMPSS_TASKLOOP_FOR_CLAUSE(if)
@@ -197,8 +199,8 @@ OMPSS_TASKLOOP_FOR_CLAUSE(weakout)
 OMPSS_TASKLOOP_FOR_CLAUSE(weakinout)
 OMPSS_TASKLOOP_FOR_CLAUSE(weakcommutative)
 OMPSS_TASKLOOP_FOR_CLAUSE(weakreduction)
-// TODO: add chunksize
-// TODO: add grainsize
+OMPSS_TASKLOOP_FOR_CLAUSE(chunksize)
+OMPSS_TASKLOOP_FOR_CLAUSE(grainsize)
 
 // Clauses allowed for OmpSs directive 'taskwait'.
 OMPSS_TASKWAIT_CLAUSE(depend)

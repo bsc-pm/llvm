@@ -11033,6 +11033,14 @@ public:
   OSSClause *ActOnOmpSsLabelClause(Expr *E, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,
                                    SourceLocation EndLoc);
+  /// Called on well-formed 'chunksize' clause.
+  OSSClause *ActOnOmpSsChunksizeClause(Expr *E, SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc);
+  /// Called on well-formed 'grainsize' clause.
+  OSSClause *ActOnOmpSsGrainsizeClause(Expr *E, SourceLocation StartLoc,
+                                       SourceLocation LParenLoc,
+                                       SourceLocation EndLoc);
 
   OSSClause *ActOnOmpSsClause(OmpSsClauseKind Kind, SourceLocation StartLoc,
                               SourceLocation EndLoc);

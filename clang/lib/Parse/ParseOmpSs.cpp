@@ -706,6 +706,8 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_cost:
   case OSSC_priority:
   case OSSC_label:
+  case OSSC_chunksize:
+  case OSSC_grainsize:
     if (!FirstClause) {
       Diag(Tok, diag::err_oss_more_one_clause)
           << getOmpSsDirectiveName(DKind) << getOmpSsClauseName(CKind) << 0;

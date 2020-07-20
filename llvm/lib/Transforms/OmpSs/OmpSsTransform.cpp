@@ -1730,9 +1730,13 @@ struct OmpSs : public ModulePass {
         Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
         Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
         Value *RegisterUpperB = IRB.CreateSub(TI.LoopInfo.UBound, TI.LoopInfo.LBound);
-        // TODO: support clauses
         Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
-        Value *RegisterChunkSize = ConstantInt::get(IndVarTy, 0);
+        if (TI.LoopInfo.Grainsize)
+          RegisterGrainsize = TI.LoopInfo.Grainsize;
+        Value *RegisterChunksize = ConstantInt::get(IndVarTy, 0);
+        if (TI.LoopInfo.Chunksize)
+          RegisterChunksize = TI.LoopInfo.Chunksize;
+
         switch (TI.LoopInfo.LoopType) {
         case TaskLoopInfo::SLT:
         case TaskLoopInfo::ULT:
@@ -1760,7 +1764,7 @@ struct OmpSs : public ModulePass {
             IRB.CreateSExt(RegisterLowerB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(0)),
             IRB.CreateSExt(RegisterUpperB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(1)),
             IRB.CreateSExt(RegisterGrainsize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(2)),
-            IRB.CreateSExt(RegisterChunkSize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(3))
+            IRB.CreateSExt(RegisterChunksize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(3))
           }
         );
       }

@@ -53,6 +53,8 @@ enum OmpSsBundleKind {
   OSSB_cost,
   OSSB_priority,
   OSSB_label,
+  OSSB_chunksize,
+  OSSB_grainsize,
   OSSB_wait,
   OSSB_in,
   OSSB_out,
@@ -111,6 +113,10 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.PRIORITY";
   case OSSB_label:
     return "QUAL.OSS.LABEL";
+  case OSSB_chunksize:
+    return "QUAL.OSS.LOOP.CHUNKSIZE";
+  case OSSB_grainsize:
+    return "QUAL.OSS.LOOP.GRAINSIZE";
   case OSSB_wait:
     return "QUAL.OSS.WAIT";
   case OSSB_in:
@@ -2052,6 +2058,16 @@ void CGOmpSsRuntime::EmitDirectiveData(
     llvm::Value *Step = CGF.EmitScalarExpr(LoopData.Step);
     TaskInfo.emplace_back(getBundleStr(OSSB_loop_step), Step);
     CapturedList.push_back(Step);
+    if (LoopData.Chunksize) {
+      llvm::Value *V = CGF.EmitScalarExpr(LoopData.Chunksize);
+      CapturedList.push_back(V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_chunksize), V);
+    }
+    if (LoopData.Grainsize) {
+      llvm::Value *V = CGF.EmitScalarExpr(LoopData.Grainsize);
+      CapturedList.push_back(V);
+      TaskInfo.emplace_back(getBundleStr(OSSB_grainsize), V);
+    }
     TaskInfo.emplace_back(
       getBundleStr(OSSB_loop_type),
       llvm::ConstantInt::getSigned(CGF.Int64Ty,

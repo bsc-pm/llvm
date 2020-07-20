@@ -202,6 +202,24 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddReductionData(S, TaskData.Reductions);
 }
 
+static void AddChunksizeLoopData(const OSSLoopDirective &S, const Expr * &ChunksizeExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSChunksizeClause>()) {
+    assert(!Found);
+    Found = true;
+    ChunksizeExpr = C->getExpression();
+  }
+}
+
+static void AddGrainsizeLoopData(const OSSLoopDirective &S, const Expr * &GrainsizeExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSGrainsizeClause>()) {
+    assert(!Found);
+    Found = true;
+    GrainsizeExpr = C->getExpression();
+  }
+}
+
 // Convenience function to add all info from a loop directive
 static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.IndVar = S.getIterationVariable();
@@ -210,6 +228,8 @@ static void AddLoopData(const OSSLoopDirective &S, OSSLoopDataTy &LoopData) {
   LoopData.Step = S.getStep();
   LoopData.TestIsLessOp = S.getIsLessOp();
   LoopData.TestIsStrictOp = S.getIsStrictOp();
+  AddChunksizeLoopData(S, LoopData.Chunksize);
+  AddGrainsizeLoopData(S, LoopData.Grainsize);
 }
 
 void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {

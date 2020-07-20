@@ -461,6 +461,110 @@ public:
   }
 };
 
+/// This represents 'chunksize' clause in the
+/// '#pragma oss {task for|taskloop|taskloop for}' directive.
+///
+/// \code
+/// #pragma oss task for chunksize(foo(N))
+/// \endcode
+/// In this example directive '#pragma oss task for' has simple 'chunksize'
+/// clause with expression 'foo(N)'.
+class OSSChunksizeClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'chunksize' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'chunksize' clause with expression \a E.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param E Expression of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSChunksizeClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(OSSC_chunksize, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(E) {}
+
+  /// Build an empty clause.
+  OSSChunksizeClause()
+      : OSSClause(OSSC_chunksize, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_chunksize;
+  }
+};
+
+/// This represents 'grainsize' clause in the
+/// '#pragma oss {task for|taskloop|taskloop for}' directive.
+///
+/// \code
+/// #pragma oss task for grainsize(foo(N))
+/// \endcode
+/// In this example directive '#pragma oss task for' has simple 'grainsize'
+/// clause with expression 'foo(N)'.
+class OSSGrainsizeClause : public OSSClause {
+  friend class OSSClauseReader;
+
+  /// Location of '('.
+  SourceLocation LParenLoc;
+
+  /// Expression of the 'grainsize' clause.
+  Stmt *Expression = nullptr;
+
+  /// Set expression.
+  void setExpression(Expr *E) { Expression = E; }
+
+public:
+  /// Build 'grainsize' clause with expression \a E.
+  ///
+  /// \param StartLoc Starting location of the clause.
+  /// \param LParenLoc Location of '('.
+  /// \param E Expression of the clause.
+  /// \param EndLoc Ending location of the clause.
+  OSSGrainsizeClause(Expr *E, SourceLocation StartLoc, SourceLocation LParenLoc,
+                SourceLocation EndLoc)
+      : OSSClause(OSSC_grainsize, StartLoc, EndLoc), LParenLoc(LParenLoc),
+        Expression(E) {}
+
+  /// Build an empty clause.
+  OSSGrainsizeClause()
+      : OSSClause(OSSC_grainsize, SourceLocation(), SourceLocation()) {}
+
+  /// Sets the location of '('.
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+
+  /// Returns the location of '('.
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+
+  /// Returns expression.
+  Expr *getExpression() const { return cast_or_null<Expr>(Expression); }
+
+  child_range children() { return child_range(&Expression, &Expression + 1); }
+
+  static bool classof(const OSSClause *T) {
+    return T->getClauseKind() == OSSC_grainsize;
+  }
+};
+
 /// This represents 'default' clause in the '#pragma oss ...' directive.
 ///
 /// \code

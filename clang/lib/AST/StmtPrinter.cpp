@@ -706,6 +706,18 @@ void OSSClausePrinter::VisitOSSLabelClause(OSSLabelClause *Node) {
   OS << ")";
 }
 
+void OSSClausePrinter::VisitOSSChunksizeClause(OSSChunksizeClause *Node) {
+  OS << "chunksize(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
+void OSSClausePrinter::VisitOSSGrainsizeClause(OSSGrainsizeClause *Node) {
+  OS << "grainsize(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
   OS << "wait";
 }

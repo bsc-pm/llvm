@@ -127,6 +127,8 @@ public:
     OB_oss_loop_lower_bound = 36,      // "OB_oss_loop_lower_bound"
     OB_oss_loop_upper_bound = 37,      // "OB_oss_loop_upper_bound"
     OB_oss_loop_step = 38,             // "OB_oss_loop_step"
+    OB_oss_loop_chunksize = 39,        // "OB_oss_loop_chunksize"
+    OB_oss_loop_grainsize = 40,        // "OB_oss_loop_grainsize"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
