@@ -359,8 +359,9 @@ struct OmpSs : public ModulePass {
                         BasicBlock *&LoopEntryBB, BasicBlock *&BodyBB) {
 
     IRBuilder<> IRB(Entry);
+    Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
 
-    IRB.CreateStore(LoopInfo.LBound, LoopInfo.IndVar);
+    IRB.CreateStore(IRB.CreateSExtOrTrunc(LoopInfo.LBound, IndVarTy), LoopInfo.IndVar);
 
     BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
     CondBB->setName("for.cond");
@@ -371,31 +372,31 @@ struct OmpSs : public ModulePass {
     IRB.SetInsertPoint(Entry);
 
     Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
-    Value *LoopCmp = nullptr;
+    Value *LoopCmp = IRB.CreateSExtOrTrunc(LoopInfo.UBound, IndVarTy);
     switch (LoopInfo.LoopType) {
     case TaskLoopInfo::SLT:
-      LoopCmp = IRB.CreateICmpSLT(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpSLT(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::SLE:
-      LoopCmp = IRB.CreateICmpSLE(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpSLE(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::SGT:
-      LoopCmp = IRB.CreateICmpSGT(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpSGT(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::SGE:
-      LoopCmp = IRB.CreateICmpSGE(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpSGE(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::ULT:
-      LoopCmp = IRB.CreateICmpULT(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpULT(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::ULE:
-      LoopCmp = IRB.CreateICmpULE(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpULE(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::UGT:
-      LoopCmp = IRB.CreateICmpUGT(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpUGT(IndVarVal, LoopCmp);
       break;
     case TaskLoopInfo::UGE:
-      LoopCmp = IRB.CreateICmpUGE(IndVarVal, LoopInfo.UBound);
+      LoopCmp = IRB.CreateICmpUGE(IndVarVal, LoopCmp);
       break;
     default:
       llvm_unreachable("unexpected loop type");
@@ -414,7 +415,7 @@ struct OmpSs : public ModulePass {
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
     IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
-    IndVarVal = IRB.CreateAdd(IndVarVal, LoopInfo.Step);
+    IndVarVal = IRB.CreateAdd(IndVarVal, IRB.CreateSExtOrTrunc(LoopInfo.Step, IndVarTy));
     IRB.CreateStore(IndVarVal, LoopInfo.IndVar);
     IRB.CreateBr(CondBB);
 
@@ -535,12 +536,12 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
       Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
       LBoundField = IRB.CreateLoad(LBoundField);
-      LBoundField = IRB.CreateTrunc(LBoundField, IndVarTy, "lb");
+      LBoundField = IRB.CreateSExtOrTrunc(LBoundField, IndVarTy, "lb");
 
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
       Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
       UBoundField = IRB.CreateLoad(UBoundField);
-      UBoundField = IRB.CreateTrunc(UBoundField, IndVarTy);
+      UBoundField = IRB.CreateSExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
       // Replace loop bounds
@@ -1065,11 +1066,28 @@ struct OmpSs : public ModulePass {
     TaskLoopInfo NewLoopInfo = TI.LoopInfo;
     if (!TI.LoopInfo.empty()) {
       Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
+
+      IRBuilder<> IRB(TI.Entry);
+
+      // Use tmp variables to be replaced by what comes from nanos6. This fixes
+      // the problem when bounds or step are constants
+      NewLoopInfo.LBound = IRB.CreateAlloca(IndVarTy, nullptr, "lb.tmp.addr");
+      IRB.CreateStore(TI.LoopInfo.LBound, NewLoopInfo.LBound);
+      NewLoopInfo.LBound = IRB.CreateLoad(NewLoopInfo.LBound);
+
+      NewLoopInfo.UBound = IRB.CreateAlloca(IndVarTy, nullptr, "ub.tmp.addr");
+      IRB.CreateStore(TI.LoopInfo.UBound, NewLoopInfo.UBound);
+      NewLoopInfo.UBound = IRB.CreateLoad(NewLoopInfo.UBound);
+
+      // unpacked_task_region loops are always step 1
+      NewLoopInfo.Step = IRB.CreateAlloca(IndVarTy, nullptr, "step.tmp.addr");
+      IRB.CreateStore(ConstantInt::get(IndVarTy, 1), NewLoopInfo.Step);
+      NewLoopInfo.Step = IRB.CreateLoad(NewLoopInfo.Step);
+
       NewLoopInfo.IndVar =
-        IRBuilder<>(TI.Entry).CreateAlloca(IndVarTy, nullptr, "loop." + TI.LoopInfo.IndVar->getName());
-      // unpacked_task_region loops are always SLT and step 1
+        IRB.CreateAlloca(IndVarTy, nullptr, "loop." + TI.LoopInfo.IndVar->getName());
+      // unpacked_task_region loops are always SLT
       NewLoopInfo.LoopType = TaskLoopInfo::SLT;
-      NewLoopInfo.Step = ConstantInt::get(IndVarTy, 1);
       buildLoopForTaskImpl(M, F, TI.Entry, TI.Exit, NewLoopInfo, NewEntryBB, EntryBB);
     }
 
@@ -1395,30 +1413,30 @@ struct OmpSs : public ModulePass {
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
         LBoundField = IRB.CreateLoad(LBoundField);
-        LBoundField = IRB.CreateTrunc(LBoundField, IndVarTy, "lb");
+        LBoundField = IRB.CreateSExtOrTrunc(LBoundField, IndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
         Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
         UBoundField = IRB.CreateLoad(UBoundField);
-        UBoundField = IRB.CreateTrunc(UBoundField, IndVarTy, "ub");
+        UBoundField = IRB.CreateSExtOrTrunc(UBoundField, IndVarTy, "ub");
 
-        // Replace loop bounds
-        if (isReplaceableValue(TI.LoopInfo.LBound)) {
+        // Replace loop bounds of the indvar, loop cond. and loop incr.
+        if (isReplaceableValue(NewLoopInfo.LBound)) {
           rewriteUsesInBlocksWithPred(
-            TI.LoopInfo.LBound, LBoundField,
+            NewLoopInfo.LBound, LBoundField,
             [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
         }
-        if (isReplaceableValue(TI.LoopInfo.UBound)) {
+        if (isReplaceableValue(NewLoopInfo.UBound)) {
           rewriteUsesInBlocksWithPred(
-            TI.LoopInfo.UBound, UBoundField,
+            NewLoopInfo.UBound, UBoundField,
             [&Blocks](Instruction *I) { return Blocks.count(I->getParent()); });
         }
 
-        // Now we can set BodyIndVar = (LoopIndVar * Step) + LBound
+        // Now we can set BodyIndVar = (LoopIndVar * Step) + OrigLBound
         IRBuilder<> LoopBodyIRB(&EntryBB->front());
         Value *NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar);
-        NormVal = LoopBodyIRB.CreateMul(NormVal, TI.LoopInfo.Step);
-        NormVal = LoopBodyIRB.CreateAdd(NormVal, TI.LoopInfo.LBound);
+        NormVal = LoopBodyIRB.CreateMul(NormVal, IRB.CreateSExtOrTrunc(NewLoopInfo.Step, IndVarTy));
+        NormVal = LoopBodyIRB.CreateAdd(NormVal, IRB.CreateSExtOrTrunc(NewLoopInfo.LBound, IndVarTy));
         LoopBodyIRB.CreateStore(NormVal, TI.LoopInfo.IndVar);
       }
 
@@ -1729,7 +1747,8 @@ struct OmpSs : public ModulePass {
         // >=     0, (ub - lb)     / step + 1
         Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
         Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
-        Value *RegisterUpperB = IRB.CreateSub(TI.LoopInfo.UBound, TI.LoopInfo.LBound);
+        Value *RegisterUpperB = IRB.CreateSExtOrTrunc(TI.LoopInfo.UBound, IndVarTy);
+        RegisterUpperB = IRB.CreateSub(RegisterUpperB, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
         Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
         if (TI.LoopInfo.Grainsize)
           RegisterGrainsize = TI.LoopInfo.Grainsize;
@@ -1755,7 +1774,7 @@ struct OmpSs : public ModulePass {
           llvm_unreachable("unexpected loop type");
         }
         // TODO: should we handle sdiv/udiv depending on loop type?
-        RegisterUpperB = IRB.CreateSDiv(RegisterUpperB, TI.LoopInfo.Step);
+        RegisterUpperB = IRB.CreateSDiv(RegisterUpperB, IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy));
         RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
         IRB.CreateCall(
           RegisterLoopFuncCallee,

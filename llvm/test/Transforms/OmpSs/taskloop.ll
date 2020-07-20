@@ -67,27 +67,36 @@ entry:
 ; CHECK-NEXT:   %ub_gep = getelementptr %nanos6_loop_bounds_t, %nanos6_loop_bounds_t* %loop_bounds, i32 0, i32 1, !dbg !15
 ; CHECK-NEXT:   %2 = load i64, i64* %ub_gep, align 8, !dbg !15
 ; CHECK-NEXT:   %ub5 = trunc i64 %2 to i32, !dbg !15
+; CHECK-NEXT:   %lb.tmp.addr = alloca i32, align 4, !dbg !15
+; CHECK-NEXT:   store i32 %lb.value, i32* %lb.tmp.addr, align 4, !dbg !15
+; CHECK-NEXT:   %3 = load i32, i32* %lb.tmp.addr, align 4, !dbg !15
+; CHECK-NEXT:   %ub.tmp.addr = alloca i32, align 4, !dbg !15
+; CHECK-NEXT:   store i32 %ub.value, i32* %ub.tmp.addr, align 4, !dbg !15
+; CHECK-NEXT:   %4 = load i32, i32* %ub.tmp.addr, align 4, !dbg !15
+; CHECK-NEXT:   %step.tmp.addr = alloca i32, align 4, !dbg !15
+; CHECK-NEXT:   store i32 1, i32* %step.tmp.addr, align 4, !dbg !15
+; CHECK-NEXT:   %5 = load i32, i32* %step.tmp.addr, align 4, !dbg !15
 ; CHECK-NEXT:   %loop.i.addr = alloca i32, align 4, !dbg !15
 ; CHECK-NEXT:   store i32 %lb4, i32* %loop.i.addr, align 4, !dbg !15
 ; CHECK-NEXT:   br label %for.cond1, !dbg !15
 ; CHECK: for.cond1:                                        ; preds = %for.incr3, %0
-; CHECK-NEXT:   %3 = load i32, i32* %loop.i.addr, align 4, !dbg !15
-; CHECK-NEXT:   %4 = icmp slt i32 %3, %ub5, !dbg !15
-; CHECK-NEXT:   br i1 %4, label %for.body2, label %.exitStub, !dbg !15
+; CHECK-NEXT:   %6 = load i32, i32* %loop.i.addr, align 4, !dbg !15
+; CHECK-NEXT:   %7 = icmp slt i32 %6, %ub5, !dbg !15
+; CHECK-NEXT:   br i1 %7, label %for.body2, label %.exitStub, !dbg !15
 ; CHECK: for.body2:                                        ; preds = %for.cond1
-; CHECK-NEXT:   %5 = load i32, i32* %loop.i.addr, align 4, !dbg !16
-; CHECK-NEXT:   %6 = mul i32 %5, %step.value, !dbg !16
-; CHECK-NEXT:   %7 = add i32 %6, %lb.value, !dbg !16
-; CHECK-NEXT:   store i32 %7, i32* %i.addr, align 4, !dbg !16
-; CHECK-NEXT:   %8 = load i32, i32* @sum, align 4, !dbg !16
+; CHECK-NEXT:   %8 = load i32, i32* %loop.i.addr, align 4, !dbg !16
+; CHECK-NEXT:   %9 = mul i32 %8, %5, !dbg !16
+; CHECK-NEXT:   %10 = add i32 %9, %3, !dbg !16
+; CHECK-NEXT:   store i32 %10, i32* %i.addr, align 4, !dbg !16
+; CHECK-NEXT:   %11 = load i32, i32* @sum, align 4, !dbg !16
 ; CHECK-NEXT:   %i = load i32, i32* %i.addr, align 4, !dbg !16
-; CHECK-NEXT:   %add = add nsw i32 %8, %i, !dbg !16
+; CHECK-NEXT:   %add = add nsw i32 %11, %i, !dbg !16
 ; CHECK-NEXT:   store i32 %add, i32* @sum, align 4, !dbg !16
 ; CHECK-NEXT:   br label %for.incr3, !dbg !17
 ; CHECK: for.incr3:                                        ; preds = %for.body2
-; CHECK-NEXT:   %9 = load i32, i32* %loop.i.addr, align 4, !dbg !15
-; CHECK-NEXT:   %10 = add i32 %9, 1, !dbg !15
-; CHECK-NEXT:   store i32 %10, i32* %loop.i.addr, align 4, !dbg !15
+; CHECK-NEXT:   %12 = load i32, i32* %loop.i.addr, align 4, !dbg !15
+; CHECK-NEXT:   %13 = add i32 %12, %5, !dbg !15
+; CHECK-NEXT:   store i32 %13, i32* %loop.i.addr, align 4, !dbg !15
 ; CHECK-NEXT:   br label %for.cond1, !dbg !15
 ; CHECK-NEXT: }
 
