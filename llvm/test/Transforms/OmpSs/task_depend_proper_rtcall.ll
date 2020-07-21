@@ -212,87 +212,96 @@ entry:
 ; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [20 x i32]]* %array, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t @compute_dep([10 x [20 x i32]]* %array)
-; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t %0, 0
-; CHECK-NEXT:   %2 = bitcast [10 x [20 x i32]]* %1 to i8*
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t %0, 1
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %0, 2
-; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %0, 3
-; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %0, 4
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %0, 5
-; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %0, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %2, i64 %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8)
-; CHECK-NEXT:   %9 = call %struct._depend_unpack_t.0 @compute_dep.1([10 x [20 x i32]]* %array)
-; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.0 %9, 0
-; CHECK-NEXT:   %11 = bitcast [10 x [20 x i32]]* %10 to i8*
-; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %9, 1
-; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.0 %9, 2
-; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.0 %9, 3
-; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t.0 %9, 4
-; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.0 %9, 5
-; CHECK-NEXT:   %17 = extractvalue %struct._depend_unpack_t.0 %9, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %11, i64 %12, i64 %13, i64 %14, i64 %15, i64 %16, i64 %17)
-; CHECK-NEXT:   %18 = call %struct._depend_unpack_t.1 @compute_dep.2([10 x [20 x i32]]* %array)
-; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.1 %18, 0
-; CHECK-NEXT:   %20 = bitcast [10 x [20 x i32]]* %19 to i8*
-; CHECK-NEXT:   %21 = extractvalue %struct._depend_unpack_t.1 %18, 1
-; CHECK-NEXT:   %22 = extractvalue %struct._depend_unpack_t.1 %18, 2
-; CHECK-NEXT:   %23 = extractvalue %struct._depend_unpack_t.1 %18, 3
-; CHECK-NEXT:   %24 = extractvalue %struct._depend_unpack_t.1 %18, 4
-; CHECK-NEXT:   %25 = extractvalue %struct._depend_unpack_t.1 %18, 5
-; CHECK-NEXT:   %26 = extractvalue %struct._depend_unpack_t.1 %18, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %20, i64 %21, i64 %22, i64 %23, i64 %24, i64 %25, i64 %26)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep([10 x [20 x i32]]* %array)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %0, 0
+; CHECK-NEXT:   %3 = bitcast [10 x [20 x i32]]* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %0, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %0, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %1, 3
+; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %0, 4
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %0, 5
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t %1, 6
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9)
+; CHECK-NEXT:   %10 = call %struct._depend_unpack_t.0 @compute_dep.1([10 x [20 x i32]]* %array)
+; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.0 @compute_dep.1([10 x [20 x i32]]* %array)
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %10, 0
+; CHECK-NEXT:   %13 = bitcast [10 x [20 x i32]]* %12 to i8*
+; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.0 %10, 1
+; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t.0 %10, 2
+; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.0 %11, 3
+; CHECK-NEXT:   %17 = extractvalue %struct._depend_unpack_t.0 %10, 4
+; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.0 %10, 5
+; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.0 %11, 6
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %13, i64 %14, i64 %15, i64 %16, i64 %17, i64 %18, i64 %19)
+; CHECK-NEXT:   %20 = call %struct._depend_unpack_t.1 @compute_dep.2([10 x [20 x i32]]* %array)
+; CHECK-NEXT:   %21 = call %struct._depend_unpack_t.1 @compute_dep.2([10 x [20 x i32]]* %array)
+; CHECK-NEXT:   %22 = extractvalue %struct._depend_unpack_t.1 %20, 0
+; CHECK-NEXT:   %23 = bitcast [10 x [20 x i32]]* %22 to i8*
+; CHECK-NEXT:   %24 = extractvalue %struct._depend_unpack_t.1 %20, 1
+; CHECK-NEXT:   %25 = extractvalue %struct._depend_unpack_t.1 %20, 2
+; CHECK-NEXT:   %26 = extractvalue %struct._depend_unpack_t.1 %21, 3
+; CHECK-NEXT:   %27 = extractvalue %struct._depend_unpack_t.1 %20, 4
+; CHECK-NEXT:   %28 = extractvalue %struct._depend_unpack_t.1 %20, 5
+; CHECK-NEXT:   %29 = extractvalue %struct._depend_unpack_t.1 %21, 6
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %23, i64 %24, i64 %25, i64 %26, i64 %27, i64 %28, i64 %29)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_deps_main1(%struct.S* %s, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.2 @compute_dep.3(%struct.S* %s)
-; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.2 %0, 0
-; CHECK-NEXT:   %2 = bitcast i32* %1 to i8*
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t.2 %0, 1
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.2 %0, 2
-; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.2 %0, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %2, i64 %3, i64 %4, i64 %5)
-; CHECK-NEXT:   %6 = call %struct._depend_unpack_t.3 @compute_dep.4(%struct.S* %s)
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t.3 %6, 0
-; CHECK-NEXT:   %8 = bitcast i32* %7 to i8*
-; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.3 %6, 1
-; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.3 %6, 2
-; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.3 %6, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %8, i64 %9, i64 %10, i64 %11)
-; CHECK-NEXT:   %12 = call %struct._depend_unpack_t.4 @compute_dep.5(%struct.S* %s)
-; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.4 %12, 0
-; CHECK-NEXT:   %14 = bitcast i32* %13 to i8*
-; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t.4 %12, 1
-; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.4 %12, 2
-; CHECK-NEXT:   %17 = extractvalue %struct._depend_unpack_t.4 %12, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %14, i64 %15, i64 %16, i64 %17)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t.2 @compute_dep.3(%struct.S* %s)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t.2 %0, 0
+; CHECK-NEXT:   %3 = bitcast i32* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.2 %0, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.2 %0, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.2 %1, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.3 @compute_dep.4(%struct.S* %s)
+; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.3 @compute_dep.4(%struct.S* %s)
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.3 %7, 0
+; CHECK-NEXT:   %10 = bitcast i32* %9 to i8*
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.3 %7, 1
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.3 %7, 2
+; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.3 %8, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %10, i64 %11, i64 %12, i64 %13)
+; CHECK-NEXT:   %14 = call %struct._depend_unpack_t.4 @compute_dep.5(%struct.S* %s)
+; CHECK-NEXT:   %15 = call %struct._depend_unpack_t.4 @compute_dep.5(%struct.S* %s)
+; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.4 %14, 0
+; CHECK-NEXT:   %17 = bitcast i32* %16 to i8*
+; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.4 %14, 1
+; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.4 %14, 2
+; CHECK-NEXT:   %20 = extractvalue %struct._depend_unpack_t.4 %15, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %17, i64 %18, i64 %19, i64 %20)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
 ; CHECK: define internal void @nanos6_unpacked_deps_main2(i32* %n, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %0 = call %struct._depend_unpack_t.5 @compute_dep.6(i32* %n)
-; CHECK-NEXT:   %1 = extractvalue %struct._depend_unpack_t.5 %0, 0
-; CHECK-NEXT:   %2 = bitcast i32* %1 to i8*
-; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t.5 %0, 1
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.5 %0, 2
-; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.5 %0, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %2, i64 %3, i64 %4, i64 %5)
-; CHECK-NEXT:   %6 = call %struct._depend_unpack_t.6 @compute_dep.7(i32* %n)
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t.6 %6, 0
-; CHECK-NEXT:   %8 = bitcast i32* %7 to i8*
-; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.6 %6, 1
-; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.6 %6, 2
-; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.6 %6, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %8, i64 %9, i64 %10, i64 %11)
-; CHECK-NEXT:   %12 = call %struct._depend_unpack_t.7 @compute_dep.8(i32* %n)
-; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.7 %12, 0
-; CHECK-NEXT:   %14 = bitcast i32* %13 to i8*
-; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t.7 %12, 1
-; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.7 %12, 2
-; CHECK-NEXT:   %17 = extractvalue %struct._depend_unpack_t.7 %12, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %14, i64 %15, i64 %16, i64 %17)
+; CHECK-NEXT:   %1 = call %struct._depend_unpack_t.5 @compute_dep.6(i32* %n)
+; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t.5 %0, 0
+; CHECK-NEXT:   %3 = bitcast i32* %2 to i8*
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.5 %0, 1
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.5 %0, 2
+; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.5 %1, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.6 @compute_dep.7(i32* %n)
+; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.6 @compute_dep.7(i32* %n)
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.6 %7, 0
+; CHECK-NEXT:   %10 = bitcast i32* %9 to i8*
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.6 %7, 1
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.6 %7, 2
+; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.6 %8, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %10, i64 %11, i64 %12, i64 %13)
+; CHECK-NEXT:   %14 = call %struct._depend_unpack_t.7 @compute_dep.8(i32* %n)
+; CHECK-NEXT:   %15 = call %struct._depend_unpack_t.7 @compute_dep.8(i32* %n)
+; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.7 %14, 0
+; CHECK-NEXT:   %17 = bitcast i32* %16 to i8*
+; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.7 %14, 1
+; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.7 %14, 2
+; CHECK-NEXT:   %20 = extractvalue %struct._depend_unpack_t.7 %15, 3
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %17, i64 %18, i64 %19, i64 %20)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

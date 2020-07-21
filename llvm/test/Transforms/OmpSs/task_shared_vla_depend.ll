@@ -234,18 +234,19 @@ entry:
 ; CHECK: define internal void @nanos6_unpacked_deps_foo0(i32* %vla, i64 %0, i64 %1, i64 %2, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT:   %3 = call %struct._depend_unpack_t @compute_dep(i32* %vla, i64 %0, i64 %1, i64 %2)
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %3, 0
-; CHECK-NEXT:   %5 = bitcast i32* %4 to i8*
-; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %3, 1
-; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %3, 2
-; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %3, 3
-; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t %3, 4
-; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t %3, 5
-; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t %3, 6
-; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %3, 7
-; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t %3, 8
-; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %3, 9
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo3(i8* %handler, i32 0, i8* null, i8* %5, i64 %6, i64 %7, i64 %8, i64 %9, i64 %10, i64 %11, i64 %12, i64 %13, i64 %14)
+; CHECK-NEXT:   %4 = call %struct._depend_unpack_t @compute_dep(i32* %vla, i64 %0, i64 %1, i64 %2)
+; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %3, 0
+; CHECK-NEXT:   %6 = bitcast i32* %5 to i8*
+; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %3, 1
+; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %3, 2
+; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t %4, 3
+; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t %3, 4
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t %3, 5
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %4, 6
+; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t %3, 7
+; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %3, 8
+; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t %4, 9
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo3(i8* %handler, i32 0, i8* null, i8* %6, i64 %7, i64 %8, i64 %9, i64 %10, i64 %11, i64 %12, i64 %13, i64 %14, i64 %15)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

@@ -521,10 +521,13 @@ struct OmpSs : public ModulePass {
     // add the terminator so IRBuilder inserts just before it
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    // Insert RT call before replacing uses
-    unpackDepsCallToRT(M, TI, F);
+    Value *NewIndVarLBound = nullptr;
+    Value *NewIndVarUBound = nullptr;
 
-    if (!TI.LoopInfo.empty()) {
+    bool IsTaskLoop = TI.TaskKind == TaskInfo::OSSD_taskloop ||
+                      TI.TaskKind == TaskInfo::OSSD_taskloop_for;
+
+    if (!TI.LoopInfo.empty() && IsTaskLoop) {
       Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
 
       IRBuilder<> IRB(&Entry.front());
@@ -543,14 +546,20 @@ struct OmpSs : public ModulePass {
       UBoundField = IRB.CreateSExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
-      // Replace loop bounds
-      for (Instruction &I : Entry) {
-        if (isReplaceableValue(TI.LoopInfo.LBound))
-          I.replaceUsesOfWith(TI.LoopInfo.LBound, LBoundField);
-        if (isReplaceableValue(TI.LoopInfo.UBound))
-        I.replaceUsesOfWith(TI.LoopInfo.UBound, UBoundField);
-      }
+      NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".lb");
+      NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".ub");
+
+      Value *NewIndVar = IRB.CreateNUWMul(TI.LoopInfo.Step, LBoundField);
+      NewIndVar = IRB.CreateNUWAdd(NewIndVar, TI.LoopInfo.LBound);
+      IRB.CreateStore(NewIndVar, NewIndVarLBound);
+
+      NewIndVar = IRB.CreateNUWMul(TI.LoopInfo.Step, UBoundField);
+      NewIndVar = IRB.CreateNUWAdd(NewIndVar, TI.LoopInfo.LBound);
+      IRB.CreateStore(NewIndVar, NewIndVarUBound);
     }
+
+    // Insert RT call before replacing uses
+    unpackDepsCallToRT(M, TI, F, IsTaskLoop, NewIndVarLBound, NewIndVarUBound);
 
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
@@ -606,23 +615,30 @@ struct OmpSs : public ModulePass {
     }
   }
 
-  void unpackCallToRTOfType(Module &M,
-                            const SmallVectorImpl<DependInfo> &DependList,
-                            Function *F,
-                            StringRef DepType) {
+  void unpackCallToRTOfType(
+      Module &M, const SmallVectorImpl<DependInfo> &DependList,
+      Function *F, Value *IndVar, Value *NewIndVarLBound, Value *NewIndVarUBound,
+      bool IsTaskLoop, StringRef DepType) {
+
     for (const DependInfo &DI : DependList) {
       BasicBlock &Entry = F->getEntryBlock();
       Instruction &RetI = Entry.back();
       IRBuilder<> BBBuilder(&RetI);
 
       Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
-      CallInst *CallComputeDep = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      CallInst *CallComputeDepStart = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      CallInst *CallComputeDepEnd = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      if (IsTaskLoop) {
+        assert(NewIndVarLBound && NewIndVarUBound && "Expected new lb/up in taskloop dependency");
+        CallComputeDepStart->replaceUsesOfWith(IndVar, NewIndVarLBound);
+        CallComputeDepEnd->replaceUsesOfWith(IndVar, NewIndVarUBound);
+      }
       StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
 
       assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
       size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
 
-      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDep, 0);
+      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDepStart, 0);
 
       SmallVector<Value *, 4> TaskDepAPICall;
       Value *Handler = &*(F->arg_end() - 1);
@@ -630,28 +646,38 @@ struct OmpSs : public ModulePass {
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
       TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
-      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ++i) {
-        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i));
+      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ) {
+        // dimsize
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimstart
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimend
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepEnd, i++));
       }
 
       BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, DepType, NumDims), TaskDepAPICall);
     }
   }
 
-  void unpackCallToRTOfReduction(Module &M,
-                            const SmallVectorImpl<ReductionInfo> &ReductionsList,
-                            const TaskReductionsInitCombInfo &TRI,
-                            Function *F,
-                            StringRef RedType) {
+  void unpackCallToRTOfReduction(
+      Module &M, const SmallVectorImpl<ReductionInfo> &ReductionsList,
+      const TaskReductionsInitCombInfo &TRI, Function *F,
+      Value *IndVar, Value *NewIndVarLBound, Value *NewIndVarUBound,
+      bool IsTaskLoop, StringRef RedType) {
+
     for (const ReductionInfo &RI : ReductionsList) {
       const DependInfo &DI = RI.DepInfo;
       BasicBlock &Entry = F->getEntryBlock();
       Instruction &RetI = Entry.back();
       IRBuilder<> BBBuilder(&RetI);
 
-      // Do remove ComputeDep, we're going to use it in ol_task_region
       Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
-      CallInst *CallComputeDep = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      CallInst *CallComputeDepStart = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      CallInst *CallComputeDepEnd = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      if (IsTaskLoop) {
+        CallComputeDepStart->replaceUsesOfWith(IndVar, NewIndVarLBound);
+        CallComputeDepEnd->replaceUsesOfWith(IndVar, NewIndVarUBound);
+      }
       StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
 
       llvm::Value *DepBaseDSA = DI.Args[0];
@@ -661,7 +687,7 @@ struct OmpSs : public ModulePass {
       assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
       size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
 
-      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDep, 0);
+      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDepStart, 0);
 
       SmallVector<Value *, 4> TaskDepAPICall;
       TaskDepAPICall.push_back(RI.RedKind);
@@ -671,31 +697,37 @@ struct OmpSs : public ModulePass {
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
       TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
       TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
-      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ++i) {
-        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i));
+      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ) {
+        // dimsize
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimstart
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimend
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepEnd, i++));
       }
       BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, RedType, NumDims, /*IsReduction=*/true), TaskDepAPICall);
     }
   }
 
-  void unpackDepsCallToRT(Module &M,
-                      const TaskInfo &TI,
-                      Function *F) {
+  void unpackDepsCallToRT(
+      Module &M, const TaskInfo &TI, Function *F,
+      bool IsTaskLoop, Value *NewIndVarLBound, Value *NewIndVarUBound) {
+
     const TaskDependsInfo &TDI = TI.DependsInfo;
     const TaskReductionsInitCombInfo &TRI = TI.ReductionsInitCombInfo;
 
-    unpackCallToRTOfType(M, TDI.Ins, F, "read");
-    unpackCallToRTOfType(M, TDI.Outs, F, "write");
-    unpackCallToRTOfType(M, TDI.Inouts, F, "readwrite");
-    unpackCallToRTOfType(M, TDI.Concurrents, F, "concurrent");
-    unpackCallToRTOfType(M, TDI.Commutatives, F, "commutative");
-    unpackCallToRTOfType(M, TDI.WeakIns, F, "weak_read");
-    unpackCallToRTOfType(M, TDI.WeakOuts, F, "weak_write");
-    unpackCallToRTOfType(M, TDI.WeakInouts, F, "weak_readwrite");
-    unpackCallToRTOfType(M, TDI.WeakConcurrents, F, "weak_concurrent");
-    unpackCallToRTOfType(M, TDI.WeakCommutatives, F, "weak_commutative");
-    unpackCallToRTOfReduction(M, TDI.Reductions, TRI, F, "reduction");
-    unpackCallToRTOfReduction(M, TDI.WeakReductions, TRI, F, "weak_reduction");
+    unpackCallToRTOfType(M, TDI.Ins, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "read");
+    unpackCallToRTOfType(M, TDI.Outs, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "write");
+    unpackCallToRTOfType(M, TDI.Inouts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "readwrite");
+    unpackCallToRTOfType(M, TDI.Concurrents, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "concurrent");
+    unpackCallToRTOfType(M, TDI.Commutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "commutative");
+    unpackCallToRTOfType(M, TDI.WeakIns, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_read");
+    unpackCallToRTOfType(M, TDI.WeakOuts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_write");
+    unpackCallToRTOfType(M, TDI.WeakInouts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_readwrite");
+    unpackCallToRTOfType(M, TDI.WeakConcurrents, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_concurrent");
+    unpackCallToRTOfType(M, TDI.WeakCommutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_commutative");
+    unpackCallToRTOfReduction(M, TDI.Reductions, TRI, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "reduction");
+    unpackCallToRTOfReduction(M, TDI.WeakReductions, TRI, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_reduction");
   }
 
   // TypeList[i] <-> NameList[i]
