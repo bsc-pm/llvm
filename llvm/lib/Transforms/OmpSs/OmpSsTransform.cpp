@@ -549,12 +549,12 @@ struct OmpSs : public ModulePass {
       NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".lb");
       NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".ub");
 
-      Value *NewIndVar = IRB.CreateNUWMul(TI.LoopInfo.Step, LBoundField);
-      NewIndVar = IRB.CreateNUWAdd(NewIndVar, TI.LoopInfo.LBound);
+      Value *NewIndVar = IRB.CreateNUWMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), LBoundField);
+      NewIndVar = IRB.CreateNUWAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
       IRB.CreateStore(NewIndVar, NewIndVarLBound);
 
-      NewIndVar = IRB.CreateNUWMul(TI.LoopInfo.Step, UBoundField);
-      NewIndVar = IRB.CreateNUWAdd(NewIndVar, TI.LoopInfo.LBound);
+      NewIndVar = IRB.CreateNUWMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), UBoundField);
+      NewIndVar = IRB.CreateNUWAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
       IRB.CreateStore(NewIndVar, NewIndVarUBound);
     }
 

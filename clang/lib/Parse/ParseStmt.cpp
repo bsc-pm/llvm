@@ -2024,8 +2024,8 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
       if (isOmpSsLoopDirective(DKind) && FirstPart.isUsable()) {
         // Gather InductionVar if we are a loop clause
         Actions.ActOnOmpSsLoopInitialization(ForLoc, FirstPart.get());
-        if (isOmpSsTaskLoopDirective(DKind)) {
-
+        // In nested loops we only have to parse clauses when there're late tokens
+        if (isOmpSsTaskLoopDirective(DKind) && !OSSLateParsedToks.empty()) {
           // Parse late clause tokens
           OSSFNContextRAII FnContext(*this, DG);
           PP.EnterToken(Tok, /*IsReinject*/ true);
