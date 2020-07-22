@@ -77,8 +77,8 @@ entry:
 ; CHECK-NEXT:   br i1 %10, label %for.body2, label %.exitStub
 ; CHECK: for.body2:                                        ; preds = %for.cond1
 ; CHECK-NEXT:   %11 = load i32, i32* %loop.i, align 4
-; CHECK-NEXT:   %12 = mul i32 %11, %8
-; CHECK-NEXT:   %13 = add i32 %12, %6
+; CHECK-NEXT:   %12 = mul i32 %11, 1
+; CHECK-NEXT:   %13 = add i32 %12, 5
 ; CHECK-NEXT:   store i32 %13, i32* %i, align 4
 ; CHECK-NEXT:   %14 = load i32, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.incr3
@@ -119,8 +119,8 @@ entry:
 ; CHECK-NEXT:   br i1 %10, label %for.body15, label %.exitStub
 ; CHECK: for.body15:                                       ; preds = %for.cond14
 ; CHECK-NEXT:   %11 = load i32, i32* %loop.i1, align 4
-; CHECK-NEXT:   %12 = mul i32 %11, %8
-; CHECK-NEXT:   %13 = add i32 %12, %6
+; CHECK-NEXT:   %12 = mul i32 %11, 3
+; CHECK-NEXT:   %13 = add i32 %12, 5
 ; CHECK-NEXT:   store i32 %13, i32* %i1, align 4
 ; CHECK-NEXT:   %14 = load i32, i32* %i1, align 4
 ; CHECK-NEXT:   br label %for.incr16
@@ -161,8 +161,8 @@ entry:
 ; CHECK-NEXT:   br i1 %10, label %for.body31, label %.exitStub
 ; CHECK: for.body31:                                       ; preds = %for.cond30
 ; CHECK-NEXT:   %11 = load i32, i32* %loop.i2, align 4
-; CHECK-NEXT:   %12 = mul i32 %11, %8
-; CHECK-NEXT:   %13 = add i32 %12, %6
+; CHECK-NEXT:   %12 = mul i32 %11, 1
+; CHECK-NEXT:   %13 = add i32 %12, 10
 ; CHECK-NEXT:   store i32 %13, i32* %i2, align 4
 ; CHECK-NEXT:   %14 = load i32, i32* %i2, align 4
 ; CHECK-NEXT:   br label %for.incr32
@@ -203,8 +203,8 @@ entry:
 ; CHECK-NEXT:   br i1 %10, label %for.body47, label %.exitStub
 ; CHECK: for.body47:                                       ; preds = %for.cond46
 ; CHECK-NEXT:   %11 = load i32, i32* %loop.i3, align 4
-; CHECK-NEXT:   %12 = mul i32 %11, %8
-; CHECK-NEXT:   %13 = add i32 %12, %6
+; CHECK-NEXT:   %12 = mul i32 %11, 3
+; CHECK-NEXT:   %13 = add i32 %12, 10
 ; CHECK-NEXT:   store i32 %13, i32* %i3, align 4
 ; CHECK-NEXT:   %14 = load i32, i32* %i3, align 4
 ; CHECK-NEXT:   br label %for.incr48

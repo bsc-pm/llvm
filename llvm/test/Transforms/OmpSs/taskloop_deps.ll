@@ -127,11 +127,11 @@ entry:
 ; CHECK-NEXT:   %ub = sub i32 %5, 1
 ; CHECK-NEXT:   %i.lb = alloca i32, align 4
 ; CHECK-NEXT:   %i.ub = alloca i32, align 4
-; CHECK-NEXT:   %6 = mul nuw i32 1, %lb
-; CHECK-NEXT:   %7 = add nuw i32 %6, 0
+; CHECK-NEXT:   %6 = mul i32 1, %lb
+; CHECK-NEXT:   %7 = add i32 %6, 0
 ; CHECK-NEXT:   store i32 %7, i32* %i.lb, align 4
-; CHECK-NEXT:   %8 = mul nuw i32 1, %ub
-; CHECK-NEXT:   %9 = add nuw i32 %8, 0
+; CHECK-NEXT:   %8 = mul i32 1, %ub
+; CHECK-NEXT:   %9 = add i32 %8, 0
 ; CHECK-NEXT:   store i32 %9, i32* %i.ub, align 4
 ; CHECK-NEXT:   %10 = call %struct._depend_unpack_t @compute_dep([100 x i32]* %array, i32* %i.lb)
 ; CHECK-NEXT:   %11 = call %struct._depend_unpack_t @compute_dep([100 x i32]* %array, i32* %i.ub)
@@ -155,11 +155,11 @@ entry:
 ; CHECK-NEXT:   %ub = sub i32 %5, 1
 ; CHECK-NEXT:   %i.lb = alloca i32, align 4
 ; CHECK-NEXT:   %i.ub = alloca i32, align 4
-; CHECK-NEXT:   %6 = mul nuw i32 1, %lb
-; CHECK-NEXT:   %7 = add nuw i32 %6, 0
+; CHECK-NEXT:   %6 = mul i32 1, %lb
+; CHECK-NEXT:   %7 = add i32 %6, 0
 ; CHECK-NEXT:   store i32 %7, i32* %i.lb, align 4
-; CHECK-NEXT:   %8 = mul nuw i32 1, %ub
-; CHECK-NEXT:   %9 = add nuw i32 %8, 0
+; CHECK-NEXT:   %8 = mul i32 1, %ub
+; CHECK-NEXT:   %9 = add i32 %8, 0
 ; CHECK-NEXT:   store i32 %9, i32* %i.ub, align 4
 ; CHECK-NEXT:   %10 = call %struct._depend_unpack_t.0 @compute_dep.1([100 x i32]* %array, i32* %i.lb)
 ; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.0 @compute_dep.1([100 x i32]* %array, i32* %i.ub)

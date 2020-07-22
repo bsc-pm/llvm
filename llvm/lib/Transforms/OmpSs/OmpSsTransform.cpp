@@ -549,12 +549,12 @@ struct OmpSs : public ModulePass {
       NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".lb");
       NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".ub");
 
-      Value *NewIndVar = IRB.CreateNUWMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), LBoundField);
-      NewIndVar = IRB.CreateNUWAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
+      Value *NewIndVar = IRB.CreateMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), LBoundField);
+      NewIndVar = IRB.CreateAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
       IRB.CreateStore(NewIndVar, NewIndVarLBound);
 
-      NewIndVar = IRB.CreateNUWMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), UBoundField);
-      NewIndVar = IRB.CreateNUWAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
+      NewIndVar = IRB.CreateMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), UBoundField);
+      NewIndVar = IRB.CreateAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
       IRB.CreateStore(NewIndVar, NewIndVarUBound);
     }
 
@@ -1670,8 +1670,8 @@ struct OmpSs : public ModulePass {
         // Now we can set BodyIndVar = (LoopIndVar * Step) + OrigLBound
         IRBuilder<> LoopBodyIRB(&EntryBB->front());
         Value *NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar);
-        NormVal = LoopBodyIRB.CreateMul(NormVal, IRB.CreateSExtOrTrunc(NewLoopInfo.Step, IndVarTy));
-        NormVal = LoopBodyIRB.CreateAdd(NormVal, IRB.CreateSExtOrTrunc(NewLoopInfo.LBound, IndVarTy));
+        NormVal = LoopBodyIRB.CreateMul(NormVal, IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy));
+        NormVal = LoopBodyIRB.CreateAdd(NormVal, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
         LoopBodyIRB.CreateStore(NormVal, TI.LoopInfo.IndVar);
       }
 

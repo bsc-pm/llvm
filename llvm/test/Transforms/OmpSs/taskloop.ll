@@ -85,8 +85,8 @@ entry:
 ; CHECK-NEXT:   br i1 %7, label %for.body2, label %.exitStub, !dbg !15
 ; CHECK: for.body2:                                        ; preds = %for.cond1
 ; CHECK-NEXT:   %8 = load i32, i32* %loop.i.addr, align 4, !dbg !16
-; CHECK-NEXT:   %9 = mul i32 %8, %5, !dbg !16
-; CHECK-NEXT:   %10 = add i32 %9, %3, !dbg !16
+; CHECK-NEXT:   %9 = mul i32 %8, %step.value, !dbg !16
+; CHECK-NEXT:   %10 = add i32 %9, %lb.value, !dbg !16
 ; CHECK-NEXT:   store i32 %10, i32* %i.addr, align 4, !dbg !16
 ; CHECK-NEXT:   %11 = load i32, i32* @sum, align 4, !dbg !16
 ; CHECK-NEXT:   %i = load i32, i32* %i.addr, align 4, !dbg !16
