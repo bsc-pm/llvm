@@ -947,6 +947,17 @@ struct OmpSs : public ModulePass {
 
     Value *TaskArgsStructSizeOf = ConstantInt::get(IRB.getInt64Ty(), M.getDataLayout().getTypeAllocSize(TaskArgsTy));
 
+    // TODO: this forces an alignment of 16 for VLAs
+    {
+      const int ALIGN = 16;
+      TaskArgsStructSizeOf =
+        IRB.CreateNUWAdd(TaskArgsStructSizeOf,
+                         ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1));
+      TaskArgsStructSizeOf =
+        IRB.CreateAnd(TaskArgsStructSizeOf,
+                      IRB.CreateNot(ConstantInt::get(IRB.getInt64Ty(), ALIGN - 1)));
+    }
+
     Value *TaskArgsDstLi8 = IRB.CreateBitCast(TaskArgsDstL, IRB.getInt8PtrTy());
     Value *TaskArgsDstLi8IdxGEP = IRB.CreateGEP(TaskArgsDstLi8, TaskArgsStructSizeOf, "args_end");
 

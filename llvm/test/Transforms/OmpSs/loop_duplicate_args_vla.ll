@@ -97,7 +97,7 @@ arraydestroy.done3:                               ; preds = %arraydestroy.body, 
 ; CHECK: entry:
 ; CHECK-NEXT:  %0 = load %nanos6_task_args__Z3foov1*, %nanos6_task_args__Z3foov1** %task_args_dst, align 8
 ; CHECK-NEXT:  %1 = bitcast %nanos6_task_args__Z3foov1* %0 to i8*
-; CHECK-NEXT:  %args_end = getelementptr i8, i8* %1, i64 40
+; CHECK-NEXT:  %args_end = getelementptr i8, i8* %1, i64 48
 ; CHECK-NEXT:  %gep_dst_vla = getelementptr %nanos6_task_args__Z3foov1, %nanos6_task_args__Z3foov1* %0, i32 0, i32 0
 ; CHECK-NEXT:  %2 = bitcast %struct.S** %gep_dst_vla to i8**
 ; CHECK-NEXT:  store i8* %args_end, i8** %2, align 8
@@ -116,7 +116,7 @@ arraydestroy.done3:                               ; preds = %arraydestroy.body, 
 ; CHECK: entry:
 ; CHECK-NEXT:  %0 = load %nanos6_task_args__Z3foov2*, %nanos6_task_args__Z3foov2** %task_args_dst, align 8
 ; CHECK-NEXT:  %1 = bitcast %nanos6_task_args__Z3foov2* %0 to i8*
-; CHECK-NEXT:  %args_end = getelementptr i8, i8* %1, i64 40
+; CHECK-NEXT:  %args_end = getelementptr i8, i8* %1, i64 48
 ; CHECK-NEXT:  %gep_dst_vla = getelementptr %nanos6_task_args__Z3foov2, %nanos6_task_args__Z3foov2* %0, i32 0, i32 1
 ; CHECK-NEXT:  %2 = bitcast %struct.S** %gep_dst_vla to i8**
 ; CHECK-NEXT:  store i8* %args_end, i8** %2, align 8
