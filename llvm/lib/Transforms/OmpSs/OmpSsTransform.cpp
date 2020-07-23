@@ -1295,11 +1295,11 @@ struct OmpSs : public ModulePass {
       // Use tmp variables to be replaced by what comes from nanos6. This fixes
       // the problem when bounds or step are constants
       NewLoopInfo.LBound = IRB.CreateAlloca(IndVarTy, nullptr, "lb.tmp.addr");
-      IRB.CreateStore(TI.LoopInfo.LBound, NewLoopInfo.LBound);
+      IRB.CreateStore(IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy), NewLoopInfo.LBound);
       NewLoopInfo.LBound = IRB.CreateLoad(NewLoopInfo.LBound);
 
       NewLoopInfo.UBound = IRB.CreateAlloca(IndVarTy, nullptr, "ub.tmp.addr");
-      IRB.CreateStore(TI.LoopInfo.UBound, NewLoopInfo.UBound);
+      IRB.CreateStore(IRB.CreateSExtOrTrunc(TI.LoopInfo.UBound, IndVarTy), NewLoopInfo.UBound);
       NewLoopInfo.UBound = IRB.CreateLoad(NewLoopInfo.UBound);
 
       // unpacked_task_region loops are always step 1
