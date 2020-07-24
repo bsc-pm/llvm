@@ -29,19 +29,19 @@ entry:
   store i32 %ub, i32* %ub.addr, align 4
   store i32 %step, i32* %step.addr, align 4
   store i32 5, i32* %i, align 4, !dbg !9
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 5), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 5, i32 10, i32 1) ], !dbg !9
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 5), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 5, i32 10, i32 1) ], !dbg !9
   %1 = load i32, i32* %i, align 4, !dbg !9
   call void @llvm.directive.region.exit(token %0), !dbg !9
   store i32 5, i32* %i1, align 4, !dbg !10
-  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 5), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 3), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 5, i32 10, i32 3) ], !dbg !10
+  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i1), "QUAL.OSS.LOOP.IND.VAR"(i32* %i1), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 5), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 5, i32 10, i32 3) ], !dbg !10
   %3 = load i32, i32* %i1, align 4, !dbg !10
   call void @llvm.directive.region.exit(token %2), !dbg !10
   store i32 10, i32* %i2, align 4, !dbg !11
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i2), "QUAL.OSS.LOOP.IND.VAR"(i32* %i2), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 10), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 0), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 2), "QUAL.OSS.CAPTURED"(i32 10, i32 0, i32 1) ], !dbg !11
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i2), "QUAL.OSS.LOOP.IND.VAR"(i32* %i2), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 10), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 0), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 10, i32 0, i32 1) ], !dbg !11
   %5 = load i32, i32* %i2, align 4, !dbg !11
   call void @llvm.directive.region.exit(token %4), !dbg !11
   store i32 10, i32* %i3, align 4, !dbg !12
-  %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 10), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 0), "QUAL.OSS.LOOP.STEP"(i32 3), "QUAL.OSS.LOOP.TYPE"(i64 2), "QUAL.OSS.CAPTURED"(i32 10, i32 0, i32 3) ], !dbg !12
+  %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i3), "QUAL.OSS.LOOP.IND.VAR"(i32* %i3), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 10), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 0), "QUAL.OSS.LOOP.STEP"(i32 3), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 10, i32 0, i32 3) ], !dbg !12
   %7 = load i32, i32* %i3, align 4, !dbg !12
   call void @llvm.directive.region.exit(token %6), !dbg !12
   ret void, !dbg !13

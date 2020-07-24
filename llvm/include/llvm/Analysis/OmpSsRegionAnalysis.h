@@ -84,8 +84,12 @@ using TaskReductionsInitCombInfo = MapVector<Value *, ReductionInitCombInfo>;
 
 struct TaskLoopInfo {
   // TODO document this
-  enum { SLT, SLE, SGT, SGE, ULT, ULE, UGT, UGE};
+  enum { LT, LE, GT, GE };
   int64_t LoopType;
+  int64_t IndVarSigned;
+  int64_t LBoundSigned;
+  int64_t UBoundSigned;
+  int64_t StepSigned;
   Value *IndVar = nullptr;
   Value *LBound = nullptr;
   Value *UBound = nullptr;

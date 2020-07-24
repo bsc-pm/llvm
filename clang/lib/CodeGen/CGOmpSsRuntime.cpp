@@ -1992,23 +1992,24 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   delete BB;
 }
 
-// returns an integer representing the loop type
-// SLT → signed(<)    → 0
-// SLE → signed(<=)   → 1
-// SGT → signed(>)    → 2
-// SGE → signed(>=)   → 3
-// ULT → unsigned(<)  → 4
-// ULE → unsigned(<=) → 5
-// UGT → unsigned(>)  → 6
-// UGE → unsigned(>=) → 7
-static int getLoopType(
-    QualType IndVarTy, llvm::Optional<bool> TestIsLessOp,
-    bool TestIsStrictOp) {
-  int IsUnsigned = !IndVarTy->isSignedIntegerOrEnumerationType() * 4;
-  int IsLessOp = !(*TestIsLessOp) * 2;
-  int IsStrictOp = !TestIsStrictOp * 1;
+static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  return IsUnsigned + IsLessOp + IsStrictOp;
+  SmallVector<llvm::Value*, 4> List;
+  // LT → <    → 0
+  // LE → <=   → 1
+  // GT → >    → 2
+  // GE → >=   → 3
+  int IsLessOp = !*LoopData.TestIsLessOp * 2;
+  int IsStrictOp = !LoopData.TestIsStrictOp * 1;
+  int LoopCmp = IsLessOp + IsStrictOp;
+  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopCmp));
+  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.IndVar->getType()->isSignedIntegerOrEnumerationType()));
+  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.LB->getType()->isSignedIntegerOrEnumerationType()));
+  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.UB->getType()->isSignedIntegerOrEnumerationType()));
+  List.push_back(llvm::ConstantInt::getSigned(CGF.Int64Ty, LoopData.Step->getType()->isSignedIntegerOrEnumerationType()));
+  // TODO: missing step increment/decrement
+  TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
 void CGOmpSsRuntime::EmitDirectiveData(
@@ -2068,10 +2069,7 @@ void CGOmpSsRuntime::EmitDirectiveData(
       CapturedList.push_back(V);
       TaskInfo.emplace_back(getBundleStr(OSSB_grainsize), V);
     }
-    TaskInfo.emplace_back(
-      getBundleStr(OSSB_loop_type),
-      llvm::ConstantInt::getSigned(CGF.Int64Ty,
-          getLoopType(LoopData.IndVar->getType(), LoopData.TestIsLessOp, LoopData.TestIsStrictOp)));
+    EmitLoopType(LoopData, CGF, TaskInfo);
   }
 
   if (!CapturedList.empty())

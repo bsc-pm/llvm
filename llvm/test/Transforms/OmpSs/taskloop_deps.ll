@@ -37,7 +37,7 @@ entry:
   %i = alloca i32, align 4
   store i32 0, i32* %retval, align 4
   store i32 0, i32* %i, align 4, !dbg !8
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.OUT"([100 x i32]* %array, %struct._depend_unpack_t ([100 x i32]*, i32*)* @compute_dep, [100 x i32]* %array, i32* %i) ], !dbg !9
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.OUT"([100 x i32]* %array, %struct._depend_unpack_t ([100 x i32]*, i32*)* @compute_dep, [100 x i32]* %array, i32* %i) ], !dbg !9
   %1 = load i32, i32* %i, align 4, !dbg !10
   %2 = load i32, i32* %i, align 4, !dbg !11
   %idxprom = sext i32 %2 to i64, !dbg !12
@@ -45,7 +45,7 @@ entry:
   store i32 %1, i32* %arrayidx, align 4, !dbg !13
   call void @llvm.directive.region.exit(token %0), !dbg !14
   store i32 0, i32* %i, align 4, !dbg !15
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.IN"([100 x i32]* %array, %struct._depend_unpack_t.0 ([100 x i32]*, i32*)* @compute_dep.1, [100 x i32]* %array, i32* %i) ], !dbg !16
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.IN"([100 x i32]* %array, %struct._depend_unpack_t.0 ([100 x i32]*, i32*)* @compute_dep.1, [100 x i32]* %array, i32* %i) ], !dbg !16
   %4 = load i32, i32* %i, align 4, !dbg !17
   %idxprom1 = sext i32 %4 to i64, !dbg !17
   %arrayidx2 = getelementptr inbounds [100 x i32], [100 x i32]* %array, i64 0, i64 %idxprom1, !dbg !17

@@ -565,10 +565,18 @@ static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
 
 static void gatherLoopInfo(const IntrinsicInst *I, TaskInfo &TI) {
   assert(isOmpSsLoopDirective(TI.TaskKind) && "gatherLoopInfo expects a loop directive");
-  Value *LoopType;
-  getValueFromOperandBundleWithID(I, LoopType, LLVMContext::OB_oss_loop_type);
-  if (LoopType)
-    TI.LoopInfo.LoopType = cast<ConstantInt>(LoopType)->getSExtValue();
+
+  // TODO: add stepincr
+  SmallVector<OperandBundleDef, 4> LoopTypeBundles;
+  getOperandBundlesAsDefsWithID(I, LoopTypeBundles, LLVMContext::OB_oss_loop_type);
+  assert(LoopTypeBundles.size() == 1 && LoopTypeBundles[0].input_size() == 5);
+
+  TI.LoopInfo.LoopType = cast<ConstantInt>(LoopTypeBundles[0].inputs()[0])->getSExtValue();
+  TI.LoopInfo.IndVarSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[1])->getSExtValue();
+  TI.LoopInfo.LBoundSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[2])->getSExtValue();
+  TI.LoopInfo.UBoundSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[3])->getSExtValue();
+  TI.LoopInfo.StepSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[4])->getSExtValue();
+
   getValueFromOperandBundleWithID(I, TI.LoopInfo.IndVar, LLVMContext::OB_oss_loop_ind_var);
   getValueFromOperandBundleWithID(I, TI.LoopInfo.LBound, LLVMContext::OB_oss_loop_lower_bound);
   getValueFromOperandBundleWithID(I, TI.LoopInfo.UBound, LLVMContext::OB_oss_loop_upper_bound);

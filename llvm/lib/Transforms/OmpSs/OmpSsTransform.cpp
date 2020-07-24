@@ -339,6 +339,35 @@ struct OmpSs : public ModulePass {
     TaskInfo *TI;
   };
 
+  // Signed extension of V to type Ty
+  static Value *createZSExtOrTrunc(IRBuilder<> &IRB, Value *V, Type *Ty, bool Signed) {
+    if (Signed)
+      return IRB.CreateSExtOrTrunc(V, Ty);
+    return IRB.CreateZExtOrTrunc(V, Ty);
+  }
+
+  // Compares LHS and RHS and extends the one with lower type size. The extension
+  // is based on LHSSigned/RHSSigned
+  // returns the new instruction built and the signedness
+  static std::pair<Value *, bool> buildInstructionSignDependent(
+      IRBuilder<> &IRB, Module &M,
+      Value *LHS, Value *RHS, bool LHSSigned, bool RHSSigned,
+      const llvm::function_ref<Value *(IRBuilder<> &, Value *, Value *, bool)> InstrGen) {
+    Type *LHSTy = LHS->getType();
+    Type *RHSTy = RHS->getType();
+    TypeSize LHSTySize = M.getDataLayout().getTypeSizeInBits(LHSTy);
+    TypeSize RHSTySize = M.getDataLayout().getTypeSizeInBits(RHSTy);
+    // same size LHS and RHS build signed intr. only if both are signed
+    bool NewOpSigned = LHSSigned & RHSSigned;
+    if (LHSTySize < RHSTySize) {
+      NewOpSigned = RHSSigned;
+      LHS = createZSExtOrTrunc(IRB, LHS, RHSTy, LHSSigned);
+    } else if (LHSTySize > RHSTySize) {
+      NewOpSigned = LHSSigned;
+      RHS = createZSExtOrTrunc(IRB, RHS, LHSTy, RHSSigned);
+    }
+    return std::make_pair(InstrGen(IRB, LHS, RHS, NewOpSigned), NewOpSigned);
+  }
 
   static bool isReplaceableValue(Value *V) {
     return isa<Instruction>(V) || isa<Argument>(V) || isa<GlobalValue>(V);
@@ -361,7 +390,7 @@ struct OmpSs : public ModulePass {
     IRBuilder<> IRB(Entry);
     Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
 
-    IRB.CreateStore(IRB.CreateSExtOrTrunc(LoopInfo.LBound, IndVarTy), LoopInfo.IndVar);
+    IRB.CreateStore(createZSExtOrTrunc(IRB, LoopInfo.LBound, IndVarTy, LoopInfo.LBoundSigned), LoopInfo.IndVar);
 
     BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
     CondBB->setName("for.cond");
@@ -372,31 +401,43 @@ struct OmpSs : public ModulePass {
     IRB.SetInsertPoint(Entry);
 
     Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
-    Value *LoopCmp = IRB.CreateSExtOrTrunc(LoopInfo.UBound, IndVarTy);
+    Value *LoopCmp = nullptr;
     switch (LoopInfo.LoopType) {
-    case TaskLoopInfo::SLT:
-      LoopCmp = IRB.CreateICmpSLT(IndVarVal, LoopCmp);
+    case TaskLoopInfo::LT:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSLT(LHS, RHS);
+          return IRB.CreateICmpULT(LHS, RHS);
+        }).first;
       break;
-    case TaskLoopInfo::SLE:
-      LoopCmp = IRB.CreateICmpSLE(IndVarVal, LoopCmp);
+    case TaskLoopInfo::LE:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSLE(LHS, RHS);
+          return IRB.CreateICmpULE(LHS, RHS);
+        }).first;
       break;
-    case TaskLoopInfo::SGT:
-      LoopCmp = IRB.CreateICmpSGT(IndVarVal, LoopCmp);
+    case TaskLoopInfo::GT:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSGT(LHS, RHS);
+          return IRB.CreateICmpUGT(LHS, RHS);
+        }).first;
       break;
-    case TaskLoopInfo::SGE:
-      LoopCmp = IRB.CreateICmpSGE(IndVarVal, LoopCmp);
-      break;
-    case TaskLoopInfo::ULT:
-      LoopCmp = IRB.CreateICmpULT(IndVarVal, LoopCmp);
-      break;
-    case TaskLoopInfo::ULE:
-      LoopCmp = IRB.CreateICmpULE(IndVarVal, LoopCmp);
-      break;
-    case TaskLoopInfo::UGT:
-      LoopCmp = IRB.CreateICmpUGT(IndVarVal, LoopCmp);
-      break;
-    case TaskLoopInfo::UGE:
-      LoopCmp = IRB.CreateICmpUGE(IndVarVal, LoopCmp);
+    case TaskLoopInfo::GE:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, LoopInfo.UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSGE(LHS, RHS);
+          return IRB.CreateICmpUGE(LHS, RHS);
+        }).first;
       break;
     default:
       llvm_unreachable("unexpected loop type");
@@ -415,8 +456,12 @@ struct OmpSs : public ModulePass {
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
     IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
-    IndVarVal = IRB.CreateAdd(IndVarVal, IRB.CreateSExtOrTrunc(LoopInfo.Step, IndVarTy));
-    IRB.CreateStore(IndVarVal, LoopInfo.IndVar);
+    auto p = buildInstructionSignDependent(
+      IRB, M, IndVarVal, LoopInfo.Step, LoopInfo.IndVarSigned, LoopInfo.StepSigned,
+      [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+        return IRB.CreateAdd(LHS, RHS);
+      });
+    IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), LoopInfo.IndVar);
     IRB.CreateBr(CondBB);
 
     // Replace task end br. by a br. to for.incr
@@ -538,24 +583,40 @@ struct OmpSs : public ModulePass {
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
       Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
       LBoundField = IRB.CreateLoad(LBoundField);
-      LBoundField = IRB.CreateSExtOrTrunc(LBoundField, IndVarTy, "lb");
+      LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
 
       Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
       Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
       UBoundField = IRB.CreateLoad(UBoundField);
-      UBoundField = IRB.CreateSExtOrTrunc(UBoundField, IndVarTy);
+      UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy);
       UBoundField = IRB.CreateSub(UBoundField, ConstantInt::get(IndVarTy, 1), "ub");
 
       NewIndVarLBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".lb");
       NewIndVarUBound = IRB.CreateAlloca(IndVarTy, nullptr, TI.LoopInfo.IndVar->getName() + ".ub");
 
-      Value *NewIndVar = IRB.CreateMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), LBoundField);
-      NewIndVar = IRB.CreateAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
-      IRB.CreateStore(NewIndVar, NewIndVarLBound);
+      auto p = buildInstructionSignDependent(
+        IRB, M, TI.LoopInfo.Step, LBoundField, TI.LoopInfo.StepSigned, TI.LoopInfo.IndVarSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateMul(LHS, RHS);
+        });
+      p = buildInstructionSignDependent(
+        IRB, M, p.first, TI.LoopInfo.LBound, p.second, TI.LoopInfo.LBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateAdd(LHS, RHS);
+        });
+      IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), NewIndVarLBound);
 
-      NewIndVar = IRB.CreateMul(IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy), UBoundField);
-      NewIndVar = IRB.CreateAdd(NewIndVar, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
-      IRB.CreateStore(NewIndVar, NewIndVarUBound);
+      p = buildInstructionSignDependent(
+        IRB, M, TI.LoopInfo.Step, UBoundField, TI.LoopInfo.StepSigned, TI.LoopInfo.IndVarSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateMul(LHS, RHS);
+        });
+      p = buildInstructionSignDependent(
+        IRB, M, p.first, TI.LoopInfo.LBound, p.second, TI.LoopInfo.LBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          return IRB.CreateAdd(LHS, RHS);
+        });
+      IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), NewIndVarUBound);
     }
 
     // Insert RT call before replacing uses
@@ -1295,22 +1356,25 @@ struct OmpSs : public ModulePass {
       // Use tmp variables to be replaced by what comes from nanos6. This fixes
       // the problem when bounds or step are constants
       NewLoopInfo.LBound = IRB.CreateAlloca(IndVarTy, nullptr, "lb.tmp.addr");
-      IRB.CreateStore(IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy), NewLoopInfo.LBound);
+      IRB.CreateStore(createZSExtOrTrunc(IRB, TI.LoopInfo.LBound, IndVarTy, TI.LoopInfo.LBoundSigned), NewLoopInfo.LBound);
       NewLoopInfo.LBound = IRB.CreateLoad(NewLoopInfo.LBound);
+      NewLoopInfo.LBoundSigned = TI.LoopInfo.IndVarSigned;
 
       NewLoopInfo.UBound = IRB.CreateAlloca(IndVarTy, nullptr, "ub.tmp.addr");
-      IRB.CreateStore(IRB.CreateSExtOrTrunc(TI.LoopInfo.UBound, IndVarTy), NewLoopInfo.UBound);
+      IRB.CreateStore(createZSExtOrTrunc(IRB, TI.LoopInfo.UBound, IndVarTy, TI.LoopInfo.UBoundSigned), NewLoopInfo.UBound);
       NewLoopInfo.UBound = IRB.CreateLoad(NewLoopInfo.UBound);
+      NewLoopInfo.UBoundSigned = TI.LoopInfo.IndVarSigned;
 
       // unpacked_task_region loops are always step 1
       NewLoopInfo.Step = IRB.CreateAlloca(IndVarTy, nullptr, "step.tmp.addr");
       IRB.CreateStore(ConstantInt::get(IndVarTy, 1), NewLoopInfo.Step);
       NewLoopInfo.Step = IRB.CreateLoad(NewLoopInfo.Step);
+      NewLoopInfo.StepSigned = TI.LoopInfo.IndVarSigned;
 
       NewLoopInfo.IndVar =
         IRB.CreateAlloca(IndVarTy, nullptr, "loop." + TI.LoopInfo.IndVar->getName());
       // unpacked_task_region loops are always SLT
-      NewLoopInfo.LoopType = TaskLoopInfo::SLT;
+      NewLoopInfo.LoopType = TaskLoopInfo::LT;
       buildLoopForTaskImpl(M, F, TI.Entry, TI.Exit, NewLoopInfo, NewEntryBB, EntryBB);
     }
 
@@ -1648,12 +1712,12 @@ struct OmpSs : public ModulePass {
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Value *LBoundField = IRB.CreateGEP(LoopBounds, Idx, "lb_gep");
         LBoundField = IRB.CreateLoad(LBoundField);
-        LBoundField = IRB.CreateSExtOrTrunc(LBoundField, IndVarTy, "lb");
+        LBoundField = IRB.CreateZExtOrTrunc(LBoundField, IndVarTy, "lb");
 
         Idx[1] = ConstantInt::get(Type::getInt32Ty(M.getContext()), 1);
         Value *UBoundField = IRB.CreateGEP(LoopBounds, Idx, "ub_gep");
         UBoundField = IRB.CreateLoad(UBoundField);
-        UBoundField = IRB.CreateSExtOrTrunc(UBoundField, IndVarTy, "ub");
+        UBoundField = IRB.CreateZExtOrTrunc(UBoundField, IndVarTy, "ub");
 
         // Replace loop bounds of the indvar, loop cond. and loop incr.
         if (isReplaceableValue(NewLoopInfo.LBound)) {
@@ -1670,9 +1734,17 @@ struct OmpSs : public ModulePass {
         // Now we can set BodyIndVar = (LoopIndVar * Step) + OrigLBound
         IRBuilder<> LoopBodyIRB(&EntryBB->front());
         Value *NormVal = LoopBodyIRB.CreateLoad(NewLoopInfo.IndVar);
-        NormVal = LoopBodyIRB.CreateMul(NormVal, IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy));
-        NormVal = LoopBodyIRB.CreateAdd(NormVal, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
-        LoopBodyIRB.CreateStore(NormVal, TI.LoopInfo.IndVar);
+        auto p = buildInstructionSignDependent(
+          LoopBodyIRB, M, NormVal, TI.LoopInfo.Step, NewLoopInfo.IndVarSigned, TI.LoopInfo.StepSigned,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            return IRB.CreateMul(LHS, RHS);
+          });
+        p = buildInstructionSignDependent(
+          LoopBodyIRB, M, p.first, TI.LoopInfo.LBound, p.second, TI.LoopInfo.LBoundSigned,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            return IRB.CreateAdd(LHS, RHS);
+          });
+        LoopBodyIRB.CreateStore(createZSExtOrTrunc(LoopBodyIRB, p.first, IndVarTy, p.second), TI.LoopInfo.IndVar);
       }
 
       // Create an iterator to name all of the arguments we inserted.
@@ -1982,8 +2054,14 @@ struct OmpSs : public ModulePass {
         // >=     0, (ub - lb)     / step + 1
         Type *IndVarTy = TI.LoopInfo.IndVar->getType()->getPointerElementType();
         Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
-        Value *RegisterUpperB = IRB.CreateSExtOrTrunc(TI.LoopInfo.UBound, IndVarTy);
-        RegisterUpperB = IRB.CreateSub(RegisterUpperB, IRB.CreateSExtOrTrunc(TI.LoopInfo.LBound, IndVarTy));
+
+        auto p = buildInstructionSignDependent(
+          IRB, M, TI.LoopInfo.UBound, TI.LoopInfo.LBound, TI.LoopInfo.UBoundSigned, TI.LoopInfo.LBoundSigned,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            return IRB.CreateSub(LHS, RHS);
+          });
+        Value *RegisterUpperB = p.first;
+
         Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
         if (TI.LoopInfo.Grainsize)
           RegisterGrainsize = TI.LoopInfo.Grainsize;
@@ -1992,33 +2070,42 @@ struct OmpSs : public ModulePass {
           RegisterChunksize = TI.LoopInfo.Chunksize;
 
         switch (TI.LoopInfo.LoopType) {
-        case TaskLoopInfo::SLT:
-        case TaskLoopInfo::ULT:
-          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+        case TaskLoopInfo::LT:
+          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
           break;
-        case TaskLoopInfo::SGT:
-        case TaskLoopInfo::UGT:
-          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+        case TaskLoopInfo::GT:
+          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
           break;
-        case TaskLoopInfo::SLE:
-        case TaskLoopInfo::ULE:
-        case TaskLoopInfo::SGE:
-        case TaskLoopInfo::UGE:
+        case TaskLoopInfo::LE:
+        case TaskLoopInfo::GE:
           break;
         default:
           llvm_unreachable("unexpected loop type");
         }
-        // TODO: should we handle sdiv/udiv depending on loop type?
-        RegisterUpperB = IRB.CreateSDiv(RegisterUpperB, IRB.CreateSExtOrTrunc(TI.LoopInfo.Step, IndVarTy));
-        RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(IndVarTy, 1));
+        p = buildInstructionSignDependent(
+          IRB, M, RegisterUpperB, TI.LoopInfo.Step, p.second, TI.LoopInfo.Step,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            if (NewOpSigned)
+              return IRB.CreateSDiv(LHS, RHS);
+            return IRB.CreateUDiv(LHS, RHS);
+          });
+        RegisterUpperB = IRB.CreateAdd(p.first, ConstantInt::get(p.first->getType(), 1));
         IRB.CreateCall(
           RegisterLoopFuncCallee,
           {
             TaskPtrVarL,
-            IRB.CreateSExt(RegisterLowerB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(0)),
-            IRB.CreateSExt(RegisterUpperB, Nanos6LoopBounds::getInstance(M).getType()->getElementType(1)),
-            IRB.CreateSExt(RegisterGrainsize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(2)),
-            IRB.CreateSExt(RegisterChunksize, Nanos6LoopBounds::getInstance(M).getType()->getElementType(3))
+            createZSExtOrTrunc(
+              IRB, RegisterLowerB,
+              Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), /*Signed=*/false),
+            createZSExtOrTrunc(
+              IRB, RegisterUpperB,
+              Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), p.second),
+            createZSExtOrTrunc(
+              IRB, RegisterGrainsize,
+              Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), /*Signed=*/false),
+            createZSExtOrTrunc(
+              IRB, RegisterChunksize,
+              Nanos6LoopBounds::getInstance(M).getType()->getElementType(3), /*Signed=*/false)
           }
         );
       }

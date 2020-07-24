@@ -56,7 +56,7 @@ entry:
   %1 = load i32, i32* %lb.addr, align 4, !dbg !9
   %2 = load i32, i32* %ub.addr, align 4, !dbg !9
   %3 = load i32, i32* %step.addr, align 4, !dbg !9
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !9
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !9
   call void @llvm.directive.region.exit(token %4), !dbg !9
   ret void, !dbg !10
 ; CHECK-LABEL: @signed_loop_slt(
@@ -91,7 +91,7 @@ entry:
   %1 = load i32, i32* %lb.addr, align 4, !dbg !12
   %2 = load i32, i32* %ub.addr, align 4, !dbg !12
   %3 = load i32, i32* %step.addr, align 4, !dbg !12
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !12
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !12
   call void @llvm.directive.region.exit(token %4), !dbg !12
   ret void, !dbg !13
 ; CHECK-LABEL: @signed_loop_sle(
@@ -119,7 +119,7 @@ entry:
   %1 = load i32, i32* %ub.addr, align 4, !dbg !15
   %2 = load i32, i32* %ub.addr, align 4, !dbg !15
   %3 = load i32, i32* %step.addr, align 4, !dbg !15
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 2), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !15
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !15
   call void @llvm.directive.region.exit(token %4), !dbg !15
   ret void, !dbg !16
 ; CHECK-LABEL: @signed_loop_sgt(
@@ -148,7 +148,7 @@ entry:
   %1 = load i32, i32* %ub.addr, align 4, !dbg !18
   %2 = load i32, i32* %ub.addr, align 4, !dbg !18
   %3 = load i32, i32* %step.addr, align 4, !dbg !18
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 3), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !18
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !18
   call void @llvm.directive.region.exit(token %4), !dbg !18
   ret void, !dbg !19
 ; CHECK-LABEL: @signed_loop_sge(
@@ -176,16 +176,16 @@ entry:
   %1 = load i32, i32* %lb.addr, align 4, !dbg !21
   %2 = load i32, i32* %ub.addr, align 4, !dbg !21
   %3 = load i32, i32* %step.addr, align 4, !dbg !21
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 4), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !21
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !21
   call void @llvm.directive.region.exit(token %4), !dbg !21
   ret void, !dbg !22
 ; CHECK-LABEL: @unsigned_loop_slt(
 ; CHECK: %15 = load i8*, i8** %6, align 8
 ; CHECK-NEXT: %16 = sub i32 %2, %1
 ; CHECK-NEXT: %17 = sub i32 %16, 1
-; CHECK-NEXT: %18 = sdiv i32 %17, %3
+; CHECK-NEXT: %18 = udiv i32 %17, %3
 ; CHECK-NEXT: %19 = add i32 %18, 1
-; CHECK-NEXT: %20 = sext i32 %19 to i64
+; CHECK-NEXT: %20 = zext i32 %19 to i64
 ; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %20, i64 0, i64 0)
 ; CHECK: %22 = icmp ult i32 %21, %2
 }
@@ -205,15 +205,15 @@ entry:
   %1 = load i32, i32* %lb.addr, align 4, !dbg !24
   %2 = load i32, i32* %ub.addr, align 4, !dbg !24
   %3 = load i32, i32* %step.addr, align 4, !dbg !24
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 5), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !24
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 1, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !24
   call void @llvm.directive.region.exit(token %4), !dbg !24
   ret void, !dbg !25
 ; CHECK-LABEL: @unsigned_loop_sle(
 ; CHECK: %15 = load i8*, i8** %6, align 8
 ; CHECK-NEXT: %16 = sub i32 %2, %1
-; CHECK-NEXT: %17 = sdiv i32 %16, %3
+; CHECK-NEXT: %17 = udiv i32 %16, %3
 ; CHECK-NEXT: %18 = add i32 %17, 1
-; CHECK-NEXT: %19 = sext i32 %18 to i64
+; CHECK-NEXT: %19 = zext i32 %18 to i64
 ; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %19, i64 0, i64 0)
 ; CHECK: %21 = icmp ule i32 %20, %2
 }
@@ -233,16 +233,16 @@ entry:
   %1 = load i32, i32* %ub.addr, align 4, !dbg !27
   %2 = load i32, i32* %ub.addr, align 4, !dbg !27
   %3 = load i32, i32* %step.addr, align 4, !dbg !27
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 6), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !27
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 2, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !27
   call void @llvm.directive.region.exit(token %4), !dbg !27
   ret void, !dbg !28
 ; CHECK-LABEL: @unsigned_loop_sgt(
 ; CHECK: %13 = load i8*, i8** %6, align 8
 ; CHECK-NEXT: %14 = sub i32 %2, %1
 ; CHECK-NEXT: %15 = add i32 %14, 1
-; CHECK-NEXT: %16 = sdiv i32 %15, %3
+; CHECK-NEXT: %16 = udiv i32 %15, %3
 ; CHECK-NEXT: %17 = add i32 %16, 1
-; CHECK-NEXT: %18 = sext i32 %17 to i64
+; CHECK-NEXT: %18 = zext i32 %17 to i64
 ; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %18, i64 0, i64 0)
 ; CHECK: %20 = icmp ugt i32 %19, %2
 }
@@ -262,15 +262,15 @@ entry:
   %1 = load i32, i32* %ub.addr, align 4, !dbg !30
   %2 = load i32, i32* %ub.addr, align 4, !dbg !30
   %3 = load i32, i32* %step.addr, align 4, !dbg !30
-  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 7), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !30
+  %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.FIRSTPRIVATE"(i32* %ub.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %step.addr), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %1), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %2), "QUAL.OSS.LOOP.STEP"(i32 %3), "QUAL.OSS.LOOP.TYPE"(i64 3, i64 0, i64 0, i64 0, i64 0), "QUAL.OSS.CAPTURED"(i32 %1, i32 %2, i32 %3) ], !dbg !30
   call void @llvm.directive.region.exit(token %4), !dbg !30
   ret void, !dbg !31
 ; CHECK-LABEL: @unsigned_loop_sge(
 ; CHECK: %13 = load i8*, i8** %6, align 8
 ; CHECK-NEXT: %14 = sub i32 %2, %1
-; CHECK-NEXT: %15 = sdiv i32 %14, %3
+; CHECK-NEXT: %15 = udiv i32 %14, %3
 ; CHECK-NEXT: %16 = add i32 %15, 1
-; CHECK-NEXT: %17 = sext i32 %16 to i64
+; CHECK-NEXT: %17 = zext i32 %16 to i64
 ; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %17, i64 0, i64 0)
 ; CHECK: %19 = icmp uge i32 %18, %2
 }
@@ -280,7 +280,7 @@ define void @constants_loop() #0 !dbg !32 {
 entry:
   %i = alloca i32, align 4
   store i32 0, i32* %i, align 4, !dbg !33
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0), "QUAL.OSS.CAPTURED"(i32 0, i32 10, i32 1) ], !dbg !33
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASK.FOR\00"), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 10, i32 1) ], !dbg !33
   call void @llvm.directive.region.exit(token %0), !dbg !33
   ret void, !dbg !34
 ; CHECK-LABEL: @constants_loop(

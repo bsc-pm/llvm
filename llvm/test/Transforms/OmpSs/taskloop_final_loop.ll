@@ -104,7 +104,7 @@ entry:
   %region = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"),
   "QUAL.OSS.PRIVATE"(i32* %i.addr),
   "QUAL.OSS.CAPTURED"(i32 %lb.value, i32 %ub.value, i32 %step.value),
-  "QUAL.OSS.LOOP.TYPE"(i32 0),
+  "QUAL.OSS.LOOP.TYPE"(i32 0, i32 1, i32 1, i32 1, i32 1),
   "QUAL.OSS.LOOP.IND.VAR"(i32* %i.addr),
   "QUAL.OSS.LOOP.LOWER.BOUND"(i32 %lb.value),
   "QUAL.OSS.LOOP.UPPER.BOUND"(i32 %ub.value),
