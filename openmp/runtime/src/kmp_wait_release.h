@@ -350,6 +350,7 @@ final_spin=FALSE)
             task_team = __kmp_threads[i]->th.th_task_team;
             old_gtid = th_gtid;
             th_gtid = i;
+            KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_threads);
             // fprintf(stderr, "Unshackled stealing unshackled=%d team=%p\n", old_gtid, task_team);
             break;
           }
