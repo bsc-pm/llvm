@@ -2490,6 +2490,8 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
       getBundleStr(OSSB_directive),
       llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(LoopDirectiveBundleKind)));
 
+  CodeGenFunction::LexicalScope ForScope(CGF, cast<ForStmt>(D.getAssociatedStmt())->getSourceRange());
+
   // Emit for-init before task entry
   CGF.EmitStmt(cast<ForStmt>(D.getAssociatedStmt())->getInit());
 
