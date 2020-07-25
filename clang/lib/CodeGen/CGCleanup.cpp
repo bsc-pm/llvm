@@ -1266,19 +1266,6 @@ void CodeGenFunction::DeactivateCleanupBlock(EHScopeStack::stable_iterator C,
 }
 
 Address CodeGenFunction::getNormalCleanupDestSlot() {
-  if (getContext().getLangOpts().OmpSs
-      && CGM.getOmpSsRuntime().inTaskBody()) {
-        Address NCleanupDest = CGM.getOmpSsRuntime().getTaskNormalCleanupDestSlot();
-        if (NCleanupDest.isValid())
-          return NCleanupDest;
-
-        NCleanupDest =
-          CreateDefaultAlignTempAlloca(Builder.getInt32Ty(), "cleanup.dest.slot");
-
-        CGM.getOmpSsRuntime().setTaskNormalCleanupDestSlot(NCleanupDest);
-        return NCleanupDest;
-
-  }
   if (!NormalCleanupDest.isValid())
     NormalCleanupDest =
       CreateDefaultAlignTempAlloca(Builder.getInt32Ty(), "cleanup.dest.slot");

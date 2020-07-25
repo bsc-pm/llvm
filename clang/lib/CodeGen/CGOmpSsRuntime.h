@@ -142,7 +142,6 @@ private:
     llvm::BasicBlock *UnreachableBlock = nullptr;
     Address ExceptionSlot = Address::invalid();
     Address EHSelectorSlot = Address::invalid();
-    Address NormalCleanupDestSlot = Address::invalid();
   };
 
 private:
@@ -231,8 +230,6 @@ public:
   Address getTaskExceptionSlot();
   // returns the innermost nested task EHSelectorSlot address
   Address getTaskEHSelectorSlot();
-  // returns the innermost nested task NormalCleanupDestSlot address
-  Address getTaskNormalCleanupDestSlot();
   // returns the captured address of VD
   Address getTaskCaptureAddr(const VarDecl *VD);
 
@@ -248,8 +245,6 @@ public:
   void setTaskExceptionSlot(Address Addr);
   // sets the innermost nested task EHSelectorSlot address
   void setTaskEHSelectorSlot(Address Addr);
-  // returns the innermost nested task NormalCleanupDestSlot address
-  void setTaskNormalCleanupDestSlot(Address Addr);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,

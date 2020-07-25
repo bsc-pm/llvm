@@ -1941,10 +1941,6 @@ Address CGOmpSsRuntime::getTaskEHSelectorSlot() {
   return TaskStack.back().EHSelectorSlot;
 }
 
-Address CGOmpSsRuntime::getTaskNormalCleanupDestSlot() {
-  return TaskStack.back().NormalCleanupDestSlot;
-}
-
 Address CGOmpSsRuntime::getTaskCaptureAddr(const VarDecl *VD) {
   for (auto ItMap = CaptureMapStack.rbegin();
        ItMap != CaptureMapStack.rend(); ++ItMap) {
@@ -1978,10 +1974,6 @@ void CGOmpSsRuntime::setTaskExceptionSlot(Address Addr) {
 
 void CGOmpSsRuntime::setTaskEHSelectorSlot(Address Addr) {
   TaskStack.back().EHSelectorSlot = Addr;
-}
-
-void CGOmpSsRuntime::setTaskNormalCleanupDestSlot(Address Addr) {
-  TaskStack.back().NormalCleanupDestSlot = Addr;
 }
 
 // Borrowed brom CodeGenFunction.cpp
