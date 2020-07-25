@@ -240,6 +240,13 @@ void CodeGenFunction::EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S) {
   CGM.getOmpSsRuntime().emitTaskwaitCall(*this, S.getBeginLoc(), Data);
 }
 
+void CodeGenFunction::EmitOSSReleaseDirective(const OSSReleaseDirective &S) {
+  OSSTaskDataTy Data;
+
+  AddDepData(S, Data.Deps);
+  CGM.getOmpSsRuntime().emitReleaseCall(*this, S.getBeginLoc(), Data);
+}
+
 void CodeGenFunction::EmitOSSTaskDirective(const OSSTaskDirective &S) {
   OSSTaskDataTy Data;
 

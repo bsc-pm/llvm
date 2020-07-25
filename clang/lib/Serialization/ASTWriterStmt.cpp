@@ -2558,6 +2558,10 @@ void ASTStmtWriter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
   llvm_unreachable("Not supported yet");
 }
 
+void ASTStmtWriter::VisitOSSReleaseDirective(OSSReleaseDirective *D) {
+  llvm_unreachable("Not supported yet");
+}
+
 void ASTStmtWriter::VisitOSSTaskDirective(OSSTaskDirective *D) {
   llvm_unreachable("Not supported yet");
 }

@@ -11051,6 +11051,11 @@ public:
                                          SourceLocation StartLoc,
                                          SourceLocation EndLoc);
 
+  /// Called on well-formed '\#pragma oss taskwait'.
+  StmtResult ActOnOmpSsReleaseDirective(ArrayRef<OSSClause *> Clauses,
+                                        SourceLocation StartLoc,
+                                        SourceLocation EndLoc);
+
   /// Called on well-formed '\#pragma omp task' after parsing of the
   /// associated statement.
   StmtResult ActOnOmpSsTaskDirective(ArrayRef<OSSClause *> Clauses,

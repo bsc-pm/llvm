@@ -42,6 +42,25 @@ OSSTaskwaitDirective *OSSTaskwaitDirective::CreateEmpty(const ASTContext &C,
   return new (Mem) OSSTaskwaitDirective(NumClauses);
 }
 
+OSSReleaseDirective *
+OSSReleaseDirective::Create(const ASTContext &C, SourceLocation StartLoc,
+                             SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses) {
+  unsigned Size = llvm::alignTo(sizeof(OSSReleaseDirective), alignof(OSSClause *));
+  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * Clauses.size());
+  OSSReleaseDirective *Dir =
+      new (Mem) OSSReleaseDirective(StartLoc, EndLoc, Clauses.size());
+  Dir->setClauses(Clauses);
+  return Dir;
+}
+
+OSSReleaseDirective *OSSReleaseDirective::CreateEmpty(const ASTContext &C,
+                                                      unsigned NumClauses,
+                                                      EmptyShell) {
+  unsigned Size = llvm::alignTo(sizeof(OSSReleaseDirective), alignof(OSSClause *));
+  void *Mem = C.Allocate(Size + sizeof(OSSClause *) * NumClauses);
+  return new (Mem) OSSReleaseDirective(NumClauses);
+}
+
 OSSTaskDirective *
 OSSTaskDirective::Create(const ASTContext &C, SourceLocation StartLoc,
                          SourceLocation EndLoc, ArrayRef<OSSClause *> Clauses, Stmt *AStmt) {

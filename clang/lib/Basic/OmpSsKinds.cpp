@@ -228,6 +228,16 @@ bool clang::isAllowedClauseForDirective(OmpSsDirectiveKind DKind,
       break;
     }
     break;
+  case OSSD_release:
+    switch (CKind) {
+#define OMPSS_RELEASE_CLAUSE(Name)                                           \
+  case OSSC_##Name:                                                            \
+    return true;
+#include "clang/Basic/OmpSsKinds.def"
+    default:
+      break;
+    }
+    break;
   case OSSD_declare_reduction:
   case OSSD_unknown:
     break;
@@ -240,7 +250,9 @@ bool clang::isOmpSsPrivate(OmpSsClauseKind Kind) {
 }
 
 bool clang::isOmpSsTaskingDirective(OmpSsDirectiveKind Kind) {
-  return Kind == OSSD_task || isOmpSsLoopDirective(Kind);
+  return Kind == OSSD_task
+    || Kind == OSSD_declare_task
+    || isOmpSsLoopDirective(Kind);
 }
 
 bool clang::isOmpSsLoopDirective(OmpSsDirectiveKind Kind) {

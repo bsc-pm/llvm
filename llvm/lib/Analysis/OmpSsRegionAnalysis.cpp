@@ -659,6 +659,62 @@ static void gatherMultiDependsInfo(
   TI.DependsInfo.NumSymbols += TI.DSAInfo.DepSymToIdx.size();
 }
 
+// Process OpBundle gathering dependency information (oss release)
+static void gatherReleaseDependInfoFromBundle(
+    ArrayRef<Value *> OBArgs, ReleaseDependInfo &DI) {
+  // First operand has to be the DSA over the dependency is made
+  Value *DepBaseDSA = OBArgs[0];
+  DI.Base = DepBaseDSA;
+
+  Function *ComputeDepFun = cast<Function>(OBArgs[1]);
+  DI.ComputeDepFun = ComputeDepFun;
+
+  // Gather compute_dep function params
+  for (size_t i = 2; i < OBArgs.size(); ++i) {
+    DI.Args.push_back(OBArgs[i]);
+  }
+}
+
+// Gathers dependencies needed information of type Id (oss release)
+static void gatherReleaseDependsInfoWithID(
+    const IntrinsicInst *I, SmallVectorImpl<ReleaseDependInfo> &DependsList,
+    uint64_t Id) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  // TODO: maybe do a bundle gather with asserts?
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    ReleaseDependInfo DI;
+
+    gatherReleaseDependInfoFromBundle(OBDef.inputs(), DI);
+
+    DependsList.push_back(DI);
+  }
+}
+
+// Gathers all dependencies needed information
+static void gatherReleaseDependsInfo(
+    const IntrinsicInst *I, ReleaseInfo &TI) {
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.Ins,
+                          LLVMContext::OB_oss_dep_in);
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.Outs,
+                          LLVMContext::OB_oss_dep_out);
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.Inouts,
+                          LLVMContext::OB_oss_dep_inout);
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.WeakIns,
+                          LLVMContext::OB_oss_dep_weakin);
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.WeakOuts,
+                          LLVMContext::OB_oss_dep_weakout);
+  gatherReleaseDependsInfoWithID(I,
+                          TI.DependsInfo.WeakInouts,
+                          LLVMContext::OB_oss_dep_weakinout);
+}
+
+
 // TODO: change function name for this
 static void gatherIfFinalCostPrioWaitInfo(const IntrinsicInst *I, TaskInfo &TI) {
   getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
@@ -815,7 +871,22 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
           Stack.pop_back();
         } else if (II->getIntrinsicID() == Intrinsic::directive_marker) {
-          FI.TaskwaitFuncInfo.PostOrder.push_back({II});
+
+          Value *MarkerKindValue = nullptr;
+          getValueFromOperandBundleWithID(II, MarkerKindValue, LLVMContext::OB_oss_dir);
+          assert(MarkerKindValue && "Expected task kind value in bundles");
+          ConstantDataArray *MarkerKindDataArray = cast<ConstantDataArray>(MarkerKindValue);
+          assert(MarkerKindDataArray->isCString() && "Marker kind must be a C string");
+          StringRef MarkerKindStringRef = MarkerKindDataArray->getAsCString();
+
+          if (MarkerKindStringRef == "RELEASE") {
+            ReleaseInfo RI;
+            RI.I = II;
+            gatherReleaseDependsInfo(II, RI);
+            FI.ReleaseFuncInfo.PostOrder.push_back(RI);
+          } else {
+            FI.TaskwaitFuncInfo.PostOrder.push_back({II});
+          }
         }
       } else if (!Stack.empty()) {
         Instruction *StackEntry = Stack.back();

@@ -3494,7 +3494,10 @@ ExprResult Parser::ParseOSSMultiDepExpression() {
   return ExprError();
 }
 
-ExprResult Parser::ParseOSSAssignmentExpression(OmpSsClauseKind CKind) {
+ExprResult Parser::ParseOSSAssignmentExpression(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind CKind) {
+  if (!isOmpSsTaskingDirective(DKind))
+    return ParseAssignmentExpression();
   if (Tok.is(tok::l_brace) &&
       (CKind == OSSC_depend
        || CKind == OSSC_in || CKind == OSSC_out || CKind == OSSC_inout

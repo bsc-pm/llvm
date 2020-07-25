@@ -1147,6 +1147,11 @@ void StmtPrinter::VisitOSSTaskwaitDirective(OSSTaskwaitDirective *Node) {
   PrintOSSExecutableDirective(Node);
 }
 
+void StmtPrinter::VisitOSSReleaseDirective(OSSReleaseDirective *Node) {
+  Indent() << "#pragma oss release";
+  PrintOSSExecutableDirective(Node);
+}
+
 void StmtPrinter::VisitOSSTaskDirective(OSSTaskDirective *Node) {
   Indent() << "#pragma oss task";
   PrintOSSExecutableDirective(Node);

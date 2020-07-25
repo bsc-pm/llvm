@@ -275,6 +275,57 @@ public:
   }
 };
 
+/// This represents '#pragma oss release' directive.
+///
+/// \code
+/// #pragma oss release
+/// \endcode
+///
+class OSSReleaseDirective : public OSSExecutableDirective {
+  friend class ASTStmtReader;
+  /// Build directive with the given start and end location.
+  ///
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending location of the directive.
+  /// \param NumClauses Number of clauses.
+  ///
+  OSSReleaseDirective(SourceLocation StartLoc, SourceLocation EndLoc, unsigned NumClauses)
+      : OSSExecutableDirective(this, OSSReleaseDirectiveClass, OSSD_release,
+                               StartLoc, EndLoc, NumClauses, 0) {}
+
+  /// Build an empty directive.
+  ///
+  /// \param NumClauses Number of clauses.
+  ///
+  explicit OSSReleaseDirective(unsigned NumClauses)
+      : OSSExecutableDirective(this, OSSReleaseDirectiveClass, OSSD_release,
+                               SourceLocation(), SourceLocation(), NumClauses, 0) {}
+
+public:
+  /// Creates directive.
+  ///
+  /// \param C AST context.
+  /// \param StartLoc Starting location of the directive kind.
+  /// \param EndLoc Ending Location of the directive.
+  /// \param Clauses List of clauses.
+  ///
+  static OSSReleaseDirective *
+  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc,
+         ArrayRef<OSSClause *> Clauses);
+
+  /// Creates an empty directive.
+  ///
+  /// \param C AST context.
+  /// \param NumClauses Number of clauses.
+  ///
+  static OSSReleaseDirective *CreateEmpty(const ASTContext &C, unsigned NumClauses,
+                                           EmptyShell);
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == OSSReleaseDirectiveClass;
+  }
+};
+
 class OSSTaskDirective : public OSSExecutableDirective {
   friend class ASTStmtReader;
   /// Build directive with the given start and end location.

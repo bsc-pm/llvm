@@ -304,6 +304,26 @@ struct OmpSs : public ModulePass {
       return FunctionType::get(Type::getVoidTy(M.getContext()),
                                Params, /*IsVarArgs=*/false);
     }
+
+    FunctionType *BuildReleaseDepFuncType(Module &M, StringRef FullName, size_t Ndims) {
+      // void nanos6_release_x_Y(
+      //   void *base_address,
+      //   long dim1size, long dim1start, long dim1end,
+      //   ...);
+
+      SmallVector<Type *, 8> Params;
+      Params.push_back(Type::getInt8PtrTy(M.getContext()));
+      for (size_t i = 0; i < Ndims; ++i) {
+        // long dimsize
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+        // long dimstart
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+        // long dimend
+        Params.push_back(Type::getInt64Ty(M.getContext()));
+      }
+      return FunctionType::get(Type::getVoidTy(M.getContext()),
+                               Params, /*IsVarArgs=*/false);
+    }
   public:
     FunctionCallee getMultidepFuncCallee(Module &M, StringRef Name, size_t Ndims, bool IsReduction=false) {
       std::string FullName = ("nanos6_register_region_" + Name + "_depinfo" + Twine(Ndims)).str();
@@ -315,6 +335,21 @@ struct OmpSs : public ModulePass {
       assert(Ndims <= MAX_DEP_DIMS);
 
       FunctionType *DepF = BuildDepFuncType(M, FullName, Ndims, IsReduction);
+      FunctionCallee DepCallee = M.getOrInsertFunction(FullName, DepF);
+      DepNameToFuncCalleeMap[FullName] = DepCallee;
+      return DepCallee;
+    }
+
+    FunctionCallee getReleaseMultidepFuncCallee(Module &M, StringRef Name, size_t Ndims) {
+      std::string FullName = ("nanos6_release_" + Name + "_" + Twine(Ndims)).str();
+
+      auto It = DepNameToFuncCalleeMap.find(FullName);
+      if (It != DepNameToFuncCalleeMap.end())
+        return It->second;
+
+      assert(Ndims <= MAX_DEP_DIMS);
+
+      FunctionType *DepF = BuildReleaseDepFuncType(M, FullName, Ndims);
       FunctionCallee DepCallee = M.getOrInsertFunction(FullName, DepF);
       DepNameToFuncCalleeMap[FullName] = DepCallee;
       return DepCallee;
@@ -942,6 +977,62 @@ struct OmpSs : public ModulePass {
     unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakCommutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_commutative");
   }
 
+  // oss release
+  void unpackReleaseDepCallToRTOfType(
+      Module &M, const ReleaseDependInfo &DI,
+      Instruction *InsertPt, StringRef DepType) {
+
+    IRBuilder<> BBBuilder(InsertPt);
+
+    Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
+    Value *CallComputeDep = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+    StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
+
+    assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
+    size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
+
+    llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDep, 0);
+
+    SmallVector<Value *, 4> TaskDepAPICall;
+    TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
+    for (size_t i = 1; i < ComputeDepTy->getNumElements(); ) {
+      // dimsize
+      TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i++));
+      // dimstart
+      TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i++));
+      // dimend
+      TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDep, i++));
+    }
+
+    BBBuilder.CreateCall(
+      MultidepFactory.getReleaseMultidepFuncCallee(M, DepType, NumDims), TaskDepAPICall);
+
+  }
+
+  // oss release
+  void unpackReleaseDepsCallToRTOfType(
+      Module &M, const SmallVectorImpl<ReleaseDependInfo> &DependList,
+      Instruction *InsertPt, StringRef DepType) {
+
+    for (const ReleaseDependInfo &DI : DependList) {
+      unpackReleaseDepCallToRTOfType(M, DI, InsertPt, DepType);
+    }
+  }
+
+  // oss release
+  void unpackReleaseDepsCallToRT(
+      Module &M, const ReleaseInfo &TI) {
+
+    const ReleaseDependsInfo &TDI = TI.DependsInfo;
+
+    unpackReleaseDepsCallToRTOfType(M, TDI.Ins, TI.I, "read");
+    unpackReleaseDepsCallToRTOfType(M, TDI.Outs, TI.I, "write");
+    unpackReleaseDepsCallToRTOfType(M, TDI.Inouts, TI.I, "readwrite");
+    unpackReleaseDepsCallToRTOfType(M, TDI.WeakIns, TI.I, "weak_read");
+    unpackReleaseDepsCallToRTOfType(M, TDI.WeakOuts, TI.I, "weak_write");
+    unpackReleaseDepsCallToRTOfType(M, TDI.WeakInouts, TI.I, "weak_readwrite");
+  }
+
   // TypeList[i] <-> NameList[i]
   // ExtraTypeList[i] <-> ExtraNameList[i]
   Function *createUnpackOlFunction(Module &M, Function &F,
@@ -1425,6 +1516,13 @@ struct OmpSs : public ModulePass {
     IRB.CreateCall(Func, {Nanos6TaskwaitLocStr});
     // 4. Remove the intrinsic
     TwI.I->eraseFromParent();
+  }
+
+  void lowerRelease(const ReleaseInfo &RelI,
+                    Module &M) {
+    unpackReleaseDepsCallToRT(M, RelI);
+    // Remove the intrinsic
+    RelI.I->eraseFromParent();
   }
 
   // This must be called before erasing original entry/exit
@@ -2398,6 +2496,7 @@ struct OmpSs : public ModulePass {
       FunctionInfo &FI = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
       TaskFunctionInfo &TFI = FI.TaskFuncInfo;
       TaskwaitFunctionInfo &TwFI = FI.TaskwaitFuncInfo;
+      ReleaseFunctionInfo &RelFI = FI.ReleaseFuncInfo;
 
       DenseMap<TaskInfo *, SmallVector<FinalBodyInfo, 4>> TaskFinalInfo;
 
@@ -2474,6 +2573,10 @@ struct OmpSs : public ModulePass {
 
       for (TaskwaitInfo& TwI : TwFI.PostOrder) {
         lowerTaskwait(TwI, M);
+      }
+
+      for (ReleaseInfo& RelI : RelFI.PostOrder) {
+        lowerRelease(RelI, M);
       }
 
       size_t taskNum = 0;

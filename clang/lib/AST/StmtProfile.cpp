@@ -1125,6 +1125,10 @@ void StmtProfiler::VisitOSSTaskwaitDirective(const OSSTaskwaitDirective *S) {
   VisitOSSExecutableDirective(S);
 }
 
+void StmtProfiler::VisitOSSReleaseDirective(const OSSReleaseDirective *S) {
+  VisitOSSExecutableDirective(S);
+}
+
 void StmtProfiler::VisitOSSTaskDirective(const OSSTaskDirective *S) {
   VisitOSSExecutableDirective(S);
 }

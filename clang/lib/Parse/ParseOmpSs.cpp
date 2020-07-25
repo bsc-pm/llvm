@@ -295,6 +295,8 @@ static bool parseDeclareTaskClauses(
     case OSSC_default:
       P.ParseOmpSsSimpleClauseImpl(CKind, SimpleData);
       break;
+    case OSSC_chunksize:
+    case OSSC_grainsize:
     case OSSC_weakconcurrent:
     case OSSC_reduction:
     case OSSC_weakreduction:
@@ -501,6 +503,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
   case OSSD_taskloop:
   case OSSD_taskloop_for:
   case OSSD_taskwait:
+  case OSSD_release:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
     break;
@@ -534,6 +537,10 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
 ///       executable-directive:
 ///         annot_pragma_ompss 'taskwait'
 ///         annot_pragma_ompss 'task'
+///         annot_pragma_ompss 'task for'
+///         annot_pragma_ompss 'taskloop'
+///         annot_pragma_ompss 'taskloop for'
+///         annot_pragma_ompss 'release'
 ///         annot_pragma_ompss_end
 ///
 StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
@@ -551,6 +558,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
   bool HasAssociatedStatement = true;
   switch (DKind) {
   case OSSD_taskwait:
+  case OSSD_release:
     HasAssociatedStatement = false;
     LLVM_FALLTHROUGH;
   case OSSD_task_for:
@@ -675,7 +683,9 @@ Parser::OSSClauseList Parser::ParseOmpSsClauses(OmpSsDirectiveKind DKind, Source
   // Consume final annot_pragma_ompss_end.
   ConsumeAnnotationToken();
 
-  Actions.ActOnOmpSsAfterClauseGathering(Clauses);
+  // 'release' does not need clause analysis
+  if (DKind != OSSD_release)
+    Actions.ActOnOmpSsAfterClauseGathering(Clauses);
 
   return Clauses;
 }
@@ -1220,7 +1230,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
     // Parse variable
     ExprResult VarExpr =
-        Actions.CorrectDelayedTyposInExpr(ParseOSSAssignmentExpression(Kind));
+        Actions.CorrectDelayedTyposInExpr(ParseOSSAssignmentExpression(DKind, Kind));
     if (VarExpr.isUsable()) {
       Vars.push_back(VarExpr.get());
     } else {

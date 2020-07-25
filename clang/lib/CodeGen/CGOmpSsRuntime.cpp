@@ -45,6 +45,7 @@ enum OmpSsBundleKind {
   OSSB_taskloop,
   OSSB_taskloop_for,
   OSSB_taskwait,
+  OSSB_release,
   OSSB_shared,
   OSSB_private,
   OSSB_firstprivate,
@@ -107,6 +108,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "TASKLOOP.FOR";
   case OSSB_taskwait:
     return "TASKWAIT";
+  case OSSB_release:
+    return "RELEASE";
   case OSSB_shared:
     return "QUAL.OSS.SHARED";
   case OSSB_private:
@@ -2146,6 +2149,32 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
     TaskStack.pop_back();
     CaptureMapStack.pop_back();
   }
+}
+
+void CGOmpSsRuntime::emitReleaseCall(
+    CodeGenFunction &CGF, SourceLocation Loc, const OSSTaskDataTy &Data) {
+
+  SmallVector<llvm::OperandBundleDef, 8> ReleaseInfo;
+
+  ReleaseInfo.emplace_back(
+      getBundleStr(OSSB_directive),
+      llvm::ConstantDataArray::getString(CGM.getLLVMContext(), getBundleStr(OSSB_release)));
+
+  // Push Task Stack
+  TaskStack.push_back(TaskContext());
+  CaptureMapStack.push_back(CaptureMapTy());
+
+  // TODO: rename this since we have release directive
+  InTaskEmission = true;
+  EmitDirectiveData(CGF, Data, ReleaseInfo);
+  InTaskEmission = false;
+
+  llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
+  CGF.Builder.CreateCall(Callee, {}, llvm::makeArrayRef(ReleaseInfo));
+
+  // Pop Task Stack
+  TaskStack.pop_back();
+  CaptureMapStack.pop_back();
 }
 
 // We're in task body context once we set InsertPt

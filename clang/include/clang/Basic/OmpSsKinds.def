@@ -24,6 +24,9 @@
 #ifndef OMPSS_TASK_CLAUSE
 #  define OMPSS_TASK_CLAUSE(Name)
 #endif
+#ifndef OMPSS_RELEASE_CLAUSE
+#  define OMPSS_RELEASE_CLAUSE(Name)
+#endif
 #ifndef OMPSS_TASK_FOR_CLAUSE
 #  define OMPSS_TASK_FOR_CLAUSE(Name)
 #endif
@@ -53,6 +56,7 @@
 OMPSS_DIRECTIVE(task)
 OMPSS_DIRECTIVE(taskloop)
 OMPSS_DIRECTIVE(taskwait)
+OMPSS_DIRECTIVE(release)
 
 // OmpSs clauses.
 OMPSS_CLAUSE(if, OSSIfClause)
@@ -125,6 +129,15 @@ OMPSS_TASK_CLAUSE(weakout)
 OMPSS_TASK_CLAUSE(weakinout)
 OMPSS_TASK_CLAUSE(weakcommutative)
 OMPSS_TASK_CLAUSE(weakreduction)
+
+// Clauses allowed for OmpSs directive 'release'.
+OMPSS_RELEASE_CLAUSE(depend)
+OMPSS_RELEASE_CLAUSE(in)
+OMPSS_RELEASE_CLAUSE(out)
+OMPSS_RELEASE_CLAUSE(inout)
+OMPSS_RELEASE_CLAUSE(weakin)
+OMPSS_RELEASE_CLAUSE(weakout)
+OMPSS_RELEASE_CLAUSE(weakinout)
 
 // Clauses allowed for OmpSs directive 'task for'.
 OMPSS_TASK_FOR_CLAUSE(if)
@@ -235,6 +248,7 @@ OMPSS_DECLARE_TASK_CLAUSE(weakcommutative)
 #undef OMPSS_DECLARE_TASK_CLAUSE
 #undef OMPSS_TASKWAIT_CLAUSE
 #undef OMPSS_TASK_CLAUSE
+#undef OMPSS_RELEASE_CLAUSE
 #undef OMPSS_TASK_FOR_CLAUSE
 #undef OMPSS_TASKLOOP_CLAUSE
 #undef OMPSS_TASKLOOP_FOR_CLAUSE

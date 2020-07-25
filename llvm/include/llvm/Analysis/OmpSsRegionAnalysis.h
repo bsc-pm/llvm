@@ -165,6 +165,32 @@ struct TaskwaitFunctionInfo {
 };
 // End Taskwait data structures
 
+// Release data structures
+struct ReleaseDependInfo {
+  Value *Base;
+  Function *ComputeDepFun;
+  SmallVector<Value *, 4> Args;
+};
+
+struct ReleaseDependsInfo {
+  SmallVector<ReleaseDependInfo, 4> Ins;
+  SmallVector<ReleaseDependInfo, 4> Outs;
+  SmallVector<ReleaseDependInfo, 4> Inouts;
+  SmallVector<ReleaseDependInfo, 4> WeakIns;
+  SmallVector<ReleaseDependInfo, 4> WeakOuts;
+  SmallVector<ReleaseDependInfo, 4> WeakInouts;
+};
+
+struct ReleaseInfo {
+  ReleaseDependsInfo DependsInfo;
+  Instruction *I;
+};
+
+struct ReleaseFunctionInfo {
+  SmallVector<ReleaseInfo, 4> PostOrder;
+};
+// End Release data structures
+
 // Start Analysis data structures. this info is not passed to transformation phase
 struct TaskAnalysisInfo {
   SetVector<Value *> UsesBeforeEntry;
@@ -181,6 +207,7 @@ struct TaskWithAnalysisInfo {
 struct FunctionInfo {
   TaskFunctionInfo TaskFuncInfo;
   TaskwaitFunctionInfo TaskwaitFuncInfo;
+  ReleaseFunctionInfo ReleaseFuncInfo;
 };
 
 class OmpSsRegionAnalysisPass : public FunctionPass {

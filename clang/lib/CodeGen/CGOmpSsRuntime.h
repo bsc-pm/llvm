@@ -264,6 +264,9 @@ public:
   virtual void emitTaskwaitCall(CodeGenFunction &CGF,
                                 SourceLocation Loc,
                                 const OSSTaskDataTy &Data);
+  /// Emit code for 'release' directive.
+  virtual void emitReleaseCall(
+    CodeGenFunction &CGF, SourceLocation Loc, const OSSTaskDataTy &Data);
   /// Emit code for 'task' directive.
   virtual void emitTaskCall(CodeGenFunction &CGF,
                             const OSSExecutableDirective &D,

@@ -3595,6 +3595,9 @@ RecursiveASTVisitor<Derived>::TraverseOSSLoopDirective(OSSLoopDirective *S) {
 DEF_TRAVERSE_STMT(OSSTaskwaitDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 
+DEF_TRAVERSE_STMT(OSSReleaseDirective,
+                  { TRY_TO(TraverseOSSExecutableDirective(S)); })
+
 DEF_TRAVERSE_STMT(OSSTaskDirective,
                   { TRY_TO(TraverseOSSExecutableDirective(S)); })
 

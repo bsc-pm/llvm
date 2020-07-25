@@ -3316,6 +3316,7 @@ public:
 
   // OmpSs statements
   void EmitOSSTaskwaitDirective(const OSSTaskwaitDirective &S);
+  void EmitOSSReleaseDirective(const OSSReleaseDirective &S);
   void EmitOSSTaskDirective(const OSSTaskDirective &S);
   void EmitOSSTaskForDirective(const OSSTaskForDirective &S);
   void EmitOSSTaskLoopDirective(const OSSTaskLoopDirective &S);

@@ -10217,6 +10217,16 @@ TreeTransform<Derived>::TransformOSSTaskwaitDirective(OSSTaskwaitDirective *D) {
 
 template <typename Derived>
 StmtResult
+TreeTransform<Derived>::TransformOSSReleaseDirective(OSSReleaseDirective *D) {
+  getDerived().getSema().StartOmpSsDSABlock(OSSD_release, nullptr,
+                                            D->getBeginLoc());
+  StmtResult Res = getDerived().TransformOSSExecutableDirective(D);
+  getDerived().getSema().EndOmpSsDSABlock(Res.get());
+  return Res;
+}
+
+template <typename Derived>
+StmtResult
 TreeTransform<Derived>::TransformOSSTaskDirective(OSSTaskDirective *D) {
   DeclarationNameInfo DirName;
   getDerived().getSema().StartOmpSsDSABlock(OSSD_task, nullptr,

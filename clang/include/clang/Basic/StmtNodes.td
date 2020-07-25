@@ -281,6 +281,7 @@ def OMPTargetTeamsDistributeSimdDirective : StmtNode<OMPLoopDirective>;
 def OSSExecutableDirective : StmtNode<Stmt, 1>;
 def OSSLoopDirective : StmtNode<OSSExecutableDirective, 1>;
 def OSSTaskwaitDirective : StmtNode<OSSExecutableDirective>;
+def OSSReleaseDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskDirective : StmtNode<OSSExecutableDirective>;
 def OSSTaskForDirective : StmtNode<OSSLoopDirective>;
 def OSSTaskLoopDirective : StmtNode<OSSLoopDirective>;

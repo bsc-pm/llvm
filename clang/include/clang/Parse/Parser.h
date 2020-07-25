@@ -1882,7 +1882,8 @@ private:
 
   ExprResult ParseOSSMultiDepExpression();
   // Used to handle assignment exprs. and multideps 
-  ExprResult ParseOSSAssignmentExpression(OmpSsClauseKind CKind);
+  ExprResult ParseOSSAssignmentExpression(
+    OmpSsDirectiveKind DKind, OmpSsClauseKind CKind);
 
   //===--------------------------------------------------------------------===//
   // C++ Expressions
