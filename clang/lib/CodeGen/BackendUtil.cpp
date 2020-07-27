@@ -185,10 +185,6 @@ private:
 };
 }
 
-static void addOmpSsPass(const PassManagerBuilder &Builder, PassManagerBase &PM) {
-  PM.add(createOmpSsPass());
-}
-
 static void addObjCARCAPElimPass(const PassManagerBuilder &Builder, PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
     PM.add(createObjCARCAPElimPass());
@@ -619,13 +615,6 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
   if (TM)
     TM->adjustPassManager(PMBuilder);
 
-  if (LangOpts.OmpSs) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
-                           addOmpSsPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addOmpSsPass);
-  }
-
   if (CodeGenOpts.DebugInfoForProfiling ||
       !CodeGenOpts.SampleProfileFile.empty())
     PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
@@ -863,6 +852,16 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
   if (TM)
     TheModule->setDataLayout(TM->createDataLayout());
 
+  legacy::PassManager EarlyPerModulePasses;
+  // TODO: Do we need this?
+  EarlyPerModulePasses.add(
+    createTargetTransformInfoWrapperPass(getTargetIRAnalysis()));
+
+  if (LangOpts.OmpSs) {
+    if (!CodeGenOpts.DisableLLVMPasses)
+      EarlyPerModulePasses.add(createOmpSsPass());
+  }
+
   legacy::PassManager PerModulePasses;
   PerModulePasses.add(
       createTargetTransformInfoWrapperPass(getTargetIRAnalysis()));
@@ -935,6 +934,12 @@ void EmitAssemblyHelper::EmitAssembly(BackendAction Action,
 
   // Run passes. For now we do all passes at once, but eventually we
   // would like to have the option of streaming code generation.
+
+  {
+    PrettyStackTraceString CrashInfo("Early per-module transformation");
+    llvm::TimeTraceScope TimeScope("EarlyPerModulePasses");
+    EarlyPerModulePasses.run(*TheModule);
+  }
 
   {
     PrettyStackTraceString CrashInfo("Per-function optimization");

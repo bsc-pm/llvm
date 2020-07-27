@@ -33,13 +33,11 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/IntrinsicsOmpSs.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/PatternMatch.h"
@@ -1409,16 +1407,6 @@ public:
   bool runOnFunction(Function &F) override {
     if (skipFunction(F))
       return false;
-
-    // OmpSs-2: for now skip functions that have oss intrinsics
-    for (Instruction &Inst : instructions(F)) {
-      if (match(&Inst, m_Intrinsic<Intrinsic::directive_region_entry>()))
-        return false;
-      if (match(&Inst, m_Intrinsic<Intrinsic::directive_region_exit>()))
-        return false;
-      if (match(&Inst, m_Intrinsic<Intrinsic::directive_marker>()))
-        return false;
-    }
 
     auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
     auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
