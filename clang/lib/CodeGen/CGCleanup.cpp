@@ -840,6 +840,11 @@ void CodeGenFunction::PopCleanupBlock(bool FallthroughIsBranchThrough) {
           NormalCleanupDestSlot->user_back()->eraseFromParent();
           NormalCleanupDestSlot->eraseFromParent();
           NormalCleanupDest = Address::invalid();
+
+          // OmpSs-2: Clean up the possibly dead store to the cleanup dest slot.
+          if (getContext().getLangOpts().OmpSs
+              && CGM.getOmpSsRuntime().inTaskBody())
+            CGM.getOmpSsRuntime().setTaskNormalCleanupDestSlot(Address::invalid());
         }
 
         llvm::BasicBlock *BranchAfter = Scope.getBranchAfterBlock(0);
@@ -1266,6 +1271,19 @@ void CodeGenFunction::DeactivateCleanupBlock(EHScopeStack::stable_iterator C,
 }
 
 Address CodeGenFunction::getNormalCleanupDestSlot() {
+  if (getContext().getLangOpts().OmpSs
+      && CGM.getOmpSsRuntime().inTaskBody()) {
+        Address NCleanupDest = CGM.getOmpSsRuntime().getTaskNormalCleanupDestSlot();
+        if (NCleanupDest.isValid())
+          return NCleanupDest;
+
+        NCleanupDest =
+          CreateDefaultAlignTempAlloca(Builder.getInt32Ty(), "cleanup.dest.slot");
+
+        CGM.getOmpSsRuntime().setTaskNormalCleanupDestSlot(NCleanupDest);
+        return NCleanupDest;
+
+  }
   if (!NormalCleanupDest.isValid())
     NormalCleanupDest =
       CreateDefaultAlignTempAlloca(Builder.getInt32Ty(), "cleanup.dest.slot");

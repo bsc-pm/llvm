@@ -27,21 +27,19 @@
 // RUN: %oss-compile
 // RUN: %oss-O2-compile
 
-// There's only one cleanup here, so codegen removes the cleanup.dest.slot.
-// We have to do the same in task context
+// There's more than one cleanup here
 
-int main(int argc, char **argv)
-{
+int main() {
     #pragma oss task
     {
-        // cleanup for 'd'
-        for (int d = 0; d < 100; ++d) {
-        }
-        // cleanup for 'd'
-        for (int d = 0; d < 100; ++d) {
-        }
+        for (int i = 0; i < 10; ++i)
+            for (int j = 0; j < 10; ++j)
+                ;
     }
-    #pragma oss taskwait
-
-    return 0;
+    #pragma oss task
+    {
+        for (int i = 0; i < 10; ++i)
+            for (int j = 0; j < 10; ++j)
+                ;
+    }
 }
