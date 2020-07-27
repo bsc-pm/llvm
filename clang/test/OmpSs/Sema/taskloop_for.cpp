@@ -41,4 +41,12 @@ void foo() {
     bar<int>(); // expected-note {{in instantiation of function template specialization 'bar<int>' requested here}}
     Q<int> q;
     q.foo(); // expected-note {{in instantiation of member function 'Q<int>::foo' requested here}}
+
+    // Check we cleanup late parsed tokens even if init-stmt is not well-formed
+    #pragma oss taskloop
+    for ( = ; i < 10; ++i) { // expected-error 2 {{expected expression}} expected-error 2 {{use of undeclared identifier 'i'}}
+        #pragma oss taskloop
+        for (int j = 0; j < 10; ++j)
+        ;
+    }
 }

@@ -2031,7 +2031,6 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
           PP.EnterToken(Tok, /*IsReinject*/ true);
           PP.EnterTokenStream(OSSLateParsedToks, /*DisableMacroExpansion=*/true,
                               /*IsReinject*/ true);
-          OSSLateParsedToks.clear();
 
           // Consume the previously pushed token.
           ConsumeAnyToken(/*ConsumeCodeCompletionTok=*/true);
@@ -2041,6 +2040,7 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
           StackClauses.back() = ParseOmpSsClauses(DKind, EndLoc);
         }
       }
+      OSSLateParsedToks.clear();
     }
   }
 
