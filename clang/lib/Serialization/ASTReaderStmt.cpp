@@ -973,6 +973,10 @@ void ASTStmtReader::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
   llvm_unreachable("OSS shaping");
 }
 
+void ASTStmtReader::VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+  llvm_unreachable("OSS multideps");
+}
+
 void ASTStmtReader::VisitCallExpr(CallExpr *E) {
   VisitExpr(E);
   unsigned NumArgs = Record.readInt();

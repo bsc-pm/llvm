@@ -1226,7 +1226,7 @@ bool Parser::ParseOmpSsVarList(OmpSsDirectiveKind DKind,
                      Tok.isNot(tok::annot_pragma_ompss_end))) {
     // Parse variable
     ExprResult VarExpr =
-        Actions.CorrectDelayedTyposInExpr(ParseAssignmentExpression());
+        Actions.CorrectDelayedTyposInExpr(ParseOSSAssignmentExpression(Kind));
     if (VarExpr.isUsable()) {
       Vars.push_back(VarExpr.get());
     } else {

@@ -14190,6 +14190,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
     // OmpSs
   case Expr::OSSArraySectionExprClass:
   case Expr::OSSArrayShapingExprClass:
+  case Expr::OSSMultiDepExprClass:
   case Expr::MemberExprClass:
   case Expr::CompoundAssignOperatorClass:
   case Expr::CompoundLiteralExprClass:

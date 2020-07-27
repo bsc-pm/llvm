@@ -494,13 +494,41 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   OSSClause *CurClause;
   bool ErrorFound = false;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
+  llvm::SmallVector<Expr *, 4> ImplicitPrivate;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   // This is used to know we're inside a subscript expression
   size_t ArraySubscriptCnt = 0;
+  // This is used to know we're inside a multidep init/ub/step
+  // or init-list
+  bool IsMultiDepInfo = false;
   // This is used to mark the innermost base symbol expression as:
   // *p, p[2], p[1:2], [2]p, s.x, s->x
   bool IsDerefMemberArrayBase = false;
 public:
+
+  void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+    // Before going through dependency base set iterators
+    // as private
+    for (auto *E : E->getDepIterators()) {
+      auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+      Stack->addDSA(VD, E, OSSC_private, /*Ignore=*/true, /*Implicit=*/true);
+      ImplicitPrivate.push_back(E);
+    }
+
+    // init/ub/step work like array subscripts, so let's make them
+    // firstprivate
+    IsMultiDepInfo = true;
+    for (size_t i = 0; i < E->getDepInits().size(); ++i) {
+      Visit(E->getDepInits()[i]);
+      if (E->getDepSizes()[i])
+        Visit(E->getDepSizes()[i]);
+      if (E->getDepSteps()[i])
+        Visit(E->getDepSteps()[i]);
+    }
+    IsMultiDepInfo = false;
+
+    Visit(E->getDepExpr());
+  }
 
   void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
     if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
@@ -576,6 +604,9 @@ public:
       // inout(ps->x)          | firstprivate(ps) | struct S *ps;
       // inout([1]p)           | firstprivate(p)  | int *p;
       OmpSsClauseKind VKind = OSSC_shared;
+      // Multidep init/ub/step are firstprivate
+      if (IsMultiDepInfo)
+        VKind = OSSC_firstprivate;
       // FIXME?: There's an overlapping between IsDerefMemberArrayBase
       // and ArraySubscriptCnt
       // i.e
@@ -676,6 +707,10 @@ public:
     return ImplicitShared;
   }
 
+  ArrayRef<Expr *> getImplicitPrivate() const {
+    return ImplicitPrivate;
+  }
+
   ArrayRef<Expr *> getImplicitFirstprivate() const {
     return ImplicitFirstprivate;
   }
@@ -774,6 +809,10 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
       OSSClauseChecker.getImplicitShared().begin(),
       OSSClauseChecker.getImplicitShared().end());
 
+  SmallVector<Expr *, 4> ImplicitPrivate(
+      OSSClauseChecker.getImplicitPrivate().begin(),
+      OSSClauseChecker.getImplicitPrivate().end());
+
   SmallVector<Expr *, 4> ImplicitFirstprivate(
       OSSClauseChecker.getImplicitFirstprivate().begin(),
       OSSClauseChecker.getImplicitFirstprivate().end());
@@ -784,6 +823,19 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
             SourceLocation(), /*isImplicit=*/true)) {
       Clauses.push_back(Implicit);
       if (cast<OSSSharedClause>(Implicit)->varlist_size() != ImplicitShared.size())
+        ErrorFound = true;
+
+    } else {
+      ErrorFound = true;
+    }
+  }
+
+  if (!ImplicitPrivate.empty()) {
+    if (OSSClause *Implicit = ActOnOmpSsPrivateClause(
+            ImplicitPrivate, SourceLocation(), SourceLocation(),
+            SourceLocation())) {
+      Clauses.push_back(Implicit);
+      if (cast<OSSPrivateClause>(Implicit)->varlist_size() != ImplicitPrivate.size())
         ErrorFound = true;
 
     } else {
@@ -802,6 +854,145 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
       ErrorFound = true;
     }
   }
+}
+
+Expr *Sema::ActOnOmpSsMultiDepIterator(Scope *S, StringRef Name, SourceLocation Loc) {
+  VarDecl *MultiDepItDecl =
+      buildVarDecl(*this, Loc, Context.IntTy, Name);
+  // TODO: what about templates?
+  if (S) {
+    PushOnScopeChains(MultiDepItDecl, S);
+  }
+  Expr *MultiDepItE = buildDeclRefExpr(*this, MultiDepItDecl, Context.IntTy, Loc);
+  return MultiDepItE;
+}
+
+ExprResult Sema::ActOnOmpSsMultiDepIteratorInitListExpr(InitListExpr *InitList) {
+  // int [] = InitList
+  unsigned NumInits = InitList->getNumInits();
+  ExprResult Res = ActOnIntegerConstant(SourceLocation(), NumInits);
+
+  QualType Ty = BuildArrayType(Context.IntTy, ArrayType::Normal, Res.get(), /*Quals=*/0,
+                        SourceRange(), DeclarationName());
+  VarDecl *DiscreteArrayDecl =
+      buildVarDecl(*this, SourceLocation(), Ty, "discrete.array");
+  AddInitializerToDecl(DiscreteArrayDecl, InitList, /*DirectInit=*/false);
+
+  Expr *DiscreteArrayE = buildDeclRefExpr(*this, DiscreteArrayDecl, Ty, SourceLocation());
+
+  if (DiscreteArrayDecl->hasInit())
+    return DiscreteArrayE;
+  return ExprError();
+}
+
+ExprResult Sema::ActOnOSSMultiDepExpression(
+    SourceLocation Loc, SourceLocation RLoc, ArrayRef<Expr *> MultiDepIterators,
+    ArrayRef<Expr *> MultiDepInits, ArrayRef<Expr *> MultiDepSizes,
+    ArrayRef<Expr *> MultiDepSteps, ArrayRef<bool> MultiDepSizeOrSection,
+    Expr *DepExpr) {
+  assert((MultiDepIterators.size() == MultiDepInits.size() &&
+          MultiDepIterators.size() == MultiDepSizes.size() &&
+          MultiDepIterators.size() == MultiDepSteps.size() &&
+          MultiDepIterators.size() == MultiDepSizeOrSection.size())
+         && "Multidep info lists do not have the same size");
+
+  bool IsDependent = DepExpr &&
+    (DepExpr->isTypeDependent() || DepExpr->isValueDependent());
+  bool IsError = !DepExpr;
+  for (size_t i = 0; i < MultiDepIterators.size(); ++i) {
+    if (MultiDepInits[i]) {
+      if (!isa<InitListExpr>(MultiDepInits[i]) && !MultiDepSizes[i]) {
+        IsError = true;
+      }
+    } else {
+      IsError = true;
+    }
+    IsDependent = IsDependent ||
+      (MultiDepInits[i] && (MultiDepInits[i]->isTypeDependent()
+       || MultiDepInits[i]->isValueDependent()));
+    IsDependent = IsDependent ||
+      (MultiDepSizes[i] && (MultiDepSizes[i]->isTypeDependent()
+       || MultiDepSizes[i]->isValueDependent()));
+    IsDependent = IsDependent ||
+      (MultiDepSteps[i] && (MultiDepSteps[i]->isTypeDependent()
+       || MultiDepSteps[i]->isValueDependent()));
+  }
+
+  SmallVector<Expr *, 4> Inits;
+  SmallVector<Expr *, 4> Sizes;
+  SmallVector<Expr *, 4> Steps;
+  SmallVector<Expr *, 4> DiscreteArrays;
+
+  // This errors are from Parser, which should have emitted
+  // some diagnostics
+  if (IsError)
+    return ExprError();
+
+  if (IsDependent)
+    // Analyze later
+    return OSSMultiDepExpr::Create(
+      Context,
+      Context.DependentTy, VK_LValue, OK_Ordinary, DepExpr,
+      MultiDepIterators, MultiDepInits, MultiDepSizes,
+      MultiDepSteps, DiscreteArrays, MultiDepSizeOrSection, Loc, RLoc);
+
+  for (size_t i = 0; i < MultiDepIterators.size(); ++i) {
+    Expr *ItE = MultiDepIterators[i];
+    VarDecl *ItVD = cast<VarDecl>(cast<DeclRefExpr>(ItE)->getDecl());
+
+    IsError = false;
+
+    Expr *InitExpr = MultiDepInits[i];
+    if (InitListExpr *InitList = dyn_cast<InitListExpr>(InitExpr)) {
+      ExprResult Res = ActOnOmpSsMultiDepIteratorInitListExpr(InitList);
+      if (Res.isInvalid())
+        IsError = true;
+      DiscreteArrays.push_back(Res.get());
+    } else {
+      AddInitializerToDecl(ItVD, InitExpr, /*DirectInit=*/false);
+      InitExpr = ItVD->getInit();
+      if (!InitExpr)
+        IsError = true;
+    }
+    Inits.push_back(InitExpr);
+
+    Expr *SizeExpr = MultiDepSizes[i];
+    if (SizeExpr) {
+      ExprResult Res = PerformOmpSsImplicitIntegerConversion(SizeExpr->getExprLoc(), SizeExpr);
+      if (Res.isInvalid()) {
+        IsError = true;
+      } else {
+        SizeExpr = Res.get();
+        // Force the type of the expression to 'int'.
+        if (!Context.hasSameType(SizeExpr->getType(), Context.IntTy))
+          SizeExpr = ImpCastExprToType(SizeExpr, Context.IntTy, CK_IntegralCast).get();
+      }
+    }
+    Sizes.push_back(SizeExpr);
+
+    Expr *StepExpr = MultiDepSteps[i];
+    if (StepExpr) {
+      ExprResult Res = PerformOmpSsImplicitIntegerConversion(StepExpr->getExprLoc(), StepExpr);
+      if (Res.isInvalid()) {
+        IsError = true;
+      } else {
+        StepExpr = Res.get();
+        // Force the type of the expression to 'int'.
+        if (!Context.hasSameType(StepExpr->getType(), Context.IntTy))
+          StepExpr = ImpCastExprToType(StepExpr, Context.IntTy, CK_IntegralCast).get();
+      }
+    }
+    Steps.push_back(StepExpr);
+  }
+
+  if (IsError)
+    return ExprError();
+
+  return OSSMultiDepExpr::Create(
+    Context,
+    DepExpr->getType(), VK_LValue, OK_Ordinary, DepExpr,
+    MultiDepIterators, Inits, Sizes, Steps, DiscreteArrays,
+    MultiDepSizeOrSection, Loc, RLoc);
 }
 
 QualType Sema::ActOnOmpSsDeclareReductionType(SourceLocation TyLoc,
@@ -3165,7 +3356,16 @@ ExprResult Sema::PerformOmpSsImplicitIntegerConversion(SourceLocation Loc,
       llvm_unreachable("conversion functions are permitted");
     }
   } ConvertDiagnoser;
-  return PerformContextualImplicitConversion(Loc, Op, ConvertDiagnoser);
+  ExprResult Ex = PerformContextualImplicitConversion(Loc, Op, ConvertDiagnoser);
+  if (Ex.isInvalid())
+    return ExprError();
+  QualType Type = Ex.get()->getType();
+  if (!ConvertDiagnoser.match(Type))
+    // FIXME: PerformContextualImplicitConversion should return ExprError
+    //        itself in this case.
+    // Case: int [10]
+    return ExprError();
+  return Ex;
 }
 
 

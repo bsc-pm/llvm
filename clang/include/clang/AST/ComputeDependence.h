@@ -91,6 +91,7 @@ class OMPArrayShapingExpr;
 class OMPIteratorExpr;
 class OSSArraySectionExpr;
 class OSSArrayShapingExpr;
+class OSSMultiDepExpr;
 class ObjCArrayLiteral;
 class ObjCDictionaryLiteral;
 class ObjCBoxedExpr;
@@ -182,6 +183,7 @@ ExprDependence computeDependence(OMPIteratorExpr *E);
 // OmpSs
 ExprDependence computeDependence(OSSArraySectionExpr *E);
 ExprDependence computeDependence(OSSArrayShapingExpr *E);
+ExprDependence computeDependence(OSSMultiDepExpr *E);
 
 ExprDependence computeDependence(ObjCArrayLiteral *E);
 ExprDependence computeDependence(ObjCDictionaryLiteral *E);

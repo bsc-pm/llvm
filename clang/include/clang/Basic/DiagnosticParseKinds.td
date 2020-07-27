@@ -1236,6 +1236,10 @@ def err_oss_decl_in_task: Error<
   "function declaration is expected after 'task' function directive">;
 def err_oss_expected_reduction_identifier : Error<
   "expected identifier or one of the following operators: '+', '-', '*', '&', '|', '^', '&&', or '||'">;
+def err_oss_expected_multidep_iterator_identifier : Error<
+  "expected iterator identifier">;
+def err_oss_expected_multidep_separator : Error<
+  "expected ':'%select{| or ';'}0">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

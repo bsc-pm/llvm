@@ -253,6 +253,56 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSLoopGrainsizeEntry->second == LLVMContext::OB_oss_loop_grainsize &&
          "oss_loop_grainsize operand bundle id drifted!");
   (void)OSSLoopGrainsizeEntry;
+
+  auto *OSSMultiDepRangeInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.IN");
+  assert(OSSMultiDepRangeInEntry->second == LLVMContext::OB_oss_multidep_range_in &&
+         "oss_multidep_range_in operand bundle id drifted!");
+  (void)OSSMultiDepRangeInEntry;
+
+  auto *OSSMultiDepRangeOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.OUT");
+  assert(OSSMultiDepRangeOutEntry->second == LLVMContext::OB_oss_multidep_range_out &&
+         "oss_multidep_range_out operand bundle id drifted!");
+  (void)OSSMultiDepRangeOutEntry;
+
+  auto *OSSMultiDepRangeInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.INOUT");
+  assert(OSSMultiDepRangeInoutEntry->second == LLVMContext::OB_oss_multidep_range_inout &&
+         "oss_multidep_range_inout operand bundle id drifted!");
+  (void)OSSMultiDepRangeInoutEntry;
+
+  auto *OSSMultiDepRangeConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.CONCURRENT");
+  assert(OSSMultiDepRangeConcurrentEntry->second == LLVMContext::OB_oss_multidep_range_concurrent &&
+         "oss_multidep_range_concurrent operand bundle id drifted!");
+  (void)OSSMultiDepRangeConcurrentEntry;
+
+  auto *OSSMultiDepRangeCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.COMMUTATIVE");
+  assert(OSSMultiDepRangeCommutativeEntry->second == LLVMContext::OB_oss_multidep_range_commutative &&
+         "oss_multidep_range_commutative operand bundle id drifted!");
+  (void)OSSMultiDepRangeCommutativeEntry;
+
+  auto *OSSMultiDepRangeWeakInEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKIN");
+  assert(OSSMultiDepRangeWeakInEntry->second == LLVMContext::OB_oss_multidep_range_weakin &&
+         "oss_multidep_range_weakin operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakInEntry;
+
+  auto *OSSMultiDepRangeWeakOutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKOUT");
+  assert(OSSMultiDepRangeWeakOutEntry->second == LLVMContext::OB_oss_multidep_range_weakout &&
+         "oss_multidep_range_weakout operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakOutEntry;
+
+  auto *OSSMultiDepRangeWeakInoutEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKINOUT");
+  assert(OSSMultiDepRangeWeakInoutEntry->second == LLVMContext::OB_oss_multidep_range_weakinout &&
+         "oss_multidep_range_weakinout operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakInoutEntry;
+
+  auto *OSSMultiDepRangeWeakConcurrentEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKCONCURRENT");
+  assert(OSSMultiDepRangeWeakConcurrentEntry->second == LLVMContext::OB_oss_multidep_range_weakconcurrent &&
+         "oss_multidep_range_weakconcurrent operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakConcurrentEntry;
+
+  auto *OSSMultiDepRangeWeakCommutativeEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.MULTIDEP.RANGE.WEAKCOMMUTATIVE");
+  assert(OSSMultiDepRangeWeakCommutativeEntry->second == LLVMContext::OB_oss_multidep_range_weakcommutative &&
+         "oss_multidep_range_weakcommutative operand bundle id drifted!");
+  (void)OSSMultiDepRangeWeakCommutativeEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

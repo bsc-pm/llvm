@@ -2610,6 +2610,7 @@ DEF_TRAVERSE_STMT(OMPIteratorExpr, {})
 // OmpSs
 DEF_TRAVERSE_STMT(OSSArraySectionExpr, {})
 DEF_TRAVERSE_STMT(OSSArrayShapingExpr, {})
+DEF_TRAVERSE_STMT(OSSMultiDepExpr, {})
 
 DEF_TRAVERSE_STMT(BlockExpr, {
   TRY_TO(TraverseDecl(S->getBlockDecl()));

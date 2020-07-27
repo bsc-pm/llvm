@@ -447,6 +447,49 @@ static void gatherDependsInfoWithID(const IntrinsicInst *I,
   }
 }
 
+// Gathers multi dependencies needed information of type Id
+static void gatherMultiDependsInfoWithID(
+    const IntrinsicInst *I, SmallVectorImpl<MultiDependInfo> &DependsList,
+    TaskDSAInfo &DSAInfo, TaskCapturedInfo &CapturedInfo, uint64_t Id) {
+  SmallVector<OperandBundleDef, 4> OpBundles;
+  // TODO: maybe do a bundle gather with asserts?
+  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
+  for (const OperandBundleDef &OBDef : OpBundles) {
+    MultiDependInfo MDI;
+    DependInfo &DI = MDI.DepInfo;
+    ArrayRef<Value *> OBArgs = OBDef.inputs();
+
+    size_t i;
+    size_t ComputeFnCnt = 0;
+    // 1. Gather iterators from begin to compute multidep function
+    // 2. Gather compute multidep function args from 1. to compute dep function previous element
+    //    which is the dep base
+    for (i = 0; i < OBArgs.size(); ++i) {
+      if (auto *ComputeFn = dyn_cast<Function>(OBArgs[i])) {
+        if (ComputeFnCnt == 0) // ComputeMultiDepFun
+          MDI.ComputeMultiDepFun = ComputeFn;
+        else // Seen ComputeDepFun
+          break;
+        ++ComputeFnCnt;
+        continue;
+      }
+      assert((valueInDSABundles(DSAInfo, OBArgs[i])
+              || valueInCapturedBundle(CapturedInfo, OBArgs[i]))
+             && "Multidependency value has no associated DSA or capture");
+      if (ComputeFnCnt == 0)
+        MDI.Iters.push_back(OBArgs[i]);
+      else if (ComputeFnCnt == 1)
+        MDI.Args.push_back(OBArgs[i]);
+    }
+    // TODO: this is used because we add dep base too
+    // which is wrong...
+    MDI.Args.pop_back();
+
+    gatherDependInfoFromBundle(OBArgs.drop_front(i - 1), DSAInfo, CapturedInfo, DI);
+    DependsList.push_back(MDI);
+  }
+}
+
 // Gathers dependencies needed information of type Id
 static void gatherReductionsInfoWithID(const IntrinsicInst *I,
                                        SmallVectorImpl<ReductionInfo> &ReductionsList,
@@ -537,6 +580,64 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
                              LLVMContext::OB_oss_dep_weakreduction);
 
   TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
+}
+
+static void gatherMultiDependsInfo(
+  const IntrinsicInst *I, TaskInfo &TI,
+  TaskAnalysisInfo &TAI, const OrderedInstructions &OI) {
+
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeIns,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_in);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeOuts,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_out);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeInouts,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_inout);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeConcurrents,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_concurrent);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeCommutatives,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_commutative);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeWeakIns,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_weakin);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeWeakOuts,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_weakout);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeWeakInouts,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_weakinout);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeWeakConcurrents,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_weakconcurrent);
+  gatherMultiDependsInfoWithID(I,
+                          TI.DependsInfo.MultiRangeWeakCommutatives,
+                          TI.DSAInfo,
+                          TI.CapturedInfo,
+                          LLVMContext::OB_oss_multidep_range_weakcommutative);
+
+  TI.DependsInfo.NumSymbols += TI.DSAInfo.DepSymToIdx.size();
 }
 
 // TODO: change function name for this
@@ -681,6 +782,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
           gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
+          gatherMultiDependsInfo(II, T.Info, T.AnalysisInfo, OI);
           gatherReductionsInitCombInfo(II, T.Info);
           gatherIfFinalCostPrioWaitInfo(II, T.Info);
           if (isOmpSsLoopDirective(T.Info.TaskKind))

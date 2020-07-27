@@ -146,6 +146,7 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
     // OmpSs
   case Expr::OSSArraySectionExprClass:
   case Expr::OSSArrayShapingExprClass:
+  case Expr::OSSMultiDepExprClass:
     return Cl::CL_LValue;
 
     // C99 6.5.2.5p5 says that compound literals are lvalues.

@@ -10863,6 +10863,14 @@ public:
   /// \param Init First part of the for loop.
   void ActOnOmpSsLoopInitialization(SourceLocation ForLoc, Stmt *Init);
 
+  Expr *ActOnOmpSsMultiDepIterator(Scope *S, StringRef Name, SourceLocation Loc);
+  ExprResult ActOnOmpSsMultiDepIteratorInitListExpr(InitListExpr *InitList);
+  ExprResult ActOnOSSMultiDepExpression(
+    SourceLocation Loc, SourceLocation RLoc, ArrayRef<Expr *> MultiDepIterators,
+    ArrayRef<Expr *> MultiDepInits, ArrayRef<Expr *> MultiDepSizes,
+    ArrayRef<Expr *> MultiDepSteps, ArrayRef<bool> MultiDepSizeOrSection,
+    Expr *DepExpr);
+
   /// Check if the specified type is allowed to be used in 'oss declare
   /// reduction' construct.
   QualType ActOnOmpSsDeclareReductionType(SourceLocation TyLoc,

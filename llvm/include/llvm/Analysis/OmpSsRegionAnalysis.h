@@ -50,6 +50,13 @@ struct DependInfo {
   std::string RegionText;
 };
 
+struct MultiDependInfo {
+  SmallVector<Value *, 4> Iters;
+  Function *ComputeMultiDepFun;
+  SmallVector<Value *, 4> Args;
+  DependInfo DepInfo;
+};
+
 struct ReductionInfo {
   Value *RedKind;
   DependInfo DepInfo;
@@ -68,6 +75,17 @@ struct TaskDependsInfo {
   SmallVector<DependInfo, 4> WeakCommutatives;
   SmallVector<ReductionInfo, 4> Reductions;
   SmallVector<ReductionInfo, 4> WeakReductions;
+
+  SmallVector<MultiDependInfo, 4> MultiRangeIns;
+  SmallVector<MultiDependInfo, 4> MultiRangeOuts;
+  SmallVector<MultiDependInfo, 4> MultiRangeInouts;
+  SmallVector<MultiDependInfo, 4> MultiRangeConcurrents;
+  SmallVector<MultiDependInfo, 4> MultiRangeCommutatives;
+  SmallVector<MultiDependInfo, 4> MultiRangeWeakIns;
+  SmallVector<MultiDependInfo, 4> MultiRangeWeakOuts;
+  SmallVector<MultiDependInfo, 4> MultiRangeWeakInouts;
+  SmallVector<MultiDependInfo, 4> MultiRangeWeakConcurrents;
+  SmallVector<MultiDependInfo, 4> MultiRangeWeakCommutatives;
 
   int NumSymbols;
 };

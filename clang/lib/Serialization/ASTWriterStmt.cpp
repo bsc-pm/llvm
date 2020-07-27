@@ -797,6 +797,10 @@ void ASTStmtWriter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
   llvm_unreachable("OSS shaping");
 }
 
+void ASTStmtWriter::VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+  llvm_unreachable("OSS multideps");
+}
+
 void ASTStmtWriter::VisitOMPArrayShapingExpr(OMPArrayShapingExpr *E) {
   VisitExpr(E);
   Record.push_back(E->getDimensions().size());

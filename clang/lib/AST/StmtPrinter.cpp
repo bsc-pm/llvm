@@ -1587,6 +1587,35 @@ void StmtPrinter::VisitOSSArrayShapingExpr(OSSArrayShapingExpr *Node) {
   PrintExpr(Node->getBase());
 }
 
+void StmtPrinter::VisitOSSMultiDepExpr(OSSMultiDepExpr *Node) {
+  OS << "{";
+  PrintExpr(Node->getDepExpr());
+  ArrayRef<Expr *> DepIterators = Node->getDepIterators();
+  ArrayRef<Expr *> DepInits = Node->getDepInits();
+  ArrayRef<Expr *> DepSizes = Node->getDepSizes();
+  ArrayRef<Expr *> DepSteps = Node->getDepSteps();
+  ArrayRef<bool> DepSizeOrSection = Node->getDepSizeOrSection();
+  for (size_t i = 0; i < DepIterators.size(); ++i) {
+    OS << ", ";
+    VarDecl *ItVD = cast<VarDecl>(cast<DeclRefExpr>(DepIterators[i])->getDecl());
+    OS << ItVD->getName();
+    OS << " = ";
+    PrintExpr(DepInits[i]);
+    if (DepSizes[i]) {
+      if (DepSizeOrSection[i])
+        OS << ";";
+      else
+        OS << ":";
+      PrintExpr(DepSizes[i]);
+    }
+    if (DepSteps[i]) {
+      OS << ":";
+      PrintExpr(DepSteps[i]);
+    }
+  }
+  OS << "}";
+}
+
 void StmtPrinter::VisitOMPArrayShapingExpr(OMPArrayShapingExpr *Node) {
   OS << "(";
   for (Expr *E : Node->getDimensions()) {

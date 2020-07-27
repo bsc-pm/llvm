@@ -479,6 +479,113 @@ struct OmpSs : public ModulePass {
     return LoopEntryBB;
   }
 
+  void buildLoopForMultiDep(
+      Module &M, Function &F, Instruction *Entry, Instruction *Exit,
+      TaskLoopInfo &LoopInfo,
+      const llvm::function_ref<Value *(IRBuilder<> &)> LBoundGen,
+      const llvm::function_ref<Value *(IRBuilder<> &)> RemapGen,
+      const llvm::function_ref<Value *(IRBuilder<> &)> UBoundGen,
+      const llvm::function_ref<Value *(IRBuilder<> &)> IncrGen) {
+
+    IRBuilder<> IRB(Entry);
+    Type *IndVarTy = LoopInfo.IndVar->getType()->getPointerElementType();
+
+    Value *IndVarRemap = IRB.CreateAlloca(IndVarTy, nullptr, LoopInfo.IndVar->getName() + ".remap");
+
+    Value *LBound = LBoundGen(IRB);
+    IRB.CreateStore(createZSExtOrTrunc(IRB, LBound, IndVarTy, LoopInfo.LBoundSigned), LoopInfo.IndVar);
+
+    BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
+    CondBB->setName("for.cond");
+
+    // The new entry is the start of the loop
+    CondBB->getUniquePredecessor();
+
+    IRB.SetInsertPoint(Entry);
+
+    Value *UBound = UBoundGen(IRB);
+    Value *IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    Value *LoopCmp = nullptr;
+    switch (LoopInfo.LoopType) {
+    case TaskLoopInfo::LT:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSLT(LHS, RHS);
+          return IRB.CreateICmpULT(LHS, RHS);
+        }).first;
+      break;
+    case TaskLoopInfo::LE:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSLE(LHS, RHS);
+          return IRB.CreateICmpULE(LHS, RHS);
+        }).first;
+      break;
+    case TaskLoopInfo::GT:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSGT(LHS, RHS);
+          return IRB.CreateICmpUGT(LHS, RHS);
+        }).first;
+      break;
+    case TaskLoopInfo::GE:
+      LoopCmp = buildInstructionSignDependent(
+        IRB, M, IndVarVal, UBound, LoopInfo.IndVarSigned, LoopInfo.UBoundSigned,
+        [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+          if (NewOpSigned)
+            return IRB.CreateICmpSGE(LHS, RHS);
+          return IRB.CreateICmpUGE(LHS, RHS);
+        }).first;
+      break;
+    default:
+      llvm_unreachable("unexpected loop type");
+    }
+    BasicBlock *BodyBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
+    BodyBB->setName("for.body");
+
+    // Build the remap value before runtime call and replace uses
+    // NOTE: this is doable because when building multideps there's only a BasicBlock containing
+    // the call to RT
+    for (Instruction &I : *BodyBB) {
+      I.replaceUsesOfWith(LoopInfo.IndVar, IndVarRemap);
+    }
+    IRB.SetInsertPoint(&BodyBB->front());
+    Value *Remap = RemapGen(IRB);
+    IRB.CreateStore(createZSExtOrTrunc(IRB, Remap, IndVarTy, LoopInfo.IndVarSigned), IndVarRemap);
+
+    // Replace default br. by a conditional br. to task.body or task end
+    Instruction *OldTerminator = CondBB->getTerminator();
+    IRB.SetInsertPoint(OldTerminator);
+    IRB.CreateCondBr(LoopCmp, BodyBB, Exit->getParent()->getUniqueSuccessor());
+    OldTerminator->eraseFromParent();
+
+    BasicBlock *IncrBB = BasicBlock::Create(M.getContext(), "for.incr", &F);
+
+    // Add a br. to for.cond
+    IRB.SetInsertPoint(IncrBB);
+
+    Value *Incr = IncrGen(IRB);
+    IndVarVal = IRB.CreateLoad(LoopInfo.IndVar);
+    auto p = buildInstructionSignDependent(
+      IRB, M, IndVarVal, Incr, LoopInfo.IndVarSigned, LoopInfo.StepSigned,
+      [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+        return IRB.CreateAdd(LHS, RHS);
+      });
+    IRB.CreateStore(createZSExtOrTrunc(IRB, p.first, IndVarTy, p.second), LoopInfo.IndVar);
+    IRB.CreateBr(CondBB);
+
+    // Replace task end br. by a br. to for.incr
+    OldTerminator = Exit->getParent()->getTerminator();
+    assert(OldTerminator->getNumSuccessors() == 1);
+    OldTerminator->setSuccessor(0, IncrBB);
+  }
+
   // Insert a new nanos6 task info registration in
   // the constructor (global ctor inserted) function
   void registerTaskInfo(Module &M, Value *TaskInfoVar) {
@@ -562,7 +669,6 @@ struct OmpSs : public ModulePass {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
 
-    // Once we have inserted the cloned instructions and the ConstantExpr instructions
     // add the terminator so IRBuilder inserts just before it
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
 
@@ -622,12 +728,14 @@ struct OmpSs : public ModulePass {
     // Insert RT call before replacing uses
     unpackDepsCallToRT(M, TI, F, IsTaskLoop, NewIndVarLBound, NewIndVarUBound);
 
-    for (Instruction &I : Entry) {
-      Function::arg_iterator AI = F->arg_begin();
-      for (auto It = StructToIdxMap.begin();
-             It != StructToIdxMap.end(); ++It, ++AI) {
-        if (isReplaceableValue(It->first))
-          I.replaceUsesOfWith(It->first, &*AI);
+    for (BasicBlock &BB : *F) {
+      for (Instruction &I : BB) {
+        Function::arg_iterator AI = F->arg_begin();
+        for (auto It = StructToIdxMap.begin();
+               It != StructToIdxMap.end(); ++It, ++AI) {
+          if (isReplaceableValue(It->first))
+            I.replaceUsesOfWith(It->first, &*AI);
+        }
       }
     }
   }
@@ -720,6 +828,90 @@ struct OmpSs : public ModulePass {
     }
   }
 
+  void unpackMultiRangeCallToRTOfType(
+      Module &M, const SmallVectorImpl<MultiDependInfo> &DependList,
+      Function *F, Value *IndVar, Value *NewIndVarLBound, Value *NewIndVarUBound,
+      bool IsTaskLoop, StringRef DepType) {
+
+    for (const MultiDependInfo &MDI : DependList) {
+      const DependInfo &DI = MDI.DepInfo;
+      BasicBlock &Entry = F->getEntryBlock();
+      Instruction &RetI = Entry.back();
+
+      IRBuilder<> BBBuilder(&RetI);
+      Function *ComputeDepFun = cast<Function>(DI.ComputeDepFun);
+      CallInst *CallComputeDepStart = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      CallInst *CallComputeDepEnd = BBBuilder.CreateCall(ComputeDepFun, DI.Args);
+      if (IsTaskLoop) {
+        assert(NewIndVarLBound && NewIndVarUBound && "Expected new lb/up in taskloop dependency");
+        CallComputeDepStart->replaceUsesOfWith(IndVar, NewIndVarLBound);
+        CallComputeDepEnd->replaceUsesOfWith(IndVar, NewIndVarUBound);
+      }
+      StructType *ComputeDepTy = cast<StructType>(ComputeDepFun->getReturnType());
+
+      assert(ComputeDepTy->getNumElements() > 1 && "Expected dependency base with dim_{size, start, end}");
+      size_t NumDims = (ComputeDepTy->getNumElements() - 1)/3;
+
+      llvm::Value *Base = BBBuilder.CreateExtractValue(CallComputeDepStart, 0);
+
+      SmallVector<Value *, 4> TaskDepAPICall;
+      Value *Handler = &*(F->arg_end() - 1);
+      TaskDepAPICall.push_back(Handler);
+      TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DI.SymbolIndex));
+      TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+      TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
+      for (size_t i = 1; i < ComputeDepTy->getNumElements(); ) {
+        // dimsize
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimstart
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepStart, i++));
+        // dimend
+        TaskDepAPICall.push_back(BBBuilder.CreateExtractValue(CallComputeDepEnd, i++));
+      }
+
+      Instruction *RegisterDepCall = BBBuilder.CreateCall(MultidepFactory.getMultidepFuncCallee(M, DepType, NumDims), TaskDepAPICall);
+
+      // Build a BasicBlock conatining the compute_dep call and the dep. registration
+      CallComputeDepStart->getParent()->splitBasicBlock(CallComputeDepStart);
+      Instruction *AfterRegisterDepCall = RegisterDepCall->getNextNode();
+      AfterRegisterDepCall->getParent()->splitBasicBlock(AfterRegisterDepCall);
+
+      // TODO: refactor this
+      TaskLoopInfo LoopInfo;
+      LoopInfo.LoopType = TaskLoopInfo::LE;
+      // NOTE: we can do this because clang converts to the same type of the iterator (int)
+      LoopInfo.IndVarSigned = 1;
+      LoopInfo.LBoundSigned = 1;
+      LoopInfo.UBoundSigned = 1;
+      LoopInfo.StepSigned = 1;
+
+      Function *ComputeMultiDepFun = MDI.ComputeMultiDepFun;
+      ArrayRef<Value *> Args = MDI.Args;
+
+      for (size_t i = 0; i < MDI.Iters.size(); i++) {
+        LoopInfo.IndVar = MDI.Iters[i];
+        auto LBoundGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+          Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+           return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 0);
+        };
+        auto RemapGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+          Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+           return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 1);
+        };
+        auto UBoundGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+          Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+           return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 2);
+        };
+        auto IncrGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+          Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+           return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 3);
+        };
+        buildLoopForMultiDep(
+            M, *F, CallComputeDepStart, RegisterDepCall, LoopInfo, LBoundGen, RemapGen, UBoundGen, IncrGen);
+      }
+    }
+  }
+
   void unpackCallToRTOfReduction(
       Module &M, const SmallVectorImpl<ReductionInfo> &ReductionsList,
       const TaskReductionsInitCombInfo &TRI, Function *F,
@@ -789,6 +981,17 @@ struct OmpSs : public ModulePass {
     unpackCallToRTOfType(M, TDI.WeakCommutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_commutative");
     unpackCallToRTOfReduction(M, TDI.Reductions, TRI, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "reduction");
     unpackCallToRTOfReduction(M, TDI.WeakReductions, TRI, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_reduction");
+
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeIns, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "read");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeOuts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "write");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeInouts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "readwrite");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeConcurrents, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "concurrent");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeCommutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "commutative");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakIns, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_read");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakOuts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_write");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakInouts, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_readwrite");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakConcurrents, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_concurrent");
+    unpackMultiRangeCallToRTOfType(M, TDI.MultiRangeWeakCommutatives, F, TI.LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop, "weak_commutative");
   }
 
   // TypeList[i] <-> NameList[i]

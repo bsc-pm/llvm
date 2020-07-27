@@ -74,6 +74,7 @@ def OMPIteratorExpr : StmtNode<Expr>;
 // OmpSs
 def OSSArraySectionExpr : StmtNode<Expr>;
 def OSSArrayShapingExpr : StmtNode<Expr>;
+def OSSMultiDepExpr : StmtNode<Expr>;
 def CallExpr : StmtNode<Expr>;
 def MemberExpr : StmtNode<Expr>;
 def CastExpr : StmtNode<Expr, 1>;

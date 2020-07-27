@@ -408,6 +408,22 @@ ExprDependence clang::computeDependence(OSSArrayShapingExpr *E) {
   return D;
 }
 
+ExprDependence clang::computeDependence(OSSMultiDepExpr *E) {
+  auto D = E->getDepExpr()->getDependence();
+  // TODO: What about iterators decls
+  // for (auto *S : E->getDepIterators())
+  for (auto *S : E->getDepInits())
+    if (S)
+      D |= S->getDependence();
+  for (auto *S : E->getDepSizes())
+    if (S)
+      D |= S->getDependence();
+  for (auto *S : E->getDepSteps())
+    if (S)
+      D |= S->getDependence();
+  return D;
+}
+
 /// Compute the type-, value-, and instantiation-dependence of a
 /// declaration reference
 /// based on the declaration being referenced.

@@ -3288,6 +3288,143 @@ ExprResult Parser::ParseFoldExpression(ExprResult LHS,
                                   EllipsisLoc, RHS.get(), T.getCloseLocation());
 }
 
+ExprResult Parser::ParseOSSMultiDepExpression() {
+  assert(Tok.is(tok::l_brace) && "Not a multidep expr!");
+  ColonProtectionRAIIObject ColonProtection(*this);
+  BalancedDelimiterTracker T(*this, tok::l_brace, tok::annot_pragma_ompss_end);
+
+  SourceLocation Loc, RLoc;
+
+  // Parse '{'.
+  T.consumeOpen();
+  Loc = T.getOpenLocation();
+
+  CachedTokens LateParsedTokens;
+  // Save stmt to parse it after declaring iterators
+  while (Tok.isNot(tok::comma) &&
+         Tok.isNot(tok::r_brace) &&
+         Tok.isNot(tok::annot_pragma_ompss_end)) {
+    LateParsedTokens.push_back(Tok);
+    ConsumeAnyToken();
+  }
+
+  ParseScope OSSMultiDepScope(this, Scope::DeclScope | Scope::CompoundStmtScope);
+
+  SmallVector<Expr *, 2> MultiDepIterators;
+  SmallVector<Expr *, 2> MultiDepInits;
+  SmallVector<Expr *, 2> MultiDepSizes;
+  SmallVector<Expr *, 2> MultiDepSteps;
+  SmallVector<bool, 2> MultiDepSizeOrSection;
+
+  bool IsCorrect = true;
+  bool IsComma = true;
+  while (IsComma ||
+         (Tok.isNot(tok::r_brace) && Tok.isNot(tok::annot_pragma_ompss_end))) {
+    // Consume ','
+    IsCorrect = !ExpectAndConsume(tok::comma) && IsCorrect;
+
+    if (Tok.isNot(tok::identifier)) {
+      IsCorrect = false;
+      Diag(Tok, diag::err_oss_expected_multidep_iterator_identifier);
+      SkipUntil(tok::comma, tok::r_brace, tok::annot_pragma_ompss_end, StopBeforeMatch);
+    } else {
+      // Call Sema to declare the variable
+      StringRef IteratorName = Tok.getIdentifierInfo()->getName();
+      Expr *ItE = Actions.ActOnOmpSsMultiDepIterator(
+          getCurScope(), IteratorName, Tok.getLocation());
+      VarDecl *ItVD = cast<VarDecl>(cast<DeclRefExpr>(ItE)->getDecl());
+
+      // InitExpr is mandatory in parsing
+      ExprResult InitExpr, SizeExpr, StepExpr;
+      // Used to distinguish ':' ';'
+      bool IsMultiDepSize = false;
+      // Used to distinguish init-list, so we do not expect ub/step
+      // to be specified
+      bool IsMultiDepInitList = false;
+
+      // Consume identifier
+      ConsumeToken();
+
+      if (isTokenEqualOrEqualTypo()) {
+        // Consume '='
+        ConsumeToken();
+
+        IsMultiDepInitList = Tok.is(tok::l_brace);
+        InitExpr = ParseInitializer();
+
+        if (!IsMultiDepInitList) {
+          if (Tok.isNot(tok::semi) && Tok.isNot(tok::colon)) {
+            IsCorrect = false;
+            Diag(Tok, diag::err_oss_expected_multidep_separator) << 1;
+            SkipUntil(tok::comma, tok::r_brace, tok::annot_pragma_ompss_end, StopBeforeMatch);
+          } else {
+            IsMultiDepSize = Tok.is(tok::semi);
+            ConsumeAnyToken();
+            SizeExpr = ParseAssignmentExpression();
+          }
+
+          // If we're not at the end of pragma or multidep '}'
+          // or in a comma, we expect the step
+          if (Tok.isNot(tok::comma) && Tok.isNot(tok::r_brace)
+              && Tok.isNot(tok::annot_pragma_ompss_end)) {
+            if (Tok.isNot(tok::colon)) {
+              IsCorrect = false;
+              Diag(Tok, diag::err_oss_expected_multidep_separator) << 0;
+              SkipUntil(tok::comma, tok::r_brace, tok::annot_pragma_ompss_end, StopBeforeMatch);
+            } else {
+              ConsumeAnyToken();
+              StepExpr = ParseAssignmentExpression();
+            }
+          }
+        }
+      } else {
+        IsCorrect = false;
+        Diag(Tok, diag::err_expected) << tok::equal;
+        SkipUntil(tok::comma, tok::r_brace, tok::annot_pragma_ompss_end, StopBeforeMatch);
+        Actions.ActOnUninitializedDecl(ItVD);
+      }
+
+      MultiDepIterators.push_back(ItE);
+      MultiDepInits.push_back(InitExpr.get());
+
+      MultiDepSizes.push_back(SizeExpr.get());
+      MultiDepSizeOrSection.push_back(IsMultiDepSize);
+      MultiDepSteps.push_back(StepExpr.get());
+    }
+    IsComma = Tok.is(tok::comma);
+  }
+
+  // Insert tokens
+  PP.EnterToken(Tok, /*IsReinject*/ true);
+  PP.EnterTokenStream(
+    LateParsedTokens, /*DisableMacroExpansion=*/true, /*IsReinject*/ true);
+  ConsumeAnyToken();
+
+  ExprResult DepExpr = ParseAssignmentExpression();
+
+  // Match the '}'.
+  T.consumeClose();
+  RLoc = T.getCloseLocation();
+
+  if (IsCorrect)
+    return Actions.ActOnOSSMultiDepExpression(
+      Loc, RLoc, MultiDepIterators, MultiDepInits,
+      MultiDepSizes, MultiDepSteps, MultiDepSizeOrSection,
+      DepExpr.get());
+  return ExprError();
+}
+
+ExprResult Parser::ParseOSSAssignmentExpression(OmpSsClauseKind CKind) {
+  if (Tok.is(tok::l_brace) &&
+      (CKind == OSSC_depend
+       || CKind == OSSC_in || CKind == OSSC_out || CKind == OSSC_inout
+       || CKind == OSSC_concurrent || CKind == OSSC_commutative
+       || CKind == OSSC_weakin || CKind == OSSC_weakout || CKind == OSSC_weakinout
+       || CKind == OSSC_weakconcurrent || CKind == OSSC_weakcommutative))
+    return ParseOSSMultiDepExpression();
+  return ParseAssignmentExpression();
+}
+
 /// ParseExpressionList - Used for C/C++ (argument-)expression-list.
 ///
 /// \verbatim

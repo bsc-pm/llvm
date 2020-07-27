@@ -129,6 +129,16 @@ public:
     OB_oss_loop_step = 38,             // "OB_oss_loop_step"
     OB_oss_loop_chunksize = 39,        // "OB_oss_loop_chunksize"
     OB_oss_loop_grainsize = 40,        // "OB_oss_loop_grainsize"
+    OB_oss_multidep_range_in = 41,                // "OB_oss_multidep_range_in"
+    OB_oss_multidep_range_out = 42,               // "OB_oss_multidep_range_out"
+    OB_oss_multidep_range_inout = 43,             // "OB_oss_multidep_range_inout"
+    OB_oss_multidep_range_concurrent = 44,        // "OB_oss_multidep_range_concurrent"
+    OB_oss_multidep_range_commutative = 45,       // "OB_oss_multidep_range_commutative"
+    OB_oss_multidep_range_weakin = 46,            // "OB_oss_multidep_range_weakin"
+    OB_oss_multidep_range_weakout = 47,           // "OB_oss_multidep_range_weakout"
+    OB_oss_multidep_range_weakinout = 48,         // "OB_oss_multidep_range_weakinout"
+    OB_oss_multidep_range_weakconcurrent = 49,    // "OB_oss_multidep_range_weakconcurrent"
+    OB_oss_multidep_range_weakcommutative = 50,   // "OB_oss_multidep_range_weakcommutative"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

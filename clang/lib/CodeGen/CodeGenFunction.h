@@ -3815,6 +3815,7 @@ public:
   LValue EmitOMPArraySectionExpr(const OMPArraySectionExpr *E,
                                  bool IsLowerBound = true);
   LValue EmitOSSArrayShapingExpr(const OSSArrayShapingExpr *E);
+  LValue EmitOSSMultiDepExpr(const OSSMultiDepExpr *E);
   LValue EmitExtVectorElementExpr(const ExtVectorElementExpr *E);
   LValue EmitMemberExpr(const MemberExpr *E);
   LValue EmitObjCIsaExpr(const ObjCIsaExpr *E);

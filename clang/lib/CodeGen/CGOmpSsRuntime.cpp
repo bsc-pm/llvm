@@ -62,6 +62,11 @@ enum OmpSsBundleKind {
   OSSB_concurrent,
   OSSB_commutative,
   OSSB_reduction,
+  OSSB_multi_in,
+  OSSB_multi_out,
+  OSSB_multi_inout,
+  OSSB_multi_concurrent,
+  OSSB_multi_commutative,
   OSSB_redinit,
   OSSB_redcomb,
   OSSB_weakin,
@@ -70,6 +75,11 @@ enum OmpSsBundleKind {
   OSSB_weakconcurrent,
   OSSB_weakcommutative,
   OSSB_weakreduction,
+  OSSB_multi_weakin,
+  OSSB_multi_weakout,
+  OSSB_multi_weakinout,
+  OSSB_multi_weakconcurrent,
+  OSSB_multi_weakcommutative,
   OSSB_init,
   OSSB_copy,
   OSSB_deinit,
@@ -131,6 +141,16 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.DEP.COMMUTATIVE";
   case OSSB_reduction:
     return "QUAL.OSS.DEP.REDUCTION";
+  case OSSB_multi_in:
+    return "QUAL.OSS.MULTIDEP.RANGE.IN";
+  case OSSB_multi_out:
+    return "QUAL.OSS.MULTIDEP.RANGE.OUT";
+  case OSSB_multi_inout:
+    return "QUAL.OSS.MULTIDEP.RANGE.INOUT";
+  case OSSB_multi_concurrent:
+    return "QUAL.OSS.MULTIDEP.RANGE.CONCURRENT";
+  case OSSB_multi_commutative:
+    return "QUAL.OSS.MULTIDEP.RANGE.COMMUTATIVE";
   case OSSB_redinit:
     return "QUAL.OSS.DEP.REDUCTION.INIT";
   case OSSB_redcomb:
@@ -147,6 +167,16 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.DEP.WEAKCOMMUTATIVE";
   case OSSB_weakreduction:
     return "QUAL.OSS.DEP.WEAKREDUCTION";
+  case OSSB_multi_weakin:
+    return "QUAL.OSS.MULTIDEP.RANGE.WEAKIN";
+  case OSSB_multi_weakout:
+    return "QUAL.OSS.MULTIDEP.RANGE.WEAKOUT";
+  case OSSB_multi_weakinout:
+    return "QUAL.OSS.MULTIDEP.RANGE.WEAKINOUT";
+  case OSSB_multi_weakconcurrent:
+    return "QUAL.OSS.MULTIDEP.RANGE.WEAKCONCURRENT";
+  case OSSB_multi_weakcommutative:
+    return "QUAL.OSS.MULTIDEP.RANGE.WEAKCOMMUTATIVE";
   case OSSB_init:
     return "QUAL.OSS.INIT";
   case OSSB_copy:
@@ -177,6 +207,7 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
 namespace {
 // This class gathers all the info needed for OSSDependVisitor to emit a dependency in
 // compute_dep.
+// Also its used to visit init/ub/step expressions in multideps
 // The visitor walks and annotates the number of dimensions in the same way that OSSDependVisitor
 // NOTE: keep synchronized
 //
@@ -566,6 +597,10 @@ public:
       CGF.EmitVariablyModifiedType(E->getType());
     }
     FillDimsFromInnermostExpr(E);
+  }
+
+  void VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+    Visit(E->getDepExpr());
   }
 
   // l-values.
@@ -1286,6 +1321,193 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
   return FuncVar;
 }
 
+static llvm::Value *emitDiscreteArray(
+    CodeGenFunction &CGF, const Expr *const DiscreteArrExpr, const Expr *const IterExpr) {
+  if (auto *Ref = dyn_cast<DeclRefExpr>(DiscreteArrExpr)) {
+    auto *VD = cast<VarDecl>(Ref->getDecl());
+    CGF.EmitDecl(*VD);
+    LValue DiscreteArrLV = CGF.EmitLValue(Ref);
+    llvm::Value *Idx[2];
+    Idx[0] = llvm::Constant::getNullValue(CGF.ConvertType(CGF.getContext().IntTy));
+    Idx[1] = CGF.EmitScalarExpr(IterExpr);
+    llvm::Value *GEP = CGF.Builder.CreateGEP(DiscreteArrLV.getPointer(CGF), Idx, "discreteidx");
+    llvm::Value *LoadGEP = CGF.Builder.CreateLoad(Address(GEP, CGF.getPointerAlign()));
+    return LoadGEP;
+  }
+  return nullptr;
+}
+
+void CGOmpSsRuntime::EmitMultiDependencyList(
+    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::Value *> &List) {
+  auto *MDExpr = cast<OSSMultiDepExpr>(Dep.E);
+
+  OSSDependInfoGathering MultiDepInfoGathering(CGF);
+  for (size_t i = 0; i < MDExpr->getDepInits().size(); ++i) {
+    MultiDepInfoGathering.Visit(MDExpr->getDepIterators()[i]);
+    MultiDepInfoGathering.Visit(MDExpr->getDepInits()[i]);
+    if (MDExpr->getDepSizes()[i])
+      MultiDepInfoGathering.Visit(MDExpr->getDepSizes()[i]);
+    if (MDExpr->getDepSteps()[i])
+      MultiDepInfoGathering.Visit(MDExpr->getDepSteps()[i]);
+  }
+
+  CodeGenFunction NewCGF(CGF.CGM);
+  // NOTE:
+  // OSSDependInfoGathering is too specific of dependency emission
+  // It's better to just build the ret types here
+  // For each iterator we have {init, remap, ub, step}
+  SmallVector<QualType, 3 + 1> MultiDepRetTypes(
+    MDExpr->getDepInits().size()*(3 + 1), NewCGF.getContext().IntTy);
+  DeclRefExpr *StructRetDRE;
+
+  // TODO: use different compute_dep name to distinguish from a regular
+  // dependency
+  llvm::Function *ComputeMultiDepFun =
+    createComputeDepFunction(
+      CGF, MultiDepInfoGathering.getInvolvedVarList(),
+      MultiDepInfoGathering.getVLASizeInvolvedMap(),
+      MultiDepInfoGathering.getCaptureInvolvedMap(),
+      MultiDepInfoGathering.getThisAddress(),
+      MultiDepRetTypes,
+      NewCGF, StructRetDRE);
+  // TODO change name
+  {
+    CodeGenFunction::OSSPrivateScope InitScope(NewCGF);
+    auto ArgI = ComputeMultiDepFun->arg_begin();
+    for (const auto &p : MultiDepInfoGathering.getInvolvedVarList()) {
+      const VarDecl *VD = p.first;
+      LValue LV = p.second;
+      InitScope.addPrivate(VD, [&ArgI, &LV]() -> Address {
+        return Address(ArgI, LV.getAlignment());
+      });
+
+      ++ArgI;
+    }
+    for (const auto &p : MultiDepInfoGathering.getVLASizeInvolvedMap()) {
+      const Expr *VLASizeExpr = p.first;
+      InitScope.addPrivateVLA(VLASizeExpr, [ArgI]() -> llvm::Value * {
+        return ArgI;
+      });
+
+      ++ArgI;
+    }
+    CaptureMapTy CaptureReplacedMap;
+    for (const auto &p : MultiDepInfoGathering.getCaptureInvolvedMap()) {
+      const VarDecl *VD = p.first;
+      Address Addr = p.second;
+      Address NewAddr = Address(ArgI, Addr.getAlignment());
+      CaptureReplacedMap.try_emplace(VD, NewAddr);
+      ++ArgI;
+    }
+    CaptureMapStack.push_back(CaptureReplacedMap);
+
+    // Map 'this' to compute_dep param
+    const Address CXXThisAddress = MultiDepInfoGathering.getThisAddress();
+    if (CXXThisAddress.isValid()) {
+      InitScope.setThis(Address(ArgI, CXXThisAddress.getAlignment()));
+      ++ArgI;
+    }
+
+    (void)InitScope.Privatize();
+
+    // Emit init/ub/step expressions
+    for (size_t i = 0; i < MDExpr->getDepInits().size(); ++i) {
+      const Expr *const IterExpr = MDExpr->getDepIterators()[i];
+      const Expr *const InitExpr = MDExpr->getDepInits()[i];
+      const Expr *const SizeExpr = MDExpr->getDepSizes()[i];
+      const Expr *const StepExpr = MDExpr->getDepSteps()[i];
+      const Expr *const DiscreteArrExpr = MDExpr->getDiscreteArrays()[i];
+      bool IsSizeOrSection = MDExpr->getDepSizeOrSection()[i];
+      llvm::Value *InitValue = nullptr;
+      llvm::Value *RemapValue = nullptr;
+      llvm::Value *SizeValue = nullptr;
+      llvm::Value *StepValue = nullptr;
+      if (DiscreteArrExpr) {
+        // Discrete initialize to 0 the iterator and its remapped to what discrete array has
+        InitValue = llvm::ConstantInt::get(
+          NewCGF.ConvertType(NewCGF.getContext().IntTy), 0);
+        RemapValue = emitDiscreteArray(NewCGF, DiscreteArrExpr, IterExpr);
+
+        const ConstantArrayType *CAT =
+          NewCGF.getContext().getAsConstantArrayType(DiscreteArrExpr->getType());
+
+        uint64_t ArraySize = CAT->getSize().getZExtValue() - 1;
+        SizeValue = llvm::ConstantInt::get(
+          NewCGF.ConvertType(NewCGF.getContext().IntTy), ArraySize);
+        StepValue = llvm::ConstantInt::get(
+          NewCGF.ConvertType(NewCGF.getContext().IntTy), 1);
+      } else {
+        // Ranges initialize to 'init' and there's no remap
+        InitValue = NewCGF.EmitScalarExpr(InitExpr);
+        RemapValue = NewCGF.EmitScalarExpr(IterExpr);
+
+        SizeValue = NewCGF.EmitScalarExpr(SizeExpr);
+        // Convert Size to UB, that is -> Init + Size - 1
+        if (IsSizeOrSection) {
+          SizeValue = NewCGF.Builder.CreateAdd(InitValue, SizeValue);
+          SizeValue = NewCGF.Builder.CreateAdd(
+            InitValue, llvm::ConstantInt::getSigned(
+              NewCGF.ConvertType(NewCGF.getContext().IntTy), -1));
+        }
+
+        if (StepExpr) {
+          StepValue = NewCGF.EmitScalarExpr(StepExpr);
+        } else {
+          // There's no step, so default to 1
+          StepValue = llvm::ConstantInt::getSigned(
+            NewCGF.ConvertType(NewCGF.getContext().IntTy), 1);
+        }
+      }
+      assert(InitValue && SizeValue && StepValue);
+      List.push_back(InitValue);
+      List.push_back(RemapValue);
+      List.push_back(SizeValue);
+      List.push_back(StepValue);
+
+    }
+    Address RetAddr = NewCGF.ReturnValue;
+    for (size_t i = 0; i < List.size(); ++i) {
+      NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
+    }
+
+    NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
+
+    // After finishing the computedep function remove the alloca instruction
+    llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
+    NewCGF.AllocaInsertPt = nullptr;
+    AllocaInsertPointer->eraseFromParent();
+  }
+  // Pop temporal empty refmap, we are not in compute_dep function anymore
+  CaptureMapStack.pop_back();
+
+  List.clear();
+  // Fill the bundle
+
+  for (auto *E : MDExpr->getDepIterators()) {
+    List.push_back(CGF.EmitLValue(E).getPointer(CGF));
+  }
+  List.push_back(ComputeMultiDepFun);
+
+  for (const auto &p : MultiDepInfoGathering.getInvolvedVarList()) {
+    LValue LV = p.second;
+    List.push_back(LV.getPointer(CGF));
+  }
+  for (const auto &p : MultiDepInfoGathering.getVLASizeInvolvedMap()) {
+    llvm::Value *VLASizeValue = p.second;
+    List.push_back(VLASizeValue);
+  }
+  for (const auto &p : MultiDepInfoGathering.getCaptureInvolvedMap()) {
+    Address Addr = p.second;
+    llvm::Value *V = Addr.getPointer();
+    List.push_back(V);
+  }
+  const Address CXXThisAddress = MultiDepInfoGathering.getThisAddress();
+  if (CXXThisAddress.isValid()) {
+    List.push_back(CXXThisAddress.getPointer());
+  }
+}
+
 void CGOmpSsRuntime::EmitDependencyList(
     CodeGenFunction &CGF, const OSSDepDataTy &Dep,
     SmallVectorImpl<llvm::Value *> &List) {
@@ -1350,7 +1572,6 @@ void CGOmpSsRuntime::EmitDependencyList(
 
     OSSDependVisitor DepVisitor(NewCGF, Dep.OSSSyntax);
     DepVisitor.Visit(Dep.E);
-
 
     SmallVector<llvm::Value *, 4> Starts(
         DepVisitor.getStarts().begin(),
@@ -1473,13 +1694,41 @@ void CGOmpSsRuntime::EmitDependencyList(
   }
 }
 
+static std::string convertDepToMultiDepStr(StringRef Str) {
+  if (Str == getBundleStr(OSSB_in)) return getBundleStr(OSSB_multi_in);
+  if (Str == getBundleStr(OSSB_out)) return getBundleStr(OSSB_multi_out);
+  if (Str == getBundleStr(OSSB_inout)) return getBundleStr(OSSB_multi_inout);
+  if (Str == getBundleStr(OSSB_concurrent)) return getBundleStr(OSSB_multi_concurrent);
+  if (Str == getBundleStr(OSSB_commutative)) return getBundleStr(OSSB_multi_commutative);
+  if (Str == getBundleStr(OSSB_weakin)) return getBundleStr(OSSB_multi_weakin);
+  if (Str == getBundleStr(OSSB_weakout)) return getBundleStr(OSSB_multi_weakout);
+  if (Str == getBundleStr(OSSB_weakinout)) return getBundleStr(OSSB_multi_weakinout);
+  if (Str == getBundleStr(OSSB_weakconcurrent)) return getBundleStr(OSSB_multi_weakconcurrent);
+  if (Str == getBundleStr(OSSB_weakcommutative)) return getBundleStr(OSSB_multi_weakcommutative);
+  llvm_unreachable("unexpected dependency bundle string");
+}
+
 void CGOmpSsRuntime::EmitDependency(
     std::string Name, CodeGenFunction &CGF, const OSSDepDataTy &Dep,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
+  SmallVector<llvm::Value*, 4> MultiDepData;
   SmallVector<llvm::Value*, 4> DepData;
+  SmallVector<llvm::Value*, 4> MultiAndDepData;
+
+  if (isa<OSSMultiDepExpr>(Dep.E)) {
+    // Convert Name in MultiName
+    Name = convertDepToMultiDepStr(Name);
+    EmitMultiDependencyList(CGF, Dep, MultiDepData);
+  }
+
   EmitDependencyList(CGF, Dep, DepData);
-  TaskInfo.emplace_back(Name, llvm::makeArrayRef(DepData));
+
+  // Merge the two value lists
+  MultiAndDepData.append(MultiDepData.begin(), MultiDepData.end());
+  MultiAndDepData.append(DepData.begin(), DepData.end());
+
+  TaskInfo.emplace_back(Name, llvm::makeArrayRef(MultiAndDepData));
 }
 
 /// Check if the combiner is a call to UDR and if it is so return the
@@ -2012,10 +2261,35 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
   TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
+static void EmitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
+  auto EmitDepListIterDecls = [&CGF](ArrayRef<OSSDepDataTy> DepList) {
+    for (const OSSDepDataTy &Dep : DepList) {
+      if (auto *MDExpr = dyn_cast<OSSMultiDepExpr>(Dep.E)) {
+        for (auto *E : MDExpr->getDepIterators()) {
+          CGF.EmitDecl(*cast<DeclRefExpr>(E)->getDecl());
+        }
+      }
+    }
+  };
+  EmitDepListIterDecls(Data.Deps.Ins);
+  EmitDepListIterDecls(Data.Deps.Outs);
+  EmitDepListIterDecls(Data.Deps.Inouts);
+  EmitDepListIterDecls(Data.Deps.Concurrents);
+  EmitDepListIterDecls(Data.Deps.Commutatives);
+  EmitDepListIterDecls(Data.Deps.WeakIns);
+  EmitDepListIterDecls(Data.Deps.WeakOuts);
+  EmitDepListIterDecls(Data.Deps.WeakInouts);
+  EmitDepListIterDecls(Data.Deps.WeakConcurrents);
+  EmitDepListIterDecls(Data.Deps.WeakCommutatives);
+  // TODO: reductions
+}
+
 void CGOmpSsRuntime::EmitDirectiveData(
     CodeGenFunction &CGF, const OSSTaskDataTy &Data,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
     const OSSLoopDataTy &LoopData) {
+
+  EmitMultiDepIterDecls(CGF, Data);
 
   SmallVector<llvm::Value*, 4> CapturedList;
   for (const Expr *E : Data.DSAs.Shareds) {

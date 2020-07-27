@@ -1834,6 +1834,10 @@ private:
 
   ExprResult ParseFoldExpression(ExprResult LHS, BalancedDelimiterTracker &T);
 
+  ExprResult ParseOSSMultiDepExpression();
+  // Used to handle assignment exprs. and multideps 
+  ExprResult ParseOSSAssignmentExpression(OmpSsClauseKind CKind);
+
   //===--------------------------------------------------------------------===//
   // C++ Expressions
   ExprResult tryParseCXXIdExpression(CXXScopeSpec &SS, bool isAddressOfOperand,

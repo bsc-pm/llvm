@@ -1381,6 +1381,8 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitOMPArraySectionExpr(cast<OMPArraySectionExpr>(E));
   case Expr::OSSArrayShapingExprClass:
     return EmitOSSArrayShapingExpr(cast<OSSArrayShapingExpr>(E));
+  case Expr::OSSMultiDepExprClass:
+    return EmitOSSMultiDepExpr(cast<OSSMultiDepExpr>(E));
   case Expr::ExtVectorElementExprClass:
     return EmitExtVectorElementExpr(cast<ExtVectorElementExpr>(E));
   case Expr::MemberExprClass:
@@ -3982,6 +3984,10 @@ LValue CodeGenFunction::EmitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
   Address Addr = EmitPointerWithAlignment(E->getBase(), &EltBaseInfo, &EltTBAAInfo);
   LValue LV = MakeAddrLValue(Addr, E->getType(), EltBaseInfo, EltTBAAInfo);
   return LV;
+}
+
+LValue CodeGenFunction::EmitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+  return EmitLValue(E->getDepExpr());
 }
 
 LValue CodeGenFunction::

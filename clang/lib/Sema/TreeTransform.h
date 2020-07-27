@@ -2613,6 +2613,19 @@ public:
     return getSema().ActOnOSSArrayShapingExpr(Base, Shapes, LBLoc, RBLoc);
   }
 
+  /// Build a new multidep expression.
+  ///
+  /// By default, performs semantic analysis to build the new expression.
+  /// Subclasses may override this routine to provide different behavior.
+  ExprResult RebuildOSSMultiDepExpr(Expr *DepExpr, ArrayRef<Expr *> MultiDepIterators,
+                                    ArrayRef<Expr *> MultiDepInits, ArrayRef<Expr *> MultiDepSizes,
+                                    ArrayRef<Expr *> MultiDepSteps, ArrayRef<bool> MultiDepSizeOrSection,
+                                    SourceLocation LBLoc, SourceLocation RBLoc) {
+    return getSema().ActOnOSSMultiDepExpression(
+      LBLoc, RBLoc, MultiDepIterators, MultiDepInits, MultiDepSizes,
+      MultiDepSteps, MultiDepSizeOrSection, DepExpr);
+  }
+
   /// Build a new array shaping expression.
   ///
   /// By default, performs semantic analysis to build the new expression.
@@ -10825,6 +10838,84 @@ TreeTransform<Derived>::TransformOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
 
   return getDerived().RebuildOSSArrayShapingExpr(
       Base.get(), ShapeList,
+      E->getBeginLoc(), E->getEndLoc());
+}
+
+template <typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformOSSMultiDepExpr(OSSMultiDepExpr *E) {
+  bool ExprHasChanged = false;
+
+  SmallVector<Expr *, 2> MultiDepIterators;
+  SmallVector<Expr *, 2> MultiDepInits;
+  SmallVector<Expr *, 2> MultiDepSizes;
+  SmallVector<Expr *, 2> MultiDepSteps;
+  for (Expr *S : E->getDepIterators()) {
+    if (S) {
+      DeclRefExpr *ItE = cast<DeclRefExpr>(S);
+      VarDecl *ItVD = cast_or_null<VarDecl>(
+        getDerived().TransformDefinition(ItE->getLocation(), ItE->getDecl()));
+      if (!ItVD)
+        return ExprError();
+
+      if (ItVD != ItE->getDecl())
+        ExprHasChanged = true;
+    }
+    MultiDepIterators.push_back(S);
+  }
+
+  for (Expr *S : E->getDepInits()) {
+    if (S) {
+      ExprResult Init = getDerived().TransformExpr(cast<Expr>(S));
+      if (Init.isInvalid())
+        return ExprError();
+
+      if (Init.get() != S)
+        ExprHasChanged = true;
+      S = Init.get();
+    }
+    MultiDepInits.push_back(S);
+  }
+
+  for (Expr *S : E->getDepSizes()) {
+    if (S) {
+      ExprResult Size = getDerived().TransformExpr(cast<Expr>(S));
+      if (Size.isInvalid())
+        return ExprError();
+
+      if (Size.get() != S)
+        ExprHasChanged = true;
+      S = Size.get();
+    }
+    MultiDepSizes.push_back(S);
+  }
+
+  for (Expr *S : E->getDepSteps()) {
+    if (S) {
+      ExprResult Step = getDerived().TransformExpr(cast<Expr>(S));
+      if (Step.isInvalid())
+        return ExprError();
+
+      if (Step.get() != S)
+        ExprHasChanged = true;
+      S = Step.get();
+    }
+    MultiDepSteps.push_back(S);
+  }
+
+  ExprResult DepExpr = getDerived().TransformExpr(E->getDepExpr());
+  if (DepExpr.isInvalid())
+    return ExprError();
+
+  if (DepExpr.get() != E->getDepExpr())
+    ExprHasChanged = true;
+
+  if (!getDerived().AlwaysRebuild() && !ExprHasChanged)
+    return E;
+
+  return getDerived().RebuildOSSMultiDepExpr(
+      DepExpr.get(), MultiDepIterators, MultiDepInits,
+      MultiDepSizes, MultiDepSteps, E->getDepSizeOrSection(),
       E->getBeginLoc(), E->getEndLoc());
 }
 

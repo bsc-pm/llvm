@@ -1243,6 +1243,10 @@ void StmtProfiler::VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *S) {
   llvm_unreachable("OSS shaping");
 }
 
+void StmtProfiler::VisitOSSMultiDepExpr(const OSSMultiDepExpr *S) {
+  llvm_unreachable("OSS multidep");
+}
+
 void StmtProfiler::VisitOMPArrayShapingExpr(const OMPArrayShapingExpr *S) {
   VisitExpr(S);
 }

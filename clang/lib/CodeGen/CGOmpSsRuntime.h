@@ -182,6 +182,10 @@ private:
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
     SmallVectorImpl<llvm::Value*> &CapturedList);
 
+  void EmitMultiDependencyList(
+    CodeGenFunction &CGF, const OSSDepDataTy &Dep,
+    SmallVectorImpl<llvm::Value *> &List);
+
   void EmitDependencyList(
     CodeGenFunction &CGF, const OSSDepDataTy &Dep,
     SmallVectorImpl<llvm::Value *> &List);
