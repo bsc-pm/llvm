@@ -2921,6 +2921,8 @@ static inline int __kmp_execute_tasks_template(
         __kmp_itt_task_starting(itt_sync_obj);
       }
 #endif /* USE_ITT_BUILD && USE_ITT_NOTIFY */
+        KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d team %p\n",
+                      gtid, thread->th.th_team));
       __kmp_invoke_task(gtid, task, current_task);
 #if USE_ITT_BUILD
       if (itt_sync_obj != NULL)

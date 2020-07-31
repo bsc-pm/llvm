@@ -319,7 +319,7 @@ final_spin=FALSE)
   oversubscribed = (TCR_4(__kmp_nth) > __kmp_avail_proc);
   KMP_MB();
 
-  // Main wait spin loop
+    // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
     if (__kmp_tasking_mode != tskm_immediate_exec) {
@@ -331,9 +331,7 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      kmp_info_t* old_thr = NULL;
-      int old_gtid = -1;
-      if (task_team == NULL && this_thr->th.th_team == NULL) {
+      if (this_thr->th.th_team == NULL && this_thr->th.th_task_team == NULL) {
         // This is an unshackled thread, give it a chance to execute work from
         // some other task team.
         for (int i = 0; i < __kmp_threads_capacity; i++) {
@@ -342,45 +340,47 @@ final_spin=FALSE)
           if (__kmp_threads[i] != this_thr &&
               __kmp_threads[i]->th.th_team != NULL &&
               __kmp_threads[i]->th.th_task_team != NULL) {
-            // This unshackled thread now impersonates a thread with a task team.
-            // TODO: This does not really work, what if we "insert" temporarily the unshackled in the task team?
-            // TODO: Does it make sense to steal directly? We need to pick a victim first though.
-            old_thr = this_thr;
-            this_thr = __kmp_threads[i];
             task_team = __kmp_threads[i]->th.th_task_team;
-            old_gtid = th_gtid;
-            th_gtid = i;
-            KMP_ATOMIC_INC(&task_team->tt.tt_unfinished_threads);
-            // fprintf(stderr, "Unshackled stealing unshackled=%d team=%p\n", old_gtid, task_team);
+            this_thr->th.th_task_team = task_team;
+
+            std::atomic<kmp_int32> *unfinished_threads;
+            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
+            kmp_int32 count = KMP_ATOMIC_INC(unfinished_threads);
             break;
           }
         }
       }
       if (task_team != NULL) {
         if (TCR_SYNC_4(task_team->tt.tt_active)) {
-          if (KMP_TASKING_ENABLED(task_team))
-          {
+          if (KMP_TASKING_ENABLED(task_team)) {
             flag->execute_tasks(
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
-            if (old_thr != NULL) {
-              // Restore if this is an unshackled thread.
-              this_thr = old_thr;
-              th_gtid = old_gtid;
+          } else {
+            if (this_thr->th.th_team == NULL) {
+              // unshackled
+              // unset task team found
+              this_thr->th.th_task_team = NULL;
               task_team = NULL;
             }
-          }
-          else
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+          }
         } else {
-          KMP_DEBUG_ASSERT(!KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid));
+          if (this_thr->th.th_team == NULL) {
+            // unshackled
+            this_thr->th.th_task_team = NULL;
+            task_team = NULL;
+            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+          } else {
+            KMP_DEBUG_ASSERT(!KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid));
 #if OMPT_SUPPORT
-          // task-team is done now, other cases should be catched above
-          if (final_spin && ompt_enabled.enabled)
-            __ompt_implicit_task_end(this_thr, ompt_entry_state, tId);
+            // task-team is done now, other cases should be catched above
+            if (final_spin && ompt_enabled.enabled)
+              __ompt_implicit_task_end(this_thr, ompt_entry_state, tId);
 #endif
-          this_thr->th.th_task_team = NULL;
-          this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+            this_thr->th.th_task_team = NULL;
+            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+          }
         }
       } else {
         this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;

@@ -4436,7 +4436,53 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 
 static
 kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
-  return __kmp_allocate_thread_common(root, NULL, new_tid);
+  // FIXME - Copied from __kmp_init_implicit_task.
+  kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
+  kmp_taskdata_t *task =
+    (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
+  thread->th.th_current_task = task;
+
+  KF_TRACE(
+      10,
+      ("__kmp_allocate_unshackled_thread(enter): T#:%d team=%p task=%p, reinit=%s\n",
+       new_tid, NULL, task, "FALSE"));
+
+  task->td_task_id = KMP_GEN_TASK_ID();
+  task->td_team = NULL;
+  //    task->td_parent   = NULL;  // fix for CQ230101 (broken parent task info
+  //    in debugger)
+  task->td_ident = NULL;
+  task->td_taskwait_ident = NULL;
+  task->td_taskwait_counter = 0;
+  task->td_taskwait_thread = 0;
+
+  task->td_flags.tiedness = TASK_TIED;
+  task->td_flags.tasktype = TASK_IMPLICIT;
+  task->td_flags.proxy = TASK_FULL;
+
+  // All implicit tasks are executed immediately, not deferred
+  task->td_flags.task_serial = 1;
+  task->td_flags.tasking_ser = (__kmp_tasking_mode == tskm_immediate_exec);
+  task->td_flags.team_serial = 0;
+
+  task->td_flags.started = 1;
+  task->td_flags.executing = 1;
+  task->td_flags.complete = 0;
+  task->td_flags.freed = 0;
+
+  task->td_depnode = NULL;
+  task->td_last_tied = task;
+
+  // Initialize counter to -1 event, considering that cannot have pending events
+  task->td_allow_completion_event.pending_events_count = -1;
+  task->td_allow_completion_event.ed.task = nullptr;
+
+  KMP_DEBUG_ASSERT(task->td_incomplete_child_tasks == 0);
+  KMP_DEBUG_ASSERT(task->td_allocated_child_tasks == 0);
+
+  KF_TRACE(10, ("__kmp_allocate_unshackled_thread(exit): T#:%d team=%p task=%p\n", new_tid,
+        NULL, task));
+  return thread;
 }
 
 /* Reinitialize team for reuse.
@@ -6865,9 +6911,6 @@ static void __kmp_do_middle_initialize(void) {
     for (i = 0; i < __kmp_threads_capacity; i++) {
       kmp_info_t *thread = __kmp_threads[i];
       if (thread == NULL)
-        continue;
-      // Unshackled thread?
-      if (!thread->th.th_current_task)
         continue;
       if (thread->th.th_current_task->td_icvs.nproc != 0)
         continue;
