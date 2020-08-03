@@ -556,8 +556,9 @@ bool tools::addOpenMPRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   return true;
 }
 
-void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
-                            const ArgList &Args) {
+void tools::addOmpSsRuntimeLibs(
+    ArgStringList &CmdArgs, const ToolChain &TC, const ArgList &Args) {
+
   // -fdo-not-use-nanos6 means ignoring nanos6
   if (Args.getLastArg(options::OPT_fdo_not_use_nanos6))
     return;
@@ -596,6 +597,39 @@ void tools::addOmpSsRuntime(ArgStringList &CmdArgs, const ToolChain &TC,
   CmdArgs.push_back("-lnanos6");
   CmdArgs.push_back("-ldl");
 }
+
+void tools::addOmpSsRuntimeInclude(
+    ArgStringList &CmdArgs, const ToolChain &TC, const ArgList &Args) {
+
+  // -fdo-not-use-nanos6 means ignoring nanos6
+  if (Args.getLastArg(options::OPT_fdo_not_use_nanos6))
+    return;
+
+  std::string RuntimeDefaultHome(CLANG_DEFAULT_NANOS6_HOME);
+  Optional<std::string> RuntimeHome =
+    llvm::sys::Process::GetEnv("NANOS6_HOME");
+
+  // First look at environment NANOS6_HOME,
+  // then CMAKE defined variable.
+  //
+  // Default to compiler lib dir. in case both are not defined.
+  std::string HomePath;
+  if (RuntimeHome && !RuntimeHome->empty()) {
+    HomePath = RuntimeHome.getValue();
+  } else if (!RuntimeDefaultHome.empty()) {
+    HomePath = RuntimeDefaultHome;
+  }
+
+  if (!HomePath.empty()) {
+    CmdArgs.push_back("-I");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + "/include"));
+  } else {
+    // Fallback to compiler installed dir.
+    CmdArgs.push_back("-I");
+    CmdArgs.push_back(Args.MakeArgString(HomePath + std::string(TC.getDriver().getInstalledDir()) + "/../include"));
+  }
+}
+
 
 static void addSanitizerRuntime(const ToolChain &TC, const ArgList &Args,
                                 ArgStringList &CmdArgs, StringRef Sanitizer,

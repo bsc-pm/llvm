@@ -572,7 +572,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         WantPthread = true;
 
       if (Args.getLastArg(options::OPT_fompss))
-        addOmpSsRuntime(CmdArgs, ToolChain, Args);
+        addOmpSsRuntimeLibs(CmdArgs, ToolChain, Args);
 
       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
 

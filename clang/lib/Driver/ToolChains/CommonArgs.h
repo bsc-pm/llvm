@@ -84,7 +84,9 @@ bool addOpenMPRuntime(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
                       bool IsOffloadingHost = false, bool GompNeedsRT = false);
 
 /// OmpSs Nanos6 linker flags
-void addOmpSsRuntime(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
+void addOmpSsRuntimeLibs(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
+                     const llvm::opt::ArgList &Args);
+void addOmpSsRuntimeInclude(llvm::opt::ArgStringList &CmdArgs, const ToolChain &TC,
                      const llvm::opt::ArgList &Args);
 
 llvm::opt::Arg *getLastProfileUseArg(const llvm::opt::ArgList &Args);
