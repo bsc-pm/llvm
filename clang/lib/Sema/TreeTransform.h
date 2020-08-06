@@ -10853,13 +10853,23 @@ TreeTransform<Derived>::TransformOSSMultiDepExpr(OSSMultiDepExpr *E) {
   for (Expr *S : E->getDepIterators()) {
     if (S) {
       DeclRefExpr *ItE = cast<DeclRefExpr>(S);
+      // Transform Decl first
       VarDecl *ItVD = cast_or_null<VarDecl>(
         getDerived().TransformDefinition(ItE->getLocation(), ItE->getDecl()));
+
       if (!ItVD)
         return ExprError();
 
       if (ItVD != ItE->getDecl())
         ExprHasChanged = true;
+
+      ExprResult Iter = getDerived().TransformExpr(cast<Expr>(S));
+      if (Iter.isInvalid())
+        return ExprError();
+
+      if (Iter.get() != S)
+        ExprHasChanged = true;
+      S = Iter.get();
     }
     MultiDepIterators.push_back(S);
   }

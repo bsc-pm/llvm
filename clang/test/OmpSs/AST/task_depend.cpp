@@ -86,8 +86,6 @@ void bar1() {
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:42> 'int' 1
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:45> 'int' 2
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:48> 'int' 3
-// CHECK-NEXT: OSSSharedClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int [10][20]' lvalue Var {{[a-z0-9]+}} 'array' 'int [10][20]'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:70:11, col:48>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:20, col:47>
@@ -100,8 +98,6 @@ void bar1() {
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:38> 'int' 1
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:41> 'int' 2
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:44> 'int' 3
-// CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
-// CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
 
 // CHECK: OSSTaskDirective {{[a-z0-9]+}} <line:68:11, col:56>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:20, col:55>
@@ -134,6 +130,5 @@ void bar1() {
 // CHECK-NEXT: IntegerLiteral {{[a-z0-9]+}} <col:44> 'int' 3
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
-// CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
 

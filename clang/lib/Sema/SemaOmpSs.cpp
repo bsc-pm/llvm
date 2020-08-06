@@ -793,6 +793,9 @@ getListOfPossibleValues(OmpSsClauseKind K, unsigned First, unsigned Last,
 
 void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses) {
 
+  if (CurContext->isDependentContext())
+    return;
+
   bool ErrorFound = false;
 
   OSSClauseDSAChecker OSSClauseChecker(DSAStack, *this);
