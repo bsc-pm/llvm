@@ -1310,6 +1310,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
 
   NewCGF.AllocaInsertPt = AllocaInsertPointer;
   NewCGF.Builder.SetInsertPoint(EntryBB);
+  NewCGF.CurCodeDecl = GlobalDecl().getDecl();
   NewCGF.CurFuncDecl = nullptr;
   NewCGF.FnRetTy = StructRetQ;
   NewCGF.CurFn = FuncVar;
