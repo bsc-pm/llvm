@@ -946,11 +946,12 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
     IsError = false;
 
     Expr *InitExpr = MultiDepInits[i];
+    Expr *DiscreteArrExpr = nullptr;
     if (InitListExpr *InitList = dyn_cast<InitListExpr>(InitExpr)) {
       ExprResult Res = ActOnOmpSsMultiDepIteratorInitListExpr(InitList);
       if (Res.isInvalid())
         IsError = true;
-      DiscreteArrays.push_back(Res.get());
+      DiscreteArrExpr = Res.get();
     } else {
       AddInitializerToDecl(ItVD, InitExpr, /*DirectInit=*/false);
       InitExpr = ItVD->getInit();
@@ -958,6 +959,7 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
         IsError = true;
     }
     Inits.push_back(InitExpr);
+    DiscreteArrays.push_back(DiscreteArrExpr);
 
     Expr *SizeExpr = MultiDepSizes[i];
     if (SizeExpr) {

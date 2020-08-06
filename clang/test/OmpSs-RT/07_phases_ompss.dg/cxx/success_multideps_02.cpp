@@ -5,6 +5,9 @@ test_CXXFLAGS="--no-copy-deps"
 </testinfo>
 */
 
+// RUN: %oss-cxx-compile-and-run
+// RUN: %oss-cxx-O2-compile-and-run
+
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -24,9 +27,6 @@ void set(std::vector<T *>& w)
             *n = k;
         }
     }
-// RUN: %oss-cxx-compile-and-run
-// RUN: %oss-cxx-O2-compile-and-run
-//XFAIL: *
 }
 
 template <typename T>
