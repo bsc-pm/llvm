@@ -2087,6 +2087,22 @@ struct OmpSs : public ModulePass {
         + TI.DependsInfo.Reductions.size()
         + TI.DependsInfo.WeakReductions.size();
 
+      int NumMultidependencies =
+        TI.DependsInfo.MultiRangeIns.size()
+        + TI.DependsInfo.MultiRangeOuts.size()
+        + TI.DependsInfo.MultiRangeInouts.size()
+        + TI.DependsInfo.MultiRangeConcurrents.size()
+        + TI.DependsInfo.MultiRangeCommutatives.size()
+        + TI.DependsInfo.MultiRangeWeakIns.size()
+        + TI.DependsInfo.MultiRangeWeakOuts.size()
+        + TI.DependsInfo.MultiRangeWeakInouts.size()
+        + TI.DependsInfo.MultiRangeWeakConcurrents.size()
+        + TI.DependsInfo.MultiRangeWeakCommutatives.size();
+      // TODO: build loop to compute the amount of dependencies in
+      // multideps. Fallback to -1 if the task has some dependency
+      if (NumMultidependencies)
+        NumDependencies = -1;
+
       // If taskloop NumDeps = -1
       if (!TI.LoopInfo.empty() &&
           (TI.TaskKind == TaskInfo::OSSD_taskloop
