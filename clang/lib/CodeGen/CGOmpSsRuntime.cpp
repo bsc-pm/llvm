@@ -1372,6 +1372,9 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       MultiDepInfoGathering.getThisAddress(),
       MultiDepRetTypes,
       NewCGF, StructRetDRE);
+
+  Address RetAddr = NewCGF.ReturnValue;
+
   // TODO change name
   {
     CodeGenFunction::OSSPrivateScope InitScope(NewCGF);
@@ -1467,18 +1470,17 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       List.push_back(StepValue);
 
     }
-    Address RetAddr = NewCGF.ReturnValue;
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
-
-    NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
 
     // After finishing the computedep function remove the alloca instruction
     llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
     NewCGF.AllocaInsertPt = nullptr;
     AllocaInsertPointer->eraseFromParent();
   }
+  NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
+
   // Pop temporal empty refmap, we are not in compute_dep function anymore
   CaptureMapStack.pop_back();
 
@@ -1527,6 +1529,8 @@ void CGOmpSsRuntime::EmitDependencyList(
       DependInfoGathering.getThisAddress(),
       DependInfoGathering.getRetTypes(),
       NewCGF, StructRetDRE);
+
+  Address RetAddr = NewCGF.ReturnValue;
 
   // TODO change name
   {
@@ -1653,18 +1657,17 @@ void CGOmpSsRuntime::EmitDependencyList(
     List.push_back(IdxStart);
     List.push_back(IdxEnd);
 
-    Address RetAddr = NewCGF.ReturnValue;
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
 
-    NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
 
     // After finishing the computedep function remove the alloca instruction
     llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
     NewCGF.AllocaInsertPt = nullptr;
     AllocaInsertPointer->eraseFromParent();
   }
+  NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
 
   // Pop temporal empty refmap, we are not in compute_dep function anymore
   CaptureMapStack.pop_back();
