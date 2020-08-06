@@ -1447,7 +1447,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
         if (IsSizeOrSection) {
           SizeValue = NewCGF.Builder.CreateAdd(InitValue, SizeValue);
           SizeValue = NewCGF.Builder.CreateAdd(
-            InitValue, llvm::ConstantInt::getSigned(
+            SizeValue, llvm::ConstantInt::getSigned(
               NewCGF.ConvertType(NewCGF.getContext().IntTy), -1));
         }
 
