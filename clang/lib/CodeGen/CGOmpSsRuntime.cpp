@@ -2524,6 +2524,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       llvm::Value *V = CGF.EmitScalarExpr(E);
       TaskInfo.emplace_back(getBundleStr(OSSB_label), V);
     }
+    if (Attr->getWait()) {
+      TaskInfo.emplace_back(
+          getBundleStr(OSSB_wait),
+          llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
+    }
     // in()
     for (const Expr *E : Attr->ins()) {
       OSSDepDataTy Dep;
