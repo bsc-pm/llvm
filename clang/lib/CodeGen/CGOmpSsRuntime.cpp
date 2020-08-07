@@ -2269,40 +2269,61 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
   TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
-static void EmitOutlineMultiDepIterDecls(
+static DeclRefExpr *emitTaskCallArg(
+    CodeGenFunction &CGF, StringRef Name, QualType Q, SourceLocation Loc,
+    llvm::Optional<const Expr *> InitE = llvm::None) {
+
+  ASTContext &Ctx = CGF.getContext();
+
+  Q = Q.getUnqualifiedType();
+  if (Q->isArrayType())
+    Q = Ctx.getBaseElementType(Q).getCanonicalType();
+
+  auto *VD =
+    VarDecl::Create(
+      Ctx, const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
+      Loc, Loc, &Ctx.Idents.get(Name),
+      Q, Ctx.getTrivialTypeSourceInfo(Q, Loc), SC_Auto);
+
+  VD->setImplicit();
+  VD->setReferenced();
+  VD->markUsed(Ctx);
+  VD->setInitStyle(VarDecl::CInit);
+  if (InitE.hasValue())
+    VD->setInit(const_cast<Expr *>(*InitE));
+
+  CGF.EmitVarDecl(*VD);
+
+  DeclRefExpr *Ref = DeclRefExpr::Create(
+      Ctx, NestedNameSpecifierLoc(), SourceLocation(), VD,
+      /*RefersToEnclosingVariableOrCapture=*/false, Loc, Q.getNonReferenceType(), VK_LValue);
+  return Ref;
+}
+
+static void emitOutlineMultiDepIterDecls(
     CodeGenFunction &CGF, const OSSTaskDeclAttr *TaskDecl, SmallVectorImpl<Expr *> &PrivateCopies,
     CodeGenFunction::OSSPrivateScope &Scope) {
   auto EmitDepListIterDecls = [&CGF, &PrivateCopies, &Scope](const Expr *DepExpr) {
     if (auto *MDExpr = dyn_cast<OSSMultiDepExpr>(DepExpr)) {
       for (auto *IterE : MDExpr->getDepIterators()) {
-        // The a new VarDecl like ParamArgDecl, but in context of function call
-        ASTContext &Ctx = CGF.getContext();
-        auto *ParmDecl =
-          VarDecl::Create(Ctx,
-                          const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
-                          IterE->getExprLoc(),
-                          IterE->getExprLoc(),
-                          &Ctx.Idents.get("ASDF"),
-                          IterE->getType(),
-                          Ctx.getTrivialTypeSourceInfo(IterE->getType(), IterE->getExprLoc()),
-                          SC_Auto);
-        ParmDecl->setImplicit();
-        ParmDecl->setReferenced();
-        ParmDecl->markUsed(Ctx);
-        ParmDecl->setInitStyle(VarDecl::CInit);
-        // ParmDecl->setInit(const_cast<Expr *>(*ArgI));
+        auto *IterVD = cast<VarDecl>(cast<DeclRefExpr>(IterE)->getDecl());
 
-        CGF.EmitVarDecl(*ParmDecl);
+        // Do not emit the iterator as is because we want it to be unique
+        // of each task call
 
-        Expr *ParmRef = DeclRefExpr::Create(
-            Ctx, NestedNameSpecifierLoc(), SourceLocation(), ParmDecl,
-            /*RefersToEnclosingVariableOrCapture=*/false, IterE->getExprLoc(), IterE->getType().getNonReferenceType(), VK_LValue);
+        QualType Q = IterVD->getType();
+        // Do not put any location since it is not an argument
+        SourceLocation Loc;
+        std::string Name(IterVD->getName());
+        Name += ".call_arg";
 
-        PrivateCopies.push_back(ParmRef);
+        Expr *NewIterE = emitTaskCallArg(CGF, Name, Q, Loc);
 
-        LValue ParmLV = CGF.EmitLValue(ParmRef);
+        PrivateCopies.push_back(NewIterE);
 
-        Scope.addPrivate(cast<VarDecl>(cast<DeclRefExpr>(IterE)->getDecl()), [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
+        LValue NewIterLV = CGF.EmitLValue(NewIterE);
+
+        Scope.addPrivate(IterVD, [&CGF, &NewIterLV]() -> Address { return NewIterLV.getAddress(CGF); });
         (void)Scope.Privatize();
       }
     }
@@ -2327,9 +2348,10 @@ static void EmitOutlineMultiDepIterDecls(
   for (const Expr *E : TaskDecl->depWeakInouts()) { EmitDepListIterDecls(E); }
   for (const Expr *E : TaskDecl->depWeakConcurrents()) { EmitDepListIterDecls(E); }
   for (const Expr *E : TaskDecl->depWeakCommutatives()) { EmitDepListIterDecls(E); }
+  // TODO: reductions
 }
 
-static void EmitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
+static void emitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
   auto EmitDepListIterDecls = [&CGF](ArrayRef<OSSDepDataTy> DepList) {
     for (const OSSDepDataTy &Dep : DepList) {
       if (auto *MDExpr = dyn_cast<OSSMultiDepExpr>(Dep.E)) {
@@ -2357,7 +2379,7 @@ void CGOmpSsRuntime::EmitDirectiveData(
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
     const OSSLoopDataTy &LoopData) {
 
-  EmitMultiDepIterDecls(CGF, Data);
+  emitMultiDepIterDecls(CGF, Data);
 
   SmallVector<llvm::Value*, 4> CapturedList;
   for (const Expr *E : Data.DSAs.Shareds) {
@@ -2473,8 +2495,6 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   CodeGenModule &CGM = CGF.CGM;
   ASTContext &Ctx = CGM.getContext();
 
-  SourceLocation Loc = CE->getBeginLoc();
-
   SmallVector<Expr *, 4> ParmCopies;
   SmallVector<Expr *, 4> FirstprivateCopies;
   SmallVector<Expr *, 4> PrivateCopies;
@@ -2489,34 +2509,13 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   auto ParI = FD->param_begin(); 
   while (ArgI != CE->arg_end()) {
 
-    // QualType ParQ = (*ParI)->getType();
-    QualType ParQ = (*ParI)->getType().getUnqualifiedType();
-    if (ParQ->isArrayType())
-      ParQ = Ctx.getBaseElementType(ParQ).getCanonicalType();
+    QualType ParQ = (*ParI)->getType();
+    SourceLocation Loc = (*ArgI)->getExprLoc();
 
     // The a new VarDecl like ParamArgDecl, but in context of function call
-    auto *ParmDecl =
-      VarDecl::Create(Ctx,
-                      const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
-                      Loc,
-                      Loc,
-                      &Ctx.Idents.get("call_arg"),
-                      ParQ,
-                      Ctx.getTrivialTypeSourceInfo(ParQ, Loc),
-                      SC_Auto);
-    ParmDecl->setImplicit();
-    ParmDecl->setReferenced();
-    ParmDecl->markUsed(Ctx);
-    ParmDecl->setInitStyle(VarDecl::CInit);
-    ParmDecl->setInit(const_cast<Expr *>(*ArgI));
+    Expr *ParmRef = emitTaskCallArg(CGF, "call_arg", ParQ, Loc, *ArgI);
 
-    CGF.EmitVarDecl(*ParmDecl);
-
-    Expr *ParmRef = DeclRefExpr::Create(
-        Ctx, NestedNameSpecifierLoc(), SourceLocation(), ParmDecl,
-        /*RefersToEnclosingVariableOrCapture=*/false, Loc, ParQ.getNonReferenceType(), VK_LValue);
-
-    if (!(*ParI)->getType()->isReferenceType()) {
+    if (!ParQ->isReferenceType()) {
       ParmRef =
         ImplicitCastExpr::Create(Ctx, ParmRef->getType(), CK_LValueToRValue,
                                  ParmRef, /*BasePath=*/nullptr,
@@ -2541,7 +2540,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
   // Emit multidep iterators before building task bundles
   // NOTE: this should do only one iteration
   for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
-    EmitOutlineMultiDepIterDecls(CGF, Attr, PrivateCopies, InitScope);
+    emitOutlineMultiDepIterDecls(CGF, Attr, PrivateCopies, InitScope);
   }
 
   llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
