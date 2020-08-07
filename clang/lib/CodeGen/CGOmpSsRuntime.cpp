@@ -359,27 +359,28 @@ public:
     FillTypeVLASizes(E);
 
     llvm::Value *PossibleBase = nullptr;
-    const VarDecl *VD = cast<VarDecl>(E->getDecl());
-    if (VD->getType()->isReferenceType()
-        || E->refersToEnclosingVariableOrCapture()) {
-      // Reuse the ref addr. got in DSA
-      LValue LV = CGF.EmitDeclRefLValue(E);
-      PossibleBase = LV.getPointer(CGF);
-      CaptureInvolvedMap.try_emplace(VD, LV.getAddress(CGF));
-    } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
-      PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
-      CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
-      Address Addr(PossibleBase, Alignment);
-      CaptureInvolvedMap.try_emplace(VD, Addr);
-    } else {
-      LValue LV = CGF.EmitDeclRefLValue(E);
-      PossibleBase = LV.getPointer(CGF);
-      ExprInvolvedVarList[VD] = LV;
+    if (const VarDecl *VD = dyn_cast<VarDecl>(E->getDecl())) {
+      if (VD->getType()->isReferenceType()
+          || E->refersToEnclosingVariableOrCapture()) {
+        // Reuse the ref addr. got in DSA
+        LValue LV = CGF.EmitDeclRefLValue(E);
+        PossibleBase = LV.getPointer(CGF);
+        CaptureInvolvedMap.try_emplace(VD, LV.getAddress(CGF));
+      } else if (VD->hasLinkage() || VD->isStaticDataMember()) {
+        PossibleBase = CGF.CGM.GetAddrOfGlobalVar(VD);
+        CharUnits Alignment = CGF.getContext().getDeclAlign(VD);
+        Address Addr(PossibleBase, Alignment);
+        CaptureInvolvedMap.try_emplace(VD, Addr);
+      } else {
+        LValue LV = CGF.EmitDeclRefLValue(E);
+        PossibleBase = LV.getPointer(CGF);
+        ExprInvolvedVarList[VD] = LV;
+      }
+      // Since we prioritize visiting the base of the expression
+      // the first DeclRefExpr is always the Base
+      if (!Base)
+        Base = PossibleBase;
     }
-    // Since we prioritize visiting the base of the expression
-    // the first DeclRefExpr is always the Base
-    if (!Base)
-      Base = PossibleBase;
   }
 
   void VisitCXXThisExpr(const CXXThisExpr *ThisE) {
