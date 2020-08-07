@@ -1179,12 +1179,15 @@ void CGOmpSsRuntime::EmitDSAPrivate(
   if (!DimsWithValue.empty())
     TaskInfo.emplace_back(getBundleStr(OSSB_vladims), DimsWithValue);
 
-  const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
-  const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
+  // TODO: is this sufficient to skip COPY/DEINIT? (task functions)
+  if (PDataTy.Copy) {
+    const DeclRefExpr *CopyE = cast<DeclRefExpr>(PDataTy.Copy);
+    const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
 
-  if (!CopyD->getType().isPODType(CGF.getContext())) {
-    EmitCtorFunc(DSAValue, CopyD, TaskInfo);
-    EmitDtorFunc(DSAValue, CopyD, TaskInfo);
+    if (!CopyD->getType().isPODType(CGF.getContext())) {
+      EmitCtorFunc(DSAValue, CopyD, TaskInfo);
+      EmitDtorFunc(DSAValue, CopyD, TaskInfo);
+    }
   }
 }
 
@@ -2266,6 +2269,66 @@ static void EmitLoopType(const OSSLoopDataTy &LoopData, CodeGenFunction &CGF,
   TaskInfo.emplace_back(getBundleStr(OSSB_loop_type), List);
 }
 
+static void EmitOutlineMultiDepIterDecls(
+    CodeGenFunction &CGF, const OSSTaskDeclAttr *TaskDecl, SmallVectorImpl<Expr *> &PrivateCopies,
+    CodeGenFunction::OSSPrivateScope &Scope) {
+  auto EmitDepListIterDecls = [&CGF, &PrivateCopies, &Scope](const Expr *DepExpr) {
+    if (auto *MDExpr = dyn_cast<OSSMultiDepExpr>(DepExpr)) {
+      for (auto *IterE : MDExpr->getDepIterators()) {
+        // The a new VarDecl like ParamArgDecl, but in context of function call
+        ASTContext &Ctx = CGF.getContext();
+        auto *ParmDecl =
+          VarDecl::Create(Ctx,
+                          const_cast<DeclContext *>(cast<DeclContext>(CGF.CurCodeDecl)),
+                          IterE->getExprLoc(),
+                          IterE->getExprLoc(),
+                          &Ctx.Idents.get("ASDF"),
+                          IterE->getType(),
+                          Ctx.getTrivialTypeSourceInfo(IterE->getType(), IterE->getExprLoc()),
+                          SC_Auto);
+        ParmDecl->setImplicit();
+        ParmDecl->setReferenced();
+        ParmDecl->markUsed(Ctx);
+        ParmDecl->setInitStyle(VarDecl::CInit);
+        // ParmDecl->setInit(const_cast<Expr *>(*ArgI));
+
+        CGF.EmitVarDecl(*ParmDecl);
+
+        Expr *ParmRef = DeclRefExpr::Create(
+            Ctx, NestedNameSpecifierLoc(), SourceLocation(), ParmDecl,
+            /*RefersToEnclosingVariableOrCapture=*/false, IterE->getExprLoc(), IterE->getType().getNonReferenceType(), VK_LValue);
+
+        PrivateCopies.push_back(ParmRef);
+
+        LValue ParmLV = CGF.EmitLValue(ParmRef);
+
+        Scope.addPrivate(cast<VarDecl>(cast<DeclRefExpr>(IterE)->getDecl()), [&CGF, &ParmLV]() -> Address { return ParmLV.getAddress(CGF); });
+        (void)Scope.Privatize();
+      }
+    }
+  };
+  for (const Expr *E : TaskDecl->ins()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->outs()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->inouts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->concurrents()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->commutatives()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->weakIns()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->weakOuts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->weakInouts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->weakConcurrents()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->weakCommutatives()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depIns()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depOuts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depInouts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depConcurrents()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depCommutatives()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depWeakIns()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depWeakOuts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depWeakInouts()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depWeakConcurrents()) { EmitDepListIterDecls(E); }
+  for (const Expr *E : TaskDecl->depWeakCommutatives()) { EmitDepListIterDecls(E); }
+}
+
 static void EmitMultiDepIterDecls(CodeGenFunction &CGF, const OSSTaskDataTy &Data) {
   auto EmitDepListIterDecls = [&CGF](ArrayRef<OSSDepDataTy> DepList) {
     for (const OSSDepDataTy &Dep : DepList) {
@@ -2414,6 +2477,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   SmallVector<Expr *, 4> ParmCopies;
   SmallVector<Expr *, 4> FirstprivateCopies;
+  SmallVector<Expr *, 4> PrivateCopies;
   SmallVector<Expr *, 4> SharedCopies;
 
   CodeGenFunction::OSSPrivateScope InitScope(CGF);
@@ -2473,6 +2537,13 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     ++ArgI;
     ++ParI;
   }
+
+  // Emit multidep iterators before building task bundles
+  // NOTE: this should do only one iteration
+  for (const auto *Attr : FD->specific_attrs<OSSTaskDeclAttr>()) {
+    EmitOutlineMultiDepIterDecls(CGF, Attr, PrivateCopies, InitScope);
+  }
+
   llvm::Function *EntryCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_entry);
   llvm::Function *ExitCallee = CGM.getIntrinsic(llvm::Intrinsic::directive_region_exit);
   SmallVector<llvm::OperandBundleDef, 8> TaskInfo;
@@ -2497,6 +2568,12 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     SmallVector<llvm::Value*, 4> CapturedList;
     for (const Expr *E : SharedCopies) {
       EmitDSAShared(CGF, E, TaskInfo, CapturedList);
+    }
+    for (const Expr *E : PrivateCopies) {
+      OSSDSAPrivateDataTy PDataTy;
+      PDataTy.Ref = E;
+      PDataTy.Copy = nullptr;
+      EmitDSAPrivate(CGF, PDataTy, TaskInfo, CapturedList);
     }
     for (const Expr *E : FirstprivateCopies) {
       OSSDSAFirstprivateDataTy FpDataTy;
