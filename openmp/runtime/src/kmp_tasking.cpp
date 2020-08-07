@@ -428,6 +428,23 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
 
+  // Traverse all the unshackled threads, if we find one that is sleeping, resume it
+  // so we give it a chance to execute the task.
+  // for (unsigned i = 0; i < __kmp_root[0]->r.)
+  for (int i = 0; i < __kmp_threads_capacity; i++) {
+    if (__kmp_threads[i] == NULL)
+      continue;
+    if (__kmp_threads[i]->th.is_unshackled) {
+      // This is an unshackled thread
+      kmp_flag_64 flag(&__kmp_threads[i]->th.th_bar[bs_forkjoin_barrier].bb.b_go,
+           __kmp_threads[i]);
+      if (flag.is_sleeping()) {
+        flag.resume(i);
+        break;
+      }
+    }
+  }
+
   return TASK_SUCCESSFULLY_PUSHED;
 }
 

@@ -2549,6 +2549,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
+  uint8_t is_unshackled; // This is an unshackled thread.
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {

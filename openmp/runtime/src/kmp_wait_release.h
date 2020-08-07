@@ -331,15 +331,14 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      if (this_thr->th.th_team == NULL && this_thr->th.th_task_team == NULL) {
+      if (this_thr->th.is_unshackled) {
         // This is an unshackled thread, give it a chance to execute work from
         // some other task team.
         for (int i = 0; i < __kmp_threads_capacity; i++) {
           if (__kmp_threads[i] == NULL)
             continue;
           if (__kmp_threads[i] != this_thr &&
-              __kmp_threads[i]->th.th_team != NULL &&
-              __kmp_threads[i]->th.th_task_team != NULL) {
+              !__kmp_threads[i]->th.is_unshackled) {
             task_team = __kmp_threads[i]->th.th_task_team;
             this_thr->th.th_task_team = task_team;
 
@@ -357,7 +356,7 @@ final_spin=FALSE)
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
           } else {
-            if (this_thr->th.th_team == NULL) {
+            if (this_thr->th.is_unshackled) {
               // unshackled
               // unset task team found
               this_thr->th.th_task_team = NULL;
@@ -366,7 +365,7 @@ final_spin=FALSE)
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           }
         } else {
-          if (this_thr->th.th_team == NULL) {
+          if (this_thr->th.is_unshackled) {
             // unshackled
             this_thr->th.th_task_team = NULL;
             task_team = NULL;

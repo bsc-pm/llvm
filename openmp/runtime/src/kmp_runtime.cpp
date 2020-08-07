@@ -4415,6 +4415,8 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 #endif /* KMP_ADJUST_BLOCKTIME */
 
+  new_thr->th.is_unshackled = 0;
+
   /* actually fork it and create the new worker thread */
   KF_TRACE(
       10, ("__kmp_allocate_thread: before __kmp_create_worker: %p\n", new_thr));
@@ -4438,6 +4440,7 @@ static
 kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
+  thread->th.is_unshackled = 1;
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -6931,6 +6934,7 @@ static void __kmp_do_middle_initialize(void) {
       __kmp_zero_bt = TRUE;
     }
   }
+
 #endif /* KMP_ADJUST_BLOCKTIME */
 
   /* we have finished middle initialization */
