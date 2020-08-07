@@ -338,13 +338,15 @@ final_spin=FALSE)
           if (__kmp_threads[i] == NULL)
             continue;
           if (__kmp_threads[i] != this_thr &&
-              !__kmp_threads[i]->th.is_unshackled) {
+              !__kmp_threads[i]->th.is_unshackled &&
+              __kmp_threads[i]->th.th_team != NULL &&
+              __kmp_threads[i]->th.th_task_team != NULL) {
             task_team = __kmp_threads[i]->th.th_task_team;
             this_thr->th.th_task_team = task_team;
 
             std::atomic<kmp_int32> *unfinished_threads;
             unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-            kmp_int32 count = KMP_ATOMIC_INC(unfinished_threads);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_threads);
             break;
           }
         }
