@@ -1328,6 +1328,9 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
   SourceLocation ELoc = Tok.getLocation();
 
   // 1. Disable diagnostics for label clause. Emit a warning and keep going
+  // FIXME: this hides any typo correction diagnostic like:
+  // const char *blabla;
+  // #pragma oss task label(babla) <- hidden typo correction
   if (ClauseName == "label")
     Diags.setSuppressAllDiagnostics(true);
 
