@@ -3541,8 +3541,7 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
     VDInitRefExpr = buildDeclRefExpr(*this, VDInit, Type,
                                      RefExpr->getExprLoc());
     // Set temp variable as initializer of DSA clone
-    AddInitializerToDecl(VDPrivate,
-                         DefaultLvalueConversion(VDInitRefExpr).get(),
+    AddInitializerToDecl(VDPrivate, VDInitRefExpr,
                          /*DirectInit=*/false);
 
     DeclRefExpr *VDPrivateRefExpr = buildDeclRefExpr(
@@ -3609,8 +3608,7 @@ ExprResult Sema::CheckIsConstCharPtrConvertibleExpr(Expr *E) {
 
     VarDecl *LabelVD =
         buildVarDecl(*this, E->getExprLoc(), ConstCharPtrTy, ".tmp.label");
-    AddInitializerToDecl(LabelVD,
-                         DefaultLvalueConversion(E).get(),
+    AddInitializerToDecl(LabelVD, E,
                          /*DirectInit=*/false);
     if (!LabelVD->hasInit())
       return ExprError();
