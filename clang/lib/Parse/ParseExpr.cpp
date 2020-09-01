@@ -3301,12 +3301,9 @@ ExprResult Parser::ParseOSSMultiDepExpression() {
 
   CachedTokens LateParsedTokens;
   // Save stmt to parse it after declaring iterators
-  while (Tok.isNot(tok::comma) &&
-         Tok.isNot(tok::r_brace) &&
-         Tok.isNot(tok::annot_pragma_ompss_end)) {
-    LateParsedTokens.push_back(Tok);
-    ConsumeAnyToken();
-  }
+  ConsumeAndStoreUntil(
+    tok::comma, tok::r_brace, LateParsedTokens,
+    /* StopAtSemi=*/ false, /* ConsumeFinalToken= */false);
 
   ParseScope OSSMultiDepScope(this, Scope::DeclScope | Scope::CompoundStmtScope);
 
