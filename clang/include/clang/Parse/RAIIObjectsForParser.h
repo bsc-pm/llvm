@@ -306,6 +306,25 @@ namespace clang {
     ~ParsingOpenMPDirectiveRAII() { restore(); }
   };
 
+  /// Activates OmpSs parsing mode to preseve OmpSs specific annotation
+  /// tokens.
+  class ParsingOmpSsDirectiveRAII {
+    Parser &P;
+    bool OldVal;
+
+  public:
+    ParsingOmpSsDirectiveRAII(Parser &P)
+        : P(P), OldVal(P.OmpSsDirectiveParsing) {
+      P.OmpSsDirectiveParsing = true;
+    }
+
+    /// This can be used to restore the state early, before the dtor
+    /// is run.
+    void restore() { P.OmpSsDirectiveParsing = OldVal; }
+
+    ~ParsingOmpSsDirectiveRAII() { restore(); }
+  };
+
   /// RAII object that makes '>' behave either as an operator
   /// or as the closing angle bracket for a template argument list.
   class GreaterThanIsOperatorScope {

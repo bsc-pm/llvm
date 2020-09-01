@@ -734,7 +734,14 @@ bool Parser::ConsumeAndStoreUntil(tok::TokenKind T1, tok::TokenKind T2,
     case tok::annot_module_include:
       // Ran out of tokens.
       return false;
-
+    case tok::annot_pragma_ompss:
+    case tok::annot_pragma_ompss_end:
+       // Stop before an OmpSs pragma boundary.
+      if (OmpSsDirectiveParsing)
+        return false;
+      Toks.push_back(Tok);
+      ConsumeAnnotationToken();
+      break;
     case tok::l_paren:
       // Recursively consume properly-nested parens.
       Toks.push_back(Tok);

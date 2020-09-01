@@ -286,6 +286,10 @@ bool Parser::SkipUntil(ArrayRef<tok::TokenKind> Toks, SkipUntilFlags Flags) {
     case tok::annot_pragma_ompss:
     case tok::annot_pragma_ompss_end:
       // Stop before an OmpSs pragma boundary.
+      if (OmpSsDirectiveParsing)
+        return false;
+      ConsumeAnnotationToken();
+      break;
     case tok::annot_module_begin:
     case tok::annot_module_end:
     case tok::annot_module_include:

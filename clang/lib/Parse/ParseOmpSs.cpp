@@ -416,6 +416,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     AccessSpecifier &AS, ParsedAttributesWithRange &Attrs, bool Delayed,
     DeclSpec::TST TagType, Decl *Tag) {
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
+  ParsingOmpSsDirectiveRAII DirScope(*this);
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
   SourceLocation Loc;
@@ -538,6 +539,7 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
 StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     ParsedStmtContext Allowed) {
   assert(Tok.is(tok::annot_pragma_ompss) && "Not an OmpSs directive!");
+  ParsingOmpSsDirectiveRAII DirScope(*this);
   ParenBraceBracketBalancer BalancerRAIIObj(*this);
   unsigned ScopeFlags = Scope::FnScope | Scope::DeclScope |
                         Scope::CompoundStmtScope | Scope::OmpSsDirectiveScope;
