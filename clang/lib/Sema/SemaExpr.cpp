@@ -340,7 +340,7 @@ bool Sema::DiagnoseUseOfDecl(NamedDecl *D, ArrayRef<SourceLocation> Locs,
   auto *DRDOSS = dyn_cast<OSSDeclareReductionDecl>(CurContext);
   if (LangOpts.OmpSs && DRDOSS && !CurContext->containsDecl(D) &&
       isa<VarDecl>(D)) {
-    Diag(Loc, diag::err_omp_wrong_var_in_declare_reduction)
+    Diag(Loc, diag::err_oss_wrong_var_in_declare_reduction)
         << getCurFunction()->HasOSSDeclareReductionCombiner;
     Diag(D->getLocation(), diag::note_entity_declared_at) << D;
     return true;

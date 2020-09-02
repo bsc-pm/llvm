@@ -10767,6 +10767,7 @@ def err_oss_loop_not_canonical_cond : Error<
 def err_oss_loop_not_canonical_incr : Error<
   "increment clause of OmpSs-2 for loop must perform simple addition "
   "or subtraction on loop variable %0">;
+def err_oss_wrong_var_in_declare_reduction : Error<"only %select{'omp_priv' or 'omp_orig'|'omp_in' or 'omp_out'}0 variables are allowed in %select{initializer|combiner}0 expression">;
 } // end of OmpSs component.
 
 
