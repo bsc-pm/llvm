@@ -886,23 +886,27 @@ struct OmpSs : public ModulePass {
       LoopInfo.StepSigned = 1;
 
       Function *ComputeMultiDepFun = MDI.ComputeMultiDepFun;
-      ArrayRef<Value *> Args = MDI.Args;
+      auto Args = MDI.Args;
+
+      if (IsTaskLoop) {
+        std::replace(Args.begin(), Args.end(), IndVar, NewIndVarLBound);
+      }
 
       for (size_t i = 0; i < MDI.Iters.size(); i++) {
         LoopInfo.IndVar = MDI.Iters[i];
-        auto LBoundGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+        auto LBoundGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
           Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
            return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 0);
         };
-        auto RemapGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+        auto RemapGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
           Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
            return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 1);
         };
-        auto UBoundGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+        auto UBoundGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
           Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
            return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 2);
         };
-        auto IncrGen = [ComputeMultiDepFun, Args, i](IRBuilder<> &IRB) {
+        auto IncrGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
           Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
            return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 3);
         };
