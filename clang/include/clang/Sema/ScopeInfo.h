@@ -124,8 +124,11 @@ public:
   /// True if current scope is for OpenMP declare reduction combiner.
   bool HasOMPDeclareReductionCombiner : 1;
 
-  /// True if current scope is for OmpSs declare reduction combiner.
+  /// True if current scope is for OmpSs-2 declare reduction combiner.
   bool HasOSSDeclareReductionCombiner : 1;
+
+  /// True if current scope is for OmpSs-2 task/taskloop...
+  bool HasOSSExecutableDirective : 1;
 
   /// Whether there is a fallthrough statement in this function.
   bool HasFallthroughStmt : 1;
@@ -371,6 +374,7 @@ public:
         HasBranchIntoScope(false), HasIndirectGoto(false),
         HasDroppedStmt(false), HasOMPDeclareReductionCombiner(false),
         HasOSSDeclareReductionCombiner(false),
+        HasOSSExecutableDirective(false),
         HasFallthroughStmt(false), HasPotentialAvailabilityViolations(false),
         ObjCShouldCallSuper(false), ObjCIsDesignatedInit(false),
         ObjCWarnForNoDesignatedInitChain(false), ObjCIsSecondaryInit(false),
@@ -420,6 +424,10 @@ public:
 
   void setHasOSSDeclareReductionCombiner() {
     HasOSSDeclareReductionCombiner = true;
+  }
+
+  void setHasOSSExecutableDirective() {
+    HasOSSExecutableDirective = true;
   }
 
   void setHasFallthroughStmt() {

@@ -594,7 +594,9 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
 
     StmtResult AssociatedStmt;
     if (HasAssociatedStatement) {
+      Actions.ActOnOmpSsExecutableDirectiveStart();
       AssociatedStmt = (Sema::CompoundScopeRAII(Actions), ParseStatement());
+      Actions.ActOnOmpSsExecutableDirectiveEnd();
     }
 
     Clauses = StackClauses.back();

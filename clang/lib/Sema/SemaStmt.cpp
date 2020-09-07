@@ -3628,13 +3628,11 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
   if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp))
     return StmtError();
 
-  // OmpSs directives introduce a new Scope that is both
-  // a FnScope and OmpSsDirectiveScope.
-  // Lambdas are FnScopes too, so we can determine if
-  // the stmt belongs to the lambda or the OmpSs-2 region.
+  // OmpSs directives push a new FunctionScopeInfo
+  // with HasOSSExecutableDirective flag. So if the return
+  // is in this fake function emit a diagnostic
   if (getLangOpts().OmpSs
-      && getCurScope()->getFnParent()
-      && getCurScope()->getFnParent()->isOmpSsDirectiveScope()) {
+      && getCurFunction()->HasOSSExecutableDirective) {
 
     Diag(ReturnLoc, diag::err_oss_invalid_branch);
     return StmtError();

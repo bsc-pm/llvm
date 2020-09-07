@@ -10895,6 +10895,10 @@ public:
       Scope *S, DeclGroupPtrTy DeclReductions, bool IsValid);
 
 
+  // Used to push a fake FunctionScopeInfo
+  void ActOnOmpSsExecutableDirectiveStart();
+  // Used to pop the fake FunctionScopeInfo
+  void ActOnOmpSsExecutableDirectiveEnd();
   StmtResult ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
       OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc);
 

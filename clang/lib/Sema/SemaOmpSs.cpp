@@ -1281,6 +1281,21 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareReductionDirectiveEnd(
   return DeclReductions;
 }
 
+void Sema::ActOnOmpSsExecutableDirectiveStart() {
+  // Enter new function scope.
+  PushFunctionScope();
+  setFunctionHasBranchProtectedScope();
+  getCurFunction()->setHasOSSExecutableDirective();
+  PushExpressionEvaluationContext(
+      ExpressionEvaluationContext::PotentiallyEvaluated);
+}
+
+void Sema::ActOnOmpSsExecutableDirectiveEnd() {
+  DiscardCleanupsInEvaluationContext();
+  PopExpressionEvaluationContext();
+
+  PopFunctionScopeInfo();
+}
 
 StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     OmpSsDirectiveKind Kind, Stmt *AStmt, SourceLocation StartLoc, SourceLocation EndLoc) {
