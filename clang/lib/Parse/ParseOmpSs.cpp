@@ -971,14 +971,9 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
     TentativeParsingAction TPA(*this);
     ExprResult CombinerResult;
     {
-      // Do not use Scope::OmpSsDirectiveScope since it may trigger a
-      // a construct definition for example.
-      // struct A {
-      //   A() {}
-      // };
-      // #pragma oss declare reduction(+ : A : omp_out) initializer(omp_priv = A())
-      ParseScope OSSDRScope(this, Scope::FnScope | Scope::DeclScope |
-                                      Scope::CompoundStmtScope);
+      ParseScope OSSDRScope(this,
+        Scope::FnScope | Scope::DeclScope | Scope::CompoundStmtScope
+        | Scope::OmpSsDirectiveScope);
       // Parse <combiner> expression.
       Actions.ActOnOmpSsDeclareReductionCombinerStart(getCurScope(), D);
       CombinerResult = Actions.ActOnFinishFullExpr(
@@ -1012,14 +1007,9 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
           !T.expectAndConsume(diag::err_expected_lparen_after, "initializer") &&
           IsCorrect;
       if (Tok.isNot(tok::annot_pragma_ompss_end)) {
-        // Do not use Scope::OmpSsDirectiveScope since it may trigger a
-        // a construct definition for example.
-        // struct A {
-        //   A() {}
-        // };
-        // #pragma oss declare reduction(+ : A : omp_out) initializer(omp_priv = A())
-        ParseScope OSSDRScope(this, Scope::FnScope | Scope::DeclScope |
-                                        Scope::CompoundStmtScope);
+        ParseScope OSSDRScope(this,
+          Scope::FnScope | Scope::DeclScope | Scope::CompoundStmtScope
+          | Scope::OmpSsDirectiveScope);
         // Parse expression.
         VarDecl *OmpPrivParm =
             Actions.ActOnOmpSsDeclareReductionInitializerStart(getCurScope(),
