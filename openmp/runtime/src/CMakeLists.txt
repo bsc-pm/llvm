@@ -312,6 +312,15 @@ else()
         \"${alias}${LIBOMP_LIBRARY_SUFFIX}\" WORKING_DIRECTORY
         \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${OPENMP_INSTALL_LIBDIR})")
     endforeach()
+
+    # Make a symlink of libomp to other directory. Used to avoid linking with this runtime
+    # when compiling with gcc and having OmpSs-2 module loaded
+    set(OMPSS_2_OMP_CUSTOM_DIR "libllvmrt")
+    install(CODE "file(MAKE_DIRECTORY \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${OMPSS_2_OMP_CUSTOM_DIR})")
+    install(CODE "execute_process(COMMAND \"\${CMAKE_COMMAND}\" -E create_symlink
+        \"../${OPENMP_INSTALL_LIBDIR}/${LIBOMP_LIB_FILE}\"
+        \"${LIBOMP_LIB_FILE}\"
+        WORKING_DIRECTORY \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${OMPSS_2_OMP_CUSTOM_DIR})")
   endif()
 endif()
 install(
