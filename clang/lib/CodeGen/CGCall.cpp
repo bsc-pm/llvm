@@ -727,6 +727,12 @@ CodeGenTypes::arrangeCall(const CGFunctionInfo &signature,
 
 namespace clang {
 namespace CodeGen {
+void computeTrivialABIInfo(CodeGenModule &CGM, CGFunctionInfo &FI);
+}
+}
+
+namespace clang {
+namespace CodeGen {
 void computeSPIRKernelABIInfo(CodeGenModule &CGM, CGFunctionInfo &FI);
 }
 }
@@ -773,6 +779,8 @@ CodeGenTypes::arrangeLLVMFunctionInfo(CanQualType resultType,
     computeSPIRKernelABIInfo(CGM, *FI);
   } else if (info.getCC() == CC_Swift) {
     swiftcall::computeABIInfo(CGM, *FI);
+  } else if (info.getCC() == CC_Trivial) {
+    computeTrivialABIInfo(CGM, *FI);
   } else {
     getABIInfo().computeInfo(*FI);
   }

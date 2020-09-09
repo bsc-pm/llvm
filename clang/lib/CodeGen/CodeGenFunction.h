@@ -1140,15 +1140,11 @@ public:
   /// The scope used to remap some variables as private and
   /// to restore old vars back on exit.
   /// Also keeps VLASizeMap unmodified
-  /// Also keeps 'this' value unmodified
   class OSSPrivateScope : public RunCleanupsScope {
     OSSMapVars MappedVars;
 
     using VLASizeMapTy = llvm::DenseMap<const Expr*, llvm::Value*>;
     VLASizeMapTy SavedVLASizeMap;
-
-    llvm::Value *OldCXXThisValue;
-    CharUnits OldCXXThisAlignment;
 
     OSSPrivateScope(const OSSPrivateScope &) = delete;
     void operator=(const OSSPrivateScope &) = delete;
@@ -1156,8 +1152,7 @@ public:
   public:
     /// Enter a new OmpSs-2 private scope.
     explicit OSSPrivateScope(CodeGenFunction &CGF)
-      : RunCleanupsScope(CGF), SavedVLASizeMap(CGF.VLASizeMap),
-      OldCXXThisValue(CGF.CXXThisValue), OldCXXThisAlignment(CGF.CXXThisAlignment)
+      : RunCleanupsScope(CGF), SavedVLASizeMap(CGF.VLASizeMap)
       {}
 
     /// Registers \p LocalVD variable as a private and apply \p PrivateGen
@@ -1180,11 +1175,6 @@ public:
       CGF.VLASizeMap[VLASizeExpr] = PrivateGen();
     }
 
-    void setThis(Address CXXThisAddress) {
-      CGF.CXXThisValue = CXXThisAddress.getPointer();
-      CGF.CXXThisAlignment = CXXThisAddress.getAlignment();
-    }
-
     /// Privatizes local variables previously registered as private.
     /// Registration is separate from the actual privatization to allow
     /// initializers use values of the original variables, not the private one.
@@ -1200,9 +1190,6 @@ public:
       MappedVars.restore(CGF);
       // Restore VLASizeMap
       CGF.VLASizeMap = SavedVLASizeMap;
-      // Restore 'this'
-      CGF.CXXThisValue = OldCXXThisValue;
-      CGF.CXXThisAlignment = OldCXXThisAlignment;
     }
 
     /// Exit scope - all the mapped variables are restored.

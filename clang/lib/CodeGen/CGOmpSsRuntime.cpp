@@ -231,8 +231,6 @@ class OSSDependInfoGathering
   // i.e. references and global variables
   llvm::DenseMap<const VarDecl *, Address> CaptureInvolvedMap;
 
-  Address CXXThisAddress = Address::invalid();
-
   SmallVector<QualType, 4> RetTypes;
 
   llvm::Value *Base = nullptr;
@@ -384,7 +382,7 @@ public:
   }
 
   void VisitCXXThisExpr(const CXXThisExpr *ThisE) {
-    CXXThisAddress = CGF.LoadCXXThisAddress();
+    Address CXXThisAddress = CGF.LoadCXXThisAddress();
     if (!Base)
       Base = CXXThisAddress.getPointer();
   }
@@ -474,7 +472,6 @@ public:
   const llvm::MapVector<const VarDecl *, LValue> &getInvolvedVarList() const { return ExprInvolvedVarList; }
   const llvm::MapVector<const Expr *, llvm::Value *> &getVLASizeInvolvedMap() const { return VLASizeInvolvedMap; }
   const llvm::DenseMap<const VarDecl *, Address> &getCaptureInvolvedMap() const { return CaptureInvolvedMap; }
-  const Address getThisAddress() const { return CXXThisAddress; }
   ArrayRef<QualType> getRetTypes() const { return RetTypes; }
   llvm::Value *getBaseValue() const { assert(Base); return Base; }
 
@@ -1246,34 +1243,37 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
                                                 const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
                                                 const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
                                                 const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
-                                                const Address CXXThisAddress,
                                                 ArrayRef<QualType> RetTypes,
-                                                CodeGenFunction &NewCGF,
-                                                DeclRefExpr *&StructRetDRE) {
+                                                CodeGenFunction &NewCGF) {
   ASTContext &C = CGF.CGM.getContext();
-  SmallVector<llvm::Type *, 4> ArgsTypeList;
-  SmallVector<llvm::Value *, 4> ArgsValueList;
 
+  FunctionArgList Args;
   for (const auto &p : ExprInvolvedVarList) {
-    llvm::Value *V = p.second.getPointer(CGF);
-    ArgsTypeList.push_back(V->getType());
-    ArgsValueList.push_back(V);
+    QualType Q = C.getPointerType(p.first->getType());
+    auto *Arg =
+      ImplicitParamDecl::Create(
+        C, Q, ImplicitParamDecl::Other);
+    Args.push_back(Arg);
   }
   for (const auto &p : VLASizeInvolvedMap) {
-    llvm::Value *V = p.second;
-    ArgsTypeList.push_back(V->getType());
-    ArgsValueList.push_back(V);
+    (void)p;
+    // VLASizes are SizeTy
+    QualType Q = C.getSizeType();
+    auto *Arg =
+      ImplicitParamDecl::Create(
+        C, Q, ImplicitParamDecl::Other);
+    Args.push_back(Arg);
   }
   for (const auto &p : CaptureInvolvedMap) {
-    Address Addr = p.second;
-    llvm::Value *V = Addr.getPointer();
-    ArgsTypeList.push_back(V->getType());
-    ArgsValueList.push_back(V);
+    QualType Q = C.getPointerType(p.first->getType().getNonReferenceType());
+    auto *Arg =
+      ImplicitParamDecl::Create(
+        C, Q, ImplicitParamDecl::Other);
+    Args.push_back(Arg);
   }
-  if (CXXThisAddress.isValid()) {
-    llvm::Value *CXXThisValue = CXXThisAddress.getPointer();
-    ArgsTypeList.push_back(CXXThisValue->getType());
-    ArgsValueList.push_back(CXXThisValue);
+  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+    NewCGF.CurGD = GlobalDecl(MD);
+    NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
   }
 
   RecordDecl *RD = RecordDecl::Create(C, TTK_Struct,
@@ -1286,42 +1286,42 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
                                   ICIS_NoInit));
   }
   RD->completeDefinition();
-
   QualType StructRetQ = C.getTagDeclType(RD);
-  llvm::StructType *StructRetTy = cast<llvm::StructType>(CGF.CGM.getTypes().ConvertType(StructRetQ));
 
-  auto *FuncType =
-    llvm::FunctionType::get(StructRetTy, ArgsTypeList, /*IsVarArgs=*/ false);
+  auto GetReturnType = [](QualType Q) -> CanQualType {
+    // Borrowed from CGCall.cpp
+    return Q->getCanonicalTypeUnqualified().getUnqualifiedType();
+  };
+
+  SmallVector<CanQualType, 16> ArgTypes;
+  for (auto &Arg : Args)
+    ArgTypes.push_back(C.getCanonicalParamType(Arg->getType()));
+  const CGFunctionInfo &FuncInfo = CGF.CGM.getTypes().arrangeLLVMFunctionInfo(
+    GetReturnType(StructRetQ), /*instanceMethod=*/false, /*chainCall=*/false,
+    ArgTypes, FunctionType::ExtInfo(CC_Trivial), {}, RequiredArgs::All);
+
+  llvm::FunctionType *FuncType = CGF.CGM.getTypes().GetFunctionType(FuncInfo);
 
   auto *FuncVar = llvm::Function::Create(
       FuncType, llvm::GlobalValue::InternalLinkage, CGF.CurFn->getAddressSpace(),
       "compute_dep", &CGF.CGM.getModule());
 
+  CodeGenFunction::OSSPrivateScope Scope(NewCGF);
+  auto ArgI = FuncVar->arg_begin() + ExprInvolvedVarList.size();
+  for (const auto &p : VLASizeInvolvedMap) {
+    const Expr *VLASizeExpr = p.first;
+    Scope.addPrivateVLA(VLASizeExpr, [ArgI]() -> llvm::Value * {
+      return ArgI;
+    });
 
-  // Set names for arguments.
-  auto AI = FuncVar->arg_begin();
-  for (unsigned i = 0, e = ArgsValueList.size(); i != e; ++i, ++AI)
-    AI->setName(ArgsValueList[i]->getName());
+    ++ArgI;
+  }
 
-  llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(CGF.CGM.getModule().getContext(), "entry", FuncVar);
+  (void)Scope.Privatize();
 
-  // Create a marker to make it easy to insert allocas into the entryblock
-  // later.  Don't create this with the builder, because we don't want it
-  // folded.
+  // TODO: Set names for arguments.
 
-  llvm::Value *Undef = llvm::UndefValue::get(CGF.Int32Ty);
-  llvm::Instruction *AllocaInsertPointer = new llvm::BitCastInst(Undef, CGF.Int32Ty, "allocapt", EntryBB);
-
-  NewCGF.AllocaInsertPt = AllocaInsertPointer;
-  NewCGF.Builder.SetInsertPoint(EntryBB);
-  NewCGF.CurCodeDecl = GlobalDecl().getDecl();
-  NewCGF.CurFuncDecl = nullptr;
-  NewCGF.FnRetTy = StructRetQ;
-  NewCGF.CurFn = FuncVar;
-  NewCGF.CurFnInfo = CGF.CurFnInfo;
-  Address StructRetAddr = NewCGF.CreateMemTemp(StructRetQ, "return.val");
-  // Address StructRetAddr = Address(NewCGF.Builder.CreateAlloca(StructRetTy, nullptr, "return.val"), C.getTypeAlignInChars(StructRetQ));
-  NewCGF.ReturnValue = StructRetAddr;
+  NewCGF.StartFunction(NewCGF.CurGD, StructRetQ, FuncVar, FuncInfo, Args, SourceLocation(), SourceLocation());
 
   return FuncVar;
 }
@@ -1364,7 +1364,6 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   // For each iterator we have {init, remap, ub, step}
   SmallVector<QualType, 3 + 1> MultiDepRetTypes(
     MDExpr->getDepInits().size()*(3 + 1), NewCGF.getContext().IntTy);
-  DeclRefExpr *StructRetDRE;
 
   // TODO: use different compute_dep name to distinguish from a regular
   // dependency
@@ -1373,9 +1372,10 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       CGF, MultiDepInfoGathering.getInvolvedVarList(),
       MultiDepInfoGathering.getVLASizeInvolvedMap(),
       MultiDepInfoGathering.getCaptureInvolvedMap(),
-      MultiDepInfoGathering.getThisAddress(),
       MultiDepRetTypes,
-      NewCGF, StructRetDRE);
+      NewCGF);
+
+  NewCGF.EHStack.pushTerminate();
 
   Address RetAddr = NewCGF.ReturnValue;
 
@@ -1409,13 +1409,6 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       ++ArgI;
     }
     CaptureMapStack.push_back(CaptureReplacedMap);
-
-    // Map 'this' to compute_dep param
-    const Address CXXThisAddress = MultiDepInfoGathering.getThisAddress();
-    if (CXXThisAddress.isValid()) {
-      InitScope.setThis(Address(ArgI, CXXThisAddress.getAlignment()));
-      ++ArgI;
-    }
 
     (void)InitScope.Privatize();
 
@@ -1477,13 +1470,9 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
-
-    // After finishing the computedep function remove the alloca instruction
-    llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
-    NewCGF.AllocaInsertPt = nullptr;
-    AllocaInsertPointer->eraseFromParent();
   }
-  NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
+  NewCGF.EHStack.popTerminate();
+  NewCGF.FinishFunction();
 
   // Pop temporal empty refmap, we are not in compute_dep function anymore
   CaptureMapStack.pop_back();
@@ -1509,9 +1498,8 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  const Address CXXThisAddress = MultiDepInfoGathering.getThisAddress();
-  if (CXXThisAddress.isValid()) {
-    List.push_back(CXXThisAddress.getPointer());
+  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+    List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
 
@@ -1523,16 +1511,16 @@ void CGOmpSsRuntime::EmitDependencyList(
   DependInfoGathering.Visit(Dep.E);
 
   CodeGenFunction NewCGF(CGF.CGM);
-  DeclRefExpr *StructRetDRE;
 
   llvm::Function *ComputeDepFun =
     createComputeDepFunction(
       CGF, DependInfoGathering.getInvolvedVarList(),
       DependInfoGathering.getVLASizeInvolvedMap(),
       DependInfoGathering.getCaptureInvolvedMap(),
-      DependInfoGathering.getThisAddress(),
       DependInfoGathering.getRetTypes(),
-      NewCGF, StructRetDRE);
+      NewCGF);
+
+  NewCGF.EHStack.pushTerminate();
 
   Address RetAddr = NewCGF.ReturnValue;
 
@@ -1566,13 +1554,6 @@ void CGOmpSsRuntime::EmitDependencyList(
       ++ArgI;
     }
     CaptureMapStack.push_back(CaptureReplacedMap);
-
-    // Map 'this' to compute_dep param
-    const Address CXXThisAddress = DependInfoGathering.getThisAddress();
-    if (CXXThisAddress.isValid()) {
-      InitScope.setThis(Address(ArgI, CXXThisAddress.getAlignment()));
-      ++ArgI;
-    }
 
     (void)InitScope.Privatize();
 
@@ -1664,14 +1645,9 @@ void CGOmpSsRuntime::EmitDependencyList(
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
-
-
-    // After finishing the computedep function remove the alloca instruction
-    llvm::Instruction *AllocaInsertPointer = NewCGF.AllocaInsertPt;
-    NewCGF.AllocaInsertPt = nullptr;
-    AllocaInsertPointer->eraseFromParent();
   }
-  NewCGF.Builder.CreateRet(NewCGF.Builder.CreateLoad(RetAddr));
+  NewCGF.EHStack.popTerminate();
+  NewCGF.FinishFunction();
 
   // Pop temporal empty refmap, we are not in compute_dep function anymore
   CaptureMapStack.pop_back();
@@ -1696,9 +1672,8 @@ void CGOmpSsRuntime::EmitDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  const Address CXXThisAddress = DependInfoGathering.getThisAddress();
-  if (CXXThisAddress.isValid()) {
-    List.push_back(CXXThisAddress.getPointer());
+  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+    List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
 

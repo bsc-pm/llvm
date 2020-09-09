@@ -282,6 +282,7 @@ namespace clang {
     CC_PreserveMost, // __attribute__((preserve_most))
     CC_PreserveAll,  // __attribute__((preserve_all))
     CC_AArch64VectorCall, // __attribute__((aarch64_vector_pcs))
+    CC_Trivial,     // OmpSs-2 dependencies
   };
 
   /// Checks whether the given calling convention supports variadic

@@ -2863,6 +2863,8 @@ StringRef CXXNameMangler::getCallingConvQualifierName(CallingConv CC) {
     return "ms_abi";
   case CC_Swift:
     return "swiftcall";
+  case CC_Trivial:
+    return "trivial";
   }
   llvm_unreachable("bad calling convention");
 }
