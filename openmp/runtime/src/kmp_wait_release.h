@@ -358,21 +358,9 @@ final_spin=FALSE)
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
           } else {
-            if (this_thr->th.is_unshackled) {
-              // unshackled
-              // unset task team found
-              this_thr->th.th_task_team = NULL;
-              task_team = NULL;
-            }
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           }
         } else {
-          if (this_thr->th.is_unshackled) {
-            // unshackled
-            this_thr->th.th_task_team = NULL;
-            task_team = NULL;
-            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-          } else {
             KMP_DEBUG_ASSERT(!KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid));
 #if OMPT_SUPPORT
             // task-team is done now, other cases should be catched above
@@ -381,7 +369,15 @@ final_spin=FALSE)
 #endif
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-          }
+        }
+        // Unshackled clean up
+        if (this_thr->th.is_unshackled) {
+            std::atomic<kmp_int32> *unfinished_threads;
+            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
+            kmp_int32 count = KMP_ATOMIC_DEC(unfinished_threads);
+            this_thr->th.th_task_team = NULL;
+            task_team = NULL;
+            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
         }
       } else {
         this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;

@@ -1222,6 +1222,12 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_team_t *team = thread->th.th_team;
   kmp_taskdata_t *parent_task = thread->th.th_current_task;
+  if (thread->th.is_unshackled) {
+    // GROSS HACK because unshackled threads do not belong to a team but they
+    // can execute tasks that create new tasks that logically belong to the same
+    // team as the parent task.
+    team = parent_task->td_team;
+  }
   size_t shareds_offset;
 
   if (!TCR_4(__kmp_init_middle))
@@ -2776,19 +2782,21 @@ static kmp_task_t *__kmp_steal_task(kmp_info_t *victim_thr, kmp_int32 gtid,
     victim_td->td.td_deque_tail = target; // tail -= 1 (wrapped))
   }
   if (*thread_finished) {
-    // We need to un-mark this victim as a finished victim.  This must be done
-    // before releasing the lock, or else other threads (starting with the
-    // master victim) might be prematurely released from the barrier!!!
-    kmp_int32 count;
+    // Unshackled threads do not increment.
+    if (!__kmp_threads[gtid]->th.is_unshackled) {
+      // We need to un-mark this victim as a finished victim.  This must be done
+      // before releasing the lock, or else other threads (starting with the
+      // master victim) might be prematurely released from the barrier!!!
+      kmp_int32 count;
 
-    count = KMP_ATOMIC_INC(unfinished_threads);
+      count = KMP_ATOMIC_INC(unfinished_threads);
 
-    KA_TRACE(
-        20,
-        ("__kmp_steal_task: T#%d inc unfinished_threads to %d: task_team=%p\n",
-         gtid, count + 1, task_team));
+      KA_TRACE(20, ("__kmp_steal_task: T#%d inc unfinished_threads to %d: "
+                   "task_team=%p\n",
+                   gtid, count + 1, task_team));
 
-    *thread_finished = FALSE;
+      *thread_finished = FALSE;
+    }
   }
   TCW_4(victim_td->td.td_deque_ntasks, ntasks - 1);
 
@@ -2981,12 +2989,15 @@ static inline int __kmp_execute_tasks_template(
       // done.  This decrement might be to the spin location, and result in the
       // termination condition being satisfied.
       if (!*thread_finished) {
-        kmp_int32 count;
+        // Unshackled threads do not decrement
+        if (!thread->th.is_unshackled) {
+          kmp_int32 count;
 
-        count = KMP_ATOMIC_DEC(unfinished_threads) - 1;
-        KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d dec "
-                      "unfinished_threads to %d task_team=%p\n",
-                      gtid, count, task_team));
+          count = KMP_ATOMIC_DEC(unfinished_threads) - 1;
+          KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d dec "
+                        "unfinished_threads to %d task_team=%p\n",
+                        gtid, count, task_team));
+        }
         *thread_finished = TRUE;
       }
 
