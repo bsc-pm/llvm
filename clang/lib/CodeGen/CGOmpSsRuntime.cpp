@@ -1252,7 +1252,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
     QualType Q = C.getPointerType(p.first->getType());
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, Q, ImplicitParamDecl::Other);
+        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
     Args.push_back(Arg);
   }
   for (const auto &p : VLASizeInvolvedMap) {
@@ -1268,7 +1268,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
     QualType Q = C.getPointerType(p.first->getType().getNonReferenceType());
     auto *Arg =
       ImplicitParamDecl::Create(
-        C, Q, ImplicitParamDecl::Other);
+        C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
     Args.push_back(Arg);
   }
   if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
