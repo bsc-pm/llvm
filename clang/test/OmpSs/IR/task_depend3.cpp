@@ -44,79 +44,79 @@ int main() {
 // CHECK-NEXT: store i32 %inc4, i32* %8, align 4
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %9)
 
-// CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %x) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t, align 8
-// CHECK-NEXT:   %0 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 0
+// CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %x)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 0
 // CHECK-NEXT:   store i32* %x, i32** %0, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 1
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 1
 // CHECK-NEXT:   store i64 4, i64* %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 2
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 2
 // CHECK-NEXT:   store i64 0, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 3
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 3
 // CHECK-NEXT:   store i64 4, i64* %3, align 8
-// CHECK-NEXT:   %4 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, align 8
 // CHECK-NEXT:   ret %struct._depend_unpack_t %4
 // CHECK-NEXT: }
 
-// CHECK: define internal %struct._depend_unpack_t.0 @compute_dep.1(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.0, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.0 %5
+// CHECK: define internal %struct._depend_unpack_t.0 @compute_dep.1(i32* %rx)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.0, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %rx, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.0, %struct._depend_unpack_t.0* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.0 %4
 // CHECK-NEXT: }
 
-// CHECK: define internal %struct._depend_unpack_t.1 @compute_dep.2(i32* %y) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.1, align 8
-// CHECK-NEXT:   %0 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 0
+// CHECK: define internal %struct._depend_unpack_t.1 @compute_dep.2(i32* %y)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.1, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 0
 // CHECK-NEXT:   store i32* %y, i32** %0, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 1
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 1
 // CHECK-NEXT:   store i64 4, i64* %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 2
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 2
 // CHECK-NEXT:   store i64 0, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, i32 0, i32 3
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, i32 0, i32 3
 // CHECK-NEXT:   store i64 4, i64* %3, align 8
-// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %return.val, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.1, %struct._depend_unpack_t.1* %retval, align 8
 // CHECK-NEXT:   ret %struct._depend_unpack_t.1 %4
 // CHECK-NEXT: }
 
-// CHECK: define internal %struct._depend_unpack_t.2 @compute_dep.3(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.2, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.2 %5
+// CHECK: define internal %struct._depend_unpack_t.2 @compute_dep.3(i32* %ry)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.2, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %ry, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.2, %struct._depend_unpack_t.2* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.2 %4
 // CHECK-NEXT: }
 
-// CHECK: define internal %struct._depend_unpack_t.3 @compute_dep.4(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.3, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.3 %5
+// CHECK: define internal %struct._depend_unpack_t.3 @compute_dep.4(i32* %rz)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.3, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %rz, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.3, %struct._depend_unpack_t.3* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.3 %4
 // CHECK-NEXT: }
 
 void foo1(int &ri) {
@@ -131,19 +131,19 @@ void foo1(int &ri) {
 // CHECK-NEXT: store i32 %inc, i32* %0, align 4
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %1)
 
-// CHECK: define internal %struct._depend_unpack_t.4 @compute_dep.5(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.4, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.4 %5
+// CHECK: define internal %struct._depend_unpack_t.4 @compute_dep.5(i32* %ri)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.4, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %ri, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.4, %struct._depend_unpack_t.4* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.4 %4
 // CHECK-NEXT: }
 
 struct S {
@@ -194,32 +194,32 @@ void foo2() {
 // CHECK-NEXT:   store i32 %8, i32* %9, align 4
 // CHECK-NEXT:   call void @llvm.directive.region.exit(token %4)
 
-// CHECK: define internal %struct._depend_unpack_t.5 @compute_dep.6(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.5, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.5 %5
+// CHECK: define internal %struct._depend_unpack_t.5 @compute_dep.6(i32* %srx)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.5, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %srx, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.5, %struct._depend_unpack_t.5* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.5 %4
 // CHECK-NEXT: }
 
-// CHECK: define internal %struct._depend_unpack_t.6 @compute_dep.7(i32* %0) {
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t.6, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t.6 %5
+// CHECK: define internal %struct._depend_unpack_t.6 @compute_dep.7(i32* %rx)
+// CHECK: entry:
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.6, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %rx, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t.6, %struct._depend_unpack_t.6* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t.6 %4
 // CHECK-NEXT: }

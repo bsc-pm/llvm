@@ -17,18 +17,19 @@ void bar(int x) {
 // CHECK-NEXT: store i32 %inc, i32* %1, align 4
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %2)
 
-// CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %0) {
+// CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %x)
 // CHECK: entry:
-// CHECK-NEXT:   %return.val = alloca %struct._depend_unpack_t, align 8
-// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 0
-// CHECK-NEXT:   store i32* %0, i32** %1, align 8
-// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 1
-// CHECK-NEXT:   store i64 4, i64* %2, align 8
-// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 2
-// CHECK-NEXT:   store i64 0, i64* %3, align 8
-// CHECK-NEXT:   %4 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, i32 0, i32 3
-// CHECK-NEXT:   store i64 4, i64* %4, align 8
-// CHECK-NEXT:   %5 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %return.val, align 8
-// CHECK-NEXT:   ret %struct._depend_unpack_t %5
+// CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t, align 8
+// CHECK:   %0 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 0
+// CHECK-NEXT:   store i32* %x, i32** %0, align 8
+// CHECK-NEXT:   %1 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 1
+// CHECK-NEXT:   store i64 4, i64* %1, align 8
+// CHECK-NEXT:   %2 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 2
+// CHECK-NEXT:   store i64 0, i64* %2, align 8
+// CHECK-NEXT:   %3 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 3
+// CHECK-NEXT:   store i64 4, i64* %3, align 8
+// CHECK-NEXT:   %4 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, align 8
+// CHECK-NEXT:   ret %struct._depend_unpack_t %4
 // CHECK-NEXT: }
+
 
