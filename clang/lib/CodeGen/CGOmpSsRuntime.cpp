@@ -1271,7 +1271,9 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
         C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
     Args.push_back(Arg);
   }
-  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+  // We don't care about lambdas
+  if (const CXXMethodDecl *MD =
+      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
     NewCGF.CurGD = GlobalDecl(MD);
     NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
   }
@@ -1498,7 +1500,9 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+  // We don't care about lambdas
+  if (const CXXMethodDecl *MD =
+      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
     List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
@@ -1672,7 +1676,9 @@ void CGOmpSsRuntime::EmitDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl())) {
+  // We don't care about lambdas
+  if (const CXXMethodDecl *MD =
+      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
     List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
