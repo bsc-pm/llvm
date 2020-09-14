@@ -1321,8 +1321,6 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
 
   (void)Scope.Privatize();
 
-  // TODO: Set names for arguments.
-
   NewCGF.StartFunction(NewCGF.CurGD, StructRetQ, FuncVar, FuncInfo, Args, SourceLocation(), SourceLocation());
 
   return FuncVar;
@@ -1378,8 +1376,6 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       NewCGF);
 
   NewCGF.EHStack.pushTerminate();
-
-  Address RetAddr = NewCGF.ReturnValue;
 
   // TODO change name
   {
@@ -1469,6 +1465,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       List.push_back(StepValue);
 
     }
+    Address RetAddr = NewCGF.ReturnValue;
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
@@ -1525,8 +1522,6 @@ void CGOmpSsRuntime::EmitDependencyList(
       NewCGF);
 
   NewCGF.EHStack.pushTerminate();
-
-  Address RetAddr = NewCGF.ReturnValue;
 
   // TODO change name
   {
@@ -1646,6 +1641,7 @@ void CGOmpSsRuntime::EmitDependencyList(
     List.push_back(IdxStart);
     List.push_back(IdxEnd);
 
+    Address RetAddr = NewCGF.ReturnValue;
     for (size_t i = 0; i < List.size(); ++i) {
       NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
     }
