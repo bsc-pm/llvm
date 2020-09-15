@@ -73,9 +73,6 @@ PassManager<LazyCallGraph::SCC, CGSCCAnalysisManager, LazyCallGraph &,
       AM.getCachedResult<FunctionAnalysisManagerCGSCCProxy>(*C)->getManager();
 
   for (auto &Pass : Passes) {
-    if (DebugLogging)
-      dbgs() << "Running pass: " << Pass->name() << " on " << *C << "\n";
-
     // Check the PassInstrumentation's BeforePass callbacks before running the
     // pass, skip its execution completely if asked to (callback returns false).
     if (!PI.runBeforePass(*Pass, *C))
@@ -88,9 +85,9 @@ PassManager<LazyCallGraph::SCC, CGSCCAnalysisManager, LazyCallGraph &,
     }
 
     if (UR.InvalidatedSCCs.count(C))
-      PI.runAfterPassInvalidated<LazyCallGraph::SCC>(*Pass);
+      PI.runAfterPassInvalidated<LazyCallGraph::SCC>(*Pass, PassPA);
     else
-      PI.runAfterPass<LazyCallGraph::SCC>(*Pass, *C);
+      PI.runAfterPass<LazyCallGraph::SCC>(*Pass, *C, PassPA);
 
     // Update the SCC if necessary.
     C = UR.UpdatedC ? UR.UpdatedC : C;

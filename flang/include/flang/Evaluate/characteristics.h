@@ -78,6 +78,7 @@ public:
 
   bool operator==(const TypeAndShape &) const;
   bool operator!=(const TypeAndShape &that) const { return !(*this == that); }
+
   static std::optional<TypeAndShape> Characterize(
       const semantics::Symbol &, FoldingContext &);
   static std::optional<TypeAndShape> Characterize(
@@ -90,6 +91,8 @@ public:
       const semantics::ProcInterface &);
   static std::optional<TypeAndShape> Characterize(
       const semantics::DeclTypeSpec &);
+  static std::optional<TypeAndShape> Characterize(
+      const ActualArgument &, FoldingContext &);
 
   template <typename A>
   static std::optional<TypeAndShape> Characterize(
@@ -113,6 +116,24 @@ public:
       }
     }
     return std::nullopt;
+  }
+  template <typename A>
+  static std::optional<TypeAndShape> Characterize(
+      const std::optional<A> &x, FoldingContext &context) {
+    if (x) {
+      return Characterize(*x, context);
+    } else {
+      return std::nullopt;
+    }
+  }
+  template <typename A>
+  static std::optional<TypeAndShape> Characterize(
+      const A *x, FoldingContext &context) {
+    if (x) {
+      return Characterize(*x, context);
+    } else {
+      return std::nullopt;
+    }
   }
 
   DynamicType type() const { return type_; }
@@ -278,7 +299,7 @@ struct Procedure {
       const ProcedureRef &, const IntrinsicProcTable &);
 
   // At most one of these will return true.
-  // For "EXTERNAL P" with no calls to P, both will be false.
+  // For "EXTERNAL P" with no type for or calls to P, both will be false.
   bool IsFunction() const { return functionResult.has_value(); }
   bool IsSubroutine() const { return attrs.test(Attr::Subroutine); }
 

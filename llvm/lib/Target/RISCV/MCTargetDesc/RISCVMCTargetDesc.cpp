@@ -57,7 +57,7 @@ static MCAsmInfo *createRISCVMCAsmInfo(const MCRegisterInfo &MRI,
   MCAsmInfo *MAI = new RISCVMCAsmInfo(TT);
 
   Register SP = MRI.getDwarfRegNum(RISCV::X2, true);
-  MCCFIInstruction Inst = MCCFIInstruction::createDefCfa(nullptr, SP, 0);
+  MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);
   MAI->addInitialFrameState(Inst);
 
   return MAI;
@@ -68,7 +68,7 @@ static MCSubtargetInfo *createRISCVMCSubtargetInfo(const Triple &TT,
   std::string CPUName = std::string(CPU);
   if (CPUName.empty())
     CPUName = TT.isArch64Bit() ? "generic-rv64" : "generic-rv32";
-  return createRISCVMCSubtargetInfoImpl(TT, CPUName, FS);
+  return createRISCVMCSubtargetInfoImpl(TT, CPUName, /*TuneCPU*/ CPUName, FS);
 }
 
 static MCInstPrinter *createRISCVMCInstPrinter(const Triple &T,
@@ -92,6 +92,10 @@ static MCTargetStreamer *createRISCVAsmTargetStreamer(MCStreamer &S,
                                                       MCInstPrinter *InstPrint,
                                                       bool isVerboseAsm) {
   return new RISCVTargetAsmStreamer(S, OS);
+}
+
+static MCTargetStreamer *createRISCVNullTargetStreamer(MCStreamer &S) {
+  return new RISCVTargetStreamer(S);
 }
 
 namespace {
@@ -148,5 +152,8 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTargetMC() {
 
     // Register the asm target streamer.
     TargetRegistry::RegisterAsmTargetStreamer(*T, createRISCVAsmTargetStreamer);
+    // Register the null target streamer.
+    TargetRegistry::RegisterNullTargetStreamer(*T,
+                                               createRISCVNullTargetStreamer);
   }
 }

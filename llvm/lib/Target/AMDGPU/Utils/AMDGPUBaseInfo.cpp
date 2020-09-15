@@ -108,6 +108,7 @@ namespace AMDGPU {
 #define GET_MIMGInfoTable_IMPL
 #define GET_MIMGLZMappingTable_IMPL
 #define GET_MIMGMIPMappingTable_IMPL
+#define GET_MIMGG16MappingTable_IMPL
 #include "AMDGPUGenSearchableTables.inc"
 
 int getMIMGOpcode(unsigned BaseOpcode, unsigned MIMGEncoding,
@@ -310,7 +311,7 @@ unsigned getMaxWavesPerEU(const MCSubtargetInfo *STI) {
   // FIXME: Need to take scratch memory into account.
   if (!isGFX10(*STI))
     return 10;
-  return 20;
+  return hasGFX10_3Insts(*STI) ? 16 : 20;
 }
 
 unsigned getWavesPerEUForWorkGroup(const MCSubtargetInfo *STI,
@@ -440,12 +441,21 @@ unsigned getVGPRAllocGranule(const MCSubtargetInfo *STI,
   bool IsWave32 = EnableWavefrontSize32 ?
       *EnableWavefrontSize32 :
       STI->getFeatureBits().test(FeatureWavefrontSize32);
+
+  if (hasGFX10_3Insts(*STI))
+    return IsWave32 ? 16 : 8;
+
   return IsWave32 ? 8 : 4;
 }
 
 unsigned getVGPREncodingGranule(const MCSubtargetInfo *STI,
                                 Optional<bool> EnableWavefrontSize32) {
-  return getVGPRAllocGranule(STI, EnableWavefrontSize32);
+
+  bool IsWave32 = EnableWavefrontSize32 ?
+      *EnableWavefrontSize32 :
+      STI->getFeatureBits().test(FeatureWavefrontSize32);
+
+  return IsWave32 ? 8 : 4;
 }
 
 unsigned getTotalNumVGPRs(const MCSubtargetInfo *STI) {
@@ -568,7 +578,7 @@ bool isReadOnlySegment(const GlobalValue *GV) {
 }
 
 bool shouldEmitConstantsToTextSection(const Triple &TT) {
-  return TT.getOS() == Triple::AMDPAL || TT.getArch() == Triple::r600;
+  return TT.getArch() == Triple::r600;
 }
 
 int getIntegerAttribute(const Function &F, StringRef Name, int Default) {
@@ -731,13 +741,16 @@ static unsigned getLastSymbolicHwreg(const MCSubtargetInfo &STI) {
     return ID_SYMBOLIC_FIRST_GFX9_;
   else if (isGFX9(STI))
     return ID_SYMBOLIC_FIRST_GFX10_;
+  else if (isGFX10(STI) && !isGFX10_BEncoding(STI))
+    return ID_SYMBOLIC_FIRST_GFX1030_;
   else
     return ID_SYMBOLIC_LAST_;
 }
 
 bool isValidHwreg(int64_t Id, const MCSubtargetInfo &STI) {
-  return ID_SYMBOLIC_FIRST_ <= Id && Id < getLastSymbolicHwreg(STI) &&
-         IdSymbolic[Id];
+  return
+    ID_SYMBOLIC_FIRST_ <= Id && Id < getLastSymbolicHwreg(STI) &&
+    IdSymbolic[Id] && (Id != ID_XNACK_MASK || !AMDGPU::isGFX10_BEncoding(STI));
 }
 
 bool isValidHwreg(int64_t Id) {
@@ -769,6 +782,104 @@ void decodeHwreg(unsigned Val, unsigned &Id, unsigned &Offset, unsigned &Width) 
 }
 
 } // namespace Hwreg
+
+//===----------------------------------------------------------------------===//
+// MTBUF Format
+//===----------------------------------------------------------------------===//
+
+namespace MTBUFFormat {
+
+int64_t getDfmt(const StringRef Name) {
+  for (int Id = DFMT_MIN; Id <= DFMT_MAX; ++Id) {
+    if (Name == DfmtSymbolic[Id])
+      return Id;
+  }
+  return DFMT_UNDEF;
+}
+
+StringRef getDfmtName(unsigned Id) {
+  assert(Id <= DFMT_MAX);
+  return DfmtSymbolic[Id];
+}
+
+static StringLiteral const *getNfmtLookupTable(const MCSubtargetInfo &STI) {
+  if (isSI(STI) || isCI(STI))
+    return NfmtSymbolicSICI;
+  if (isVI(STI) || isGFX9(STI))
+    return NfmtSymbolicVI;
+  return NfmtSymbolicGFX10;
+}
+
+int64_t getNfmt(const StringRef Name, const MCSubtargetInfo &STI) {
+  auto lookupTable = getNfmtLookupTable(STI);
+  for (int Id = NFMT_MIN; Id <= NFMT_MAX; ++Id) {
+    if (Name == lookupTable[Id])
+      return Id;
+  }
+  return NFMT_UNDEF;
+}
+
+StringRef getNfmtName(unsigned Id, const MCSubtargetInfo &STI) {
+  assert(Id <= NFMT_MAX);
+  return getNfmtLookupTable(STI)[Id];
+}
+
+bool isValidDfmtNfmt(unsigned Id, const MCSubtargetInfo &STI) {
+  unsigned Dfmt;
+  unsigned Nfmt;
+  decodeDfmtNfmt(Id, Dfmt, Nfmt);
+  return isValidNfmt(Nfmt, STI);
+}
+
+bool isValidNfmt(unsigned Id, const MCSubtargetInfo &STI) {
+  return !getNfmtName(Id, STI).empty();
+}
+
+int64_t encodeDfmtNfmt(unsigned Dfmt, unsigned Nfmt) {
+  return (Dfmt << DFMT_SHIFT) | (Nfmt << NFMT_SHIFT);
+}
+
+void decodeDfmtNfmt(unsigned Format, unsigned &Dfmt, unsigned &Nfmt) {
+  Dfmt = (Format >> DFMT_SHIFT) & DFMT_MASK;
+  Nfmt = (Format >> NFMT_SHIFT) & NFMT_MASK;
+}
+
+int64_t getUnifiedFormat(const StringRef Name) {
+  for (int Id = UFMT_FIRST; Id <= UFMT_LAST; ++Id) {
+    if (Name == UfmtSymbolic[Id])
+      return Id;
+  }
+  return UFMT_UNDEF;
+}
+
+StringRef getUnifiedFormatName(unsigned Id) {
+  return isValidUnifiedFormat(Id) ? UfmtSymbolic[Id] : "";
+}
+
+bool isValidUnifiedFormat(unsigned Id) {
+  return Id <= UFMT_LAST;
+}
+
+int64_t convertDfmtNfmt2Ufmt(unsigned Dfmt, unsigned Nfmt) {
+  int64_t Fmt = encodeDfmtNfmt(Dfmt, Nfmt);
+  for (int Id = UFMT_FIRST; Id <= UFMT_LAST; ++Id) {
+    if (Fmt == DfmtNfmt2UFmt[Id])
+      return Id;
+  }
+  return UFMT_UNDEF;
+}
+
+bool isValidFormatEncoding(unsigned Val, const MCSubtargetInfo &STI) {
+  return isGFX10(STI) ? (Val <= UFMT_MAX) : (Val <= DFMT_NFMT_MAX);
+}
+
+unsigned getDefaultFormatEncoding(const MCSubtargetInfo &STI) {
+  if (isGFX10(STI))
+    return UFMT_DEFAULT;
+  return DFMT_NFMT_DEFAULT;
+}
+
+} // namespace MTBUFFormat
 
 //===----------------------------------------------------------------------===//
 // SendMsg
@@ -943,6 +1054,10 @@ bool hasGFX10A16(const MCSubtargetInfo &STI) {
   return STI.getFeatureBits()[AMDGPU::FeatureGFX10A16];
 }
 
+bool hasG16(const MCSubtargetInfo &STI) {
+  return STI.getFeatureBits()[AMDGPU::FeatureG16];
+}
+
 bool hasPackedD16(const MCSubtargetInfo &STI) {
   return !STI.getFeatureBits()[AMDGPU::FeatureUnpackedD16VMem];
 }
@@ -969,6 +1084,14 @@ bool isGFX10(const MCSubtargetInfo &STI) {
 
 bool isGCN3Encoding(const MCSubtargetInfo &STI) {
   return STI.getFeatureBits()[AMDGPU::FeatureGCN3Encoding];
+}
+
+bool isGFX10_BEncoding(const MCSubtargetInfo &STI) {
+  return STI.getFeatureBits()[AMDGPU::FeatureGFX10_BEncoding];
+}
+
+bool hasGFX10_3Insts(const MCSubtargetInfo &STI) {
+  return STI.getFeatureBits()[AMDGPU::FeatureGFX10_3Insts];
 }
 
 bool isSGPR(unsigned Reg, const MCRegisterInfo* TRI) {
@@ -1170,7 +1293,7 @@ unsigned getRegOperandSize(const MCRegisterInfo *MRI, const MCInstrDesc &Desc,
 }
 
 bool isInlinableLiteral64(int64_t Literal, bool HasInv2Pi) {
-  if (Literal >= -16 && Literal <= 64)
+  if (isInlinableIntLiteral(Literal))
     return true;
 
   uint64_t Val = static_cast<uint64_t>(Literal);
@@ -1187,7 +1310,7 @@ bool isInlinableLiteral64(int64_t Literal, bool HasInv2Pi) {
 }
 
 bool isInlinableLiteral32(int32_t Literal, bool HasInv2Pi) {
-  if (Literal >= -16 && Literal <= 64)
+  if (isInlinableIntLiteral(Literal))
     return true;
 
   // The actual type of the operand does not seem to matter as long
@@ -1216,7 +1339,7 @@ bool isInlinableLiteral16(int16_t Literal, bool HasInv2Pi) {
   if (!HasInv2Pi)
     return false;
 
-  if (Literal >= -16 && Literal <= 64)
+  if (isInlinableIntLiteral(Literal))
     return true;
 
   uint16_t Val = static_cast<uint16_t>(Literal);
@@ -1244,6 +1367,30 @@ bool isInlinableLiteralV216(int32_t Literal, bool HasInv2Pi) {
   int16_t Lo16 = static_cast<int16_t>(Literal);
   int16_t Hi16 = static_cast<int16_t>(Literal >> 16);
   return Lo16 == Hi16 && isInlinableLiteral16(Lo16, HasInv2Pi);
+}
+
+bool isInlinableIntLiteralV216(int32_t Literal) {
+  int16_t Lo16 = static_cast<int16_t>(Literal);
+  if (isInt<16>(Literal) || isUInt<16>(Literal))
+    return isInlinableIntLiteral(Lo16);
+
+  int16_t Hi16 = static_cast<int16_t>(Literal >> 16);
+  if (!(Literal & 0xffff))
+    return isInlinableIntLiteral(Hi16);
+  return Lo16 == Hi16 && isInlinableIntLiteral(Lo16);
+}
+
+bool isFoldableLiteralV216(int32_t Literal, bool HasInv2Pi) {
+  assert(HasInv2Pi);
+
+  int16_t Lo16 = static_cast<int16_t>(Literal);
+  if (isInt<16>(Literal) || isUInt<16>(Literal))
+    return true;
+
+  int16_t Hi16 = static_cast<int16_t>(Literal >> 16);
+  if (!(Literal & 0xffff))
+    return true;
+  return Lo16 == Hi16;
 }
 
 bool isArgPassedInSGPR(const Argument *A) {
@@ -1341,8 +1488,8 @@ Optional<int64_t> getSMRDEncodedLiteralOffset32(const MCSubtargetInfo &ST,
 // aligned if they are aligned to begin with. It also ensures that additional
 // offsets within the given alignment can be added to the resulting ImmOffset.
 bool splitMUBUFOffset(uint32_t Imm, uint32_t &SOffset, uint32_t &ImmOffset,
-                      const GCNSubtarget *Subtarget, uint32_t Align) {
-  const uint32_t MaxImm = alignDown(4095, Align);
+                      const GCNSubtarget *Subtarget, Align Alignment) {
+  const uint32_t MaxImm = alignDown(4095, Alignment.value());
   uint32_t Overflow = 0;
 
   if (Imm > MaxImm) {
@@ -1360,10 +1507,10 @@ bool splitMUBUFOffset(uint32_t Imm, uint32_t &SOffset, uint32_t &ImmOffset,
       //
       // Atomic operations fail to work correctly when individual address
       // components are unaligned, even if their sum is aligned.
-      uint32_t High = (Imm + Align) & ~4095;
-      uint32_t Low = (Imm + Align) & 4095;
+      uint32_t High = (Imm + Alignment.value()) & ~4095;
+      uint32_t Low = (Imm + Alignment.value()) & 4095;
       Imm = Low;
-      Overflow = High - Align;
+      Overflow = High - Alignment.value();
     }
   }
 

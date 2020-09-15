@@ -361,13 +361,8 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
   if (m_option_data.m_process_name.empty() &&
       m_option_data.m_process_pid == LLDB_INVALID_PROCESS_ID) {
 
-    // If the option data args array is empty that means the file was not
-    // specified with -f and we need to get it from the input args.
-    if (m_option_data.m_args.empty()) {
-      if (auto *arg = args.getLastArgNoClaim(OPT_INPUT)) {
-        m_option_data.m_args.push_back(arg->getAsString((args)));
-      }
-    }
+    for (auto *arg : args.filtered(OPT_INPUT))
+      m_option_data.m_args.push_back(arg->getAsString((args)));
 
     // Any argument following -- is an argument for the inferior.
     if (auto *arg = args.getLastArgNoClaim(OPT_REM)) {
@@ -496,9 +491,9 @@ int Driver::MainLoop() {
   SBCommandInterpreter sb_interpreter = m_debugger.GetCommandInterpreter();
 
   // Before we handle any options from the command line, we parse the
-  // .lldbinit file in the user's home directory.
+  // REPL init file or the default file in the user's home directory.
   SBCommandReturnObject result;
-  sb_interpreter.SourceInitFileInHomeDirectory(result);
+  sb_interpreter.SourceInitFileInHomeDirectory(result, m_option_data.m_repl);
   if (m_option_data.m_debug_mode) {
     result.PutError(m_debugger.GetErrorFile());
     result.PutOutput(m_debugger.GetOutputFile());
@@ -765,10 +760,15 @@ EXAMPLES:
   The debugger can be started in several modes.
 
   Passing an executable as a positional argument prepares lldb to debug the
-  given executable. Arguments passed after -- are considered arguments to the
-  debugged executable.
+  given executable. To disambiguate between arguments passed to lldb and
+  arguments passed to the debugged executable, arguments starting with a - must
+  be passed after --.
 
-    lldb --arch x86_64 /path/to/program -- --arch arvm7
+    lldb --arch x86_64 /path/to/program program argument -- --arch arvm7
+
+  For convenience, passing the executable after -- is also supported.
+
+    lldb --arch x86_64 -- /path/to/program program argument --arch arvm7
 
   Passing one of the attach options causes lldb to immediately attach to the
   given process.
@@ -797,11 +797,14 @@ EXAMPLES:
   llvm::outs() << examples << '\n';
 }
 
-llvm::Optional<int> InitializeReproducer(opt::InputArgList &input_args) {
+llvm::Optional<int> InitializeReproducer(llvm::StringRef argv0,
+                                         opt::InputArgList &input_args) {
   if (auto *replay_path = input_args.getLastArg(OPT_replay)) {
-    const bool skip_version_check = input_args.hasArg(OPT_skip_version_check);
+    SBReplayOptions replay_options;
+    replay_options.SetCheckVersion(!input_args.hasArg(OPT_no_version_check));
+    replay_options.SetVerify(!input_args.hasArg(OPT_no_verification));
     if (const char *error =
-            SBReproducer::Replay(replay_path->getValue(), skip_version_check)) {
+            SBReproducer::Replay(replay_path->getValue(), replay_options)) {
       WithColor::error() << "reproducer replay failed: " << error << '\n';
       return 1;
     }
@@ -809,15 +812,21 @@ llvm::Optional<int> InitializeReproducer(opt::InputArgList &input_args) {
   }
 
   bool capture = input_args.hasArg(OPT_capture);
-  bool auto_generate = input_args.hasArg(OPT_auto_generate);
+  bool generate_on_exit = input_args.hasArg(OPT_generate_on_exit);
   auto *capture_path = input_args.getLastArg(OPT_capture_path);
 
-  if (auto_generate && !capture) {
+  if (generate_on_exit && !capture) {
     WithColor::warning()
-        << "-reproducer-auto-generate specified without -capture\n";
+        << "-reproducer-generate-on-exit specified without -capture\n";
   }
 
   if (capture || capture_path) {
+    // Register the reproducer signal handler.
+    if (!input_args.hasArg(OPT_no_generate_on_signal)) {
+      llvm::sys::AddSignalHandler(reproducer_handler,
+                                  const_cast<char *>(argv0.data()));
+    }
+
     if (capture_path) {
       if (!capture)
         WithColor::warning() << "-capture-path specified without -capture\n";
@@ -832,7 +841,7 @@ llvm::Optional<int> InitializeReproducer(opt::InputArgList &input_args) {
         return 1;
       }
     }
-    if (auto_generate)
+    if (generate_on_exit)
       SBReproducer::SetAutoGenerate(true);
   }
 
@@ -846,27 +855,39 @@ int main(int argc, char const *argv[]) {
 
   // Parse arguments.
   LLDBOptTable T;
-  unsigned MAI;
-  unsigned MAC;
+  unsigned MissingArgIndex;
+  unsigned MissingArgCount;
   ArrayRef<const char *> arg_arr = makeArrayRef(argv + 1, argc - 1);
-  opt::InputArgList input_args = T.ParseArgs(arg_arr, MAI, MAC);
+  opt::InputArgList input_args =
+      T.ParseArgs(arg_arr, MissingArgIndex, MissingArgCount);
+  llvm::StringRef argv0 = llvm::sys::path::filename(argv[0]);
 
   if (input_args.hasArg(OPT_help)) {
-    printHelp(T, llvm::sys::path::filename(argv[0]));
+    printHelp(T, argv0);
     return 0;
   }
 
-  for (auto *arg : input_args.filtered(OPT_UNKNOWN)) {
-    WithColor::warning() << "ignoring unknown option: " << arg->getSpelling()
-                         << '\n';
+  // Check for missing argument error.
+  if (MissingArgCount) {
+    WithColor::error() << "argument to '"
+                       << input_args.getArgString(MissingArgIndex)
+                       << "' is missing\n";
+  }
+  // Error out on unknown options.
+  if (input_args.hasArg(OPT_UNKNOWN)) {
+    for (auto *arg : input_args.filtered(OPT_UNKNOWN)) {
+      WithColor::error() << "unknown option: " << arg->getSpelling() << '\n';
+    }
+  }
+  if (MissingArgCount || input_args.hasArg(OPT_UNKNOWN)) {
+    llvm::errs() << "Use '" << argv0
+                 << " --help' for a complete list of options.\n";
+    return 1;
   }
 
-  if (auto exit_code = InitializeReproducer(input_args)) {
+  if (auto exit_code = InitializeReproducer(argv[0], input_args)) {
     return *exit_code;
   }
-
-  // Register the reproducer signal handler.
-  llvm::sys::AddSignalHandler(reproducer_handler, const_cast<char *>(argv[0]));
 
   SBError error = SBDebugger::InitializeWithErrorHandling();
   if (error.Fail()) {

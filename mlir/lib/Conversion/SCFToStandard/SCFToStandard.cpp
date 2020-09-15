@@ -356,7 +356,7 @@ ParallelLowering::matchAndRewrite(ParallelOp parallelOp,
       // A loop is constructed with an empty "yield" terminator if there are
       // no results.
       rewriter.setInsertionPointToEnd(rewriter.getInsertionBlock());
-      rewriter.create<YieldOp>(loc, forOp.getResults());
+      rewriter.create<scf::YieldOp>(loc, forOp.getResults());
     }
 
     rewriter.setInsertionPointToStart(forOp.getBody());
@@ -391,7 +391,7 @@ ParallelLowering::matchAndRewrite(ParallelOp parallelOp,
 
   if (!yieldOperands.empty()) {
     rewriter.setInsertionPointToEnd(rewriter.getInsertionBlock());
-    rewriter.create<YieldOp>(loc, yieldOperands);
+    rewriter.create<scf::YieldOp>(loc, yieldOperands);
   }
 
   rewriter.replaceOp(parallelOp, loopResults);
@@ -407,8 +407,11 @@ void mlir::populateLoopToStdConversionPatterns(
 void SCFToStandardPass::runOnOperation() {
   OwningRewritePatternList patterns;
   populateLoopToStdConversionPatterns(patterns, &getContext());
+  // Configure conversion to lower out scf.for, scf.if and scf.parallel.
+  // Anything else is fine.
   ConversionTarget target(getContext());
-  target.addLegalDialect<StandardOpsDialect>();
+  target.addIllegalOp<scf::ForOp, scf::IfOp, scf::ParallelOp>();
+  target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
   if (failed(applyPartialConversion(getOperation(), target, patterns)))
     signalPassFailure();
 }

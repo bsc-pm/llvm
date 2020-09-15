@@ -19,7 +19,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def SCF_Dialect : Dialect {
   let name = "scf";
-  let cppNamespace = "";
+  let cppNamespace = "scf";
 }
 
 // Base class for SCF dialect ops.
@@ -39,7 +39,7 @@ class SCF_Op<string mnemonic, list<OpTrait> traits = []> :
 def ForOp : SCF_Op<"for",
       [DeclareOpInterfaceMethods<LoopLikeOpInterface>,
        DeclareOpInterfaceMethods<RegionBranchOpInterface>,
-       SingleBlockImplicitTerminator<"YieldOp">,
+       SingleBlockImplicitTerminator<"scf::YieldOp">,
        RecursiveSideEffects]> {
   let summary = "for operation";
   let description = [{
@@ -137,10 +137,15 @@ def ForOp : SCF_Op<"for",
   let builders = [
     OpBuilder<"OpBuilder &builder, OperationState &result, "
               "Value lowerBound, Value upperBound, Value step, "
-              "ValueRange iterArgs = llvm::None">
+              "ValueRange iterArgs = llvm::None, "
+              "function_ref<void(OpBuilder &, Location, Value, ValueRange)>"
+              "    = nullptr">
   ];
 
   let extraClassDeclaration = [{
+    using BodyBuilderFn =
+        function_ref<void(OpBuilder &, Location, Value, ValueRange)>;
+
     Value getInductionVar() { return getBody()->getArgument(0); }
     Block::BlockArgListType getRegionIterArgs() {
       return getBody()->getArguments().drop_front();
@@ -178,7 +183,8 @@ def ForOp : SCF_Op<"for",
 
 def IfOp : SCF_Op<"if",
       [DeclareOpInterfaceMethods<RegionBranchOpInterface>,
-       SingleBlockImplicitTerminator<"YieldOp">, RecursiveSideEffects]> {
+       SingleBlockImplicitTerminator<"scf::YieldOp">, RecursiveSideEffects,
+       NoRegionArguments]> {
   let summary = "if-then-else operation";
   let description = [{
     The `scf.if` operation represents an if-then-else construct for
@@ -233,7 +239,18 @@ def IfOp : SCF_Op<"if",
     OpBuilder<"OpBuilder &builder, OperationState &result, "
               "Value cond, bool withElseRegion">,
     OpBuilder<"OpBuilder &builder, OperationState &result, "
-              "TypeRange resultTypes, Value cond, bool withElseRegion">
+              "TypeRange resultTypes, Value cond, bool withElseRegion">,
+    OpBuilder<
+        "OpBuilder &builder, OperationState &result, TypeRange resultTypes, "
+        "Value cond, "
+        "function_ref<void(OpBuilder &, Location)> thenBuilder "
+        "    = buildTerminatedBody, "
+        "function_ref<void(OpBuilder &, Location)> elseBuilder = nullptr">,
+    OpBuilder<
+        "OpBuilder &builder, OperationState &result, Value cond, "
+        "function_ref<void(OpBuilder &, Location)> thenBuilder "
+        "    = buildTerminatedBody, "
+        "function_ref<void(OpBuilder &, Location)> elseBuilder = nullptr">
   ];
 
   let extraClassDeclaration = [{
@@ -254,7 +271,7 @@ def ParallelOp : SCF_Op<"parallel",
     [AttrSizedOperandSegments,
      DeclareOpInterfaceMethods<LoopLikeOpInterface>,
      RecursiveSideEffects,
-     SingleBlockImplicitTerminator<"YieldOp">]> {
+     SingleBlockImplicitTerminator<"scf::YieldOp">]> {
   let summary = "parallel for operation";
   let description = [{
     The "scf.parallel" operation represents a loop nest taking 4 groups of SSA
@@ -312,7 +329,15 @@ def ParallelOp : SCF_Op<"parallel",
   let builders = [
     OpBuilder<"OpBuilder &builder, OperationState &result, "
               "ValueRange lowerBounds, ValueRange upperBounds, "
-              "ValueRange steps, ValueRange initVals = {}">,
+              "ValueRange steps, ValueRange initVals, "
+              "function_ref<void (OpBuilder &, Location, "
+                                 "ValueRange, ValueRange)>"
+              "  bodyBuilderFn = nullptr">,
+    OpBuilder<"OpBuilder &builder, OperationState &result, "
+              "ValueRange lowerBounds, ValueRange upperBounds, "
+              "ValueRange steps, "
+              "function_ref<void (OpBuilder &, Location, ValueRange)>"
+              "  bodyBuilderFn = nullptr">,
   ];
 
   let extraClassDeclaration = [{
@@ -322,6 +347,8 @@ def ParallelOp : SCF_Op<"parallel",
     unsigned getNumLoops() { return step().size(); }
     unsigned getNumReductions() { return initVals().size(); }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def ReduceOp : SCF_Op<"reduce", [HasParent<"ParallelOp">]> {
@@ -364,7 +391,9 @@ def ReduceOp : SCF_Op<"reduce", [HasParent<"ParallelOp">]> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"OpBuilder &builder, OperationState &result, "
-              "Value operand">
+              "Value operand, "
+              "function_ref<void (OpBuilder &, Location, Value, Value)>"
+              "  bodyBuilderFn = nullptr">
   ];
 
   let arguments = (ins AnyType:$operand);
@@ -389,7 +418,8 @@ def ReduceReturnOp :
   let assemblyFormat = "$result attr-dict `:` type($result)";
 }
 
-def YieldOp : SCF_Op<"yield", [NoSideEffect, ReturnLike, Terminator]> {
+def YieldOp : SCF_Op<"yield", [NoSideEffect, ReturnLike, Terminator,
+                               ParentOneOf<["IfOp, ForOp", "ParallelOp"]>]> {
   let summary = "loop yield and termination operation";
   let description = [{
     "scf.yield" yields an SSA value from the SCF dialect op region and
@@ -408,5 +438,8 @@ def YieldOp : SCF_Op<"yield", [NoSideEffect, ReturnLike, Terminator]> {
     OpBuilder<"OpBuilder &builder, OperationState &result",
               [{ /* nothing to do */ }]>
   ];
+  // Override default verifier (defined in SCF_Op), no custom verification
+  // needed.
+  let verifier = ?;
 }
 #endif // MLIR_DIALECT_SCF_SCFOPS

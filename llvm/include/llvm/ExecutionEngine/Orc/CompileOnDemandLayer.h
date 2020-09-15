@@ -18,7 +18,6 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
@@ -97,7 +96,8 @@ public:
 
   /// Emits the given module. This should not be called by clients: it will be
   /// called by the JIT when a definition added via the add method is requested.
-  void emit(MaterializationResponsibility R, ThreadSafeModule TSM) override;
+  void emit(std::unique_ptr<MaterializationResponsibility> R,
+            ThreadSafeModule TSM) override;
 
 private:
   struct PerDylibResources {
@@ -121,7 +121,8 @@ private:
 
   void expandPartition(GlobalValueSet &Partition);
 
-  void emitPartition(MaterializationResponsibility R, ThreadSafeModule TSM,
+  void emitPartition(std::unique_ptr<MaterializationResponsibility> R,
+                     ThreadSafeModule TSM,
                      IRMaterializationUnit::SymbolNameToDefinitionMap Defs);
 
   mutable std::mutex CODLayerMutex;

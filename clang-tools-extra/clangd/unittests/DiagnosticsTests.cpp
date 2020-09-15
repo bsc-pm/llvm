@@ -29,6 +29,8 @@ namespace clangd {
 namespace {
 
 using ::testing::_;
+using ::testing::AllOf;
+using ::testing::Contains;
 using ::testing::ElementsAre;
 using ::testing::Field;
 using ::testing::IsEmpty;
@@ -48,6 +50,12 @@ using ::testing::UnorderedElementsAre;
 ::testing::Matcher<const Diag &>
 WithNote(::testing::Matcher<Note> NoteMatcher) {
   return Field(&Diag::Notes, ElementsAre(NoteMatcher));
+}
+
+::testing::Matcher<const Diag &>
+WithNote(::testing::Matcher<Note> NoteMatcher1,
+         ::testing::Matcher<Note> NoteMatcher2) {
+  return Field(&Diag::Notes, UnorderedElementsAre(NoteMatcher1, NoteMatcher2));
 }
 
 MATCHER_P2(Diag, Range, Message,
@@ -272,6 +280,68 @@ TEST(DiagnosticsTest, ClangTidy) {
                   "use a trailing return type for this function")))));
 }
 
+TEST(DiagnosticsTest, ClangTidyEOF) {
+  // clang-format off
+  Annotations Test(R"cpp(
+  [[#]]include <b.h>
+  #include "a.h")cpp");
+  // clang-format on
+  auto TU = TestTU::withCode(Test.code());
+  TU.ExtraArgs = {"-isystem."};
+  TU.AdditionalFiles["a.h"] = TU.AdditionalFiles["b.h"] = "";
+  TU.ClangTidyChecks = "-*, llvm-include-order";
+  EXPECT_THAT(
+      TU.build().getDiagnostics(),
+      Contains(AllOf(Diag(Test.range(), "#includes are not sorted properly"),
+                     DiagSource(Diag::ClangTidy),
+                     DiagName("llvm-include-order"))));
+}
+
+TEST(DiagnosticTest, TemplatesInHeaders) {
+  // Diagnostics from templates defined in headers are placed at the expansion.
+  Annotations Main(R"cpp(
+    Derived<int> [[y]]; // error-ok
+  )cpp");
+  Annotations Header(R"cpp(
+    template <typename T>
+    struct Derived : [[T]] {};
+  )cpp");
+  TestTU TU = TestTU::withCode(Main.code());
+  TU.HeaderCode = Header.code().str();
+  EXPECT_THAT(
+      TU.build().getDiagnostics(),
+      ElementsAre(AllOf(
+          Diag(Main.range(), "in template: base specifier must name a class"),
+          WithNote(Diag(Header.range(), "error occurred here"),
+                   Diag(Main.range(), "in instantiation of template class "
+                                      "'Derived<int>' requested here")))));
+}
+
+TEST(DiagnosticTest, MakeUnique) {
+  // We usually miss diagnostics from header functions as we don't parse them.
+  // std::make_unique is an exception.
+  Annotations Main(R"cpp(
+    struct S { S(char*); };
+    auto x = std::[[make_unique]]<S>(42); // error-ok
+  )cpp");
+  TestTU TU = TestTU::withCode(Main.code());
+  TU.HeaderCode = R"cpp(
+    namespace std {
+    // These mocks aren't quite right - we omit unique_ptr for simplicity.
+    // forward is included to show its body is not needed to get the diagnostic.
+    template <typename T> T&& forward(T& t) { return static_cast<T&&>(t); }
+    template <typename T, typename... A> T* make_unique(A&&... args) {
+       return new T(std::forward<A>(args)...);
+    }
+    }
+  )cpp";
+  EXPECT_THAT(TU.build().getDiagnostics(),
+              UnorderedElementsAre(
+                  Diag(Main.range(),
+                       "in template: "
+                       "no matching constructor for initialization of 'S'")));
+}
+
 TEST(DiagnosticTest, NoMultipleDiagnosticInFlight) {
   Annotations Main(R"cpp(
     template <typename T> struct Foo {
@@ -385,6 +455,21 @@ TEST(DiagnosticTest, ClangTidySuppressionCommentTrumpsWarningAsError) {
   TU.ClangTidyChecks = "bugprone-integer-division";
   TU.ClangTidyWarningsAsErrors = "bugprone-integer-division";
   EXPECT_THAT(TU.build().getDiagnostics(), UnorderedElementsAre());
+}
+
+TEST(DiagnosticTest, ClangTidyNoLiteralDataInMacroToken) {
+  Annotations Main(R"cpp(
+    #define SIGTERM 15
+    using pthread_t = int;
+    int pthread_kill(pthread_t thread, int sig);
+    int func() {
+      pthread_t thread;
+      return pthread_kill(thread, 0);
+    }
+  )cpp");
+  TestTU TU = TestTU::withCode(Main.code());
+  TU.ClangTidyChecks = "-*,bugprone-bad-signal-to-kill-thread";
+  EXPECT_THAT(TU.build().getDiagnostics(), UnorderedElementsAre()); // no-crash
 }
 
 TEST(DiagnosticsTest, Preprocessor) {

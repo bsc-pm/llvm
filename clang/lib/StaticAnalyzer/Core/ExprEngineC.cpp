@@ -218,7 +218,7 @@ void ExprEngine::VisitBlockExpr(const BlockExpr *BE, ExplodedNode *Pred,
     auto CE = BD->capture_end();
     for (; I != E; ++I) {
       const VarRegion *capturedR = I.getCapturedRegion();
-      const VarRegion *originalR = I.getOriginalRegion();
+      const TypedValueRegion *originalR = I.getOriginalRegion();
 
       // If the capture had a copy expression, use the result of evaluating
       // that expression, otherwise use the original value.
@@ -991,10 +991,11 @@ void ExprEngine::VisitUnaryOperator(const UnaryOperator* U, ExplodedNode *Pred,
       if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Ex)) {
         const ValueDecl *VD = DRE->getDecl();
 
-        if (isa<CXXMethodDecl>(VD) || isa<FieldDecl>(VD)) {
+        if (isa<CXXMethodDecl>(VD) || isa<FieldDecl>(VD) ||
+            isa<IndirectFieldDecl>(VD)) {
           ProgramStateRef State = (*I)->getState();
           const LocationContext *LCtx = (*I)->getLocationContext();
-          SVal SV = svalBuilder.getMemberPointer(cast<DeclaratorDecl>(VD));
+          SVal SV = svalBuilder.getMemberPointer(cast<NamedDecl>(VD));
           Bldr.generateNode(U, *I, State->BindExpr(U, LCtx, SV));
           break;
         }

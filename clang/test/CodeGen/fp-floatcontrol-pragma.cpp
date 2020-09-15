@@ -119,6 +119,24 @@ float fma_test1(float a, float b, float c) {
   return x;
 }
 
+#pragma float_control(push)
+#pragma float_control(precise, on)
+struct Distance {};
+Distance operator+(Distance, Distance);
+
+template <class T>
+T add(T lhs, T rhs) {
+#pragma float_control(except, on)
+  return lhs + rhs;
+}
+#pragma float_control(pop)
+
+float test_OperatorCall() {
+  return add(1.0f, 2.0f);
+  //CHECK: llvm.experimental.constrained.fadd{{.*}}fpexcept.strict
+}
+// CHECK-LABEL define float  {{.*}}test_OperatorCall{{.*}}
+
 #if FENV_ON
 // expected-warning@+1{{pragma STDC FENV_ACCESS ON is not supported, ignoring pragma}}
 #pragma STDC FENV_ACCESS ON
@@ -160,7 +178,7 @@ float exc_off(double x, float zero) {
 // CHECK-NS: define {{.*}}exc_off{{.*}}
   {} try {
     x = 1.0 / zero; /* division by zero, the result unused */
-//CHECK-NS: fdiv contract double
+//CHECK-NS: fdiv double
   } catch (...) {}
   return zero;
 }

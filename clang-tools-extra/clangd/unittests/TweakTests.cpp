@@ -173,6 +173,15 @@ TEST_F(ShowSelectionTreeTest, Test) {
         *IntegerLiteral 2
 )";
   EXPECT_EQ(apply("int fcall(int); int x = fca[[ll(2 +]]2);"), Output);
+
+  Output = R"(message:
+ TranslationUnitDecl 
+   FunctionDecl void x()
+     CompoundStmt { …
+       ForStmt for (;;) …
+        *BreakStmt break;
+)";
+  EXPECT_EQ(apply("void x() { for (;;) br^eak; }"), Output);
 }
 
 TWEAK_TEST(DumpRecordLayout);
@@ -596,6 +605,9 @@ TEST_F(ExtractFunctionTest, FunctionTest) {
   EXPECT_THAT(apply(" if(true) [[{ return; }]] "), HasSubstr("extracted"));
   // Don't extract uncertain return
   EXPECT_THAT(apply(" if(true) [[if (false) return;]] "), StartsWith("fail"));
+
+  FileName = "a.c";
+  EXPECT_THAT(apply(" for([[int i = 0;]];);"), HasSubstr("unavailable"));
 }
 
 TEST_F(ExtractFunctionTest, FileTest) {
@@ -1083,6 +1095,11 @@ TEST_F(DefineInlineTest, TemplateSpec) {
 
     template<> void f^oo<int>() {
       bar();
+    })cpp");
+  EXPECT_UNAVAILABLE(R"cpp(
+    namespace bar {
+      template <typename T> void f^oo() {}
+      template void foo<int>();
     })cpp");
 }
 
@@ -1994,6 +2011,13 @@ TEST_F(DefineOutlineTest, TriggersOnFunctionDecl) {
   EXPECT_UNAVAILABLE(R"cpp(
     template <typename> struct Foo { void fo^o(){} };
     )cpp");
+
+  // Not available on function templates and specializations, as definition must
+  // be visible to all translation units.
+  EXPECT_UNAVAILABLE(R"cpp(
+    template <typename> void fo^o() {};
+    template <> void fo^o<int>() {};
+  )cpp");
 }
 
 TEST_F(DefineOutlineTest, FailsWithoutSource) {
@@ -2023,48 +2047,63 @@ TEST_F(DefineOutlineTest, ApplyTest) {
           "void foo() ;",
           "void foo() { return; }",
       },
-      // Templated function.
-      {
-          "template <typename T> void fo^o(T, T x) { return; }",
-          "template <typename T> void foo(T, T x) ;",
-          "template <typename T> void foo(T, T x) { return; }",
-      },
-      {
-          "template <typename> void fo^o() { return; }",
-          "template <typename> void foo() ;",
-          "template <typename> void foo() { return; }",
-      },
-      // Template specialization.
-      {
-          R"cpp(
-            template <typename> void foo();
-            template <> void fo^o<int>() { return; })cpp",
-          R"cpp(
-            template <typename> void foo();
-            template <> void foo<int>() ;)cpp",
-          "template <> void foo<int>() { return; }",
-      },
       // Default args.
       {
           "void fo^o(int x, int y = 5, int = 2, int (*foo)(int) = nullptr) {}",
           "void foo(int x, int y = 5, int = 2, int (*foo)(int) = nullptr) ;",
           "void foo(int x, int y , int , int (*foo)(int) ) {}",
       },
-      // Ctor initializers.
+      // Constructors
+      {
+          R"cpp(
+            class Foo {public: Foo(); Foo(int);};
+            class Bar {
+              Ba^r() {}
+              Bar(int x) : f1(x) {}
+              Foo f1;
+              Foo f2 = 2;
+            };)cpp",
+          R"cpp(
+            class Foo {public: Foo(); Foo(int);};
+            class Bar {
+              Bar() ;
+              Bar(int x) : f1(x) {}
+              Foo f1;
+              Foo f2 = 2;
+            };)cpp",
+          "Bar::Bar() {}\n",
+      },
+      // Ctor with initializer.
+      {
+          R"cpp(
+            class Foo {public: Foo(); Foo(int);};
+            class Bar {
+              Bar() {}
+              B^ar(int x) : f1(x), f2(3) {}
+              Foo f1;
+              Foo f2 = 2;
+            };)cpp",
+          R"cpp(
+            class Foo {public: Foo(); Foo(int);};
+            class Bar {
+              Bar() {}
+              Bar(int x) ;
+              Foo f1;
+              Foo f2 = 2;
+            };)cpp",
+          "Bar::Bar(int x) : f1(x), f2(3) {}\n",
+      },
+      // Ctor initializer with attribute.
       {
           R"cpp(
               class Foo {
-                int y = 2;
                 F^oo(int z) __attribute__((weak)) : bar(2){}
                 int bar;
-                int z = 2;
               };)cpp",
           R"cpp(
               class Foo {
-                int y = 2;
                 Foo(int z) __attribute__((weak)) ;
                 int bar;
-                int z = 2;
               };)cpp",
           "Foo::Foo(int z) __attribute__((weak)) : bar(2){}\n",
       },
@@ -2683,6 +2722,63 @@ using one::two::ff;
 namespace foo { void fun(); }
 
 void foo::fun() {
+  ff();
+})cpp"},
+            // If all other using are fully qualified, add ::
+            {R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using ::one::two::ee;
+
+void fun() {
+  one::two::f^f();
+})cpp",
+             R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using ::one::two::ff;using ::one::two::ee;
+
+void fun() {
+  ff();
+})cpp"},
+            // Make sure we don't add :: if it's already there
+            {R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using ::one::two::ee;
+
+void fun() {
+  ::one::two::f^f();
+})cpp",
+             R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using ::one::two::ff;using ::one::two::ee;
+
+void fun() {
+  ff();
+})cpp"},
+            // If even one using doesn't start with ::, do not add it
+            {R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using one::two::ee;
+
+void fun() {
+  one::two::f^f();
+})cpp",
+             R"cpp(
+#include "test.hpp"
+
+using ::one::two::cc;
+using one::two::ff;using one::two::ee;
+
+void fun() {
   ff();
 })cpp"}};
   llvm::StringMap<std::string> EditedFiles;

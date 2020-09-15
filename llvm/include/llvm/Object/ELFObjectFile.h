@@ -51,6 +51,12 @@ class ELFObjectFileBase : public ObjectFile {
   friend class ELFSectionRef;
   friend class ELFSymbolRef;
 
+  SubtargetFeatures getMIPSFeatures() const;
+  SubtargetFeatures getARMFeatures() const;
+  SubtargetFeatures getRISCVFeatures() const;
+
+  StringRef getAMDGPUCPUName() const;
+
 protected:
   ELFObjectFileBase(unsigned int Type, MemoryBufferRef Source);
 
@@ -80,11 +86,7 @@ public:
 
   SubtargetFeatures getFeatures() const override;
 
-  SubtargetFeatures getMIPSFeatures() const;
-
-  SubtargetFeatures getARMFeatures() const;
-
-  SubtargetFeatures getRISCVFeatures() const;
+  Optional<StringRef> tryGetCPUName() const override;
 
   void setARMSubArch(Triple &TheTriple) const override;
 
@@ -92,7 +94,8 @@ public:
 
   virtual uint16_t getEMachine() const = 0;
 
-  std::vector<std::pair<DataRefImpl, uint64_t>> getPltAddresses() const;
+  std::vector<std::pair<Optional<DataRefImpl>, uint64_t>>
+  getPltAddresses() const;
 };
 
 class ELFSectionRef : public SectionRef {
@@ -744,10 +747,10 @@ ELFObjectFile<ELFT>::getSectionContents(DataRefImpl Sec) const {
   const Elf_Shdr *EShdr = getSection(Sec);
   if (EShdr->sh_type == ELF::SHT_NOBITS)
     return makeArrayRef((const uint8_t *)base(), 0);
-  if (std::error_code EC =
+  if (Error E =
           checkOffset(getMemoryBufferRef(),
                       (uintptr_t)base() + EShdr->sh_offset, EShdr->sh_size))
-    return errorCodeToError(EC);
+    return std::move(E);
   return makeArrayRef((const uint8_t *)base() + EShdr->sh_offset,
                       EShdr->sh_size);
 }
@@ -1109,6 +1112,8 @@ StringRef ELFObjectFile<ELFT>::getFileFormatName() const {
       return "elf32-powerpc";
     case ELF::EM_RISCV:
       return "elf32-littleriscv";
+    case ELF::EM_CSKY:
+      return "elf32-csky";
     case ELF::EM_SPARC:
     case ELF::EM_SPARC32PLUS:
       return "elf32-sparc";
@@ -1139,6 +1144,8 @@ StringRef ELFObjectFile<ELFT>::getFileFormatName() const {
       return "elf64-amdgpu";
     case ELF::EM_BPF:
       return "elf64-bpf";
+    case ELF::EM_VE:
+      return "elf64-ve";
     default:
       return "elf64-unknown";
     }
@@ -1217,6 +1224,10 @@ template <class ELFT> Triple::ArchType ELFObjectFile<ELFT>::getArch() const {
   case ELF::EM_BPF:
     return IsLittleEndian ? Triple::bpfel : Triple::bpfeb;
 
+  case ELF::EM_VE:
+    return Triple::ve;
+  case ELF::EM_CSKY:
+    return Triple::csky;
   default:
     return Triple::UnknownArch;
   }

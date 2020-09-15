@@ -13,6 +13,7 @@
 
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
+#include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
@@ -42,8 +43,7 @@ CCState::CCState(CallingConv::ID CC, bool isVarArg, MachineFunction &mf,
 /// its parameter attribute.
 void CCState::HandleByVal(unsigned ValNo, MVT ValVT, MVT LocVT,
                           CCValAssign::LocInfo LocInfo, int MinSize,
-                          int MinAlignment, ISD::ArgFlagsTy ArgFlags) {
-  Align MinAlign(MinAlignment);
+                          Align MinAlign, ISD::ArgFlagsTy ArgFlags) {
   Align Alignment = ArgFlags.getNonZeroByValAlign();
   unsigned Size  = ArgFlags.getByValSize();
   if (MinSize > (int)Size)
@@ -51,10 +51,9 @@ void CCState::HandleByVal(unsigned ValNo, MVT ValVT, MVT LocVT,
   if (MinAlign > Alignment)
     Alignment = MinAlign;
   ensureMaxAlignment(Alignment);
-  MF.getSubtarget().getTargetLowering()->HandleByVal(this, Size,
-                                                     Alignment.value());
+  MF.getSubtarget().getTargetLowering()->HandleByVal(this, Size, Alignment);
   Size = unsigned(alignTo(Size, MinAlign));
-  unsigned Offset = AllocateStack(Size, Alignment.value());
+  unsigned Offset = AllocateStack(Size, Alignment);
   addLoc(CCValAssign::getMem(ValNo, ValVT, Offset, LocVT, LocInfo));
 }
 
@@ -184,6 +183,11 @@ void CCState::AnalyzeCallResult(MVT VT, CCAssignFn Fn) {
 #endif
     llvm_unreachable(nullptr);
   }
+}
+
+void CCState::ensureMaxAlignment(Align Alignment) {
+  if (!AnalyzingMustTailForwardedRegs)
+    MF.getFrameInfo().ensureMaxAlignment(Alignment);
 }
 
 static bool isValueTypeInRegForCC(CallingConv::ID CC, MVT VT) {

@@ -300,7 +300,9 @@ void VPRegionBlock::execute(VPTransformState *State) {
 
   for (unsigned Part = 0, UF = State->UF; Part < UF; ++Part) {
     State->Instance->Part = Part;
-    for (unsigned Lane = 0, VF = State->VF; Lane < VF; ++Lane) {
+    assert(!State->VF.isScalable() && "VF is assumed to be non scalable.");
+    for (unsigned Lane = 0, VF = State->VF.getKnownMinValue(); Lane < VF;
+         ++Lane) {
       State->Instance->Lane = Lane;
       // Visit the VPBlocks connected to \p this, starting from it.
       for (VPBlockBase *Block : RPOT) {
@@ -380,6 +382,20 @@ void VPInstruction::generateInstruction(VPTransformState &State,
     State.set(this, V, Part);
     break;
   }
+  case VPInstruction::ActiveLaneMask: {
+    // Get first lane of vector induction variable.
+    Value *VIVElem0 = State.get(getOperand(0), {Part, 0});
+    // Get the original loop tripcount.
+    Value *ScalarTC = State.TripCount;
+
+    auto *Int1Ty = Type::getInt1Ty(Builder.getContext());
+    auto *PredTy = FixedVectorType::get(Int1Ty, State.VF.getKnownMinValue());
+    Instruction *Call = Builder.CreateIntrinsic(
+        Intrinsic::get_active_lane_mask, {PredTy, ScalarTC->getType()},
+        {VIVElem0, ScalarTC}, nullptr, "active.lane.mask");
+    State.set(this, Call, Part);
+    break;
+  }
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -421,6 +437,10 @@ void VPInstruction::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
   case VPInstruction::SLPStore:
     O << "combined store";
     break;
+  case VPInstruction::ActiveLaneMask:
+    O << "active lane mask";
+    break;
+
   default:
     O << Instruction::getOpcodeName(getOpcode());
   }
@@ -441,7 +461,9 @@ void VPlan::execute(VPTransformState *State) {
     IRBuilder<> Builder(State->CFG.PrevBB->getTerminator());
     auto *TCMO = Builder.CreateSub(TC, ConstantInt::get(TC->getType(), 1),
                                    "trip.count.minus.1");
-    Value *VTCMO = Builder.CreateVectorSplat(State->VF, TCMO, "broadcast");
+    auto VF = State->VF;
+    Value *VTCMO =
+        VF == 1 ? TCMO : Builder.CreateVectorSplat(VF, TCMO, "broadcast");
     for (unsigned Part = 0, UF = State->UF; Part < UF; ++Part)
       State->set(BackedgeTakenCount, VTCMO, Part);
   }
@@ -780,6 +802,15 @@ void VPBlendRecipe::print(raw_ostream &O, const Twine &Indent,
   }
 }
 
+void VPReductionRecipe::print(raw_ostream &O, const Twine &Indent,
+                              VPSlotTracker &SlotTracker) const {
+  O << "\"REDUCE of" << *I << " as ";
+  ChainOp->printAsOperand(O, SlotTracker);
+  O << " + reduce(";
+  VecOp->printAsOperand(O, SlotTracker);
+  O << ")";
+}
+
 void VPReplicateRecipe::print(raw_ostream &O, const Twine &Indent,
                               VPSlotTracker &SlotTracker) const {
   O << "\"" << (IsUniform ? "CLONE " : "REPLICATE ")
@@ -809,12 +840,20 @@ void VPWidenCanonicalIVRecipe::execute(VPTransformState &State) {
   Value *CanonicalIV = State.CanonicalIV;
   Type *STy = CanonicalIV->getType();
   IRBuilder<> Builder(State.CFG.PrevBB->getTerminator());
-  Value *VStart = Builder.CreateVectorSplat(State.VF, CanonicalIV, "broadcast");
+  ElementCount VF = State.VF;
+  assert(!VF.isScalable() && "the code following assumes non scalables ECs");
+  Value *VStart = VF.isScalar()
+                      ? CanonicalIV
+                      : Builder.CreateVectorSplat(VF.getKnownMinValue(),
+                                                  CanonicalIV, "broadcast");
   for (unsigned Part = 0, UF = State.UF; Part < UF; ++Part) {
     SmallVector<Constant *, 8> Indices;
-    for (unsigned Lane = 0, VF = State.VF; Lane < VF; ++Lane)
-      Indices.push_back(ConstantInt::get(STy, Part * VF + Lane));
-    Constant *VStep = ConstantVector::get(Indices);
+    for (unsigned Lane = 0; Lane < VF.getKnownMinValue(); ++Lane)
+      Indices.push_back(
+          ConstantInt::get(STy, Part * VF.getKnownMinValue() + Lane));
+    // If VF == 1, there is only one iteration in the loop above, thus the
+    // element pushed back into Indices is ConstantInt::get(STy, Part)
+    Constant *VStep = VF == 1 ? Indices.back() : ConstantVector::get(Indices);
     // Add the consecutive indices to the vector value.
     Value *CanonicalVectorIV = Builder.CreateAdd(VStart, VStep, "vec.iv");
     State.set(getVPValue(), CanonicalVectorIV, Part);

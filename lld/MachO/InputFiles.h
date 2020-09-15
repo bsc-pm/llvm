@@ -9,11 +9,18 @@
 #ifndef LLD_MACHO_INPUT_FILES_H
 #define LLD_MACHO_INPUT_FILES_H
 
+#include "MachOStructs.h"
+
 #include "lld/Common/LLVM.h"
+#include "lld/Common/Memory.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/TextAPIReader.h"
+
+#include <map>
 #include <vector>
 
 namespace lld {
@@ -23,32 +30,46 @@ class InputSection;
 class Symbol;
 struct Reloc;
 
+// If .subsections_via_symbols is set, each InputSection will be split along
+// symbol boundaries. The keys of a SubsectionMap represent the offsets of
+// each subsection from the start of the original pre-split InputSection.
+using SubsectionMap = std::map<uint32_t, InputSection *>;
+
 class InputFile {
 public:
   enum Kind {
     ObjKind,
     DylibKind,
     ArchiveKind,
+    OpaqueKind,
   };
 
   virtual ~InputFile() = default;
   Kind kind() const { return fileKind; }
-  StringRef getName() const { return mb.getBufferIdentifier(); }
+  StringRef getName() const { return name; }
 
   MemoryBufferRef mb;
   std::vector<Symbol *> symbols;
-  std::vector<InputSection *> sections;
+  ArrayRef<llvm::MachO::section_64> sectionHeaders;
+  std::vector<SubsectionMap> subsections;
 
 protected:
-  InputFile(Kind kind, MemoryBufferRef mb) : mb(mb), fileKind(kind) {}
+  InputFile(Kind kind, MemoryBufferRef mb)
+      : mb(mb), fileKind(kind), name(mb.getBufferIdentifier()) {}
 
-  std::vector<InputSection *> parseSections(ArrayRef<llvm::MachO::section_64>);
+  InputFile(Kind kind, const llvm::MachO::InterfaceFile &interface)
+      : fileKind(kind), name(saver.save(interface.getPath())) {}
 
-  void parseRelocations(const llvm::MachO::section_64 &,
-                        std::vector<Reloc> &relocs);
+  void parseSections(ArrayRef<llvm::MachO::section_64>);
+
+  void parseSymbols(ArrayRef<lld::structs::nlist_64> nList, const char *strtab,
+                    bool subsectionsViaSymbols);
+
+  void parseRelocations(const llvm::MachO::section_64 &, SubsectionMap &);
 
 private:
   const Kind fileKind;
+  const StringRef name;
 };
 
 // .o file
@@ -56,6 +77,14 @@ class ObjFile : public InputFile {
 public:
   explicit ObjFile(MemoryBufferRef mb);
   static bool classof(const InputFile *f) { return f->kind() == ObjKind; }
+};
+
+// command-line -sectcreate file
+class OpaqueFile : public InputFile {
+public:
+  explicit OpaqueFile(MemoryBufferRef mb, StringRef segName,
+                      StringRef sectName);
+  static bool classof(const InputFile *f) { return f->kind() == OpaqueKind; }
 };
 
 // .dylib file
@@ -69,12 +98,11 @@ public:
   // to the root. On the other hand, if a dylib is being directly loaded
   // (through an -lfoo flag), then `umbrella` should be a nullptr.
   explicit DylibFile(MemoryBufferRef mb, DylibFile *umbrella = nullptr);
-  static bool classof(const InputFile *f) { return f->kind() == DylibKind; }
 
-  // Do not use this constructor!! This is meant only for createLibSystemMock(),
-  // but it cannot be made private as we call it via make().
-  DylibFile();
-  static DylibFile *createLibSystemMock();
+  explicit DylibFile(const llvm::MachO::InterfaceFile &interface,
+                     DylibFile *umbrella = nullptr);
+
+  static bool classof(const InputFile *f) { return f->kind() == DylibKind; }
 
   StringRef dylibName;
   uint64_t ordinal = 0; // Ordinal numbering starts from 1, so 0 is a sentinel
@@ -99,6 +127,9 @@ private:
 extern std::vector<InputFile *> inputFiles;
 
 llvm::Optional<MemoryBufferRef> readFile(StringRef path);
+
+const llvm::MachO::load_command *
+findCommand(const llvm::MachO::mach_header_64 *, uint32_t type);
 
 } // namespace macho
 

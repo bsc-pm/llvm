@@ -199,6 +199,12 @@ namespace llvm {
                                  unsigned Encoding,
                                  DINode::DIFlags Flags = DINode::FlagZero);
 
+    /// Create debugging information entry for a string
+    /// type.
+    /// \param Name        Type name.
+    /// \param SizeInBits  Size of the type.
+    DIStringType *createStringType(StringRef Name, uint64_t SizeInBits);
+
     /// Create debugging information entry for a qualified
     /// type, e.g. 'const int'.
     /// \param Tag         Tag identifing type, e.g. dwarf::TAG_volatile_type
@@ -573,6 +579,8 @@ namespace llvm {
     /// implicitly uniques the values returned.
     DISubrange *getOrCreateSubrange(int64_t Lo, int64_t Count);
     DISubrange *getOrCreateSubrange(int64_t Lo, Metadata *CountNode);
+    DISubrange *getOrCreateSubrange(Metadata *Count, Metadata *LowerBound,
+                                    Metadata *UpperBound, Metadata *Stride);
 
     /// Create a new descriptor for the specified variable.
     /// \param Context     Variable scope.

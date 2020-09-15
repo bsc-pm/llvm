@@ -17,6 +17,7 @@
 #include "clang/Basic/MacroBuilder.h"
 #include "clang/Basic/TargetBuiltins.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Frontend/OpenMP/OMPGridValues.h"
 #include "llvm/IR/DataLayout.h"
 
 using namespace clang;
@@ -45,6 +46,8 @@ const LangASMap AMDGPUTargetInfo::AMDGPUDefIsGenMap = {
     Constant, // opencl_constant
     Private,  // opencl_private
     Generic,  // opencl_generic
+    Global,   // opencl_global_device
+    Global,   // opencl_global_host
     Global,   // cuda_device
     Constant, // cuda_constant
     Local,    // cuda_shared
@@ -60,6 +63,8 @@ const LangASMap AMDGPUTargetInfo::AMDGPUDefIsPrivMap = {
     Constant, // opencl_constant
     Private,  // opencl_private
     Generic,  // opencl_generic
+    Global,   // opencl_global_device
+    Global,   // opencl_global_host
     Global,   // cuda_device
     Constant, // cuda_constant
     Local,    // cuda_shared
@@ -169,6 +174,23 @@ bool AMDGPUTargetInfo::initFeatureMap(
   // XXX - What does the member GPU mean if device name string passed here?
   if (isAMDGCN(getTriple())) {
     switch (llvm::AMDGPU::parseArchAMDGCN(CPU)) {
+    case GK_GFX1031:
+    case GK_GFX1030:
+      Features["ci-insts"] = true;
+      Features["dot1-insts"] = true;
+      Features["dot2-insts"] = true;
+      Features["dot5-insts"] = true;
+      Features["dot6-insts"] = true;
+      Features["dl-insts"] = true;
+      Features["flat-address-space"] = true;
+      Features["16-bit-insts"] = true;
+      Features["dpp"] = true;
+      Features["gfx8-insts"] = true;
+      Features["gfx9-insts"] = true;
+      Features["gfx10-insts"] = true;
+      Features["gfx10-3-insts"] = true;
+      Features["s-memrealtime"] = true;
+      break;
     case GK_GFX1012:
     case GK_GFX1011:
       Features["dot1-insts"] = true;
@@ -286,6 +308,7 @@ AMDGPUTargetInfo::AMDGPUTargetInfo(const llvm::Triple &Triple,
   resetDataLayout(isAMDGCN(getTriple()) ? DataLayoutStringAMDGCN
                                         : DataLayoutStringR600);
   assert(DataLayout->getAllocaAddrSpace() == Private);
+  GridValues = llvm::omp::AMDGPUGpuGridValues;
 
   setAddressSpaceMap(Triple.getOS() == llvm::Triple::Mesa3D ||
                      !isAMDGCN(Triple));
@@ -334,6 +357,23 @@ void AMDGPUTargetInfo::getTargetDefines(const LangOptions &Opts,
     StringRef CanonName = isAMDGCN(getTriple()) ?
       getArchNameAMDGCN(GPUKind) : getArchNameR600(GPUKind);
     Builder.defineMacro(Twine("__") + Twine(CanonName) + Twine("__"));
+    if (isAMDGCN(getTriple())) {
+      Builder.defineMacro("__amdgcn_processor__",
+                          Twine("\"") + Twine(CanonName) + Twine("\""));
+      Builder.defineMacro("__amdgcn_target_id__",
+                          Twine("\"") + Twine(getTargetID().getValue()) +
+                              Twine("\""));
+      for (auto F : getAllPossibleTargetIDFeatures(getTriple(), CanonName)) {
+        auto Loc = OffloadArchFeatures.find(F);
+        if (Loc != OffloadArchFeatures.end()) {
+          std::string NewF = F.str();
+          std::replace(NewF.begin(), NewF.end(), '-', '_');
+          Builder.defineMacro(Twine("__amdgcn_feature_") + Twine(NewF) +
+                                  Twine("__"),
+                              Loc->second ? "1" : "0");
+        }
+      }
+    }
   }
 
   // TODO: __HAS_FMAF__, __HAS_LDEXPF__, __HAS_FP64__ are deprecated and will be

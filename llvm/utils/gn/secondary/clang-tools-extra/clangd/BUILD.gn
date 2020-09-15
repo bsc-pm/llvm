@@ -16,6 +16,7 @@ write_cmake_config("features") {
   } else {
     values += [ "CLANGD_BUILD_XPC=0" ]
   }
+  values += [ "CLANGD_ENABLE_REMOTE=0" ]
   public_configs = [ ":features_config" ]
 }
 
@@ -26,6 +27,7 @@ static_library("clangd") {
     ":features",
     "//clang-tools-extra/clang-tidy",
     "//clang-tools-extra/clang-tidy:all-checks",
+    "//clang-tools-extra/clang-tidy:clang-tidy-config",
     "//clang-tools-extra/clangd/support",
     "//clang/lib/AST",
     "//clang/lib/ASTMatchers",
@@ -61,6 +63,10 @@ static_library("clangd") {
     "CollectMacros.cpp",
     "CompileCommands.cpp",
     "Compiler.cpp",
+    "Config.cpp",
+    "ConfigCompile.cpp",
+    "ConfigProvider.cpp",
+    "ConfigYAML.cpp",
     "Diagnostics.cpp",
     "DraftStore.cpp",
     "ExpectedTypes.cpp",

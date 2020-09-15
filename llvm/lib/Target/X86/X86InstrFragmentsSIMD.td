@@ -61,7 +61,11 @@ def X86hadd    : SDNode<"X86ISD::HADD",      SDTIntBinOp>;
 def X86hsub    : SDNode<"X86ISD::HSUB",      SDTIntBinOp>;
 def X86comi    : SDNode<"X86ISD::COMI",      SDTX86FCmp>;
 def X86ucomi   : SDNode<"X86ISD::UCOMI",     SDTX86FCmp>;
+
+def SDTX86Cmps : SDTypeProfile<1, 3, [SDTCisFP<0>, SDTCisSameAs<0, 1>,
+                                      SDTCisSameAs<1, 2>, SDTCisVT<3, i8>]>;
 def X86cmps    : SDNode<"X86ISD::FSETCC",    SDTX86Cmps>;
+
 def X86pshufb  : SDNode<"X86ISD::PSHUFB",
                  SDTypeProfile<1, 2, [SDTCVecEltisVT<0, i8>, SDTCisSameAs<0,1>,
                                       SDTCisSameAs<0,2>]>>;
@@ -203,16 +207,21 @@ def X86CmpMaskCC :
       SDTypeProfile<1, 3, [SDTCisVec<0>, SDTCVecEltisVT<0, i1>,
                        SDTCisVec<1>, SDTCisSameAs<2, 1>,
                        SDTCisSameNumEltsAs<0, 1>, SDTCisVT<3, i8>]>;
+def X86MaskCmpMaskCC :
+      SDTypeProfile<1, 4, [SDTCisVec<0>, SDTCVecEltisVT<0, i1>,
+                       SDTCisVec<1>, SDTCisSameAs<2, 1>,
+                       SDTCisSameNumEltsAs<0, 1>, SDTCisVT<3, i8>, SDTCisSameAs<4, 0>]>;
 def X86CmpMaskCCScalar :
       SDTypeProfile<1, 3, [SDTCisInt<0>, SDTCisFP<1>, SDTCisSameAs<1, 2>,
                            SDTCisVT<3, i8>]>;
 
 def X86cmpm     : SDNode<"X86ISD::CMPM",     X86CmpMaskCC>;
+def X86cmpmm    : SDNode<"X86ISD::CMPMM",    X86MaskCmpMaskCC>;
 def X86strict_cmpm : SDNode<"X86ISD::STRICT_CMPM", X86CmpMaskCC, [SDNPHasChain]>;
 def X86any_cmpm    : PatFrags<(ops node:$src1, node:$src2, node:$src3),
                                [(X86strict_cmpm node:$src1, node:$src2, node:$src3),
                                 (X86cmpm node:$src1, node:$src2, node:$src3)]>;
-def X86cmpmSAE  : SDNode<"X86ISD::CMPM_SAE", X86CmpMaskCC>;
+def X86cmpmmSAE : SDNode<"X86ISD::CMPMM_SAE", X86MaskCmpMaskCC>;
 def X86cmpms    : SDNode<"X86ISD::FSETCCM",   X86CmpMaskCCScalar>;
 def X86cmpmsSAE : SDNode<"X86ISD::FSETCCM_SAE",   X86CmpMaskCCScalar>;
 

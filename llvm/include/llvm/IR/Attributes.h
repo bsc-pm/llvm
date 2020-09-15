@@ -108,6 +108,7 @@ public:
                                         unsigned ElemSizeArg,
                                         const Optional<unsigned> &NumElemsArg);
   static Attribute getWithByValType(LLVMContext &Context, Type *Ty);
+  static Attribute getWithByRefType(LLVMContext &Context, Type *Ty);
   static Attribute getWithPreallocatedType(LLVMContext &Context, Type *Ty);
 
   static Attribute::AttrKind getAttrKindFromName(StringRef AttrName);
@@ -137,6 +138,9 @@ public:
 
   /// Return true if the attribute is a type attribute.
   bool isTypeAttribute() const;
+
+  /// Return true if the attribute is any kind of attribute.
+  bool isValid() const { return pImpl; }
 
   /// Return true if the attribute is present.
   bool hasAttribute(AttrKind Val) const;
@@ -303,6 +307,7 @@ public:
   uint64_t getDereferenceableBytes() const;
   uint64_t getDereferenceableOrNullBytes() const;
   Type *getByValType() const;
+  Type *getByRefType() const;
   Type *getPreallocatedType() const;
   std::pair<unsigned, Optional<unsigned>> getAllocSizeArgs() const;
   std::string getAsString(bool InAttrGrp = false) const;
@@ -396,6 +401,9 @@ public:
   static AttributeList get(LLVMContext &C, ArrayRef<AttributeList> Attrs);
   static AttributeList get(LLVMContext &C, unsigned Index,
                            ArrayRef<Attribute::AttrKind> Kinds);
+  static AttributeList get(LLVMContext &C, unsigned Index,
+                           ArrayRef<Attribute::AttrKind> Kinds,
+                           ArrayRef<uint64_t> Values);
   static AttributeList get(LLVMContext &C, unsigned Index,
                            ArrayRef<StringRef> Kind);
   static AttributeList get(LLVMContext &C, unsigned Index,
@@ -623,6 +631,12 @@ public:
   /// Return the byval type for the specified function parameter.
   Type *getParamByValType(unsigned ArgNo) const;
 
+  /// Return the byref type for the specified function parameter.
+  Type *getParamByRefType(unsigned ArgNo) const;
+
+  /// Return the preallocated type for the specified function parameter.
+  Type *getParamPreallocatedType(unsigned ArgNo) const;
+
   /// Get the stack alignment.
   MaybeAlign getStackAlignment(unsigned Index) const;
 
@@ -723,6 +737,7 @@ class AttrBuilder {
   uint64_t DerefOrNullBytes = 0;
   uint64_t AllocSizeArgs = 0;
   Type *ByValType = nullptr;
+  Type *ByRefType = nullptr;
   Type *PreallocatedType = nullptr;
 
 public:
@@ -738,7 +753,14 @@ public:
   void clear();
 
   /// Add an attribute to the builder.
-  AttrBuilder &addAttribute(Attribute::AttrKind Val);
+  AttrBuilder &addAttribute(Attribute::AttrKind Val) {
+    assert((unsigned)Val < Attribute::EndAttrKinds &&
+           "Attribute out of range!");
+    assert(!Attribute::doesAttrKindHaveArgument(Val) &&
+           "Adding integer attribute without adding a value!");
+    Attrs[Val] = true;
+    return *this;
+  }
 
   /// Add the Attribute object to the builder.
   AttrBuilder &addAttribute(Attribute A);
@@ -802,6 +824,9 @@ public:
   /// Retrieve the byval type.
   Type *getByValType() const { return ByValType; }
 
+  /// Retrieve the byref type.
+  Type *getByRefType() const { return ByRefType; }
+
   /// Retrieve the preallocated type.
   Type *getPreallocatedType() const { return PreallocatedType; }
 
@@ -847,6 +872,9 @@ public:
 
   /// This turns a byval type into the form used internally in Attribute.
   AttrBuilder &addByValAttr(Type *Ty);
+
+  /// This turns a byref type into the form used internally in Attribute.
+  AttrBuilder &addByRefAttr(Type *Ty);
 
   /// This turns a preallocated type into the form used internally in Attribute.
   AttrBuilder &addPreallocatedAttr(Type *Ty);

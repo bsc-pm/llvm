@@ -98,6 +98,7 @@ static const char *getPropertyName(MachineFunctionProperties::Property Prop) {
   case P::RegBankSelected: return "RegBankSelected";
   case P::Selected: return "Selected";
   case P::TracksLiveness: return "TracksLiveness";
+  case P::TiedOpsRewritten: return "TiedOpsRewritten";
   }
   llvm_unreachable("Invalid machine function property");
 }
@@ -340,7 +341,7 @@ void MachineFunction::RenumberBlocks(MachineBasicBlock *MBB) {
   MBBNumbering.resize(BlockNo);
 }
 
-/// This is used with -fbasicblock-sections or -fbasicblock-labels option.
+/// This is used with -fbasic-block-sections or -fbasicblock-labels option.
 /// A unary encoding of basic block labels is done to keep ".strtab" sizes
 /// small.
 void MachineFunction::createBBLabels() {
@@ -473,6 +474,13 @@ MachineMemOperand *MachineFunction::getMachineMemOperand(
                         SSID, Ordering, FailureOrdering);
 }
 
+MachineMemOperand *MachineFunction::getMachineMemOperand(
+    const MachineMemOperand *MMO, MachinePointerInfo &PtrInfo, uint64_t Size) {
+  return new (Allocator) MachineMemOperand(
+      PtrInfo, MMO->getFlags(), Size, MMO->getBaseAlign(), AAMDNodes(), nullptr,
+      MMO->getSyncScopeID(), MMO->getOrdering(), MMO->getFailureOrdering());
+}
+
 MachineMemOperand *
 MachineFunction::getMachineMemOperand(const MachineMemOperand *MMO,
                                       int64_t Offset, uint64_t Size) {
@@ -484,9 +492,11 @@ MachineFunction::getMachineMemOperand(const MachineMemOperand *MMO,
                         ? commonAlignment(MMO->getBaseAlign(), Offset)
                         : MMO->getBaseAlign();
 
+  // Do not preserve ranges, since we don't necessarily know what the high bits
+  // are anymore.
   return new (Allocator)
       MachineMemOperand(PtrInfo.getWithOffset(Offset), MMO->getFlags(), Size,
-                        Alignment, AAMDNodes(), nullptr, MMO->getSyncScopeID(),
+                        Alignment, MMO->getAAInfo(), nullptr, MMO->getSyncScopeID(),
                         MMO->getOrdering(), MMO->getFailureOrdering());
 }
 
@@ -658,10 +668,10 @@ void MachineFunction::viewCFGOnly() const
 
 /// Add the specified physical register as a live-in value and
 /// create a corresponding virtual register for it.
-unsigned MachineFunction::addLiveIn(unsigned PReg,
+Register MachineFunction::addLiveIn(MCRegister PReg,
                                     const TargetRegisterClass *RC) {
   MachineRegisterInfo &MRI = getRegInfo();
-  unsigned VReg = MRI.getLiveInVirtReg(PReg);
+  Register VReg = MRI.getLiveInVirtReg(PReg);
   if (VReg) {
     const TargetRegisterClass *VRegRC = MRI.getRegClass(VReg);
     (void)VRegRC;

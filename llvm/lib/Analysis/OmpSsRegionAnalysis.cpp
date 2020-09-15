@@ -8,7 +8,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/OmpSsRegionAnalysis.h"
-#include "llvm/Analysis/OrderedInstructions.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -22,6 +21,7 @@
 #include "llvm/IR/IntrinsicsOmpSs.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 using namespace llvm;
 
@@ -213,6 +213,27 @@ static bool isOmpSsLoopDirective(TaskInfo::OmpSsTaskKind TaskKind) {
   return TaskKind == TaskInfo::OSSD_task_for ||
          TaskKind == TaskInfo::OSSD_taskloop ||
          TaskKind == TaskInfo::OSSD_taskloop_for;
+}
+
+/// NOTE: from old OrderedInstructions
+static bool localDominates(
+    const Instruction *InstA, const Instruction *InstB) {
+  assert(InstA->getParent() == InstB->getParent() &&
+         "Instructions must be in the same basic block");
+
+  return InstA->comesBefore(InstB);
+}
+
+/// Given 2 instructions, check for dominance relation if the instructions are
+/// in the same basic block. Otherwise, use dominator tree.
+/// NOTE: from old OrderedInstructions
+static bool orderedInstructions(
+    DominatorTree &DT, const Instruction *InstA, const Instruction *InstB) {
+  // Use ordered basic block to do dominance check in case the 2 instructions
+  // are in the same basic block.
+  if (InstA->getParent() == InstB->getParent())
+    return localDominates(InstA, InstB);
+  return DT.dominates(InstA->getParent(), InstB->getParent());
 }
 
 static void getOperandBundlesAsDefsWithID(const IntrinsicInst *I,
@@ -512,9 +533,8 @@ static void gatherReductionsInfoWithID(const IntrinsicInst *I,
 }
 
 // Gathers all dependencies needed information
-static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
-                              TaskAnalysisInfo &TAI,
-                              const OrderedInstructions &OI) {
+static void gatherDependsInfo(
+    const IntrinsicInst *I, TaskInfo &TI, TaskAnalysisInfo &TAI) {
 
   gatherDependsInfoWithID(I,
                           TI.DependsInfo.Ins,
@@ -583,8 +603,7 @@ static void gatherDependsInfo(const IntrinsicInst *I, TaskInfo &TI,
 }
 
 static void gatherMultiDependsInfo(
-  const IntrinsicInst *I, TaskInfo &TI,
-  TaskAnalysisInfo &TAI, const OrderedInstructions &OI) {
+  const IntrinsicInst *I, TaskInfo &TI, TaskAnalysisInfo &TAI) {
 
   gatherMultiDependsInfoWithID(I,
                           TI.DependsInfo.MultiRangeIns,
@@ -740,8 +759,6 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
   MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
   MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree) {
 
-  OrderedInstructions OI(&DT);
-
   MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBTaskStacks;
   SmallVector<BasicBlock*, 8> Worklist;
   SmallPtrSet<BasicBlock*, 8> Visited;
@@ -762,7 +779,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
           Instruction *Exit = cast<Instruction>(II->user_back());
           // This should not happen because it will crash before this pass
-          assert(OI.dominates(II, Exit) && "Task entry does not dominate exit.");
+          assert(orderedInstructions(DT, II, Exit) && "Task entry does not dominate exit.");
 
           if (Stack.empty()) {
             // outer task, insert into nullptr
@@ -781,8 +798,8 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherNonPODInfo(II, T.Info);
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
-          gatherDependsInfo(II, T.Info, T.AnalysisInfo, OI);
-          gatherMultiDependsInfo(II, T.Info, T.AnalysisInfo, OI);
+          gatherDependsInfo(II, T.Info, T.AnalysisInfo);
+          gatherMultiDependsInfo(II, T.Info, T.AnalysisInfo);
           gatherReductionsInitCombInfo(II, T.Info);
           gatherIfFinalCostPrioWaitInfo(II, T.Info);
           if (isOmpSsLoopDirective(T.Info.TaskKind))
@@ -806,7 +823,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[StackEntry];
         for (Use &U : I.operands()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U.get())) {
-            if (OI.dominates(I2, StackEntry)) {
+            if (orderedInstructions(DT, I2, StackEntry)) {
               T.AnalysisInfo.UsesBeforeEntry.insert(I2);
             if (!DisableChecks
                 && !valueInDSABundles(T.Info.DSAInfo, I2)
@@ -827,7 +844,7 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         }
         for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {
-            if (OI.dominates(StackExit, I2)) {
+            if (orderedInstructions(DT, StackExit, I2)) {
               T.AnalysisInfo.UsesAfterExit.insert(&I);
               if (!DisableChecks) {
                 llvm_unreachable("Value inside the task body used after it.");

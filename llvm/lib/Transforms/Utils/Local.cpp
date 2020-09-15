@@ -91,6 +91,18 @@ using namespace llvm::PatternMatch;
 #define DEBUG_TYPE "local"
 
 STATISTIC(NumRemoved, "Number of unreachable basic blocks removed");
+STATISTIC(NumPHICSEs, "Number of PHI's that got CSE'd");
+
+static cl::opt<bool> PHICSEDebugHash(
+    "phicse-debug-hash",
+#ifdef EXPENSIVE_CHECKS
+    cl::init(true),
+#else
+    cl::init(false),
+#endif
+    cl::Hidden,
+    cl::desc("Perform extra assertion checking to verify that PHINodes's hash "
+             "function is well-behaved w.r.t. its isEqual predicate"));
 
 // Max recursion depth for collectBitParts used when detecting bswap and
 // bitreverse idioms
@@ -170,6 +182,8 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       TheOnlyDest = SI->case_begin()->getCaseSuccessor();
     }
 
+    bool Changed = false;
+
     // Figure out which case it goes to.
     for (auto i = SI->case_begin(), e = SI->case_end(); i != e;) {
       // Found case matching a constant operand?
@@ -208,6 +222,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
         DefaultDest->removePredecessor(ParentBB);
         i = SI->removeCase(i);
         e = SI->case_end();
+        Changed = true;
         if (DTU)
           DTU->applyUpdatesPermissive(
               {{DominatorTree::Delete, ParentBB, DefaultDest}});
@@ -296,7 +311,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       SI->eraseFromParent();
       return true;
     }
-    return false;
+    return Changed;
   }
 
   if (auto *IBI = dyn_cast<IndirectBrInst>(T)) {
@@ -453,21 +468,24 @@ bool llvm::wouldInstructionBeTriviallyDead(Instruction *I,
 /// trivially dead, delete them too, recursively.  Return true if any
 /// instructions were deleted.
 bool llvm::RecursivelyDeleteTriviallyDeadInstructions(
-    Value *V, const TargetLibraryInfo *TLI, MemorySSAUpdater *MSSAU) {
+    Value *V, const TargetLibraryInfo *TLI, MemorySSAUpdater *MSSAU,
+    std::function<void(Value *)> AboutToDeleteCallback) {
   Instruction *I = dyn_cast<Instruction>(V);
   if (!I || !isInstructionTriviallyDead(I, TLI))
     return false;
 
   SmallVector<WeakTrackingVH, 16> DeadInsts;
   DeadInsts.push_back(I);
-  RecursivelyDeleteTriviallyDeadInstructions(DeadInsts, TLI, MSSAU);
+  RecursivelyDeleteTriviallyDeadInstructions(DeadInsts, TLI, MSSAU,
+                                             AboutToDeleteCallback);
 
   return true;
 }
 
 bool llvm::RecursivelyDeleteTriviallyDeadInstructionsPermissive(
     SmallVectorImpl<WeakTrackingVH> &DeadInsts, const TargetLibraryInfo *TLI,
-    MemorySSAUpdater *MSSAU) {
+    MemorySSAUpdater *MSSAU,
+    std::function<void(Value *)> AboutToDeleteCallback) {
   unsigned S = 0, E = DeadInsts.size(), Alive = 0;
   for (; S != E; ++S) {
     auto *I = cast<Instruction>(DeadInsts[S]);
@@ -478,13 +496,15 @@ bool llvm::RecursivelyDeleteTriviallyDeadInstructionsPermissive(
   }
   if (Alive == E)
     return false;
-  RecursivelyDeleteTriviallyDeadInstructions(DeadInsts, TLI, MSSAU);
+  RecursivelyDeleteTriviallyDeadInstructions(DeadInsts, TLI, MSSAU,
+                                             AboutToDeleteCallback);
   return true;
 }
 
 void llvm::RecursivelyDeleteTriviallyDeadInstructions(
     SmallVectorImpl<WeakTrackingVH> &DeadInsts, const TargetLibraryInfo *TLI,
-    MemorySSAUpdater *MSSAU) {
+    MemorySSAUpdater *MSSAU,
+    std::function<void(Value *)> AboutToDeleteCallback) {
   // Process the dead instruction list until empty.
   while (!DeadInsts.empty()) {
     Value *V = DeadInsts.pop_back_val();
@@ -497,6 +517,9 @@ void llvm::RecursivelyDeleteTriviallyDeadInstructions(
 
     // Don't lose the debug info while deleting the instructions.
     salvageDebugInfo(*I);
+
+    if (AboutToDeleteCallback)
+      AboutToDeleteCallback(I);
 
     // Null out all of the instruction's operands to see if any operand becomes
     // dead as we go.
@@ -1109,6 +1132,8 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
   return true;
 }
 
+// WARNING: this logic must be kept in sync with
+//          Instruction::isIdenticalToWhenDefined()!
 bool llvm::EliminateDuplicatePHINodes(BasicBlock *BB) {
   // This implementation doesn't currently consider undef operands
   // specially. Theoretically, two phis which are identical except for
@@ -1123,7 +1148,11 @@ bool llvm::EliminateDuplicatePHINodes(BasicBlock *BB) {
       return DenseMapInfo<PHINode *>::getTombstoneKey();
     }
 
-    static unsigned getHashValue(PHINode *PN) {
+    static bool isSentinel(PHINode *PN) {
+      return PN == getEmptyKey() || PN == getTombstoneKey();
+    }
+
+    static unsigned getHashValueImpl(PHINode *PN) {
       // Compute a hash value on the operands. Instcombine will likely have
       // sorted them, which helps expose duplicates, but we have to check all
       // the operands to be safe in case instcombine hasn't run.
@@ -1132,11 +1161,31 @@ bool llvm::EliminateDuplicatePHINodes(BasicBlock *BB) {
           hash_combine_range(PN->block_begin(), PN->block_end())));
     }
 
-    static bool isEqual(PHINode *LHS, PHINode *RHS) {
-      if (LHS == getEmptyKey() || LHS == getTombstoneKey() ||
-          RHS == getEmptyKey() || RHS == getTombstoneKey())
+    static unsigned getHashValue(PHINode *PN) {
+#ifndef NDEBUG
+      // If -phicse-debug-hash was specified, return a constant -- this
+      // will force all hashing to collide, so we'll exhaustively search
+      // the table for a match, and the assertion in isEqual will fire if
+      // there's a bug causing equal keys to hash differently.
+      if (PHICSEDebugHash)
+        return 0;
+#endif
+      return getHashValueImpl(PN);
+    }
+
+    static bool isEqualImpl(PHINode *LHS, PHINode *RHS) {
+      if (isSentinel(LHS) || isSentinel(RHS))
         return LHS == RHS;
       return LHS->isIdenticalTo(RHS);
+    }
+
+    static bool isEqual(PHINode *LHS, PHINode *RHS) {
+      // These comparisons are nontrivial, so assert that equality implies
+      // hash equality (DenseMap demands this as an invariant).
+      bool Result = isEqualImpl(LHS, RHS);
+      assert(!Result || (isSentinel(LHS) && LHS == RHS) ||
+             getHashValueImpl(LHS) == getHashValueImpl(RHS));
+      return Result;
     }
   };
 
@@ -1149,6 +1198,7 @@ bool llvm::EliminateDuplicatePHINodes(BasicBlock *BB) {
     auto Inserted = PHISet.insert(PN);
     if (!Inserted.second) {
       // A duplicate. Replace this PHI with its duplicate.
+      ++NumPHICSEs;
       PN->replaceAllUsesWith(*Inserted.first);
       PN->eraseFromParent();
       Changed = true;
@@ -1628,23 +1678,18 @@ static MetadataAsValue *wrapValueInMetadata(LLVMContext &C, Value *V) {
   return MetadataAsValue::get(C, ValueAsMetadata::get(V));
 }
 
-bool llvm::salvageDebugInfo(Instruction &I) {
+/// Where possible to salvage debug information for \p I do so
+/// and return True. If not possible mark undef and return False.
+void llvm::salvageDebugInfo(Instruction &I) {
   SmallVector<DbgVariableIntrinsic *, 1> DbgUsers;
   findDbgUsers(DbgUsers, &I);
-  if (DbgUsers.empty())
-    return false;
-
-  return salvageDebugInfoForDbgValues(I, DbgUsers);
+  salvageDebugInfoForDbgValues(I, DbgUsers);
 }
 
-void llvm::salvageDebugInfoOrMarkUndef(Instruction &I) {
-  if (!salvageDebugInfo(I))
-    replaceDbgUsesWithUndef(&I);
-}
-
-bool llvm::salvageDebugInfoForDbgValues(
+void llvm::salvageDebugInfoForDbgValues(
     Instruction &I, ArrayRef<DbgVariableIntrinsic *> DbgUsers) {
   auto &Ctx = I.getContext();
+  bool Salvaged = false;
   auto wrapMD = [&](Value *V) { return wrapValueInMetadata(Ctx, V); };
 
   for (auto *DII : DbgUsers) {
@@ -1659,14 +1704,22 @@ bool llvm::salvageDebugInfoForDbgValues(
     // salvageDebugInfoImpl should fail on examining the first element of
     // DbgUsers, or none of them.
     if (!DIExpr)
-      return false;
+      break;
 
     DII->setOperand(0, wrapMD(I.getOperand(0)));
     DII->setOperand(2, MetadataAsValue::get(Ctx, DIExpr));
     LLVM_DEBUG(dbgs() << "SALVAGE: " << *DII << '\n');
+    Salvaged = true;
   }
 
-  return true;
+  if (Salvaged)
+    return;
+
+  for (auto *DII : DbgUsers) {
+    Value *Undef = UndefValue::get(I.getType());
+    DII->setOperand(0, MetadataAsValue::get(DII->getContext(),
+                                            ValueAsMetadata::get(Undef)));
+  }
 }
 
 DIExpression *llvm::salvageDebugInfoImpl(Instruction &I,
@@ -1698,13 +1751,14 @@ DIExpression *llvm::salvageDebugInfoImpl(Instruction &I,
   };
 
   if (auto *CI = dyn_cast<CastInst>(&I)) {
-    // No-op casts and zexts are irrelevant for debug info.
-    if (CI->isNoopCast(DL) || isa<ZExtInst>(&I))
+    // No-op casts are irrelevant for debug info.
+    if (CI->isNoopCast(DL))
       return SrcDIExpr;
 
     Type *Type = CI->getType();
-    // Casts other than Trunc or SExt to scalar types cannot be salvaged.
-    if (Type->isVectorTy() || (!isa<TruncInst>(&I) && !isa<SExtInst>(&I)))
+    // Casts other than Trunc, SExt, or ZExt to scalar types cannot be salvaged.
+    if (Type->isVectorTy() ||
+        !(isa<TruncInst>(&I) || isa<SExtInst>(&I) || isa<ZExtInst>(&I)))
       return nullptr;
 
     Value *FromValue = CI->getOperand(0);
@@ -1821,7 +1875,7 @@ static bool rewriteDebugUsers(
 
   if (!UndefOrSalvage.empty()) {
     // Try to salvage the remaining debug users.
-    salvageDebugInfoOrMarkUndef(From);
+    salvageDebugInfo(From);
     Changed = true;
   }
 
@@ -1907,8 +1961,10 @@ bool llvm::replaceAllDbgUsesWith(Instruction &From, Value &To,
   return false;
 }
 
-unsigned llvm::removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB) {
+std::pair<unsigned, unsigned>
+llvm::removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB) {
   unsigned NumDeadInst = 0;
+  unsigned NumDeadDbgInst = 0;
   // Delete the instructions backwards, as it has a reduced likelihood of
   // having to update as many def-use and use-def chains.
   Instruction *EndInst = BB->getTerminator(); // Last not to be deleted.
@@ -1921,11 +1977,13 @@ unsigned llvm::removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB) {
       EndInst = Inst;
       continue;
     }
-    if (!isa<DbgInfoIntrinsic>(Inst))
+    if (isa<DbgInfoIntrinsic>(Inst))
+      ++NumDeadDbgInst;
+    else
       ++NumDeadInst;
     Inst->eraseFromParent();
   }
-  return NumDeadInst;
+  return {NumDeadInst, NumDeadDbgInst};
 }
 
 unsigned llvm::changeToUnreachable(Instruction *I, bool UseLLVMTrap,
@@ -1981,6 +2039,18 @@ CallInst *llvm::createCallMatchingInvoke(InvokeInst *II) {
   NewCall->setAttributes(II->getAttributes());
   NewCall->setDebugLoc(II->getDebugLoc());
   NewCall->copyMetadata(*II);
+
+  // If the invoke had profile metadata, try converting them for CallInst.
+  uint64_t TotalWeight;
+  if (NewCall->extractProfTotalWeight(TotalWeight)) {
+    // Set the total weight if it fits into i32, otherwise reset.
+    MDBuilder MDB(NewCall->getContext());
+    auto NewWeights = uint32_t(TotalWeight) != TotalWeight
+                          ? nullptr
+                          : MDB.createBranchWeights({uint32_t(TotalWeight)});
+    NewCall->setMetadata(LLVMContext::MD_prof, NewWeights);
+  }
+
   return NewCall;
 }
 
@@ -2259,7 +2329,7 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
   SmallSetVector<BasicBlock *, 8> DeadBlockSet;
   for (BasicBlock &BB : F) {
     // Skip reachable basic blocks
-    if (Reachable.find(&BB) != Reachable.end())
+    if (Reachable.count(&BB))
       continue;
     DeadBlockSet.insert(&BB);
   }
@@ -3004,44 +3074,6 @@ bool llvm::canReplaceOperandWithVariable(const Instruction *I, unsigned OpIdx) {
   }
 }
 
-using AllocaForValueMapTy = DenseMap<Value *, AllocaInst *>;
-AllocaInst *llvm::findAllocaForValue(Value *V,
-                                     AllocaForValueMapTy &AllocaForValue) {
-  if (AllocaInst *AI = dyn_cast<AllocaInst>(V))
-    return AI;
-  // See if we've already calculated (or started to calculate) alloca for a
-  // given value.
-  AllocaForValueMapTy::iterator I = AllocaForValue.find(V);
-  if (I != AllocaForValue.end())
-    return I->second;
-  // Store 0 while we're calculating alloca for value V to avoid
-  // infinite recursion if the value references itself.
-  AllocaForValue[V] = nullptr;
-  AllocaInst *Res = nullptr;
-  if (CastInst *CI = dyn_cast<CastInst>(V))
-    Res = findAllocaForValue(CI->getOperand(0), AllocaForValue);
-  else if (PHINode *PN = dyn_cast<PHINode>(V)) {
-    for (Value *IncValue : PN->incoming_values()) {
-      // Allow self-referencing phi-nodes.
-      if (IncValue == PN)
-        continue;
-      AllocaInst *IncValueAI = findAllocaForValue(IncValue, AllocaForValue);
-      // AI for incoming values should exist and should all be equal.
-      if (IncValueAI == nullptr || (Res != nullptr && IncValueAI != Res))
-        return nullptr;
-      Res = IncValueAI;
-    }
-  } else if (GetElementPtrInst *EP = dyn_cast<GetElementPtrInst>(V)) {
-    Res = findAllocaForValue(EP->getPointerOperand(), AllocaForValue);
-  } else {
-    LLVM_DEBUG(dbgs() << "Alloca search cancelled on unknown instruction: "
-                      << *V << "\n");
-  }
-  if (Res)
-    AllocaForValue[V] = Res;
-  return Res;
-}
-
 Value *llvm::invertCondition(Value *Condition) {
   // First: Check if it's a constant
   if (Constant *C = dyn_cast<Constant>(Condition))
@@ -3052,31 +3084,26 @@ Value *llvm::invertCondition(Value *Condition) {
   if (match(Condition, m_Not(m_Value(NotCondition))))
     return NotCondition;
 
-  if (Instruction *Inst = dyn_cast<Instruction>(Condition)) {
-    // Third: Check all the users for an invert
-    BasicBlock *Parent = Inst->getParent();
-    for (User *U : Condition->users())
-      if (Instruction *I = dyn_cast<Instruction>(U))
-        if (I->getParent() == Parent && match(I, m_Not(m_Specific(Condition))))
-          return I;
+  BasicBlock *Parent = nullptr;
+  Instruction *Inst = dyn_cast<Instruction>(Condition);
+  if (Inst)
+    Parent = Inst->getParent();
+  else if (Argument *Arg = dyn_cast<Argument>(Condition))
+    Parent = &Arg->getParent()->getEntryBlock();
+  assert(Parent && "Unsupported condition to invert");
 
-    // Last option: Create a new instruction
-    auto Inverted = BinaryOperator::CreateNot(Inst, "");
-    if (isa<PHINode>(Inst)) {
-      // FIXME: This fails if the inversion is to be used in a
-      // subsequent PHINode in the same basic block.
-      Inverted->insertBefore(&*Parent->getFirstInsertionPt());
-    } else {
-      Inverted->insertAfter(Inst);
-    }
-    return Inverted;
-  }
+  // Third: Check all the users for an invert
+  for (User *U : Condition->users())
+    if (Instruction *I = dyn_cast<Instruction>(U))
+      if (I->getParent() == Parent && match(I, m_Not(m_Specific(Condition))))
+        return I;
 
-  if (Argument *Arg = dyn_cast<Argument>(Condition)) {
-    BasicBlock &EntryBlock = Arg->getParent()->getEntryBlock();
-    return BinaryOperator::CreateNot(Condition, Arg->getName() + ".inv",
-                                     &*EntryBlock.getFirstInsertionPt());
-  }
-
-  llvm_unreachable("Unhandled condition to invert");
+  // Last option: Create a new instruction
+  auto *Inverted =
+      BinaryOperator::CreateNot(Condition, Condition->getName() + ".inv");
+  if (Inst && !isa<PHINode>(Inst))
+    Inverted->insertAfter(Inst);
+  else
+    Inverted->insertBefore(&*Parent->getFirstInsertionPt());
+  return Inverted;
 }

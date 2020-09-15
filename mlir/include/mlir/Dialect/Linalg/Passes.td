@@ -11,6 +11,17 @@
 
 include "mlir/Pass/PassBase.td"
 
+def LinalgFoldUnitExtentDims : FunctionPass<"linalg-fold-unit-extent-dims"> {
+  let summary = "Remove unit-extent dimension in Linalg ops on tensors";
+  let constructor = "mlir::createLinalgFoldUnitExtentDimsPass()";
+  let options = [
+    Option<"foldOneTripLoopsOnly", "fold-one-trip-loops-only", "bool",
+            /*default=*/"false",
+	    "Only folds the one-trip loops from Linalg ops on tensors "
+	    "(for testing purposes only)">
+  ];
+}
+
 def LinalgFusion : FunctionPass<"linalg-fusion"> {
   let summary = "Fuse operations in the linalg dialect";
   let constructor = "mlir::createLinalgFusionPass()";
@@ -19,17 +30,20 @@ def LinalgFusion : FunctionPass<"linalg-fusion"> {
 def LinalgFusionOfTensorOps : Pass<"linalg-fusion-for-tensor-ops"> {
   let summary = "Fuse operations on RankedTensorType in linalg dialect";
   let constructor = "mlir::createLinalgFusionOfTensorOpsPass()";
+  let dependentDialects = ["AffineDialect"];
 }
 
 def LinalgLowerToAffineLoops : FunctionPass<"convert-linalg-to-affine-loops"> {
   let summary = "Lower the operations from the linalg dialect into affine "
                 "loops";
   let constructor = "mlir::createConvertLinalgToAffineLoopsPass()";
+  let dependentDialects = ["AffineDialect"];
 }
 
 def LinalgLowerToLoops : FunctionPass<"convert-linalg-to-loops"> {
   let summary = "Lower the operations from the linalg dialect into loops";
   let constructor = "mlir::createConvertLinalgToLoopsPass()";
+  let dependentDialects = ["scf::SCFDialect", "AffineDialect"];
 }
 
 def LinalgOnTensorsToBuffers : Pass<"convert-linalg-on-tensors-to-buffers", "ModuleOp"> {
@@ -43,6 +57,7 @@ def LinalgLowerToParallelLoops
   let summary = "Lower the operations from the linalg dialect into parallel "
                 "loops";
   let constructor = "mlir::createConvertLinalgToParallelLoopsPass()";
+  let dependentDialects = ["AffineDialect", "scf::SCFDialect"];
 }
 
 def LinalgPromotion : FunctionPass<"linalg-promote-subviews"> {
@@ -50,13 +65,18 @@ def LinalgPromotion : FunctionPass<"linalg-promote-subviews"> {
   let constructor = "mlir::createLinalgPromotionPass()";
   let options = [
     Option<"dynamicBuffers", "test-promote-dynamic", "bool",
-           /*default=*/"false", "Test generation of dynamic promoted buffers">
+           /*default=*/"false", "Test generation of dynamic promoted buffers">,
+    Option<"useAlloca", "test-use-alloca", "bool",
+           /*default=*/"false", "Test generation of alloca'ed buffers.">
   ];
 }
 
 def LinalgTiling : FunctionPass<"linalg-tile"> {
   let summary = "Tile operations in the linalg dialect";
   let constructor = "mlir::createLinalgTilingPass()";
+  let dependentDialects = [
+    "AffineDialect", "scf::SCFDialect"
+  ];
   let options = [
     ListOption<"tileSizes", "linalg-tile-sizes", "int64_t",
                "Test generation of dynamic promoted buffers",
@@ -73,6 +93,7 @@ def LinalgTilingToParallelLoops
                "Test generation of dynamic promoted buffers",
                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">
   ];
+  let dependentDialects = ["AffineDialect", "scf::SCFDialect"];
 }
 
 #endif // MLIR_DIALECT_LINALG_PASSES

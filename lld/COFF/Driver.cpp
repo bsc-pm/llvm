@@ -34,6 +34,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/BinaryStreamReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
@@ -924,6 +925,75 @@ static void parseOrderFile(StringRef arg) {
   }
 }
 
+static void parseCallGraphFile(StringRef path) {
+  std::unique_ptr<MemoryBuffer> mb = CHECK(
+      MemoryBuffer::getFile(path, -1, false, true), "could not open " + path);
+
+  // Build a map from symbol name to section.
+  DenseMap<StringRef, Symbol *> map;
+  for (ObjFile *file : ObjFile::instances)
+    for (Symbol *sym : file->getSymbols())
+      if (sym)
+        map[sym->getName()] = sym;
+
+  auto findSection = [&](StringRef name) -> SectionChunk * {
+    Symbol *sym = map.lookup(name);
+    if (!sym) {
+      if (config->warnMissingOrderSymbol)
+        warn(path + ": no such symbol: " + name);
+      return nullptr;
+    }
+
+    if (DefinedCOFF *dr = dyn_cast_or_null<DefinedCOFF>(sym))
+      return dyn_cast_or_null<SectionChunk>(dr->getChunk());
+    return nullptr;
+  };
+
+  for (StringRef line : args::getLines(*mb)) {
+    SmallVector<StringRef, 3> fields;
+    line.split(fields, ' ');
+    uint64_t count;
+
+    if (fields.size() != 3 || !to_integer(fields[2], count)) {
+      error(path + ": parse error");
+      return;
+    }
+
+    if (SectionChunk *from = findSection(fields[0]))
+      if (SectionChunk *to = findSection(fields[1]))
+        config->callGraphProfile[{from, to}] += count;
+  }
+}
+
+static void readCallGraphsFromObjectFiles() {
+  for (ObjFile *obj : ObjFile::instances) {
+    if (obj->callgraphSec) {
+      ArrayRef<uint8_t> contents;
+      cantFail(
+          obj->getCOFFObj()->getSectionContents(obj->callgraphSec, contents));
+      BinaryStreamReader reader(contents, support::little);
+      while (!reader.empty()) {
+        uint32_t fromIndex, toIndex;
+        uint64_t count;
+        if (Error err = reader.readInteger(fromIndex))
+          fatal(toString(obj) + ": Expected 32-bit integer");
+        if (Error err = reader.readInteger(toIndex))
+          fatal(toString(obj) + ": Expected 32-bit integer");
+        if (Error err = reader.readInteger(count))
+          fatal(toString(obj) + ": Expected 64-bit integer");
+        auto *fromSym = dyn_cast_or_null<Defined>(obj->getSymbol(fromIndex));
+        auto *toSym = dyn_cast_or_null<Defined>(obj->getSymbol(toIndex));
+        if (!fromSym || !toSym)
+          continue;
+        auto *from = dyn_cast_or_null<SectionChunk>(fromSym->getChunk());
+        auto *to = dyn_cast_or_null<SectionChunk>(toSym->getChunk());
+        if (from && to)
+          config->callGraphProfile[{from, to}] += count;
+      }
+    }
+  }
+}
+
 static void markAddrsig(Symbol *s) {
   if (auto *d = dyn_cast_or_null<Defined>(s))
     if (SectionChunk *c = dyn_cast_or_null<SectionChunk>(d->getChunk()))
@@ -1108,6 +1178,8 @@ Optional<std::string> getReproduceFile(const opt::InputArgList &args) {
 }
 
 void LinkerDriver::link(ArrayRef<const char *> argsArr) {
+  ScopedTimer rootTimer(Timer::root());
+
   // Needed for LTO.
   InitializeAllTargetInfos();
   InitializeAllTargets();
@@ -1166,7 +1238,6 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
 
   config->showSummary = args.hasArg(OPT_summary);
 
-  ScopedTimer t(Timer::root());
   // Handle --version, which is an lld extension. This option is a bit odd
   // because it doesn't start with "/", but we deliberately chose "--" to
   // avoid conflict with /version and for compatibility with clang-cl.
@@ -1586,9 +1657,11 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
       args.hasFlag(OPT_auto_import, OPT_auto_import_no, config->mingw);
   config->pseudoRelocs = args.hasFlag(
       OPT_runtime_pseudo_reloc, OPT_runtime_pseudo_reloc_no, config->mingw);
+  config->callGraphProfileSort = args.hasFlag(
+      OPT_call_graph_profile_sort, OPT_call_graph_profile_sort_no, true);
 
-  // Don't warn about long section names, such as .debug_info, for mingw or when
-  // -debug:dwarf is requested.
+  // Don't warn about long section names, such as .debug_info, for mingw or
+  // when -debug:dwarf is requested.
   if (config->mingw || config->debugDwarf)
     config->warnLongSectionNames = false;
 
@@ -1699,9 +1772,10 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
   config->wordsize = config->is64() ? 8 : 4;
 
   // Handle /safeseh, x86 only, on by default, except for mingw.
-  if (config->machine == I386 &&
-      args.hasFlag(OPT_safeseh, OPT_safeseh_no, !config->mingw))
-    config->safeSEH = true;
+  if (config->machine == I386) {
+    config->safeSEH = args.hasFlag(OPT_safeseh, OPT_safeseh_no, !config->mingw);
+    config->noSEH = args.hasArg(OPT_noseh);
+  }
 
   // Handle /functionpadmin
   for (auto *arg : args.filtered(OPT_functionpadmin, OPT_functionpadmin_opt))
@@ -2022,8 +2096,24 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
   // Handle /order. We want to do this at this moment because we
   // need a complete list of comdat sections to warn on nonexistent
   // functions.
-  if (auto *arg = args.getLastArg(OPT_order))
+  if (auto *arg = args.getLastArg(OPT_order)) {
+    if (args.hasArg(OPT_call_graph_ordering_file))
+      error("/order and /call-graph-order-file may not be used together");
     parseOrderFile(arg->getValue());
+    config->callGraphProfileSort = false;
+  }
+
+  // Handle /call-graph-ordering-file and /call-graph-profile-sort (default on).
+  if (config->callGraphProfileSort) {
+    if (auto *arg = args.getLastArg(OPT_call_graph_ordering_file)) {
+      parseCallGraphFile(arg->getValue());
+    }
+    readCallGraphsFromObjectFiles();
+  }
+
+  // Handle /print-symbol-order.
+  if (auto *arg = args.getLastArg(OPT_print_symbol_order))
+    config->printSymbolOrder = arg->getValue();
 
   // Identify unreferenced COMDAT sections.
   if (config->doGC)
@@ -2042,7 +2132,7 @@ void LinkerDriver::link(ArrayRef<const char *> argsArr) {
   writeResult();
 
   // Stop early so we can print the results.
-  Timer::root().stop();
+  rootTimer.stop();
   if (config->showTiming)
     Timer::root().print();
 }

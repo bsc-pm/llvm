@@ -664,6 +664,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(noreturn);
   KEYWORD(nosync);
   KEYWORD(nocf_check);
+  KEYWORD(noundef);
   KEYWORD(nounwind);
   KEYWORD(null_pointer_is_valid);
   KEYWORD(optforfuzzing);
@@ -696,6 +697,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(writeonly);
   KEYWORD(zeroext);
   KEYWORD(immarg);
+  KEYWORD(byref);
 
   KEYWORD(type);
   KEYWORD(opaque);
@@ -741,6 +743,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(name);
   KEYWORD(summaries);
   KEYWORD(flags);
+  KEYWORD(blockcount);
   KEYWORD(linkage);
   KEYWORD(notEligibleToImport);
   KEYWORD(live);
@@ -757,6 +760,8 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(alwaysInline);
   KEYWORD(calls);
   KEYWORD(callee);
+  KEYWORD(params);
+  KEYWORD(param);
   KEYWORD(hotness);
   KEYWORD(unknown);
   KEYWORD(hot);

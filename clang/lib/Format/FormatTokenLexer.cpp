@@ -22,13 +22,15 @@
 namespace clang {
 namespace format {
 
-FormatTokenLexer::FormatTokenLexer(const SourceManager &SourceMgr, FileID ID,
-                                   unsigned Column, const FormatStyle &Style,
-                                   encoding::Encoding Encoding)
+FormatTokenLexer::FormatTokenLexer(
+    const SourceManager &SourceMgr, FileID ID, unsigned Column,
+    const FormatStyle &Style, encoding::Encoding Encoding,
+    llvm::SpecificBumpPtrAllocator<FormatToken> &Allocator,
+    IdentifierTable &IdentTable)
     : FormatTok(nullptr), IsFirstToken(true), StateStack({LexerState::NORMAL}),
       Column(Column), TrailingWhitespace(0), SourceMgr(SourceMgr), ID(ID),
-      Style(Style), IdentTable(getFormattingLangOpts(Style)),
-      Keywords(IdentTable), Encoding(Encoding), FirstInLineIndex(0),
+      Style(Style), IdentTable(IdentTable), Keywords(IdentTable),
+      Encoding(Encoding), Allocator(Allocator), FirstInLineIndex(0),
       FormattingDisabled(false), MacroBlockBeginRegex(Style.MacroBlockBegin),
       MacroBlockEndRegex(Style.MacroBlockEnd) {
   Lex.reset(new Lexer(ID, SourceMgr.getBuffer(ID), SourceMgr,
@@ -37,12 +39,19 @@ FormatTokenLexer::FormatTokenLexer(const SourceManager &SourceMgr, FileID ID,
 
   for (const std::string &ForEachMacro : Style.ForEachMacros)
     Macros.insert({&IdentTable.get(ForEachMacro), TT_ForEachMacro});
+  for (const std::string &AttributeMacro : Style.AttributeMacros)
+    Macros.insert({&IdentTable.get(AttributeMacro), TT_AttributeMacro});
   for (const std::string &StatementMacro : Style.StatementMacros)
     Macros.insert({&IdentTable.get(StatementMacro), TT_StatementMacro});
   for (const std::string &TypenameMacro : Style.TypenameMacros)
     Macros.insert({&IdentTable.get(TypenameMacro), TT_TypenameMacro});
   for (const std::string &NamespaceMacro : Style.NamespaceMacros)
     Macros.insert({&IdentTable.get(NamespaceMacro), TT_NamespaceMacro});
+  for (const std::string &WhitespaceSensitiveMacro :
+       Style.WhitespaceSensitiveMacros) {
+    Macros.insert(
+        {&IdentTable.get(WhitespaceSensitiveMacro), TT_UntouchableMacroFunc});
+  }
 }
 
 ArrayRef<FormatToken *> FormatTokenLexer::lex() {
@@ -73,6 +82,10 @@ void FormatTokenLexer::tryMergePreviousTokens() {
   if (tryMergeConflictMarkers())
     return;
   if (tryMergeLessLess())
+    return;
+  if (tryMergeForEach())
+    return;
+  if (Style.isCpp() && tryTransformTryUsageForC())
     return;
 
   if (Style.isCSharp()) {
@@ -356,6 +369,48 @@ bool FormatTokenLexer::tryTransformCSharpForEach() {
 
   Identifier->setType(TT_ForEachMacro);
   Identifier->Tok.setKind(tok::kw_for);
+  return true;
+}
+
+bool FormatTokenLexer::tryMergeForEach() {
+  if (Tokens.size() < 2)
+    return false;
+  auto &For = *(Tokens.end() - 2);
+  auto &Each = *(Tokens.end() - 1);
+  if (!For->is(tok::kw_for))
+    return false;
+  if (!Each->is(tok::identifier))
+    return false;
+  if (Each->TokenText != "each")
+    return false;
+
+  For->setType(TT_ForEachMacro);
+  For->Tok.setKind(tok::kw_for);
+
+  For->TokenText = StringRef(For->TokenText.begin(),
+                             Each->TokenText.end() - For->TokenText.begin());
+  For->ColumnWidth += Each->ColumnWidth;
+  Tokens.erase(Tokens.end() - 1);
+  return true;
+}
+
+bool FormatTokenLexer::tryTransformTryUsageForC() {
+  if (Tokens.size() < 2)
+    return false;
+  auto &Try = *(Tokens.end() - 2);
+  if (!Try->is(tok::kw_try))
+    return false;
+  auto &Next = *(Tokens.end() - 1);
+  if (Next->isOneOf(tok::l_brace, tok::colon))
+    return false;
+
+  if (Tokens.size() > 2) {
+    auto &At = *(Tokens.end() - 3);
+    if (At->is(tok::at))
+      return false;
+  }
+
+  Try->Tok.setKind(tok::identifier);
   return true;
 }
 

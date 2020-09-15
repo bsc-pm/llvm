@@ -10,11 +10,12 @@
 ; CHECK-NEXT:      Dominator Tree Construction
 ; CHECK-NEXT:      Natural Loop Information
 ; CHECK-NEXT:      MVE gather/scatter lowering
-; CHECK-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:      Module Verifier
+; CHECK-NEXT:      Basic Alias Analysis (stateless AA impl)
 ; CHECK-NEXT:      Canonicalize natural loops
 ; CHECK-NEXT:      Scalar Evolution Analysis
 ; CHECK-NEXT:      Loop Pass Manager
+; CHECK-NEXT:        Canonicalize Freeze Instructions in Loops
 ; CHECK-NEXT:        Induction Variable Users
 ; CHECK-NEXT:        Loop Strength Reduction
 ; CHECK-NEXT:      Basic Alias Analysis (stateless AA impl)
@@ -169,6 +170,8 @@
 ; CHECK-NEXT:      Contiguously Lay Out Funclets
 ; CHECK-NEXT:      StackMap Liveness Analysis
 ; CHECK-NEXT:      Live DEBUG_VALUE analysis
+; CHECK-NEXT:    Machine Outliner
+; CHECK-NEXT:    FunctionPass Manager
 ; CHECK-NEXT:      MachineDominator Tree Construction
 ; CHECK-NEXT:      ARM constant island placement and branch shortening pass
 ; CHECK-NEXT:      MachineDominator Tree Construction

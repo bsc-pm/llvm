@@ -58,6 +58,7 @@ enum NodeType {
   /// of the extension
   AssertSext,
   AssertZext,
+  AssertAlign,
 
   /// Various leaf nodes.
   BasicBlock,
@@ -309,6 +310,16 @@ enum NodeType {
   SSUBSAT,
   USUBSAT,
 
+  /// RESULT = [US]SHLSAT(LHS, RHS) - Perform saturation left shift. The first
+  /// operand is the value to be shifted, and the second argument is the amount
+  /// to shift by. Both must be integers of the same bit width (W). If the true
+  /// value of LHS << RHS exceeds the largest value that can be represented by
+  /// W bits, the resulting value is this maximum value, Otherwise, if this
+  /// value is less than the smallest value that can be represented by W bits,
+  /// the resulting value is this minimum value.
+  SSHLSAT,
+  USHLSAT,
+
   /// RESULT = [US]MULFIX(LHS, RHS, SCALE) - Perform fixed point multiplication
   /// on
   /// 2 integers with the same width and scale. SCALE represents the scale of
@@ -376,6 +387,7 @@ enum NodeType {
   STRICT_FCEIL,
   STRICT_FFLOOR,
   STRICT_FROUND,
+  STRICT_FROUNDEVEN,
   STRICT_FTRUNC,
   STRICT_LROUND,
   STRICT_LLROUND,
@@ -445,44 +457,68 @@ enum NodeType {
   /// Returns platform specific canonical encoding of a floating point number.
   FCANONICALIZE,
 
-  /// BUILD_VECTOR(ELT0, ELT1, ELT2, ELT3,...) - Return a vector with the
-  /// specified, possibly variable, elements.  The number of elements is
-  /// required to be a power of two.  The types of the operands must all be
-  /// the same and must match the vector element type, except that integer
-  /// types are allowed to be larger than the element type, in which case
-  /// the operands are implicitly truncated.
+  /// BUILD_VECTOR(ELT0, ELT1, ELT2, ELT3,...) - Return a fixed-width vector
+  /// with the specified, possibly variable, elements. The types of the
+  /// operands must match the vector element type, except that integer types
+  /// are allowed to be larger than the element type, in which case the
+  /// operands are implicitly truncated. The types of the operands must all
+  /// be the same.
   BUILD_VECTOR,
 
   /// INSERT_VECTOR_ELT(VECTOR, VAL, IDX) - Returns VECTOR with the element
-  /// at IDX replaced with VAL.  If the type of VAL is larger than the vector
+  /// at IDX replaced with VAL. If the type of VAL is larger than the vector
   /// element type then VAL is truncated before replacement.
+  ///
+  /// If VECTOR is a scalable vector, then IDX may be larger than the minimum
+  /// vector width. IDX is not first scaled by the runtime scaling factor of
+  /// VECTOR.
   INSERT_VECTOR_ELT,
 
   /// EXTRACT_VECTOR_ELT(VECTOR, IDX) - Returns a single element from VECTOR
-  /// identified by the (potentially variable) element number IDX.  If the
-  /// return type is an integer type larger than the element type of the
-  /// vector, the result is extended to the width of the return type. In
-  /// that case, the high bits are undefined.
+  /// identified by the (potentially variable) element number IDX. If the return
+  /// type is an integer type larger than the element type of the vector, the
+  /// result is extended to the width of the return type. In that case, the high
+  /// bits are undefined.
+  ///
+  /// If VECTOR is a scalable vector, then IDX may be larger than the minimum
+  /// vector width. IDX is not first scaled by the runtime scaling factor of
+  /// VECTOR.
   EXTRACT_VECTOR_ELT,
 
   /// CONCAT_VECTORS(VECTOR0, VECTOR1, ...) - Given a number of values of
   /// vector type with the same length and element type, this produces a
   /// concatenated vector result value, with length equal to the sum of the
-  /// lengths of the input vectors.
+  /// lengths of the input vectors. If VECTOR0 is a fixed-width vector, then
+  /// VECTOR1..VECTORN must all be fixed-width vectors. Similarly, if VECTOR0
+  /// is a scalable vector, then VECTOR1..VECTORN must all be scalable vectors.
   CONCAT_VECTORS,
 
-  /// INSERT_SUBVECTOR(VECTOR1, VECTOR2, IDX) - Returns a vector
-  /// with VECTOR2 inserted into VECTOR1 at the constant element number
-  /// IDX, which must be a multiple of the VECTOR2 vector length. The
-  /// elements of VECTOR1 starting at IDX are overwritten with VECTOR2.
-  /// Elements IDX through vector_length(VECTOR2) must be valid VECTOR1
-  /// indices.
+  /// INSERT_SUBVECTOR(VECTOR1, VECTOR2, IDX) - Returns a vector with VECTOR2
+  /// inserted into VECTOR1. IDX represents the starting element number at which
+  /// VECTOR2 will be inserted. IDX must be a constant multiple of T's known
+  /// minimum vector length. Let the type of VECTOR2 be T, then if T is a
+  /// scalable vector, IDX is first scaled by the runtime scaling factor of T.
+  /// The elements of VECTOR1 starting at IDX are overwritten with VECTOR2.
+  /// Elements IDX through (IDX + num_elements(T) - 1) must be valid VECTOR1
+  /// indices. If this condition cannot be determined statically but is false at
+  /// runtime, then the result vector is undefined.
+  ///
+  /// This operation supports inserting a fixed-width vector into a scalable
+  /// vector, but not the other way around.
   INSERT_SUBVECTOR,
 
-  /// EXTRACT_SUBVECTOR(VECTOR, IDX) - Returns a subvector from VECTOR (an
-  /// vector value) starting with the constant element number IDX, which
-  /// must be a multiple of the result vector length. Elements IDX through
-  /// vector_length(VECTOR) must be valid VECTOR indices.
+  /// EXTRACT_SUBVECTOR(VECTOR, IDX) - Returns a subvector from VECTOR.
+  /// Let the result type be T, then IDX represents the starting element number
+  /// from which a subvector of type T is extracted. IDX must be a constant
+  /// multiple of T's known minimum vector length. If T is a scalable vector,
+  /// IDX is first scaled by the runtime scaling factor of T. Elements IDX
+  /// through (IDX + num_elements(T) - 1) must be valid VECTOR indices. If this
+  /// condition cannot be determined statically but is false at runtime, then
+  /// the result vector is undefined. The IDX parameter must be a vector index
+  /// constant type, which for most targets will be an integer pointer type.
+  ///
+  /// This operation supports extracting a fixed-width vector from a scalable
+  /// vector, but not the other way around.
   EXTRACT_SUBVECTOR,
 
   /// VECTOR_SHUFFLE(VEC1, VEC2) - Returns a vector, of the same type as
@@ -562,6 +598,7 @@ enum NodeType {
   CTLZ,
   CTPOP,
   BITREVERSE,
+  PARITY,
 
   /// Bit counting operators with an undefined result for zero inputs.
   CTTZ_ZERO_UNDEF,
@@ -752,6 +789,7 @@ enum NodeType {
   FRINT,
   FNEARBYINT,
   FROUND,
+  FROUNDEVEN,
   FFLOOR,
   LROUND,
   LLROUND,
@@ -844,7 +882,7 @@ enum NodeType {
   /// SDOperands.
   INLINEASM,
 
-  /// INLINEASM_BR - Terminator version of inline asm. Used by asm-goto.
+  /// INLINEASM_BR - Branching version of inline asm. Used by asm-goto.
   INLINEASM_BR,
 
   /// EH_LABEL - Represents a label in mid basic block used to track
@@ -905,6 +943,13 @@ enum NodeType {
   /// pointer, and a SRCVALUE.
   VAEND,
   VASTART,
+
+  // PREALLOCATED_SETUP - This has 2 operands: an input chain and a SRCVALUE
+  // with the preallocated call Value.
+  PREALLOCATED_SETUP,
+  // PREALLOCATED_ARG - This has 3 operands: an input chain, a SRCVALUE
+  // with the preallocated call Value, and a constant int.
+  PREALLOCATED_ARG,
 
   /// SRCVALUE - This is a node type that holds a Value* that is used to
   /// make reference to a value in the LLVM IR.

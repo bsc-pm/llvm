@@ -46,7 +46,7 @@ define <2 x i1> @shuf2i1_1_2(<2 x i1> %a) {
 ; AVX512F-NEXT:    vpsllq $63, %xmm0, %xmm0
 ; AVX512F-NEXT:    vptestmq %zmm0, %zmm0, %k1
 ; AVX512F-NEXT:    vpternlogq $255, %zmm0, %zmm0, %zmm0 {%k1} {z}
-; AVX512F-NEXT:    vpcmpeqd %xmm1, %xmm1, %xmm1
+; AVX512F-NEXT:    vmovdqa {{.*#+}} xmm1 = [18446744073709551615,0]
 ; AVX512F-NEXT:    vpalignr {{.*#+}} xmm0 = xmm0[8,9,10,11,12,13,14,15],xmm1[0,1,2,3,4,5,6,7]
 ; AVX512F-NEXT:    vptestmq %zmm0, %zmm0, %k1
 ; AVX512F-NEXT:    vpternlogq $255, %zmm0, %zmm0, %zmm0 {%k1} {z}
@@ -60,8 +60,7 @@ define <2 x i1> @shuf2i1_1_2(<2 x i1> %a) {
 ; AVX512VL-NEXT:    vptestmq %xmm0, %xmm0, %k1
 ; AVX512VL-NEXT:    vpcmpeqd %xmm0, %xmm0, %xmm0
 ; AVX512VL-NEXT:    vmovdqa64 %xmm0, %xmm1 {%k1} {z}
-; AVX512VL-NEXT:    movq $-1, %rax
-; AVX512VL-NEXT:    vmovq %rax, %xmm2
+; AVX512VL-NEXT:    vmovdqa {{.*#+}} xmm2 = [18446744073709551615,0]
 ; AVX512VL-NEXT:    vpalignr {{.*#+}} xmm1 = xmm1[8,9,10,11,12,13,14,15],xmm2[0,1,2,3,4,5,6,7]
 ; AVX512VL-NEXT:    vptestmq %xmm1, %xmm1, %k1
 ; AVX512VL-NEXT:    vmovdqa64 %xmm0, %xmm0 {%k1} {z}
@@ -71,10 +70,9 @@ define <2 x i1> @shuf2i1_1_2(<2 x i1> %a) {
 ; VL_BW_DQ:       # %bb.0:
 ; VL_BW_DQ-NEXT:    vpsllq $63, %xmm0, %xmm0
 ; VL_BW_DQ-NEXT:    vpmovq2m %xmm0, %k0
-; VL_BW_DQ-NEXT:    movq $-1, %rax
-; VL_BW_DQ-NEXT:    vmovq %rax, %xmm0
-; VL_BW_DQ-NEXT:    vpmovm2q %k0, %xmm1
-; VL_BW_DQ-NEXT:    vpalignr {{.*#+}} xmm0 = xmm1[8,9,10,11,12,13,14,15],xmm0[0,1,2,3,4,5,6,7]
+; VL_BW_DQ-NEXT:    vpmovm2q %k0, %xmm0
+; VL_BW_DQ-NEXT:    vmovdqa {{.*#+}} xmm1 = [18446744073709551615,0]
+; VL_BW_DQ-NEXT:    vpalignr {{.*#+}} xmm0 = xmm0[8,9,10,11,12,13,14,15],xmm1[0,1,2,3,4,5,6,7]
 ; VL_BW_DQ-NEXT:    vpmovq2m %xmm0, %k0
 ; VL_BW_DQ-NEXT:    vpmovm2q %k0, %xmm0
 ; VL_BW_DQ-NEXT:    retq
@@ -723,7 +721,7 @@ define i8 @shuf8i1__9_6_1_10_3_7_7_1(i8 %a) {
 ; AVX512VL-NEXT:    kmovw %edi, %k1
 ; AVX512VL-NEXT:    vpcmpeqd %ymm0, %ymm0, %ymm0
 ; AVX512VL-NEXT:    vmovdqa32 %ymm0, %ymm0 {%k1} {z}
-; AVX512VL-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[1,1,2,3]
+; AVX512VL-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[1,1,1,1]
 ; AVX512VL-NEXT:    vpblendd {{.*#+}} ymm0 = ymm0[0],mem[1,2,3,4,5,6,7]
 ; AVX512VL-NEXT:    vptestmd %ymm0, %ymm0, %k0
 ; AVX512VL-NEXT:    kmovw %k0, %eax
@@ -735,7 +733,7 @@ define i8 @shuf8i1__9_6_1_10_3_7_7_1(i8 %a) {
 ; VL_BW_DQ:       # %bb.0:
 ; VL_BW_DQ-NEXT:    kmovd %edi, %k0
 ; VL_BW_DQ-NEXT:    vpmovm2d %k0, %ymm0
-; VL_BW_DQ-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[1,1,2,3]
+; VL_BW_DQ-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[1,1,1,1]
 ; VL_BW_DQ-NEXT:    vpblendd {{.*#+}} ymm0 = ymm0[0],mem[1,2,3,4,5,6,7]
 ; VL_BW_DQ-NEXT:    vpmovd2m %ymm0, %k0
 ; VL_BW_DQ-NEXT:    kmovd %k0, %eax
@@ -796,7 +794,6 @@ define i8 @shuf8i1_9_6_1_10_3_7_7_0_all_ones(<8 x i1> %a) {
   %c1 = bitcast <8 x i1>%c to i8
   ret i8 %c1
 }
-
 
 define i16 @shuf16i1_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0(i16 %a) {
 ; AVX512F-LABEL: shuf16i1_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0_0:

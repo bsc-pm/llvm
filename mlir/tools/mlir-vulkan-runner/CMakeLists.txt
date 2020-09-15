@@ -38,9 +38,14 @@ if (MLIR_VULKAN_RUNNER_ENABLED)
     VulkanRuntime.cpp
   )
 
+  target_include_directories(vulkan-runtime-wrappers
+    PUBLIC
+    ${Vulkan_INCLUDE_DIR}
+  )
+
   # *IMPORTANT*: This library cannot depend on LLVM libraries. Otherwise,
   # it may cause LLVM version conflict when used together with other shared
-  # libraries depending on LLVM. Notably, Mesa, who implemnents Vulkan
+  # libraries depending on LLVM. Notably, Mesa, who implements Vulkan
   # drivers on Linux, depends on the system libLLVM.so.
   target_link_libraries(vulkan-runtime-wrappers
     PUBLIC

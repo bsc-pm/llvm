@@ -1010,6 +1010,7 @@ static unsigned getFixupKindContainerSizeBytes(unsigned Kind) {
   case ARM::fixup_t2_condbranch:
   case ARM::fixup_t2_uncondbranch:
   case ARM::fixup_t2_pcrel_10:
+  case ARM::fixup_t2_pcrel_9:
   case ARM::fixup_t2_adr_pcrel_12:
   case ARM::fixup_arm_thumb_bl:
   case ARM::fixup_arm_thumb_blx:
@@ -1118,11 +1119,11 @@ uint32_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
     const MCCFIInstruction &Inst = Instrs[i];
     switch (Inst.getOperation()) {
     case MCCFIInstruction::OpDefCfa: // DW_CFA_def_cfa
-      CFARegisterOffset = -Inst.getOffset();
+      CFARegisterOffset = Inst.getOffset();
       CFARegister = *MRI.getLLVMRegNum(Inst.getRegister(), true);
       break;
     case MCCFIInstruction::OpDefCfaOffset: // DW_CFA_def_cfa_offset
-      CFARegisterOffset = -Inst.getOffset();
+      CFARegisterOffset = Inst.getOffset();
       break;
     case MCCFIInstruction::OpDefCfaRegister: // DW_CFA_def_cfa_register
       CFARegister = *MRI.getLLVMRegNum(Inst.getRegister(), true);

@@ -53,13 +53,12 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
   FlatWorkGroupSizes = ST.getFlatWorkGroupSizes(F);
   WavesPerEU = ST.getWavesPerEU(F);
 
-  Occupancy = ST.computeOccupancy(MF, getLDSSize());
+  Occupancy = ST.computeOccupancy(F, getLDSSize());
   CallingConv::ID CC = F.getCallingConv();
-  const MachineFrameInfo &FrameInfo = MF.getFrameInfo();
 
   // FIXME: Should have analysis or something rather than attribute to detect
   // calls.
-  const bool HasCalls = FrameInfo.hasCalls() || F.hasFnAttribute("amdgpu-calls");
+  const bool HasCalls = F.hasFnAttribute("amdgpu-calls");
 
   // Enable all kernel inputs if we have the fixed ABI. Don't bother if we don't
   // have any calls.
@@ -125,8 +124,7 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
       WorkItemIDZ = true;
   }
 
-  bool HasStackObjects = FrameInfo.hasStackObjects();
-
+  bool HasStackObjects = F.hasFnAttribute("amdgpu-stack-objects");
   if (isEntryFunction()) {
     // X, XY, and XYZ are the only supported combinations, so make sure Y is
     // enabled if Z is.
@@ -170,20 +168,10 @@ SIMachineFunctionInfo::SIMachineFunctionInfo(const MachineFunction &MF)
     KernargSegmentPtr = true;
 
   if (ST.hasFlatAddressSpace() && isEntryFunction() && isAmdHsaOrMesa) {
-    auto hasNonSpillStackObjects = [&]() {
-      // Avoid expensive checking if there's no stack objects.
-      if (!HasStackObjects)
-        return false;
-      for (auto OI = FrameInfo.getObjectIndexBegin(),
-                OE = FrameInfo.getObjectIndexEnd(); OI != OE; ++OI)
-        if (!FrameInfo.isSpillSlotObjectIndex(OI))
-          return true;
-      // All stack objects are spill slots.
-      return false;
-    };
     // TODO: This could be refined a lot. The attribute is a poor way of
-    // detecting calls that may require it before argument lowering.
-    if (HasCalls || hasNonSpillStackObjects())
+    // detecting calls or stack objects that may require it before argument
+    // lowering.
+    if (HasCalls || HasStackObjects)
       FlatScratchInit = true;
   }
 
@@ -299,20 +287,32 @@ bool SIMachineFunctionInfo::allocateSGPRSpillToVGPR(MachineFunction &MF,
   SIMachineFunctionInfo *FuncInfo = MF.getInfo<SIMachineFunctionInfo>();
 
   unsigned Size = FrameInfo.getObjectSize(FI);
-  assert(Size >= 4 && Size <= 64 && "invalid sgpr spill size");
-  assert(TRI->spillSGPRToVGPR() && "not spilling SGPRs to VGPRs");
+  unsigned NumLanes = Size / 4;
 
-  int NumLanes = Size / 4;
+  if (NumLanes > WaveSize)
+    return false;
+
+  assert(Size >= 4 && "invalid sgpr spill size");
+  assert(TRI->spillSGPRToVGPR() && "not spilling SGPRs to VGPRs");
 
   const MCPhysReg *CSRegs = MRI.getCalleeSavedRegs();
 
   // Make sure to handle the case where a wide SGPR spill may span between two
   // VGPRs.
-  for (int I = 0; I < NumLanes; ++I, ++NumVGPRSpillLanes) {
+  for (unsigned I = 0; I < NumLanes; ++I, ++NumVGPRSpillLanes) {
     Register LaneVGPR;
     unsigned VGPRIndex = (NumVGPRSpillLanes % WaveSize);
 
-    if (VGPRIndex == 0 && !FuncInfo->VGPRReservedForSGPRSpill) {
+    // Reserve a VGPR (when NumVGPRSpillLanes = 0, WaveSize, 2*WaveSize, ..) and
+    // when one of the two conditions is true:
+    // 1. One reserved VGPR being tracked by VGPRReservedForSGPRSpill is not yet
+    // reserved.
+    // 2. All spill lanes of reserved VGPR(s) are full and another spill lane is
+    // required.
+    if (FuncInfo->VGPRReservedForSGPRSpill && NumVGPRSpillLanes < WaveSize) {
+      assert(FuncInfo->VGPRReservedForSGPRSpill == SpillVGPRs.back().VGPR);
+      LaneVGPR = FuncInfo->VGPRReservedForSGPRSpill;
+    } else if (VGPRIndex == 0) {
       LaneVGPR = TRI->findUnusedRegister(MRI, &AMDGPU::VGPR_32RegClass, MF);
       if (LaneVGPR == AMDGPU::NoRegister) {
         // We have no VGPRs left for spilling SGPRs. Reset because we will not
@@ -537,21 +537,20 @@ convertArgumentInfo(const AMDGPUFunctionArgInfo &ArgInfo,
 }
 
 yaml::SIMachineFunctionInfo::SIMachineFunctionInfo(
-  const llvm::SIMachineFunctionInfo& MFI,
-  const TargetRegisterInfo &TRI)
-  : ExplicitKernArgSize(MFI.getExplicitKernArgSize()),
-    MaxKernArgAlign(MFI.getMaxKernArgAlign()),
-    LDSSize(MFI.getLDSSize()),
-    IsEntryFunction(MFI.isEntryFunction()),
-    NoSignedZerosFPMath(MFI.hasNoSignedZerosFPMath()),
-    MemoryBound(MFI.isMemoryBound()),
-    WaveLimiter(MFI.needsWaveLimiter()),
-    HighBitsOf32BitAddress(MFI.get32BitAddressHighBits()),
-    ScratchRSrcReg(regToString(MFI.getScratchRSrcReg(), TRI)),
-    FrameOffsetReg(regToString(MFI.getFrameOffsetReg(), TRI)),
-    StackPtrOffsetReg(regToString(MFI.getStackPtrOffsetReg(), TRI)),
-    ArgInfo(convertArgumentInfo(MFI.getArgInfo(), TRI)),
-    Mode(MFI.getMode()) {}
+    const llvm::SIMachineFunctionInfo &MFI, const TargetRegisterInfo &TRI)
+    : ExplicitKernArgSize(MFI.getExplicitKernArgSize()),
+      MaxKernArgAlign(MFI.getMaxKernArgAlign()), LDSSize(MFI.getLDSSize()),
+      DynLDSAlign(MFI.getDynLDSAlign()), IsEntryFunction(MFI.isEntryFunction()),
+      NoSignedZerosFPMath(MFI.hasNoSignedZerosFPMath()),
+      MemoryBound(MFI.isMemoryBound()), WaveLimiter(MFI.needsWaveLimiter()),
+      HasSpilledSGPRs(MFI.hasSpilledSGPRs()),
+      HasSpilledVGPRs(MFI.hasSpilledVGPRs()),
+      HighBitsOf32BitAddress(MFI.get32BitAddressHighBits()),
+      ScratchRSrcReg(regToString(MFI.getScratchRSrcReg(), TRI)),
+      FrameOffsetReg(regToString(MFI.getFrameOffsetReg(), TRI)),
+      StackPtrOffsetReg(regToString(MFI.getStackPtrOffsetReg(), TRI)),
+      ArgInfo(convertArgumentInfo(MFI.getArgInfo(), TRI)), Mode(MFI.getMode()) {
+}
 
 void yaml::SIMachineFunctionInfo::mappingImpl(yaml::IO &YamlIO) {
   MappingTraits<SIMachineFunctionInfo>::mapping(YamlIO, *this);
@@ -562,11 +561,14 @@ bool SIMachineFunctionInfo::initializeBaseYamlFields(
   ExplicitKernArgSize = YamlMFI.ExplicitKernArgSize;
   MaxKernArgAlign = assumeAligned(YamlMFI.MaxKernArgAlign);
   LDSSize = YamlMFI.LDSSize;
+  DynLDSAlign = YamlMFI.DynLDSAlign;
   HighBitsOf32BitAddress = YamlMFI.HighBitsOf32BitAddress;
   IsEntryFunction = YamlMFI.IsEntryFunction;
   NoSignedZerosFPMath = YamlMFI.NoSignedZerosFPMath;
   MemoryBound = YamlMFI.MemoryBound;
   WaveLimiter = YamlMFI.WaveLimiter;
+  HasSpilledSGPRs = YamlMFI.HasSpilledSGPRs;
+  HasSpilledVGPRs = YamlMFI.HasSpilledVGPRs;
   return false;
 }
 

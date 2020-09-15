@@ -1589,14 +1589,14 @@ bool OmpSsIterationSpaceChecker::setStep(Expr *NewStep, bool Subtract) {
     //  loop. If test-expr is of form b relational-op var and relational-op is
     //  > or >= then incr-expr must cause var to increase on each iteration of
     //  the loop.
-    llvm::APSInt Result;
-    bool IsConstant = NewStep->isIntegerConstantExpr(Result, SemaRef.Context);
+    Optional<llvm::APSInt> Result =
+        NewStep->getIntegerConstantExpr(SemaRef.Context);
     bool IsUnsigned = !NewStep->getType()->hasSignedIntegerRepresentation();
     bool IsConstNeg =
-        IsConstant && Result.isSigned() && (Subtract != Result.isNegative());
+        Result && Result->isSigned() && (Subtract != Result->isNegative());
     bool IsConstPos =
-        IsConstant && Result.isSigned() && (Subtract == Result.isNegative());
-    bool IsConstZero = IsConstant && !Result.getBoolValue();
+        Result && Result->isSigned() && (Subtract == Result->isNegative());
+    bool IsConstZero = Result && !Result->getBoolValue();
 
     if (UB && (IsConstZero ||
                (TestIsLessOp.getValue() ?
@@ -3584,15 +3584,16 @@ ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
 
   ValExpr = Res.get();
   // The expression must evaluate to a non-negative integer value.
-  llvm::APSInt Result;
-  if (ValExpr->isIntegerConstantExpr(Result, Context) &&
-      Result.isSigned() &&
-      !((!StrictlyPositive && Result.isNonNegative()) ||
-        (StrictlyPositive && Result.isStrictlyPositive()))) {
-    Diag(ValExpr->getExprLoc(), diag::err_oss_negative_expression_in_clause)
-        << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
-        << ValExpr->getSourceRange();
-    return ExprError();
+  if (Optional<llvm::APSInt> Result =
+          ValExpr->getIntegerConstantExpr(Context)) {
+    if (Result->isSigned() &&
+        !((!StrictlyPositive && Result->isNonNegative()) ||
+          (StrictlyPositive && Result->isStrictlyPositive()))) {
+      Diag(ValExpr->getExprLoc(), diag::err_oss_negative_expression_in_clause)
+          << getOmpSsClauseName(CKind) << (StrictlyPositive ? 1 : 0)
+          << ValExpr->getSourceRange();
+      return ExprError();
+    }
   }
   return ValExpr;
 }

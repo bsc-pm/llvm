@@ -311,6 +311,8 @@ enum {
   EM_RISCV = 243,         // RISC-V
   EM_LANAI = 244,         // Lanai 32-bit processor
   EM_BPF = 247,           // Linux kernel bpf virtual machine
+  EM_VE = 251,            // NEC SX-Aurora VE
+  EM_CSKY = 252,          // C-SKY 32-bit processor
 };
 
 // Object file classes.
@@ -705,6 +707,8 @@ enum : unsigned {
   EF_AMDGPU_MACH_AMDGCN_GFX1010 = 0x033,
   EF_AMDGPU_MACH_AMDGCN_GFX1011 = 0x034,
   EF_AMDGPU_MACH_AMDGCN_GFX1012 = 0x035,
+  EF_AMDGPU_MACH_AMDGCN_GFX1030 = 0x036,
+  EF_AMDGPU_MACH_AMDGCN_GFX1031 = 0x037,
 
   // Reserved for AMDGCN-based processors.
   EF_AMDGPU_MACH_AMDGCN_RESERVED0 = 0x027,
@@ -712,7 +716,7 @@ enum : unsigned {
 
   // First/last AMDGCN-based processors.
   EF_AMDGPU_MACH_AMDGCN_FIRST = EF_AMDGPU_MACH_AMDGCN_GFX600,
-  EF_AMDGPU_MACH_AMDGCN_LAST = EF_AMDGPU_MACH_AMDGCN_GFX1012,
+  EF_AMDGPU_MACH_AMDGCN_LAST = EF_AMDGPU_MACH_AMDGCN_GFX1031,
 
   // Indicates if the "xnack" target feature is enabled for all code contained
   // in the object.
@@ -762,6 +766,17 @@ enum : unsigned {
 // ELF Relocation types for MSP430
 enum {
 #include "ELFRelocs/MSP430.def"
+};
+
+// ELF Relocation type for VE.
+enum {
+#include "ELFRelocs/VE.def"
+};
+
+
+// ELF Relocation types for CSKY
+enum {
+#include "ELFRelocs/CSKY.def"
 };
 
 #undef ELF_RELOC
@@ -1290,7 +1305,8 @@ enum {
   DF_1_NORELOC = 0x00400000,
   DF_1_SYMINTPOSE = 0x00800000, // Object has individual interposers.
   DF_1_GLOBAUDIT = 0x01000000,  // Global auditing required.
-  DF_1_SINGLETON = 0x02000000   // Singleton symbols are used.
+  DF_1_SINGLETON = 0x02000000,  // Singleton symbols are used.
+  DF_1_PIE = 0x08000000,        // Object is a position-independent executable.
 };
 
 // DT_MIPS_FLAGS values.

@@ -22,9 +22,12 @@
 #include "clang/AST/LocInfoType.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/AST/TypeVisitor.h"
 
 namespace clang {
+
+class APValue;
 
 /**
 
@@ -51,6 +54,7 @@ struct {
   void Visit(const OSSClause *C);
   void Visit(const BlockDecl::Capture &C);
   void Visit(const GenericSelectionExpr::ConstAssociation &A);
+  void Visit(const APValue &Value, QualType Ty);
 };
 */
 template <typename Derived, typename NodeDelegateType>
@@ -221,6 +225,10 @@ public:
     });
   }
 
+  void Visit(const APValue &Value, QualType Ty) {
+    getNodeDelegate().AddChild([=] { getNodeDelegate().Visit(Value, Ty); });
+  }
+
   void Visit(const comments::Comment *C, const comments::FullComment *FC) {
     getNodeDelegate().AddChild([=] {
       getNodeDelegate().Visit(C, FC);
@@ -364,8 +372,6 @@ public:
   void VisitTemplateSpecializationType(const TemplateSpecializationType *T) {
     for (const auto &Arg : *T)
       Visit(Arg);
-    if (T->isTypeAlias())
-      Visit(T->getAliasedType());
   }
   void VisitObjCObjectPointerType(const ObjCObjectPointerType *T) {
     Visit(T->getPointeeType());
@@ -556,9 +562,7 @@ public:
 
   void VisitTemplateTypeParmDecl(const TemplateTypeParmDecl *D) {
     if (const auto *TC = D->getTypeConstraint())
-      if (TC->hasExplicitTemplateArgs())
-        for (const auto &ArgLoc : TC->getTemplateArgsAsWritten()->arguments())
-          dumpTemplateArgumentLoc(ArgLoc);
+      Visit(TC->getImmediatelyDeclaredConstraint());
     if (D->hasDefaultArgument())
       Visit(D->getDefaultArgument(), SourceRange(),
             D->getDefaultArgStorage().getInheritedFrom(),
@@ -585,6 +589,12 @@ public:
   void VisitConceptDecl(const ConceptDecl *D) {
     dumpTemplateParameters(D->getTemplateParameters());
     Visit(D->getConstraintExpr());
+  }
+
+  void VisitConceptSpecializationExpr(const ConceptSpecializationExpr *CSE) {
+    if (CSE->hasExplicitTemplateArgs())
+      for (const auto &ArgLoc : CSE->getTemplateArgsAsWritten()->arguments())
+        dumpTemplateArgumentLoc(ArgLoc);
   }
 
   void VisitUsingShadowDecl(const UsingShadowDecl *D) {
@@ -707,6 +717,15 @@ public:
         Visit(A);
   }
 
+  void VisitSubstNonTypeTemplateParmExpr(const SubstNonTypeTemplateParmExpr *E) {
+    Visit(E->getParameter());
+  }
+  void VisitSubstNonTypeTemplateParmPackExpr(
+      const SubstNonTypeTemplateParmPackExpr *E) {
+    Visit(E->getParameterPack());
+    Visit(E->getArgumentPack());
+  }
+
   void VisitObjCAtCatchStmt(const ObjCAtCatchStmt *Node) {
     if (const VarDecl *CatchParam = Node->getCatchParamDecl())
       Visit(CatchParam);
@@ -715,6 +734,11 @@ public:
   void VisitExpressionTemplateArgument(const TemplateArgument &TA) {
     Visit(TA.getAsExpr());
   }
+
+  void VisitTypeTemplateArgument(const TemplateArgument &TA) {
+    Visit(TA.getAsType());
+  }
+
   void VisitPackTemplateArgument(const TemplateArgument &TA) {
     for (const auto &TArg : TA.pack_elements())
       Visit(TArg);

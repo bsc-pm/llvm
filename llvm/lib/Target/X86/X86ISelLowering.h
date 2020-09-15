@@ -384,8 +384,10 @@ namespace llvm {
     /// Vector comparison generating mask bits for fp and
     /// integer signed and unsigned data types.
     CMPM,
-    // Vector comparison with SAE for FP values
-    CMPM_SAE,
+    // Vector mask comparison generating mask bits for FP values.
+    CMPMM,
+    // Vector mask comparison with SAE for FP values.
+    CMPMM_SAE,
 
     // Arithmetic operations with FLAGS results.
     ADD,
@@ -747,6 +749,9 @@ namespace llvm {
     STRICT_CVTPS2PH,
     STRICT_CVTPH2PS,
 
+    // Mwaitx builtin is lowered to this if the base pointer needs saving.
+    MWAITX_DAG,
+
     // Compare and swap.
     LCMPXCHG_DAG = ISD::FIRST_TARGET_MEMORY_OPCODE,
     LCMPXCHG8_DAG,
@@ -935,17 +940,13 @@ namespace llvm {
     /// and some i16 instructions are slow.
     bool IsDesirableToPromoteOp(SDValue Op, EVT &PVT) const override;
 
-    /// Returns whether computing the negated form of the specified expression
-    /// is more expensive, the same cost or cheaper.
-    NegatibleCost getNegatibleCost(SDValue Op, SelectionDAG &DAG,
-                                   bool LegalOperations, bool ForCodeSize,
-                                   unsigned Depth) const override;
-
-    /// If getNegatibleCost returns Neutral/Cheaper, return the newly negated
-    /// expression.
-    SDValue negateExpression(SDValue Op, SelectionDAG &DAG,
-                             bool LegalOperations, bool ForCodeSize,
-                             unsigned Depth) const override;
+    /// Return the newly negated expression if the cost is not expensive and
+    /// set the cost in \p Cost to indicate that if it is cheaper or neutral to
+    /// do the negation.
+    SDValue getNegatedExpression(SDValue Op, SelectionDAG &DAG,
+                                 bool LegalOperations, bool ForCodeSize,
+                                 NegatibleCost &Cost,
+                                 unsigned Depth) const override;
 
     MachineBasicBlock *
     EmitInstrWithCustomInserter(MachineInstr &MI,
@@ -1040,7 +1041,8 @@ namespace llvm {
     EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
                            EVT VT) const override;
 
-    bool targetShrinkDemandedConstant(SDValue Op, const APInt &Demanded,
+    bool targetShrinkDemandedConstant(SDValue Op, const APInt &DemandedBits,
+                                      const APInt &DemandedElts,
                                       TargetLoweringOpt &TLO) const override;
 
     /// Determine which of the bits specified in Mask are known to be either
@@ -1063,6 +1065,12 @@ namespace llvm {
                                                  APInt &KnownZero,
                                                  TargetLoweringOpt &TLO,
                                                  unsigned Depth) const override;
+
+    bool SimplifyDemandedVectorEltsForTargetShuffle(SDValue Op,
+                                                    const APInt &DemandedElts,
+                                                    unsigned MaskIndex,
+                                                    TargetLoweringOpt &TLO,
+                                                    unsigned Depth) const;
 
     bool SimplifyDemandedBitsForTargetNode(SDValue Op,
                                            const APInt &DemandedBits,
@@ -1113,7 +1121,8 @@ namespace llvm {
     }
 
     /// Handle Lowering flag assembly outputs.
-    SDValue LowerAsmOutputForConstraint(SDValue &Chain, SDValue &Flag, SDLoc DL,
+    SDValue LowerAsmOutputForConstraint(SDValue &Chain, SDValue &Flag,
+                                        const SDLoc &DL,
                                         const AsmOperandInfo &Constraint,
                                         SelectionDAG &DAG) const override;
 
@@ -1185,6 +1194,7 @@ namespace llvm {
 
     bool shouldSinkOperands(Instruction *I,
                             SmallVectorImpl<Use *> &Ops) const override;
+    bool shouldConvertPhiType(Type *From, Type *To) const override;
 
     /// Return true if folding a vector load into ExtVal (a sign, zero, or any
     /// extend node) is profitable.
@@ -1345,8 +1355,6 @@ namespace llvm {
                                           Align Alignment,
                                           SelectionDAG &DAG) const;
 
-    bool isNoopAddrSpaceCast(unsigned SrcAS, unsigned DestAS) const override;
-
     /// Customize the preferred legalization strategy for certain types.
     LegalizeTypeAction getPreferredVectorAction(MVT VT) const override;
 
@@ -1432,7 +1440,7 @@ namespace llvm {
     SDValue LowerMemOpCallTo(SDValue Chain, SDValue StackPtr, SDValue Arg,
                              const SDLoc &dl, SelectionDAG &DAG,
                              const CCValAssign &VA,
-                             ISD::ArgFlagsTy Flags) const;
+                             ISD::ArgFlagsTy Flags, bool isByval) const;
 
     // Call lowering helpers.
 

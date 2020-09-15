@@ -191,6 +191,8 @@ public:
 
   const coff_section *addrsigSec = nullptr;
 
+  const coff_section *callgraphSec = nullptr;
+
   // When using Microsoft precompiled headers, this is the PCH's key.
   // The same key is used by both the precompiled object, and objects using the
   // precompiled object. Any difference indicates out-of-date objects.
@@ -253,9 +255,10 @@ private:
   // match the existing symbol and its selection. If either old or new
   // symbol have selection IMAGE_COMDAT_SELECT_LARGEST, Sym might replace
   // the existing leader. In that case, Prevailing is set to true.
-  void handleComdatSelection(COFFSymbolRef sym,
-                             llvm::COFF::COMDATType &selection,
-                             bool &prevailing, DefinedRegular *leader);
+  void
+  handleComdatSelection(COFFSymbolRef sym, llvm::COFF::COMDATType &selection,
+                        bool &prevailing, DefinedRegular *leader,
+                        const llvm::object::coff_aux_section_definition *def);
 
   llvm::Optional<Symbol *>
   createDefined(COFFSymbolRef sym,
@@ -285,18 +288,18 @@ private:
   std::vector<SectionChunk *> guardFidChunks;
   std::vector<SectionChunk *> guardLJmpChunks;
 
-  // This vector contains the same chunks as Chunks, but they are
-  // indexed such that you can get a SectionChunk by section index.
-  // Nonexistent section indices are filled with null pointers.
-  // (Because section number is 1-based, the first slot is always a
-  // null pointer.)
-  std::vector<SectionChunk *> sparseChunks;
-
   // This vector contains a list of all symbols defined or referenced by this
   // file. They are indexed such that you can get a Symbol by symbol
   // index. Nonexistent indices (which are occupied by auxiliary
   // symbols in the real symbol table) are filled with null pointers.
   std::vector<Symbol *> symbols;
+
+  // This vector contains the same chunks as Chunks, but they are
+  // indexed such that you can get a SectionChunk by section index.
+  // Nonexistent section indices are filled with null pointers.
+  // (Because section number is 1-based, the first slot is always a
+  // null pointer.) This vector is only valid during initialization.
+  std::vector<SectionChunk *> sparseChunks;
 
   DWARFCache *dwarf = nullptr;
 };

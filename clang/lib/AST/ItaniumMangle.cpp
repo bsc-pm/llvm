@@ -162,6 +162,7 @@ public:
   void mangleDynamicInitializer(const VarDecl *D, raw_ostream &Out) override;
   void mangleDynamicAtExitDestructor(const VarDecl *D,
                                      raw_ostream &Out) override;
+  void mangleDynamicStermFinalizer(const VarDecl *D, raw_ostream &Out) override;
   void mangleSEHFilterExpression(const NamedDecl *EnclosingDecl,
                                  raw_ostream &Out) override;
   void mangleSEHFinallyBlock(const NamedDecl *EnclosingDecl,
@@ -532,6 +533,8 @@ private:
   void mangleNeonVectorType(const DependentVectorType *T);
   void mangleAArch64NeonVectorType(const VectorType *T);
   void mangleAArch64NeonVectorType(const DependentVectorType *T);
+  void mangleAArch64FixedSveVectorType(const VectorType *T);
+  void mangleAArch64FixedSveVectorType(const DependentVectorType *T);
 
   void mangleIntegerLiteral(QualType T, const llvm::APSInt &Value);
   void mangleMemberExprBase(const Expr *base, bool isArrow);
@@ -658,6 +661,8 @@ void CXXNameMangler::mangle(GlobalDecl GD) {
     mangleName(FD);
   else if (const MSGuidDecl *GuidD = dyn_cast<MSGuidDecl>(GD.getDecl()))
     mangleName(GuidD);
+  else if (const BindingDecl *BD = dyn_cast<BindingDecl>(GD.getDecl()))
+    mangleName(BD);
   else
     llvm_unreachable("unexpected kind of global decl");
 }
@@ -2389,16 +2394,39 @@ void CXXNameMangler::mangleQualifiers(Qualifiers Quals, const DependentAddressSp
       switch (AS) {
       default: llvm_unreachable("Not a language specific address space");
       //  <OpenCL-addrspace> ::= "CL" [ "global" | "local" | "constant" |
-      //                                "private"| "generic" ]
-      case LangAS::opencl_global:   ASString = "CLglobal";   break;
-      case LangAS::opencl_local:    ASString = "CLlocal";    break;
-      case LangAS::opencl_constant: ASString = "CLconstant"; break;
-      case LangAS::opencl_private:  ASString = "CLprivate";  break;
-      case LangAS::opencl_generic:  ASString = "CLgeneric";  break;
+      //                                "private"| "generic" | "device" |
+      //                                "host" ]
+      case LangAS::opencl_global:
+        ASString = "CLglobal";
+        break;
+      case LangAS::opencl_global_device:
+        ASString = "CLdevice";
+        break;
+      case LangAS::opencl_global_host:
+        ASString = "CLhost";
+        break;
+      case LangAS::opencl_local:
+        ASString = "CLlocal";
+        break;
+      case LangAS::opencl_constant:
+        ASString = "CLconstant";
+        break;
+      case LangAS::opencl_private:
+        ASString = "CLprivate";
+        break;
+      case LangAS::opencl_generic:
+        ASString = "CLgeneric";
+        break;
       //  <CUDA-addrspace> ::= "CU" [ "device" | "constant" | "shared" ]
-      case LangAS::cuda_device:     ASString = "CUdevice";   break;
-      case LangAS::cuda_constant:   ASString = "CUconstant"; break;
-      case LangAS::cuda_shared:     ASString = "CUshared";   break;
+      case LangAS::cuda_device:
+        ASString = "CUdevice";
+        break;
+      case LangAS::cuda_constant:
+        ASString = "CUconstant";
+        break;
+      case LangAS::cuda_shared:
+        ASString = "CUshared";
+        break;
       //  <ptrsize-addrspace> ::= [ "ptr32_sptr" | "ptr32_uptr" | "ptr64" ]
       case LangAS::ptr32_sptr:
         ASString = "ptr32_sptr";
@@ -2766,6 +2794,11 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
     Out << TI->getFloat128Mangling();
     break;
   }
+  case BuiltinType::BFloat16: {
+    const TargetInfo *TI = &getASTContext().getTargetInfo();
+    Out << TI->getBFloat16Mangling();
+    break;
+  }
   case BuiltinType::NullPtr:
     Out << "Dn";
     break;
@@ -2817,10 +2850,18 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
   // The SVE types are effectively target-specific.  The mangling scheme
   // is defined in the appendices to the Procedure Call Standard for the
   // Arm Architecture.
-#define SVE_TYPE(Name, Id, SingletonId) \
-  case BuiltinType::Id: \
-    type_name = Name; \
-    Out << 'u' << type_name.size() << type_name; \
+#define SVE_VECTOR_TYPE(InternalName, MangledName, Id, SingletonId, NumEls,    \
+                        ElBits, IsSigned, IsFP, IsBF)                          \
+  case BuiltinType::Id:                                                        \
+    type_name = MangledName;                                                   \
+    Out << (type_name == InternalName ? "u" : "") << type_name.size()          \
+        << type_name;                                                          \
+    break;
+#define SVE_PREDICATE_TYPE(InternalName, MangledName, Id, SingletonId, NumEls) \
+  case BuiltinType::Id:                                                        \
+    type_name = MangledName;                                                   \
+    Out << (type_name == InternalName ? "u" : "") << type_name.size()          \
+        << type_name;                                                          \
     break;
 #include "clang/Basic/AArch64SVEACLETypes.def"
   }
@@ -3166,6 +3207,7 @@ void CXXNameMangler::mangleNeonVectorType(const VectorType *T) {
     case BuiltinType::UShort:
       EltName = "poly16_t";
       break;
+    case BuiltinType::LongLong:
     case BuiltinType::ULongLong:
       EltName = "poly64_t";
       break;
@@ -3183,7 +3225,8 @@ void CXXNameMangler::mangleNeonVectorType(const VectorType *T) {
     case BuiltinType::ULongLong: EltName = "uint64_t"; break;
     case BuiltinType::Double:    EltName = "float64_t"; break;
     case BuiltinType::Float:     EltName = "float32_t"; break;
-    case BuiltinType::Half:      EltName = "float16_t";break;
+    case BuiltinType::Half:      EltName = "float16_t"; break;
+    case BuiltinType::BFloat16:  EltName = "bfloat16_t"; break;
     default:
       llvm_unreachable("unexpected Neon vector element type");
     }
@@ -3235,6 +3278,8 @@ static StringRef mangleAArch64VectorBase(const BuiltinType *EltType) {
     return "Float32";
   case BuiltinType::Double:
     return "Float64";
+  case BuiltinType::BFloat16:
+    return "Bfloat16";
   default:
     llvm_unreachable("Unexpected vector element base type");
   }
@@ -3284,6 +3329,103 @@ void CXXNameMangler::mangleAArch64NeonVectorType(const DependentVectorType *T) {
   Diags.Report(T->getAttributeLoc(), DiagID);
 }
 
+// The AArch64 ACLE specifies that fixed-length SVE vector and predicate types
+// defined with the 'arm_sve_vector_bits' attribute map to the same AAPCS64
+// type as the sizeless variants.
+//
+// The mangling scheme for VLS types is implemented as a "pseudo" template:
+//
+//   '__SVE_VLS<<type>, <vector length>>'
+//
+// Combining the existing SVE type and a specific vector length (in bits).
+// For example:
+//
+//   typedef __SVInt32_t foo __attribute__((arm_sve_vector_bits(512)));
+//
+// is described as '__SVE_VLS<__SVInt32_t, 512u>' and mangled as:
+//
+//   "9__SVE_VLSI" + base type mangling + "Lj" + __ARM_FEATURE_SVE_BITS + "EE"
+//
+//   i.e. 9__SVE_VLSIu11__SVInt32_tLj512EE
+//
+// The latest ACLE specification (00bet5) does not contain details of this
+// mangling scheme, it will be specified in the next revision. The mangling
+// scheme is otherwise defined in the appendices to the Procedure Call Standard
+// for the Arm Architecture, see
+// https://github.com/ARM-software/abi-aa/blob/master/aapcs64/aapcs64.rst#appendix-c-mangling
+void CXXNameMangler::mangleAArch64FixedSveVectorType(const VectorType *T) {
+  assert((T->getVectorKind() == VectorType::SveFixedLengthDataVector ||
+          T->getVectorKind() == VectorType::SveFixedLengthPredicateVector) &&
+         "expected fixed-length SVE vector!");
+
+  QualType EltType = T->getElementType();
+  assert(EltType->isBuiltinType() &&
+         "expected builtin type for fixed-length SVE vector!");
+
+  StringRef TypeName;
+  switch (cast<BuiltinType>(EltType)->getKind()) {
+  case BuiltinType::SChar:
+    TypeName = "__SVInt8_t";
+    break;
+  case BuiltinType::UChar: {
+    if (T->getVectorKind() == VectorType::SveFixedLengthDataVector)
+      TypeName = "__SVUint8_t";
+    else
+      TypeName = "__SVBool_t";
+    break;
+  }
+  case BuiltinType::Short:
+    TypeName = "__SVInt16_t";
+    break;
+  case BuiltinType::UShort:
+    TypeName = "__SVUint16_t";
+    break;
+  case BuiltinType::Int:
+    TypeName = "__SVInt32_t";
+    break;
+  case BuiltinType::UInt:
+    TypeName = "__SVUint32_t";
+    break;
+  case BuiltinType::Long:
+    TypeName = "__SVInt64_t";
+    break;
+  case BuiltinType::ULong:
+    TypeName = "__SVUint64_t";
+    break;
+  case BuiltinType::Half:
+    TypeName = "__SVFloat16_t";
+    break;
+  case BuiltinType::Float:
+    TypeName = "__SVFloat32_t";
+    break;
+  case BuiltinType::Double:
+    TypeName = "__SVFloat64_t";
+    break;
+  case BuiltinType::BFloat16:
+    TypeName = "__SVBfloat16_t";
+    break;
+  default:
+    llvm_unreachable("unexpected element type for fixed-length SVE vector!");
+  }
+
+  unsigned VecSizeInBits = getASTContext().getTypeInfo(T).Width;
+
+  if (T->getVectorKind() == VectorType::SveFixedLengthPredicateVector)
+    VecSizeInBits *= 8;
+
+  Out << "9__SVE_VLSI" << 'u' << TypeName.size() << TypeName << "Lj"
+      << VecSizeInBits << "EE";
+}
+
+void CXXNameMangler::mangleAArch64FixedSveVectorType(
+    const DependentVectorType *T) {
+  DiagnosticsEngine &Diags = Context.getDiags();
+  unsigned DiagID = Diags.getCustomDiagID(
+      DiagnosticsEngine::Error,
+      "cannot mangle this dependent fixed-length SVE vector type yet");
+  Diags.Report(T->getAttributeLoc(), DiagID);
+}
+
 // GNU extension: vector types
 // <type>                  ::= <vector-type>
 // <vector-type>           ::= Dv <positive dimension number> _
@@ -3303,6 +3445,10 @@ void CXXNameMangler::mangleType(const VectorType *T) {
       mangleAArch64NeonVectorType(T);
     else
       mangleNeonVectorType(T);
+    return;
+  } else if (T->getVectorKind() == VectorType::SveFixedLengthDataVector ||
+             T->getVectorKind() == VectorType::SveFixedLengthPredicateVector) {
+    mangleAArch64FixedSveVectorType(T);
     return;
   }
   Out << "Dv" << T->getNumElements() << '_';
@@ -3325,6 +3471,10 @@ void CXXNameMangler::mangleType(const DependentVectorType *T) {
       mangleAArch64NeonVectorType(T);
     else
       mangleNeonVectorType(T);
+    return;
+  } else if (T->getVectorKind() == VectorType::SveFixedLengthDataVector ||
+             T->getVectorKind() == VectorType::SveFixedLengthPredicateVector) {
+    mangleAArch64FixedSveVectorType(T);
     return;
   }
 
@@ -4239,6 +4389,15 @@ recurse:
     Out << "ix";
     mangleExpression(AE->getLHS());
     mangleExpression(AE->getRHS());
+    break;
+  }
+
+  case Expr::MatrixSubscriptExprClass: {
+    const MatrixSubscriptExpr *ME = cast<MatrixSubscriptExpr>(E);
+    Out << "ixix";
+    mangleExpression(ME->getBase());
+    mangleExpression(ME->getRowIdx());
+    mangleExpression(ME->getColumnIdx());
     break;
   }
 
@@ -5206,6 +5365,18 @@ void ItaniumMangleContextImpl::mangleDynamicAtExitDestructor(const VarDecl *D,
   // Prefix the mangling of D with __dtor_.
   CXXNameMangler Mangler(*this, Out);
   Mangler.getStream() << "__dtor_";
+  if (shouldMangleDeclName(D))
+    Mangler.mangle(D);
+  else
+    Mangler.getStream() << D->getName();
+}
+
+void ItaniumMangleContextImpl::mangleDynamicStermFinalizer(const VarDecl *D,
+                                                           raw_ostream &Out) {
+  // Clang generates these internal-linkage functions as part of its
+  // implementation of the XL ABI.
+  CXXNameMangler Mangler(*this, Out);
+  Mangler.getStream() << "__finalize_";
   if (shouldMangleDeclName(D))
     Mangler.mangle(D);
   else

@@ -16,6 +16,7 @@
 #include "llvm/LTO/LTOBackend.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Analysis/ModuleSummaryAnalysis.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -48,6 +49,19 @@
 
 using namespace llvm;
 using namespace lto;
+
+enum class LTOBitcodeEmbedding {
+  DoNotEmbed = 0,
+  EmbedOptimized = 1,
+};
+
+static cl::opt<LTOBitcodeEmbedding> EmbedBitcode(
+    "lto-embed-bitcode", cl::init(LTOBitcodeEmbedding::DoNotEmbed),
+    cl::values(clEnumValN(LTOBitcodeEmbedding::DoNotEmbed, "none",
+                          "Do not embed"),
+               clEnumValN(LTOBitcodeEmbedding::EmbedOptimized, "optimized",
+                          "Embed after all optimization passes")),
+    cl::desc("Embed LLVM bitcode in object files produced by LTO"));
 
 LLVM_ATTRIBUTE_NORETURN static void reportOpenError(StringRef Path, Twine Msg) {
   errs() << "failed to open " << Path << ": " << Msg << '\n';
@@ -196,7 +210,7 @@ static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
   }
 
   PassInstrumentationCallbacks PIC;
-  StandardInstrumentations SI;
+  StandardInstrumentations SI(Conf.DebugPassManager);
   SI.registerCallbacks(PIC);
   PassBuilder PB(TM, Conf.PTO, PGOOpt, &PIC);
   AAManager AA;
@@ -345,29 +359,16 @@ bool opt(const Config &Conf, TargetMachine *TM, unsigned Task, Module &Mod,
   return !Conf.PostOptModuleHook || Conf.PostOptModuleHook(Task, Mod);
 }
 
-static cl::opt<bool> EmbedBitcode(
-    "lto-embed-bitcode", cl::init(false),
-    cl::desc("Embed LLVM bitcode in object files produced by LTO"));
-
-static void EmitBitcodeSection(Module &M, const Config &Conf) {
-  if (!EmbedBitcode)
-    return;
-  SmallVector<char, 0> Buffer;
-  raw_svector_ostream OS(Buffer);
-  WriteBitcodeToFile(M, OS);
-
-  std::unique_ptr<MemoryBuffer> Buf(
-      new SmallVectorMemoryBuffer(std::move(Buffer)));
-  llvm::EmbedBitcodeInModule(M, Buf->getMemBufferRef(), /*EmbedBitcode*/ true,
-                             /*EmbedMarker*/ false, /*CmdArgs*/ nullptr);
-}
-
 void codegen(const Config &Conf, TargetMachine *TM, AddStreamFn AddStream,
-             unsigned Task, Module &Mod) {
+             unsigned Task, Module &Mod,
+             const ModuleSummaryIndex &CombinedIndex) {
   if (Conf.PreCodeGenModuleHook && !Conf.PreCodeGenModuleHook(Task, Mod))
     return;
 
-  EmitBitcodeSection(Mod, Conf);
+  if (EmbedBitcode == LTOBitcodeEmbedding::EmbedOptimized)
+    llvm::EmbedBitcodeInModule(Mod, llvm::MemoryBufferRef(),
+                               /*EmbedBitcode*/ true,
+                               /*EmbedMarker*/ false, /*CmdArgs*/ nullptr);
 
   std::unique_ptr<ToolOutputFile> DwoOut;
   SmallString<1024> DwoFile(Conf.SplitDwarfOutput);
@@ -392,6 +393,8 @@ void codegen(const Config &Conf, TargetMachine *TM, AddStreamFn AddStream,
 
   auto Stream = AddStream(Task);
   legacy::PassManager CodeGenPasses;
+  CodeGenPasses.add(
+      createImmutableModuleSummaryIndexWrapperPass(&CombinedIndex));
   if (TM->addPassesToEmitFile(CodeGenPasses, *Stream->OS,
                               DwoOut ? &DwoOut->os() : nullptr,
                               Conf.CGFileType))
@@ -404,7 +407,8 @@ void codegen(const Config &Conf, TargetMachine *TM, AddStreamFn AddStream,
 
 void splitCodeGen(const Config &C, TargetMachine *TM, AddStreamFn AddStream,
                   unsigned ParallelCodeGenParallelismLevel,
-                  std::unique_ptr<Module> Mod) {
+                  std::unique_ptr<Module> Mod,
+                  const ModuleSummaryIndex &CombinedIndex) {
   ThreadPool CodegenThreadPool(
       heavyweight_hardware_concurrency(ParallelCodeGenParallelismLevel));
   unsigned ThreadCount = 0;
@@ -437,7 +441,8 @@ void splitCodeGen(const Config &C, TargetMachine *TM, AddStreamFn AddStream,
               std::unique_ptr<TargetMachine> TM =
                   createTargetMachine(C, T, *MPartInCtx);
 
-              codegen(C, TM.get(), AddStream, ThreadId, *MPartInCtx);
+              codegen(C, TM.get(), AddStream, ThreadId, *MPartInCtx,
+                      CombinedIndex);
             },
             // Pass BC using std::move to ensure that it get moved rather than
             // copied into the thread's context.
@@ -493,10 +498,10 @@ Error lto::backend(const Config &C, AddStreamFn AddStream,
   }
 
   if (ParallelCodeGenParallelismLevel == 1) {
-    codegen(C, TM.get(), AddStream, 0, *Mod);
+    codegen(C, TM.get(), AddStream, 0, *Mod, CombinedIndex);
   } else {
     splitCodeGen(C, TM.get(), AddStream, ParallelCodeGenParallelismLevel,
-                 std::move(Mod));
+                 std::move(Mod), CombinedIndex);
   }
   return Error::success();
 }
@@ -541,8 +546,12 @@ Error lto::thinBackend(const Config &Conf, unsigned Task, AddStreamFn AddStream,
     return DiagFileOrErr.takeError();
   auto DiagnosticOutputFile = std::move(*DiagFileOrErr);
 
+  // Set the partial sample profile ratio in the profile summary module flag of
+  // the module, if applicable.
+  Mod.setPartialSampleProfileRatio(CombinedIndex);
+
   if (Conf.CodeGenOnly) {
-    codegen(Conf, TM.get(), AddStream, Task, Mod);
+    codegen(Conf, TM.get(), AddStream, Task, Mod, CombinedIndex);
     return finalizeOptimizationRemarks(std::move(DiagnosticOutputFile));
   }
 
@@ -593,6 +602,6 @@ Error lto::thinBackend(const Config &Conf, unsigned Task, AddStreamFn AddStream,
            /*ExportSummary=*/nullptr, /*ImportSummary=*/&CombinedIndex))
     return finalizeOptimizationRemarks(std::move(DiagnosticOutputFile));
 
-  codegen(Conf, TM.get(), AddStream, Task, Mod);
+  codegen(Conf, TM.get(), AddStream, Task, Mod, CombinedIndex);
   return finalizeOptimizationRemarks(std::move(DiagnosticOutputFile));
 }

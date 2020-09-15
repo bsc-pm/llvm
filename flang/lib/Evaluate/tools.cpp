@@ -242,9 +242,9 @@ std::optional<Expr<SomeType>> MixedComplexLeft(
     // (a,b) * x -> (a*x, b*x)
     // (a,b) / x -> (a/x, b/x)
     auto copy{iry};
-    auto rr{NumericOperation<Multiply>(messages, AsGenericExpr(std::move(zr)),
+    auto rr{NumericOperation<OPR>(messages, AsGenericExpr(std::move(zr)),
         AsGenericExpr(std::move(iry)), defaultRealKind)};
-    auto ri{NumericOperation<Multiply>(messages, AsGenericExpr(std::move(zi)),
+    auto ri{NumericOperation<OPR>(messages, AsGenericExpr(std::move(zi)),
         AsGenericExpr(std::move(copy)), defaultRealKind)};
     if (auto parts{common::AllPresent(std::move(rr), std::move(ri))}) {
       return Package(ConstructComplex(messages, std::get<0>(std::move(*parts)),
@@ -287,7 +287,7 @@ std::optional<Expr<SomeType>> MixedComplexRight(
       std::is_same_v<OPR<LargestReal>, Multiply<LargestReal>>) {
     // x + (a,b) -> (a,b) + x -> (a+x, b)
     // x * (a,b) -> (a,b) * x -> (a*x, b*x)
-    return MixedComplexLeft<Add, LCAT>(
+    return MixedComplexLeft<OPR, LCAT>(
         messages, std::move(zy), std::move(irx), defaultRealKind);
   } else if constexpr (std::is_same_v<OPR<LargestReal>,
                            Subtract<LargestReal>>) {
@@ -661,11 +661,6 @@ std::optional<Expr<SomeType>> ConvertToType(
 
 std::optional<Expr<SomeType>> ConvertToType(
     const Symbol &symbol, Expr<SomeType> &&x) {
-  if (int xRank{x.Rank()}; xRank > 0) {
-    if (symbol.Rank() != xRank) {
-      return std::nullopt;
-    }
-  }
   if (auto symType{DynamicType::From(symbol)}) {
     return ConvertToType(*symType, std::move(x));
   }
@@ -702,6 +697,10 @@ bool IsAssumedRank(const ActualArgument &arg) {
 
 bool IsProcedure(const Expr<SomeType> &expr) {
   return std::holds_alternative<ProcedureDesignator>(expr.u);
+}
+bool IsFunction(const Expr<SomeType> &expr) {
+  const auto *designator{std::get_if<ProcedureDesignator>(&expr.u)};
+  return designator && designator->GetType().has_value();
 }
 
 bool IsProcedurePointer(const Expr<SomeType> &expr) {
@@ -814,8 +813,8 @@ parser::Message *AttachDeclaration(
           unhosted->detailsIf<semantics::ProcBindingDetails>()}) {
     if (binding->symbol().name() != symbol.name()) {
       message.Attach(binding->symbol().name(),
-          "Procedure '%s' is bound to '%s'"_en_US, symbol.name(),
-          binding->symbol().name());
+          "Procedure '%s' of type '%s' is bound to '%s'"_en_US, symbol.name(),
+          symbol.owner().GetName().value(), binding->symbol().name());
       return &message;
     }
     unhosted = &binding->symbol();
@@ -823,7 +822,7 @@ parser::Message *AttachDeclaration(
   if (const auto *use{symbol.detailsIf<semantics::UseDetails>()}) {
     message.Attach(use->location(),
         "'%s' is USE-associated with '%s' in module '%s'"_en_US, symbol.name(),
-        unhosted->name(), use->module().name());
+        unhosted->name(), GetUsedModule(*use).name());
   } else {
     message.Attach(
         unhosted->name(), "Declaration of '%s'"_en_US, unhosted->name());
@@ -872,3 +871,187 @@ std::optional<std::string> FindImpureCall(
 }
 
 } // namespace Fortran::evaluate
+
+namespace Fortran::semantics {
+
+// When a construct association maps to a variable, and that variable
+// is not an array with a vector-valued subscript, return the base
+// Symbol of that variable, else nullptr.  Descends into other construct
+// associations when one associations maps to another.
+static const Symbol *GetAssociatedVariable(
+    const semantics::AssocEntityDetails &details) {
+  if (const auto &expr{details.expr()}) {
+    if (IsVariable(*expr) && !HasVectorSubscript(*expr)) {
+      if (const Symbol * varSymbol{GetFirstSymbol(*expr)}) {
+        return GetAssociationRoot(*varSymbol);
+      }
+    }
+  }
+  return nullptr;
+}
+
+const Symbol *GetAssociationRoot(const Symbol &symbol) {
+  const Symbol &ultimate{symbol.GetUltimate()};
+  const auto *details{ultimate.detailsIf<semantics::AssocEntityDetails>()};
+  return details ? GetAssociatedVariable(*details) : &ultimate;
+}
+
+bool IsVariableName(const Symbol &symbol) {
+  const Symbol *root{GetAssociationRoot(symbol)};
+  return root && root->has<ObjectEntityDetails>() && !IsNamedConstant(*root);
+}
+
+bool IsPureProcedure(const Symbol &symbol) {
+  if (const auto *procDetails{symbol.detailsIf<ProcEntityDetails>()}) {
+    if (const Symbol * procInterface{procDetails->interface().symbol()}) {
+      // procedure component with a pure interface
+      return IsPureProcedure(*procInterface);
+    }
+  } else if (const auto *details{symbol.detailsIf<ProcBindingDetails>()}) {
+    return IsPureProcedure(details->symbol());
+  } else if (!IsProcedure(symbol)) {
+    return false;
+  }
+  if (IsStmtFunction(symbol)) {
+    // Section 15.7(1) states that a statement function is PURE if it does not
+    // reference an IMPURE procedure or a VOLATILE variable
+    if (const auto &expr{symbol.get<SubprogramDetails>().stmtFunction()}) {
+      for (const SymbolRef &ref : evaluate::CollectSymbols(*expr)) {
+        if (IsFunction(*ref) && !IsPureProcedure(*ref)) {
+          return false;
+        }
+        const Symbol *root{GetAssociationRoot(*ref)};
+        if (root && root->attrs().test(Attr::VOLATILE)) {
+          return false;
+        }
+      }
+    }
+    return true; // statement function was not found to be impure
+  }
+  return symbol.attrs().test(Attr::PURE) ||
+      (symbol.attrs().test(Attr::ELEMENTAL) &&
+          !symbol.attrs().test(Attr::IMPURE));
+}
+
+bool IsPureProcedure(const Scope &scope) {
+  const Symbol *symbol{scope.GetSymbol()};
+  return symbol && IsPureProcedure(*symbol);
+}
+
+bool IsFunction(const Symbol &symbol) {
+  return std::visit(
+      common::visitors{
+          [](const SubprogramDetails &x) { return x.isFunction(); },
+          [&](const SubprogramNameDetails &) {
+            return symbol.test(Symbol::Flag::Function);
+          },
+          [](const ProcEntityDetails &x) {
+            const auto &ifc{x.interface()};
+            return ifc.type() || (ifc.symbol() && IsFunction(*ifc.symbol()));
+          },
+          [](const ProcBindingDetails &x) { return IsFunction(x.symbol()); },
+          [](const UseDetails &x) { return IsFunction(x.symbol()); },
+          [](const auto &) { return false; },
+      },
+      symbol.details());
+}
+
+bool IsProcedure(const Symbol &symbol) {
+  return std::visit(
+      common::visitors{
+          [](const SubprogramDetails &) { return true; },
+          [](const SubprogramNameDetails &) { return true; },
+          [](const ProcEntityDetails &) { return true; },
+          [](const GenericDetails &) { return true; },
+          [](const ProcBindingDetails &) { return true; },
+          [](const UseDetails &x) { return IsProcedure(x.symbol()); },
+          // TODO: FinalProcDetails?
+          [](const auto &) { return false; },
+      },
+      symbol.details());
+}
+
+const Symbol *FindCommonBlockContaining(const Symbol &object) {
+  const auto *details{object.detailsIf<ObjectEntityDetails>()};
+  return details ? details->commonBlock() : nullptr;
+}
+
+bool IsProcedurePointer(const Symbol &symbol) {
+  return symbol.has<ProcEntityDetails>() && IsPointer(symbol);
+}
+
+bool IsSaved(const Symbol &original) {
+  if (const Symbol * root{GetAssociationRoot(original)}) {
+    const Symbol &symbol{*root};
+    const Scope *scope{&symbol.owner()};
+    auto scopeKind{scope->kind()};
+    if (scopeKind == Scope::Kind::Module) {
+      return true; // BLOCK DATA entities must all be in COMMON, handled below
+    } else if (symbol.attrs().test(Attr::SAVE)) {
+      return true;
+    } else if (scopeKind == Scope::Kind::DerivedType) {
+      return false; // this is a component
+    } else if (IsNamedConstant(symbol)) {
+      return false;
+    } else if (const auto *object{symbol.detailsIf<ObjectEntityDetails>()};
+               object && object->init()) {
+      return true;
+    } else if (IsProcedurePointer(symbol) &&
+        symbol.get<ProcEntityDetails>().init()) {
+      return true;
+    } else if (const Symbol * block{FindCommonBlockContaining(symbol)};
+               block && block->attrs().test(Attr::SAVE)) {
+      return true;
+    } else if (IsDummy(symbol) || IsFunctionResult(symbol)) {
+      return false;
+    } else {
+      for (; !scope->IsGlobal(); scope = &scope->parent()) {
+        if (scope->hasSAVE()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool IsDummy(const Symbol &symbol) {
+  return std::visit(
+      common::visitors{[](const EntityDetails &x) { return x.isDummy(); },
+          [](const ObjectEntityDetails &x) { return x.isDummy(); },
+          [](const ProcEntityDetails &x) { return x.isDummy(); },
+          [](const HostAssocDetails &x) { return IsDummy(x.symbol()); },
+          [](const auto &) { return false; }},
+      symbol.details());
+}
+
+bool IsFunctionResult(const Symbol &symbol) {
+  return (symbol.has<ObjectEntityDetails>() &&
+             symbol.get<ObjectEntityDetails>().isFuncResult()) ||
+      (symbol.has<ProcEntityDetails>() &&
+          symbol.get<ProcEntityDetails>().isFuncResult());
+}
+
+int CountLenParameters(const DerivedTypeSpec &type) {
+  return std::count_if(type.parameters().begin(), type.parameters().end(),
+      [](const auto &pair) { return pair.second.isLen(); });
+}
+
+int CountNonConstantLenParameters(const DerivedTypeSpec &type) {
+  return std::count_if(
+      type.parameters().begin(), type.parameters().end(), [](const auto &pair) {
+        if (!pair.second.isLen()) {
+          return false;
+        } else if (const auto &expr{pair.second.GetExplicit()}) {
+          return !IsConstantExpr(*expr);
+        } else {
+          return true;
+        }
+      });
+}
+
+const Symbol &GetUsedModule(const UseDetails &details) {
+  return DEREF(details.symbol().owner().symbol());
+}
+
+} // namespace Fortran::semantics

@@ -267,6 +267,12 @@ DIBasicType *DIBuilder::createBasicType(StringRef Name, uint64_t SizeInBits,
                           0, Encoding, Flags);
 }
 
+DIStringType *DIBuilder::createStringType(StringRef Name, uint64_t SizeInBits) {
+  assert(!Name.empty() && "Unable to create type without name");
+  return DIStringType::get(VMContext, dwarf::DW_TAG_string_type, Name,
+                           SizeInBits, 0);
+}
+
 DIDerivedType *DIBuilder::createQualifiedType(unsigned Tag, DIType *FromTy) {
   return DIDerivedType::get(VMContext, Tag, "", nullptr, 0, nullptr, FromTy, 0,
                             0, 0, None, DINode::FlagZero);
@@ -625,11 +631,22 @@ DITypeRefArray DIBuilder::getOrCreateTypeArray(ArrayRef<Metadata *> Elements) {
 }
 
 DISubrange *DIBuilder::getOrCreateSubrange(int64_t Lo, int64_t Count) {
-  return DISubrange::get(VMContext, Count, Lo);
+  auto *LB = ConstantAsMetadata::get(
+      ConstantInt::getSigned(Type::getInt64Ty(VMContext), Lo));
+  auto *CountNode = ConstantAsMetadata::get(
+      ConstantInt::getSigned(Type::getInt64Ty(VMContext), Count));
+  return DISubrange::get(VMContext, CountNode, LB, nullptr, nullptr);
 }
 
 DISubrange *DIBuilder::getOrCreateSubrange(int64_t Lo, Metadata *CountNode) {
-  return DISubrange::get(VMContext, CountNode, Lo);
+  auto *LB = ConstantAsMetadata::get(
+      ConstantInt::getSigned(Type::getInt64Ty(VMContext), Lo));
+  return DISubrange::get(VMContext, CountNode, LB, nullptr, nullptr);
+}
+
+DISubrange *DIBuilder::getOrCreateSubrange(Metadata *CountNode, Metadata *LB,
+                                           Metadata *UB, Metadata *Stride) {
+  return DISubrange::get(VMContext, CountNode, LB, UB, Stride);
 }
 
 static void checkGlobalVariableScope(DIScope *Context) {

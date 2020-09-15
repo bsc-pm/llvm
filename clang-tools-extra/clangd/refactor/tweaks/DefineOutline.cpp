@@ -120,11 +120,9 @@ getFunctionSourceAfterReplacements(const FunctionDecl *FD,
   auto OrigFuncRange = toHalfOpenFileRange(
       SM, FD->getASTContext().getLangOpts(), FD->getSourceRange());
   if (!OrigFuncRange)
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "Couldn't get range for function.");
-  // Include template parameter list.
-  if (auto *FTD = FD->getDescribedFunctionTemplate())
-    OrigFuncRange->setBegin(FTD->getBeginLoc());
+    return error("Couldn't get range for function.");
+  assert(!FD->getDescribedFunctionTemplate() &&
+         "Define out-of-line doesn't apply to function templates.");
 
   // Get new begin and end positions for the qualified function definition.
   unsigned FuncBegin = SM.getFileOffset(OrigFuncRange->getBegin());
@@ -152,9 +150,7 @@ getFunctionSourceCode(const FunctionDecl *FD, llvm::StringRef TargetNamespace,
   auto &SM = AST.getSourceManager();
   auto TargetContext = findContextForNS(TargetNamespace, FD->getDeclContext());
   if (!TargetContext)
-    return llvm::createStringError(
-        llvm::inconvertibleErrorCode(),
-        "define outline: couldn't find a context for target");
+    return error("define outline: couldn't find a context for target");
 
   llvm::Error Errors = llvm::Error::success();
   tooling::Replacements DeclarationCleanups;
@@ -220,12 +216,9 @@ getFunctionSourceCode(const FunctionDecl *FD, llvm::StringRef TargetNamespace,
     assert(A->getLocation().isValid());
     if (!AttrTokens || AttrTokens->empty()) {
       Errors = llvm::joinErrors(
-          std::move(Errors),
-          llvm::createStringError(
-              llvm::inconvertibleErrorCode(),
-              llvm::StringRef("define outline: Can't move out of line as "
-                              "function has a macro `") +
-                  A->getSpelling() + "` specifier."));
+          std::move(Errors), error("define outline: Can't move out of line as "
+                                   "function has a macro `{0}` specifier.",
+                                   A->getSpelling()));
       return;
     }
     CharSourceRange DelRange =
@@ -249,10 +242,8 @@ getFunctionSourceCode(const FunctionDecl *FD, llvm::StringRef TargetNamespace,
       if (!Spelling) {
         Errors = llvm::joinErrors(
             std::move(Errors),
-            llvm::createStringError(
-                llvm::inconvertibleErrorCode(),
-                llvm::formatv("define outline: couldn't remove `{0}` keyword.",
-                              tok::getKeywordSpelling(Kind))));
+            error("define outline: couldn't remove `{0}` keyword.",
+                  tok::getKeywordSpelling(Kind)));
         break;
       }
       CharSourceRange DelRange =
@@ -265,11 +256,8 @@ getFunctionSourceCode(const FunctionDecl *FD, llvm::StringRef TargetNamespace,
     if (!FoundAny) {
       Errors = llvm::joinErrors(
           std::move(Errors),
-          llvm::createStringError(
-              llvm::inconvertibleErrorCode(),
-              llvm::formatv(
-                  "define outline: couldn't find `{0}` keyword to remove.",
-                  tok::getKeywordSpelling(Kind))));
+          error("define outline: couldn't find `{0}` keyword to remove.",
+                tok::getKeywordSpelling(Kind)));
     }
   };
 
@@ -317,18 +305,16 @@ SourceRange getDeletionRange(const FunctionDecl *FD,
                              const syntax::TokenBuffer &TokBuf) {
   auto DeletionRange = FD->getBody()->getSourceRange();
   if (auto *CD = llvm::dyn_cast<CXXConstructorDecl>(FD)) {
-    const auto &SM = TokBuf.sourceManager();
     // AST doesn't contain the location for ":" in ctor initializers. Therefore
     // we find it by finding the first ":" before the first ctor initializer.
     SourceLocation InitStart;
     // Find the first initializer.
     for (const auto *CInit : CD->inits()) {
-      // We don't care about in-class initializers.
-      if (CInit->isInClassMemberInitializer())
+      // SourceOrder is -1 for implicit initializers.
+      if (CInit->getSourceOrder() != 0)
         continue;
-      if (InitStart.isInvalid() ||
-          SM.isBeforeInTranslationUnit(CInit->getSourceLocation(), InitStart))
-        InitStart = CInit->getSourceLocation();
+      InitStart = CInit->getSourceLocation();
+      break;
     }
     if (InitStart.isValid()) {
       auto Toks = TokBuf.expandedTokens(CD->getSourceRange());
@@ -389,6 +375,13 @@ public:
         Source->isOutOfLine())
       return false;
 
+    // Bail out if this is a function template or specialization, as their
+    // definitions need to be visible in all including translation units.
+    if (Source->getDescribedFunctionTemplate())
+      return false;
+    if (Source->getTemplateSpecializationInfo())
+      return false;
+
     // Bail out in templated classes, as it is hard to spell the class name, i.e
     // if the template parameter is unnamed.
     if (auto *MD = llvm::dyn_cast<CXXMethodDecl>(Source)) {
@@ -407,15 +400,11 @@ public:
     auto MainFileName =
         getCanonicalPath(SM.getFileEntryForID(SM.getMainFileID()), SM);
     if (!MainFileName)
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Couldn't get absolute path for mainfile.");
+      return error("Couldn't get absolute path for main file.");
 
     auto CCFile = getSourceFile(*MainFileName, Sel);
     if (!CCFile)
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Couldn't find a suitable implementation file.");
+      return error("Couldn't find a suitable implementation file.");
 
     auto &FS =
         Sel.AST->getSourceManager().getFileManager().getVirtualFileSystem();
@@ -423,13 +412,10 @@ public:
     // FIXME: Maybe we should consider creating the implementation file if it
     // doesn't exist?
     if (!Buffer)
-      return llvm::createStringError(Buffer.getError(),
-                                     Buffer.getError().message());
+      return llvm::errorCodeToError(Buffer.getError());
     auto Contents = Buffer->get()->getBuffer();
-    auto LangOpts = format::getFormattingLangOpts(
-        getFormatStyleForFile(*CCFile, Contents, &FS));
     auto InsertionPoint = getInsertionPoint(
-        Contents, Source->getQualifiedNameAsString(), LangOpts);
+        Contents, Source->getQualifiedNameAsString(), Sel.AST->getLangOpts());
     if (!InsertionPoint)
       return InsertionPoint.takeError();
 

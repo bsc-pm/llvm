@@ -8,15 +8,15 @@
 # has a dependance on MLIRIR, which must depend on libLLVM.so).  This works
 # in this special case because this library is static.
 
-llvm_add_library(LLVMMLIRTableGen STATIC
+llvm_add_library(MLIRTableGen STATIC
   Argument.cpp
   Attribute.cpp
   Constraint.cpp
   Dialect.cpp
   Format.cpp
+  Interfaces.cpp
   Operator.cpp
   OpClass.cpp
-  OpInterfaces.cpp
   OpTrait.cpp
   Pass.cpp
   Pattern.cpp
@@ -32,4 +32,6 @@ llvm_add_library(LLVMMLIRTableGen STATIC
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/TableGen
 )
 
-mlir_check_all_link_libraries(LLVMMLIRTableGen)
+mlir_check_all_link_libraries(MLIRTableGen)
+
+add_mlir_library_install(MLIRTableGen)

@@ -65,43 +65,19 @@ CodeGenFunction::CodeGenFunction(CodeGenModule &cgm, bool suppressNewContext)
     : CodeGenTypeCache(cgm), CGM(cgm), Target(cgm.getTarget()),
       Builder(cgm, cgm.getModule().getContext(), llvm::ConstantFolder(),
               CGBuilderInserterTy(this)),
-      SanOpts(CGM.getLangOpts().Sanitize), DebugInfo(CGM.getModuleDebugInfo()),
-      PGO(cgm), ShouldEmitLifetimeMarkers(shouldEmitLifetimeMarkers(
-                    CGM.getCodeGenOpts(), CGM.getLangOpts())) {
+      SanOpts(CGM.getLangOpts().Sanitize), CurFPFeatures(CGM.getLangOpts()),
+      DebugInfo(CGM.getModuleDebugInfo()), PGO(cgm),
+      ShouldEmitLifetimeMarkers(
+          shouldEmitLifetimeMarkers(CGM.getCodeGenOpts(), CGM.getLangOpts())) {
   if (!suppressNewContext)
     CGM.getCXXABI().getMangleContext().startNewFunction();
 
-  llvm::FastMathFlags FMF;
-  if (CGM.getLangOpts().FastMath)
-    FMF.setFast();
-  if (CGM.getLangOpts().FiniteMathOnly) {
-    FMF.setNoNaNs();
-    FMF.setNoInfs();
-  }
-  if (CGM.getCodeGenOpts().NoNaNsFPMath) {
-    FMF.setNoNaNs();
-  }
-  if (CGM.getCodeGenOpts().NoSignedZeros) {
-    FMF.setNoSignedZeros();
-  }
-  if (CGM.getCodeGenOpts().ReciprocalMath) {
-    FMF.setAllowReciprocal();
-  }
-  if (CGM.getCodeGenOpts().Reassociate) {
-    FMF.setAllowReassoc();
-  }
-  Builder.setFastMathFlags(FMF);
+  SetFastMathFlags(CurFPFeatures);
   SetFPModel();
 }
 
 CodeGenFunction::~CodeGenFunction() {
   assert(LifetimeExtendedCleanupStack.empty() && "failed to emit a cleanup");
-
-  // If there are any unclaimed block infos, go ahead and destroy them
-  // now.  This can happen if IR-gen gets clever and skips evaluating
-  // something.
-  if (FirstBlockInfo)
-    destroyBlockInfos(FirstBlockInfo);
 
   if (getLangOpts().OpenMP && CurFn)
     CGM.getOpenMPRuntime().functionFinished(*this);
@@ -111,8 +87,8 @@ CodeGenFunction::~CodeGenFunction() {
   // seems to be a reasonable spot. We do it here, as opposed to the deletion
   // time of the CodeGenModule, because we have to ensure the IR has not yet
   // been "emitted" to the outside, thus, modifications are still sensible.
-  if (llvm::OpenMPIRBuilder *OMPBuilder = CGM.getOpenMPIRBuilder())
-    OMPBuilder->finalize();
+  if (CGM.getLangOpts().OpenMPIRBuilder)
+    CGM.getOpenMPRuntime().getOMPBuilder().finalize();
 }
 
 // Map the LangOption for exception behavior into
@@ -139,65 +115,69 @@ void CodeGenFunction::SetFPModel() {
                              RM != llvm::RoundingMode::NearestTiesToEven);
 }
 
-CharUnits CodeGenFunction::getNaturalPointeeTypeAlignment(QualType T,
-                                                    LValueBaseInfo *BaseInfo,
-                                                    TBAAAccessInfo *TBAAInfo) {
-  return getNaturalTypeAlignment(T->getPointeeType(), BaseInfo, TBAAInfo,
-                                 /* forPointeeType= */ true);
+void CodeGenFunction::SetFastMathFlags(FPOptions FPFeatures) {
+  llvm::FastMathFlags FMF;
+  FMF.setAllowReassoc(FPFeatures.getAllowFPReassociate());
+  FMF.setNoNaNs(FPFeatures.getNoHonorNaNs());
+  FMF.setNoInfs(FPFeatures.getNoHonorInfs());
+  FMF.setNoSignedZeros(FPFeatures.getNoSignedZero());
+  FMF.setAllowReciprocal(FPFeatures.getAllowReciprocal());
+  FMF.setApproxFunc(FPFeatures.getAllowApproxFunc());
+  FMF.setAllowContract(FPFeatures.allowFPContractAcrossStatement());
+  Builder.setFastMathFlags(FMF);
 }
 
-CharUnits CodeGenFunction::getNaturalTypeAlignment(QualType T,
-                                                   LValueBaseInfo *BaseInfo,
-                                                   TBAAAccessInfo *TBAAInfo,
-                                                   bool forPointeeType) {
-  if (TBAAInfo)
-    *TBAAInfo = CGM.getTBAAAccessInfo(T);
+CodeGenFunction::CGFPOptionsRAII::CGFPOptionsRAII(CodeGenFunction &CGF,
+                                                  FPOptions FPFeatures)
+    : CGF(CGF), OldFPFeatures(CGF.CurFPFeatures) {
+  CGF.CurFPFeatures = FPFeatures;
 
-  // Honor alignment typedef attributes even on incomplete types.
-  // We also honor them straight for C++ class types, even as pointees;
-  // there's an expressivity gap here.
-  if (auto TT = T->getAs<TypedefType>()) {
-    if (auto Align = TT->getDecl()->getMaxAlignment()) {
-      if (BaseInfo)
-        *BaseInfo = LValueBaseInfo(AlignmentSource::AttributedType);
-      return getContext().toCharUnitsFromBits(Align);
-    }
-  }
+  if (OldFPFeatures == FPFeatures)
+    return;
 
-  if (BaseInfo)
-    *BaseInfo = LValueBaseInfo(AlignmentSource::Type);
+  FMFGuard.emplace(CGF.Builder);
 
-  CharUnits Alignment;
-  if (T->isIncompleteType()) {
-    Alignment = CharUnits::One(); // Shouldn't be used, but pessimistic is best.
-  } else {
-    // For C++ class pointees, we don't know whether we're pointing at a
-    // base or a complete object, so we generally need to use the
-    // non-virtual alignment.
-    const CXXRecordDecl *RD;
-    if (forPointeeType && (RD = T->getAsCXXRecordDecl())) {
-      Alignment = CGM.getClassPointerAlignment(RD);
-    } else {
-      Alignment = getContext().getTypeAlignInChars(T);
-      if (T.getQualifiers().hasUnaligned())
-        Alignment = CharUnits::One();
-    }
+  llvm::RoundingMode NewRoundingBehavior =
+      static_cast<llvm::RoundingMode>(FPFeatures.getRoundingMode());
+  CGF.Builder.setDefaultConstrainedRounding(NewRoundingBehavior);
+  auto NewExceptionBehavior =
+      ToConstrainedExceptMD(static_cast<LangOptions::FPExceptionModeKind>(
+          FPFeatures.getFPExceptionMode()));
+  CGF.Builder.setDefaultConstrainedExcept(NewExceptionBehavior);
 
-    // Cap to the global maximum type alignment unless the alignment
-    // was somehow explicit on the type.
-    if (unsigned MaxAlign = getLangOpts().MaxTypeAlign) {
-      if (Alignment.getQuantity() > MaxAlign &&
-          !getContext().isAlignmentRequired(T))
-        Alignment = CharUnits::fromQuantity(MaxAlign);
-    }
-  }
-  return Alignment;
+  CGF.SetFastMathFlags(FPFeatures);
+
+  assert((CGF.CurFuncDecl == nullptr || CGF.Builder.getIsFPConstrained() ||
+          isa<CXXConstructorDecl>(CGF.CurFuncDecl) ||
+          isa<CXXDestructorDecl>(CGF.CurFuncDecl) ||
+          (NewExceptionBehavior == llvm::fp::ebIgnore &&
+           NewRoundingBehavior == llvm::RoundingMode::NearestTiesToEven)) &&
+         "FPConstrained should be enabled on entire function");
+
+  auto mergeFnAttrValue = [&](StringRef Name, bool Value) {
+    auto OldValue =
+        CGF.CurFn->getFnAttribute(Name).getValueAsString() == "true";
+    auto NewValue = OldValue & Value;
+    if (OldValue != NewValue)
+      CGF.CurFn->addFnAttr(Name, llvm::toStringRef(NewValue));
+  };
+  mergeFnAttrValue("no-infs-fp-math", FPFeatures.getNoHonorInfs());
+  mergeFnAttrValue("no-nans-fp-math", FPFeatures.getNoHonorNaNs());
+  mergeFnAttrValue("no-signed-zeros-fp-math", FPFeatures.getNoSignedZero());
+  mergeFnAttrValue("unsafe-fp-math", FPFeatures.getAllowFPReassociate() &&
+                                         FPFeatures.getAllowReciprocal() &&
+                                         FPFeatures.getAllowApproxFunc() &&
+                                         FPFeatures.getNoSignedZero());
+}
+
+CodeGenFunction::CGFPOptionsRAII::~CGFPOptionsRAII() {
+  CGF.CurFPFeatures = OldFPFeatures;
 }
 
 LValue CodeGenFunction::MakeNaturalAlignAddrLValue(llvm::Value *V, QualType T) {
   LValueBaseInfo BaseInfo;
   TBAAAccessInfo TBAAInfo;
-  CharUnits Alignment = getNaturalTypeAlignment(T, &BaseInfo, &TBAAInfo);
+  CharUnits Alignment = CGM.getNaturalTypeAlignment(T, &BaseInfo, &TBAAInfo);
   return LValue::MakeAddr(Address(V, Alignment), T, getContext(), BaseInfo,
                           TBAAInfo);
 }
@@ -208,8 +188,8 @@ LValue
 CodeGenFunction::MakeNaturalAlignPointeeAddrLValue(llvm::Value *V, QualType T) {
   LValueBaseInfo BaseInfo;
   TBAAAccessInfo TBAAInfo;
-  CharUnits Align = getNaturalTypeAlignment(T, &BaseInfo, &TBAAInfo,
-                                            /* forPointeeType= */ true);
+  CharUnits Align = CGM.getNaturalTypeAlignment(T, &BaseInfo, &TBAAInfo,
+                                                /* forPointeeType= */ true);
   return MakeAddrLValue(Address(V, Align), T, BaseInfo, TBAAInfo);
 }
 
@@ -853,6 +833,9 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
   if (CGM.getCodeGenOpts().ProfileSampleAccurate)
     Fn->addFnAttr("profile-sample-accurate");
 
+  if (!CGM.getCodeGenOpts().SampleProfileFile.empty())
+    Fn->addFnAttr("use-sample-profile");
+
   if (D && D->hasAttr<CFICanonicalJumpTableAttr>())
     Fn->addFnAttr("cfi-canonical-jump-table");
 
@@ -1044,7 +1027,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
     llvm::Value *Addr = Builder.CreateStructGEP(nullptr, &*EI, Idx);
     ReturnValuePointer = Address(Addr, getPointerAlign());
     Addr = Builder.CreateAlignedLoad(Addr, getPointerAlign(), "agg.result");
-    ReturnValue = Address(Addr, getNaturalTypeAlignment(RetTy));
+    ReturnValue = Address(Addr, CGM.getNaturalTypeAlignment(RetTy));
   } else {
     ReturnValue = CreateIRTemp(RetTy, "retval");
 
@@ -1479,16 +1462,15 @@ bool CodeGenFunction::ConstantFoldsToSimpleInteger(const Expr *Cond,
   return true;
 }
 
-
-
 /// EmitBranchOnBoolExpr - Emit a branch on a boolean condition (e.g. for an if
 /// statement) to the specified blocks.  Based on the condition, this might try
 /// to simplify the codegen of the conditional based on the branch.
-///
+/// \param Weights The weights determined by the likelihood attributes.
 void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
                                            llvm::BasicBlock *TrueBlock,
                                            llvm::BasicBlock *FalseBlock,
-                                           uint64_t TrueCount) {
+                                           uint64_t TrueCount,
+                                           llvm::MDNode *Weights) {
   Cond = Cond->IgnoreParens();
 
   if (const BinaryOperator *CondBOp = dyn_cast<BinaryOperator>(Cond)) {
@@ -1503,7 +1485,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
         // br(1 && X) -> br(X).
         incrementProfileCounter(CondBOp);
         return EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock,
-                                    TrueCount);
+                                    TrueCount, Weights);
       }
 
       // If we have "X && 1", simplify the code to use an uncond branch.
@@ -1512,7 +1494,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
           ConstantBool) {
         // br(X && 1) -> br(X).
         return EmitBranchOnBoolExpr(CondBOp->getLHS(), TrueBlock, FalseBlock,
-                                    TrueCount);
+                                    TrueCount, Weights);
       }
 
       // Emit the LHS as a conditional.  If the LHS conditional is false, we
@@ -1525,7 +1507,8 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
       ConditionalEvaluation eval(*this);
       {
         ApplyDebugLocation DL(*this, Cond);
-        EmitBranchOnBoolExpr(CondBOp->getLHS(), LHSTrue, FalseBlock, RHSCount);
+        EmitBranchOnBoolExpr(CondBOp->getLHS(), LHSTrue, FalseBlock, RHSCount,
+                             Weights);
         EmitBlock(LHSTrue);
       }
 
@@ -1534,7 +1517,8 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
 
       // Any temporaries created here are conditional.
       eval.begin(*this);
-      EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock, TrueCount);
+      EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock, TrueCount,
+                           Weights);
       eval.end(*this);
 
       return;
@@ -1549,7 +1533,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
         // br(0 || X) -> br(X).
         incrementProfileCounter(CondBOp);
         return EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock,
-                                    TrueCount);
+                                    TrueCount, Weights);
       }
 
       // If we have "X || 0", simplify the code to use an uncond branch.
@@ -1558,7 +1542,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
           !ConstantBool) {
         // br(X || 0) -> br(X).
         return EmitBranchOnBoolExpr(CondBOp->getLHS(), TrueBlock, FalseBlock,
-                                    TrueCount);
+                                    TrueCount, Weights);
       }
 
       // Emit the LHS as a conditional.  If the LHS conditional is true, we
@@ -1574,7 +1558,8 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
       ConditionalEvaluation eval(*this);
       {
         ApplyDebugLocation DL(*this, Cond);
-        EmitBranchOnBoolExpr(CondBOp->getLHS(), TrueBlock, LHSFalse, LHSCount);
+        EmitBranchOnBoolExpr(CondBOp->getLHS(), TrueBlock, LHSFalse, LHSCount,
+                             Weights);
         EmitBlock(LHSFalse);
       }
 
@@ -1583,7 +1568,8 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
 
       // Any temporaries created here are conditional.
       eval.begin(*this);
-      EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock, RHSCount);
+      EmitBranchOnBoolExpr(CondBOp->getRHS(), TrueBlock, FalseBlock, RHSCount,
+                           Weights);
 
       eval.end(*this);
 
@@ -1598,7 +1584,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
       uint64_t FalseCount = getCurrentProfileCount() - TrueCount;
       // Negate the condition and swap the destination blocks.
       return EmitBranchOnBoolExpr(CondUOp->getSubExpr(), FalseBlock, TrueBlock,
-                                  FalseCount);
+                                  FalseCount, Weights);
     }
   }
 
@@ -1609,7 +1595,7 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
 
     ConditionalEvaluation cond(*this);
     EmitBranchOnBoolExpr(CondOp->getCond(), LHSBlock, RHSBlock,
-                         getProfileCount(CondOp));
+                         getProfileCount(CondOp), Weights);
 
     // When computing PGO branch weights, we only know the overall count for
     // the true block. This code is essentially doing tail duplication of the
@@ -1629,14 +1615,14 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
     {
       ApplyDebugLocation DL(*this, Cond);
       EmitBranchOnBoolExpr(CondOp->getLHS(), TrueBlock, FalseBlock,
-                           LHSScaledTrueCount);
+                           LHSScaledTrueCount, Weights);
     }
     cond.end(*this);
 
     cond.begin(*this);
     EmitBlock(RHSBlock);
     EmitBranchOnBoolExpr(CondOp->getRHS(), TrueBlock, FalseBlock,
-                         TrueCount - LHSScaledTrueCount);
+                         TrueCount - LHSScaledTrueCount, Weights);
     cond.end(*this);
 
     return;
@@ -1667,9 +1653,10 @@ void CodeGenFunction::EmitBranchOnBoolExpr(const Expr *Cond,
 
   // Create branch weights based on the number of times we get here and the
   // number of times the condition should be true.
-  uint64_t CurrentCount = std::max(getCurrentProfileCount(), TrueCount);
-  llvm::MDNode *Weights =
-      createProfileWeights(TrueCount, CurrentCount - TrueCount);
+  if (!Weights) {
+    uint64_t CurrentCount = std::max(getCurrentProfileCount(), TrueCount);
+    Weights = createProfileWeights(TrueCount, CurrentCount - TrueCount);
+  }
 
   // Emit the code with the fully general case.
   llvm::Value *CondV;
@@ -2092,7 +2079,6 @@ void CodeGenFunction::EmitVariablyModifiedType(QualType type) {
     case Type::UnaryTransform:
     case Type::Attributed:
     case Type::SubstTemplateTypeParm:
-    case Type::PackExpansion:
     case Type::MacroQualified:
       // Keep walking after single level desugaring.
       type = type.getSingleStepDesugaredType(getContext());
@@ -2171,13 +2157,39 @@ void CodeGenFunction::emitAlignmentAssumption(llvm::Value *PtrValue,
                                               SourceLocation AssumptionLoc,
                                               llvm::Value *Alignment,
                                               llvm::Value *OffsetValue) {
-  llvm::Value *TheCheck;
-  llvm::Instruction *Assumption = Builder.CreateAlignmentAssumption(
-      CGM.getDataLayout(), PtrValue, Alignment, OffsetValue, &TheCheck);
+  if (Alignment->getType() != IntPtrTy)
+    Alignment =
+        Builder.CreateIntCast(Alignment, IntPtrTy, false, "casted.align");
+  if (OffsetValue && OffsetValue->getType() != IntPtrTy)
+    OffsetValue =
+        Builder.CreateIntCast(OffsetValue, IntPtrTy, true, "casted.offset");
+  llvm::Value *TheCheck = nullptr;
   if (SanOpts.has(SanitizerKind::Alignment)) {
-    emitAlignmentAssumptionCheck(PtrValue, Ty, Loc, AssumptionLoc, Alignment,
-                                 OffsetValue, TheCheck, Assumption);
+    llvm::Value *PtrIntValue =
+        Builder.CreatePtrToInt(PtrValue, IntPtrTy, "ptrint");
+
+    if (OffsetValue) {
+      bool IsOffsetZero = false;
+      if (const auto *CI = dyn_cast<llvm::ConstantInt>(OffsetValue))
+        IsOffsetZero = CI->isZero();
+
+      if (!IsOffsetZero)
+        PtrIntValue = Builder.CreateSub(PtrIntValue, OffsetValue, "offsetptr");
+    }
+
+    llvm::Value *Zero = llvm::ConstantInt::get(IntPtrTy, 0);
+    llvm::Value *Mask =
+        Builder.CreateSub(Alignment, llvm::ConstantInt::get(IntPtrTy, 1));
+    llvm::Value *MaskedPtr = Builder.CreateAnd(PtrIntValue, Mask, "maskedptr");
+    TheCheck = Builder.CreateICmpEQ(MaskedPtr, Zero, "maskcond");
   }
+  llvm::Instruction *Assumption = Builder.CreateAlignmentAssumption(
+      CGM.getDataLayout(), PtrValue, Alignment, OffsetValue);
+
+  if (!SanOpts.has(SanitizerKind::Alignment))
+    return;
+  emitAlignmentAssumptionCheck(PtrValue, Ty, Loc, AssumptionLoc, Alignment,
+                               OffsetValue, TheCheck, Assumption);
 }
 
 void CodeGenFunction::emitAlignmentAssumption(llvm::Value *PtrValue,

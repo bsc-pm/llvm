@@ -13,10 +13,9 @@
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 
 ## Now define a SHT_NULL section with fields all zeroed.
 ## In this case it is equal to the section created by default.
@@ -26,10 +25,9 @@ FileHeader:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:         SHT_NULL
     Name:         ''
@@ -52,10 +50,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:         SHT_NULL
     Name:         .foo
@@ -80,10 +77,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:         SHT_NULL
     Name:         .foo
@@ -109,10 +105,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:         SHT_NULL
     Name:         ''
@@ -128,17 +123,19 @@ Sections:
 
 # RUN: not yaml2obj --docnum=6 %s -o %t6 2>&1 | FileCheck %s --check-prefix=CASE4
 
-# CASE4: error: unknown section referenced: '.foo' by YAML section ''
+# CASE4:      error: unknown section referenced: '.foo' by YAML section '(index 0)'
+# CASE4-NEXT: error: unknown section referenced: '.bar' by YAML section '(index 1)'
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type: SHT_NULL
     Link: .foo
+  - Type: SHT_NULL
+    Link: .bar
 
 ## Check that null section fields are set to zero, if they are unspecified.
 
@@ -147,10 +144,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type: SHT_NULL
 
@@ -166,10 +162,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type: SHT_NULL
   - Type:    SHT_NULL
@@ -192,10 +187,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:     SHT_NULL
     Size:     0x2
@@ -219,10 +213,9 @@ Sections:
 
 --- !ELF
 FileHeader:
-  Class:   ELFCLASS64
-  Data:    ELFDATA2LSB
-  Type:    ET_REL
-  Machine: EM_X86_64
+  Class: ELFCLASS64
+  Data:  ELFDATA2LSB
+  Type:  ET_REL
 Sections:
   - Type:   SHT_NULL
     Offset: [[OFFSET]]

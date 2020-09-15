@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -189,7 +190,7 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
           // stack allocation for each one.
           // Inform the Frame Information that we have variable-sized objects.
           MF->getFrameInfo().CreateVariableSizedObject(
-              Alignment <= StackAlign ? 0 : Alignment.value(), AI);
+              Alignment <= StackAlign ? Align(1) : Alignment, AI);
         }
       }
 
@@ -359,7 +360,7 @@ void FunctionLoweringInfo::clear() {
   RegFixups.clear();
   RegsWithFixups.clear();
   StatepointStackSlots.clear();
-  StatepointSpillMaps.clear();
+  StatepointRelocationMaps.clear();
   PreferredExtendType.clear();
 }
 

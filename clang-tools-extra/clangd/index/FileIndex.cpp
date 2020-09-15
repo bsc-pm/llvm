@@ -47,12 +47,13 @@ SlabTuple indexSymbols(ASTContext &AST, std::shared_ptr<Preprocessor> PP,
                        llvm::ArrayRef<Decl *> DeclsToIndex,
                        const MainFileMacros *MacroRefsToIndex,
                        const CanonicalIncludes &Includes, bool IsIndexMainAST,
-                       llvm::StringRef Version) {
+                       llvm::StringRef Version, bool CollectMainFileRefs) {
   SymbolCollector::Options CollectorOpts;
   CollectorOpts.CollectIncludePath = true;
   CollectorOpts.Includes = &Includes;
   CollectorOpts.CountReferences = false;
   CollectorOpts.Origin = SymbolOrigin::Dynamic;
+  CollectorOpts.CollectMainFileRefs = CollectMainFileRefs;
 
   index::IndexingOptions IndexOpts;
   // We only need declarations, because we don't count references.
@@ -201,14 +202,15 @@ FileShardedIndex::getShard(llvm::StringRef Uri) const {
     RelB.insert(*Rel);
   }
   IF.Relations = std::move(RelB).build();
-  return IF;
+  // Explicit move here is needed by some compilers.
+  return std::move(IF);
 }
 
-SlabTuple indexMainDecls(ParsedAST &AST) {
-  return indexSymbols(AST.getASTContext(), AST.getPreprocessorPtr(),
-                      AST.getLocalTopLevelDecls(), &AST.getMacros(),
-                      AST.getCanonicalIncludes(),
-                      /*IsIndexMainAST=*/true, AST.version());
+SlabTuple indexMainDecls(ParsedAST &AST, bool CollectMainFileRefs) {
+  return indexSymbols(
+      AST.getASTContext(), AST.getPreprocessorPtr(),
+      AST.getLocalTopLevelDecls(), &AST.getMacros(), AST.getCanonicalIncludes(),
+      /*IsIndexMainAST=*/true, AST.version(), CollectMainFileRefs);
 }
 
 SlabTuple indexHeaderSymbols(llvm::StringRef Version, ASTContext &AST,
@@ -219,7 +221,8 @@ SlabTuple indexHeaderSymbols(llvm::StringRef Version, ASTContext &AST,
       AST.getTranslationUnitDecl()->decls().end());
   return indexSymbols(AST, std::move(PP), DeclsToIndex,
                       /*MainFileMacros=*/nullptr, Includes,
-                      /*IsIndexMainAST=*/false, Version);
+                      /*IsIndexMainAST=*/false, Version,
+                      /*CollectMainFileRefs=*/false);
 }
 
 void FileSymbols::update(llvm::StringRef Key,
@@ -228,6 +231,7 @@ void FileSymbols::update(llvm::StringRef Key,
                          std::unique_ptr<RelationSlab> Relations,
                          bool CountReferences) {
   std::lock_guard<std::mutex> Lock(Mutex);
+  ++Version;
   if (!Symbols)
     SymbolsSnapshot.erase(Key);
   else
@@ -247,7 +251,8 @@ void FileSymbols::update(llvm::StringRef Key,
 }
 
 std::unique_ptr<SymbolIndex>
-FileSymbols::buildIndex(IndexType Type, DuplicateHandling DuplicateHandle) {
+FileSymbols::buildIndex(IndexType Type, DuplicateHandling DuplicateHandle,
+                        size_t *Version) {
   std::vector<std::shared_ptr<SymbolSlab>> SymbolSlabs;
   std::vector<std::shared_ptr<RefSlab>> RefSlabs;
   std::vector<std::shared_ptr<RelationSlab>> RelationSlabs;
@@ -263,6 +268,9 @@ FileSymbols::buildIndex(IndexType Type, DuplicateHandling DuplicateHandle) {
     }
     for (const auto &FileAndRelations : RelatiosSnapshot)
       RelationSlabs.push_back(FileAndRelations.second);
+
+    if (Version)
+      *Version = this->Version;
   }
   std::vector<const Symbol *> AllSymbols;
   std::vector<Symbol> SymsStorage;
@@ -365,8 +373,9 @@ FileSymbols::buildIndex(IndexType Type, DuplicateHandling DuplicateHandle) {
   llvm_unreachable("Unknown clangd::IndexType");
 }
 
-FileIndex::FileIndex(bool UseDex)
+FileIndex::FileIndex(bool UseDex, bool CollectMainFileRefs)
     : MergedIndex(&MainFileIndex, &PreambleIndex), UseDex(UseDex),
+      CollectMainFileRefs(CollectMainFileRefs),
       PreambleIndex(std::make_unique<MemIndex>()),
       MainFileIndex(std::make_unique<MemIndex>()) {}
 
@@ -389,26 +398,48 @@ void FileIndex::updatePreamble(PathRef Path, llvm::StringRef Version,
         std::make_unique<RelationSlab>(std::move(*IF->Relations)),
         /*CountReferences=*/false);
   }
-  PreambleIndex.reset(
+  size_t IndexVersion = 0;
+  auto NewIndex =
       PreambleSymbols.buildIndex(UseDex ? IndexType::Heavy : IndexType::Light,
-                                 DuplicateHandling::PickOne));
-  vlog("Build dynamic index for header symbols with estimated memory usage of "
-       "{0} bytes",
-       PreambleIndex.estimateMemoryUsage());
+                                 DuplicateHandling::PickOne, &IndexVersion);
+  {
+    std::lock_guard<std::mutex> Lock(UpdateIndexMu);
+    if (IndexVersion <= PreambleIndexVersion) {
+      // We lost the race, some other thread built a later version.
+      return;
+    }
+    PreambleIndexVersion = IndexVersion;
+    PreambleIndex.reset(std::move(NewIndex));
+    vlog(
+        "Build dynamic index for header symbols with estimated memory usage of "
+        "{0} bytes",
+        PreambleIndex.estimateMemoryUsage());
+  }
 }
 
 void FileIndex::updateMain(PathRef Path, ParsedAST &AST) {
-  auto Contents = indexMainDecls(AST);
+  auto Contents = indexMainDecls(AST, CollectMainFileRefs);
   MainFileSymbols.update(
       Path, std::make_unique<SymbolSlab>(std::move(std::get<0>(Contents))),
       std::make_unique<RefSlab>(std::move(std::get<1>(Contents))),
       std::make_unique<RelationSlab>(std::move(std::get<2>(Contents))),
       /*CountReferences=*/true);
-  MainFileIndex.reset(
-      MainFileSymbols.buildIndex(IndexType::Light, DuplicateHandling::Merge));
-  vlog("Build dynamic index for main-file symbols with estimated memory usage "
-       "of {0} bytes",
-       MainFileIndex.estimateMemoryUsage());
+  size_t IndexVersion = 0;
+  auto NewIndex = MainFileSymbols.buildIndex(
+      IndexType::Light, DuplicateHandling::Merge, &IndexVersion);
+  {
+    std::lock_guard<std::mutex> Lock(UpdateIndexMu);
+    if (IndexVersion <= MainIndexVersion) {
+      // We lost the race, some other thread built a later version.
+      return;
+    }
+    MainIndexVersion = IndexVersion;
+    MainFileIndex.reset(std::move(NewIndex));
+    vlog(
+        "Build dynamic index for main-file symbols with estimated memory usage "
+        "of {0} bytes",
+        MainFileIndex.estimateMemoryUsage());
+  }
 }
 
 } // namespace clangd

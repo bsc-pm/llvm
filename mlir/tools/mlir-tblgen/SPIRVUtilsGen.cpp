@@ -205,7 +205,8 @@ static void emitConceptDecl(const Availability &availability, raw_ostream &os) {
      << "  public:\n"
      << "    virtual ~Concept() = default;\n"
      << "    virtual " << availability.getQueryFnRetType() << " "
-     << availability.getQueryFnName() << "(Operation *tblgen_opaque_op) = 0;\n"
+     << availability.getQueryFnName()
+     << "(Operation *tblgen_opaque_op) const = 0;\n"
      << "  };\n";
 }
 
@@ -215,7 +216,7 @@ static void emitModelDecl(const Availability &availability, raw_ostream &os) {
      << "  public:\n"
      << "    " << availability.getQueryFnRetType() << " "
      << availability.getQueryFnName()
-     << "(Operation *tblgen_opaque_op) final {\n"
+     << "(Operation *tblgen_opaque_op) const final {\n"
      << "      auto op = llvm::cast<ConcreteOp>(tblgen_opaque_op);\n"
      << "      (void)op;\n"
      // Forward to the method on the concrete operation type.
@@ -508,6 +509,11 @@ static void emitAttributeSerialization(const Attribute &attr,
        << formatv("  {0}.push_back(static_cast<uint32_t>("
                   "attr.cast<IntegerAttr>().getValue().getZExtValue()));\n",
                   operandList);
+  } else if (attr.isEnumAttr() || attr.getAttrDefName() == "TypeAttr") {
+    os << tabs
+       << formatv("  {0}.push_back(static_cast<uint32_t>("
+                  "getTypeID(attr.cast<TypeAttr>().getValue())));\n",
+                  operandList);
   } else {
     PrintFatalError(
         loc,
@@ -707,7 +713,7 @@ static void emitSerializationFunction(const Record *attrClass,
 static void initDispatchSerializationFn(StringRef opVar, raw_ostream &os) {
   os << formatv(
       "LogicalResult Serializer::dispatchToAutogenSerialization(Operation "
-      "*{0}) {{\n ",
+      "*{0}) {{\n",
       opVar);
 }
 
@@ -721,18 +727,15 @@ static void emitSerializationDispatch(const Operator &op, StringRef tabs,
   os << tabs
      << formatv("  return processOp(cast<{0}>({1}));\n",
                 op.getQualCppClassName(), opVar);
-  os << tabs << "} else";
+  os << tabs << "}\n";
 }
 
 /// Generates the epilogue for the function that dispatches the serialization of
 /// the operation.
 static void finalizeDispatchSerializationFn(StringRef opVar, raw_ostream &os) {
-  os << " {\n";
   os << formatv(
-      "    return {0}->emitError(\"unhandled operation serialization\");\n",
+      "  return {0}->emitError(\"unhandled operation serialization\");\n",
       opVar);
-  os << "  }\n";
-  os << "  return success();\n";
   os << "}\n\n";
 }
 
@@ -768,6 +771,11 @@ static void emitAttributeDeserialization(const Attribute &attr,
     os << tabs
        << formatv("{0}.push_back(opBuilder.getNamedAttr(\"{1}\", "
                   "opBuilder.getI32IntegerAttr({2}[{3}++])));\n",
+                  attrList, attrName, words, wordIndex);
+  } else if (attr.isEnumAttr() || attr.getAttrDefName() == "TypeAttr") {
+    os << tabs
+       << formatv("{0}.push_back(opBuilder.getNamedAttr(\"{1}\", "
+                  "TypeAttr::get(getType({2}[{3}++]))));\n",
                   attrList, attrName, words, wordIndex);
   } else {
     PrintFatalError(
@@ -1275,7 +1283,7 @@ static void emitAvailabilityImpl(const Operator &srcOp, raw_ostream &os) {
       os << formatv("    auto tblgen_instance = {0}::{1}(tblgen_attrVal);\n",
                     enumAttr->getCppNamespace(), avail.getQueryFnName());
       os << "    if (tblgen_instance) "
-         // TODO(antiagainst): use `avail.getMergeCode()` here once ODS supports
+         // TODO` here once ODS supports
          // dialect-specific contents so that we can use not implementing the
          // availability interface as indication of no requirements.
          << std::string(tgfmt(caseSpecs.front().second.getMergeActionCode(),

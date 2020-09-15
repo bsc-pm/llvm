@@ -1,4 +1,4 @@
-# Table-driven Operation Definition Specification (ODS)
+# Operation Definition Specification (ODS)
 
 In addition to specializing the `mlir::Op` C++ template, MLIR also supports
 defining operations in a table-driven manner. This is achieved via
@@ -346,20 +346,20 @@ involving multiple operands/attributes/results are provided as the second
 template parameter to the `Op` class. They should be deriving from the `OpTrait`
 class. See [Constraints](#constraints) for more information.
 
-### Operation interfaces
+### Interfaces
 
-[Operation interfaces](Interfaces.md#operation-interfaces) allow
-operations to expose method calls without the
-caller needing to know the exact operation type. Operation interfaces
-defined in C++ can be accessed in the ODS framework via the
-`OpInterfaceTrait` class. Aside from using pre-existing interfaces in
-the C++ API, the ODS framework also provides a simplified mechanism
-for defining such interfaces which removes much of the boilerplate
-necessary.
+[Interfaces](Interfaces.md#attribute-operation-type-interfaces) allow for
+attributes, operations, and types to expose method calls without the caller
+needing to know the derived type. Operation interfaces defined in C++ can be
+accessed in the ODS framework via the `OpInterfaceTrait` class. Aside from using
+pre-existing interfaces in the C++ API, the ODS framework also provides a
+simplified mechanism for defining such interfaces which removes much of the
+boilerplate necessary.
 
-Providing a definition of the `OpInterface` class will auto-generate the C++
-classes for the interface. An `OpInterface` includes a name, for the C++ class,
-a description, and a list of interface methods.
+Providing a definition of the `AttrInterface`, `OpInterface`, or `TypeInterface`
+class will auto-generate the C++ classes for the interface. An interface
+includes a name, for the C++ class, a description, and a list of interface
+methods.
 
 ```tablegen
 def MyInterface : OpInterface<"MyInterface"> {
@@ -444,16 +444,17 @@ def MyInterface : OpInterface<"MyInterface"> {
     // Note: `ConcreteOp` corresponds to the derived operation typename.
     InterfaceMethod<"/*insert doc here*/",
       "unsigned", "getNumWithDefault", (ins), /*methodBody=*/[{}], [{
-        ConcreteOp op = cast<ConcreteOp>(getOperation());
+        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
         return op.getNumInputs() + op.getNumOutputs();
     }]>,
   ];
 }
 
-// Interfaces can optionally be wrapped inside DeclareOpInterfaceMethods. This
-// would result in autogenerating declarations for members `foo`, `bar` and
-// `fooStatic`. Methods with bodies are not declared inside the op
-// declaration but instead handled by the op interface trait directly.
+// Operation interfaces can optionally be wrapped inside
+// DeclareOpInterfaceMethods. This would result in autogenerating declarations
+// for members `foo`, `bar` and `fooStatic`. Methods with bodies are not
+// declared inside the op declaration but instead handled by the op interface
+// trait directly.
 def OpWithInferTypeInterfaceOp : Op<...
     [DeclareOpInterfaceMethods<MyInterface>]> { ... }
 
@@ -465,9 +466,9 @@ def OpWithOverrideInferTypeInterfaceOp : Op<...
     [DeclareOpInterfaceMethods<MyInterface, ["getNumWithDefault"]>]> { ... }
 ```
 
-A verification method can also be specified on the `OpInterface` by setting
-`verify`. Setting `verify` results in the generated trait having a `verifyTrait`
-method that is applied to all operations implementing the trait.
+Operation interfaces may also provide a verification method on `OpInterface` by
+setting `verify`. Setting `verify` results in the generated trait having a
+`verifyTrait` method that is applied to all operations implementing the trait.
 
 ### Builder methods
 
@@ -526,10 +527,9 @@ static void build(OpBuilder &odsBuilder, OperationState &odsState,
                   IntegerAttr i32_attr, FloatAttr f32_attr, ...);
 
 // All operands/attributes have aggregate parameters.
-// Generated if InferTypeOpInterface interface is specified.
+// Generated if return type can be inferred.
 static void build(OpBuilder &odsBuilder, OperationState &odsState,
-                  ValueRange operands,
-                  ArrayRef<NamedAttribute> attributes);
+                  ValueRange operands, ArrayRef<NamedAttribute> attributes);
 
 // (And manually specified builders depending on the specific op.)
 ```
@@ -553,6 +553,12 @@ behavior is essentially due to C++ function parameter default value placement
 restrictions.) Otherwise, the builder of the third form will still be generated
 but default values for the attributes not at the end of the `arguments` list
 will not be supplied in the builder's signature.
+
+ODS will generate a builder that doesn't require return type specified if
+
+*   Op implements InferTypeOpInterface interface;
+*   All return types are either buildable types or are the same as a given
+    operand (e.g., `AllTypesMatch` constraint between operand and result);
 
 And there may potentially exist other builders depending on the specific op;
 please refer to the
@@ -621,7 +627,8 @@ let verifier = [{
 ```
 
 Code placed in `verifier` will be called after the auto-generated verification
-code.
+code. The order of trait verification excluding those of `verifier` should not
+be relied upon.
 
 ### Declarative Assembly Format
 
@@ -657,6 +664,12 @@ The available directives are as follows:
     -   Represents the attribute dictionary of the operation, but prefixes the
         dictionary with an `attributes` keyword.
 
+*   `custom` < UserDirective > ( Params )
+
+    -   Represents a custom directive implemented by the user in C++.
+    -   See the [Custom Directives](#custom-directives) section below for more
+        details.
+
 *   `functional-type` ( inputs , results )
 
     -   Formats the `inputs` and `results` arguments as a
@@ -667,6 +680,10 @@ The available directives are as follows:
 *   `operands`
 
     -   Represents all of the operands of an operation.
+
+*   `regions`
+
+    -   Represents all of the regions of an operation.
 
 *   `results`
 
@@ -687,16 +704,92 @@ The available directives are as follows:
 A literal is either a keyword or punctuation surrounded by \`\`.
 
 The following are the set of valid punctuation:
-  `:`, `,`, `=`, `<`, `>`, `(`, `)`, `[`, `]`, `->`
+
+`:`, `,`, `=`, `<`, `>`, `(`, `)`, `{`, `}`, `[`, `]`, `->`
 
 #### Variables
 
 A variable is an entity that has been registered on the operation itself, i.e.
-an argument(attribute or operand), result, successor, etc. In the `CallOp`
-example above, the variables would be `$callee` and `$args`.
+an argument(attribute or operand), region, result, successor, etc. In the
+`CallOp` example above, the variables would be `$callee` and `$args`.
 
 Attribute variables are printed with their respective value type, unless that
 value type is buildable. In those cases, the type of the attribute is elided.
+
+#### Custom Directives
+
+The declarative assembly format specification allows for handling a large
+majority of the common cases when formatting an operation. For the operations
+that require or desire specifying parts of the operation in a form not supported
+by the declarative syntax, custom directives may be specified. A custom
+directive essentially allows for users to use C++ for printing and parsing
+subsections of an otherwise declaratively specified format. Looking at the
+specification of a custom directive above:
+
+```
+custom-directive ::= `custom` `<` UserDirective `>` `(` Params `)`
+```
+
+A custom directive has two main parts: The `UserDirective` and the `Params`. A
+custom directive is transformed into a call to a `print*` and a `parse*` method
+when generating the C++ code for the format. The `UserDirective` is an
+identifier used as a suffix to these two calls, i.e., `custom<MyDirective>(...)`
+would result in calls to `parseMyDirective` and `printMyDirective` wihtin the
+parser and printer respectively. `Params` may be any combination of variables
+(i.e. Attribute, Operand, Successor, etc.) and type directives. The type
+directives must refer to a variable, but that variable need not also be a
+parameter to the custom directive.
+
+The arguments to the `parse<UserDirective>` method is firstly a reference to the
+`OpAsmParser`(`OpAsmParser &`), and secondly a set of output parameters
+corresponding to the parameters specified in the format. The mapping of
+declarative parameter to `parse` method argument is detailed below:
+
+*   Attribute Variables
+    -   Single: `<Attribute-Storage-Type>(e.g. Attribute) &`
+    -   Optional: `<Attribute-Storage-Type>(e.g. Attribute) &`
+*   Operand Variables
+    -   Single: `OpAsmParser::OperandType &`
+    -   Optional: `Optional<OpAsmParser::OperandType> &`
+    -   Variadic: `SmallVectorImpl<OpAsmParser::OperandType> &`
+*   Region Variables
+    -   Single: `Region &`
+    -   Variadic: `SmallVectorImpl<std::unique_ptr<Region>> &`
+*   Successor Variables
+    -   Single: `Block *&`
+    -   Variadic: `SmallVectorImpl<Block *> &`
+*   Type Directives
+    -   Single: `Type &`
+    -   Optional: `Type &`
+    -   Variadic: `SmallVectorImpl<Type> &`
+
+When a variable is optional, the value should only be specified if the variable
+is present. Otherwise, the value should remain `None` or null.
+
+The arguments to the `print<UserDirective>` method is firstly a reference to the
+`OpAsmPrinter`(`OpAsmPrinter &`), and secondly a set of output parameters
+corresponding to the parameters specified in the format. The mapping of
+declarative parameter to `print` method argument is detailed below:
+
+*   Attribute Variables
+    -   Single: `<Attribute-Storage-Type>(e.g. Attribute)`
+    -   Optional: `<Attribute-Storage-Type>(e.g. Attribute)`
+*   Operand Variables
+    -   Single: `Value`
+    -   Optional: `Value`
+    -   Variadic: `OperandRange`
+*   Region Variables
+    -   Single: `Region &`
+    -   Variadic: `MutableArrayRef<Region>`
+*   Successor Variables
+    -   Single: `Block *`
+    -   Variadic: `SuccessorRange`
+*   Type Directives
+    -   Single: `Type`
+    -   Optional: `Type`
+    -   Variadic: `TypeRange`
+
+When a variable is optional, the provided value may be null.
 
 #### Optional Groups
 
@@ -706,7 +799,8 @@ of the assembly format can be marked as `optional` based on the presence of this
 information. An optional group is defined by wrapping a set of elements within
 `()` followed by a `?` and has the following requirements:
 
-*   The first element of the group must either be a literal or an operand.
+*   The first element of the group must either be a attribute, literal, operand,
+    or region.
     -   This is because the first element must be optionally parsable.
 *   Exactly one argument variable within the group must be marked as the anchor
     of the group.
@@ -714,18 +808,22 @@ information. An optional group is defined by wrapping a set of elements within
         should be printed/parsed.
     -   An element is marked as the anchor by adding a trailing `^`.
     -   The first element is *not* required to be the anchor of the group.
-*   Literals, variables, and type directives are the only valid elements within
-    the group.
+    -   When a non-variadic region anchors a group, the detector for printing
+        the group is if the region is empty.
+*   Literals, variables, custom directives, and type directives are the only
+    valid elements within the group.
     -   Any attribute variable may be used, but only optional attributes can be
         marked as the anchor.
     -   Only variadic or optional operand arguments can be used.
+    -   All region variables can be used. When a non-variable length region is
+        used, if the group is not present the region is empty.
     -   The operands to a type directive must be defined within the optional
         group.
 
 An example of an operation with an optional group is `std.return`, which has a
 variadic number of operands.
 
-```
+```tablegen
 def ReturnOp : ... {
   let arguments = (ins Variadic<AnyType>:$operands);
 
@@ -735,23 +833,57 @@ def ReturnOp : ... {
 }
 ```
 
+##### Unit Attributes
+
+In MLIR, the [`unit` Attribute](LangRef.md#unit-attribute) is special in that it
+only has one possible value, i.e. it derives meaning from its existence. When a
+unit attribute is used to anchor an optional group and is not the first element
+of the group, the presence of the unit attribute can be directly correlated with
+the presence of the optional group itself. As such, in these situations the unit
+attribute will not be printed or present in the output and will be automatically
+inferred when parsing by the presence of the optional group itself.
+
+For example, the following operation:
+
+```tablegen
+def FooOp : ... {
+  let arguments = (ins UnitAttr:$is_read_only);
+
+  let assemblyFormat = "attr-dict (`is_read_only` $is_read_only^)?";
+}
+```
+
+would be formatted as such:
+
+```mlir
+// When the unit attribute is present:
+foo.op is_read_only
+
+// When the unit attribute is not present:
+foo.op
+```
+
 #### Requirements
 
 The format specification has a certain set of requirements that must be adhered
 to:
 
-1. The output and operation name are never shown as they are fixed and cannot be
-   altered.
-1. All operands within the operation must appear within the format, either
-   individually or with the `operands` directive.
-1. All operand and result types must appear within the format using the various
-   `type` directives, either individually or with the `operands` or `results`
-   directives.
-1. The `attr-dict` directive must always be present.
-1. Must not contain overlapping information; e.g. multiple instances of
-   'attr-dict', types, operands, etc.
-   -  Note that `attr-dict` does not overlap with individual attributes. These
-      attributes will simply be elided when printing the attribute dictionary.
+1.  The output and operation name are never shown as they are fixed and cannot
+    be altered.
+1.  All operands within the operation must appear within the format, either
+    individually or with the `operands` directive.
+1.  All regions within the operation must appear within the format, either
+    individually or with the `regions` directive.
+1.  All successors within the operation must appear within the format, either
+    individually or with the `successors` directive.
+1.  All operand and result types must appear within the format using the various
+    `type` directives, either individually or with the `operands` or `results`
+    directives.
+1.  The `attr-dict` directive must always be present.
+1.  Must not contain overlapping information; e.g. multiple instances of
+    'attr-dict', types, operands, etc.
+    -   Note that `attr-dict` does not overlap with individual attributes. These
+        attributes will simply be elided when printing the attribute dictionary.
 
 ##### Type Inference
 
@@ -773,8 +905,8 @@ There are many operations that have known type equality constraints registered
 as traits on the operation; for example the true, false, and result values of a
 `select` operation often have the same type. The assembly format may inspect
 these equal constraints to discern the types of missing variables. The currently
-supported traits are: `AllTypesMatch`, `SameTypeOperands`, and
-`SameOperandsAndResultType`.
+supported traits are: `AllTypesMatch`, `TypesMatchWith`, `SameTypeOperands`,
+and `SameOperandsAndResultType`.
 
 ### `hasCanonicalizer`
 
@@ -842,9 +974,8 @@ to access them. For example, for a binary arithmetic operation, it may provide
 `.lhs()` to access the first operand and `.rhs()` to access the second operand.
 
 The operand adaptor class lives in the same namespace as the operation class,
-and has the name of the operation followed by `OperandAdaptor`. A template
-declaration `OperandAdaptor<>` is provided to look up the operand adaptor for
-the given operation.
+and has the name of the operation followed by `Adaptor` as well as an alias
+`Adaptor` inside the op class.
 
 Operand adaptors can be used in function templates that also process operations:
 
@@ -856,7 +987,7 @@ std::pair<Value, Value> zip(BinaryOpTy &&op) {
 
 void process(AddOp op, ArrayRef<Value> newOperands) {
   zip(op);
-  zip(OperandAdaptor<AddOp>(newOperands));
+  zip(Adaptor<AddOp>(newOperands));
   /*...*/
 }
 ```
@@ -958,9 +1089,9 @@ is used. They serve as "hooks" to the enclosing environment.  This includes
   replaced by the operand/result's type. E.g., for `F32` in `F32:$operand`, its
   `$_self` will be expanded as `getOperand(...).getType()`.
 
-TODO(b/130663252): Reconsider the leading symbol for special placeholders.
-Eventually we want to allow referencing operand/result $-names; such $-names
-can start with underscore.
+TODO: Reconsider the leading symbol for special placeholders. Eventually we want
+to allow referencing operand/result $-names; such $-names can start with
+underscore.
 
 For example, to write an attribute `attr` is an `IntegerAttr`, in C++ you can
 just call `attr.isa<IntegerAttr>()`. The code can be wrapped in a `CPred` as
@@ -1041,7 +1172,7 @@ to convert between the internal storage and the helper method.
 
 ### Attribute decorators
 
-There are a few important attribute adapters/decorators/modifers that can be
+There are a few important attribute adapters/decorators/modifiers that can be
 applied to ODS attributes to specify common additional properties like
 optionality, default values, etc.:
 

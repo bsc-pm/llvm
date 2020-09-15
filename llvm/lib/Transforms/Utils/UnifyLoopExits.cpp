@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/InitializePasses.h"
@@ -33,7 +34,7 @@ struct UnifyLoopExits : public FunctionPass {
     initializeUnifyLoopExitsPass(*PassRegistry::getPassRegistry());
   }
 
-  void getAnalysisUsage(AnalysisUsage &AU) const {
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequiredID(LowerSwitchID);
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -42,7 +43,7 @@ struct UnifyLoopExits : public FunctionPass {
     AU.addPreserved<DominatorTreeWrapperPass>();
   }
 
-  bool runOnFunction(Function &F);
+  bool runOnFunction(Function &F) override;
 };
 } // namespace
 
@@ -80,7 +81,7 @@ static void restoreSSA(const DominatorTree &DT, const Loop *L,
                        const SetVector<BasicBlock *> &Incoming,
                        BasicBlock *LoopExitBlock) {
   using InstVector = SmallVector<Instruction *, 8>;
-  using IIMap = DenseMap<Instruction *, InstVector>;
+  using IIMap = MapVector<Instruction *, InstVector>;
   IIMap ExternalUsers;
   for (auto BB : L->blocks()) {
     for (auto &I : *BB) {

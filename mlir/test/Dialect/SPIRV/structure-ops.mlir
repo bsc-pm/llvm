@@ -11,7 +11,7 @@ spv.module Logical GLSL450 {
     // CHECK: [[VAR1:%.*]] = spv._address_of @var1 : !spv.ptr<!spv.struct<f32, !spv.array<4 x f32>>, Input>
     // CHECK-NEXT: spv.AccessChain [[VAR1]][{{.*}}, {{.*}}] : !spv.ptr<!spv.struct<f32, !spv.array<4 x f32>>, Input>
     %1 = spv._address_of @var1 : !spv.ptr<!spv.struct<f32, !spv.array<4xf32>>, Input>
-    %2 = spv.AccessChain %1[%0, %0] : !spv.ptr<!spv.struct<f32, !spv.array<4xf32>>, Input>
+    %2 = spv.AccessChain %1[%0, %0] : !spv.ptr<!spv.struct<f32, !spv.array<4xf32>>, Input>, i32, i32
     spv.Return
   }
 }
@@ -175,7 +175,7 @@ spv.module Logical GLSL450 {
    spv.EntryPoint "GLCompute" @do_something
 }
 
-/// TODO(ravishankarm) : Add a test that verifies an error is thrown
+/// TODO: Add a test that verifies an error is thrown
 /// when interface entries of EntryPointOp are not
 /// spv.Variables. There is currently no other op that has a spv.ptr
 /// return type
@@ -348,6 +348,13 @@ spv.module Logical GLSL450 {
 // -----
 
 spv.module Logical GLSL450 {
+  // expected-error @+1 {{storage class cannot be 'Function'}}
+  spv.globalVariable @var0 : !spv.ptr<f32, Function>
+}
+
+// -----
+
+spv.module Logical GLSL450 {
   spv.func @foo() "None" {
     // expected-error @+1 {{op must appear in a module-like op's block}}
     spv.globalVariable @var0 : !spv.ptr<f32, Input>
@@ -365,6 +372,9 @@ spv.module Logical GLSL450 {
 // CHECK: spv.module Logical GLSL450
 spv.module Logical GLSL450 { }
 
+// Module with a name
+// CHECK: spv.module @{{.*}} Logical GLSL450
+spv.module @name Logical GLSL450 { }
 
 // Module with (version, capabilities, extensions) triple
 // CHECK: spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_16bit_storage]>

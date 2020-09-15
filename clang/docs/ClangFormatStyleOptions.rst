@@ -151,6 +151,9 @@ the configuration (without a prefix: ``Auto``).
   * ``Microsoft``
     A style complying with `Microsoft's style guide
     <https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference?view=vs-2017>`_
+  * ``GNU``
+    A style complying with the `GNU coding standards
+    <https://www.gnu.org/prep/standards/standards.html>`_
 
 .. START_FORMAT_STYLE_OPTIONS
 
@@ -203,6 +206,18 @@ the configuration (without a prefix: ``Auto``).
     int aaaa = 12;
     int b    = 23;
     int ccc  = 23;
+
+**AlignConsecutiveBitFields** (``bool``)
+  If ``true``, aligns consecutive bitfield members.
+
+  This will align the bitfield separators of consecutive lines. This
+  will result in formattings like
+
+  .. code-block:: c++
+
+    int aaaa : 1;
+    int b    : 12;
+    int ccc  : 8;
 
 **AlignConsecutiveDeclarations** (``bool``)
   If ``true``, aligns consecutive declarations.
@@ -743,7 +758,24 @@ the configuration (without a prefix: ``Auto``).
              int bbbbbbbbbbbbbbbbbbbbb) {
        }
 
+**AttributeMacros** (``std::vector<std::string>``)
+  A vector of strings that should be interpreted as attributes/qualifiers
+  instead of identifiers. This can be useful for language extensions or
+  static analyzer annotations:
 
+  .. code-block:: c++
+
+    x = (char *__capability)&y;
+    int function(void) __ununsed;
+    void only_writes_to_buffer(char *__output buffer);
+
+  In the .clang-format configuration file, this can be configured like:
+
+  .. code-block:: yaml
+
+    AttributeMacros: ['__capability', '__output', '__ununsed']
+
+  For example: __capability.
 
 **BinPackArguments** (``bool``)
   If ``false``, a function call's arguments will either be all on the
@@ -778,6 +810,43 @@ the configuration (without a prefix: ``Auto``).
     void f(int aaaaaaaaaaaaaaaaaaaa,
            int aaaaaaaaaaaaaaaaaaaa,
            int aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) {}
+
+**BitFieldColonSpacing** (``BitFieldColonSpacingStyle``)
+  The BitFieldColonSpacingStyle to use for bitfields.
+
+  Possible values:
+
+  * ``BFCS_Both`` (in configuration: ``Both``)
+    Add one space on each side of the ``:``
+
+    .. code-block:: c++
+
+      unsigned bf : 2;
+
+  * ``BFCS_None`` (in configuration: ``None``)
+    Add no space around the ``:`` (except when needed for
+    ``AlignConsecutiveBitFields``).
+
+    .. code-block:: c++
+
+      unsigned bf:2;
+
+  * ``BFCS_Before`` (in configuration: ``Before``)
+    Add space before the ``:`` only
+
+    .. code-block:: c++
+
+      unsigned bf :2;
+
+  * ``BFCS_After`` (in configuration: ``After``)
+    Add space after the ``:`` only (space may be added before if
+    needed for ``AlignConsecutiveBitFields``).
+
+    .. code-block:: c++
+
+      unsigned bf: 2;
+
+
 
 **BraceWrapping** (``BraceWrappingFlags``)
   Control of individual brace wrapping cases.
@@ -1012,6 +1081,21 @@ the configuration (without a prefix: ``Auto``).
         foo();
         bar();
       });
+
+  * ``bool BeforeWhile`` Wrap before ``while``.
+
+    .. code-block:: c++
+
+      true:
+      do {
+        foo();
+      }
+      while (1);
+
+      false:
+      do {
+        foo();
+      } while (1);
 
   * ``bool IndentBraces`` Indent the wrapped braces themselves.
 
@@ -1711,6 +1795,52 @@ the configuration (without a prefix: ``Auto``).
      default:                                 default:
        plop();                                  plop();
      }                                      }
+
+**IndentExternBlock** (``IndentExternBlockStyle``)
+  IndentExternBlockStyle is the type of indenting of extern blocks.
+
+  Possible values:
+
+  * ``IEBS_AfterExternBlock`` (in configuration: ``AfterExternBlock``)
+    Backwards compatible with AfterExternBlock's indenting.
+
+    .. code-block:: c++
+
+       IndentExternBlock: AfterExternBlock
+       BraceWrapping.AfterExternBlock: true
+       extern "C"
+       {
+           void foo();
+       }
+
+
+    .. code-block:: c++
+
+       IndentExternBlock: AfterExternBlock
+       BraceWrapping.AfterExternBlock: false
+       extern "C" {
+       void foo();
+       }
+
+  * ``IEBS_NoIndent`` (in configuration: ``NoIndent``)
+    Does not indent extern blocks.
+
+    .. code-block:: c++
+
+        extern "C" {
+        void foo();
+        }
+
+  * ``IEBS_Indent`` (in configuration: ``Indent``)
+    Indents extern blocks.
+
+    .. code-block:: c++
+
+        extern "C" {
+          void foo();
+        }
+
+
 
 **IndentGotoLabels** (``bool``)
   Indent goto labels.
@@ -2619,6 +2749,24 @@ the configuration (without a prefix: ``Auto``).
     one tab stop to the next one.
 
 
+
+**WhitespaceSensitiveMacros** (``std::vector<std::string>``)
+  A vector of macros which are whitespace-sensitive and should not
+  be touched.
+
+  These are expected to be macros of the form:
+
+  .. code-block:: c++
+
+    STRINGIZE(...)
+
+  In the .clang-format configuration file, this can be configured like:
+
+  .. code-block:: yaml
+
+    WhitespaceSensitiveMacros: ['STRINGIZE', 'PP_STRINGIZE']
+
+  For example: BOOST_PP_STRINGIZE
 
 .. END_FORMAT_STYLE_OPTIONS
 

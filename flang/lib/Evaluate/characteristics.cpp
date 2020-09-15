@@ -121,6 +121,11 @@ std::optional<TypeAndShape> TypeAndShape::Characterize(
   }
 }
 
+std::optional<TypeAndShape> TypeAndShape::Characterize(
+    const ActualArgument &arg, FoldingContext &context) {
+  return Characterize(arg.UnwrapExpr(), context);
+}
+
 bool TypeAndShape::IsCompatibleWith(parser::ContextualMessages &messages,
     const TypeAndShape &that, const char *thisIs, const char *thatIs,
     bool isElemental) const {
@@ -183,7 +188,7 @@ llvm::raw_ostream &TypeAndShape::Dump(llvm::raw_ostream &o) const {
   o << type_.AsFortran(LEN_ ? LEN_->AsFortran() : "");
   attrs_.Dump(o, EnumToString);
   if (!shape_.empty()) {
-    o << " dimension(";
+    o << " dimension";
     char sep{'('};
     for (const auto &expr : shape_) {
       o << sep;
@@ -563,8 +568,9 @@ bool Procedure::CanOverride(
 }
 
 std::optional<Procedure> Procedure::Characterize(
-    const semantics::Symbol &symbol, const IntrinsicProcTable &intrinsics) {
+    const semantics::Symbol &original, const IntrinsicProcTable &intrinsics) {
   Procedure result;
+  const auto &symbol{ResolveAssociations(original)};
   CopyAttrs<Procedure, Procedure::Attr>(symbol, result,
       {
           {semantics::Attr::PURE, Procedure::Attr::Pure},

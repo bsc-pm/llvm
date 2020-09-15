@@ -1,13 +1,12 @@
 # REQUIRES: arm
 
-# RUN: yaml2obj %s >%t
+# RUN: yaml2obj %s -o %t
 # RUN: %lldb -c %t -o "target symbols add %S/Inputs/stack-cfi-arm.syms" \
 # RUN:   -o "image show-unwind -n func0" -b | FileCheck %s
 
 # CHECK:      Symbol file UnwindPlan:
 # CHECK:      row[0]:    0: CFA=DW_OP_breg13 +0, DW_OP_consts +0, DW_OP_plus  => pc=DW_OP_breg14 +0 
-# CHECK-NEXT: row[1]:    2: CFA=DW_OP_breg13 +0, DW_OP_consts +8, DW_OP_plus  => r7=DW_OP_pick 0x00, DW_OP_consts -8, DW_OP_plus , DW_OP_deref  pc=DW_OP_pick 0x00, DW_OP_consts -4, DW_OP_plus , DW_OP_deref  
-# 
+# CHECK-NEXT: row[1]:    2: CFA=DW_OP_breg13 +0, DW_OP_consts +8, DW_OP_plus  => r7=DW_OP_pick 0x0, DW_OP_consts -8, DW_OP_plus, DW_OP_deref pc=DW_OP_pick 0x0, DW_OP_consts -4, DW_OP_plus, DW_OP_deref
 
 --- !minidump
 Streams:         

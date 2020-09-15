@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -140,7 +141,7 @@ public:
     edsc::ScopedContext context(rewriter, op->getLoc());
 
     // Fill in an aggregate value of the descriptor.
-    RangeOpOperandAdaptor adaptor(operands);
+    RangeOpAdaptor adaptor(operands);
     Value desc = llvm_undef(rangeDescriptorTy);
     desc = llvm_insertvalue(desc, adaptor.min(), rewriter.getI64ArrayAttr(0));
     desc = llvm_insertvalue(desc, adaptor.max(), rewriter.getI64ArrayAttr(1));
@@ -178,7 +179,7 @@ public:
       return failure();
 
     edsc::ScopedContext context(rewriter, op->getLoc());
-    ReshapeOpOperandAdaptor adaptor(operands);
+    ReshapeOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(adaptor.src());
     BaseViewConversionHelper desc(typeConverter.convertType(dstType));
     desc.setAllocatedPtr(baseDesc.allocatedPtr());
@@ -208,7 +209,7 @@ public:
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     edsc::ScopedContext context(rewriter, op->getLoc());
-    SliceOpOperandAdaptor adaptor(operands);
+    SliceOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(adaptor.view());
 
     auto sliceOp = cast<SliceOp>(op);
@@ -219,7 +220,7 @@ public:
     BaseViewConversionHelper desc(
         typeConverter.convertType(sliceOp.getShapedType()));
 
-    // TODO(ntv): extract sizes and emit asserts.
+    // TODO: extract sizes and emit asserts.
     SmallVector<Value, 4> strides(memRefType.getRank());
     for (int i = 0, e = memRefType.getRank(); i < e; ++i)
       strides[i] = baseDesc.stride(i);
@@ -302,7 +303,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     // Initialize the common boilerplate and alloca at the top of the FuncOp.
     edsc::ScopedContext context(rewriter, op->getLoc());
-    TransposeOpOperandAdaptor adaptor(operands);
+    TransposeOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(adaptor.view());
 
     auto transposeOp = cast<TransposeOp>(op);
@@ -338,7 +339,8 @@ public:
 class YieldOpConversion : public ConvertToLLVMPattern {
 public:
   explicit YieldOpConversion(MLIRContext *context, LLVMTypeConverter &lowering_)
-      : ConvertToLLVMPattern(YieldOp::getOperationName(), context, lowering_) {}
+      : ConvertToLLVMPattern(linalg::YieldOp::getOperationName(), context,
+                             lowering_) {}
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
@@ -383,10 +385,8 @@ void ConvertLinalgToLLVMPass::runOnOperation() {
   populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
 
   LLVMConversionTarget target(getContext());
-  target.addDynamicallyLegalOp<FuncOp>(
-      [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
   target.addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  if (failed(applyFullConversion(module, target, patterns, &converter)))
+  if (failed(applyFullConversion(module, target, patterns)))
     signalPassFailure();
 }
 

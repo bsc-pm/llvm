@@ -3,7 +3,10 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_clang_unittest(SyntaxTests
-  TreeTest.cpp
+  TreeTestBase.cpp
+  BuildTreeTest.cpp
+  MutationsTest.cpp
+  SynthesisTest.cpp
   TokensTest.cpp
 )
 
@@ -14,6 +17,7 @@ clang_target_link_libraries(SyntaxTests
   clangFrontend
   clangLex
   clangSerialization
+  clangTesting
   clangTooling
   clangToolingCore
   clangToolingSyntax

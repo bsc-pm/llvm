@@ -12,7 +12,7 @@ void foo(int &rx) {
 // CHECK: store i32 0, i32* %3, align 4
 
 // CHECK: define internal void @red_comb(i32* %0, i32* %1, i64 %2)
-// CHECK: %add = add nsw i32 %7, %8, !dbg !16
+// CHECK: %add = add nsw i32 %7, %8
 // CHECK: store i32 %add, i32* %arrayctor.dst.cur, align 4
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %rx)

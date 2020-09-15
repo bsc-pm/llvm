@@ -133,7 +133,7 @@ const DILocation *DILocation::getMergedLocation(const DILocation *LocA,
 }
 
 Optional<unsigned> DILocation::encodeDiscriminator(unsigned BD, unsigned DF, unsigned CI) {
-  SmallVector<unsigned, 3> Components = {BD, DF, CI};
+  std::array<unsigned, 3> Components = {BD, DF, CI};
   uint64_t RemainingWork = 0U;
   // We use RemainingWork to figure out if we have no remaining components to
   // encode. For example: if BD != 0 but DF == 0 && CI == 0, we don't need to
@@ -336,18 +336,106 @@ DISubrange *DISubrange::getImpl(LLVMContext &Context, int64_t Count, int64_t Lo,
                                 StorageType Storage, bool ShouldCreate) {
   auto *CountNode = ConstantAsMetadata::get(
       ConstantInt::getSigned(Type::getInt64Ty(Context), Count));
-  return getImpl(Context, CountNode, Lo, Storage, ShouldCreate);
+  auto *LB = ConstantAsMetadata::get(
+      ConstantInt::getSigned(Type::getInt64Ty(Context), Lo));
+  return getImpl(Context, CountNode, LB, nullptr, nullptr, Storage,
+                 ShouldCreate);
 }
 
 DISubrange *DISubrange::getImpl(LLVMContext &Context, Metadata *CountNode,
                                 int64_t Lo, StorageType Storage,
                                 bool ShouldCreate) {
-  DEFINE_GETIMPL_LOOKUP(DISubrange, (CountNode, Lo));
-  Metadata *Ops[] = { CountNode };
-  DEFINE_GETIMPL_STORE(DISubrange, (CountNode, Lo), Ops);
+  auto *LB = ConstantAsMetadata::get(
+      ConstantInt::getSigned(Type::getInt64Ty(Context), Lo));
+  return getImpl(Context, CountNode, LB, nullptr, nullptr, Storage,
+                 ShouldCreate);
 }
 
-DIEnumerator *DIEnumerator::getImpl(LLVMContext &Context, APInt Value,
+DISubrange *DISubrange::getImpl(LLVMContext &Context, Metadata *CountNode,
+                                Metadata *LB, Metadata *UB, Metadata *Stride,
+                                StorageType Storage, bool ShouldCreate) {
+  DEFINE_GETIMPL_LOOKUP(DISubrange, (CountNode, LB, UB, Stride));
+  Metadata *Ops[] = {CountNode, LB, UB, Stride};
+  DEFINE_GETIMPL_STORE_NO_CONSTRUCTOR_ARGS(DISubrange, Ops);
+}
+
+DISubrange::CountType DISubrange::getCount() const {
+  if (!getRawCountNode())
+    return CountType();
+
+  if (auto *MD = dyn_cast<ConstantAsMetadata>(getRawCountNode()))
+    return CountType(cast<ConstantInt>(MD->getValue()));
+
+  if (auto *DV = dyn_cast<DIVariable>(getRawCountNode()))
+    return CountType(DV);
+
+  return CountType();
+}
+
+DISubrange::BoundType DISubrange::getLowerBound() const {
+  Metadata *LB = getRawLowerBound();
+  if (!LB)
+    return BoundType();
+
+  assert((isa<ConstantAsMetadata>(LB) || isa<DIVariable>(LB) ||
+          isa<DIExpression>(LB)) &&
+         "LowerBound must be signed constant or DIVariable or DIExpression");
+
+  if (auto *MD = dyn_cast<ConstantAsMetadata>(LB))
+    return BoundType(cast<ConstantInt>(MD->getValue()));
+
+  if (auto *MD = dyn_cast<DIVariable>(LB))
+    return BoundType(MD);
+
+  if (auto *MD = dyn_cast<DIExpression>(LB))
+    return BoundType(MD);
+
+  return BoundType();
+}
+
+DISubrange::BoundType DISubrange::getUpperBound() const {
+  Metadata *UB = getRawUpperBound();
+  if (!UB)
+    return BoundType();
+
+  assert((isa<ConstantAsMetadata>(UB) || isa<DIVariable>(UB) ||
+          isa<DIExpression>(UB)) &&
+         "UpperBound must be signed constant or DIVariable or DIExpression");
+
+  if (auto *MD = dyn_cast<ConstantAsMetadata>(UB))
+    return BoundType(cast<ConstantInt>(MD->getValue()));
+
+  if (auto *MD = dyn_cast<DIVariable>(UB))
+    return BoundType(MD);
+
+  if (auto *MD = dyn_cast<DIExpression>(UB))
+    return BoundType(MD);
+
+  return BoundType();
+}
+
+DISubrange::BoundType DISubrange::getStride() const {
+  Metadata *ST = getRawStride();
+  if (!ST)
+    return BoundType();
+
+  assert((isa<ConstantAsMetadata>(ST) || isa<DIVariable>(ST) ||
+          isa<DIExpression>(ST)) &&
+         "Stride must be signed constant or DIVariable or DIExpression");
+
+  if (auto *MD = dyn_cast<ConstantAsMetadata>(ST))
+    return BoundType(cast<ConstantInt>(MD->getValue()));
+
+  if (auto *MD = dyn_cast<DIVariable>(ST))
+    return BoundType(MD);
+
+  if (auto *MD = dyn_cast<DIExpression>(ST))
+    return BoundType(MD);
+
+  return BoundType();
+}
+
+DIEnumerator *DIEnumerator::getImpl(LLVMContext &Context, const APInt &Value,
                                     bool IsUnsigned, MDString *Name,
                                     StorageType Storage, bool ShouldCreate) {
   assert(isCanonical(Name) && "Expected canonical MDString");
@@ -382,6 +470,20 @@ Optional<DIBasicType::Signedness> DIBasicType::getSignedness() const {
   }
 }
 
+DIStringType *DIStringType::getImpl(LLVMContext &Context, unsigned Tag,
+                                    MDString *Name, Metadata *StringLength,
+                                    Metadata *StringLengthExp,
+                                    uint64_t SizeInBits, uint32_t AlignInBits,
+                                    unsigned Encoding, StorageType Storage,
+                                    bool ShouldCreate) {
+  assert(isCanonical(Name) && "Expected canonical MDString");
+  DEFINE_GETIMPL_LOOKUP(DIStringType, (Tag, Name, StringLength, StringLengthExp,
+                                       SizeInBits, AlignInBits, Encoding));
+  Metadata *Ops[] = {nullptr, nullptr, Name, StringLength, StringLengthExp};
+  DEFINE_GETIMPL_STORE(DIStringType, (Tag, SizeInBits, AlignInBits, Encoding),
+                       Ops);
+}
+
 DIDerivedType *DIDerivedType::getImpl(
     LLVMContext &Context, unsigned Tag, MDString *Name, Metadata *File,
     unsigned Line, Metadata *Scope, Metadata *BaseType, uint64_t SizeInBits,
@@ -405,7 +507,8 @@ DICompositeType *DICompositeType::getImpl(
     uint32_t AlignInBits, uint64_t OffsetInBits, DIFlags Flags,
     Metadata *Elements, unsigned RuntimeLang, Metadata *VTableHolder,
     Metadata *TemplateParams, MDString *Identifier, Metadata *Discriminator,
-    Metadata *DataLocation, StorageType Storage, bool ShouldCreate) {
+    Metadata *DataLocation, Metadata *Associated, Metadata *Allocated,
+    StorageType Storage, bool ShouldCreate) {
   assert(isCanonical(Name) && "Expected canonical MDString");
 
   // Keep this in sync with buildODRType.
@@ -413,10 +516,10 @@ DICompositeType *DICompositeType::getImpl(
                         (Tag, Name, File, Line, Scope, BaseType, SizeInBits,
                          AlignInBits, OffsetInBits, Flags, Elements,
                          RuntimeLang, VTableHolder, TemplateParams, Identifier,
-                         Discriminator, DataLocation));
+                         Discriminator, DataLocation, Associated, Allocated));
   Metadata *Ops[] = {File,          Scope,        Name,           BaseType,
                      Elements,      VTableHolder, TemplateParams, Identifier,
-                     Discriminator, DataLocation};
+                     Discriminator, DataLocation, Associated,     Allocated};
   DEFINE_GETIMPL_STORE(DICompositeType, (Tag, Line, RuntimeLang, SizeInBits,
                                          AlignInBits, OffsetInBits, Flags),
                        Ops);
@@ -428,7 +531,7 @@ DICompositeType *DICompositeType::buildODRType(
     uint64_t SizeInBits, uint32_t AlignInBits, uint64_t OffsetInBits,
     DIFlags Flags, Metadata *Elements, unsigned RuntimeLang,
     Metadata *VTableHolder, Metadata *TemplateParams, Metadata *Discriminator,
-    Metadata *DataLocation) {
+    Metadata *DataLocation, Metadata *Associated, Metadata *Allocated) {
   assert(!Identifier.getString().empty() && "Expected valid identifier");
   if (!Context.isODRUniquingDebugTypes())
     return nullptr;
@@ -438,7 +541,7 @@ DICompositeType *DICompositeType::buildODRType(
                Context, Tag, Name, File, Line, Scope, BaseType, SizeInBits,
                AlignInBits, OffsetInBits, Flags, Elements, RuntimeLang,
                VTableHolder, TemplateParams, &Identifier, Discriminator,
-               DataLocation);
+               DataLocation, Associated, Allocated);
 
   // Only mutate CT if it's a forward declaration and the new operands aren't.
   assert(CT->getRawIdentifier() == &Identifier && "Wrong ODR identifier?");
@@ -450,7 +553,7 @@ DICompositeType *DICompositeType::buildODRType(
              Flags);
   Metadata *Ops[] = {File,          Scope,        Name,           BaseType,
                      Elements,      VTableHolder, TemplateParams, &Identifier,
-                     Discriminator, DataLocation};
+                     Discriminator, DataLocation, Associated,     Allocated};
   assert((std::end(Ops) - std::begin(Ops)) == (int)CT->getNumOperands() &&
          "Mismatched number of operands");
   for (unsigned I = 0, E = CT->getNumOperands(); I != E; ++I)
@@ -465,7 +568,7 @@ DICompositeType *DICompositeType::getODRType(
     uint64_t SizeInBits, uint32_t AlignInBits, uint64_t OffsetInBits,
     DIFlags Flags, Metadata *Elements, unsigned RuntimeLang,
     Metadata *VTableHolder, Metadata *TemplateParams, Metadata *Discriminator,
-    Metadata *DataLocation) {
+    Metadata *DataLocation, Metadata *Associated, Metadata *Allocated) {
   assert(!Identifier.getString().empty() && "Expected valid identifier");
   if (!Context.isODRUniquingDebugTypes())
     return nullptr;
@@ -474,7 +577,8 @@ DICompositeType *DICompositeType::getODRType(
     CT = DICompositeType::getDistinct(
         Context, Tag, Name, File, Line, Scope, BaseType, SizeInBits,
         AlignInBits, OffsetInBits, Flags, Elements, RuntimeLang, VTableHolder,
-        TemplateParams, &Identifier, Discriminator, DataLocation);
+        TemplateParams, &Identifier, Discriminator, DataLocation, Associated,
+        Allocated);
   return CT;
 }
 

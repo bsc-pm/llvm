@@ -8,6 +8,7 @@
 
 #include "mod-file.h"
 #include "resolve-names.h"
+#include "flang/Common/restorer.h"
 #include "flang/Evaluate/tools.h"
 #include "flang/Parser/message.h"
 #include "flang/Parser/parsing.h"
@@ -99,6 +100,9 @@ private:
 };
 
 bool ModFileWriter::WriteAll() {
+  // this flag affects character literals: force it to be consistent
+  auto restorer{
+      common::ScopedSet(parser::useHexadecimalEscapeSequences, false)};
   WriteAll(context_.globalScope());
   return !context_.AnyFatalError();
 }
@@ -322,7 +326,11 @@ void ModFileWriter::PutSubprogram(const Symbol &symbol) {
     if (n++ > 0) {
       os << ',';
     }
-    os << dummy->name();
+    if (dummy) {
+      os << dummy->name();
+    } else {
+      os << "*";
+    }
   }
   os << ')';
   PutAttrs(os, bindAttrs, details.bindName(), " "s, ""s);
@@ -389,7 +397,7 @@ void ModFileWriter::PutGeneric(const Symbol &symbol) {
 void ModFileWriter::PutUse(const Symbol &symbol) {
   auto &details{symbol.get<UseDetails>()};
   auto &use{details.symbol()};
-  uses_ << "use " << details.module().name();
+  uses_ << "use " << GetUsedModule(details).name();
   PutGenericName(uses_ << ",only:", symbol);
   // Can have intrinsic op with different local-name and use-name
   // (e.g. `operator(<)` and `operator(.lt.)`) but rename is not allowed
@@ -743,7 +751,7 @@ Scope *ModFileReader::Read(const SourceName &name, Scope *ancestor) {
       return it->second->scope();
     }
   }
-  parser::Parsing parsing{context_.allSources()};
+  parser::Parsing parsing{context_.allCookedSources()};
   parser::Options options;
   options.isModuleFile = true;
   options.features.Enable(common::LanguageFeature::BackslashEscapes);
@@ -788,7 +796,6 @@ Scope *ModFileReader::Read(const SourceName &name, Scope *ancestor) {
   }
   auto &modSymbol{*it->second};
   modSymbol.set(Symbol::Flag::ModFile);
-  modSymbol.scope()->set_chars(parsing.cooked());
   return modSymbol.scope();
 }
 
@@ -825,7 +832,9 @@ void SubprogramSymbolCollector::Collect() {
   const auto &details{symbol_.get<SubprogramDetails>()};
   isInterface_ = details.isInterface();
   for (const Symbol *dummyArg : details.dummyArgs()) {
-    DoSymbol(DEREF(dummyArg));
+    if (dummyArg) {
+      DoSymbol(*dummyArg);
+    }
   }
   if (details.isFunction()) {
     DoSymbol(details.result());

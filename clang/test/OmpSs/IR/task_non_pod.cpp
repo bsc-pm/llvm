@@ -48,7 +48,7 @@ void foo() {
 // CHECK: arrayctor.loop:                                   ; preds = %arrayctor.loop, %entry
 // CHECK-NEXT:   %arrayctor.dst.cur = phi %struct.S* [ %4, %entry ], [ %arrayctor.dst.next, %arrayctor.loop ]
 // CHECK-NEXT:   %arrayctor.src.cur = phi %struct.S* [ %3, %entry ], [ %arrayctor.src.next, %arrayctor.loop ]
-// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* %arrayctor.dst.cur, %struct.S* dereferenceable(4) %arrayctor.src.cur, i32{{( signext)?}} 0)
+// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* %arrayctor.dst.cur, %struct.S* nonnull align 4 dereferenceable(4) %arrayctor.src.cur, i32{{( signext)?}} 0)
 // CHECK-NEXT:   %arrayctor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.dst.cur, i64 1
 // CHECK-NEXT:   %arrayctor.src.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.src.cur, i64 1
 // CHECK-NEXT:   %arrayctor.done = icmp eq %struct.S* %arrayctor.dst.next, %arrayctor.dst.end

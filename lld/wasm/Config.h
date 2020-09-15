@@ -27,6 +27,7 @@ struct Configuration {
   bool compressRelocations;
   bool demangle;
   bool disableVerify;
+  bool experimentalPic;
   bool emitRelocs;
   bool exportAll;
   bool exportDynamic;
@@ -36,6 +37,7 @@ struct Configuration {
   bool importMemory;
   bool sharedMemory;
   bool importTable;
+  llvm::Optional<bool> is64;
   bool mergeDataSegments;
   bool pie;
   bool printGcSections;
@@ -56,6 +58,7 @@ struct Configuration {
   llvm::StringRef thinLTOJobs;
 
   llvm::StringRef entry;
+  llvm::StringRef mapFile;
   llvm::StringRef outputFile;
   llvm::StringRef thinLTOCacheDir;
 

@@ -14,12 +14,12 @@
 #define LLVM_ANALYSIS_VECTORUTILS_H
 
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Support/CheckedArithmetic.h"
 
 namespace llvm {
+class TargetLibraryInfo;
 
 /// Describes the type of Parameters
 enum class VFParamKind {
@@ -63,7 +63,7 @@ struct VFParameter {
   unsigned ParamPos;         // Parameter Position in Scalar Function.
   VFParamKind ParamKind;     // Kind of Parameter.
   int LinearStepOrPos = 0;   // Step or Position of the Parameter.
-  Align Alignment = Align(); // Optional aligment in bytes, defaulted to 1.
+  Align Alignment = Align(); // Optional alignment in bytes, defaulted to 1.
 
   // Comparison operator.
   bool operator==(const VFParameter &Other) const {
@@ -82,7 +82,7 @@ struct VFParameter {
 struct VFShape {
   unsigned VF;     // Vectorization factor.
   bool IsScalable; // True if the function is a scalable function.
-  SmallVector<VFParameter, 8> Parameters; // List of parameter informations.
+  SmallVector<VFParameter, 8> Parameters; // List of parameter information.
   // Comparison operator.
   bool operator==(const VFShape &Other) const {
     return std::tie(VF, IsScalable, Parameters) ==
@@ -99,7 +99,8 @@ struct VFShape {
   // Retrieve the VFShape that can be used to map a (scalar) function to itself,
   // with VF = 1.
   static VFShape getScalarShape(const CallInst &CI) {
-    return VFShape::get(CI, /*EC*/ {1, false}, /*HasGlobalPredicate*/ false);
+    return VFShape::get(CI, ElementCount::getFixed(1),
+                        /*HasGlobalPredicate*/ false);
   }
 
   // Retrieve the basic vectorization shape of the function, where all
@@ -114,7 +115,7 @@ struct VFShape {
       Parameters.push_back(
           VFParameter({CI.arg_size(), VFParamKind::GlobalPredicate}));
 
-    return {EC.Min, EC.Scalable, Parameters};
+    return {EC.getKnownMinValue(), EC.isScalable(), Parameters};
   }
   /// Sanity check on the Parameters in the VFShape.
   bool hasValidParameterList() const;
@@ -145,14 +146,14 @@ static constexpr char const *_LLVM_ = "_LLVM_";
 /// it once vectorization is done.
 static constexpr char const *_LLVM_Scalarize_ = "_LLVM_Scalarize_";
 
-/// Function to contruct a VFInfo out of a mangled names in the
+/// Function to construct a VFInfo out of a mangled names in the
 /// following format:
 ///
 /// <VFABI_name>{(<redirection>)}
 ///
 /// where <VFABI_name> is the name of the vector function, mangled according
 /// to the rules described in the Vector Function ABI of the target vector
-/// extentsion (or <isa> from now on). The <VFABI_name> is in the following
+/// extension (or <isa> from now on). The <VFABI_name> is in the following
 /// format:
 ///
 /// _ZGV<isa><mask><vlen><parameters>_<scalarname>[(<redirection>)]
@@ -166,9 +167,9 @@ static constexpr char const *_LLVM_Scalarize_ = "_LLVM_Scalarize_";
 ///
 /// \param MangledName -> input string in the format
 /// _ZGV<isa><mask><vlen><parameters>_<scalarname>[(<redirection>)].
-/// \param M -> Module used to retrive informations about the vector
+/// \param M -> Module used to retrieve informations about the vector
 /// function that are not possible to retrieve from the mangled
-/// name. At the moment, this parameter is needed only to retrive the
+/// name. At the moment, this parameter is needed only to retrieve the
 /// Vectorization Factor of scalable vector functions from their
 /// respective IR declarations.
 Optional<VFInfo> tryDemangleForVFABI(StringRef MangledName, const Module &M);
@@ -216,14 +217,17 @@ class VFDatabase {
   const Module *M;
   /// The CallInst instance being queried for scalar to vector mappings.
   const CallInst &CI;
-  /// List of vector functions descritors associated to the call
+  /// List of vector functions descriptors associated to the call
   /// instruction.
   const SmallVector<VFInfo, 8> ScalarToVectorMappings;
 
-  /// Retreive the scalar-to-vector mappings associated to the rule of
+  /// Retrieve the scalar-to-vector mappings associated to the rule of
   /// a vector Function ABI.
   static void getVFABIMappings(const CallInst &CI,
                                SmallVectorImpl<VFInfo> &Mappings) {
+    if (!CI.getCalledFunction())
+      return;
+
     const StringRef ScalarName = CI.getCalledFunction()->getName();
 
     SmallVector<std::string, 8> ListOfStrings;
@@ -296,13 +300,17 @@ namespace Intrinsic {
 typedef unsigned ID;
 }
 
-/// A helper function for converting Scalar types to vector types.
-/// If the incoming type is void, we return void. If the VF is 1, we return
-/// the scalar type.
-inline Type *ToVectorTy(Type *Scalar, unsigned VF, bool isScalable = false) {
-  if (Scalar->isVoidTy() || VF == 1)
+/// A helper function for converting Scalar types to vector types. If
+/// the incoming type is void, we return void. If the EC represents a
+/// scalar, we return the scalar type.
+inline Type *ToVectorTy(Type *Scalar, ElementCount EC) {
+  if (Scalar->isVoidTy() || EC.isScalar())
     return Scalar;
-  return VectorType::get(Scalar, {VF, isScalable});
+  return VectorType::get(Scalar, EC);
+}
+
+inline Type *ToVectorTy(Type *Scalar, unsigned VF) {
+  return ToVectorTy(Scalar, ElementCount::getFixed(VF));
 }
 
 /// Identify if the intrinsic is trivially vectorizable.
@@ -350,7 +358,7 @@ int getSplatIndex(ArrayRef<int> Mask);
 /// Get splat value if the input is a splat vector or return nullptr.
 /// The value may be extracted from a splat constants vector or from
 /// a sequence of instructions that broadcast a single value into a vector.
-const Value *getSplatValue(const Value *V);
+Value *getSplatValue(const Value *V);
 
 /// Return true if each element of the vector value \p V is poisoned or equal to
 /// every other non-poisoned element. If an index element is specified, either
@@ -536,20 +544,20 @@ createSequentialMask(unsigned Start, unsigned NumInts, unsigned NumUndefs);
 /// elements, it will be padded with undefs.
 Value *concatenateVectors(IRBuilderBase &Builder, ArrayRef<Value *> Vecs);
 
-/// Given a mask vector of the form <Y x i1>, Return true if all of the
-/// elements of this predicate mask are false or undef.  That is, return true
-/// if all lanes can be assumed inactive. 
+/// Given a mask vector of i1, Return true if all of the elements of this
+/// predicate mask are known to be false or undef.  That is, return true if all
+/// lanes can be assumed inactive.
 bool maskIsAllZeroOrUndef(Value *Mask);
 
-/// Given a mask vector of the form <Y x i1>, Return true if all of the
-/// elements of this predicate mask are true or undef.  That is, return true
-/// if all lanes can be assumed active. 
+/// Given a mask vector of i1, Return true if all of the elements of this
+/// predicate mask are known to be true or undef.  That is, return true if all
+/// lanes can be assumed active.
 bool maskIsAllOneOrUndef(Value *Mask);
 
 /// Given a mask vector of the form <Y x i1>, return an APInt (of bitwidth Y)
 /// for each lane which may be active.
 APInt possiblyDemandedEltsInMask(Value *Mask);
-  
+
 /// The group of interleaved loads/stores sharing the same stride and
 /// close to each other.
 ///
