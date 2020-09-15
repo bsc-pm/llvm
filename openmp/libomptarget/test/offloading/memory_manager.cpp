@@ -4,6 +4,8 @@
 // RUN: %libomptarget-compilexx-run-and-check-x86_64-pc-linux-gnu
 // RUN: %libomptarget-compilexx-run-and-check-nvptx64-nvidia-cuda
 
+// XFAIL: *
+
 #include <omp.h>
 
 #include <cassert>
