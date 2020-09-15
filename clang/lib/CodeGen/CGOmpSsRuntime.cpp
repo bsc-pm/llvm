@@ -234,6 +234,7 @@ class OSSDependInfoGathering
   SmallVector<QualType, 4> RetTypes;
 
   llvm::Value *Base = nullptr;
+  bool HasThis = false;
 
   void AddDimStartEnd() {
     RetTypes.push_back(OSSArgTy);
@@ -382,6 +383,7 @@ public:
   }
 
   void VisitCXXThisExpr(const CXXThisExpr *ThisE) {
+    HasThis = true;
     Address CXXThisAddress = CGF.LoadCXXThisAddress();
     if (!Base)
       Base = CXXThisAddress.getPointer();
@@ -474,6 +476,7 @@ public:
   const llvm::DenseMap<const VarDecl *, Address> &getCaptureInvolvedMap() const { return CaptureInvolvedMap; }
   ArrayRef<QualType> getRetTypes() const { return RetTypes; }
   llvm::Value *getBaseValue() const { assert(Base); return Base; }
+  bool hasThis() const { return HasThis; }
 
 };
 
@@ -1244,6 +1247,7 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
                                                 const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
                                                 const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
                                                 ArrayRef<QualType> RetTypes,
+                                                bool HasThis,
                                                 CodeGenFunction &NewCGF) {
   ASTContext &C = CGF.CGM.getContext();
 
@@ -1271,10 +1275,10 @@ static llvm::Function *createComputeDepFunction(CodeGenFunction &CGF,
         C, /*DC=*/nullptr, SourceLocation(), p.first->getIdentifier(), Q, ImplicitParamDecl::Other);
     Args.push_back(Arg);
   }
-  // We don't care about lambdas
-  if (const CXXMethodDecl *MD =
-      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
-    NewCGF.CurGD = GlobalDecl(MD);
+  if (HasThis) {
+    // We don't care about lambdas.
+    // NOTE: We have seen 'this' so it's fine to assume we are in a method function
+    NewCGF.CurGD = GlobalDecl(cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext()));
     NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
   }
 
@@ -1373,6 +1377,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       MultiDepInfoGathering.getVLASizeInvolvedMap(),
       MultiDepInfoGathering.getCaptureInvolvedMap(),
       MultiDepRetTypes,
+      MultiDepInfoGathering.hasThis(),
       NewCGF);
 
   NewCGF.EHStack.pushTerminate();
@@ -1497,9 +1502,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  // We don't care about lambdas
-  if (const CXXMethodDecl *MD =
-      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
+  if (MultiDepInfoGathering.hasThis()) {
     List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
@@ -1519,6 +1522,7 @@ void CGOmpSsRuntime::EmitDependencyList(
       DependInfoGathering.getVLASizeInvolvedMap(),
       DependInfoGathering.getCaptureInvolvedMap(),
       DependInfoGathering.getRetTypes(),
+      DependInfoGathering.hasThis(),
       NewCGF);
 
   NewCGF.EHStack.pushTerminate();
@@ -1672,9 +1676,7 @@ void CGOmpSsRuntime::EmitDependencyList(
     llvm::Value *V = Addr.getPointer();
     List.push_back(V);
   }
-  // We don't care about lambdas
-  if (const CXXMethodDecl *MD =
-      dyn_cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext())) {
+  if (DependInfoGathering.hasThis()) {
     List.push_back(CGF.LoadCXXThisAddress().getPointer());
   }
 }
