@@ -254,6 +254,7 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
     break;
   case BuiltinType::BFloat16:
     ID = PREDEF_TYPE_BFLOAT16_ID;
+    break;
   // OmpSs
   case BuiltinType::OSSArraySection:
     ID = PREDEF_TYPE_OSS_ARRAY_SECTION;
