@@ -25,10 +25,10 @@ void class_convertible() {
 // CHECK-NEXT:   %exn.slot = alloca i8*, align 8
 // CHECK-NEXT:   %ehselector.slot = alloca i32, align 4
 // CHECK-NEXT:   store [10 x i32]* %v, [10 x i32]** %v.addr, align 8
-// CHECK-NEXT:   invoke void @_ZN1SC1Ei(%struct.S* %ref.tmp, i32 0)
+// CHECK-NEXT:   invoke void @_ZN1SC1Ei(%struct.S* %ref.tmp, i32{{( signext)?}} 0)
 // CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 // CHECK: invoke.cont:                                      ; preds = %entry
-// CHECK-NEXT:   %call = invoke i32 @_ZN1ScviEv(%struct.S* %ref.tmp)
+// CHECK-NEXT:   %call = invoke{{( signext)?}} i32 @_ZN1ScviEv(%struct.S* %ref.tmp)
 // CHECK-NEXT:           to label %invoke.cont1 unwind label %lpad
 // CHECK: invoke.cont1:                                     ; preds = %invoke.cont
 // CHECK-NEXT:   %0 = sext i32 %call to i64
@@ -73,7 +73,7 @@ void class_convertible() {
 // CHECK-NEXT:   %retval = alloca %struct._depend_unpack_t.0, align 8
 // CHECK-NEXT:   %v.addr = alloca [10 x i32]*, align 8
 // CHECK-NEXT:   store [10 x i32]* %v, [10 x i32]** %v.addr, align 8
-// CHECK-NEXT:   %call = invoke i32 @_Z3foov()
+// CHECK-NEXT:   %call = invoke{{( signext)?}} i32 @_Z3foov()
 // CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 // CHECK: invoke.cont:                                      ; preds = %entry
 // CHECK-NEXT:   %0 = sext i32 %call to i64
