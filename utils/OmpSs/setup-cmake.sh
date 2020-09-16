@@ -313,12 +313,27 @@ then
 fi
 
 ################################################################################
+# OpenMP for installations
+################################################################################
+
+# libomptarget is a bit flaky for testing, do not attempt to build it for now.
+# We could build it but try to disable its tests, alternatively.
+CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_ENABLE_LIBOMPTARGET=OFF")
+
+################################################################################
+# Extra runtimes we may want to build
+################################################################################
+
+EXTRA_RUNTIMES=""
+
+################################################################################
 # Compiler-rt for installations
 ################################################################################
 
+
 if [ "${ENABLE_COMPILER_RT}" = 1 ];
 then
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_ENABLE_RUNTIMES=compiler-rt")
+  EXTRA_RUNTIMES+=";compiler-rt"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_CAN_EXECUTE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_INCLUDE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_BUILD_SANITIZERS=ON")
@@ -332,7 +347,8 @@ fi
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
-   -DLLVM_ENABLE_PROJECTS="clang;openmp" \
+   -DLLVM_ENABLE_PROJECTS="clang" \
+   -DLLVM_ENABLE_RUNTIMES="openmp${EXTRA_RUNTIMES}" \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
