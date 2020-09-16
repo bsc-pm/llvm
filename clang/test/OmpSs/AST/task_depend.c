@@ -107,8 +107,11 @@ void foo3() {
     } a;
     int index[10];
     #pragma oss task depend(in: array[i])
+    {}
     #pragma oss task depend(in: array[i + a.x])
+    {}
     #pragma oss task depend(in: array[a.x])
+    {}
     #pragma oss task depend(in: array[index[i]])
     {}
 }
@@ -124,6 +127,7 @@ void foo3() {
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int [10]' lvalue Var {{[a-z0-9]+}} 'array' 'int [10]'
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'i' 'int'
+// CHECK-NEXT: CompoundStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSTaskDirective {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: ArraySubscriptExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}> 'int' lvalue
@@ -140,6 +144,7 @@ void foo3() {
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int' lvalue Var {{[a-z0-9]+}} 'i' 'int'
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'struct A':'struct A' lvalue Var {{[a-z0-9]+}} 'a' 'struct A':'struct A'
+// CHECK-NEXT: CompoundStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSTaskDirective {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: ArraySubscriptExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}> 'int' lvalue
@@ -152,6 +157,7 @@ void foo3() {
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'int [10]' lvalue Var {{[a-z0-9]+}} 'array' 'int [10]'
 // CHECK-NEXT: OSSFirstprivateClause {{[a-z0-9]+}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}> 'struct A':'struct A' lvalue Var {{[a-z0-9]+}} 'a' 'struct A':'struct A'
+// CHECK-NEXT: CompoundStmt {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSTaskDirective {{[a-z0-9]+}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: OSSDependClause {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}>
 // CHECK-NEXT: ArraySubscriptExpr {{[a-z0-9]+}} <col:{{[a-z0-9]+}}, col:{{[a-z0-9]+}}> 'int' lvalue
@@ -182,7 +188,7 @@ void foo4() {
     {}
 }
 
-// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:175:13, col:{{.*}}>
+// CHECK: OSSTaskDirective 0x{{[^ ]*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:{{.*}}, col:{{.*}}> '<OmpSs-2 array section type>' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{.*}}> 'int (*)[10]' <ArrayToPointerDecay>
@@ -192,7 +198,7 @@ void foo4() {
 // CHECK-NEXT: OSSSharedClause 0x{{[^ ]*}} <<invalid sloc>> <implicit>
 // CHECK-NEXT: DeclRefExpr 0x{{[^ ]*}} <col:{{.*}}> 'int [10][10]' lvalue Var 0x{{[^ ]*}} 'array' 'int [10][10]'
 // CHECK-NEXT: CompoundStmt 0x{{[^ ]*}} <line:{{[a-z0-9]+}}:{{[a-z0-9]+}}, col:{{.*}}>
-// CHECK-NEXT: OSSTaskDirective 0x{{[^ ]*}} <line:177:13, col:{{.*}}>
+// CHECK-NEXT: OSSTaskDirective 0x{{[^ ]*}} <line:{{.*}}:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSDependClause 0x{{[^ ]*}} <col:{{.*}}, col:{{.*}}>
 // CHECK-NEXT: OSSArraySectionExpr 0x{{[^ ]*}} <col:{{.*}}, col:{{.*}}> '<OmpSs-2 array section type>' lvalue
 // CHECK-NEXT: ImplicitCastExpr 0x{{[^ ]*}} <col:{{.*}}> 'int (*)[10]' <ArrayToPointerDecay>

@@ -451,10 +451,23 @@ public:
     }
   }
 
+  void VisitOSSClause(OSSClause *Clause) {
+    for (Stmt *C : Clause->children()) {
+      Visit(C);
+    }
+  }
+
   void VisitStmt(Stmt *S) {
     for (Stmt *C : S->children()) {
-      if (C)
+      if (C) {
         Visit(C);
+        if (auto *OSSStmt = dyn_cast<OSSExecutableDirective>(C)) {
+          // Visit clauses too.
+          for (OSSClause *Clause : OSSStmt->clauses()) {
+            VisitOSSClause(Clause);
+          }
+        }
+      }
     }
   }
 
