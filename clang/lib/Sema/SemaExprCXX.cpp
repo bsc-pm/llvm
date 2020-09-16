@@ -1044,7 +1044,7 @@ bool Sema::CheckCXXThrowOperand(SourceLocation ThrowLoc,
 
 static QualType adjustCVQualifiersForCXXThisWithinLambda(
     ArrayRef<FunctionScopeInfo *> FunctionScopes, QualType ThisTy,
-    DeclContext *CurSemaContext, ASTContext &ASTCtx) {
+    DeclContext *CurSemaContext, ASTContext &ASTCtx, bool IsOmpSs) {
 
   QualType ClassType = ThisTy->getPointeeType();
   LambdaScopeInfo *CurLSI = nullptr;
@@ -1086,23 +1086,30 @@ static QualType adjustCVQualifiersForCXXThisWithinLambda(
   //  regarding capture information.
 
   // 1) Climb down the function scope info stack.
-  for (int I = FunctionScopes.size();
-       I-- && isa<LambdaScopeInfo>(FunctionScopes[I]) &&
+  for (int I = FunctionScopes.size() - 1; I >= 0; --I) {
+    if (isa<LambdaScopeInfo>(FunctionScopes[I]) &&
        (!CurLSI || !CurLSI->Lambda || CurLSI->Lambda->getDeclContext() ==
-                       cast<LambdaScopeInfo>(FunctionScopes[I])->CallOperator);
-       CurDC = getLambdaAwareParentOfDeclContext(CurDC)) {
-    CurLSI = cast<LambdaScopeInfo>(FunctionScopes[I]);
+         cast<LambdaScopeInfo>(FunctionScopes[I])->CallOperator)) {
+      CurLSI = cast<LambdaScopeInfo>(FunctionScopes[I]);
 
-    if (!CurLSI->isCXXThisCaptured())
+      if (!CurLSI->isCXXThisCaptured()) {
+        CurDC = getLambdaAwareParentOfDeclContext(CurDC);
         continue;
+      }
 
-    auto C = CurLSI->getCXXThisCapture();
+      auto C = CurLSI->getCXXThisCapture();
 
-    if (C.isCopyCapture()) {
-      ClassType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
-      if (CurLSI->CallOperator->isConst())
-        ClassType.addConst();
-      return ASTCtx.getPointerType(ClassType);
+      if (C.isCopyCapture()) {
+        ClassType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
+        if (CurLSI->CallOperator->isConst())
+          ClassType.addConst();
+        return ASTCtx.getPointerType(ClassType);
+      }
+      CurDC = getLambdaAwareParentOfDeclContext(CurDC);
+    } else if (IsOmpSs && FunctionScopes[I]->HasOSSExecutableDirective) {
+      continue;
+    } else {
+      break;
     }
   }
 
@@ -1183,7 +1190,8 @@ QualType Sema::getCurrentThisType() {
   // captures '*this' by copy.
   if (!ThisTy.isNull() && isLambdaCallOperator(CurContext))
     return adjustCVQualifiersForCXXThisWithinLambda(FunctionScopes, ThisTy,
-                                                    CurContext, Context);
+                                                    CurContext, Context,
+                                                    getLangOpts().OmpSs);
   return ThisTy;
 }
 
@@ -1289,6 +1297,9 @@ bool Sema::CheckCXXThisCapture(SourceLocation Loc, const bool Explicit,
             << (Explicit && idx == MaxFunctionScopesIndex);
       return true;
     }
+    if (getLangOpts().OmpSs && FunctionScopes[idx]->HasOSSExecutableDirective) {
+      continue;
+    }
     break;
   }
   if (!BuildAndDiagnose) return false;
@@ -1309,22 +1320,24 @@ bool Sema::CheckCXXThisCapture(SourceLocation Loc, const bool Explicit,
   QualType ThisTy = getCurrentThisType();
   for (int idx = MaxFunctionScopesIndex; NumCapturingClosures;
        --idx, --NumCapturingClosures) {
-    CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FunctionScopes[idx]);
+    if (!(getLangOpts().OmpSs && FunctionScopes[idx]->HasOSSExecutableDirective)) {
+      CapturingScopeInfo *CSI = cast<CapturingScopeInfo>(FunctionScopes[idx]);
 
-    // The type of the corresponding data member (not a 'this' pointer if 'by
-    // copy').
-    QualType CaptureType = ThisTy;
-    if (ByCopy) {
-      // If we are capturing the object referred to by '*this' by copy, ignore
-      // any cv qualifiers inherited from the type of the member function for
-      // the type of the closure-type's corresponding data member and any use
-      // of 'this'.
-      CaptureType = ThisTy->getPointeeType();
-      CaptureType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
+      // The type of the corresponding data member (not a 'this' pointer if 'by
+      // copy').
+      QualType CaptureType = ThisTy;
+      if (ByCopy) {
+        // If we are capturing the object referred to by '*this' by copy, ignore
+        // any cv qualifiers inherited from the type of the member function for
+        // the type of the closure-type's corresponding data member and any use
+        // of 'this'.
+        CaptureType = ThisTy->getPointeeType();
+        CaptureType.removeLocalCVRQualifiers(Qualifiers::CVRMask);
+      }
+
+      bool isNested = NumCapturingClosures > 1;
+      CSI->addThisCapture(isNested, Loc, CaptureType, ByCopy);
     }
-
-    bool isNested = NumCapturingClosures > 1;
-    CSI->addThisCapture(isNested, Loc, CaptureType, ByCopy);
   }
   return false;
 }
