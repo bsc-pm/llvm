@@ -534,7 +534,7 @@ static void gatherReductionsInfoWithID(const IntrinsicInst *I,
 
 // Gathers all dependencies needed information
 static void gatherDependsInfo(
-    const IntrinsicInst *I, TaskInfo &TI, TaskAnalysisInfo &TAI) {
+    const IntrinsicInst *I, TaskInfo &TI) {
 
   gatherDependsInfoWithID(I,
                           TI.DependsInfo.Ins,
@@ -603,7 +603,7 @@ static void gatherDependsInfo(
 }
 
 static void gatherMultiDependsInfo(
-  const IntrinsicInst *I, TaskInfo &TI, TaskAnalysisInfo &TAI) {
+  const IntrinsicInst *I, TaskInfo &TI) {
 
   gatherMultiDependsInfoWithID(I,
                           TI.DependsInfo.MultiRangeIns,
@@ -854,8 +854,8 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
           gatherNonPODInfo(II, T.Info);
           gatherVLADimsInfo(II, T.Info);
           gatherCapturedInfo(II, T.Info);
-          gatherDependsInfo(II, T.Info, T.AnalysisInfo);
-          gatherMultiDependsInfo(II, T.Info, T.AnalysisInfo);
+          gatherDependsInfo(II, T.Info);
+          gatherMultiDependsInfo(II, T.Info);
           gatherReductionsInitCombInfo(II, T.Info);
           gatherIfFinalCostPrioWaitInfo(II, T.Info);
           if (isOmpSsLoopDirective(T.Info.TaskKind))
