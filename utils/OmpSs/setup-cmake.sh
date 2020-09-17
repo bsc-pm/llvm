@@ -289,7 +289,7 @@ then
 fi
 
 ################################################################################
-# JUnit and timeout
+# Flags for lit
 ################################################################################
 
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_LIT_ARGS=-sv --xunit-xml-output=xunit.xml")
@@ -352,7 +352,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
    -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
    -DOPENMP_NOT_EXECUTABLE="$(pwd)/bin/not" \
-   -DOPENMP_LIT_ARGS="-sv --timeout=240 --xunit-xml-output=xunit.xml" \
+   -DOPENMP_LIT_ARGS="-sv --xunit-xml-output=xunit.xml" \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
