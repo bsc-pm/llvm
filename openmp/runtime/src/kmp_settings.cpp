@@ -4697,6 +4697,22 @@ static void __kmp_stg_print_omp_tool_libraries(kmp_str_buf_t *buffer,
 
 #endif
 
+// -----------------------------------------------------------------------------
+// KMP_NUM_UNSHACKLED_THREADS
+
+static void __kmp_stg_parse_num_unshackled_threads(char const *name,
+                                                   char const *value,
+                                                   void *data) {
+  __kmp_stg_parse_int(name, value, 0, KMP_INT_MAX,
+                      &__kmp_num_unshackled_threads);
+}
+
+static void __kmp_stg_print_num_unshackled_threads(kmp_str_buf_t *buffer,
+                                                   char const *name,
+                                                   void *data) {
+  __kmp_stg_print_int(buffer, name, __kmp_num_unshackled_threads);
+}
+
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -4938,6 +4954,10 @@ static kmp_setting_t __kmp_stg_table[] = {
     {"OMP_TOOL_LIBRARIES", __kmp_stg_parse_omp_tool_libraries,
      __kmp_stg_print_omp_tool_libraries, NULL, 0, 0},
 #endif
+
+    // Unshackled threads
+    {"KMP_NUM_UNSHACKLED_THREADS", __kmp_stg_parse_num_unshackled_threads,
+      __kmp_stg_print_num_unshackled_threads, NULL, 0, 0},
 
     {"", NULL, NULL, NULL, 0, 0}}; // settings
 

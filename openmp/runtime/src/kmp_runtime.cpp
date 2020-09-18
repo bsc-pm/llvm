@@ -3818,8 +3818,7 @@ int __kmp_register_root(int initial_thread) {
 #endif
 
   /* Allocate unshackled threads here */
-  // FIXME: Do not hardcode number of unshackled
-  root->r.num_unshackled_threads = 4;
+  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
   root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
       sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
   for (int i = 0; i < root->r.num_unshackled_threads; i++) {
