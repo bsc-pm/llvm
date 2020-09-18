@@ -15,7 +15,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = AggressiveInstCombine Coroutines IPO InstCombine Instrumentation Scalar Utils Vectorize ObjCARC CFGuard OmpSs
+subdirectories = AggressiveInstCombine Coroutines HelloNew IPO InstCombine Instrumentation Scalar Utils Vectorize ObjCARC CFGuard OmpSs
 
 [component_0]
 type = Group
