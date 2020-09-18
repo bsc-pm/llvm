@@ -2655,7 +2655,7 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
     // i.e. globals an references
     if (getLangOpts().OmpSs
         && (CGM.getOmpSsRuntime().inTaskBody()
-            || CGM.getOmpSsRuntime().InTaskEmission)) {
+            || CGM.getOmpSsRuntime().InDirectiveEmission)) {
 
       Address Addr = CGM.getOmpSsRuntime().getTaskCaptureAddr(VD);
       if (Addr.isValid()) {
@@ -2676,7 +2676,7 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
     // OmpSs: Skip global constant references resolution to referenced value.
     if (!(getLangOpts().OmpSs
           && (CGM.getOmpSsRuntime().inTaskBody()
-              || CGM.getOmpSsRuntime().InTaskEmission)
+              || CGM.getOmpSsRuntime().InDirectiveEmission)
           && VD->getType()->isReferenceType()) &&
       E->isNonOdrUse() == NOUR_Constant &&
         (VD->getType()->isReferenceType() ||

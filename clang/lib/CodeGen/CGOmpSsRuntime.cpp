@@ -2137,9 +2137,9 @@ void CGOmpSsRuntime::emitTaskwaitCall(CodeGenFunction &CGF,
     TaskStack.push_back(TaskContext());
     CaptureMapStack.push_back(CaptureMapTy());
 
-    InTaskEmission = true;
+    InDirectiveEmission = true;
     EmitDirectiveData(CGF, Data, TaskInfo);
-    InTaskEmission = false;
+    InDirectiveEmission = false;
 
     llvm::Instruction *Result =
       CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
@@ -2164,10 +2164,9 @@ void CGOmpSsRuntime::emitReleaseCall(
   TaskStack.push_back(TaskContext());
   CaptureMapStack.push_back(CaptureMapTy());
 
-  // TODO: rename this since we have release directive
-  InTaskEmission = true;
+  InDirectiveEmission = true;
   EmitDirectiveData(CGF, Data, ReleaseInfo);
-  InTaskEmission = false;
+  InDirectiveEmission = false;
 
   llvm::Function *Callee = CGM.getIntrinsic(llvm::Intrinsic::directive_marker);
   CGF.Builder.CreateCall(Callee, {}, llvm::makeArrayRef(ReleaseInfo));
@@ -2510,7 +2509,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
 
   CodeGenFunction::OSSPrivateScope InitScope(CGF);
 
-  InTaskEmission = true;
+  InDirectiveEmission = true;
   CaptureMapStack.push_back(CaptureMapTy());
 
   auto ArgI = CE->arg_begin();
@@ -2739,7 +2738,7 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
   }
-  InTaskEmission = false;
+  InDirectiveEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
@@ -2808,9 +2807,9 @@ void CGOmpSsRuntime::emitTaskCall(CodeGenFunction &CGF,
   TaskStack.push_back(TaskContext());
   CaptureMapStack.push_back(CaptureMapTy());
 
-  InTaskEmission = true;
+  InDirectiveEmission = true;
   EmitDirectiveData(CGF, Data, TaskInfo);
-  InTaskEmission = false;
+  InDirectiveEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));
@@ -2869,9 +2868,9 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   TaskStack.push_back(TaskContext());
   CaptureMapStack.push_back(CaptureMapTy());
 
-  InTaskEmission = true;
+  InDirectiveEmission = true;
   EmitDirectiveData(CGF, Data, TaskInfo, LoopData);
-  InTaskEmission = false;
+  InDirectiveEmission = false;
 
   llvm::Instruction *Result =
     CGF.Builder.CreateCall(EntryCallee, {}, llvm::makeArrayRef(TaskInfo));

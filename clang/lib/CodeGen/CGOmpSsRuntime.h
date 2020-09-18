@@ -219,7 +219,7 @@ public:
   virtual ~CGOmpSsRuntime() {};
   virtual void clear() {};
 
-  bool InTaskEmission = false;
+  bool InDirectiveEmission = false;
 
   // returns true if we're emitting code inside a task context (entry/exit)
   bool inTaskBody();
