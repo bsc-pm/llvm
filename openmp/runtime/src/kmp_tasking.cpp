@@ -431,10 +431,12 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   // Traverse all the unshackled threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
   // for (unsigned i = 0; i < __kmp_root[0]->r.)
+  // FIXME: There is an array for unshackled onlys, used that one instead.
   for (int i = 0; i < __kmp_threads_capacity; i++) {
     if (__kmp_threads[i] == NULL)
       continue;
-    if (__kmp_threads[i]->th.is_unshackled) {
+    if (__kmp_threads[i]->th.is_unshackled
+        && __kmp_threads[i]->th.is_unshackled_active) {
       // This is an unshackled thread
       kmp_flag_64 flag(&__kmp_threads[i]->th.th_bar[bs_forkjoin_barrier].bb.b_go,
            __kmp_threads[i]);

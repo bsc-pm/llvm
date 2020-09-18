@@ -2549,7 +2549,9 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
-  uint8_t is_unshackled; // This is an unshackled thread.
+  bool is_unshackled; // This is an unshackled thread.
+  bool is_unshackled_active; // This is an unshackled thread that is actively
+                             // looking for work.
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {
@@ -3938,6 +3940,12 @@ static inline void __kmp_resume_if_hard_paused() {
 }
 
 extern void __kmp_omp_display_env(int verbose);
+
+// Unshackled threads API.
+extern int __kmp_num_unshackled_threads;
+unsigned int __kmp_get_num_unshackled_threads();
+void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
+                                               bool active);
 
 #ifdef __cplusplus
 }

@@ -90,6 +90,10 @@ VERSION {
         __kmp_itt_init_ittlib;
 #endif /* USE_ITT_BUILD */
 
+    # Unshackled API
+    __kmp_get_num_unshackled_threads;
+    __kmp_set_unshackled_thread_active_status;
+
     local: # Non-exported symbols.
 
         *;         # All other symbols are not exported.

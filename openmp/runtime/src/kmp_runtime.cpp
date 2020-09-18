@@ -4415,7 +4415,7 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 #endif /* KMP_ADJUST_BLOCKTIME */
 
-  new_thr->th.is_unshackled = 0;
+  new_thr->th.is_unshackled = false;
 
   /* actually fork it and create the new worker thread */
   KF_TRACE(
@@ -4440,7 +4440,8 @@ static
 kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
-  thread->th.is_unshackled = 1;
+  thread->th.is_unshackled = true;
+  thread->th.is_unshackled_active = false;
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -8379,4 +8380,23 @@ void __kmp_omp_display_env(int verbose) {
     __kmp_do_serial_initialize();
   __kmp_display_env_impl(!verbose, verbose);
   __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+}
+
+int __kmp_num_unshackled_threads = 0;
+
+unsigned int __kmp_get_num_unshackled_threads() {
+  int gtid = __kmp_entry_gtid();
+  return __kmp_threads[gtid]->th.th_root->r.num_unshackled_threads;
+}
+
+void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
+                                               bool active) {
+  unsigned num_unshackleds = __kmp_get_num_unshackled_threads();
+  // FIXME: Should this be a hard error rather than silently ignore it?
+  if (thread_num >= num_unshackleds)
+    return;
+  int gtid = __kmp_entry_gtid();
+  __kmp_threads[gtid]
+      ->th.th_root->r.unshackled_threads[thread_num]
+      ->th.is_unshackled_active = active;
 }
