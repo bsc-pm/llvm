@@ -26,7 +26,7 @@ entry:
   ret void
 }
 
-; CHECK: [0] %6
+; CHECK: [0] TASK %6
 ; CHECK-NEXT:   %1
 ; CHECK-NEXT:   %3
 

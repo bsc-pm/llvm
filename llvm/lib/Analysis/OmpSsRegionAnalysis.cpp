@@ -27,12 +27,12 @@ using namespace llvm;
 
 static cl::opt<bool>
 DisableChecks("disable-checks",
-                  cl::desc("Avoid checking OmpSs-2 task uses after task body and DSA matching"),
+                  cl::desc("Avoid checking OmpSs-2 directive bundle correctness"),
                   cl::Hidden,
                   cl::init(false));
 
 enum PrintVerbosity {
-  PV_Task,
+  PV_Directive,
   PV_Uses,
   PV_UnpackAndConst,
   PV_DsaMissing,
@@ -47,13 +47,13 @@ PrintVerboseLevel("print-verbosity",
   cl::desc("Choose verbosity level"),
   cl::Hidden,
   cl::values(
-  clEnumValN(PV_Task, "task", "Print task layout only"),
-  clEnumValN(PV_Uses, "uses", "Print task layout with uses"),
-  clEnumValN(PV_DsaMissing, "dsa_missing", "Print task layout with uses without DSA"),
-  clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print task layout with DSAs without VLA info or VLA info without DSAs"),
-  clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print task layout with VLA dimensions without capture"),
-  clEnumValN(PV_NonPODDSAMissing, "non_pod_dsa_missing", "Print task layout with non-pod info without according DSA"),
-  clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print task layout with reduction init and combiner functions"))
+  clEnumValN(PV_Directive, "directive", "Print directive layout only"),
+  clEnumValN(PV_Uses, "uses", "Print directive layout with uses"),
+  clEnumValN(PV_DsaMissing, "dsa_missing", "Print directive layout with uses without DSA"),
+  clEnumValN(PV_DsaVLADimsMissing, "dsa_vla_dims_missing", "Print directive layout with DSAs without VLA info or VLA info without DSAs"),
+  clEnumValN(PV_VLADimsCaptureMissing, "vla_dims_capture_missing", "Print directive layout with VLA dimensions without capture"),
+  clEnumValN(PV_NonPODDSAMissing, "non_pod_dsa_missing", "Print directive layout with non-pod info without according DSA"),
+  clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print directive layout with reduction init and combiner functions"))
   );
 
 char OmpSsRegionAnalysisPass::ID = 0;
@@ -62,7 +62,8 @@ OmpSsRegionAnalysisPass::OmpSsRegionAnalysisPass() : FunctionPass(ID) {
   initializeOmpSsRegionAnalysisPassPass(*PassRegistry::getPassRegistry());
 }
 
-static bool valueInDSABundles(const TaskDSAInfo& DSAInfo,
+// returns if V is in DSAInfo
+static bool valueInDSABundles(const DirectiveDSAInfo& DSAInfo,
                               const Value *V) {
   auto SharedIt = find(DSAInfo.Shared, V);
   auto PrivateIt = find(DSAInfo.Private, V);
@@ -75,119 +76,113 @@ static bool valueInDSABundles(const TaskDSAInfo& DSAInfo,
   return true;
 }
 
-static bool valueInVLADimsBundles(const TaskVLADimsInfo& VLADimsInfo,
-                                  const Value *V) {
-  for (auto &VLAWithDimsMap : VLADimsInfo) {
-    auto Res = find(VLAWithDimsMap.second, V);
-    if (Res != VLAWithDimsMap.second.end())
-      return true;
-  }
-  return false;
-}
-
-static bool valueInCapturedBundle(const TaskCapturedInfo& CapturedInfo,
+// returns if V is in CapturedInfo
+static bool valueInCapturedBundle(const DirectiveCapturedInfo& CapturedInfo,
                                   Value *const V) {
   return CapturedInfo.count(V);
 }
 
-static void print_verbose(
-  const MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
-  const MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
-  Instruction *Cur, int Depth, int PrintSpaceMultiplier) {
+void OmpSsRegionAnalysisPass::print_verbose(
+    Instruction *Cur, int Depth, int PrintSpaceMultiplier) const {
   if (Cur) {
+    const DirectiveAnalysisInfo &AnalysisInfo = DEntryToDAnalysisInfo.lookup(Cur);
+    const DirectiveInfo *Info = DEntryToDInfo.find(Cur)->second.get();
+    const DirectiveEnvironment &DirEnv = Info->DirEnv;
     dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
+    dbgs() << DirEnv.getDirectiveNameAsStr();
+    dbgs() << " ";
     Cur->printAsOperand(dbgs(), false);
-    const TaskAnalysisInfo &AnalysisInfo = TEntryToTaskWithAnalysisInfo.lookup(Cur).AnalysisInfo;
-    const TaskInfo &Info = TEntryToTaskWithAnalysisInfo.lookup(Cur).Info;
+
+    std::string SpaceMultiplierStr = std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
     if (PrintVerboseLevel == PV_Uses) {
-      for (size_t j = 0; j < AnalysisInfo.UsesBeforeEntry.size(); ++j) {
+      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
         dbgs() << "\n";
-        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+        dbgs() << SpaceMultiplierStr
                << "[Before] ";
-        AnalysisInfo.UsesBeforeEntry[j]->printAsOperand(dbgs(), false);
+        V->printAsOperand(dbgs(), false);
       }
-      for (size_t j = 0; j < AnalysisInfo.UsesAfterExit.size(); ++j) {
+      for (auto *V : AnalysisInfo.UsesAfterExit) {
         dbgs() << "\n";
-        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+        dbgs() << SpaceMultiplierStr
                << "[After] ";
-        AnalysisInfo.UsesAfterExit[j]->printAsOperand(dbgs(), false);
+        V->printAsOperand(dbgs(), false);
       }
     }
     else if (PrintVerboseLevel == PV_DsaMissing) {
-      for (size_t j = 0; j < AnalysisInfo.UsesBeforeEntry.size(); ++j) {
-        if (!valueInDSABundles(Info.DSAInfo, AnalysisInfo.UsesBeforeEntry[j])) {
+      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
+        if (!valueInDSABundles(DirEnv.DSAInfo, V)) {
           dbgs() << "\n";
-          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
-          AnalysisInfo.UsesBeforeEntry[j]->printAsOperand(dbgs(), false);
+          dbgs() << SpaceMultiplierStr;
+          V->printAsOperand(dbgs(), false);
         }
       }
     }
     else if (PrintVerboseLevel == PV_DsaVLADimsMissing) {
       // Count VLAs and DSAs, Well-formed VLA must have a DSA and dimensions.
-      // Thai is, it must have a frequency of 2
+      // That is, it must have a frequency of 2
       std::map<const Value *, size_t> DSAVLADimsFreqMap;
-      for (Value *V : Info.DSAInfo.Shared) DSAVLADimsFreqMap[V]++;
-      for (Value *V : Info.DSAInfo.Private) DSAVLADimsFreqMap[V]++;
-      for (Value *V : Info.DSAInfo.Firstprivate) DSAVLADimsFreqMap[V]++;
+      for (Value *V : DirEnv.DSAInfo.Shared) DSAVLADimsFreqMap[V]++;
+      for (Value *V : DirEnv.DSAInfo.Private) DSAVLADimsFreqMap[V]++;
+      for (Value *V : DirEnv.DSAInfo.Firstprivate) DSAVLADimsFreqMap[V]++;
 
-      for (const auto &VLAWithDimsMap : Info.VLADimsInfo) {
+      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
         DSAVLADimsFreqMap[VLAWithDimsMap.first]++;
       }
       for (const auto &Pair : DSAVLADimsFreqMap) {
         // It's expected to have only two VLA bundles, the DSA and dimensions
         if (Pair.second != 2) {
           dbgs() << "\n";
-          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+          dbgs() << SpaceMultiplierStr;
           Pair.first->printAsOperand(dbgs(), false);
         }
       }
     }
     else if (PrintVerboseLevel == PV_VLADimsCaptureMissing) {
-      for (auto &VLAWithDimsMap : Info.VLADimsInfo) {
-        for (Value *const &V : VLAWithDimsMap.second) {
-          if (!valueInCapturedBundle(Info.CapturedInfo, V)) {
+      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
+        for (auto *V : VLAWithDimsMap.second) {
+          if (!valueInCapturedBundle(DirEnv.CapturedInfo, V)) {
             dbgs() << "\n";
-            dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+            dbgs() << SpaceMultiplierStr;
             V->printAsOperand(dbgs(), false);
           }
         }
       }
     }
     else if (PrintVerboseLevel == PV_NonPODDSAMissing) {
-      for (auto &InitsPair : Info.NonPODsInfo.Inits) {
-        auto It = find(Info.DSAInfo.Private, InitsPair.first);
-        if (It == Info.DSAInfo.Private.end()) {
+      for (const auto &InitsPair : DirEnv.NonPODsInfo.Inits) {
+        auto It = find(DirEnv.DSAInfo.Private, InitsPair.first);
+        if (It == DirEnv.DSAInfo.Private.end()) {
           dbgs() << "\n";
-          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+          dbgs() << SpaceMultiplierStr
                  << "[Init] ";
           InitsPair.first->printAsOperand(dbgs(), false);
         }
       }
-      for (auto &CopiesPair : Info.NonPODsInfo.Copies) {
-        auto It = find(Info.DSAInfo.Firstprivate, CopiesPair.first);
-        if (It == Info.DSAInfo.Firstprivate.end()) {
+      for (const auto &CopiesPair : DirEnv.NonPODsInfo.Copies) {
+        auto It = find(DirEnv.DSAInfo.Firstprivate, CopiesPair.first);
+        if (It == DirEnv.DSAInfo.Firstprivate.end()) {
           dbgs() << "\n";
-          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+          dbgs() << SpaceMultiplierStr
                  << "[Copy] ";
           CopiesPair.first->printAsOperand(dbgs(), false);
         }
       }
-      for (auto &DeinitsPair : Info.NonPODsInfo.Deinits) {
-        auto PrivateIt = find(Info.DSAInfo.Private, DeinitsPair.first);
-        auto FirstprivateIt = find(Info.DSAInfo.Firstprivate, DeinitsPair.first);
-        if (FirstprivateIt == Info.DSAInfo.Firstprivate.end()
-            && PrivateIt == Info.DSAInfo.Private.end()) {
+      for (const auto &DeinitsPair : DirEnv.NonPODsInfo.Deinits) {
+        auto PrivateIt = find(DirEnv.DSAInfo.Private, DeinitsPair.first);
+        auto FirstprivateIt = find(DirEnv.DSAInfo.Firstprivate, DeinitsPair.first);
+        if (FirstprivateIt == DirEnv.DSAInfo.Firstprivate.end()
+            && PrivateIt == DirEnv.DSAInfo.Private.end()) {
           dbgs() << "\n";
-          dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ')
+          dbgs() << SpaceMultiplierStr
                  << "[Deinit] ";
           DeinitsPair.first->printAsOperand(dbgs(), false);
         }
       }
     }
     else if (PrintVerboseLevel == PV_ReductionInitsCombiners) {
-      for (auto &RedInfo : Info.ReductionsInitCombInfo) {
+      for (const auto &RedInfo : DirEnv.ReductionsInitCombInfo) {
         dbgs() << "\n";
-        dbgs() << std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+        dbgs() << SpaceMultiplierStr;
         RedInfo.first->printAsOperand(dbgs(), false);
         dbgs() << " ";
         RedInfo.second.Init->printAsOperand(dbgs(), false);
@@ -197,23 +192,16 @@ static void print_verbose(
     }
     dbgs() << "\n";
   }
-  for (auto II : TasksTree.lookup(Cur)) {
-    print_verbose(TEntryToTaskWithAnalysisInfo,
-                  TasksTree, II, Depth + 1, PrintSpaceMultiplier);
+  for (auto *II : DirectivesTree.lookup(Cur)) {
+    print_verbose(II, Depth + 1, PrintSpaceMultiplier);
   }
 }
 
 void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
-  print_verbose(TEntryToTaskWithAnalysisInfo, TasksTree, nullptr, -1, PrintSpaceMultiplier);
+  print_verbose(nullptr, -1, PrintSpaceMultiplier);
 }
 
-FunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return FuncInfo; }
-
-static bool isOmpSsLoopDirective(TaskInfo::OmpSsTaskKind TaskKind) {
-  return TaskKind == TaskInfo::OSSD_task_for ||
-         TaskKind == TaskInfo::OSSD_taskloop ||
-         TaskKind == TaskInfo::OSSD_taskloop_for;
-}
+DirectiveFunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return DirectiveFuncInfo; }
 
 /// NOTE: from old OrderedInstructions
 static bool localDominates(
@@ -236,586 +224,555 @@ static bool orderedInstructions(
   return DT.dominates(InstA->getParent(), InstB->getParent());
 }
 
-static void getOperandBundlesAsDefsWithID(const IntrinsicInst *I,
-                                          SmallVectorImpl<OperandBundleDef> &OpBundles,
-                                          uint32_t Id) {
-
-  for (unsigned i = 0, e = I->getNumOperandBundles(); i != e; ++i) {
-    OperandBundleUse U = I->getOperandBundleAt(i);
-    if (U.getTagID() == Id)
-      OpBundles.emplace_back(U);
+static DependInfo::DependType getDependTypeFromId(uint64_t Id) {
+  switch (Id) {
+  case LLVMContext::OB_oss_dep_in:
+  case LLVMContext::OB_oss_multidep_range_in:
+    return DependInfo::DT_in;
+  case LLVMContext::OB_oss_dep_out:
+  case LLVMContext::OB_oss_multidep_range_out:
+    return DependInfo::DT_out;
+  case LLVMContext::OB_oss_dep_inout:
+  case LLVMContext::OB_oss_multidep_range_inout:
+    return DependInfo::DT_inout;
+  case LLVMContext::OB_oss_dep_concurrent:
+  case LLVMContext::OB_oss_multidep_range_concurrent:
+    return DependInfo::DT_concurrent;
+  case LLVMContext::OB_oss_dep_commutative:
+  case LLVMContext::OB_oss_multidep_range_commutative:
+    return DependInfo::DT_commutative;
+  case LLVMContext::OB_oss_dep_reduction:
+    return DependInfo::DT_reduction;
+  case LLVMContext::OB_oss_dep_weakin:
+  case LLVMContext::OB_oss_multidep_range_weakin:
+    return DependInfo::DT_weakin;
+  case LLVMContext::OB_oss_dep_weakout:
+  case LLVMContext::OB_oss_multidep_range_weakout:
+    return DependInfo::DT_weakout;
+  case LLVMContext::OB_oss_dep_weakinout:
+  case LLVMContext::OB_oss_multidep_range_weakinout:
+    return DependInfo::DT_weakinout;
+  case LLVMContext::OB_oss_dep_weakconcurrent:
+  case LLVMContext::OB_oss_multidep_range_weakconcurrent:
+    return DependInfo::DT_weakconcurrent;
+  case LLVMContext::OB_oss_dep_weakcommutative:
+  case LLVMContext::OB_oss_multidep_range_weakcommutative:
+    return DependInfo::DT_weakcommutative;
+  case LLVMContext::OB_oss_dep_weakreduction:
+    return DependInfo::DT_weakreduction;
   }
+  llvm_unreachable("unknown depend type id");
 }
 
-// Gather Value from each OperandBundle Id.
-// Error if there is more than one Value in OperandBundle
-static void getValueFromOperandBundlesWithID(const IntrinsicInst *I,
-                                              SetVector<Value *> &Values,
-                                              uint32_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 1 && "Only allowed one Value per OperandBundle");
-    Values.insert(OBDef.inputs()[0]);
-  }
-}
+void DirectiveEnvironment::gatherDirInfo(OperandBundleDef &OB) {
+  assert(DirectiveKind == OSSD_unknown && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  ConstantDataArray *DirectiveKindDataArray = cast<ConstantDataArray>(OB.inputs()[0]);
+  assert(DirectiveKindDataArray->isCString() && "Directive kind must be a C string");
+  DirectiveKindStringRef = DirectiveKindDataArray->getAsCString();
 
-// Gather Value unique OperandBundle Id.
-// Error if there is more than one Value in OperandBundle
-// or more than one OperandBundle
-static void getValueFromOperandBundleWithID(const IntrinsicInst *I,
-                                            Value *&V,
-                                            uint32_t Id) {
-  SmallVector<OperandBundleDef, 1> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  assert(OpBundles.size() <= 1 && "Only allowed one OperandBundle with this Id");
-  if (OpBundles.size() == 1) {
-    assert(OpBundles[0].input_size() == 1 && "Only allowed one Value per OperandBundle");
-    V = OpBundles[0].inputs()[0];
-  }
-}
-
-// Gather Value list from each OperandBundle Id.
-static void getValueListFromOperandBundlesWithID(const IntrinsicInst *I,
-                                              SetVector<Value *> &Values,
-                                              uint32_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (OperandBundleDef &OBDef : OpBundles) {
-    Values.insert(OBDef.input_begin(), OBDef.input_end());
-  }
-}
-
-static void gatherTaskKindInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  Value *TaskKindValue = nullptr;
-  getValueFromOperandBundleWithID(I, TaskKindValue, LLVMContext::OB_oss_dir);
-  assert(TaskKindValue && "Expected task kind value in bundles");
-  ConstantDataArray *TaskKindDataArray = cast<ConstantDataArray>(TaskKindValue);
-  assert(TaskKindDataArray->isCString() && "Task kind must be a C string");
-  StringRef TaskKindStringRef = TaskKindDataArray->getAsCString();
-
-  if (TaskKindStringRef == "TASK")
-    TI.TaskKind = TaskInfo::OSSD_task;
-  else if (TaskKindStringRef == "TASK.FOR")
-    TI.TaskKind = TaskInfo::OSSD_task_for;
-  else if (TaskKindStringRef == "TASKLOOP")
-    TI.TaskKind = TaskInfo::OSSD_taskloop;
-  else if (TaskKindStringRef == "TASKLOOP.FOR")
-    TI.TaskKind = TaskInfo::OSSD_taskloop_for;
+  if (DirectiveKindStringRef == "TASK")
+    DirectiveKind = OSSD_task;
+  else if (DirectiveKindStringRef == "TASK.FOR")
+    DirectiveKind = OSSD_task_for;
+  else if (DirectiveKindStringRef == "TASKLOOP")
+    DirectiveKind = OSSD_taskloop;
+  else if (DirectiveKindStringRef == "TASKLOOP.FOR")
+    DirectiveKind = OSSD_taskloop_for;
+  else if (DirectiveKindStringRef == "TASKWAIT")
+    DirectiveKind = OSSD_taskwait;
+  else if (DirectiveKindStringRef == "RELEASE")
+    DirectiveKind = OSSD_release;
   else
-    llvm_unreachable("Unhandled TaskKind string");
+    llvm_unreachable("Unhandled DirectiveKind string");
 }
 
-static void gatherDSAInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  getValueFromOperandBundlesWithID(I, TI.DSAInfo.Shared,
-                                    LLVMContext::OB_oss_shared);
-  getValueFromOperandBundlesWithID(I, TI.DSAInfo.Private,
-                                    LLVMContext::OB_oss_private);
-  getValueFromOperandBundlesWithID(I, TI.DSAInfo.Firstprivate,
-                                    LLVMContext::OB_oss_firstprivate);
+void DirectiveEnvironment::gatherSharedInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  DSAInfo.Shared.insert(OB.inputs()[0]);
 }
 
-static void gatherNonPODInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  // INIT
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_init);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks) {
-      // INIT may only be in private clauses
-      auto It = find(TI.DSAInfo.Private, OBArgs[0]);
-      if (It == TI.DSAInfo.Private.end())
-        llvm_unreachable("Non-POD INIT OperandBundle must have a PRIVATE DSA");
-    }
-    TI.NonPODsInfo.Inits[OBArgs[0]] = OBArgs[1];
-  }
-
-  OpBundles.clear();
-
-  // DEINIT
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_deinit);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks) {
-      // DEINIT may only be in firstprivate clauses
-      auto PrivateIt = find(TI.DSAInfo.Private, OBArgs[0]);
-      auto FirstprivateIt = find(TI.DSAInfo.Firstprivate, OBArgs[0]);
-      if (FirstprivateIt == TI.DSAInfo.Firstprivate.end()
-          && PrivateIt == TI.DSAInfo.Private.end())
-        llvm_unreachable("Non-POD DEINIT OperandBundle must have a PRIVATE or FIRSTPRIVATE DSA");
-    }
-    TI.NonPODsInfo.Deinits[OBArgs[0]] = OBArgs[1];
-  }
-
-  OpBundles.clear();
-
-  // COPY
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_copy);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks) {
-      // COPY may only be in firstprivate clauses
-      auto It = find(TI.DSAInfo.Firstprivate, OBArgs[0]);
-      if (It == TI.DSAInfo.Firstprivate.end())
-        llvm_unreachable("Non-POD COPY OperandBundle must have a FIRSTPRIVATE DSA");
-    }
-    TI.NonPODsInfo.Copies[OBArgs[0]] = OBArgs[1];
-  }
+void DirectiveEnvironment::gatherPrivateInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  DSAInfo.Private.insert(OB.inputs()[0]);
 }
 
-// After gathering DSAInfo we can assert if we find a VLA.DIMS bundle
-// without its corresponding DSA
-static void gatherVLADimsInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_vla_dims);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() > 1 && "VLA dims OperandBundle must have at least a value for the VLA and one dimension");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
-      llvm_unreachable("VLA dims OperandBundle must have an associated DSA");
-    assert(TI.VLADimsInfo[OBArgs[0]].empty() && "There're VLA dims duplicated OperandBundles");
-    TI.VLADimsInfo[OBArgs[0]].insert(&OBArgs[1], OBArgs.end());
-  }
+void DirectiveEnvironment::gatherFirstprivateInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  DSAInfo.Firstprivate.insert(OB.inputs()[0]);
 }
 
-// After gathering DSAInfo we can assert if we find a DEP.REDUCTION.INIT/COMBINE bundle
-// without its corresponding DSA
-static void gatherReductionsInitCombInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_reduction_init);
-  // Different reductions may have same init/comb, assign the same ReductionIndex
-  DenseMap<Value *, int> SeenInits;
-  int ReductionIndex = 0;
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 2 && "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
-      llvm_unreachable("Reduction init/combiner OperandBundle must have an associated DSA");
-
-    // This assert should not trigger since clang allows an unique reduction per DSA
-    assert(!TI.ReductionsInitCombInfo.count(OBArgs[0])
-           && "Two or more reductions of the same DSA in the same task are not allowed");
-    TI.ReductionsInitCombInfo[OBArgs[0]].Init = OBArgs[1];
-
-    if (SeenInits.count(OBArgs[1])) {
-      TI.ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = SeenInits[OBArgs[1]];
-    } else {
-      SeenInits[OBArgs[1]] = ReductionIndex;
-      TI.ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = ReductionIndex;
-      ReductionIndex++;
-    }
-  }
-
-  OpBundles.clear();
-  getOperandBundlesAsDefsWithID(I, OpBundles, LLVMContext::OB_oss_reduction_comb);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    assert(OBDef.input_size() == 2 && "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    if (!DisableChecks && !valueInDSABundles(TI.DSAInfo, OBArgs[0]))
-      llvm_unreachable("Reduction init/combiner OperandBundle must have an associated DSA");
-    TI.ReductionsInitCombInfo[OBArgs[0]].Comb = OBArgs[1];
-  }
+void DirectiveEnvironment::gatherVLADimsInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() > 1 &&
+    "VLA dims OperandBundle must have at least a value for the VLA and one dimension");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  assert(VLADimsInfo[OBArgs[0]].empty() && "There're VLA dims duplicated OperandBundles");
+  VLADimsInfo[OBArgs[0]].insert(&OBArgs[1], OBArgs.end());
 }
 
-// Process OpBundle gathering dependency information
-static void gatherDependInfoFromBundle(ArrayRef<Value *> OBArgs,
-                                       TaskDSAInfo &DSAInfo,
-                                       TaskCapturedInfo &CapturedInfo,
-                                       DependInfo &DI) {
+static void gatherDependInfo(
+    ArrayRef<Value *> OBArgs, std::map<Value *, int> &DepSymToIdx,
+    DirectiveDependsInfo &DependsInfo, DependInfo &DI, uint64_t Id) {
+  DI.DepType = getDependTypeFromId(Id);
+
+  if (DI.isReduction()) {
+    DI.RedKind = OBArgs[0];
+    // Skip the reduction kind
+    OBArgs = OBArgs.drop_front(1);
+  }
+
   // First operand has to be the DSA over the dependency is made
-  Value *DepBaseDSA = OBArgs[0];
-  assert(valueInDSABundles(DSAInfo, DepBaseDSA) && "Dependency has no associated DSA");
-  DI.Base = DepBaseDSA;
+  DI.Base = OBArgs[0];
 
-  Function *ComputeDepFun = cast<Function>(OBArgs[1]);
-  DI.ComputeDepFun = ComputeDepFun;
+  DI.ComputeDepFun = cast<Function>(OBArgs[1]);
 
   // Gather compute_dep function params
   for (size_t i = 2; i < OBArgs.size(); ++i) {
-    assert((valueInDSABundles(DSAInfo, OBArgs[i])
-            || valueInCapturedBundle(CapturedInfo, OBArgs[i]))
-           && "Dependency has no associated DSA or capture");
     DI.Args.push_back(OBArgs[i]);
   }
 
-  if (!DSAInfo.DepSymToIdx.count(DepBaseDSA)) {
-    DSAInfo.DepSymToIdx[DepBaseDSA] = DSAInfo.DepSymToIdx.size();
+  if (!DepSymToIdx.count(DI.Base)) {
+    DepSymToIdx[DI.Base] = DepSymToIdx.size();
+    DependsInfo.NumSymbols++;
   }
-  DI.SymbolIndex = DSAInfo.DepSymToIdx[DepBaseDSA];
+  DI.SymbolIndex = DepSymToIdx[DI.Base];
 
   // TODO: Support RegionText stringifying clause content
   DI.RegionText = "";
 }
 
-// Gathers dependencies needed information of type Id
-static void gatherDependsInfoWithID(const IntrinsicInst *I,
-                                    SmallVectorImpl<DependInfo> &DependsList,
-                                    TaskDSAInfo &DSAInfo,
-                                    TaskCapturedInfo &CapturedInfo,
-                                    uint64_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  // TODO: maybe do a bundle gather with asserts?
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    DependInfo DI;
+void DirectiveEnvironment::gatherDependInfo(
+    OperandBundleDef &OB, uint64_t Id) {
 
-    gatherDependInfoFromBundle(OBDef.inputs(), DSAInfo, CapturedInfo, DI);
+  assert(OB.input_size() > 2 &&
+    "Depend OperandBundle must have at least depend base, function and one argument");
+  DependInfo *DI = new DependInfo();
 
-    DependsList.push_back(DI);
+  ::gatherDependInfo(OB.inputs(), DepSymToIdx, DependsInfo, *DI, Id);
+
+  DependsInfo.List.emplace_back(DI);
+}
+
+void DirectiveEnvironment::gatherReductionInitInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 2 &&
+    "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+
+  // This assert should not trigger since clang allows an unique reduction per DSA
+  assert(!ReductionsInitCombInfo.count(OBArgs[0])
+         && "Two or more reductions of the same DSA in the same directive are not allowed");
+  ReductionsInitCombInfo[OBArgs[0]].Init = OBArgs[1];
+
+  if (SeenInits.count(OBArgs[1])) {
+    ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = SeenInits[OBArgs[1]];
+  } else {
+    SeenInits[OBArgs[1]] = ReductionIndex;
+    ReductionsInitCombInfo[OBArgs[0]].ReductionIndex = ReductionIndex;
+    ReductionIndex++;
   }
 }
 
-// Gathers multi dependencies needed information of type Id
-static void gatherMultiDependsInfoWithID(
-    const IntrinsicInst *I, SmallVectorImpl<MultiDependInfo> &DependsList,
-    TaskDSAInfo &DSAInfo, TaskCapturedInfo &CapturedInfo, uint64_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  // TODO: maybe do a bundle gather with asserts?
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    MultiDependInfo MDI;
-    DependInfo &DI = MDI.DepInfo;
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
+void DirectiveEnvironment::gatherReductionCombInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 2 &&
+    "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
+  ArrayRef<Value *> OBArgs = OB.inputs();
 
-    size_t i;
-    size_t ComputeFnCnt = 0;
-    // 1. Gather iterators from begin to compute multidep function
-    // 2. Gather compute multidep function args from 1. to compute dep function previous element
-    //    which is the dep base
-    for (i = 0; i < OBArgs.size(); ++i) {
-      if (auto *ComputeFn = dyn_cast<Function>(OBArgs[i])) {
-        if (ComputeFnCnt == 0) // ComputeMultiDepFun
-          MDI.ComputeMultiDepFun = ComputeFn;
-        else // Seen ComputeDepFun
-          break;
-        ++ComputeFnCnt;
-        continue;
-      }
-      assert((valueInDSABundles(DSAInfo, OBArgs[i])
-              || valueInCapturedBundle(CapturedInfo, OBArgs[i]))
-             && "Multidependency value has no associated DSA or capture");
-      if (ComputeFnCnt == 0)
-        MDI.Iters.push_back(OBArgs[i]);
-      else if (ComputeFnCnt == 1)
-        MDI.Args.push_back(OBArgs[i]);
+  ReductionsInitCombInfo[OBArgs[0]].Comb = OBArgs[1];
+}
+
+void DirectiveEnvironment::gatherFinalInfo(OperandBundleDef &OB) {
+  assert(!Final && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Final = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherIfInfo(OperandBundleDef &OB) {
+  assert(!If && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  If = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherCostInfo(OperandBundleDef &OB) {
+  assert(!Cost && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Cost = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherPriorityInfo(OperandBundleDef &OB) {
+  assert(!Priority && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Priority = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLabelInfo(OperandBundleDef &OB) {
+  assert(!Label && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Label = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherWaitInfo(OperandBundleDef &OB) {
+  assert(!Wait && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  Wait = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherCapturedInfo(OperandBundleDef &OB) {
+  assert(CapturedInfo.empty() && "Only allowed one OperandBundle with this Id");
+  CapturedInfo.insert(OB.input_begin(), OB.input_end());
+}
+
+void DirectiveEnvironment::gatherNonPODInitInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 2 &&
+    "Non-POD info must have a Value matching a DSA and a function pointer Value");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  NonPODsInfo.Inits[OBArgs[0]] = OBArgs[1];
+}
+
+void DirectiveEnvironment::gatherNonPODDeinitInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 2 &&
+    "Non-POD info must have a Value matching a DSA and a function pointer Value");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  NonPODsInfo.Deinits[OBArgs[0]] = OBArgs[1];
+}
+
+void DirectiveEnvironment::gatherNonPODCopyInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() == 2 && "Non-POD info must have a Value matching a DSA and a function pointer Value");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  NonPODsInfo.Copies[OBArgs[0]] = OBArgs[1];
+}
+
+void DirectiveEnvironment::gatherLoopTypeInfo(OperandBundleDef &OB) {
+  assert(LoopInfo.LoopType == -1 && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.IndVarSigned == -1 && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.LBoundSigned == -1 && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.UBoundSigned == -1 && "Only allowed one OperandBundle with this Id");
+  assert(LoopInfo.StepSigned == -1 && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 5 && "Expected loop type and indvar, lb, ub, step signedness");
+
+  LoopInfo.LoopType = cast<ConstantInt>(OB.inputs()[0])->getSExtValue();
+  LoopInfo.IndVarSigned = cast<ConstantInt>(OB.inputs()[1])->getSExtValue();
+  LoopInfo.LBoundSigned = cast<ConstantInt>(OB.inputs()[2])->getSExtValue();
+  LoopInfo.UBoundSigned = cast<ConstantInt>(OB.inputs()[3])->getSExtValue();
+  LoopInfo.StepSigned = cast<ConstantInt>(OB.inputs()[4])->getSExtValue();
+}
+
+void DirectiveEnvironment::gatherLoopIndVarInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.IndVar && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.IndVar = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLoopLowerBoundInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.LBound && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.LBound = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLoopUpperBoundInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.UBound && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.UBound = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLoopStepInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.Step && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.Step = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLoopChunksizeInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.Chunksize && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.Chunksize = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherLoopGrainsizeInfo(OperandBundleDef &OB) {
+  assert(!LoopInfo.Grainsize && "Only allowed one OperandBundle with this Id");
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  LoopInfo.Grainsize = OB.inputs()[0];
+}
+
+void DirectiveEnvironment::gatherMultiDependInfo(
+    OperandBundleDef &OB, uint64_t Id) {
+  // TODO: add asserts
+
+  MultiDependInfo *MDI = new MultiDependInfo();
+  MDI->DepType = getDependTypeFromId(Id);
+
+  ArrayRef<Value *> OBArgs = OB.inputs();
+
+  size_t i;
+  size_t ComputeFnCnt = 0;
+  // 1. Gather iterators from begin to compute multidep function
+  // 2. Gather compute multidep function args from 1. to compute dep function previous element
+  //    which is the dep base
+  for (i = 0; i < OBArgs.size(); ++i) {
+    if (auto *ComputeFn = dyn_cast<Function>(OBArgs[i])) {
+      if (ComputeFnCnt == 0) // ComputeMultiDepFun
+        MDI->ComputeMultiDepFun = ComputeFn;
+      else // Seen ComputeDepFun
+        break;
+      ++ComputeFnCnt;
+      continue;
     }
-    // TODO: this is used because we add dep base too
-    // which is wrong...
-    MDI.Args.pop_back();
-
-    gatherDependInfoFromBundle(OBArgs.drop_front(i - 1), DSAInfo, CapturedInfo, DI);
-    DependsList.push_back(MDI);
+    if (ComputeFnCnt == 0)
+      MDI->Iters.push_back(OBArgs[i]);
+    else if (ComputeFnCnt == 1)
+      MDI->Args.push_back(OBArgs[i]);
   }
+  // TODO: this is used because we add dep base too
+  // which is wrong...
+  MDI->Args.pop_back();
+
+  ::gatherDependInfo(OBArgs.drop_front(i - 1), DepSymToIdx, DependsInfo, *MDI, Id);
+
+  DependsInfo.List.emplace_back(MDI);
 }
 
-// Gathers dependencies needed information of type Id
-static void gatherReductionsInfoWithID(const IntrinsicInst *I,
-                                       SmallVectorImpl<ReductionInfo> &ReductionsList,
-                                       TaskDSAInfo &DSAInfo,
-                                       TaskCapturedInfo &CapturedInfo,
-                                       uint64_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    ReductionInfo RI;
-
-    ArrayRef<Value *> OBArgs = OBDef.inputs();
-    RI.RedKind = OBArgs[0];
-
-    // Skip the reduction kind
-    gatherDependInfoFromBundle(OBArgs.drop_front(1), DSAInfo, CapturedInfo, RI.DepInfo);
-
-    ReductionsList.push_back(RI);
-  }
-}
-
-// Gathers all dependencies needed information
-static void gatherDependsInfo(
-    const IntrinsicInst *I, TaskInfo &TI) {
-
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.Ins,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_in);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.Outs,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_out);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.Inouts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_inout);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.Concurrents,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_concurrent);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.Commutatives,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_commutative);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.WeakIns,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_weakin);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.WeakOuts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_weakout);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.WeakInouts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_weakinout);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.WeakConcurrents,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_weakconcurrent);
-  gatherDependsInfoWithID(I,
-                          TI.DependsInfo.WeakCommutatives,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_dep_weakcommutative);
-
-  gatherReductionsInfoWithID(I,
-                             TI.DependsInfo.Reductions,
-                             TI.DSAInfo,
-                             TI.CapturedInfo,
-                             LLVMContext::OB_oss_dep_reduction);
-
-  gatherReductionsInfoWithID(I,
-                             TI.DependsInfo.WeakReductions,
-                             TI.DSAInfo,
-                             TI.CapturedInfo,
-                             LLVMContext::OB_oss_dep_weakreduction);
-
-  TI.DependsInfo.NumSymbols = TI.DSAInfo.DepSymToIdx.size();
-}
-
-static void gatherMultiDependsInfo(
-  const IntrinsicInst *I, TaskInfo &TI) {
-
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeIns,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_in);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeOuts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_out);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeInouts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_inout);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeConcurrents,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_concurrent);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeCommutatives,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_commutative);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeWeakIns,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_weakin);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeWeakOuts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_weakout);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeWeakInouts,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_weakinout);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeWeakConcurrents,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_weakconcurrent);
-  gatherMultiDependsInfoWithID(I,
-                          TI.DependsInfo.MultiRangeWeakCommutatives,
-                          TI.DSAInfo,
-                          TI.CapturedInfo,
-                          LLVMContext::OB_oss_multidep_range_weakcommutative);
-
-  TI.DependsInfo.NumSymbols += TI.DSAInfo.DepSymToIdx.size();
-}
-
-// Process OpBundle gathering dependency information (oss release)
-static void gatherReleaseDependInfoFromBundle(
-    ArrayRef<Value *> OBArgs, ReleaseDependInfo &DI) {
-  // First operand has to be the DSA over the dependency is made
-  Value *DepBaseDSA = OBArgs[0];
-  DI.Base = DepBaseDSA;
-
-  Function *ComputeDepFun = cast<Function>(OBArgs[1]);
-  DI.ComputeDepFun = ComputeDepFun;
-
-  // Gather compute_dep function params
-  for (size_t i = 2; i < OBArgs.size(); ++i) {
-    DI.Args.push_back(OBArgs[i]);
-  }
-}
-
-// Gathers dependencies needed information of type Id (oss release)
-static void gatherReleaseDependsInfoWithID(
-    const IntrinsicInst *I, SmallVectorImpl<ReleaseDependInfo> &DependsList,
-    uint64_t Id) {
-  SmallVector<OperandBundleDef, 4> OpBundles;
-  // TODO: maybe do a bundle gather with asserts?
-  getOperandBundlesAsDefsWithID(I, OpBundles, Id);
-  for (const OperandBundleDef &OBDef : OpBundles) {
-    ReleaseDependInfo DI;
-
-    gatherReleaseDependInfoFromBundle(OBDef.inputs(), DI);
-
-    DependsList.push_back(DI);
-  }
-}
-
-// Gathers all dependencies needed information
-static void gatherReleaseDependsInfo(
-    const IntrinsicInst *I, ReleaseInfo &TI) {
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.Ins,
-                          LLVMContext::OB_oss_dep_in);
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.Outs,
-                          LLVMContext::OB_oss_dep_out);
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.Inouts,
-                          LLVMContext::OB_oss_dep_inout);
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.WeakIns,
-                          LLVMContext::OB_oss_dep_weakin);
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.WeakOuts,
-                          LLVMContext::OB_oss_dep_weakout);
-  gatherReleaseDependsInfoWithID(I,
-                          TI.DependsInfo.WeakInouts,
-                          LLVMContext::OB_oss_dep_weakinout);
-}
-
-
-// TODO: change function name for this
-static void gatherIfFinalCostPrioWaitInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  getValueFromOperandBundleWithID(I, TI.Final, LLVMContext::OB_oss_final);
-  getValueFromOperandBundleWithID(I, TI.If, LLVMContext::OB_oss_if);
-  getValueFromOperandBundleWithID(I, TI.Cost, LLVMContext::OB_oss_cost);
-  getValueFromOperandBundleWithID(I, TI.Priority, LLVMContext::OB_oss_priority);
-  getValueFromOperandBundleWithID(I, TI.Label, LLVMContext::OB_oss_label);
-  getValueFromOperandBundleWithID(I, TI.Wait, LLVMContext::OB_oss_wait);
-}
-
-// It's expected to have VLA dims info before calling this
-static void gatherCapturedInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  getValueListFromOperandBundlesWithID(I, TI.CapturedInfo, LLVMContext::OB_oss_captured);
-  if (!DisableChecks) {
+void DirectiveEnvironment::verifyVLADimsInfo() {
+  for (const auto &VLAWithDimsMap : VLADimsInfo) {
+    if (!valueInDSABundles(DSAInfo, VLAWithDimsMap.first))
+      llvm_unreachable("VLA dims OperandBundle must have an associated DSA");
     // VLA Dims that are not Captured is an error
-    for (auto &VLAWithDimsMap : TI.VLADimsInfo) {
-      for (Value *const &V : VLAWithDimsMap.second) {
-        if (!valueInCapturedBundle(TI.CapturedInfo, V))
-          llvm_unreachable("VLA dimension has not been captured");
-      }
+    for (auto *V : VLAWithDimsMap.second) {
+      if (!valueInCapturedBundle(CapturedInfo, V))
+        llvm_unreachable("VLA dimension has not been captured");
     }
   }
 }
 
-static void gatherLoopInfo(const IntrinsicInst *I, TaskInfo &TI) {
-  assert(isOmpSsLoopDirective(TI.TaskKind) && "gatherLoopInfo expects a loop directive");
+void DirectiveEnvironment::verifyDependInfo() {
+  for (auto &DI : DependsInfo.List) {
+    if (!valueInDSABundles(DSAInfo, DI->Base))
+      llvm_unreachable("Dependency has no associated DSA");
+    for (auto *V : DI->Args) {
+      if (!valueInDSABundles(DSAInfo, V)
+          && !valueInCapturedBundle(CapturedInfo, V))
+        llvm_unreachable("Dependency has no associated DSA or capture");
+    }
+  }
+}
 
-  // TODO: add stepincr
-  SmallVector<OperandBundleDef, 4> LoopTypeBundles;
-  getOperandBundlesAsDefsWithID(I, LoopTypeBundles, LLVMContext::OB_oss_loop_type);
-  assert(LoopTypeBundles.size() == 1 && LoopTypeBundles[0].input_size() == 5);
+void DirectiveEnvironment::verifyReductionInitCombInfo() {
+  for (const auto &RedInitCombMap : ReductionsInitCombInfo) {
+    if (!valueInDSABundles(DSAInfo, RedInitCombMap.first))
+      llvm_unreachable(
+        "Reduction init/combiner must have a Value matching a DSA and a function pointer Value");
+    if (!RedInitCombMap.second.Init)
+      llvm_unreachable("Missing reduction initializer");
+    if (!RedInitCombMap.second.Comb)
+      llvm_unreachable("Missing reduction combiner");
+  }
+}
 
-  TI.LoopInfo.LoopType = cast<ConstantInt>(LoopTypeBundles[0].inputs()[0])->getSExtValue();
-  TI.LoopInfo.IndVarSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[1])->getSExtValue();
-  TI.LoopInfo.LBoundSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[2])->getSExtValue();
-  TI.LoopInfo.UBoundSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[3])->getSExtValue();
-  TI.LoopInfo.StepSigned = cast<ConstantInt>(LoopTypeBundles[0].inputs()[4])->getSExtValue();
+void DirectiveEnvironment::verifyNonPODInfo() {
+  for (const auto &InitMap : NonPODsInfo.Inits) {
+    // INIT may only be in private clauses
+    auto It = find(DSAInfo.Private, InitMap.first);
+    if (It == DSAInfo.Private.end())
+      llvm_unreachable("Non-POD INIT OperandBundle must have a PRIVATE DSA");
+  }
+  for (const auto &DeinitMap : NonPODsInfo.Deinits) {
+      // DEINIT may only be in firstprivate clauses
+      auto PrivateIt = find(DSAInfo.Private, DeinitMap.first);
+      auto FirstprivateIt = find(DSAInfo.Firstprivate, DeinitMap.first);
+      if (FirstprivateIt == DSAInfo.Firstprivate.end()
+          && PrivateIt == DSAInfo.Private.end())
+        llvm_unreachable("Non-POD DEINIT OperandBundle must have a PRIVATE or FIRSTPRIVATE DSA");
+  }
+  for (const auto &CopyMap : NonPODsInfo.Copies) {
+    // COPY may only be in firstprivate clauses
+    auto It = find(DSAInfo.Firstprivate, CopyMap.first);
+    if (It == DSAInfo.Firstprivate.end())
+      llvm_unreachable("Non-POD COPY OperandBundle must have a FIRSTPRIVATE DSA");
+  }
+}
 
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.IndVar, LLVMContext::OB_oss_loop_ind_var);
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.LBound, LLVMContext::OB_oss_loop_lower_bound);
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.UBound, LLVMContext::OB_oss_loop_upper_bound);
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.Step, LLVMContext::OB_oss_loop_step);
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.Chunksize, LLVMContext::OB_oss_loop_chunksize);
-  getValueFromOperandBundleWithID(I, TI.LoopInfo.Grainsize, LLVMContext::OB_oss_loop_grainsize);
-
-  if (TI.LoopInfo.empty())
+void DirectiveEnvironment::verifyLoopInfo() {
+  if (isOmpSsLoopDirective() && LoopInfo.empty())
     llvm_unreachable("LoopInfo is missing some information");
 }
 
-// in: TasksTree, Cur
-// out: tasks are ordered in post order, which means that
-// child tasks will be placed before its parent tasks
-static void convertTasksTreeToVectorImpl(
-  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
-  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
-  Instruction *Cur,
-  SmallVectorImpl<TaskInfo *> &PostOrder,
-  SmallVectorImpl<Instruction *> &Stack) {
-
-  if (Cur)
-    Stack.push_back(Cur);
-
-  // TODO: Why using operator[] does weird things?
-  // for (auto II : TasksTree[Cur]) {
-  for (auto II : TasksTree.lookup(Cur)) {
-    convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
-                                 TasksTree, II, PostOrder, Stack);
-  }
-  if (Cur) {
-    Stack.pop_back();
-
-    TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[Cur];
-    for (Instruction *I : Stack) {
-      // Annotate the current task as inner of all tasks in stack
-      TaskWithAnalysisInfo &TStack = TEntryToTaskWithAnalysisInfo[I];
-      TStack.Info.InnerTaskInfos.push_back(&T.Info);
+void DirectiveEnvironment::verifyMultiDependInfo() {
+  for (auto &DI : DependsInfo.List)
+    if (auto *MDI = dyn_cast<MultiDependInfo>(DI.get())) {
+      for (auto *V : MDI->Iters)
+        if (!valueInDSABundles(DSAInfo, V)
+            && !valueInCapturedBundle(CapturedInfo, V))
+          llvm_unreachable("Multidependency value has no associated DSA or capture");
+      for (auto *V : MDI->Args)
+        if (!valueInDSABundles(DSAInfo, V)
+            && !valueInCapturedBundle(CapturedInfo, V))
+          llvm_unreachable("Multidependency value has no associated DSA or capture");
     }
-    PostOrder.push_back(&T.Info);
+}
+
+void DirectiveEnvironment::verify() {
+  verifyVLADimsInfo();
+
+  // release directive does not need data-sharing checks
+  if (DirectiveKind != OSSD_release)
+    verifyDependInfo();
+
+  verifyReductionInitCombInfo();
+  verifyNonPODInfo();
+  verifyLoopInfo();
+  verifyMultiDependInfo();
+}
+
+DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
+  const IntrinsicInst *II = cast<IntrinsicInst>(I);
+  for (unsigned i = 0, e = II->getNumOperandBundles(); i != e; ++i) {
+    OperandBundleUse OBUse = II->getOperandBundleAt(i);
+    OperandBundleDef OBDef(OBUse);
+    uint64_t Id = OBUse.getTagID();
+    switch (Id) {
+    case LLVMContext::OB_oss_dir:
+      gatherDirInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_shared:
+      gatherSharedInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_private:
+      gatherPrivateInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_firstprivate:
+      gatherFirstprivateInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_vla_dims:
+      gatherVLADimsInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_dep_in:
+    case LLVMContext::OB_oss_dep_out:
+    case LLVMContext::OB_oss_dep_inout:
+    case LLVMContext::OB_oss_dep_concurrent:
+    case LLVMContext::OB_oss_dep_commutative:
+    case LLVMContext::OB_oss_dep_weakin:
+    case LLVMContext::OB_oss_dep_weakout:
+    case LLVMContext::OB_oss_dep_weakinout:
+    case LLVMContext::OB_oss_dep_weakconcurrent:
+    case LLVMContext::OB_oss_dep_weakcommutative:
+    case LLVMContext::OB_oss_dep_reduction:
+    case LLVMContext::OB_oss_dep_weakreduction:
+      gatherDependInfo(OBDef, Id);
+      break;
+    case LLVMContext::OB_oss_reduction_init:
+      gatherReductionInitInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_reduction_comb:
+      gatherReductionCombInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_final:
+      gatherFinalInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_if:
+      gatherIfInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_cost:
+      gatherCostInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_priority:
+      gatherPriorityInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_label:
+      gatherLabelInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_wait:
+      gatherWaitInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_captured:
+      gatherCapturedInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_init:
+      gatherNonPODInitInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_deinit:
+      gatherNonPODDeinitInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_copy:
+      gatherNonPODCopyInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_type:
+      gatherLoopTypeInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_ind_var:
+      gatherLoopIndVarInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_lower_bound:
+      gatherLoopLowerBoundInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_upper_bound:
+      gatherLoopUpperBoundInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_step:
+      gatherLoopStepInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_chunksize:
+      gatherLoopChunksizeInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_loop_grainsize:
+      gatherLoopGrainsizeInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_multidep_range_in:
+    case LLVMContext::OB_oss_multidep_range_out:
+    case LLVMContext::OB_oss_multidep_range_inout:
+    case LLVMContext::OB_oss_multidep_range_concurrent:
+    case LLVMContext::OB_oss_multidep_range_commutative:
+    case LLVMContext::OB_oss_multidep_range_weakin:
+    case LLVMContext::OB_oss_multidep_range_weakout:
+    case LLVMContext::OB_oss_multidep_range_weakinout:
+    case LLVMContext::OB_oss_multidep_range_weakconcurrent:
+    case LLVMContext::OB_oss_multidep_range_weakcommutative:
+      gatherMultiDependInfo(OBDef, Id);
+      break;
+    default:
+      llvm_unreachable("unknown ompss-2 bundle id");
+    }
   }
 }
 
-// in: TasksTree, Cur
-// out: tasks are ordered in post order, which means that
-// child tasks will be placed before its parent tasks
-static void convertTasksTreeToVector(
-  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
-  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree,
-  SmallVectorImpl<TaskInfo*> &PostOrder) {
+// child directives will be placed before its parent directives
+void OmpSsRegionAnalysisPass::convertDirectivesTreeToVectorImpl(
+  Instruction *Cur, SmallVectorImpl<Instruction *> &Stack) {
 
+  if (Cur)
+    if (auto *II = dyn_cast<IntrinsicInst>(Cur))
+      if (II->getIntrinsicID() == Intrinsic::directive_region_entry)
+        Stack.push_back(Cur);
+
+  // TODO: Why using operator[] does weird things?
+  // for (auto II : DirectivesTree[Cur]) {
+  for (auto II : DirectivesTree.lookup(Cur)) {
+    convertDirectivesTreeToVectorImpl(II, Stack);
+  }
+  if (Cur) {
+    DirectiveInfo *DI = DEntryToDInfo[Cur].get();
+
+    if (auto *II = dyn_cast<IntrinsicInst>(Cur)) {
+      if (II->getIntrinsicID() == Intrinsic::directive_region_entry) {
+        Stack.pop_back();
+
+        for (Instruction *I : Stack) {
+          // Annotate the current directive as inner of all directives in stack
+          DirectiveInfo *DIStack = DEntryToDInfo[I].get();
+          DIStack->InnerDirectiveInfos.push_back(DI);
+        }
+      }
+    }
+    DirectiveFuncInfo.PostOrder.push_back(DI);
+  }
+}
+
+// child directives will be placed before its parent directives
+void OmpSsRegionAnalysisPass::convertDirectivesTreeToVector() {
   SmallVector<Instruction *, 4> Stack;
-
-  convertTasksTreeToVectorImpl(TEntryToTaskWithAnalysisInfo,
-                               TasksTree, nullptr, PostOrder, Stack);
+  convertDirectivesTreeToVectorImpl(nullptr, Stack);
 }
 
 void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
-  Function &F, DominatorTree &DT, FunctionInfo &FI,
-  MapVector<Instruction *, TaskWithAnalysisInfo> &TEntryToTaskWithAnalysisInfo,
-  MapVector<Instruction *, SmallVector<Instruction *, 4>> &TasksTree) {
+    Function &F, DominatorTree &DT) {
 
-  MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBTaskStacks;
+  MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBDirectiveStacks;
   SmallVector<BasicBlock*, 8> Worklist;
   SmallPtrSet<BasicBlock*, 8> Visited;
 
@@ -826,89 +783,80 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
     BasicBlock *BB = *WIt;
     Worklist.erase(WIt);
 
-    SmallVectorImpl<Instruction *> &Stack = BBTaskStacks[BB];
+    SmallVectorImpl<Instruction *> &Stack = BBDirectiveStacks[BB];
 
     for (Instruction &I : *BB) {
       if (auto *II = dyn_cast<IntrinsicInst>(&I)) {
         if (II->getIntrinsicID() == Intrinsic::directive_region_entry) {
-          assert(II->hasOneUse() && "Task entry has more than one user.");
+          assert(II->hasOneUse() && "Directive entry has more than one user.");
 
           Instruction *Exit = cast<Instruction>(II->user_back());
           // This should not happen because it will crash before this pass
-          assert(orderedInstructions(DT, II, Exit) && "Task entry does not dominate exit.");
+          assert(orderedInstructions(DT, II, Exit) && "Directive entry does not dominate exit.");
 
+          // directive.region pushes into the stack
           if (Stack.empty()) {
-            // outer task, insert into nullptr
-            TasksTree[nullptr].push_back(II);
+            // outer directive, insert into nullptr
+            DirectivesTree[nullptr].push_back(II);
           } else {
-            TasksTree[Stack.back()].push_back(II);
+            DirectivesTree[Stack.back()].push_back(II);
           }
           Stack.push_back(II);
 
-          TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[II];
-          T.Info.Entry = II;
-          T.Info.Exit = Exit;
+          auto Dir = std::make_unique<DirectiveInfo>(II, Exit);
+          if (!DisableChecks)
+            Dir->DirEnv.verify();
 
-          gatherTaskKindInfo(II, T.Info);
-          gatherDSAInfo(II, T.Info);
-          gatherNonPODInfo(II, T.Info);
-          gatherVLADimsInfo(II, T.Info);
-          gatherCapturedInfo(II, T.Info);
-          gatherDependsInfo(II, T.Info);
-          gatherMultiDependsInfo(II, T.Info);
-          gatherReductionsInitCombInfo(II, T.Info);
-          gatherIfFinalCostPrioWaitInfo(II, T.Info);
-          if (isOmpSsLoopDirective(T.Info.TaskKind))
-            gatherLoopInfo(II, T.Info);
-          // TODO: missing grainsize, chunksize
+          DEntryToDInfo.insert({II, std::move(Dir)});
+
         } else if (II->getIntrinsicID() == Intrinsic::directive_region_exit) {
           if (Stack.empty())
-            llvm_unreachable("Task exit hit without and entry.");
+            llvm_unreachable("Directive exit hit without and entry.");
 
           Instruction *StackEntry = Stack.back();
           Instruction *StackExit = cast<Instruction>(StackEntry->user_back());
-          assert(StackExit == II && "unexpected task exit instr.");
+          assert(StackExit == II && "unexpected directive exit instr.");
 
           Stack.pop_back();
         } else if (II->getIntrinsicID() == Intrinsic::directive_marker) {
 
-          Value *MarkerKindValue = nullptr;
-          getValueFromOperandBundleWithID(II, MarkerKindValue, LLVMContext::OB_oss_dir);
-          assert(MarkerKindValue && "Expected task kind value in bundles");
-          ConstantDataArray *MarkerKindDataArray = cast<ConstantDataArray>(MarkerKindValue);
-          assert(MarkerKindDataArray->isCString() && "Marker kind must be a C string");
-          StringRef MarkerKindStringRef = MarkerKindDataArray->getAsCString();
-
-          if (MarkerKindStringRef == "RELEASE") {
-            ReleaseInfo RI;
-            RI.I = II;
-            gatherReleaseDependsInfo(II, RI);
-            FI.ReleaseFuncInfo.PostOrder.push_back(RI);
+          // directive_marker does not push into the stack
+          if (Stack.empty()) {
+            // outer directive, insert into nullptr
+            DirectivesTree[nullptr].push_back(II);
           } else {
-            FI.TaskwaitFuncInfo.PostOrder.push_back({II});
+            DirectivesTree[Stack.back()].push_back(II);
           }
+
+          auto Dir = std::make_unique<DirectiveInfo>(II);
+          if (!DisableChecks)
+            Dir->DirEnv.verify();
+
+          DEntryToDInfo.insert({II, std::move(Dir)});
         }
       } else if (!Stack.empty()) {
         Instruction *StackEntry = Stack.back();
         Instruction *StackExit = cast<Instruction>(StackEntry->user_back());
-        TaskWithAnalysisInfo &T = TEntryToTaskWithAnalysisInfo[StackEntry];
+        DirectiveAnalysisInfo &DAI = DEntryToDAnalysisInfo[StackEntry];
+        const DirectiveInfo *DI = DEntryToDInfo[StackEntry].get();
+        const DirectiveEnvironment &DirEnv = DI->DirEnv;
         for (Use &U : I.operands()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U.get())) {
             if (orderedInstructions(DT, I2, StackEntry)) {
-              T.AnalysisInfo.UsesBeforeEntry.insert(I2);
+              DAI.UsesBeforeEntry.insert(I2);
             if (!DisableChecks
-                && !valueInDSABundles(T.Info.DSAInfo, I2)
-                && !valueInCapturedBundle(T.Info.CapturedInfo, I2)) {
-                llvm_unreachable("Value supposed to be inside task entry "
+                && !valueInDSABundles(DirEnv.DSAInfo, I2)
+                && !valueInCapturedBundle(DirEnv.CapturedInfo, I2)) {
+                llvm_unreachable("Value supposed to be inside directive entry "
                                  "OperandBundle not found.");
               }
             }
           } else if (Argument *A = dyn_cast<Argument>(U.get())) {
-            T.AnalysisInfo.UsesBeforeEntry.insert(A);
+            DAI.UsesBeforeEntry.insert(A);
             if (!DisableChecks
-                && !valueInDSABundles(T.Info.DSAInfo, A)
-                && !valueInCapturedBundle(T.Info.CapturedInfo, A)) {
-              llvm_unreachable("Value supposed to be inside task entry "
+                && !valueInDSABundles(DirEnv.DSAInfo, A)
+                && !valueInCapturedBundle(DirEnv.CapturedInfo, A)) {
+              llvm_unreachable("Value supposed to be inside directive entry "
                                "OperandBundle not found.");
             }
           }
@@ -916,9 +864,9 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         for (User *U : I.users()) {
           if (Instruction *I2 = dyn_cast<Instruction>(U)) {
             if (orderedInstructions(DT, StackExit, I2)) {
-              T.AnalysisInfo.UsesAfterExit.insert(&I);
+              DAI.UsesAfterExit.insert(&I);
               if (!DisableChecks) {
-                llvm_unreachable("Value inside the task body used after it.");
+                llvm_unreachable("Value inside the directive body used after it.");
               }
             }
           }
@@ -936,32 +884,32 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
         // we do this only once per BB
         if (!StackCopy) {
           // We need to copy Stacki, otherwise &Stack as an iterator would be
-          // invalidated after BBTaskStacks[*It].
+          // invalidated after BBDirectiveStacks[*It].
           StackCopy.reset(
               new std::vector<Instruction *>(Stack.begin(), Stack.end()));
         }
 
-        BBTaskStacks[*It].append(StackCopy->begin(), StackCopy->end());
+        BBDirectiveStacks[*It].append(StackCopy->begin(), StackCopy->end());
       }
     }
   }
 
-  convertTasksTreeToVector(TEntryToTaskWithAnalysisInfo,
-                           TasksTree, FI.TaskFuncInfo.PostOrder);
+  convertDirectivesTreeToVector();
 
 }
 
 bool OmpSsRegionAnalysisPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  getOmpSsFunctionInfo(F, DT, FuncInfo, TEntryToTaskWithAnalysisInfo, TasksTree);
+  getOmpSsFunctionInfo(F, DT);
 
   return false;
 }
 
 void OmpSsRegionAnalysisPass::releaseMemory() {
-  FuncInfo = FunctionInfo();
-  TEntryToTaskWithAnalysisInfo.clear();
-  TasksTree.clear();
+  DirectiveFuncInfo = DirectiveFunctionInfo();
+  DEntryToDAnalysisInfo.clear();
+  DEntryToDInfo.clear();
+  DirectivesTree.clear();
 }
 
 void OmpSsRegionAnalysisPass::getAnalysisUsage(AnalysisUsage &AU) const {

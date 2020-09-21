@@ -40,7 +40,7 @@ define void @foo(i32 %x, i32 %y) {
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP10]]), !dbg !1
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !1
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0)), !dbg !1
+; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([33 x i8], [33 x i8]* @1, i32 0, i32 0)), !dbg !1
 ; CHECK-NEXT:    ret void
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, i32* [[X_ADDR]], align 4

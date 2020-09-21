@@ -45,14 +45,6 @@ entry:
   ret void, !dbg !13
 }
 
-; CHECK: define internal void @nanos6_ol_duplicate__Z3foov0(%nanos6_task_args__Z3foov0* %task_args_src, %nanos6_task_args__Z3foov0** %task_args_dst) {
-; CHECK: entry:
-; CHECK-NEXT:  %0 = load %nanos6_task_args__Z3foov0*, %nanos6_task_args__Z3foov0** %task_args_dst, align 8
-; CHECK:  %gep_src_s = getelementptr %nanos6_task_args__Z3foov0, %nanos6_task_args__Z3foov0* %task_args_src, i32 0, i32 0
-; CHECK-NEXT:  %gep_dst_s = getelementptr %nanos6_task_args__Z3foov0, %nanos6_task_args__Z3foov0* %0, i32 0, i32 0
-; CHECK-NEXT:  %2 = load %struct.S*, %struct.S** %gep_src_s, align 8
-; CHECK-NEXT:  store %struct.S* %2, %struct.S** %gep_dst_s, align 8
-
 ; CHECK: define internal void @nanos6_ol_duplicate__Z3foov1(%nanos6_task_args__Z3foov1* %task_args_src, %nanos6_task_args__Z3foov1** %task_args_dst) {
 ; CHECK: entry:
 ; CHECK-NEXT:   %0 = load %nanos6_task_args__Z3foov1*, %nanos6_task_args__Z3foov1** %task_args_dst, align 8

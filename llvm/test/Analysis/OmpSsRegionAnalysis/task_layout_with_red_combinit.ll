@@ -45,16 +45,16 @@ entry:
 }
 
 
-; CHECK: [0] %0
+; CHECK: [0] TASK %0
 ; CHECK-NEXT:   %x @red_init @red_comb
 ; CHECK-NEXT:   %y @red_init @red_comb
-; CHECK-NEXT: [0] %1
+; CHECK-NEXT: [0] TASK %1
 ; CHECK-NEXT:   %x @red_init @red_comb
 ; CHECK-NEXT:   %y @red_init @red_comb
-; CHECK-NEXT: [0] %2
+; CHECK-NEXT: [0] TASK %2
 ; CHECK-NEXT:   %x @red_init.4 @red_comb.5
 ; CHECK-NEXT:   %y @red_init.4 @red_comb.5
-; CHECK-NEXT: [0] %3
+; CHECK-NEXT: [0] TASK %3
 ; CHECK-NEXT:   %x @red_init.4 @red_comb.5
 ; CHECK-NEXT:   %y @red_init.4 @red_comb.5
 

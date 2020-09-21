@@ -29,9 +29,9 @@ entry:
   ret void
 }
 
-; CHECK: [0] %3
+; CHECK: [0] TASK %3
 ; CHECK-NEXT:   %vla
-; CHECK-NEXT: [0] %4
+; CHECK-NEXT: [0] TASK %4
 ; CHECK-NEXT:   %vla
 
 declare i8* @llvm.stacksave()

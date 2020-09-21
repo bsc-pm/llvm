@@ -49,7 +49,7 @@ define dso_local void @fold_if(i32 %a, i32 %b) #0 !dbg !6 {
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP9]]), !dbg !8
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !8
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([16 x i8], [16 x i8]* @0, i32 0, i32 0)), !dbg !9
+; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([16 x i8], [16 x i8]* @1, i32 0, i32 0)), !dbg !9
 ; CHECK-NEXT:    ret void, !dbg !10
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[L_CLONE:%.*]] = alloca i32, align 4

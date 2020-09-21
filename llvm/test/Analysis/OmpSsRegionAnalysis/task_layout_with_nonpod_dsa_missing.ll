@@ -19,10 +19,10 @@ entry:
   ret i32 %2
 }
 
-; CHECK: [0] %0
+; CHECK: [0] TASK %0
 ; CHECK-NEXT:   [Copy] %s
 ; CHECK-NEXT:   [Deinit] %s
-; CHECK-NEXT: [0] %1
+; CHECK-NEXT: [0] TASK %1
 ; CHECK-NEXT:   [Init] %s
 ; CHECK-NEXT:   [Deinit] %s
 
