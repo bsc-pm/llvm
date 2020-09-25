@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 #include "sanitizer_common/sanitizer_stackdepot.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_libc.h"
@@ -66,7 +65,13 @@ TEST(SanitizerCommon, StackDepotSeveral) {
   EXPECT_NE(i1, i2);
 }
 
-TEST(SanitizerCommon, StackDepotPrint) {
+#if SANITIZER_WINDOWS
+// CaptureStderr does not work on Windows.
+#define Maybe_StackDepotPrint DISABLED_StackDepotPrint
+#else
+#define Maybe_StackDepotPrint StackDepotPrint
+#endif
+TEST(SanitizerCommon, Maybe_StackDepotPrint) {
   uptr array1[] = {1, 2, 3, 4, 7};
   StackTrace s1(array1, ARRAY_SIZE(array1));
   u32 i1 = StackDepotPut(s1);
@@ -74,13 +79,10 @@ TEST(SanitizerCommon, StackDepotPrint) {
   StackTrace s2(array2, ARRAY_SIZE(array2));
   u32 i2 = StackDepotPut(s2);
   EXPECT_NE(i1, i2);
-  testing::internal::CaptureStderr();
-  StackDepotPrintAll();
-  EXPECT_THAT(
-      testing::internal::GetCapturedStderr(),
-      testing::MatchesRegex(
-          "Stack for id .*#0 0x0.*#1 0x1.*#2 0x2.*#3 0x3.*#4 0x6.*Stack for id "
-          ".*#0 0x0.*#1 0x1.*#2 0x2.*#3 0x3.*#4 0x7.*#5 0x8.*"));
+  EXPECT_EXIT(
+      (StackDepotPrintAll(), exit(0)), ::testing::ExitedWithCode(0),
+      "Stack for id .*#0 0x0.*#1 0x1.*#2 0x2.*#3 0x3.*#4 0x6.*Stack for id "
+      ".*#0 0x0.*#1 0x1.*#2 0x2.*#3 0x3.*#4 0x7.*#5 0x8.*");
 }
 
 TEST(SanitizerCommon, StackDepotReverseMap) {

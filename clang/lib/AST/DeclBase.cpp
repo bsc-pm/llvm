@@ -721,7 +721,7 @@ bool Decl::isWeakImported() const {
   if (!canBeWeakImported(IsDefinition))
     return false;
 
-  for (const auto *A : getMostRecentDecl()->attrs()) {
+  for (const auto *A : attrs()) {
     if (isa<WeakImportAttr>(A))
       return true;
 
