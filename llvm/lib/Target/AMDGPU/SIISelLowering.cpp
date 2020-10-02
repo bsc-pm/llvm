@@ -1433,7 +1433,8 @@ bool SITargetLowering::allowsMisalignedMemoryAccessesImpl(
       AddrSpace == AMDGPUAS::REGION_ADDRESS) {
     // Check if alignment requirements for ds_read/write instructions are
     // disabled.
-    if (Subtarget->hasUnalignedDSAccessEnabled() &&
+    if (Subtarget->hasUnalignedDSAccess() &&
+        Subtarget->hasUnalignedAccessMode() &&
         !Subtarget->hasLDSMisalignedBug()) {
       if (IsFast)
         *IsFast = Alignment != Align(2);
@@ -1483,7 +1484,7 @@ bool SITargetLowering::allowsMisalignedMemoryAccessesImpl(
     return AlignedBy4;
   }
 
-  if (Subtarget->hasUnalignedBufferAccessEnabled() &&
+  if (Subtarget->hasUnalignedBufferAccess() &&
       !(AddrSpace == AMDGPUAS::LOCAL_ADDRESS ||
         AddrSpace == AMDGPUAS::REGION_ADDRESS)) {
     // If we have an uniform constant load, it still requires using a slow
@@ -11675,46 +11676,40 @@ static bool isCopyFromRegOfInlineAsm(const SDNode *N) {
   return false;
 }
 
-bool SITargetLowering::isSDNodeSourceOfDivergence(const SDNode * N,
-  FunctionLoweringInfo * FLI, LegacyDivergenceAnalysis * KDA) const
-{
+bool SITargetLowering::isSDNodeSourceOfDivergence(
+    const SDNode *N, FunctionLoweringInfo *FLI,
+    LegacyDivergenceAnalysis *KDA) const {
   switch (N->getOpcode()) {
-    case ISD::CopyFromReg:
-    {
-      const RegisterSDNode *R = cast<RegisterSDNode>(N->getOperand(1));
-      const MachineRegisterInfo &MRI = FLI->MF->getRegInfo();
-      const SIRegisterInfo *TRI = Subtarget->getRegisterInfo();
-      Register Reg = R->getReg();
+  case ISD::CopyFromReg: {
+    const RegisterSDNode *R = cast<RegisterSDNode>(N->getOperand(1));
+    const MachineRegisterInfo &MRI = FLI->MF->getRegInfo();
+    const SIRegisterInfo *TRI = Subtarget->getRegisterInfo();
+    Register Reg = R->getReg();
 
-      // FIXME: Why does this need to consider isLiveIn?
-      if (Reg.isPhysical() || MRI.isLiveIn(Reg))
-        return !TRI->isSGPRReg(MRI, Reg);
-
-      if (const Value *V = FLI->getValueFromVirtualReg(R->getReg()))
-        return KDA->isDivergent(V);
-
-      assert(Reg == FLI->DemoteRegister || isCopyFromRegOfInlineAsm(N));
+    // FIXME: Why does this need to consider isLiveIn?
+    if (Reg.isPhysical() || MRI.isLiveIn(Reg))
       return !TRI->isSGPRReg(MRI, Reg);
-    }
-    break;
-    case ISD::LOAD: {
-      const LoadSDNode *L = cast<LoadSDNode>(N);
-      unsigned AS = L->getAddressSpace();
-      // A flat load may access private memory.
-      return AS == AMDGPUAS::PRIVATE_ADDRESS || AS == AMDGPUAS::FLAT_ADDRESS;
-    } break;
-    case ISD::CALLSEQ_END:
-    return true;
-    break;
-    case ISD::INTRINSIC_WO_CHAIN:
-    {
 
-    }
-      return AMDGPU::isIntrinsicSourceOfDivergence(
-      cast<ConstantSDNode>(N->getOperand(0))->getZExtValue());
-    case ISD::INTRINSIC_W_CHAIN:
-      return AMDGPU::isIntrinsicSourceOfDivergence(
-      cast<ConstantSDNode>(N->getOperand(1))->getZExtValue());
+    if (const Value *V = FLI->getValueFromVirtualReg(R->getReg()))
+      return KDA->isDivergent(V);
+
+    assert(Reg == FLI->DemoteRegister || isCopyFromRegOfInlineAsm(N));
+    return !TRI->isSGPRReg(MRI, Reg);
+  }
+  case ISD::LOAD: {
+    const LoadSDNode *L = cast<LoadSDNode>(N);
+    unsigned AS = L->getAddressSpace();
+    // A flat load may access private memory.
+    return AS == AMDGPUAS::PRIVATE_ADDRESS || AS == AMDGPUAS::FLAT_ADDRESS;
+  }
+  case ISD::CALLSEQ_END:
+    return true;
+  case ISD::INTRINSIC_WO_CHAIN:
+    return AMDGPU::isIntrinsicSourceOfDivergence(
+        cast<ConstantSDNode>(N->getOperand(0))->getZExtValue());
+  case ISD::INTRINSIC_W_CHAIN:
+    return AMDGPU::isIntrinsicSourceOfDivergence(
+        cast<ConstantSDNode>(N->getOperand(1))->getZExtValue());
   }
   return false;
 }

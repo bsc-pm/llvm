@@ -9,6 +9,7 @@
 #include "IRModules.h"
 #include "PybindUtils.h"
 
+#include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir-c/Registration.h"
 #include "mlir-c/StandardAttributes.h"
 #include "mlir-c/StandardTypes.h"
@@ -453,6 +454,17 @@ PyMlirContext::~PyMlirContext() {
   mlirContextDestroy(context);
 }
 
+py::object PyMlirContext::getCapsule() {
+  return py::reinterpret_steal<py::object>(mlirPythonContextToCapsule(get()));
+}
+
+py::object PyMlirContext::createFromCapsule(py::object capsule) {
+  MlirContext rawContext = mlirPythonCapsuleToContext(capsule.ptr());
+  if (mlirContextIsNull(rawContext))
+    throw py::error_already_set();
+  return forContext(rawContext).releaseObject();
+}
+
 PyMlirContext *PyMlirContext::createNewContextForInit() {
   MlirContext context = mlirContextCreate();
   mlirRegisterAllDialects(context);
@@ -579,6 +591,10 @@ PyModuleRef PyModule::create(PyMlirContextRef contextRef, MlirModule module) {
       py::cast(unownedModule, py::return_value_policy::take_ownership);
   unownedModule->handle = pyRef;
   return PyModuleRef(unownedModule, std::move(pyRef));
+}
+
+py::object PyModule::getCapsule() {
+  return py::reinterpret_steal<py::object>(mlirPythonModuleToCapsule(get()));
 }
 
 //------------------------------------------------------------------------------
@@ -1278,6 +1294,56 @@ public:
   }
 };
 
+/// Function type.
+class PyFunctionType : public PyConcreteType<PyFunctionType> {
+public:
+  static constexpr IsAFunctionTy isaFunction = mlirTypeIsAFunction;
+  static constexpr const char *pyClassName = "FunctionType";
+  using PyConcreteType::PyConcreteType;
+
+  static void bindDerived(ClassTy &c) {
+    c.def_static(
+        "get",
+        [](PyMlirContext &context, std::vector<PyType> inputs,
+           std::vector<PyType> results) {
+          SmallVector<MlirType, 4> inputsRaw(inputs.begin(), inputs.end());
+          SmallVector<MlirType, 4> resultsRaw(results.begin(), results.end());
+          MlirType t = mlirFunctionTypeGet(context.get(), inputsRaw.size(),
+                                           inputsRaw.data(), resultsRaw.size(),
+                                           resultsRaw.data());
+          return PyFunctionType(context.getRef(), t);
+        },
+        py::arg("context"), py::arg("inputs"), py::arg("results"),
+        "Gets a FunctionType from a list of input and result types");
+    c.def_property_readonly(
+        "inputs",
+        [](PyFunctionType &self) {
+          MlirType t = self.type;
+          auto contextRef = self.getContext();
+          py::list types;
+          for (intptr_t i = 0, e = mlirFunctionTypeGetNumInputs(self.type);
+               i < e; ++i) {
+            types.append(PyType(contextRef, mlirFunctionTypeGetInput(t, i)));
+          }
+          return types;
+        },
+        "Returns the list of input types in the FunctionType.");
+    c.def_property_readonly(
+        "results",
+        [](PyFunctionType &self) {
+          MlirType t = self.type;
+          auto contextRef = self.getContext();
+          py::list types;
+          for (intptr_t i = 0, e = mlirFunctionTypeGetNumResults(self.type);
+               i < e; ++i) {
+            types.append(PyType(contextRef, mlirFunctionTypeGetResult(t, i)));
+          }
+          return types;
+        },
+        "Returns the list of result types in the FunctionType.");
+  }
+};
+
 } // namespace
 
 //------------------------------------------------------------------------------
@@ -1295,6 +1361,9 @@ void mlir::python::populateIRSubmodule(py::module &m) {
              return ref.releaseObject();
            })
       .def("_get_live_operation_count", &PyMlirContext::getLiveOperationCount)
+      .def_property_readonly(MLIR_PYTHON_CAPI_PTR_ATTR,
+                             &PyMlirContext::getCapsule)
+      .def(MLIR_PYTHON_CAPI_FACTORY_ATTR, &PyMlirContext::createFromCapsule)
       .def_property(
           "allow_unregistered_dialects",
           [](PyMlirContext &self) -> bool {
@@ -1378,6 +1447,7 @@ void mlir::python::populateIRSubmodule(py::module &m) {
 
   // Mapping of Module
   py::class_<PyModule>(m, "Module")
+      .def_property_readonly(MLIR_PYTHON_CAPI_PTR_ATTR, &PyModule::getCapsule)
       .def_property_readonly(
           "operation",
           [](PyModule &self) {
@@ -1613,6 +1683,7 @@ void mlir::python::populateIRSubmodule(py::module &m) {
   PyMemRefType::bind(m);
   PyUnrankedMemRefType::bind(m);
   PyTupleType::bind(m);
+  PyFunctionType::bind(m);
 
   // Container bindings.
   PyBlockIterator::bind(m);

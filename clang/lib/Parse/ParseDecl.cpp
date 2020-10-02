@@ -4113,8 +4113,13 @@ void Parser::ParseStructDeclaration(
     DeclaratorInfo.D.setCommaLoc(CommaLoc);
 
     // Attributes are only allowed here on successive declarators.
-    if (!FirstDeclarator)
+    if (!FirstDeclarator) {
+      // However, this does not apply for [[]] attributes (which could show up
+      // before or after the __attribute__ attributes).
+      DiagnoseAndSkipCXX11Attributes();
       MaybeParseGNUAttributes(DeclaratorInfo.D);
+      DiagnoseAndSkipCXX11Attributes();
+    }
 
     /// struct-declarator: declarator
     /// struct-declarator: declarator[opt] ':' constant-expression
@@ -4152,7 +4157,7 @@ void Parser::ParseStructDeclaration(
 ///       struct-contents:
 ///         struct-declaration-list
 /// [EXT]   empty
-/// [GNU]   "struct-declaration-list" without terminatoring ';'
+/// [GNU]   "struct-declaration-list" without terminating ';'
 ///       struct-declaration-list:
 ///         struct-declaration
 ///         struct-declaration-list struct-declaration

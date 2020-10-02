@@ -10,10 +10,11 @@
 /* RUN: mlir-capi-ir-test 2>&1 | FileCheck %s
  */
 
-#include "mlir-c/AffineMap.h"
 #include "mlir-c/IR.h"
+#include "mlir-c/AffineMap.h"
 #include "mlir-c/Registration.h"
 #include "mlir-c/StandardAttributes.h"
+#include "mlir-c/StandardDialect.h"
 #include "mlir-c/StandardTypes.h"
 
 #include <assert.h>
@@ -443,6 +444,26 @@ static int printStandardTypes(MlirContext ctx) {
   mlirTypeDump(tuple);
   fprintf(stderr, "\n");
 
+  // Function type.
+  MlirType funcInputs[2] = {mlirIndexTypeGet(ctx), mlirIntegerTypeGet(ctx, 1)};
+  MlirType funcResults[3] = {mlirIntegerTypeGet(ctx, 16),
+                             mlirIntegerTypeGet(ctx, 32),
+                             mlirIntegerTypeGet(ctx, 64)};
+  MlirType funcType = mlirFunctionTypeGet(ctx, 2, funcInputs, 3, funcResults);
+  if (mlirFunctionTypeGetNumInputs(funcType) != 2)
+    return 21;
+  if (mlirFunctionTypeGetNumResults(funcType) != 3)
+    return 22;
+  if (!mlirTypeEqual(funcInputs[0], mlirFunctionTypeGetInput(funcType, 0)) ||
+      !mlirTypeEqual(funcInputs[1], mlirFunctionTypeGetInput(funcType, 1)))
+    return 23;
+  if (!mlirTypeEqual(funcResults[0], mlirFunctionTypeGetResult(funcType, 0)) ||
+      !mlirTypeEqual(funcResults[1], mlirFunctionTypeGetResult(funcType, 1)) ||
+      !mlirTypeEqual(funcResults[2], mlirFunctionTypeGetResult(funcType, 2)))
+    return 24;
+  mlirTypeDump(funcType);
+  fprintf(stderr, "\n");
+
   return 0;
 }
 
@@ -691,8 +712,7 @@ int printAffineMap(MlirContext ctx) {
     return 2;
 
   if (!mlirAffineMapIsEmpty(emptyAffineMap) ||
-      mlirAffineMapIsEmpty(affineMap) ||
-      mlirAffineMapIsEmpty(constAffineMap) ||
+      mlirAffineMapIsEmpty(affineMap) || mlirAffineMapIsEmpty(constAffineMap) ||
       mlirAffineMapIsEmpty(multiDimIdentityAffineMap) ||
       mlirAffineMapIsEmpty(minorIdentityAffineMap) ||
       mlirAffineMapIsEmpty(permutationAffineMap))
@@ -767,6 +787,42 @@ int printAffineMap(MlirContext ctx) {
   mlirAffineMapDump(subMap);
   mlirAffineMapDump(majorSubMap);
   mlirAffineMapDump(minorSubMap);
+
+  return 0;
+}
+
+int registerOnlyStd() {
+  MlirContext ctx = mlirContextCreate();
+  // The built-in dialect is always loaded.
+  if (mlirContextGetNumLoadedDialects(ctx) != 1)
+    return 1;
+
+  MlirDialect std =
+      mlirContextGetOrLoadDialect(ctx, mlirStandardDialectGetNamespace());
+  if (!mlirDialectIsNull(std))
+    return 2;
+
+  mlirContextRegisterStandardDialect(ctx);
+  if (mlirContextGetNumRegisteredDialects(ctx) != 1)
+    return 3;
+  if (mlirContextGetNumLoadedDialects(ctx) != 1)
+    return 4;
+
+  std = mlirContextGetOrLoadDialect(ctx, mlirStandardDialectGetNamespace());
+  if (mlirDialectIsNull(std))
+    return 5;
+  if (mlirContextGetNumLoadedDialects(ctx) != 2)
+    return 6;
+
+  MlirDialect alsoStd = mlirContextLoadStandardDialect(ctx);
+  if (!mlirDialectEqual(std, alsoStd))
+    return 7;
+
+  MlirStringRef stdNs = mlirDialectGetNamespace(std);
+  MlirStringRef alsoStdNs = mlirStandardDialectGetNamespace();
+  if (stdNs.length != alsoStdNs.length ||
+      strncmp(stdNs.data, alsoStdNs.data, stdNs.length))
+    return 8;
 
   return 0;
 }
@@ -859,6 +915,7 @@ int main() {
   // CHECK: memref<2x3xf32, 2>
   // CHECK: memref<*xf32, 4>
   // CHECK: tuple<memref<*xf32, 4>, f32>
+  // CHECK: (index, i1) -> (i16, i32, i64)
   // CHECK: 0
   // clang-format on
   fprintf(stderr, "@types\n");
@@ -914,6 +971,14 @@ int main() {
   fprintf(stderr, "@affineMap\n");
   errcode = printAffineMap(ctx);
   fprintf(stderr, "%d\n", errcode);
+
+  fprintf(stderr, "@registration\n");
+  errcode = registerOnlyStd();
+  fprintf(stderr, "%d\n", errcode);
+  // clang-format off
+  // CHECK-LABEL: @registration
+  // CHECK: 0
+  // clang-format on
 
   mlirContextDestroy(ctx);
 

@@ -10,6 +10,7 @@
 #define MLIR_DIALECT_LINALG_UTILS_H_
 
 #include "mlir/Dialect/Affine/EDSC/Intrinsics.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/EDSC/Builders.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -214,10 +215,11 @@ struct GenerateLoopNest {
       typename std::conditional<std::is_same<LoopTy, AffineForOp>::value,
                                 AffineIndexedValue, StdIndexedValue>::type;
 
-  static void doit(ArrayRef<SubViewOp::Range> loopRanges,
-                   ArrayRef<Attribute> iteratorTypes,
-                   function_ref<void(ValueRange)> bodyBuilderFn,
-                   Optional<LinalgLoopDistributionOptions> = None);
+  static void
+  doit(ArrayRef<SubViewOp::Range> loopRanges, ValueRange iterArgInitValues,
+       ArrayRef<Attribute> iteratorTypes,
+       function_ref<scf::ValueVector(ValueRange, ValueRange)> bodyBuilderFn,
+       Optional<LinalgLoopDistributionOptions> = None);
 };
 
 } // namespace linalg

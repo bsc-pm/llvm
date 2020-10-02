@@ -9,7 +9,6 @@
 #ifndef TEST_OPS
 #define TEST_OPS
 
-include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/RegionKindInterface.td"
@@ -629,6 +628,16 @@ def OpNonNorm : TEST_Op<"op_nonnorm"> {
   let arguments = (ins AnyMemRef:$X, AnyMemRef:$Y);
 }
 
+// Test for memrefs normalization of an op with a reference to a function
+// symbol.
+def OpFuncRef : TEST_Op<"op_funcref"> {
+  let summary = "Test op with a reference to a function symbol";
+  let description = [{
+    The "test.op_funcref" is a test op with a reference to a function symbol.
+  }];
+  let builders = [OpBuilder<[{FuncOp function}]>];
+}
+
 // Pattern add the argument plus a increasing static number hidden in
 // OpMTest function. That value is set into the optional argument.
 // That way, we will know if operations is called once or twice.
@@ -1121,12 +1130,12 @@ def LegalOpB : TEST_Op<"legal_op_b">, Results<(outs I32)>;
 def IllegalOpTerminator : TEST_Op<"illegal_op_terminator", [Terminator]>;
 def IllegalOpWithRegion : TEST_Op<"illegal_op_with_region"> {
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<"OpBuilder &builder, OperationState &state",
-                  [{ Region *bodyRegion = state.addRegion();
-                     OpBuilder::InsertionGuard g(builder);
-                     Block *body = builder.createBlock(bodyRegion);
-                     builder.setInsertionPointToEnd(body);
-                     builder.create<IllegalOpTerminator>(state.location);
+  let builders = [OpBuilder<"",
+                  [{ Region *bodyRegion = $_state.addRegion();
+                     OpBuilder::InsertionGuard g($_builder);
+                     Block *body = $_builder.createBlock(bodyRegion);
+                     $_builder.setInsertionPointToEnd(body);
+                     $_builder.create<IllegalOpTerminator>($_state.location);
                   }]>];
 }
 def IllegalOpWithRegionAnchor : TEST_Op<"illegal_op_with_region_anchor">;
@@ -1165,8 +1174,7 @@ def TestRegionBuilderOp : TEST_Op<"region_builder">;
 def TestReturnOp : TEST_Op<"return", [ReturnLike, Terminator]> {
   let arguments = (ins Variadic<AnyType>);
   let builders = [
-    OpBuilder<"OpBuilder &builder, OperationState &state",
-              [{ build(builder, state, {}); }]>
+    OpBuilder<"", [{ build($_builder, $_state, {}); }]>
   ];
 }
 def TestCastOp : TEST_Op<"cast">,

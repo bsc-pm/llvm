@@ -52,15 +52,25 @@ function(llvm_ExternalProject_Add name source_dir)
     endif()
   endforeach()
 
+  # If CMAKE_SYSTEM_NAME is not set explicitly in the arguments passed to us,
+  # reflect CMake's own default.
+  if (NOT _cmake_system_name)
+    set(_cmake_system_name "${CMAKE_HOST_SYSTEM_NAME}")
+  endif()
+
   if(NOT ARG_TOOLCHAIN_TOOLS)
-    set(ARG_TOOLCHAIN_TOOLS clang lld llvm-ar llvm-ranlib llvm-nm llvm-objdump)
-    if(_cmake_system_name STREQUAL Darwin)
-      list(APPEND ARG_TOOLCHAIN_TOOLS llvm-libtool-darwin llvm-lipo)
-    elseif(_cmake_system_name STREQUAL Windows)
-      list(APPEND ARG_TOOLCHAIN_TOOLS llvm-lib)
-    else()
-      # TODO: These tools don't fully support Mach-O format yet.
-      list(APPEND ARG_TOOLCHAIN_TOOLS llvm-objcopy llvm-strip)
+    set(ARG_TOOLCHAIN_TOOLS clang)
+    # AIX 64-bit XCOFF and big AR format is not yet supported in some of these tools.
+    if(NOT _cmake_system_name STREQUAL AIX)
+      list(APPEND ARG_TOOLCHAIN_TOOLS lld llvm-ar llvm-ranlib llvm-nm llvm-objdump)
+      if(_cmake_system_name STREQUAL Darwin)
+        list(APPEND ARG_TOOLCHAIN_TOOLS llvm-libtool-darwin llvm-lipo)
+      elseif(_cmake_system_name STREQUAL Windows)
+        list(APPEND ARG_TOOLCHAIN_TOOLS llvm-lib)
+      else()
+        # TODO: These tools don't fully support Mach-O format yet.
+        list(APPEND ARG_TOOLCHAIN_TOOLS llvm-objcopy llvm-strip)
+      endif()
     endif()
   endif()
   foreach(tool ${ARG_TOOLCHAIN_TOOLS})

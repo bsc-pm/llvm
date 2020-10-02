@@ -571,7 +571,7 @@ static Optional<GCOVOptions> getGCOVOptions(const CodeGenOptions &CodeGenOpts,
   Options.NoRedZone = CodeGenOpts.DisableRedZone;
   Options.Filter = CodeGenOpts.ProfileFilterFiles;
   Options.Exclude = CodeGenOpts.ProfileExcludeFiles;
-  Options.Atomic = LangOpts.Sanitize.has(SanitizerKind::Thread);
+  Options.Atomic = CodeGenOpts.AtomicProfileUpdate;
   return Options;
 }
 
@@ -583,10 +583,7 @@ getInstrProfOptions(const CodeGenOptions &CodeGenOpts,
   InstrProfOptions Options;
   Options.NoRedZone = CodeGenOpts.DisableRedZone;
   Options.InstrProfileOutput = CodeGenOpts.InstrProfileOutput;
-
-  // TODO: Surface the option to emit atomic profile counter increments at
-  // the driver level.
-  Options.Atomic = LangOpts.Sanitize.has(SanitizerKind::Thread);
+  Options.Atomic = CodeGenOpts.AtomicProfileUpdate;
   return Options;
 }
 
@@ -1233,6 +1230,9 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
   PB.registerFunctionAnalyses(FAM);
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  if (TM)
+    TM->registerPassBuilderCallbacks(PB, CodeGenOpts.DebugPassManager);
 
   ModulePassManager MPM(CodeGenOpts.DebugPassManager);
 

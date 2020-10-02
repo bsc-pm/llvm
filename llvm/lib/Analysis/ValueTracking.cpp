@@ -2561,12 +2561,15 @@ bool isKnownNonZero(const Value *V, const APInt &DemandedElts, unsigned Depth,
         }
       }
     }
-    // Check if all incoming values are non-zero constant.
-    bool AllNonZeroConstants = llvm::all_of(PN->operands(), [](Value *V) {
-      return isa<ConstantInt>(V) && !cast<ConstantInt>(V)->isZero();
+    // Check if all incoming values are non-zero using recursion.
+    Query RecQ = Q;
+    unsigned NewDepth = std::max(Depth, MaxAnalysisRecursionDepth - 1);
+    return llvm::all_of(PN->operands(), [&](const Use &U) {
+      if (U.get() == PN)
+        return true;
+      RecQ.CxtI = PN->getIncomingBlock(U)->getTerminator();
+      return isKnownNonZero(U.get(), DemandedElts, NewDepth, RecQ);
     });
-    if (AllNonZeroConstants)
-      return true;
   }
   // ExtractElement
   else if (const auto *EEI = dyn_cast<ExtractElementInst>(V)) {
@@ -2967,11 +2970,13 @@ static unsigned ComputeNumSignBitsImpl(const Value *V,
 
       // Take the minimum of all incoming values.  This can't infinitely loop
       // because of our depth threshold.
-      Tmp = ComputeNumSignBits(PN->getIncomingValue(0), Depth + 1, Q);
-      for (unsigned i = 1, e = NumIncomingValues; i != e; ++i) {
+      Query RecQ = Q;
+      Tmp = TyBits;
+      for (unsigned i = 0, e = NumIncomingValues; i != e; ++i) {
         if (Tmp == 1) return Tmp;
+        RecQ.CxtI = PN->getIncomingBlock(i)->getTerminator();
         Tmp = std::min(
-            Tmp, ComputeNumSignBits(PN->getIncomingValue(i), Depth + 1, Q));
+            Tmp, ComputeNumSignBits(PN->getIncomingValue(i), Depth + 1, RecQ));
       }
       return Tmp;
     }
@@ -3523,11 +3528,20 @@ bool llvm::isKnownNeverInfinity(const Value *V, const TargetLibraryInfo *TLI,
       return isKnownNeverInfinity(Inst->getOperand(1), TLI, Depth + 1) &&
              isKnownNeverInfinity(Inst->getOperand(2), TLI, Depth + 1);
     }
-    case Instruction::UIToFP:
-      // If the input type fits into the floating type the result is finite.
-      return ilogb(APFloat::getLargest(
-                 Inst->getType()->getScalarType()->getFltSemantics())) >=
-             (int)Inst->getOperand(0)->getType()->getScalarSizeInBits();
+    case Instruction::SIToFP:
+    case Instruction::UIToFP: {
+      // Get width of largest magnitude integer (remove a bit if signed).
+      // This still works for a signed minimum value because the largest FP
+      // value is scaled by some fraction close to 2.0 (1.0 + 0.xxxx).
+      int IntSize = Inst->getOperand(0)->getType()->getScalarSizeInBits();
+      if (Inst->getOpcode() == Instruction::SIToFP)
+        --IntSize;
+
+      // If the exponent of the largest finite FP value can hold the largest
+      // integer, the result of the cast must be finite.
+      Type *FPTy = Inst->getType()->getScalarType();
+      return ilogb(APFloat::getLargest(FPTy->getFltSemantics())) >= IntSize;
+    }
     default:
       break;
     }
@@ -4930,7 +4944,20 @@ static bool isGuaranteedNotToBeUndefOrPoison(const Value *V,
         return true;
     }
 
-    if (!canCreateUndefOrPoison(Opr) && all_of(Opr->operands(), OpCheck))
+    if (const auto *PN = dyn_cast<PHINode>(V)) {
+      unsigned Num = PN->getNumIncomingValues();
+      bool IsWellDefined = true;
+      for (unsigned i = 0; i < Num; ++i) {
+        auto *TI = PN->getIncomingBlock(i)->getTerminator();
+        if (!isGuaranteedNotToBeUndefOrPoison(PN->getIncomingValue(i), TI, DT,
+                                              Depth + 1, PoisonOnly)) {
+          IsWellDefined = false;
+          break;
+        }
+      }
+      if (IsWellDefined)
+        return true;
+    } else if (!canCreateUndefOrPoison(Opr) && all_of(Opr->operands(), OpCheck))
       return true;
   }
 

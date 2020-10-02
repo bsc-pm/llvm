@@ -50,6 +50,7 @@
 #include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/ModuleSummaryAnalysis.h"
+#include "llvm/Analysis/ObjCARCAliasAnalysis.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/PhiValues.h"
 #include "llvm/Analysis/PostDominators.h"
@@ -130,6 +131,7 @@
 #include "llvm/Transforms/Scalar/BDCE.h"
 #include "llvm/Transforms/Scalar/CallSiteSplitting.h"
 #include "llvm/Transforms/Scalar/ConstantHoisting.h"
+#include "llvm/Transforms/Scalar/ConstraintElimination.h"
 #include "llvm/Transforms/Scalar/CorrelatedValuePropagation.h"
 #include "llvm/Transforms/Scalar/DCE.h"
 #include "llvm/Transforms/Scalar/DeadStoreElimination.h"
@@ -148,12 +150,14 @@
 #include "llvm/Transforms/Scalar/LoopDataPrefetch.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
 #include "llvm/Transforms/Scalar/LoopDistribute.h"
+#include "llvm/Transforms/Scalar/LoopFlatten.h"
 #include "llvm/Transforms/Scalar/LoopFuse.h"
 #include "llvm/Transforms/Scalar/LoopIdiomRecognize.h"
 #include "llvm/Transforms/Scalar/LoopInstSimplify.h"
 #include "llvm/Transforms/Scalar/LoopLoadElimination.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Scalar/LoopPredication.h"
+#include "llvm/Transforms/Scalar/LoopReroll.h"
 #include "llvm/Transforms/Scalar/LoopRotation.h"
 #include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
 #include "llvm/Transforms/Scalar/LoopSink.h"
@@ -247,6 +251,10 @@ static cl::opt<bool> EnableUnrollAndJam(
     "enable-npm-unroll-and-jam", cl::init(false), cl::Hidden,
     cl::desc("Enable the Unroll and Jam pass for the new PM (default = off)"));
 
+static cl::opt<bool> EnableLoopFlatten(
+    "enable-npm-loop-flatten", cl::init(false), cl::Hidden,
+    cl::desc("Enable the Loop flattening pass for the new PM (default = off)"));
+
 static cl::opt<bool> EnableSyntheticCounts(
     "enable-npm-synthetic-counts", cl::init(false), cl::Hidden, cl::ZeroOrMore,
     cl::desc("Run synthetic function entry count generation "
@@ -283,6 +291,7 @@ PipelineTuningOptions::PipelineTuningOptions() {
   CallGraphProfile = true;
 }
 
+extern cl::opt<bool> EnableConstraintElimination;
 extern cl::opt<bool> EnableHotColdSplit;
 extern cl::opt<bool> EnableOrderFileInstrumentation;
 
@@ -506,6 +515,8 @@ FunctionPassManager PassBuilder::buildO1FunctionSimplificationPipeline(
     C(LPM2, Level);
 
   LPM2.addPass(LoopDeletionPass());
+  if (EnableLoopFlatten)
+    LPM2.addPass(LoopFlattenPass());
   // Do not enable unrolling in PreLinkThinLTO phase during sample PGO
   // because it changes IR to makes profile annotation in back compile
   // inaccurate. The normal unroller doesn't pay attention to forced full unroll
@@ -604,6 +615,9 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
     FPM.addPass(GVNSinkPass());
     FPM.addPass(SimplifyCFGPass());
   }
+
+  if (EnableConstraintElimination)
+    FPM.addPass(ConstraintEliminationPass());
 
   // Speculative execution if the target has divergent branches; otherwise nop.
   FPM.addPass(SpeculativeExecutionPass(/* OnlyIfDivergentTarget =*/true));
@@ -889,7 +903,7 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level, ThinLTOPhase Phase,
     MainCGPipeline.addPass(AttributorCGSCCPass());
 
   if (PTO.Coroutines)
-    MainCGPipeline.addPass(CoroSplitPass());
+    MainCGPipeline.addPass(CoroSplitPass(Level != OptimizationLevel::O0));
 
   // Now deduce any function attributes based in the current code.
   MainCGPipeline.addPass(PostOrderFunctionAttrsPass());
@@ -2834,4 +2848,10 @@ bool PassBuilder::isAnalysisPassName(StringRef PassName) {
     return true;
 #include "PassRegistry.def"
   return false;
+}
+
+void PassBuilder::registerParseTopLevelPipelineCallback(
+    const std::function<bool(ModulePassManager &, ArrayRef<PipelineElement>,
+                             bool VerifyEachPass, bool DebugLogging)> &C) {
+  TopLevelPipelineParsingCallbacks.push_back(C);
 }
