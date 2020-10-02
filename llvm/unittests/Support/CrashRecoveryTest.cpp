@@ -173,16 +173,6 @@ TEST(CrashRecoveryTest, UnixCRCReturnCode) {
   int Res = setenv("LLVM_CRC_UNIXCRCRETURNCODE", "1", 0);
   ASSERT_EQ(Res, 0);
 
-  // LD_LIBRARY_PATH is too precious to not to include it in the environment.
-  // We declare it here to make sure it lives long enough because we will put
-  // it in an array of StringRef.
-  std::string LdLibraryPath;
-  if (const char *Value = getenv("LD_LIBRARY_PATH")) {
-    LdLibraryPath = "LD_LIBRARY_PATH=";
-    LdLibraryPath += Value;
-    EnvTable.push_back(LdLibraryPath);
-  }
-
   std::string Error;
   bool ExecutionFailed;
   int RetCode = ExecuteAndWait(Executable, argv, {}, {}, 0, 0, &Error,
