@@ -17,7 +17,7 @@ int main() {
   { rz++; }
 }
 
-// CHECK: %0 = load i32*, i32** %rx, align 8, !dbg !11
+// CHECK: %0 = load i32*, i32** %rx, align 8
 // CHECK-NEXT: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"(i32* %0), "QUAL.OSS.DEP.IN"(i32* %x, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %x), "QUAL.OSS.DEP.IN"(i32* %0, %struct._depend_unpack_t.0 (i32*)* @compute_dep.1, i32* %0) ]
 // CHECK-NEXT: %2 = load i32, i32* %0, align 4
 // CHECK-NEXT: %inc = add nsw i32 %2, 1
