@@ -227,6 +227,11 @@ entry:
 ; CHECK-NEXT:   %load_capt_gep1 = load i64, i64* %capt_gep1
 ; CHECK-NEXT:   %capt_gep2 = getelementptr %nanos6_task_args_foo0, %nanos6_task_args_foo0* %task_args, i32 0, i32 3
 ; CHECK-NEXT:   %load_capt_gep2 = load i64, i64* %capt_gep2
+; CHECK-NEXT:   %0 = icmp ne %nanos6_address_translation_entry_t* %address_translation_table, null
+; CHECK-NEXT:   br i1 %0, label %1, label %2
+; CHECK: 1:                                                ; preds = %entry
+; CHECK-NEXT:   br label %2
+; CHECK: 2:                                                ; preds = %1, %entry
 ; CHECK-NEXT:   call void @nanos6_unpacked_task_region_foo0(i32* %load_gep_vla, i64 %load_capt_gep, i64 %load_capt_gep1, i64 %load_capt_gep2, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }

@@ -81,7 +81,7 @@ entry:
 
 ; CHECK: define internal void @nanos6_ol_task_region__Z3fooiRi0(%nanos6_task_args__Z3fooiRi0* %task_args, i8* %device_env, %nanos6_address_translation_entry_t* %address_translation_table) {
 ; CHECK: entry:
-; CHECK:   %0 = call %struct._depend_unpack_t @compute_dep(i32* %load_gep_y)
+; CHECK:   %2 = call %struct._depend_unpack_t @compute_dep(i32* %load_gep_y)
 ; CHECK: }
 
 ; CHECK: define internal void @nanos6_unpacked_constraints__Z3fooiRi0(i32* %y, i32 %x, %nanos6_task_constraints_t* %constraints) {

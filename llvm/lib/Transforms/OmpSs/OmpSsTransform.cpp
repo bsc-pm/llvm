@@ -1011,40 +1011,43 @@ struct OmpSs : public ModulePass {
 
   // Rewrites task_args using address_translation
   void translateDep(
-      IRBuilder<> &IRB, const DependInfo *DepInfo, Value *DSA,
+      IRBuilder<> &IRBTranslate, IRBuilder<> &IRBReload, const DependInfo *DepInfo, Value *DSA,
       Value *&UnpackedDSA, Value *AddrTranslationTable,
       const std::map<Value *, int> &DepSymToIdx) {
 
     Function *ComputeDepFun = cast<Function>(DepInfo->ComputeDepFun);
-    CallInst *CallComputeDep = IRB.CreateCall(ComputeDepFun, DepInfo->Args);
-    llvm::Value *DepBase = IRB.CreateExtractValue(CallComputeDep, 0);
+    CallInst *CallComputeDep = IRBTranslate.CreateCall(ComputeDepFun, DepInfo->Args);
+    llvm::Value *DepBase = IRBTranslate.CreateExtractValue(CallComputeDep, 0);
 
     Value *Idx[2];
-    Idx[0] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), DepSymToIdx.at(DSA));
-    Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRB.getContext()));
-    Value *LocalAddr = IRB.CreateGEP(
+    Idx[0] = ConstantInt::get(Type::getInt32Ty(
+      IRBTranslate.getContext()), DepSymToIdx.at(DSA));
+    Idx[1] = Constant::getNullValue(Type::getInt32Ty(IRBTranslate.getContext()));
+    Value *LocalAddr = IRBTranslate.CreateGEP(
         AddrTranslationTable, Idx, "local_lookup_" + DSA->getName());
-    LocalAddr = IRB.CreateLoad(LocalAddr);
+    LocalAddr = IRBTranslate.CreateLoad(LocalAddr);
 
-    Idx[1] = ConstantInt::get(Type::getInt32Ty(IRB.getContext()), 1);
-    Value *DeviceAddr = IRB.CreateGEP(
+    Idx[1] = ConstantInt::get(Type::getInt32Ty(IRBTranslate.getContext()), 1);
+    Value *DeviceAddr = IRBTranslate.CreateGEP(
         AddrTranslationTable, Idx, "device_lookup_" + DSA->getName());
-    DeviceAddr = IRB.CreateLoad(DeviceAddr);
+    DeviceAddr = IRBTranslate.CreateLoad(DeviceAddr);
 
     // Res = device_addr + (DSA_addr - local_addr)
-    Value *Translation = IRB.CreateBitCast(DepBase, Type::getInt8PtrTy(IRB.getContext()));
-    Translation = IRB.CreateGEP(Translation, IRB.CreateNeg(LocalAddr));
-    Translation = IRB.CreateGEP(Translation, DeviceAddr);
+    Value *Translation = IRBTranslate.CreateBitCast(
+      DepBase, Type::getInt8PtrTy(IRBTranslate.getContext()));
+    Translation = IRBTranslate.CreateGEP(Translation, IRBTranslate.CreateNeg(LocalAddr));
+    Translation = IRBTranslate.CreateGEP(Translation, DeviceAddr);
 
     // Store the translation in task_args
     if (auto *LUnpackedDSA = dyn_cast<LoadInst>(UnpackedDSA)) {
-      Translation = IRB.CreateBitCast(Translation, LUnpackedDSA->getType());
-      IRB.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
+      Translation = IRBTranslate.CreateBitCast(Translation, LUnpackedDSA->getType());
+      IRBTranslate.CreateStore(Translation, LUnpackedDSA->getPointerOperand());
       // Reload what we have translated
-      UnpackedDSA = IRB.CreateLoad(LUnpackedDSA->getPointerOperand());
+      UnpackedDSA = IRBReload.CreateLoad(LUnpackedDSA->getPointerOperand());
     } else {
-      Translation = IRB.CreateBitCast(Translation, UnpackedDSA->getType()->getPointerElementType());
-      IRB.CreateStore(Translation, UnpackedDSA);
+      Translation = IRBTranslate.CreateBitCast(
+        Translation, UnpackedDSA->getType()->getPointerElementType());
+      IRBTranslate.CreateStore(Translation, UnpackedDSA);
     }
   }
 
@@ -1126,27 +1129,41 @@ struct OmpSs : public ModulePass {
     AI++;
     SmallVector<Value *, 4> UnpackParams;
     unpackDSAsWithVLADims(M, DirInfo, OlFunc, StructToIdxMap, UnpackParams);
+    while (AI != OlFunc->arg_end()) {
+      UnpackParams.push_back(&*AI++);
+    }
 
     if (IsTaskFunc) {
       // Build call to compute_dep in order to have get the base dependency of
       // the reduction. The result is passed to unpack
       const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
       const DirectiveDependsInfo &DependsInfo = DirEnv.DependsInfo;
-      // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
-      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
       // Preserve the params before translation. And replace used after build all
       // compute_dep calls
+      // NOTE: this assumes UnpackParams can be indexed with StructToIdxMap
       SmallVector<Value *, 4> UnpackParamsCopy(UnpackParams);
+
+      BasicBlock *IfThenBB = BasicBlock::Create(M.getContext(), "", OlFunc);
+      BasicBlock *IfEndBB = BasicBlock::Create(M.getContext(), "", OlFunc);
+
+      Value *AddrTranslationTable = &*(OlFunc->arg_end() - 1);
+      Value *Cmp = BBBuilder.CreateICmpNE(
+        AddrTranslationTable, Constant::getNullValue(AddrTranslationTable->getType()));
+      BBBuilder.CreateCondBr(Cmp, IfThenBB, IfEndBB);
+
+      IRBuilder<> IRBIfThen(IfThenBB);
+      IRBuilder<> IRBIfEnd(IfEndBB);
+
       for (auto &DepInfo : DependsInfo.List) {
         if (DepInfo->isReduction()) {
           Value *DepBaseDSA = DepInfo->Base;
           translateDep(
-            BBBuilder, DepInfo.get(), DepBaseDSA,
+            IRBIfThen, IRBIfEnd, DepInfo.get(), DepBaseDSA,
             UnpackParams[StructToIdxMap.lookup(DepBaseDSA)],
             AddrTranslationTable, DirInfo.DirEnv.DepSymToIdx);
         }
       }
-      for (Instruction &I : *BBBuilder.GetInsertBlock()) {
+      for (Instruction &I : *IfThenBB) {
         auto UnpackedIt = UnpackParamsCopy.begin();
         for (auto It = StructToIdxMap.begin();
                It != StructToIdxMap.end(); ++It, ++UnpackedIt) {
@@ -1154,15 +1171,15 @@ struct OmpSs : public ModulePass {
             I.replaceUsesOfWith(It->first, *UnpackedIt);
         }
       }
+      IRBIfThen.CreateBr(IfEndBB);
+      // Build TaskUnpackCall
+      IRBIfEnd.CreateCall(UnpackFunc, UnpackParams);
+      IRBIfEnd.CreateRetVoid();
+    } else {
+      // Build TaskUnpackCall
+      BBBuilder.CreateCall(UnpackFunc, UnpackParams);
+      BBBuilder.CreateRetVoid();
     }
-
-    while (AI != OlFunc->arg_end()) {
-      UnpackParams.push_back(&*AI++);
-    }
-    // Build TaskUnpackCall
-    BBBuilder.CreateCall(UnpackFunc, UnpackParams);
-    // Make BB legal with a terminator to task outline function
-    BBBuilder.CreateRetVoid();
   }
 
   // Copy task_args from src to dst, calling copyctors or ctors if
