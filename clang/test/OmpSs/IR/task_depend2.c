@@ -7,11 +7,15 @@ void foo1() {
     int (*c)[5];
     int d[5][6][7];
     int e[5];
-    #pragma oss task depend(in: a, *a, a[1], a[1][2])
+    #pragma oss task depend(in: a)
+    {}
+    #pragma oss task depend(in: *a, a[1], a[1][2])
     {}
     #pragma oss task depend(in: b, *b, b[1], b[1][2])
     {}
-    #pragma oss task depend(in: c, *c, c[1], c[1][2])
+    #pragma oss task depend(in: c)
+    {}
+    #pragma oss task depend(in: *c, c[1], c[1][2])
     {}
     #pragma oss task depend(in: d, d[1][2][3])
     {}
@@ -19,16 +23,20 @@ void foo1() {
     {}
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t (i32***)* @compute_dep, i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.0 (i32***)* @compute_dep.1, i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.1 (i32***)* @compute_dep.2, i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.2 (i32***)* @compute_dep.3, i32*** %a) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t (i32***)* @compute_dep, i32*** %a) ]
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %0)
-// CHECK-NEXT: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.3 ([5 x [6 x i32]]*)* @compute_dep.4, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.4 ([5 x [6 x i32]]*)* @compute_dep.5, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.5 ([5 x [6 x i32]]*)* @compute_dep.6, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.6 ([5 x [6 x i32]]*)* @compute_dep.7, [5 x [6 x i32]]* %b) ]
+// CHECK-NEXT: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.0 (i32***)* @compute_dep.1, i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.1 (i32***)* @compute_dep.2, i32*** %a), "QUAL.OSS.DEP.IN"(i32*** %a, %struct._depend_unpack_t.2 (i32***)* @compute_dep.3, i32*** %a) ]
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %1)
-// CHECK-NEXT: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.7 ([5 x i32]**)* @compute_dep.8, [5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.8 ([5 x i32]**)* @compute_dep.9, [5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.9 ([5 x i32]**)* @compute_dep.10, [5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.10 ([5 x i32]**)* @compute_dep.11, [5 x i32]** %c) ]
+// CHECK-NEXT: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.3 ([5 x [6 x i32]]*)* @compute_dep.4, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.4 ([5 x [6 x i32]]*)* @compute_dep.5, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.5 ([5 x [6 x i32]]*)* @compute_dep.6, [5 x [6 x i32]]* %b), "QUAL.OSS.DEP.IN"([5 x [6 x i32]]* %b, %struct._depend_unpack_t.6 ([5 x [6 x i32]]*)* @compute_dep.7, [5 x [6 x i32]]* %b) ]
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %2)
-// CHECK-NEXT: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x [6 x [7 x i32]]]* %d), "QUAL.OSS.DEP.IN"([5 x [6 x [7 x i32]]]* %d, %struct._depend_unpack_t.11 ([5 x [6 x [7 x i32]]]*)* @compute_dep.12, [5 x [6 x [7 x i32]]]* %d), "QUAL.OSS.DEP.IN"([5 x [6 x [7 x i32]]]* %d, %struct._depend_unpack_t.12 ([5 x [6 x [7 x i32]]]*)* @compute_dep.13, [5 x [6 x [7 x i32]]]* %d) ]
+// CHECK-NEXT: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.7 ([5 x i32]**)* @compute_dep.8, [5 x i32]** %c) ]
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %3)
-// CHECK-NEXT: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x i32]* %e), "QUAL.OSS.DEP.IN"([5 x i32]* %e, %struct._depend_unpack_t.13 ([5 x i32]*)* @compute_dep.14, [5 x i32]* %e), "QUAL.OSS.DEP.IN"([5 x i32]* %e, %struct._depend_unpack_t.14 ([5 x i32]*)* @compute_dep.15, [5 x i32]* %e) ]
+// CHECK-NEXT: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"([5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.8 ([5 x i32]**)* @compute_dep.9, [5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.9 ([5 x i32]**)* @compute_dep.10, [5 x i32]** %c), "QUAL.OSS.DEP.IN"([5 x i32]** %c, %struct._depend_unpack_t.10 ([5 x i32]**)* @compute_dep.11, [5 x i32]** %c) ]
 // CHECK-NEXT: call void @llvm.directive.region.exit(token %4)
+// CHECK-NEXT: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x [6 x [7 x i32]]]* %d), "QUAL.OSS.DEP.IN"([5 x [6 x [7 x i32]]]* %d, %struct._depend_unpack_t.11 ([5 x [6 x [7 x i32]]]*)* @compute_dep.12, [5 x [6 x [7 x i32]]]* %d), "QUAL.OSS.DEP.IN"([5 x [6 x [7 x i32]]]* %d, %struct._depend_unpack_t.12 ([5 x [6 x [7 x i32]]]*)* @compute_dep.13, [5 x [6 x [7 x i32]]]* %d) ]
+// CHECK-NEXT: call void @llvm.directive.region.exit(token %5)
+// CHECK-NEXT: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([5 x i32]* %e), "QUAL.OSS.DEP.IN"([5 x i32]* %e, %struct._depend_unpack_t.13 ([5 x i32]*)* @compute_dep.14, [5 x i32]* %e), "QUAL.OSS.DEP.IN"([5 x i32]* %e, %struct._depend_unpack_t.14 ([5 x i32]*)* @compute_dep.15, [5 x i32]* %e) ]
+// CHECK-NEXT: call void @llvm.directive.region.exit(token %6)
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32*** %a)
 // CHECK: entry:

@@ -509,17 +509,21 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
   llvm::SmallVector<Expr *, 4> ImplicitPrivate;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
-  // This is used to know we're inside a subscript expression
-  size_t ArraySubscriptCnt = 0;
-  // This is used to know we're inside a multidep init/ub/step
-  // or init-list
-  bool IsMultiDepInfo = false;
-  // This is used to mark the innermost base symbol expression as:
-  // *p, p[2], p[1:2], [2]p, s.x, s->x
-  bool IsDerefMemberArrayBase = false;
+  // Map to record that one variable has been used in a subexpression.
+  llvm::DenseMap<const VarDecl *, bool> SubExprUsed;
+  // We visit the base of all the expressions, so the first
+  // decl value is the dep base.
+  bool IsFirstDecl = true;
+  // This is used to distinguish
+  // p → shared
+  // from
+  // *p, p[0], ps->x → firstprivate
+  bool IsPlainDeclRef = true;
+
 public:
 
   void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+    IsPlainDeclRef = false;
     // Before going through dependency base set iterators
     // as private
     for (auto *E : E->getDepIterators()) {
@@ -528,9 +532,8 @@ public:
       ImplicitPrivate.push_back(E);
     }
 
-    // init/ub/step work like array subscripts, so let's make them
-    // firstprivate
-    IsMultiDepInfo = true;
+    Visit(E->getDepExpr());
+
     for (size_t i = 0; i < E->getDepInits().size(); ++i) {
       Visit(E->getDepInits()[i]);
       if (E->getDepSizes()[i])
@@ -538,60 +541,40 @@ public:
       if (E->getDepSteps()[i])
         Visit(E->getDepSteps()[i]);
     }
-    IsMultiDepInfo = false;
-
-    Visit(E->getDepExpr());
   }
 
   void VisitOSSArrayShapingExpr(OSSArrayShapingExpr *E) {
-    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
-      IsDerefMemberArrayBase = true;
+    IsPlainDeclRef = false;
     Visit(E->getBase());
-    IsDerefMemberArrayBase = false;
 
-    ArraySubscriptCnt++;
     for (Expr *S : E->getShapes())
       Visit(S);
-    ArraySubscriptCnt--;
   }
 
   void VisitOSSArraySectionExpr(OSSArraySectionExpr *E) {
-    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
-      IsDerefMemberArrayBase = true;
+    IsPlainDeclRef = false;
     Visit(E->getBase());
-    IsDerefMemberArrayBase = false;
 
-    ArraySubscriptCnt++;
     if (E->getLowerBound())
       Visit(E->getLowerBound());
     if (E->getLengthUpper())
       Visit(E->getLengthUpper());
-    ArraySubscriptCnt--;
   }
 
   void VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
-    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
-      IsDerefMemberArrayBase = true;
+    IsPlainDeclRef = false;
     Visit(E->getBase());
-    IsDerefMemberArrayBase = false;
-
-    ArraySubscriptCnt++;
     Visit(E->getIdx());
-    ArraySubscriptCnt--;
   }
 
   void VisitUnaryOperator(UnaryOperator *E) {
-    if (isa<DeclRefExpr>(E->getSubExpr()->IgnoreParenImpCasts()))
-      IsDerefMemberArrayBase = true;
+    IsPlainDeclRef = false;
     Visit(E->getSubExpr());
-    IsDerefMemberArrayBase = false;
   }
 
   void VisitMemberExpr(MemberExpr *E) {
-    if (isa<DeclRefExpr>(E->getBase()->IgnoreParenImpCasts()))
-      IsDerefMemberArrayBase = true;
+    IsPlainDeclRef = false;
     Visit(E->getBase());
-    IsDerefMemberArrayBase = false;
   }
 
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
@@ -609,6 +592,7 @@ public:
       return;
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
+
       // inout(x)              | shared(x)        | int x;
       // inout(p[i])           | firstprivate(p)  | int *p;
       // inout(a[i])           | shared(a)        | int a[N];
@@ -617,20 +601,15 @@ public:
       // inout(ps->x)          | firstprivate(ps) | struct S *ps;
       // inout([1]p)           | firstprivate(p)  | int *p;
       OmpSsClauseKind VKind = OSSC_shared;
-      // Multidep init/ub/step are firstprivate
-      if (IsMultiDepInfo)
+
+      if (IsFirstDecl) {
+        IsFirstDecl = false;
+        if (VD->getType()->isPointerType() && !IsPlainDeclRef)
+          VKind = OSSC_firstprivate;
+      } else {
         VKind = OSSC_firstprivate;
-      // FIXME?: There's an overlapping between IsDerefMemberArrayBase
-      // and ArraySubscriptCnt
-      // i.e
-      //    a[b[7]]
-      // b will have ArraySubscriptCnt > 0
-      // and IsDerefMemberArrayBase true
-      // Check ArraySubscriptCnt first since is more restrictive
-      if (ArraySubscriptCnt)
-        VKind = OSSC_firstprivate;
-      else if (VD->getType()->isPointerType() && IsDerefMemberArrayBase)
-        VKind = OSSC_firstprivate;
+        SubExprUsed[VD] = true;
+      }
 
       SourceLocation ELoc = E->getExprLoc();
       SourceRange ERange = E->getSourceRange();
@@ -652,14 +631,28 @@ public:
 
       switch (DVarCurrent.CKind) {
       case OSSC_shared:
-        // Do nothing
+        if (VKind == OSSC_firstprivate) {
+          if (!SubExprUsed[VD]) {
+            ErrorFound = true;
+            SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
+              << getOmpSsClauseName(DVarCurrent.CKind)
+              << getOmpSsClauseName(VKind) << ERange;
+          }
+        }
         break;
       case OSSC_private:
+        if (!DVarCurrent.Ignore) {
+          ErrorFound = true;
+          SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
+            << getOmpSsClauseName(DVarCurrent.CKind)
+            << getOmpSsClauseName(VKind) << ERange;
+        }
         break;
       case OSSC_firstprivate:
         if (VKind == OSSC_shared) {
-          if (DVarCurrent.Implicit) {
+          if (DVarCurrent.Implicit && SubExprUsed[VD]) {
             // Promote Implicit firstprivate to Implicit shared
+            // in decls that are not the base symbol
             auto It = ImplicitFirstprivate.begin();
             while (It != ImplicitFirstprivate.end()) {
               if (*It == DVarCurrent.RefExpr) break;
@@ -697,8 +690,9 @@ public:
   }
 
   void VisitClause(OSSClause *Clause) {
-    CurClause = Clause;
     for (Stmt *Child : Clause->children()) {
+      reset();
+      CurClause = Clause;
       if (Child)
         Visit(Child);
     }
@@ -709,6 +703,12 @@ public:
       if (C)
         Visit(C);
     }
+  }
+
+  void reset() {
+    CurClause = nullptr;
+    IsFirstDecl = true;
+    IsPlainDeclRef = true;
   }
 
   bool isErrorFound() const { return ErrorFound; }
