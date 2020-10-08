@@ -49,13 +49,10 @@ public:
     const Expr *RefExpr = nullptr;
     bool Ignore = false;
     bool Implicit = false;
-    OmpSsClauseKind CRestrict = OSSC_unknown;
     DSAVarData() = default;
     DSAVarData(OmpSsDirectiveKind DKind, OmpSsClauseKind CKind,
-               const Expr *RefExpr, bool Ignore,
-               OmpSsClauseKind CRestrict)
-        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), Ignore(Ignore),
-          CRestrict(CRestrict)
+               const Expr *RefExpr, bool Ignore)
+        : DKind(DKind), CKind(CKind), RefExpr(RefExpr), Ignore(Ignore)
           {}
   };
 
@@ -65,9 +62,6 @@ private:
     const Expr * RefExpr;
     bool Ignore = false;
     bool Implicit = false;
-    // CRestrict is helper info to detect and diagnose
-    // variables conflicting between dependency and reductions
-    OmpSsClauseKind CRestrict;
   };
   using DeclSAMapTy = llvm::SmallDenseMap<const ValueDecl *, DSAInfo, 8>;
 
@@ -117,10 +111,8 @@ public:
   }
 
   /// Adds explicit data sharing attribute to the specified declaration.
-  // CRestrict tells what clause restriction the DSA has. Used
-  // to detect conflicts between dependency and reduction clause
   void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-              bool Ignore, bool Implicit, OmpSsClauseKind CRestrict = OSSC_unknown);
+              bool Ignore, bool Implicit);
 
   void addLoopControlVariable(const ValueDecl *D, const Expr *E);
 
@@ -230,7 +222,6 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
     DVar.Ignore = Data.Ignore;
     DVar.Implicit = Data.Implicit;
     DVar.CKind = Data.Attributes;
-    DVar.CRestrict = Data.CRestrict;
     return DVar;
   }
 
@@ -238,7 +229,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
 }
 
 void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-                        bool Ignore, bool Implicit, OmpSsClauseKind CRestrict) {
+                        bool Ignore, bool Implicit) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
   DSAInfo &Data = Stack.back().SharingMap[D];
@@ -246,7 +237,6 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
   Data.RefExpr = E;
   Data.Ignore = Ignore;
   Data.Implicit = Implicit;
-  Data.CRestrict = CRestrict;
 }
 
 void DSAStackTy::addLoopControlVariable(const ValueDecl *D, const Expr *E) {
@@ -511,6 +501,18 @@ class OSSClauseDSAChecker final : public StmtVisitor<OSSClauseDSAChecker, void> 
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   // Map to record that one variable has been used in a subexpression.
   llvm::DenseMap<const VarDecl *, bool> SubExprUsed;
+  // Map to record that one variable has been used in a reduction/dependency.
+  // Strong restriction (true) is when the variable is the symbol reduced:
+  //
+  // i.e.
+  //     reduction(+ : x)
+  // Weak restriction (false) are the other case:
+  //
+  // i.e. looking at 'x'
+  //     reduction(+ : [x]p)
+  //     in([x]p)
+  //     in(x)
+  llvm::DenseMap<const VarDecl *, bool> SeenStrongRestric;
   // We visit the base of all the expressions, so the first
   // decl value is the dep base.
   bool IsFirstDecl = true;
@@ -593,6 +595,11 @@ public:
     if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
       VD = VD->getCanonicalDecl();
 
+      SourceLocation ELoc = E->getExprLoc();
+      SourceRange ERange = E->getSourceRange();
+
+      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
+
       // inout(x)              | shared(x)        | int x;
       // inout(p[i])           | firstprivate(p)  | int *p;
       // inout(a[i])           | shared(a)        | int a[N];
@@ -602,8 +609,9 @@ public:
       // inout([1]p)           | firstprivate(p)  | int *p;
       OmpSsClauseKind VKind = OSSC_shared;
 
-      if (IsFirstDecl) {
-        IsFirstDecl = false;
+      bool CurIsFirstDecl = IsFirstDecl;
+      IsFirstDecl = false;
+      if (CurIsFirstDecl) {
         if (VD->getType()->isPointerType() && !IsPlainDeclRef)
           VKind = OSSC_firstprivate;
       } else {
@@ -611,23 +619,24 @@ public:
         SubExprUsed[VD] = true;
       }
 
-      SourceLocation ELoc = E->getExprLoc();
-      SourceRange ERange = E->getSourceRange();
+      // We have to emit a diagnostic if a strong restriction
+      // is used in other places.
+      bool IsReduction = false;
+      if (CurClause->getClauseKind() == OSSC_reduction
+          || CurClause->getClauseKind() == OSSC_weakreduction)
+        IsReduction = true;
 
-      DSAStackTy::DSAVarData DVarCurrent = Stack->getCurrentDSA(VD);
-
-      // CRestrict promotes from OSSC_depend to OSSC_reduction
-      OmpSsClauseKind CRestrict = CurClause->getClauseKind();
-      // Seen before  |      Current      | Result
-      //    depend    |     reduction     |   KO
-      //   reduction  |  depend/reduction |   KO
-      if (DVarCurrent.CRestrict == OSSC_reduction
-          || (DVarCurrent.CRestrict == OSSC_depend && CRestrict == OSSC_reduction)) {
-        ErrorFound = true;
-        CRestrict = OSSC_reduction;
-        SemaRef.Diag(ELoc, diag::err_oss_reduction_depend_conflict)
-          << E->getDecl();
+      bool CurIsStrongRestric = IsReduction && CurIsFirstDecl;
+      auto It = SeenStrongRestric.find(VD);
+      if (It != SeenStrongRestric.end()) {
+        // if (Seen strong red || Seen weak and now we're strong)
+        if (It->second || CurIsStrongRestric) {
+          ErrorFound = true;
+          SemaRef.Diag(ELoc, diag::err_oss_reduction_depend_conflict)
+            << E->getDecl();
+        }
       }
+      SeenStrongRestric[VD] = SeenStrongRestric[VD] || CurIsStrongRestric;
 
       switch (DVarCurrent.CKind) {
       case OSSC_shared:
@@ -663,8 +672,7 @@ public:
 
             ImplicitShared.push_back(E);
             // Rewrite DSA
-            Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true,
-                          CRestrict);
+            Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
           } else {
             ErrorFound = true;
             SemaRef.Diag(ELoc, diag::err_oss_mismatch_depend_dsa)
@@ -679,8 +687,7 @@ public:
         if (VKind == OSSC_firstprivate)
           ImplicitFirstprivate.push_back(E);
 
-        Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true,
-                      CRestrict);
+        Stack->addDSA(VD, E, VKind, /*Ignore=*/false, /*Implicit=*/true);
 
         break;
       default:
@@ -1871,7 +1878,7 @@ bool OmpSsIterationSpaceChecker::checkAndSetIncRHS(Expr *RHS) {
         return setStep(BO->getRHS(), !IsAdd);
       // The following cases are handled here
       // incr + var
-      // -incr + var 
+      // -incr + var
       if (IsAdd && getInitLCDecl(BO->getRHS()) == LCDecl)
         return setStep(BO->getLHS(), /*Subtract=*/false);
     }
