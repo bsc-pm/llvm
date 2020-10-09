@@ -3940,6 +3940,7 @@ const SCEV *ScalarEvolution::getUMinFromMismatchedTypes(
       MaxType = getWiderType(MaxType, S->getType());
     else
       MaxType = S->getType();
+  assert(MaxType && "Failed to find maximum type!");
 
   // Extend all ops to max type.
   SmallVector<const SCEV *, 2> PromotedOps;
@@ -9916,9 +9917,13 @@ bool ScalarEvolution::isImpliedCondOperandsViaAddRecStart(
   // prove the original pred using this fact.
   if (!Context)
     return false;
+  const BasicBlock *ContextBB = Context->getParent();
   // Make sure AR varies in the context block.
   if (auto *AR = dyn_cast<SCEVAddRecExpr>(FoundLHS)) {
-    if (!AR->getLoop()->contains(Context->getParent()))
+    const Loop *L = AR->getLoop();
+    // Make sure that context belongs to the loop and executes on 1st iteration
+    // (if it ever executes at all).
+    if (!L->contains(ContextBB) || !DT.dominates(ContextBB, L->getLoopLatch()))
       return false;
     if (!isAvailableAtLoopEntry(FoundRHS, AR->getLoop()))
       return false;
@@ -9926,7 +9931,10 @@ bool ScalarEvolution::isImpliedCondOperandsViaAddRecStart(
   }
 
   if (auto *AR = dyn_cast<SCEVAddRecExpr>(FoundRHS)) {
-    if (!AR->getLoop()->contains(Context))
+    const Loop *L = AR->getLoop();
+    // Make sure that context belongs to the loop and executes on 1st iteration
+    // (if it ever executes at all).
+    if (!L->contains(ContextBB) || !DT.dominates(ContextBB, L->getLoopLatch()))
       return false;
     if (!isAvailableAtLoopEntry(FoundLHS, AR->getLoop()))
       return false;

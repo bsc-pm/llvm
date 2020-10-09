@@ -106,6 +106,11 @@ New checks
   Finds condition variables in nested ``if`` statements that were also checked
   in the outer ``if`` statement and were not changed.
 
+- New :doc:`readability-function-cognitive-complexity
+  <clang-tidy/checks/readability-function-cognitive-complexity>` check.
+
+  Flags functions with Cognitive Complexity metric exceeding the configured limit.
+
 Changes in existing checks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -114,6 +119,9 @@ Changes in existing checks
 
   Added an option `GetConfigPerFile` to support including files which use
   different naming styles.
+
+- Removed `google-runtime-references` check because the rule it checks does
+  not exist in the Google Style Guide anymore.
 
 Improvements to include-fixer
 -----------------------------

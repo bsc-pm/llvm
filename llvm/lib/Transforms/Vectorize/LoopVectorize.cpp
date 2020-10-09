@@ -7080,8 +7080,15 @@ void LoopVectorizationPlanner::collectTriviallyDeadInstructions(
   // condition will be dead after vectorization if it's only used by the
   // branch.
   auto *Cmp = dyn_cast<Instruction>(Latch->getTerminator()->getOperand(0));
-  if (Cmp && Cmp->hasOneUse())
+  if (Cmp && Cmp->hasOneUse()) {
     DeadInstructions.insert(Cmp);
+
+    // The operands of the icmp is often a dead trunc, used by IndUpdate.
+    for (Value *Op : Cmp->operands()) {
+      if (isa<TruncInst>(Op) && Op->hasOneUse())
+          DeadInstructions.insert(cast<Instruction>(Op));
+    }
+  }
 
   // We create new "steps" for induction variable updates to which the original
   // induction variables map. An original update instruction will be dead if
@@ -7889,11 +7896,11 @@ void LoopVectorizationPlanner::adjustRecipesForInLoopReductions(
       unsigned FirstOpId;
       if (Kind == RecurrenceDescriptor::RK_IntegerMinMax ||
           Kind == RecurrenceDescriptor::RK_FloatMinMax) {
-        assert(WidenRecipe->getVPRecipeID() == VPRecipeBase::VPWidenSelectSC &&
+        assert(isa<VPWidenSelectRecipe>(WidenRecipe) &&
                "Expected to replace a VPWidenSelectSC");
         FirstOpId = 1;
       } else {
-        assert(WidenRecipe->getVPRecipeID() == VPRecipeBase::VPWidenSC &&
+        assert(isa<VPWidenRecipe>(WidenRecipe) &&
                "Expected to replace a VPWidenSC");
         FirstOpId = 0;
       }
@@ -7910,7 +7917,7 @@ void LoopVectorizationPlanner::adjustRecipesForInLoopReductions(
           Kind == RecurrenceDescriptor::RK_FloatMinMax) {
         VPRecipeBase *CompareRecipe =
             RecipeBuilder.getRecipe(cast<Instruction>(R->getOperand(0)));
-        assert(CompareRecipe->getVPRecipeID() == VPRecipeBase::VPWidenSC &&
+        assert(isa<VPWidenRecipe>(CompareRecipe) &&
                "Expected to replace a VPWidenSC");
         CompareRecipe->eraseFromParent();
       }

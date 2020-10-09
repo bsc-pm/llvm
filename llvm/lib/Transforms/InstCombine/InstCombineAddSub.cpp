@@ -924,6 +924,20 @@ Instruction *InstCombinerImpl::foldAddWithConstant(BinaryOperator &Add) {
       C2->isMinSignedValue() && C2->sext(Ty->getScalarSizeInBits()) == *C)
     return CastInst::Create(Instruction::SExt, X, Ty);
 
+  if (match(Op0, m_Xor(m_Value(X), m_APInt(C2)))) {
+    // (X ^ signmask) + C --> (X + (signmask ^ C))
+    if (C2->isSignMask())
+      return BinaryOperator::CreateAdd(X, ConstantInt::get(Ty, *C2 ^ *C));
+
+    // If X has no high-bits set above an xor mask:
+    // add (xor X, LowMaskC), C --> sub (LowMaskC + C), X
+    if (C2->isMask()) {
+      KnownBits LHSKnown = computeKnownBits(X, 0, &Add);
+      if ((*C2 | LHSKnown.Zero).isAllOnesValue())
+        return BinaryOperator::CreateSub(ConstantInt::get(Ty, *C2 + *C), X);
+    }
+  }
+
   if (C->isOneValue() && Op0->hasOneUse()) {
     // add (sext i1 X), 1 --> zext (not X)
     // TODO: The smallest IR representation is (select X, 0, 1), and that would
@@ -1291,20 +1305,6 @@ Instruction *InstCombinerImpl::visitAdd(BinaryOperator &I) {
         Value *NewShl = Builder.CreateShl(XorLHS, ShAmt, "sext");
         return BinaryOperator::CreateAShr(NewShl, ShAmt);
       }
-
-      // If this is a xor that was canonicalized from a sub, turn it back into
-      // a sub and fuse this add with it.
-      if (LHS->hasOneUse() && (XorRHS->getValue()+1).isPowerOf2()) {
-        KnownBits LHSKnown = computeKnownBits(XorLHS, 0, &I);
-        if ((XorRHS->getValue() | LHSKnown.Zero).isAllOnesValue())
-          return BinaryOperator::CreateSub(ConstantExpr::getAdd(XorRHS, CI),
-                                           XorLHS);
-      }
-      // (X + signmask) + C could have gotten canonicalized to (X^signmask) + C,
-      // transform them into (X + (signmask ^ C))
-      if (XorRHS->getValue().isSignMask())
-        return BinaryOperator::CreateAdd(XorLHS,
-                                         ConstantExpr::getXor(XorRHS, CI));
     }
   }
 
@@ -1824,8 +1824,7 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
   }
 
   auto m_AddRdx = [](Value *&Vec) {
-    return m_OneUse(
-        m_Intrinsic<Intrinsic::experimental_vector_reduce_add>(m_Value(Vec)));
+    return m_OneUse(m_Intrinsic<Intrinsic::vector_reduce_add>(m_Value(Vec)));
   };
   Value *V0, *V1;
   if (match(Op0, m_AddRdx(V0)) && match(Op1, m_AddRdx(V1)) &&
@@ -1833,8 +1832,8 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
     // Difference of sums is sum of differences:
     // add_rdx(V0) - add_rdx(V1) --> add_rdx(V0 - V1)
     Value *Sub = Builder.CreateSub(V0, V1);
-    Value *Rdx = Builder.CreateIntrinsic(
-        Intrinsic::experimental_vector_reduce_add, {Sub->getType()}, {Sub});
+    Value *Rdx = Builder.CreateIntrinsic(Intrinsic::vector_reduce_add,
+                                         {Sub->getType()}, {Sub});
     return replaceInstUsesWith(I, Rdx);
   }
 
@@ -2280,9 +2279,8 @@ Instruction *InstCombinerImpl::visitFSub(BinaryOperator &I) {
     }
 
     auto m_FaddRdx = [](Value *&Sum, Value *&Vec) {
-      return m_OneUse(
-          m_Intrinsic<Intrinsic::experimental_vector_reduce_v2_fadd>(
-              m_Value(Sum), m_Value(Vec)));
+      return m_OneUse(m_Intrinsic<Intrinsic::vector_reduce_fadd>(m_Value(Sum),
+                                                                 m_Value(Vec)));
     };
     Value *A0, *A1, *V0, *V1;
     if (match(Op0, m_FaddRdx(A0, V0)) && match(Op1, m_FaddRdx(A1, V1)) &&
@@ -2290,9 +2288,8 @@ Instruction *InstCombinerImpl::visitFSub(BinaryOperator &I) {
       // Difference of sums is sum of differences:
       // add_rdx(A0, V0) - add_rdx(A1, V1) --> add_rdx(A0, V0 - V1) - A1
       Value *Sub = Builder.CreateFSubFMF(V0, V1, &I);
-      Value *Rdx = Builder.CreateIntrinsic(
-          Intrinsic::experimental_vector_reduce_v2_fadd,
-          {A0->getType(), Sub->getType()}, {A0, Sub}, &I);
+      Value *Rdx = Builder.CreateIntrinsic(Intrinsic::vector_reduce_fadd,
+                                           {Sub->getType()}, {A0, Sub}, &I);
       return BinaryOperator::CreateFSubFMF(Rdx, A1, &I);
     }
 
