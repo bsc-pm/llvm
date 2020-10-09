@@ -1912,11 +1912,9 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       ExprResult Idx, Length, Stride;
       SourceLocation ColonLocFirst, ColonLocSecond;
       bool ColonForm = false;
-      PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
-      if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
-        Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
-        Idx = ParseBraceInitializer();
-      } else if (getLangOpts().OpenMP) {
+
+      auto ParseOmpSection =
+          [this, &ColonLocFirst, &ColonLocSecond, &Length, &Stride, &Idx]() {
         ColonProtectionRAIIObject RAII(*this);
         // Parse [: or [ expr or [ expr :
         if (!Tok.is(tok::colon)) {
@@ -1941,7 +1939,10 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
             Stride = ParseExpression();
           }
         }
-      } else if (getLangOpts().OmpSs) {
+      };
+
+      auto ParseOssSection =
+          [this, &ColonLocFirst, &ColonForm, &Length, &Idx]() {
         ColonProtectionRAIIObject RAII(*this);
         // Parse [: or [ expr or [ expr :
         // Parse [; or [ expr or [ expr ;
@@ -1961,6 +1962,20 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
           if (Tok.isNot(tok::r_square))
             Length = ParseExpression();
         }
+      };
+
+      bool IsOssSection =
+        (getLangOpts().OmpSs
+           && (!getLangOpts().OpenMP || getCurScope()->isOmpSsDirectiveScope()));
+
+      PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
+      if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
+        Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
+        Idx = ParseBraceInitializer();
+      } else if (IsOssSection) {
+        ParseOssSection();
+      } else if (getLangOpts().OpenMP) {
+        ParseOmpSection();
       } else
         Idx = ParseExpression();
 
@@ -1972,16 +1987,14 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       if (!LHS.isInvalid() && !Idx.isInvalid() && !Length.isInvalid() &&
           !Stride.isInvalid() && Tok.is(tok::r_square)) {
         if (ColonLocFirst.isValid() || ColonLocSecond.isValid()) {
-          if (getLangOpts().OpenMP)
+          if (!IsOssSection)
             LHS = Actions.ActOnOMPArraySectionExpr(
                 LHS.get(), Loc, Idx.get(), ColonLocFirst, ColonLocSecond,
                 Length.get(), Stride.get(), RLoc);
-          else if (getLangOpts().OmpSs)
+          else
             LHS = Actions.ActOnOSSArraySectionExpr(
                 LHS.get(), Loc, Idx.get(),
                 ColonLocFirst, Length.get(), RLoc, ColonForm);
-          else
-            llvm_unreachable("Parsed Array Section without OpenMP or OmpSs");
         } else {
           LHS = Actions.ActOnArraySubscriptExpr(getCurScope(), LHS.get(), Loc,
                                                 Idx.get(), RLoc);
