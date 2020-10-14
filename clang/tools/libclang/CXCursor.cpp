@@ -435,6 +435,7 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
     // OmpSs
   case Stmt::OSSArrayShapingExprClass:
   case Stmt::OSSArraySectionExprClass:
+  case Stmt::OSSMultiDepExprClass:
     llvm_unreachable("unsupported");
     break;
 
@@ -809,7 +810,11 @@ CXCursor cxcursor::MakeCXCursor(const Stmt *S, const Decl *Parent,
     break;
     // OmpSs
   case Stmt::OSSTaskDirectiveClass:
+  case Stmt::OSSTaskForDirectiveClass:
+  case Stmt::OSSTaskLoopDirectiveClass:
+  case Stmt::OSSTaskLoopForDirectiveClass:
   case Stmt::OSSTaskwaitDirectiveClass:
+  case Stmt::OSSReleaseDirectiveClass:
     llvm_unreachable("unsupported");
     break;
   case Stmt::BuiltinBitCastExprClass:

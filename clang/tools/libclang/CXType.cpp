@@ -668,6 +668,7 @@ CXCallingConv clang_getFunctionTypeCallingConv(CXType X) {
       TCALLINGCONV(PreserveAll);
     case CC_SpirFunction: return CXCallingConv_Unexposed;
     case CC_OpenCLKernel: return CXCallingConv_Unexposed;
+    case CC_Trivial: return CXCallingConv_Unexposed;
       break;
     }
 #undef TCALLINGCONV

@@ -1305,6 +1305,7 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
     // OmpSs
   case Expr::OSSArraySectionExprClass:
   case Expr::OSSArrayShapingExprClass:
+  case Expr::OSSMultiDepExprClass:
   case Expr::BinaryOperatorClass:
   case Expr::DependentCoawaitExprClass:
   case Expr::CompoundAssignOperatorClass:
