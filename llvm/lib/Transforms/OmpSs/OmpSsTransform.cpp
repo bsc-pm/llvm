@@ -402,6 +402,8 @@ struct OmpSs : public ModulePass {
   FunctionCallee TaskInFinalFuncCallee;
   FunctionCallee TaskInfoRegisterFuncCallee;
   FunctionCallee TaskInfoRegisterCtorFuncCallee;
+  FunctionCallee RegisterAssertFuncCallee;
+  FunctionCallee RegisterCtorAssertFuncCallee;
 
   // Data used to build final code.
   // We use Instructions instead of BasicBlocks because
@@ -634,6 +636,15 @@ struct OmpSs : public ModulePass {
 
     IRBuilder<> BBBuilder(&Entry.getInstList().back());
     BBBuilder.CreateCall(TaskInfoRegisterFuncCallee, TaskInfoVar);
+  }
+
+  void registerAssert(Module &M, StringRef Str) {
+    Function *Func = cast<Function>(RegisterCtorAssertFuncCallee.getCallee());
+    BasicBlock &Entry = Func->getEntryBlock();
+
+    IRBuilder<> BBBuilder(&Entry.getInstList().back());
+    Constant *StringPtr = BBBuilder.CreateGlobalStringPtr(Str);
+    BBBuilder.CreateCall(RegisterAssertFuncCallee, StringPtr);
   }
 
   void unpackDestroyArgsAndRewrite(
@@ -2528,12 +2539,57 @@ struct OmpSs : public ModulePass {
       M.getOrInsertFunction("nanos6_constructor_register_task_info",
         Type::getVoidTy(M.getContext())
       );
-    cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee())->setLinkage(GlobalValue::InternalLinkage);
-    BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
-      cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()));
-    EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
+    {
+      cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee())->setLinkage(GlobalValue::InternalLinkage);
+      BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
+        cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()));
+      EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
 
-    appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()), 65535);
+      appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()), 65535);
+    }
+
+    // void nanos6_config_assert(const char *str);
+    RegisterAssertFuncCallee =
+      M.getOrInsertFunction("nanos6_config_assert",
+        Type::getVoidTy(M.getContext()),
+        Type::getInt8PtrTy(M.getContext())
+      );
+
+    // void nanos6_constructor_register_assert(void);
+    // NOTE: This does not belong to nanos6 API
+    RegisterCtorAssertFuncCallee =
+      M.getOrInsertFunction("nanos6_constructor_register_assert",
+        Type::getVoidTy(M.getContext())
+      );
+    {
+      cast<Function>(RegisterCtorAssertFuncCallee.getCallee())->setLinkage(GlobalValue::InternalLinkage);
+      BasicBlock *EntryBB = BasicBlock::Create(M.getContext(), "entry",
+        cast<Function>(RegisterCtorAssertFuncCallee.getCallee()));
+      EntryBB->getInstList().push_back(ReturnInst::Create(M.getContext()));
+
+      appendToGlobalCtors(M, cast<Function>(RegisterCtorAssertFuncCallee.getCallee()), 65535);
+
+      // Try to find asserts and add them to the nanos6_constructor_register_assert()
+      const NamedMDNode *ModuleMD = M.getModuleFlagsMetadata();
+      if (ModuleMD) {
+        for (const MDNode *ModuleMDOp : ModuleMD->operands()) {
+          assert(ModuleMDOp->getNumOperands() == 3);
+          StringRef IDStrRef = cast<MDString>(ModuleMDOp->getOperand(1))->getString();
+          if (IDStrRef == "OmpSs-2 Metadata") {
+            const MDNode *OssMD = cast<MDNode>(ModuleMDOp->getOperand(2));
+            for (const MDOperand &OssMDOp : OssMD->operands()) {
+              const MDNode *Op = cast<MDNode>(OssMDOp.get());
+              assert(Op->getNumOperands() == 2);
+              StringRef KeyStrRef = cast<MDString>(Op->getOperand(0))->getString();
+              StringRef ValueStrRef = cast<MDString>(Op->getOperand(1))->getString();
+              if (KeyStrRef == "assert") {
+                registerAssert(M, ValueStrRef);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   void relocateInstrs() {

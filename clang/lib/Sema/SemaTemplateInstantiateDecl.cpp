@@ -3463,6 +3463,11 @@ Decl *TemplateDeclInstantiator::VisitOSSDeclareReductionDecl(
   return NewDRD;
 }
 
+Decl *TemplateDeclInstantiator::VisitOSSAssertDecl(OSSAssertDecl *D) {
+  llvm_unreachable(
+      "Assert directive cannot be instantiated within a dependent context");
+}
+
 Decl *
 TemplateDeclInstantiator::VisitOMPDeclareMapperDecl(OMPDeclareMapperDecl *D) {
   // Instantiate type and check if it is allowed.

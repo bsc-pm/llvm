@@ -57,6 +57,7 @@ OMPSS_DIRECTIVE(task)
 OMPSS_DIRECTIVE(taskloop)
 OMPSS_DIRECTIVE(taskwait)
 OMPSS_DIRECTIVE(release)
+OMPSS_DIRECTIVE(assert)
 
 // OmpSs clauses.
 OMPSS_CLAUSE(if, OSSIfClause)

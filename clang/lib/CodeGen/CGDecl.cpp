@@ -123,6 +123,7 @@ void CodeGenFunction::EmitDecl(const Decl &D) {
   case Decl::OMPCapturedExpr:
   case Decl::OMPRequires:
   case Decl::OSSDeclareReduction:
+  case Decl::OSSAssert:
   case Decl::Empty:
   case Decl::Concept:
   case Decl::LifetimeExtendedTemporary:
@@ -2585,4 +2586,18 @@ void CodeGenModule::EmitOMPDeclareMapper(const OMPDeclareMapperDecl *D,
 
 void CodeGenModule::EmitOMPRequiresDecl(const OMPRequiresDecl *D) {
   getOpenMPRuntime().processRequiresDirective(D);
+}
+
+void CodeGenModule::EmitOSSAssertDecl(const OSSAssertDecl *D) {
+  // Add a new assert entry to OmpSs-2 metadata
+  llvm::Metadata *Key = llvm::MDString::get(getLLVMContext(), "assert");
+  SmallVector<llvm::Metadata *, 4> List;
+  for (OSSAssertDecl::varlist_const_iterator I = D->varlist_begin(),
+      E = D->varlist_end();
+      I != E; ++I) {
+    const StringLiteral *SL = cast<StringLiteral>(*I);
+    llvm::Metadata *Value = llvm::MDString::get(getLLVMContext(), SL->getString());
+    List.push_back(llvm::MDTuple::get(getLLVMContext(), {Key, Value}));
+  }
+  getOmpSsRuntime().addMetadata(List);
 }

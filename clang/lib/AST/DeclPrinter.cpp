@@ -107,6 +107,8 @@ namespace {
     void VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D);
     // OmpSs
     void VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D);
+    void VisitOSSAssertDecl(OSSAssertDecl *D);
+
     void VisitTemplateTypeParmDecl(const TemplateTypeParmDecl *TTP);
     void VisitNonTypeTemplateParmDecl(const NonTypeTemplateParmDecl *NTTP);
 
@@ -443,7 +445,8 @@ void DeclPrinter::VisitDeclContext(DeclContext *DC, bool Indent) {
     if (isa<OMPThreadPrivateDecl>(*D) || isa<OMPDeclareReductionDecl>(*D) ||
         isa<OMPDeclareMapperDecl>(*D) || isa<OMPRequiresDecl>(*D) ||
         isa<OMPAllocateDecl>(*D) ||
-        isa<OSSDeclareReductionDecl>(*D))
+        isa<OSSDeclareReductionDecl>(*D) ||
+        isa<OSSAssertDecl>(*D))
       Terminator = nullptr;
     else if (isa<ObjCMethodDecl>(*D) && cast<ObjCMethodDecl>(*D)->hasBody())
       Terminator = nullptr;
@@ -1733,6 +1736,20 @@ void DeclPrinter::VisitOSSDeclareReductionDecl(OSSDeclareReductionDecl *D) {
         Out << ")";
       Out << ")";
     }
+  }
+}
+
+void DeclPrinter::VisitOSSAssertDecl(OSSAssertDecl *D) {
+  Out << "#pragma oss assert";
+  if (!D->varlist_empty()) {
+    for (OSSAssertDecl::varlist_iterator I = D->varlist_begin(),
+        E = D->varlist_end();
+        I != E; ++I) {
+      Out << (I == D->varlist_begin() ? '(' : ',');
+      StringLiteral *SL = cast<StringLiteral>(*I);
+      SL->printPretty(Out, nullptr, Policy, Indentation);
+    }
+    Out << ")";
   }
 }
 

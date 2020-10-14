@@ -141,6 +141,65 @@ public:
   }
 };
 
+/// This represents '#pragma oss assert ...' directive.
+///
+/// \code
+/// #pragma oss assert("stacksize=4M")
+/// int main() {}
+/// \endcode
+///
+class OSSAssertDecl final
+    : public Decl, private llvm::TrailingObjects<OSSAssertDecl, Expr *> {
+  friend class ASTDeclReader;
+  friend TrailingObjects;
+
+  unsigned NumVars;
+
+  virtual void anchor();
+
+  OSSAssertDecl(Kind DK, DeclContext *DC, SourceLocation L) :
+    Decl(DK, DC, L), NumVars(0) { }
+
+  ArrayRef<const Expr *> getVars() const {
+    return llvm::makeArrayRef(getTrailingObjects<Expr *>(), NumVars);
+  }
+
+  MutableArrayRef<Expr *> getVars() {
+    return MutableArrayRef<Expr *>(getTrailingObjects<Expr *>(), NumVars);
+  }
+
+  void setVars(ArrayRef<Expr *> VL);
+
+public:
+  static OSSAssertDecl *Create(
+    ASTContext &C, DeclContext *DC, SourceLocation L, ArrayRef<Expr *> VL);
+
+  static OSSAssertDecl *CreateDeserialized(
+    ASTContext &C, unsigned ID, unsigned N);
+
+  typedef MutableArrayRef<Expr *>::iterator varlist_iterator;
+  typedef ArrayRef<const Expr *>::iterator varlist_const_iterator;
+  typedef llvm::iterator_range<varlist_iterator> varlist_range;
+  typedef llvm::iterator_range<varlist_const_iterator> varlist_const_range;
+
+  unsigned varlist_size() const { return NumVars; }
+  bool varlist_empty() const { return NumVars == 0; }
+
+  varlist_range varlists() {
+    return varlist_range(varlist_begin(), varlist_end());
+  }
+  varlist_const_range varlists() const {
+    return varlist_const_range(varlist_begin(), varlist_end());
+  }
+  varlist_iterator varlist_begin() { return getVars().begin(); }
+  varlist_iterator varlist_end() { return getVars().end(); }
+  varlist_const_iterator varlist_begin() const { return getVars().begin(); }
+  varlist_const_iterator varlist_end() const { return getVars().end(); }
+
+  static bool classof(const Decl *D) { return classofKind(D->getKind()); }
+  static bool classofKind(Kind K) { return K == OSSAssert; }
+};
+
 } // end namespace clang
 
 #endif

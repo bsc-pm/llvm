@@ -498,6 +498,40 @@ Parser::DeclGroupPtrTy Parser::ParseOmpSsDeclarativeDirectiveWithExtDecl(
     Actions.EndOmpSsDSABlock(nullptr);
     return Ret;
   }
+  case OSSD_assert: {
+    ConsumeToken();
+
+    BalancedDelimiterTracker T(*this, tok::l_paren, tok::annot_pragma_ompss_end);
+    if (T.expectAndConsume(
+        diag::err_expected_lparen_after, getOmpSsDirectiveName(DKind)))
+      break;
+
+    bool IsCorrect = true;
+    ExprResult Res;
+    if (isTokenStringLiteral()) {
+      Res = ParseStringLiteralExpression();
+    } else {
+      Diag(Tok, diag::err_oss_expected_string_literal);
+      SkipUntil(tok::r_paren, StopBeforeMatch);
+      IsCorrect = false;
+    }
+
+    IsCorrect = !T.consumeClose() && Res.isUsable() && IsCorrect;
+
+    if (IsCorrect) {
+      // Need to check for extra tokens.
+      if (Tok.isNot(tok::annot_pragma_ompss_end)) {
+        Diag(Tok, diag::warn_oss_extra_tokens_at_eol)
+            << getOmpSsDirectiveName(DKind);
+        while (Tok.isNot(tok::annot_pragma_ompss_end))
+          ConsumeAnyToken();
+      }
+      // Skip the last annot_pragma_ompss_end.
+      ConsumeAnnotationToken();
+      return Actions.ActOnOmpSsAssertDirective(Loc, Res.get());
+    }
+    break;
+  }
   case OSSD_declare_task:
   case OSSD_task_for:
   case OSSD_taskloop:
@@ -645,6 +679,7 @@ StmtResult Parser::ParseOmpSsDeclarativeOrExecutableDirective(
     SkipUntil(tok::annot_pragma_ompss_end);
     break;
   case OSSD_declare_task:
+  case OSSD_assert:
     Diag(Tok, diag::err_oss_unexpected_directive)
         << 1 << getOmpSsDirectiveName(DKind);
     SkipUntil(tok::annot_pragma_ompss_end);

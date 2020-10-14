@@ -2915,3 +2915,13 @@ void CGOmpSsRuntime::emitLoopCall(CodeGenFunction &CGF,
   TaskAllocaInsertPt->eraseFromParent();
 
 }
+
+void CGOmpSsRuntime::addMetadata(ArrayRef<llvm::Metadata *> List) {
+  MetadataList.append(List.begin(), List.end());
+}
+
+llvm::MDNode *CGOmpSsRuntime::getMetadataNode() {
+  if (MetadataList.empty())
+    return nullptr;
+  return llvm::MDTuple::get(CGM.getLLVMContext(), MetadataList);
+}

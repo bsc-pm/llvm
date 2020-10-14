@@ -10599,7 +10599,7 @@ bool ASTContext::DeclMustBeEmitted(const Decl *D) {
     return true;
   else if (isa<PragmaDetectMismatchDecl>(D))
     return true;
-  else if (isa<OMPRequiresDecl>(D))
+  else if (isa<OMPRequiresDecl>(D) || isa<OSSAssertDecl>(D))
     return true;
   else if (isa<OMPThreadPrivateDecl>(D))
     return !D->getDeclContext()->isDependentContext();

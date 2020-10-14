@@ -166,6 +166,7 @@ namespace clang {
   class OMPRequiresDecl;
   class OMPDeclareReductionDecl;
   class OMPDeclareSimdDecl;
+  class OSSAssertDecl;
   class OSSDeclareReductionDecl;
   class OSSTaskDecl;
   class OMPClause;
@@ -11162,6 +11163,9 @@ public:
     ArrayRef<Expr *> MultiDepInits, ArrayRef<Expr *> MultiDepSizes,
     ArrayRef<Expr *> MultiDepSteps, ArrayRef<bool> MultiDepSizeOrSection,
     Expr *DepExpr);
+
+  /// Called on well-formed '#pragma oss assert'.
+  DeclGroupPtrTy ActOnOmpSsAssertDirective(SourceLocation Loc, Expr *E);
 
   /// Check if the specified type is allowed to be used in 'oss declare
   /// reduction' construct.

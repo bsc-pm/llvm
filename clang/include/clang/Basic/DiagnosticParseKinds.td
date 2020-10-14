@@ -1269,6 +1269,8 @@ def err_oss_expected_multidep_iterator_identifier : Error<
   "expected iterator identifier">;
 def err_oss_expected_multidep_separator : Error<
   "expected ':'%select{| or ';'}0">;
+def err_oss_expected_string_literal : Error<
+  "expected string literal">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<

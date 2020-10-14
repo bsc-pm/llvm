@@ -1609,12 +1609,19 @@ DEF_TRAVERSE_DECL(OMPRequiresDecl, {
   }
 })
 
+// OmpSs-2
 DEF_TRAVERSE_DECL(OSSDeclareReductionDecl, {
   TRY_TO(TraverseStmt(D->getCombiner()));
   if (auto *Initializer = D->getInitializer())
     TRY_TO(TraverseStmt(Initializer));
   TRY_TO(TraverseType(D->getType()));
   return true;
+})
+
+DEF_TRAVERSE_DECL(OSSAssertDecl, {
+  for (auto *I : D->varlists()) {
+    TRY_TO(TraverseStmt(I));
+  }
 })
 
 DEF_TRAVERSE_DECL(OMPDeclareReductionDecl, {

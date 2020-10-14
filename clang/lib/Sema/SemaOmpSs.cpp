@@ -1035,6 +1035,18 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
     MultiDepSizeOrSection, Loc, RLoc);
 }
 
+Sema::DeclGroupPtrTy Sema::ActOnOmpSsAssertDirective(SourceLocation Loc, Expr *E) {
+  OSSAssertDecl *D = nullptr;
+  if (!CurContext->isFileContext()) {
+    Diag(Loc, diag::err_oss_invalid_scope) << "assert";
+  } else {
+    D = OSSAssertDecl::Create(
+      Context, getCurLexicalContext(), Loc, {E});
+    CurContext->addDecl(D);
+  }
+  return DeclGroupPtrTy::make(DeclGroupRef(D));
+}
+
 QualType Sema::ActOnOmpSsDeclareReductionType(SourceLocation TyLoc,
                                               TypeResult ParsedType) {
   assert(ParsedType.isUsable());
@@ -1426,6 +1438,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
     break;
   case OSSD_declare_task:
   case OSSD_declare_reduction:
+  case OSSD_assert:
   case OSSD_unknown:
     llvm_unreachable("Unknown OmpSs directive");
   }

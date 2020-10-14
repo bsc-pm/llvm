@@ -167,6 +167,9 @@ private:
   using GenericCXXNonPodMethodDefsTy = llvm::DenseMap<const CXXMethodDecl *, llvm::Function *>;
   GenericCXXNonPodMethodDefsTy GenericCXXNonPodMethodDefs;
 
+  // List of OmpSs-2 specific metadata to be added to llvm.module.flags
+  SmallVector<llvm::Metadata *, 4> MetadataList;
+
   void EmitDSAShared(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -283,6 +286,11 @@ public:
                             SourceLocation Loc,
                             const OSSTaskDataTy &Data,
                             const OSSLoopDataTy &LoopData);
+
+  // Add all the metadata to OmpSs-2 metadata list.
+  void addMetadata(ArrayRef<llvm::Metadata *> List);
+  // Get OmpSs-2 metadata list as a single metadata node.
+  llvm::MDNode *getMetadataNode();
 
 };
 

@@ -616,6 +616,13 @@ void CodeGenModule::Release() {
                               !LangOpts.isSignReturnAddressWithAKey());
   }
 
+  // Add our llvm.oss.flags to llvm.module.flags
+  if (LangOpts.OmpSs) {
+    if (llvm::MDNode *MDN = getOmpSsRuntime().getMetadataNode()) {
+      getModule().addModuleFlag(llvm::Module::Error, "OmpSs-2 Metadata", MDN);
+    }
+  }
+
   if (LangOpts.CUDAIsDevice && getTriple().isNVPTX()) {
     // Indicate whether __nvvm_reflect should be configured to flush denormal
     // floating point values to 0.  (This corresponds to its "__CUDA_FTZ"
@@ -5697,6 +5704,10 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   // OmpSs-2 declare reductions do not have to be emitted
   // by themselves. OSSReductionClause does it
   case Decl::OSSDeclareReduction:
+    break;
+
+  case Decl::OSSAssert:
+    EmitOSSAssertDecl(cast<OSSAssertDecl>(D));
     break;
 
   case Decl::OMPRequires:
