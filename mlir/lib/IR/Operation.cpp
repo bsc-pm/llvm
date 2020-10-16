@@ -14,7 +14,6 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FoldInterfaces.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include <numeric>
 
 using namespace mlir;
@@ -395,7 +394,7 @@ void Operation::updateOrderIfNecessary() {
   // Check to see if there is a valid order between the two.
   if (prevOrder + 1 == nextOrder)
     return block->recomputeOpOrder();
-  orderIndex = prevOrder + 1 + ((nextOrder - prevOrder) / 2);
+  orderIndex = prevOrder + ((nextOrder - prevOrder) / 2);
 }
 
 //===----------------------------------------------------------------------===//
@@ -732,8 +731,10 @@ static Type getTensorOrVectorElementType(Type type) {
 }
 
 LogicalResult OpTrait::impl::verifyIsInvolution(Operation *op) {
-  if (!MemoryEffectOpInterface::hasNoEffect(op))
-    return op->emitOpError() << "requires operation to have no side effects";
+  // FIXME: Add back check for no side effects on operation.
+  // Currently adding it would cause the shared library build
+  // to fail since there would be a dependency of IR on SideEffectInterfaces
+  // which is cyclical.
   return success();
 }
 

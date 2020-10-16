@@ -2531,8 +2531,10 @@ parseListOfOperandsOrIntegers(OpAsmParser &parser, OperationState &result,
   if (failed(parser.parseLSquare()))
     return failure();
   // 0-D.
-  if (succeeded(parser.parseOptionalRSquare()))
+  if (succeeded(parser.parseOptionalRSquare())) {
+    result.addAttribute(attrName, parser.getBuilder().getArrayAttr({}));
     return success();
+  }
 
   SmallVector<int64_t, 4> attrVals;
   while (true) {
@@ -3333,6 +3335,13 @@ void SubViewOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                  SubViewOpMemRefCastFolder>(context);
 }
 
+OpFoldResult SubViewOp::fold(ArrayRef<Attribute> operands) {
+  if (getResultRank() == 0 && getSourceRank() == 0)
+    return getViewSource();
+
+  return {};
+}
+
 //===----------------------------------------------------------------------===//
 // SubTensorOp
 //===----------------------------------------------------------------------===//
@@ -3592,7 +3601,7 @@ void TensorCastOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for Tensor[Load|Store]Op
+// Helpers for Tensor[Load|Store]Op and TensorToMemrefOp
 //===----------------------------------------------------------------------===//
 
 static Type getTensorTypeFromMemRefType(Type type) {
@@ -3601,6 +3610,27 @@ static Type getTensorTypeFromMemRefType(Type type) {
   if (auto memref = type.dyn_cast<UnrankedMemRefType>())
     return UnrankedTensorType::get(memref.getElementType());
   return NoneType::get(type.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// TensorLoadOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute>) {
+  if (auto tensorToMemref = memref().getDefiningOp<TensorToMemrefOp>())
+    return tensorToMemref.tensor();
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// TensorToMemrefOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorToMemrefOp::fold(ArrayRef<Attribute>) {
+  if (auto tensorLoad = tensor().getDefiningOp<TensorLoadOp>())
+    if (tensorLoad.memref().getType() == getType())
+      return tensorLoad.memref();
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

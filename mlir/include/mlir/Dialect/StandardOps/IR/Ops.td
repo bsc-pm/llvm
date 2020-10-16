@@ -619,7 +619,7 @@ def GenericAtomicRMWOp : Std_Op<"generic_atomic_rmw", [
     ]> {
   let summary = "atomic read-modify-write operation with a region";
   let description = [{
-    The `atomic_rmw` operation provides a way to perform a read-modify-write
+    The `generic_atomic_rmw` operation provides a way to perform a read-modify-write
     sequence that is free from data races. The memref operand represents the
     buffer that the read and write will be performed against, as accessed by
     the specified indices. The arity of the indices is the rank of the memref.
@@ -2935,7 +2935,7 @@ def SubViewOp : BaseOpWithOffsetSizesAndStrides<
     `static_offsets`, `static_sizes` and `static_strides` arguments. A special
     sentinel value ShapedType::kDynamicSize and
     ShapedType::kDynamicStrideOrOffset encodes that the corresponding entry has
-    a static value.
+    a dynamic value.
 
     A subview operation may additionally reduce the rank of the resulting view
     by removing dimensions that are statically known to be of size 1.
@@ -3062,21 +3062,19 @@ def SubViewOp : BaseOpWithOffsetSizesAndStrides<
       "ArrayRef<NamedAttribute> attrs = {}">,
     // Build a SubViewOp with all dynamic entries.
     OpBuilder<
-      "OpBuilder &b, OperationState &result, Value source, "
-      "ValueRange offsets, ValueRange sizes, ValueRange strides, "
+      "Value source, ValueRange offsets, ValueRange sizes, ValueRange strides, "
       "ArrayRef<NamedAttribute> attrs = {}">,
     // Build a SubViewOp with mixed static and dynamic entries
     // and custom result type.
     OpBuilder<
-      "OpBuilder &b, OperationState &result, MemRefType resultType, "
-      "Value source, ArrayRef<int64_t> staticOffsets, "
+      "MemRefType resultType, Value source, ArrayRef<int64_t> staticOffsets, "
       "ArrayRef<int64_t> staticSizes, ArrayRef<int64_t> staticStrides, "
       "ValueRange offsets, ValueRange sizes, "
       "ValueRange strides, ArrayRef<NamedAttribute> attrs = {}">,
     // Build a SubViewOp with all dynamic entries and custom result type.
     OpBuilder<
-      "OpBuilder &b, OperationState &result, MemRefType resultType, "
-      "Value source, ValueRange offsets, ValueRange sizes, ValueRange strides, "
+      "MemRefType resultType, Value source, ValueRange offsets, "
+      "ValueRange sizes, ValueRange strides, "
       "ArrayRef<NamedAttribute> attrs = {}">
   ];
 
@@ -3099,6 +3097,7 @@ def SubViewOp : BaseOpWithOffsetSizesAndStrides<
   }];
 
   let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3118,7 +3117,7 @@ def SubTensorOp : BaseOpWithOffsetSizesAndStrides<"subtensor"> {
                to extract the subtensor.
     * sizes: tensor-rank number of sizes which specify the sizes of the result
              tensor type.
-    * strides: tensor-rank number of strides specifying subsampling in each 
+    * strides: tensor-rank number of strides specifying subsampling in each
                dimension.
 
     The representation based on offsets, sizes and strides support a
@@ -3126,7 +3125,7 @@ def SubTensorOp : BaseOpWithOffsetSizesAndStrides<"subtensor"> {
     `static_offsets`, `static_sizes` and `static_strides` arguments. A special
     sentinel value ShapedType::kDynamicSize and
     ShapedType::kDynamicStrideOrOffset encodes that the corresponding entry has
-    a static value.
+    a dynamic value.
 
     After buffer-allocation, the "subtensor" op is expected to lower into a
     "subview" op.
@@ -3222,7 +3221,7 @@ def SubTensorInsertOp : BaseOpWithOffsetSizesAndStrides<"subtensor_insert"> {
     `static_offsets`, `static_sizes` and `static_strides` arguments. A special
     sentinel value ShapedType::kDynamicSize and
     ShapedType::kDynamicStrideOrOffset encodes that the corresponding entry has
-    a static value.
+    a dynamic value.
 
     After buffer-allocation, the "subtensor_insert" op is expected to become
     an in-place buffer update.
@@ -3364,6 +3363,10 @@ def TensorLoadOp : Std_Op<"tensor_load",
     data. The result value is a tensor whose shape and element type match the
     memref operand.
 
+    The opposite of this op is tensor_to_memref. Together, these two ops are
+    useful for source/target materializations when doing type conversions
+    involving tensors and memrefs.
+
     Example:
 
     ```mlir
@@ -3395,6 +3398,8 @@ def TensorLoadOp : Std_Op<"tensor_load",
   }];
 
   let assemblyFormat = "$memref attr-dict `:` type($memref)";
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3430,6 +3435,47 @@ def TensorStoreOp : Std_Op<"tensor_store",
 }
 
 //===----------------------------------------------------------------------===//
+// TensorToMemrefOp
+//===----------------------------------------------------------------------===//
+
+def TensorToMemrefOp : Std_Op<"tensor_to_memref",
+    [SameOperandsAndResultShape, SameOperandsAndResultElementType,
+     TypesMatchWith<"type of 'tensor' is the tensor equivalent of 'memref'",
+                    "memref", "tensor",
+                    "getTensorTypeFromMemRefType($_self)">]> {
+  let summary = "tensor to memref operation";
+  let description = [{
+    Create a memref from a tensor. This is equivalent to allocating a new
+    memref of the appropriate (possibly dynamic) shape, and then copying the
+    elements (as if by a tensor_store op) into the newly allocated memref.
+
+    The opposite of this op is tensor_load. Together, these two ops are useful
+    for source/target materializations when doing type conversions involving
+    tensors and memrefs.
+
+    Note: This op takes the memref type in its pretty form because the tensor
+    type can always be inferred from the memref type, but the reverse is not
+    true. For example, the memref might have a layout map or memory space which
+    cannot be inferred from the tensor type.
+
+    ```mlir
+    // Result type is tensor<4x?xf32>
+    %12 = tensor_to_memref %10 :  memref<4x?xf32, #map0, 42>
+    ```
+  }];
+
+  let arguments = (ins AnyTensor:$tensor);
+  let results = (outs Res<AnyRankedOrUnrankedMemRef,
+                      "the memref to create", [MemAlloc]>:$memref);
+  // This op is fully verified by traits.
+  let verifier = ?;
+
+  let assemblyFormat = "$tensor attr-dict `:` type($memref)";
+
+  let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // TransposeOp
 //===----------------------------------------------------------------------===//
 
@@ -3450,8 +3496,8 @@ def TransposeOp : Std_Op<"transpose", [NoSideEffect]>,
   }];
 
   let builders = [OpBuilder<
-    "OpBuilder &b, OperationState &result, Value in, "
-    "AffineMapAttr permutation, ArrayRef<NamedAttribute> attrs = {}">];
+    "Value in, AffineMapAttr permutation, "
+    "ArrayRef<NamedAttribute> attrs = {}">];
 
   let extraClassDeclaration = [{
     static StringRef getPermutationAttrName() { return "permutation"; }

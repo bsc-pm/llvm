@@ -1023,6 +1023,8 @@ public:
                   "expected operation to take one operand");
     static_assert(ConcreteType::template hasTrait<SameOperandsAndResultType>(),
                   "expected operation to preserve type");
+    // Involution requires the operation to be side effect free as well
+    // but currently this check is under a FIXME and is not actually done.
     return impl::verifyIsInvolution(op);
   }
 
