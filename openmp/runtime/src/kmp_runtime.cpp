@@ -3584,8 +3584,21 @@ static int __kmp_expand_threads(int nNeed) {
   return added;
 }
 
-// FIXME
+// FIXME - Sort this.
 static kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid);
+
+static void __kmp_create_unshackled_threads(void) {
+  /* Allocate unshackled threads here */
+  int gtid = __kmp_entry_gtid();
+  kmp_root_t *root = __kmp_threads[gtid]->th.th_root;
+
+  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
+  root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
+      sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
+  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
+    root->r.unshackled_threads[i] = __kmp_allocate_unshackled_thread(root, i);
+  }
+}
 
 /* Register the current thread as a root thread and obtain our gtid. We must
    have the __kmp_initz_lock held at this point. Argument TRUE only if are the
@@ -3816,14 +3829,6 @@ int __kmp_register_root(int initial_thread) {
     ompt_set_thread_state(root_thread, ompt_state_work_serial);
   }
 #endif
-
-  /* Allocate unshackled threads here */
-  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
-  root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
-      sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
-  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
-    root->r.unshackled_threads[i] = __kmp_allocate_unshackled_thread(root, i);
-  }
 
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
@@ -6937,6 +6942,9 @@ static void __kmp_do_middle_initialize(void) {
 
 #endif /* KMP_ADJUST_BLOCKTIME */
 
+  // Initialize unshackled threads here.
+  __kmp_create_unshackled_threads();
+
   /* we have finished middle initialization */
   TCW_SYNC_4(__kmp_init_middle, TRUE);
 
@@ -8371,7 +8379,6 @@ int __kmp_pause_resource(kmp_pause_status_t level) {
     return 1;
   }
 }
-
 
 void __kmp_omp_display_env(int verbose) {
   __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);

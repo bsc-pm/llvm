@@ -619,9 +619,7 @@ extern int __kmp_tile_depth;
 #endif
 
 extern size_t __kmp_affin_mask_size;
-// #define KMP_AFFINITY_CAPABLE() (__kmp_affin_mask_size > 0)
-// FIXME - Temporarily didsabled for unshackled
-#define KMP_AFFINITY_CAPABLE() (0)
+#define KMP_AFFINITY_CAPABLE() (__kmp_affin_mask_size > 0)
 #define KMP_AFFINITY_DISABLE() (__kmp_affin_mask_size = 0)
 #define KMP_AFFINITY_ENABLE(mask_size) (__kmp_affin_mask_size = mask_size)
 #define KMP_CPU_SET_ITERATE(i, mask)                                           \
