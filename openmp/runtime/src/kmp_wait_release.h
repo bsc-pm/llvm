@@ -344,6 +344,9 @@ final_spin=FALSE)
             task_team = __kmp_threads[i]->th.th_task_team;
             this_thr->th.th_task_team = task_team;
 
+            // x86 needs this.
+            updateHWFPControl(__kmp_threads[i]->th.th_team);
+
             std::atomic<kmp_int32> *unfinished_threads;
             unfinished_threads = &(task_team->tt.tt_unfinished_threads);
             /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_threads);

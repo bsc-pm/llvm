@@ -3949,4 +3949,66 @@ void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
 }
 #endif
 
+#if KMP_ARCH_X86 || KMP_ARCH_X86_64
+// Propagate any changes to the floating point control registers out to the team
+// We try to avoid unnecessary writes to the relevant cache line in the team
+// structure, so we don't make changes unless they are needed.
+inline static void propagateFPControl(kmp_team_t *team) {
+  if (__kmp_inherit_fp_control) {
+    kmp_int16 x87_fpu_control_word;
+    kmp_uint32 mxcsr;
+
+    // Get master values of FPU control flags (both X87 and vector)
+    __kmp_store_x87_fpu_control_word(&x87_fpu_control_word);
+    __kmp_store_mxcsr(&mxcsr);
+    mxcsr &= KMP_X86_MXCSR_MASK;
+
+    // There is no point looking at t_fp_control_saved here.
+    // If it is TRUE, we still have to update the values if they are different
+    // from those we now have. If it is FALSE we didn't save anything yet, but
+    // our objective is the same. We have to ensure that the values in the team
+    // are the same as those we have.
+    // So, this code achieves what we need whether or not t_fp_control_saved is
+    // true. By checking whether the value needs updating we avoid unnecessary
+    // writes that would put the cache-line into a written state, causing all
+    // threads in the team to have to read it again.
+    KMP_CHECK_UPDATE(team->t.t_x87_fpu_control_word, x87_fpu_control_word);
+    KMP_CHECK_UPDATE(team->t.t_mxcsr, mxcsr);
+    // Although we don't use this value, other code in the runtime wants to know
+    // whether it should restore them. So we must ensure it is correct.
+    KMP_CHECK_UPDATE(team->t.t_fp_control_saved, TRUE);
+  } else {
+    // Similarly here. Don't write to this cache-line in the team structure
+    // unless we have to.
+    KMP_CHECK_UPDATE(team->t.t_fp_control_saved, FALSE);
+  }
+}
+
+// Do the opposite, setting the hardware registers to the updated values from
+// the team.
+inline static void updateHWFPControl(kmp_team_t *team) {
+  if (__kmp_inherit_fp_control && team->t.t_fp_control_saved) {
+    // Only reset the fp control regs if they have been changed in the team.
+    // the parallel region that we are exiting.
+    kmp_int16 x87_fpu_control_word;
+    kmp_uint32 mxcsr;
+    __kmp_store_x87_fpu_control_word(&x87_fpu_control_word);
+    __kmp_store_mxcsr(&mxcsr);
+    mxcsr &= KMP_X86_MXCSR_MASK;
+
+    if (team->t.t_x87_fpu_control_word != x87_fpu_control_word) {
+      __kmp_clear_x87_fpu_status_word();
+      __kmp_load_x87_fpu_control_word(&team->t.t_x87_fpu_control_word);
+    }
+
+    if (team->t.t_mxcsr != mxcsr) {
+      __kmp_load_mxcsr(&team->t.t_mxcsr);
+    }
+  }
+}
+#else
+#define propagateFPControl(x) ((void)0)
+#define updateHWFPControl(x) ((void)0)
+#endif /* KMP_ARCH_X86 || KMP_ARCH_X86_64 */
+
 #endif /* KMP_H */
