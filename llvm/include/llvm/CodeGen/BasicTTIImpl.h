@@ -944,7 +944,11 @@ public:
       return Cost;
 
     if (Src->isVectorTy() &&
-        Src->getPrimitiveSizeInBits() < LT.second.getSizeInBits()) {
+        // In practice it's not currently possible to have a change in lane
+        // length for extending loads or truncating stores so both types should
+        // have the same scalable property.
+        TypeSize::isKnownLT(Src->getPrimitiveSizeInBits(),
+                            LT.second.getSizeInBits())) {
       // This is a vector load that legalizes to a larger type than the vector
       // itself. Unless the corresponding extending load or truncating store is
       // legal, then this will scalarize.
@@ -1162,15 +1166,9 @@ public:
       break;
 
     case Intrinsic::memcpy:
-      // FIXME: all cost kinds should default to the same thing?
-      if (CostKind != TTI::TCK_RecipThroughput)
-        return thisT()->getMemcpyCost(ICA.getInst());
-      return BaseT::getIntrinsicInstrCost(ICA, CostKind);
+      return thisT()->getMemcpyCost(ICA.getInst());
 
     case Intrinsic::masked_scatter: {
-      // FIXME: all cost kinds should default to the same thing?
-      if (CostKind != TTI::TCK_RecipThroughput)
-        return BaseT::getIntrinsicInstrCost(ICA, CostKind);
       assert(VF == 1 && "Can't vectorize types here.");
       const Value *Mask = Args[3];
       bool VarMask = !isa<Constant>(Mask);
@@ -1180,9 +1178,6 @@ public:
                                              VarMask, Alignment, CostKind, I);
     }
     case Intrinsic::masked_gather: {
-      // FIXME: all cost kinds should default to the same thing?
-      if (CostKind != TTI::TCK_RecipThroughput)
-        return BaseT::getIntrinsicInstrCost(ICA, CostKind);
       assert(VF == 1 && "Can't vectorize types here.");
       const Value *Mask = Args[2];
       bool VarMask = !isa<Constant>(Mask);

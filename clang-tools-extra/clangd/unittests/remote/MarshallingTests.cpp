@@ -133,7 +133,7 @@ TEST(RemoteMarshallingTest, URITranslation) {
 
   // Paths transmitted over the wire can not be absolute, they have to be
   // relative.
-  Ref WithAbsolutePath;
+  v1::Ref WithAbsolutePath;
   *WithAbsolutePath.mutable_location()->mutable_file_path() =
       "/usr/local/user/home/HelloWorld.cpp";
   Deserialized = ProtobufMarshaller.fromProtobuf(WithAbsolutePath);
@@ -239,8 +239,8 @@ TEST(RemoteMarshallingTest, IncludeHeaderURIs) {
 
   clangd::Symbol::IncludeHeaderWithReferences Header;
   // Add only valid headers.
-  Header.IncludeHeader = Strings.save(
-      URI::createFile("/usr/local/user/home/project/Header.h").toString());
+  Header.IncludeHeader =
+      Strings.save(URI::createFile(testPath("project/Header.h")).toString());
   Header.References = 21;
   Sym.IncludeHeaders.push_back(Header);
   Header.IncludeHeader = Strings.save("<iostream>");
@@ -250,7 +250,7 @@ TEST(RemoteMarshallingTest, IncludeHeaderURIs) {
   Header.References = 200;
   Sym.IncludeHeaders.push_back(Header);
 
-  Marshaller ProtobufMarshaller(convert_to_slash("/"), convert_to_slash("/"));
+  Marshaller ProtobufMarshaller(testPath(""), testPath(""));
 
   auto Serialized = ProtobufMarshaller.toProtobuf(Sym);
   ASSERT_TRUE(bool(Serialized));
@@ -282,7 +282,7 @@ TEST(RemoteMarshallingTest, IncludeHeaderURIs) {
   Sym.IncludeHeaders.pop_back();
   Serialized = ProtobufMarshaller.toProtobuf(Sym);
   ASSERT_TRUE(bool(Serialized));
-  HeaderWithReferences InvalidHeader;
+  v1::HeaderWithReferences InvalidHeader;
   InvalidHeader.set_header(convert_to_slash("/absolute/path/Header.h"));
   InvalidHeader.set_references(9000);
   *Serialized->add_headers() = InvalidHeader;
@@ -388,7 +388,7 @@ TEST(RemoteMarshallingTest, RelationsRequestSerialization) {
 }
 
 TEST(RemoteMarshallingTest, RelationsRequestFailingSerialization) {
-  RelationsRequest Serialized;
+  v1::RelationsRequest Serialized;
   Serialized.add_subjects("ZZZZZZZZZZZZZZZZ");
   Marshaller ProtobufMarshaller(testPath("remote/"), testPath("local/"));
   auto Deserialized = ProtobufMarshaller.fromProtobuf(&Serialized);

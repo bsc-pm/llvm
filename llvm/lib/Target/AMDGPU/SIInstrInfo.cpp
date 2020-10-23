@@ -919,6 +919,10 @@ void SIInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
   ArrayRef<int16_t> SubIndices = RI.getRegSplitParts(RC, 4);
 
+  // If there is an overlap, we can't kill the super-register on the last
+  // instruction, since it will also kill the components made live by this def.
+  const bool CanKillSuperReg = KillSrc && !RI.regsOverlap(SrcReg, DestReg);
+
   for (unsigned Idx = 0; Idx < SubIndices.size(); ++Idx) {
     unsigned SubIdx;
     if (Forward)
@@ -926,7 +930,7 @@ void SIInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     else
       SubIdx = SubIndices[SubIndices.size() - Idx - 1];
 
-    bool UseKill = KillSrc && Idx == SubIndices.size() - 1;
+    bool UseKill = CanKillSuperReg && Idx == SubIndices.size() - 1;
 
     if (Opcode == AMDGPU::INSTRUCTION_LIST_END) {
       Register ImpDefSuper = Idx == 0 ? Register(DestReg) : Register();
@@ -1529,25 +1533,24 @@ void SIInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     .addMemOperand(MMO);
 }
 
-void SIInstrInfo::insertWaitStates(MachineBasicBlock &MBB,
-                                   MachineBasicBlock::iterator MI,
-                                   int Count) const {
-  DebugLoc DL = MBB.findDebugLoc(MI);
-  while (Count > 0) {
-    int Arg;
-    if (Count >= 8)
-      Arg = 7;
-    else
-      Arg = Count - 1;
-    Count -= 8;
-    BuildMI(MBB, MI, DL, get(AMDGPU::S_NOP))
-            .addImm(Arg);
-  }
-}
-
 void SIInstrInfo::insertNoop(MachineBasicBlock &MBB,
                              MachineBasicBlock::iterator MI) const {
-  insertWaitStates(MBB, MI, 1);
+  insertNoops(MBB, MI, 1);
+}
+
+void SIInstrInfo::insertNoops(MachineBasicBlock &MBB,
+                              MachineBasicBlock::iterator MI,
+                              unsigned Quantity) const {
+  DebugLoc DL = MBB.findDebugLoc(MI);
+  while (Quantity > 0) {
+    unsigned Arg;
+    if (Quantity >= 8)
+      Arg = 7;
+    else
+      Arg = Quantity - 1;
+    Quantity -= Arg + 1;
+    BuildMI(MBB, MI, DL, get(AMDGPU::S_NOP)).addImm(Arg);
+  }
 }
 
 void SIInstrInfo::insertReturn(MachineBasicBlock &MBB) const {

@@ -370,6 +370,7 @@ namespace clang {
     void VisitFieldDecl(FieldDecl *FD);
     void VisitMSPropertyDecl(MSPropertyDecl *FD);
     void VisitMSGuidDecl(MSGuidDecl *D);
+    void VisitTemplateParamObjectDecl(TemplateParamObjectDecl *D);
     void VisitIndirectFieldDecl(IndirectFieldDecl *FD);
     RedeclarableResult VisitVarDeclImpl(VarDecl *D);
     void VisitVarDecl(VarDecl *VD) { VisitVarDeclImpl(VD); }
@@ -1378,6 +1379,17 @@ void ASTDeclReader::VisitMSGuidDecl(MSGuidDecl *D) {
     Reader.getContext().setPrimaryMergedDecl(D, Existing->getCanonicalDecl());
 }
 
+void ASTDeclReader::VisitTemplateParamObjectDecl(TemplateParamObjectDecl *D) {
+  VisitValueDecl(D);
+  D->Value = Record.readAPValue();
+
+  // Add this template parameter object to the AST context's lookup structure,
+  // and merge if needed.
+  if (TemplateParamObjectDecl *Existing =
+          Reader.getContext().TemplateParamObjectDecls.GetOrInsertNode(D))
+    Reader.getContext().setPrimaryMergedDecl(D, Existing->getCanonicalDecl());
+}
+
 void ASTDeclReader::VisitIndirectFieldDecl(IndirectFieldDecl *FD) {
   VisitValueDecl(FD);
 
@@ -1424,10 +1436,9 @@ ASTDeclReader::RedeclarableResult ASTDeclReader::VisitVarDeclImpl(VarDecl *VD) {
 
   if (uint64_t Val = Record.readInt()) {
     VD->setInit(Record.readExpr());
-    if (Val > 1) {
+    if (Val != 1) {
       EvaluatedStmt *Eval = VD->ensureEvaluatedStmt();
-      Eval->CheckedICE = true;
-      Eval->IsICE = (Val & 1) != 0;
+      Eval->HasConstantInitialization = (Val & 2) != 0;
       Eval->HasConstantDestruction = (Val & 4) != 0;
     }
   }
@@ -2411,8 +2422,10 @@ void ASTDeclReader::VisitLifetimeExtendedTemporaryDecl(
   VisitDecl(D);
   D->ExtendingDecl = readDeclAs<ValueDecl>();
   D->ExprWithTemporary = Record.readStmt();
-  if (Record.readInt())
+  if (Record.readInt()) {
     D->Value = new (D->getASTContext()) APValue(Record.readAPValue());
+    D->getASTContext().addDestruction(D->Value);
+  }
   D->ManglingNumber = Record.readInt();
   mergeMergeable(D);
 }
@@ -3985,6 +3998,9 @@ Decl *ASTReader::ReadDeclRecord(DeclID ID) {
   case DECL_MS_GUID:
     D = MSGuidDecl::CreateDeserialized(Context, ID);
     break;
+  case DECL_TEMPLATE_PARAM_OBJECT:
+    D = TemplateParamObjectDecl::CreateDeserialized(Context, ID);
+    break;
   case DECL_CAPTURED:
     D = CapturedDecl::CreateDeserialized(Context, ID, Record.readInt());
     break;
@@ -4439,10 +4455,10 @@ void ASTDeclReader::UpdateDecl(Decl *D,
       uint64_t Val = Record.readInt();
       if (Val && !VD->getInit()) {
         VD->setInit(Record.readExpr());
-        if (Val > 1) { // IsInitKnownICE = 1, IsInitNotICE = 2, IsInitICE = 3
+        if (Val != 1) {
           EvaluatedStmt *Eval = VD->ensureEvaluatedStmt();
-          Eval->CheckedICE = true;
-          Eval->IsICE = Val == 3;
+          Eval->HasConstantInitialization = (Val & 2) != 0;
+          Eval->HasConstantDestruction = (Val & 4) != 0;
         }
       }
       break;

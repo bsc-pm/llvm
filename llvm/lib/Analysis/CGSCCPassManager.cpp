@@ -21,9 +21,11 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/PassManagerImpl.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TimeProfiler.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
@@ -35,6 +37,11 @@ using namespace llvm;
 // Explicit template instantiations and specialization definitions for core
 // template typedefs.
 namespace llvm {
+
+static cl::opt<bool> AbortOnMaxDevirtIterationsReached(
+    "abort-on-max-devirt-iterations-reached",
+    cl::desc("Abort when the max iterations for devirtualization CGSCC repeat "
+             "pass is reached"));
 
 // Explicit instantiations for the core proxy templates.
 template class AllAnalysesOn<LazyCallGraph::SCC>;
@@ -362,6 +369,11 @@ static void updateNewSCCFunctionAnalyses(LazyCallGraph::SCC &C,
   }
 }
 
+void llvm::maxDevirtIterationsReached() {
+  if (AbortOnMaxDevirtIterationsReached)
+    report_fatal_error("Max devirtualization iterations reached");
+}
+
 /// Helper function to update both the \c CGSCCAnalysisManager \p AM and the \c
 /// CGSCCPassManager's \c CGSCCUpdateResult \p UR based on a range of newly
 /// added SCCs.
@@ -654,6 +666,7 @@ static LazyCallGraph::SCC &updateCGAndAnalysisManagerForPass(
 
   // Now promote ref edges into call edges.
   for (Node *CallTarget : PromotedRefTargets) {
+    UR.Devirtualized = true;
     SCC &TargetC = *G.lookupSCC(*CallTarget);
     RefSCC &TargetRC = TargetC.getOuterRefSCC();
 
