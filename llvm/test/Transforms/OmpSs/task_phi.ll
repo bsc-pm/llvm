@@ -28,61 +28,64 @@ define dso_local void @fold_if(i32 %a, i32 %b) #0 !dbg !6 {
 ; CHECK-NEXT:    [[B_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[A:%.*]], i32* [[A_ADDR]], align 4
 ; CHECK-NEXT:    store i32 [[B:%.*]], i32* [[B_ADDR]], align 4
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !8
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8:!dbg !.*]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_fold_if0*, align 8, !dbg !8
-; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_fold_if0** [[TMP0]] to i8**, !dbg !8
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, !dbg !8
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_fold_if0, %nanos6_task_invocation_info_t* @task_invocation_info_fold_if0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 1, i64 0), !dbg !8
-; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args_fold_if0*, %nanos6_task_args_fold_if0** [[TMP0]], align 8, !dbg !8
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args_fold_if0* [[TMP3]] to i8*, !dbg !8
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP4]], i64 16, !dbg !8
-; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0:%.*]], %nanos6_task_args_fold_if0* [[TMP3]], i32 0, i32 0, !dbg !8
-; CHECK-NEXT:    [[TMP5:%.*]] = bitcast i32* [[GEP_A_ADDR]] to i8*, !dbg !8
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast i32* [[A_ADDR]] to i8*, !dbg !8
-; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP5]], i8* align 4 [[TMP6]], i64 4, i1 false), !dbg !8
-; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0]], %nanos6_task_args_fold_if0* [[TMP3]], i32 0, i32 1, !dbg !8
-; CHECK-NEXT:    [[TMP7:%.*]] = bitcast i32* [[GEP_B_ADDR]] to i8*, !dbg !8
-; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32* [[B_ADDR]] to i8*, !dbg !8
-; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP7]], i8* align 4 [[TMP8]], i64 4, i1 false), !dbg !8
-; CHECK-NEXT:    [[TMP9:%.*]] = load i8*, i8** [[TMP2]], align 8, !dbg !8
-; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP9]]), !dbg !8
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !8
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_fold_if0*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_fold_if0** [[TMP0]] to i8**, [[DBG8]]
+; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG8]]
+; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_fold_if0, %nanos6_task_invocation_info_t* @task_invocation_info_fold_if0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 1, i64 [[TMP3]]), [[DBG8]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_fold_if0*, %nanos6_task_args_fold_if0** [[TMP0]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_fold_if0* [[TMP4]] to i8*, [[DBG8]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG8]]
+; CHECK-NEXT:    [[GEP_A_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0:%.*]], %nanos6_task_args_fold_if0* [[TMP4]], i32 0, i32 0, [[DBG8]]
+; CHECK-NEXT:    [[TMP6:%.*]] = bitcast i32* [[GEP_A_ADDR]] to i8*, [[DBG8]]
+; CHECK-NEXT:    [[TMP7:%.*]] = bitcast i32* [[A_ADDR]] to i8*, [[DBG8]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP6]], i8* align 4 [[TMP7]], i64 4, i1 false), [[DBG8]]
+; CHECK-NEXT:    [[GEP_B_ADDR:%.*]] = getelementptr [[NANOS6_TASK_ARGS_FOLD_IF0]], %nanos6_task_args_fold_if0* [[TMP4]], i32 0, i32 1, [[DBG8]]
+; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32* [[GEP_B_ADDR]] to i8*, [[DBG8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = bitcast i32* [[B_ADDR]] to i8*, [[DBG8]]
+; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP8]], i8* align 4 [[TMP9]], i64 4, i1 false), [[DBG8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i8*, i8** [[TMP2]], align 8, [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP10]]), [[DBG8]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG8]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([16 x i8], [16 x i8]* @1, i32 0, i32 0)), !dbg !9
-; CHECK-NEXT:    ret void, !dbg !10
+; CHECK-NEXT:    call void @nanos6_taskwait(i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[GLOB1:@.*]], i32 0, i32 0)), [[DBG9:!dbg !.*]]
+; CHECK-NEXT:    ret void, [[DBG10:!dbg !.*]]
 ; CHECK:       final.then:
 ; CHECK-NEXT:    [[L_CLONE:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, i32* [[A_ADDR]], align 4, !dbg !11
-; CHECK-NEXT:    [[TOBOOL_CLONE:%.*]] = icmp ne i32 [[TMP10]], 0, !dbg !11
-; CHECK-NEXT:    br i1 [[TOBOOL_CLONE]], label [[LOR_END_CLONE:%.*]], label [[LOR_RHS_CLONE:%.*]], !dbg !12
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, i32* [[A_ADDR]], align 4, [[DBG11:!dbg !.*]]
+; CHECK-NEXT:    [[TOBOOL_CLONE:%.*]] = icmp ne i32 [[TMP11]], 0, [[DBG11]]
+; CHECK-NEXT:    br i1 [[TOBOOL_CLONE]], label [[LOR_END_CLONE:%.*]], label [[LOR_RHS_CLONE:%.*]], [[DBG12:!dbg !.*]]
 ; CHECK:       lor.end.clone:
-; CHECK-NEXT:    [[TMP11:%.*]] = phi i1 [ true, [[FINAL_THEN:%.*]] ], [ [[TOBOOL1_CLONE:%.*]], [[LOR_RHS_CLONE]] ]
-; CHECK-NEXT:    [[LOR_EXT_CLONE:%.*]] = zext i1 [[TMP11]] to i32, !dbg !12
-; CHECK-NEXT:    store i32 [[LOR_EXT_CLONE]], i32* [[L_CLONE]], align 4, !dbg !13
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, i32* [[L_CLONE]], align 4, !dbg !14
-; CHECK-NEXT:    [[CMP_CLONE:%.*]] = icmp eq i32 [[TMP12]], 3, !dbg !15
-; CHECK-NEXT:    br i1 [[CMP_CLONE]], label [[IF_THEN_CLONE:%.*]], label [[IF_ELSE_CLONE:%.*]], !dbg !14
+; CHECK-NEXT:    [[TMP12:%.*]] = phi i1 [ true, [[FINAL_THEN:%.*]] ], [ [[TOBOOL1_CLONE:%.*]], [[LOR_RHS_CLONE]] ]
+; CHECK-NEXT:    [[LOR_EXT_CLONE:%.*]] = zext i1 [[TMP12]] to i32, [[DBG12]]
+; CHECK-NEXT:    store i32 [[LOR_EXT_CLONE]], i32* [[L_CLONE]], align 4, [[DBG13:!dbg !.*]]
+; CHECK-NEXT:    [[TMP13:%.*]] = load i32, i32* [[L_CLONE]], align 4, [[DBG14:!dbg !.*]]
+; CHECK-NEXT:    [[CMP_CLONE:%.*]] = icmp eq i32 [[TMP13]], 3, [[DBG15:!dbg !.*]]
+; CHECK-NEXT:    br i1 [[CMP_CLONE]], label [[IF_THEN_CLONE:%.*]], label [[IF_ELSE_CLONE:%.*]], [[DBG14]]
 ; CHECK:       lor.rhs.clone:
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, i32* [[B_ADDR]], align 4, !dbg !16
-; CHECK-NEXT:    [[TOBOOL1_CLONE]] = icmp ne i32 [[TMP13]], 0, !dbg !12
-; CHECK-NEXT:    br label [[LOR_END_CLONE]], !dbg !12
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, i32* [[B_ADDR]], align 4, [[DBG16:!dbg !.*]]
+; CHECK-NEXT:    [[TOBOOL1_CLONE]] = icmp ne i32 [[TMP14]], 0, [[DBG12]]
+; CHECK-NEXT:    br label [[LOR_END_CLONE]], [[DBG12]]
 ; CHECK:       if.then.clone:
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, i32* [[L_CLONE]], align 4, !dbg !17
-; CHECK-NEXT:    [[INC_CLONE:%.*]] = add nsw i32 [[TMP14]], 1, !dbg !17
-; CHECK-NEXT:    store i32 [[INC_CLONE]], i32* [[L_CLONE]], align 4, !dbg !17
-; CHECK-NEXT:    br label [[IF_END_CLONE:%.*]], !dbg !18
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, i32* [[L_CLONE]], align 4, [[DBG17:!dbg !.*]]
+; CHECK-NEXT:    [[INC_CLONE:%.*]] = add nsw i32 [[TMP15]], 1, [[DBG17]]
+; CHECK-NEXT:    store i32 [[INC_CLONE]], i32* [[L_CLONE]], align 4, [[DBG17]]
+; CHECK-NEXT:    br label [[IF_END_CLONE:%.*]], [[DBG18:!dbg !.*]]
 ; CHECK:       if.else.clone:
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, i32* [[L_CLONE]], align 4, !dbg !19
-; CHECK-NEXT:    [[DEC_CLONE:%.*]] = add nsw i32 [[TMP15]], -1, !dbg !19
-; CHECK-NEXT:    store i32 [[DEC_CLONE]], i32* [[L_CLONE]], align 4, !dbg !19
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, i32* [[L_CLONE]], align 4, [[DBG19:!dbg !.*]]
+; CHECK-NEXT:    [[DEC_CLONE:%.*]] = add nsw i32 [[TMP16]], -1, [[DBG19]]
+; CHECK-NEXT:    store i32 [[DEC_CLONE]], i32* [[L_CLONE]], align 4, [[DBG19]]
 ; CHECK-NEXT:    br label [[IF_END_CLONE]]
 ; CHECK:       if.end.clone:
-; CHECK-NEXT:    br label [[FINAL_END]], !dbg !9
+; CHECK-NEXT:    br label [[FINAL_END]], [[DBG9]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @nanos6_in_final(), !dbg !8
-; CHECK-NEXT:    [[TMP17:%.*]] = icmp ne i32 [[TMP16]], 0, !dbg !8
-; CHECK-NEXT:    br i1 [[TMP17]], label [[FINAL_THEN]], label [[CODEREPL:%.*]], !dbg !8
+; CHECK-NEXT:    [[TMP17:%.*]] = call i32 @nanos6_in_final(), [[DBG8]]
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp ne i32 [[TMP17]], 0, [[DBG8]]
+; CHECK-NEXT:    br i1 [[TMP18]], label [[FINAL_THEN]], label [[CODEREPL:%.*]], [[DBG8]]
 ;
 entry:
   %a.addr = alloca i32, align 4
@@ -139,8 +142,8 @@ declare i1 @llvm.directive.marker() #1
 define dso_local i32 @main() #0 !dbg !21 {
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @fold_if(i32 1, i32 2), !dbg !21
-; CHECK-NEXT:    ret i32 0, !dbg !22
+; CHECK-NEXT:    call void @fold_if(i32 1, i32 2), [[DBG21:!dbg !.*]]
+; CHECK-NEXT:    ret i32 0, [[DBG22:!dbg !.*]]
 ;
 entry:
   call void @fold_if(i32 1, i32 2), !dbg !22

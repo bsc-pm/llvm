@@ -2143,6 +2143,32 @@ struct OmpSs : public ModulePass {
       // Set debug info from the task entry to all instructions
       IRB.SetCurrentDebugLocation(DLoc);
 
+      // Add a branch to the next basic block after the task region
+      // and replace the terminator that exits the task region
+      // Since this is a single entry single exit region this should
+      // be done once.
+      BasicBlock *NewRetBB = nullptr;
+      for (BasicBlock *Block : Blocks) {
+        Instruction *DirInfo = Block->getTerminator();
+        for (unsigned i = 0, e = DirInfo->getNumSuccessors(); i != e; ++i)
+          if (!Blocks.count(DirInfo->getSuccessor(i))) {
+            assert(!NewRetBB && "More than one exit in task code");
+
+            BasicBlock *OldTarget = DirInfo->getSuccessor(i);
+            // Create branch to next BB after the task region
+            IRB.CreateBr(OldTarget);
+
+            NewRetBB = BasicBlock::Create(M.getContext(), ".exitStub", newFunction);
+            IRBuilder<> (NewRetBB).CreateRetVoid();
+
+            // rewrite the original branch instruction with this new target
+            DirInfo->setSuccessor(i, NewRetBB);
+          }
+      }
+
+      // Here we have a valid codeReplacer BasicBlock with its terminator
+      IRB.SetInsertPoint(codeReplacer->getTerminator());
+
       AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
       Value *TaskFlagsVar = computeTaskFlags(IRB, DirEnv);
@@ -2163,19 +2189,54 @@ struct OmpSs : public ModulePass {
 
       Value *TaskArgsVLAsExtraSizeOf = computeTaskArgsVLAsExtraSizeOf(M, IRB, VLADimsInfo);
       Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
-      int NumDependencies = DependsInfo.List.size();
-      for (auto &DepInfo : DependsInfo.List) {
-        if (isa<MultiDependInfo>(DepInfo.get())) {
-          // TODO: build loop to compute the amount of dependencies in
-          // multideps. Fallback to -1 if the task has some dependency
-          NumDependencies = -1;
-          break;
+
+      Instruction *NumDependencies = IRB.CreateAlloca(IRB.getInt64Ty(), nullptr, "num.deps");
+      if (DirEnv.isOmpSsTaskLoopDirective()) {
+        // If taskloop NumDeps = -1
+        IRB.CreateStore(IRB.getInt64(-1), NumDependencies);
+      } else {
+        IRB.CreateStore(IRB.getInt64(0), NumDependencies);
+        for (auto &DepInfo : DependsInfo.List) {
+          Instruction *NumDependenciesLoad = IRB.CreateLoad(NumDependencies);
+          Value *NumDependenciesIncr = IRB.CreateAdd(NumDependenciesLoad, IRB.getInt64(1));
+          Instruction *NumDependenciesStore = IRB.CreateStore(NumDependenciesIncr, NumDependencies);
+          if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
+
+            // Build a BasicBlock containing the num_deps increment
+            NumDependenciesLoad->getParent()->splitBasicBlock(NumDependenciesLoad);
+            Instruction *AfterNumDependenciesStore = NumDependenciesStore->getNextNode();
+            AfterNumDependenciesStore->getParent()->splitBasicBlock(AfterNumDependenciesStore);
+
+            // NOTE: after spliting IRBuilder is pointing to a bad BasicBlock.
+            // Set again the insert point
+            IRB.SetInsertPoint(AfterNumDependenciesStore);
+
+            Function *ComputeMultiDepFun = MultiDepInfo->ComputeMultiDepFun;
+            auto Args = MultiDepInfo->Args;
+            for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
+              Value *IndVar = MultiDepInfo->Iters[i];
+              auto LBoundGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
+                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+                 return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 0);
+              };
+              auto RemapGen = [IndVar](IRBuilder<> &IRB) {
+                // We do not need remap here
+                return IRB.CreateLoad(IndVar);
+              };
+              auto UBoundGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
+                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+                 return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 2);
+              };
+              auto IncrGen = [ComputeMultiDepFun, &Args, i](IRBuilder<> &IRB) {
+                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, Args);
+                 return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 3);
+              };
+              buildLoopForMultiDep(
+                  M, F, NumDependenciesLoad, NumDependenciesStore, IndVar, LBoundGen, RemapGen, UBoundGen, IncrGen);
+            }
+          }
         }
       }
-
-      // If taskloop NumDeps = -1
-      if (DirEnv.isOmpSsTaskLoopDirective())
-        NumDependencies = -1;
 
       // Store label if it's not a string literal (i.e label("L1"))
       if (DirEnv.Label && !isa<Constant>(DirEnv.Label)) {
@@ -2193,8 +2254,7 @@ struct OmpSs : public ModulePass {
                                   TaskArgsVarCast,
                                   TaskPtrVar,
                                   TaskFlagsVar,
-                                  ConstantInt::get(IRB.getInt64Ty(),
-                                                   NumDependencies)});
+                                  IRB.CreateLoad(NumDependencies)});
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);
@@ -2398,29 +2458,6 @@ struct OmpSs : public ModulePass {
       }
 
       CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
-      // Add a branch to the next basic block after the task region
-      // and replace the terminator that exits the task region
-      // Since this is a single entry single exit region this should
-      // be done once.
-      BasicBlock *NewRetBB = nullptr;
-      for (BasicBlock *Block : Blocks) {
-        Instruction *DirInfo = Block->getTerminator();
-        for (unsigned i = 0, e = DirInfo->getNumSuccessors(); i != e; ++i)
-          if (!Blocks.count(DirInfo->getSuccessor(i))) {
-            assert(!NewRetBB && "More than one exit in task code");
-
-            BasicBlock *OldTarget = DirInfo->getSuccessor(i);
-            // Create branch to next BB after the task region
-            IRB.CreateBr(OldTarget);
-
-            NewRetBB = BasicBlock::Create(M.getContext(), ".exitStub", newFunction);
-            IRBuilder<> (NewRetBB).CreateRetVoid();
-
-            // rewrite the original branch instruction with this new target
-            DirInfo->setSuccessor(i, NewRetBB);
-          }
-      }
-
       return TaskSubmitFuncCall;
     };
 

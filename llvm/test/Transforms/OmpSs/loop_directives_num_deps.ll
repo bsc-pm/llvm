@@ -38,9 +38,21 @@ entry:
   call void @llvm.directive.region.exit(token %2), !dbg !11
   ret void, !dbg !12
 }
-; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** %1, i8** %2, i64 8, i64 0)
-; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo1, %nanos6_task_invocation_info_t* @task_invocation_info_foo1, i64 16, i8** %7, i8** %8, i64 4, i64 -1)
-; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo2, %nanos6_task_invocation_info_t* @task_invocation_info_foo2, i64 16, i8** %13, i8** %14, i64 12, i64 -1)
+
+; CHECK: %num.deps = alloca i64, align 8
+; CHECK-NEXT: store i64 0, i64* %num.deps, align 8
+; CHECK-NEXT: %3 = load i64, i64* %num.deps, align 8
+; CHECK-NEXT: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 16, i8** %1, i8** %2, i64 8, i64 %3)
+
+; CHECK: %num.deps20 = alloca i64, align 8
+; CHECK-NEXT: store i64 -1, i64* %num.deps20, align 8
+; CHECK-NEXT: %10 = load i64, i64* %num.deps20, align 8
+; CHECK-NEXT: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo1, %nanos6_task_invocation_info_t* @task_invocation_info_foo1, i64 16, i8** %8, i8** %9, i64 4, i64 %10)
+
+; CHECK: %num.deps37 = alloca i64, align 8
+; CHECK-NEXT: store i64 -1, i64* %num.deps37, align 8
+; CHECK-NEXT: %17 = load i64, i64* %num.deps37, align 8
+; CHECK-NEXT: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo2, %nanos6_task_invocation_info_t* @task_invocation_info_foo2, i64 16, i8** %15, i8** %16, i64 12, i64 %17)
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

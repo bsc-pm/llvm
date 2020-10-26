@@ -38,54 +38,57 @@ define dso_local void @taskloop(i32 %lb, i32 %ub, i32 %step) #0 !dbg !6 {
 ; CHECK-NEXT:    [[STEP_VALUE:%.*]] = load i32, i32* [[STEP_ADDR]], align 4
 ; CHECK-NEXT:    [[I_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[NEW_UB_ADDR:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], !dbg !8
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8:!dbg !.*]]
 ; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_taskloop0*, align 8, !dbg !8
-; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_taskloop0** [[TMP0]] to i8**, !dbg !8
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, !dbg !8
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 4, i64 -1), !dbg !8
-; CHECK-NEXT:    [[TMP3:%.*]] = load %nanos6_task_args_taskloop0*, %nanos6_task_args_taskloop0** [[TMP0]], align 8, !dbg !8
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast %nanos6_task_args_taskloop0* [[TMP3]] to i8*, !dbg !8
-; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP4]], i64 16, !dbg !8
-; CHECK-NEXT:    [[CAPT_GEP_LB_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0:%.*]], %nanos6_task_args_taskloop0* [[TMP3]], i32 0, i32 1, !dbg !8
-; CHECK-NEXT:    store i32 [[LB_VALUE]], i32* [[CAPT_GEP_LB_VALUE]], align 4, !dbg !8
-; CHECK-NEXT:    [[CAPT_GEP_UB_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], %nanos6_task_args_taskloop0* [[TMP3]], i32 0, i32 2, !dbg !8
-; CHECK-NEXT:    store i32 [[UB_VALUE]], i32* [[CAPT_GEP_UB_VALUE]], align 4, !dbg !8
-; CHECK-NEXT:    [[CAPT_GEP_STEP_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], %nanos6_task_args_taskloop0* [[TMP3]], i32 0, i32 3, !dbg !8
-; CHECK-NEXT:    store i32 [[STEP_VALUE]], i32* [[CAPT_GEP_STEP_VALUE]], align 4, !dbg !8
-; CHECK-NEXT:    [[TMP5:%.*]] = load i8*, i8** [[TMP2]], align 8, !dbg !8
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 [[UB_VALUE]], [[LB_VALUE]], !dbg !8
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], 1, !dbg !8
-; CHECK-NEXT:    [[TMP8:%.*]] = sdiv i32 [[TMP7]], [[STEP_VALUE]], !dbg !8
-; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], 1, !dbg !8
-; CHECK-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP9]] to i64, !dbg !8
-; CHECK-NEXT:    call void @nanos6_register_loop_bounds(i8* [[TMP5]], i64 0, i64 [[TMP10]], i64 0, i64 0), !dbg !8
-; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP5]]), !dbg !8
-; CHECK-NEXT:    br label [[FINAL_END:%.*]], !dbg !8
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_taskloop0*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_taskloop0** [[TMP0]] to i8**, [[DBG8]]
+; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG8]]
+; CHECK-NEXT:    store i64 -1, i64* [[NUM_DEPS]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 4, i64 [[TMP3]]), [[DBG8]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_taskloop0*, %nanos6_task_args_taskloop0** [[TMP0]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_taskloop0* [[TMP4]] to i8*, [[DBG8]]
+; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG8]]
+; CHECK-NEXT:    [[CAPT_GEP_LB_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0:%.*]], %nanos6_task_args_taskloop0* [[TMP4]], i32 0, i32 1, [[DBG8]]
+; CHECK-NEXT:    store i32 [[LB_VALUE]], i32* [[CAPT_GEP_LB_VALUE]], align 4, [[DBG8]]
+; CHECK-NEXT:    [[CAPT_GEP_UB_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], %nanos6_task_args_taskloop0* [[TMP4]], i32 0, i32 2, [[DBG8]]
+; CHECK-NEXT:    store i32 [[UB_VALUE]], i32* [[CAPT_GEP_UB_VALUE]], align 4, [[DBG8]]
+; CHECK-NEXT:    [[CAPT_GEP_STEP_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], %nanos6_task_args_taskloop0* [[TMP4]], i32 0, i32 3, [[DBG8]]
+; CHECK-NEXT:    store i32 [[STEP_VALUE]], i32* [[CAPT_GEP_STEP_VALUE]], align 4, [[DBG8]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP2]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[UB_VALUE]], [[LB_VALUE]], [[DBG8]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1, [[DBG8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sdiv i32 [[TMP8]], [[STEP_VALUE]], [[DBG8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i32 [[TMP9]], 1, [[DBG8]]
+; CHECK-NEXT:    [[TMP11:%.*]] = sext i32 [[TMP10]] to i64, [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_register_loop_bounds(i8* [[TMP6]], i64 0, i64 [[TMP11]], i64 0, i64 0), [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), [[DBG8]]
+; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG8]]
 ; CHECK:       final.end:
-; CHECK-NEXT:    ret void, !dbg !9
+; CHECK-NEXT:    ret void, [[DBG9:!dbg !.*]]
 ; CHECK:       final.then:
-; CHECK-NEXT:    store i32 [[LB_VALUE]], i32* [[I_ADDR]], align 4, !dbg !8
-; CHECK-NEXT:    br label [[FOR_COND:%.*]], !dbg !8
+; CHECK-NEXT:    store i32 [[LB_VALUE]], i32* [[I_ADDR]], align 4, [[DBG8]]
+; CHECK-NEXT:    br label [[FOR_COND:%.*]], [[DBG8]]
 ; CHECK:       for.cond:
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, i32* [[I_ADDR]], align 4, !dbg !8
-; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[TMP11]], [[UB_VALUE]], !dbg !8
-; CHECK-NEXT:    br i1 [[TMP12]], label [[FOR_BODY:%.*]], label [[FINAL_END]], !dbg !8
+; CHECK-NEXT:    [[TMP12:%.*]] = load i32, i32* [[I_ADDR]], align 4, [[DBG8]]
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp slt i32 [[TMP12]], [[UB_VALUE]], [[DBG8]]
+; CHECK-NEXT:    br i1 [[TMP13]], label [[FOR_BODY:%.*]], label [[FINAL_END]], [[DBG8]]
 ; CHECK:       for.body:
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, i32* @sum, align 4, !dbg !10
-; CHECK-NEXT:    [[I_CLONE:%.*]] = load i32, i32* [[I_ADDR]], align 4, !dbg !10
-; CHECK-NEXT:    [[ADD_CLONE:%.*]] = add nsw i32 [[TMP13]], [[I_CLONE]], !dbg !10
-; CHECK-NEXT:    store i32 [[ADD_CLONE]], i32* @sum, align 4, !dbg !10
-; CHECK-NEXT:    br label [[FOR_INCR:%.*]], !dbg !9
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, i32* @sum, align 4, [[DBG10:!dbg !.*]]
+; CHECK-NEXT:    [[I_CLONE:%.*]] = load i32, i32* [[I_ADDR]], align 4, [[DBG10]]
+; CHECK-NEXT:    [[ADD_CLONE:%.*]] = add nsw i32 [[TMP14]], [[I_CLONE]], [[DBG10]]
+; CHECK-NEXT:    store i32 [[ADD_CLONE]], i32* @sum, align 4, [[DBG10]]
+; CHECK-NEXT:    br label [[FOR_INCR:%.*]], [[DBG9]]
 ; CHECK:       for.incr:
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, i32* [[I_ADDR]], align 4, !dbg !8
-; CHECK-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], [[STEP_VALUE]], !dbg !8
-; CHECK-NEXT:    store i32 [[TMP15]], i32* [[I_ADDR]], align 4, !dbg !8
-; CHECK-NEXT:    br label [[FOR_COND]], !dbg !8
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, i32* [[I_ADDR]], align 4, [[DBG8]]
+; CHECK-NEXT:    [[TMP16:%.*]] = add i32 [[TMP15]], [[STEP_VALUE]], [[DBG8]]
+; CHECK-NEXT:    store i32 [[TMP16]], i32* [[I_ADDR]], align 4, [[DBG8]]
+; CHECK-NEXT:    br label [[FOR_COND]], [[DBG8]]
 ; CHECK:       final.cond:
-; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @nanos6_in_final(), !dbg !8
-; CHECK-NEXT:    [[TMP17:%.*]] = icmp ne i32 [[TMP16]], 0, !dbg !8
-; CHECK-NEXT:    br i1 [[TMP17]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], !dbg !8
+; CHECK-NEXT:    [[TMP17:%.*]] = call i32 @nanos6_in_final(), [[DBG8]]
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp ne i32 [[TMP17]], 0, [[DBG8]]
+; CHECK-NEXT:    br i1 [[TMP18]], label [[FINAL_THEN:%.*]], label [[CODEREPL:%.*]], [[DBG8]]
 ;
 entry:
   %lb.addr = alloca i32, align 4
@@ -130,8 +133,8 @@ declare void @llvm.directive.region.exit(token) #1
 define dso_local i32 @main() #0 !dbg !12 {
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    call void @taskloop(i32 -55, i32 31, i32 2), !dbg !12
-; CHECK-NEXT:    ret i32 0, !dbg !13
+; CHECK-NEXT:    call void @taskloop(i32 -55, i32 31, i32 2), [[DBG12:!dbg !.*]]
+; CHECK-NEXT:    ret i32 0, [[DBG13:!dbg !.*]]
 ;
 entry:
   call void @taskloop(i32 -55, i32 31, i32 2), !dbg !13

@@ -18,7 +18,7 @@ entry:
 }
 
 ; wait clause adds 1 << 4 -> 16 to flags
-; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 0, i8** %1, i8** %2, i64 16, i64 0), !dbg !9
+; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 0, i8** %1, i8** %2, i64 16, i64 %3)
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

@@ -60,14 +60,14 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !9
   ret void, !dbg !10
 ; CHECK-LABEL: @signed_loop_slt(
-; CHECK: %15 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %16 = sub i32 %2, %1
-; CHECK-NEXT: %17 = sub i32 %16, 1
-; CHECK-NEXT: %18 = sdiv i32 %17, %3
-; CHECK-NEXT: %19 = add i32 %18, 1
-; CHECK-NEXT: %20 = sext i32 %19 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %20, i64 0, i64 0)
-; CHECK: %22 = icmp slt i32 %21, %2
+; CHECK: %16 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %17 = sub i32 %2, %1
+; CHECK-NEXT: %18 = sub i32 %17, 1
+; CHECK-NEXT: %19 = sdiv i32 %18, %3
+; CHECK-NEXT: %20 = add i32 %19, 1
+; CHECK-NEXT: %21 = sext i32 %20 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %16, i64 0, i64 %21, i64 0, i64 0)
+; CHECK: %23 = icmp slt i32 %22, %2
 }
 
 ; Function Attrs: nounwind
@@ -95,13 +95,13 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !12
   ret void, !dbg !13
 ; CHECK-LABEL: @signed_loop_sle(
-; CHECK: %15 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %16 = sub i32 %2, %1
-; CHECK-NEXT: %17 = sdiv i32 %16, %3
-; CHECK-NEXT: %18 = add i32 %17, 1
-; CHECK-NEXT: %19 = sext i32 %18 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %19, i64 0, i64 0)
-; CHECK: %21 = icmp sle i32 %20, %2
+; CHECK: %16 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %17 = sub i32 %2, %1
+; CHECK-NEXT: %18 = sdiv i32 %17, %3
+; CHECK-NEXT: %19 = add i32 %18, 1
+; CHECK-NEXT: %20 = sext i32 %19 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %16, i64 0, i64 %20, i64 0, i64 0)
+; CHECK: %22 = icmp sle i32 %21, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -123,14 +123,14 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !15
   ret void, !dbg !16
 ; CHECK-LABEL: @signed_loop_sgt(
-; CHECK: %13 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %14 = sub i32 %2, %1
-; CHECK-NEXT: %15 = add i32 %14, 1
-; CHECK-NEXT: %16 = sdiv i32 %15, %3
-; CHECK-NEXT: %17 = add i32 %16, 1
-; CHECK-NEXT: %18 = sext i32 %17 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %18, i64 0, i64 0)
-; CHECK: %20 = icmp sgt i32 %19, %2
+; CHECK: %14 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %15 = sub i32 %2, %1
+; CHECK-NEXT: %16 = add i32 %15, 1
+; CHECK-NEXT: %17 = sdiv i32 %16, %3
+; CHECK-NEXT: %18 = add i32 %17, 1
+; CHECK-NEXT: %19 = sext i32 %18 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %14, i64 0, i64 %19, i64 0, i64 0)
+; CHECK: %21 = icmp sgt i32 %20, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -152,13 +152,13 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !18
   ret void, !dbg !19
 ; CHECK-LABEL: @signed_loop_sge(
-; CHECK: %13 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %14 = sub i32 %2, %1
-; CHECK-NEXT: %15 = sdiv i32 %14, %3
-; CHECK-NEXT: %16 = add i32 %15, 1
-; CHECK-NEXT: %17 = sext i32 %16 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %17, i64 0, i64 0)
-; CHECK: %19 = icmp sge i32 %18, %2
+; CHECK: %14 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %15 = sub i32 %2, %1
+; CHECK-NEXT: %16 = sdiv i32 %15, %3
+; CHECK-NEXT: %17 = add i32 %16, 1
+; CHECK-NEXT: %18 = sext i32 %17 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %14, i64 0, i64 %18, i64 0, i64 0)
+; CHECK: %20 = icmp sge i32 %19, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -180,14 +180,14 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !21
   ret void, !dbg !22
 ; CHECK-LABEL: @unsigned_loop_slt(
-; CHECK: %15 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %16 = sub i32 %2, %1
-; CHECK-NEXT: %17 = sub i32 %16, 1
-; CHECK-NEXT: %18 = udiv i32 %17, %3
-; CHECK-NEXT: %19 = add i32 %18, 1
-; CHECK-NEXT: %20 = zext i32 %19 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %20, i64 0, i64 0)
-; CHECK: %22 = icmp ult i32 %21, %2
+; CHECK: %16 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %17 = sub i32 %2, %1
+; CHECK-NEXT: %18 = sub i32 %17, 1
+; CHECK-NEXT: %19 = udiv i32 %18, %3
+; CHECK-NEXT: %20 = add i32 %19, 1
+; CHECK-NEXT: %21 = zext i32 %20 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %16, i64 0, i64 %21, i64 0, i64 0)
+; CHECK: %23 = icmp ult i32 %22, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -209,13 +209,13 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !24
   ret void, !dbg !25
 ; CHECK-LABEL: @unsigned_loop_sle(
-; CHECK: %15 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %16 = sub i32 %2, %1
-; CHECK-NEXT: %17 = udiv i32 %16, %3
-; CHECK-NEXT: %18 = add i32 %17, 1
-; CHECK-NEXT: %19 = zext i32 %18 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %15, i64 0, i64 %19, i64 0, i64 0)
-; CHECK: %21 = icmp ule i32 %20, %2
+; CHECK: %16 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %17 = sub i32 %2, %1
+; CHECK-NEXT: %18 = udiv i32 %17, %3
+; CHECK-NEXT: %19 = add i32 %18, 1
+; CHECK-NEXT: %20 = zext i32 %19 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %16, i64 0, i64 %20, i64 0, i64 0)
+; CHECK: %22 = icmp ule i32 %21, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -237,14 +237,14 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !27
   ret void, !dbg !28
 ; CHECK-LABEL: @unsigned_loop_sgt(
-; CHECK: %13 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %14 = sub i32 %2, %1
-; CHECK-NEXT: %15 = add i32 %14, 1
-; CHECK-NEXT: %16 = udiv i32 %15, %3
-; CHECK-NEXT: %17 = add i32 %16, 1
-; CHECK-NEXT: %18 = zext i32 %17 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %18, i64 0, i64 0)
-; CHECK: %20 = icmp ugt i32 %19, %2
+; CHECK: %14 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %15 = sub i32 %2, %1
+; CHECK-NEXT: %16 = add i32 %15, 1
+; CHECK-NEXT: %17 = udiv i32 %16, %3
+; CHECK-NEXT: %18 = add i32 %17, 1
+; CHECK-NEXT: %19 = zext i32 %18 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %14, i64 0, i64 %19, i64 0, i64 0)
+; CHECK:  %21 = icmp ugt i32 %20, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -266,13 +266,13 @@ entry:
   call void @llvm.directive.region.exit(token %4), !dbg !30
   ret void, !dbg !31
 ; CHECK-LABEL: @unsigned_loop_sge(
-; CHECK: %13 = load i8*, i8** %6, align 8
-; CHECK-NEXT: %14 = sub i32 %2, %1
-; CHECK-NEXT: %15 = udiv i32 %14, %3
-; CHECK-NEXT: %16 = add i32 %15, 1
-; CHECK-NEXT: %17 = zext i32 %16 to i64
-; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %13, i64 0, i64 %17, i64 0, i64 0)
-; CHECK: %19 = icmp uge i32 %18, %2
+; CHECK: %14 = load i8*, i8** %6, align 8
+; CHECK-NEXT: %15 = sub i32 %2, %1
+; CHECK-NEXT: %16 = udiv i32 %15, %3
+; CHECK-NEXT: %17 = add i32 %16, 1
+; CHECK-NEXT: %18 = zext i32 %17 to i64
+; CHECK-NEXT: call void @nanos6_register_loop_bounds(i8* %14, i64 0, i64 %18, i64 0, i64 0)
+; CHECK: %20 = icmp uge i32 %19, %2
 }
 
 ; Function Attrs: noinline nounwind optnone
@@ -284,8 +284,8 @@ entry:
   call void @llvm.directive.region.exit(token %0), !dbg !33
   ret void, !dbg !34
 ; CHECK-LABEL: @constants_loop(
-; CHECK: call void @nanos6_register_loop_bounds(i8* %5, i64 0, i64 10, i64 0, i64 0)
-; CHECK: %7 = icmp slt i32 %6, 10
+; CHECK: call void @nanos6_register_loop_bounds(i8* %6, i64 0, i64 10, i64 0, i64 0)
+; CHECK: %8 = icmp slt i32 %7, 10
 }
 
 attributes #0 = { noinline nounwind optnone "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "frame-pointer"="none" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "stack-protector-buffer-size"="8" "target-features"="+cx8,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }

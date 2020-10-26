@@ -37,10 +37,10 @@ entry:
   ret void, !dbg !20
 }
 
-; CHECK: call void @nanos6_register_loop_bounds(i8* %5, i64 0, i64 10, i64 0, i64 777)
-; CHECK: call void @nanos6_register_loop_bounds(i8* %11, i64 0, i64 10, i64 0, i64 777)
-; CHECK: call void @nanos6_register_loop_bounds(i8* %17, i64 0, i64 10, i64 777, i64 0)
-; CHECK: call void @nanos6_register_loop_bounds(i8* %23, i64 0, i64 10, i64 777, i64 0)
+; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 0, i64 777)
+; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 0, i64 777)
+; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 777, i64 0)
+; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 777, i64 0)
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

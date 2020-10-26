@@ -11,7 +11,7 @@ entry:
 }
 
 ; task_flags | (!If << 1)
-; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 0, i8** %1, i8** %2, i64 2, i64 0)
+; CHECK: call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo0, %nanos6_task_invocation_info_t* @task_invocation_info_foo0, i64 0, i8** %1, i8** %2, i64 2, i64 %3)
 
 declare token @llvm.directive.region.entry()
 declare void @llvm.directive.region.exit(token)
