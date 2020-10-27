@@ -752,15 +752,6 @@ struct OmpSs : public ModulePass {
     Instruction *AfterRegisterDepCall = RegisterDepCall->getNextNode();
     AfterRegisterDepCall->getParent()->splitBasicBlock(AfterRegisterDepCall);
 
-    // TODO: refactor this
-    DirectiveLoopInfo LoopInfo;
-    LoopInfo.LoopType = DirectiveLoopInfo::LE;
-    // NOTE: we can do this because clang converts to the same type of the iterator (int)
-    LoopInfo.IndVarSigned = 1;
-    LoopInfo.LBoundSigned = 1;
-    LoopInfo.UBoundSigned = 1;
-    LoopInfo.StepSigned = 1;
-
     Function *ComputeMultiDepFun = MultiDepInfo->ComputeMultiDepFun;
     auto Args = MultiDepInfo->Args;
 
