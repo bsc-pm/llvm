@@ -67,6 +67,7 @@
 #include <iterator>
 #include <map>
 #include <set>
+#include <stdint.h>
 #include <utility>
 #include <vector>
 
@@ -942,6 +943,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::SanitizeHWAddress:
       case Attribute::SanitizeMemTag:
       case Attribute::SpeculativeLoadHardening:
+      case Attribute::NoStackProtect:
       case Attribute::StackProtect:
       case Attribute::StackProtectReq:
       case Attribute::StackProtectStrong:
@@ -1379,7 +1381,7 @@ void CodeExtractor::calculateNewCallTerminatorWeights(
 
   // Update the branch weights for the exit block.
   Instruction *TI = CodeReplacer->getTerminator();
-  SmallVector<unsigned, 8> BranchWeights(TI->getNumSuccessors(), 0);
+  SmallVector<uint64_t, 8> BranchWeights(TI->getNumSuccessors(), 0);
 
   // Block Frequency distribution with dummy node.
   Distribution BranchDist;

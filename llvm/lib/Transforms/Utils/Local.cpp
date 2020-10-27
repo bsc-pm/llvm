@@ -207,7 +207,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
         // left, unless the metadata doesn't match the switch.
         if (NCases > 1 && MD && MD->getNumOperands() == 2 + NCases) {
           // Collect branch weights into a vector.
-          SmallVector<uint32_t, 8> Weights;
+          SmallVector<uint64_t, 8> Weights;
           for (unsigned MD_i = 1, MD_e = MD->getNumOperands(); MD_i < MD_e;
                ++MD_i) {
             auto *CI = mdconst::extract<ConstantInt>(MD->getOperand(MD_i));
@@ -2091,11 +2091,8 @@ CallInst *llvm::createCallMatchingInvoke(InvokeInst *II) {
   // If the invoke had profile metadata, try converting them for CallInst.
   uint64_t TotalWeight;
   if (NewCall->extractProfTotalWeight(TotalWeight)) {
-    // Set the total weight if it fits into i32, otherwise reset.
     MDBuilder MDB(NewCall->getContext());
-    auto NewWeights = uint32_t(TotalWeight) != TotalWeight
-                          ? nullptr
-                          : MDB.createBranchWeights({uint32_t(TotalWeight)});
+    auto NewWeights = MDB.createBranchWeights({TotalWeight});
     NewCall->setMetadata(LLVMContext::MD_prof, NewWeights);
   }
 
@@ -2672,10 +2669,13 @@ bool llvm::callsGCLeafFunction(const CallBase *Call,
     if (F->hasFnAttribute("gc-leaf-function"))
       return true;
 
-    if (auto IID = F->getIntrinsicID())
+    if (auto IID = F->getIntrinsicID()) {
       // Most LLVM intrinsics do not take safepoints.
       return IID != Intrinsic::experimental_gc_statepoint &&
-             IID != Intrinsic::experimental_deoptimize;
+             IID != Intrinsic::experimental_deoptimize &&
+             IID != Intrinsic::memcpy_element_unordered_atomic &&
+             IID != Intrinsic::memmove_element_unordered_atomic;
+    }
   }
 
   // Lib calls can be materialized by some passes, and won't be
@@ -2941,6 +2941,20 @@ collectBitParts(Value *V, bool MatchBSwaps, bool MatchBitReversals,
         Result->Provenance[BitIdx] = Res->Provenance[BitIdx];
       for (unsigned BitIdx = NarrowBitWidth; BitIdx < BitWidth; ++BitIdx)
         Result->Provenance[BitIdx] = BitPart::Unset;
+      return Result;
+    }
+
+    // BITREVERSE - most likely due to us previous matching a partial
+    // bitreverse.
+    if (match(V, m_BitReverse(m_Value(X)))) {
+      const auto &Res =
+          collectBitParts(X, MatchBSwaps, MatchBitReversals, BPS, Depth + 1);
+      if (!Res)
+        return Result;
+
+      Result = BitPart(Res->Provider, BitWidth);
+      for (unsigned BitIdx = 0; BitIdx < BitWidth; ++BitIdx)
+        Result->Provenance[(BitWidth - 1) - BitIdx] = Res->Provenance[BitIdx];
       return Result;
     }
 

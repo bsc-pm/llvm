@@ -433,3 +433,419 @@ multiclass VMVm<string opcStr, bits<8>opc, RegisterClass RC,
   defm iv : VMVmm<opcStr, opc, RC, RCM, (ins uimm7:$sy, RC:$vz)>;
 }
 defm VMV : VMVm<"vmv", 0x9c, V64, VM>;
+
+//-----------------------------------------------------------------------------
+// Section 8.10 - Vector Fixed-Point Arithmetic Instructions
+//-----------------------------------------------------------------------------
+
+// Multiclass for generic vector calculation
+let vx = ?, hasSideEffects = 0, Uses = [VL] in
+multiclass RVbm<string opcStr, string argStr, bits<8>opc, RegisterClass RC,
+                dag dag_in, string disEnc = ""> {
+  let DisableEncoding = disEnc in
+  def "" : RV<opc, (outs RC:$vx), dag_in,
+              !strconcat(opcStr, " $vx", argStr)>;
+  let Constraints = "$vx = $base", DisableEncoding = disEnc#"$base",
+      isCodeGenOnly = 1 in
+  def _v : RV<opc, (outs RC:$vx), !con(dag_in, (ins RC:$base)),
+              !strconcat(opcStr, " $vx", argStr)>;
+}
+multiclass RVlm<string opcStr, string argStr, bits<8>opc, RegisterClass RC,
+                dag dag_in> {
+  defm "" : RVbm<opcStr, argStr, opc, RC, dag_in>;
+  let isCodeGenOnly = 1, VE_VLInUse = 1 in {
+    defm l : RVbm<opcStr, argStr, opc, RC, !con(dag_in, (ins I32:$vl)),
+                  "$vl,">;
+    defm L : RVbm<opcStr, argStr, opc, RC, !con(dag_in, (ins VLS:$vl)),
+                  "$vl,">;
+  }
+}
+multiclass RVmm<string opcStr, string argStr, bits<8>opc, RegisterClass RC,
+                RegisterClass RCM, dag dag_in> {
+  defm "" : RVlm<opcStr, argStr, opc, RC, dag_in>;
+  let m = ?, VE_VLWithMask = 1 in
+  defm m : RVlm<opcStr, argStr#", $m", opc, RC, !con(dag_in, (ins RCM:$m))>;
+}
+// Generic RV multiclass with 2 arguments.
+//   e.g. VADD, VSUB, VMPY, and etc.
+let VE_VLIndex = 3 in
+multiclass RVm<string opcStr, bits<8>opc, RegisterClass VRC, RegisterClass RC,
+               RegisterClass RCM, Operand SIMM = simm7> {
+  let cy = 0, sy = 0, vy = ?, vz = ? in
+  defm vv : RVmm<opcStr, ", $vy, $vz", opc, VRC, RCM, (ins VRC:$vy, VRC:$vz)>;
+  let cs = 1, vz = ? in
+  defm rv : RVmm<opcStr, ", $sy, $vz", opc, VRC, RCM, (ins RC:$sy, VRC:$vz)>;
+  let cs = 1, cy = 0, vz = ? in
+  defm iv : RVmm<opcStr, ", $sy, $vz", opc, VRC, RCM, (ins SIMM:$sy, VRC:$vz)>;
+}
+// Special RV multiclass with 2 arguments using cs2.
+//   e.g. VDIV, VDVS, and VDVX.
+let VE_VLIndex = 3 in
+multiclass RVDIVm<string opcStr, bits<8>opc, RegisterClass VRC,
+                  RegisterClass RC, RegisterClass RCM, Operand SIMM = simm7> {
+  let cy = 0, sy = 0, vy = ?, vz = ? in
+  defm vv : RVmm<opcStr, ", $vy, $vz", opc, VRC, RCM, (ins VRC:$vy, VRC:$vz)>;
+  let cs2 = 1, vy = ? in
+  defm vr : RVmm<opcStr, ", $vy, $sy", opc, VRC, RCM, (ins VRC:$vy, RC:$sy)>;
+  let cs2 = 1, cy = 0, vy = ? in
+  defm vi : RVmm<opcStr, ", $vy, $sy", opc, VRC, RCM, (ins VRC:$vy, SIMM:$sy)>;
+  let cs = 1, vz = ? in
+  defm rv : RVmm<opcStr, ", $sy, $vz", opc, VRC, RCM, (ins RC:$sy, VRC:$vz)>;
+  let cs = 1, cy = 0, vz = ? in
+  defm iv : RVmm<opcStr, ", $sy, $vz", opc, VRC, RCM, (ins SIMM:$sy, VRC:$vz)>;
+}
+// Generic RV multiclass with 2 arguments for logical operations.
+//   e.g. VAND, VOR, VXOR, and etc.
+let VE_VLIndex = 3 in
+multiclass RVLm<string opcStr, bits<8>opc, RegisterClass ScaRC,
+                RegisterClass RC, RegisterClass RCM> {
+  let cy = 0, sy = 0, vy = ?, vz = ? in
+  defm vv : RVmm<opcStr, ", $vy, $vz", opc, RC, RCM, (ins RC:$vy, RC:$vz)>;
+  let cs = 1, vz = ? in
+  defm rv : RVmm<opcStr, ", $sy, $vz", opc, RC, RCM, (ins ScaRC:$sy, RC:$vz)>;
+  let cs = 1, cy = 0, vz = ? in
+  defm mv : RVmm<opcStr, ", $sy, $vz", opc, RC, RCM, (ins mimm:$sy, RC:$vz)>;
+}
+// Generic RV multiclass with 1 argument.
+//   e.g. VLDZ, VPCNT, and VBRV.
+let VE_VLIndex = 2 in
+multiclass RV1m<string opcStr, bits<8>opc, RegisterClass RC,
+                RegisterClass RCM> {
+  let cy = 0, sy = 0, vz = ? in
+  defm v : RVmm<opcStr, ", $vz", opc, RC, RCM, (ins RC:$vz)>;
+}
+// Generic RV multiclass with no argument.
+//   e.g. VSEQ.
+let VE_VLIndex = 1 in
+multiclass RV0m<string opcStr, bits<8>opc, RegisterClass RC,
+                RegisterClass RCM> {
+  let cy = 0, sy = 0 in
+  defm "" : RVmm<opcStr, "", opc, RC, RCM, (ins)>;
+}
+// Generic RV multiclass with 2 arguments for shift operations.
+//   e.g. VSLL, VSRL, VSLA, and etc.
+let VE_VLIndex = 3 in
+multiclass RVSm<string opcStr, bits<8>opc, RegisterClass ScaRC,
+                RegisterClass RC, RegisterClass RCM> {
+  let cy = 0, sy = 0, vy = ?, vz = ? in
+  defm vv : RVmm<opcStr, ", $vz, $vy", opc, RC, RCM, (ins RC:$vz, RC:$vy)>;
+  let cs = 1, vz = ? in
+  defm vr : RVmm<opcStr, ", $vz, $sy", opc, RC, RCM, (ins RC:$vz, ScaRC:$sy)>;
+  let cs = 1, cy = 0, vz = ? in
+  defm vi : RVmm<opcStr, ", $vz, $sy", opc, RC, RCM, (ins RC:$vz, uimm7:$sy)>;
+}
+// Generic RV multiclass with 3 arguments for shift operations.
+//   e.g. VSLD and VSRD.
+let VE_VLIndex = 4 in
+multiclass RVSDm<string opcStr, bits<8>opc, RegisterClass RC,
+                 RegisterClass RCM> {
+  let vy = ?, vz = ? in
+  defm vvr : RVmm<opcStr, ", ($vy, ${vz}), $sy", opc, RC, RCM,
+                 (ins RC:$vy, RC:$vz, I64:$sy)>;
+  let cy = 0, vy = ?, vz = ? in
+  defm vvi : RVmm<opcStr, ", ($vy, ${vz}), $sy", opc, RC, RCM,
+                 (ins RC:$vy, RC:$vz, uimm7:$sy)>;
+}
+// Special RV multiclass with 3 arguments.
+//   e.g. VSFA
+let VE_VLIndex = 4 in
+multiclass RVSAm<string opcStr, bits<8>opc, RegisterClass RC,
+                 RegisterClass RCM> {
+  let cz = 1, sz = ?, vz = ? in
+  defm vrr : RVmm<opcStr, ", $vz, $sy, $sz", opc, RC, RCM,
+                  (ins RC:$vz, I64:$sy, I64:$sz)>;
+  let cz = 0, sz = ?, vz = ? in
+  defm vrm : RVmm<opcStr, ", $vz, $sy, $sz", opc, RC, RCM,
+                  (ins RC:$vz, I64:$sy, mimm:$sz)>;
+  let cy = 0, cz = 1, sz = ?, vz = ? in
+  defm vir : RVmm<opcStr, ", $vz, $sy, $sz", opc, RC, RCM,
+                  (ins RC:$vz, uimm3:$sy, I64:$sz)>;
+  let cy = 0, cz = 0, sz = ?, vz = ? in
+  defm vim : RVmm<opcStr, ", $vz, $sy, $sz", opc, RC, RCM,
+                  (ins RC:$vz, uimm3:$sy, mimm:$sz)>;
+}
+
+// Section 8.10.1 - VADD (Vector Add)
+let cx = 0, cx2 = 0 in
+defm VADDUL : RVm<"vaddu.l", 0xc8, V64, I64, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVADDULO : RVm<"pvaddu.lo", 0xc8, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VADDUW : RVm<"vaddu.w", 0xc8, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVADDUUP : RVm<"pvaddu.up", 0xc8, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVADDU : RVm<"pvaddu", 0xc8, V64, I64, VM512>;
+def : MnemonicAlias<"vaddu.w", "pvaddu.lo">;
+
+// Section 8.10.2 - VADS (Vector Add Single)
+let cx = 0, cx2 = 0 in
+defm VADDSWSX : RVm<"vadds.w.sx", 0xca, V64, I32, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVADDSLO : RVm<"pvadds.lo", 0xca, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VADDSWZX : RVm<"vadds.w.zx", 0xca, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVADDSUP : RVm<"pvadds.up", 0xca, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVADDS : RVm<"pvadds", 0xca, V64, I64, VM512>;
+def : MnemonicAlias<"pvadds.lo.sx", "vadds.w.sx">;
+def : MnemonicAlias<"vadds.w.zx", "pvadds.lo">;
+def : MnemonicAlias<"vadds.w", "pvadds.lo">;
+def : MnemonicAlias<"pvadds.lo.zx", "pvadds.lo">;
+
+// Section 8.10.3 - VADX (Vector Add)
+defm VADDSL : RVm<"vadds.l", 0x8b, V64, I64, VM>;
+
+// Section 8.10.4 - VSUB (Vector Subtract)
+let cx = 0, cx2 = 0 in
+defm VSUBUL : RVm<"vsubu.l", 0xd8, V64, I64, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVSUBULO : RVm<"pvsubu.lo", 0xd8, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VSUBUW : RVm<"vsubu.w", 0xd8, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVSUBUUP : RVm<"pvsubu.up", 0xd8, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVSUBU : RVm<"pvsubu", 0xd8, V64, I64, VM512>;
+def : MnemonicAlias<"vsubu.w", "pvsubu.lo">;
+
+// Section 8.10.5 - VSBS (Vector Subtract Single)
+let cx = 0, cx2 = 0 in
+defm VSUBSWSX : RVm<"vsubs.w.sx", 0xda, V64, I32, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVSUBSLO : RVm<"pvsubs.lo", 0xda, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VSUBSWZX : RVm<"vsubs.w.zx", 0xda, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVSUBSUP : RVm<"pvsubs.up", 0xda, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVSUBS : RVm<"pvsubs", 0xda, V64, I64, VM512>;
+def : MnemonicAlias<"pvsubs.lo.sx", "vsubs.w.sx">;
+def : MnemonicAlias<"vsubs.w.zx", "pvsubs.lo">;
+def : MnemonicAlias<"vsubs.w", "pvsubs.lo">;
+def : MnemonicAlias<"pvsubs.lo.zx", "pvsubs.lo">;
+
+// Section 8.10.6 - VSBX (Vector Subtract)
+defm VSUBSL : RVm<"vsubs.l", 0x9b, V64, I64, VM>;
+
+// Section 8.10.7 - VMPY (Vector Multiply)
+let cx2 = 0 in
+defm VMULUL : RVm<"vmulu.l", 0xc9, V64, I64, VM>;
+let cx2 = 1 in
+defm VMULUW : RVm<"vmulu.w", 0xc9, V64, I32, VM>;
+
+// Section 8.10.8 - VMPS (Vector Multiply Single)
+let cx2 = 0 in
+defm VMULSWSX : RVm<"vmuls.w.sx", 0xcb, V64, I32, VM>;
+let cx2 = 1 in
+defm VMULSWZX : RVm<"vmuls.w.zx", 0xcb, V64, I32, VM>;
+def : MnemonicAlias<"vmuls.w", "vmuls.w.zx">;
+
+// Section 8.10.9 - VMPX (Vector Multiply)
+defm VMULSL : RVm<"vmuls.l", 0xdb, V64, I64, VM>;
+
+// Section 8.10.10 - VMPD (Vector Multiply)
+defm VMULSLW : RVm<"vmuls.l.w", 0xd9, V64, I32, VM>;
+
+// Section 8.10.11 - VDIV (Vector Divide)
+let cx2 = 0 in
+defm VDIVUL : RVDIVm<"vdivu.l", 0xe9, V64, I64, VM>;
+let cx2 = 1 in
+defm VDIVUW : RVDIVm<"vdivu.w", 0xe9, V64, I32, VM>;
+
+// Section 8.10.12 - VDVS (Vector Divide Single)
+let cx2 = 0 in
+defm VDIVSWSX : RVDIVm<"vdivs.w.sx", 0xeb, V64, I32, VM>;
+let cx2 = 1 in
+defm VDIVSWZX : RVDIVm<"vdivs.w.zx", 0xeb, V64, I32, VM>;
+def : MnemonicAlias<"vdivs.w", "vdivs.w.zx">;
+
+// Section 8.10.13 - VDVX (Vector Divide)
+defm VDIVSL : RVDIVm<"vdivs.l", 0xfb, V64, I64, VM>;
+
+// Section 8.10.14 - VCMP (Vector Compare)
+let cx = 0, cx2 = 0 in
+defm VCMPUL : RVm<"vcmpu.l", 0xb9, V64, I64, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVCMPULO : RVm<"pvcmpu.lo", 0xb9, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VCMPUW : RVm<"vcmpu.w", 0xb9, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVCMPUUP : RVm<"pvcmpu.up", 0xb9, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVCMPU : RVm<"pvcmpu", 0xb9, V64, I64, VM512>;
+def : MnemonicAlias<"vcmpu.w", "pvcmpu.lo">;
+
+// Section 8.10.15 - VCPS (Vector Compare Single)
+let cx = 0, cx2 = 0 in
+defm VCMPSWSX : RVm<"vcmps.w.sx", 0xfa, V64, I32, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVCMPSLO : RVm<"pvcmps.lo", 0xfa, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VCMPSWZX : RVm<"vcmps.w.zx", 0xfa, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVCMPSUP : RVm<"pvcmps.up", 0xfa, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVCMPS : RVm<"pvcmps", 0xfa, V64, I64, VM512>;
+def : MnemonicAlias<"pvcmps.lo.sx", "vcmps.w.sx">;
+def : MnemonicAlias<"vcmps.w.zx", "pvcmps.lo">;
+def : MnemonicAlias<"vcmps.w", "pvcmps.lo">;
+def : MnemonicAlias<"pvcmps.lo.zx", "pvcmps.lo">;
+
+// Section 8.10.16 - VCPX (Vector Compare)
+defm VCMPSL : RVm<"vcmps.l", 0xba, V64, I64, VM>;
+
+// Section 8.10.17 - VCMS (Vector Compare and Select Maximum/Minimum Single)
+let cx = 0, cx2 = 0 in
+defm VMAXSWSX : RVm<"vmaxs.w.sx", 0x8a, V64, I32, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVMAXSLO : RVm<"pvmaxs.lo", 0x8a, V64, I32, VM>;
+  let isCodeGenOnly = 1 in
+  defm VMAXSWZX : RVm<"vmaxs.w.zx", 0x8a, V64, I32, VM>;
+}
+let cx = 1, cx2 = 0 in
+defm PVMAXSUP : RVm<"pvmaxs.up", 0x8a, V64, I64, VM>;
+let cx = 1, cx2 = 1 in
+defm PVMAXS : RVm<"pvmaxs", 0x8a, V64, I64, VM512>;
+let cs2 = 1 in {
+  let cx = 0, cx2 = 0 in
+  defm VMINSWSX : RVm<"vmins.w.sx", 0x8a, V64, I32, VM>;
+  let cx = 0, cx2 = 1 in {
+    defm PVMINSLO : RVm<"pvmins.lo", 0x8a, V64, I32, VM>;
+    let isCodeGenOnly = 1 in
+    defm VMINSWZX : RVm<"vmins.w.zx", 0x8a, V64, I32, VM>;
+  }
+  let cx = 1, cx2 = 0 in
+  defm PVMINSUP : RVm<"pvmins.up", 0x8a, V64, I64, VM>;
+  let cx = 1, cx2 = 1 in
+  defm PVMINS : RVm<"pvmins", 0x8a, V64, I64, VM512>;
+}
+def : MnemonicAlias<"pvmaxs.lo.sx", "vmaxs.w.sx">;
+def : MnemonicAlias<"vmaxs.w.zx", "pvmaxs.lo">;
+def : MnemonicAlias<"vmaxs.w", "pvmaxs.lo">;
+def : MnemonicAlias<"pvmaxs.lo.zx", "pvmaxs.lo">;
+def : MnemonicAlias<"pvmins.lo.sx", "vmins.w.sx">;
+def : MnemonicAlias<"vmins.w.zx", "pvmins.lo">;
+def : MnemonicAlias<"vmins.w", "pvmins.lo">;
+def : MnemonicAlias<"pvmins.lo.zx", "pvmins.lo">;
+
+// Section 8.10.18 - VCMX (Vector Compare and Select Maximum/Minimum)
+defm VMAXSL : RVm<"vmaxs.l", 0x9a, V64, I64, VM>;
+let cs2 = 1 in
+defm VMINSL : RVm<"vmins.l", 0x9a, V64, I64, VM>;
+
+//-----------------------------------------------------------------------------
+// Section 8.11 - Vector Logical Operation Instructions
+//-----------------------------------------------------------------------------
+
+// Section 8.11.1 - VAND (Vector And)
+let cx = 0, cx2 = 0 in defm VAND : RVLm<"vand", 0xc4, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVANDLO : RVLm<"pvand.lo", 0xc4, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVANDUP : RVLm<"pvand.up", 0xc4, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVAND : RVLm<"pvand", 0xc4, I64, V64, VM512>;
+
+// Section 8.11.2 - VOR (Vector Or)
+let cx = 0, cx2 = 0 in defm VOR : RVLm<"vor", 0xc5, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVORLO : RVLm<"pvor.lo", 0xc5, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVORUP : RVLm<"pvor.up", 0xc5, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVOR : RVLm<"pvor", 0xc5, I64, V64, VM512>;
+
+// Section 8.11.3 - VXOR (Vector Exclusive Or)
+let cx = 0, cx2 = 0 in defm VXOR : RVLm<"vxor", 0xc6, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVXORLO : RVLm<"pvxor.lo", 0xc6, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVXORUP : RVLm<"pvxor.up", 0xc6, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVXOR : RVLm<"pvxor", 0xc6, I64, V64, VM512>;
+
+// Section 8.11.4 - VEQV (Vector Equivalence)
+let cx = 0, cx2 = 0 in defm VEQV : RVLm<"veqv", 0xc7, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVEQVLO : RVLm<"pveqv.lo", 0xc7, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVEQVUP : RVLm<"pveqv.up", 0xc7, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVEQV : RVLm<"pveqv", 0xc7, I64, V64, VM512>;
+
+// Section 8.11.5 - VLDZ (Vector Leading Zero Count)
+let cx = 0, cx2 = 0 in defm VLDZ : RV1m<"vldz", 0xe7, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVLDZLO : RV1m<"pvldz.lo", 0xe7, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVLDZUP : RV1m<"pvldz.up", 0xe7, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVLDZ : RV1m<"pvldz", 0xe7, V64, VM512>;
+
+// Section 8.11.6 - VPCNT (Vector Population Count)
+let cx = 0, cx2 = 0 in defm VPCNT : RV1m<"vpcnt", 0xac, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVPCNTLO : RV1m<"pvpcnt.lo", 0xac, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVPCNTUP : RV1m<"pvpcnt.up", 0xac, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVPCNT : RV1m<"pvpcnt", 0xac, V64, VM512>;
+
+// Section 8.11.7 - VBRV (Vector Bit Reverse)
+let cx = 0, cx2 = 0 in defm VBRV : RV1m<"vbrv", 0xf7, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVBRVLO : RV1m<"pvbrv.lo", 0xf7, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVBRVUP : RV1m<"pvbrv.up", 0xf7, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVBRV : RV1m<"pvbrv", 0xf7, V64, VM512>;
+
+// Section 8.11.8 - VSEQ (Vector Sequential Number)
+let cx = 0, cx2 = 0 in defm VSEQ : RV0m<"vseq", 0x99, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVSEQLO : RV0m<"pvseq.lo", 0x99, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVSEQUP : RV0m<"pvseq.up", 0x99, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVSEQ : RV0m<"pvseq", 0x99, V64, VM512>;
+
+//-----------------------------------------------------------------------------
+// Section 8.12 - Vector Shift Operation Instructions
+//-----------------------------------------------------------------------------
+
+// Section 8.12.1 - VSLL (Vector Shift Left Logical)
+let cx = 0, cx2 = 0 in defm VSLL : RVSm<"vsll", 0xe5, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVSLLLO : RVSm<"pvsll.lo", 0xe5, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVSLLUP : RVSm<"pvsll.up", 0xe5, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVSLL : RVSm<"pvsll", 0xe5, I64, V64, VM512>;
+
+// Section 8.12.2 - VSLD (Vector Shift Left Double)
+defm VSLD : RVSDm<"vsld", 0xe4, V64, VM>;
+
+// Section 8.12.3 - VSRL (Vector Shift Right Logical)
+let cx = 0, cx2 = 0 in defm VSRL : RVSm<"vsrl", 0xf5, I64, V64, VM>;
+let cx = 0, cx2 = 1 in defm PVSRLLO : RVSm<"pvsrl.lo", 0xf5, I32, V64, VM>;
+let cx = 1, cx2 = 0 in defm PVSRLUP : RVSm<"pvsrl.up", 0xf5, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVSRL : RVSm<"pvsrl", 0xf5, I64, V64, VM512>;
+
+// Section 8.12.4 - VSRD (Vector Shift Right Double)
+defm VSRD : RVSDm<"vsrd", 0xf4, V64, VM>;
+
+// Section 8.12.5 - VSLA (Vector Shift Left Arithmetic)
+let cx = 0, cx2 = 0 in defm VSLAWSX : RVSm<"vsla.w.sx", 0xe6, I32, V64, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVSLALO : RVSm<"pvsla.lo", 0xe6, I32, V64, VM>;
+  let isCodeGenOnly = 1 in defm VSLAWZX : RVSm<"vsla.w.zx", 0xe6, I32, V64, VM>;
+}
+let cx = 1, cx2 = 0 in defm PVSLAUP : RVSm<"pvsla.up", 0xe6, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVSLA : RVSm<"pvsla", 0xe6, I64, V64, VM512>;
+def : MnemonicAlias<"pvsla.lo.sx", "vsla.w.sx">;
+def : MnemonicAlias<"vsla.w.zx", "pvsla.lo">;
+def : MnemonicAlias<"vsla.w", "pvsla.lo">;
+def : MnemonicAlias<"pvsla.lo.zx", "pvsla.lo">;
+
+// Section 8.12.6 - VSLAX (Vector Shift Left Arithmetic)
+defm VSLAL : RVSm<"vsla.l", 0xd4, I64, V64, VM>;
+
+// Section 8.12.7 - VSRA (Vector Shift Right Arithmetic)
+let cx = 0, cx2 = 0 in defm VSRAWSX : RVSm<"vsra.w.sx", 0xf6, I32, V64, VM>;
+let cx = 0, cx2 = 1 in {
+  defm PVSRALO : RVSm<"pvsra.lo", 0xf6, I32, V64, VM>;
+  let isCodeGenOnly = 1 in defm VSRAWZX : RVSm<"vsra.w.zx", 0xf6, I32, V64, VM>;
+}
+let cx = 1, cx2 = 0 in defm PVSRAUP : RVSm<"pvsra.up", 0xf6, F32, V64, VM>;
+let cx = 1, cx2 = 1 in defm PVSRA : RVSm<"pvsra", 0xf6, I64, V64, VM512>;
+def : MnemonicAlias<"pvsra.lo.sx", "vsra.w.sx">;
+def : MnemonicAlias<"vsra.w.zx", "pvsra.lo">;
+def : MnemonicAlias<"vsra.w", "pvsra.lo">;
+def : MnemonicAlias<"pvsra.lo.zx", "pvsra.lo">;
+
+// Section 8.12.8 - VSRAX (Vector Shift Right Arithmetic)
+defm VSRAL : RVSm<"vsra.l", 0xd5, I64, V64, VM>;
+
+// Section 8.12.9 - VSFA (Vector Shift Left and Add)
+defm VSFA : RVSAm<"vsfa", 0xd7, V64, VM>;

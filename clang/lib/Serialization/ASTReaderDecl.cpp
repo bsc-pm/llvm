@@ -889,7 +889,6 @@ void ASTDeclReader::VisitFunctionDecl(FunctionDecl *FD) {
 
   FD->ODRHash = Record.readInt();
   FD->setHasODRHash(true);
-  FD->setUsesFPIntrin(Record.readInt());
 
   if (FD->isDefaulted()) {
     if (unsigned NumLookups = Record.readInt()) {

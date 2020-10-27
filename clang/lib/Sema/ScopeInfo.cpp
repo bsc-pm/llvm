@@ -31,6 +31,7 @@ void FunctionScopeInfo::Clear() {
   HasOSSDeclareReductionCombiner = false;
   HasOSSExecutableDirective = false;
   HasFallthroughStmt = false;
+  UsesFPIntrin = false;
   HasPotentialAvailabilityViolations = false;
   ObjCShouldCallSuper = false;
   ObjCIsDesignatedInit = false;

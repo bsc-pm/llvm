@@ -34,20 +34,20 @@ MDNode *MDBuilder::createFPMath(float Accuracy) {
   return MDNode::get(Context, Op);
 }
 
-MDNode *MDBuilder::createBranchWeights(uint32_t TrueWeight,
-                                       uint32_t FalseWeight) {
+MDNode *MDBuilder::createBranchWeights(uint64_t TrueWeight,
+                                       uint64_t FalseWeight) {
   return createBranchWeights({TrueWeight, FalseWeight});
 }
 
-MDNode *MDBuilder::createBranchWeights(ArrayRef<uint32_t> Weights) {
+MDNode *MDBuilder::createBranchWeights(ArrayRef<uint64_t> Weights) {
   assert(Weights.size() >= 1 && "Need at least one branch weights!");
 
   SmallVector<Metadata *, 4> Vals(Weights.size() + 1);
   Vals[0] = createString("branch_weights");
 
-  Type *Int32Ty = Type::getInt32Ty(Context);
+  Type *Int64Ty = Type::getInt64Ty(Context);
   for (unsigned i = 0, e = Weights.size(); i != e; ++i)
-    Vals[i + 1] = createConstant(ConstantInt::get(Int32Ty, Weights[i]));
+    Vals[i + 1] = createConstant(ConstantInt::get(Int64Ty, Weights[i]));
 
   return MDNode::get(Context, Vals);
 }
@@ -151,24 +151,20 @@ MDNode *MDBuilder::mergeCallbackEncodings(MDNode *ExistingCallbacks,
 }
 
 MDNode *MDBuilder::createAnonymousAARoot(StringRef Name, MDNode *Extra) {
-  // To ensure uniqueness the root node is self-referential.
-  auto Dummy = MDNode::getTemporary(Context, None);
-
-  SmallVector<Metadata *, 3> Args(1, Dummy.get());
+  SmallVector<Metadata *, 3> Args(1, nullptr);
   if (Extra)
     Args.push_back(Extra);
   if (!Name.empty())
     Args.push_back(createString(Name));
-  MDNode *Root = MDNode::get(Context, Args);
+  MDNode *Root = MDNode::getDistinct(Context, Args);
 
   // At this point we have
-  //   !0 = metadata !{}            <- dummy
-  //   !1 = metadata !{metadata !0} <- root
-  // Replace the dummy operand with the root node itself and delete the dummy.
+  //   !0 = distinct !{null} <- root
+  // Replace the reserved operand with the root node itself.
   Root->replaceOperandWith(0, Root);
 
   // We now have
-  //   !1 = metadata !{metadata !1} <- self-referential root
+  //   !0 = distinct !{!0} <- root
   return Root;
 }
 
