@@ -2118,7 +2118,7 @@ struct OmpSs : public ModulePass {
       return UnpackTaskFuncVar;
     };
     auto emitOmpSsCaptureAndSubmitTask
-      = [this, &M, &DLoc, &TaskArgsTy,
+      = [this, &M, &F, &DLoc, &TaskArgsTy,
          &DirEnv, &TaskArgsToStructIdxMap,
          &TaskInfoVar, &TaskImplInfoVar,
          &TaskInvInfoVar](Function *newFunction,
