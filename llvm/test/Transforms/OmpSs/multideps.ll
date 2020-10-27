@@ -17,15 +17,16 @@ target triple = "x86_64-unknown-linux-gnu"
 @__const.main.discrete.array = private unnamed_addr constant [3 x i32] [i32 0, i32 1, i32 2], align 4
 
 ; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 !dbg !6 {
+define i32 @main() #0 !dbg !6 {
 entry:
   %i = alloca i32, align 4
   %j = alloca i32, align 4
-  %0 = load i32, i32* %i, align 4, !dbg !8
-  store i32 %0, i32* %j, align 4, !dbg !9
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [10 x i32]]* @v, %struct._depend_unpack_t.0 (i32*, i32*, [10 x [10 x i32]]*)* @compute_dep.1, i32* %i, i32* %j, [10 x [10 x i32]]* @v) ], !dbg !10
-  call void @llvm.directive.region.exit(token %1), !dbg !11
-  ret i32 0, !dbg !12
+  store i32 0, i32* %i, align 4, !dbg !9
+  %0 = load i32, i32* %i, align 4, !dbg !10
+  store i32 %0, i32* %j, align 4, !dbg !11
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [10 x i32]]* @v, %struct._depend_unpack_t.0 (i32*, i32*, [10 x [10 x i32]]*)* @compute_dep.1, i32* %i, i32* %j, [10 x [10 x i32]]* @v) ], !dbg !12
+  call void @llvm.directive.region.exit(token %1), !dbg !13
+  ret i32 0, !dbg !14
 }
 
 ; Function Attrs: nounwind
@@ -103,6 +104,7 @@ entry:
 ; CHECK-NEXT:   br label %0
 ; CHECK: 0:                                                ; preds = %entry
 ; CHECK-NEXT:   %i.remap = alloca i32, align 4
+; CHECK-NEXT:   store i32 0, i32* %i, align 4
 ; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 ; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %1, 0
 ; CHECK-NEXT:   store i32 %2, i32* %i, align 4
@@ -118,6 +120,7 @@ entry:
 ; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %7, 1
 ; CHECK-NEXT:   store i32 %8, i32* %i.remap, align 4
 ; CHECK-NEXT:   %j.remap = alloca i32, align 4
+; CHECK-NEXT:   store i32 0, i32* %j, align 4
 ; CHECK-NEXT:   %9 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 ; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t %9, 4
 ; CHECK-NEXT:   store i32 %10, i32* %j, align 4

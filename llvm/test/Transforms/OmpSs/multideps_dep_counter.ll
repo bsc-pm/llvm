@@ -39,6 +39,7 @@ define i32 @main() #0 !dbg !6 {
 ; CHECK-NEXT:    br label [[TMP6:%.*]], [[DBG12]]
 ; CHECK:       6:
 ; CHECK-NEXT:    [[I_REMAP:%.*]] = alloca i32, align 4, [[DBG12]]
+; CHECK-NEXT:    store i32 0, i32* [[I]], align 4, [[DBG12]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_0:%.*]] @compute_dep.1(i32* [[I]], i32* [[J]]), [[DBG12]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP7]], 0, [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP8]], i32* [[I]], align 4, [[DBG12]]
@@ -53,6 +54,7 @@ define i32 @main() #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP13:%.*]] = load i32, i32* [[I]], align 4, [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP13]], i32* [[I_REMAP]], align 4, [[DBG12]]
 ; CHECK-NEXT:    [[J_REMAP:%.*]] = alloca i32, align 4, [[DBG12]]
+; CHECK-NEXT:    store i32 0, i32* [[J]], align 4, [[DBG12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call [[STRUCT__DEPEND_UNPACK_T_0]] @compute_dep.1(i32* [[I]], i32* [[J]]), [[DBG12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractvalue [[STRUCT__DEPEND_UNPACK_T_0]] [[TMP14]], 4, [[DBG12]]
 ; CHECK-NEXT:    store i32 [[TMP15]], i32* [[J]], align 4, [[DBG12]]

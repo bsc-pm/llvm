@@ -96,6 +96,7 @@ entry:
 ; CHECK-NEXT:   br label %10
 ; CHECK: 10:                                               ; preds = %entry
 ; CHECK-NEXT:   %i.remap = alloca i32, align 4
+; CHECK-NEXT:   store i32 0, i32* %i, align 4
 ; CHECK-NEXT:   %11 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j.lb)
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %11, 0
 ; CHECK-NEXT:   store i32 %12, i32* %i, align 4

@@ -38,6 +38,7 @@ void foo() {
     #pragma oss task in( { v1[i], i=0¿10:}, v) // expected-error {{expected ':' or ';'}}
 
     #pragma oss task in( { v1[i], i = {0, v, 2}} ) // expected-error {{cannot initialize an array element of type 'int' with an lvalue of type 'int [10][10]'}}
+    #pragma oss task in( { v1[i], i = {} } ) // expected-error {{expected a non-empty list}}
     #pragma oss task in( { v1[i], i|0:10:0, j = 0 }, v) // expected-error {{expected '='}} expected-error {{expected ':' or ';'}}
     #pragma oss task in( { v1[i], i|}, v) // expected-error {{expected '='}}
     #pragma oss task in( { v1[i], i(1)}, v ) // expected-error {{expected '='}}

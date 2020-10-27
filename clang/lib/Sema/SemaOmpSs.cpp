@@ -891,6 +891,10 @@ Expr *Sema::ActOnOmpSsMultiDepIterator(Scope *S, StringRef Name, SourceLocation 
 }
 
 ExprResult Sema::ActOnOmpSsMultiDepIteratorInitListExpr(InitListExpr *InitList) {
+  if (InitList->getNumInits() == 0) {
+      Diag(InitList->getBeginLoc(), diag::err_oss_multidep_discrete_empty);
+      return ExprError();
+  }
   // int [] = InitList
   unsigned NumInits = InitList->getNumInits();
   ExprResult Res = ActOnIntegerConstant(SourceLocation(), NumInits);
@@ -968,6 +972,10 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
     Expr *InitExpr = MultiDepInits[i];
     Expr *DiscreteArrExpr = nullptr;
     if (InitListExpr *InitList = dyn_cast<InitListExpr>(InitExpr)) {
+      // Initialize the iterator to a valid number so it can
+      // be used to index the discrete array.
+      AddInitializerToDecl(
+          ItVD, ActOnIntegerConstant(SourceLocation(), 0).get(), /*DirectInit=*/false);
       ExprResult Res = ActOnOmpSsMultiDepIteratorInitListExpr(InitList);
       if (Res.isInvalid())
         IsError = true;

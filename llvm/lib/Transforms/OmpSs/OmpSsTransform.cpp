@@ -567,6 +567,9 @@ struct OmpSs : public ModulePass {
     Type *IndVarTy = IndVar->getType()->getPointerElementType();
 
     Value *IndVarRemap = IRB.CreateAlloca(IndVarTy, nullptr, IndVar->getName() + ".remap");
+    // Set the iterator to a valid value to avoid indexing discrete
+    // assray with random bytes
+    IRB.CreateStore(ConstantInt::get(IndVarTy, 0), IndVar);
 
     Value *LBound = LBoundGen(IRB);
     IRB.CreateStore(LBound, IndVar);
