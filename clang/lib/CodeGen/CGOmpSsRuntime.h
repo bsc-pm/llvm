@@ -255,6 +255,10 @@ public:
   // returns the innermost nested task NormalCleanupDestSlot address
   void setTaskNormalCleanupDestSlot(Address Addr);
 
+
+  llvm::AllocaInst *createTaskAwareAlloca(
+    CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize);
+
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,
                           const CallExpr *CE,

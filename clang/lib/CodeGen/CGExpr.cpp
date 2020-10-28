@@ -111,11 +111,8 @@ llvm::AllocaInst *CodeGenFunction::CreateTempAlloca(llvm::Type *Ty,
                                                     llvm::Value *ArraySize) {
   if (ArraySize)
     return Builder.CreateAlloca(Ty, ArraySize, Name);
-  if (getLangOpts().OmpSs && CGM.getOmpSsRuntime().inTaskBody())
-    return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
-                                ArraySize, Name,
-                                CGM.getOmpSsRuntime().getTaskInsertPt());
-
+  if (getLangOpts().OmpSs)
+    return CGM.getOmpSsRuntime().createTaskAwareAlloca(*this, Ty, Name, ArraySize);
   return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
                               ArraySize, Name, AllocaInsertPt);
 }

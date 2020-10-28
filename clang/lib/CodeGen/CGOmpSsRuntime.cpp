@@ -1374,6 +1374,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 
   // TODO: use different compute_dep name to distinguish from a regular
   // dependency
+  InDirectiveEmission = false;
   llvm::Function *ComputeMultiDepFun =
     createComputeDepFunction(
       CGF, MultiDepInfoGathering.getInvolvedVarList(),
@@ -1382,6 +1383,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
       MultiDepRetTypes,
       MultiDepInfoGathering.hasThis(),
       NewCGF);
+  InDirectiveEmission = true;
 
   NewCGF.EHStack.pushTerminate();
 
@@ -1519,6 +1521,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   CodeGenFunction NewCGF(CGF.CGM);
 
+  InDirectiveEmission = false;
   llvm::Function *ComputeDepFun =
     createComputeDepFunction(
       CGF, DependInfoGathering.getInvolvedVarList(),
@@ -1527,6 +1530,7 @@ void CGOmpSsRuntime::EmitDependencyList(
       DependInfoGathering.getRetTypes(),
       DependInfoGathering.hasThis(),
       NewCGF);
+  InDirectiveEmission = true;
 
   NewCGF.EHStack.pushTerminate();
 
@@ -2493,6 +2497,18 @@ void CGOmpSsRuntime::EmitDirectiveData(
     TaskInfo.emplace_back(getBundleStr(OSSB_if), CGF.EvaluateExprAsBool(Data.If));
   if (Data.Final)
     TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(Data.Final));
+}
+
+llvm::AllocaInst *CGOmpSsRuntime::createTaskAwareAlloca(
+    CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize) {
+  if (InDirectiveEmission && TaskStack.size() > 1)
+    return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
+                                ArraySize, Name, TaskStack[TaskStack.size() - 2].InsertPt);
+  if (inTaskBody())
+    return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
+                                ArraySize, Name, TaskStack[TaskStack.size() - 1].InsertPt);
+  return new llvm::AllocaInst(Ty, CGM.getDataLayout().getAllocaAddrSpace(),
+                              ArraySize, Name, CGF.AllocaInsertPt);
 }
 
 RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,

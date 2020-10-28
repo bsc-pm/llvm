@@ -338,6 +338,13 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
 
 public:
 
+  void VisitOSSMultiDepExpr(OSSMultiDepExpr *E) {
+    for (auto *E : E->getDepIterators()) {
+      auto *VD = cast<VarDecl>(cast<DeclRefExpr>(E)->getDecl());
+      InnerDecls.insert(VD);
+    }
+  }
+
   void VisitCXXThisExpr(CXXThisExpr *ThisE) {
     // Add DSA to 'this' if is the first time we see it
     if (!Stack->getThisExpr()) {
