@@ -28,15 +28,15 @@ define dso_local void @fold_if(i32 %a, i32 %b) #0 !dbg !6 {
 ; CHECK-NEXT:    [[B_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[A:%.*]], i32* [[A_ADDR]], align 4
 ; CHECK-NEXT:    store i32 [[B:%.*]], i32* [[B_ADDR]], align 4
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8:!dbg !.*]]
-; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_fold_if0*, align 8, [[DBG8]]
-; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_fold_if0** [[TMP0]] to i8**, [[DBG8]]
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_fold_if0*, align 8, [[DBG8:!dbg !.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, [[DBG8]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG8]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8]]
+; CHECK:       codeRepl:
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_fold_if0** [[TMP0]] to i8**, [[DBG8]]
 ; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG8]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG8]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_fold_if0, %nanos6_task_invocation_info_t* @task_invocation_info_fold_if0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 1, i64 [[TMP3]]), [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_fold_if0, %nanos6_task_invocation_info_t* @task_invocation_info_fold_if0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 1, i64 [[TMP3]]), [[DBG8]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_fold_if0*, %nanos6_task_args_fold_if0** [[TMP0]], align 8, [[DBG8]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_fold_if0* [[TMP4]] to i8*, [[DBG8]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG8]]
@@ -48,7 +48,7 @@ define dso_local void @fold_if(i32 %a, i32 %b) #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32* [[GEP_B_ADDR]] to i8*, [[DBG8]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = bitcast i32* [[B_ADDR]] to i8*, [[DBG8]]
 ; CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 [[TMP8]], i8* align 4 [[TMP9]], i64 4, i1 false), [[DBG8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i8*, i8** [[TMP2]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG8]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP10]]), [[DBG8]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG8]]
 ; CHECK:       final.end:

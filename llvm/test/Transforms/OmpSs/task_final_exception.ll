@@ -39,21 +39,21 @@ define dso_local i32 @main() #1 personality i8* bitcast (i32 (...)* @__gxx_perso
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[S:%.*]] = alloca [[STRUCT_S:%.*]], align 4
 ; CHECK-NEXT:    call void @_ZN1SC2Ev(%struct.S* [[S]]), [[DBG8:!dbg !.*]]
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG9:!dbg !.*]]
-; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_main0*, align 8, [[DBG9]]
-; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_main0** [[TMP0]] to i8**, [[DBG9]]
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, [[DBG9]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_main0*, align 8, [[DBG9:!dbg !.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, [[DBG9]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG9]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG9]]
+; CHECK:       codeRepl:
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_main0** [[TMP0]] to i8**, [[DBG9]]
 ; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS]], align 8, [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 0, i64 [[TMP3]]), [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 0, i64 [[TMP3]]), [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP0]], align 8, [[DBG9]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_main0* [[TMP4]] to i8*, [[DBG9]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG9]]
 ; CHECK-NEXT:    [[GEP_S:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0:%.*]], %nanos6_task_args_main0* [[TMP4]], i32 0, i32 0, [[DBG9]]
 ; CHECK-NEXT:    call void @oss_copy_ctor_ZN1SC1ERKS_(%struct.S* [[S]], %struct.S* [[GEP_S]], i64 1), [[DBG9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP2]], align 8, [[DBG9]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG9]]
 ; CHECK:       final.end:

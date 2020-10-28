@@ -101,9 +101,10 @@ entry:
 
 ; CHECK: define internal void @nanos6_unpacked_deps_main0([10 x [10 x i32]]* %v, i32* %i, i32* %j, %nanos6_loop_bounds_t* %loop_bounds, i8* %handler) {
 ; CHECK: entry:
+; CHECK-NEXT:   %i.remap = alloca i32, align 4
+; CHECK-NEXT:   %j.remap = alloca i32, align 4
 ; CHECK-NEXT:   br label %0
 ; CHECK: 0:                                                ; preds = %entry
-; CHECK-NEXT:   %i.remap = alloca i32, align 4
 ; CHECK-NEXT:   store i32 0, i32* %i, align 4
 ; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 ; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %1, 0
@@ -119,7 +120,6 @@ entry:
 ; CHECK-NEXT:   %7 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 ; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %7, 1
 ; CHECK-NEXT:   store i32 %8, i32* %i.remap, align 4
-; CHECK-NEXT:   %j.remap = alloca i32, align 4
 ; CHECK-NEXT:   store i32 0, i32* %j, align 4
 ; CHECK-NEXT:   %9 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 ; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t %9, 4

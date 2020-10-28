@@ -38,15 +38,15 @@ define dso_local void @taskloop(i32 %lb, i32 %ub, i32 %step) #0 !dbg !6 {
 ; CHECK-NEXT:    [[STEP_VALUE:%.*]] = load i32, i32* [[STEP_ADDR]], align 4
 ; CHECK-NEXT:    [[I_ADDR:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[NEW_UB_ADDR:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8:!dbg !.*]]
-; CHECK:       codeRepl:
-; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_taskloop0*, align 8, [[DBG8]]
-; CHECK-NEXT:    [[TMP1:%.*]] = bitcast %nanos6_task_args_taskloop0** [[TMP0]] to i8**, [[DBG8]]
-; CHECK-NEXT:    [[TMP2:%.*]] = alloca i8*, align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca %nanos6_task_args_taskloop0*, align 8, [[DBG8:!dbg !.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = alloca i8*, align 8, [[DBG8]]
 ; CHECK-NEXT:    [[NUM_DEPS:%.*]] = alloca i64, align 8, [[DBG8]]
+; CHECK-NEXT:    br label [[FINAL_COND:%.*]], [[DBG8]]
+; CHECK:       codeRepl:
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_taskloop0** [[TMP0]] to i8**, [[DBG8]]
 ; CHECK-NEXT:    store i64 -1, i64* [[NUM_DEPS]], align 8, [[DBG8]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG8]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i64 16, i8** [[TMP1]], i8** [[TMP2]], i64 4, i64 [[TMP3]]), [[DBG8]]
+; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_taskloop0, %nanos6_task_invocation_info_t* @task_invocation_info_taskloop0, i64 16, i8** [[TMP2]], i8** [[TMP1]], i64 4, i64 [[TMP3]]), [[DBG8]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_taskloop0*, %nanos6_task_args_taskloop0** [[TMP0]], align 8, [[DBG8]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_taskloop0* [[TMP4]] to i8*, [[DBG8]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 16, [[DBG8]]
@@ -56,7 +56,7 @@ define dso_local void @taskloop(i32 %lb, i32 %ub, i32 %step) #0 !dbg !6 {
 ; CHECK-NEXT:    store i32 [[UB_VALUE]], i32* [[CAPT_GEP_UB_VALUE]], align 4, [[DBG8]]
 ; CHECK-NEXT:    [[CAPT_GEP_STEP_VALUE:%.*]] = getelementptr [[NANOS6_TASK_ARGS_TASKLOOP0]], %nanos6_task_args_taskloop0* [[TMP4]], i32 0, i32 3, [[DBG8]]
 ; CHECK-NEXT:    store i32 [[STEP_VALUE]], i32* [[CAPT_GEP_STEP_VALUE]], align 4, [[DBG8]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP2]], align 8, [[DBG8]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG8]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[UB_VALUE]], [[LB_VALUE]], [[DBG8]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1, [[DBG8]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = sdiv i32 [[TMP8]], [[STEP_VALUE]], [[DBG8]]

@@ -415,6 +415,12 @@ struct OmpSs : public ModulePass {
   // For each directive have all inner directives in final context.
   using FinalBodyInfoMap = DenseMap<DirectiveInfo *, SmallVector<FinalBodyInfo, 4>>;
 
+  // This is a hack to move some instructions to its corresponding functions
+  // at the end of the pass.
+  // For example, this is used to move allocas to its corresponding
+  // function entry.
+  SmallVector<Instruction *, 4> PostMoveInstructions;
+
   // Signed extension of V to type Ty
   static Value *createZSExtOrTrunc(IRBuilder<> &IRB, Value *V, Type *Ty, bool Signed) {
     if (Signed)
@@ -566,7 +572,8 @@ struct OmpSs : public ModulePass {
     IRBuilder<> IRB(Entry);
     Type *IndVarTy = IndVar->getType()->getPointerElementType();
 
-    Value *IndVarRemap = IRB.CreateAlloca(IndVarTy, nullptr, IndVar->getName() + ".remap");
+    Value *IndVarRemap =
+      IRBuilder<>(&F.getEntryBlock().back()).CreateAlloca(IndVarTy, nullptr, IndVar->getName() + ".remap");
     // Set the iterator to a valid value to avoid indexing discrete
     // assray with random bytes
     IRB.CreateStore(ConstantInt::get(IndVarTy, 0), IndVar);
@@ -2164,9 +2171,11 @@ struct OmpSs : public ModulePass {
       IRB.SetInsertPoint(codeReplacer->getTerminator());
 
       AllocaInst *TaskArgsVar = IRB.CreateAlloca(TaskArgsTy->getPointerTo());
+      PostMoveInstructions.push_back(TaskArgsVar);
       Value *TaskArgsVarCast = IRB.CreateBitCast(TaskArgsVar, IRB.getInt8PtrTy()->getPointerTo());
       Value *TaskFlagsVar = computeTaskFlags(IRB, DirEnv);
-      Value *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
+      AllocaInst *TaskPtrVar = IRB.CreateAlloca(IRB.getInt8PtrTy());
+      PostMoveInstructions.push_back(TaskPtrVar);
 
       Value *TaskArgsStructSizeOf = ConstantInt::get(IRB.getInt64Ty(), M.getDataLayout().getTypeAllocSize(TaskArgsTy));
 
@@ -2185,6 +2194,8 @@ struct OmpSs : public ModulePass {
       Value *TaskArgsSizeOf = IRB.CreateNUWAdd(TaskArgsStructSizeOf, TaskArgsVLAsExtraSizeOf);
 
       Instruction *NumDependencies = IRB.CreateAlloca(IRB.getInt64Ty(), nullptr, "num.deps");
+      PostMoveInstructions.push_back(NumDependencies);
+
       if (DirEnv.isOmpSsTaskLoopDirective()) {
         // If taskloop NumDeps = -1
         IRB.CreateStore(IRB.getInt64(-1), NumDependencies);
@@ -2525,6 +2536,22 @@ struct OmpSs : public ModulePass {
     appendToGlobalCtors(M, cast<Function>(TaskInfoRegisterCtorFuncCallee.getCallee()), 65535);
   }
 
+  void relocateInstrs() {
+    for (auto *I : PostMoveInstructions) {
+      Function *TmpF = nullptr;
+      for (User *U : I->users()) {
+        if (Instruction *I2 = dyn_cast<Instruction>(U)) {
+          Function *DstF = cast<Function>(I2->getParent()->getParent());
+          assert((!TmpF || TmpF == DstF) &&
+            "Instruction I has uses in differents functions");
+          TmpF = DstF;
+          Instruction *TI = DstF->getEntryBlock().getTerminator();
+          I->moveBefore(TI);
+        }
+      }
+    }
+  }
+
   bool runOnModule(Module &M) override {
     if (skipModule(M))
       return false;
@@ -2639,6 +2666,7 @@ struct OmpSs : public ModulePass {
       }
 
     }
+    relocateInstrs();
     return true;
   }
 
