@@ -5,4 +5,4 @@
 
 int main() {}
 
-// CHECK: OSSAssertDecl 0x{{.*}} <assert.c:{{.*}}:{{.*}}> col:{{.*}}
+// CHECK: OSSAssertDecl 0x{{.*}} <{{.*}}:{{.*}}:{{.*}}> col:{{.*}}
