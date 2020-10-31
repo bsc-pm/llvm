@@ -15534,6 +15534,13 @@ AArch64TargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *AI) const {
   if (AI->isFloatingPointOperation())
     return AtomicExpansionKind::CmpXChg;
 
+  // At -O0, fast-regalloc may introduce extraneous spills inside the ll/sc
+  // loop which may not guarantee the progress (due to the memory access), or
+  // in some situations clear the monitor. Use cmpxchg, which are expanded
+  // post-RA.
+  if (getTargetMachine().getOptLevel() == CodeGenOpt::None)
+    return AtomicExpansionKind::CmpXChg;
+
   unsigned Size = AI->getType()->getPrimitiveSizeInBits();
   if (Size > 128) return AtomicExpansionKind::None;
   // Nand not supported in LSE.

@@ -3,16 +3,18 @@
 
 define void @atomic_swap_f16(half* %ptr, half %val) nounwind {
 ; CHECK-LABEL: @atomic_swap_f16(
+; CHECK-NEXT:    [[TMP1:%.*]] = load half, half* [[PTR:%.*]], align 2
 ; CHECK-NEXT:    br label [[ATOMICRMW_START:%.*]]
 ; CHECK:       atomicrmw.start:
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.aarch64.ldaxr.p0f16(half* [[PTR:%.*]])
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i16
-; CHECK-NEXT:    [[TMP3:%.*]] = bitcast i16 [[TMP2]] to half
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast half [[VAL:%.*]] to i16
-; CHECK-NEXT:    [[TMP5:%.*]] = zext i16 [[TMP4]] to i64
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.aarch64.stxr.p0f16(i64 [[TMP5]], half* [[PTR]])
-; CHECK-NEXT:    [[TRYAGAIN:%.*]] = icmp ne i32 [[TMP6]], 0
-; CHECK-NEXT:    br i1 [[TRYAGAIN]], label [[ATOMICRMW_START]], label [[ATOMICRMW_END:%.*]]
+; CHECK-NEXT:    [[LOADED:%.*]] = phi half [ [[TMP1]], [[TMP0:%.*]] ], [ [[TMP6:%.*]], [[ATOMICRMW_START]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast half* [[PTR]] to i16*
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast half [[VAL:%.*]] to i16
+; CHECK-NEXT:    [[TMP4:%.*]] = bitcast half [[LOADED]] to i16
+; CHECK-NEXT:    [[TMP5:%.*]] = cmpxchg i16* [[TMP2]], i16 [[TMP4]], i16 [[TMP3]] acquire acquire
+; CHECK-NEXT:    [[SUCCESS:%.*]] = extractvalue { i16, i1 } [[TMP5]], 1
+; CHECK-NEXT:    [[NEWLOADED:%.*]] = extractvalue { i16, i1 } [[TMP5]], 0
+; CHECK-NEXT:    [[TMP6]] = bitcast i16 [[NEWLOADED]] to half
+; CHECK-NEXT:    br i1 [[SUCCESS]], label [[ATOMICRMW_END:%.*]], label [[ATOMICRMW_START]]
 ; CHECK:       atomicrmw.end:
 ; CHECK-NEXT:    ret void
 ;
@@ -22,16 +24,18 @@ define void @atomic_swap_f16(half* %ptr, half %val) nounwind {
 
 define void @atomic_swap_f32(float* %ptr, float %val) nounwind {
 ; CHECK-LABEL: @atomic_swap_f32(
+; CHECK-NEXT:    [[TMP1:%.*]] = load float, float* [[PTR:%.*]], align 4
 ; CHECK-NEXT:    br label [[ATOMICRMW_START:%.*]]
 ; CHECK:       atomicrmw.start:
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.aarch64.ldaxr.p0f32(float* [[PTR:%.*]])
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
-; CHECK-NEXT:    [[TMP3:%.*]] = bitcast i32 [[TMP2]] to float
-; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float [[VAL:%.*]] to i32
-; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[TMP4]] to i64
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.aarch64.stxr.p0f32(i64 [[TMP5]], float* [[PTR]])
-; CHECK-NEXT:    [[TRYAGAIN:%.*]] = icmp ne i32 [[TMP6]], 0
-; CHECK-NEXT:    br i1 [[TRYAGAIN]], label [[ATOMICRMW_START]], label [[ATOMICRMW_END:%.*]]
+; CHECK-NEXT:    [[LOADED:%.*]] = phi float [ [[TMP1]], [[TMP0:%.*]] ], [ [[TMP6:%.*]], [[ATOMICRMW_START]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast float* [[PTR]] to i32*
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast float [[VAL:%.*]] to i32
+; CHECK-NEXT:    [[TMP4:%.*]] = bitcast float [[LOADED]] to i32
+; CHECK-NEXT:    [[TMP5:%.*]] = cmpxchg i32* [[TMP2]], i32 [[TMP4]], i32 [[TMP3]] acquire acquire
+; CHECK-NEXT:    [[SUCCESS:%.*]] = extractvalue { i32, i1 } [[TMP5]], 1
+; CHECK-NEXT:    [[NEWLOADED:%.*]] = extractvalue { i32, i1 } [[TMP5]], 0
+; CHECK-NEXT:    [[TMP6]] = bitcast i32 [[NEWLOADED]] to float
+; CHECK-NEXT:    br i1 [[SUCCESS]], label [[ATOMICRMW_END:%.*]], label [[ATOMICRMW_START]]
 ; CHECK:       atomicrmw.end:
 ; CHECK-NEXT:    ret void
 ;
@@ -41,14 +45,18 @@ define void @atomic_swap_f32(float* %ptr, float %val) nounwind {
 
 define void @atomic_swap_f64(double* %ptr, double %val) nounwind {
 ; CHECK-LABEL: @atomic_swap_f64(
+; CHECK-NEXT:    [[TMP1:%.*]] = load double, double* [[PTR:%.*]], align 8
 ; CHECK-NEXT:    br label [[ATOMICRMW_START:%.*]]
 ; CHECK:       atomicrmw.start:
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.aarch64.ldaxr.p0f64(double* [[PTR:%.*]])
-; CHECK-NEXT:    [[TMP2:%.*]] = bitcast i64 [[TMP1]] to double
+; CHECK-NEXT:    [[LOADED:%.*]] = phi double [ [[TMP1]], [[TMP0:%.*]] ], [ [[TMP6:%.*]], [[ATOMICRMW_START]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast double* [[PTR]] to i64*
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast double [[VAL:%.*]] to i64
-; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.aarch64.stxr.p0f64(i64 [[TMP3]], double* [[PTR]])
-; CHECK-NEXT:    [[TRYAGAIN:%.*]] = icmp ne i32 [[TMP4]], 0
-; CHECK-NEXT:    br i1 [[TRYAGAIN]], label [[ATOMICRMW_START]], label [[ATOMICRMW_END:%.*]]
+; CHECK-NEXT:    [[TMP4:%.*]] = bitcast double [[LOADED]] to i64
+; CHECK-NEXT:    [[TMP5:%.*]] = cmpxchg i64* [[TMP2]], i64 [[TMP4]], i64 [[TMP3]] acquire acquire
+; CHECK-NEXT:    [[SUCCESS:%.*]] = extractvalue { i64, i1 } [[TMP5]], 1
+; CHECK-NEXT:    [[NEWLOADED:%.*]] = extractvalue { i64, i1 } [[TMP5]], 0
+; CHECK-NEXT:    [[TMP6]] = bitcast i64 [[NEWLOADED]] to double
+; CHECK-NEXT:    br i1 [[SUCCESS]], label [[ATOMICRMW_END:%.*]], label [[ATOMICRMW_START]]
 ; CHECK:       atomicrmw.end:
 ; CHECK-NEXT:    ret void
 ;

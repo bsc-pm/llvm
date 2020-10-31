@@ -2052,11 +2052,18 @@ done:
 define i32 @test_atomicrmw_xchg(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_xchg
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.{{[^)]+}}
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_XCHG [[ADDR]](p0), [[VAL]] :: (load store monotonic 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store monotonic monotonic 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw xchg i256* %addr, i256 1 monotonic
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2069,11 +2076,19 @@ define i32 @test_atomicrmw_xchg(i256* %addr) {
 define i32 @test_atomicrmw_add(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_add
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_ADD [[ADDR]](p0), [[VAL]] :: (load store acquire 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_ADD [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store acquire acquire 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw add i256* %addr, i256 1 acquire
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2086,11 +2101,19 @@ define i32 @test_atomicrmw_add(i256* %addr) {
 define i32 @test_atomicrmw_sub(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_sub
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_SUB [[ADDR]](p0), [[VAL]] :: (load store release 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_SUB [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store release monotonic 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw sub i256* %addr, i256 1 release
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2103,11 +2126,19 @@ define i32 @test_atomicrmw_sub(i256* %addr) {
 define i32 @test_atomicrmw_and(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_and
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_AND [[ADDR]](p0), [[VAL]] :: (load store acq_rel 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_AND [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store acq_rel acquire 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw and i256* %addr, i256 1 acq_rel
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2120,11 +2151,22 @@ define i32 @test_atomicrmw_and(i256* %addr) {
 define i32 @test_atomicrmw_nand(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_nand
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_NAND [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[MASK:%[0-9]+]]:_(s256) = G_CONSTANT i256 -1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[TMP:%[0-9]+]]:_(s256) = G_AND [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_XOR [[TMP]], [[MASK]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
+
   %oldval = atomicrmw nand i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2137,11 +2179,19 @@ define i32 @test_atomicrmw_nand(i256* %addr) {
 define i32 @test_atomicrmw_or(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_or
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_OR [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_OR [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw or i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2154,11 +2204,19 @@ define i32 @test_atomicrmw_or(i256* %addr) {
 define i32 @test_atomicrmw_xor(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_xor
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_XOR [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_XOR [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw xor i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2171,11 +2229,20 @@ define i32 @test_atomicrmw_xor(i256* %addr) {
 define i32 @test_atomicrmw_min(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_min
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_MIN [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[TMP:%[0-9]+]]:_(s1) = G_ICMP intpred(sle), [[OLDVAL]](s256), [[ONE]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_SELECT [[TMP]](s1), [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw min i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2188,11 +2255,20 @@ define i32 @test_atomicrmw_min(i256* %addr) {
 define i32 @test_atomicrmw_max(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_max
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_MAX [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[TMP:%[0-9]+]]:_(s1) = G_ICMP intpred(sgt), [[OLDVAL]](s256), [[ONE]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_SELECT [[TMP]](s1), [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw max i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2205,11 +2281,20 @@ define i32 @test_atomicrmw_max(i256* %addr) {
 define i32 @test_atomicrmw_umin(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_umin
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_UMIN [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[TMP:%[0-9]+]]:_(s1) = G_ICMP intpred(ule), [[OLDVAL]](s256), [[ONE]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_SELECT [[TMP]](s1), [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw umin i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.
@@ -2222,11 +2307,20 @@ define i32 @test_atomicrmw_umin(i256* %addr) {
 define i32 @test_atomicrmw_umax(i256* %addr) {
 ; CHECK-LABEL: name: test_atomicrmw_umax
 ; CHECK:       bb.1 (%ir-block.{{[0-9]+}}):
+; CHECK-NEXT:  successors: %bb.2
 ; CHECK-NEXT:  liveins: $x0
 ; CHECK:         [[ADDR:%[0-9]+]]:_(p0) = COPY $x0
-; CHECK-NEXT:    [[VAL:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
-; CHECK-NEXT:    [[OLDVALRES:%[0-9]+]]:_(s256) = G_ATOMICRMW_UMAX [[ADDR]](p0), [[VAL]] :: (load store seq_cst 32 on %ir.addr)
-; CHECK-NEXT:    [[RES:%[0-9]+]]:_(s32) = G_TRUNC [[OLDVALRES]]
+; CHECK-NEXT:    [[ONE:%[0-9]+]]:_(s256) = G_CONSTANT i256 1
+; CHECK-NEXT:    [[CURRENTVAL:%[0-9]+]]:_(s256) = G_LOAD %0(p0) :: (load 32 from %ir.addr)
+; CHECK:       bb.2.atomicrmw.start:
+; CHECK-NEXT:    successors: %bb.3({{[^)]+}}), %bb.2({{[^)]+}})
+; CHECK:         [[OLDVAL:%[0-9]+]]:_(s256) = G_PHI [[CURRENTVAL]](s256), %bb.1, [[OLDVALRES:%[0-9]+]](s256), %bb.2
+; CHECK-NEXT:    [[TMP:%[0-9]+]]:_(s1) = G_ICMP intpred(ugt), [[OLDVAL]](s256), [[ONE]]
+; CHECK-NEXT:    [[NEWVAL:%[0-9]+]]:_(s256) = G_SELECT [[TMP]](s1), [[OLDVAL]], [[ONE]]
+; CHECK-NEXT:    [[OLDVALRES]]:_(s256), [[SUCCESS:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[ADDR]](p0), [[OLDVAL]], [[NEWVAL]] :: (load store seq_cst seq_cst 32 on %ir.addr)
+; CHECK-NEXT:    G_BRCOND [[SUCCESS]](s1), %bb.3
+; CHECK-NEXT:    G_BR %bb.2
+; CHECK:       bb.3.atomicrmw.end:
   %oldval = atomicrmw umax i256* %addr, i256 1 seq_cst
   ; FIXME: We currently can't lower 'ret i256' and it's not the purpose of this
   ;        test so work around it by truncating to i32 for now.

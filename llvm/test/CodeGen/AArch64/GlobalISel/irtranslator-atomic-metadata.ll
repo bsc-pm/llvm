@@ -4,11 +4,20 @@
 define i32 @atomicrmw_volatile(i32* %ptr) {
   ; CHECK-LABEL: name: atomicrmw_volatile
   ; CHECK: bb.1 (%ir-block.0):
+  ; CHECK:   successors: %bb.2(0x80000000)
   ; CHECK:   liveins: $x0
   ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
   ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 1
-  ; CHECK:   [[ATOMICRMW_ADD:%[0-9]+]]:_(s32) = G_ATOMICRMW_ADD [[COPY]](p0), [[C]] :: (volatile load store monotonic 4 on %ir.ptr)
-  ; CHECK:   $w0 = COPY [[ATOMICRMW_ADD]](s32)
+  ; CHECK:   [[LOAD:%[0-9]+]]:_(s32) = G_LOAD [[COPY]](p0) :: (load 4 from %ir.ptr)
+  ; CHECK: bb.2.atomicrmw.start:
+  ; CHECK:   successors: %bb.3(0x40000000), %bb.2(0x40000000)
+  ; CHECK:   [[PHI:%[0-9]+]]:_(s32) = G_PHI [[LOAD]](s32), %bb.1, %5(s32), %bb.2
+  ; CHECK:   [[ADD:%[0-9]+]]:_(s32) = G_ADD [[PHI]], [[C]]
+  ; CHECK:   [[ATOMIC_CMPXCHG_WITH_SUCCESS:%[0-9]+]]:_(s32), [[ATOMIC_CMPXCHG_WITH_SUCCESS1:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[COPY]](p0), [[PHI]], [[ADD]] :: (load store monotonic monotonic 4 on %ir.ptr)
+  ; CHECK:   G_BRCOND [[ATOMIC_CMPXCHG_WITH_SUCCESS1]](s1), %bb.3
+  ; CHECK:   G_BR %bb.2
+  ; CHECK: bb.3.atomicrmw.end:
+  ; CHECK:   $w0 = COPY [[ATOMIC_CMPXCHG_WITH_SUCCESS]](s32)
   ; CHECK:   RET_ReallyLR implicit $w0
   %oldval = atomicrmw volatile add i32* %ptr, i32 1 monotonic
   ret i32 %oldval
@@ -17,11 +26,20 @@ define i32 @atomicrmw_volatile(i32* %ptr) {
 define i32 @atomicrmw_falkor(i32* %ptr) {
   ; CHECK-LABEL: name: atomicrmw_falkor
   ; CHECK: bb.1 (%ir-block.0):
+  ; CHECK:   successors: %bb.2(0x80000000)
   ; CHECK:   liveins: $x0
   ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
   ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 1
-  ; CHECK:   [[ATOMICRMW_ADD:%[0-9]+]]:_(s32) = G_ATOMICRMW_ADD [[COPY]](p0), [[C]] :: ("aarch64-strided-access" load store monotonic 4 on %ir.ptr)
-  ; CHECK:   $w0 = COPY [[ATOMICRMW_ADD]](s32)
+  ; CHECK:   [[LOAD:%[0-9]+]]:_(s32) = G_LOAD [[COPY]](p0) :: (load 4 from %ir.ptr)
+  ; CHECK: bb.2.atomicrmw.start:
+  ; CHECK:   successors: %bb.3(0x40000000), %bb.2(0x40000000)
+  ; CHECK:   [[PHI:%[0-9]+]]:_(s32) = G_PHI [[LOAD]](s32), %bb.1, %5(s32), %bb.2
+  ; CHECK:   [[ADD:%[0-9]+]]:_(s32) = G_ADD [[PHI]], [[C]]
+  ; CHECK:   [[ATOMIC_CMPXCHG_WITH_SUCCESS:%[0-9]+]]:_(s32), [[ATOMIC_CMPXCHG_WITH_SUCCESS1:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[COPY]](p0), [[PHI]], [[ADD]] :: (load store monotonic monotonic 4 on %ir.ptr)
+  ; CHECK:   G_BRCOND [[ATOMIC_CMPXCHG_WITH_SUCCESS1]](s1), %bb.3
+  ; CHECK:   G_BR %bb.2
+  ; CHECK: bb.3.atomicrmw.end:
+  ; CHECK:   $w0 = COPY [[ATOMIC_CMPXCHG_WITH_SUCCESS]](s32)
   ; CHECK:   RET_ReallyLR implicit $w0
   %oldval = atomicrmw add i32* %ptr, i32 1 monotonic, !falkor.strided.access !0
   ret i32 %oldval
@@ -30,11 +48,20 @@ define i32 @atomicrmw_falkor(i32* %ptr) {
 define i32 @atomicrmw_volatile_falkor(i32* %ptr) {
   ; CHECK-LABEL: name: atomicrmw_volatile_falkor
   ; CHECK: bb.1 (%ir-block.0):
+  ; CHECK:   successors: %bb.2(0x80000000)
   ; CHECK:   liveins: $x0
   ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
   ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 1
-  ; CHECK:   [[ATOMICRMW_ADD:%[0-9]+]]:_(s32) = G_ATOMICRMW_ADD [[COPY]](p0), [[C]] :: (volatile "aarch64-strided-access" load store monotonic 4 on %ir.ptr)
-  ; CHECK:   $w0 = COPY [[ATOMICRMW_ADD]](s32)
+  ; CHECK:   [[LOAD:%[0-9]+]]:_(s32) = G_LOAD [[COPY]](p0) :: (load 4 from %ir.ptr)
+  ; CHECK: bb.2.atomicrmw.start:
+  ; CHECK:   successors: %bb.3(0x40000000), %bb.2(0x40000000)
+  ; CHECK:   [[PHI:%[0-9]+]]:_(s32) = G_PHI [[LOAD]](s32), %bb.1, %5(s32), %bb.2
+  ; CHECK:   [[ADD:%[0-9]+]]:_(s32) = G_ADD [[PHI]], [[C]]
+  ; CHECK:   [[ATOMIC_CMPXCHG_WITH_SUCCESS:%[0-9]+]]:_(s32), [[ATOMIC_CMPXCHG_WITH_SUCCESS1:%[0-9]+]]:_(s1) = G_ATOMIC_CMPXCHG_WITH_SUCCESS [[COPY]](p0), [[PHI]], [[ADD]] :: (load store monotonic monotonic 4 on %ir.ptr)
+  ; CHECK:   G_BRCOND [[ATOMIC_CMPXCHG_WITH_SUCCESS1]](s1), %bb.3
+  ; CHECK:   G_BR %bb.2
+  ; CHECK: bb.3.atomicrmw.end:
+  ; CHECK:   $w0 = COPY [[ATOMIC_CMPXCHG_WITH_SUCCESS]](s32)
   ; CHECK:   RET_ReallyLR implicit $w0
   %oldval = atomicrmw volatile add i32* %ptr, i32 1 monotonic, !falkor.strided.access !0
   ret i32 %oldval
