@@ -38,7 +38,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss release depend (in : vec[1]) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss release depend (in : argv[0])
   #pragma oss release depend (in : ) // expected-error {{expected expression}}
-  #pragma oss release depend (in : main)
+  #pragma oss release depend (in : main) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss release depend(in : a[0]) // expected-error{{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss release depend (in : argv[ // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}
   #pragma oss release depend (in : argv[: // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}

@@ -34,7 +34,7 @@ int main(int argc, char **argv, char *env[]) {
   #pragma oss task in(argv[1][1] = '2')
   #pragma oss task in (vec[1]) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task in (argv[0])
-  #pragma oss task in (main)
+  #pragma oss task in (main) // expected-error {{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task in (a[0]) // expected-error{{expected addressable lvalue expression, array element, array shape or array section}}
   #pragma oss task in (argv[ // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}
   #pragma oss task in (argv[: // expected-error {{expected expression}} expected-error {{expected ']'}} expected-error {{expected ')'}} expected-note {{to match this '['}} expected-note {{to match this '('}}

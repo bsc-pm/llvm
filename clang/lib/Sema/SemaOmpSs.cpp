@@ -3280,7 +3280,10 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
     //   typedef float V __attribute__((vector_size(16)));
     //   V a;
     //   #pragma oss task in(a[3])
-    if (!RefExpr->IgnoreParenImpCasts()->isLValue() ||
+    // and functions:
+    //   void foo() { #pragma oss task in(foo) {} }
+    if (RefExpr->IgnoreParenImpCasts()->getType()->isFunctionType() ||
+        !RefExpr->IgnoreParenImpCasts()->isLValue() ||
         (ASE &&
          !ASE->getBase()->getType().getNonReferenceType()->isPointerType() &&
          !ASE->getBase()->getType().getNonReferenceType()->isArrayType())) {
@@ -3288,6 +3291,50 @@ Sema::ActOnOmpSsDependClause(ArrayRef<OmpSsDependClauseKind> DepKinds, SourceLoc
           << RefExpr->getSourceRange();
       continue;
     }
+
+    class CheckCallExpr
+        : public ConstStmtVisitor<CheckCallExpr, bool> {
+    // This Visitor checks the base of the
+    // dependency is over a CallExpr, which is error.
+    // int *get();
+    // auto l = []() -> int * {...};
+    // #pragma oss task in(get()[1], l()[3])
+    public:
+      bool VisitOSSMultiDepExpr(const OSSMultiDepExpr *E) {
+        return Visit(E->getDepExpr());
+      }
+
+      bool VisitOSSArrayShapingExpr(const OSSArrayShapingExpr *E) {
+        return Visit(E->getBase());
+      }
+
+      bool VisitOSSArraySectionExpr(const OSSArraySectionExpr *E) {
+        return Visit(E->getBase());
+      }
+
+      bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E) {
+        return Visit(E->getBase());
+      }
+
+      bool VisitUnaryOperator(const UnaryOperator *E) {
+        return Visit(E->getSubExpr());
+      }
+
+      bool VisitMemberExpr(const MemberExpr *E) {
+        return Visit(E->getBase());
+      }
+
+      bool VisitCallExpr(const CallExpr *E) {
+        return true;
+      }
+    };
+    CheckCallExpr CCE;
+    if (CCE.Visit(RefExpr)) {
+      Diag(ELoc, diag::err_oss_call_expr_support)
+          << RefExpr->getSourceRange();
+      continue;
+    }
+
     bool InvalidArraySection = false;
     while (auto *OASE = dyn_cast<OSSArraySectionExpr>(SimpleExpr)) {
       if (!OASE->isColonForm() && !OSSSyntax) {

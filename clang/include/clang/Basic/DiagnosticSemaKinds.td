@@ -10888,6 +10888,8 @@ def err_oss_clause_not_arithmetic_type_arg : Error<
 def err_oss_reduction_depend_conflict : Error<
   "variable %0 conflicts between dependency and reduction clause">;
 
+def err_oss_call_expr_support : Error<
+  "call expressions are not supported">;
 def err_oss_expected_addressable_lvalue_or_array_item : Error<
   "expected addressable lvalue expression, array element, array shape or array section">;
 def err_oss_expected_dereference_or_array_item : Error<
