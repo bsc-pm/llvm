@@ -998,28 +998,22 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
 
     Expr *SizeExpr = MultiDepSizes[i];
     if (SizeExpr) {
-      ExprResult Res = PerformOmpSsImplicitIntegerConversion(SizeExpr->getExprLoc(), SizeExpr);
+      ExprResult Res = PerformImplicitConversion(SizeExpr, Context.IntTy, AA_Converting);
       if (Res.isInvalid()) {
         IsError = true;
       } else {
         SizeExpr = Res.get();
-        // Force the type of the expression to 'int'.
-        if (!Context.hasSameType(SizeExpr->getType(), Context.IntTy))
-          SizeExpr = ImpCastExprToType(SizeExpr, Context.IntTy, CK_IntegralCast).get();
       }
     }
     Sizes.push_back(SizeExpr);
 
     Expr *StepExpr = MultiDepSteps[i];
     if (StepExpr) {
-      ExprResult Res = PerformOmpSsImplicitIntegerConversion(StepExpr->getExprLoc(), StepExpr);
+      ExprResult Res = PerformImplicitConversion(StepExpr, Context.IntTy, AA_Converting);
       if (Res.isInvalid()) {
         IsError = true;
       } else {
         StepExpr = Res.get();
-        // Force the type of the expression to 'int'.
-        if (!Context.hasSameType(StepExpr->getType(), Context.IntTy))
-          StepExpr = ImpCastExprToType(StepExpr, Context.IntTy, CK_IntegralCast).get();
       }
     }
     Steps.push_back(StepExpr);

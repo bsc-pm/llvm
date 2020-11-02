@@ -49,7 +49,7 @@ int main() {
 
     #pragma oss task in( { v1[i], i = 0:10:1 }[2], v ) // expected-error {{expected ',' or ')' in 'in' clause}} expected-error {{expected expression}}
     #pragma oss task in( { v[i], i = { ,}, j = i: } ) // expected-error 2 {{expected expression}}
-    #pragma oss task in( { v[i], i = 0:v:v1 } ) // expected-error {{expression must have integral or unscoped enumeration type, not 'int [10][20]'}} expected-error {{expression must have integral or unscoped enumeration type, not 'int [10]'}}
+    #pragma oss task in( { v[i], i = 0:v:v1 } ) // expected-error {{converting 'int [10][20]' to incompatible type 'int'}} expected-error {{converting 'int [10]' to incompatible type 'int'}}
     #pragma oss task in( { v[1, 2], i=0;10 } ) // expected-warning {{expression result unused}}
     {}
 }
