@@ -7989,7 +7989,7 @@ public:
         }))
       CombinedInfo.Types.back() |= OMP_MAP_PRESENT;
     // Remove TARGET_PARAM flag from the first element
-    (*CurTypes.begin()) &= ~OMP_MAP_TARGET_PARAM;
+    CurTypes.front() &= ~OMP_MAP_TARGET_PARAM;
 
     // All other current entries will be MEMBER_OF the combined entry
     // (except for PTR_AND_OBJ entries which do not have a placeholder value
@@ -10513,7 +10513,8 @@ void CGOpenMPRuntime::emitTargetDataStandAloneCall(
     TargetDataInfo Info;
     // Fill up the arrays and create the arguments.
     emitOffloadingArrays(CGF, CombinedInfo, Info);
-    bool HasDependClauses = D.hasClausesOfKind<OMPDependClause>();
+    bool RequiresOuterTask = D.hasClausesOfKind<OMPDependClause>() ||
+                             D.hasClausesOfKind<OMPNowaitClause>();
     emitOffloadingArraysArgument(
         CGF, Info.BasePointersArray, Info.PointersArray, Info.SizesArray,
         Info.MapTypesArray, Info.MappersArray, Info, {/*ForEndTask=*/false});
@@ -10526,7 +10527,7 @@ void CGOpenMPRuntime::emitTargetDataStandAloneCall(
         Address(Info.SizesArray, CGM.getPointerAlign());
     InputInfo.MappersArray = Address(Info.MappersArray, CGM.getPointerAlign());
     MapTypesArray = Info.MapTypesArray;
-    if (HasDependClauses)
+    if (RequiresOuterTask)
       CGF.EmitOMPTargetTaskBasedDirective(D, ThenGen, InputInfo);
     else
       emitInlinedDirective(CGF, D.getDirectiveKind(), ThenGen);

@@ -224,6 +224,9 @@ TEST(DIBuilder, CreateFortranArrayTypeWithAttributes) {
   EXPECT_EQ(ArrayType->getRawAssociated(), Associated);
   EXPECT_EQ(ArrayType->getRawAllocated(), Allocated);
   EXPECT_EQ(ArrayType->getRawRank(), Rank);
+
+  // Avoid memory leak.
+  DIVariable::deleteTemporary(DataLocation);
 }
 
 } // end namespace

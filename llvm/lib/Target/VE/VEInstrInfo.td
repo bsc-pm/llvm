@@ -157,6 +157,15 @@ def uimm3 : Operand<i32>, PatLeaf<(imm), [{
   let ParserMatchClass = UImm3AsmOperand;
 }
 
+// uimm4 - Generic immediate value.
+def UImm4AsmOperand : AsmOperandClass {
+  let Name = "UImm4";
+}
+def uimm4 : Operand<i32>, PatLeaf<(imm), [{
+    return isUInt<4>(N->getZExtValue()); }], ULO7> {
+  let ParserMatchClass = UImm4AsmOperand;
+}
+
 // uimm6 - Generic immediate value.
 def UImm6AsmOperand : AsmOperandClass {
   let Name = "UImm6";
@@ -194,6 +203,12 @@ def mimm : Operand<i32>, PatLeaf<(imm), [{
     return isMImmVal(getImmVal(N)); }], MIMM> {
   let ParserMatchClass = MImmAsmOperand;
   let PrintMethod = "printMImmOperand";
+}
+
+// zerofp - Generic fp immediate zero value.
+def zerofp : Operand<i32>, PatLeaf<(fpimm), [{
+    return getFpImmVal(N) == 0; }]> {
+  let ParserMatchClass = ZeroAsmOperand;
 }
 
 // simm7fp - Generic fp immediate value.
@@ -778,10 +793,10 @@ multiclass BCbpfm<string opcStr, string cmpStr, bits<8> opc, dag cond,
   let bpf = 0 /* NONE */ in
   def "" : CF<opc, (outs), !con(cond, (ins ADDR:$addr)),
               !strconcat(opcStr, " ", cmpStr, "$addr")>;
-  let bpf = 2 /* NOT TaKEN */ in
+  let bpf = 2 /* NOT TAKEN */ in
   def _nt : CF<opc, (outs), !con(cond, (ins ADDR:$addr)),
                !strconcat(opcStr, ".nt ", cmpStr, "$addr")>;
-  let bpf = 3 /* TaKEN */ in
+  let bpf = 3 /* TAKEN */ in
   def _t : CF<opc, (outs), !con(cond, (ins ADDR:$addr)),
               !strconcat(opcStr, ".t ", cmpStr, "$addr")>;
 }
@@ -810,18 +825,25 @@ multiclass BCRbpfm<string opcStr, string cmpStr, bits<8> opc, dag cond> {
   let bpf = 0 /* NONE */ in
   def "" : CF<opc, (outs), !con(cond, (ins brtarget32:$imm32)),
               !strconcat(opcStr, " ", cmpStr, "$imm32")>;
-  let bpf = 2 /* NOT TaKEN */ in
+  let bpf = 2 /* NOT TAKEN */ in
   def _nt : CF<opc, (outs), !con(cond, (ins brtarget32:$imm32)),
                !strconcat(opcStr, ".nt ", cmpStr, "$imm32")>;
-  let bpf = 3 /* TaKEN */ in
+  let bpf = 3 /* TAKEN */ in
   def _t : CF<opc, (outs), !con(cond, (ins brtarget32:$imm32)),
               !strconcat(opcStr, ".t ", cmpStr, "$imm32")>;
 }
 multiclass BCRm<string opcStr, string opcStrAt, string opcStrAf, bits<8> opc,
-               RegisterClass RC, Operand immOp> {
+               RegisterClass RC, Operand immOp, Operand zeroOp> {
   defm rr : BCRbpfm<opcStr, "$sy, $sz, ", opc, (ins CCOp:$cf, RC:$sy, RC:$sz)>;
   let cy = 0 in
-  defm ir : BCRbpfm<opcStr, "$sy, $sz, ", opc, (ins CCOp:$cf, immOp:$sy, RC:$sz)>;
+  defm ir : BCRbpfm<opcStr, "$sy, $sz, ", opc, (ins CCOp:$cf, immOp:$sy,
+                                                    RC:$sz)>;
+  let cz = 0 in
+  defm rz : BCRbpfm<opcStr, "$sy, $sz, ", opc, (ins CCOp:$cf, RC:$sy,
+                                                    zeroOp:$sz)>;
+  let cy = 0, cz = 0 in
+  defm iz : BCRbpfm<opcStr, "$sy, $sz, ", opc, (ins CCOp:$cf, immOp:$sy,
+                                                    zeroOp:$sz)>;
   let cy = 0, sy = 0, cz = 0, sz = 0, cf = 15 /* AT */, isBarrier = 1 in
   defm a : BCRbpfm<opcStrAt, "", opc, (ins)>;
   let cy = 0, sy = 0, cz = 0, sz = 0, cf = 0 /* AF */ in
@@ -1400,13 +1422,13 @@ defm BCFS : BCm<"b${cond}.s", "b.s", "baf.s", 0x1C, F32, simm7fp>;
 
 // Section 8.8.4 - BCR (Branch on Condition Relative)
 let cx = 0, cx2 = 0 in
-defm BRCFL : BCRm<"br${cf}.l", "br.l", "braf.l", 0x18, I64, simm7>;
+defm BRCFL : BCRm<"br${cf}.l", "br.l", "braf.l", 0x18, I64, simm7, zero>;
 let cx = 1, cx2 = 0 in
-defm BRCFW : BCRm<"br${cf}.w", "br.w", "braf.w", 0x18, I32, simm7>;
+defm BRCFW : BCRm<"br${cf}.w", "br.w", "braf.w", 0x18, I32, simm7, zero>;
 let cx = 0, cx2 = 1 in
-defm BRCFD : BCRm<"br${cf}.d", "br.d", "braf.d", 0x18, I64, simm7fp>;
+defm BRCFD : BCRm<"br${cf}.d", "br.d", "braf.d", 0x18, I64, simm7fp, zerofp>;
 let cx = 1, cx2 = 1 in
-defm BRCFS : BCRm<"br${cf}.s", "br.s", "braf.s", 0x18, F32, simm7fp>;
+defm BRCFS : BCRm<"br${cf}.s", "br.s", "braf.s", 0x18, F32, simm7fp, zerofp>;
 
 // Section 8.8.5 - BSIC (Branch and Save IC)
 let isCall = 1, hasSideEffects = 0, DecoderMethod = "DecodeCall" in

@@ -6437,6 +6437,7 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
   CachedTokens *ExceptionSpecTokens = nullptr;
   ParsedAttributesWithRange FnAttrs(AttrFactory);
   TypeResult TrailingReturnType;
+  SourceLocation TrailingReturnTypeLoc;
 
   /* LocalEndLoc is the end location for the local FunctionTypeLoc.
      EndLoc is the end location for the function declarator.
@@ -6547,6 +6548,7 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
         SourceRange Range;
         TrailingReturnType =
             ParseTrailingReturnType(Range, D.mayBeFollowedByCXXDirectInit());
+        TrailingReturnTypeLoc = Range.getBegin();
         EndLoc = Range.getEnd();
       }
     } else if (standardAttributesAllowed()) {
@@ -6579,7 +6581,8 @@ void Parser::ParseFunctionDeclarator(Declarator &D,
                     DynamicExceptionRanges.data(), DynamicExceptions.size(),
                     NoexceptExpr.isUsable() ? NoexceptExpr.get() : nullptr,
                     ExceptionSpecTokens, DeclsInPrototype, StartLoc,
-                    LocalEndLoc, D, TrailingReturnType, &DS),
+                    LocalEndLoc, D, TrailingReturnType, TrailingReturnTypeLoc,
+                    &DS),
                 std::move(FnAttrs), EndLoc);
 }
 

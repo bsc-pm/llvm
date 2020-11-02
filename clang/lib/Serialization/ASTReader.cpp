@@ -7034,14 +7034,19 @@ QualType ASTReader::GetType(TypeID ID) {
     case PREDEF_TYPE_OMP_ITERATOR:
       T = Context.OMPIteratorTy;
       break;
+    case PREDEF_TYPE_OSS_ARRAY_SECTION:
+      T = Context.OSSArraySectionTy;
+      break;
 #define SVE_TYPE(Name, Id, SingletonId) \
     case PREDEF_TYPE_##Id##_ID: \
       T = Context.SingletonId; \
       break;
 #include "clang/Basic/AArch64SVEACLETypes.def"
-    case PREDEF_TYPE_OSS_ARRAY_SECTION:
-      T = Context.OSSArraySectionTy;
+#define PPC_MMA_VECTOR_TYPE(Name, Id, Size) \
+    case PREDEF_TYPE_##Id##_ID: \
+      T = Context.Id##Ty; \
       break;
+#include "clang/Basic/PPCTypes.def"
     }
 
     assert(!T.isNull() && "Unknown predefined type");

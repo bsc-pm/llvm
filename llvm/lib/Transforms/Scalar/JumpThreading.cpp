@@ -293,7 +293,7 @@ static void updatePredecessorProfileMetadata(PHINode *PN, BasicBlock *BB) {
     if (BP >= BranchProbability(50, 100))
       continue;
 
-    SmallVector<uint64_t, 2> Weights;
+    SmallVector<uint32_t, 2> Weights;
     if (PredBr->getSuccessor(0) == PredOutEdge.second) {
       Weights.push_back(BP.getNumerator());
       Weights.push_back(BP.getCompl().getNumerator());
@@ -2236,6 +2236,14 @@ void JumpThreadingPass::ThreadThroughTwoBasicBlocks(BasicBlock *PredPredBB,
   DenseMap<Instruction *, Value *> ValueMapping =
       CloneInstructions(PredBB->begin(), PredBB->end(), NewBB, PredPredBB);
 
+  // Copy the edge probabilities from PredBB to NewBB.
+  if (HasProfileData) {
+    SmallVector<BranchProbability, 4> Probs;
+    for (BasicBlock *Succ : successors(PredBB))
+      Probs.push_back(BPI->getEdgeProbability(PredBB, Succ));
+    BPI->setEdgeProbability(NewBB, Probs);
+  }
+
   // Update the terminator of PredPredBB to jump to NewBB instead of PredBB.
   // This eliminates predecessors from PredPredBB, which requires us to simplify
   // any PHI nodes in PredBB.
@@ -2533,7 +2541,7 @@ void JumpThreadingPass::UpdateBlockFreqAndEdgeWeight(BasicBlock *PredBB,
   // shouldn't make edges extremely likely or unlikely based solely on static
   // estimation.
   if (BBSuccProbs.size() >= 2 && doesBlockHaveProfileData(BB)) {
-    SmallVector<uint64_t, 4> Weights;
+    SmallVector<uint32_t, 4> Weights;
     for (auto Prob : BBSuccProbs)
       Weights.push_back(Prob.getNumerator());
 

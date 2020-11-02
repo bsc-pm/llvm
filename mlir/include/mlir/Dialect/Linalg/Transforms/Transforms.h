@@ -331,16 +331,19 @@ enum class LinalgTilingLoopType {
   AffineLoops = 1,
   ParallelLoops = 2,
 };
+
 using TileSizeComputationFunction =
     std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>;
+
 struct LinalgTilingOptions {
   /// Computation function that returns the tile sizes for each operation.
   /// Delayed construction of constant tile sizes should occur to interoperate
   /// with folding.
   TileSizeComputationFunction tileSizeComputationFunction = nullptr;
+
   LinalgTilingOptions &
-  setTileSizeComputationFunction(TileSizeComputationFunction &fun) {
-    tileSizeComputationFunction = fun;
+  setTileSizeComputationFunction(TileSizeComputationFunction fun) {
+    tileSizeComputationFunction = std::move(fun);
     return *this;
   }
   /// Set the `tileSizeComputationFunction` to return the values `ts`. The
@@ -356,13 +359,16 @@ struct LinalgTilingOptions {
   LinalgTilingOptions &setTileSizes(ArrayRef<int64_t> ts);
 
   /// The interchange vector to reorder the tiled loops.
-  SmallVector<unsigned, 4> interchangeVector{};
+  SmallVector<unsigned, 4> interchangeVector = {};
+
   LinalgTilingOptions &setInterchange(ArrayRef<unsigned> interchange) {
     interchangeVector.assign(interchange.begin(), interchange.end());
     return *this;
   }
+
   /// The type of tile loops to generate.
-  LinalgTilingLoopType loopType{LinalgTilingLoopType::Loops};
+  LinalgTilingLoopType loopType = LinalgTilingLoopType::Loops;
+
   LinalgTilingOptions &setLoopType(LinalgTilingLoopType lt) {
     loopType = lt;
     return *this;
@@ -371,9 +377,10 @@ struct LinalgTilingOptions {
   /// When specified, specifies distribution of generated tile loops to
   /// processors.
   Optional<LinalgLoopDistributionOptions> distribution = None;
+
   LinalgTilingOptions &
-  setDistributionOptions(LinalgLoopDistributionOptions &distributionOptions) {
-    distribution = distributionOptions;
+  setDistributionOptions(LinalgLoopDistributionOptions distributionOptions) {
+    distribution = std::move(distributionOptions);
     return *this;
   }
 };
@@ -745,98 +752,6 @@ public:
 
   LogicalResult matchAndRewrite(ConvOp minOp,
                                 PatternRewriter &rewriter) const override;
-};
-
-//===----------------------------------------------------------------------===//
-// Patterns to convert a LinalgOp to std.call @external library implementation.
-//===----------------------------------------------------------------------===//
-// Create a new call to the type-canonicalized `LinalgOp::getLibraryCallName()`
-// function. The implementation of the function can be either in the same module
-// or in an externally linked library.
-// This is a generic entry point for all LinalgOp, except for CopyOp and
-// IndexedGenericOp, for which omre specialized patterns are provided.
-class LinalgOpToLibraryCallRewrite : public RewritePattern {
-public:
-  LinalgOpToLibraryCallRewrite()
-      : RewritePattern(/*benefit=*/1, MatchAnyOpTypeTag()) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override;
-};
-
-/// Rewrite pattern specialization for CopyOp, kicks in when both input and
-/// output permutations are left unspecified or are the identity.
-class CopyOpToLibraryCallRewrite : public OpRewritePattern<CopyOp> {
-public:
-  using OpRewritePattern<CopyOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(CopyOp op,
-                                PatternRewriter &rewriter) const override;
-};
-
-/// Rewrite CopyOp with permutations into a sequence of TransposeOp and
-/// permutation-free CopyOp. This interplays with TransposeOpConversion and
-/// LinalgConversion<CopyOp> to create a path to the LLVM dialect.
-class CopyTransposeRewrite : public OpRewritePattern<CopyOp> {
-public:
-  using OpRewritePattern<CopyOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(CopyOp op,
-                                PatternRewriter &rewriter) const override;
-};
-
-/// Conversion pattern specialization for IndexedGenericOp, has special handling
-/// for the extra index operands.
-class IndexedGenericOpToLibraryCallRewrite
-    : public OpRewritePattern<IndexedGenericOp> {
-public:
-  using OpRewritePattern<IndexedGenericOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IndexedGenericOp op,
-                                PatternRewriter &rewriter) const override;
-};
-
-/// Populate the given list with patterns that convert from Linalg to Standard.
-void populateLinalgToStandardConversionPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *ctx);
-
-//===----------------------------------------------------------------------===//
-// Buffer allocation patterns.
-//===----------------------------------------------------------------------===//
-
-/// Generic BufferizeConversionPattern that matches any Operation* and
-/// dispatches internally. This avoids template instantiating one pattern for
-/// each LinalgOp op.
-class LinalgOpConverter : public BufferizeConversionPattern {
-public:
-  LinalgOpConverter(MLIRContext *context, BufferizeTypeConverter &converter)
-      : BufferizeConversionPattern(context, converter) {}
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final;
-};
-
-/// TensorConstantOp conversion inserts a linearized 1-D vector constant that is
-/// stored in memory. A linalg.reshape is introduced to convert to the desired
-/// n-D buffer form.
-class TensorConstantOpConverter
-    : public BufferizeOpConversionPattern<ConstantOp> {
-public:
-  using BufferizeOpConversionPattern<ConstantOp>::BufferizeOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final;
-};
-
-/// TensorCastOp converts 1-1 to MemRefCastOp.
-class TensorCastOpConverter
-    : public BufferizeOpConversionPattern<TensorCastOp> {
-public:
-  using BufferizeOpConversionPattern<
-      TensorCastOp>::BufferizeOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(TensorCastOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final;
 };
 
 //===----------------------------------------------------------------------===//

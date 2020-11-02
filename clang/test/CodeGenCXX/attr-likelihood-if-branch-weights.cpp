@@ -69,6 +69,7 @@ void WhileStmt() {
 
   // CHECK-NOT: br {{.*}} %if.end{{.*}} !prof
   if (b)
+    // CHECK: br {{.*}} !prof !7
     while (B())
       [[unlikely]] { b = false; }
 }
@@ -96,6 +97,7 @@ void ForStmt() {
 
   // CHECK-NOT: br {{.*}} %if.end{{.*}} !prof
   if (b)
+    // CHECK: br {{.*}} !prof !7
     for (; B();)
       [[unlikely]] {}
 }
@@ -142,5 +144,5 @@ void SwitchStmt() {
   }
 }
 
-// CHECK: !7 = !{!"branch_weights", i64 [[UNLIKELY]], i64 [[LIKELY]]}
-// CHECK: !8 = !{!"branch_weights", i64 [[LIKELY]], i64 [[UNLIKELY]]}
+// CHECK: !7 = !{!"branch_weights", i32 [[UNLIKELY]], i32 [[LIKELY]]}
+// CHECK: !8 = !{!"branch_weights", i32 [[LIKELY]], i32 [[UNLIKELY]]}
