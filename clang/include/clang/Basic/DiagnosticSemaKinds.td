@@ -10869,7 +10869,6 @@ def err_oss_wrong_dsa : Error<
   "%0 variable cannot be %1">;
 def err_oss_array_section_use : Error<"OmpSs-2 array section is not allowed here">;
 def err_oss_array_shaping_use : Error<"OmpSs-2 array shaping is not allowed here">;
-def err_oss_array_shaping_use_section : Error<"OmpSs-2 array section is not allowed in array shaping">;
 def err_oss_mismatch_depend_dsa : Error<
   "the data-sharing '%0' conflicts with '%1' required by the dependency">;
 def err_oss_not_defined_dsa_when_default_none : Error<

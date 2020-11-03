@@ -8,7 +8,7 @@ void foo1() {
   {}
   #pragma oss task depend(in: ([1][2][3]array)[4:5][5])
   {}
-  #pragma oss task depend(in: [1][2]array[4:5]) // expected-error {{OmpSs-2 array section is not allowed in array shaping}}
+  #pragma oss task depend(in: [1][2]array[4:5]) // expected-error {{OmpSs-2 array section is not allowed here}}
   {}
   #pragma oss task depend(in: [1][2 : 3]array) // expected-error {{expected ']'}} expected-note {{to match this '['}}
   {}

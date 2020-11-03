@@ -104,6 +104,7 @@ void bar1() {
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:31, col:34> 'int [t][20]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int (*)[20]' <ArrayToPointerDecay>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int [10][20]' lvalue Var {{[a-z0-9]+}} 'array' 'int [10][20]'
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int':'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:41, col:50> 'int [1][2][3][20]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:50> 'int (*)[20]' <ArrayToPointerDecay>
@@ -121,6 +122,7 @@ void bar1() {
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:31, col:34> 'int [t]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:34> 'int *' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:34> 'int *' lvalue Var {{[a-z0-9]+}} 'p' 'int *'
+// CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:32> 'int':'int' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{[a-z0-9]+}} <col:32> 'int':'int' lvalue ParmVar {{[a-z0-9]+}} 't' 'int':'int'
 // CHECK-NEXT: OSSArrayShapingExpr {{[a-z0-9]+}} <col:37, col:46> 'int [1][2][3]' lvalue
 // CHECK-NEXT: ImplicitCastExpr {{[a-z0-9]+}} <col:46> 'int *' <LValueToRValue>

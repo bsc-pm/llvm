@@ -5160,10 +5160,12 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
 
   if (!Base) {
     ErrorFound = true;
-  } else if (auto *OASE = dyn_cast<OSSArraySectionExpr>(Base->IgnoreParens())) {
-    Diag(OASE->getBeginLoc(), diag::err_oss_array_shaping_use_section)
-      << OASE->getSourceRange();
-    ErrorFound = true;
+  } else {
+    ExprResult Result = CheckPlaceholderExpr(Base);
+    if (Result.isInvalid()) {
+      Base = Result.get();
+      ErrorFound = true;
+    }
   }
 
   for (Expr *const &E : Shapes) {
@@ -5220,20 +5222,31 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
     ErrorFound = true;
   }
 
+  SmallVector<Expr *, 4> NewShapes;
   for (int i = Shapes.size() - 1 ; i >= 0; --i) {
-    auto Res = PerformOmpSsImplicitIntegerConversion(Shapes[i]->getExprLoc(),
-                                                     Shapes[i]);
+    Expr *NewShape = Shapes[i];
+    ExprResult Result = DefaultLvalueConversion(NewShape);
+    if (Result.isInvalid()) {
+      ErrorFound = true;
+      continue;
+    }
+    NewShape = Result.get();
+
+    auto Res = PerformOmpSsImplicitIntegerConversion(NewShape->getExprLoc(),
+                                                     NewShape);
     if (Res.isInvalid()) {
       ErrorFound = true;
       // FIXME: PerformContextualImplicitConversion doesn't always tell us if it
       // failed and produced a diagnostic.
       // From commit ef6c43dc
-      Diag(Shapes[i]->getExprLoc(), diag::err_oss_typecheck_shape_not_integer)
-                       << 0 << Shapes[i]->getSourceRange();
+      Diag(NewShape->getExprLoc(), diag::err_oss_typecheck_shape_not_integer)
+                       << 0 << NewShape->getSourceRange();
       continue;
     }
+    NewShape = Res.get();
+    NewShapes.insert(NewShapes.begin(), NewShape);
 
-    Type = BuildArrayType(Type, ArrayType::Normal, Res.get(), /*Quals=*/0,
+    Type = BuildArrayType(Type, ArrayType::Normal, NewShape, /*Quals=*/0,
                           Shapes[i]->getSourceRange(),
                           DeclarationName());
     if (Type.isNull())
@@ -5251,7 +5264,7 @@ ExprResult Sema::ActOnOSSArrayShapingExpr(Expr *Base, ArrayRef<Expr *> Shapes,
     return ExprError();
 
   return OSSArrayShapingExpr::Create(Context, Type,
-                                     VK_LValue, OK_Ordinary, Base, Shapes, LBLoc, RBLoc);
+                                     VK_LValue, OK_Ordinary, Base, NewShapes, LBLoc, RBLoc);
 }
 
 ExprResult Sema::ActOnOMPArrayShapingExpr(Expr *Base, SourceLocation LParenLoc,
