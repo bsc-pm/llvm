@@ -7,7 +7,7 @@ void constants() {
   {}
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [20 x i32]]* @v, %struct._depend_unpack_t.0 (i32*, i32*, [10 x [20 x i32]]*)* @compute_dep.2, i32* %i, i32* %j, [10 x [20 x i32]]* @v) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [20 x i32]]* @v, [40 x i8] c"{ v[i][j], i = {0, 1, 2}, j={3, 4, 5} }\00", %struct._depend_unpack_t.0 (i32*, i32*, [10 x [20 x i32]]*)* @compute_dep.2, i32* %i, i32* %j, [10 x [20 x i32]]* @v) ]
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j)
 // CHECK: entry:
@@ -51,7 +51,7 @@ void nonconstants_int(
   {}
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb1.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb2.addr), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.1 (i32*, i32*, i32*, i32*)* @compute_dep.3, i32* %i, i32* %lb1.addr, i32* %j, i32* %lb2.addr, [10 x [20 x i32]]* @v, %struct._depend_unpack_t.2 (i32*, i32*, i32*, i32*, [10 x [20 x i32]]*)* @compute_dep.4, i32* %i, i32* %j, i32* %lb1.addr, i32* %lb2.addr, [10 x [20 x i32]]* @v) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb1.addr), "QUAL.OSS.FIRSTPRIVATE"(i32* %lb2.addr), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.1 (i32*, i32*, i32*, i32*)* @compute_dep.3, i32* %i, i32* %lb1.addr, i32* %j, i32* %lb2.addr, [10 x [20 x i32]]* @v, [68 x i8] c"{ v[i][j], i = {lb1, lb1 + 1, lb1 + 2}, j={lb2, lb2 + 1, lb2 + 2} }\00", %struct._depend_unpack_t.2 (i32*, i32*, i32*, i32*, [10 x [20 x i32]]*)* @compute_dep.4, i32* %i, i32* %j, i32* %lb1.addr, i32* %lb2.addr, [10 x [20 x i32]]* @v) ]
 
 // CHECK: define internal %struct._depend_unpack_t.1 @compute_dep.3(i32* %i, i32* %lb1, i32* %j, i32* %lb2)
 // CHECK: entry:
@@ -113,7 +113,7 @@ void nonconstants_short(
   {}
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.FIRSTPRIVATE"(i16* %lb1.addr), "QUAL.OSS.FIRSTPRIVATE"(i16* %lb2.addr), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.3 (i32*, i16*, i32*, i16*)* @compute_dep.5, i32* %i, i16* %lb1.addr, i32* %j, i16* %lb2.addr, [10 x [20 x i32]]* @v, %struct._depend_unpack_t.4 (i32*, i32*, i16*, i16*, [10 x [20 x i32]]*)* @compute_dep.6, i32* %i, i32* %j, i16* %lb1.addr, i16* %lb2.addr, [10 x [20 x i32]]* @v) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.FIRSTPRIVATE"(i16* %lb1.addr), "QUAL.OSS.FIRSTPRIVATE"(i16* %lb2.addr), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.3 (i32*, i16*, i32*, i16*)* @compute_dep.5, i32* %i, i16* %lb1.addr, i32* %j, i16* %lb2.addr, [10 x [20 x i32]]* @v, [68 x i8] c"{ v[i][j], i = {lb1, lb1 + 1, lb1 + 2}, j={lb2, lb2 + 1, lb2 + 2} }\00", %struct._depend_unpack_t.4 (i32*, i32*, i16*, i16*, [10 x [20 x i32]]*)* @compute_dep.6, i32* %i, i32* %j, i16* %lb1.addr, i16* %lb2.addr, [10 x [20 x i32]]* @v) ]
 
 // CHECK: define internal %struct._depend_unpack_t.3 @compute_dep.5(i32* %i, i16* %lb1, i32* %j, i16* %lb2)
 // CHECK: entry:

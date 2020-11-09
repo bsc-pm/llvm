@@ -26,9 +26,9 @@ define i32 @main() #0 !dbg !6 {
 entry:
   %x = alloca i32, align 4
   %array = alloca [10 x [10 x i32]], align 16
-  %0 = call i1 @llvm.directive.marker() [ "DIR.OSS"([8 x i8] c"RELEASE\00"), "QUAL.OSS.DEP.IN"(i32* %x, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, %struct._depend_unpack_t.0 ([10 x [10 x i32]]*)* @compute_dep.1, [10 x [10 x i32]]* %array) ], !dbg !9
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"([10 x [10 x i32]]* %array), "QUAL.OSS.DEP.IN"(i32* %x, %struct._depend_unpack_t.1 (i32*)* @compute_dep.2, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, %struct._depend_unpack_t.2 ([10 x [10 x i32]]*)* @compute_dep.3, [10 x [10 x i32]]* %array) ], !dbg !10
-  %2 = call i1 @llvm.directive.marker() [ "DIR.OSS"([8 x i8] c"RELEASE\00"), "QUAL.OSS.DEP.IN"(i32* %x, %struct._depend_unpack_t.3 (i32*)* @compute_dep.4, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, %struct._depend_unpack_t.4 ([10 x [10 x i32]]*)* @compute_dep.5, [10 x [10 x i32]]* %array) ], !dbg !11
+  %0 = call i1 @llvm.directive.marker() [ "DIR.OSS"([8 x i8] c"RELEASE\00"), "QUAL.OSS.DEP.IN"(i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t (i32*)* @compute_dep, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, [6 x i8] c"array\00", %struct._depend_unpack_t.0 ([10 x [10 x i32]]*)* @compute_dep.1, [10 x [10 x i32]]* %array) ], !dbg !9
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %x), "QUAL.OSS.SHARED"([10 x [10 x i32]]* %array), "QUAL.OSS.DEP.IN"(i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t.1 (i32*)* @compute_dep.2, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, [6 x i8] c"array\00", %struct._depend_unpack_t.2 ([10 x [10 x i32]]*)* @compute_dep.3, [10 x [10 x i32]]* %array) ], !dbg !10
+  %2 = call i1 @llvm.directive.marker() [ "DIR.OSS"([8 x i8] c"RELEASE\00"), "QUAL.OSS.DEP.IN"(i32* %x, [2 x i8] c"x\00", %struct._depend_unpack_t.3 (i32*)* @compute_dep.4, i32* %x), "QUAL.OSS.DEP.IN"([10 x [10 x i32]]* %array, [6 x i8] c"array\00", %struct._depend_unpack_t.4 ([10 x [10 x i32]]*)* @compute_dep.5, [10 x [10 x i32]]* %array) ], !dbg !11
   call void @llvm.directive.region.exit(token %1), !dbg !12
   ret i32 0, !dbg !13
 ; CHECK-LABEL: @main(

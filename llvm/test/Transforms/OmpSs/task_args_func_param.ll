@@ -16,7 +16,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: noinline nounwind
 define void @_Z3fooiRi(i32 %x, i32* dereferenceable(4) %y) #0 !dbg !6 {
 entry:
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.COST"(i32 %x), "QUAL.OSS.PRIORITY"(i32 %x), "QUAL.OSS.CAPTURED"(i32 %x, i32 %x), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %y, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb) ], !dbg !9
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %y), "QUAL.OSS.COST"(i32 %x), "QUAL.OSS.PRIORITY"(i32 %x), "QUAL.OSS.CAPTURED"(i32 %x, i32 %x), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %y, [2 x i8] c"y\00", %struct._depend_unpack_t (i32*)* @compute_dep, i32* %y), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %y, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %y, void (i32*, i32*, i64)* @red_comb) ], !dbg !9
   call void @llvm.directive.region.exit(token %0), !dbg !10
   ret void, !dbg !11
 }

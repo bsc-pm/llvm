@@ -37,7 +37,7 @@ entry:
   %i = alloca i32, align 4
   store i32 0, i32* %retval, align 4
   store i32 0, i32* %i, align 4, !dbg !8
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.OUT"([100 x i32]* %array, %struct._depend_unpack_t ([100 x i32]*, i32*)* @compute_dep, [100 x i32]* %array, i32* %i) ], !dbg !9
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.OUT"([100 x i32]* %array, [9 x i8] c"array[i]\00", %struct._depend_unpack_t ([100 x i32]*, i32*)* @compute_dep, [100 x i32]* %array, i32* %i) ], !dbg !9
   %1 = load i32, i32* %i, align 4, !dbg !10
   %2 = load i32, i32* %i, align 4, !dbg !11
   %idxprom = sext i32 %2 to i64, !dbg !12
@@ -45,7 +45,7 @@ entry:
   store i32 %1, i32* %arrayidx, align 4, !dbg !13
   call void @llvm.directive.region.exit(token %0), !dbg !14
   store i32 0, i32* %i, align 4, !dbg !15
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.IN"([100 x i32]* %array, %struct._depend_unpack_t.0 ([100 x i32]*, i32*)* @compute_dep.1, [100 x i32]* %array, i32* %i) ], !dbg !16
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([100 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.LOOP.IND.VAR"(i32* %i), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 100), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 100, i32 1), "QUAL.OSS.DEP.IN"([100 x i32]* %array, [9 x i8] c"array[i]\00", %struct._depend_unpack_t.0 ([100 x i32]*, i32*)* @compute_dep.1, [100 x i32]* %array, i32* %i) ], !dbg !16
   %4 = load i32, i32* %i, align 4, !dbg !17
   %idxprom1 = sext i32 %4 to i64, !dbg !17
   %arrayidx2 = getelementptr inbounds [100 x i32], [100 x i32]* %array, i64 0, i64 %idxprom1, !dbg !17
@@ -140,7 +140,7 @@ entry:
 ; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %10, 1
 ; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t %10, 2
 ; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t %11, 3
-; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo1(i8* %handler, i32 0, i8* null, i8* %13, i64 %14, i64 %15, i64 %16)
+; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([9 x i8], [9 x i8]* @1, i32 0, i32 0), i8* %13, i64 %14, i64 %15, i64 %16)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -168,7 +168,7 @@ entry:
 ; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.0 %10, 1
 ; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t.0 %10, 2
 ; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.0 %11, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %13, i64 %14, i64 %15, i64 %16)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([9 x i8], [9 x i8]* @3, i32 0, i32 0), i8* %13, i64 %14, i64 %15, i64 %16)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

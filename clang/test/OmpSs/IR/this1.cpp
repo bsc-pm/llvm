@@ -24,4 +24,4 @@ int main() {
 
 // CHECK:  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg),
 // CHECK-SAME: "QUAL.OSS.FIRSTPRIVATE"(%struct.S** %call_arg2),
-// CHECK-SAME: "QUAL.OSS.DEP.IN"(i32** %call_arg, %struct._depend_unpack_t (i32**)* @compute_dep, i32** %call_arg) ]
+// CHECK-SAME: "QUAL.OSS.DEP.IN"(i32** %call_arg, [3 x i8] c"*a\00", %struct._depend_unpack_t (i32**)* @compute_dep, i32** %call_arg) ]

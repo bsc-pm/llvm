@@ -113,7 +113,7 @@ entry:
   store i32 0, i32* %i, align 4, !dbg !9
   %0 = load i32, i32* %i, align 4, !dbg !10
   store i32 %0, i32* %j, align 4, !dbg !11
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.DEP.IN"([10 x i32]* %array, %struct._depend_unpack_t ([10 x i32]*)* @compute_dep, [10 x i32]* %array), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.0 (i32*, i32*)* @compute_dep.1, i32* %i, i32* %j, [10 x i32]* %array, %struct._depend_unpack_t.1 ([10 x i32]*, i32*, i32*)* @compute_dep.2, [10 x i32]* %array, i32* %i, i32* %j) ], !dbg !12
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x i32]* %array), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.DEP.IN"([10 x i32]* %array, [9 x i8] c"array[0]\00", %struct._depend_unpack_t ([10 x i32]*)* @compute_dep, [10 x i32]* %array), "QUAL.OSS.MULTIDEP.RANGE.IN"(i32* %i, i32* %j, %struct._depend_unpack_t.0 (i32*, i32*)* @compute_dep.1, i32* %i, i32* %j, [10 x i32]* %array, [35 x i8] c"{ array[1], i = 0 : 9, j = i : 9 }\00", %struct._depend_unpack_t.1 ([10 x i32]*, i32*, i32*)* @compute_dep.2, [10 x i32]* %array, i32* %i, i32* %j) ], !dbg !12
   call void @llvm.directive.region.exit(token %1), !dbg !13
   ret i32 0, !dbg !14
 }

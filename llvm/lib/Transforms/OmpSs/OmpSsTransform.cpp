@@ -722,10 +722,13 @@ struct OmpSs : public ModulePass {
       TaskDepAPICall.push_back(DepInfo->RedKind);
       TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DRI.lookup(Base).ReductionIndex));
     }
+
+    Constant *RegionTextGV = BBBuilder.CreateGlobalStringPtr(DepInfo->RegionText);
+
     Value *Handler = &*(F->arg_end() - 1);
     TaskDepAPICall.push_back(Handler);
     TaskDepAPICall.push_back(ConstantInt::get(Type::getInt32Ty(M.getContext()), DepInfo->SymbolIndex));
-    TaskDepAPICall.push_back(ConstantPointerNull::get(Type::getInt8PtrTy(M.getContext()))); // TODO: stringify
+    TaskDepAPICall.push_back(BBBuilder.CreateBitCast(RegionTextGV, Type::getInt8PtrTy(M.getContext())));
     TaskDepAPICall.push_back(BBBuilder.CreateBitCast(Base, Type::getInt8PtrTy(M.getContext())));
     for (size_t i = 1; i < ComputeDepTy->getNumElements(); ) {
       // dimsize

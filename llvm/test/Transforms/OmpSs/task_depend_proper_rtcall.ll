@@ -36,11 +36,11 @@ target triple = "x86_64-unknown-linux-gnu"
 define dso_local i32 @main() #0 !dbg !6 {
 entry:
   %n = alloca i32, align 4
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, %struct._depend_unpack_t ([10 x [20 x i32]]*)* @compute_dep, [10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, %struct._depend_unpack_t.0 ([10 x [20 x i32]]*)* @compute_dep.1, [10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, %struct._depend_unpack_t.1 ([10 x [20 x i32]]*)* @compute_dep.2, [10 x [20 x i32]]* @array) ], !dbg !8
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, [6 x i8] c"array\00", %struct._depend_unpack_t ([10 x [20 x i32]]*)* @compute_dep, [10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, [6 x i8] c"array\00", %struct._depend_unpack_t.0 ([10 x [20 x i32]]*)* @compute_dep.1, [10 x [20 x i32]]* @array), "QUAL.OSS.DEP.IN"([10 x [20 x i32]]* @array, [6 x i8] c"array\00", %struct._depend_unpack_t.1 ([10 x [20 x i32]]*)* @compute_dep.2, [10 x [20 x i32]]* @array) ], !dbg !8
   call void @llvm.directive.region.exit(token %0), !dbg !9
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(%struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, %struct._depend_unpack_t.2 (%struct.S*)* @compute_dep.3, %struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, %struct._depend_unpack_t.3 (%struct.S*)* @compute_dep.4, %struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, %struct._depend_unpack_t.4 (%struct.S*)* @compute_dep.5, %struct.S* @s) ], !dbg !10
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(%struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, [4 x i8] c"s.x\00", %struct._depend_unpack_t.2 (%struct.S*)* @compute_dep.3, %struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, [4 x i8] c"s.x\00", %struct._depend_unpack_t.3 (%struct.S*)* @compute_dep.4, %struct.S* @s), "QUAL.OSS.DEP.IN"(%struct.S* @s, [4 x i8] c"s.x\00", %struct._depend_unpack_t.4 (%struct.S*)* @compute_dep.5, %struct.S* @s) ], !dbg !10
   call void @llvm.directive.region.exit(token %1), !dbg !11
-  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, %struct._depend_unpack_t.5 (i32*)* @compute_dep.6, i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, %struct._depend_unpack_t.6 (i32*)* @compute_dep.7, i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, %struct._depend_unpack_t.7 (i32*)* @compute_dep.8, i32* %n) ], !dbg !12
+  %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, [2 x i8] c"n\00", %struct._depend_unpack_t.5 (i32*)* @compute_dep.6, i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, [2 x i8] c"n\00", %struct._depend_unpack_t.6 (i32*)* @compute_dep.7, i32* %n), "QUAL.OSS.DEP.IN"(i32* %n, [2 x i8] c"n\00", %struct._depend_unpack_t.7 (i32*)* @compute_dep.8, i32* %n) ], !dbg !12
   call void @llvm.directive.region.exit(token %2), !dbg !13
   ret i32 0, !dbg !14
 }
@@ -221,7 +221,7 @@ entry:
 ; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %0, 4
 ; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %0, 5
 ; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t %1, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @1, i32 0, i32 0), i8* %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9)
 ; CHECK-NEXT:   %10 = call %struct._depend_unpack_t.0 @compute_dep.1([10 x [20 x i32]]* %array)
 ; CHECK-NEXT:   %11 = call %struct._depend_unpack_t.0 @compute_dep.1([10 x [20 x i32]]* %array)
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %10, 0
@@ -232,7 +232,7 @@ entry:
 ; CHECK-NEXT:   %17 = extractvalue %struct._depend_unpack_t.0 %10, 4
 ; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.0 %10, 5
 ; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.0 %11, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %13, i64 %14, i64 %15, i64 %16, i64 %17, i64 %18, i64 %19)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @2, i32 0, i32 0), i8* %13, i64 %14, i64 %15, i64 %16, i64 %17, i64 %18, i64 %19)
 ; CHECK-NEXT:   %20 = call %struct._depend_unpack_t.1 @compute_dep.2([10 x [20 x i32]]* %array)
 ; CHECK-NEXT:   %21 = call %struct._depend_unpack_t.1 @compute_dep.2([10 x [20 x i32]]* %array)
 ; CHECK-NEXT:   %22 = extractvalue %struct._depend_unpack_t.1 %20, 0
@@ -243,7 +243,7 @@ entry:
 ; CHECK-NEXT:   %27 = extractvalue %struct._depend_unpack_t.1 %20, 4
 ; CHECK-NEXT:   %28 = extractvalue %struct._depend_unpack_t.1 %20, 5
 ; CHECK-NEXT:   %29 = extractvalue %struct._depend_unpack_t.1 %21, 6
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* null, i8* %23, i64 %24, i64 %25, i64 %26, i64 %27, i64 %28, i64 %29)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @3, i32 0, i32 0), i8* %23, i64 %24, i64 %25, i64 %26, i64 %27, i64 %28, i64 %29)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -256,7 +256,7 @@ entry:
 ; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.2 %0, 1
 ; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.2 %0, 2
 ; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.2 %1, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @5, i32 0, i32 0), i8* %3, i64 %4, i64 %5, i64 %6)
 ; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.3 @compute_dep.4(%struct.S* %s)
 ; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.3 @compute_dep.4(%struct.S* %s)
 ; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.3 %7, 0
@@ -264,7 +264,7 @@ entry:
 ; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.3 %7, 1
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.3 %7, 2
 ; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.3 %8, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %10, i64 %11, i64 %12, i64 %13)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @6, i32 0, i32 0), i8* %10, i64 %11, i64 %12, i64 %13)
 ; CHECK-NEXT:   %14 = call %struct._depend_unpack_t.4 @compute_dep.5(%struct.S* %s)
 ; CHECK-NEXT:   %15 = call %struct._depend_unpack_t.4 @compute_dep.5(%struct.S* %s)
 ; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.4 %14, 0
@@ -272,7 +272,7 @@ entry:
 ; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.4 %14, 1
 ; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.4 %14, 2
 ; CHECK-NEXT:   %20 = extractvalue %struct._depend_unpack_t.4 %15, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %17, i64 %18, i64 %19, i64 %20)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @7, i32 0, i32 0), i8* %17, i64 %18, i64 %19, i64 %20)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -285,7 +285,7 @@ entry:
 ; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t.5 %0, 1
 ; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.5 %0, 2
 ; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.5 %1, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %3, i64 %4, i64 %5, i64 %6)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([2 x i8], [2 x i8]* @9, i32 0, i32 0), i8* %3, i64 %4, i64 %5, i64 %6)
 ; CHECK-NEXT:   %7 = call %struct._depend_unpack_t.6 @compute_dep.7(i32* %n)
 ; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.6 @compute_dep.7(i32* %n)
 ; CHECK-NEXT:   %9 = extractvalue %struct._depend_unpack_t.6 %7, 0
@@ -293,7 +293,7 @@ entry:
 ; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t.6 %7, 1
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.6 %7, 2
 ; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.6 %8, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %10, i64 %11, i64 %12, i64 %13)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([2 x i8], [2 x i8]* @10, i32 0, i32 0), i8* %10, i64 %11, i64 %12, i64 %13)
 ; CHECK-NEXT:   %14 = call %struct._depend_unpack_t.7 @compute_dep.8(i32* %n)
 ; CHECK-NEXT:   %15 = call %struct._depend_unpack_t.7 @compute_dep.8(i32* %n)
 ; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t.7 %14, 0
@@ -301,7 +301,7 @@ entry:
 ; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t.7 %14, 1
 ; CHECK-NEXT:   %19 = extractvalue %struct._depend_unpack_t.7 %14, 2
 ; CHECK-NEXT:   %20 = extractvalue %struct._depend_unpack_t.7 %15, 3
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* null, i8* %17, i64 %18, i64 %19, i64 %20)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([2 x i8], [2 x i8]* @11, i32 0, i32 0), i8* %17, i64 %18, i64 %19, i64 %20)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

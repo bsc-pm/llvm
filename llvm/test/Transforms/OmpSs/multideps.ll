@@ -24,7 +24,7 @@ entry:
   store i32 0, i32* %i, align 4, !dbg !9
   %0 = load i32, i32* %i, align 4, !dbg !10
   store i32 %0, i32* %j, align 4, !dbg !11
-  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [10 x i32]]* @v, %struct._depend_unpack_t.0 (i32*, i32*, [10 x [10 x i32]]*)* @compute_dep.1, i32* %i, i32* %j, [10 x [10 x i32]]* @v) ], !dbg !12
+  %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"([10 x [10 x i32]]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, i32* %j, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x [10 x i32]]* @v, [39 x i8] c"{ v[i][j], i = {0, 1, 2}, j = i:10-1 }\00", %struct._depend_unpack_t.0 (i32*, i32*, [10 x [10 x i32]]*)* @compute_dep.1, i32* %i, i32* %j, [10 x [10 x i32]]* @v) ], !dbg !12
   call void @llvm.directive.region.exit(token %1), !dbg !13
   ret i32 0, !dbg !14
 }
@@ -145,7 +145,7 @@ entry:
 ; CHECK-NEXT:   %24 = extractvalue %struct._depend_unpack_t.0 %17, 4
 ; CHECK-NEXT:   %25 = extractvalue %struct._depend_unpack_t.0 %17, 5
 ; CHECK-NEXT:   %26 = extractvalue %struct._depend_unpack_t.0 %18, 6
-; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo2(i8* %handler, i32 0, i8* null, i8* %20, i64 %21, i64 %22, i64 %23, i64 %24, i64 %25, i64 %26)
+; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo2(i8* %handler, i32 0, i8* getelementptr inbounds ([39 x i8], [39 x i8]* @1, i32 0, i32 0), i8* %20, i64 %21, i64 %22, i64 %23, i64 %24, i64 %25, i64 %26)
 ; CHECK-NEXT:   br label %for.incr3
 ; CHECK: 27:                                               ; preds = %for.cond
 ; CHECK-NEXT:   ret void

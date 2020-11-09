@@ -8,7 +8,7 @@ void vla_senction_dep(int n, int k, int j) {
     {}
 }
 
-// CHECK: %17 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.SHARED"(i32* %vla6), "QUAL.OSS.VLA.DIMS"(i32* %vla6, i64 %10, i64 %12, i64 %14), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5, i64 %10, i64 %12, i64 %14), "QUAL.OSS.DEP.IN"(i32* %vla, %struct._depend_unpack_t (i32*, i64, i64, i64)* @compute_dep, i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla6, %struct._depend_unpack_t.0 (i32*, i64, i64, i64)* @compute_dep.1, i32* %vla6, i64 %10, i64 %12, i64 %14), "QUAL.OSS.DEP.OUT"(i32* %vla, %struct._depend_unpack_t.1 (i32*, i64, i64, i64)* @compute_dep.2, i32* %vla, i64 %1, i64 %3, i64 %5) ]
+// CHECK: %17 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.SHARED"(i32* %vla6), "QUAL.OSS.VLA.DIMS"(i32* %vla6, i64 %10, i64 %12, i64 %14), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5, i64 %10, i64 %12, i64 %14), "QUAL.OSS.DEP.IN"(i32* %vla, [6 x i8] c"array\00", %struct._depend_unpack_t (i32*, i64, i64, i64)* @compute_dep, i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla6, [7 x i8] c"array2\00", %struct._depend_unpack_t.0 (i32*, i64, i64, i64)* @compute_dep.1, i32* %vla6, i64 %10, i64 %12, i64 %14), "QUAL.OSS.DEP.OUT"(i32* %vla, [13 x i8] c"array[0 : 5]\00", %struct._depend_unpack_t.1 (i32*, i64, i64, i64)* @compute_dep.2, i32* %vla, i64 %1, i64 %3, i64 %5) ]
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %array, i64 %0, i64 %1, i64 %2)
 // CHECK: entry:

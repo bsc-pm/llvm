@@ -25,7 +25,7 @@ entry:
   %i = alloca i32, align 4
   store i32 0, i32* %j, align 4, !dbg !9
   store i32 0, i32* %i, align 4, !dbg !10
-  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([10 x i32]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.LOOP.IND.VAR"(i32* %j), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 10, i32 1), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x i32]* @v, %struct._depend_unpack_t.0 (i32*, i32*, [10 x i32]*)* @compute_dep.1, i32* %i, i32* %j, [10 x i32]* @v) ], !dbg !9
+  %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([9 x i8] c"TASKLOOP\00"), "QUAL.OSS.SHARED"([10 x i32]* @v), "QUAL.OSS.PRIVATE"(i32* %i), "QUAL.OSS.PRIVATE"(i32* %j), "QUAL.OSS.LOOP.IND.VAR"(i32* %j), "QUAL.OSS.LOOP.LOWER.BOUND"(i32 0), "QUAL.OSS.LOOP.UPPER.BOUND"(i32 10), "QUAL.OSS.LOOP.STEP"(i32 1), "QUAL.OSS.LOOP.TYPE"(i64 0, i64 1, i64 1, i64 1, i64 1), "QUAL.OSS.CAPTURED"(i32 0, i32 10, i32 1), "QUAL.OSS.MULTIDEP.RANGE.OUT"(i32* %i, %struct._depend_unpack_t (i32*, i32*)* @compute_dep, i32* %i, i32* %j, [10 x i32]* @v, [16 x i8] c"{ v[i], i=0;j }\00", %struct._depend_unpack_t.0 (i32*, i32*, [10 x i32]*)* @compute_dep.1, i32* %i, i32* %j, [10 x i32]* @v) ], !dbg !9
   call void @llvm.directive.region.exit(token %0), !dbg !9
   ret i32 0, !dbg !11
 }
@@ -118,7 +118,7 @@ entry:
 ; CHECK-NEXT:   %23 = extractvalue %struct._depend_unpack_t.0 %19, 1
 ; CHECK-NEXT:   %24 = extractvalue %struct._depend_unpack_t.0 %19, 2
 ; CHECK-NEXT:   %25 = extractvalue %struct._depend_unpack_t.0 %20, 3
-; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo1(i8* %handler, i32 0, i8* null, i8* %22, i64 %23, i64 %24, i64 %25)
+; CHECK-NEXT:   call void @nanos6_register_region_write_depinfo1(i8* %handler, i32 0, i8* getelementptr inbounds ([16 x i8], [16 x i8]* @1, i32 0, i32 0), i8* %22, i64 %23, i64 %24, i64 %25)
 ; CHECK-NEXT:   br label %for.incr
 ; CHECK: 26:                                               ; preds = %for.cond
 ; CHECK-NEXT:   ret void

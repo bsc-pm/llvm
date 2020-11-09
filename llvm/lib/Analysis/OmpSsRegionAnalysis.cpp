@@ -324,10 +324,14 @@ static void gatherDependInfo(
   // First operand has to be the DSA over the dependency is made
   DI.Base = OBArgs[0];
 
-  DI.ComputeDepFun = cast<Function>(OBArgs[1]);
+  ConstantDataArray *DirectiveKindDataArray = cast<ConstantDataArray>(OBArgs[1]);
+  assert(DirectiveKindDataArray->isCString() && "Region text must be a C string");
+  DI.RegionText = DirectiveKindDataArray->getAsCString();
+
+  DI.ComputeDepFun = cast<Function>(OBArgs[2]);
 
   // Gather compute_dep function params
-  for (size_t i = 2; i < OBArgs.size(); ++i) {
+  for (size_t i = 3; i < OBArgs.size(); ++i) {
     DI.Args.push_back(OBArgs[i]);
   }
 
@@ -337,8 +341,6 @@ static void gatherDependInfo(
   }
   DI.SymbolIndex = DepSymToIdx[DI.Base];
 
-  // TODO: Support RegionText stringifying clause content
-  DI.RegionText = "";
 }
 
 void DirectiveEnvironment::gatherDependInfo(
@@ -520,11 +522,12 @@ void DirectiveEnvironment::gatherMultiDependInfo(
     else if (ComputeFnCnt == 1)
       MDI->Args.push_back(OBArgs[i]);
   }
-  // TODO: this is used because we add dep base too
+  // TODO: this is used because we add dep base and region text too
   // which is wrong...
   MDI->Args.pop_back();
+  MDI->Args.pop_back();
 
-  ::gatherDependInfo(OBArgs.drop_front(i - 1), DepSymToIdx, DependsInfo, *MDI, Id);
+  ::gatherDependInfo(OBArgs.drop_front(i - 2), DepSymToIdx, DependsInfo, *MDI, Id);
 
   DependsInfo.List.emplace_back(MDI);
 }

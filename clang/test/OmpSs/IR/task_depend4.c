@@ -14,10 +14,10 @@ void foo1(int a) {
     {}
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.CONCURRENT"(i32* %a.addr, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %a.addr) ]
-// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.CONCURRENT"(i32* %a.addr, %struct._depend_unpack_t.0 (i32*)* @compute_dep.1, i32* %a.addr) ]
-// CHECK: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.COMMUTATIVE"(i32* %a.addr, %struct._depend_unpack_t.1 (i32*)* @compute_dep.2, i32* %a.addr) ]
-// CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.COMMUTATIVE"(i32* %a.addr, %struct._depend_unpack_t.2 (i32*)* @compute_dep.3, i32* %a.addr) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.CONCURRENT"(i32* %a.addr, [2 x i8] c"a\00", %struct._depend_unpack_t (i32*)* @compute_dep, i32* %a.addr) ]
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.CONCURRENT"(i32* %a.addr, [2 x i8] c"a\00", %struct._depend_unpack_t.0 (i32*)* @compute_dep.1, i32* %a.addr) ]
+// CHECK: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.COMMUTATIVE"(i32* %a.addr, [2 x i8] c"a\00", %struct._depend_unpack_t.1 (i32*)* @compute_dep.2, i32* %a.addr) ]
+// CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %a.addr), "QUAL.OSS.DEP.COMMUTATIVE"(i32* %a.addr, [2 x i8] c"a\00", %struct._depend_unpack_t.2 (i32*)* @compute_dep.3, i32* %a.addr) ]
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32* %a)
 // CHECK: entry:

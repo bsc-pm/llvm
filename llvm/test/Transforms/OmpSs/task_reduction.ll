@@ -41,7 +41,7 @@ entry:
   store i8* %2, i8** %saved_stack, align 8, !dbg !9
   %vla = alloca i32, i64 %1, align 16, !dbg !9
   store i64 %1, i64* %__vla_expr0, align 8, !dbg !9
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %n.addr, %struct._depend_unpack_t (i32*)* @compute_dep, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %vla, %struct._depend_unpack_t.0 (i32*, i64)* @compute_dep.1, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb) ], !dbg !10
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %n.addr, [2 x i8] c"n\00", %struct._depend_unpack_t (i32*)* @compute_dep, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb), "QUAL.OSS.DEP.REDUCTION"(i32 -1, i32* %vla, [6 x i8] c"array\00", %struct._depend_unpack_t.0 (i32*, i64)* @compute_dep.1, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb) ], !dbg !10
   call void @llvm.directive.region.exit(token %3), !dbg !11
   %4 = load i8*, i8** %saved_stack, align 8, !dbg !12
   call void @llvm.stackrestore(i8* %4), !dbg !12
@@ -100,7 +100,7 @@ entry:
 ; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t %1, 1
 ; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t %1, 2
 ; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t %2, 3
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 0, i8* null, i8* %4, i64 %5, i64 %6, i64 %7)
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 0, i8* getelementptr inbounds ([2 x i8], [2 x i8]* @1, i32 0, i32 0), i8* %4, i64 %5, i64 %6, i64 %7)
 ; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %vla, i64 %0)
 ; CHECK-NEXT:   %9 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %vla, i64 %0)
 ; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.0 %8, 0
@@ -108,7 +108,7 @@ entry:
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.0 %8, 1
 ; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.0 %8, 2
 ; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.0 %9, 3
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 1, i8* null, i8* %11, i64 %12, i64 %13, i64 %14)
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 -1, i32 0, i8* %handler, i32 1, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @2, i32 0, i32 0), i8* %11, i64 %12, i64 %13, i64 %14)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
@@ -230,7 +230,7 @@ entry:
   store i8* %2, i8** %saved_stack, align 8, !dbg !21
   %vla = alloca i32, i64 %1, align 16, !dbg !21
   store i64 %1, i64* %__vla_expr0, align 8, !dbg !21
-  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %n.addr, %struct._depend_unpack_t.1 (i32*)* @compute_dep.4, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb.3), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %vla, %struct._depend_unpack_t.2 (i32*, i64)* @compute_dep.5, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb.3) ], !dbg !22
+  %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %n.addr), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %n.addr, [2 x i8] c"n\00", %struct._depend_unpack_t.1 (i32*)* @compute_dep.4, i32* %n.addr), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %n.addr, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %n.addr, void (i32*, i32*, i64)* @red_comb.3), "QUAL.OSS.DEP.REDUCTION"(i32 6000, i32* %vla, [6 x i8] c"array\00", %struct._depend_unpack_t.2 (i32*, i64)* @compute_dep.5, i32* %vla, i64 %1), "QUAL.OSS.DEP.REDUCTION.INIT"(i32* %vla, void (i32*, i32*, i64)* @red_init.2), "QUAL.OSS.DEP.REDUCTION.COMBINE"(i32* %vla, void (i32*, i32*, i64)* @red_comb.3) ], !dbg !22
   call void @llvm.directive.region.exit(token %3), !dbg !23
   %4 = load i8*, i8** %saved_stack, align 8, !dbg !24
   call void @llvm.stackrestore(i8* %4), !dbg !24
@@ -289,7 +289,7 @@ entry:
 ; CHECK-NEXT:   %5 = extractvalue %struct._depend_unpack_t.1 %1, 1
 ; CHECK-NEXT:   %6 = extractvalue %struct._depend_unpack_t.1 %1, 2
 ; CHECK-NEXT:   %7 = extractvalue %struct._depend_unpack_t.1 %2, 3
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 0, i8* null, i8* %4, i64 %5, i64 %6, i64 %7)
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 0, i8* getelementptr inbounds ([2 x i8], [2 x i8]* @4, i32 0, i32 0), i8* %4, i64 %5, i64 %6, i64 %7)
 ; CHECK-NEXT:   %8 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %vla, i64 %0)
 ; CHECK-NEXT:   %9 = call %struct._depend_unpack_t.2 @compute_dep.5(i32* %vla, i64 %0)
 ; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t.2 %8, 0
@@ -297,7 +297,7 @@ entry:
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t.2 %8, 1
 ; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t.2 %8, 2
 ; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t.2 %9, 3
-; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 1, i8* null, i8* %11, i64 %12, i64 %13, i64 %14)
+; CHECK-NEXT:   call void @nanos6_register_region_reduction_depinfo1(i32 6000, i32 0, i8* %handler, i32 1, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @5, i32 0, i32 0), i8* %11, i64 %12, i64 %13, i64 %14)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 

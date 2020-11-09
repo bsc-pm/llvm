@@ -127,7 +127,7 @@ void global_ref() {
 
 // CHECK: %0 = load %struct.S*, %struct.S** @res, align 8
 // CHECK-NEXT: %1 = load %struct.S*, %struct.S** @rs, align 8
-// CHECK-NEXT: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(%struct.S* %0), "QUAL.OSS.SHARED"(%struct.S* %1), "QUAL.OSS.DEP.IN"(%struct.S* %0, %struct._depend_unpack_t (%struct.S*)* @compute_dep, %struct.S* %0), "QUAL.OSS.DEP.IN"(%struct.S* %1, %struct._depend_unpack_t.0 (%struct.S*)* @compute_dep.1, %struct.S* %1) ]
+// CHECK-NEXT: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(%struct.S* %0), "QUAL.OSS.SHARED"(%struct.S* %1), "QUAL.OSS.DEP.IN"(%struct.S* %0, [6 x i8] c"res.x\00", %struct._depend_unpack_t (%struct.S*)* @compute_dep, %struct.S* %0), "QUAL.OSS.DEP.IN"(%struct.S* %1, [5 x i8] c"rs.x\00", %struct._depend_unpack_t.0 (%struct.S*)* @compute_dep.1, %struct.S* %1) ]
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(%struct.S* %res)
 // CHECK: entry:

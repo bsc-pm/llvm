@@ -27,6 +27,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Value.h"
+#include "clang/Lex/Lexer.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/Sema/SemaDiagnostic.h"
@@ -1668,6 +1669,14 @@ void CGOmpSsRuntime::EmitDependencyList(
   // Fill the bundle
 
   List.push_back(DependInfoGathering.getBaseValue());
+
+  StringRef ExprStringified = Lexer::getSourceText(
+    CharSourceRange::getTokenRange(Dep.E->getBeginLoc(), Dep.E->getEndLoc()),
+    CGM.getContext().getSourceManager(), CGM.getLangOpts());
+  List.push_back(
+    llvm::ConstantDataArray::getString(
+      CGM.getLLVMContext(), ExprStringified));
+
   List.push_back(ComputeDepFun);
 
   for (const auto &p : DependInfoGathering.getInvolvedVarList()) {

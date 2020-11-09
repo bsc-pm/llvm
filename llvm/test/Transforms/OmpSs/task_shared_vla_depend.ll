@@ -129,7 +129,7 @@ entry:
   store i64 %1, i64* %__vla_expr0, align 8, !dbg !10
   store i64 %3, i64* %__vla_expr1, align 8, !dbg !10
   store i64 %5, i64* %__vla_expr2, align 8, !dbg !10
-  %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla, %struct._depend_unpack_t (i32*, i64, i64, i64)* @compute_dep, i32* %vla, i64 %1, i64 %3, i64 %5) ], !dbg !15
+  %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.SHARED"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1, i64 %3, i64 %5), "QUAL.OSS.CAPTURED"(i64 %1, i64 %3, i64 %5), "QUAL.OSS.DEP.IN"(i32* %vla, [4 x i8] c"vla\00", %struct._depend_unpack_t (i32*, i64, i64, i64)* @compute_dep, i32* %vla, i64 %1, i64 %3, i64 %5) ], !dbg !15
   %size = alloca i32, align 4
   %10 = mul nuw i64 %1, %3, !dbg !16
   %11 = mul nuw i64 %10, %5, !dbg !16
@@ -257,7 +257,7 @@ entry:
 ; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t %3, 7
 ; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %3, 8
 ; CHECK-NEXT:   %15 = extractvalue %struct._depend_unpack_t %4, 9
-; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo3(i8* %handler, i32 0, i8* null, i8* %6, i64 %7, i64 %8, i64 %9, i64 %10, i64 %11, i64 %12, i64 %13, i64 %14, i64 %15)
+; CHECK-NEXT:   call void @nanos6_register_region_read_depinfo3(i8* %handler, i32 0, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @1, i32 0, i32 0), i8* %6, i64 %7, i64 %8, i64 %9, i64 %10, i64 %11, i64 %12, i64 %13, i64 %14, i64 %15)
 ; CHECK-NEXT:   ret void
 ; CHECK-NEXT: }
 
