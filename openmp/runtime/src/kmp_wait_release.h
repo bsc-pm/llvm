@@ -331,7 +331,7 @@ final_spin=FALSE)
          3) Tasking is off for this region.  This could be because we are in a
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
-      if (this_thr->th.is_unshackled && this_thr->th.is_unshackled_active) {
+      if (this_thr->th.is_unshackled && *this_thr->th.is_unshackled_active) {
         // This is an unshackled thread, give it a chance to execute work from
         // some other task team.
         for (int i = 0; i < __kmp_threads_capacity; i++) {

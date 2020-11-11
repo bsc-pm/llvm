@@ -1320,6 +1320,11 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
     OMPT_CUR_TASK_INFO(this_thr)->frame.exit_frame.ptr = OMPT_GET_FRAME_ADDRESS(0);
   }
 #endif
+  // If this parallel has been serialized, make sure tasking is enabled for
+  // it when there are unshackled threads.
+  if (__kmp_num_unshackled_threads != 0) {
+    __kmp_enable_tasking_in_serial_mode(loc, __kmp_entry_gtid());
+  }
 }
 
 /* most of the work for a fork */
@@ -3531,6 +3536,7 @@ static void __kmp_create_unshackled_threads(void) {
   kmp_root_t *root = __kmp_threads[gtid]->th.th_root;
 
   root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
+
   root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
       sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
   for (int i = 0; i < root->r.num_unshackled_threads; i++) {
@@ -3767,6 +3773,19 @@ int __kmp_register_root(int initial_thread) {
     ompt_set_thread_state(root_thread, ompt_state_work_serial);
   }
 #endif
+
+  root->r.is_unshackled_thread_active = (bool*)__kmp_allocate(
+      sizeof(*root->r.is_unshackled_thread_active) * __kmp_num_unshackled_threads);
+  // FIXME: Maybe there is a "calloc" like allocate?
+  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+    root->r.is_unshackled_thread_active[i] = true; // TEMPORARY
+  }
+
+  // The root team is a serial team, so enable tasking for it
+  // if we have unshackled threads.
+  if (__kmp_num_unshackled_threads != 0) {
+    __kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, gtid);
+  }
 
   KMP_MB();
   __kmp_release_bootstrap_lock(&__kmp_forkjoin_lock);
@@ -4383,7 +4402,7 @@ kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
   thread->th.is_unshackled = true;
-  thread->th.is_unshackled_active = false;
+  thread->th.is_unshackled_active = &root->r.is_unshackled_thread_active[new_tid];
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -8329,18 +8348,18 @@ void __kmp_omp_display_env(int verbose) {
 int __kmp_num_unshackled_threads = 0;
 
 unsigned int __kmp_get_num_unshackled_threads() {
-  int gtid = __kmp_entry_gtid();
-  return __kmp_threads[gtid]->th.th_root->r.num_unshackled_threads;
+  // Ensure the runtime has been initialized here.
+  (void)__kmp_entry_gtid();
+  return __kmp_num_unshackled_threads;
 }
 
 void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
                                                bool active) {
-  unsigned num_unshackleds = __kmp_get_num_unshackled_threads();
-  // FIXME: Should this be a hard error rather than silently ignore it?
-  if (thread_num >= num_unshackleds)
-    return;
+  // The runtime may initialize here if needed.
   int gtid = __kmp_entry_gtid();
-  __kmp_threads[gtid]
-      ->th.th_root->r.unshackled_threads[thread_num]
-      ->th.is_unshackled_active = active;
+  // FIXME: Should this be a hard error rather than silently ignore it?
+  if (thread_num >= __kmp_num_unshackled_threads)
+    return;
+  __kmp_threads[gtid]->th.th_root->r.is_unshackled_thread_active[thread_num] =
+      active;
 }

@@ -344,7 +344,8 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   }
 
   // The first check avoids building task_team thread data if serialized
-  if (taskdata->td_flags.task_serial) {
+  if (taskdata->td_flags.task_serial &&
+      (!task_team || !task_team->tt.tt_found_proxy_tasks)) {
     KA_TRACE(20, ("__kmp_push_task: T#%d team serialized; returning "
                   "TASK_NOT_PUSHED for task %p\n",
                   gtid, taskdata));
@@ -436,7 +437,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
     if (__kmp_threads[i] == NULL)
       continue;
     if (__kmp_threads[i]->th.is_unshackled
-        && __kmp_threads[i]->th.is_unshackled_active) {
+        && *__kmp_threads[i]->th.is_unshackled_active) {
       // This is an unshackled thread
       kmp_flag_64 flag(&__kmp_threads[i]->th.th_bar[bs_forkjoin_barrier].bb.b_go,
            __kmp_threads[i]);
@@ -3015,6 +3016,12 @@ static inline int __kmp_execute_tasks_template(
              gtid));
         return TRUE;
       }
+
+      // FIXME: Explain this better??? Is this correct?
+      // We never get here with nthreads == 1 unless there are proxy tasks
+      // or we have enabled tasking for serial teams due to unshackled threads.
+      if (nthreads == 1 && *thread_finished)
+        return TRUE;
     }
 
     // If this thread's task team is NULL, master has recognized that there are

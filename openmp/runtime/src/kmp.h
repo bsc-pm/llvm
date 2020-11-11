@@ -2548,8 +2548,8 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread
   bool is_unshackled; // This is an unshackled thread.
-  bool is_unshackled_active; // This is an unshackled thread that is actively
-                             // looking for work.
+  bool *is_unshackled_active; // Reference to the is_unshackled_thread_active array.
+                              // This is for convenience.
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {
@@ -2736,8 +2736,9 @@ typedef struct kmp_base_root {
   int r_blocktime; /* blocktime for this root and descendants */
 
   /* Unshackled threads */
-  unsigned int num_unshackled_threads;
-  kmp_info_t **unshackled_threads;
+  unsigned int num_unshackled_threads; // Number of unshackled threads.
+  kmp_info_t **unshackled_threads; // Threads that are unshackled in this root.
+  bool *is_unshackled_thread_active; // States if an unshackled thread is enabled or not.
 } kmp_base_root_t;
 
 typedef union KMP_ALIGN_CACHE kmp_root {
@@ -3941,7 +3942,10 @@ extern void __kmp_omp_display_env(int verbose);
 
 // Unshackled threads API.
 extern int __kmp_num_unshackled_threads;
+// Returns the number of unshackled threads. They may not have been created yet.
 unsigned int __kmp_get_num_unshackled_threads();
+// Sets the active status of an unshackled threads. They may not have been
+// created yet.
 void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
                                                bool active);
 
