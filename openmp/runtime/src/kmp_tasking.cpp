@@ -3016,12 +3016,6 @@ static inline int __kmp_execute_tasks_template(
              gtid));
         return TRUE;
       }
-
-      // FIXME: Explain this better??? Is this correct?
-      // We never get here with nthreads == 1 unless there are proxy tasks
-      // or we have enabled tasking for serial teams due to unshackled threads.
-      if (nthreads == 1 && *thread_finished)
-        return TRUE;
     }
 
     // If this thread's task team is NULL, master has recognized that there are
@@ -3034,7 +3028,7 @@ static inline int __kmp_execute_tasks_template(
 
     // We could be getting tasks from target constructs; if this is the only
     // thread, keep trying to execute tasks from own queue
-    if (nthreads == 1)
+    if (nthreads == 1 && !thread->th.is_unshackled) {
       use_own_tasks = 1;
     else {
       KA_TRACE(15,
