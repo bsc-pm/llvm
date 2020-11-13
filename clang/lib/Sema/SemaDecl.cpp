@@ -7706,9 +7706,15 @@ void Sema::OSSCheckShadow(NamedDecl *D, NamedDecl *ShadowedDecl,
       isa<CXXMethodDecl>(NewDC)) {
     if (const auto *RD = dyn_cast<CXXRecordDecl>(NewDC->getParent())) {
       if (RD->isLambda() && OldDC->Encloses(NewDC->getLexicalParent())) {
+
+        FunctionScopeInfo *FSI = getCurFunction();
+        // He are in a ompss-2 directive scope, get the next one.
+        if (FSI->HasOSSExecutableDirective)
+          FSI = FunctionScopes[FunctionScopes.size() - 2];
+
         if (RD->getLambdaCaptureDefault() == LCD_None) {
           // Try to avoid warnings for lambdas with an explicit capture list.
-          const auto *LSI = cast<LambdaScopeInfo>(getCurFunction());
+          const auto *LSI = cast<LambdaScopeInfo>(FSI);
           // Warn only when the lambda captures the shadowed decl explicitly.
           CaptureLoc = getCaptureLocation(LSI, cast<VarDecl>(ShadowedDecl));
           if (CaptureLoc.isInvalid())
@@ -7716,7 +7722,7 @@ void Sema::OSSCheckShadow(NamedDecl *D, NamedDecl *ShadowedDecl,
         } else {
           // Remember that this was shadowed so we can avoid the warning if the
           // shadowed decl isn't captured and the warning settings allow it.
-          cast<LambdaScopeInfo>(getCurFunction())
+          cast<LambdaScopeInfo>(FSI)
               ->ShadowingDecls.push_back(
                   {cast<VarDecl>(D), cast<VarDecl>(ShadowedDecl)});
           return;
