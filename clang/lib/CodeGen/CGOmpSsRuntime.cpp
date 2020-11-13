@@ -1189,8 +1189,10 @@ void CGOmpSsRuntime::EmitDSAPrivate(
     const VarDecl *CopyD = cast<VarDecl>(CopyE->getDecl());
 
     if (!CopyD->getType().isPODType(CGF.getContext())) {
+      InDirectiveEmission = false;
       EmitCtorFunc(DSAValue, CopyD, TaskInfo);
       EmitDtorFunc(DSAValue, CopyD, TaskInfo);
+      InDirectiveEmission = true;
     }
   }
 }
@@ -1240,8 +1242,10 @@ void CGOmpSsRuntime::EmitDSAFirstprivate(
     if (!CopyD->getType().isPODType(CGF.getContext())) {
       const CXXConstructExpr *CtorE = cast<CXXConstructExpr>(CopyD->getAnyInitializer());
 
+      InDirectiveEmission = false;
       EmitCopyCtorFunc(DSAValue, CtorE, CopyD, InitD, TaskInfo);
       EmitDtorFunc(DSAValue, CopyD, TaskInfo);
+      InDirectiveEmission = true;
     }
   }
 }
@@ -2085,6 +2089,7 @@ void CGOmpSsRuntime::EmitReduction(
   llvm::ConstantInt *RedKind = reductionKindToNanos6Enum(CGF, Red.ReductionOp->getType(), Red.ReductionKind);
   llvm::Value *RedInit = nullptr;
   llvm::Value *RedComb = nullptr;
+  InDirectiveEmission = false;
   if (!RedKind->isMinusOne()) {
     auto It = BuiltinRedMap.find(RedKind);
     if (It == BuiltinRedMap.end()) {
@@ -2107,6 +2112,7 @@ void CGOmpSsRuntime::EmitReduction(
       RedComb = It->second.second;
     }
   }
+  InDirectiveEmission = true;
 
   EmitDependencyList(CGF, {/*OSSSyntax=*/true, Red.Ref}, List);
   // First operand has to be the DSA over the dependency is made
