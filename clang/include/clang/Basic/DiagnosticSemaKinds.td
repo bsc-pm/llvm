@@ -10993,6 +10993,16 @@ def err_oss_multidep_discrete_empty : Error<
   "expected a non-empty list">;
 def err_oss_invalid_scope : Error <
   "'#pragma oss %0' directive must appear only in file scope">;
+def warn_oss_decl_shadow :
+  Warning<"declaration shadows a %select{"
+          "local variable|"
+          "variable in %2|"
+          "static data member of %2|"
+          "field of %2|"
+          "typedef in %2|"
+          "type alias in %2}1">;
+def warn_oss_decl_shadow_uncaptured_local :
+  Warning<warn_oss_decl_shadow.Text>;
 } // end of OmpSs component.
 
 

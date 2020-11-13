@@ -7665,6 +7665,131 @@ void Sema::CheckShadow(Scope *S, VarDecl *D) {
     CheckShadow(D, ShadowedDecl, R);
 }
 
+// Same as CheckShadow but always diagnose
+void Sema::OSSCheckShadow(NamedDecl *D, NamedDecl *ShadowedDecl,
+                       const LookupResult &R) {
+  DeclContext *NewDC = D->getDeclContext();
+
+  if (FieldDecl *FD = dyn_cast<FieldDecl>(ShadowedDecl)) {
+    // Fields are not shadowed by variables in C++ static methods.
+    if (CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(NewDC))
+      if (MD->isStatic())
+        return;
+
+    // Fields shadowed by constructor parameters are a special case. Usually
+    // the constructor initializes the field with the parameter.
+    if (isa<CXXConstructorDecl>(NewDC))
+      if (const auto PVD = dyn_cast<ParmVarDecl>(D)) {
+        // Remember that this was shadowed so we can either warn about its
+        // modification or its existence depending on warning settings.
+        ShadowingDecls.insert({PVD->getCanonicalDecl(), FD});
+        return;
+      }
+  }
+
+  if (VarDecl *shadowedVar = dyn_cast<VarDecl>(ShadowedDecl))
+    if (shadowedVar->isExternC()) {
+      // For shadowing external vars, make sure that we point to the global
+      // declaration, not a locally scoped extern declaration.
+      for (auto I : shadowedVar->redecls())
+        if (I->isFileVarDecl()) {
+          ShadowedDecl = I;
+          break;
+        }
+    }
+
+  DeclContext *OldDC = ShadowedDecl->getDeclContext()->getRedeclContext();
+
+  unsigned WarningDiag = diag::warn_oss_decl_shadow;
+  SourceLocation CaptureLoc;
+  if (isa<VarDecl>(D) && isa<VarDecl>(ShadowedDecl) && NewDC &&
+      isa<CXXMethodDecl>(NewDC)) {
+    if (const auto *RD = dyn_cast<CXXRecordDecl>(NewDC->getParent())) {
+      if (RD->isLambda() && OldDC->Encloses(NewDC->getLexicalParent())) {
+        if (RD->getLambdaCaptureDefault() == LCD_None) {
+          // Try to avoid warnings for lambdas with an explicit capture list.
+          const auto *LSI = cast<LambdaScopeInfo>(getCurFunction());
+          // Warn only when the lambda captures the shadowed decl explicitly.
+          CaptureLoc = getCaptureLocation(LSI, cast<VarDecl>(ShadowedDecl));
+          if (CaptureLoc.isInvalid())
+            WarningDiag = diag::warn_oss_decl_shadow_uncaptured_local;
+        } else {
+          // Remember that this was shadowed so we can avoid the warning if the
+          // shadowed decl isn't captured and the warning settings allow it.
+          cast<LambdaScopeInfo>(getCurFunction())
+              ->ShadowingDecls.push_back(
+                  {cast<VarDecl>(D), cast<VarDecl>(ShadowedDecl)});
+          return;
+        }
+      }
+
+      if (cast<VarDecl>(ShadowedDecl)->hasLocalStorage()) {
+        // A variable can't shadow a local variable in an enclosing scope, if
+        // they are separated by a non-capturing declaration context.
+        for (DeclContext *ParentDC = NewDC;
+             ParentDC && !ParentDC->Equals(OldDC);
+             ParentDC = getLambdaAwareParentOfDeclContext(ParentDC)) {
+          // Only block literals, captured statements, and lambda expressions
+          // can capture; other scopes don't.
+          if (!isa<BlockDecl>(ParentDC) && !isa<CapturedDecl>(ParentDC) &&
+              !isLambdaCallOperator(ParentDC)) {
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // Only warn about certain kinds of shadowing for class members.
+  if (NewDC && NewDC->isRecord()) {
+    // In particular, don't warn about shadowing non-class members.
+    if (!OldDC->isRecord())
+      return;
+
+    // TODO: should we warn about static data members shadowing
+    // static data members from base classes?
+
+    // TODO: don't diagnose for inaccessible shadowed members.
+    // This is hard to do perfectly because we might friend the
+    // shadowing context, but that's just a false negative.
+  }
+
+
+  DeclarationName Name = R.getLookupName();
+
+  // Emit warning and note.
+  if (getSourceManager().isInSystemMacro(R.getNameLoc()))
+    return;
+  ShadowedDeclKind Kind = computeShadowedDeclKind(ShadowedDecl, OldDC);
+  Diag(R.getNameLoc(), WarningDiag) << Name << Kind << OldDC;
+  if (!CaptureLoc.isInvalid())
+    Diag(CaptureLoc, diag::note_var_explicitly_captured_here)
+        << Name << /*explicitly*/ 1;
+  Diag(ShadowedDecl->getLocation(), diag::note_previous_declaration);
+}
+
+// Same as CheckShadow but always diagnose
+void Sema::OSSCheckShadow(Scope *S, VarDecl *D) {
+  LookupResult R(*this, D->getDeclName(), D->getLocation(),
+                 Sema::LookupOrdinaryName, Sema::ForVisibleRedeclaration);
+  LookupName(R, S);
+  // Don't diagnose declarations at file scope.
+  if (D->hasGlobalStorage())
+    return;
+
+  // Only diagnose if we're shadowing an unambiguous field or variable.
+  if (R.getResultKind() != LookupResult::Found)
+    return;
+
+  NamedDecl *ShadowedDecl = R.getFoundDecl();
+  ShadowedDecl = isa<VarDecl>(ShadowedDecl) || isa<FieldDecl>(ShadowedDecl)
+             ? ShadowedDecl
+             : nullptr;
+  if (ShadowedDecl)
+    OSSCheckShadow(D, ShadowedDecl, R);
+}
+
+
 /// Check if 'E', which is an expression that is about to be modified, refers
 /// to a constructor parameter that shadows a field.
 void Sema::CheckShadowingDeclModification(Expr *E, SourceLocation Loc) {

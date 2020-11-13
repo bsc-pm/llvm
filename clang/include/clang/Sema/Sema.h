@@ -2507,6 +2507,12 @@ public:
                    const LookupResult &R);
   void CheckShadow(Scope *S, VarDecl *D);
 
+  // OmpSs-2
+  // Same behaviour as CheckShadow, but different diag messages.
+  void OSSCheckShadow(
+    NamedDecl *D, NamedDecl *ShadowedDecl, const LookupResult &R);
+  void OSSCheckShadow(Scope *S, VarDecl *D);
+
   /// Warn if 'E', which is an expression that is about to be modified, refers
   /// to a shadowing declaration.
   void CheckShadowingDeclModification(Expr *E, SourceLocation Loc);

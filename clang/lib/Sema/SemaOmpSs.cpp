@@ -889,6 +889,7 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
 Expr *Sema::ActOnOmpSsMultiDepIterator(Scope *S, StringRef Name, SourceLocation Loc) {
   VarDecl *MultiDepItDecl =
       buildVarDecl(*this, Loc, Context.IntTy, Name);
+  OSSCheckShadow(S, MultiDepItDecl);
   // TODO: what about templates?
   if (S) {
     PushOnScopeChains(MultiDepItDecl, S);
