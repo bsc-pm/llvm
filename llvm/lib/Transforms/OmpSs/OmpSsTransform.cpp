@@ -1726,6 +1726,19 @@ struct OmpSs : public ModulePass {
     return OlConstraintsFuncVar;
   }
 
+  bool hasMultidepUsingLoopIter(
+      const DirectiveLoopInfo &LoopInfo, const DirectiveDependsInfo &DependsInfo) {
+    for (auto &DepInfo : DependsInfo.List) {
+      if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
+        for (const auto *V : MultiDepInfo->Args) {
+          if (V == LoopInfo.IndVar)
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
   Function *createPriorityOlFunc(
       Module &M, Function &F, int taskNum,
       const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
@@ -2153,6 +2166,7 @@ struct OmpSs : public ModulePass {
       const DirectiveVLADimsInfo &VLADimsInfo = DirEnv.VLADimsInfo;
       const DirectiveCapturedInfo &CapturedInfo = DirEnv.CapturedInfo;
       const DirectiveDependsInfo &DependsInfo = DirEnv.DependsInfo;
+      const DirectiveLoopInfo &LoopInfo = DirEnv.LoopInfo;
 
       IRBuilder<> IRB(codeReplacer);
       // Set debug info from the task entry to all instructions
@@ -2210,8 +2224,9 @@ struct OmpSs : public ModulePass {
       Instruction *NumDependencies = IRB.CreateAlloca(IRB.getInt64Ty(), nullptr, "num.deps");
       PostMoveInstructions.push_back(NumDependencies);
 
-      if (DirEnv.isOmpSsTaskLoopDirective()) {
-        // If taskloop NumDeps = -1
+      if (DirEnv.isOmpSsTaskLoopDirective() && hasMultidepUsingLoopIter(LoopInfo, DependsInfo)) {
+        // If taskloop has a multidep using the loop iterator
+        // NumDeps = -1
         IRB.CreateStore(IRB.getInt64(-1), NumDependencies);
       } else {
         IRB.CreateStore(IRB.getInt64(0), NumDependencies);

@@ -5,8 +5,6 @@ source_filename = "loop_directives_num_deps.ll"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-; taskloop directives have -1 num dependencies
-
 ; void foo(int lb, int ub, int step) {
 ;     #pragma oss task for
 ;     for (int i = 0; i < 10; i += 1) {}
@@ -63,7 +61,7 @@ define void @foo(i32 %lb, i32 %ub, i32 %step) #0 !dbg !6 {
 ; CHECK-NEXT:    br label [[FINAL_COND12:%.*]], [[DBG10]]
 ; CHECK:       codeRepl17:
 ; CHECK-NEXT:    [[TMP11:%.*]] = bitcast %nanos6_task_args_foo1** [[TMP2]] to i8**, [[DBG10]]
-; CHECK-NEXT:    store i64 -1, i64* [[NUM_DEPS20]], align 8, [[DBG10]]
+; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS20]], align 8, [[DBG10]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = load i64, i64* [[NUM_DEPS20]], align 8, [[DBG10]]
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo1, %nanos6_task_invocation_info_t* @task_invocation_info_foo1, i64 16, i8** [[TMP11]], i8** [[TMP3]], i64 4, i64 [[TMP12]]), [[DBG10]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = load %nanos6_task_args_foo1*, %nanos6_task_args_foo1** [[TMP2]], align 8, [[DBG10]]
@@ -84,7 +82,7 @@ define void @foo(i32 %lb, i32 %ub, i32 %step) #0 !dbg !6 {
 ; CHECK-NEXT:    br label [[FINAL_COND29:%.*]], [[DBG11]]
 ; CHECK:       codeRepl34:
 ; CHECK-NEXT:    [[TMP16:%.*]] = bitcast %nanos6_task_args_foo2** [[TMP4]] to i8**, [[DBG11]]
-; CHECK-NEXT:    store i64 -1, i64* [[NUM_DEPS37]], align 8, [[DBG11]]
+; CHECK-NEXT:    store i64 0, i64* [[NUM_DEPS37]], align 8, [[DBG11]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = load i64, i64* [[NUM_DEPS37]], align 8, [[DBG11]]
 ; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_foo2, %nanos6_task_invocation_info_t* @task_invocation_info_foo2, i64 16, i8** [[TMP16]], i8** [[TMP5]], i64 12, i64 [[TMP17]]), [[DBG11]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = load %nanos6_task_args_foo2*, %nanos6_task_args_foo2** [[TMP4]], align 8, [[DBG11]]
