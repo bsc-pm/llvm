@@ -2192,6 +2192,12 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     return DeclGroupPtrTy();
   }
 
+  if (FD->getFirstDecl() != FD) {
+    Diag(ADecl->getLocation(), diag::warn_oss_call_may_not_be_task);
+    Diag(FD->getFirstDecl()->getLocation(), diag::note_previous_decl)
+      << FD->getFirstDecl();
+  }
+
   auto ParI = FD->param_begin();
   while (ParI != FD->param_end()) {
     QualType Type = (*ParI)->getType();

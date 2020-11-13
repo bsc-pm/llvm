@@ -11003,6 +11003,9 @@ def warn_oss_decl_shadow :
           "type alias in %2}1">;
 def warn_oss_decl_shadow_uncaptured_local :
   Warning<warn_oss_decl_shadow.Text>;
+def warn_oss_call_may_not_be_task :
+  Warning<"function has already been declared earlier as a regular (non-task) function, "
+          "any calls prior to this point will not create tasks">;
 } // end of OmpSs component.
 
 
