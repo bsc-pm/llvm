@@ -1,6 +1,6 @@
 // RUN: %clang_cc1 -verify -fompss-2 -ferror-limit 100 %s -Wuninitialized
-static void foo(int *p); // expected-note {{'foo' declared here}}
 static void foo(int *p);
+static void foo(int *p); // expected-note {{'foo' declared here}}
 
 int main() {
     int n;

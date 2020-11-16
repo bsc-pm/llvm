@@ -2192,10 +2192,14 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     return DeclGroupPtrTy();
   }
 
-  if (FD->getFirstDecl() != FD) {
-    Diag(ADecl->getLocation(), diag::warn_oss_call_may_not_be_task);
-    Diag(FD->getFirstDecl()->getLocation(), diag::note_previous_decl)
-      << FD->getFirstDecl();
+  FunctionDecl *PrevFD = FD->getPreviousDecl();
+  if (PrevFD && PrevFD != FD) {
+    bool IsPrevTask = PrevFD->hasAttr<OSSTaskDeclAttr>();
+
+    Diag(ADecl->getLocation(), diag::warn_oss_task_redeclaration)
+      << IsPrevTask;
+    Diag(PrevFD->getLocation(), diag::note_previous_decl)
+      << PrevFD;
   }
 
   auto ParI = FD->param_begin();
