@@ -11000,13 +11000,13 @@ def warn_oss_decl_shadow :
           "static data member of %2|"
           "field of %2|"
           "typedef in %2|"
-          "type alias in %2}1">;
+          "type alias in %2}1">, InGroup<OmpSs>;
 def warn_oss_decl_shadow_uncaptured_local :
-  Warning<warn_oss_decl_shadow.Text>;
+  Warning<warn_oss_decl_shadow.Text>, InGroup<OmpSs>;
 def warn_oss_task_redeclaration :
   Warning<"function has already been declared earlier as a %select{"
           "regular (non-task) function, any calls prior to this point will not create tasks|"
-          "task function, any calls prior this point may create different tasks}0">;
+          "task function, any calls prior this point may create different tasks}0">, InGroup<OmpSs>;
 } // end of OmpSs component.
 
 
