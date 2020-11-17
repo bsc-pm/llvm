@@ -25,10 +25,10 @@ void class_convertible() {
 // CHECK-NEXT:   %exn.slot = alloca i8*, align 8
 // CHECK-NEXT:   %ehselector.slot = alloca i32, align 4
 // CHECK-NEXT:   store [10 x i32]* %v, [10 x i32]** %v.addr, align 8
-// CHECK-NEXT:   invoke void @_ZN1SC1Ei(%struct.S* %ref.tmp, i32{{( signext)?}} 0)
+// CHECK-NEXT:   invoke void @_ZN1SC1Ei(%struct.S* nonnull dereferenceable(1) %ref.tmp, i32{{( signext)?}} 0)
 // CHECK-NEXT:           to label %invoke.cont unwind label %terminate.lpad
 // CHECK: invoke.cont:                                      ; preds = %entry
-// CHECK-NEXT:   %call = invoke{{( signext)?}} i32 @_ZN1ScviEv(%struct.S* %ref.tmp)
+// CHECK-NEXT:   %call = invoke{{( signext)?}} i32 @_ZN1ScviEv(%struct.S* nonnull dereferenceable(1) %ref.tmp)
 // CHECK-NEXT:           to label %invoke.cont1 unwind label %lpad
 // CHECK: invoke.cont1:                                     ; preds = %invoke.cont
 // CHECK-NEXT:   %0 = sext i32 %call to i64
@@ -44,7 +44,7 @@ void class_convertible() {
 // CHECK-NEXT:   store i64 %2, i64* %6, align 8
 // CHECK-NEXT:   %7 = getelementptr inbounds %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, i32 0, i32 3
 // CHECK-NEXT:   store i64 %3, i64* %7, align 8
-// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* %ref.tmp)
+// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* nonnull dereferenceable(1) %ref.tmp)
 // CHECK-NEXT:   %8 = load %struct._depend_unpack_t, %struct._depend_unpack_t* %retval, align 8
 // CHECK-NEXT:   ret %struct._depend_unpack_t %8
 // CHECK: lpad:                                             ; preds = %invoke.cont
@@ -54,7 +54,7 @@ void class_convertible() {
 // CHECK-NEXT:   store i8* %10, i8** %exn.slot, align 8
 // CHECK-NEXT:   %11 = extractvalue { i8*, i32 } %9, 1
 // CHECK-NEXT:   store i32 %11, i32* %ehselector.slot, align 4
-// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* %ref.tmp)
+// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* nonnull dereferenceable(1) %ref.tmp)
 // CHECK-NEXT:   br label %terminate.handler
 // CHECK: terminate.lpad:                                   ; preds = %entry
 // CHECK-NEXT:   %12 = landingpad { i8*, i32 }

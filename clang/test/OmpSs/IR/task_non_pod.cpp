@@ -48,7 +48,7 @@ void foo() {
 // CHECK: arrayctor.loop:                                   ; preds = %arrayctor.loop, %entry
 // CHECK-NEXT:   %arrayctor.dst.cur = phi %struct.S* [ %4, %entry ], [ %arrayctor.dst.next, %arrayctor.loop ]
 // CHECK-NEXT:   %arrayctor.src.cur = phi %struct.S* [ %3, %entry ], [ %arrayctor.src.next, %arrayctor.loop ]
-// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* %arrayctor.dst.cur, %struct.S* nonnull align 4 dereferenceable(4) %arrayctor.src.cur, i32{{( signext)?}} 0)
+// CHECK-NEXT:   call void @_ZN1SC1ERS_i(%struct.S* nonnull dereferenceable(4) %arrayctor.dst.cur, %struct.S* nonnull align 4 dereferenceable(4) %arrayctor.src.cur, i32{{( signext)?}} 0)
 // CHECK-NEXT:   %arrayctor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.dst.cur, i64 1
 // CHECK-NEXT:   %arrayctor.src.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.src.cur, i64 1
 // CHECK-NEXT:   %arrayctor.done = icmp eq %struct.S* %arrayctor.dst.next, %arrayctor.dst.end
@@ -69,7 +69,7 @@ void foo() {
 // CHECK-NEXT:   br label %arraydtor.loop
 // CHECK: arraydtor.loop:                                   ; preds = %arraydtor.loop, %entry
 // CHECK-NEXT:   %arraydtor.dst.cur = phi %struct.S* [ %2, %entry ], [ %arraydtor.dst.next, %arraydtor.loop ]
-// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* %arraydtor.dst.cur)
+// CHECK-NEXT:   call void @_ZN1SD1Ev(%struct.S* nonnull dereferenceable(4) %arraydtor.dst.cur)
 // CHECK-NEXT:   %arraydtor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arraydtor.dst.cur, i64 1
 // CHECK-NEXT:   %arraydtor.done = icmp eq %struct.S* %arraydtor.dst.next, %arraydtor.dst.end
 // CHECK-NEXT:   br i1 %arraydtor.done, label %arraydtor.cont, label %arraydtor.loop
@@ -89,7 +89,7 @@ void foo() {
 // CHECK-NEXT:   br label %arrayctor.loop
 // CHECK: arrayctor.loop:                                   ; preds = %arrayctor.loop, %entry
 // CHECK-NEXT:   %arrayctor.dst.cur = phi %struct.S* [ %2, %entry ], [ %arrayctor.dst.next, %arrayctor.loop ]
-// CHECK-NEXT:   call void @_ZN1SC1Ev(%struct.S* %arrayctor.dst.cur)
+// CHECK-NEXT:   call void @_ZN1SC1Ev(%struct.S* nonnull dereferenceable(4) %arrayctor.dst.cur)
 // CHECK-NEXT:   %arrayctor.dst.next = getelementptr inbounds %struct.S, %struct.S* %arrayctor.dst.cur, i64 1
 // CHECK-NEXT:   %arrayctor.done = icmp eq %struct.S* %arrayctor.dst.next, %arrayctor.dst.end
 // CHECK-NEXT:   br i1 %arrayctor.done, label %arrayctor.cont, label %arrayctor.loop

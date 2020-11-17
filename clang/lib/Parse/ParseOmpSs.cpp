@@ -959,7 +959,7 @@ Parser::ParseOmpSsDeclareReductionDirective(AccessSpecifier AS) {
     ColonProtectionRAIIObject ColonRAII(*this);
     SourceRange Range;
     TypeResult TR =
-        ParseTypeName(&Range, DeclaratorContext::PrototypeContext, AS);
+        ParseTypeName(&Range, DeclaratorContext::Prototype, AS);
     if (TR.isUsable()) {
       QualType ReductionType =
           Actions.ActOnOmpSsDeclareReductionType(Range.getBegin(), TR);

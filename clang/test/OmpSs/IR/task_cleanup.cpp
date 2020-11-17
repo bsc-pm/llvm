@@ -28,7 +28,7 @@ l:      n++; // to put something in the label
 // CHECK-NEXT:   br label %while.body
 // CHECK: while.body:                                       ; preds = %while.cond
 // CHECK-NEXT:   store i32 4, i32* %cleanup.dest.slot, align 4
-// CHECK-NEXT:   call void @_ZN3FooD1Ev(%struct.Foo* %f)
+// CHECK-NEXT:   call void @_ZN3FooD1Ev(%struct.Foo* nonnull dereferenceable(1) %f)
 // CHECK-NEXT:   %cleanup.dest = load i32, i32* %cleanup.dest.slot, align 4
 // CHECK-NEXT:   switch i32 %cleanup.dest, label %unreachable [
 // CHECK-NEXT:     i32 4, label %l
