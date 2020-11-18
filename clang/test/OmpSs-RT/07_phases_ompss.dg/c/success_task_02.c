@@ -24,8 +24,8 @@
   Cambridge, MA 02139, USA.
 --------------------------------------------------------------------*/
 
-// RUN: %oss-compile-and-run
-// RUN: %oss-O2-compile-and-run
+// RUN: %oss-compile && NANOS6_CONFIG_OVERRIDE="version.dependencies=regions,$NANOS6_CONFIG_OVERRIDE" %oss-run
+// RUN: %oss-O2-compile && NANOS6_CONFIG_OVERRIDE="version.dependencies=regions,$NANOS6_CONFIG_OVERRIDE" %oss-run
 
 /*
 <testinfo>
