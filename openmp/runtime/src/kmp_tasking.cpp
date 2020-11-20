@@ -926,9 +926,10 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     taskdata->td_flags.complete = 1; // mark the task as completed
 
     // Only need to keep track of count if team parallel and tasking not
-    // serialized, or task is detachable and event has already been fulfilled 
-    if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser) ||
-        taskdata->td_flags.detachable == TASK_DETACHABLE) {
+    // serialized, or task is detachable and event has already been fulfilled
+    if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser)
+        || taskdata->td_flags.detachable == TASK_DETACHABLE
+        || __kmp_num_unshackled_threads != 0) {
       // Predecrement simulated by "- 1" calculation
       children =
           KMP_ATOMIC_DEC(&taskdata->td_parent->td_incomplete_child_tasks) - 1;
@@ -1375,10 +1376,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 #endif
 // Only need to keep track of child task counts if team parallel and tasking not
 // serialized or if it is a proxy or detachable task
-  if (flags->proxy == TASK_PROXY ||
-      flags->detachable == TASK_DETACHABLE ||
-      !(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser))
-  {
+  if (flags->proxy == TASK_PROXY || flags->detachable == TASK_DETACHABLE ||
+      !(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser) ||
+      __kmp_num_unshackled_threads != 0) {
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
     if (parent_task->td_taskgroup)
       KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
@@ -2983,6 +2983,16 @@ static inline int __kmp_execute_tasks_template(
       }
     }
 
+    if (!final_spin && __kmp_num_unshackled_threads != 0 &&
+        KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
+      // So this is like a taskwait but we could not find a task (perhaps an
+      // unshackled got a chance to execute it first)
+      KA_TRACE(15, ("__kmp_execute_tasks_template: T#%d spin condition "
+                    "satisfied without having executed any task\n",
+                    gtid));
+      return TRUE;
+    }
+
     // The task source has been exhausted. If in final spin loop of barrier,
     // check if termination condition is satisfied. The work queue may be empty
     // but there might be proxy tasks still executing.
@@ -3030,7 +3040,7 @@ static inline int __kmp_execute_tasks_template(
     // thread, keep trying to execute tasks from own queue
     if (nthreads == 1 && !thread->th.is_unshackled) {
       use_own_tasks = 1;
-    else {
+    } else {
       KA_TRACE(15,
                ("__kmp_execute_tasks_template: T#%d can't find work\n", gtid));
       return FALSE;
