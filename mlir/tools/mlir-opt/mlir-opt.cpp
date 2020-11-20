@@ -74,6 +74,7 @@ void registerTestLinalgCodegenStrategy();
 void registerTestLinalgFusionTransforms();
 void registerTestLinalgGreedyFusion();
 void registerTestLinalgHoisting();
+void registerTestLinalgTileAndFuseSequencePass();
 void registerTestLinalgTransforms();
 void registerTestLivenessPass();
 void registerTestLoopFusion();
@@ -87,6 +88,7 @@ void registerTestOpaqueLoc();
 void registerTestPreparationPassWithAllowedMemrefResults();
 void registerTestRecursiveTypesPass();
 void registerTestSCFUtilsPass();
+void registerTestSparsification();
 void registerTestVectorConversions();
 } // namespace test
 } // namespace mlir
@@ -140,6 +142,7 @@ void registerTestPasses() {
   test::registerTestLinalgFusionTransforms();
   test::registerTestLinalgGreedyFusion();
   test::registerTestLinalgHoisting();
+  test::registerTestLinalgTileAndFuseSequencePass();
   test::registerTestLinalgTransforms();
   test::registerTestLivenessPass();
   test::registerTestLoopFusion();
@@ -152,6 +155,7 @@ void registerTestPasses() {
   test::registerTestOpaqueLoc();
   test::registerTestRecursiveTypesPass();
   test::registerTestSCFUtilsPass();
+  test::registerTestSparsification();
   test::registerTestVectorConversions();
 }
 #endif

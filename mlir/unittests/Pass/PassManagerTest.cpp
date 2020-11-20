@@ -8,7 +8,7 @@
 
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "gtest/gtest.h"
 
