@@ -140,6 +140,7 @@ public:
     OB_oss_multidep_range_weakinout = 49,         // "OB_oss_multidep_range_weakinout"
     OB_oss_multidep_range_weakconcurrent = 50,    // "OB_oss_multidep_range_weakconcurrent"
     OB_oss_multidep_range_weakcommutative = 51,   // "OB_oss_multidep_range_weakcommutative"
+    OB_oss_decl_source = 52,                      // "OB_oss_decl_source"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.

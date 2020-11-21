@@ -8,7 +8,7 @@ void bar() {
     foo1(0);
 }
 
-// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg), "QUAL.OSS.DEP.CONCURRENT"(i32** %call_arg, [9 x i8] c"p[1 ; 5]\00", %struct._depend_unpack_t (i32**)* @compute_dep, i32** %call_arg), "QUAL.OSS.DEP.COMMUTATIVE"(i32** %call_arg, [9 x i8] c"p[1 : 5]\00", %struct._depend_unpack_t.0 (i32**)* @compute_dep.1, i32** %call_arg) ]
+// CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg), "QUAL.OSS.DEP.CONCURRENT"(i32** %call_arg, [9 x i8] c"p[1 ; 5]\00", %struct._depend_unpack_t (i32**)* @compute_dep, i32** %call_arg), "QUAL.OSS.DEP.COMMUTATIVE"(i32** %call_arg, [9 x i8] c"p[1 : 5]\00", %struct._depend_unpack_t.0 (i32**)* @compute_dep.1, i32** %call_arg), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:4:9\00") ]
 
 // CHECK: define internal %struct._depend_unpack_t @compute_dep(i32** %p)
 // CHECK: entry:

@@ -11,5 +11,5 @@ void foo() {
 }
 
 // CHECK: %0 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ]
-// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true) ]
+// CHECK: %1 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.WAIT"(i1 true), "QUAL.OSS.DECL.SOURCE"([12 x i8] c"outline:4:9\00") ]
 

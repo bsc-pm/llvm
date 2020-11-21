@@ -1844,6 +1844,9 @@ struct OmpSs : public ModulePass {
                  Module &M,
                  FinalBodyInfoMap &FinalBodyInfo) {
 
+    const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+    const DirectiveLoopInfo LoopInfo = DirInfo.DirEnv.LoopInfo;
+
     DebugLoc DLoc = DirInfo.Entry->getDebugLoc();
     unsigned Line = DLoc.getLine();
     unsigned Col = DLoc.getCol();
@@ -1852,14 +1855,15 @@ struct OmpSs : public ModulePass {
                                    + ":" + Twine(Col)).str();
 
     Constant *Nanos6TaskLocStr = IRBuilder<>(DirInfo.Entry).CreateGlobalStringPtr(FileNamePlusLoc);
+    Constant *Nanos6TaskDeclSourceStr = nullptr;
+    if (!DirEnv.DeclSourceStringRef.empty())
+      Nanos6TaskDeclSourceStr = IRBuilder<>(DirInfo.Entry).CreateGlobalStringPtr(DirEnv.DeclSourceStringRef);
 
     buildFinalCondCFG(M, F, FinalBodyInfo.lookup(&DirInfo));
 
     BasicBlock *EntryBB = DirInfo.Entry->getParent();
     BasicBlock *ExitBB = DirInfo.Exit->getParent()->getUniqueSuccessor();
 
-    const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
-    const DirectiveLoopInfo LoopInfo = DirInfo.DirEnv.LoopInfo;
 
     // In loop constructs this will be the starting loop BB
     BasicBlock *NewEntryBB = EntryBB;
@@ -1990,7 +1994,7 @@ struct OmpSs : public ModulePass {
           ? ConstantExpr::getPointerCast(cast<Constant>(DirEnv.Label),
                                          Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))
           : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(3))),
-        Nanos6TaskLocStr,
+        Nanos6TaskDeclSourceStr ? Nanos6TaskDeclSourceStr : Nanos6TaskLocStr,
         ConstantPointerNull::get(cast<PointerType>(Nanos6TaskImplInfo::getInstance(M).getType()->getElementType(5))))));
 
 

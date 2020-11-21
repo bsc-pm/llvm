@@ -308,6 +308,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSMultiDepRangeWeakCommutativeEntry->second == LLVMContext::OB_oss_multidep_range_weakcommutative &&
          "oss_multidep_range_weakcommutative operand bundle id drifted!");
   (void)OSSMultiDepRangeWeakCommutativeEntry;
+
+  auto *OSSDeclSourceEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.DECL.SOURCE");
+  assert(OSSDeclSourceEntry->second == LLVMContext::OB_oss_decl_source &&
+         "oss_decl_source operand bundle id drifted!");
+  (void)OSSDeclSourceEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

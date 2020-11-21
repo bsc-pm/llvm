@@ -92,6 +92,7 @@ enum OmpSsBundleKind {
   OSSB_loop_lowerbound,
   OSSB_loop_upperbound,
   OSSB_loop_step,
+  OSSB_decl_source,
   OSSB_unknown
 };
 
@@ -201,6 +202,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.LOOP.UPPER.BOUND";
   case OSSB_loop_step:
     return "QUAL.OSS.LOOP.STEP";
+  case OSSB_decl_source:
+    return "QUAL.OSS.DECL.SOURCE";
   default:
     llvm_unreachable("Invalid OmpSs bundle kind");
   }
@@ -2768,6 +2771,17 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
     }
     if (!CapturedList.empty())
       TaskInfo.emplace_back(getBundleStr(OSSB_captured), CapturedList);
+
+    CGDebugInfo *DI = CGF.getDebugInfo();
+    // Get location information.
+    llvm::DebugLoc DbgLoc = DI->SourceLocToDebugLoc(Attr->getLocation());
+
+    StringRef Name = FD->getName();
+    TaskInfo.emplace_back(
+      getBundleStr(OSSB_decl_source),
+      llvm::ConstantDataArray::getString(
+        CGM.getLLVMContext(),
+        (Name + ":" + Twine(DbgLoc.getLine()) + ":" + Twine(DbgLoc.getCol())).str()));
   }
   InDirectiveEmission = false;
 

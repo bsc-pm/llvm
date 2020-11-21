@@ -188,6 +188,7 @@ struct DirectiveEnvironment {
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
   DirectiveLoopInfo LoopInfo;
+  StringRef DeclSourceStringRef;
   DirectiveEnvironment(const Instruction *I);
   // Different reductions may have same init/comb, assign the same ReductionIndex
   DenseMap<Value *, int> SeenInits;
@@ -221,6 +222,7 @@ private:
   void gatherLoopChunksizeInfo(OperandBundleDef &OBDef);
   void gatherLoopGrainsizeInfo(OperandBundleDef &OBDef);
   void gatherMultiDependInfo(OperandBundleDef &OBDef, uint64_t Id);
+  void gatherDeclSource(OperandBundleDef &OBDef);
 
   void verifyVLADimsInfo();
   void verifyDependInfo();

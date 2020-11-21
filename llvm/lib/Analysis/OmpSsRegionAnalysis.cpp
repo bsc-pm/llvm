@@ -532,6 +532,13 @@ void DirectiveEnvironment::gatherMultiDependInfo(
   DependsInfo.List.emplace_back(MDI);
 }
 
+void DirectiveEnvironment::gatherDeclSource(OperandBundleDef &OB) {
+  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
+  ConstantDataArray *DeclSourceDataArray = cast<ConstantDataArray>(OB.inputs()[0]);
+  assert(DeclSourceDataArray->isCString() && "Region text must be a C string");
+  DeclSourceStringRef = DeclSourceDataArray->getAsCString();
+}
+
 void DirectiveEnvironment::verifyVLADimsInfo() {
   for (const auto &VLAWithDimsMap : VLADimsInfo) {
     if (!valueInDSABundles(DSAInfo, VLAWithDimsMap.first))
@@ -727,6 +734,9 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
     case LLVMContext::OB_oss_multidep_range_weakconcurrent:
     case LLVMContext::OB_oss_multidep_range_weakcommutative:
       gatherMultiDependInfo(OBDef, Id);
+      break;
+    case LLVMContext::OB_oss_decl_source:
+      gatherDeclSource(OBDef);
       break;
     default:
       llvm_unreachable("unknown ompss-2 bundle id");

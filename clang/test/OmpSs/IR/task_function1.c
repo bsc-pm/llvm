@@ -18,7 +18,7 @@ int main() {
 // CHECK-NEXT: %sub = sub nsw i32 %6, 1
 // CHECK-NEXT: store i32 %sub, i32* %call_arg, align 4
 // CHECK: store i32* %vla, i32** %call_arg1, align 8
-// CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.IN"(i32** %call_arg1, [3 x i8] c"*a\00", %struct._depend_unpack_t (i32**, i64)* @compute_dep, i32** %call_arg1, i64 %8), "QUAL.OSS.CAPTURED"(i64 %8) ]
+// CHECK: %9 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.IN"(i32** %call_arg1, [3 x i8] c"*a\00", %struct._depend_unpack_t (i32**, i64)* @compute_dep, i32** %call_arg1, i64 %8), "QUAL.OSS.CAPTURED"(i64 %8), "QUAL.OSS.DECL.SOURCE"([8 x i8] c"foo:4:9\00") ]
 // CHECK-NEXT: %10 = load i32, i32* %call_arg, align 4
 // CHECK-NEXT: %11 = load i32*, i32** %call_arg1, align 8
 // CHECK-NEXT: call void @foo(i32{{( signext)?}} %10, i32* %11)
@@ -59,14 +59,14 @@ void bar() {
 // CHECK-NEXT: store i32 %div, i32* %call_arg, align 4
 // CHECK-NEXT: %1 = load i32*, i32** %v, align 8
 // CHECK-NEXT: store i32* %1, i32** %call_arg1, align 8
-// CHECK: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.OUT"(i32** %call_arg1, [11 x i8] c"[size/77]p\00", %struct._depend_unpack_t.0 (i32**, i32*)* @compute_dep.1, i32** %call_arg1, i32* %call_arg) ]
+// CHECK: %2 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.OUT"(i32** %call_arg1, [11 x i8] c"[size/77]p\00", %struct._depend_unpack_t.0 (i32**, i32*)* @compute_dep.1, i32** %call_arg1, i32* %call_arg), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:44:9\00") ]
 
 // CHECK: %5 = load i32, i32* %n, align 4
 // CHECK-NEXT: %div3 = sdiv i32 %5, 99
 // CHECK-NEXT: store i32 %div3, i32* %call_arg2, align 4
 // CHECK-NEXT: %6 = load i32*, i32** %v, align 8
 // CHECK-NEXT: store i32* %6, i32** %call_arg4, align 8
-// CHECK: %7 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg2), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg4), "QUAL.OSS.DEP.OUT"(i32** %call_arg4, [11 x i8] c"[size/77]p\00", %struct._depend_unpack_t.1 (i32**, i32*)* @compute_dep.2, i32** %call_arg4, i32* %call_arg2) ]
+// CHECK: %7 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg2), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg4), "QUAL.OSS.DEP.OUT"(i32** %call_arg4, [11 x i8] c"[size/77]p\00", %struct._depend_unpack_t.1 (i32**, i32*)* @compute_dep.2, i32** %call_arg4, i32* %call_arg2), "QUAL.OSS.DECL.SOURCE"([10 x i8] c"foo1:44:9\00") ]
 
 // CHECK: define internal %struct._depend_unpack_t.0 @compute_dep.1(i32** %p, i32* %size)
 // CHECK: entry:

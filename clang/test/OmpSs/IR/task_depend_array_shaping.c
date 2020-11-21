@@ -239,7 +239,7 @@ void bar() {
     foo3(10, mat);
 }
 
-// CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.IN"(i32** %call_arg1, [20 x i8] c"pvla[sizeof(*pvla)]\00", %struct._depend_unpack_t.8 (i32**, i64)* @compute_dep.9, i32** %call_arg1, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1) ]
+// CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.FIRSTPRIVATE"(i32** %call_arg1), "QUAL.OSS.DEP.IN"(i32** %call_arg1, [20 x i8] c"pvla[sizeof(*pvla)]\00", %struct._depend_unpack_t.8 (i32**, i64)* @compute_dep.9, i32** %call_arg1, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1), "QUAL.OSS.DECL.SOURCE"([11 x i8] c"foo3:233:9\00") ]
 
 // CHECK: define internal %struct._depend_unpack_t.8 @compute_dep.9(i32** %pvla, i64 %0)
 // CHECK: entry:
