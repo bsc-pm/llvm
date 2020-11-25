@@ -37,10 +37,10 @@ entry:
   ret void, !dbg !20
 }
 
-; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 0, i64 777)
-; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 0, i64 777)
-; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 777, i64 0)
-; CHECK: call void @nanos6_register_loop_bounds(i8* {{%.*}}, i64 0, i64 10, i64 777, i64 0)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var__Z3foov0, %nanos6_task_invocation_info_t* @task_invocation_info__Z3foov0, i64 32, i8** %8, i8** %1, i64 8, i64 %9, i64 0, i64 10, i64 0, i64 777)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var__Z3foov1, %nanos6_task_invocation_info_t* @task_invocation_info__Z3foov1, i64 32, i8** %13, i8** %3, i64 12, i64 %14, i64 0, i64 10, i64 0, i64 777)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var__Z3foov2, %nanos6_task_invocation_info_t* @task_invocation_info__Z3foov2, i64 32, i8** %18, i8** %5, i64 4, i64 %19, i64 0, i64 10, i64 777, i64 0)
+; CHECK: call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var__Z3foov3, %nanos6_task_invocation_info_t* @task_invocation_info__Z3foov3, i64 32, i8** %23, i8** %7, i64 12, i64 %24, i64 0, i64 10, i64 777, i64 0)
 
 ; Function Attrs: nounwind
 declare token @llvm.directive.region.entry() #1

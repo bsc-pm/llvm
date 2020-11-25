@@ -398,7 +398,7 @@ struct OmpSs : public ModulePass {
 
   FunctionCallee CreateTaskFuncCallee;
   FunctionCallee TaskSubmitFuncCallee;
-  FunctionCallee RegisterLoopFuncCallee;
+  FunctionCallee CreateLoopFuncCallee;
   FunctionCallee TaskInFinalFuncCallee;
   FunctionCallee TaskInfoRegisterFuncCallee;
   FunctionCallee TaskInfoRegisterCtorFuncCallee;
@@ -2286,13 +2286,82 @@ struct OmpSs : public ModulePass {
         IRB.CreateStore(DirEnv.Label, LabelField);
       }
 
-      IRB.CreateCall(CreateTaskFuncCallee, {TaskInfoVar,
-                                  TaskInvInfoVar,
-                                  TaskArgsSizeOf,
-                                  TaskArgsVarCast,
-                                  TaskPtrVar,
-                                  TaskFlagsVar,
-                                  IRB.CreateLoad(NumDependencies)});
+      // Arguments for creating a task or a loop directive
+      SmallVector<Value *, 4> CreateDirectiveArgs = {
+        TaskInfoVar,
+        TaskInvInfoVar,
+        TaskArgsSizeOf,
+        TaskArgsVarCast,
+        TaskPtrVar,
+        TaskFlagsVar,
+        IRB.CreateLoad(NumDependencies)
+      };
+
+      if (DirEnv.isOmpSsLoopDirective()) {
+        // <      0, (ub - 1 - lb) / step + 1
+        // <=     0, (ub - lb)     / step + 1
+        // >      0, (ub + 1 - lb) / step + 1
+        // >=     0, (ub - lb)     / step + 1
+        Type *IndVarTy = DirEnv.LoopInfo.IndVar->getType()->getPointerElementType();
+        Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
+
+        auto p = buildInstructionSignDependent(
+          IRB, M, DirEnv.LoopInfo.UBound, DirEnv.LoopInfo.LBound, DirEnv.LoopInfo.UBoundSigned, DirEnv.LoopInfo.LBoundSigned,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            return IRB.CreateSub(LHS, RHS);
+          });
+        Value *RegisterUpperB = p.first;
+
+        Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
+        if (DirEnv.LoopInfo.Grainsize)
+          RegisterGrainsize = DirEnv.LoopInfo.Grainsize;
+        Value *RegisterChunksize = ConstantInt::get(IndVarTy, 0);
+        if (DirEnv.LoopInfo.Chunksize)
+          RegisterChunksize = DirEnv.LoopInfo.Chunksize;
+
+        switch (DirEnv.LoopInfo.LoopType) {
+        case DirectiveLoopInfo::LT:
+          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
+          break;
+        case DirectiveLoopInfo::GT:
+          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
+          break;
+        case DirectiveLoopInfo::LE:
+        case DirectiveLoopInfo::GE:
+          break;
+        default:
+          llvm_unreachable("unexpected loop type");
+        }
+        p = buildInstructionSignDependent(
+          IRB, M, RegisterUpperB, DirEnv.LoopInfo.Step, p.second, DirEnv.LoopInfo.Step,
+          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
+            if (NewOpSigned)
+              return IRB.CreateSDiv(LHS, RHS);
+            return IRB.CreateUDiv(LHS, RHS);
+          });
+        RegisterUpperB = IRB.CreateAdd(p.first, ConstantInt::get(p.first->getType(), 1));
+
+        CreateDirectiveArgs.push_back(
+          createZSExtOrTrunc(
+              IRB, RegisterLowerB,
+              Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), /*Signed=*/false));
+        CreateDirectiveArgs.push_back(
+          createZSExtOrTrunc(
+            IRB, RegisterUpperB,
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), p.second));
+        CreateDirectiveArgs.push_back(
+          createZSExtOrTrunc(
+            IRB, RegisterGrainsize,
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), /*Signed=*/false));
+        CreateDirectiveArgs.push_back(
+          createZSExtOrTrunc(
+            IRB, RegisterChunksize,
+            Nanos6LoopBounds::getInstance(M).getType()->getElementType(3), /*Signed=*/false));
+
+        IRB.CreateCall(CreateLoopFuncCallee, CreateDirectiveArgs);
+      } else {
+        IRB.CreateCall(CreateTaskFuncCallee, CreateDirectiveArgs);
+      }
 
       // DSA capture
       Value *TaskArgsVarL = IRB.CreateLoad(TaskArgsVar);
@@ -2432,68 +2501,6 @@ struct OmpSs : public ModulePass {
 
       Value *TaskPtrVarL = IRB.CreateLoad(TaskPtrVar);
 
-      if (DirEnv.isOmpSsLoopDirective()) {
-        // <      0, (ub - 1 - lb) / step + 1
-        // <=     0, (ub - lb)     / step + 1
-        // >      0, (ub + 1 - lb) / step + 1
-        // >=     0, (ub - lb)     / step + 1
-        Type *IndVarTy = DirEnv.LoopInfo.IndVar->getType()->getPointerElementType();
-        Value *RegisterLowerB = ConstantInt::get(IndVarTy, 0);
-
-        auto p = buildInstructionSignDependent(
-          IRB, M, DirEnv.LoopInfo.UBound, DirEnv.LoopInfo.LBound, DirEnv.LoopInfo.UBoundSigned, DirEnv.LoopInfo.LBoundSigned,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            return IRB.CreateSub(LHS, RHS);
-          });
-        Value *RegisterUpperB = p.first;
-
-        Value *RegisterGrainsize = ConstantInt::get(IndVarTy, 0);
-        if (DirEnv.LoopInfo.Grainsize)
-          RegisterGrainsize = DirEnv.LoopInfo.Grainsize;
-        Value *RegisterChunksize = ConstantInt::get(IndVarTy, 0);
-        if (DirEnv.LoopInfo.Chunksize)
-          RegisterChunksize = DirEnv.LoopInfo.Chunksize;
-
-        switch (DirEnv.LoopInfo.LoopType) {
-        case DirectiveLoopInfo::LT:
-          RegisterUpperB = IRB.CreateSub(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
-          break;
-        case DirectiveLoopInfo::GT:
-          RegisterUpperB = IRB.CreateAdd(RegisterUpperB, ConstantInt::get(RegisterUpperB->getType(), 1));
-          break;
-        case DirectiveLoopInfo::LE:
-        case DirectiveLoopInfo::GE:
-          break;
-        default:
-          llvm_unreachable("unexpected loop type");
-        }
-        p = buildInstructionSignDependent(
-          IRB, M, RegisterUpperB, DirEnv.LoopInfo.Step, p.second, DirEnv.LoopInfo.Step,
-          [](IRBuilder<> &IRB, Value *LHS, Value *RHS, bool NewOpSigned) {
-            if (NewOpSigned)
-              return IRB.CreateSDiv(LHS, RHS);
-            return IRB.CreateUDiv(LHS, RHS);
-          });
-        RegisterUpperB = IRB.CreateAdd(p.first, ConstantInt::get(p.first->getType(), 1));
-        IRB.CreateCall(
-          RegisterLoopFuncCallee,
-          {
-            TaskPtrVarL,
-            createZSExtOrTrunc(
-              IRB, RegisterLowerB,
-              Nanos6LoopBounds::getInstance(M).getType()->getElementType(0), /*Signed=*/false),
-            createZSExtOrTrunc(
-              IRB, RegisterUpperB,
-              Nanos6LoopBounds::getInstance(M).getType()->getElementType(1), p.second),
-            createZSExtOrTrunc(
-              IRB, RegisterGrainsize,
-              Nanos6LoopBounds::getInstance(M).getType()->getElementType(2), /*Signed=*/false),
-            createZSExtOrTrunc(
-              IRB, RegisterChunksize,
-              Nanos6LoopBounds::getInstance(M).getType()->getElementType(3), /*Signed=*/false)
-          }
-        );
-      }
 
       CallInst *TaskSubmitFuncCall = IRB.CreateCall(TaskSubmitFuncCallee, TaskPtrVarL);
       return TaskSubmitFuncCall;
@@ -2537,17 +2544,34 @@ struct OmpSs : public ModulePass {
         Type::getInt32Ty(M.getContext())
     );
 
-    // void nanos6_register_loop_bounds(
-    //     void *taskHandle, size_t lower_bound, size_t upper_bound,
-    //     size_t grainsize, size_t chunksize)
-    RegisterLoopFuncCallee = M.getOrInsertFunction("nanos6_register_loop_bounds",
+    // void nanos6_create_loop(
+    //     nanos6_task_info_t *task_info,
+    //     nanos6_task_invocation_info_t *task_invocation_info,
+    //     size_t args_block_size,
+    //     /* OUT */ void **args_block_pointer,
+    //     /* OUT */ void **task_pointer,
+    //     size_t flags,
+    //     size_t num_deps,
+    //     size_t lower_bound,
+    //     size_t upper_bound,
+    //     size_t grainsize,
+    //     size_t chunksize
+    // );
+    CreateLoopFuncCallee = M.getOrInsertFunction("nanos6_create_loop",
         Type::getVoidTy(M.getContext()),
-        Type::getInt8PtrTy(M.getContext()),
+        Nanos6TaskInfo::getInstance(M).getType()->getPointerTo(),
+        Nanos6TaskInvInfo::getInstance(M).getType()->getPointerTo(),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt8PtrTy(M.getContext())->getPointerTo(),
+        Type::getInt64Ty(M.getContext()),
+        Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext()),
         Type::getInt64Ty(M.getContext())
     );
+
 
     // void nanos6_register_task_info(nanos6_task_info_t *task_info);
     TaskInfoRegisterFuncCallee = M.getOrInsertFunction("nanos6_register_task_info",

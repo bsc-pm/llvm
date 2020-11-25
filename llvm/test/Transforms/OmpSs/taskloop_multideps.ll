@@ -38,7 +38,7 @@ define i32 @main() #0 !dbg !6 {
 ; CHECK-NEXT:    [[TMP2:%.*]] = bitcast %nanos6_task_args_main0** [[TMP0]] to i8**, [[DBG9]]
 ; CHECK-NEXT:    store i64 -1, i64* [[NUM_DEPS]], align 8, [[DBG9]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i64, i64* [[NUM_DEPS]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_create_task(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 32, i8** [[TMP2]], i8** [[TMP1]], i64 4, i64 [[TMP3]]), [[DBG9]]
+; CHECK-NEXT:    call void @nanos6_create_loop(%nanos6_task_info_t* @task_info_var_main0, %nanos6_task_invocation_info_t* @task_invocation_info_main0, i64 32, i8** [[TMP2]], i8** [[TMP1]], i64 4, i64 [[TMP3]], i64 0, i64 10, i64 0, i64 0), [[DBG9]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load %nanos6_task_args_main0*, %nanos6_task_args_main0** [[TMP0]], align 8, [[DBG9]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast %nanos6_task_args_main0* [[TMP4]] to i8*, [[DBG9]]
 ; CHECK-NEXT:    [[ARGS_END:%.*]] = getelementptr i8, i8* [[TMP5]], i64 32, [[DBG9]]
@@ -51,7 +51,6 @@ define i32 @main() #0 !dbg !6 {
 ; CHECK-NEXT:    [[CAPT_GEP_5:%.*]] = getelementptr [[NANOS6_TASK_ARGS_MAIN0]], %nanos6_task_args_main0* [[TMP4]], i32 0, i32 5, [[DBG9]]
 ; CHECK-NEXT:    store i32 1, i32* [[CAPT_GEP_5]], align 4, [[DBG9]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load i8*, i8** [[TMP1]], align 8, [[DBG9]]
-; CHECK-NEXT:    call void @nanos6_register_loop_bounds(i8* [[TMP6]], i64 0, i64 10, i64 0, i64 0), [[DBG9]]
 ; CHECK-NEXT:    call void @nanos6_submit_task(i8* [[TMP6]]), [[DBG9]]
 ; CHECK-NEXT:    br label [[FINAL_END:%.*]], [[DBG9]]
 ; CHECK:       final.end:
