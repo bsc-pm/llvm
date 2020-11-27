@@ -1,6 +1,3 @@
-set(OLD_CMAKE_JOB_POOL_COMPILE CMAKE_JOB_POOL_COMPILE)
-set(CMAKE_JOB_POOL_COMPILE "compile_flang")
-
 add_flang_library(FortranSemantics
   assignment.cpp
   attr.cpp
@@ -59,5 +56,3 @@ add_flang_library(FortranSemantics
   FrontendOpenMP
   FrontendOpenACC
 )
-
-set(CMAKE_JOB_POOL_COMPILE OLD_CMAKE_JOB_POOL_COMPILE)
