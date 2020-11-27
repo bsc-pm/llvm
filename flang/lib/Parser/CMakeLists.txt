@@ -1,3 +1,5 @@
+set(OLD_CMAKE_JOB_POOL_COMPILE CMAKE_JOB_POOL_COMPILE)
+set(CMAKE_JOB_POOL_COMPILE "compile_flang")
 
 add_flang_library(FortranParser
   Fortran-parsers.cpp
@@ -37,3 +39,5 @@ add_flang_library(FortranParser
   omp_gen
   acc_gen
 )
+
+set(CMAKE_JOB_POOL_COMPILE OLD_CMAKE_JOB_POOL_COMPILE)

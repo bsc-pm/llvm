@@ -16,6 +16,12 @@ if (POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
 endif()
 
+# Some components of flang are extremely memory resource hungry
+# at compile time, so build just few of them at a time.
+if(CMAKE_GENERATOR STREQUAL "Ninja")
+  set_property(GLOBAL APPEND PROPERTY JOB_POOLS compile_flang=2)
+endif()
+
 option(LINK_WITH_FIR "Link driver with FIR and LLVM" ON)
 option(FLANG_BUILD_NEW_DRIVER "Build the flang compiler driver" OFF)
 

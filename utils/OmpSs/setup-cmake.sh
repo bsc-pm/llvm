@@ -227,17 +227,11 @@ fi
 
 if [ "$BUILD_SYSTEM" = "Ninja" ];
 then
-  if [ -z "${LLVM_PARALLEL_COMPILE_JOBS}" ];
-  then
-    PHYSICAL_MEMORY=$(free -g|awk '/^Mem:/{print $2}')
-    # Flang has files that use up to 5 Gb of RAM so divide the amount of available
-    # physical memory over 5 for an approximate number.
-    NUM_COMPILE_JOBS=$((1 + ${PHYSICAL_MEMORY}/5))
-  else
+  if [ -n "${LLVM_PARALLEL_COMPILE_JOBS}" ];
     NUM_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}
+    info "Setting concurrent compile jobs to ${NUM_COMPILE_JOBS}"
+    CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_COMPILE_JOBS=${NUM_COMPILE_JOBS}")
   fi
-  info "Setting concurrent compile jobs to ${NUM_COMPILE_JOBS}"
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_COMPILE_JOBS=${NUM_COMPILE_JOBS}")
 
   if [ -z "${LLVM_PARALLEL_LINK_JOBS}" ];
   then
