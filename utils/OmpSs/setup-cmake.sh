@@ -228,6 +228,7 @@ fi
 if [ "$BUILD_SYSTEM" = "Ninja" ];
 then
   if [ -n "${LLVM_PARALLEL_COMPILE_JOBS}" ];
+  then
     NUM_COMPILE_JOBS=${LLVM_PARALLEL_COMPILE_JOBS}
     info "Setting concurrent compile jobs to ${NUM_COMPILE_JOBS}"
     CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_PARALLEL_COMPILE_JOBS=${NUM_COMPILE_JOBS}")
