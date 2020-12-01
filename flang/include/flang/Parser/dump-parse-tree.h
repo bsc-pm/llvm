@@ -708,21 +708,25 @@ public:
 
   NODE(parser, OSSClause)
   NODE(parser, OSSClauseList)
-  NODE(OSSClause, Cost)
-  NODE(OSSClause, Final)
-  NODE(OSSClause, Firstprivate)
-  NODE(OSSClause, If)
-  NODE(OSSClause, Private)
-  NODE(OSSClause, Shared)
+
+  static std::string GetNodeName(const llvm::oss::Directive &x) {
+    return llvm::Twine(
+        "llvm::oss::Directive = ", llvm::oss::getOmpSsDirectiveName(x))
+        .str();
+  }
+  static std::string GetNodeName(const llvm::oss::Clause &x) {
+    return llvm::Twine(
+        "llvm::oss::Clause = ", llvm::oss::getOmpSsClauseName(x))
+        .str();
+  }
+
+#define GEN_FLANG_DUMP_PARSE_TREE_CLAUSES
+#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
 
   NODE(parser, OSSDependClause)
   NODE(OSSDependClause, InOut)
-  NODE(OSSDependClause, Sink)
-  NODE(OSSDependClause, Source)
   NODE(parser, OSSDependenceType)
   NODE_ENUM(OSSDependenceType, Type)
-  NODE(parser, OSSDependSinkVec)
-  NODE(parser, OSSDependSinkVecLength)
 
   NODE(parser, OSSDefaultClause)
   NODE_ENUM(OSSDefaultClause, Type)
@@ -731,10 +735,8 @@ public:
   NODE(parser, OSSReductionClause)
 
   NODE(parser, OSSSimpleStandaloneDirective)
-  NODE_ENUM(OSSSimpleStandaloneDirective, Directive)
 
   NODE(parser, OSSBlockDirective)
-  NODE_ENUM(OSSBlockDirective, Directive)
   NODE(parser, OSSBeginBlockDirective)
   NODE(parser, OSSEndBlockDirective)
 

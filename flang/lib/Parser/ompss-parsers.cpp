@@ -26,16 +26,8 @@ TYPE_PARSER(construct<OSSObject>(designator))
 TYPE_PARSER(construct<OSSObjectList>(nonemptyList(Parser<OSSObject>{})))
 
 TYPE_PARSER(construct<OSSDefaultClause>(
-    "PRIVATE" >> pure(OSSDefaultClause::Type::Private) ||
-    "FIRSTPRIVATE" >> pure(OSSDefaultClause::Type::Firstprivate) ||
     "SHARED" >> pure(OSSDefaultClause::Type::Shared) ||
     "NONE" >> pure(OSSDefaultClause::Type::None)))
-
-TYPE_PARSER(construct<OSSDependSinkVecLength>(
-    Parser<DefinedOperator>{}, scalarIntConstantExpr))
-
-TYPE_PARSER(
-    construct<OSSDependSinkVec>(name, maybe(Parser<OSSDependSinkVecLength>{})))
 
 TYPE_PARSER(
     construct<OSSDependenceType>("IN"_id >> pure(OSSDependenceType::Type::In) ||
@@ -43,12 +35,8 @@ TYPE_PARSER(
         "OUT" >> pure(OSSDependenceType::Type::Out)))
 
 TYPE_CONTEXT_PARSER("OmpSs-2 Depend clause"_en_US,
-    construct<OSSDependClause>(construct<OSSDependClause::Sink>(
-        "SINK :" >> nonemptyList(Parser<OSSDependSinkVec>{}))) ||
-        construct<OSSDependClause>(
-            construct<OSSDependClause::Source>("SOURCE"_tok)) ||
-        construct<OSSDependClause>(construct<OSSDependClause::InOut>(
-            Parser<OSSDependenceType>{}, ":" >> nonemptyList(designator))))
+    construct<OSSDependClause>(construct<OSSDependClause::InOut>(
+        Parser<OSSDependenceType>{}, ":" >> nonemptyList(designator))))
 
 TYPE_PARSER(construct<OSSReductionOperator>(Parser<DefinedOperator>{}) ||
     construct<OSSReductionOperator>(Parser<ProcedureDesignator>{}))
@@ -60,6 +48,8 @@ TYPE_PARSER(construct<OSSReductionClause>(
 TYPE_PARSER(
     "COST" >> construct<OSSClause>(construct<OSSClause::Cost>(
                       parenthesized(scalarIntExpr))) ||
+    "CHUNKSIZE" >> construct<OSSClause>(construct<OSSClause::Chunksize>(
+                       parenthesized(scalarIntExpr))) ||
     "DEFAULT"_id >>
         construct<OSSClause>(parenthesized(Parser<OSSDefaultClause>{})) ||
     "DEPEND" >>
@@ -68,28 +58,39 @@ TYPE_PARSER(
                    parenthesized(scalarLogicalExpr))) ||
     "FIRSTPRIVATE" >> construct<OSSClause>(construct<OSSClause::Firstprivate>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
+    "GRAINSIZE" >> construct<OSSClause>(construct<OSSClause::Grainsize>(
+                       parenthesized(scalarIntExpr))) ||
     "IF" >> construct<OSSClause>(construct<OSSClause::If>(
                    parenthesized(scalarLogicalExpr))) ||
+    "LABEL" >> construct<OSSClause>(construct<OSSClause::Label>(
+                      parenthesized(scalarDefaultCharExpr))) ||
+    "PRIORITY" >> construct<OSSClause>(construct<OSSClause::Priority>(
+                      parenthesized(scalarIntExpr))) ||
     "PRIVATE" >> construct<OSSClause>(construct<OSSClause::Private>(
                      parenthesized(Parser<OSSObjectList>{}))) ||
     "REDUCTION" >>
         construct<OSSClause>(parenthesized(Parser<OSSReductionClause>{})) ||
     "SHARED" >> construct<OSSClause>(construct<OSSClause::Shared>(
-                    parenthesized(Parser<OSSObjectList>{}))))
+                    parenthesized(Parser<OSSObjectList>{}))) ||
+    "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()))
 
 TYPE_PARSER(sourced(construct<OSSClauseList>(
     many(maybe(","_tok) >> sourced(Parser<OSSClause>{})))))
 
 // Simple standalone directives
 TYPE_PARSER(sourced(construct<OSSSimpleStandaloneDirective>(first(
-    "TASKWAIT" >> pure(OSSSimpleStandaloneDirective::Directive::Taskwait)))))
+    "RELEASE" >> pure(llvm::oss::Directive::OSSD_release),
+    "TASKWAIT" >> pure(llvm::oss::Directive::OSSD_taskwait)))))
 
 TYPE_PARSER(sourced(construct<OmpSsSimpleStandaloneConstruct>(
     Parser<OSSSimpleStandaloneDirective>{}, Parser<OSSClauseList>{})))
 
 // Block directives
-TYPE_PARSER(construct<OSSBlockDirective>(
-    first("TASK"_id >> pure(OSSBlockDirective::Directive::Task))))
+TYPE_PARSER(construct<OSSBlockDirective>(first(
+    "TASK FOR" >> pure(llvm::oss::Directive::OSSD_task_for),
+    "TASK"_id >> pure(llvm::oss::Directive::OSSD_task),
+    "TASKLOOP FOR" >> pure(llvm::oss::Directive::OSSD_taskloop_for),
+    "TASKLOOP" >> pure(llvm::oss::Directive::OSSD_taskloop))))
 
 TYPE_PARSER(sourced(construct<OSSBeginBlockDirective>(
     sourced(Parser<OSSBlockDirective>{}), Parser<OSSClauseList>{})))

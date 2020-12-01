@@ -2555,22 +2555,86 @@ public:
   WALK_NESTED_ENUM(OmpScheduleClause, ScheduleType) // OMP schedule-type
   WALK_NESTED_ENUM(OmpIfClause, DirectiveNameModifier) // OMP directive-modifier
   WALK_NESTED_ENUM(OmpCancelType, Type) // OMP cancel-type
+  WALK_NESTED_ENUM(OSSDefaultClause, Type) // OSS DEFAULT
+  WALK_NESTED_ENUM(OSSDependenceType, Type) // OSS dependence-type
 #undef WALK_NESTED_ENUM
+
+  // OmpSs-2 Clauses & Directives
+  void Unparse(const OSSObject &x) {
+    std::visit(common::visitors{
+                   [&](const Designator &y) { Walk(y); },
+                   [&](const Name &y) { Put("/"), Walk(y), Put("/"); },
+               },
+        x.u);
+  }
+
+  void Unparse(const OSSObjectList &x) { Walk(x.v, ","); }
 
   void Unparse(const OSSClauseList &x) { Walk(" ", x.v, " "); }
 
+  void Unparse(const OSSDependClause::InOut &x) {
+    Put("(");
+    Walk(std::get<OSSDependenceType>(x.t));
+    Put(":");
+    Walk(std::get<std::list<Designator>>(x.t), ",");
+    Put(")");
+  }
+  bool Pre(const OSSDependClause &x) {
+    return std::visit(common::visitors{
+                          [&](const OSSDependClause::InOut &) {
+                            Word("DEPEND");
+                            return true;
+                          },
+                      },
+        x.u);
+  }
+
+  bool Pre(const OSSDefaultClause &) {
+    Word("DEFAULT(");
+    return true;
+  }
+  void Post(const OSSDefaultClause &) { Put(")"); }
+
+  void Unparse(const OSSReductionClause &x) {
+    Word("REDUCTION(");
+    Walk(std::get<OSSReductionOperator>(x.t));
+    Put(":");
+    Walk(std::get<std::list<Designator>>(x.t), ",");
+    Put(")");
+  }
+
+#define GEN_FLANG_CLAUSE_UNPARSE
+#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
   void Unparse(const OSSBlockDirective &x) {
     switch (x.v) {
-    case OSSBlockDirective::Directive::Task:
+    case llvm::oss::Directive::OSSD_task:
       Word("TASK ");
+      break;
+    case llvm::oss::Directive::OSSD_task_for:
+      Word("TASK FOR ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop:
+      Word("TASKLOOP ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop_for:
+      Word("TASKLOOP FOR ");
+      break;
+    default:
+      // Nothing to be done
       break;
     }
   }
 
   void Unparse(const OSSSimpleStandaloneDirective &x) {
     switch (x.v) {
-    case OSSSimpleStandaloneDirective::Directive::Taskwait:
+    case llvm::oss::Directive::OSSD_taskwait:
       Word("TASKWAIT ");
+      break;
+    case llvm::oss::Directive::OSSD_release:
+      Word("RELEASE ");
+      break;
+    default:
+      // Nothing to be done
       break;
     }
   }

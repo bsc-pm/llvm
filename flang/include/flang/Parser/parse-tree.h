@@ -27,6 +27,7 @@
 #include "flang/Common/indirection.h"
 #include "llvm/Frontend/OpenACC/ACC.h.inc"
 #include "llvm/Frontend/OpenMP/OMPConstants.h"
+#include "llvm/Frontend/OmpSs/OSS.h.inc"
 #include <cinttypes>
 #include <list>
 #include <memory>
@@ -4048,34 +4049,22 @@ struct OSSObject {
 WRAPPER_CLASS(OSSObjectList, std::list<OSSObject>);
 
 struct OSSDefaultClause {
-  ENUM_CLASS(Type, Private, Firstprivate, Shared, None)
+  ENUM_CLASS(Type, Shared, None)
   WRAPPER_CLASS_BOILERPLATE(OSSDefaultClause, Type);
 };
 
-struct OSSDependSinkVecLength {
-  TUPLE_CLASS_BOILERPLATE(OSSDependSinkVecLength);
-  std::tuple<DefinedOperator, ScalarIntConstantExpr> t;
-};
-
-struct OSSDependSinkVec {
-  TUPLE_CLASS_BOILERPLATE(OSSDependSinkVec);
-  std::tuple<Name, std::optional<OSSDependSinkVecLength>> t;
-};
-
 struct OSSDependenceType {
-  ENUM_CLASS(Type, In, Out, Inout, Source, Sink)
+  ENUM_CLASS(Type, In, Out, Inout)
   WRAPPER_CLASS_BOILERPLATE(OSSDependenceType, Type);
 };
 
 struct OSSDependClause {
   UNION_CLASS_BOILERPLATE(OSSDependClause);
-  EMPTY_CLASS(Source);
-  WRAPPER_CLASS(Sink, std::list<OSSDependSinkVec>);
   struct InOut {
     TUPLE_CLASS_BOILERPLATE(InOut);
     std::tuple<OSSDependenceType, std::list<Designator>> t;
   };
-  std::variant<Source, Sink, InOut> u;
+  std::variant<InOut> u;
 };
 
 struct OSSReductionOperator {
@@ -4088,17 +4077,19 @@ struct OSSReductionClause {
   std::tuple<OSSReductionOperator, std::list<Designator>> t;
 };
 
+// OmpSs-2 Clauses
 struct OSSClause {
   UNION_CLASS_BOILERPLATE(OSSClause);
-  WRAPPER_CLASS(Final, ScalarLogicalExpr);
-  WRAPPER_CLASS(Firstprivate, OSSObjectList);
-  WRAPPER_CLASS(Private, OSSObjectList);
-  WRAPPER_CLASS(Shared, OSSObjectList);
-  WRAPPER_CLASS(If, ScalarLogicalExpr);
-  WRAPPER_CLASS(Cost, ScalarIntExpr);
+
+#define GEN_FLANG_CLAUSE_PARSER_CLASSES
+#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
+
   CharBlock source;
-  std::variant<Final, Firstprivate, Private, Shared, If, Cost, OSSDefaultClause,
-      OSSReductionClause, OSSDependClause>
+
+  std::variant<
+#define GEN_FLANG_CLAUSE_PARSER_CLASSES_LIST
+#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
+      >
       u;
 };
 
@@ -4108,8 +4099,7 @@ struct OSSClauseList {
 };
 
 struct OSSSimpleStandaloneDirective {
-  ENUM_CLASS(Directive, Taskwait)
-  WRAPPER_CLASS_BOILERPLATE(OSSSimpleStandaloneDirective, Directive);
+  WRAPPER_CLASS_BOILERPLATE(OSSSimpleStandaloneDirective, llvm::oss::Directive);
   CharBlock source;
 };
 
@@ -4126,8 +4116,7 @@ struct OmpSsStandaloneConstruct {
 };
 
 struct OSSBlockDirective {
-  ENUM_CLASS(Directive, Task);
-  WRAPPER_CLASS_BOILERPLATE(OSSBlockDirective, Directive);
+  WRAPPER_CLASS_BOILERPLATE(OSSBlockDirective, llvm::oss::Directive);
   CharBlock source;
 };
 

@@ -1,0 +1,10 @@
+! RUN: %f18 -fompss-2 -funparse %s | FileCheck %s
+
+PROGRAM P1
+    INTEGER :: S, P, F
+
+!$OSS RELEASE DEPEND(IN: S) DEPEND(OUT: P) DEPEND(INOUT: F)
+
+END PROGRAM
+
+!CHECK: !$OSS RELEASE  DEPEND(IN:s) DEPEND(OUT:p) DEPEND(INOUT:f)

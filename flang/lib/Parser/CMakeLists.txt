@@ -38,6 +38,7 @@ add_flang_library(FortranParser
   DEPENDS
   omp_gen
   acc_gen
+  oss_gen
 )
 
 set(CMAKE_JOB_POOL_COMPILE OLD_CMAKE_JOB_POOL_COMPILE)
