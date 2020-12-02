@@ -2556,7 +2556,7 @@ public:
   WALK_NESTED_ENUM(OmpIfClause, DirectiveNameModifier) // OMP directive-modifier
   WALK_NESTED_ENUM(OmpCancelType, Type) // OMP cancel-type
   WALK_NESTED_ENUM(OSSDefaultClause, Type) // OSS DEFAULT
-  WALK_NESTED_ENUM(OSSDependenceType, Type) // OSS dependence-type
+  // WALK_NESTED_ENUM(OSSDependenceType, Type) // OSS dependence-type
 #undef WALK_NESTED_ENUM
 
   // OmpSs-2 Clauses & Directives
@@ -2571,6 +2571,29 @@ public:
   void Unparse(const OSSObjectList &x) { Walk(x.v, ","); }
 
   void Unparse(const OSSClauseList &x) { Walk(" ", x.v, " "); }
+
+  void Unparse(const OSSDependenceType &x) {
+    switch (x.v) {
+    case OSSDependenceType::Type::In:
+      Word("IN");
+      break;
+    case OSSDependenceType::Type::Out:
+      Word("OUT");
+      break;
+    case OSSDependenceType::Type::Inout:
+      Word("INOUT");
+      break;
+    case OSSDependenceType::Type::WeakIn:
+      Word("WEAK, IN");
+      break;
+    case OSSDependenceType::Type::WeakOut:
+      Word("WEAK, OUT");
+      break;
+    case OSSDependenceType::Type::WeakInout:
+      Word("WEAK, INOUT");
+      break;
+    }
+  }
 
   void Unparse(const OSSDependClause::InOut &x) {
     Put("(");

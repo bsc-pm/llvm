@@ -30,9 +30,16 @@ TYPE_PARSER(construct<OSSDefaultClause>(
     "NONE" >> pure(OSSDefaultClause::Type::None)))
 
 TYPE_PARSER(
-    construct<OSSDependenceType>("IN"_id >> pure(OSSDependenceType::Type::In) ||
-        "INOUT" >> pure(OSSDependenceType::Type::Inout) ||
-        "OUT" >> pure(OSSDependenceType::Type::Out)))
+    construct<OSSDependenceType>(first(
+        "IN, WEAK" >> pure(OSSDependenceType::Type::WeakIn),
+        "IN"_id >> pure(OSSDependenceType::Type::In),
+        "INOUT, WEAK" >> pure(OSSDependenceType::Type::WeakInout),
+        "INOUT" >> pure(OSSDependenceType::Type::Inout),
+        "OUT, WEAK" >> pure(OSSDependenceType::Type::WeakOut),
+        "OUT" >> pure(OSSDependenceType::Type::Out),
+        "WEAK, IN"_id >> pure(OSSDependenceType::Type::WeakIn),
+        "WEAK, INOUT" >> pure(OSSDependenceType::Type::WeakInout),
+        "WEAK, OUT" >> pure(OSSDependenceType::Type::WeakOut))))
 
 TYPE_CONTEXT_PARSER("OmpSs-2 Depend clause"_en_US,
     construct<OSSDependClause>(construct<OSSDependClause::InOut>(
