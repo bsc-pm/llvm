@@ -2839,6 +2839,10 @@ static inline int __kmp_execute_tasks_template(
   kmp_int32 nthreads, victim_tid = -2, use_own_tasks = 1, new_victim = 0,
                       tid = thread->th.th_info.ds.ds_tid;
 
+  // Unshackled threads never look at their own queue (because they don't have any!)
+  if (thread->th.is_unshackled)
+    use_own_tasks = 0;
+
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(thread == __kmp_threads[gtid]);
 
@@ -2869,13 +2873,20 @@ static inline int __kmp_execute_tasks_template(
       if ((task == NULL) && (nthreads > 1)) { // Steal a task
         int asleep = 1;
         use_own_tasks = 0;
-        // Try to steal from the last place I stole from successfully.
-        if (victim_tid == -2) { // haven't stolen anything yet
-          victim_tid = threads_data[tid].td.td_deque_last_stolen;
-          if (victim_tid !=
-              -1) // if we have a last stolen from victim, get the thread
-            other_thread = threads_data[victim_tid].td.td_thr;
+        // Try to steal from the last place I stole from successfully
+        // if this is not an unshackled thread.
+        if (!thread->th.is_unshackled) {
+          if (victim_tid == -2) { // haven't stolen anything yet
+            victim_tid = threads_data[tid].td.td_deque_last_stolen;
+            if (victim_tid !=
+                -1) // if we have a last stolen from victim, get the thread
+              other_thread = threads_data[victim_tid].td.td_thr;
+          }
+        } else {
+          victim_tid = -1;
         }
+        // victim_tid is either -1 or a real tid.
+        KMP_DEBUG_ASSERT(victim_tid != -2);
         if (victim_tid != -1) { // found last victim
           asleep = 0;
         } else if (!new_victim) { // no recent steals and we haven't already
@@ -2884,9 +2895,13 @@ static inline int __kmp_execute_tasks_template(
             // Pick a random thread. Initial plan was to cycle through all the
             // threads, and only return if we tried to steal from every thread,
             // and failed.  Arch says that's not such a great idea.
-            victim_tid = __kmp_get_random(thread) % (nthreads - 1);
-            if (victim_tid >= tid) {
-              ++victim_tid; // Adjusts random distribution to exclude self
+            if (thread->th.is_unshackled) {
+              victim_tid = __kmp_get_random(thread) % nthreads;
+            } else {
+              victim_tid = __kmp_get_random(thread) % (nthreads - 1);
+              if (victim_tid >= tid) {
+                ++victim_tid; // Adjusts random distribution to exclude self
+              }
             }
             // Found a potential victim
             other_thread = threads_data[victim_tid].td.td_thr;
@@ -2922,17 +2937,22 @@ static inline int __kmp_execute_tasks_template(
                                   unfinished_threads, thread_finished,
                                   is_constrained);
         }
-        if (task != NULL) { // set last stolen to victim
-          if (threads_data[tid].td.td_deque_last_stolen != victim_tid) {
-            threads_data[tid].td.td_deque_last_stolen = victim_tid;
-            // The pre-refactored code did not try more than 1 successful new
-            // vicitm, unless the last one generated more local tasks;
-            // new_victim keeps track of this
-            new_victim = 1;
+        if (!thread->th.is_unshackled) {
+          if (task != NULL) { // set last stolen to victim
+            if (threads_data[tid].td.td_deque_last_stolen != victim_tid) {
+              threads_data[tid].td.td_deque_last_stolen = victim_tid;
+              // The pre-refactored code did not try more than 1 successful new
+              // vicitm, unless the last one generated more local tasks;
+              // new_victim keeps track of this
+              new_victim = 1;
+            }
+          } else { // No tasks found; unset last_stolen
+            KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
+            victim_tid = -2; // no successful victim found
           }
-        } else { // No tasks found; unset last_stolen
-          KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
-          victim_tid = -2; // no successful victim found
+        } else if (task != NULL) {
+          // Unshackled threads will try to steal all the tasks from the thread.
+          new_victim = 1;
         }
       }
 
@@ -2973,8 +2993,10 @@ static inline int __kmp_execute_tasks_template(
       }
       KMP_YIELD(__kmp_library == library_throughput); // Yield before next task
       // If execution of a stolen task results in more tasks being placed on our
-      // run queue, reset use_own_tasks
-      if (!use_own_tasks && TCR_4(threads_data[tid].td.td_deque_ntasks) != 0) {
+      // run queue and we are not an unshackled (an unshackled doesn't have a queue!),
+      // reset use_own_tasks
+      if (!thread->th.is_unshackled && !use_own_tasks &&
+          TCR_4(threads_data[tid].td.td_deque_ntasks) != 0) {
         KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d stolen task spawned "
                       "other tasks, restart\n",
                       gtid));
