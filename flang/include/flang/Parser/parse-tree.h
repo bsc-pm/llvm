@@ -4054,7 +4054,9 @@ struct OSSDefaultClause {
 };
 
 struct OSSDependenceType {
-  ENUM_CLASS(Type, In, Out, Inout, WeakIn, WeakOut, WeakInout)
+  ENUM_CLASS(Type,
+             In, Out, Inout, Inoutset, Mutexinoutset,
+             WeakIn, WeakOut, WeakInout, WeakInoutset, WeakMutexinoutset)
   WRAPPER_CLASS_BOILERPLATE(OSSDependenceType, Type);
 };
 

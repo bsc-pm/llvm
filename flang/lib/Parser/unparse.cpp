@@ -2583,6 +2583,12 @@ public:
     case OSSDependenceType::Type::Inout:
       Word("INOUT");
       break;
+    case OSSDependenceType::Type::Inoutset:
+      Word("INOUTSET");
+      break;
+    case OSSDependenceType::Type::Mutexinoutset:
+      Word("MUTEXINOUTSET");
+      break;
     case OSSDependenceType::Type::WeakIn:
       Word("WEAK, IN");
       break;
@@ -2591,6 +2597,12 @@ public:
       break;
     case OSSDependenceType::Type::WeakInout:
       Word("WEAK, INOUT");
+      break;
+    case OSSDependenceType::Type::WeakInoutset:
+      Word("WEAK, INOUTSET");
+      break;
+    case OSSDependenceType::Type::WeakMutexinoutset:
+      Word("WEAK, MUTEXINOUTSET");
       break;
     }
   }
