@@ -31,21 +31,21 @@ TYPE_PARSER(construct<OSSDefaultClause>(
 
 TYPE_PARSER(
     construct<OSSDependenceType>(first(
-        "IN, WEAK" >> pure(OSSDependenceType::Type::WeakIn),
+        "IN, WEAK" >> pure(OSSDependenceType::Type::Weakin),
         "IN"_id >> pure(OSSDependenceType::Type::In),
-        "INOUT, WEAK" >> pure(OSSDependenceType::Type::WeakInout),
+        "INOUT, WEAK" >> pure(OSSDependenceType::Type::Weakinout),
         "INOUT"_id >> pure(OSSDependenceType::Type::Inout),
-        "INOUTSET, WEAK" >> pure(OSSDependenceType::Type::WeakInoutset),
+        "INOUTSET, WEAK" >> pure(OSSDependenceType::Type::Weakinoutset),
         "INOUTSET" >> pure(OSSDependenceType::Type::Inoutset),
-        "MUTEXINOUTSET, WEAK" >> pure(OSSDependenceType::Type::WeakMutexinoutset),
+        "MUTEXINOUTSET, WEAK" >> pure(OSSDependenceType::Type::Weakmutexinoutset),
         "MUTEXINOUTSET" >> pure(OSSDependenceType::Type::Mutexinoutset),
-        "OUT, WEAK" >> pure(OSSDependenceType::Type::WeakOut),
+        "OUT, WEAK" >> pure(OSSDependenceType::Type::Weakout),
         "OUT" >> pure(OSSDependenceType::Type::Out),
-        "WEAK, IN"_id >> pure(OSSDependenceType::Type::WeakIn),
-        "WEAK, INOUT"_id >> pure(OSSDependenceType::Type::WeakInout),
-        "WEAK, INOUTSET" >> pure(OSSDependenceType::Type::WeakInoutset),
-        "WEAK, MUTEXINOUTSET" >> pure(OSSDependenceType::Type::WeakMutexinoutset),
-        "WEAK, OUT" >> pure(OSSDependenceType::Type::WeakOut))))
+        "WEAK, IN"_id >> pure(OSSDependenceType::Type::Weakin),
+        "WEAK, INOUT"_id >> pure(OSSDependenceType::Type::Weakinout),
+        "WEAK, INOUTSET" >> pure(OSSDependenceType::Type::Weakinoutset),
+        "WEAK, MUTEXINOUTSET" >> pure(OSSDependenceType::Type::Weakmutexinoutset),
+        "WEAK, OUT" >> pure(OSSDependenceType::Type::Weakout))))
 
 TYPE_CONTEXT_PARSER("OmpSs-2 Depend clause"_en_US,
     construct<OSSDependClause>(construct<OSSDependClause::InOut>(
@@ -63,6 +63,10 @@ TYPE_PARSER(
                       parenthesized(scalarIntExpr))) ||
     "CHUNKSIZE" >> construct<OSSClause>(construct<OSSClause::Chunksize>(
                        parenthesized(scalarIntExpr))) ||
+    "COMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Commutative>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "CONCURRENT" >> construct<OSSClause>(construct<OSSClause::Concurrent>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
     "DEFAULT"_id >>
         construct<OSSClause>(parenthesized(Parser<OSSDefaultClause>{})) ||
     "DEPEND" >>
@@ -75,8 +79,14 @@ TYPE_PARSER(
                        parenthesized(scalarIntExpr))) ||
     "IF" >> construct<OSSClause>(construct<OSSClause::If>(
                    parenthesized(scalarLogicalExpr))) ||
+    "IN"_id >> construct<OSSClause>(construct<OSSClause::In>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "INOUT" >> construct<OSSClause>(construct<OSSClause::Inout>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
     "LABEL" >> construct<OSSClause>(construct<OSSClause::Label>(
                       parenthesized(scalarDefaultCharExpr))) ||
+    "OUT" >> construct<OSSClause>(construct<OSSClause::Out>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
     "PRIORITY" >> construct<OSSClause>(construct<OSSClause::Priority>(
                       parenthesized(scalarIntExpr))) ||
     "PRIVATE" >> construct<OSSClause>(construct<OSSClause::Private>(
@@ -85,7 +95,17 @@ TYPE_PARSER(
         construct<OSSClause>(parenthesized(Parser<OSSReductionClause>{})) ||
     "SHARED" >> construct<OSSClause>(construct<OSSClause::Shared>(
                     parenthesized(Parser<OSSObjectList>{}))) ||
-    "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()))
+    "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()) ||
+    "WEAKCOMMUTATIVE" >> construct<OSSClause>(construct<OSSClause::Weakcommutative>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "WEAKCONCURRENT" >> construct<OSSClause>(construct<OSSClause::Weakconcurrent>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "WEAKIN"_id >> construct<OSSClause>(construct<OSSClause::Weakin>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "WEAKINOUT" >> construct<OSSClause>(construct<OSSClause::Weakinout>(
+                          parenthesized(Parser<OSSObjectList>{}))) ||
+    "WEAKOUT" >> construct<OSSClause>(construct<OSSClause::Weakout>(
+                          parenthesized(Parser<OSSObjectList>{}))))
 
 TYPE_PARSER(sourced(construct<OSSClauseList>(
     many(maybe(","_tok) >> sourced(Parser<OSSClause>{})))))

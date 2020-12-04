@@ -75,6 +75,46 @@ def OSSC_Depend : Clause<"depend"> {
   let clangClass = "OSSDependClause";
   let flangClass = "OSSDependClause";
 }
+def OSSC_In : Clause<"in"> {
+  let clangClass = "OSSInClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_Out : Clause<"out"> {
+  let clangClass = "OSSOutClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_Inout : Clause<"inout"> {
+  let clangClass = "OSSInoutClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_Concurrent : Clause<"concurrent"> {
+  let clangClass = "OSSConcurrentClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_Commutative : Clause<"commutative"> {
+  let clangClass = "OSSCommutativeClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_WeakIn : Clause<"weakin"> {
+  let clangClass = "OSSWeakInClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_WeakOut : Clause<"weakout"> {
+  let clangClass = "OSSWeakOutClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_WeakInout : Clause<"weakinout"> {
+  let clangClass = "OSSWeakInoutClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_WeakConcurrent : Clause<"weakconcurrent"> {
+  let clangClass = "OSSWeakConcurrentClause";
+  let flangClassValue = "OSSObjectList";
+}
+def OSSC_WeakCommutative : Clause<"weakcommutative"> {
+  let clangClass = "OSSWeakCommutativeClause";
+  let flangClassValue = "OSSObjectList";
+}
 def OSSC_Reduction : Clause<"reduction"> {
   let clangClass = "OSSReductionClause";
   let flangClass = "OSSReductionClause";
@@ -103,6 +143,16 @@ def OSS_Task : Directive<"task"> {
     VersionedClause<OSSC_FirstPrivate>,
     VersionedClause<OSSC_Shared>,
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakConcurrent>,
+    VersionedClause<OSSC_WeakCommutative>,
     VersionedClause<OSSC_Reduction>,
   ];
   let allowedOnceClauses = [
@@ -118,12 +168,21 @@ def OSS_Task : Directive<"task"> {
 def OSS_TaskWait : Directive<"taskwait"> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
   ];
 }
 
 def OSS_Release : Directive<"release"> {
   let allowedClauses = [
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
   ];
 }
 def OSS_TaskLoop : Directive<"taskloop"> {
@@ -132,6 +191,16 @@ def OSS_TaskLoop : Directive<"taskloop"> {
     VersionedClause<OSSC_FirstPrivate>,
     VersionedClause<OSSC_Shared>,
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakConcurrent>,
+    VersionedClause<OSSC_WeakCommutative>,
     VersionedClause<OSSC_Reduction>,
   ];
   let allowedOnceClauses = [
@@ -151,6 +220,16 @@ def OSS_TaskFor : Directive<"task for"> {
     VersionedClause<OSSC_FirstPrivate>,
     VersionedClause<OSSC_Shared>,
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakConcurrent>,
+    VersionedClause<OSSC_WeakCommutative>,
     VersionedClause<OSSC_Reduction>,
   ];
   let allowedOnceClauses = [
@@ -170,6 +249,16 @@ def OSS_TaskLoopFor : Directive<"taskloop for"> {
     VersionedClause<OSSC_FirstPrivate>,
     VersionedClause<OSSC_Shared>,
     VersionedClause<OSSC_Depend>,
+    VersionedClause<OSSC_In>,
+    VersionedClause<OSSC_Out>,
+    VersionedClause<OSSC_Inout>,
+    VersionedClause<OSSC_Concurrent>,
+    VersionedClause<OSSC_Commutative>,
+    VersionedClause<OSSC_WeakIn>,
+    VersionedClause<OSSC_WeakOut>,
+    VersionedClause<OSSC_WeakInout>,
+    VersionedClause<OSSC_WeakConcurrent>,
+    VersionedClause<OSSC_WeakCommutative>,
     VersionedClause<OSSC_Reduction>,
   ];
   let allowedOnceClauses = [
