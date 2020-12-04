@@ -2660,6 +2660,43 @@ public:
     }
   }
 
+  void Unparse(const OSSLoopDirective &x) {
+    switch (x.v) {
+    case llvm::oss::Directive::OSSD_task_for:
+      Word("TASK FOR ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop:
+      Word("TASKLOOP ");
+      break;
+    case llvm::oss::Directive::OSSD_taskloop_for:
+      Word("TASKLOOP FOR ");
+      break;
+    default:
+      // Nothing to be done
+      break;
+    }
+  }
+
+  void Unparse(const OSSEndLoopDirective &x) {
+    BeginOmpSs();
+    Word("!$OSS END ");
+    Walk(std::get<OSSLoopDirective>(x.t));
+    Walk(std::get<OSSClauseList>(x.t));
+    Put("\n");
+    EndOmpSs();
+  }
+
+  void Unparse(const OmpSsLoopConstruct &x) {
+    BeginOmpSs();
+    Word("!$OSS ");
+    Walk(std::get<OSSBeginLoopDirective>(x.t));
+    Put("\n");
+    EndOmpSs();
+    Walk(std::get<std::optional<DoConstruct>>(x.t));
+    Walk(std::get<std::optional<OSSEndLoopDirective>>(x.t));
+  }
+
+
   void Unparse(const OSSSimpleStandaloneDirective &x) {
     switch (x.v) {
     case llvm::oss::Directive::OSSD_taskwait:

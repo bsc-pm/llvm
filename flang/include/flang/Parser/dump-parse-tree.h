@@ -740,9 +740,14 @@ public:
   NODE(parser, OSSBeginBlockDirective)
   NODE(parser, OSSEndBlockDirective)
 
+  NODE(parser, OSSLoopDirective)
+  NODE(parser, OSSBeginLoopDirective)
+  NODE(parser, OSSEndLoopDirective)
+
   NODE(parser, OmpSsSimpleStandaloneConstruct)
   NODE(parser, OmpSsStandaloneConstruct)
   NODE(parser, OmpSsBlockConstruct)
+  NODE(parser, OmpSsLoopConstruct)
 
   NODE(parser, OmpSsConstruct)
 #undef NODE

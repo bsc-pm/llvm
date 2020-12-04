@@ -98,12 +98,13 @@ TYPE_PARSER(sourced(construct<OSSSimpleStandaloneDirective>(first(
 TYPE_PARSER(sourced(construct<OmpSsSimpleStandaloneConstruct>(
     Parser<OSSSimpleStandaloneDirective>{}, Parser<OSSClauseList>{})))
 
+TYPE_PARSER(sourced(construct<OmpSsStandaloneConstruct>(
+                Parser<OmpSsSimpleStandaloneConstruct>{})) /
+    endOfLine)
+
 // Block directives
 TYPE_PARSER(construct<OSSBlockDirective>(first(
-    "TASK FOR" >> pure(llvm::oss::Directive::OSSD_task_for),
-    "TASK"_id >> pure(llvm::oss::Directive::OSSD_task),
-    "TASKLOOP FOR" >> pure(llvm::oss::Directive::OSSD_taskloop_for),
-    "TASKLOOP" >> pure(llvm::oss::Directive::OSSD_taskloop))))
+    "TASK"_id >> pure(llvm::oss::Directive::OSSD_task))))
 
 TYPE_PARSER(sourced(construct<OSSBeginBlockDirective>(
     sourced(Parser<OSSBlockDirective>{}), Parser<OSSClauseList>{})))
@@ -117,14 +118,29 @@ TYPE_PARSER(construct<OmpSsBlockConstruct>(
     Parser<OSSBeginBlockDirective>{} / endOSSLine, block,
     Parser<OSSEndBlockDirective>{} / endOSSLine))
 
-TYPE_PARSER(sourced(construct<OmpSsStandaloneConstruct>(
-                Parser<OmpSsSimpleStandaloneConstruct>{})) /
-    endOfLine)
+// Loop directives
+TYPE_PARSER(sourced(construct<OSSLoopDirective>(first(
+    "TASK FOR" >> pure(llvm::oss::Directive::OSSD_task_for),
+    "TASKLOOP FOR" >> pure(llvm::oss::Directive::OSSD_taskloop_for),
+    "TASKLOOP" >> pure(llvm::oss::Directive::OSSD_taskloop)))))
+
+TYPE_PARSER(sourced(construct<OSSBeginLoopDirective>(
+    sourced(Parser<OSSLoopDirective>{}), Parser<OSSClauseList>{})))
+
+TYPE_PARSER(
+    startOSSLine >> sourced(construct<OSSEndLoopDirective>(
+                        sourced("END"_tok >> Parser<OSSLoopDirective>{}),
+                        Parser<OSSClauseList>{})))
+
+TYPE_PARSER(construct<OmpSsLoopConstruct>(
+    Parser<OSSBeginLoopDirective>{} / endOSSLine))
 
 // OmpSs-2 Top level Executable statement
 TYPE_CONTEXT_PARSER("OmpSs-2 construct"_en_US,
     startOSSLine >>
-        first(construct<OmpSsConstruct>(Parser<OmpSsBlockConstruct>{}),
+        first(
+            construct<OmpSsConstruct>(Parser<OmpSsLoopConstruct>{}),
+            construct<OmpSsConstruct>(Parser<OmpSsBlockConstruct>{}),
             construct<OmpSsConstruct>(Parser<OmpSsStandaloneConstruct>{})))
 
 } // namespace Fortran::parser

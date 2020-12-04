@@ -1,0 +1,28 @@
+! RUN: %f18 -fompss-2 -funparse %s | FileCheck %s
+
+PROGRAM P1
+
+!$OSS TASK FOR
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+!$OSS TASKLOOP
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+!$OSS TASKLOOP FOR
+    DO I = 1, 10
+        CONTINUE
+    END DO
+
+END PROGRAM
+
+!CHECK: !$OSS TASK FOR
+!CHECK-NOT: !$OSS END TASK FOR
+!CHECK: !$OSS TASKLOOP
+!CHECK-NOT: !$OSS END TASKLOOP
+!CHECK: !$OSS
+!CHECK-NOT: !$OSS END
+

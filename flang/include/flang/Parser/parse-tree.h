@@ -266,6 +266,7 @@ struct OpenMPDeclarativeConstruct;
 struct OmpEndLoopDirective;
 
 struct OmpSsConstruct;
+struct OSSEndLoopDirective;
 
 // Cooked character stream locations
 using Location = const char *;
@@ -524,7 +525,8 @@ struct ExecutableConstruct {
       common::Indirection<AccEndCombinedDirective>,
       common::Indirection<OpenMPConstruct>,
       common::Indirection<OmpEndLoopDirective>,
-      common::Indirection<OmpSsConstruct>>
+      common::Indirection<OmpSsConstruct>,
+      common::Indirection<OSSEndLoopDirective>>
       u;
 };
 
@@ -4139,9 +4141,39 @@ struct OmpSsBlockConstruct {
   std::tuple<OSSBeginBlockDirective, Block, OSSEndBlockDirective> t;
 };
 
+// OmpSs-2 directives that associate with loop(s)
+struct OSSLoopDirective {
+  WRAPPER_CLASS_BOILERPLATE(OSSLoopDirective, llvm::oss::Directive);
+  CharBlock source;
+};
+
+struct OSSBeginLoopDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSBeginLoopDirective);
+  std::tuple<OSSLoopDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+struct OSSEndLoopDirective {
+  TUPLE_CLASS_BOILERPLATE(OSSEndLoopDirective);
+  std::tuple<OSSLoopDirective, OSSClauseList> t;
+  CharBlock source;
+};
+
+// OmpSs-2 directives enclosing do loop
+struct OmpSsLoopConstruct {
+  TUPLE_CLASS_BOILERPLATE(OmpSsLoopConstruct);
+  OmpSsLoopConstruct(OSSBeginLoopDirective &&a)
+      : t({std::move(a), std::nullopt, std::nullopt}) {}
+  std::tuple<OSSBeginLoopDirective, std::optional<DoConstruct>,
+      std::optional<OSSEndLoopDirective>>
+      t;
+};
+
 struct OmpSsConstruct {
   UNION_CLASS_BOILERPLATE(OmpSsConstruct);
-  std::variant<OmpSsStandaloneConstruct, OmpSsBlockConstruct> u;
+  std::variant<
+      OmpSsStandaloneConstruct, OmpSsBlockConstruct, OmpSsLoopConstruct
+      > u;
 };
 
 } // namespace Fortran::parser

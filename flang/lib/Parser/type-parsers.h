@@ -137,5 +137,6 @@ constexpr Parser<OpenMPConstruct> openmpConstruct;
 constexpr Parser<OpenMPDeclarativeConstruct> openmpDeclarativeConstruct;
 constexpr Parser<OmpEndLoopDirective> ompEndLoopDirective;
 constexpr Parser<OmpSsConstruct> ompssConstruct;
+constexpr Parser<OSSEndLoopDirective> ossEndLoopDirective;
 } // namespace Fortran::parser
 #endif // FORTRAN_PARSER_TYPE_PARSERS_H_
