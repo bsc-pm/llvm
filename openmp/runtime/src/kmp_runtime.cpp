@@ -3785,6 +3785,8 @@ int __kmp_register_root(int initial_thread) {
   // if we have unshackled threads.
   if (__kmp_num_unshackled_threads != 0) {
     __kmp_enable_tasking_in_serial_mode(/*loc=*/ NULL, gtid);
+    // x86 needs this.
+    propagateFPControl(root_thread->th.th_team);
   }
 
   KMP_MB();

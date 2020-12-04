@@ -363,7 +363,9 @@ final_spin=FALSE)
           } else {
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           }
-        } else {
+        } else if (!this_thr->th.is_unshackled) {
+            // Unshackled threads are never master of any team, so they
+            // don't have to do any of this.
             KMP_DEBUG_ASSERT(!KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid));
 #if OMPT_SUPPORT
             // task-team is done now, other cases should be catched above

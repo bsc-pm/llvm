@@ -2859,7 +2859,12 @@ static inline int __kmp_execute_tasks_template(
 
   nthreads = task_team->tt.tt_nproc;
   unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-  KMP_DEBUG_ASSERT(nthreads > 1 || task_team->tt.tt_found_proxy_tasks);
+
+  // FIXME: We are not sure about this why it happens. Looks like unshackled
+  // threads can be here even if there are no proxy tasks and this is a serial
+  // team.
+  KMP_DEBUG_ASSERT(thread->th.is_unshackled || nthreads > 1 ||
+                   task_team->tt.tt_found_proxy_tasks);
   KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
 
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
@@ -2870,7 +2875,8 @@ static inline int __kmp_execute_tasks_template(
       if (use_own_tasks) { // check on own queue first
         task = __kmp_remove_my_task(thread, gtid, task_team, is_constrained);
       }
-      if ((task == NULL) && (nthreads > 1)) { // Steal a task
+      if ((task == NULL) &&
+          (nthreads > 1 || thread->th.is_unshackled)) { // Steal a task
         int asleep = 1;
         use_own_tasks = 0;
         // Try to steal from the last place I stole from successfully
