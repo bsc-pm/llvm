@@ -281,7 +281,7 @@ CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_CXX_FLAGS_DEBUG=-g -ggnu-pubnames")
 if [ "$LINKER" = "lld" ];
 then
   info "Make LLD generate '.gdb_index' section for faster debugging"
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS_DEBUG=-Wl,-gdb-index")
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_EXE_LINKER_FLAGS_DEBUG=-Wl,--gdb-index")
 else
    info "GNU ld is used, '.gdb_index' sections for faster debugging won't be generated"
 fi
