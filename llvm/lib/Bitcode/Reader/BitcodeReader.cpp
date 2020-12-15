@@ -2410,6 +2410,9 @@ Error BitcodeReader::parseConstants() {
     case bitc::CST_CODE_UNDEF:     // UNDEF
       V = UndefValue::get(CurTy);
       break;
+    case bitc::CST_CODE_POISON:    // POISON
+      V = PoisonValue::get(CurTy);
+      break;
     case bitc::CST_CODE_SETTYPE:   // SETTYPE: [typeid]
       if (Record.empty())
         return error("Invalid record");
@@ -3956,7 +3959,8 @@ Error BitcodeReader::parseFunctionBody(Function *F) {
         if (!IA)
           return error("Invalid record");
       }
-      LastLoc = DebugLoc::get(Line, Col, Scope, IA, isImplicitCode);
+      LastLoc = DILocation::get(Scope->getContext(), Line, Col, Scope, IA,
+                                isImplicitCode);
       I->setDebugLoc(LastLoc);
       I = nullptr;
       continue;

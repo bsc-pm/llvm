@@ -694,6 +694,9 @@ public:
     virtual int begin() const { return 0; }
     virtual int end() const { return 0; }
     virtual int next(int previous) const { return 0; }
+#if KMP_OS_WINDOWS
+    virtual int set_process_affinity(bool abort_on_error) const { return -1; }
+#endif
     // Set the system's affinity to this affinity mask's value
     virtual int set_system_affinity(bool abort_on_error) const { return -1; }
     // Set this affinity mask to the current system affinity
@@ -1325,25 +1328,17 @@ static inline void __kmp_x86_pause(void) { _mm_pause(); }
 // User-level Monitor/Mwait
 #if KMP_HAVE_UMWAIT
 // We always try for UMWAIT first
-#if (KMP_COMPILER_ICC && __INTEL_COMPILER >= 1300) ||                          \
-    (KMP_COMPILER_MSVC && _MSC_VER >= 1700) ||                                 \
-    (KMP_COMPILER_CLANG && (KMP_MSVC_COMPAT || __MINGW32__)) ||                \
-    (KMP_COMPILER_GCC && __MINGW32__)
-#if KMP_OS_UNIX
+#if KMP_HAVE_WAITPKG_INTRINSICS
+#if KMP_HAVE_IMMINTRIN_H
 #include <immintrin.h>
-#else
+#elif KMP_HAVE_INTRIN_H
 #include <intrin.h>
-#endif // KMP_OS_UNIX
-#else
-#define USE_MWAIT_ASM                                                          \
-  KMP_OS_UNIX && (!KMP_COMPILER_ICC || __INTEL_COMPILER < 1900)
-#endif // KMP_COMPILER_ICC etc.
-#if KMP_OS_UNIX && 0 // "waitpkg" not recognized yet
-__attribute__((target("waitpkg")))
 #endif
+#endif // KMP_HAVE_WAITPKG_INTRINSICS
+KMP_ATTRIBUTE_TARGET_WAITPKG
 static inline int
 __kmp_tpause(uint32_t hint, uint64_t counter) {
-#if (USE_MWAIT_ASM)
+#if !KMP_HAVE_WAITPKG_INTRINSICS
   uint32_t timeHi = uint32_t(counter >> 32);
   uint32_t timeLo = uint32_t(counter & 0xffffffff);
   char flag;
@@ -1357,12 +1352,10 @@ __kmp_tpause(uint32_t hint, uint64_t counter) {
   return _tpause(hint, counter);
 #endif
 }
-#if KMP_OS_UNIX && 0 // "waitpkg" not recognized on our build machine
-__attribute__((target("waitpkg")))
-#endif
+KMP_ATTRIBUTE_TARGET_WAITPKG
 static inline void
 __kmp_umonitor(void *cacheline) {
-#if (USE_MWAIT_ASM)
+#if !KMP_HAVE_WAITPKG_INTRINSICS
   __asm__ volatile("# umonitor\n.byte 0xF3, 0x0F, 0xAE, 0x01 "
                    :
                    : "a"(cacheline)
@@ -1371,12 +1364,10 @@ __kmp_umonitor(void *cacheline) {
   _umonitor(cacheline);
 #endif
 }
-#if KMP_OS_UNIX && 0 // "waitpkg" not recognized on our build machine
-__attribute__((target("waitpkg")))
-#endif
+KMP_ATTRIBUTE_TARGET_WAITPKG
 static inline int
 __kmp_umwait(uint32_t hint, uint64_t counter) {
-#if (USE_MWAIT_ASM)
+#if !KMP_HAVE_WAITPKG_INTRINSICS
   uint32_t timeHi = uint32_t(counter >> 32);
   uint32_t timeLo = uint32_t(counter & 0xffffffff);
   char flag;
@@ -3227,6 +3218,7 @@ extern void __kmp_internal_end_dest(void *);
 
 extern int __kmp_register_root(int initial_thread);
 extern void __kmp_unregister_root(int gtid);
+extern void __kmp_unregister_library(void); // called by __kmp_internal_end()
 
 extern int __kmp_ignore_mppbeg(void);
 extern int __kmp_ignore_mppend(void);
@@ -3813,6 +3805,12 @@ KMP_EXPORT void __kmpc_taskloop(ident_t *loc, kmp_int32 gtid, kmp_task_t *task,
                                 kmp_uint64 *ub, kmp_int64 st, kmp_int32 nogroup,
                                 kmp_int32 sched, kmp_uint64 grainsize,
                                 void *task_dup);
+KMP_EXPORT void __kmpc_taskloop_5(ident_t *loc, kmp_int32 gtid,
+                                  kmp_task_t *task, kmp_int32 if_val,
+                                  kmp_uint64 *lb, kmp_uint64 *ub, kmp_int64 st,
+                                  kmp_int32 nogroup, kmp_int32 sched,
+                                  kmp_uint64 grainsize, kmp_int32 modifier,
+                                  void *task_dup);
 KMP_EXPORT void *__kmpc_task_reduction_init(int gtid, int num_data, void *data);
 KMP_EXPORT void *__kmpc_taskred_init(int gtid, int num_data, void *data);
 KMP_EXPORT void *__kmpc_task_reduction_get_th_data(int gtid, void *tg, void *d);
@@ -4015,14 +4013,14 @@ extern void __kmp_suspend_32(int th_gtid, kmp_flag_32<C, S> *flag);
 template <bool C, bool S>
 extern void __kmp_suspend_64(int th_gtid, kmp_flag_64<C, S> *flag);
 extern void __kmp_suspend_oncore(int th_gtid, kmp_flag_oncore *flag);
-template <bool C, bool S>
 #if KMP_HAVE_MWAIT || KMP_HAVE_UMWAIT
+template <bool C, bool S>
 extern void __kmp_mwait_32(int th_gtid, kmp_flag_32<C, S> *flag);
 template <bool C, bool S>
 extern void __kmp_mwait_64(int th_gtid, kmp_flag_64<C, S> *flag);
 extern void __kmp_mwait_oncore(int th_gtid, kmp_flag_oncore *flag);
-template <bool C, bool S>
 #endif
+template <bool C, bool S>
 extern void __kmp_resume_32(int target_gtid, kmp_flag_32<C, S> *flag);
 template <bool C, bool S>
 extern void __kmp_resume_64(int target_gtid, kmp_flag_64<C, S> *flag);

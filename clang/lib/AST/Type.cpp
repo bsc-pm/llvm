@@ -3373,8 +3373,9 @@ void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID,
           getExtProtoInfo(), Ctx, isCanonicalUnqualified());
 }
 
-TypedefType::TypedefType(TypeClass tc, const TypedefNameDecl *D, QualType can)
-    : Type(tc, can, D->getUnderlyingType()->getDependence()),
+TypedefType::TypedefType(TypeClass tc, const TypedefNameDecl *D,
+                         QualType underlying, QualType can)
+    : Type(tc, can, underlying->getDependence()),
       Decl(const_cast<TypedefNameDecl *>(D)) {
   assert(!isa<TypedefType>(can) && "Invalid canonical type");
 }
@@ -3516,6 +3517,7 @@ bool AttributedType::isQualifier() const {
   case attr::ObjCInertUnsafeUnretained:
   case attr::TypeNonNull:
   case attr::TypeNullable:
+  case attr::TypeNullableResult:
   case attr::TypeNullUnspecified:
   case attr::LifetimeBound:
   case attr::AddressSpace:
@@ -4165,6 +4167,8 @@ AttributedType::getImmediateNullability() const {
     return NullabilityKind::Nullable;
   if (getAttrKind() == attr::TypeNullUnspecified)
     return NullabilityKind::Unspecified;
+  if (getAttrKind() == attr::TypeNullableResult)
+    return NullabilityKind::NullableResult;
   return None;
 }
 

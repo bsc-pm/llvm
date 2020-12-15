@@ -38,7 +38,8 @@ struct TestLinalgFusionTransforms
 static void fillFusionPatterns(MLIRContext *context,
                                const LinalgDependenceGraph &dependenceGraph,
                                OwningRewritePatternList &patterns) {
-  patterns.insert<LinalgTileAndFusePattern<MatmulOp>>(
+  patterns.insert<LinalgTileAndFusePattern<MatmulOp>,
+                  LinalgTileAndFusePattern<ConvOp>>(
       context, dependenceGraph,
       LinalgTilingOptions()
           .setTileSizes({32, 64, 16})
@@ -127,7 +128,7 @@ static LogicalResult fuseLinalgOpsGreedily(FuncOp f) {
   SmallVector<LinalgOp, 8> linalgOps;
   f.walk([&](LinalgOp op) {
     // TODO: support multi-results.
-    if (op.getOperation()->getNumResults() <= 1)
+    if (op->getNumResults() <= 1)
       linalgOps.push_back(op);
   });
 
@@ -191,7 +192,7 @@ struct TestLinalgGreedyFusion
       pm.addPass(createLoopInvariantCodeMotionPass());
       pm.addPass(createCanonicalizerPass());
       pm.addPass(createCSEPass());
-      LogicalResult res = pm.run(getFunction().getParentOfType<ModuleOp>());
+      LogicalResult res = pm.run(getFunction()->getParentOfType<ModuleOp>());
       if (failed(res))
         this->signalPassFailure();
     }

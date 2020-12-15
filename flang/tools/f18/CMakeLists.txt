@@ -19,6 +19,8 @@ target_link_libraries(f18
 )
 
 set(MODULES
+  "__fortran_builtins"
+  "__fortran_type_info"
   "ieee_arithmetic"
   "ieee_exceptions"
   "ieee_features"
@@ -26,6 +28,7 @@ set(MODULES
   "iso_fortran_env"
   "omp_lib"
   "__fortran_builtins"
+  "__fortran_type_info"
 )
 
 set(include ${FLANG_BINARY_DIR}/include/flang)
@@ -36,8 +39,10 @@ target_include_directories(f18
 
 # Create module files directly from the top-level module source directory
 foreach(filename ${MODULES})
-  if(${filename} MATCHES "__fortran_builtins")
+  if(${filename} MATCHES "__fortran_type_info")
     set(depends "")
+  elseif(${filename} MATCHES "__fortran_builtins")
+    set(depends ${include}/__fortran_type_info.mod)
   else()
     set(depends ${include}/__fortran_builtins.mod)
   endif()

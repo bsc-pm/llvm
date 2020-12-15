@@ -426,3 +426,30 @@ module {
     return
   }
 }
+
+// -----
+
+module {
+  func @basic_conv_fusion(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?xf32>,
+                          %arg2: memref<?x?x?x?xf32>) {
+    %cst = constant 0.000000e+00 : f32
+    linalg.fill(%arg2, %cst) : memref<?x?x?x?xf32>, f32
+    linalg.conv(%arg0, %arg1, %arg2) {
+      dilations = [1, 1], strides = [1, 1],
+      __internal_linalg_transform__ = "basic_fusion"} :
+      memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
+    return
+  }
+}
+//      CHECK: func @basic_conv_fusion
+//      CHECK:   linalg.fill
+// CHECK-SAME:     __internal_linalg_transform__ = "after_basic_fusion_original"
+//      CHECK:  scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
+// CHECK-SAME:  {
+//      CHECK:    linalg.fill
+// CHECK-SAME:      __internal_linalg_transform__ = "after_basic_fusion_producer"
+//      CHECK:    linalg.conv
+// CHECK-SAME:      __internal_linalg_transform__ = "after_basic_fusion"
+//      CHECK:  }
+//      CHECK:  linalg.conv
+// CHECK-SAME:    __internal_linalg_transform__ = "after_basic_fusion_original"

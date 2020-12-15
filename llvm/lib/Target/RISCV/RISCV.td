@@ -41,6 +41,14 @@ def HasStdExtD : Predicate<"Subtarget->hasStdExtD()">,
                            AssemblerPredicate<(all_of FeatureStdExtD),
                            "'D' (Double-Precision Floating-Point)">;
 
+def FeatureExtZfh
+    : SubtargetFeature<"experimental-zfh", "HasStdExtZfh", "true",
+                       "'Zfh' (Half-Precision Floating-Point)",
+                       [FeatureStdExtF]>;
+def HasStdExtZfh : Predicate<"Subtarget->hasStdExtZfh()">,
+                             AssemblerPredicate<(all_of FeatureExtZfh),
+                             "'Zfh' (Half-Precision Floating-Point)">;
+
 def FeatureStdExtC
     : SubtargetFeature<"c", "HasStdExtC", "true",
                        "'C' (Compressed Instructions)">;
@@ -118,6 +126,7 @@ def HasStdExtZbbOrZbp
                 AssemblerPredicate<(any_of FeatureExtZbb, FeatureExtZbp)>;
 def NotHasStdExtZbbOrZbp
     : Predicate<"!(Subtarget->hasStdExtZbb() || Subtarget->hasStdExtZbp())">;
+def NotHasStdExtZbb : Predicate<"!Subtarget->hasStdExtZbb()">;
 
 def FeatureExtZbproposedc
     : SubtargetFeature<"experimental-zbproposedc", "HasStdExtZbproposedc", "true",
@@ -181,8 +190,8 @@ def IsRV32 : Predicate<"!Subtarget->is64Bit()">,
                        AssemblerPredicate<(all_of (not Feature64Bit)),
                        "RV32I Base Instruction Set">;
 
+defvar RV32 = DefaultMode;
 def RV64           : HwMode<"+64bit">;
-def RV32           : HwMode<"-64bit">;
 
 def FeatureRV32E
     : SubtargetFeature<"e", "IsRV32E", "true",

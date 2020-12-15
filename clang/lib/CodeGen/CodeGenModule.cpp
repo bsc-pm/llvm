@@ -77,11 +77,11 @@ static const char AnnotationSection[] = "llvm.metadata";
 
 static CGCXXABI *createCXXABI(CodeGenModule &CGM) {
   switch (CGM.getTarget().getCXXABI().getKind()) {
+  case TargetCXXABI::AppleARM64:
   case TargetCXXABI::Fuchsia:
   case TargetCXXABI::GenericAArch64:
   case TargetCXXABI::GenericARM:
   case TargetCXXABI::iOS:
-  case TargetCXXABI::iOS64:
   case TargetCXXABI::WatchOS:
   case TargetCXXABI::GenericMIPS:
   case TargetCXXABI::GenericItanium:
@@ -428,6 +428,13 @@ static void setVisibilityFromDLLStorageClass(const clang::LangOptions &LO,
   for (llvm::GlobalValue &GV : M.global_values()) {
     if (GV.hasAppendingLinkage() || GV.hasLocalLinkage())
       continue;
+
+    // Reset DSO locality before setting the visibility. This removes
+    // any effects that visibility options and annotations may have
+    // had on the DSO locality. Setting the visibility will implicitly set
+    // appropriate globals to DSO Local; however, this will be pessimistic
+    // w.r.t. to the normal compiler IRGen.
+    GV.setDSOLocal(false);
 
     if (GV.isDeclarationForLinker()) {
       GV.setVisibility(GV.getDLLStorageClass() ==
@@ -976,10 +983,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
   if (RM == llvm::Reloc::PIC_ && GV->hasExternalWeakLinkage())
     return false;
 
-  // PPC has no copy relocations and cannot use a plt entry as a symbol address.
-  llvm::Triple::ArchType Arch = TT.getArch();
-  if (Arch == llvm::Triple::ppc || Arch == llvm::Triple::ppc64 ||
-      Arch == llvm::Triple::ppc64le)
+  // PowerPC64 prefers TOC indirection to avoid copy relocations.
+  if (TT.isPPC64())
     return false;
 
   // If we can use copy relocations we can assume it is local.

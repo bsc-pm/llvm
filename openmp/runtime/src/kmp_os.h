@@ -342,6 +342,18 @@ extern "C" {
 #  define KMP_FALLTHROUGH() ((void)0)
 #endif
 
+#if KMP_HAVE_ATTRIBUTE_WAITPKG
+#define KMP_ATTRIBUTE_TARGET_WAITPKG __attribute__((target("waitpkg")))
+#else
+#define KMP_ATTRIBUTE_TARGET_WAITPKG /* Nothing */
+#endif
+
+#if KMP_HAVE_ATTRIBUTE_RTM
+#define KMP_ATTRIBUTE_TARGET_RTM __attribute__((target("rtm")))
+#else
+#define KMP_ATTRIBUTE_TARGET_RTM /* Nothing */
+#endif
+
 // Define attribute that indicates a function does not return
 #if __cplusplus >= 201103L
 #define KMP_NORETURN [[noreturn]]

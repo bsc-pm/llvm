@@ -1239,7 +1239,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
                                    Scope::CompoundStmtScope);
     Scope *ParentScope = getCurScope()->getParent();
 
-    D.setFunctionDefinitionKind(FDK_Definition);
+    D.setFunctionDefinitionKind(FunctionDefinitionKind::Definition);
     Decl *DP = Actions.HandleDeclarator(ParentScope, D,
                                         TemplateParameterLists);
     D.complete(DP);
@@ -1270,7 +1270,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
                                    Scope::CompoundStmtScope);
     Scope *ParentScope = getCurScope()->getParent();
 
-    D.setFunctionDefinitionKind(FDK_Definition);
+    D.setFunctionDefinitionKind(FunctionDefinitionKind::Definition);
     Decl *FuncDecl = Actions.HandleDeclarator(ParentScope, D,
                                               MultiTemplateParamsArg());
     D.complete(FuncDecl);

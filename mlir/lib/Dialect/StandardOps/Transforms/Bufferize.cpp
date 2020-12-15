@@ -15,10 +15,26 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
+
+namespace {
+class BufferizeDimOp : public OpConversionPattern<DimOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(DimOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    DimOp::Adaptor adaptor(operands);
+    rewriter.replaceOpWithNewOp<DimOp>(op, adaptor.memrefOrTensor(),
+                                       adaptor.index());
+    return success();
+  }
+};
+} // namespace
 
 namespace {
 class BufferizeDynamicTensorFromElementsOp
@@ -68,21 +84,6 @@ public:
         });
 
     rewriter.replaceOp(op, {result});
-    return success();
-  }
-};
-} // namespace
-
-namespace {
-class BufferizeExtractElementOp : public OpConversionPattern<ExtractElementOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(ExtractElementOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    ExtractElementOp::Adaptor adaptor(operands);
-    rewriter.replaceOpWithNewOp<LoadOp>(op, adaptor.aggregate(),
-                                        adaptor.indices());
     return success();
   }
 };
@@ -148,8 +149,8 @@ void mlir::populateStdBufferizePatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns) {
   patterns.insert<
       // clang-format off
+      BufferizeDimOp,
       BufferizeDynamicTensorFromElementsOp,
-      BufferizeExtractElementOp,
       BufferizeSelectOp,
       BufferizeTensorCastOp,
       BufferizeTensorFromElementsOp
@@ -167,10 +168,11 @@ struct StdBufferizePass : public StdBufferizeBase<StdBufferizePass> {
 
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalDialect<scf::SCFDialect>();
+    target.addLegalDialect<tensor::TensorDialect>();
 
     populateStdBufferizePatterns(context, typeConverter, patterns);
-    target.addIllegalOp<DynamicTensorFromElementsOp, ExtractElementOp,
-                        TensorCastOp, TensorFromElementsOp>();
+    target.addIllegalOp<DynamicTensorFromElementsOp, TensorCastOp,
+                        TensorFromElementsOp>();
     // We only bufferize the case of tensor selected type and scalar condition,
     // as that boils down to a select over memref descriptors (don't need to
     // touch the data).
@@ -178,6 +180,8 @@ struct StdBufferizePass : public StdBufferizeBase<StdBufferizePass> {
       return typeConverter.isLegal(op.getType()) ||
              !op.condition().getType().isa<IntegerType>();
     });
+    target.addDynamicallyLegalOp<DimOp>(
+        [&](DimOp op) { return typeConverter.isLegal(op); });
     if (failed(
             applyPartialConversion(getFunction(), target, std::move(patterns))))
       signalPassFailure();

@@ -543,6 +543,10 @@ static unsigned getJumpThreadDuplicationCost(BasicBlock *BB,
     // Debugger intrinsics don't incur code size.
     if (isa<DbgInfoIntrinsic>(I)) continue;
 
+    // Pseudo-probes don't incur code size.
+    if (isa<PseudoProbeInst>(I))
+      continue;
+
     // If this is a pointer->pointer bitcast, it is free.
     if (isa<BitCastInst>(I) && I->getType()->isPointerTy())
       continue;
@@ -1107,6 +1111,8 @@ bool JumpThreadingPass::processBlock(BasicBlock *BB) {
                       << '\n');
     ++NumFolds;
     ConstantFoldTerminator(BB, true, nullptr, DTU);
+    if (HasProfileData)
+      BPI->eraseBlock(BB);
     return true;
   }
 
@@ -1162,6 +1168,8 @@ bool JumpThreadingPass::processBlock(BasicBlock *BB) {
         }
         DTU->applyUpdatesPermissive(
             {{DominatorTree::Delete, BB, ToRemoveSucc}});
+        if (HasProfileData)
+          BPI->eraseBlock(BB);
         return true;
       }
 
@@ -1259,6 +1267,8 @@ bool JumpThreadingPass::processImpliedCondition(BasicBlock *BB) {
       UncondBI->setDebugLoc(BI->getDebugLoc());
       BI->eraseFromParent();
       DTU->applyUpdatesPermissive({{DominatorTree::Delete, BB, RemoveSucc}});
+      if (HasProfileData)
+        BPI->eraseBlock(BB);
       return true;
     }
     CurrentBB = CurrentPred;

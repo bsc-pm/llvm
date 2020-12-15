@@ -1107,6 +1107,18 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     // They'll be converted to Copy(To/From)Reg.
     Action = TargetLowering::Legal;
     break;
+  case ISD::UBSANTRAP:
+    Action = TLI.getOperationAction(Node->getOpcode(), Node->getValueType(0));
+    if (Action == TargetLowering::Expand) {
+      // replace ISD::UBSANTRAP with ISD::TRAP
+      SDValue NewVal;
+      NewVal = DAG.getNode(ISD::TRAP, SDLoc(Node), Node->getVTList(),
+                           Node->getOperand(0));
+      ReplaceNode(Node, NewVal.getNode());
+      LegalizeOp(NewVal.getNode());
+      return;
+    }
+    break;
   case ISD::DEBUGTRAP:
     Action = TLI.getOperationAction(Node->getOpcode(), Node->getValueType(0));
     if (Action == TargetLowering::Expand) {
@@ -1714,14 +1726,19 @@ bool SelectionDAGLegalize::LegalizeSetCCCondCode(
     unsigned Opc = 0;
     switch (CCCode) {
     default: llvm_unreachable("Don't know how to expand this condition!");
+    case ISD::SETUO:
+        if (TLI.isCondCodeLegal(ISD::SETUNE, OpVT)) {
+          CC1 = ISD::SETUNE; CC2 = ISD::SETUNE; Opc = ISD::OR;
+          break;
+        }
+        assert(TLI.isCondCodeLegal(ISD::SETOEQ, OpVT) &&
+               "If SETUE is expanded, SETOEQ or SETUNE must be legal!");
+        NeedInvert = true;
+        LLVM_FALLTHROUGH;
     case ISD::SETO:
         assert(TLI.isCondCodeLegal(ISD::SETOEQ, OpVT)
             && "If SETO is expanded, SETOEQ must be legal!");
         CC1 = ISD::SETOEQ; CC2 = ISD::SETOEQ; Opc = ISD::AND; break;
-    case ISD::SETUO:
-        assert(TLI.isCondCodeLegal(ISD::SETUNE, OpVT)
-            && "If SETUO is expanded, SETUNE must be legal!");
-        CC1 = ISD::SETUNE; CC2 = ISD::SETUNE; Opc = ISD::OR;  break;
     case ISD::SETOEQ:
     case ISD::SETOGT:
     case ISD::SETOGE:
@@ -4052,12 +4069,23 @@ void SelectionDAGLegalize::ConvertNodeToLibcall(SDNode *Node) {
   case ISD::ATOMIC_LOAD_UMAX:
   case ISD::ATOMIC_CMP_SWAP: {
     MVT VT = cast<AtomicSDNode>(Node)->getMemoryVT().getSimpleVT();
-    RTLIB::Libcall LC = RTLIB::getSYNC(Opc, VT);
-    assert(LC != RTLIB::UNKNOWN_LIBCALL && "Unexpected atomic op or value type!");
-
+    AtomicOrdering Order = cast<AtomicSDNode>(Node)->getOrdering();
+    RTLIB::Libcall LC = RTLIB::getOUTLINE_ATOMIC(Opc, Order, VT);
     EVT RetVT = Node->getValueType(0);
-    SmallVector<SDValue, 4> Ops(Node->op_begin() + 1, Node->op_end());
     TargetLowering::MakeLibCallOptions CallOptions;
+    SmallVector<SDValue, 4> Ops;
+    if (TLI.getLibcallName(LC)) {
+      // If outline atomic available, prepare its arguments and expand.
+      Ops.append(Node->op_begin() + 2, Node->op_end());
+      Ops.push_back(Node->getOperand(1));
+
+    } else {
+      LC = RTLIB::getSYNC(Opc, VT);
+      assert(LC != RTLIB::UNKNOWN_LIBCALL &&
+             "Unexpected atomic op or value type!");
+      // Arguments for expansion to sync libcall
+      Ops.append(Node->op_begin() + 1, Node->op_end());
+    }
     std::pair<SDValue, SDValue> Tmp = TLI.makeLibCall(DAG, LC, RetVT,
                                                       Ops, CallOptions,
                                                       SDLoc(Node),
@@ -4406,7 +4434,9 @@ void SelectionDAGLegalize::PromoteNode(SDNode *Node) {
     OVT = Node->getOperand(0).getSimpleValueType();
   }
   if (Node->getOpcode() == ISD::STRICT_UINT_TO_FP ||
-      Node->getOpcode() == ISD::STRICT_SINT_TO_FP)
+      Node->getOpcode() == ISD::STRICT_SINT_TO_FP ||
+      Node->getOpcode() == ISD::STRICT_FSETCC ||
+      Node->getOpcode() == ISD::STRICT_FSETCCS)
     OVT = Node->getOperand(1).getSimpleValueType();
   if (Node->getOpcode() == ISD::BR_CC)
     OVT = Node->getOperand(2).getSimpleValueType();
@@ -4600,12 +4630,28 @@ void SelectionDAGLegalize::PromoteNode(SDNode *Node) {
     Results.push_back(Tmp1);
     break;
   }
-  case ISD::SETCC: {
+  case ISD::SETCC:
+  case ISD::STRICT_FSETCC:
+  case ISD::STRICT_FSETCCS: {
     unsigned ExtOp = ISD::FP_EXTEND;
     if (NVT.isInteger()) {
-      ISD::CondCode CCCode =
-        cast<CondCodeSDNode>(Node->getOperand(2))->get();
+      ISD::CondCode CCCode = cast<CondCodeSDNode>(Node->getOperand(2))->get();
       ExtOp = isSignedIntSetCC(CCCode) ? ISD::SIGN_EXTEND : ISD::ZERO_EXTEND;
+    }
+    if (Node->isStrictFPOpcode()) {
+      SDValue InChain = Node->getOperand(0);
+      std::tie(Tmp1, std::ignore) =
+          DAG.getStrictFPExtendOrRound(Node->getOperand(1), InChain, dl, NVT);
+      std::tie(Tmp2, std::ignore) =
+          DAG.getStrictFPExtendOrRound(Node->getOperand(2), InChain, dl, NVT);
+      SmallVector<SDValue, 2> TmpChains = {Tmp1.getValue(1), Tmp2.getValue(1)};
+      SDValue OutChain = DAG.getTokenFactor(dl, TmpChains);
+      SDVTList VTs = DAG.getVTList(Node->getValueType(0), MVT::Other);
+      Results.push_back(DAG.getNode(Node->getOpcode(), dl, VTs,
+                                    {OutChain, Tmp1, Tmp2, Node->getOperand(3)},
+                                    Node->getFlags()));
+      Results.push_back(Results.back().getValue(1));
+      break;
     }
     Tmp1 = DAG.getNode(ExtOp, dl, NVT, Node->getOperand(0));
     Tmp2 = DAG.getNode(ExtOp, dl, NVT, Node->getOperand(1));

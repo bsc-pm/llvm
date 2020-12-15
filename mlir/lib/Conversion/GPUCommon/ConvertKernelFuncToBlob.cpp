@@ -70,7 +70,7 @@ public:
     // attribute to the module.
     if (auto blobAttr = translateGPUModuleToBinaryAnnotation(
             *llvmModule, module.getLoc(), module.getName()))
-      module.setAttr(blobAnnotation, blobAttr);
+      module->setAttr(blobAnnotation, blobAttr);
     else
       signalPassFailure();
   }
@@ -130,6 +130,10 @@ OwnedBlob GpuKernelToBlobPass::convertModuleToBlob(llvm::Module &llvmModule,
     }
     targetMachine.reset(target->createTargetMachine(triple.str(), targetChip,
                                                     features, {}, {}));
+    if (targetMachine == nullptr) {
+      emitError(loc, "connot initialize target machine");
+      return {};
+    }
   }
 
   llvmModule.setDataLayout(targetMachine->createDataLayout());

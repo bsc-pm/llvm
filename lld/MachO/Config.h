@@ -36,13 +36,18 @@ struct Configuration {
   bool allLoad = false;
   bool forceLoadObjC = false;
   bool staticLink = false;
+  bool implicitDylibs = false;
   bool isPic = false;
   bool headerPadMaxInstallNames = false;
+  bool printEachFile = false;
+  bool printWhyLoad = false;
   bool searchDylibsFirst = false;
   bool saveTemps = false;
   uint32_t headerPad;
   llvm::StringRef installName;
   llvm::StringRef outputFile;
+  llvm::StringRef ltoObjPath;
+  bool demangle = false;
   llvm::MachO::Architecture arch;
   PlatformInfo platform;
   llvm::MachO::HeaderFileType outputType;

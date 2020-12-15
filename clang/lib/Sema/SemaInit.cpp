@@ -3443,6 +3443,7 @@ void InitializationSequence::Step::Destroy() {
   case SK_QualificationConversionRValue:
   case SK_QualificationConversionXValue:
   case SK_QualificationConversionLValue:
+  case SK_FunctionReferenceConversion:
   case SK_AtomicConversion:
   case SK_ListInitialization:
   case SK_UnwrapInitList:
@@ -3617,6 +3618,13 @@ void InitializationSequence::AddQualificationConversionStep(QualType Ty,
     S.Kind = SK_QualificationConversionLValue;
     break;
   }
+  S.Type = Ty;
+  Steps.push_back(S);
+}
+
+void InitializationSequence::AddFunctionReferenceConversionStep(QualType Ty) {
+  Step S;
+  S.Kind = SK_FunctionReferenceConversion;
   S.Type = Ty;
   Steps.push_back(S);
 }
@@ -4654,7 +4662,7 @@ static OverloadingResult TryRefInitWithConversionFunction(
   else if (RefConv & Sema::ReferenceConversions::ObjC)
     Sequence.AddObjCObjectConversionStep(cv1T1);
   else if (RefConv & Sema::ReferenceConversions::Function)
-    Sequence.AddQualificationConversionStep(cv1T1, VK);
+    Sequence.AddFunctionReferenceConversionStep(cv1T1);
   else if (RefConv & Sema::ReferenceConversions::Qualification) {
     if (!S.Context.hasSameType(cv1T4, cv1T1))
       Sequence.AddQualificationConversionStep(cv1T1, VK);
@@ -4756,12 +4764,12 @@ static void TryReferenceInitializationCore(Sema &S,
           Sequence.AddDerivedToBaseCastStep(cv1T1, VK_LValue);
         else
           Sequence.AddObjCObjectConversionStep(cv1T1);
-      } else if (RefConv & (Sema::ReferenceConversions::Qualification |
-                            Sema::ReferenceConversions::Function)) {
+      } else if (RefConv & Sema::ReferenceConversions::Qualification) {
         // Perform a (possibly multi-level) qualification conversion.
-        // FIXME: Should we use a different step kind for function conversions?
         Sequence.AddQualificationConversionStep(cv1T1,
                                                 Initializer->getValueKind());
+      } else if (RefConv & Sema::ReferenceConversions::Function) {
+        Sequence.AddFunctionReferenceConversionStep(cv1T1);
       }
 
       // We only create a temporary here when binding a reference to a
@@ -8046,6 +8054,7 @@ ExprResult InitializationSequence::Perform(Sema &S,
   case SK_QualificationConversionLValue:
   case SK_QualificationConversionXValue:
   case SK_QualificationConversionRValue:
+  case SK_FunctionReferenceConversion:
   case SK_AtomicConversion:
   case SK_ConversionSequence:
   case SK_ConversionSequenceNoNarrowing:
@@ -8310,6 +8319,13 @@ ExprResult InitializationSequence::Perform(Sema &S,
       CurInit = S.PerformQualificationConversion(CurInit.get(), Step->Type, VK);
       break;
     }
+
+    case SK_FunctionReferenceConversion:
+      assert(CurInit.get()->isLValue() &&
+             "function reference should be lvalue");
+      CurInit =
+          S.ImpCastExprToType(CurInit.get(), Step->Type, CK_NoOp, VK_LValue);
+      break;
 
     case SK_AtomicConversion: {
       assert(CurInit.get()->isRValue() && "cannot convert glvalue to atomic");
@@ -9569,6 +9585,10 @@ void InitializationSequence::dump(raw_ostream &OS) const {
 
     case SK_QualificationConversionLValue:
       OS << "qualification conversion (lvalue)";
+      break;
+
+    case SK_FunctionReferenceConversion:
+      OS << "function reference conversion";
       break;
 
     case SK_AtomicConversion:

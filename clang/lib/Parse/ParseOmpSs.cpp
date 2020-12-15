@@ -1379,11 +1379,14 @@ ExprResult Parser::ParseOmpSsParensExpr(StringRef ClauseName,
   Val = Actions.ActOnFinishFullExpr(Val.get(), ELoc, /*DiscardedValue*/ false);
 
   // See 1.
-  if (ClauseName == "label")
+  if (ClauseName == "label") {
     Diags.setSuppressAllDiagnostics(false);
 
-  if (Val.isInvalid())
-    Diag(ELoc, diag::warn_oss_label_error);
+    if (Val.isInvalid() || Val.get()->containsErrors()) {
+      Diag(ELoc, diag::warn_oss_label_error);
+      Val = ExprError();
+    }
+  }
 
   // Parse ')'.
   RLoc = Tok.getLocation();

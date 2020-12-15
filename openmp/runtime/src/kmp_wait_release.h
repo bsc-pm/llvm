@@ -74,7 +74,6 @@ template <typename P> class kmp_flag {
       *loc; /**< Pointer to the flag storage that is modified by another thread
              */
   flag_properties t; /**< "Type" of the flag in loc */
-
 public:
   typedef P flag_t;
   kmp_flag(std::atomic<P> *p, flag_type ft)
@@ -964,7 +963,7 @@ public:
     else if (flag_switch) {
       this_thr->th.th_bar[bt].bb.wait_flag = KMP_BARRIER_SWITCHING;
       kmp_flag_64<> flag(&this_thr->th.th_bar[bt].bb.b_go,
-                         (kmp_uint64)KMP_BARRIER_STATE_BUMP);
+                       (kmp_uint64)KMP_BARRIER_STATE_BUMP);
       __kmp_wait_64(this_thr, &flag, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
     }
     return false;

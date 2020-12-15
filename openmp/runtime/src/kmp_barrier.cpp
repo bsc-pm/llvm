@@ -204,7 +204,7 @@ static bool __kmp_linear_barrier_release_template(
              other_threads[i]->th.th_bar[bt].bb.b_go + KMP_BARRIER_STATE_BUMP));
         ANNOTATE_BARRIER_BEGIN(other_threads[i]);
         kmp_flag_64<> flag(&other_threads[i]->th.th_bar[bt].bb.b_go,
-                           other_threads[i]);
+                         other_threads[i]);
         flag.release();
       }
     }

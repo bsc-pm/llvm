@@ -417,7 +417,11 @@ enum NodeType : unsigned {
 
   LDP,
   STP,
-  STNP
+  STNP,
+
+  // Pseudo for a OBJC call that gets emitted together with a special `mov
+  // x29, x29` marker instruction.
+  CALL_RVMARKER
 };
 
 } // end namespace AArch64ISD
@@ -805,6 +809,7 @@ private:
 
   SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
 
+  SDValue LowerMGATHER(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerMSCATTER(SDValue Op, SelectionDAG &DAG) const;
 
   SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;

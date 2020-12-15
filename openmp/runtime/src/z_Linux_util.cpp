@@ -1149,6 +1149,7 @@ static void __kmp_team_handler(int signo) {
       if (__kmp_debug_buf) {
         __kmp_dump_debug_buffer();
       }
+      __kmp_unregister_library(); // cleanup shared memory
       KMP_MB(); // Flush all pending memory write invalidates.
       TCW_4(__kmp_global.g.g_abort, signo);
       KMP_MB(); // Flush all pending memory write invalidates.
@@ -1611,6 +1612,7 @@ static inline void __kmp_resume_template(int target_gtid, C *flag) {
   KMP_DEBUG_ASSERT(gtid != target_gtid);
 
   __kmp_suspend_initialize_thread(th);
+
   __kmp_lock_suspend_mx(th);
 
   if (!flag) { // coming from __kmp_null_resume_wrapper

@@ -26,7 +26,6 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
-#include "llvm/Support/AlignOf.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Transforms/InstCombine/InstCombiner.h"
@@ -82,11 +81,11 @@ namespace {
   private:
     bool insaneIntVal(int V) { return V > 4 || V < -4; }
 
-    APFloat *getFpValPtr()
-      { return reinterpret_cast<APFloat *>(&FpValBuf.buffer[0]); }
+    APFloat *getFpValPtr() { return reinterpret_cast<APFloat *>(&FpValBuf); }
 
-    const APFloat *getFpValPtr() const
-      { return reinterpret_cast<const APFloat *>(&FpValBuf.buffer[0]); }
+    const APFloat *getFpValPtr() const {
+      return reinterpret_cast<const APFloat *>(&FpValBuf);
+    }
 
     const APFloat &getFpVal() const {
       assert(IsFp && BufHasFpVal && "Incorret state");
@@ -120,7 +119,7 @@ namespace {
     // is overkill of this end.
     short IntVal = 0;
 
-    AlignedCharArrayUnion<APFloat> FpValBuf;
+    std::aligned_union_t<1, APFloat> FpValBuf;
   };
 
   /// FAddend is used to represent floating-point addend. An addend is
@@ -1678,11 +1677,12 @@ Value *InstCombinerImpl::OptimizePointerDifference(Value *LHS, Value *RHS,
         I->getOpcode() == Instruction::Mul)
       I->setHasNoUnsignedWrap();
 
-  // If we had a constant expression GEP on the other side offsetting the
-  // pointer, subtract it from the offset we have.
+  // If we have a 2nd GEP of the same base pointer, subtract the offsets.
+  // If both GEPs are inbounds, then the subtract does not have signed overflow.
   if (GEP2) {
     Value *Offset = EmitGEPOffset(GEP2);
-    Result = Builder.CreateSub(Result, Offset, "gepdiff");
+    Result = Builder.CreateSub(Result, Offset, "gepdiff", /* NUW */ false,
+                               GEP1->isInBounds() && GEP2->isInBounds());
   }
 
   // If we have p - gep(p, ...)  then we have to negate the result.
@@ -1720,6 +1720,10 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
 
     return Res;
   }
+
+  // Try this before Negator to preserve NSW flag.
+  if (Instruction *R = factorizeMathWithShlOps(I, Builder))
+    return R;
 
   if (Constant *C = dyn_cast<Constant>(Op0)) {
     Value *X;
@@ -1768,9 +1772,6 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
   // (A*B)-(A*C) -> A*(B-C) etc
   if (Value *V = SimplifyUsingDistributiveLaws(I))
     return replaceInstUsesWith(I, V);
-
-  if (Instruction *R = factorizeMathWithShlOps(I, Builder))
-    return R;
 
   if (I.getType()->isIntOrIntVectorTy(1))
     return BinaryOperator::CreateXor(Op0, Op1);
