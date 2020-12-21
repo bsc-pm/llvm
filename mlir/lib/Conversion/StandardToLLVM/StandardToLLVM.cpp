@@ -1681,6 +1681,7 @@ using MulFOpLowering = VectorConvertToLLVMPattern<MulFOp, LLVM::FMulOp>;
 using MulIOpLowering = VectorConvertToLLVMPattern<MulIOp, LLVM::MulOp>;
 using NegFOpLowering = VectorConvertToLLVMPattern<NegFOp, LLVM::FNegOp>;
 using OrOpLowering = VectorConvertToLLVMPattern<OrOp, LLVM::OrOp>;
+using PowFOpLowering = VectorConvertToLLVMPattern<PowFOp, LLVM::PowOp>;
 using RemFOpLowering = VectorConvertToLLVMPattern<RemFOp, LLVM::FRemOp>;
 using SelectOpLowering = OneToOneConvertToLLVMPattern<SelectOp, LLVM::SelectOp>;
 using ShiftLeftOpLowering =
@@ -1896,8 +1897,8 @@ struct ConstantOpLowering : public ConvertOpToLLVMPattern<ConstantOp> {
       if (!type)
         return rewriter.notifyMatchFailure(op, "failed to convert result type");
 
-      MutableDictionaryAttr attrs(op.getAttrs());
-      attrs.remove(rewriter.getIdentifier("value"));
+      NamedAttrList attrs(op->getAttrDictionary());
+      attrs.erase("value");
       rewriter.replaceOpWithNewOp<LLVM::AddressOfOp>(
           op, type.cast<LLVM::LLVMType>(), symbolRef.getValue(),
           attrs.getAttrs());
@@ -3963,6 +3964,7 @@ void mlir::populateStdToLLVMNonMemoryConversionPatterns(
       MulIOpLowering,
       NegFOpLowering,
       OrOpLowering,
+      PowFOpLowering,
       PrefetchOpLowering,
       ReOpLowering,
       RemFOpLowering,

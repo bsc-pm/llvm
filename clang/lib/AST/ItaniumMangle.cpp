@@ -2580,6 +2580,15 @@ void CXXNameMangler::mangleType(QualType T) {
         if (!TST->isTypeAlias())
           break;
 
+      // FIXME: We presumably shouldn't strip off ElaboratedTypes with
+      // instantation-dependent qualifiers. See
+      // https://github.com/itanium-cxx-abi/cxx-abi/issues/114.
+
+      // Don't desugar instantiation-dependent decltype / typeof types. We need
+      // to mangle the expression as written.
+      if (isa<DecltypeType, TypeOfType>(T))
+        break;
+
       QualType Desugared
         = T.getSingleStepDesugaredType(Context.getASTContext());
       if (Desugared == T)
@@ -2860,7 +2869,7 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
         << type_name;                                                          \
     break;
 #include "clang/Basic/AArch64SVEACLETypes.def"
-#define PPC_MMA_VECTOR_TYPE(Name, Id, Size) \
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
   case BuiltinType::Id: \
     type_name = #Name; \
     Out << 'u' << type_name.size() << type_name; \
@@ -4078,10 +4087,28 @@ recurse:
     mangleExpression(cast<CXXStdInitializerListExpr>(E)->getSubExpr(), Arity);
     break;
 
-  case Expr::SubstNonTypeTemplateParmExprClass:
-    mangleExpression(cast<SubstNonTypeTemplateParmExpr>(E)->getReplacement(),
-                     Arity);
+  case Expr::SubstNonTypeTemplateParmExprClass: {
+    // Mangle a substituted parameter the same way we mangle the template
+    // argument.
+    // As proposed in https://github.com/itanium-cxx-abi/cxx-abi/issues/111.
+    auto *SNTTPE = cast<SubstNonTypeTemplateParmExpr>(E);
+    if (auto *CE = dyn_cast<ConstantExpr>(SNTTPE->getReplacement())) {
+      // Pull out the constant value and mangle it as a template argument.
+      QualType ParamType = SNTTPE->getParameterType(Context.getASTContext());
+      if (CE->hasAPValueResult())
+        mangleValueInTemplateArg(ParamType, CE->getResultAsAPValue(), false,
+                                 /*NeedExactType=*/true);
+      else
+        mangleValueInTemplateArg(ParamType, CE->getAPValueResult(), false,
+                                 /*NeedExactType=*/true);
+    } else {
+      // The remaining cases all happen to be substituted with expressions that
+      // mangle the same as a corresponding template argument anyway.
+      mangleExpression(cast<SubstNonTypeTemplateParmExpr>(E)->getReplacement(),
+                       Arity);
+    }
     break;
+  }
 
   case Expr::UserDefinedLiteralClass:
     // We follow g++'s approach of mangling a UDL as a call to the literal
@@ -4851,6 +4878,7 @@ namespace {
 struct TemplateArgManglingInfo {
   TemplateDecl *ResolvedTemplate = nullptr;
   bool SeenPackExpansionIntoNonPack = false;
+  const NamedDecl *UnresolvedExpandedPack = nullptr;
 
   TemplateArgManglingInfo(TemplateName TN) {
     if (TemplateDecl *TD = TN.getAsTemplateDecl())
@@ -4867,21 +4895,32 @@ struct TemplateArgManglingInfo {
     if (!ResolvedTemplate || SeenPackExpansionIntoNonPack)
       return true;
 
+    // Move to the next parameter.
+    const NamedDecl *Param = UnresolvedExpandedPack;
+    if (!Param) {
+      assert(ParamIdx < ResolvedTemplate->getTemplateParameters()->size() &&
+             "no parameter for argument");
+      Param = ResolvedTemplate->getTemplateParameters()->getParam(ParamIdx);
+
+      // If we reach an expanded parameter pack whose argument isn't in pack
+      // form, that means Sema couldn't figure out which arguments belonged to
+      // it, because it contains a pack expansion. Track the expanded pack for
+      // all further template arguments until we hit that pack expansion.
+      if (Param->isParameterPack() && Arg.getKind() != TemplateArgument::Pack) {
+        assert(getExpandedPackSize(Param) &&
+               "failed to form pack argument for parameter pack");
+        UnresolvedExpandedPack = Param;
+      }
+    }
+
     // If we encounter a pack argument that is expanded into a non-pack
     // parameter, we can no longer track parameter / argument correspondence,
     // and need to use exact types from this point onwards.
-    assert(ParamIdx < ResolvedTemplate->getTemplateParameters()->size() &&
-           "no parameter for argument");
-    const NamedDecl *Param =
-        ResolvedTemplate->getTemplateParameters()->getParam(ParamIdx);
-    if (!Param->isParameterPack() && Arg.isPackExpansion()) {
+    if (Arg.isPackExpansion() &&
+        (!Param->isParameterPack() || UnresolvedExpandedPack)) {
       SeenPackExpansionIntoNonPack = true;
       return true;
     }
-
-    assert(Param->isParameterPack() ==
-               (Arg.getKind() == TemplateArgument::Pack) &&
-           "should have formed pack argument for pack parameter");
 
     // We need exact types for function template arguments because they might be
     // overloaded on template parameter type. As a special case, a member
@@ -4894,6 +4933,11 @@ struct TemplateArgManglingInfo {
 
     // Otherwise, we only need a correct type if the parameter has a deduced
     // type.
+    //
+    // Note: for an expanded parameter pack, getType() returns the type prior
+    // to expansion. We could ask for the expanded type with getExpansionType(),
+    // but it doesn't matter because substitution and expansion don't affect
+    // whether a deduced type appears in the type.
     auto *NTTP = dyn_cast<NonTypeTemplateParmDecl>(Param);
     return NTTP && NTTP->getType()->getContainedDeducedType();
   }
@@ -5021,6 +5065,10 @@ void CXXNameMangler::mangleTemplateArg(TemplateArgument A, bool NeedExactType) {
     mangleNullPointer(A.getNullPtrType());
     break;
   }
+  case TemplateArgument::UncommonValue:
+    mangleValueInTemplateArg(A.getUncommonValueType(), A.getAsUncommonValue(),
+                             /*TopLevel=*/true, NeedExactType);
+    break;
   case TemplateArgument::Pack: {
     //  <template-arg> ::= J <template-arg>* E
     Out << 'J';
@@ -5355,7 +5403,20 @@ void CXXNameMangler::mangleValueInTemplateArg(QualType T, const APValue &V,
       Out << "plcvPcad";
       Kind = Offset;
     } else {
-      if (!V.getLValuePath().empty() || V.isLValueOnePastTheEnd()) {
+      // Clang 11 and before mangled an array subject to array-to-pointer decay
+      // as if it were the declaration itself.
+      bool IsArrayToPointerDecayMangledAsDecl = false;
+      if (TopLevel && Ctx.getLangOpts().getClangABICompat() <=
+                          LangOptions::ClangABI::Ver11) {
+        QualType BType = B.getType();
+        IsArrayToPointerDecayMangledAsDecl =
+            BType->isArrayType() && V.getLValuePath().size() == 1 &&
+            V.getLValuePath()[0].getAsArrayIndex() == 0 &&
+            Ctx.hasSimilarType(T, Ctx.getDecayedType(BType));
+      }
+
+      if ((!V.getLValuePath().empty() || V.isLValueOnePastTheEnd()) &&
+          !IsArrayToPointerDecayMangledAsDecl) {
         NotPrimaryExpr();
         // A final conversion to the template parameter's type is usually
         // folded into the 'so' mangling, but we can't do that for 'void*'

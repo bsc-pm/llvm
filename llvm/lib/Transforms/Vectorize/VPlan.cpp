@@ -124,8 +124,12 @@ VPValue *VPRecipeBase::toVPValue() {
     return V;
   if (auto *V = dyn_cast<VPReductionRecipe>(this))
     return V;
-  if (auto *V = dyn_cast<VPWidenMemoryInstructionRecipe>(this))
-    return V;
+  if (auto *V = dyn_cast<VPWidenMemoryInstructionRecipe>(this)) {
+    if (!V->isStore())
+      return V->getVPValue();
+    else
+      return nullptr;
+  }
   if (auto *V = dyn_cast<VPWidenCallRecipe>(this))
     return V;
   if (auto *V = dyn_cast<VPWidenSelectRecipe>(this))
@@ -144,8 +148,12 @@ const VPValue *VPRecipeBase::toVPValue() const {
     return V;
   if (auto *V = dyn_cast<VPReductionRecipe>(this))
     return V;
-  if (auto *V = dyn_cast<VPWidenMemoryInstructionRecipe>(this))
-    return V;
+  if (auto *V = dyn_cast<VPWidenMemoryInstructionRecipe>(this)) {
+    if (!V->isStore())
+      return V->getVPValue();
+    else
+      return nullptr;
+  }
   if (auto *V = dyn_cast<VPWidenCallRecipe>(this))
     return V;
   if (auto *V = dyn_cast<VPWidenSelectRecipe>(this))
@@ -376,8 +384,12 @@ void VPBasicBlock::execute(VPTransformState *State) {
 
 void VPBasicBlock::dropAllReferences(VPValue *NewValue) {
   for (VPRecipeBase &R : Recipes) {
-    if (auto *VPV = R.toVPValue())
-      VPV->replaceAllUsesWith(NewValue);
+    if (VPValue *Def = R.toVPValue())
+      Def->replaceAllUsesWith(NewValue);
+    else if (auto *IR = dyn_cast<VPInterleaveRecipe>(&R)) {
+      for (auto *Def : IR->definedValues())
+        Def->replaceAllUsesWith(NewValue);
+    }
 
     if (auto *User = R.toVPUser())
       for (unsigned I = 0, E = User->getNumOperands(); I != E; I++)
@@ -993,10 +1005,10 @@ void VPWidenMemoryInstructionRecipe::print(raw_ostream &O, const Twine &Indent,
   O << "\"WIDEN ";
 
   if (!isStore()) {
-    printAsOperand(O, SlotTracker);
+    getVPValue()->printAsOperand(O, SlotTracker);
     O << " = ";
   }
-  O << Instruction::getOpcodeName(getUnderlyingInstr()->getOpcode()) << " ";
+  O << Instruction::getOpcodeName(Ingredient.getOpcode()) << " ";
 
   printOperands(O, SlotTracker);
 }
