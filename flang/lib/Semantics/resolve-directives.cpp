@@ -233,6 +233,18 @@ public:
     return true;
   }
 
+  bool Pre(const parser::StmtFunctionStmt &x) {
+    const auto &parsedExpr{std::get<parser::Scalar<parser::Expr>>(x.t)};
+    if (const auto *expr{GetExpr(parsedExpr)}) {
+      for (const Symbol &symbol : evaluate::CollectSymbols(*expr)) {
+        if (!IsStmtFunctionDummy(symbol)) {
+          stmtFunctionExprSymbols_.insert(symbol.GetUltimate());
+        }
+      }
+    }
+    return true;
+  }
+
   bool Pre(const parser::OpenMPBlockConstruct &);
   void Post(const parser::OpenMPBlockConstruct &);
 
@@ -343,6 +355,7 @@ private:
 
   std::vector<const parser::Name *> allocateNames_; // on one directive
   SymbolSet privateDataSharingAttributeObjects_; // on one directive
+  SymbolSet stmtFunctionExprSymbols_;
 
   void AddAllocateName(const parser::Name *&object) {
     allocateNames_.push_back(object);
@@ -378,7 +391,7 @@ private:
       const parser::Name &, const Symbol &, Symbol::Flag);
 
   void CheckAssocLoopLevel(std::int64_t level, const parser::OmpClause *clause);
-  void CheckObjectInNamelist(
+  void CheckPrivateDSAObject(
       const parser::Name &, const Symbol &, Symbol::Flag);
 };
 
@@ -639,10 +652,10 @@ void AccAttributeVisitor::PrivatizeAssociatedLoopIndex(
 void AccAttributeVisitor::Post(const parser::AccDefaultClause &x) {
   if (!dirContext_.empty()) {
     switch (x.v) {
-    case parser::AccDefaultClause::Arg::Present:
+    case llvm::acc::DefaultValue::ACC_Default_present:
       SetContextDefaultDSA(Symbol::Flag::AccPresent);
       break;
-    case parser::AccDefaultClause::Arg::None:
+    case llvm::acc::DefaultValue::ACC_Default_none:
       SetContextDefaultDSA(Symbol::Flag::AccNone);
       break;
     }
@@ -1164,7 +1177,7 @@ void OmpAttributeVisitor::ResolveOmpObject(
                     CheckMultipleAppearances(*name, *symbol, ompFlag);
                   }
                   if (privateDataSharingAttributeFlags.test(ompFlag)) {
-                    CheckObjectInNamelist(*name, *symbol, ompFlag);
+                    CheckPrivateDSAObject(*name, *symbol, ompFlag);
                   }
 
                   if (ompFlag == Symbol::Flag::OmpAllocate) {
@@ -1318,16 +1331,26 @@ void OmpAttributeVisitor::CheckDataCopyingClause(
   }
 }
 
-void OmpAttributeVisitor::CheckObjectInNamelist(
+void OmpAttributeVisitor::CheckPrivateDSAObject(
     const parser::Name &name, const Symbol &symbol, Symbol::Flag ompFlag) {
-  if (symbol.GetUltimate().test(Symbol::Flag::InNamelist)) {
-    llvm::StringRef clauseName{"PRIVATE"};
-    if (ompFlag == Symbol::Flag::OmpFirstPrivate)
-      clauseName = "FIRSTPRIVATE";
-    else if (ompFlag == Symbol::Flag::OmpLastPrivate)
-      clauseName = "LASTPRIVATE";
+  const auto &ultimateSymbol{symbol.GetUltimate()};
+  llvm::StringRef clauseName{"PRIVATE"};
+  if (ompFlag == Symbol::Flag::OmpFirstPrivate)
+    clauseName = "FIRSTPRIVATE";
+  else if (ompFlag == Symbol::Flag::OmpLastPrivate)
+    clauseName = "LASTPRIVATE";
+
+  if (ultimateSymbol.test(Symbol::Flag::InNamelist)) {
     context_.Say(name.source,
         "Variable '%s' in NAMELIST cannot be in a %s clause"_err_en_US,
+        name.ToString(), clauseName.str());
+  }
+
+  if (stmtFunctionExprSymbols_.find(ultimateSymbol) !=
+      stmtFunctionExprSymbols_.end()) {
+    context_.Say(name.source,
+        "Variable '%s' in STATEMENT FUNCTION expression cannot be in a "
+        "%s clause"_err_en_US,
         name.ToString(), clauseName.str());
   }
 }

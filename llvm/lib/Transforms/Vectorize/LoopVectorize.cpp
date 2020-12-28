@@ -3311,6 +3311,16 @@ Loop *InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
   LoopScalarPreHeader =
       SplitBlock(LoopMiddleBlock, LoopMiddleBlock->getTerminator(), DT, LI,
                  nullptr, Twine(Prefix) + "scalar.ph");
+
+  // Set up branch from middle block to the exit and scalar preheader blocks.
+  // completeLoopSkeleton will update the condition to use an iteration check,
+  // if required to decide whether to execute the remainder.
+  BranchInst *BrInst =
+      BranchInst::Create(LoopExitBlock, LoopScalarPreHeader, Builder.getTrue());
+  auto *ScalarLatchTerm = OrigLoop->getLoopLatch()->getTerminator();
+  BrInst->setDebugLoc(ScalarLatchTerm->getDebugLoc());
+  ReplaceInstWithInst(LoopMiddleBlock->getTerminator(), BrInst);
+
   // We intentionally don't let SplitBlock to update LoopInfo since
   // LoopVectorBody should belong to another loop than LoopVectorPreHeader.
   // LoopVectorBody is explicitly added to the correct place few lines later.
@@ -3419,23 +3429,18 @@ BasicBlock *InnerLoopVectorizer::completeLoopSkeleton(Loop *L,
   // all of the iterations in the first vector loop.
   // If (N - N%VF) == N, then we *don't* need to run the remainder.
   // If tail is to be folded, we know we don't need to run the remainder.
-  Value *CmpN = Builder.getTrue();
   if (!Cost->foldTailByMasking()) {
-    CmpN = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ, Count,
-                           VectorTripCount, "cmp.n",
-                           LoopMiddleBlock->getTerminator());
+    Instruction *CmpN = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                                        Count, VectorTripCount, "cmp.n",
+                                        LoopMiddleBlock->getTerminator());
 
     // Here we use the same DebugLoc as the scalar loop latch terminator instead
     // of the corresponding compare because they may have ended up with
     // different line numbers and we want to avoid awkward line stepping while
     // debugging. Eg. if the compare has got a line number inside the loop.
-    cast<Instruction>(CmpN)->setDebugLoc(ScalarLatchTerm->getDebugLoc());
+    CmpN->setDebugLoc(ScalarLatchTerm->getDebugLoc());
+    cast<BranchInst>(LoopMiddleBlock->getTerminator())->setCondition(CmpN);
   }
-
-  BranchInst *BrInst =
-      BranchInst::Create(LoopExitBlock, LoopScalarPreHeader, CmpN);
-  BrInst->setDebugLoc(ScalarLatchTerm->getDebugLoc());
-  ReplaceInstWithInst(LoopMiddleBlock->getTerminator(), BrInst);
 
   // Get ready to start creating new instructions into the vectorized body.
   assert(LoopVectorPreHeader == L->getLoopPreheader() &&
@@ -5506,7 +5511,15 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
          "MaxVF must be a power of 2");
   unsigned MaxVFtimesIC =
       UserIC ? MaxVF.getFixedValue() * UserIC : MaxVF.getFixedValue();
-  if (TC > 0 && TC % MaxVFtimesIC == 0) {
+  // Avoid tail folding if the trip count is known to be a multiple of any VF we
+  // chose.
+  ScalarEvolution *SE = PSE.getSE();
+  const SCEV *BackedgeTakenCount = PSE.getBackedgeTakenCount();
+  const SCEV *ExitCount = SE->getAddExpr(
+      BackedgeTakenCount, SE->getOne(BackedgeTakenCount->getType()));
+  const SCEV *Rem = SE->getURemExpr(
+      ExitCount, SE->getConstant(BackedgeTakenCount->getType(), MaxVFtimesIC));
+  if (Rem->isZero()) {
     // Accept MaxVF if we do not have a tail.
     LLVM_DEBUG(dbgs() << "LV: No tail will remain for any chosen VF.\n");
     return MaxVF;
@@ -8420,11 +8433,10 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
 
       if (auto Recipe =
               RecipeBuilder.tryToCreateWidenRecipe(Instr, Range, Plan)) {
-        // Check if the recipe can be converted to a VPValue. We need the extra
-        // down-casting step until VPRecipeBase inherits from VPValue.
-        VPValue *MaybeVPValue = Recipe->toVPValue();
-        if (!Instr->getType()->isVoidTy() && MaybeVPValue)
-          Plan->addVPValue(Instr, MaybeVPValue);
+        for (auto *Def : Recipe->definedValues()) {
+          auto *UV = Def->getUnderlyingValue();
+          Plan->addVPValue(UV, Def);
+        }
 
         RecipeBuilder.setRecipe(Instr, Recipe);
         VPBB->appendRecipe(Recipe);
@@ -8600,10 +8612,11 @@ void LoopVectorizationPlanner::adjustRecipesForInLoopReductions(
                          : nullptr;
       VPReductionRecipe *RedRecipe = new VPReductionRecipe(
           &RdxDesc, R, ChainOp, VecOp, CondOp, Legal->hasFunNoNaNAttr(), TTI);
-      WidenRecipe->toVPValue()->replaceAllUsesWith(RedRecipe);
+      WidenRecipe->getVPValue()->replaceAllUsesWith(RedRecipe);
       Plan->removeVPValueFor(R);
       Plan->addVPValue(R, RedRecipe);
       WidenRecipe->getParent()->insert(RedRecipe, WidenRecipe->getIterator());
+      WidenRecipe->getVPValue()->replaceAllUsesWith(RedRecipe);
       WidenRecipe->eraseFromParent();
 
       if (Kind == RecurrenceDescriptor::RK_IntegerMinMax ||
@@ -8612,7 +8625,7 @@ void LoopVectorizationPlanner::adjustRecipesForInLoopReductions(
             RecipeBuilder.getRecipe(cast<Instruction>(R->getOperand(0)));
         assert(isa<VPWidenRecipe>(CompareRecipe) &&
                "Expected to replace a VPWidenSC");
-        assert(CompareRecipe->toVPValue()->getNumUsers() == 0 &&
+        assert(cast<VPWidenRecipe>(CompareRecipe)->getNumUsers() == 0 &&
                "Expected no remaining users");
         CompareRecipe->eraseFromParent();
       }
@@ -8849,7 +8862,7 @@ void VPPredInstPHIRecipe::execute(VPTransformState &State) {
 void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
   VPValue *StoredValue = isStore() ? getStoredValue() : nullptr;
   State.ILV->vectorizeMemoryInstruction(&Ingredient, State,
-                                        StoredValue ? nullptr : toVPValue(),
+                                        StoredValue ? nullptr : getVPValue(),
                                         getAddr(), StoredValue, getMask());
 }
 
