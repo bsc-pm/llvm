@@ -11,6 +11,9 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Also, taskloop having multideps using the loop iterator
 ; means num_deps = -1
 
+; Also multideps using loop iterator are assumed discrete,
+; so upper_bound = lower_bound
+
 ; int v[10];
 ; int main() {
 ;     #pragma oss taskloop out( { v[i], i=0;j } )
@@ -204,7 +207,7 @@ entry:
 ; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t %17, 1
 ; CHECK-NEXT:   store i32 %18, i32* %i.remap, align 4
 ; CHECK-NEXT:   %19 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %i.remap, i32* %j.lb, [10 x i32]* %v)
-; CHECK-NEXT:   %20 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %i.remap, i32* %j.ub, [10 x i32]* %v)
+; CHECK-NEXT:   %20 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %i.remap, i32* %j.lb, [10 x i32]* %v)
 ; CHECK-NEXT:   %21 = extractvalue %struct._depend_unpack_t.0 %19, 0
 ; CHECK-NEXT:   %22 = bitcast i32* %21 to i8*
 ; CHECK-NEXT:   %23 = extractvalue %struct._depend_unpack_t.0 %19, 1

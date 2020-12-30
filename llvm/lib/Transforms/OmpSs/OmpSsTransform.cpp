@@ -817,14 +817,19 @@ struct OmpSs : public ModulePass {
     const DirectiveDependsInfo &DependsInfo = DirEnv.DependsInfo;
 
     for (auto &DepInfo : DependsInfo.List) {
-      if (auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get()))
+      if (auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
+        // Multideps using loop iterator are assumed to be discrete
+        if (multidepUsesLoopIter(LoopInfo, *MultiDepInfo))
+          NewIndVarUBound = NewIndVarLBound;
+
         unpackMultiRangeCall(
           M, MultiDepInfo, DRI, F,
           LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
-      else
+      } else {
         unpackDepCallToRT(
           M, DepInfo.get(), DRI, F,
           LoopInfo.IndVar, NewIndVarLBound, NewIndVarUBound, IsTaskLoop);
+      }
     }
   }
 
@@ -1726,14 +1731,21 @@ struct OmpSs : public ModulePass {
     return OlConstraintsFuncVar;
   }
 
+  bool multidepUsesLoopIter(
+      const DirectiveLoopInfo &LoopInfo,const MultiDependInfo& MultiDepInfo) {
+    for (const auto *V : MultiDepInfo.Args) {
+      if (V == LoopInfo.IndVar)
+        return true;
+    }
+    return false;
+  }
+
   bool hasMultidepUsingLoopIter(
       const DirectiveLoopInfo &LoopInfo, const DirectiveDependsInfo &DependsInfo) {
     for (auto &DepInfo : DependsInfo.List) {
       if (const auto *MultiDepInfo = dyn_cast<MultiDependInfo>(DepInfo.get())) {
-        for (const auto *V : MultiDepInfo->Args) {
-          if (V == LoopInfo.IndVar)
-            return true;
-        }
+        if (multidepUsesLoopIter(LoopInfo, *MultiDepInfo))
+          return true;
       }
     }
     return false;
