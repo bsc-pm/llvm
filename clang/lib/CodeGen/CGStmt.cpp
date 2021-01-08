@@ -1460,7 +1460,7 @@ void CodeGenFunction::EmitCaseStmt(const CaseStmt &S,
       SwitchWeights->push_back(getProfileCount(NextCase));
     if (CGM.getCodeGenOpts().hasProfileClangInstr()) {
       CaseDest = createBasicBlock("sw.bb");
-      EmitBlockWithFallThrough(CaseDest, &S);
+      EmitBlockWithFallThrough(CaseDest, CurCase);
     }
     // Since this loop is only executed when the CaseStmt has no attributes
     // use a hard-coded value.

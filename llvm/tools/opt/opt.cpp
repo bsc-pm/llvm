@@ -463,8 +463,18 @@ struct TimeTracerRAII {
 // it exists.
 static bool shouldPinPassToLegacyPM(StringRef Pass) {
   std::vector<StringRef> PassNameExactToIgnore = {
-      "amdgpu-simplifylib", "amdgpu-usenative", "amdgpu-promote-alloca",
-      "amdgpu-promote-alloca-to-vector", "amdgpu-lower-kernel-attributes"};
+      "nvvm-reflect",
+      "nvvm-intr-range",
+      "amdgpu-simplifylib",
+      "amdgpu-usenative",
+      "amdgpu-promote-alloca",
+      "amdgpu-promote-alloca-to-vector",
+      "amdgpu-lower-kernel-attributes",
+      "amdgpu-propagate-attributes-early",
+      "amdgpu-propagate-attributes-late",
+      "amdgpu-unify-metadata",
+      "amdgpu-printf-runtime-binding",
+      "amdgpu-always-inline"};
   for (const auto &P : PassNameExactToIgnore)
     if (Pass == P)
       return false;
@@ -555,7 +565,7 @@ int main(int argc, char **argv) {
   initializeAtomicExpandPass(Registry);
   initializeRewriteSymbolsLegacyPassPass(Registry);
   initializeWinEHPreparePass(Registry);
-  initializeDwarfEHPreparePass(Registry);
+  initializeDwarfEHPrepareLegacyPassPass(Registry);
   initializeSafeStackLegacyPassPass(Registry);
   initializeSjLjEHPreparePass(Registry);
   initializePreISelIntrinsicLoweringLegacyPassPass(Registry);

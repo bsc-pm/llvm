@@ -152,8 +152,7 @@ LogicalResult getMemRefAlignment(LLVMTypeConverter &typeConverter,
   // stop depending on translation.
   llvm::LLVMContext llvmContext;
   align = LLVM::TypeToLLVMIRTranslator(llvmContext)
-              .getPreferredAlignment(elementTy.cast<LLVM::LLVMType>(),
-                                     typeConverter.getDataLayout());
+              .getPreferredAlignment(elementTy, typeConverter.getDataLayout());
   return success();
 }
 
@@ -193,7 +192,7 @@ static LogicalResult getBasePtr(ConversionPatternRewriter &rewriter,
   Value base;
   if (failed(getBase(rewriter, loc, memref, memRefType, base)))
     return failure();
-  auto pType = LLVM::LLVMPointerType::get(type.template cast<LLVM::LLVMType>());
+  auto pType = LLVM::LLVMPointerType::get(type);
   base = rewriter.create<LLVM::BitcastOp>(loc, pType, base);
   ptr = rewriter.create<LLVM::GEPOp>(loc, pType, base);
   return success();
@@ -748,7 +747,7 @@ public:
 
     // Remaining extraction of element from 1-D LLVM vector
     auto position = positionAttrs.back().cast<IntegerAttr>();
-    auto i64Type = LLVM::LLVMIntegerType::get(rewriter.getContext(), 64);
+    auto i64Type = IntegerType::get(rewriter.getContext(), 64);
     auto constant = rewriter.create<LLVM::ConstantOp>(loc, i64Type, position);
     extracted =
         rewriter.create<LLVM::ExtractElementOp>(loc, extracted, constant);
@@ -856,7 +855,7 @@ public:
     }
 
     // Insertion of an element into a 1-D LLVM vector.
-    auto i64Type = LLVM::LLVMIntegerType::get(rewriter.getContext(), 64);
+    auto i64Type = IntegerType::get(rewriter.getContext(), 64);
     auto constant = rewriter.create<LLVM::ConstantOp>(loc, i64Type, position);
     Value inserted = rewriter.create<LLVM::InsertElementOp>(
         loc, typeConverter->convertType(oneDVectorType), extracted,
@@ -1122,7 +1121,7 @@ public:
         }))
       return failure();
 
-    auto int64Ty = LLVM::LLVMIntegerType::get(rewriter.getContext(), 64);
+    auto int64Ty = IntegerType::get(rewriter.getContext(), 64);
 
     // Create descriptor.
     auto desc = MemRefDescriptor::undef(rewriter, loc, llvmTargetDescriptorTy);
@@ -1361,11 +1360,11 @@ private:
       switch (conversion) {
       case PrintConversion::ZeroExt64:
         value = rewriter.create<ZeroExtendIOp>(
-            loc, value, LLVM::LLVMIntegerType::get(rewriter.getContext(), 64));
+            loc, value, IntegerType::get(rewriter.getContext(), 64));
         break;
       case PrintConversion::SignExt64:
         value = rewriter.create<SignExtendIOp>(
-            loc, value, LLVM::LLVMIntegerType::get(rewriter.getContext(), 64));
+            loc, value, IntegerType::get(rewriter.getContext(), 64));
         break;
       case PrintConversion::None:
         break;
@@ -1401,7 +1400,7 @@ private:
 
   // Helper for printer method declaration (first hit) and lookup.
   static Operation *getPrint(Operation *op, StringRef name,
-                             ArrayRef<LLVM::LLVMType> params) {
+                             ArrayRef<Type> params) {
     auto module = op->getParentOfType<ModuleOp>();
     auto func = module.lookupSymbol<LLVM::LLVMFuncOp>(name);
     if (func)
@@ -1415,12 +1414,10 @@ private:
 
   // Helpers for method names.
   Operation *getPrintI64(Operation *op) const {
-    return getPrint(op, "printI64",
-                    LLVM::LLVMIntegerType::get(op->getContext(), 64));
+    return getPrint(op, "printI64", IntegerType::get(op->getContext(), 64));
   }
   Operation *getPrintU64(Operation *op) const {
-    return getPrint(op, "printU64",
-                    LLVM::LLVMIntegerType::get(op->getContext(), 64));
+    return getPrint(op, "printU64", IntegerType::get(op->getContext(), 64));
   }
   Operation *getPrintFloat(Operation *op) const {
     return getPrint(op, "printF32", LLVM::LLVMFloatType::get(op->getContext()));

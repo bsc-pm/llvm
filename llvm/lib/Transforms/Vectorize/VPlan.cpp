@@ -433,6 +433,14 @@ void VPRecipeBase::moveAfter(VPRecipeBase *InsertPos) {
   insertAfter(InsertPos);
 }
 
+void VPRecipeBase::moveBefore(VPBasicBlock &BB,
+                              iplist<VPRecipeBase>::iterator I) {
+  assert(I == BB.end() || I->getParent() == &BB);
+  removeFromParent();
+  Parent = &BB;
+  BB.getRecipeList().insert(I, this);
+}
+
 void VPInstruction::generateInstruction(VPTransformState &State,
                                         unsigned Part) {
   IRBuilder<> &Builder = State.Builder;
@@ -917,7 +925,7 @@ void VPReductionRecipe::print(raw_ostream &O, const Twine &Indent,
   printAsOperand(O, SlotTracker);
   O << " = ";
   getChainOp()->printAsOperand(O, SlotTracker);
-  O << " + reduce." << Instruction::getOpcodeName(RdxDesc->getRecurrenceBinOp())
+  O << " + reduce." << Instruction::getOpcodeName(RdxDesc->getOpcode())
     << " (";
   getVecOp()->printAsOperand(O, SlotTracker);
   if (getCondOp()) {
