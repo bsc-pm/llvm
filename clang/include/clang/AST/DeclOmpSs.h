@@ -64,7 +64,7 @@ private:
   /// the declare reduction construct is declared inside compound statement.
   LazyDeclPtr PrevDeclInScope;
 
-  virtual void anchor();
+  void anchor() override;
 
   OSSDeclareReductionDecl(Kind DK, DeclContext *DC, SourceLocation L,
                           DeclarationName Name, QualType Ty,
