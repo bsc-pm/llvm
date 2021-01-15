@@ -164,10 +164,15 @@ bool ISD::isConstantSplatVector(const SDNode *N, APInt &SplatVal) {
 // FIXME: AllOnes and AllZeros duplicate a lot of code. Could these be
 // specializations of the more general isConstantSplatVector()?
 
-bool ISD::isBuildVectorAllOnes(const SDNode *N) {
+bool ISD::isConstantSplatVectorAllOnes(const SDNode *N, bool BuildVectorOnly) {
   // Look through a bit convert.
   while (N->getOpcode() == ISD::BITCAST)
     N = N->getOperand(0).getNode();
+
+  if (!BuildVectorOnly && N->getOpcode() == ISD::SPLAT_VECTOR) {
+    APInt SplatVal;
+    return isConstantSplatVector(N, SplatVal) && SplatVal.isAllOnesValue();
+  }
 
   if (N->getOpcode() != ISD::BUILD_VECTOR) return false;
 
@@ -208,10 +213,15 @@ bool ISD::isBuildVectorAllOnes(const SDNode *N) {
   return true;
 }
 
-bool ISD::isBuildVectorAllZeros(const SDNode *N) {
+bool ISD::isConstantSplatVectorAllZeros(const SDNode *N, bool BuildVectorOnly) {
   // Look through a bit convert.
   while (N->getOpcode() == ISD::BITCAST)
     N = N->getOperand(0).getNode();
+
+  if (!BuildVectorOnly && N->getOpcode() == ISD::SPLAT_VECTOR) {
+    APInt SplatVal;
+    return isConstantSplatVector(N, SplatVal) && SplatVal.isNullValue();
+  }
 
   if (N->getOpcode() != ISD::BUILD_VECTOR) return false;
 
@@ -243,6 +253,14 @@ bool ISD::isBuildVectorAllZeros(const SDNode *N) {
   if (IsAllUndef)
     return false;
   return true;
+}
+
+bool ISD::isBuildVectorAllOnes(const SDNode *N) {
+  return isConstantSplatVectorAllOnes(N, /*BuildVectorOnly*/ true);
+}
+
+bool ISD::isBuildVectorAllZeros(const SDNode *N) {
+  return isConstantSplatVectorAllZeros(N, /*BuildVectorOnly*/ true);
 }
 
 bool ISD::isBuildVectorOfConstantSDNodes(const SDNode *N) {
@@ -374,6 +392,41 @@ ISD::NodeType ISD::getVecReduceBaseOpcode(unsigned VecReduceOpcode) {
     return ISD::FMAXNUM;
   case ISD::VECREDUCE_FMIN:
     return ISD::FMINNUM;
+  }
+}
+
+bool ISD::isVPOpcode(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+#define BEGIN_REGISTER_VP_SDNODE(SDOPC, ...)                                   \
+  case ISD::SDOPC:                                                             \
+    return true;
+#include "llvm/IR/VPIntrinsics.def"
+  }
+}
+
+/// The operand position of the vector mask.
+Optional<unsigned> ISD::getVPMaskIdx(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return None;
+#define BEGIN_REGISTER_VP_SDNODE(SDOPC, LEGALPOS, TDNAME, MASKPOS, ...)        \
+  case ISD::SDOPC:                                                             \
+    return MASKPOS;
+#include "llvm/IR/VPIntrinsics.def"
+  }
+}
+
+/// The operand position of the explicit vector length parameter.
+Optional<unsigned> ISD::getVPExplicitVectorLengthIdx(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return None;
+#define BEGIN_REGISTER_VP_SDNODE(SDOPC, LEGALPOS, TDNAME, MASKPOS, EVLPOS)     \
+  case ISD::SDOPC:                                                             \
+    return EVLPOS;
+#include "llvm/IR/VPIntrinsics.def"
   }
 }
 
@@ -3081,13 +3134,10 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
           }
         } else if (BitWidth == CstTy->getPrimitiveSizeInBits()) {
           if (auto *CInt = dyn_cast<ConstantInt>(Cst)) {
-            const APInt &Value = CInt->getValue();
-            Known.One = Value;
-            Known.Zero = ~Value;
+            Known = KnownBits::makeConstant(CInt->getValue());
           } else if (auto *CFP = dyn_cast<ConstantFP>(Cst)) {
-            APInt Value = CFP->getValueAPF().bitcastToAPInt();
-            Known.One = Value;
-            Known.Zero = ~Value;
+            Known =
+                KnownBits::makeConstant(CFP->getValueAPF().bitcastToAPInt());
           }
         }
       }
@@ -3366,7 +3416,6 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     }
 
     Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
-    if (Known.isUnknown()) break; // Early-out
     Known2 = computeKnownBits(Op.getOperand(1), DemandedElts, Depth + 1);
     if (IsMax)
       Known = KnownBits::smax(Known, Known2);
@@ -4742,6 +4791,15 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     break;
   case ISD::VSCALE:
     assert(VT == Operand.getValueType() && "Unexpected VT!");
+    break;
+  case ISD::CTPOP:
+    if (Operand.getValueType().getScalarType() == MVT::i1)
+      return Operand;
+    break;
+  case ISD::CTLZ:
+  case ISD::CTTZ:
+    if (Operand.getValueType().getScalarType() == MVT::i1)
+      return getNOT(DL, Operand, Operand.getValueType());
     break;
   case ISD::VECREDUCE_SMIN:
   case ISD::VECREDUCE_UMAX:
@@ -9076,6 +9134,18 @@ ConstantSDNode *llvm::isConstOrConstSplat(SDValue N, bool AllowUndefs,
   if (ConstantSDNode *CN = dyn_cast<ConstantSDNode>(N))
     return CN;
 
+  // SplatVectors can truncate their operands. Ignore that case here unless
+  // AllowTruncation is set.
+  if (N->getOpcode() == ISD::SPLAT_VECTOR) {
+    EVT VecEltVT = N->getValueType(0).getVectorElementType();
+    if (auto *CN = dyn_cast<ConstantSDNode>(N->getOperand(0))) {
+      EVT CVT = CN->getValueType(0);
+      assert(CVT.bitsGE(VecEltVT) && "Illegal splat_vector element extension");
+      if (AllowTruncation || CVT == VecEltVT)
+        return CN;
+    }
+  }
+
   if (BuildVectorSDNode *BV = dyn_cast<BuildVectorSDNode>(N)) {
     BitVector UndefElements;
     ConstantSDNode *CN = BV->getConstantSplatNode(&UndefElements);
@@ -10003,7 +10073,7 @@ bool ShuffleVectorSDNode::isSplatMask(const int *Mask, EVT VT) {
 
 // Returns the SDNode if it is a constant integer BuildVector
 // or constant integer.
-SDNode *SelectionDAG::isConstantIntBuildVectorOrConstantInt(SDValue N) {
+SDNode *SelectionDAG::isConstantIntBuildVectorOrConstantInt(SDValue N) const {
   if (isa<ConstantSDNode>(N))
     return N.getNode();
   if (ISD::isBuildVectorOfConstantSDNodes(N.getNode()))
@@ -10020,7 +10090,9 @@ SDNode *SelectionDAG::isConstantIntBuildVectorOrConstantInt(SDValue N) {
   return nullptr;
 }
 
-SDNode *SelectionDAG::isConstantFPBuildVectorOrConstantFP(SDValue N) {
+// Returns the SDNode if it is a constant float BuildVector
+// or constant float.
+SDNode *SelectionDAG::isConstantFPBuildVectorOrConstantFP(SDValue N) const {
   if (isa<ConstantFPSDNode>(N))
     return N.getNode();
 

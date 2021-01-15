@@ -189,17 +189,7 @@ Type LLVMTypeConverter::convertIntegerType(IntegerType type) {
   return IntegerType::get(&getContext(), type.getWidth());
 }
 
-Type LLVMTypeConverter::convertFloatType(FloatType type) {
-  if (type.isa<Float32Type>())
-    return LLVM::LLVMFloatType::get(&getContext());
-  if (type.isa<Float64Type>())
-    return LLVM::LLVMDoubleType::get(&getContext());
-  if (type.isa<Float16Type>())
-    return LLVM::LLVMHalfType::get(&getContext());
-  if (type.isa<BFloat16Type>())
-    return LLVM::LLVMBFloatType::get(&getContext());
-  llvm_unreachable("non-float type in convertFloatType");
-}
+Type LLVMTypeConverter::convertFloatType(FloatType type) { return type; }
 
 // Convert a `ComplexType` to an LLVM type. The result is a complex number
 // struct with entries for the
@@ -400,16 +390,16 @@ Type LLVMTypeConverter::convertMemRefToBarePtr(BaseMemRefType type) {
   return LLVM::LLVMPointerType::get(elementType, type.getMemorySpace());
 }
 
-// Convert an n-D vector type to an LLVM vector type via (n-1)-D array type when
-// n > 1.
-// For example, `vector<4 x f32>` converts to `!llvm.type<"<4 x float>">` and
-// `vector<4 x 8 x 16 f32>` converts to `!llvm<"[4 x [8 x <16 x float>]]">`.
+/// Convert an n-D vector type to an LLVM vector type via (n-1)-D array type
+/// when n > 1. For example, `vector<4 x f32>` remains as is while,
+/// `vector<4x8x16xf32>` converts to `!llvm.array<4xarray<8 x vector<16xf32>>>`.
 Type LLVMTypeConverter::convertVectorType(VectorType type) {
   auto elementType = unwrap(convertType(type.getElementType()));
   if (!elementType)
     return {};
-  Type vectorType =
-      LLVM::LLVMFixedVectorType::get(elementType, type.getShape().back());
+  Type vectorType = VectorType::get(type.getShape().back(), elementType);
+  assert(LLVM::isCompatibleVectorType(vectorType) &&
+         "expected vector type compatible with the LLVM dialect");
   auto shape = type.getShape();
   for (int i = shape.size() - 2; i >= 0; --i)
     vectorType = LLVM::LLVMArrayType::get(vectorType, shape[i]);
@@ -1093,11 +1083,14 @@ Type ConvertToLLVMPattern::getElementPtrType(MemRefType type) const {
 }
 
 void ConvertToLLVMPattern::getMemRefDescriptorSizes(
-    Location loc, MemRefType memRefType, ArrayRef<Value> dynamicSizes,
+    Location loc, MemRefType memRefType, ValueRange dynamicSizes,
     ConversionPatternRewriter &rewriter, SmallVectorImpl<Value> &sizes,
     SmallVectorImpl<Value> &strides, Value &sizeBytes) const {
   assert(isConvertibleAndHasIdentityMaps(memRefType) &&
          "layout maps must have been normalized away");
+  assert(count(memRefType.getShape(), ShapedType::kDynamicSize) ==
+             static_cast<ssize_t>(dynamicSizes.size()) &&
+         "dynamicSizes size doesn't match dynamic sizes count in memref shape");
 
   sizes.reserve(memRefType.getRank());
   unsigned dynamicIndex = 0;
@@ -1507,7 +1500,7 @@ static NDVectorTypeInfo extractNDVectorTypeInfo(VectorType vectorType,
         llvmTy.cast<LLVM::LLVMArrayType>().getNumElements());
     llvmTy = llvmTy.cast<LLVM::LLVMArrayType>().getElementType();
   }
-  if (!llvmTy.isa<LLVM::LLVMVectorType>())
+  if (!LLVM::isCompatibleVectorType(llvmTy))
     return info;
   info.llvmVectorTy = llvmTy;
   return info;
@@ -1745,19 +1738,18 @@ struct CreateComplexOpLowering
   using ConvertOpToLLVMPattern<CreateComplexOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(CreateComplexOp op, ArrayRef<Value> operands,
+  matchAndRewrite(CreateComplexOp complexOp, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto complexOp = cast<CreateComplexOp>(op);
     CreateComplexOp::Adaptor transformed(operands);
 
     // Pack real and imaginary part in a complex number struct.
-    auto loc = op.getLoc();
+    auto loc = complexOp.getLoc();
     auto structType = typeConverter->convertType(complexOp.getType());
     auto complexStruct = ComplexStructBuilder::undef(rewriter, loc, structType);
     complexStruct.setReal(rewriter, loc, transformed.real());
     complexStruct.setImaginary(rewriter, loc, transformed.imaginary());
 
-    rewriter.replaceOp(op, {complexStruct});
+    rewriter.replaceOp(complexOp, {complexStruct});
     return success();
   }
 };
@@ -1804,8 +1796,7 @@ template <typename OpTy>
 BinaryComplexOperands
 unpackBinaryComplexOperands(OpTy op, ArrayRef<Value> operands,
                             ConversionPatternRewriter &rewriter) {
-  auto bop = cast<OpTy>(op);
-  auto loc = bop.getLoc();
+  auto loc = op.getLoc();
   typename OpTy::Adaptor transformed(operands);
 
   // Extract real and imaginary values from operands.
@@ -2493,7 +2484,7 @@ struct RsqrtOpLowering : public ConvertOpToLLVMPattern<RsqrtOp> {
 
     if (!operandType.isa<LLVM::LLVMArrayType>()) {
       LLVM::ConstantOp one;
-      if (operandType.isa<LLVM::LLVMVectorType>()) {
+      if (LLVM::isCompatibleVectorType(operandType)) {
         one = rewriter.create<LLVM::ConstantOp>(
             loc, operandType,
             SplatElementsAttr::get(resultType.cast<ShapedType>(), floatOne));
@@ -2514,8 +2505,7 @@ struct RsqrtOpLowering : public ConvertOpToLLVMPattern<RsqrtOp> {
         [&](Type llvmVectorTy, ValueRange operands) {
           auto splatAttr = SplatElementsAttr::get(
               mlir::VectorType::get(
-                  {llvmVectorTy.cast<LLVM::LLVMFixedVectorType>()
-                       .getNumElements()},
+                  {LLVM::getVectorNumElements(llvmVectorTy).getFixedValue()},
                   floatType),
               floatOne);
           auto one =
@@ -4092,8 +4082,7 @@ SmallVector<Value, 4> LLVMTypeConverter::promoteOperands(Location loc,
         continue;
       }
       if (auto memrefType = operand.getType().dyn_cast<MemRefType>()) {
-        MemRefDescriptor::unpack(builder, loc, llvmOperand,
-                                 operand.getType().cast<MemRefType>(),
+        MemRefDescriptor::unpack(builder, loc, llvmOperand, memrefType,
                                  promotedOperands);
         continue;
       }

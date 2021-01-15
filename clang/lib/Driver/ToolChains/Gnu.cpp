@@ -734,6 +734,7 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
   case llvm::Triple::ppc: {
     CmdArgs.push_back("-a32");
     CmdArgs.push_back("-mppc");
+    CmdArgs.push_back("-mbig-endian");
     CmdArgs.push_back(
       ppc::getPPCAsmModeForCPU(getCPUName(Args, getToolChain().getTriple())));
     break;
@@ -749,6 +750,7 @@ void tools::gnutools::Assembler::ConstructJob(Compilation &C,
   case llvm::Triple::ppc64: {
     CmdArgs.push_back("-a64");
     CmdArgs.push_back("-mppc64");
+    CmdArgs.push_back("-mbig-endian");
     CmdArgs.push_back(
       ppc::getPPCAsmModeForCPU(getCPUName(Args, getToolChain().getTriple())));
     break;

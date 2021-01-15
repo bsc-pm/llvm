@@ -1167,6 +1167,7 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
     }
 
     for (auto VT : {MVT::nxv2bf16, MVT::nxv4bf16, MVT::nxv8bf16}) {
+      setOperationAction(ISD::CONCAT_VECTORS, VT, Custom);
       setOperationAction(ISD::MGATHER, VT, Custom);
       setOperationAction(ISD::MSCATTER, VT, Custom);
     }
@@ -3954,7 +3955,6 @@ void selectGatherScatterAddrMode(SDValue &BasePtr, SDValue &Index, EVT MemVT,
   Opcode = NewOp;
   BasePtr = Index->getOperand(0);
   Index = ConstOffset;
-  return;
 }
 
 SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
@@ -3990,7 +3990,6 @@ SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
 
   // Handle FP data
   if (VT.isFloatingPoint()) {
-    VT = VT.changeVectorElementTypeToInteger();
     ElementCount EC = VT.getVectorElementCount();
     auto ScalarIntVT =
         MVT::getIntegerVT(AArch64::SVEBitsPerBlock / EC.getKnownMinValue());
@@ -4013,7 +4012,14 @@ SDValue AArch64TargetLowering::LowerMGATHER(SDValue Op,
     Opcode = getSignExtendedGatherOpcode(Opcode);
 
   SDValue Ops[] = {Chain, Mask, BasePtr, Index, InputVT, PassThru};
-  return DAG.getNode(Opcode, DL, VTs, Ops);
+  SDValue Gather = DAG.getNode(Opcode, DL, VTs, Ops);
+
+  if (VT.isFloatingPoint()) {
+    SDValue Cast = DAG.getNode(AArch64ISD::REINTERPRET_CAST, DL, VT, Gather);
+    return DAG.getMergeValues({Cast, Gather}, DL);
+  }
+
+  return Gather;
 }
 
 SDValue AArch64TargetLowering::LowerMSCATTER(SDValue Op,
@@ -5393,7 +5399,7 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
       Type *Ty = EVT(VA.getValVT()).getTypeForEVT(*DAG.getContext());
       Align Alignment = DAG.getDataLayout().getPrefTypeAlign(Ty);
       int FI = MFI.CreateStackObject(StoreSize, Alignment, false);
-      MFI.setStackID(FI, TargetStackID::SVEVector);
+      MFI.setStackID(FI, TargetStackID::ScalableVector);
 
       MachinePointerInfo MPI =
           MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI);
@@ -7252,7 +7258,7 @@ SDValue AArch64TargetLowering::LowerRETURNADDR(SDValue Op,
   // Armv8.3-A architectures. On Armv8.3-A and onwards XPACI is available so use
   // that instead.
   SDNode *St;
-  if (Subtarget->hasV8_3aOps()) {
+  if (Subtarget->hasPAuth()) {
     St = DAG.getMachineNode(AArch64::XPACI, DL, VT, ReturnAddress);
   } else {
     // XPACLRI operates on LR therefore we must move the operand accordingly.

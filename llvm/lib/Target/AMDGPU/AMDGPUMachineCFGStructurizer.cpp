@@ -984,11 +984,11 @@ void LinearizedRegion::addMBBs(LinearizedRegion *InnerRegion) {
 }
 
 bool LinearizedRegion::contains(MachineBasicBlock *MBB) {
-  return MBBs.count(MBB) == 1;
+  return MBBs.contains(MBB);
 }
 
 bool LinearizedRegion::isLiveOut(unsigned Reg) {
-  return LiveOuts.count(Reg) == 1;
+  return LiveOuts.contains(Reg);
 }
 
 bool LinearizedRegion::hasNoDef(unsigned Reg, MachineRegisterInfo *MRI) {
@@ -2574,7 +2574,7 @@ static void removeOldExitPreds(RegionMRT *Region) {
 static bool mbbHasBackEdge(MachineBasicBlock *MBB,
                            SmallPtrSet<MachineBasicBlock *, 8> &MBBs) {
   for (auto SI = MBB->succ_begin(), SE = MBB->succ_end(); SI != SE; ++SI) {
-    if (MBBs.count(*SI) != 0) {
+    if (MBBs.contains(*SI)) {
       return true;
     }
   }

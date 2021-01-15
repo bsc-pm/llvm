@@ -33,8 +33,8 @@ def HasVH            : Predicate<"Subtarget->hasVH()">,
 def HasLOR           : Predicate<"Subtarget->hasLOR()">,
                        AssemblerPredicate<(all_of FeatureLOR), "lor">;
 
-def HasPA            : Predicate<"Subtarget->hasPA()">,
-                       AssemblerPredicate<(all_of FeaturePA), "pa">;
+def HasPAuth         : Predicate<"Subtarget->hasPAuth()">,
+                       AssemblerPredicate<(all_of FeaturePAuth), "pauth">;
 
 def HasJS            : Predicate<"Subtarget->hasJS()">,
                        AssemblerPredicate<(all_of FeatureJS), "jsconv">;
@@ -69,8 +69,8 @@ def HasPMU           : Predicate<"Subtarget->hasPMU()">,
 def HasTLB_RMI          : Predicate<"Subtarget->hasTLB_RMI()">,
                        AssemblerPredicate<(all_of FeatureTLB_RMI), "tlb-rmi">;
 
-def HasFMI           : Predicate<"Subtarget->hasFMI()">,
-                       AssemblerPredicate<(all_of FeatureFMI), "fmi">;
+def HasFlagM         : Predicate<"Subtarget->hasFlagM()">,
+                       AssemblerPredicate<(all_of FeatureFlagM), "flagm">;
 
 def HasRCPC_IMMO      : Predicate<"Subtarget->hasRCPCImm()">,
                        AssemblerPredicate<(all_of FeatureRCPC_IMMO), "rcpc-immo">;
@@ -1073,7 +1073,7 @@ def : InstAlias<"autib1716", (AUTIB1716), 0>;
 def : InstAlias<"xpaclri", (XPACLRI), 0>;
 
 // These pointer authentication instructions require armv8.3a
-let Predicates = [HasPA] in {
+let Predicates = [HasPAuth] in {
 
   // When PA is enabled, a better mnemonic should be emitted.
   def : InstAlias<"paciaz", (PACIAZ), 1>;
@@ -1149,7 +1149,7 @@ def FJCVTZS  : BaseFPToIntegerUnscaled<0b01, 0b11, 0b110, FPR64, GPR32,
 } // HasJS, HasFPARMv8
 
 // v8.4 Flag manipulation instructions
-let Predicates = [HasFMI], Defs = [NZCV], Uses = [NZCV] in {
+let Predicates = [HasFlagM], Defs = [NZCV], Uses = [NZCV] in {
 def CFINV : SimpleSystemI<0, (ins), "cfinv", "">, Sched<[WriteSys]> {
   let Inst{20-5} = 0b0000001000000000;
 }
@@ -1157,7 +1157,7 @@ def SETF8  : BaseFlagManipulation<0, 0, (ins GPR32:$Rn), "setf8", "{\t$Rn}">;
 def SETF16 : BaseFlagManipulation<0, 1, (ins GPR32:$Rn), "setf16", "{\t$Rn}">;
 def RMIF   : FlagRotate<(ins GPR64:$Rn, uimm6:$imm, imm0_15:$mask), "rmif",
                         "{\t$Rn, $imm, $mask}">;
-} // HasFMI
+} // HasFlagM
 
 // v8.5 flag manipulation instructions
 let Predicates = [HasAltNZCV], Uses = [NZCV], Defs = [NZCV] in {
@@ -7809,10 +7809,18 @@ let AddedComplexity = 10 in {
 let Predicates = [HasLS64] in {
   def LD64B: LoadStore64B<0b101, "ld64b", (ins GPR64sp:$Rn),
                                           (outs GPR64x8:$Rt)>;
-  def ST64B: LoadStore64B<0b001, "st64b", (ins GPR64sp:$Rn, GPR64x8:$Rt),
+  def ST64B: LoadStore64B<0b001, "st64b", (ins GPR64x8:$Rt, GPR64sp:$Rn),
                                           (outs)>;
   def ST64BV:   Store64BV<0b011, "st64bv">;
   def ST64BV0:  Store64BV<0b010, "st64bv0">;
+
+  class ST64BPattern<Intrinsic intrinsic, Instruction instruction>
+    : Pat<(intrinsic GPR64sp:$addr, GPR64:$x0, GPR64:$x1, GPR64:$x2, GPR64:$x3, GPR64:$x4, GPR64:$x5, GPR64:$x6, GPR64:$x7),
+          (instruction (REG_SEQUENCE GPR64x8Class, $x0, x8sub_0, $x1, x8sub_1, $x2, x8sub_2, $x3, x8sub_3, $x4, x8sub_4, $x5, x8sub_5, $x6, x8sub_6, $x7, x8sub_7), $addr)>;
+
+  def : ST64BPattern<int_aarch64_st64b, ST64B>;
+  def : ST64BPattern<int_aarch64_st64bv, ST64BV>;
+  def : ST64BPattern<int_aarch64_st64bv0, ST64BV0>;
 }
 
 include "AArch64InstrAtomics.td"

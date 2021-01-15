@@ -735,13 +735,13 @@ void llvm::MergeBasicBlockIntoOnlyPred(BasicBlock *DestBB,
   SmallVector<DominatorTree::UpdateType, 32> Updates;
 
   if (DTU) {
-    Updates.push_back({DominatorTree::Delete, PredBB, DestBB});
     for (auto I = pred_begin(PredBB), E = pred_end(PredBB); I != E; ++I) {
-      Updates.push_back({DominatorTree::Delete, *I, PredBB});
       // This predecessor of PredBB may already have DestBB as a successor.
       if (!llvm::is_contained(successors(*I), DestBB))
         Updates.push_back({DominatorTree::Insert, *I, DestBB});
+      Updates.push_back({DominatorTree::Delete, *I, PredBB});
     }
+    Updates.push_back({DominatorTree::Delete, PredBB, DestBB});
   }
 
   // Zap anything that took the address of DestBB.  Not doing this will give the
@@ -1046,16 +1046,16 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
 
   SmallVector<DominatorTree::UpdateType, 32> Updates;
   if (DTU) {
-    Updates.push_back({DominatorTree::Delete, BB, Succ});
     // All predecessors of BB will be moved to Succ.
     SmallSetVector<BasicBlock *, 8> Predecessors(pred_begin(BB), pred_end(BB));
     Updates.reserve(Updates.size() + 2 * Predecessors.size());
     for (auto *Predecessor : Predecessors) {
-      Updates.push_back({DominatorTree::Delete, Predecessor, BB});
       // This predecessor of BB may already have Succ as a successor.
       if (!llvm::is_contained(successors(Predecessor), Succ))
         Updates.push_back({DominatorTree::Insert, Predecessor, Succ});
+      Updates.push_back({DominatorTree::Delete, Predecessor, BB});
     }
+    Updates.push_back({DominatorTree::Delete, BB, Succ});
   }
 
   if (isa<PHINode>(Succ->begin())) {
@@ -2362,33 +2362,40 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
     return Changed;
 
   assert(Reachable.size() < F.size());
-  NumRemoved += F.size() - Reachable.size();
 
-  SmallSetVector<BasicBlock *, 8> DeadBlockSet;
+  // Are there any blocks left to actually delete?
+  SmallSetVector<BasicBlock *, 8> BlocksToRemove;
   for (BasicBlock &BB : F) {
     // Skip reachable basic blocks
     if (Reachable.count(&BB))
       continue;
-    DeadBlockSet.insert(&BB);
+    // Skip already-deleted blocks
+    if (DTU && DTU->isBBPendingDeletion(&BB))
+      continue;
+    BlocksToRemove.insert(&BB);
   }
 
-  if (MSSAU)
-    MSSAU->removeBlocks(DeadBlockSet);
+  if (BlocksToRemove.empty())
+    return Changed;
 
-  // Loop over all of the basic blocks that are not reachable, dropping all of
+  Changed = true;
+  NumRemoved += BlocksToRemove.size();
+
+  if (MSSAU)
+    MSSAU->removeBlocks(BlocksToRemove);
+
+  // Loop over all of the basic blocks that are up for removal, dropping all of
   // their internal references. Update DTU if available.
   std::vector<DominatorTree::UpdateType> Updates;
-  for (auto *BB : DeadBlockSet) {
+  for (auto *BB : BlocksToRemove) {
     SmallSetVector<BasicBlock *, 8> UniqueSuccessors;
     for (BasicBlock *Successor : successors(BB)) {
-      if (!DeadBlockSet.count(Successor))
+      // Only remove references to BB in reachable successors of BB.
+      if (Reachable.count(Successor))
         Successor->removePredecessor(BB);
       if (DTU)
         UniqueSuccessors.insert(Successor);
     }
-    if (DTU)
-      for (auto *UniqueSuccessor : UniqueSuccessors)
-        Updates.push_back({DominatorTree::Delete, BB, UniqueSuccessor});
     BB->dropAllReferences();
     if (DTU) {
       Instruction *TI = BB->getTerminator();
@@ -2401,27 +2408,22 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
       new UnreachableInst(BB->getContext(), BB);
       assert(succ_empty(BB) && "The successor list of BB isn't empty before "
                                "applying corresponding DTU updates.");
+      Updates.reserve(Updates.size() + UniqueSuccessors.size());
+      for (auto *UniqueSuccessor : UniqueSuccessors)
+        Updates.push_back({DominatorTree::Delete, BB, UniqueSuccessor});
     }
   }
 
   if (DTU) {
     DTU->applyUpdates(Updates);
-    bool Deleted = false;
-    for (auto *BB : DeadBlockSet) {
-      if (DTU->isBBPendingDeletion(BB))
-        --NumRemoved;
-      else
-        Deleted = true;
+    for (auto *BB : BlocksToRemove)
       DTU->deleteBB(BB);
-    }
-    if (!Deleted)
-      return false;
   } else {
-    for (auto *BB : DeadBlockSet)
+    for (auto *BB : BlocksToRemove)
       BB->eraseFromParent();
   }
 
-  return true;
+  return Changed;
 }
 
 void llvm::combineMetadata(Instruction *K, const Instruction *J,

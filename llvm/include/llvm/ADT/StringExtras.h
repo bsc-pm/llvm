@@ -384,13 +384,16 @@ inline std::string join_impl(IteratorT Begin, IteratorT End,
 
   size_t Len = (std::distance(Begin, End) - 1) * Separator.size();
   for (IteratorT I = Begin; I != End; ++I)
-    Len += (*Begin).size();
+    Len += (*I).size();
   S.reserve(Len);
+  size_t PrevCapacity = S.capacity();
+  (void)PrevCapacity;
   S += (*Begin);
   while (++Begin != End) {
     S += Separator;
     S += (*Begin);
   }
+  assert(PrevCapacity == S.capacity() && "String grew during building");
   return S;
 }
 
@@ -461,6 +464,30 @@ inline std::string join_items(Sep Separator, Args &&... Items) {
   detail::join_items_impl(Result, Separator, std::forward<Args>(Items)...);
   return Result;
 }
+
+/// A helper class to return the specified delimiter string after the first
+/// invocation of operator StringRef().  Used to generate a comma-separated
+/// list from a loop like so:
+///
+/// \code
+///   SubsequentDelim SD;
+///   for (auto &I : C)
+///     OS << SD << I.getName();
+/// \end
+class SubsequentDelim {
+  bool First = true;
+  StringRef Delim;
+
+ public:
+  SubsequentDelim(StringRef Delim = ", ") : Delim(Delim) {}
+  operator StringRef() {
+    if (First) {
+      First = false;
+      return {};
+    }
+    return Delim;
+  }
+};
 
 } // end namespace llvm
 
