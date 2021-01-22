@@ -166,7 +166,7 @@ using OperandsDirective = DirectiveElement<Element::Kind::OperandsDirective>;
 
 /// This class represents the `regions` directive. This directive represents
 /// all of the regions of an operation.
-using RegionsDirective = DirectiveElement<Element::Kind::ResultsDirective>;
+using RegionsDirective = DirectiveElement<Element::Kind::RegionsDirective>;
 
 /// This class represents the `results` directive. This directive represents
 /// all of the results of an operation.
@@ -1757,7 +1757,7 @@ void OperationFormat::genElementPrinter(Element *element, OpMethodBody &body,
                              lastWasPunctuation);
 
   // Emit a whitespace element.
-  if (NewlineElement *newline = dyn_cast<NewlineElement>(element)) {
+  if (isa<NewlineElement>(element)) {
     body << "  p.printNewline();\n";
     return;
   }

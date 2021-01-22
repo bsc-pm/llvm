@@ -1,20 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
 
-# RPATH settings on macOS do not affect INSTALL_NAME.
-if (POLICY CMP0068)
-  cmake_policy(SET CMP0068 NEW)
-  set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
-endif()
-
-# Include file check macros honor CMAKE_REQUIRED_LIBRARIES.
-if(POLICY CMP0075)
-  cmake_policy(SET CMP0075 NEW)
-endif()
-
-# option() honors normal variables.
-if (POLICY CMP0077)
-  cmake_policy(SET CMP0077 NEW)
-endif()
+set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
 # Some components of flang are extremely memory resource hungry
 # at compile time, so build just few of them at a time.

@@ -4607,6 +4607,10 @@ SDValue DAGCombiner::visitIMINMAX(SDNode *N) {
       return DAG.getNode(AltOpcode, SDLoc(N), VT, N0, N1);
   }
 
+  // Simplify the operands using demanded-bits information.
+  if (SimplifyDemandedBits(SDValue(N, 0)))
+    return SDValue(N, 0);
+
   return SDValue();
 }
 
@@ -11948,8 +11952,7 @@ SDValue DAGCombiner::visitTRUNCATE(SDNode *N) {
   }
 
   // Simplify the operands using demanded-bits information.
-  if (!VT.isVector() &&
-      SimplifyDemandedBits(SDValue(N, 0)))
+  if (SimplifyDemandedBits(SDValue(N, 0)))
     return SDValue(N, 0);
 
   // (trunc adde(X, Y, Carry)) -> (adde trunc(X), trunc(Y), Carry)
@@ -14936,16 +14939,13 @@ bool DAGCombiner::CombineToPreIndexedLoadStore(SDNode *N) {
     // Therefore, we have:
     //   t0 = (x0 * offset0 - x1 * y0 * y1 *offset1) + (y0 * y1) * t1
 
-    ConstantSDNode *CN =
-      cast<ConstantSDNode>(OtherUses[i]->getOperand(OffsetIdx));
-    int X0, X1, Y0, Y1;
+    auto *CN = cast<ConstantSDNode>(OtherUses[i]->getOperand(OffsetIdx));
     const APInt &Offset0 = CN->getAPIntValue();
-    APInt Offset1 = cast<ConstantSDNode>(Offset)->getAPIntValue();
-
-    X0 = (OtherUses[i]->getOpcode() == ISD::SUB && OffsetIdx == 1) ? -1 : 1;
-    Y0 = (OtherUses[i]->getOpcode() == ISD::SUB && OffsetIdx == 0) ? -1 : 1;
-    X1 = (AM == ISD::PRE_DEC && !Swapped) ? -1 : 1;
-    Y1 = (AM == ISD::PRE_DEC && Swapped) ? -1 : 1;
+    const APInt &Offset1 = cast<ConstantSDNode>(Offset)->getAPIntValue();
+    int X0 = (OtherUses[i]->getOpcode() == ISD::SUB && OffsetIdx == 1) ? -1 : 1;
+    int Y0 = (OtherUses[i]->getOpcode() == ISD::SUB && OffsetIdx == 0) ? -1 : 1;
+    int X1 = (AM == ISD::PRE_DEC && !Swapped) ? -1 : 1;
+    int Y1 = (AM == ISD::PRE_DEC && Swapped) ? -1 : 1;
 
     unsigned Opcode = (Y0 * Y1 < 0) ? ISD::SUB : ISD::ADD;
 
@@ -18953,8 +18953,7 @@ SDValue DAGCombiner::reduceBuildVecToShuffle(SDNode *N) {
     // Have we seen this input vector before?
     // The vectors are expected to be tiny (usually 1 or 2 elements), so using
     // a map back from SDValues to numbers isn't worth it.
-    unsigned Idx = std::distance(
-        VecIn.begin(), std::find(VecIn.begin(), VecIn.end(), ExtractedFromVec));
+    unsigned Idx = std::distance(VecIn.begin(), find(VecIn, ExtractedFromVec));
     if (Idx == VecIn.size())
       VecIn.push_back(ExtractedFromVec);
 
@@ -19449,9 +19448,8 @@ SDValue DAGCombiner::visitCONCAT_VECTORS(SDNode *N) {
     return DAG.getUNDEF(VT);
 
   // Optimize concat_vectors where all but the first of the vectors are undef.
-  if (std::all_of(std::next(N->op_begin()), N->op_end(), [](const SDValue &Op) {
-        return Op.isUndef();
-      })) {
+  if (all_of(drop_begin(N->ops()),
+             [](const SDValue &Op) { return Op.isUndef(); })) {
     SDValue In = N->getOperand(0);
     assert(In.getValueType().isVector() && "Must concat vectors");
 
@@ -20887,6 +20885,32 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
         continue;
       }
 
+      // Last chance - see if the vector is another shuffle and if it
+      // uses one of the existing candidate shuffle ops.
+      if (auto *CurrentSVN = dyn_cast<ShuffleVectorSDNode>(CurrentVec)) {
+        int InnerIdx = CurrentSVN->getMaskElt(Idx);
+        if (InnerIdx < 0) {
+          Mask.push_back(-1);
+          continue;
+        }
+        SDValue InnerVec = (InnerIdx < (int)NumElts)
+                               ? CurrentSVN->getOperand(0)
+                               : CurrentSVN->getOperand(1);
+        if (InnerVec.isUndef()) {
+          Mask.push_back(-1);
+          continue;
+        }
+        InnerIdx %= NumElts;
+        if (InnerVec == SV0) {
+          Mask.push_back(InnerIdx);
+          continue;
+        }
+        if (InnerVec == SV1) {
+          Mask.push_back(InnerIdx + NumElts);
+          continue;
+        }
+      }
+
       // Bail out if we cannot convert the shuffle pair into a single shuffle.
       return false;
     }
@@ -21412,11 +21436,10 @@ SDValue DAGCombiner::SimplifyVBinOp(SDNode *N) {
   // Make sure all but the first op are undef or constant.
   auto ConcatWithConstantOrUndef = [](SDValue Concat) {
     return Concat.getOpcode() == ISD::CONCAT_VECTORS &&
-           std::all_of(std::next(Concat->op_begin()), Concat->op_end(),
-                     [](const SDValue &Op) {
-                       return Op.isUndef() ||
-                              ISD::isBuildVectorOfConstantSDNodes(Op.getNode());
-                     });
+           all_of(drop_begin(Concat->ops()), [](const SDValue &Op) {
+             return Op.isUndef() ||
+                    ISD::isBuildVectorOfConstantSDNodes(Op.getNode());
+           });
   };
 
   // The following pattern is likely to emerge with vector reduction ops. Moving

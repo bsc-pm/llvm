@@ -93,6 +93,13 @@ enum NodeType : unsigned {
   SPLAT_VECTOR_I64,
   // Read VLENB CSR
   READ_VLENB,
+  // Truncates a RVV integer vector by one power-of-two.
+  TRUNCATE_VECTOR,
+  // Unit-stride fault-only-first load
+  VLEFF,
+  VLEFF_MASK,
+  // read vl CSR
+  READ_VL,
 };
 } // namespace RISCVISD
 
@@ -130,6 +137,10 @@ public:
                           SelectionDAG &DAG) const override;
 
   SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
+
+  bool targetShrinkDemandedConstant(SDValue Op, const APInt &DemandedBits,
+                                    const APInt &DemandedElts,
+                                    TargetLoweringOpt &TLO) const override;
 
   void computeKnownBitsForTargetNode(const SDValue Op,
                                      KnownBits &Known,
@@ -282,6 +293,9 @@ private:
   SDValue lowerShiftLeftParts(SDValue Op, SelectionDAG &DAG) const;
   SDValue lowerShiftRightParts(SDValue Op, SelectionDAG &DAG, bool IsSRA) const;
   SDValue lowerSPLATVECTOR(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerVectorMaskExt(SDValue Op, SelectionDAG &DAG,
+                             int64_t ExtTrueVal) const;
+  SDValue lowerVectorMaskTrunc(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerINTRINSIC_W_CHAIN(SDValue Op, SelectionDAG &DAG) const;
 
@@ -309,6 +323,22 @@ using namespace RISCV;
 #include "RISCVGenSearchableTables.inc"
 
 } // end namespace RISCVVIntrinsicsTable
+
+namespace RISCVZvlssegTable {
+
+struct RISCVZvlsseg {
+  unsigned int IntrinsicID;
+  unsigned int SEW;
+  unsigned int LMUL;
+  unsigned int Pseudo;
+};
+
+using namespace RISCV;
+
+#define GET_RISCVZvlssegTable_DECL
+#include "RISCVGenSearchableTables.inc"
+
+} // namespace RISCVZvlssegTable
 }
 
 #endif

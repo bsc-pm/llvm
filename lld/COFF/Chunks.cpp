@@ -357,9 +357,7 @@ void SectionChunk::writeTo(uint8_t *buf) const {
 
   // Apply relocations.
   size_t inputSize = getSize();
-  for (size_t i = 0, e = relocsSize; i < e; i++) {
-    const coff_relocation &rel = relocsData[i];
-
+  for (const coff_relocation &rel : getRelocs()) {
     // Check for an invalid relocation offset. This check isn't perfect, because
     // we don't have the relocation size, which is only known after checking the
     // machine and relocation type. As a result, a relocation may overwrite the
@@ -444,11 +442,12 @@ void SectionChunk::writeAndRelocateSubsection(ArrayRef<uint8_t> sec,
   memcpy(buf, subsec.data(), subsec.size());
   for (; nextRelocIndex < relocsSize; ++nextRelocIndex) {
     const coff_relocation &rel = relocsData[nextRelocIndex];
-    // Skip relocations applied before this subsection.
+    // Only apply relocations that apply to this subsection. These checks
+    // assume that all subsections completely contain their relocations.
+    // Relocations must not straddle the beginning or end of a subsection.
     if (rel.VirtualAddress < vaBegin)
       continue;
-    // Stop if the relocation does not apply to this subsection.
-    if (rel.VirtualAddress >= vaEnd)
+    if (rel.VirtualAddress + 1 >= vaEnd)
       break;
     applyRelocation(&buf[rel.VirtualAddress - vaBegin], rel);
   }
@@ -492,8 +491,7 @@ static uint8_t getBaserelType(const coff_relocation &rel) {
 // fixed by the loader if load-time relocation is needed.
 // Only called when base relocation is enabled.
 void SectionChunk::getBaserels(std::vector<Baserel> *res) {
-  for (size_t i = 0, e = relocsSize; i < e; i++) {
-    const coff_relocation &rel = relocsData[i];
+  for (const coff_relocation &rel : getRelocs()) {
     uint8_t ty = getBaserelType(rel);
     if (ty == IMAGE_REL_BASED_ABSOLUTE)
       continue;

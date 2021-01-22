@@ -1722,6 +1722,32 @@ bool TargetLowering::SimplifyDemandedBits(
     }
     break;
   }
+  case ISD::UMIN: {
+    // Check if one arg is always less than (or equal) to the other arg.
+    SDValue Op0 = Op.getOperand(0);
+    SDValue Op1 = Op.getOperand(1);
+    KnownBits Known0 = TLO.DAG.computeKnownBits(Op0, DemandedElts, Depth + 1);
+    KnownBits Known1 = TLO.DAG.computeKnownBits(Op1, DemandedElts, Depth + 1);
+    Known = KnownBits::umin(Known0, Known1);
+    if (Optional<bool> IsULE = KnownBits::ule(Known0, Known1))
+      return TLO.CombineTo(Op, IsULE.getValue() ? Op0 : Op1);
+    if (Optional<bool> IsULT = KnownBits::ult(Known0, Known1))
+      return TLO.CombineTo(Op, IsULT.getValue() ? Op0 : Op1);
+    break;
+  }
+  case ISD::UMAX: {
+    // Check if one arg is always greater than (or equal) to the other arg.
+    SDValue Op0 = Op.getOperand(0);
+    SDValue Op1 = Op.getOperand(1);
+    KnownBits Known0 = TLO.DAG.computeKnownBits(Op0, DemandedElts, Depth + 1);
+    KnownBits Known1 = TLO.DAG.computeKnownBits(Op1, DemandedElts, Depth + 1);
+    Known = KnownBits::umax(Known0, Known1);
+    if (Optional<bool> IsUGE = KnownBits::uge(Known0, Known1))
+      return TLO.CombineTo(Op, IsUGE.getValue() ? Op0 : Op1);
+    if (Optional<bool> IsUGT = KnownBits::ugt(Known0, Known1))
+      return TLO.CombineTo(Op, IsUGT.getValue() ? Op0 : Op1);
+    break;
+  }
   case ISD::BITREVERSE: {
     SDValue Src = Op.getOperand(0);
     APInt DemandedSrcBits = DemandedBits.reverseBits();
@@ -1960,7 +1986,8 @@ bool TargetLowering::SimplifyDemandedBits(
     // zero/one bits live out.
     unsigned OperandBitWidth = Src.getScalarValueSizeInBits();
     APInt TruncMask = DemandedBits.zext(OperandBitWidth);
-    if (SimplifyDemandedBits(Src, TruncMask, Known, TLO, Depth + 1))
+    if (SimplifyDemandedBits(Src, TruncMask, DemandedElts, Known, TLO,
+                             Depth + 1))
       return true;
     Known = Known.trunc(BitWidth);
 
@@ -1983,9 +2010,9 @@ bool TargetLowering::SimplifyDemandedBits(
           // undesirable.
           break;
 
-        SDValue ShAmt = Src.getOperand(1);
-        auto *ShAmtC = dyn_cast<ConstantSDNode>(ShAmt);
-        if (!ShAmtC || ShAmtC->getAPIntValue().uge(BitWidth))
+        const APInt *ShAmtC =
+            TLO.DAG.getValidShiftAmountConstant(Src, DemandedElts);
+        if (!ShAmtC)
           break;
         uint64_t ShVal = ShAmtC->getZExtValue();
 
@@ -1997,12 +2024,12 @@ bool TargetLowering::SimplifyDemandedBits(
         if (!(HighBits & DemandedBits)) {
           // None of the shifted in bits are needed.  Add a truncate of the
           // shift input, then shift it.
-          if (TLO.LegalTypes())
-            ShAmt = TLO.DAG.getConstant(ShVal, dl, getShiftAmountTy(VT, DL));
+          SDValue NewShAmt = TLO.DAG.getConstant(
+              ShVal, dl, getShiftAmountTy(VT, DL, TLO.LegalTypes()));
           SDValue NewTrunc =
               TLO.DAG.getNode(ISD::TRUNCATE, dl, VT, Src.getOperand(0));
           return TLO.CombineTo(
-              Op, TLO.DAG.getNode(ISD::SRL, dl, VT, NewTrunc, ShAmt));
+              Op, TLO.DAG.getNode(ISD::SRL, dl, VT, NewTrunc, NewShAmt));
         }
         break;
       }
@@ -6092,8 +6119,6 @@ bool TargetLowering::expandMUL_LOHI(unsigned Opcode, EVT VT, const SDLoc &dl,
 
   unsigned OuterBitSize = VT.getScalarSizeInBits();
   unsigned InnerBitSize = HiLoVT.getScalarSizeInBits();
-  unsigned LHSSB = DAG.ComputeNumSignBits(LHS);
-  unsigned RHSSB = DAG.ComputeNumSignBits(RHS);
 
   // LL, LH, RL, and RH must be either all NULL or all set to a value.
   assert((LL.getNode() && LH.getNode() && RL.getNode() && RH.getNode()) ||
@@ -6142,8 +6167,9 @@ bool TargetLowering::expandMUL_LOHI(unsigned Opcode, EVT VT, const SDLoc &dl,
     }
   }
 
-  if (!VT.isVector() && Opcode == ISD::MUL && LHSSB > InnerBitSize &&
-      RHSSB > InnerBitSize) {
+  if (!VT.isVector() && Opcode == ISD::MUL &&
+      DAG.ComputeNumSignBits(LHS) > InnerBitSize &&
+      DAG.ComputeNumSignBits(RHS) > InnerBitSize) {
     // The input values are both sign-extended.
     // TODO non-MUL case?
     if (MakeMUL_LOHI(LL, RL, Lo, Hi, true)) {

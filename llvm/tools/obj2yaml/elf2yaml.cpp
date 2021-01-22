@@ -1294,8 +1294,6 @@ ELFDumper<ELFT>::dumpVerdefSection(const Elf_Shdr *Shdr) {
   if (Error E = dumpCommonSection(Shdr, *S))
     return std::move(E);
 
-  S->Info = Shdr->sh_info;
-
   auto StringTableShdrOrErr = Obj.getSection(Shdr->sh_link);
   if (!StringTableShdrOrErr)
     return StringTableShdrOrErr.takeError();
@@ -1315,10 +1313,19 @@ ELFDumper<ELFT>::dumpVerdefSection(const Elf_Shdr *Shdr) {
   while (Buf) {
     const Elf_Verdef *Verdef = reinterpret_cast<const Elf_Verdef *>(Buf);
     ELFYAML::VerdefEntry Entry;
-    Entry.Version = Verdef->vd_version;
-    Entry.Flags = Verdef->vd_flags;
-    Entry.VersionNdx = Verdef->vd_ndx;
-    Entry.Hash = Verdef->vd_hash;
+    if (Verdef->vd_version != 1)
+      return createStringError(errc::invalid_argument,
+                               "invalid SHT_GNU_verdef section version: " +
+                                   Twine(Verdef->vd_version));
+
+    if (Verdef->vd_flags != 0)
+      Entry.Flags = Verdef->vd_flags;
+
+    if (Verdef->vd_ndx != 0)
+      Entry.VersionNdx = Verdef->vd_ndx;
+
+    if (Verdef->vd_hash != 0)
+      Entry.Hash = Verdef->vd_hash;
 
     const uint8_t *BufAux = Buf + Verdef->vd_aux;
     while (BufAux) {
@@ -1332,6 +1339,9 @@ ELFDumper<ELFT>::dumpVerdefSection(const Elf_Shdr *Shdr) {
     S->Entries->push_back(Entry);
     Buf = Verdef->vd_next ? Buf + Verdef->vd_next : nullptr;
   }
+
+  if (Shdr->sh_info != S->Entries->size())
+    S->Info = (llvm::yaml::Hex64)Shdr->sh_info;
 
   return S.release();
 }
@@ -1360,8 +1370,6 @@ ELFDumper<ELFT>::dumpVerneedSection(const Elf_Shdr *Shdr) {
   auto S = std::make_unique<ELFYAML::VerneedSection>();
   if (Error E = dumpCommonSection(Shdr, *S))
     return std::move(E);
-
-  S->Info = Shdr->sh_info;
 
   auto Contents = Obj.getSectionContents(*Shdr);
   if (!Contents)
@@ -1406,6 +1414,9 @@ ELFDumper<ELFT>::dumpVerneedSection(const Elf_Shdr *Shdr) {
     S->VerneedV->push_back(Entry);
     Buf = Verneed->vn_next ? Buf + Verneed->vn_next : nullptr;
   }
+
+  if (Shdr->sh_info != S->VerneedV->size())
+    S->Info = (llvm::yaml::Hex64)Shdr->sh_info;
 
   return S.release();
 }

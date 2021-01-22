@@ -146,7 +146,8 @@ public:
         return;
 
       if (Traversal == TK_IgnoreUnlessSpelledInSource &&
-          isa<LambdaExpr, CXXForRangeStmt, CallExpr>(S))
+          isa<LambdaExpr, CXXForRangeStmt, CallExpr,
+              CXXRewrittenBinaryOperator>(S))
         return;
 
       for (const Stmt *SubStmt : S->children())
@@ -768,6 +769,15 @@ public:
            return !isa<CXXDefaultArgExpr>(Child);
          })) {
       Visit(Child);
+    }
+  }
+
+  void VisitCXXRewrittenBinaryOperator(const CXXRewrittenBinaryOperator *Node) {
+    if (Traversal == TK_IgnoreUnlessSpelledInSource) {
+      Visit(Node->getLHS());
+      Visit(Node->getRHS());
+    } else {
+      ConstStmtVisitor<Derived>::VisitCXXRewrittenBinaryOperator(Node);
     }
   }
 

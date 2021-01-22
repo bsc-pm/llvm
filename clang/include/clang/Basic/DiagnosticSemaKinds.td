@@ -7609,7 +7609,7 @@ def err_no_typeid_with_fno_rtti : Error<
 def err_no_dynamic_cast_with_fno_rtti : Error<
   "use of dynamic_cast requires -frtti">;
 def warn_no_dynamic_cast_with_rtti_disabled: Warning<
-  "dynamic_cast will not work since RTTI data is disabled by " 
+  "dynamic_cast will not work since RTTI data is disabled by "
   "%select{-fno-rtti-data|/GR-}0">, InGroup<RTTI>;
 def warn_no_typeid_with_rtti_disabled: Warning<
   "typeid will not work since RTTI data is disabled by "
@@ -7625,8 +7625,7 @@ def warn_condition_is_assignment : Warning<"using the result of an "
   InGroup<Parentheses>;
 def warn_free_nonheap_object
   : Warning<"attempt to call %0 on non-heap object %1">,
-    InGroup<DiagGroup<"free-nonheap-object">>,
-    DefaultIgnore; // FIXME: add to -Wall after sufficient testing
+    InGroup<FreeNonHeapObject>;
 
 // Completely identical except off by default.
 def warn_condition_is_idiomatic_assignment : Warning<"using the result "
@@ -10469,8 +10468,9 @@ def err_omp_invariant_or_linear_dependency : Error<
   "expected loop invariant expression or '<invariant1> * %0 + <invariant2>' kind of expression">;
 def err_omp_wrong_dependency_iterator_type : Error<
   "expected an integer or a pointer type of the outer loop counter '%0' for non-rectangular nests">;
-def err_device_unsupported_type : Error <
-  "%0 requires %1 bit size %2 type support, but device '%3' does not support it">;
+def err_device_unsupported_type
+    : Error<"%0 requires %select{|%2 bit size}1 %3 type support, but device "
+            "'%4' does not support it">;
 def err_omp_lambda_capture_in_declare_target_not_to : Error<
   "variable captured in declare target region must appear in a to clause">;
 def err_omp_device_type_mismatch : Error<

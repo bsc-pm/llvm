@@ -1288,6 +1288,11 @@ template <class ELFT>
 void ELFState<ELFT>::writeSectionContent(Elf_Shdr &SHeader,
                                          const ELFYAML::SymverSection &Section,
                                          ContiguousBlobAccumulator &CBA) {
+  unsigned Link = 0;
+  if (!Section.Link && !ExcludedSectionHeaders.count(".dynsym") &&
+      SN2I.lookup(".dynsym", Link))
+    SHeader.sh_link = Link;
+
   if (!Section.Entries)
     return;
 
@@ -1446,7 +1451,16 @@ template <class ELFT>
 void ELFState<ELFT>::writeSectionContent(Elf_Shdr &SHeader,
                                          const ELFYAML::VerdefSection &Section,
                                          ContiguousBlobAccumulator &CBA) {
-  SHeader.sh_info = Section.Info;
+
+  if (Section.Info)
+    SHeader.sh_info = *Section.Info;
+  else if (Section.Entries)
+    SHeader.sh_info = Section.Entries->size();
+
+  unsigned Link = 0;
+  if (!Section.Link && !ExcludedSectionHeaders.count(".dynstr") &&
+      SN2I.lookup(".dynstr", Link))
+    SHeader.sh_link = Link;
 
   if (!Section.Entries)
     return;
@@ -1456,10 +1470,10 @@ void ELFState<ELFT>::writeSectionContent(Elf_Shdr &SHeader,
     const ELFYAML::VerdefEntry &E = (*Section.Entries)[I];
 
     Elf_Verdef VerDef;
-    VerDef.vd_version = E.Version;
-    VerDef.vd_flags = E.Flags;
-    VerDef.vd_ndx = E.VersionNdx;
-    VerDef.vd_hash = E.Hash;
+    VerDef.vd_version = E.Version.getValueOr(1);
+    VerDef.vd_flags = E.Flags.getValueOr(0);
+    VerDef.vd_ndx = E.VersionNdx.getValueOr(0);
+    VerDef.vd_hash = E.Hash.getValueOr(0);
     VerDef.vd_aux = sizeof(Elf_Verdef);
     VerDef.vd_cnt = E.VerNames.size();
     if (I == Section.Entries->size() - 1)
@@ -1488,7 +1502,15 @@ template <class ELFT>
 void ELFState<ELFT>::writeSectionContent(Elf_Shdr &SHeader,
                                          const ELFYAML::VerneedSection &Section,
                                          ContiguousBlobAccumulator &CBA) {
-  SHeader.sh_info = Section.Info;
+  if (Section.Info)
+    SHeader.sh_info = *Section.Info;
+  else if (Section.VerneedV)
+    SHeader.sh_info = Section.VerneedV->size();
+
+  unsigned Link = 0;
+  if (!Section.Link && !ExcludedSectionHeaders.count(".dynstr") &&
+      SN2I.lookup(".dynstr", Link))
+    SHeader.sh_link = Link;
 
   if (!Section.VerneedV)
     return;

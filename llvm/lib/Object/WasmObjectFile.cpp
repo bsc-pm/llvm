@@ -693,7 +693,8 @@ Error WasmObjectFile::parseLinkingSectionSymtab(ReadContext &Ctx) {
     }
 
     default:
-      return make_error<GenericBinaryError>("Invalid symbol type",
+      return make_error<GenericBinaryError>("Invalid symbol type: " +
+                                                Twine(unsigned(Info.Kind)),
                                             object_error::parse_failed);
     }
 
@@ -850,14 +851,15 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, ReadContext &Ctx) {
   uint32_t PreviousOffset = 0;
   while (RelocCount--) {
     wasm::WasmRelocation Reloc = {};
-    Reloc.Type = readVaruint32(Ctx);
+    uint32_t type = readVaruint32(Ctx);
+    Reloc.Type = type;
     Reloc.Offset = readVaruint32(Ctx);
     if (Reloc.Offset < PreviousOffset)
       return make_error<GenericBinaryError>("Relocations not in offset order",
                                             object_error::parse_failed);
     PreviousOffset = Reloc.Offset;
     Reloc.Index = readVaruint32(Ctx);
-    switch (Reloc.Type) {
+    switch (type) {
     case wasm::R_WASM_FUNCTION_INDEX_LEB:
     case wasm::R_WASM_TABLE_INDEX_SLEB:
     case wasm::R_WASM_TABLE_INDEX_SLEB64:
@@ -935,9 +937,8 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, ReadContext &Ctx) {
       Reloc.Addend = readVarint32(Ctx);
       break;
     default:
-      return make_error<GenericBinaryError>("Bad relocation type: " +
-                                                Twine(Reloc.Type),
-                                            object_error::parse_failed);
+      return make_error<GenericBinaryError>(
+          "Bad relocation type: " + Twine(type), object_error::parse_failed);
     }
 
     // Relocations must fit inside the section, and must appear in order.  They
@@ -1366,9 +1367,11 @@ Error WasmObjectFile::parseDataSection(ReadContext &Ctx) {
   while (Count--) {
     WasmSegment Segment;
     Segment.Data.InitFlags = readVaruint32(Ctx);
-    Segment.Data.MemoryIndex = (Segment.Data.InitFlags & wasm::WASM_SEGMENT_HAS_MEMINDEX)
-                               ? readVaruint32(Ctx) : 0;
-    if ((Segment.Data.InitFlags & wasm::WASM_SEGMENT_IS_PASSIVE) == 0) {
+    Segment.Data.MemoryIndex =
+        (Segment.Data.InitFlags & wasm::WASM_DATA_SEGMENT_HAS_MEMINDEX)
+            ? readVaruint32(Ctx)
+            : 0;
+    if ((Segment.Data.InitFlags & wasm::WASM_DATA_SEGMENT_IS_PASSIVE) == 0) {
       if (Error Err = readInitExpr(Segment.Data.Offset, Ctx))
         return Err;
     } else {

@@ -427,7 +427,7 @@ struct VerneedEntry {
 
 struct VerneedSection : Section {
   Optional<std::vector<VerneedEntry>> VerneedV;
-  llvm::yaml::Hex64 Info;
+  Optional<llvm::yaml::Hex64> Info;
 
   VerneedSection() : Section(ChunkKind::Verneed) {}
 
@@ -522,17 +522,16 @@ struct SymverSection : Section {
 };
 
 struct VerdefEntry {
-  uint16_t Version;
-  uint16_t Flags;
-  uint16_t VersionNdx;
-  uint32_t Hash;
+  Optional<uint16_t> Version;
+  Optional<uint16_t> Flags;
+  Optional<uint16_t> VersionNdx;
+  Optional<uint32_t> Hash;
   std::vector<StringRef> VerNames;
 };
 
 struct VerdefSection : Section {
   Optional<std::vector<VerdefEntry>> Entries;
-
-  llvm::yaml::Hex64 Info;
+  Optional<llvm::yaml::Hex64> Info;
 
   VerdefSection() : Section(ChunkKind::Verdef) {}
 
