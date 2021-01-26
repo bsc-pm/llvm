@@ -34,23 +34,23 @@ def OmpSs : DirectiveLanguage {
 
 def OSSC_If : Clause<"if"> {
   let clangClass = "OSSIfClause";
-  let flangClassValue = "ScalarLogicalExpr";
+  let flangClass = "ScalarLogicalExpr";
 }
 def OSSC_Final : Clause<"final"> {
   let clangClass = "OSSFinalClause";
-  let flangClassValue = "ScalarLogicalExpr";
+  let flangClass = "ScalarLogicalExpr";
 }
 def OSSC_Cost : Clause<"cost"> {
   let clangClass = "OSSCostClause";
-  let flangClassValue = "ScalarIntExpr";
+  let flangClass = "ScalarIntExpr";
 }
 def OSSC_Priority : Clause<"priority"> {
   let clangClass = "OSSPriorityClause";
-  let flangClassValue = "ScalarIntExpr";
+  let flangClass = "ScalarIntExpr";
 }
 def OSSC_Label : Clause<"label"> {
   let clangClass = "OSSLabelClause";
-  let flangClassValue = "ScalarDefaultCharExpr";
+  let flangClass = "ScalarDefaultCharExpr";
 }
 def OSSC_Wait : Clause<"wait"> {
   let clangClass = "OSSWaitClause";
@@ -61,15 +61,15 @@ def OSSC_Default : Clause<"default"> {
 }
 def OSSC_Private : Clause<"private"> {
   let clangClass = "OSSPrivateClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_FirstPrivate : Clause<"firstprivate"> {
   let clangClass = "OSSFirstprivateClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Shared : Clause<"shared"> {
   let clangClass = "OSSSharedClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Depend : Clause<"depend"> {
   let clangClass = "OSSDependClause";
@@ -77,43 +77,43 @@ def OSSC_Depend : Clause<"depend"> {
 }
 def OSSC_In : Clause<"in"> {
   let clangClass = "OSSInClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Out : Clause<"out"> {
   let clangClass = "OSSOutClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Inout : Clause<"inout"> {
   let clangClass = "OSSInoutClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Concurrent : Clause<"concurrent"> {
   let clangClass = "OSSConcurrentClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Commutative : Clause<"commutative"> {
   let clangClass = "OSSCommutativeClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_WeakIn : Clause<"weakin"> {
   let clangClass = "OSSWeakInClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_WeakOut : Clause<"weakout"> {
   let clangClass = "OSSWeakOutClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_WeakInout : Clause<"weakinout"> {
   let clangClass = "OSSWeakInoutClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_WeakConcurrent : Clause<"weakconcurrent"> {
   let clangClass = "OSSWeakConcurrentClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_WeakCommutative : Clause<"weakcommutative"> {
   let clangClass = "OSSWeakCommutativeClause";
-  let flangClassValue = "OSSObjectList";
+  let flangClass = "OSSObjectList";
 }
 def OSSC_Reduction : Clause<"reduction"> {
   let clangClass = "OSSReductionClause";
@@ -121,11 +121,11 @@ def OSSC_Reduction : Clause<"reduction"> {
 }
 def OSSC_GrainSize : Clause<"grainsize"> {
   let clangClass = "OSSGrainsizeClause";
-  let flangClassValue = "ScalarIntExpr";
+  let flangClass = "ScalarIntExpr";
 }
 def OSSC_ChunkSize : Clause<"chunksize"> {
   let clangClass = "OSSChunksizeClause";
-  let flangClassValue = "ScalarIntExpr";
+  let flangClass = "ScalarIntExpr";
 }
 
 def OSSC_Unknown : Clause<"unknown"> {

@@ -2606,34 +2606,23 @@ public:
   }
 
   void Unparse(const OSSDependClause::InOut &x) {
-    Put("(");
     Walk(std::get<OSSDependenceType>(x.t));
     Put(":");
     Walk(std::get<std::list<Designator>>(x.t), ",");
-    Put(")");
   }
   bool Pre(const OSSDependClause &x) {
     return std::visit(common::visitors{
                           [&](const OSSDependClause::InOut &) {
-                            Word("DEPEND");
                             return true;
                           },
                       },
         x.u);
   }
 
-  bool Pre(const OSSDefaultClause &) {
-    Word("DEFAULT(");
-    return true;
-  }
-  void Post(const OSSDefaultClause &) { Put(")"); }
-
   void Unparse(const OSSReductionClause &x) {
-    Word("REDUCTION(");
     Walk(std::get<OSSReductionOperator>(x.t));
     Put(":");
     Walk(std::get<std::list<Designator>>(x.t), ",");
-    Put(")");
   }
 
 #define GEN_FLANG_CLAUSE_UNPARSE

@@ -68,9 +68,11 @@ TYPE_PARSER(
     "CONCURRENT" >> construct<OSSClause>(construct<OSSClause::Concurrent>(
                           parenthesized(Parser<OSSObjectList>{}))) ||
     "DEFAULT"_id >>
-        construct<OSSClause>(parenthesized(Parser<OSSDefaultClause>{})) ||
+        construct<OSSClause>(construct<OSSClause::Default>(
+            parenthesized(Parser<OSSDefaultClause>{}))) ||
     "DEPEND" >>
-        construct<OSSClause>(parenthesized(Parser<OSSDependClause>{})) ||
+        construct<OSSClause>(construct<OSSClause::Depend>(
+            parenthesized(Parser<OSSDependClause>{}))) ||
     "FINAL" >> construct<OSSClause>(construct<OSSClause::Final>(
                    parenthesized(scalarLogicalExpr))) ||
     "FIRSTPRIVATE" >> construct<OSSClause>(construct<OSSClause::Firstprivate>(
@@ -92,7 +94,8 @@ TYPE_PARSER(
     "PRIVATE" >> construct<OSSClause>(construct<OSSClause::Private>(
                      parenthesized(Parser<OSSObjectList>{}))) ||
     "REDUCTION" >>
-        construct<OSSClause>(parenthesized(Parser<OSSReductionClause>{})) ||
+        construct<OSSClause>(construct<OSSClause::Reduction>(
+            parenthesized(Parser<OSSReductionClause>{}))) ||
     "SHARED" >> construct<OSSClause>(construct<OSSClause::Shared>(
                     parenthesized(Parser<OSSObjectList>{}))) ||
     "WAIT" >> construct<OSSClause>(construct<OSSClause::Wait>()) ||
