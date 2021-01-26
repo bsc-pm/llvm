@@ -2162,7 +2162,7 @@ def fobjc_sender_dependent_dispatch : Flag<["-"], "fobjc-sender-dependent-dispat
 def fomit_frame_pointer : Flag<["-"], "fomit-frame-pointer">, Group<f_Group>;
 def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Parse OmpSs-2 pragmas and generate parallel code.">,
-  MarshallingInfoFlag<"LangOpts->OmpSs">;
+  MarshallingInfoFlag<LangOpts<"OmpSs">>;
 def fdo_not_use_nanos6 : Flag<["-"], "fdo-not-use-nanos6">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"When compiling with -fompss-2 do not include or link with nanos6.">;
 def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
