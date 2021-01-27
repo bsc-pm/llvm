@@ -327,6 +327,11 @@ fi
 # We could build it but try to disable its tests, alternatively.
 CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_ENABLE_LIBOMPTARGET=OFF")
 
+if [ -n "$TEST_OMPFLAGS" ];
+then
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DOPENMP_TEST_FLAGS=$TEST_OMPFLAGS")
+fi
+
 ################################################################################
 # Extra runtimes we may want to build
 ################################################################################
