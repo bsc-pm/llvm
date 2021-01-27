@@ -3004,12 +3004,6 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     }
   }
 
-  // OmpSs, force line debug info
-  if (LangOpts.OmpSs
-      && Res.getCodeGenOpts().getDebugInfo() == codegenoptions::NoDebugInfo) {
-    Res.getCodeGenOpts().setDebugInfo(codegenoptions::LocTrackingOnly);
-  }
-
   if (LangOpts.CUDA) {
     // During CUDA device-side compilation, the aux triple is the
     // triple used for host compilation.
@@ -3023,6 +3017,12 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
 
   Success &= ParseCodeGenArgs(Res.getCodeGenOpts(), Args, DashX, Diags, T,
                               Res.getFrontendOpts().OutputFile, LangOpts);
+
+  // OmpSs, force line debug info
+  if (LangOpts.OmpSs
+      && Res.getCodeGenOpts().getDebugInfo() == codegenoptions::NoDebugInfo) {
+    Res.getCodeGenOpts().setDebugInfo(codegenoptions::LocTrackingOnly);
+  }
 
   // FIXME: Override value name discarding when asan or msan is used because the
   // backend passes depend on the name of the alloca in order to print out
