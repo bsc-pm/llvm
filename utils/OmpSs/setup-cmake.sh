@@ -374,6 +374,7 @@ run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DOPENMP_LIT_ARGS="-sv --xunit-xml-output=xunit.xml" \
    -DLLVM_INSTALL_UTILS=ON \
    -DLLVM_ENABLE_ASSERTIONS=ON \
+   -DLLVM_ENABLE_BINDINGS=OFF \
    -DOPENMP_TEST_C_COMPILER_PATH="$(pwd)/bin/clang" \
    -DOPENMP_TEST_CXX_COMPILER_PATH="$(pwd)/bin/clang++" \
    "${CMAKE_INVOCATION_EXTRA_FLAGS[@]}"
