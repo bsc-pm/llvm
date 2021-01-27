@@ -1,7 +1,7 @@
 ## Test writing unchanged content to ELF Stub file with --write-if-changed flag.
 
 # RUN: llvm-elfabi %s --output-target=elf64-little %t
-# RUN: touch -m -t 197001010000 %t
+# RUN: touch -m -t 198001010000 %t
 # RUN: llvm-elfabi %s --output-target=elf64-little %t --write-if-changed
 # RUN: ls -l %t | FileCheck %s
 
@@ -16,4 +16,4 @@ Symbols:
   plus: { Type: Func }
 ...
 
-# CHECK: {{[[:space:]]1970}}
+# CHECK: {{[[:space:]]1980}}
