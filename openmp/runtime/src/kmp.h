@@ -2350,7 +2350,13 @@ typedef struct kmp_base_task_team {
   kmp_int32 tt_untied_task_encountered;
 
   KMP_ALIGN_CACHE
+  std::atomic<kmp_int32> tt_allow_unshackleds; // This team is open for unshackled threads.
+
+  KMP_ALIGN_CACHE
   std::atomic<kmp_int32> tt_unfinished_threads; /* #threads still active */
+
+  KMP_ALIGN_CACHE
+  std::atomic<kmp_int32> tt_unfinished_unshackleds; /* #unshackled threads still active */
 
   KMP_ALIGN_CACHE
   volatile kmp_uint32

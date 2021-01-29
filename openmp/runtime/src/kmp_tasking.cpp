@@ -3425,6 +3425,8 @@ static kmp_task_team_t *__kmp_allocate_task_team(kmp_info_t *thread,
   task_team->tt.tt_nproc = nthreads = team->t.t_nproc;
 
   KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_threads, nthreads);
+  KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_unshackleds, 0);
+  KMP_ATOMIC_ST_REL(&task_team->tt.tt_allow_unshackleds, 1);
   TCW_4(task_team->tt.tt_active, TRUE);
 
   KA_TRACE(20, ("__kmp_allocate_task_team: T#%d exiting; task_team = %p "
@@ -3646,6 +3648,17 @@ void __kmp_task_team_wait(
                              &task_team->tt.tt_unfinished_threads),
                        0U);
       flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
+      // Wait for any unshackled running
+      if (__kmp_num_unshackled_threads > 0) {
+        // Don't allow any more unshackleds from now on.
+        KMP_ATOMIC_ST_REL(&task_team->tt.tt_allow_unshackleds, 0);
+        // Now wait.
+        int th_gtid = this_thr->th.th_info.ds.ds_gtid;
+        kmp_flag_32 flag(RCAST(std::atomic<kmp_uint32> *,
+                               &task_team->tt.tt_unfinished_unshackleds),
+                         0U);
+        flag.suspend(th_gtid);
+      }
     }
     // Deactivate the old task team, so that the worker threads will stop
     // referencing it while spinning.

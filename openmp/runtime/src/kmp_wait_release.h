@@ -340,17 +340,23 @@ final_spin=FALSE)
           if (__kmp_threads[i] != this_thr &&
               !__kmp_threads[i]->th.is_unshackled &&
               __kmp_threads[i]->th.th_team != NULL &&
-              __kmp_threads[i]->th.th_task_team != NULL) {
+              __kmp_threads[i]->th.th_task_team != NULL &&
+              KMP_ATOMIC_LD_ACQ(&__kmp_threads[i]->th.th_task_team->tt.tt_allow_unshackleds)) {
             task_team = __kmp_threads[i]->th.th_task_team;
             this_thr->th.th_task_team = task_team;
 
-            // x86 needs this.
-            updateHWFPControl(__kmp_threads[i]->th.th_team);
-
-            std::atomic<kmp_int32> *unfinished_threads;
-            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_threads);
-            break;
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+            if (KMP_ATOMIC_LD_ACQ(&task_team->tt.tt_allow_unshackleds)) {
+              // x86 needs this.
+              updateHWFPControl(__kmp_threads[i]->th.th_team);
+              break;
+            } else {
+              task_team = NULL;
+              this_thr->th.th_task_team = NULL;
+              KMP_ATOMIC_DEC(unfinished_unshackleds);
+            }
           }
         }
       }
@@ -377,9 +383,9 @@ final_spin=FALSE)
         }
         // Unshackled clean up
         if (this_thr->th.is_unshackled) {
-            std::atomic<kmp_int32> *unfinished_threads;
-            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_threads);
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
         }
