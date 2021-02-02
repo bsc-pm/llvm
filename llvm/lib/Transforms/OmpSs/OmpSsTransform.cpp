@@ -467,6 +467,30 @@ struct OmpSs : public ModulePass {
           inst->replaceUsesOfWith(Orig, New);
   }
 
+  // Converts all ConstantExpr users of GV in Blocks to instructions
+  static void constantExprToInstruction(
+      GlobalValue *GV, const SetVector<BasicBlock *> &Blocks) {
+    SmallVector<ConstantExpr*,4> Users;
+    for (auto *U : GV->users()) {
+      if (isa<ConstantExpr>(U))
+        Users.push_back(cast<ConstantExpr>(U));
+    }
+
+    SmallVector<Value*,4> UUsers;
+    for (auto *U : Users) {
+      UUsers.clear();
+      append_range(UUsers, U->users());
+      for (auto *UU : UUsers) {
+        Instruction *UI = cast<Instruction>(UU);
+        if (Blocks.count(UI->getParent())) {
+          Instruction *NewU = U->getAsInstruction();
+          NewU->insertBefore(UI);
+          UI->replaceUsesOfWith(U, NewU);
+        }
+      }
+    }
+  }
+
   void buildLoopForTaskImpl(Module &M, Function &F, Instruction *Entry,
                         Instruction *Exit, const DirectiveLoopInfo &LoopInfo,
                         BasicBlock *&LoopEntryBB, BasicBlock *&BodyBB) {
@@ -2150,6 +2174,11 @@ struct OmpSs : public ModulePass {
              It != TaskArgsToStructIdxMap.end(); ++It) {
         Value *RewriteVal = &*AI++;
         Value *Val = It->first;
+
+        if (auto *GV = dyn_cast<GlobalValue>(Val)) {
+          // Convert all constant expr inside task body to instructions
+          constantExprToInstruction(GV, Blocks);
+        }
 
         if (isReplaceableValue(Val)) {
           rewriteUsesInBlocksWithPred(
