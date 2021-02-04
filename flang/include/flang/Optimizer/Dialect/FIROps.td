@@ -32,7 +32,7 @@ def fir_Type : Type<CPred<"fir::isa_fir_or_std_type($_self)">,
 // Fortran intrinsic types
 def fir_CharacterType : Type<CPred<"$_self.isa<fir::CharacterType>()">,
     "FIR character type">;
-def fir_ComplexType : Type<CPred<"$_self.isa<fir::CplxType>()">,
+def fir_ComplexType : Type<CPred<"$_self.isa<fir::ComplexType>()">,
     "FIR complex type">;
 def fir_IntegerType : Type<CPred<"$_self.isa<fir::IntType>()">,
     "FIR integer type">;
@@ -1852,7 +1852,7 @@ def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {
 
 def fir_ResultOp : fir_Op<"result",
     [NoSideEffect, ReturnLike, Terminator,
-     ParentOneOf<["WhereOp", "LoopOp", "IterWhileOp"]>]> {
+     ParentOneOf<["WhereOp", "DoLoopOp", "IterWhileOp"]>]> {
   let summary = "special terminator for use in fir region operations";
 
   let description = [{
@@ -1883,7 +1883,7 @@ class region_Op<string mnemonic, list<OpTrait> traits = []> :
   let parser = [{ return ::parse$cppClass(parser, result); }];
 }
 
-def fir_LoopOp : region_Op<"do_loop",
+def fir_DoLoopOp : region_Op<"do_loop",
     [DeclareOpInterfaceMethods<LoopLikeOpInterface>]> {
   let summary = "generalized loop operation";
   let description = [{
@@ -2020,7 +2020,7 @@ def fir_IterWhileOp : region_Op<"iterate_while",
   let summary = "DO loop with early exit condition";
   let description = [{
     This construct is useful for lowering implied-DO loops. It is very similar
-    to `fir::LoopOp` with the addition that it requires a single loop-carried
+    to `fir::DoLoopOp` with the addition that it requires a single loop-carried
     bool value that signals an early exit condition to the operation. A `true`
     disposition means the next loop iteration should proceed. A `false`
     indicates that the `fir.iterate_while` operation should terminate and
@@ -2427,7 +2427,7 @@ def fir_ConstcOp : fir_Op<"constc", [NoSideEffect]> {
   }];
 
   let verifier = [{
-    if (!getType().isa<fir::CplxType>())
+    if (!getType().isa<fir::ComplexType>())
       return emitOpError("must be a !fir.complex type");
     return mlir::success();
   }];
@@ -2563,7 +2563,7 @@ def fir_ConvertOp : fir_OneResultOp<"convert", [NoSideEffect]> {
 
 def FortranTypeAttr : Attr<And<[CPred<"$_self.isa<TypeAttr>()">,
     Or<[CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::CharacterType>()">,
-        CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::CplxType>()">,
+        CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::ComplexType>()">,
         CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::IntType>()">,
         CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::LogicalType>()">,
         CPred<"$_self.cast<TypeAttr>().getValue().isa<fir::RealType>()">,

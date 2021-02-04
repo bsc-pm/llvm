@@ -209,8 +209,10 @@ public:
 /// Extra information, not in MCRegisterDesc, about registers.
 /// These are used by codegen, not by MC.
 struct TargetRegisterInfoDesc {
-  unsigned CostPerUse;          // Extra cost of instructions using register.
-  bool inAllocatableClass;      // Register belongs to an allocatable regclass.
+  const uint8_t *CostPerUse; // Extra cost of instructions using register.
+  unsigned NumCosts; // Number of cost values associated with each register.
+  const bool
+      *InAllocatableClass; // Register belongs to an allocatable regclass.
 };
 
 /// Each TargetRegisterClass has a per register weight, and weight
@@ -329,15 +331,19 @@ public:
   BitVector getAllocatableSet(const MachineFunction &MF,
                               const TargetRegisterClass *RC = nullptr) const;
 
-  /// Return the additional cost of using this register instead
-  /// of other registers in its class.
-  unsigned getCostPerUse(MCRegister RegNo) const {
-    return InfoDesc[RegNo].CostPerUse;
+  /// Get a list of cost values for all registers that correspond to the index
+  /// returned by RegisterCostTableIndex.
+  ArrayRef<uint8_t> getRegisterCosts(const MachineFunction &MF) const {
+    unsigned Idx = getRegisterCostTableIndex(MF);
+    unsigned NumRegs = getNumRegs();
+    assert(Idx < InfoDesc->NumCosts && "CostPerUse index out of bounds");
+
+    return makeArrayRef(&InfoDesc->CostPerUse[Idx * NumRegs], NumRegs);
   }
 
   /// Return true if the register is in the allocation of any register class.
   bool isInAllocatableClass(MCRegister RegNo) const {
-    return InfoDesc[RegNo].inAllocatableClass;
+    return InfoDesc->InAllocatableClass[RegNo];
   }
 
   /// Return the human-readable symbolic target-specific
@@ -648,6 +654,13 @@ protected:
     llvm_unreachable("Target has no sub-registers");
   }
 
+  /// Return the register cost table index. This implementation is sufficient
+  /// for most architectures and can be overriden by targets in case there are
+  /// multiple cost values associated with each register.
+  virtual unsigned getRegisterCostTableIndex(const MachineFunction &MF) const {
+    return 0;
+  }
+
 public:
   /// Find a common super-register class if it exists.
   ///
@@ -911,11 +924,11 @@ public:
     return false;
   }
 
-  /// Insert defining instruction(s) for BaseReg to be a pointer to FrameIdx
-  /// before insertion point I.
-  virtual void materializeFrameBaseRegister(MachineBasicBlock *MBB,
-                                            Register BaseReg, int FrameIdx,
-                                            int64_t Offset) const {
+  /// Insert defining instruction(s) for a pointer to FrameIdx before
+  /// insertion point I. Return materialized frame pointer.
+  virtual Register materializeFrameBaseRegister(MachineBasicBlock *MBB,
+                                                int FrameIdx,
+                                                int64_t Offset) const {
     llvm_unreachable("materializeFrameBaseRegister does not exist on this "
                      "target");
   }

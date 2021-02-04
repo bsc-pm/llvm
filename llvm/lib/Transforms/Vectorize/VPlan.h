@@ -97,6 +97,10 @@ struct VPIteration {
 
   /// in [0..VF)
   unsigned Lane;
+
+  VPIteration(unsigned Part, unsigned Lane) : Part(Part), Lane(Lane) {}
+
+  bool isFirstIteration() const { return Part == 0 && Lane == 0; }
 };
 
 /// This is a helper struct for maintaining vectorization state. It's used for
@@ -269,6 +273,9 @@ struct VPTransformState {
     typedef SmallVector<Value *, 2> PerPartValuesTy;
 
     DenseMap<VPValue *, PerPartValuesTy> PerPartOutput;
+
+    using ScalarsPerPartValuesTy = SmallVector<SmallVector<Value *, 4>, 2>;
+    DenseMap<VPValue *, ScalarsPerPartValuesTy> PerPartScalars;
   } Data;
 
   /// Get the generated Value for a given VPValue and a given Part. Note that
@@ -276,33 +283,24 @@ struct VPTransformState {
   /// method will delegate the call to ILV in such cases in order to provide
   /// callers a consistent API.
   /// \see set.
-  Value *get(VPValue *Def, unsigned Part) {
-    // If Values have been set for this Def return the one relevant for \p Part.
-    if (Data.PerPartOutput.count(Def))
-      return Data.PerPartOutput[Def][Part];
-    // Def is managed by ILV: bring the Values from ValueMap.
-    return Callback.getOrCreateVectorValues(VPValue2Value[Def], Part);
-  }
+  Value *get(VPValue *Def, unsigned Part);
 
   /// Get the generated Value for a given VPValue and given Part and Lane.
-  Value *get(VPValue *Def, const VPIteration &Instance) {
-    // If the Def is managed directly by VPTransformState, extract the lane from
-    // the relevant part. Note that currently only VPInstructions and external
-    // defs are managed by VPTransformState. Other Defs are still created by ILV
-    // and managed in its ValueMap. For those this method currently just
-    // delegates the call to ILV below.
-    if (Data.PerPartOutput.count(Def)) {
-      auto *VecPart = Data.PerPartOutput[Def][Instance.Part];
-      if (!VecPart->getType()->isVectorTy()) {
-        assert(Instance.Lane == 0 && "cannot get lane > 0 for scalar");
-        return VecPart;
-      }
-      // TODO: Cache created scalar values.
-      return Builder.CreateExtractElement(VecPart,
-                                          Builder.getInt32(Instance.Lane));
-    }
+  Value *get(VPValue *Def, const VPIteration &Instance);
 
-    return Callback.getOrCreateScalarValue(VPValue2Value[Def], Instance);
+  bool hasVectorValue(VPValue *Def, unsigned Part) {
+    auto I = Data.PerPartOutput.find(Def);
+    return I != Data.PerPartOutput.end() && Part < I->second.size() &&
+           I->second[Part];
+  }
+
+  bool hasScalarValue(VPValue *Def, VPIteration Instance) {
+    auto I = Data.PerPartScalars.find(Def);
+    if (I == Data.PerPartScalars.end())
+      return false;
+    return Instance.Part < I->second.size() &&
+           Instance.Lane < I->second[Instance.Part].size() &&
+           I->second[Instance.Part][Instance.Lane];
   }
 
   /// Set the generated Value for a given VPValue and a given Part.
@@ -314,6 +312,18 @@ struct VPTransformState {
     Data.PerPartOutput[Def][Part] = V;
   }
   void set(VPValue *Def, Value *IRDef, Value *V, unsigned Part);
+  void set(VPValue *Def, Value *IRDef, Value *V, const VPIteration &Instance);
+
+  void set(VPValue *Def, Value *V, const VPIteration &Instance) {
+    auto Iter = Data.PerPartScalars.insert({Def, {}});
+    auto &PerPartVec = Iter.first->second;
+    while (PerPartVec.size() <= Instance.Part)
+      PerPartVec.emplace_back();
+    auto &Scalars = PerPartVec[Instance.Part];
+    while (Scalars.size() <= Instance.Lane)
+      Scalars.push_back(nullptr);
+    Scalars[Instance.Lane] = V;
+  }
 
   /// Hold state information used when constructing the CFG of the output IR,
   /// traversing the VPBasicBlocks and generating corresponding IR BasicBlocks.
@@ -931,17 +941,18 @@ public:
 /// producing their vector and scalar values.
 class VPWidenIntOrFpInductionRecipe : public VPRecipeBase, public VPUser {
   PHINode *IV;
-  TruncInst *Trunc;
 
 public:
-  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start,
+  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start, Instruction *Cast,
                                 TruncInst *Trunc = nullptr)
-      : VPRecipeBase(VPWidenIntOrFpInductionSC), VPUser({Start}), IV(IV),
-        Trunc(Trunc) {
+      : VPRecipeBase(VPWidenIntOrFpInductionSC), VPUser({Start}), IV(IV) {
     if (Trunc)
       new VPValue(Trunc, this);
     else
       new VPValue(IV, this);
+
+    if (Cast)
+      new VPValue(Cast, this);
   }
   ~VPWidenIntOrFpInductionRecipe() override = default;
 
@@ -960,6 +971,22 @@ public:
 
   /// Returns the start value of the induction.
   VPValue *getStartValue() { return getOperand(0); }
+
+  /// Returns the cast VPValue, if one is attached, or nullptr otherwise.
+  VPValue *getCastValue() {
+    if (getNumDefinedValues() != 2)
+      return nullptr;
+    return getVPValue(1);
+  }
+
+  /// Returns the first defined value as TruncInst, if it is one or nullptr
+  /// otherwise.
+  TruncInst *getTruncInst() {
+    return dyn_cast_or_null<TruncInst>(getVPValue(0)->getUnderlyingValue());
+  }
+  const TruncInst *getTruncInst() const {
+    return dyn_cast_or_null<TruncInst>(getVPValue(0)->getUnderlyingValue());
+  }
 };
 
 /// A recipe for handling all phi nodes except for integer and FP inductions.
@@ -1116,17 +1143,15 @@ public:
 class VPReductionRecipe : public VPRecipeBase, public VPUser, public VPValue {
   /// The recurrence decriptor for the reduction in question.
   RecurrenceDescriptor *RdxDesc;
-  /// Fast math flags to use for the resulting reduction operation.
-  bool NoNaN;
   /// Pointer to the TTI, needed to create the target reduction
   const TargetTransformInfo *TTI;
 
 public:
   VPReductionRecipe(RecurrenceDescriptor *R, Instruction *I, VPValue *ChainOp,
-                    VPValue *VecOp, VPValue *CondOp, bool NoNaN,
+                    VPValue *VecOp, VPValue *CondOp,
                     const TargetTransformInfo *TTI)
       : VPRecipeBase(VPRecipeBase::VPReductionSC), VPUser({ChainOp, VecOp}),
-        VPValue(VPValue::VPVReductionSC, I, this), RdxDesc(R), NoNaN(NoNaN),
+        VPValue(VPValue::VPVReductionSC, I, this), RdxDesc(R),
         TTI(TTI) {
     if (CondOp)
       addOperand(CondOp);

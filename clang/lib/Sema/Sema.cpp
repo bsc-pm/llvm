@@ -300,7 +300,7 @@ void Sema::Initialize() {
   // core features.
   if (getLangOpts().OpenCL) {
     getOpenCLOptions().addSupport(
-        Context.getTargetInfo().getSupportedOpenCLOpts());
+        Context.getTargetInfo().getSupportedOpenCLOpts(), getLangOpts());
     getOpenCLOptions().enableSupportedCore(getLangOpts());
     addImplicitTypedef("sampler_t", Context.OCLSamplerTy);
     addImplicitTypedef("event_t", Context.OCLEventTy);
@@ -541,6 +541,13 @@ void Sema::diagnoseZeroToNullptrConversion(CastKind Kind, const Expr* E) {
   if (Kind != CK_NullToPointer && Kind != CK_NullToMemberPointer)
     return;
   if (E->IgnoreParenImpCasts()->getType()->isNullPtrType())
+    return;
+
+  // Don't diagnose the conversion from a 0 literal to a null pointer argument
+  // in a synthesized call to operator<=>.
+  if (!CodeSynthesisContexts.empty() &&
+      CodeSynthesisContexts.back().Kind ==
+          CodeSynthesisContext::RewritingOperatorAsSpaceship)
     return;
 
   // If it is a macro from system header, and if the macro name is not "NULL",

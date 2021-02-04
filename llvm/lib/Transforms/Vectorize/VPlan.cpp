@@ -216,6 +216,27 @@ VPBasicBlock::iterator VPBasicBlock::getFirstNonPhi() {
   return It;
 }
 
+Value *VPTransformState::get(VPValue *Def, const VPIteration &Instance) {
+  if (!Def->getDef())
+    return Def->getLiveInIRValue();
+
+  if (hasScalarValue(Def, Instance))
+    return Data.PerPartScalars[Def][Instance.Part][Instance.Lane];
+
+  if (hasVectorValue(Def, Instance.Part)) {
+    assert(Data.PerPartOutput.count(Def));
+    auto *VecPart = Data.PerPartOutput[Def][Instance.Part];
+    if (!VecPart->getType()->isVectorTy()) {
+      assert(Instance.Lane == 0 && "cannot get lane > 0 for scalar");
+      return VecPart;
+    }
+    // TODO: Cache created scalar values.
+    return Builder.CreateExtractElement(VecPart,
+                                        Builder.getInt32(Instance.Lane));
+  }
+  return Callback.getOrCreateScalarValue(VPValue2Value[Def], Instance);
+}
+
 BasicBlock *
 VPBasicBlock::createEmptyBasicBlock(VPTransformState::CFGState &CFG) {
   // BB stands for IR BasicBlocks. VPBB stands for VPlan VPBasicBlocks.
@@ -265,8 +286,7 @@ VPBasicBlock::createEmptyBasicBlock(VPTransformState::CFGState &CFG) {
 }
 
 void VPBasicBlock::execute(VPTransformState *State) {
-  bool Replica = State->Instance &&
-                 !(State->Instance->Part == 0 && State->Instance->Lane == 0);
+  bool Replica = State->Instance && !State->Instance->isFirstIteration();
   VPBasicBlock *PrevVPBB = State->CFG.PrevVPBB;
   VPBlockBase *SingleHPred = nullptr;
   BasicBlock *NewBB = State->CFG.PrevBB; // Reuse it if possible.
@@ -380,7 +400,7 @@ void VPRegionBlock::execute(VPTransformState *State) {
   assert(!State->Instance && "Replicating a Region with non-null instance.");
 
   // Enter replicating mode.
-  State->Instance = {0, 0};
+  State->Instance = VPIteration(0, 0);
 
   for (unsigned Part = 0, UF = State->UF; Part < UF; ++Part) {
     State->Instance->Part = Part;
@@ -476,7 +496,7 @@ void VPInstruction::generateInstruction(VPTransformState &State,
   }
   case VPInstruction::ActiveLaneMask: {
     // Get first lane of vector induction variable.
-    Value *VIVElem0 = State.get(getOperand(0), {Part, 0});
+    Value *VIVElem0 = State.get(getOperand(0), VPIteration(Part, 0));
     // Get the original loop tripcount.
     Value *ScalarTC = State.TripCount;
 
@@ -868,10 +888,11 @@ void VPWidenRecipe::print(raw_ostream &O, const Twine &Indent,
 void VPWidenIntOrFpInductionRecipe::print(raw_ostream &O, const Twine &Indent,
                                           VPSlotTracker &SlotTracker) const {
   O << "WIDEN-INDUCTION";
-  if (Trunc) {
+  if (getTruncInst()) {
     O << "\\l\"";
     O << " +\n" << Indent << "\"  " << VPlanIngredient(IV) << "\\l\"";
-    O << " +\n" << Indent << "\"  " << VPlanIngredient(Trunc);
+    O << " +\n" << Indent << "\"  ";
+    getVPValue(0)->printAsOperand(O, SlotTracker);
   } else
     O << " " << VPlanIngredient(IV);
 }

@@ -769,7 +769,9 @@ Expected<StringRef> ELFDumper<ELFT>::getSymbolVersion(const Elf_Sym &Sym,
       getVersionMap();
   if (!MapOrErr)
     return MapOrErr.takeError();
-  return Obj.getSymbolVersionByIndex(Version, IsDefault, **MapOrErr);
+
+  return Obj.getSymbolVersionByIndex(Version, IsDefault, **MapOrErr,
+                                     Sym.st_shndx == ELF::SHN_UNDEF);
 }
 
 template <typename ELFT>
@@ -1199,6 +1201,7 @@ static const EnumEntry<unsigned> ElfSectionFlags[] = {
   ENUM_ENT(SHF_GROUP,            "G"),
   ENUM_ENT(SHF_TLS,              "T"),
   ENUM_ENT(SHF_COMPRESSED,       "C"),
+  ENUM_ENT(SHF_GNU_RETAIN,       "R"),
   ENUM_ENT(SHF_EXCLUDE,          "E"),
 };
 
@@ -3481,15 +3484,14 @@ static void printSectionDescription(formatted_raw_ostream &OS,
   OS << "  L (link order), O (extra OS processing required), G (group), T "
         "(TLS),\n";
   OS << "  C (compressed), x (unknown), o (OS specific), E (exclude),\n";
+  OS << "  R (retain)";
 
   if (EMachine == EM_X86_64)
-    OS << "  l (large), ";
+    OS << ", l (large)";
   else if (EMachine == EM_ARM)
-    OS << "  y (purecode), ";
-  else
-    OS << "  ";
+    OS << ", y (purecode)";
 
-  OS << "p (processor specific)\n";
+  OS << ", p (processor specific)\n";
 }
 
 template <class ELFT> void GNUELFDumper<ELFT>::printSectionHeaders() {
@@ -4384,8 +4386,8 @@ void GNUELFDumper<ELFT>::printVersionSymbolSection(const Elf_Shdr *Sec) {
     }
 
     bool IsDefault;
-    Expected<StringRef> NameOrErr =
-        this->Obj.getSymbolVersionByIndex(Ndx, IsDefault, *VersionMap);
+    Expected<StringRef> NameOrErr = this->Obj.getSymbolVersionByIndex(
+        Ndx, IsDefault, *VersionMap, /*IsSymHidden=*/None);
     if (!NameOrErr) {
       this->reportUniqueWarning("unable to get a version for entry " +
                                 Twine(I) + " of " + this->describe(*Sec) +
@@ -5139,8 +5141,7 @@ static const NoteType CoreNoteTypes[] = {
 };
 
 template <class ELFT>
-const StringRef getNoteTypeName(const typename ELFT::Note &Note,
-                                unsigned ELFType) {
+StringRef getNoteTypeName(const typename ELFT::Note &Note, unsigned ELFType) {
   uint32_t Type = Note.getType();
   auto FindNote = [&](ArrayRef<NoteType> V) -> StringRef {
     for (const NoteType &N : V)

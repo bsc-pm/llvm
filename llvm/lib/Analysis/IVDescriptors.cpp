@@ -273,8 +273,7 @@ bool RecurrenceDescriptor::AddReductionVar(PHINode *Phi, RecurKind Kind,
   //      * An instruction type other than PHI or the reduction operation.
   //      * A PHI in the header other than the initial PHI.
   while (!Worklist.empty()) {
-    Instruction *Cur = Worklist.back();
-    Worklist.pop_back();
+    Instruction *Cur = Worklist.pop_back_val();
 
     // No Users.
     // If the instruction has no users then this is a broken chain and can't be
@@ -303,8 +302,18 @@ bool RecurrenceDescriptor::AddReductionVar(PHINode *Phi, RecurKind Kind,
       if (!ReduxDesc.isRecurrence())
         return false;
       // FIXME: FMF is allowed on phi, but propagation is not handled correctly.
-      if (isa<FPMathOperator>(ReduxDesc.getPatternInst()) && !IsAPhi)
-        FMF &= ReduxDesc.getPatternInst()->getFastMathFlags();
+      if (isa<FPMathOperator>(ReduxDesc.getPatternInst()) && !IsAPhi) {
+        FastMathFlags CurFMF = ReduxDesc.getPatternInst()->getFastMathFlags();
+        if (auto *Sel = dyn_cast<SelectInst>(ReduxDesc.getPatternInst())) {
+          // Accept FMF on either fcmp or select of a min/max idiom.
+          // TODO: This is a hack to work-around the fact that FMF may not be
+          //       assigned/propagated correctly. If that problem is fixed or we
+          //       standardize on fmin/fmax via intrinsics, this can be removed.
+          if (auto *FCmp = dyn_cast<FCmpInst>(Sel->getCondition()))
+            CurFMF |= FCmp->getFastMathFlags();
+        }
+        FMF &= CurFMF;
+      }
       // Update this reduction kind if we matched a new instruction.
       // TODO: Can we eliminate the need for a 2nd InstDesc by keeping 'Kind'
       //       state accurate while processing the worklist?

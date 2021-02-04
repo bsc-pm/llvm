@@ -182,7 +182,6 @@ feature_test_macros = [ add_version_header(x) for x in [
     "name": "__cpp_lib_constexpr_algorithms",
     "values": { "c++20": 201806 },
     "headers": ["algorithm"],
-    "unimplemented": True,
   }, {
     "name": "__cpp_lib_constexpr_complex",
     "values": { "c++20": 201711 },
@@ -270,6 +269,11 @@ feature_test_macros = [ add_version_header(x) for x in [
     "name": "__cpp_lib_filesystem",
     "values": { "c++17": 201703 },
     "headers": ["filesystem"],
+  }, {
+    "name": "__cpp_lib_format",
+    "values": { "c++20": 201907 },
+    "headers": ["format"],
+    "unimplemented": True,
   }, {
     "name": "__cpp_lib_gcd_lcm",
     "values": { "c++17": 201606 },
@@ -522,7 +526,6 @@ feature_test_macros = [ add_version_header(x) for x in [
     "name": "__cpp_lib_shift",
     "values": { "c++20": 201806 },
     "headers": ["algorithm"],
-    "unimplemented": True,
   }, {
     "name": "__cpp_lib_smart_ptr_for_overwrite",
     "values": { "c++20": 202002 },

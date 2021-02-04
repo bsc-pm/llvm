@@ -1294,10 +1294,11 @@ public:
                               bool (*ConvertResult)(int64_t&) = nullptr);
 
   OperandMatchResultTy
-  parseNamedBit(const char *Name, OperandVector &Operands,
+  parseNamedBit(StringRef Name, OperandVector &Operands,
                 AMDGPUOperand::ImmTy ImmTy = AMDGPUOperand::ImmTyNone);
   OperandMatchResultTy parseStringWithPrefix(StringRef Prefix,
-                                             StringRef &Value);
+                                             StringRef &Value,
+                                             SMLoc &StringLoc);
 
   bool isModifier();
   bool isOperandModifier(const AsmToken &Token, const AsmToken &NextToken) const;
@@ -1354,7 +1355,6 @@ private:
                      const OperandInfoTy &Offset,
                      const OperandInfoTy &Width);
 
-  OperandMatchResultTy parseExpTgtImpl(StringRef Str, uint8_t &Val);
   SMLoc getFlatOffsetLoc(const OperandVector &Operands) const;
   SMLoc getSMEMOffsetLoc(const OperandVector &Operands) const;
 
@@ -1403,6 +1403,7 @@ private:
   bool isId(const AsmToken &Token, const StringRef Id) const;
   bool isToken(const AsmToken::TokenKind Kind) const;
   bool trySkipId(const StringRef Id);
+  bool trySkipId(const StringRef Pref, const StringRef Id);
   bool trySkipId(const StringRef Id, const AsmToken::TokenKind Kind);
   bool trySkipToken(const AsmToken::TokenKind Kind);
   bool skipToken(const AsmToken::TokenKind Kind, const StringRef ErrMsg);
@@ -4942,9 +4943,6 @@ bool AMDGPUAsmParser::ParseInstruction(ParseInstructionInfo &Info,
       Mode = OperandMode_NSA;
     OperandMatchResultTy Res = parseOperand(Operands, Name, Mode);
 
-    // Eat the comma or space if there is one.
-    trySkipToken(AsmToken::Comma);
-
     if (Res != MatchOperand_Success) {
       checkUnsupportedInstruction(Name, NameLoc);
       if (!Parser.hasPendingError()) {
@@ -4959,6 +4957,9 @@ bool AMDGPUAsmParser::ParseInstruction(ParseInstructionInfo &Info,
       }
       return true;
     }
+
+    // Eat the comma or space if there is one.
+    trySkipToken(AsmToken::Comma);
   }
 
   return false;
@@ -5043,39 +5044,31 @@ AMDGPUAsmParser::parseOperandArrayWithPrefix(const char *Prefix,
 }
 
 OperandMatchResultTy
-AMDGPUAsmParser::parseNamedBit(const char *Name, OperandVector &Operands,
+AMDGPUAsmParser::parseNamedBit(StringRef Name, OperandVector &Operands,
                                AMDGPUOperand::ImmTy ImmTy) {
-  int64_t Bit = 0;
+  int64_t Bit;
   SMLoc S = getLoc();
 
-  // We are at the end of the statement, and this is a default argument, so
-  // use a default value.
-  if (!isToken(AsmToken::EndOfStatement)) {
-    switch(getTokenKind()) {
-      case AsmToken::Identifier: {
-        StringRef Tok = getTokenStr();
-        if (Tok == Name) {
-          if (Tok == "r128" && !hasMIMG_R128())
-            Error(S, "r128 modifier is not supported on this GPU");
-          if (Tok == "a16" && !isGFX9() && !hasGFX10A16())
-            Error(S, "a16 modifier is not supported on this GPU");
-          Bit = 1;
-          Parser.Lex();
-        } else if (Tok.startswith("no") && Tok.endswith(Name)) {
-          Bit = 0;
-          Parser.Lex();
-        } else {
-          return MatchOperand_NoMatch;
-        }
-        break;
-      }
-      default:
-        return MatchOperand_NoMatch;
-    }
+  if (trySkipId(Name)) {
+    Bit = 1;
+  } else if (trySkipId("no", Name)) {
+    Bit = 0;
+  } else {
+    return MatchOperand_NoMatch;
   }
 
-  if (!isGFX10Plus() && ImmTy == AMDGPUOperand::ImmTyDLC)
+  if (Name == "r128" && !hasMIMG_R128()) {
+    Error(S, "r128 modifier is not supported on this GPU");
     return MatchOperand_ParseFail;
+  }
+  if (Name == "a16" && !isGFX9() && !hasGFX10A16()) {
+    Error(S, "a16 modifier is not supported on this GPU");
+    return MatchOperand_ParseFail;
+  }
+  if (!isGFX10Plus() && ImmTy == AMDGPUOperand::ImmTyDLC) {
+    Error(S, "dlc modifier is not supported on this GPU");
+    return MatchOperand_ParseFail;
+  }
 
   if (isGFX9() && ImmTy == AMDGPUOperand::ImmTyA16)
     ImmTy = AMDGPUOperand::ImmTyR128A16;
@@ -5099,11 +5092,15 @@ static void addOptionalImmOperand(
 }
 
 OperandMatchResultTy
-AMDGPUAsmParser::parseStringWithPrefix(StringRef Prefix, StringRef &Value) {
+AMDGPUAsmParser::parseStringWithPrefix(StringRef Prefix,
+                                       StringRef &Value,
+                                       SMLoc &StringLoc) {
   if (!trySkipId(Prefix, AsmToken::Colon))
     return MatchOperand_NoMatch;
 
-  return parseId(Value) ? MatchOperand_Success : MatchOperand_ParseFail;
+  StringLoc = getLoc();
+  return parseId(Value, "expected an identifier") ? MatchOperand_Success
+                                                  : MatchOperand_ParseFail;
 }
 
 //===----------------------------------------------------------------------===//
@@ -5879,76 +5876,24 @@ OperandMatchResultTy AMDGPUAsmParser::parseInterpAttr(OperandVector &Operands) {
 // exp
 //===----------------------------------------------------------------------===//
 
-OperandMatchResultTy AMDGPUAsmParser::parseExpTgtImpl(StringRef Str,
-                                                      uint8_t &Val) {
-  if (Str == "null") {
-    Val = Exp::ET_NULL;
-    return MatchOperand_Success;
-  }
-
-  if (Str.startswith("mrt")) {
-    Str = Str.drop_front(3);
-    if (Str == "z") { // == mrtz
-      Val = Exp::ET_MRTZ;
-      return MatchOperand_Success;
-    }
-
-    if (Str.getAsInteger(10, Val))
-      return MatchOperand_ParseFail;
-
-    if (Val > Exp::ET_MRT7)
-      return MatchOperand_ParseFail;
-
-    return MatchOperand_Success;
-  }
-
-  if (Str.startswith("pos")) {
-    Str = Str.drop_front(3);
-    if (Str.getAsInteger(10, Val))
-      return MatchOperand_ParseFail;
-
-    if (Val > (isGFX10Plus() ? 4 : 3))
-      return MatchOperand_ParseFail;
-
-    Val += Exp::ET_POS0;
-    return MatchOperand_Success;
-  }
-
-  if (isGFX10Plus() && Str == "prim") {
-    Val = Exp::ET_PRIM;
-    return MatchOperand_Success;
-  }
-
-  if (Str.startswith("param")) {
-    Str = Str.drop_front(5);
-    if (Str.getAsInteger(10, Val))
-      return MatchOperand_ParseFail;
-
-    if (Val >= 32)
-      return MatchOperand_ParseFail;
-
-    Val += Exp::ET_PARAM0;
-    return MatchOperand_Success;
-  }
-
-  return MatchOperand_ParseFail;
-}
-
 OperandMatchResultTy AMDGPUAsmParser::parseExpTgt(OperandVector &Operands) {
+  using namespace llvm::AMDGPU::Exp;
+
   StringRef Str;
   SMLoc S = getLoc();
 
   if (!parseId(Str))
     return MatchOperand_NoMatch;
 
-  uint8_t Val;
-  auto Res = parseExpTgtImpl(Str, Val);
-  if (Res != MatchOperand_Success) {
-    Error(S, "invalid exp target");
-    return Res;
+  unsigned Id = getTgtId(Str);
+  if (Id == ET_INVALID || !isSupportedTgtId(Id, getSTI())) {
+    Error(S, (Id == ET_INVALID) ?
+                "invalid exp target" :
+                "exp target is not supported on this GPU");
+    return MatchOperand_ParseFail;
   }
 
-  Operands.push_back(AMDGPUOperand::CreateImm(this, Val, S,
+  Operands.push_back(AMDGPUOperand::CreateImm(this, Id, S,
                                               AMDGPUOperand::ImmTyExpTgt));
   return MatchOperand_Success;
 }
@@ -5977,6 +5922,18 @@ AMDGPUAsmParser::trySkipId(const StringRef Id) {
   if (isId(Id)) {
     lex();
     return true;
+  }
+  return false;
+}
+
+bool
+AMDGPUAsmParser::trySkipId(const StringRef Pref, const StringRef Id) {
+  if (isToken(AsmToken::Identifier)) {
+    StringRef Tok = getTokenStr();
+    if (Tok.startswith(Pref) && Tok.drop_front(Pref.size()) == Id) {
+      lex();
+      return true;
+    }
   }
   return false;
 }
@@ -7523,7 +7480,8 @@ AMDGPUAsmParser::parseSDWASel(OperandVector &Operands, StringRef Prefix,
   StringRef Value;
   OperandMatchResultTy res;
 
-  res = parseStringWithPrefix(Prefix, Value);
+  SMLoc StringLoc;
+  res = parseStringWithPrefix(Prefix, Value, StringLoc);
   if (res != MatchOperand_Success) {
     return res;
   }
@@ -7540,6 +7498,7 @@ AMDGPUAsmParser::parseSDWASel(OperandVector &Operands, StringRef Prefix,
         .Default(0xffffffff);
 
   if (Int == 0xffffffff) {
+    Error(StringLoc, "invalid " + Twine(Prefix) + " value");
     return MatchOperand_ParseFail;
   }
 
@@ -7555,7 +7514,8 @@ AMDGPUAsmParser::parseSDWADstUnused(OperandVector &Operands) {
   StringRef Value;
   OperandMatchResultTy res;
 
-  res = parseStringWithPrefix("dst_unused", Value);
+  SMLoc StringLoc;
+  res = parseStringWithPrefix("dst_unused", Value, StringLoc);
   if (res != MatchOperand_Success) {
     return res;
   }
@@ -7568,6 +7528,7 @@ AMDGPUAsmParser::parseSDWADstUnused(OperandVector &Operands) {
         .Default(0xffffffff);
 
   if (Int == 0xffffffff) {
+    Error(StringLoc, "invalid dst_unused value");
     return MatchOperand_ParseFail;
   }
 

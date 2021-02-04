@@ -128,6 +128,21 @@ template <> struct ScalarEnumerationTraits<FormatStyle::ShortFunctionStyle> {
   }
 };
 
+template <> struct ScalarEnumerationTraits<FormatStyle::AlignConsecutiveStyle> {
+  static void enumeration(IO &IO, FormatStyle::AlignConsecutiveStyle &Value) {
+    IO.enumCase(Value, "None", FormatStyle::ACS_None);
+    IO.enumCase(Value, "Consecutive", FormatStyle::ACS_Consecutive);
+    IO.enumCase(Value, "AcrossEmptyLines", FormatStyle::ACS_AcrossEmptyLines);
+    IO.enumCase(Value, "AcrossComments", FormatStyle::ACS_AcrossComments);
+    IO.enumCase(Value, "AcrossEmptyLinesAndComments",
+                FormatStyle::ACS_AcrossEmptyLinesAndComments);
+
+    // For backward compability.
+    IO.enumCase(Value, "true", FormatStyle::ACS_Consecutive);
+    IO.enumCase(Value, "false", FormatStyle::ACS_None);
+  }
+};
+
 template <> struct ScalarEnumerationTraits<FormatStyle::ShortIfStyle> {
   static void enumeration(IO &IO, FormatStyle::ShortIfStyle &Value) {
     IO.enumCase(Value, "Never", FormatStyle::SIS_Never);
@@ -223,6 +238,18 @@ struct ScalarEnumerationTraits<FormatStyle::BreakInheritanceListStyle> {
     IO.enumCase(Value, "BeforeColon", FormatStyle::BILS_BeforeColon);
     IO.enumCase(Value, "BeforeComma", FormatStyle::BILS_BeforeComma);
     IO.enumCase(Value, "AfterColon", FormatStyle::BILS_AfterColon);
+  }
+};
+
+template <>
+struct ScalarEnumerationTraits<
+    FormatStyle::EmptyLineBeforeAccessModifierStyle> {
+  static void
+  enumeration(IO &IO, FormatStyle::EmptyLineBeforeAccessModifierStyle &Value) {
+    IO.enumCase(Value, "Never", FormatStyle::ELBAMS_Never);
+    IO.enumCase(Value, "Leave", FormatStyle::ELBAMS_Leave);
+    IO.enumCase(Value, "LogicalBlock", FormatStyle::ELBAMS_LogicalBlock);
+    IO.enumCase(Value, "Always", FormatStyle::ELBAMS_Always);
   }
 };
 
@@ -388,6 +415,18 @@ struct ScalarEnumerationTraits<FormatStyle::BitFieldColonSpacingStyle> {
   }
 };
 
+template <> struct ScalarEnumerationTraits<FormatStyle::SortIncludesOptions> {
+  static void enumeration(IO &IO, FormatStyle::SortIncludesOptions &Value) {
+    IO.enumCase(Value, "Never", FormatStyle::SI_Never);
+    IO.enumCase(Value, "CaseInsensitive", FormatStyle::SI_CaseInsensitive);
+    IO.enumCase(Value, "CaseSensitive", FormatStyle::SI_CaseSensitive);
+
+    // For backward compatibility.
+    IO.enumCase(Value, "false", FormatStyle::SI_Never);
+    IO.enumCase(Value, "true", FormatStyle::SI_CaseInsensitive);
+  }
+};
+
 template <>
 struct ScalarEnumerationTraits<FormatStyle::SortJavaStaticImportOptions> {
   static void enumeration(IO &IO,
@@ -545,6 +584,8 @@ template <> struct MappingTraits<FormatStyle> {
     IO.mapOptional("DeriveLineEnding", Style.DeriveLineEnding);
     IO.mapOptional("DerivePointerAlignment", Style.DerivePointerAlignment);
     IO.mapOptional("DisableFormat", Style.DisableFormat);
+    IO.mapOptional("EmptyLineBeforeAccessModifier",
+                   Style.EmptyLineBeforeAccessModifier);
     IO.mapOptional("ExperimentalAutoDetectBinPacking",
                    Style.ExperimentalAutoDetectBinPacking);
     IO.mapOptional("FixNamespaceComments", Style.FixNamespaceComments);
@@ -632,6 +673,8 @@ template <> struct MappingTraits<FormatStyle> {
                    Style.SpacesInContainerLiterals);
     IO.mapOptional("SpacesInCStyleCastParentheses",
                    Style.SpacesInCStyleCastParentheses);
+    IO.mapOptional("SpacesInLineCommentPrefix",
+                   Style.SpacesInLineCommentPrefix);
     IO.mapOptional("SpacesInParentheses", Style.SpacesInParentheses);
     IO.mapOptional("SpacesInSquareBrackets", Style.SpacesInSquareBrackets);
     IO.mapOptional("SpaceBeforeSquareBrackets",
@@ -678,6 +721,20 @@ template <> struct MappingTraits<FormatStyle::RawStringFormat> {
     IO.mapOptional("EnclosingFunctions", Format.EnclosingFunctions);
     IO.mapOptional("CanonicalDelimiter", Format.CanonicalDelimiter);
     IO.mapOptional("BasedOnStyle", Format.BasedOnStyle);
+  }
+};
+
+template <> struct MappingTraits<FormatStyle::SpacesInLineComment> {
+  static void mapping(IO &IO, FormatStyle::SpacesInLineComment &Space) {
+    // Transform the maximum to signed, to parse "-1" correctly
+    int signedMaximum = static_cast<int>(Space.Maximum);
+    IO.mapOptional("Minimum", Space.Minimum);
+    IO.mapOptional("Maximum", signedMaximum);
+    Space.Maximum = static_cast<unsigned>(signedMaximum);
+
+    if (Space.Maximum != -1u) {
+      Space.Minimum = std::min(Space.Minimum, Space.Maximum);
+    }
   }
 };
 
@@ -857,10 +914,10 @@ FormatStyle getLLVMStyle(FormatStyle::LanguageKind Language) {
   LLVMStyle.AlignAfterOpenBracket = FormatStyle::BAS_Align;
   LLVMStyle.AlignOperands = FormatStyle::OAS_Align;
   LLVMStyle.AlignTrailingComments = true;
-  LLVMStyle.AlignConsecutiveAssignments = false;
-  LLVMStyle.AlignConsecutiveBitFields = false;
-  LLVMStyle.AlignConsecutiveDeclarations = false;
-  LLVMStyle.AlignConsecutiveMacros = false;
+  LLVMStyle.AlignConsecutiveAssignments = FormatStyle::ACS_None;
+  LLVMStyle.AlignConsecutiveBitFields = FormatStyle::ACS_None;
+  LLVMStyle.AlignConsecutiveDeclarations = FormatStyle::ACS_None;
+  LLVMStyle.AlignConsecutiveMacros = FormatStyle::ACS_None;
   LLVMStyle.AllowAllArgumentsOnNextLine = true;
   LLVMStyle.AllowAllConstructorInitializersOnNextLine = true;
   LLVMStyle.AllowAllParametersOfDeclarationOnNextLine = true;
@@ -914,6 +971,7 @@ FormatStyle getLLVMStyle(FormatStyle::LanguageKind Language) {
   LLVMStyle.Cpp11BracedListStyle = true;
   LLVMStyle.DeriveLineEnding = true;
   LLVMStyle.DerivePointerAlignment = false;
+  LLVMStyle.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_LogicalBlock;
   LLVMStyle.ExperimentalAutoDetectBinPacking = false;
   LLVMStyle.FixNamespaceComments = true;
   LLVMStyle.ForEachMacros.push_back("foreach");
@@ -956,6 +1014,7 @@ FormatStyle getLLVMStyle(FormatStyle::LanguageKind Language) {
   LLVMStyle.SpaceInEmptyParentheses = false;
   LLVMStyle.SpacesInContainerLiterals = true;
   LLVMStyle.SpacesInCStyleCastParentheses = false;
+  LLVMStyle.SpacesInLineCommentPrefix = {/*Minimum=*/1, /*Maximum=*/-1u};
   LLVMStyle.SpaceAfterCStyleCast = false;
   LLVMStyle.SpaceAfterLogicalNot = false;
   LLVMStyle.SpaceAfterTemplateKeyword = true;
@@ -983,7 +1042,7 @@ FormatStyle getLLVMStyle(FormatStyle::LanguageKind Language) {
   LLVMStyle.PenaltyIndentedWhitespace = 0;
 
   LLVMStyle.DisableFormat = false;
-  LLVMStyle.SortIncludes = true;
+  LLVMStyle.SortIncludes = FormatStyle::SI_CaseInsensitive;
   LLVMStyle.SortJavaStaticImport = FormatStyle::SJSIO_Before;
   LLVMStyle.SortUsingDeclarations = true;
   LLVMStyle.StatementAttributeLikeMacros.push_back("Q_EMIT");
@@ -1186,7 +1245,7 @@ FormatStyle getChromiumStyle(FormatStyle::LanguageKind Language) {
         "java",
         "javax",
     };
-    ChromiumStyle.SortIncludes = true;
+    ChromiumStyle.SortIncludes = FormatStyle::SI_CaseInsensitive;
   } else if (Language == FormatStyle::LK_JavaScript) {
     ChromiumStyle.AllowShortIfStatementsOnASingleLine = FormatStyle::SIS_Never;
     ChromiumStyle.AllowShortLoopsOnASingleLine = false;
@@ -1300,7 +1359,7 @@ FormatStyle getMicrosoftStyle(FormatStyle::LanguageKind Language) {
 FormatStyle getNoStyle() {
   FormatStyle NoStyle = getLLVMStyle();
   NoStyle.DisableFormat = true;
-  NoStyle.SortIncludes = false;
+  NoStyle.SortIncludes = FormatStyle::SI_Never;
   NoStyle.SortUsingDeclarations = false;
   return NoStyle;
 }
@@ -2179,10 +2238,23 @@ static void sortCppIncludes(const FormatStyle &Style,
   for (unsigned i = 0, e = Includes.size(); i != e; ++i) {
     Indices.push_back(i);
   }
-  llvm::stable_sort(Indices, [&](unsigned LHSI, unsigned RHSI) {
-    return std::tie(Includes[LHSI].Priority, Includes[LHSI].Filename) <
-           std::tie(Includes[RHSI].Priority, Includes[RHSI].Filename);
-  });
+
+  if (Style.SortIncludes == FormatStyle::SI_CaseSensitive) {
+    llvm::stable_sort(Indices, [&](unsigned LHSI, unsigned RHSI) {
+      const auto LHSFilenameLower = Includes[LHSI].Filename.lower();
+      const auto RHSFilenameLower = Includes[RHSI].Filename.lower();
+      return std::tie(Includes[LHSI].Priority, LHSFilenameLower,
+                      Includes[LHSI].Filename) <
+             std::tie(Includes[RHSI].Priority, RHSFilenameLower,
+                      Includes[RHSI].Filename);
+    });
+  } else {
+    llvm::stable_sort(Indices, [&](unsigned LHSI, unsigned RHSI) {
+      return std::tie(Includes[LHSI].Priority, Includes[LHSI].Filename) <
+             std::tie(Includes[RHSI].Priority, Includes[RHSI].Filename);
+    });
+  }
+
   // The index of the include on which the cursor will be put after
   // sorting/deduplicating.
   unsigned CursorIndex;

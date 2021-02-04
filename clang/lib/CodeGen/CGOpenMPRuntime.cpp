@@ -442,7 +442,7 @@ public:
 
 /// Values for bit flags used in the ident_t to describe the fields.
 /// All enumeric elements are named and described in accordance with the code
-/// from https://github.com/llvm/llvm-project/blob/master/openmp/runtime/src/kmp.h
+/// from https://github.com/llvm/llvm-project/blob/main/openmp/runtime/src/kmp.h
 enum OpenMPLocationFlags : unsigned {
   /// Use trampoline for internal microtask.
   OMP_IDENT_IMD = 0x01,
@@ -497,7 +497,7 @@ enum OpenMPOffloadingReservedDeviceIDs {
 
 /// Describes ident structure that describes a source location.
 /// All descriptions are taken from
-/// https://github.com/llvm/llvm-project/blob/master/openmp/runtime/src/kmp.h
+/// https://github.com/llvm/llvm-project/blob/main/openmp/runtime/src/kmp.h
 /// Original structure:
 /// typedef struct ident {
 ///    kmp_int32 reserved_1;   /**<  might be used in Fortran;
@@ -2098,6 +2098,14 @@ void CGOpenMPRuntime::emitParallelCall(CodeGenFunction &CGF, SourceLocation Loc,
     OutlinedFnArgs.push_back(ThreadIDAddr.getPointer());
     OutlinedFnArgs.push_back(ZeroAddrBound.getPointer());
     OutlinedFnArgs.append(CapturedVars.begin(), CapturedVars.end());
+
+    // Ensure we do not inline the function. This is trivially true for the ones
+    // passed to __kmpc_fork_call but the ones calles in serialized regions
+    // could be inlined. This is not a perfect but it is closer to the invariant
+    // we want, namely, every data environment starts with a new function.
+    // TODO: We should pass the if condition to the runtime function and do the
+    //       handling there. Much cleaner code.
+    OutlinedFn->addFnAttr(llvm::Attribute::NoInline);
     RT.emitOutlinedFunctionCall(CGF, Loc, OutlinedFn, OutlinedFnArgs);
 
     // __kmpc_end_serialized_parallel(&Loc, GTid);
@@ -4241,7 +4249,7 @@ CGOpenMPRuntime::emitTaskInit(CodeGenFunction &CGF, SourceLocation Loc,
   // kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
   // kmp_routine_entry_t *task_entry);
   // Task flags. Format is taken from
-  // https://github.com/llvm/llvm-project/blob/master/openmp/runtime/src/kmp.h,
+  // https://github.com/llvm/llvm-project/blob/main/openmp/runtime/src/kmp.h,
   // description of kmp_tasking_flags struct.
   enum {
     TiedFlag = 0x1,

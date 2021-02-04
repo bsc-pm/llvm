@@ -961,6 +961,10 @@ private:
                           bool Reciprocal) const override;
   SDValue getRecipEstimate(SDValue Operand, SelectionDAG &DAG, int Enabled,
                            int &ExtraSteps) const override;
+  SDValue getSqrtInputTest(SDValue Operand, SelectionDAG &DAG,
+                           const DenormalMode &Mode) const override;
+  SDValue getSqrtResultForDenormInput(SDValue Operand,
+                                      SelectionDAG &DAG) const override;
   unsigned combineRepeatedFPDivisors() const override;
 
   ConstraintType getConstraintType(StringRef Constraint) const override;
@@ -992,6 +996,7 @@ private:
     return TargetLowering::getInlineAsmMemConstraint(ConstraintCode);
   }
 
+  bool shouldExtendGSIndex(EVT VT, EVT &EltTy) const override;
   bool shouldRemoveExtendFromGSIndex(EVT VT) const override;
   bool isVectorLoadExtDesirable(SDValue ExtVal) const override;
   bool isUsedByReturnOnly(SDNode *N, SDValue &Chain) const override;

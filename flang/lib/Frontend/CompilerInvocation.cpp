@@ -84,6 +84,10 @@ bool Fortran::frontend::ParseDiagnosticArgs(clang::DiagnosticOptions &opts,
 
 static InputKind ParseFrontendArgs(FrontendOptions &opts,
     llvm::opt::ArgList &args, clang::DiagnosticsEngine &diags) {
+
+  // By default the frontend driver creates a ParseSyntaxOnly action.
+  opts.programAction_ = ParseSyntaxOnly;
+
   // Identify the action (i.e. opts.ProgramAction)
   if (const llvm::opt::Arg *a =
           args.getLastArg(clang::driver::options::OPT_Action_Group)) {
@@ -191,8 +195,7 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &res,
 
   // Parse the arguments
   const llvm::opt::OptTable &opts = clang::driver::getDriverOptTable();
-  const unsigned includedFlagsBitmask =
-      clang::driver::options::FC1Option;
+  const unsigned includedFlagsBitmask = clang::driver::options::FC1Option;
   unsigned missingArgIndex, missingArgCount;
   llvm::opt::InputArgList args = opts.ParseArgs(
       commandLineArgs, missingArgIndex, missingArgCount, includedFlagsBitmask);

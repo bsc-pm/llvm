@@ -977,6 +977,7 @@ ARMTargetLowering::ARMTargetLowering(const TargetMachine &TM,
     setTargetDAGCombine(ISD::VECTOR_SHUFFLE);
     setTargetDAGCombine(ISD::INSERT_VECTOR_ELT);
     setTargetDAGCombine(ISD::EXTRACT_VECTOR_ELT);
+    setTargetDAGCombine(ISD::SIGN_EXTEND_INREG);
     setTargetDAGCombine(ISD::STORE);
     setTargetDAGCombine(ISD::SIGN_EXTEND);
     setTargetDAGCombine(ISD::ZERO_EXTEND);
@@ -3550,14 +3551,11 @@ ARMTargetLowering::LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const {
 /// Return true if all users of V are within function F, looking through
 /// ConstantExprs.
 static bool allUsersAreInFunction(const Value *V, const Function *F) {
-  SmallVector<const User*,4> Worklist;
-  for (auto *U : V->users())
-    Worklist.push_back(U);
+  SmallVector<const User*,4> Worklist(V->users());
   while (!Worklist.empty()) {
     auto *U = Worklist.pop_back_val();
     if (isa<ConstantExpr>(U)) {
-      for (auto *UU : U->users())
-        Worklist.push_back(UU);
+      append_range(Worklist, U->users());
       continue;
     }
 
@@ -5036,17 +5034,13 @@ static bool isLowerSaturate(const SDValue LHS, const SDValue RHS,
 //     etc.
 //
 // LLVM canonicalizes these to either a min(max()) or a max(min())
-// pattern. This function tries to match one of these and will return true
-// if successful.
+// pattern. This function tries to match one of these and will return a SSAT
+// node if successful.
 //
-// USAT works similarily to SSAT but bounds on the interval [0, k] where k + 1 is
-// a power of 2.
-//
-// It returns true if the conversion can be done, false otherwise.
-// Additionally, the variable is returned in parameter V, the constant in K and
-// usat is set to true if the conditional represents an unsigned saturation
-static bool isSaturatingConditional(const SDValue &Op, SDValue &V,
-                                    uint64_t &K, bool &Usat) {
+// USAT works similarily to SSAT but bounds on the interval [0, k] where k + 1
+// is a power of 2.
+static SDValue LowerSaturatingConditional(SDValue Op, SelectionDAG &DAG) {
+  EVT VT = Op.getValueType();
   SDValue V1 = Op.getOperand(0);
   SDValue K1 = Op.getOperand(1);
   SDValue TrueVal1 = Op.getOperand(2);
@@ -5055,7 +5049,7 @@ static bool isSaturatingConditional(const SDValue &Op, SDValue &V,
 
   const SDValue Op2 = isa<ConstantSDNode>(TrueVal1) ? FalseVal1 : TrueVal1;
   if (Op2.getOpcode() != ISD::SELECT_CC)
-    return false;
+    return SDValue();
 
   SDValue V2 = Op2.getOperand(0);
   SDValue K2 = Op2.getOperand(1);
@@ -5066,49 +5060,41 @@ static bool isSaturatingConditional(const SDValue &Op, SDValue &V,
   SDValue V1Tmp = V1;
   SDValue V2Tmp = V2;
 
-  if (V1.getOpcode() == ISD::SIGN_EXTEND_INREG &&
-      V2.getOpcode() == ISD::SIGN_EXTEND_INREG) {
-    V1Tmp = V1.getOperand(0);
-    V2Tmp = V2.getOperand(0);
-  }
-
   // Check that the registers and the constants match a max(min()) or min(max())
   // pattern
-  if (V1Tmp == TrueVal1 && V2Tmp == TrueVal2 && K1 == FalseVal1 &&
-      K2 == FalseVal2 &&
-      ((isGTorGE(CC1) && isLTorLE(CC2)) || (isLTorLE(CC1) && isGTorGE(CC2)))) {
+  if (V1Tmp != TrueVal1 || V2Tmp != TrueVal2 || K1 != FalseVal1 ||
+      K2 != FalseVal2 ||
+      !((isGTorGE(CC1) && isLTorLE(CC2)) || (isLTorLE(CC1) && isGTorGE(CC2))))
+    return SDValue();
 
-    // Check that the constant in the lower-bound check is
-    // the opposite of the constant in the upper-bound check
-    // in 1's complement.
-    if (!isa<ConstantSDNode>(K1) || !isa<ConstantSDNode>(K2))
-      return false;
+  // Check that the constant in the lower-bound check is
+  // the opposite of the constant in the upper-bound check
+  // in 1's complement.
+  if (!isa<ConstantSDNode>(K1) || !isa<ConstantSDNode>(K2))
+    return SDValue();
 
-    int64_t Val1 = cast<ConstantSDNode>(K1)->getSExtValue();
-    int64_t Val2 = cast<ConstantSDNode>(K2)->getSExtValue();
-    int64_t PosVal = std::max(Val1, Val2);
-    int64_t NegVal = std::min(Val1, Val2);
+  int64_t Val1 = cast<ConstantSDNode>(K1)->getSExtValue();
+  int64_t Val2 = cast<ConstantSDNode>(K2)->getSExtValue();
+  int64_t PosVal = std::max(Val1, Val2);
+  int64_t NegVal = std::min(Val1, Val2);
 
-    if (!((Val1 > Val2 && isLTorLE(CC1)) || (Val1 < Val2 && isLTorLE(CC2))) ||
-        !isPowerOf2_64(PosVal + 1)) 
-      return false;
+  if (!((Val1 > Val2 && isLTorLE(CC1)) || (Val1 < Val2 && isLTorLE(CC2))) ||
+      !isPowerOf2_64(PosVal + 1))
+    return SDValue();
 
-    // Handle the difference between USAT (unsigned) and SSAT (signed)
-    // saturation
-    if (Val1 == ~Val2)
-      Usat = false;
-    else if (NegVal == 0)
-      Usat = true;
-    else
-      return false;
+  // Handle the difference between USAT (unsigned) and SSAT (signed)
+  // saturation
+  // At this point, PosVal is guaranteed to be positive
+  uint64_t K = PosVal;
+  SDLoc dl(Op);
+  if (Val1 == ~Val2)
+    return DAG.getNode(ARMISD::SSAT, dl, VT, V2Tmp,
+                       DAG.getConstant(countTrailingOnes(K), dl, VT));
+  if (NegVal == 0)
+    return DAG.getNode(ARMISD::USAT, dl, VT, V2Tmp,
+                       DAG.getConstant(countTrailingOnes(K), dl, VT));
 
-    V = V2Tmp;
-    // At this point, PosVal is guaranteed to be positive
-    K = (uint64_t) PosVal; 
-
-    return true;
-  }
-  return false;
+  return SDValue();
 }
 
 // Check if a condition of the type x < k ? k : x can be converted into a
@@ -5168,18 +5154,9 @@ SDValue ARMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
   SDLoc dl(Op);
 
   // Try to convert two saturating conditional selects into a single SSAT
-  SDValue SatValue;
-  uint64_t SatConstant;
-  bool SatUSat;
-  if (((!Subtarget->isThumb() && Subtarget->hasV6Ops()) || Subtarget->isThumb2()) &&
-      isSaturatingConditional(Op, SatValue, SatConstant, SatUSat)) {
-    if (SatUSat)
-      return DAG.getNode(ARMISD::USAT, dl, VT, SatValue,
-                         DAG.getConstant(countTrailingOnes(SatConstant), dl, VT));
-    else
-      return DAG.getNode(ARMISD::SSAT, dl, VT, SatValue,
-                         DAG.getConstant(countTrailingOnes(SatConstant), dl, VT));
-  }
+  if ((!Subtarget->isThumb() && Subtarget->hasV6Ops()) || Subtarget->isThumb2())
+    if (SDValue SatValue = LowerSaturatingConditional(Op, DAG))
+      return SatValue;
 
   // Try to convert expressions of the form x < k ? k : x (and similar forms)
   // into more efficient bit operations, which is possible when k is 0 or -1
@@ -5188,6 +5165,7 @@ SDValue ARMTargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
   // instructions.
   // Only allow this transformation on full-width (32-bit) operations
   SDValue LowerSatConstant;
+  SDValue SatValue;
   if (VT == MVT::i32 &&
       isLowerSaturatingConditional(Op, SatValue, LowerSatConstant)) {
     SDValue ShiftV = DAG.getNode(ISD::SRA, dl, VT, SatValue,
@@ -13618,6 +13596,25 @@ static SDValue PerformVMOVRRDCombine(SDNode *N,
     return Result;
   }
 
+  // VMOVRRD(extract(..(build_vector(a, b, c, d)))) -> a,b or c,d
+  if (InDouble.getOpcode() == ISD::EXTRACT_VECTOR_ELT &&
+      isa<ConstantSDNode>(InDouble.getOperand(1))) {
+    SDValue BV = InDouble.getOperand(0);
+    // Look up through any nop bitcasts
+    while (BV.getOpcode() == ISD::BITCAST &&
+           (BV.getValueType() == MVT::v2f64 || BV.getValueType() == MVT::v2i64))
+      BV = BV.getOperand(0);
+    if (BV.getValueType() != MVT::v4i32 || BV.getOpcode() != ISD::BUILD_VECTOR)
+      return SDValue();
+    unsigned Offset = InDouble.getConstantOperandVal(1) == 1 ? 2 : 0;
+    if (Subtarget->isLittle())
+      return DCI.DAG.getMergeValues(
+          {BV.getOperand(Offset), BV.getOperand(Offset + 1)}, SDLoc(N));
+    else
+      return DCI.DAG.getMergeValues(
+          {BV.getOperand(Offset + 1), BV.getOperand(Offset)}, SDLoc(N));
+  }
+
   return SDValue();
 }
 
@@ -13972,7 +13969,8 @@ static SDValue PerformInsertEltCombine(SDNode *N,
 }
 
 static SDValue PerformExtractEltCombine(SDNode *N,
-                                        TargetLowering::DAGCombinerInfo &DCI) {
+                                        TargetLowering::DAGCombinerInfo &DCI,
+                                        const ARMSubtarget *ST) {
   SDValue Op0 = N->getOperand(0);
   EVT VT = N->getValueType(0);
   SDLoc dl(N);
@@ -13991,12 +13989,81 @@ static SDValue PerformExtractEltCombine(SDNode *N,
       return X;
   }
 
+  // extract(bitcast(BUILD_VECTOR(VMOVDRR(a, b), ..))) -> a or b
+  if (Op0.getValueType() == MVT::v4i32 &&
+      isa<ConstantSDNode>(N->getOperand(1)) &&
+      Op0.getOpcode() == ISD::BITCAST &&
+      Op0.getOperand(0).getOpcode() == ISD::BUILD_VECTOR &&
+      Op0.getOperand(0).getValueType() == MVT::v2f64) {
+    SDValue BV = Op0.getOperand(0);
+    unsigned Offset = N->getConstantOperandVal(1);
+    SDValue MOV = BV.getOperand(Offset < 2 ? 0 : 1);
+    if (MOV.getOpcode() == ARMISD::VMOVDRR)
+      return MOV.getOperand(ST->isLittle() ? Offset % 2 : 1 - Offset % 2);
+  }
+
   return SDValue();
+}
+
+static SDValue PerformSignExtendInregCombine(SDNode *N, SelectionDAG &DAG) {
+  SDValue Op = N->getOperand(0);
+  EVT VT = N->getValueType(0);
+
+  // sext_inreg(VGETLANEu) -> VGETLANEs
+  if (Op.getOpcode() == ARMISD::VGETLANEu &&
+      cast<VTSDNode>(N->getOperand(1))->getVT() ==
+          Op.getOperand(0).getValueType().getScalarType())
+    return DAG.getNode(ARMISD::VGETLANEs, SDLoc(N), VT, Op.getOperand(0),
+                       Op.getOperand(1));
+
+  return SDValue();
+}
+
+// When lowering complex nodes that we recognize, like VQDMULH and MULH, we
+// can end up with shuffle(binop(shuffle, shuffle)), that can be simplified to
+// binop as the shuffles cancel out.
+static SDValue FlattenVectorShuffle(ShuffleVectorSDNode *N, SelectionDAG &DAG) {
+  EVT VT = N->getValueType(0);
+  if (!N->getOperand(1).isUndef() || N->getOperand(0).getValueType() != VT)
+    return SDValue();
+  SDValue Op = N->getOperand(0);
+
+  // Looking for binary operators that will have been folded from
+  // truncates/extends.
+  switch (Op.getOpcode()) {
+  case ARMISD::VQDMULH:
+  case ISD::MULHS:
+  case ISD::MULHU:
+    break;
+  default:
+    return SDValue();
+  }
+
+  ShuffleVectorSDNode *Op0 = dyn_cast<ShuffleVectorSDNode>(Op.getOperand(0));
+  ShuffleVectorSDNode *Op1 = dyn_cast<ShuffleVectorSDNode>(Op.getOperand(1));
+  if (!Op0 || !Op1 || !Op0->getOperand(1).isUndef() ||
+      !Op1->getOperand(1).isUndef() || Op0->getMask() != Op1->getMask() ||
+      Op0->getOperand(0).getValueType() != VT)
+    return SDValue();
+
+  // Check the mask turns into an identity shuffle.
+  ArrayRef<int> NMask = N->getMask();
+  ArrayRef<int> OpMask = Op0->getMask();
+  for (int i = 0, e = NMask.size(); i != e; i++) {
+    if (NMask[i] > 0 && OpMask[NMask[i]] > 0 && OpMask[NMask[i]] != i)
+      return SDValue();
+  }
+
+  return DAG.getNode(Op.getOpcode(), SDLoc(Op), Op.getValueType(),
+                     Op0->getOperand(0), Op1->getOperand(0));
 }
 
 /// PerformVECTOR_SHUFFLECombine - Target-specific dag combine xforms for
 /// ISD::VECTOR_SHUFFLE.
 static SDValue PerformVECTOR_SHUFFLECombine(SDNode *N, SelectionDAG &DAG) {
+  if (SDValue R = FlattenVectorShuffle(cast<ShuffleVectorSDNode>(N), DAG))
+    return R;
+
   // The LLVM shufflevector instruction does not require the shuffle mask
   // length to match the operand vector length, but ISD::VECTOR_SHUFFLE does
   // have that requirement.  When translating to ISD::VECTOR_SHUFFLE, if the
@@ -16363,7 +16430,9 @@ SDValue ARMTargetLowering::PerformDAGCombine(SDNode *N,
   case ISD::STORE:      return PerformSTORECombine(N, DCI, Subtarget);
   case ISD::BUILD_VECTOR: return PerformBUILD_VECTORCombine(N, DCI, Subtarget);
   case ISD::INSERT_VECTOR_ELT: return PerformInsertEltCombine(N, DCI);
-  case ISD::EXTRACT_VECTOR_ELT: return PerformExtractEltCombine(N, DCI);
+  case ISD::EXTRACT_VECTOR_ELT:
+    return PerformExtractEltCombine(N, DCI, Subtarget);
+  case ISD::SIGN_EXTEND_INREG: return PerformSignExtendInregCombine(N, DCI.DAG);
   case ISD::VECTOR_SHUFFLE: return PerformVECTOR_SHUFFLECombine(N, DCI.DAG);
   case ARMISD::VDUPLANE: return PerformVDUPLANECombine(N, DCI, Subtarget);
   case ARMISD::VDUP: return PerformVDUPCombine(N, DCI, Subtarget);
@@ -18868,7 +18937,8 @@ ARMTargetLowering::getNumInterleavedAccesses(VectorType *VecTy,
 }
 
 bool ARMTargetLowering::isLegalInterleavedAccessType(
-    unsigned Factor, FixedVectorType *VecTy, const DataLayout &DL) const {
+    unsigned Factor, FixedVectorType *VecTy, Align Alignment,
+    const DataLayout &DL) const {
 
   unsigned VecSize = DL.getTypeSizeInBits(VecTy);
   unsigned ElSize = DL.getTypeSizeInBits(VecTy->getElementType());
@@ -18890,6 +18960,9 @@ bool ARMTargetLowering::isLegalInterleavedAccessType(
 
   // Ensure the element type is legal.
   if (ElSize != 8 && ElSize != 16 && ElSize != 32)
+    return false;
+  // And the alignment if high enough under MVE.
+  if (Subtarget->hasMVEIntegerOps() && Alignment < ElSize / 8)
     return false;
 
   // Ensure the total vector size is 64 or a multiple of 128. Types larger than
@@ -18931,11 +19004,12 @@ bool ARMTargetLowering::lowerInterleavedLoad(
   Type *EltTy = VecTy->getElementType();
 
   const DataLayout &DL = LI->getModule()->getDataLayout();
+  Align Alignment = LI->getAlign();
 
   // Skip if we do not have NEON and skip illegal vector types. We can
   // "legalize" wide vector types into multiple interleaved accesses as long as
   // the vector types are divisible by 128.
-  if (!isLegalInterleavedAccessType(Factor, VecTy, DL))
+  if (!isLegalInterleavedAccessType(Factor, VecTy, Alignment, DL))
     return false;
 
   unsigned NumLoads = getNumInterleavedAccesses(VecTy, DL);
@@ -19084,11 +19158,12 @@ bool ARMTargetLowering::lowerInterleavedStore(StoreInst *SI,
   auto *SubVecTy = FixedVectorType::get(EltTy, LaneLen);
 
   const DataLayout &DL = SI->getModule()->getDataLayout();
+  Align Alignment = SI->getAlign();
 
   // Skip if we do not have NEON and skip illegal vector types. We can
   // "legalize" wide vector types into multiple interleaved accesses as long as
   // the vector types are divisible by 128.
-  if (!isLegalInterleavedAccessType(Factor, SubVecTy, DL))
+  if (!isLegalInterleavedAccessType(Factor, SubVecTy, Alignment, DL))
     return false;
 
   unsigned NumStores = getNumInterleavedAccesses(SubVecTy, DL);
@@ -19146,8 +19221,7 @@ bool ARMTargetLowering::lowerInterleavedStore(StoreInst *SI,
 
       SmallVector<Value *, 6> Ops;
       Ops.push_back(Builder.CreateBitCast(BaseAddr, Int8Ptr));
-      for (auto S : Shuffles)
-        Ops.push_back(S);
+      append_range(Ops, Shuffles);
       Ops.push_back(Builder.getInt32(SI->getAlignment()));
       Builder.CreateCall(VstNFunc, Ops);
     } else {
@@ -19163,8 +19237,7 @@ bool ARMTargetLowering::lowerInterleavedStore(StoreInst *SI,
 
       SmallVector<Value *, 6> Ops;
       Ops.push_back(Builder.CreateBitCast(BaseAddr, EltPtrTy));
-      for (auto S : Shuffles)
-        Ops.push_back(S);
+      append_range(Ops, Shuffles);
       for (unsigned F = 0; F < Factor; F++) {
         Ops.push_back(Builder.getInt32(F));
         Builder.CreateCall(VstNFunc, Ops);

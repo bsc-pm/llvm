@@ -987,6 +987,14 @@ public:
       std::array<std::pair<Value *, int>, 2> Values = {{LHS, RHS}};
       for (int Idx = 0, IdxE = Values.size(); Idx != IdxE; ++Idx) {
         Value *V = Values[Idx].first;
+        if (isa<Constant>(V)) {
+          // Since this is a function pass, it doesn't make semantic sense to
+          // walk the users of a subclass of Constant. The users could be in
+          // another function, or even another module that happens to be in
+          // the same LLVMContext.
+          continue;
+        }
+
         // Calculate the absolute lane, using the minimum relative lane of LHS
         // and RHS as base and Idx as the offset.
         int Ln = std::min(LHS.second, RHS.second) + Idx;
@@ -3403,21 +3411,21 @@ bool BoUpSLP::areAllUsersVectorized(Instruction *I) const {
          });
 }
 
-static std::pair<unsigned, unsigned>
+static std::pair<InstructionCost, InstructionCost>
 getVectorCallCosts(CallInst *CI, FixedVectorType *VecTy,
                    TargetTransformInfo *TTI, TargetLibraryInfo *TLI) {
   Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, TLI);
 
   // Calculate the cost of the scalar and vector calls.
   IntrinsicCostAttributes CostAttrs(ID, *CI, VecTy->getElementCount());
-  int IntrinsicCost =
+  auto IntrinsicCost =
     TTI->getIntrinsicInstrCost(CostAttrs, TTI::TCK_RecipThroughput);
 
   auto Shape = VFShape::get(*CI, ElementCount::getFixed(static_cast<unsigned>(
                                      VecTy->getNumElements())),
                             false /*HasGlobalPred*/);
   Function *VecFunc = VFDatabase(*CI).getVectorizedFunction(Shape);
-  int LibCost = IntrinsicCost;
+  auto LibCost = IntrinsicCost;
   if (!CI->isNoBuiltin() && VecFunc) {
     // Calculate the cost of the vector library call.
     SmallVector<Type *, 4> VecTys;
@@ -5156,8 +5164,7 @@ BoUpSLP::BlockScheduling::tryScheduleBundle(ArrayRef<Value *> VL, BoUpSLP *SLP,
   // cancelScheduling).
   while (!Bundle->isReady() && !ReadyInsts.empty()) {
 
-    ScheduleData *pickedSD = ReadyInsts.back();
-    ReadyInsts.pop_back();
+    ScheduleData *pickedSD = ReadyInsts.pop_back_val();
 
     if (pickedSD->isSchedulingEntity() && pickedSD->isReady()) {
       schedule(pickedSD, ReadyInsts);
@@ -5330,8 +5337,7 @@ void BoUpSLP::BlockScheduling::calculateDependencies(ScheduleData *SD,
   WorkList.push_back(SD);
 
   while (!WorkList.empty()) {
-    ScheduleData *SD = WorkList.back();
-    WorkList.pop_back();
+    ScheduleData *SD = WorkList.pop_back_val();
 
     ScheduleData *BundleMember = SD;
     while (BundleMember) {
@@ -5988,7 +5994,7 @@ bool SLPVectorizerPass::vectorizeStoreChain(ArrayRef<Value *> Chain, BoUpSLP &R,
   InstructionCost Cost = R.getTreeCost();
 
   LLVM_DEBUG(dbgs() << "SLP: Found cost = " << Cost << " for VF =" << VF << "\n");
-  if (Cost.isValid() && Cost < -SLPCostThreshold) {
+  if (Cost < -SLPCostThreshold) {
     LLVM_DEBUG(dbgs() << "SLP: Decided to vectorize cost = " << Cost << "\n");
 
     using namespace ore;
@@ -6289,7 +6295,7 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
 
       MinCost = std::min(MinCost, Cost);
 
-      if (Cost.isValid() && Cost < -SLPCostThreshold) {
+      if (Cost < -SLPCostThreshold) {
         LLVM_DEBUG(dbgs() << "SLP: Vectorizing list at cost:" << Cost << ".\n");
         R.getORE()->emit(OptimizationRemark(SV_NAME, "VectorizedList",
                                                     cast<Instruction>(Ops[0]))
@@ -6416,9 +6422,7 @@ class HorizontalReduction {
       // FP min/max are associative except for NaN and -0.0. We do not
       // have to rule out -0.0 here because the intrinsic semantics do not
       // specify a fixed result for it.
-      // TODO: This is artificially restricted to fast because the code that
-      //       creates reductions assumes/produces fast ops.
-      return I->getFastMathFlags().isFast();
+      return I->getFastMathFlags().noNaNs();
     }
 
     return I->isAssociative();
@@ -6812,12 +6816,18 @@ public:
     if (NumReducedVals < 4)
       return false;
 
-    // FIXME: Fast-math-flags should be set based on the instructions in the
-    //        reduction (not all of 'fast' are required).
+    // Intersect the fast-math-flags from all reduction operations.
+    FastMathFlags RdxFMF;
+    RdxFMF.set();
+    for (ReductionOpsType &RdxOp : ReductionOps) {
+      for (Value *RdxVal : RdxOp) {
+        if (auto *FPMO = dyn_cast<FPMathOperator>(RdxVal))
+          RdxFMF &= FPMO->getFastMathFlags();
+      }
+    }
+
     IRBuilder<> Builder(cast<Instruction>(ReductionRoot));
-    FastMathFlags Unsafe;
-    Unsafe.setFast();
-    Builder.setFastMathFlags(Unsafe);
+    Builder.setFastMathFlags(RdxFMF);
 
     BoUpSLP::ExtraValueToDebugLocsMap ExternallyUsedValues;
     // The same extra argument may be used several times, so log each attempt
@@ -6997,11 +7007,12 @@ public:
 
 private:
   /// Calculate the cost of a reduction.
-  int getReductionCost(TargetTransformInfo *TTI, Value *FirstReducedVal,
-                       unsigned ReduxWidth) {
+  InstructionCost getReductionCost(TargetTransformInfo *TTI,
+                                   Value *FirstReducedVal,
+                                   unsigned ReduxWidth) {
     Type *ScalarTy = FirstReducedVal->getType();
     FixedVectorType *VectorTy = FixedVectorType::get(ScalarTy, ReduxWidth);
-    int VectorCost, ScalarCost;
+    InstructionCost VectorCost, ScalarCost;
     switch (RdxKind) {
     case RecurKind::Add:
     case RecurKind::Mul:
@@ -7063,9 +7074,6 @@ private:
     assert(isPowerOf2_32(ReduxWidth) &&
            "We only handle power-of-two reductions for now");
 
-    // FIXME: The builder should use an FMF guard. It should not be hard-coded
-    //        to 'fast'.
-    assert(Builder.getFastMathFlags().isFast() && "Expected 'fast' FMF");
     return createSimpleTargetReduction(Builder, TTI, VectorizedValue, RdxKind,
                                        ReductionOps.back());
   }

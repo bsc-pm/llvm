@@ -873,9 +873,6 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
   if (Subtarget->supportsAddressTopByteIgnored())
     setTargetDAGCombine(ISD::LOAD);
 
-  setTargetDAGCombine(ISD::MGATHER);
-  setTargetDAGCombine(ISD::MSCATTER);
-
   setTargetDAGCombine(ISD::MUL);
 
   setTargetDAGCombine(ISD::SELECT);
@@ -3823,6 +3820,15 @@ SDValue AArch64TargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
                        Op.getOperand(1), Op.getOperand(2));
   }
   }
+}
+
+bool AArch64TargetLowering::shouldExtendGSIndex(EVT VT, EVT &EltTy) const {
+  if (VT.getVectorElementType() == MVT::i8 ||
+      VT.getVectorElementType() == MVT::i16) {
+    EltTy = MVT::i32;
+    return true;
+  }
+  return false;
 }
 
 bool AArch64TargetLowering::shouldRemoveExtendFromGSIndex(EVT VT) const {
@@ -7471,6 +7477,22 @@ static SDValue getEstimate(const AArch64Subtarget *ST, unsigned Opcode,
   return SDValue();
 }
 
+SDValue
+AArch64TargetLowering::getSqrtInputTest(SDValue Op, SelectionDAG &DAG,
+                                        const DenormalMode &Mode) const {
+  SDLoc DL(Op);
+  EVT VT = Op.getValueType();
+  EVT CCVT = getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), VT);
+  SDValue FPZero = DAG.getConstantFP(0.0, DL, VT);
+  return DAG.getSetCC(DL, CCVT, Op, FPZero, ISD::SETEQ);
+}
+
+SDValue
+AArch64TargetLowering::getSqrtResultForDenormInput(SDValue Op,
+                                                   SelectionDAG &DAG) const {
+  return Op;
+}
+
 SDValue AArch64TargetLowering::getSqrtEstimate(SDValue Operand,
                                                SelectionDAG &DAG, int Enabled,
                                                int &ExtraSteps,
@@ -7494,17 +7516,8 @@ SDValue AArch64TargetLowering::getSqrtEstimate(SDValue Operand,
         Step = DAG.getNode(AArch64ISD::FRSQRTS, DL, VT, Operand, Step, Flags);
         Estimate = DAG.getNode(ISD::FMUL, DL, VT, Estimate, Step, Flags);
       }
-      if (!Reciprocal) {
-        EVT CCVT = getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(),
-                                      VT);
-        SDValue FPZero = DAG.getConstantFP(0.0, DL, VT);
-        SDValue Eq = DAG.getSetCC(DL, CCVT, Operand, FPZero, ISD::SETEQ);
-
+      if (!Reciprocal)
         Estimate = DAG.getNode(ISD::FMUL, DL, VT, Operand, Estimate, Flags);
-        // Correct the result if the operand is 0.0.
-        Estimate = DAG.getNode(VT.isVector() ? ISD::VSELECT : ISD::SELECT, DL,
-                               VT, Eq, Operand, Estimate);
-      }
 
       ExtraSteps = 0;
       return Estimate;
@@ -9742,9 +9755,7 @@ SDValue AArch64TargetLowering::LowerBUILD_VECTOR(SDValue Op,
 
   if (PreferDUPAndInsert) {
     // First, build a constant vector with the common element.
-    SmallVector<SDValue, 8> Ops;
-    for (unsigned I = 0; I < NumElts; ++I)
-      Ops.push_back(Value);
+    SmallVector<SDValue, 8> Ops(NumElts, Value);
     SDValue NewVector = LowerBUILD_VECTOR(DAG.getBuildVector(VT, dl, Ops), DAG);
     // Next, insert the elements that do not match the common value.
     for (unsigned I = 0; I < NumElts; ++I)
@@ -14390,55 +14401,6 @@ static SDValue performSTORECombine(SDNode *N,
   return SDValue();
 }
 
-static SDValue performMaskedGatherScatterCombine(SDNode *N,
-                                      TargetLowering::DAGCombinerInfo &DCI,
-                                      SelectionDAG &DAG) {
-  MaskedGatherScatterSDNode *MGS = cast<MaskedGatherScatterSDNode>(N);
-  assert(MGS && "Can only combine gather load or scatter store nodes");
-
-  SDLoc DL(MGS);
-  SDValue Chain = MGS->getChain();
-  SDValue Scale = MGS->getScale();
-  SDValue Index = MGS->getIndex();
-  SDValue Mask = MGS->getMask();
-  SDValue BasePtr = MGS->getBasePtr();
-  ISD::MemIndexType IndexType = MGS->getIndexType();
-
-  EVT IdxVT = Index.getValueType();
-
-  if (DCI.isBeforeLegalize()) {
-    // SVE gather/scatter requires indices of i32/i64. Promote anything smaller
-    // prior to legalisation so the result can be split if required.
-    if ((IdxVT.getVectorElementType() == MVT::i8) ||
-        (IdxVT.getVectorElementType() == MVT::i16)) {
-      EVT NewIdxVT = IdxVT.changeVectorElementType(MVT::i32);
-      if (MGS->isIndexSigned())
-        Index = DAG.getNode(ISD::SIGN_EXTEND, DL, NewIdxVT, Index);
-      else
-        Index = DAG.getNode(ISD::ZERO_EXTEND, DL, NewIdxVT, Index);
-
-      if (auto *MGT = dyn_cast<MaskedGatherSDNode>(MGS)) {
-        SDValue PassThru = MGT->getPassThru();
-        SDValue Ops[] = { Chain, PassThru, Mask, BasePtr, Index, Scale };
-        return DAG.getMaskedGather(DAG.getVTList(N->getValueType(0), MVT::Other),
-                                   PassThru.getValueType(), DL, Ops,
-                                   MGT->getMemOperand(),
-                                   MGT->getIndexType(), MGT->getExtensionType());
-      } else {
-        auto *MSC = cast<MaskedScatterSDNode>(MGS);
-        SDValue Data = MSC->getValue();
-        SDValue Ops[] = { Chain, Data, Mask, BasePtr, Index, Scale };
-        return DAG.getMaskedScatter(DAG.getVTList(MVT::Other),
-                                    MSC->getMemoryVT(), DL, Ops,
-                                    MSC->getMemOperand(), IndexType,
-                                    MSC->isTruncatingStore());
-      }
-    }
-  }
-
-  return SDValue();
-}
-
 /// Target-specific DAG combine function for NEON load/store intrinsics
 /// to merge base address updates.
 static SDValue performNEONPostLDSTCombine(SDNode *N,
@@ -15633,9 +15595,6 @@ SDValue AArch64TargetLowering::PerformDAGCombine(SDNode *N,
     break;
   case ISD::STORE:
     return performSTORECombine(N, DCI, DAG, Subtarget);
-  case ISD::MGATHER:
-  case ISD::MSCATTER:
-    return performMaskedGatherScatterCombine(N, DCI, DAG);
   case AArch64ISD::BRCOND:
     return performBRCONDCombine(N, DCI, DAG);
   case AArch64ISD::TBNZ:

@@ -656,6 +656,21 @@ static void addMacroPrefixMapArg(const Driver &D, const ArgList &Args,
   }
 }
 
+/// Add a CC1 and CC1AS option to specify the coverage file path prefix map.
+static void addProfilePrefixMapArg(const Driver &D, const ArgList &Args,
+                                   ArgStringList &CmdArgs) {
+  for (const Arg *A : Args.filtered(options::OPT_ffile_prefix_map_EQ,
+                                    options::OPT_fprofile_prefix_map_EQ)) {
+    StringRef Map = A->getValue();
+    if (Map.find('=') == StringRef::npos)
+      D.Diag(diag::err_drv_invalid_argument_to_option)
+          << Map << A->getOption().getName();
+    else
+      CmdArgs.push_back(Args.MakeArgString("-fprofile-prefix-map=" + Map));
+    A->claim();
+  }
+}
+
 /// Vectorize at all optimization levels greater than 1 except for -Oz.
 /// For -Oz the loop vectorizer is disabled, while the slp vectorizer is
 /// enabled.
@@ -1363,6 +1378,7 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   }
 
   addMacroPrefixMapArg(D, Args, CmdArgs);
+  addProfilePrefixMapArg(D, Args, CmdArgs);
 }
 
 // FIXME: Move to target hook.
@@ -4656,21 +4672,15 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
-  if (Triple.isOSAIX() && Args.hasArg(options::OPT_maltivec)) {
-    if (Args.hasArg(options::OPT_mabi_EQ_vec_extabi)) {
-      CmdArgs.push_back("-mabi=vec-extabi");
-    } else {
-      D.Diag(diag::err_aix_default_altivec_abi);
-    }
-  }
-
   if (Arg *A = Args.getLastArg(options::OPT_mabi_EQ_vec_extabi,
                                options::OPT_mabi_EQ_vec_default)) {
     if (!Triple.isOSAIX())
       D.Diag(diag::err_drv_unsupported_opt_for_target)
           << A->getSpelling() << RawTriple.str();
-    if (!Args.hasArg(options::OPT_maltivec))
-      D.Diag(diag::err_aix_altivec);
+    if (A->getOption().getID() == options::OPT_mabi_EQ_vec_extabi)
+      CmdArgs.push_back("-mabi=vec-extabi");
+    else
+      D.Diag(diag::err_aix_default_altivec_abi);
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_Wframe_larger_than_EQ)) {
@@ -4826,6 +4836,22 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (!Args.hasFlag(options::OPT_fverbose_asm, options::OPT_fno_verbose_asm,
                     IsIntegratedAssemblerDefault))
     CmdArgs.push_back("-fno-verbose-asm");
+
+  // Parse 'none' or '$major.$minor'. Disallow -fbinutils-version=0 because we
+  // use that to indicate the MC default in the backend.
+  if (Arg *A = Args.getLastArg(options::OPT_fbinutils_version_EQ)) {
+    StringRef V = A->getValue();
+    unsigned Num;
+    if (V == "none")
+      A->render(Args, CmdArgs);
+    else if (!V.consumeInteger(10, Num) && Num > 0 &&
+             (V.empty() || (V.consume_front(".") &&
+                            !V.consumeInteger(10, Num) && V.empty())))
+      A->render(Args, CmdArgs);
+    else
+      D.Diag(diag::err_drv_invalid_argument_to_option)
+          << A->getValue() << A->getOption().getName();
+  }
 
   if (!TC.useIntegratedAs())
     CmdArgs.push_back("-no-integrated-as");
@@ -5175,6 +5201,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   //
   // If a std is supplied, only add -trigraphs if it follows the
   // option.
+  bool ImplyVCPPCVer = false;
   bool ImplyVCPPCXXVer = false;
   const Arg *Std = Args.getLastArg(options::OPT_std_EQ, options::OPT_ansi);
   if (Std) {
@@ -5199,9 +5226,13 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     // doesn't match. For the time being just ignore this for C++ inputs;
     // eventually we want to do all the standard defaulting here instead of
     // splitting it between the driver and clang -cc1.
-    if (!types::isCXX(InputType))
-      Args.AddAllArgsTranslated(CmdArgs, options::OPT_std_default_EQ, "-std=",
-                                /*Joined=*/true);
+    if (!types::isCXX(InputType)) {
+      if (!Args.hasArg(options::OPT__SLASH_std)) {
+        Args.AddAllArgsTranslated(CmdArgs, options::OPT_std_default_EQ, "-std=",
+                                  /*Joined=*/true);
+      } else
+        ImplyVCPPCVer = true;
+    }
     else if (IsWindowsMSVC)
       ImplyVCPPCXXVer = true;
 
@@ -5506,6 +5537,14 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   const XRayArgs &XRay = TC.getXRayArgs();
   XRay.addArgs(TC, Args, CmdArgs, InputType);
+
+  for (const auto &Filename :
+       Args.getAllArgValues(options::OPT_fprofile_list_EQ)) {
+    if (D.getVFS().exists(Filename))
+      CmdArgs.push_back(Args.MakeArgString("-fprofile-list=" + Filename));
+    else
+      D.Diag(clang::diag::err_drv_no_such_file) << Filename;
+  }
 
   if (Arg *A = Args.getLastArg(options::OPT_fpatchable_function_entry_EQ)) {
     StringRef S0 = A->getValue(), S = S0;
@@ -5816,6 +5855,20 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         Args.MakeArgString("-fms-compatibility-version=" + MSVT.getAsString()));
 
   bool IsMSVC2015Compatible = MSVT.getMajor() >= 19;
+  if (ImplyVCPPCVer) {
+    StringRef LanguageStandard;
+    if (const Arg *StdArg = Args.getLastArg(options::OPT__SLASH_std)) {
+      Std = StdArg;
+      LanguageStandard = llvm::StringSwitch<StringRef>(StdArg->getValue())
+                             .Case("c11", "-std=c11")
+                             .Case("c17", "-std=c17")
+                             .Default("");
+      if (LanguageStandard.empty())
+        D.Diag(clang::diag::warn_drv_unused_argument)
+            << StdArg->getAsString(Args);
+    }
+    CmdArgs.push_back(LanguageStandard.data());
+  }
   if (ImplyVCPPCXXVer) {
     StringRef LanguageStandard;
     if (const Arg *StdArg = Args.getLastArg(options::OPT__SLASH_std)) {
@@ -6449,6 +6502,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-target-feature");
       CmdArgs.push_back("-outline-atomics");
     }
+  } else if (Triple.isAArch64() &&
+             getToolChain().IsAArch64OutlineAtomicsDefault(Args)) {
+    CmdArgs.push_back("-target-feature");
+    CmdArgs.push_back("+outline-atomics");
   }
 
   if (Args.hasFlag(options::OPT_faddrsig, options::OPT_fno_addrsig,

@@ -1915,8 +1915,22 @@ bool AArch64InstructionSelector::preISelLower(MachineInstr &I) {
     }
     return true;
   }
-  case TargetOpcode::G_STORE:
-    return contractCrossBankCopyIntoStore(I, MRI);
+  case TargetOpcode::G_STORE: {
+    bool Changed = contractCrossBankCopyIntoStore(I, MRI);
+    MachineOperand &SrcOp = I.getOperand(0);
+    if (MRI.getType(SrcOp.getReg()).isPointer()) {
+      // Allow matching with imported patterns for stores of pointers. Unlike
+      // G_LOAD/G_PTR_ADD, we may not have selected all users. So, emit a copy
+      // and constrain.
+      MachineIRBuilder MIB(I);
+      auto Copy = MIB.buildCopy(LLT::scalar(64), SrcOp);
+      Register NewSrc = Copy.getReg(0);
+      SrcOp.setReg(NewSrc);
+      RBI.constrainGenericRegister(NewSrc, AArch64::GPR64RegClass, MRI);
+      Changed = true;
+    }
+    return Changed;
+  }
   case TargetOpcode::G_PTR_ADD:
     return convertPtrAddToAdd(I, MRI);
   case TargetOpcode::G_LOAD: {
@@ -4378,7 +4392,7 @@ AArch64InstructionSelector::emitOverflowOp(unsigned Opcode, Register Dst,
   case TargetOpcode::G_SSUBO:
     return std::make_pair(emitSUBS(Dst, LHS, RHS, MIRBuilder), AArch64CC::VS);
   case TargetOpcode::G_USUBO:
-    return std::make_pair(emitSUBS(Dst, LHS, RHS, MIRBuilder), AArch64CC::HS);
+    return std::make_pair(emitSUBS(Dst, LHS, RHS, MIRBuilder), AArch64CC::LO);
   }
 }
 

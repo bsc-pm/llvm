@@ -32,7 +32,7 @@
 #include "ompt-specific.h"
 #endif
 
-#if OMPTARGET_PROFILING_SUPPORT
+#if OMP_PROFILING_SUPPORT
 #include "llvm/Support/TimeProfiler.h"
 static char *ProfileTraceFile = nullptr;
 #endif
@@ -2753,6 +2753,19 @@ int __kmp_get_max_active_levels(int gtid) {
   return thread->th.th_current_task->td_icvs.max_active_levels;
 }
 
+// nteams-var per-device ICV
+void __kmp_set_num_teams(int num_teams) {
+  if (num_teams > 0)
+    __kmp_nteams = num_teams;
+}
+int __kmp_get_max_teams(void) { return __kmp_nteams; }
+// teams-thread-limit-var per-device ICV
+void __kmp_set_teams_thread_limit(int limit) {
+  if (limit > 0)
+    __kmp_teams_thread_limit = limit;
+}
+int __kmp_get_teams_thread_limit(void) { return __kmp_teams_thread_limit; }
+
 KMP_BUILD_ASSERT(sizeof(kmp_sched_t) == sizeof(int));
 KMP_BUILD_ASSERT(sizeof(enum sched_type) == sizeof(int));
 
@@ -3644,15 +3657,37 @@ int __kmp_register_root(int initial_thread) {
     }
   }
 
-  /* find an available thread slot */
-  /* Don't reassign the zero slot since we need that to only be used by initial
-     thread */
-  for (gtid = (initial_thread ? 0 : 1); TCR_PTR(__kmp_threads[gtid]) != NULL;
-       gtid++)
-    ;
-  KA_TRACE(1,
-           ("__kmp_register_root: found slot in threads array: T#%d\n", gtid));
-  KMP_ASSERT(gtid < __kmp_threads_capacity);
+  // When hidden helper task is enabled, __kmp_threads is organized as follows:
+  // 0: initial thread, also a regular OpenMP thread.
+  // [1, __kmp_hidden_helper_threads_num]: slots for hidden helper threads.
+  // [__kmp_hidden_helper_threads_num + 1, __kmp_threads_capacity): slots for
+  // regular OpenMP threads.
+  if (TCR_4(__kmp_init_hidden_helper_threads)) {
+    // Find an available thread slot for hidden helper thread. Slots for hidden
+    // helper threads start from 1 to __kmp_hidden_helper_threads_num.
+    for (gtid = 1; TCR_PTR(__kmp_threads[gtid]) != NULL &&
+                   gtid <= __kmp_hidden_helper_threads_num;
+         gtid++)
+      ;
+    KMP_ASSERT(gtid <= __kmp_hidden_helper_threads_num);
+    KA_TRACE(1, ("__kmp_register_root: found slot in threads array for "
+                 "hidden helper thread: T#%d\n",
+                 gtid));
+  } else {
+    /* find an available thread slot */
+    // Don't reassign the zero slot since we need that to only be used by
+    // initial thread. Slots for hidden helper threads should also be skipped.
+    if (initial_thread && __kmp_threads[0] == NULL) {
+      gtid = 0;
+    } else {
+      for (gtid = __kmp_hidden_helper_threads_num + 1;
+           TCR_PTR(__kmp_threads[gtid]) != NULL; gtid++)
+        ;
+    }
+    KA_TRACE(
+        1, ("__kmp_register_root: found slot in threads array: T#%d\n", gtid));
+    KMP_ASSERT(gtid < __kmp_threads_capacity);
+  }
 
   /* update global accounting */
   __kmp_all_nth++;
@@ -4303,8 +4338,20 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
 #endif
 
   KMP_MB();
-  for (new_gtid = 1; TCR_PTR(__kmp_threads[new_gtid]) != NULL; ++new_gtid) {
-    KMP_DEBUG_ASSERT(new_gtid < __kmp_threads_capacity);
+
+  {
+    int new_start_gtid = TCR_4(__kmp_init_hidden_helper_threads)
+                             ? 1
+                             : __kmp_hidden_helper_threads_num + 1;
+
+    for (new_gtid = new_start_gtid; TCR_PTR(__kmp_threads[new_gtid]) != NULL;
+         ++new_gtid) {
+      KMP_DEBUG_ASSERT(new_gtid < __kmp_threads_capacity);
+    }
+
+    if (TCR_4(__kmp_init_hidden_helper_threads)) {
+      KMP_DEBUG_ASSERT(new_gtid <= __kmp_hidden_helper_threads_num);
+    }
   }
 
   /* allocate space for it. */
@@ -5706,7 +5753,7 @@ void __kmp_free_thread(kmp_info_t *this_th) {
 /* ------------------------------------------------------------------------ */
 
 void *__kmp_launch_thread(kmp_info_t *this_thr) {
-#if OMPTARGET_PROFILING_SUPPORT
+#if OMP_PROFILING_SUPPORT
   ProfileTraceFile = getenv("LIBOMPTARGET_PROFILE");
   // TODO: add a configuration option for time granularity
   if (ProfileTraceFile)
@@ -5814,7 +5861,7 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
   KA_TRACE(10, ("__kmp_launch_thread: T#%d done\n", gtid));
   KMP_MB();
 
-#if OMPTARGET_PROFILING_SUPPORT
+#if OMP_PROFILING_SUPPORT
   llvm::timeTraceProfilerFinishThread();
 #endif
   return this_thr;
@@ -6247,6 +6294,15 @@ void __kmp_internal_end_thread(int gtid_req) {
   if (TCR_4(__kmp_global.g.g_done) || !__kmp_init_serial) {
     KA_TRACE(10, ("__kmp_internal_end_thread: already finished\n"));
     return;
+  }
+
+  // If hidden helper team has been initialized, we need to deinit it
+  if (TCR_4(__kmp_init_hidden_helper)) {
+    TCW_SYNC_4(__kmp_hidden_helper_team_done, TRUE);
+    // First release the main thread to let it continue its work
+    __kmp_hidden_helper_main_thread_release();
+    // Wait until the hidden helper team has been destroyed
+    __kmp_hidden_helper_threads_deinitz_wait();
   }
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
@@ -7125,6 +7181,41 @@ void __kmp_parallel_initialize(void) {
   __kmp_release_bootstrap_lock(&__kmp_initz_lock);
 }
 
+void __kmp_hidden_helper_initialize() {
+  if (TCR_4(__kmp_init_hidden_helper))
+    return;
+
+  // __kmp_parallel_initialize is required before we initialize hidden helper
+  if (!TCR_4(__kmp_init_parallel))
+    __kmp_parallel_initialize();
+
+  // Double check. Note that this double check should not be placed before
+  // __kmp_parallel_initialize as it will cause dead lock.
+  __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
+  if (TCR_4(__kmp_init_hidden_helper)) {
+    __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+    return;
+  }
+
+  // Set the count of hidden helper tasks to be executed to zero
+  KMP_ATOMIC_ST_REL(&__kmp_unexecuted_hidden_helper_tasks, 0);
+
+  // Set the global variable indicating that we're initializing hidden helper
+  // team/threads
+  TCW_SYNC_4(__kmp_init_hidden_helper_threads, TRUE);
+
+  // Platform independent initialization
+  __kmp_do_initialize_hidden_helper_threads();
+
+  // Wait here for the finish of initialization of hidden helper teams
+  __kmp_hidden_helper_threads_initz_wait();
+
+  // We have finished hidden helper initialization
+  TCW_SYNC_4(__kmp_init_hidden_helper, TRUE);
+
+  __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+}
+
 /* ------------------------------------------------------------------------ */
 
 void __kmp_run_before_invoked_task(int gtid, int tid, kmp_info_t *this_thr,
@@ -7342,8 +7433,13 @@ void __kmp_push_num_teams(ident_t *id, int gtid, int num_teams,
   KMP_DEBUG_ASSERT(num_teams >= 0);
   KMP_DEBUG_ASSERT(num_threads >= 0);
 
-  if (num_teams == 0)
-    num_teams = 1; // default number of teams is 1.
+  if (num_teams == 0) {
+    if (__kmp_nteams > 0) {
+      num_teams = __kmp_nteams;
+    } else {
+      num_teams = 1; // default number of teams is 1.
+    }
+  }
   if (num_teams > __kmp_teams_max_nth) { // if too many teams requested?
     if (!__kmp_reserve_warn) {
       __kmp_reserve_warn = 1;
@@ -7363,7 +7459,11 @@ void __kmp_push_num_teams(ident_t *id, int gtid, int num_teams,
   KMP_DEBUG_ASSERT(__kmp_avail_proc);
   KMP_DEBUG_ASSERT(__kmp_dflt_team_nth);
   if (num_threads == 0) {
-    num_threads = __kmp_avail_proc / num_teams;
+    if (__kmp_teams_thread_limit > 0) {
+      num_threads = __kmp_teams_thread_limit;
+    } else {
+      num_threads = __kmp_avail_proc / num_teams;
+    }
     // adjust num_threads w/o warning as it is not user setting
     // num_threads = min(num_threads, nthreads-var, thread-limit-var)
     // no thread_limit clause specified -  do not change thread-limit-var ICV
@@ -8470,11 +8570,66 @@ int __kmp_pause_resource(kmp_pause_status_t level) {
   }
 }
 
-
 void __kmp_omp_display_env(int verbose) {
   __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
   if (__kmp_init_serial == 0)
     __kmp_do_serial_initialize();
   __kmp_display_env_impl(!verbose, verbose);
   __kmp_release_bootstrap_lock(&__kmp_initz_lock);
+}
+
+// Globals and functions for hidden helper task
+kmp_info_t **__kmp_hidden_helper_threads;
+kmp_info_t *__kmp_hidden_helper_main_thread;
+kmp_int32 __kmp_hidden_helper_threads_num = 8;
+std::atomic<kmp_int32> __kmp_unexecuted_hidden_helper_tasks;
+#if KMP_OS_LINUX
+kmp_int32 __kmp_enable_hidden_helper = TRUE;
+#else
+kmp_int32 __kmp_enable_hidden_helper = FALSE;
+#endif
+
+namespace {
+std::atomic<kmp_int32> __kmp_hit_hidden_helper_threads_num;
+
+void __kmp_hidden_helper_wrapper_fn(int *gtid, int *, ...) {
+  // This is an explicit synchronization on all hidden helper threads in case
+  // that when a regular thread pushes a hidden helper task to one hidden
+  // helper thread, the thread has not been awaken once since they're released
+  // by the main thread after creating the team.
+  KMP_ATOMIC_INC(&__kmp_hit_hidden_helper_threads_num);
+  while (KMP_ATOMIC_LD_ACQ(&__kmp_hit_hidden_helper_threads_num) !=
+         __kmp_hidden_helper_threads_num)
+    ;
+
+  // If main thread, then wait for signal
+  if (__kmpc_master(nullptr, *gtid)) {
+    // First, unset the initial state and release the initial thread
+    TCW_4(__kmp_init_hidden_helper_threads, FALSE);
+    __kmp_hidden_helper_initz_release();
+    __kmp_hidden_helper_main_thread_wait();
+    // Now wake up all worker threads
+    for (int i = 1; i < __kmp_hit_hidden_helper_threads_num; ++i) {
+      __kmp_hidden_helper_worker_thread_signal();
+    }
+  }
+}
+} // namespace
+
+void __kmp_hidden_helper_threads_initz_routine() {
+  // Create a new root for hidden helper team/threads
+  const int gtid = __kmp_register_root(TRUE);
+  __kmp_hidden_helper_main_thread = __kmp_threads[gtid];
+  __kmp_hidden_helper_threads = &__kmp_threads[gtid];
+  __kmp_hidden_helper_main_thread->th.th_set_nproc =
+      __kmp_hidden_helper_threads_num;
+
+  KMP_ATOMIC_ST_REL(&__kmp_hit_hidden_helper_threads_num, 0);
+
+  __kmpc_fork_call(nullptr, 0, __kmp_hidden_helper_wrapper_fn);
+
+  // Set the initialization flag to FALSE
+  TCW_SYNC_4(__kmp_init_hidden_helper, FALSE);
+
+  __kmp_hidden_helper_threads_deinitz_release();
 }

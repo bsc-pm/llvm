@@ -1208,11 +1208,10 @@ void CodeGenSchedModels::collectProcItinRW() {
 
 // Gather the unsupported features for processor models.
 void CodeGenSchedModels::collectProcUnsupportedFeatures() {
-  for (CodeGenProcModel &ProcModel : ProcModels) {
-    for (Record *Pred : ProcModel.ModelDef->getValueAsListOfDefs("UnsupportedFeatures")) {
-       ProcModel.UnsupportedFeaturesDefs.push_back(Pred);
-    }
-  }
+  for (CodeGenProcModel &ProcModel : ProcModels)
+    append_range(
+        ProcModel.UnsupportedFeaturesDefs,
+        ProcModel.ModelDef->getValueAsListOfDefs("UnsupportedFeatures"));
 }
 
 /// Infer new classes from existing classes. In the process, this may create new
@@ -2263,25 +2262,18 @@ void PredTransitions::dump() const {
   for (std::vector<PredTransition>::const_iterator
          TI = TransVec.begin(), TE = TransVec.end(); TI != TE; ++TI) {
     dbgs() << "{";
-    for (SmallVectorImpl<PredCheck>::const_iterator
-           PCI = TI->PredTerm.begin(), PCE = TI->PredTerm.end();
-         PCI != PCE; ++PCI) {
-      if (PCI != TI->PredTerm.begin())
-        dbgs() << ", ";
-      dbgs() << SchedModels.getSchedRW(PCI->RWIdx, PCI->IsRead).Name
-             << ":" << PCI->Predicate->getName();
-    }
+    ListSeparator LS;
+    for (const PredCheck &PC : TI->PredTerm)
+      dbgs() << LS << SchedModels.getSchedRW(PC.RWIdx, PC.IsRead).Name << ":"
+             << PC.Predicate->getName();
     dbgs() << "},\n  => {";
     for (SmallVectorImpl<SmallVector<unsigned,4>>::const_iterator
            WSI = TI->WriteSequences.begin(), WSE = TI->WriteSequences.end();
          WSI != WSE; ++WSI) {
       dbgs() << "(";
-      for (SmallVectorImpl<unsigned>::const_iterator
-             WI = WSI->begin(), WE = WSI->end(); WI != WE; ++WI) {
-        if (WI != WSI->begin())
-          dbgs() << ", ";
-        dbgs() << SchedModels.getSchedWrite(*WI).Name;
-      }
+      ListSeparator LS;
+      for (unsigned N : *WSI)
+        dbgs() << LS << SchedModels.getSchedWrite(N).Name;
       dbgs() << "),";
     }
     dbgs() << "}\n";
