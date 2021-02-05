@@ -267,8 +267,6 @@ if [ -n "$(which ccache)" ];
 then
   info "Using ccache: $(which ccache)"
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_CCACHE_BUILD=ON")
-  info "Setting LLVM_APPEND_VC_REV=OFF to improve ccache hit ratio"
-  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_APPEND_VC_REV=OFF")
 else
   info "Not using ccache as it was not found"
 fi
