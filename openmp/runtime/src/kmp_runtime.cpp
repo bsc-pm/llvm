@@ -4405,6 +4405,7 @@ kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
   thread->th.is_unshackled = true;
   thread->th.is_unshackled_active = &root->r.is_unshackled_thread_active[new_tid];
+  thread->th.unshackled_id = new_tid;
   kmp_taskdata_t *task =
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
@@ -8364,4 +8365,13 @@ void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
     return;
   __kmp_threads[gtid]->th.th_root->r.is_unshackled_thread_active[thread_num] =
       active;
+}
+
+int __kmp_get_unshackled_id() {
+  // The runtime may initialize here if needed.
+  int gtid = __kmp_entry_gtid();
+  if (__kmp_threads[gtid]->th.is_unshackled) {
+    return __kmp_threads[gtid]->th.unshackled_id;
+  } else
+    return -1;
 }

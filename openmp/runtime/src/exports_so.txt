@@ -93,6 +93,7 @@ VERSION {
     # Unshackled API
     __kmp_get_num_unshackled_threads;
     __kmp_set_unshackled_thread_active_status;
+    __kmp_get_unshackled_id;
 
     local: # Non-exported symbols.
 
