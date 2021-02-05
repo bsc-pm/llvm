@@ -1370,6 +1370,8 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       MPM.addPass(createModuleToFunctionPassAdaptor(MemProfilerPass()));
       MPM.addPass(ModuleMemProfilerPass());
     }
+    // TODO: where do i put this??
+    MPM.addPass(OmpSsPass());
   }
 
   // FIXME: We still use the legacy pass manager to do code generation. We

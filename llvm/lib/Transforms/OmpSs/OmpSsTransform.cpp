@@ -34,12 +34,12 @@ using namespace llvm;
 
 namespace {
 
-struct OmpSs : public ModulePass {
-  /// Pass identification, replacement for typeid
-  static char ID;
-  OmpSs() : ModulePass(ID) {
-    initializeOmpSsPass(*PassRegistry::getPassRegistry());
-  }
+struct OmpSs {
+  OmpSs(
+    function_ref<DirectiveFunctionInfo &(Function &)> LookupDirectiveFunctionInfo)
+      : LookupDirectiveFunctionInfo(LookupDirectiveFunctionInfo)
+        {}
+  function_ref<DirectiveFunctionInfo &(Function &)> LookupDirectiveFunctionInfo;
 
   bool Initialized = false;
 
@@ -2695,8 +2695,8 @@ struct OmpSs : public ModulePass {
     }
   }
 
-  bool runOnModule(Module &M) override {
-    if (skipModule(M))
+  bool runOnModule(Module &M) {
+    if (M.empty())
       return false;
 
     // Keep all the functions before start outlining
@@ -2716,7 +2716,7 @@ struct OmpSs : public ModulePass {
     }
 
     for (auto *F : Functs) {
-      DirectiveFunctionInfo &DirectiveFuncInfo = getAnalysis<OmpSsRegionAnalysisPass>(*F).getFuncInfo();
+      DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(*F);
 
       FinalBodyInfoMap FinalBodyInfo;
 
@@ -2812,29 +2812,58 @@ struct OmpSs : public ModulePass {
     relocateInstrs();
     return true;
   }
+};
+
+struct OmpSsLegacyPass : public ModulePass {
+  /// Pass identification, replacement for typeid
+  static char ID;
+  OmpSsLegacyPass() : ModulePass(ID) {
+    initializeOmpSsLegacyPassPass(*PassRegistry::getPassRegistry());
+  }
+
+  bool runOnModule(Module &M) override {
+    if (skipModule(M))
+      return false;
+    auto LookupDirectiveFunctionInfo = [this](Function &F) -> DirectiveFunctionInfo & {
+      return this->getAnalysis<OmpSsRegionAnalysisPass>(F).getFuncInfo();
+    };
+    return OmpSs(LookupDirectiveFunctionInfo).runOnModule(M);
+  }
 
   StringRef getPassName() const override { return "Nanos6 Lowering"; }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<OmpSsRegionAnalysisPass>();
   }
-
 };
 
 }
 
-char OmpSs::ID = 0;
+PreservedAnalyses OmpSsPass::run(Module &M, ModuleAnalysisManager &AM) {
+  auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+  // auto LookupDirectiveFunctionInfo = [&FAM](Function &F) -> DirectiveFunctionInfo & {
+  //   return FAM.getResult<OmpSsAnalysis>(F).getFuncInfo();
+  // };
+  // if (!OmpSs(LookupDirectiveFunctionInfo).runOnModule(M))
+  //   return PreservedAnalyses::all();
+
+  PreservedAnalyses PA;
+  // PA.preserve<OmpSsAnalysis>();
+  return PA;
+}
+
+char OmpSsLegacyPass::ID = 0;
 
 ModulePass *llvm::createOmpSsPass() {
-  return new OmpSs();
+  return new OmpSsLegacyPass();
 }
 
 void LLVMOmpSsPass(LLVMPassManagerRef PM) {
   unwrap(PM)->add(createOmpSsPass());
 }
 
-INITIALIZE_PASS_BEGIN(OmpSs, "ompss-2",
+INITIALIZE_PASS_BEGIN(OmpSsLegacyPass, "ompss-2",
                 "Transforms OmpSs-2 llvm.directive.region intrinsics", false, false)
 INITIALIZE_PASS_DEPENDENCY(OmpSsRegionAnalysisPass)
-INITIALIZE_PASS_END(OmpSs, "ompss-2",
+INITIALIZE_PASS_END(OmpSsLegacyPass, "ompss-2",
                 "Transforms OmpSs-2 llvm.directive.region intrinsics", false, false)

@@ -15,7 +15,7 @@
 #ifndef LLVM_TRANSFORMS_OMPSS_H
 #define LLVM_TRANSFORMS_OMPSS_H
 
-#include <functional>
+#include "llvm/IR/PassManager.h"
 
 namespace llvm {
 
@@ -33,6 +33,10 @@ class TargetMachine;
 //
 // OmpSsPass - Modifies IR in order to translate intrinsics to legal OmpSs-2 code
 ModulePass *createOmpSsPass();
+
+struct OmpSsPass : public PassInfoMixin<OmpSsPass> {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+};
 
 } // End llvm namespace
 
