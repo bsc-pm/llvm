@@ -2780,6 +2780,49 @@ static kmp_affin_mask_t *__kmp_create_masks(unsigned *maxIndex,
   return osId2Mask;
 }
 
+static kmp_affin_mask_t *__kmp_create_unshackled_masks(AddrUnsPair *address2os,
+                                                       unsigned numAddrs) {
+#define UNSHACKLED_NO_RESPECT 1
+
+  // Allocate a mask_array for total CPUs in the machine - 1
+  unsigned int array_size = (UNSHACKLED_NO_RESPECT ? __kmp_xproc : numAddrs) - 1;
+  kmp_affin_mask_t *mask_array;
+  KMP_CPU_ALLOC_ARRAY(mask_array, array_size);
+
+  // Sequentially assign CPUs other than the master thread
+  unsigned int i;
+  for (i = 1; i < numAddrs; i++) {
+    kmp_affin_mask_t *mask = KMP_CPU_INDEX(mask_array, i-1);
+    KMP_CPU_SET(address2os[i].second, mask);
+  }
+
+  // Assign other CPUs not in the process affinity mask
+  if (UNSHACKLED_NO_RESPECT) {
+    kmp_affin_mask_t *machine_mask;
+    KMP_CPU_ALLOC_ON_STACK(machine_mask);
+    __kmp_affinity_entire_machine_mask(machine_mask);
+
+    // find other CPUs starting from the master thread (address2os[0].second)
+    unsigned int cpuid = (address2os[0].second + 1) % __kmp_xproc;
+    i = numAddrs; // it should already be numAddrs
+    while (cpuid != address2os[0].second) {
+      if (KMP_CPU_ISSET(cpuid, machine_mask) &&
+          !KMP_CPU_ISSET(cpuid, __kmp_affin_fullMask)) {
+        kmp_affin_mask_t *mask = KMP_CPU_INDEX(mask_array, i-1);
+        KMP_CPU_SET(cpuid, mask);
+        ++i;
+      }
+
+      // increment cpuid
+      cpuid = (cpuid + 1) % __kmp_xproc;
+    }
+
+    KMP_DEBUG_ASSERT(i-1 == array_size);
+  }
+
+  return mask_array;
+}
+
 // Stuff for the affinity proclist parsers.  It's easier to declare these vars
 // as file-static than to try and pass them through the calling sequence of
 // the recursive-descent OMP_PLACES parser.
@@ -4472,6 +4515,12 @@ static void __kmp_aux_affinity_initialize(void) {
     KMP_DEBUG_ASSERT((int)numUnique == __kmp_avail_proc);
   }
 
+  // Create the table of masks for unshackled threads
+  if (__kmp_num_unshackled_threads > 0) {
+    __kmp_affinity_unshackled_masks = __kmp_create_unshackled_masks(
+        address2os, __kmp_avail_proc);
+  }
+
   // Set the childNums vector in all Address objects. This must be done before
   // we can sort using __kmp_affinity_cmp_Address_child_num(), which takes into
   // account the setting of __kmp_affinity_compact.
@@ -4711,6 +4760,27 @@ void __kmp_affinity_set_init_mask(int gtid, int isa_root) {
     KMP_CPU_ALLOC(th->th.th_affin_mask);
   } else {
     KMP_CPU_ZERO(th->th.th_affin_mask);
+  }
+
+  if (th->th.is_unshackled) {
+    kmp_affin_mask_t *mask;
+    if (__kmp_affinity_type == affinity_none) {
+      mask = __kmp_affin_fullMask;
+    } else {
+      // NOTE: We are including here all the cases other than affinity_none for
+      // simplicity.
+      mask = KMP_CPU_INDEX(__kmp_affinity_unshackled_masks, th->th.unshackled_id);
+    }
+    KMP_CPU_COPY(th->th.th_affin_mask, mask);
+    __kmp_set_system_affinity(th->th.th_affin_mask, TRUE);
+    if (__kmp_affinity_verbose) {
+      char buf[KMP_AFFIN_MASK_PRINT_LEN];
+      __kmp_affinity_print_mask(buf, KMP_AFFIN_MASK_PRINT_LEN,
+          th->th.th_affin_mask);
+      KMP_INFORM(BoundToOSProcSet, "KMP_AFFINITY", (kmp_int32)getpid(),
+          __kmp_gettid(), gtid, buf);
+    }
+    return;
   }
 
   // Copy the thread mask to the kmp_info_t structure. If

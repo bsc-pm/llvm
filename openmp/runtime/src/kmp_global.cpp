@@ -263,6 +263,7 @@ int __kmp_affinity_respect_mask = affinity_respect_mask_default;
 char *__kmp_affinity_proclist = NULL;
 kmp_affin_mask_t *__kmp_affinity_masks = NULL;
 unsigned __kmp_affinity_num_masks = 0;
+kmp_affin_mask_t *__kmp_affinity_unshackled_masks = NULL;
 
 char *__kmp_cpuinfo_file = NULL;
 

@@ -789,6 +789,7 @@ extern char *__kmp_affinity_proclist; /* proc ID list */
 extern kmp_affin_mask_t *__kmp_affinity_masks;
 extern unsigned __kmp_affinity_num_masks;
 extern void __kmp_affinity_bind_thread(int which);
+extern kmp_affin_mask_t *__kmp_affinity_unshackled_masks;
 
 extern kmp_affin_mask_t *__kmp_affin_fullMask;
 extern char *__kmp_cpuinfo_file;
