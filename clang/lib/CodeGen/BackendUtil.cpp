@@ -1208,6 +1208,12 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+  ModulePassManager EarlyMPM(CodeGenOpts.DebugPassManager);
+  if (LangOpts.OmpSs) {
+    if (!CodeGenOpts.DisableLLVMPasses)
+      EarlyMPM.addPass(OmpSsPass());
+  }
+
   ModulePassManager MPM(CodeGenOpts.DebugPassManager);
 
   if (!CodeGenOpts.DisableLLVMPasses) {
@@ -1370,8 +1376,6 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       MPM.addPass(createModuleToFunctionPassAdaptor(MemProfilerPass()));
       MPM.addPass(ModuleMemProfilerPass());
     }
-    // TODO: where do i put this??
-    MPM.addPass(OmpSsPass());
   }
 
   // FIXME: We still use the legacy pass manager to do code generation. We
@@ -1440,6 +1444,11 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
   // Before executing passes, print the final values of the LLVM options.
   cl::PrintOptionValues();
 
+  // [OmpSs-2] Now that we have all of the passes ready, run them.
+  {
+    PrettyStackTraceString CrashInfo("Early Optimizer");
+    EarlyMPM.run(*TheModule, MAM);
+  }
   // Now that we have all of the passes ready, run them.
   {
     PrettyStackTraceString CrashInfo("Optimizer");
