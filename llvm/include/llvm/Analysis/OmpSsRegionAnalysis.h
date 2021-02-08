@@ -301,8 +301,8 @@ struct DirectiveAnalysisInfo {
   SetVector<Value *> UsesAfterExit;
 };
 
-class OmpSsRegionAnalysisPass : public FunctionPass {
-private:
+class OmpSsRegionAnalysis {
+public:
 
   // Directive Analysis for a directive entry.
   MapVector<Instruction *, DirectiveAnalysisInfo> DEntryToDAnalysisInfo;
@@ -329,11 +329,14 @@ private:
   // and after exit. Uses before task entry are then matched with DSA info
   // or Captured info from OperandBundles
   void getOmpSsFunctionInfo(Function &F, DominatorTree &DT);
+};
 
+class OmpSsRegionAnalysisLegacyPass : public FunctionPass {
+  OmpSsRegionAnalysis ORA;
 public:
   static char ID;
 
-  OmpSsRegionAnalysisPass();
+  OmpSsRegionAnalysisLegacyPass();
 
   bool runOnFunction(Function &F) override;
 
@@ -346,7 +349,20 @@ public:
   void releaseMemory() override;
 
   DirectiveFunctionInfo& getFuncInfo();
+};
 
+class OmpSsRegionAnalysisPass : public AnalysisInfoMixin<OmpSsRegionAnalysisPass> {
+  friend AnalysisInfoMixin<OmpSsRegionAnalysisPass>;
+
+  static AnalysisKey Key;
+
+  OmpSsRegionAnalysis ORA;
+
+public:
+  /// Provide the result typedef for this analysis pass.
+  using Result = DirectiveFunctionInfo;
+
+  DirectiveFunctionInfo run(Function &F, FunctionAnalysisManager &FAM);
 };
 
 } // end namespace llvm

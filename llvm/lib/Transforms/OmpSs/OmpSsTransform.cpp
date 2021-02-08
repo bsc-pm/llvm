@@ -2825,7 +2825,7 @@ struct OmpSsLegacyPass : public ModulePass {
     if (skipModule(M))
       return false;
     auto LookupDirectiveFunctionInfo = [this](Function &F) -> DirectiveFunctionInfo & {
-      return this->getAnalysis<OmpSsRegionAnalysisPass>(F).getFuncInfo();
+      return this->getAnalysis<OmpSsRegionAnalysisLegacyPass>(F).getFuncInfo();
     };
     return OmpSs(LookupDirectiveFunctionInfo).runOnModule(M);
   }
@@ -2833,7 +2833,7 @@ struct OmpSsLegacyPass : public ModulePass {
   StringRef getPassName() const override { return "Nanos6 Lowering"; }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<OmpSsRegionAnalysisPass>();
+    AU.addRequired<OmpSsRegionAnalysisLegacyPass>();
   }
 };
 
@@ -2841,15 +2841,13 @@ struct OmpSsLegacyPass : public ModulePass {
 
 PreservedAnalyses OmpSsPass::run(Module &M, ModuleAnalysisManager &AM) {
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-  // auto LookupDirectiveFunctionInfo = [&FAM](Function &F) -> DirectiveFunctionInfo & {
-  //   return FAM.getResult<OmpSsAnalysis>(F).getFuncInfo();
-  // };
-  // if (!OmpSs(LookupDirectiveFunctionInfo).runOnModule(M))
-  //   return PreservedAnalyses::all();
+  auto LookupDirectiveFunctionInfo = [&FAM](Function &F) -> DirectiveFunctionInfo & {
+    return FAM.getResult<OmpSsRegionAnalysisPass>(F);
+  };
+  if (!OmpSs(LookupDirectiveFunctionInfo).runOnModule(M))
+    return PreservedAnalyses::all();
 
-  PreservedAnalyses PA;
-  // PA.preserve<OmpSsAnalysis>();
-  return PA;
+  return PreservedAnalyses::none();
 }
 
 char OmpSsLegacyPass::ID = 0;
@@ -2864,6 +2862,6 @@ void LLVMOmpSsPass(LLVMPassManagerRef PM) {
 
 INITIALIZE_PASS_BEGIN(OmpSsLegacyPass, "ompss-2",
                 "Transforms OmpSs-2 llvm.directive.region intrinsics", false, false)
-INITIALIZE_PASS_DEPENDENCY(OmpSsRegionAnalysisPass)
+INITIALIZE_PASS_DEPENDENCY(OmpSsRegionAnalysisLegacyPass)
 INITIALIZE_PASS_END(OmpSsLegacyPass, "ompss-2",
                 "Transforms OmpSs-2 llvm.directive.region intrinsics", false, false)

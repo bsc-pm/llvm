@@ -328,7 +328,7 @@ void initializeObjCARCOptLegacyPassPass(PassRegistry &);
 void initializeOptimizationRemarkEmitterWrapperPassPass(PassRegistry&);
 void initializeOptimizePHIsPass(PassRegistry&);
 void initializeOmpSsLegacyPassPass(PassRegistry&);
-void initializeOmpSsRegionAnalysisPassPass(PassRegistry&);
+void initializeOmpSsRegionAnalysisLegacyPassPass(PassRegistry&);
 void initializePAEvalPass(PassRegistry&);
 void initializePEIPass(PassRegistry&);
 void initializePGOIndirectCallPromotionLegacyPassPass(PassRegistry&);

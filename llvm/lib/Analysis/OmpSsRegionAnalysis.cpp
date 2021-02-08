@@ -56,10 +56,10 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print directive layout with reduction init and combiner functions"))
   );
 
-char OmpSsRegionAnalysisPass::ID = 0;
+char OmpSsRegionAnalysisLegacyPass::ID = 0;
 
-OmpSsRegionAnalysisPass::OmpSsRegionAnalysisPass() : FunctionPass(ID) {
-  initializeOmpSsRegionAnalysisPassPass(*PassRegistry::getPassRegistry());
+OmpSsRegionAnalysisLegacyPass::OmpSsRegionAnalysisLegacyPass() : FunctionPass(ID) {
+  initializeOmpSsRegionAnalysisLegacyPassPass(*PassRegistry::getPassRegistry());
 }
 
 // returns if V is in DSAInfo
@@ -82,7 +82,7 @@ static bool valueInCapturedBundle(const DirectiveCapturedInfo& CapturedInfo,
   return CapturedInfo.count(V);
 }
 
-void OmpSsRegionAnalysisPass::print_verbose(
+void OmpSsRegionAnalysis::print_verbose(
     Instruction *Cur, int Depth, int PrintSpaceMultiplier) const {
   if (Cur) {
     const DirectiveAnalysisInfo &AnalysisInfo = DEntryToDAnalysisInfo.lookup(Cur);
@@ -197,11 +197,11 @@ void OmpSsRegionAnalysisPass::print_verbose(
   }
 }
 
-void OmpSsRegionAnalysisPass::print(raw_ostream &OS, const Module *M) const {
-  print_verbose(nullptr, -1, PrintSpaceMultiplier);
+void OmpSsRegionAnalysisLegacyPass::print(raw_ostream &OS, const Module *M) const {
+  ORA.print_verbose(nullptr, -1, OmpSsRegionAnalysis::PrintSpaceMultiplier);
 }
 
-DirectiveFunctionInfo& OmpSsRegionAnalysisPass::getFuncInfo() { return DirectiveFuncInfo; }
+DirectiveFunctionInfo& OmpSsRegionAnalysisLegacyPass::getFuncInfo() { return ORA.DirectiveFuncInfo; }
 
 /// NOTE: from old OrderedInstructions
 static bool localDominates(
@@ -745,7 +745,7 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
 }
 
 // child directives will be placed before its parent directives
-void OmpSsRegionAnalysisPass::convertDirectivesTreeToVectorImpl(
+void OmpSsRegionAnalysis::convertDirectivesTreeToVectorImpl(
   Instruction *Cur, SmallVectorImpl<Instruction *> &Stack) {
 
   if (Cur)
@@ -777,12 +777,12 @@ void OmpSsRegionAnalysisPass::convertDirectivesTreeToVectorImpl(
 }
 
 // child directives will be placed before its parent directives
-void OmpSsRegionAnalysisPass::convertDirectivesTreeToVector() {
+void OmpSsRegionAnalysis::convertDirectivesTreeToVector() {
   SmallVector<Instruction *, 4> Stack;
   convertDirectivesTreeToVectorImpl(nullptr, Stack);
 }
 
-void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
+void OmpSsRegionAnalysis::getOmpSsFunctionInfo(
     Function &F, DominatorTree &DT) {
 
   MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBDirectiveStacks;
@@ -911,28 +911,34 @@ void OmpSsRegionAnalysisPass::getOmpSsFunctionInfo(
 
 }
 
-bool OmpSsRegionAnalysisPass::runOnFunction(Function &F) {
+bool OmpSsRegionAnalysisLegacyPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  getOmpSsFunctionInfo(F, DT);
+  ORA.getOmpSsFunctionInfo(F, DT);
 
   return false;
 }
 
-void OmpSsRegionAnalysisPass::releaseMemory() {
-  DirectiveFuncInfo = DirectiveFunctionInfo();
-  DEntryToDAnalysisInfo.clear();
-  DEntryToDInfo.clear();
-  DirectivesTree.clear();
+void OmpSsRegionAnalysisLegacyPass::releaseMemory() {
+  ORA = OmpSsRegionAnalysis();
 }
 
-void OmpSsRegionAnalysisPass::getAnalysisUsage(AnalysisUsage &AU) const {
+void OmpSsRegionAnalysisLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
-INITIALIZE_PASS_BEGIN(OmpSsRegionAnalysisPass, "ompss-2-regions",
+INITIALIZE_PASS_BEGIN(OmpSsRegionAnalysisLegacyPass, "ompss-2-regions",
                       "Classify OmpSs-2 inside region uses", false, true)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-INITIALIZE_PASS_END(OmpSsRegionAnalysisPass, "ompss-2-regions",
+INITIALIZE_PASS_END(OmpSsRegionAnalysisLegacyPass, "ompss-2-regions",
                     "Classify OmpSs-2 inside region uses", false, true)
 
+
+AnalysisKey OmpSsRegionAnalysisPass::Key;
+
+DirectiveFunctionInfo OmpSsRegionAnalysisPass::run(
+    Function &F, FunctionAnalysisManager &FAM) {
+  auto *DT = &FAM.getResult<DominatorTreeAnalysis>(F);
+  ORA.getOmpSsFunctionInfo(F, *DT);
+  return ORA.DirectiveFuncInfo;
+}
