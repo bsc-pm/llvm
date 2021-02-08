@@ -197,11 +197,17 @@ void OmpSsRegionAnalysis::print_verbose(
   }
 }
 
-void OmpSsRegionAnalysisLegacyPass::print(raw_ostream &OS, const Module *M) const {
-  ORA.print_verbose(nullptr, -1, OmpSsRegionAnalysis::PrintSpaceMultiplier);
+DirectiveFunctionInfo& OmpSsRegionAnalysis::getFuncInfo() { return DirectiveFuncInfo; }
+
+void OmpSsRegionAnalysis::print(raw_ostream &OS) const {
+  print_verbose(nullptr, -1, PrintSpaceMultiplier);
 }
 
-DirectiveFunctionInfo& OmpSsRegionAnalysisLegacyPass::getFuncInfo() { return ORA.DirectiveFuncInfo; }
+void OmpSsRegionAnalysisLegacyPass::print(raw_ostream &OS, const Module *M) const {
+  ORA.print(OS);
+}
+
+OmpSsRegionAnalysis& OmpSsRegionAnalysisLegacyPass::getResult() { return ORA; }
 
 /// NOTE: from old OrderedInstructions
 static bool localDominates(
@@ -782,8 +788,7 @@ void OmpSsRegionAnalysis::convertDirectivesTreeToVector() {
   convertDirectivesTreeToVectorImpl(nullptr, Stack);
 }
 
-void OmpSsRegionAnalysis::getOmpSsFunctionInfo(
-    Function &F, DominatorTree &DT) {
+OmpSsRegionAnalysis::OmpSsRegionAnalysis(Function &F, DominatorTree &DT) {
 
   MapVector<BasicBlock *, SmallVector<Instruction *, 4>> BBDirectiveStacks;
   SmallVector<BasicBlock*, 8> Worklist;
@@ -913,7 +918,7 @@ void OmpSsRegionAnalysis::getOmpSsFunctionInfo(
 
 bool OmpSsRegionAnalysisLegacyPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  ORA.getOmpSsFunctionInfo(F, DT);
+  ORA = OmpSsRegionAnalysis(F, DT);
 
   return false;
 }
@@ -936,9 +941,17 @@ INITIALIZE_PASS_END(OmpSsRegionAnalysisLegacyPass, "ompss-2-regions",
 
 AnalysisKey OmpSsRegionAnalysisPass::Key;
 
-DirectiveFunctionInfo OmpSsRegionAnalysisPass::run(
+OmpSsRegionAnalysis OmpSsRegionAnalysisPass::run(
     Function &F, FunctionAnalysisManager &FAM) {
   auto *DT = &FAM.getResult<DominatorTreeAnalysis>(F);
-  ORA.getOmpSsFunctionInfo(F, *DT);
-  return ORA.DirectiveFuncInfo;
+  return OmpSsRegionAnalysis(F, *DT);
+}
+
+OmpSsRegionPrinterPass::OmpSsRegionPrinterPass(raw_ostream &OS) : OS(OS) {}
+
+PreservedAnalyses OmpSsRegionPrinterPass::run(
+    Function &F, FunctionAnalysisManager &FAM) {
+  FAM.getResult<OmpSsRegionAnalysisPass>(F).print(OS);
+
+  return PreservedAnalyses::all();
 }

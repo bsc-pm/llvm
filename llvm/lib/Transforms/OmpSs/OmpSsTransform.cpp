@@ -36,10 +36,10 @@ namespace {
 
 struct OmpSs {
   OmpSs(
-    function_ref<DirectiveFunctionInfo &(Function &)> LookupDirectiveFunctionInfo)
+    function_ref<OmpSsRegionAnalysis &(Function &)> LookupDirectiveFunctionInfo)
       : LookupDirectiveFunctionInfo(LookupDirectiveFunctionInfo)
         {}
-  function_ref<DirectiveFunctionInfo &(Function &)> LookupDirectiveFunctionInfo;
+  function_ref<OmpSsRegionAnalysis &(Function &)> LookupDirectiveFunctionInfo;
 
   bool Initialized = false;
 
@@ -2716,7 +2716,7 @@ struct OmpSs {
     }
 
     for (auto *F : Functs) {
-      DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(*F);
+      DirectiveFunctionInfo &DirectiveFuncInfo = LookupDirectiveFunctionInfo(*F).getFuncInfo();
 
       FinalBodyInfoMap FinalBodyInfo;
 
@@ -2824,8 +2824,8 @@ struct OmpSsLegacyPass : public ModulePass {
   bool runOnModule(Module &M) override {
     if (skipModule(M))
       return false;
-    auto LookupDirectiveFunctionInfo = [this](Function &F) -> DirectiveFunctionInfo & {
-      return this->getAnalysis<OmpSsRegionAnalysisLegacyPass>(F).getFuncInfo();
+    auto LookupDirectiveFunctionInfo = [this](Function &F) -> OmpSsRegionAnalysis & {
+      return this->getAnalysis<OmpSsRegionAnalysisLegacyPass>(F).getResult();
     };
     return OmpSs(LookupDirectiveFunctionInfo).runOnModule(M);
   }
@@ -2841,7 +2841,7 @@ struct OmpSsLegacyPass : public ModulePass {
 
 PreservedAnalyses OmpSsPass::run(Module &M, ModuleAnalysisManager &AM) {
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-  auto LookupDirectiveFunctionInfo = [&FAM](Function &F) -> DirectiveFunctionInfo & {
+  auto LookupDirectiveFunctionInfo = [&FAM](Function &F) -> OmpSsRegionAnalysis & {
     return FAM.getResult<OmpSsRegionAnalysisPass>(F);
   };
   if (!OmpSs(LookupDirectiveFunctionInfo).runOnModule(M))

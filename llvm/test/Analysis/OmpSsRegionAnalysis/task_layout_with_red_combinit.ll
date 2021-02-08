@@ -1,4 +1,5 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=reduction_inits_combiners < %s 2>&1 | FileCheck %s
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=reduction_inits_combiners -enable-new-pm=0 < %s 2>&1 | FileCheck %s
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=reduction_inits_combiners < %s 2>&1 | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 
 ; int main() {

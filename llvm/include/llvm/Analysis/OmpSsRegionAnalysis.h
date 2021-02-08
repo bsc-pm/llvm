@@ -302,8 +302,6 @@ struct DirectiveAnalysisInfo {
 };
 
 class OmpSsRegionAnalysis {
-public:
-
   // Directive Analysis for a directive entry.
   MapVector<Instruction *, DirectiveAnalysisInfo> DEntryToDAnalysisInfo;
   // Directive Info for a directive entry.
@@ -325,10 +323,15 @@ public:
     Instruction *Cur, SmallVectorImpl<Instruction *> &Stack);
   // Converts DirectiveTree into a post order directive list.
   void convertDirectivesTreeToVector();
+public:
   // Walk over each task in RPO identifying uses before entry
   // and after exit. Uses before task entry are then matched with DSA info
   // or Captured info from OperandBundles
-  void getOmpSsFunctionInfo(Function &F, DominatorTree &DT);
+  OmpSsRegionAnalysis(Function &F, DominatorTree &DT);
+  OmpSsRegionAnalysis() = default;
+
+  void print(raw_ostream &OS) const;
+  DirectiveFunctionInfo &getFuncInfo();
 };
 
 class OmpSsRegionAnalysisLegacyPass : public FunctionPass {
@@ -348,7 +351,7 @@ public:
 
   void releaseMemory() override;
 
-  DirectiveFunctionInfo& getFuncInfo();
+  OmpSsRegionAnalysis& getResult();
 };
 
 class OmpSsRegionAnalysisPass : public AnalysisInfoMixin<OmpSsRegionAnalysisPass> {
@@ -356,13 +359,21 @@ class OmpSsRegionAnalysisPass : public AnalysisInfoMixin<OmpSsRegionAnalysisPass
 
   static AnalysisKey Key;
 
-  OmpSsRegionAnalysis ORA;
-
 public:
   /// Provide the result typedef for this analysis pass.
-  using Result = DirectiveFunctionInfo;
+  using Result = OmpSsRegionAnalysis;
 
-  DirectiveFunctionInfo run(Function &F, FunctionAnalysisManager &FAM);
+  OmpSsRegionAnalysis run(Function &F, FunctionAnalysisManager &FAM);
+};
+
+class OmpSsRegionPrinterPass
+    : public PassInfoMixin<OmpSsRegionPrinterPass> {
+  raw_ostream &OS;
+
+public:
+  explicit OmpSsRegionPrinterPass(raw_ostream &OS);
+
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &FAM);
 };
 
 } // end namespace llvm

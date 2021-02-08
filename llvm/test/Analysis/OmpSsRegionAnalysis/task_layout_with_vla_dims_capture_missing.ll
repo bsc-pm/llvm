@@ -1,4 +1,5 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=vla_dims_capture_missing < %s 2>&1 | FileCheck %s
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=vla_dims_capture_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=vla_dims_capture_missing < %s 2>&1 | FileCheck %s
 
 define dso_local void @vla_section_dep(i32 %n) {
 entry:

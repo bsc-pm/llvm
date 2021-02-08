@@ -1,4 +1,5 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_vla_dims_missing < %s 2>&1 | FileCheck %s
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_vla_dims_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=dsa_vla_dims_missing < %s 2>&1 | FileCheck %s
 
 ; void foo() {
 ;     int n;

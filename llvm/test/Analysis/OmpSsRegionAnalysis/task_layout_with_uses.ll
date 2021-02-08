@@ -1,5 +1,8 @@
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=uses < %s 2>&1 | FileCheck %s -check-prefix=USES
-; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_missing < %s 2>&1 | FileCheck %s -check-prefix=DSA
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=uses -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=USES
+; RUN: opt -ompss-2-regions -analyze -disable-checks -print-verbosity=dsa_missing -enable-new-pm=0 < %s 2>&1 | FileCheck %s -check-prefix=DSA
+
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=uses < %s 2>&1 | FileCheck %s -check-prefix=USES
+; RUN: opt -passes='print<ompss-2-regions>' -disable-checks -print-verbosity=dsa_missing < %s 2>&1 | FileCheck %s -check-prefix=DSA
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 
