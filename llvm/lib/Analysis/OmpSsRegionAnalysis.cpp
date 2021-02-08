@@ -56,11 +56,6 @@ PrintVerboseLevel("print-verbosity",
   clEnumValN(PV_ReductionInitsCombiners, "reduction_inits_combiners", "Print directive layout with reduction init and combiner functions"))
   );
 
-char OmpSsRegionAnalysisLegacyPass::ID = 0;
-
-OmpSsRegionAnalysisLegacyPass::OmpSsRegionAnalysisLegacyPass() : FunctionPass(ID) {
-  initializeOmpSsRegionAnalysisLegacyPassPass(*PassRegistry::getPassRegistry());
-}
 
 // returns if V is in DSAInfo
 static bool valueInDSABundles(const DirectiveDSAInfo& DSAInfo,
@@ -81,133 +76,6 @@ static bool valueInCapturedBundle(const DirectiveCapturedInfo& CapturedInfo,
                                   Value *const V) {
   return CapturedInfo.count(V);
 }
-
-void OmpSsRegionAnalysis::print_verbose(
-    Instruction *Cur, int Depth, int PrintSpaceMultiplier) const {
-  if (Cur) {
-    const DirectiveAnalysisInfo &AnalysisInfo = DEntryToDAnalysisInfo.lookup(Cur);
-    const DirectiveInfo *Info = DEntryToDInfo.find(Cur)->second.get();
-    const DirectiveEnvironment &DirEnv = Info->DirEnv;
-    dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
-    dbgs() << DirEnv.getDirectiveNameAsStr();
-    dbgs() << " ";
-    Cur->printAsOperand(dbgs(), false);
-
-    std::string SpaceMultiplierStr = std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
-    if (PrintVerboseLevel == PV_Uses) {
-      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
-        dbgs() << "\n";
-        dbgs() << SpaceMultiplierStr
-               << "[Before] ";
-        V->printAsOperand(dbgs(), false);
-      }
-      for (auto *V : AnalysisInfo.UsesAfterExit) {
-        dbgs() << "\n";
-        dbgs() << SpaceMultiplierStr
-               << "[After] ";
-        V->printAsOperand(dbgs(), false);
-      }
-    }
-    else if (PrintVerboseLevel == PV_DsaMissing) {
-      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
-        if (!valueInDSABundles(DirEnv.DSAInfo, V)) {
-          dbgs() << "\n";
-          dbgs() << SpaceMultiplierStr;
-          V->printAsOperand(dbgs(), false);
-        }
-      }
-    }
-    else if (PrintVerboseLevel == PV_DsaVLADimsMissing) {
-      // Count VLAs and DSAs, Well-formed VLA must have a DSA and dimensions.
-      // That is, it must have a frequency of 2
-      std::map<const Value *, size_t> DSAVLADimsFreqMap;
-      for (Value *V : DirEnv.DSAInfo.Shared) DSAVLADimsFreqMap[V]++;
-      for (Value *V : DirEnv.DSAInfo.Private) DSAVLADimsFreqMap[V]++;
-      for (Value *V : DirEnv.DSAInfo.Firstprivate) DSAVLADimsFreqMap[V]++;
-
-      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
-        DSAVLADimsFreqMap[VLAWithDimsMap.first]++;
-      }
-      for (const auto &Pair : DSAVLADimsFreqMap) {
-        // It's expected to have only two VLA bundles, the DSA and dimensions
-        if (Pair.second != 2) {
-          dbgs() << "\n";
-          dbgs() << SpaceMultiplierStr;
-          Pair.first->printAsOperand(dbgs(), false);
-        }
-      }
-    }
-    else if (PrintVerboseLevel == PV_VLADimsCaptureMissing) {
-      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
-        for (auto *V : VLAWithDimsMap.second) {
-          if (!valueInCapturedBundle(DirEnv.CapturedInfo, V)) {
-            dbgs() << "\n";
-            dbgs() << SpaceMultiplierStr;
-            V->printAsOperand(dbgs(), false);
-          }
-        }
-      }
-    }
-    else if (PrintVerboseLevel == PV_NonPODDSAMissing) {
-      for (const auto &InitsPair : DirEnv.NonPODsInfo.Inits) {
-        auto It = find(DirEnv.DSAInfo.Private, InitsPair.first);
-        if (It == DirEnv.DSAInfo.Private.end()) {
-          dbgs() << "\n";
-          dbgs() << SpaceMultiplierStr
-                 << "[Init] ";
-          InitsPair.first->printAsOperand(dbgs(), false);
-        }
-      }
-      for (const auto &CopiesPair : DirEnv.NonPODsInfo.Copies) {
-        auto It = find(DirEnv.DSAInfo.Firstprivate, CopiesPair.first);
-        if (It == DirEnv.DSAInfo.Firstprivate.end()) {
-          dbgs() << "\n";
-          dbgs() << SpaceMultiplierStr
-                 << "[Copy] ";
-          CopiesPair.first->printAsOperand(dbgs(), false);
-        }
-      }
-      for (const auto &DeinitsPair : DirEnv.NonPODsInfo.Deinits) {
-        auto PrivateIt = find(DirEnv.DSAInfo.Private, DeinitsPair.first);
-        auto FirstprivateIt = find(DirEnv.DSAInfo.Firstprivate, DeinitsPair.first);
-        if (FirstprivateIt == DirEnv.DSAInfo.Firstprivate.end()
-            && PrivateIt == DirEnv.DSAInfo.Private.end()) {
-          dbgs() << "\n";
-          dbgs() << SpaceMultiplierStr
-                 << "[Deinit] ";
-          DeinitsPair.first->printAsOperand(dbgs(), false);
-        }
-      }
-    }
-    else if (PrintVerboseLevel == PV_ReductionInitsCombiners) {
-      for (const auto &RedInfo : DirEnv.ReductionsInitCombInfo) {
-        dbgs() << "\n";
-        dbgs() << SpaceMultiplierStr;
-        RedInfo.first->printAsOperand(dbgs(), false);
-        dbgs() << " ";
-        RedInfo.second.Init->printAsOperand(dbgs(), false);
-        dbgs() << " ";
-        RedInfo.second.Comb->printAsOperand(dbgs(), false);
-      }
-    }
-    dbgs() << "\n";
-  }
-  for (auto *II : DirectivesTree.lookup(Cur)) {
-    print_verbose(II, Depth + 1, PrintSpaceMultiplier);
-  }
-}
-
-DirectiveFunctionInfo& OmpSsRegionAnalysis::getFuncInfo() { return DirectiveFuncInfo; }
-
-void OmpSsRegionAnalysis::print(raw_ostream &OS) const {
-  print_verbose(nullptr, -1, PrintSpaceMultiplier);
-}
-
-void OmpSsRegionAnalysisLegacyPass::print(raw_ostream &OS, const Module *M) const {
-  ORA.print(OS);
-}
-
-OmpSsRegionAnalysis& OmpSsRegionAnalysisLegacyPass::getResult() { return ORA; }
 
 /// NOTE: from old OrderedInstructions
 static bool localDominates(
@@ -750,6 +618,127 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
   }
 }
 
+void OmpSsRegionAnalysis::print_verbose(
+    Instruction *Cur, int Depth, int PrintSpaceMultiplier) const {
+  if (Cur) {
+    const DirectiveAnalysisInfo &AnalysisInfo = DEntryToDAnalysisInfo.lookup(Cur);
+    const DirectiveInfo *Info = DEntryToDInfo.find(Cur)->second.get();
+    const DirectiveEnvironment &DirEnv = Info->DirEnv;
+    dbgs() << std::string(Depth*PrintSpaceMultiplier, ' ') << "[" << Depth << "] ";
+    dbgs() << DirEnv.getDirectiveNameAsStr();
+    dbgs() << " ";
+    Cur->printAsOperand(dbgs(), false);
+
+    std::string SpaceMultiplierStr = std::string((Depth + 1) * PrintSpaceMultiplier, ' ');
+    if (PrintVerboseLevel == PV_Uses) {
+      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
+        dbgs() << "\n";
+        dbgs() << SpaceMultiplierStr
+               << "[Before] ";
+        V->printAsOperand(dbgs(), false);
+      }
+      for (auto *V : AnalysisInfo.UsesAfterExit) {
+        dbgs() << "\n";
+        dbgs() << SpaceMultiplierStr
+               << "[After] ";
+        V->printAsOperand(dbgs(), false);
+      }
+    }
+    else if (PrintVerboseLevel == PV_DsaMissing) {
+      for (auto *V : AnalysisInfo.UsesBeforeEntry) {
+        if (!valueInDSABundles(DirEnv.DSAInfo, V)) {
+          dbgs() << "\n";
+          dbgs() << SpaceMultiplierStr;
+          V->printAsOperand(dbgs(), false);
+        }
+      }
+    }
+    else if (PrintVerboseLevel == PV_DsaVLADimsMissing) {
+      // Count VLAs and DSAs, Well-formed VLA must have a DSA and dimensions.
+      // That is, it must have a frequency of 2
+      std::map<const Value *, size_t> DSAVLADimsFreqMap;
+      for (Value *V : DirEnv.DSAInfo.Shared) DSAVLADimsFreqMap[V]++;
+      for (Value *V : DirEnv.DSAInfo.Private) DSAVLADimsFreqMap[V]++;
+      for (Value *V : DirEnv.DSAInfo.Firstprivate) DSAVLADimsFreqMap[V]++;
+
+      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
+        DSAVLADimsFreqMap[VLAWithDimsMap.first]++;
+      }
+      for (const auto &Pair : DSAVLADimsFreqMap) {
+        // It's expected to have only two VLA bundles, the DSA and dimensions
+        if (Pair.second != 2) {
+          dbgs() << "\n";
+          dbgs() << SpaceMultiplierStr;
+          Pair.first->printAsOperand(dbgs(), false);
+        }
+      }
+    }
+    else if (PrintVerboseLevel == PV_VLADimsCaptureMissing) {
+      for (const auto &VLAWithDimsMap : DirEnv.VLADimsInfo) {
+        for (auto *V : VLAWithDimsMap.second) {
+          if (!valueInCapturedBundle(DirEnv.CapturedInfo, V)) {
+            dbgs() << "\n";
+            dbgs() << SpaceMultiplierStr;
+            V->printAsOperand(dbgs(), false);
+          }
+        }
+      }
+    }
+    else if (PrintVerboseLevel == PV_NonPODDSAMissing) {
+      for (const auto &InitsPair : DirEnv.NonPODsInfo.Inits) {
+        auto It = find(DirEnv.DSAInfo.Private, InitsPair.first);
+        if (It == DirEnv.DSAInfo.Private.end()) {
+          dbgs() << "\n";
+          dbgs() << SpaceMultiplierStr
+                 << "[Init] ";
+          InitsPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+      for (const auto &CopiesPair : DirEnv.NonPODsInfo.Copies) {
+        auto It = find(DirEnv.DSAInfo.Firstprivate, CopiesPair.first);
+        if (It == DirEnv.DSAInfo.Firstprivate.end()) {
+          dbgs() << "\n";
+          dbgs() << SpaceMultiplierStr
+                 << "[Copy] ";
+          CopiesPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+      for (const auto &DeinitsPair : DirEnv.NonPODsInfo.Deinits) {
+        auto PrivateIt = find(DirEnv.DSAInfo.Private, DeinitsPair.first);
+        auto FirstprivateIt = find(DirEnv.DSAInfo.Firstprivate, DeinitsPair.first);
+        if (FirstprivateIt == DirEnv.DSAInfo.Firstprivate.end()
+            && PrivateIt == DirEnv.DSAInfo.Private.end()) {
+          dbgs() << "\n";
+          dbgs() << SpaceMultiplierStr
+                 << "[Deinit] ";
+          DeinitsPair.first->printAsOperand(dbgs(), false);
+        }
+      }
+    }
+    else if (PrintVerboseLevel == PV_ReductionInitsCombiners) {
+      for (const auto &RedInfo : DirEnv.ReductionsInitCombInfo) {
+        dbgs() << "\n";
+        dbgs() << SpaceMultiplierStr;
+        RedInfo.first->printAsOperand(dbgs(), false);
+        dbgs() << " ";
+        RedInfo.second.Init->printAsOperand(dbgs(), false);
+        dbgs() << " ";
+        RedInfo.second.Comb->printAsOperand(dbgs(), false);
+      }
+    }
+    dbgs() << "\n";
+  }
+  for (auto *II : DirectivesTree.lookup(Cur)) {
+    print_verbose(II, Depth + 1, PrintSpaceMultiplier);
+  }
+}
+
+DirectiveFunctionInfo& OmpSsRegionAnalysis::getFuncInfo() { return DirectiveFuncInfo; }
+
+void OmpSsRegionAnalysis::print(raw_ostream &OS) const {
+  print_verbose(nullptr, -1, PrintSpaceMultiplier);
+}
+
 // child directives will be placed before its parent directives
 void OmpSsRegionAnalysis::convertDirectivesTreeToVectorImpl(
   Instruction *Cur, SmallVectorImpl<Instruction *> &Stack) {
@@ -916,6 +905,8 @@ OmpSsRegionAnalysis::OmpSsRegionAnalysis(Function &F, DominatorTree &DT) {
 
 }
 
+// OmpSsRegionAnalysisLegacyPass
+//
 bool OmpSsRegionAnalysisLegacyPass::runOnFunction(Function &F) {
   auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   ORA = OmpSsRegionAnalysis(F, DT);
@@ -932,6 +923,18 @@ void OmpSsRegionAnalysisLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
+char OmpSsRegionAnalysisLegacyPass::ID = 0;
+
+OmpSsRegionAnalysisLegacyPass::OmpSsRegionAnalysisLegacyPass() : FunctionPass(ID) {
+  initializeOmpSsRegionAnalysisLegacyPassPass(*PassRegistry::getPassRegistry());
+}
+
+void OmpSsRegionAnalysisLegacyPass::print(raw_ostream &OS, const Module *M) const {
+  ORA.print(OS);
+}
+
+OmpSsRegionAnalysis& OmpSsRegionAnalysisLegacyPass::getResult() { return ORA; }
+
 INITIALIZE_PASS_BEGIN(OmpSsRegionAnalysisLegacyPass, "ompss-2-regions",
                       "Classify OmpSs-2 inside region uses", false, true)
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
@@ -939,6 +942,8 @@ INITIALIZE_PASS_END(OmpSsRegionAnalysisLegacyPass, "ompss-2-regions",
                     "Classify OmpSs-2 inside region uses", false, true)
 
 
+// OmpSsRegionAnalysisPass
+//
 AnalysisKey OmpSsRegionAnalysisPass::Key;
 
 OmpSsRegionAnalysis OmpSsRegionAnalysisPass::run(
@@ -947,6 +952,8 @@ OmpSsRegionAnalysis OmpSsRegionAnalysisPass::run(
   return OmpSsRegionAnalysis(F, *DT);
 }
 
+// OmpSsRegionPrinterPass
+//
 OmpSsRegionPrinterPass::OmpSsRegionPrinterPass(raw_ostream &OS) : OS(OS) {}
 
 PreservedAnalyses OmpSsRegionPrinterPass::run(

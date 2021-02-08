@@ -301,6 +301,7 @@ struct DirectiveAnalysisInfo {
   SetVector<Value *> UsesAfterExit;
 };
 
+// This is used in both old and new pass managers
 class OmpSsRegionAnalysis {
   // Directive Analysis for a directive entry.
   MapVector<Instruction *, DirectiveAnalysisInfo> DEntryToDAnalysisInfo;
@@ -328,12 +329,14 @@ public:
   // and after exit. Uses before task entry are then matched with DSA info
   // or Captured info from OperandBundles
   OmpSsRegionAnalysis(Function &F, DominatorTree &DT);
+  // Default ctor to clean all stuff and be ready for the next analysis.
   OmpSsRegionAnalysis() = default;
 
   void print(raw_ostream &OS) const;
   DirectiveFunctionInfo &getFuncInfo();
 };
 
+// Old/Legacy PassManager Analysis/Printer
 class OmpSsRegionAnalysisLegacyPass : public FunctionPass {
   OmpSsRegionAnalysis ORA;
 public:
@@ -354,6 +357,7 @@ public:
   OmpSsRegionAnalysis& getResult();
 };
 
+// New PassManager Analysis
 class OmpSsRegionAnalysisPass : public AnalysisInfoMixin<OmpSsRegionAnalysisPass> {
   friend AnalysisInfoMixin<OmpSsRegionAnalysisPass>;
 
@@ -366,6 +370,7 @@ public:
   OmpSsRegionAnalysis run(Function &F, FunctionAnalysisManager &FAM);
 };
 
+// New PassManager Printer
 class OmpSsRegionPrinterPass
     : public PassInfoMixin<OmpSsRegionPrinterPass> {
   raw_ostream &OS;
