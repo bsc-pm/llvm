@@ -363,14 +363,6 @@ else
 fi
 
 ################################################################################
-# LLVM: New pass manager.
-# Disable it temporarily until we update our passes to it.
-# NOTE: Remove once we have migrated to it.
-################################################################################
-
-CMAKE_INVOCATION_EXTRA_FLAGS+=("-DENABLE_EXPERIMENTAL_NEW_PASS_MANAGER=OFF")
-
-################################################################################
 # cmake
 ################################################################################
 
