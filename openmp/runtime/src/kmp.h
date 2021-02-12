@@ -3952,6 +3952,8 @@ extern void __kmp_omp_display_env(int verbose);
 extern int __kmp_num_unshackled_threads;
 // Returns the number of unshackled threads. They may not have been created yet.
 unsigned int __kmp_get_num_unshackled_threads();
+// Returns the unshackled thread id
+int __kmp_get_unshackled_id();
 // Sets the active status of an unshackled threads. They may not have been
 // created yet.
 void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
