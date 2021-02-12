@@ -4403,6 +4403,8 @@ static
 kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
   kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
+  // Unshackleds don't have a team so __kmp_allocate_thread_common won't give it a root.
+  thread->th.th_root = root;
   thread->th.is_unshackled = true;
   thread->th.is_unshackled_active = &root->r.is_unshackled_thread_active[new_tid];
   thread->th.unshackled_id = new_tid;
