@@ -22,6 +22,7 @@
 #include "clang/AST/StmtOmpSs.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/BitmaskEnum.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1677,9 +1678,11 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   List.push_back(DependInfoGathering.getBaseValue());
 
+  auto &SM = CGM.getContext().getSourceManager();
+  CharSourceRange ExpansionRange =
+    SM.getExpansionRange(SourceRange(Dep.E->getBeginLoc(), Dep.E->getEndLoc()));
   StringRef ExprStringified = Lexer::getSourceText(
-    CharSourceRange::getTokenRange(Dep.E->getBeginLoc(), Dep.E->getEndLoc()),
-    CGM.getContext().getSourceManager(), CGM.getLangOpts());
+    ExpansionRange, SM, CGM.getLangOpts());
   List.push_back(
     llvm::ConstantDataArray::getString(
       CGM.getLLVMContext(), ExprStringified));
