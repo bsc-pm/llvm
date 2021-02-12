@@ -3774,11 +3774,12 @@ int __kmp_register_root(int initial_thread) {
   }
 #endif
 
+  bool thread_starts_active = __kmp_unshackled_thread_start == kmp_unshackled_active;
   root->r.is_unshackled_thread_active = (bool*)__kmp_allocate(
       sizeof(*root->r.is_unshackled_thread_active) * __kmp_num_unshackled_threads);
   // FIXME: Maybe there is a "calloc" like allocate?
   for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
-    root->r.is_unshackled_thread_active[i] = true; // TEMPORARY
+    root->r.is_unshackled_thread_active[i] = thread_starts_active;
   }
 
   // The root team is a serial team, so enable tasking for it
@@ -8349,8 +8350,6 @@ void __kmp_omp_display_env(int verbose) {
   __kmp_display_env_impl(!verbose, verbose);
   __kmp_release_bootstrap_lock(&__kmp_initz_lock);
 }
-
-int __kmp_num_unshackled_threads = 0;
 
 unsigned int __kmp_get_num_unshackled_threads() {
   // Ensure the runtime has been initialized here.

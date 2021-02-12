@@ -3949,6 +3949,11 @@ static inline void __kmp_resume_if_hard_paused() {
 extern void __kmp_omp_display_env(int verbose);
 
 // Unshackled threads API.
+typedef enum kmp_unshackled_thread_start_t {
+  kmp_unshackled_inactive = 0,
+  kmp_unshackled_active = 1
+} kmp_unshackled_thread_start_t;
+extern kmp_unshackled_thread_start_t __kmp_unshackled_thread_start;
 extern int __kmp_num_unshackled_threads;
 // Returns the number of unshackled threads. They may not have been created yet.
 unsigned int __kmp_get_num_unshackled_threads();

@@ -4713,6 +4713,38 @@ static void __kmp_stg_print_num_unshackled_threads(kmp_str_buf_t *buffer,
   __kmp_stg_print_int(buffer, name, __kmp_num_unshackled_threads);
 }
 
+// -----------------------------------------------------------------------------
+// KMP_UNSHACKLED_THREAD_START
+
+static void __kmp_stg_parse_unshackled_thread_start(char const *name,
+                                                    char const *value,
+                                                    void *data) {
+  if (__kmp_str_match("active", 1, value)) {
+    __kmp_unshackled_thread_start = kmp_unshackled_active;
+  } else if (__kmp_str_match("inactive", 1, value)) {
+    __kmp_unshackled_thread_start = kmp_unshackled_inactive;
+  } else {
+    // FIXME: Use KMP messaging facilities instead.
+    fprintf(stderr,
+            "Ignoring value '%s' of KMP_UNSHACKLED_THREAD_START. Valid values "
+            "are 'active' or 'inactive'\n",
+            value);
+  }
+}
+
+static void __kmp_stg_print_unshackled_thread_start(kmp_str_buf_t *buffer,
+                                                   char const *name,
+                                                   void *data) {
+  switch(__kmp_unshackled_thread_start) {
+    case kmp_unshackled_active:
+      __kmp_stg_print_str(buffer, name, "active");
+      break;
+    case kmp_unshackled_inactive:
+      __kmp_stg_print_str(buffer, name, "inactive");
+      break;
+  }
+}
+
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -4958,6 +4990,8 @@ static kmp_setting_t __kmp_stg_table[] = {
     // Unshackled threads
     {"KMP_NUM_UNSHACKLED_THREADS", __kmp_stg_parse_num_unshackled_threads,
       __kmp_stg_print_num_unshackled_threads, NULL, 0, 0},
+    {"KMP_UNSHACKLED_THREAD_START", __kmp_stg_parse_unshackled_thread_start,
+      __kmp_stg_print_unshackled_thread_start, NULL, 0, 0},
 
     {"", NULL, NULL, NULL, 0, 0}}; // settings
 
