@@ -225,7 +225,7 @@ static void printGenericOp(OpAsmPrinter &p, GenericOpType op) {
     if (genericAttrNamesSet.count(attr.first.strref()) > 0)
       genericAttrs.push_back(attr);
   if (!genericAttrs.empty()) {
-    auto genericDictAttr = DictionaryAttr::get(genericAttrs, op.getContext());
+    auto genericDictAttr = DictionaryAttr::get(op.getContext(), genericAttrs);
     p << genericDictAttr;
   }
 
@@ -780,6 +780,24 @@ void PadTensorOp::build(OpBuilder &b, OperationState &result, Type resultType,
         b.getI64ArrayAttr(staticLow), b.getI64ArrayAttr(staticHigh));
 }
 
+PadTensorOp PadTensorOp::createPadScalarOp(Type type, Value source, Value pad,
+                                           ArrayRef<OpFoldResult> low,
+                                           ArrayRef<OpFoldResult> high,
+                                           Location loc, OpBuilder &builder) {
+  auto padTensorOp =
+      builder.create<linalg::PadTensorOp>(loc, type, source, low, high);
+  int rank = padTensorOp.getResultType().getRank();
+  SmallVector<Type, 4> blockArgTypes;
+  blockArgTypes.assign(rank, builder.getIndexType());
+  auto &region = padTensorOp.region();
+  // `builder.createBlock` changes the insertion point within the block. Create
+  // a guard to reset the insertion point of the builder after it is destroyed.
+  OpBuilder::InsertionGuard guard(builder);
+  builder.createBlock(&region, region.end(), blockArgTypes);
+  builder.create<linalg::YieldOp>(loc, pad);
+  return padTensorOp;
+}
+
 PadTensorOp PadTensorOp::createPadHighOp(Type type, Value source, Value pad,
                                          Location loc, OpBuilder &builder) {
   SmallVector<OpFoldResult, 4> low, high;
@@ -794,17 +812,8 @@ PadTensorOp PadTensorOp::createPadHighOp(Type type, Value source, Value pad,
     high.push_back(highValue);
     low.push_back(builder.createOrFold<ConstantIndexOp>(loc, 0));
   }
-  auto padTensorOp =
-      builder.create<linalg::PadTensorOp>(loc, type, source, low, high);
-  SmallVector<Type, 4> blockArgTypes;
-  blockArgTypes.assign(rank, builder.getIndexType());
-  auto &region = padTensorOp.region();
-  // `builder.createBlock` changes the insertion point within the block. Create
-  // a guard to reset the insertion point of the builder after it is destroyed.
-  OpBuilder::InsertionGuard guard(builder);
-  builder.createBlock(&region, region.end(), blockArgTypes);
-  builder.create<linalg::YieldOp>(loc, pad);
-  return padTensorOp;
+  return PadTensorOp::createPadScalarOp(type, source, pad, low, high, loc,
+                                        builder);
 }
 
 //===----------------------------------------------------------------------===//
@@ -833,7 +842,7 @@ static ArrayAttr collapseReassociationMaps(ArrayRef<AffineMap> mapsProducer,
   // Handle the corner case of the result being a rank 0 shaped type. Return an
   // emtpy ArrayAttr.
   if (mapsConsumer.empty() && !mapsProducer.empty())
-    return ArrayAttr::get(ArrayRef<Attribute>(), context);
+    return ArrayAttr::get(context, ArrayRef<Attribute>());
   if (mapsProducer.empty() || mapsConsumer.empty() ||
       mapsProducer[0].getNumDims() < mapsConsumer[0].getNumDims() ||
       mapsProducer.size() != mapsConsumer[0].getNumDims())
@@ -854,7 +863,7 @@ static ArrayAttr collapseReassociationMaps(ArrayRef<AffineMap> mapsProducer,
         numLhsDims, /*numSymbols =*/0, reassociations, context)));
     reassociations.clear();
   }
-  return ArrayAttr::get(reassociationMaps, context);
+  return ArrayAttr::get(context, reassociationMaps);
 }
 
 namespace {
@@ -1373,10 +1382,13 @@ static LogicalResult verify(linalg::YieldOp op) {
     return verifyYield(op, cast<LinalgOp>(parentOp));
 
   if (auto padTensorOp = dyn_cast<linalg::PadTensorOp>(parentOp)) {
-    return success(
-        op.getNumOperands() == 1 &&
-        op.getOperand(0).getType() ==
-            padTensorOp.getType().cast<ShapedType>().getElementType());
+    if (op.getNumOperands() != 1)
+      return op.emitOpError("expected single yield operand (got ")
+             << op->getNumOperands() << ")";
+    if (op.getOperand(0).getType() !=
+        padTensorOp.getType().cast<ShapedType>().getElementType())
+      return op.emitOpError("expected yield type to match shape element type");
+    return success();
   }
 
   return op.emitOpError("expected parent op with LinalgOp interface");
@@ -1387,8 +1399,9 @@ static LogicalResult verify(linalg::YieldOp op) {
 void FillOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  effects.emplace_back(MemoryEffects::Write::get(), output(),
-                       SideEffects::DefaultResource::get());
+  if (output().getType().isa<MemRefType>())
+    effects.emplace_back(MemoryEffects::Write::get(), output(),
+                         SideEffects::DefaultResource::get());
 }
 
 static LogicalResult verify(FillOp op) {
@@ -1552,6 +1565,9 @@ struct FoldTensorCastOp;
 
 #define GET_OP_CLASSES
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
+
+#define GET_OP_CLASSES
+#include "mlir/Dialect/Linalg/IR/LinalgSparseOps.cpp.inc"
 
 /// Return the dims that are `iteratorTypeName` loops in the LinalgOp `op`.
 /// Assumes `op` is a LinalgOp.

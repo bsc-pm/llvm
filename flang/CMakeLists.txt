@@ -9,7 +9,7 @@ if(CMAKE_GENERATOR STREQUAL "Ninja")
 endif()
 
 option(LINK_WITH_FIR "Link driver with FIR and LLVM" ON)
-option(FLANG_BUILD_NEW_DRIVER "Build the flang compiler driver" OFF)
+option(FLANG_BUILD_NEW_DRIVER "Build the flang compiler driver" ON)
 
 # Flang requires C++17.
 set(CMAKE_CXX_STANDARD 17)
@@ -78,19 +78,17 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(AddClang)
   endif()
 
-  if(LINK_WITH_FIR)
-    include(TableGen)
-    find_package(MLIR REQUIRED CONFIG)
-    # Use SYSTEM for the same reasons as for LLVM includes
-    include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
-    # If the user specifies a relative path to MLIR_DIR, the calls to include
-    # MLIR modules fail. Append the absolute path to MLIR_DIR instead.
-    get_filename_component(MLIR_DIR_ABSOLUTE ${MLIR_DIR} REALPATH)
-    list(APPEND CMAKE_MODULE_PATH ${MLIR_DIR_ABSOLUTE})
-    include(AddMLIR)
-    find_program(MLIR_TABLEGEN_EXE "mlir-tblgen" ${LLVM_TOOLS_BINARY_DIR}
-      NO_DEFAULT_PATH)
-  endif()
+  include(TableGen)
+  find_package(MLIR REQUIRED CONFIG)
+  # Use SYSTEM for the same reasons as for LLVM includes
+  include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
+  # If the user specifies a relative path to MLIR_DIR, the calls to include
+  # MLIR modules fail. Append the absolute path to MLIR_DIR instead.
+  get_filename_component(MLIR_DIR_ABSOLUTE ${MLIR_DIR} REALPATH)
+  list(APPEND CMAKE_MODULE_PATH ${MLIR_DIR_ABSOLUTE})
+  include(AddMLIR)
+  find_program(MLIR_TABLEGEN_EXE "mlir-tblgen" ${LLVM_TOOLS_BINARY_DIR}
+    NO_DEFAULT_PATH)
 
   option(LLVM_INSTALL_TOOLCHAIN_ONLY
     "Only include toolchain files in the 'install' target." OFF)
@@ -192,14 +190,12 @@ else()
   endif()
 
   set(BACKEND_PACKAGE_STRING "${PACKAGE_STRING}")
-  if (LINK_WITH_FIR)
-    set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir/include ) # --src-root
-    set(MLIR_INCLUDE_DIR ${LLVM_MAIN_SRC_DIR}/../mlir/include ) # --includedir
-    set(MLIR_TABLEGEN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/tools/mlir/include)
-    set(MLIR_TABLEGEN_EXE $<TARGET_FILE:mlir-tblgen>)
-    include_directories(SYSTEM ${MLIR_INCLUDE_DIR})
-    include_directories(SYSTEM ${MLIR_TABLEGEN_OUTPUT_DIR})
-  endif()
+  set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir/include ) # --src-root
+  set(MLIR_INCLUDE_DIR ${LLVM_MAIN_SRC_DIR}/../mlir/include ) # --includedir
+  set(MLIR_TABLEGEN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/tools/mlir/include)
+  set(MLIR_TABLEGEN_EXE $<TARGET_FILE:mlir-tblgen>)
+  include_directories(SYSTEM ${MLIR_INCLUDE_DIR})
+  include_directories(SYSTEM ${MLIR_TABLEGEN_OUTPUT_DIR})
 endif()
 
 if(FLANG_BUILD_NEW_DRIVER)
@@ -217,17 +213,13 @@ if(FLANG_BUILD_NEW_DRIVER)
     include_directories(SYSTEM ${CLANG_INCLUDE_DIR})
 endif()
 
-if(LINK_WITH_FIR)
-  # tco tool and FIR lib output directories
-  if(FLANG_STANDALONE_BUILD)
-    set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
-    set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
-  endif()
-  # Always build tco tool
-  set(LLVM_BUILD_TOOLS ON)
-  set(LLVM_COMMON_COMPONENTS Support)
-  message(STATUS "Linking driver with FIR and LLVM, using LLVM components: ${LLVM_COMMON_COMPONENTS}")
+# tco tool and FIR lib output directories
+if(FLANG_STANDALONE_BUILD)
+  set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
+  set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 endif()
+# Always build tco tool
+set(LLVM_BUILD_TOOLS ON)
 
 # Add Flang-centric modules to cmake path.
 include_directories(BEFORE

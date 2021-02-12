@@ -829,12 +829,15 @@ TEST(RenameTest, WithinFileRename) {
     SCOPED_TRACE(T);
     Annotations Code(T);
     auto TU = TestTU::withCode(Code.code());
-    TU.ExtraArgs.push_back("-fno-delayed-template-parsing");
     TU.ExtraArgs.push_back("-xobjective-c++");
     auto AST = TU.build();
     for (const auto &RenamePos : Code.points()) {
-      auto RenameResult =
-          rename({RenamePos, NewName, AST, testPath(TU.Filename)});
+      auto RenameResult = rename({RenamePos,
+                                  NewName,
+                                  AST,
+                                  testPath(TU.Filename),
+                                  /*Index*/ nullptr,
+                                  {/*CrossFile*/ false}});
       ASSERT_TRUE(bool(RenameResult)) << RenameResult.takeError();
       ASSERT_EQ(1u, RenameResult->GlobalChanges.size());
       EXPECT_EQ(
@@ -1083,11 +1086,22 @@ TEST(RenameTest, Renameable) {
        "conflict", !HeaderFile, nullptr, "Conflict"},
 
       {R"cpp(
+        void func(int Var);
+
         void func(int V^ar) {
           bool Conflict;
         }
       )cpp",
        "conflict", !HeaderFile, nullptr, "Conflict"},
+
+      {R"cpp(// No conflict: only forward declaration's argument is renamed.
+        void func(int [[V^ar]]);
+
+        void func(int Var) {
+          bool Conflict;
+        }
+      )cpp",
+       nullptr, !HeaderFile, nullptr, "Conflict"},
 
       {R"cpp(
         void func(int V^ar, int Conflict) {
@@ -1123,8 +1137,12 @@ TEST(RenameTest, Renameable) {
     }
     auto AST = TU.build();
     llvm::StringRef NewName = Case.NewName;
-    auto Results =
-        rename({T.point(), NewName, AST, testPath(TU.Filename), Case.Index});
+    auto Results = rename({T.point(),
+                           NewName,
+                           AST,
+                           testPath(TU.Filename),
+                           Case.Index,
+                           {/*CrossFile=*/false}});
     bool WantRename = true;
     if (T.ranges().empty())
       WantRename = false;
@@ -1290,7 +1308,7 @@ TEST(CrossFileRenameTests, DirtyBuffer) {
   std::string BarPath = testPath("bar.cc");
   // Build the index, the index has "Foo" references from foo.cc and "Bar"
   // references from bar.cc.
-  FileSymbols FSymbols;
+  FileSymbols FSymbols(IndexContents::All);
   FSymbols.update(FooPath, nullptr, buildRefSlab(FooCode, "Foo", FooPath),
                   nullptr, false);
   FSymbols.update(BarPath, nullptr, buildRefSlab(BarCode, "Bar", BarPath),
@@ -1367,9 +1385,9 @@ TEST(CrossFileRenameTests, DirtyBuffer) {
                    llvm::function_ref<void(const SymbolID &, const Symbol &)>
                        Callback) const override {}
 
-    llvm::unique_function<bool(llvm::StringRef) const>
+    llvm::unique_function<IndexContents(llvm::StringRef) const>
     indexedFiles() const override {
-      return [](llvm::StringRef) { return false; };
+      return [](llvm::StringRef) { return IndexContents::None; };
     }
 
     size_t estimateMemoryUsage() const override { return 0; }
@@ -1421,9 +1439,9 @@ TEST(CrossFileRenameTests, DeduplicateRefsFromIndex) {
                    llvm::function_ref<void(const SymbolID &, const Symbol &)>)
         const override {}
 
-    llvm::unique_function<bool(llvm::StringRef) const>
+    llvm::unique_function<IndexContents(llvm::StringRef) const>
     indexedFiles() const override {
-      return [](llvm::StringRef) { return false; };
+      return [](llvm::StringRef) { return IndexContents::None; };
     }
 
     size_t estimateMemoryUsage() const override { return 0; }
