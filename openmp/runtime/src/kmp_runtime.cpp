@@ -8698,7 +8698,7 @@ void __kmp_hidden_helper_threads_initz_routine() {
 
   KMP_ATOMIC_ST_REL(&__kmp_hit_hidden_helper_threads_num, 0);
 
-  __kmpc_fork_call(nullptr, 0, __kmp_hidden_helper_wrapper_fn);
+  __kmpc_fork_call(nullptr, 0, microtask_t(__kmp_hidden_helper_wrapper_fn));
 
   // Set the initialization flag to FALSE
   TCW_SYNC_4(__kmp_init_hidden_helper, FALSE);
