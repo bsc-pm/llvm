@@ -8664,7 +8664,7 @@ kmp_int32 __kmp_enable_hidden_helper = FALSE;
 namespace {
 std::atomic<kmp_int32> __kmp_hit_hidden_helper_threads_num;
 
-void __kmp_hidden_helper_wrapper_fn(int *gtid, int *, ...) {
+void __kmp_hidden_helper_wrapper_fn(int *gtid, int *) {
   // This is an explicit synchronization on all hidden helper threads in case
   // that when a regular thread pushes a hidden helper task to one hidden
   // helper thread, the thread has not been awaken once since they're released
