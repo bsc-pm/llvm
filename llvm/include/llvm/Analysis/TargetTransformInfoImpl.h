@@ -209,9 +209,10 @@ public:
     return false;
   }
 
-  bool shouldFavorPostInc() const { return false; }
-
-  bool shouldFavorBackedgeIndex(const Loop *L) const { return false; }
+  TTI::AddressingModeKind
+    getPreferredAddressingMode(const Loop *L, ScalarEvolution *SE) const {
+    return TTI::AMK_None;
+  }
 
   bool isLegalMaskedStore(Type *DataType, Align Alignment) const {
     return false;
@@ -685,6 +686,11 @@ public:
 
   bool isLegalToVectorizeStoreChain(unsigned ChainSizeInBytes, Align Alignment,
                                     unsigned AddrSpace) const {
+    return true;
+  }
+
+  bool isLegalToVectorizeReduction(RecurrenceDescriptor RdxDesc,
+                                   ElementCount VF) const {
     return true;
   }
 

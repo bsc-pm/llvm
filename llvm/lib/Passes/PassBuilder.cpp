@@ -32,6 +32,7 @@
 #include "llvm/Analysis/Delinearization.h"
 #include "llvm/Analysis/DemandedBits.h"
 #include "llvm/Analysis/DependenceAnalysis.h"
+#include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/DominanceFrontier.h"
 #include "llvm/Analysis/FunctionPropertiesAnalysis.h"
 #include "llvm/Analysis/GlobalsModRef.h"
@@ -518,6 +519,12 @@ static void addAnnotationRemarksPass(ModulePassManager &MPM) {
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 }
 
+// Helper to check if the current compilation phase is preparing for LTO
+static bool isLTOPreLink(ThinOrFullLTOPhase Phase) {
+  return Phase == ThinOrFullLTOPhase::ThinLTOPreLink ||
+         Phase == ThinOrFullLTOPhase::ThinLTOPreLink;
+}
+
 // TODO: Investigate the cost/benefit of tail call elimination on debugging.
 FunctionPassManager
 PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
@@ -564,7 +571,8 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
   LPM1.addPass(LoopInstSimplifyPass());
   LPM1.addPass(LoopSimplifyCFGPass());
 
-  LPM1.addPass(LoopRotatePass(/* Disable header duplication */ true));
+  LPM1.addPass(LoopRotatePass(/* Disable header duplication */ true,
+                              isLTOPreLink(Phase)));
   // TODO: Investigate promotion cap for O1.
   LPM1.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
   LPM1.addPass(SimpleLoopUnswitchPass());
@@ -728,7 +736,8 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   LPM1.addPass(LoopSimplifyCFGPass());
 
   // Disable header duplication in loop rotation at -Oz.
-  LPM1.addPass(LoopRotatePass(Level != OptimizationLevel::Oz));
+  LPM1.addPass(
+      LoopRotatePass(Level != OptimizationLevel::Oz, isLTOPreLink(Phase)));
   // TODO: Investigate promotion cap for O1.
   LPM1.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
   LPM1.addPass(
@@ -1720,14 +1729,15 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   // Run a few AA driver optimizations here and now to cleanup the code.
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 
-  MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(
-              PostOrderFunctionAttrsPass()));
+  MPM.addPass(
+      createModuleToPostOrderCGSCCPassAdaptor(PostOrderFunctionAttrsPass()));
   // FIXME: here we run IP alias analysis in the legacy PM.
 
   FunctionPassManager MainFPM;
 
-  // FIXME: once we fix LoopPass Manager, add LICM here.
-  // FIXME: once we provide support for enabling MLSM, add it here.
+  MainFPM.addPass(createFunctionToLoopPassAdaptor(
+      LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap)));
+
   if (RunNewGVN)
     MainFPM.addPass(NewGVNPass());
   else
@@ -1738,11 +1748,37 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
 
   // Nuke dead stores.
   MainFPM.addPass(DSEPass());
+  MainFPM.addPass(MergedLoadStoreMotionPass());
 
-  // FIXME: at this point, we run a bunch of loop passes:
-  // indVarSimplify, loopDeletion, loopInterchange, loopUnroll,
-  // loopVectorize. Enable them once the remaining issue with LPM
-  // are sorted out.
+  // More loops are countable; try to optimize them.
+  if (EnableLoopFlatten && Level.getSpeedupLevel() > 1)
+    MainFPM.addPass(LoopFlattenPass());
+
+  if (EnableConstraintElimination)
+    MainFPM.addPass(ConstraintEliminationPass());
+
+  LoopPassManager LPM(DebugLogging);
+  LPM.addPass(IndVarSimplifyPass());
+  LPM.addPass(LoopDeletionPass());
+  // FIXME: Add loop interchange.
+
+  // Unroll small loops and perform peeling.
+  LPM.addPass(LoopFullUnrollPass(Level.getSpeedupLevel(),
+                                 /* OnlyWhenForced= */ !PTO.LoopUnrolling,
+                                 PTO.ForgetAllSCEVInLoopUnroll));
+  MainFPM.addPass(createFunctionToLoopPassAdaptor(
+      std::move(LPM), EnableMSSALoopDependency, /*UseBlockFrequencyInfo=*/true,
+      DebugLogging));
+
+  MainFPM.addPass(LoopDistributePass());
+  MainFPM.addPass(LoopVectorizePass(
+      LoopVectorizeOptions(!PTO.LoopInterleaving, !PTO.LoopVectorization)));
+  // The vectorizer may have significantly shortened a loop body; unroll again.
+  MainFPM.addPass(LoopUnrollPass(LoopUnrollOptions(
+      Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+      PTO.ForgetAllSCEVInLoopUnroll)));
+
+  MainFPM.addPass(WarnMissedTransformationsPass());
 
   MainFPM.addPass(InstCombinePass());
   MainFPM.addPass(SimplifyCFGPass(SimplifyCFGOptions().hoistCommonInsts(true)));
@@ -1750,12 +1786,19 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   MainFPM.addPass(InstCombinePass());
   MainFPM.addPass(BDCEPass());
 
-  // FIXME: We may want to run SLPVectorizer here.
-  // After vectorization, assume intrinsics may tell us more
-  // about pointer alignments.
-#if 0
-  MainFPM.add(AlignmentFromAssumptionsPass());
-#endif
+  // More scalar chains could be vectorized due to more alias information
+  if (PTO.SLPVectorization) {
+    MainFPM.addPass(SLPVectorizerPass());
+    if (Level.getSpeedupLevel() > 1 && ExtraVectorizerPasses) {
+      MainFPM.addPass(EarlyCSEPass());
+    }
+  }
+
+  MainFPM.addPass(VectorCombinePass()); // Clean up partial vectorization.
+
+  // After vectorization, assume intrinsics may tell us more about pointer
+  // alignments.
+  MainFPM.addPass(AlignmentFromAssumptionsPass());
 
   // FIXME: Conditionally run LoadCombine here, after it's ported
   // (in case we still have this pass, given its questionable usefulness).

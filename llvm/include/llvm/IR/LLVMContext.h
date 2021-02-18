@@ -87,60 +87,61 @@ public:
   /// operand bundle tags without comparing strings. Keep this in sync with
   /// LLVMContext::LLVMContext().
   enum : unsigned {
-    OB_deopt = 0,         // "deopt"
-    OB_funclet = 1,       // "funclet"
-    OB_gc_transition = 2, // "gc-transition"
-    OB_cfguardtarget = 3, // "cfguardtarget"
-    OB_preallocated = 4,  // "preallocated"
-    OB_gc_live = 5,       // "gc-live"
+    OB_deopt = 0,                  // "deopt"
+    OB_funclet = 1,                // "funclet"
+    OB_gc_transition = 2,          // "gc-transition"
+    OB_cfguardtarget = 3,          // "cfguardtarget"
+    OB_preallocated = 4,           // "preallocated"
+    OB_gc_live = 5,                // "gc-live"
+    OB_clang_arc_attachedcall = 6, // "clang.arc.attachedcall"
     // OmpSs IDs
-    OB_oss_dir = 6,                               // "oss_dir"
-    OB_oss_shared = 7,                            // "oss_shared"
-    OB_oss_private = 8,                           // "oss_private"
-    OB_oss_firstprivate = 9,                      // "oss_firstprivate"
-    OB_oss_vla_dims = 10,                         // "oss_vla_dims"
-    OB_oss_dep_in = 11,                           // "OB_oss_dep_in"
-    OB_oss_dep_out = 12,                          // "OB_oss_dep_out"
-    OB_oss_dep_inout = 13,                        // "OB_oss_dep_inout"
-    OB_oss_dep_concurrent = 14,                   // "OB_oss_dep_concurrent"
-    OB_oss_dep_commutative = 15,                  // "OB_oss_dep_commutative"
-    OB_oss_dep_weakin = 16,                       // "OB_oss_dep_weakin"
-    OB_oss_dep_weakout = 17,                      // "OB_oss_dep_weakout"
-    OB_oss_dep_weakinout = 18,                    // "OB_oss_dep_weakinout"
-    OB_oss_dep_weakconcurrent = 19,               // "OB_oss_dep_weakconcurrent"
-    OB_oss_dep_weakcommutative = 20,              // "OB_oss_dep_weakcommutative"
-    OB_oss_dep_reduction = 21,                    // "OB_oss_dep_reduction"
-    OB_oss_dep_weakreduction = 22,                // "OB_oss_dep_weakreduction"
-    OB_oss_reduction_init = 23,                   // "OB_oss_reduction_init"
-    OB_oss_reduction_comb = 24,                   // "OB_oss_reduction_comb"
-    OB_oss_final = 25,                            // "OB_oss_final"
-    OB_oss_if = 26,                               // "OB_oss_if"
-    OB_oss_cost = 27,                             // "OB_oss_cost"
-    OB_oss_priority = 28,                         // "OB_oss_priority"
-    OB_oss_label = 29,                            // "OB_oss_label"
-    OB_oss_wait = 30,                             // "OB_oss_wait"
-    OB_oss_captured = 31,                         // "OB_oss_captured"
-    OB_oss_init = 32,                             // "OB_oss_init"
-    OB_oss_deinit = 33,                           // "OB_oss_deinit"
-    OB_oss_copy = 34,                             // "OB_oss_copy"
-    OB_oss_loop_type = 35,                        // "OB_oss_loop_type"
-    OB_oss_loop_ind_var = 36,                     // "OB_oss_loop_ind_var"
-    OB_oss_loop_lower_bound = 37,                 // "OB_oss_loop_lower_bound"
-    OB_oss_loop_upper_bound = 38,                 // "OB_oss_loop_upper_bound"
-    OB_oss_loop_step = 39,                        // "OB_oss_loop_step"
-    OB_oss_loop_chunksize = 40,                   // "OB_oss_loop_chunksize"
-    OB_oss_loop_grainsize = 41,                   // "OB_oss_loop_grainsize"
-    OB_oss_multidep_range_in = 42,                // "OB_oss_multidep_range_in"
-    OB_oss_multidep_range_out = 43,               // "OB_oss_multidep_range_out"
-    OB_oss_multidep_range_inout = 44,             // "OB_oss_multidep_range_inout"
-    OB_oss_multidep_range_concurrent = 45,        // "OB_oss_multidep_range_concurrent"
-    OB_oss_multidep_range_commutative = 46,       // "OB_oss_multidep_range_commutative"
-    OB_oss_multidep_range_weakin = 47,            // "OB_oss_multidep_range_weakin"
-    OB_oss_multidep_range_weakout = 48,           // "OB_oss_multidep_range_weakout"
-    OB_oss_multidep_range_weakinout = 49,         // "OB_oss_multidep_range_weakinout"
-    OB_oss_multidep_range_weakconcurrent = 50,    // "OB_oss_multidep_range_weakconcurrent"
-    OB_oss_multidep_range_weakcommutative = 51,   // "OB_oss_multidep_range_weakcommutative"
-    OB_oss_decl_source = 52,                      // "OB_oss_decl_source"
+    OB_oss_dir = 7,                               // "oss_dir"
+    OB_oss_shared = 8,                            // "oss_shared"
+    OB_oss_private = 9,                           // "oss_private"
+    OB_oss_firstprivate = 10,                     // "oss_firstprivate"
+    OB_oss_vla_dims = 11,                         // "oss_vla_dims"
+    OB_oss_dep_in = 12,                           // "OB_oss_dep_in"
+    OB_oss_dep_out = 13,                          // "OB_oss_dep_out"
+    OB_oss_dep_inout = 14,                        // "OB_oss_dep_inout"
+    OB_oss_dep_concurrent = 15,                   // "OB_oss_dep_concurrent"
+    OB_oss_dep_commutative = 16,                  // "OB_oss_dep_commutative"
+    OB_oss_dep_weakin = 17,                       // "OB_oss_dep_weakin"
+    OB_oss_dep_weakout = 18,                      // "OB_oss_dep_weakout"
+    OB_oss_dep_weakinout = 19,                    // "OB_oss_dep_weakinout"
+    OB_oss_dep_weakconcurrent = 20,               // "OB_oss_dep_weakconcurrent"
+    OB_oss_dep_weakcommutative = 21,              // "OB_oss_dep_weakcommutative"
+    OB_oss_dep_reduction = 22,                    // "OB_oss_dep_reduction"
+    OB_oss_dep_weakreduction = 23,                // "OB_oss_dep_weakreduction"
+    OB_oss_reduction_init = 24,                   // "OB_oss_reduction_init"
+    OB_oss_reduction_comb = 25,                   // "OB_oss_reduction_comb"
+    OB_oss_final = 26,                            // "OB_oss_final"
+    OB_oss_if = 27,                               // "OB_oss_if"
+    OB_oss_cost = 28,                             // "OB_oss_cost"
+    OB_oss_priority = 29,                         // "OB_oss_priority"
+    OB_oss_label = 30,                            // "OB_oss_label"
+    OB_oss_wait = 31,                             // "OB_oss_wait"
+    OB_oss_captured = 32,                         // "OB_oss_captured"
+    OB_oss_init = 33,                             // "OB_oss_init"
+    OB_oss_deinit = 34,                           // "OB_oss_deinit"
+    OB_oss_copy = 35,                             // "OB_oss_copy"
+    OB_oss_loop_type = 36,                        // "OB_oss_loop_type"
+    OB_oss_loop_ind_var = 37,                     // "OB_oss_loop_ind_var"
+    OB_oss_loop_lower_bound = 38,                 // "OB_oss_loop_lower_bound"
+    OB_oss_loop_upper_bound = 39,                 // "OB_oss_loop_upper_bound"
+    OB_oss_loop_step = 40,                        // "OB_oss_loop_step"
+    OB_oss_loop_chunksize = 41,                   // "OB_oss_loop_chunksize"
+    OB_oss_loop_grainsize = 42,                   // "OB_oss_loop_grainsize"
+    OB_oss_multidep_range_in = 43,                // "OB_oss_multidep_range_in"
+    OB_oss_multidep_range_out = 44,               // "OB_oss_multidep_range_out"
+    OB_oss_multidep_range_inout = 45,             // "OB_oss_multidep_range_inout"
+    OB_oss_multidep_range_concurrent = 46,        // "OB_oss_multidep_range_concurrent"
+    OB_oss_multidep_range_commutative = 47,       // "OB_oss_multidep_range_commutative"
+    OB_oss_multidep_range_weakin = 48,            // "OB_oss_multidep_range_weakin"
+    OB_oss_multidep_range_weakout = 49,           // "OB_oss_multidep_range_weakout"
+    OB_oss_multidep_range_weakinout = 50,         // "OB_oss_multidep_range_weakinout"
+    OB_oss_multidep_range_weakconcurrent = 51,    // "OB_oss_multidep_range_weakconcurrent"
+    OB_oss_multidep_range_weakcommutative = 52,   // "OB_oss_multidep_range_weakcommutative"
+    OB_oss_decl_source = 53,                      // "OB_oss_decl_source"
   };
 
   /// getMDKindID - Return a unique non-zero ID for the specified metadata kind.
@@ -237,10 +238,11 @@ public:
       DiagnosticHandler::DiagnosticHandlerTy DiagHandler,
       void *DiagContext = nullptr, bool RespectFilters = false);
 
-  /// setDiagnosticHandler - This method sets unique_ptr to object of DiagnosticHandler
-  /// to provide custom diagnostic handling. The first argument is unique_ptr of object
-  /// of type DiagnosticHandler or a derived of that.   The third argument should be
-  /// set to true if the handler only expects enabled diagnostics.
+  /// setDiagnosticHandler - This method sets unique_ptr to object of
+  /// DiagnosticHandler to provide custom diagnostic handling. The first
+  /// argument is unique_ptr of object of type DiagnosticHandler or a derived
+  /// of that. The second argument should be set to true if the handler only
+  /// expects enabled diagnostics.
   ///
   /// Ownership of this pointer is moved to LLVMContextImpl.
   void setDiagnosticHandler(std::unique_ptr<DiagnosticHandler> &&DH,
@@ -258,7 +260,7 @@ public:
   /// setDiagnosticHandler.
   const DiagnosticHandler *getDiagHandlerPtr() const;
 
-  /// getDiagnosticHandler - transfers owenership of DiagnosticHandler unique_ptr
+  /// getDiagnosticHandler - transfers ownership of DiagnosticHandler unique_ptr
   /// to caller.
   std::unique_ptr<DiagnosticHandler> getDiagnosticHandler();
 

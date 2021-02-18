@@ -1086,6 +1086,9 @@ public:
       // \brief  PowerPC MMA types with auto numeration
 #define PPC_VECTOR_TYPE(Name, Id, Size) PREDEF_TYPE_##Id##_ID,
 #include "clang/Basic/PPCTypes.def"
+      // \brief RISC-V V types with auto numeration
+#define RVV_TYPE(Name, Id, SingletonId) PREDEF_TYPE_##Id##_ID,
+#include "clang/Basic/RISCVVTypes.def"
     };
 
     /// The number of predefined type IDs that are reserved for
@@ -1093,7 +1096,7 @@ public:
     ///
     /// Type IDs for non-predefined types will start at
     /// NUM_PREDEF_TYPE_IDs.
-    const unsigned NUM_PREDEF_TYPE_IDS = 200;
+    const unsigned NUM_PREDEF_TYPE_IDS = 300;
 
     /// Record codes for each kind of type.
     ///
@@ -1892,6 +1895,7 @@ public:
       // OpenMP directives
       STMT_OMP_PARALLEL_DIRECTIVE,
       STMT_OMP_SIMD_DIRECTIVE,
+      STMT_OMP_TILE_DIRECTIVE,
       STMT_OMP_FOR_DIRECTIVE,
       STMT_OMP_FOR_SIMD_DIRECTIVE,
       STMT_OMP_SECTIONS_DIRECTIVE,

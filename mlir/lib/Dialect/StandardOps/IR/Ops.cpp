@@ -158,6 +158,32 @@ static void printStandardBinaryOp(Operation *op, OpAsmPrinter &p) {
   p << " : " << op->getResult(0).getType();
 }
 
+/// A custom ternary operation printer that omits the "std." prefix from the
+/// operation names.
+static void printStandardTernaryOp(Operation *op, OpAsmPrinter &p) {
+  assert(op->getNumOperands() == 3 && "ternary op should have three operands");
+  assert(op->getNumResults() == 1 && "ternary op should have one result");
+
+  // If not all the operand and result types are the same, just use the
+  // generic assembly form to avoid omitting information in printing.
+  auto resultType = op->getResult(0).getType();
+  if (op->getOperand(0).getType() != resultType ||
+      op->getOperand(1).getType() != resultType ||
+      op->getOperand(2).getType() != resultType) {
+    p.printGenericOp(op);
+    return;
+  }
+
+  int stdDotLen = StandardOpsDialect::getDialectNamespace().size() + 1;
+  p << op->getName().getStringRef().drop_front(stdDotLen) << ' '
+    << op->getOperand(0) << ", " << op->getOperand(1) << ", "
+    << op->getOperand(2);
+  p.printOptionalAttrDict(op->getAttrs());
+
+  // Now we can output only one type for all operands and the result.
+  p << " : " << op->getResult(0).getType();
+}
+
 /// A custom cast operation printer that omits the "std." prefix from the
 /// operation names.
 static void printStandardCastOp(Operation *op, OpAsmPrinter &p) {
@@ -3058,7 +3084,23 @@ isRankReducedType(Type originalType, Type candidateReducedType,
     candidateLayout = getStridedLinearLayoutMap(candidateReduced);
   else
     candidateLayout = candidateReduced.getAffineMaps().front();
-  if (inferredType != candidateLayout) {
+  assert(inferredType.getNumResults() == 1 &&
+         candidateLayout.getNumResults() == 1);
+  if (inferredType.getNumSymbols() != candidateLayout.getNumSymbols() ||
+      inferredType.getNumDims() != candidateLayout.getNumDims()) {
+    if (errMsg) {
+      llvm::raw_string_ostream os(*errMsg);
+      os << "inferred type: " << inferredType;
+    }
+    return SubViewVerificationResult::AffineMapMismatch;
+  }
+  // Check that the difference of the affine maps simplifies to 0.
+  AffineExpr diffExpr =
+      inferredType.getResult(0) - candidateLayout.getResult(0);
+  diffExpr = simplifyAffineExpr(diffExpr, inferredType.getNumDims(),
+                                inferredType.getNumSymbols());
+  auto cst = diffExpr.dyn_cast<AffineConstantExpr>();
+  if (!(cst && cst.getValue() == 0)) {
     if (errMsg) {
       llvm::raw_string_ostream os(*errMsg);
       os << "inferred type: " << inferredType;
@@ -3344,11 +3386,29 @@ public:
     /// Deduce the resultType of the SubViewOp using `inferSubViewResultType` on
     /// the cast source operand type and the SubViewOp static information. This
     /// is the resulting type if the MemRefCastOp were folded.
-    Type resultType = SubViewOp::inferResultType(
-        castOp.source().getType().cast<MemRefType>(),
-        extractFromI64ArrayAttr(subViewOp.static_offsets()),
-        extractFromI64ArrayAttr(subViewOp.static_sizes()),
-        extractFromI64ArrayAttr(subViewOp.static_strides()));
+    auto resultType = SubViewOp::inferResultType(
+                          castOp.source().getType().cast<MemRefType>(),
+                          extractFromI64ArrayAttr(subViewOp.static_offsets()),
+                          extractFromI64ArrayAttr(subViewOp.static_sizes()),
+                          extractFromI64ArrayAttr(subViewOp.static_strides()))
+                          .cast<MemRefType>();
+    uint32_t rankDiff =
+        subViewOp.getSourceType().getRank() - subViewOp.getType().getRank();
+    if (rankDiff > 0) {
+      auto shape = resultType.getShape();
+      auto projectedShape = shape.drop_front(rankDiff);
+      AffineMap map;
+      auto maps = resultType.getAffineMaps();
+      if (!maps.empty() && maps.front()) {
+        auto optionalUnusedDimsMask =
+            computeRankReductionMask(shape, projectedShape);
+        llvm::SmallDenseSet<unsigned> dimsToProject =
+            optionalUnusedDimsMask.getValue();
+        map = getProjectedMap(maps.front(), dimsToProject);
+      }
+      resultType = MemRefType::get(projectedShape, resultType.getElementType(),
+                                   map, resultType.getMemorySpace());
+    }
     Value newSubView = rewriter.create<SubViewOp>(
         subViewOp.getLoc(), resultType, castOp.source(), subViewOp.offsets(),
         subViewOp.sizes(), subViewOp.strides(), subViewOp.static_offsets(),
@@ -3556,6 +3616,37 @@ OpFoldResult TensorToMemrefOp::fold(ArrayRef<Attribute>) {
     if (tensorLoad.memref().getType() == getType())
       return tensorLoad.memref();
   return {};
+}
+
+namespace {
+/// Replace tensor_cast + tensor_to_memref by tensor_to_memref + memref_cast.
+struct TensorCastToMemref : public OpRewritePattern<TensorToMemrefOp> {
+  using OpRewritePattern<TensorToMemrefOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorToMemrefOp tensorToMemRef,
+                                PatternRewriter &rewriter) const final {
+    auto tensorCastOperand =
+        tensorToMemRef.getOperand().getDefiningOp<tensor::CastOp>();
+    if (!tensorCastOperand)
+      return failure();
+    auto srcTensorType =
+        tensorCastOperand.getOperand().getType().dyn_cast<RankedTensorType>();
+    if (!srcTensorType)
+      return failure();
+    auto memrefType = MemRefType::get(srcTensorType.getShape(),
+                                      srcTensorType.getElementType());
+    Value memref = rewriter.create<TensorToMemrefOp>(
+        tensorToMemRef.getLoc(), memrefType, tensorCastOperand.getOperand());
+    rewriter.replaceOpWithNewOp<MemRefCastOp>(tensorToMemRef,
+                                              tensorToMemRef.getType(), memref);
+    return success();
+  }
+};
+} // namespace
+
+void TensorToMemrefOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<TensorCastToMemref>(context);
 }
 
 //===----------------------------------------------------------------------===//

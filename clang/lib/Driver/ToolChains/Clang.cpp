@@ -617,13 +617,11 @@ getFramePointerKind(const ArgList &Args, const llvm::Triple &Triple) {
 /// Add a CC1 option to specify the debug compilation directory.
 static void addDebugCompDirArg(const ArgList &Args, ArgStringList &CmdArgs,
                                const llvm::vfs::FileSystem &VFS) {
-  if (Arg *A = Args.getLastArg(options::OPT_fdebug_compilation_dir)) {
-    CmdArgs.push_back("-fdebug-compilation-dir");
-    CmdArgs.push_back(A->getValue());
+  if (Arg *A = Args.getLastArg(options::OPT_fdebug_compilation_dir_EQ)) {
+    A->render(Args, CmdArgs);
   } else if (llvm::ErrorOr<std::string> CWD =
                  VFS.getCurrentWorkingDirectory()) {
-    CmdArgs.push_back("-fdebug-compilation-dir");
-    CmdArgs.push_back(Args.MakeArgString(*CWD));
+    CmdArgs.push_back(Args.MakeArgString("-fdebug-compilation-dir=" + *CWD));
   }
 }
 
@@ -981,6 +979,14 @@ static unsigned DwarfVersionNum(StringRef ArgValue) {
       .Case("-gdwarf-4", 4)
       .Case("-gdwarf-5", 5)
       .Default(0);
+}
+
+// Find a DWARF format version option.
+// This function is a complementary for DwarfVersionNum().
+static const Arg *getDwarfNArg(const ArgList &Args) {
+  return Args.getLastArg(options::OPT_gdwarf_2, options::OPT_gdwarf_3,
+                         options::OPT_gdwarf_4, options::OPT_gdwarf_5,
+                         options::OPT_gdwarf);
 }
 
 static void RenderDebugEnablingArgs(const ArgList &Args, ArgStringList &CmdArgs,
@@ -3752,6 +3758,29 @@ static DwarfFissionKind getDebugFissionKind(const Driver &D,
   return DwarfFissionKind::None;
 }
 
+static void renderDwarfFormat(const Driver &D, const llvm::Triple &T,
+                              const ArgList &Args, ArgStringList &CmdArgs,
+                              unsigned DwarfVersion) {
+  auto *DwarfFormatArg =
+      Args.getLastArg(options::OPT_gdwarf64, options::OPT_gdwarf32);
+  if (!DwarfFormatArg)
+    return;
+
+  if (DwarfFormatArg->getOption().matches(options::OPT_gdwarf64)) {
+    if (DwarfVersion < 3)
+      D.Diag(diag::err_drv_argument_only_allowed_with)
+          << DwarfFormatArg->getAsString(Args) << "DWARFv3 or greater";
+    else if (!T.isArch64Bit())
+      D.Diag(diag::err_drv_argument_only_allowed_with)
+          << DwarfFormatArg->getAsString(Args) << "64 bit architecture";
+    else if (!T.isOSBinFormatELF())
+      D.Diag(diag::err_drv_argument_only_allowed_with)
+          << DwarfFormatArg->getAsString(Args) << "ELF platforms";
+  }
+
+  DwarfFormatArg->render(Args, CmdArgs);
+}
+
 static void renderDebugOptions(const ToolChain &TC, const Driver &D,
                                const llvm::Triple &T, const ArgList &Args,
                                bool EmitCodeView, bool IRInput,
@@ -3830,9 +3859,7 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
   }
 
   // If a -gdwarf argument appeared, remember it.
-  const Arg *GDwarfN = Args.getLastArg(
-      options::OPT_gdwarf_2, options::OPT_gdwarf_3, options::OPT_gdwarf_4,
-      options::OPT_gdwarf_5, options::OPT_gdwarf);
+  const Arg *GDwarfN = getDwarfNArg(Args);
   bool EmitDwarf = false;
   if (GDwarfN) {
     if (checkDebugInfoOption(GDwarfN, Args, D, TC))
@@ -4052,25 +4079,7 @@ static void renderDebugOptions(const ToolChain &TC, const Driver &D,
   if (DebuggerTuning == llvm::DebuggerKind::SCE)
     CmdArgs.push_back("-dwarf-explicit-import");
 
-  auto *DwarfFormatArg =
-      Args.getLastArg(options::OPT_gdwarf64, options::OPT_gdwarf32);
-  if (DwarfFormatArg &&
-      DwarfFormatArg->getOption().matches(options::OPT_gdwarf64)) {
-    const llvm::Triple &RawTriple = TC.getTriple();
-    if (EffectiveDWARFVersion < 3)
-      D.Diag(diag::err_drv_argument_only_allowed_with)
-          << DwarfFormatArg->getAsString(Args) << "DWARFv3 or greater";
-    else if (!RawTriple.isArch64Bit())
-      D.Diag(diag::err_drv_argument_only_allowed_with)
-          << DwarfFormatArg->getAsString(Args) << "64 bit architecture";
-    else if (!RawTriple.isOSBinFormatELF())
-      D.Diag(diag::err_drv_argument_only_allowed_with)
-          << DwarfFormatArg->getAsString(Args) << "ELF platforms";
-  }
-
-  if (DwarfFormatArg)
-    DwarfFormatArg->render(Args, CmdArgs);
-
+  renderDwarfFormat(D, T, Args, CmdArgs, EffectiveDWARFVersion);
   RenderDebugInfoCompressionArgs(Args, CmdArgs, D, TC);
 }
 
@@ -4672,18 +4681,13 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // LLVM Code Generator Options.
 
-  if (Args.hasArg(options::OPT_frewrite_map_file) ||
-      Args.hasArg(options::OPT_frewrite_map_file_EQ)) {
-    for (const Arg *A : Args.filtered(options::OPT_frewrite_map_file,
-                                      options::OPT_frewrite_map_file_EQ)) {
-      StringRef Map = A->getValue();
-      if (!llvm::sys::fs::exists(Map)) {
-        D.Diag(diag::err_drv_no_such_file) << Map;
-      } else {
-        CmdArgs.push_back("-frewrite-map-file");
-        CmdArgs.push_back(A->getValue());
-        A->claim();
-      }
+  for (const Arg *A : Args.filtered(options::OPT_frewrite_map_file_EQ)) {
+    StringRef Map = A->getValue();
+    if (!llvm::sys::fs::exists(Map)) {
+      D.Diag(diag::err_drv_no_such_file) << Map;
+    } else {
+      A->render(Args, CmdArgs);
+      A->claim();
     }
   }
 
@@ -5647,6 +5651,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                                options::OPT_fno_reroll_loops))
     if (A->getOption().matches(options::OPT_freroll_loops))
       CmdArgs.push_back("-freroll-loops");
+
+  Args.AddLastArg(CmdArgs, options::OPT_ffinite_loops,
+                  options::OPT_fno_finite_loops);
 
   Args.AddLastArg(CmdArgs, options::OPT_fwritable_strings);
   Args.AddLastArg(CmdArgs, options::OPT_funroll_loops,
@@ -7175,18 +7182,14 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
   // Forward -g and handle debug info related flags, assuming we are dealing
   // with an actual assembly file.
   bool WantDebug = false;
-  unsigned DwarfVersion = 0;
   Args.ClaimAllArgs(options::OPT_g_Group);
-  if (Arg *A = Args.getLastArg(options::OPT_g_Group)) {
+  if (Arg *A = Args.getLastArg(options::OPT_g_Group))
     WantDebug = !A->getOption().matches(options::OPT_g0) &&
                 !A->getOption().matches(options::OPT_ggdb0);
-    if (WantDebug)
-      DwarfVersion = DwarfVersionNum(A->getSpelling());
-  }
 
-  unsigned DefaultDwarfVersion = ParseDebugDefaultVersion(getToolChain(), Args);
-  if (DwarfVersion == 0)
-    DwarfVersion = DefaultDwarfVersion;
+  unsigned DwarfVersion = ParseDebugDefaultVersion(getToolChain(), Args);
+  if (const Arg *GDwarfN = getDwarfNArg(Args))
+    DwarfVersion = DwarfVersionNum(GDwarfN->getSpelling());
 
   if (DwarfVersion == 0)
     DwarfVersion = getToolChain().GetDefaultDwarfVersion();
@@ -7216,6 +7219,7 @@ void ClangAs::ConstructJob(Compilation &C, const JobAction &JA,
   }
   RenderDebugEnablingArgs(Args, CmdArgs, DebugInfoKind, DwarfVersion,
                           llvm::DebuggerKind::Default);
+  renderDwarfFormat(D, Triple, Args, CmdArgs, DwarfVersion);
   RenderDebugInfoCompressionArgs(Args, CmdArgs, D, getToolChain());
 
 

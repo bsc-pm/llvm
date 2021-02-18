@@ -4167,6 +4167,7 @@ public:
       }
     }
 #else
+    (void)taskdata;
     retval = *(kmp_int64 *)((char *)task + lower_offset);
 #endif // defined(KMP_GOMP_COMPAT)
     return retval;

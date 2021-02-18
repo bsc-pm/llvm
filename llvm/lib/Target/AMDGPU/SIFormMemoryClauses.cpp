@@ -112,8 +112,7 @@ static bool isValidClauseInst(const MachineInstr &MI, bool IsVMEMClause) {
     return false;
   if (!MI.mayLoad() || MI.mayStore())
     return false;
-  if (AMDGPU::getAtomicNoRetOp(MI.getOpcode()) != -1 ||
-      AMDGPU::getAtomicRetOp(MI.getOpcode()) != -1)
+  if (SIInstrInfo::isAtomic(MI))
     return false;
   if (IsVMEMClause && !isVMEMClauseInst(MI))
     return false;
@@ -189,9 +188,22 @@ void SIFormMemoryClauses::forAllLanes(Register Reg, LaneBitmask LaneMask,
     return MaskA.getHighestLane() > MaskB.getHighestLane();
   });
 
+  MCRegister RepReg;
+  for (MCRegister R : *MRI->getRegClass(Reg)) {
+    if (!MRI->isReserved(R)) {
+      RepReg = R;
+      break;
+    }
+  }
+  if (!RepReg)
+    llvm_unreachable("Failed to find required allocatable register");
+
   for (unsigned Idx : CoveringSubregs) {
     LaneBitmask SubRegMask = TRI->getSubRegIndexLaneMask(Idx);
     if ((SubRegMask & ~LaneMask).any() || (SubRegMask & LaneMask).none())
+      continue;
+
+    if (MRI->isReserved(TRI->getSubReg(RepReg, Idx)))
       continue;
 
     Func(Idx);
@@ -262,7 +274,7 @@ bool SIFormMemoryClauses::checkPressure(const MachineInstr &MI,
   // tracking does not account for the alignment requirements for SGPRs, or the
   // fragmentation of registers the allocator will need to satisfy.
   if (Occupancy >= MFI->getMinAllowedOccupancy() &&
-      MaxPressure.getVGPRNum() <= MaxVGPRs / 2 &&
+      MaxPressure.getVGPRNum(ST->hasGFX90AInsts()) <= MaxVGPRs / 2 &&
       MaxPressure.getSGPRNum() <= MaxSGPRs / 2) {
     LastRecordedOccupancy = Occupancy;
     return true;
