@@ -858,6 +858,13 @@ static void addPGOAndCoverageFlags(const ToolChain &TC, Compilation &C,
     CmdArgs.push_back("-fcoverage-mapping");
   }
 
+  if (Arg *A = Args.getLastArg(options::OPT_fprofile_compilation_dir_EQ)) {
+    A->render(Args, CmdArgs);
+  } else if (llvm::ErrorOr<std::string> CWD =
+                 D.getVFS().getCurrentWorkingDirectory()) {
+    Args.MakeArgString("-fprofile-compilation-dir=" + *CWD);
+  }
+
   if (Args.hasArg(options::OPT_fprofile_exclude_files_EQ)) {
     auto *Arg = Args.getLastArg(options::OPT_fprofile_exclude_files_EQ);
     if (!Args.hasArg(options::OPT_coverage))
@@ -1531,6 +1538,15 @@ static void renderRemarksOptions(const ArgList &Args, ArgStringList &CmdArgs,
   }
 }
 
+void AddAAPCSVolatileBitfieldArgs(const ArgList &Args, ArgStringList &CmdArgs) {
+  if (!Args.hasFlag(options::OPT_faapcs_bitfield_width,
+                    options::OPT_fno_aapcs_bitfield_width, true))
+    CmdArgs.push_back("-fno-aapcs-bitfield-width");
+
+  if (Args.getLastArg(options::OPT_ForceAAPCSBitfieldLoad))
+    CmdArgs.push_back("-faapcs-bitfield-load");
+}
+
 namespace {
 void RenderARMABI(const llvm::Triple &Triple, const ArgList &Args,
                   ArgStringList &CmdArgs) {
@@ -1589,6 +1605,8 @@ void Clang::AddARMTargetArgs(const llvm::Triple &Triple, const ArgList &Args,
 
   if (Args.getLastArg(options::OPT_mcmse))
     CmdArgs.push_back("-mcmse");
+
+  AddAAPCSVolatileBitfieldArgs(Args, CmdArgs);
 }
 
 void Clang::RenderTargetOptions(const llvm::Triple &EffectiveTriple,
@@ -1777,6 +1795,8 @@ void Clang::AddAArch64TargetArgs(const ArgList &Args,
       D.Diag(diag::err_drv_unsupported_option_argument)
           << A->getOption().getName() << Val;
   }
+
+  AddAAPCSVolatileBitfieldArgs(Args, CmdArgs);
 }
 
 void Clang::AddMIPSTargetArgs(const ArgList &Args,
@@ -5986,6 +6006,12 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   ObjCRuntime Runtime = AddObjCRuntimeArgs(Args, Inputs, CmdArgs, rewriteKind);
   RenderObjCOptions(TC, D, RawTriple, Args, Runtime, rewriteKind != RK_None,
                     Input, CmdArgs);
+
+  if (types::isObjC(Input.getType()) &&
+      Args.hasFlag(options::OPT_fobjc_encode_cxx_class_template_spec,
+                   options::OPT_fno_objc_encode_cxx_class_template_spec,
+                   !Runtime.isNeXTFamily()))
+    CmdArgs.push_back("-fobjc-encode-cxx-class-template-spec");
 
   if (Args.hasFlag(options::OPT_fapplication_extension,
                    options::OPT_fno_application_extension, false))

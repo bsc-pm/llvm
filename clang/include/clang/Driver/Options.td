@@ -930,6 +930,9 @@ def gpu_max_threads_per_block_EQ : Joined<["--"], "gpu-max-threads-per-block=">,
 def gpu_instrument_lib_EQ : Joined<["--"], "gpu-instrument-lib=">,
   HelpText<"Instrument device library for HIP, which is a LLVM bitcode containing "
   "__cyg_profile_func_enter and __cyg_profile_func_exit">;
+defm gpu_sanitize : BoolFOption<"gpu-sanitize", EmptyKPM, DefaultFalse,
+  PosFlag<SetTrue, [], "Enable sanitizer for AMDGPU target">,
+  NegFlag<SetFalse>>;
 def cuid_EQ : Joined<["-"], "cuid=">, Flags<[CC1Option]>,
   HelpText<"An ID for compilation unit, which should be the same for the same "
            "compilation unit but different for different compilation units. "
@@ -1103,6 +1106,10 @@ def fdebug_compilation_dir_EQ : Joined<["-"], "fdebug-compilation-dir=">,
 def fdebug_compilation_dir : Separate<["-"], "fdebug-compilation-dir">,
     Group<f_Group>, Flags<[CC1Option, CC1AsOption, CoreOption]>,
     Alias<fdebug_compilation_dir_EQ>;
+def fprofile_compilation_dir_EQ : Joined<["-"], "fprofile-compilation-dir=">,
+    Group<f_Group>, Flags<[CC1Option, CC1AsOption, CoreOption]>,
+    HelpText<"The compilation directory to embed in the coverage mapping.">,
+    MarshallingInfoString<CodeGenOpts<"ProfileCompilationDir">>;
 defm debug_info_for_profiling : BoolFOption<"debug-info-for-profiling",
   CodeGenOpts<"DebugInfoForProfiling">, DefaultFalse,
   PosFlag<SetTrue, [CC1Option], "Emit extra debug info to make sample profile more accurate">,
@@ -2098,6 +2105,10 @@ def fno_wrapv : Flag<["-"], "fno-wrapv">, Group<f_Group>;
 def fobjc_arc : Flag<["-"], "fobjc-arc">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Synthesize retain and release calls for Objective-C pointers">;
 def fno_objc_arc : Flag<["-"], "fno-objc-arc">, Group<f_Group>;
+defm objc_encode_cxx_class_template_spec : BoolFOption<"objc-encode-cxx-class-template-spec",
+  LangOpts<"EncodeCXXClassTemplateSpec">, DefaultFalse,
+  PosFlag<SetTrue, [CC1Option], "Fully encode c++ class template specialization">,
+  NegFlag<SetFalse>>;
 defm objc_convert_messages_to_runtime_calls : BoolFOption<"objc-convert-messages-to-runtime-calls",
   CodeGenOpts<"ObjCConvertMessagesToRuntimeCalls">, DefaultTrue,
   NegFlag<SetFalse, [CC1Option]>, PosFlag<SetTrue>>;
@@ -3186,6 +3197,8 @@ def mno_longcall : Flag<["-"], "mno-longcall">,
     Group<m_ppc_Features_Group>;
 def mmma: Flag<["-"], "mmma">, Group<m_ppc_Features_Group>;
 def mno_mma: Flag<["-"], "mno-mma">, Group<m_ppc_Features_Group>;
+def mrop_protection : Flag<["-"], "mrop-protection">,
+    Group<m_ppc_Features_Group>;
 def maix_struct_return : Flag<["-"], "maix-struct-return">,
   Group<m_Group>, Flags<[CC1Option]>,
   HelpText<"Return all structs in memory (PPC32 only)">;
@@ -4274,6 +4287,12 @@ def fdebug_unparse : Flag<["-"], "fdebug-unparse">, Group<Action_Group>,
   HelpText<"Unparse and stop.">;
 def fdebug_unparse_with_symbols : Flag<["-"], "fdebug-unparse-with-symbols">, Group<Action_Group>,
   HelpText<"Unparse and stop.">;
+def fdebug_dump_symbols : Flag<["-"], "fdebug-dump-symbols">, Group<Action_Group>,
+  HelpText<"Dump symbols after the semantic analysis">;
+def fdebug_dump_parse_tree : Flag<["-"], "fdebug-dump-parse-tree">, Group<Action_Group>,
+  HelpText<"Dump the parse tree">;
+def fdebug_dump_provenance : Flag<["-"], "fdebug-dump-provenance">, Group<Action_Group>,
+  HelpText<"Dump provenance">;
 
 }
 
