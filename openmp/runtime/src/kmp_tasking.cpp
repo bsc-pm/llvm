@@ -898,8 +898,10 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
     = KMP_TEST_THEN_ADD32(&taskdata->td_allow_completion_event.pending_events_count, -1);
 
   bool detach = pending_events_count != 1;
+#if OMPT_SUPPORT
   if (detach && ompt)
     __ompt_task_finish(task, resumed_task, ompt_task_detach);
+#endif
 
   if (!detach) {
     taskdata->td_flags.complete = 1; // mark the task as completed
