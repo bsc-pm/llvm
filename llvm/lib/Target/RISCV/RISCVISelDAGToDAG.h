@@ -54,6 +54,9 @@ public:
     return selectShiftMask(N, 32, ShAmt);
   }
 
+  bool selectSExti32(SDValue N, SDValue &Val);
+  bool selectZExti32(SDValue N, SDValue &Val);
+
   bool MatchSRLIW(SDNode *N) const;
   bool MatchSLLIUW(SDNode *N) const;
 
@@ -126,10 +129,40 @@ struct VSXSEGPseudo {
   uint16_t Pseudo;
 };
 
+struct VLEPseudo {
+  uint8_t Masked;
+  uint8_t Strided;
+  uint8_t FF;
+  uint8_t SEW;
+  uint8_t LMUL;
+  uint16_t Pseudo;
+};
+
+struct VSEPseudo {
+  uint8_t Masked;
+  uint8_t Strided;
+  uint8_t SEW;
+  uint8_t LMUL;
+  uint16_t Pseudo;
+};
+
+struct VLX_VSXPseudo {
+  uint8_t Masked;
+  uint8_t Ordered;
+  uint8_t SEW;
+  uint8_t LMUL;
+  uint8_t IndexLMUL;
+  uint16_t Pseudo;
+};
+
 #define GET_RISCVVSSEGTable_DECL
 #define GET_RISCVVLSEGTable_DECL
 #define GET_RISCVVLXSEGTable_DECL
 #define GET_RISCVVSXSEGTable_DECL
+#define GET_RISCVVLETable_DECL
+#define GET_RISCVVSETable_DECL
+#define GET_RISCVVLXTable_DECL
+#define GET_RISCVVSXTable_DECL
 #include "RISCVGenSearchableTables.inc"
 } // namespace RISCV
 

@@ -921,7 +921,7 @@ void AMDGPUInstPrinter::printBoundCtrl(const MCInst *MI, unsigned OpNo,
                                        raw_ostream &O) {
   unsigned Imm = MI->getOperand(OpNo).getImm();
   if (Imm) {
-    O << " bound_ctrl:0"; // XXX - this syntax is used in sp3
+    O << " bound_ctrl:1";
   }
 }
 
@@ -1266,8 +1266,8 @@ void AMDGPUInstPrinter::printSendMsg(const MCInst *MI, unsigned OpNo,
   decodeMsg(Imm16, MsgId, OpId, StreamId);
 
   if (isValidMsgId(MsgId, STI) &&
-      isValidMsgOp(MsgId, OpId) &&
-      isValidMsgStream(MsgId, OpId, StreamId)) {
+      isValidMsgOp(MsgId, OpId, STI) &&
+      isValidMsgStream(MsgId, OpId, StreamId, STI)) {
     O << "sendmsg(" << getMsgName(MsgId);
     if (msgRequiresOp(MsgId)) {
       O << ", " << getMsgOpName(MsgId, OpId);

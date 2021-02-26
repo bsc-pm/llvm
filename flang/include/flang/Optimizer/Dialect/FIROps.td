@@ -19,96 +19,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
 include "flang/Optimizer/Dialect/FIRTypes.td"
-
-// Types and predicates
-
-def fir_Type : Type<CPred<"fir::isa_fir_or_std_type($_self)">,
-    "FIR dialect type">;
-
-// Fortran intrinsic types
-def fir_IntegerType : Type<CPred<"$_self.isa<fir::IntegerType>()">,
-    "FIR integer type">;
-def fir_LogicalType : Type<CPred<"$_self.isa<fir::LogicalType>()">,
-    "FIR logical type">;
-def fir_RealType : Type<CPred<"$_self.isa<fir::RealType>()">,
-    "FIR real type">;
-def fir_VectorType : Type<CPred<"$_self.isa<fir::VectorType>()">,
-    "FIR vector type">;
-
-// Generalized FIR and standard dialect types representing intrinsic types
-def AnyIntegerLike : TypeConstraint<Or<[SignlessIntegerLike.predicate,
-    fir_IntegerType.predicate]>, "any integer">;
-def AnyLogicalLike : TypeConstraint<Or<[BoolLike.predicate,
-    fir_LogicalType.predicate]>, "any logical">;
-def AnyRealLike : TypeConstraint<Or<[FloatLike.predicate,
-    fir_RealType.predicate]>, "any real">;
-def AnyIntegerType : Type<AnyIntegerLike.predicate, "any integer">;
-
-// Fortran derived (user defined) type
-def fir_RecordType : Type<CPred<"$_self.isa<fir::RecordType>()">,
-    "FIR derived type">;
-
-// Fortran array attribute
-def fir_SequenceType : Type<CPred<"$_self.isa<fir::SequenceType>()">,
-    "array type">;
-
-// Composable types
-def AnyCompositeLike : TypeConstraint<Or<[fir_RecordType.predicate,
-    fir_SequenceType.predicate, fir_ComplexType.predicate,
-    fir_VectorType.predicate, IsTupleTypePred]>, "any composite">;
-
-// Reference to an entity type
-def fir_ReferenceType : Type<CPred<"$_self.isa<fir::ReferenceType>()">,
-    "reference type">;
-
-// Reference to an ALLOCATABLE attribute type
-def fir_HeapType : Type<CPred<"$_self.isa<fir::HeapType>()">,
-    "allocatable type">;
-
-// Reference to a POINTER attribute type
-def fir_PointerType : Type<CPred<"$_self.isa<fir::PointerType>()">,
-    "pointer type">;
-
-// Reference types
-def AnyReferenceLike : TypeConstraint<Or<[fir_ReferenceType.predicate,
-    fir_HeapType.predicate, fir_PointerType.predicate]>, "any reference">;
-
-def AnyBoxLike : TypeConstraint<Or<[fir_BoxType.predicate,
-    fir_BoxCharType.predicate, fir_BoxProcType.predicate]>, "any box">;
-
-def AnyRefOrBox : TypeConstraint<Or<[fir_ReferenceType.predicate,
-    fir_HeapType.predicate, fir_PointerType.predicate, fir_BoxType.predicate]>,
-    "any reference or box">;
-
-def AnyShapeLike : TypeConstraint<Or<[fir_ShapeType.predicate,
-    fir_ShapeShiftType.predicate]>, "any legal shape type">;
-def AnyShapeType : Type<AnyShapeLike.predicate, "any legal shape type">;
-def fir_SliceType : Type<CPred<"$_self.isa<fir::SliceType>()">, "slice type">;
-
-def AnyEmboxLike : TypeConstraint<Or<[AnySignlessInteger.predicate,
-    Index.predicate, fir_IntegerType.predicate]>,
-    "any legal embox argument type">;
-def AnyEmboxArg : Type<AnyEmboxLike.predicate, "embox argument type">;
-
-// A type descriptor's type
-def fir_TypeDescType : Type<CPred<"$_self.isa<fir::TypeDescType>()">,
-    "type desc type">;
-
-// A LEN parameter (in a RecordType) argument's type
-def fir_LenType : Type<CPred<"$_self.isa<fir::LenType>()">,
-    "LEN parameter type">;
-
-def AnyComponentLike : TypeConstraint<Or<[AnySignlessInteger.predicate,
-    Index.predicate, fir_IntegerType.predicate, fir_FieldType.predicate]>,
-    "any coordinate index">;
-def AnyComponentType : Type<AnyComponentLike.predicate, "coordinate type">;
-
-def AnyCoordinateLike : TypeConstraint<Or<[AnySignlessInteger.predicate,
-    Index.predicate, fir_IntegerType.predicate, fir_FieldType.predicate,
-    fir_LenType.predicate]>, "any coordinate index">;
-def AnyCoordinateType : Type<AnyCoordinateLike.predicate, "coordinate type">;
 
 // Base class for FIR operations.
 // All operations automatically get a prefix of "fir.".
@@ -138,23 +49,24 @@ def fir_AllocateOpBuilder : OpBuilderDAG<(ins
   }]>;
 
 def fir_NamedAllocateOpBuilder : OpBuilderDAG<(ins
-    "Type":$inType,
-    "StringRef":$name,
-    CArg<"ValueRange", "{}">:$lenParams,
-    CArg<"ValueRange", "{}">:$sizes,
-    CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+    "mlir::Type":$inType,
+    "llvm::StringRef":$name,
+    CArg<"mlir::ValueRange", "{}">:$lenParams,
+    CArg<"mlir::ValueRange","{}">:$sizes,
+    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes),
   [{
     $_state.addTypes(getRefTy(inType));
     $_state.addAttribute("in_type", TypeAttr::get(inType));
-    $_state.addAttribute("name", $_builder.getStringAttr(name));
+    if (!name.empty())
+      $_state.addAttribute("name", $_builder.getStringAttr(name));
     $_state.addOperands(sizes);
     $_state.addAttributes(attributes);
   }]>;
 
 def fir_OneResultOpBuilder : OpBuilderDAG<(ins
-    "Type":$resultType,
-    "ValueRange":$operands,
-    CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+    "mlir::Type":$resultType,
+    "mlir::ValueRange":$operands,
+    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes),
   [{
     if (resultType)
       $_state.addTypes(resultType);
@@ -186,9 +98,10 @@ class fir_AllocatableBaseOp<string mnemonic, list<OpTrait> traits = []> :
   );
 }
 
-class fir_AllocatableOp<string mnemonic, list<OpTrait> traits = []> :
+class fir_AllocatableOp<string mnemonic, Resource resource,
+      list<OpTrait> traits = []> :
     fir_AllocatableBaseOp<mnemonic,
-	!listconcat(traits, [MemoryEffects<[MemAlloc]>])>,
+	!listconcat(traits, [MemoryEffects<[MemAlloc<resource>]>])>,
     fir_TwoBuilders<fir_AllocateOpBuilder, fir_NamedAllocateOpBuilder>,
     Arguments<(ins TypeAttr:$in_type, Variadic<AnyIntegerType>:$args)> {
 
@@ -248,7 +161,7 @@ class fir_AllocatableOp<string mnemonic, list<OpTrait> traits = []> :
       p << ", ";
       p.printOperand(sh);
     }
-    p.printOptionalAttrDict(getAttrs(), {inType(), lenpName()});
+    p.printOptionalAttrDict((*this)->getAttrs(), {inType(), lenpName()});
   }];
 
   string extraAllocClassDeclaration = [{
@@ -298,7 +211,8 @@ class fir_AllocatableOp<string mnemonic, list<OpTrait> traits = []> :
 // Memory SSA operations
 //===----------------------------------------------------------------------===//
 
-def fir_AllocaOp : fir_AllocatableOp<"alloca"> {
+def fir_AllocaOp :
+      fir_AllocatableOp<"alloca", AutomaticAllocationScopeResource> {
   let summary = "allocate storage for a temporary on the stack given a type";
   let description = [{
     This primitive operation is used to allocate an object on the stack.  A
@@ -366,6 +280,8 @@ def fir_AllocaOp : fir_AllocatableOp<"alloca"> {
     mlir::Type outType = getType();
     if (!outType.isa<fir::ReferenceType>())
       return emitOpError("must be a !fir.ref type");
+    if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
+      return emitOpError("cannot allocate !fir.box of unknown rank or type");
     return mlir::success();
   }];
 
@@ -374,7 +290,7 @@ def fir_AllocaOp : fir_AllocatableOp<"alloca"> {
   }];
 }
 
-def fir_LoadOp : fir_OneResultOp<"load", [MemoryEffects<[MemRead]>]> {
+def fir_LoadOp : fir_OneResultOp<"load"> {
   let summary = "load a value from a memory reference";
   let description = [{
     Load a value from a memory reference into an ssa-value (virtual register).
@@ -390,19 +306,23 @@ def fir_LoadOp : fir_OneResultOp<"load", [MemoryEffects<[MemRead]>]> {
     or null.
   }];
 
-  let arguments = (ins AnyReferenceLike:$memref);
+  let arguments = (ins Arg<AnyReferenceLike, "", [MemRead]>:$memref);
 
-  let builders = [
-    OpBuilderDAG<(ins "Value":$refVal),
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$refVal),
     [{
       if (!refVal) {
         mlir::emitError($_state.location, "LoadOp has null argument");
         return;
       }
-      auto refTy = refVal.getType().cast<fir::ReferenceType>();
+      auto eleTy = fir::dyn_cast_ptrEleTy(refVal.getType());
+      if (!eleTy) {
+        mlir::emitError($_state.location, "not a memory reference type");
+        return;
+      }
       $_state.addOperands(refVal);
-      $_state.addTypes(refTy.getEleTy());
-    }]>];
+      $_state.addTypes(eleTy);
+    }]
+  >];
 
   let parser = [{
     mlir::Type type;
@@ -422,7 +342,7 @@ def fir_LoadOp : fir_OneResultOp<"load", [MemoryEffects<[MemRead]>]> {
   let printer = [{
     p << getOperationName() << ' ';
     p.printOperand(memref());
-    p.printOptionalAttrDict(getAttrs(), {});
+    p.printOptionalAttrDict((*this)->getAttrs(), {});
     p << " : " << memref().getType();
   }];
 
@@ -431,7 +351,7 @@ def fir_LoadOp : fir_OneResultOp<"load", [MemoryEffects<[MemRead]>]> {
   }];
 }
 
-def fir_StoreOp : fir_Op<"store", [MemoryEffects<[MemWrite]>]> {
+def fir_StoreOp : fir_Op<"store", []> {
   let summary = "store an SSA-value to a memory location";
 
   let description = [{
@@ -450,7 +370,8 @@ def fir_StoreOp : fir_Op<"store", [MemoryEffects<[MemWrite]>]> {
     `%p`, is undefined or null.
   }];
 
-  let arguments = (ins AnyType:$value, AnyReferenceLike:$memref);
+  let arguments = (ins AnyType:$value,
+                   Arg<AnyReferenceLike, "", [MemWrite]>:$memref);
 
   let parser = [{
     mlir::Type type;
@@ -473,13 +394,15 @@ def fir_StoreOp : fir_Op<"store", [MemoryEffects<[MemWrite]>]> {
     p.printOperand(value());
     p << " to ";
     p.printOperand(memref());
-    p.printOptionalAttrDict(getAttrs(), {});
+    p.printOptionalAttrDict((*this)->getAttrs(), {});
     p << " : " << memref().getType();
   }];
 
   let verifier = [{
     if (value().getType() != fir::dyn_cast_ptrEleTy(memref().getType()))
       return emitOpError("store value type must match memory reference type");
+    if (fir::isa_unknown_size_box(value().getType()))
+      return emitOpError("cannot store !fir.box of unknown rank or type");
     return mlir::success();
   }];
 
@@ -513,7 +436,25 @@ def fir_UndefOp : fir_OneResultOp<"undefined", [NoSideEffect]> {
   }];
 }
 
-def fir_AllocMemOp : fir_AllocatableOp<"allocmem"> {
+def fir_ZeroOp : fir_OneResultOp<"zero_bits", [NoSideEffect]> {
+  let summary = "explicit polymorphic zero value of some type";
+  let description = [{
+    Constructs an ssa-value of the specified type with a value of zero for all
+    bits.
+
+    ```mlir
+      %a = fir.zero_bits !fir.box<!fir.array<10 x !fir.type<T>>>
+    ```
+
+    The example creates a value of type box where all bits are zero.
+  }];
+
+  let results = (outs AnyType:$intype);
+
+  let assemblyFormat = "type($intype) attr-dict";
+}
+
+def fir_AllocMemOp : fir_AllocatableOp<"allocmem", DefaultResource> {
   let summary = "allocate storage on the heap for an object of a given type";
 
   let description = [{
@@ -534,6 +475,8 @@ def fir_AllocMemOp : fir_AllocatableOp<"allocmem"> {
     mlir::Type outType = getType();
     if (!outType.dyn_cast<fir::HeapType>())
       return emitOpError("must be a !fir.heap type");
+    if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
+      return emitOpError("cannot allocate !fir.box of unknown rank or type");
     return mlir::success();
   }];
 
@@ -559,7 +502,7 @@ def fir_FreeMemOp : fir_Op<"freemem", [MemoryEffects<[MemFree]>]> {
     ```
   }];
 
-  let arguments = (ins fir_HeapType:$heapref);
+  let arguments = (ins Arg<fir_HeapType, "", [MemFree]>:$heapref);
 
   let assemblyFormat = "$heapref attr-dict `:` type($heapref)";
 }
@@ -627,11 +570,11 @@ class fir_IntegralSwitchTerminatorOp<string mnemonic,
     list<OpTrait> traits = []> : fir_SwitchTerminatorOp<mnemonic, traits> {
 
   let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilderDAG<(ins "Value":$selector, "ArrayRef<int64_t>":$compareOperands,
-      "ArrayRef<Block *>":$destinations,
-      CArg<"ArrayRef<ValueRange>", "{}">:$destOperands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$selector,
+    "llvm::ArrayRef<int64_t>":$compareOperands,
+    "llvm::ArrayRef<mlir::Block *>":$destinations,
+    CArg<"llvm::ArrayRef<mlir::ValueRange>", "{}">:$destOperands,
+    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes),
     [{
       $_state.addOperands(selector);
       llvm::SmallVector<mlir::Attribute, 8> ivalues;
@@ -656,11 +599,12 @@ class fir_IntegralSwitchTerminatorOp<string mnemonic,
         }
       }
       $_state.addAttribute(getOperandSegmentSizeAttr(),
-                          $_builder.getI32VectorAttr({1, 0, sumArgs}));
+        $_builder.getI32VectorAttr({1, 0, sumArgs}));
       $_state.addAttribute(getTargetOffsetAttr(),
-                          $_builder.getI32VectorAttr(argOffs));
+        $_builder.getI32VectorAttr(argOffs));
       $_state.addAttributes(attributes);
-    }]>];
+    }]
+  >];
 
   let parser = [{
     mlir::OpAsmParser::OperandType selector;
@@ -815,16 +759,18 @@ def fir_SelectCaseOp : fir_SwitchTerminatorOp<"select_case"> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "Value":$selector,
-      "ArrayRef<mlir::Attribute>":$compareAttrs,
-      "ArrayRef<ValueRange>":$cmpOperands, "ArrayRef<Block *>":$destinations,
-      CArg<"ArrayRef<ValueRange>", "{}">:$destOperands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
-    OpBuilderDAG<(ins "Value":$selector,
-      "ArrayRef<mlir::Attribute>":$compareAttrs, "ArrayRef<Value>":$cmpOpList,
-      "ArrayRef<Block *>":$destinations,
-      CArg<"ArrayRef<ValueRange>", "{}">:$destOperands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>];
+    OpBuilderDAG<(ins "mlir::Value":$selector,
+      "llvm::ArrayRef<mlir::Attribute>":$compareAttrs,
+      "llvm::ArrayRef<mlir::ValueRange>":$cmpOperands,
+      "llvm::ArrayRef<mlir::Block *>":$destinations,
+      CArg<"llvm::ArrayRef<mlir::ValueRange>", "{}">:$destOperands,
+      CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>,
+    OpBuilderDAG<(ins "mlir::Value":$selector,
+      "llvm::ArrayRef<mlir::Attribute>":$compareAttrs,
+      "llvm::ArrayRef<mlir::Value>":$cmpOpList,
+      "llvm::ArrayRef<mlir::Block *>":$destinations,
+      CArg<"llvm::ArrayRef<mlir::ValueRange>", "{}">:$destOperands,
+      CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>];
 
   let parser = "return parseSelectCase(parser, result);";
 
@@ -909,15 +855,15 @@ def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
   }];
 
   let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilderDAG<(ins "Value":$selector,
-      "ArrayRef<mlir::Attribute>":$typeOperands,
-      "ArrayRef<Block *>":$destinations,
-      CArg<"ArrayRef<ValueRange>", "{}">:$destOperands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$selector,
+    "llvm::ArrayRef<mlir::Attribute>":$typeOperands,
+    "llvm::ArrayRef<mlir::Block *>":$destinations,
+    CArg<"llvm::ArrayRef<mlir::ValueRange>", "{}">:$destOperands,
+    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes),
     [{
       $_state.addOperands(selector);
-      $_state.addAttribute(getCasesAttr(), $_builder.getArrayAttr(typeOperands));
+      $_state.addAttribute(getCasesAttr(),
+        $_builder.getArrayAttr(typeOperands));
       const auto count = destinations.size();
       for (auto d : destinations)
         $_state.addSuccessors(d);
@@ -935,11 +881,12 @@ def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
         }
       }
       $_state.addAttribute(getOperandSegmentSizeAttr(),
-                          $_builder.getI32VectorAttr({1, 0, sumArgs}));
+        $_builder.getI32VectorAttr({1, 0, sumArgs}));
       $_state.addAttribute(getTargetOffsetAttr(),
-                          $_builder.getI32VectorAttr(argOffs));
+        $_builder.getI32VectorAttr(argOffs));
       $_state.addAttributes(attributes);
-    }]>];
+    }]
+  >];
 
   let parser = "return parseSelectType(parser, result);";
 
@@ -1268,7 +1215,7 @@ def fir_UnboxOp : fir_SimpleOp<"unbox", [NoSideEffect]> {
 
     ```mlir
       %40   = ... : !fir.box<!fir.type<T>>
-      %41:6 = fir.unbox %40 : (!fir.box<!fir.type<T>>) -> (!fir.ref<!fir.type<T>>, i32, i32, !fir.tdesc<!fir.type<T>>, i32, !fir.dims<4>)
+      %41:6 = fir.unbox %40 : (!fir.box<!fir.type<T>>) -> (!fir.ref<!fir.type<T>>, i32, i32, !fir.tdesc<!fir.type<T>>, i32, !fir.array<? x index>)
     ```
   }];
 
@@ -1380,16 +1327,17 @@ def fir_BoxDimsOp : fir_Op<"box_dims", [NoSideEffect]> {
 
     ```mlir
       %c1   = constant 0 : i32
-      %52:3 = fir.box_dims %40, %c1 : (!fir.box<!fir.array<*:f64>>, i32) -> (i32, i32, i32)
+      %52:3 = fir.box_dims %40, %c1 : (!fir.box<!fir.array<*:f64>>, i32) -> (index, index, index)
     ```
 
     The above is a request to return the left most row (at index 0) triple from
-    the box. The triple will be the lower bound, upper bound, and stride.
+    the box. The triple will be the lower bound, extent, and byte-stride, which
+    are the values encoded in a standard descriptor.
   }];
 
   let arguments = (ins fir_BoxType:$val, AnyIntegerLike:$dim);
 
-  let results = (outs AnyIntegerLike, AnyIntegerLike, AnyIntegerLike);
+  let results = (outs Index, Index, Index);
 
   let assemblyFormat = [{
     $val `,` $dim attr-dict `:` functional-type(operands, results)
@@ -1450,12 +1398,13 @@ def fir_BoxIsArrayOp : fir_SimpleOp<"box_isarray", [NoSideEffect]> {
   let description = [{
     Determine if the boxed value has a positive (> 0) rank. This will return
     true if the originating box value was from a fir.embox with a memory
-    reference value that had the type !fir.array<T> and/or a dims argument.
+    reference value that had the type !fir.array<T> and/or a shape argument.
 
     ```mlir
       %r = ... : !fir.ref<i64>
-      %d = fir.gendims(1, 100, 1) : (i32, i32, i32) -> !fir.dims<1>
-      %b = fir.embox %r, %d : (!fir.ref<i64>, !fir.dims<1>) -> !fir.box<i64>
+      %c_100 = constant 100 : index
+      %d = fir.shape %c_100 : (index) -> !fir.shape<1>
+      %b = fir.embox %r(%d) : (!fir.ref<i64>, !fir.shape<1>) -> !fir.box<i64>
       %a = fir.box_isarray %b : (!fir.box<i64>) -> i1  // true
     ```
   }];
@@ -1545,9 +1494,263 @@ def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", [NoSideEffect]> {
   let results = (outs fir_TypeDescType);
 }
 
+//===----------------------------------------------------------------------===//
+// Array value operations
+//===----------------------------------------------------------------------===//
+
+def fir_ArrayLoadOp : fir_Op<"array_load", [AttrSizedOperandSegments]> {
+
+  let summary = "Load an array as a value.";
+
+  let description = [{
+    Load an entire array as a single SSA value.
+
+    ```fortran
+      real :: a(o:n,p:m)
+      ...
+      ... = ... a ...
+    ```
+
+    One can use `fir.array_load` to produce an ssa-value that captures an
+    immutable value of the entire array `a`, as in the Fortran array expression
+    shown above. Subsequent changes to the memory containing the array do not
+    alter its composite value. This operation let's one load an array as a
+    value while applying a runtime shape, shift, or slice to the memory
+    reference, and its semantics guarantee immutability.
+
+    ```mlir
+      %s = fir.shape_shift %o, %n, %p, %m : (index, index, index, index) -> !fir.shape<2>
+      // load the entire array 'a'
+      %v = fir.array_load %a(%s) : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>) -> !fir.array<?x?xf32>
+      // a fir.store here into array %a does not change %v
+    ```
+  }];
+
+  let arguments = (ins
+    Arg<AnyRefOrBox, "", [MemRead]>:$memref,
+    Optional<AnyShapeOrShiftType>:$shape,
+    Optional<fir_SliceType>:$slice,
+    Variadic<AnyIntegerType>:$lenParams
+  );
+
+  let results = (outs fir_SequenceType);
+
+  let assemblyFormat = [{
+    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? (`typeparams` $lenParams^)? attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{ return ::verify(*this); }];
+
+  let extraClassDeclaration = [{
+    std::vector<mlir::Value> getExtents();
+  }];
+}
+
+def fir_ArrayFetchOp : fir_Op<"array_fetch", [NoSideEffect]> {
+
+  let summary = "Fetch the value of an element of an array value";
+
+  let description = [{
+    Fetch the value of an element in an array value.
+
+    ```fortran
+      real :: a(n,m)
+      ...
+      ... a ...
+      ... a(r,s+1) ...
+    ```
+
+    One can use `fir.array_fetch` to fetch the (implied) value of `a(i,j)` in
+    an array expression as shown above. It can also be used to extract the
+    element `a(r,s+1)` in the second expression.
+
+    ```mlir
+      %s = fir.shape %n, %m : (index, index) -> !fir.shape<2>
+      // load the entire array 'a'
+      %v = fir.array_load %a(%s) : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>) -> !fir.array<?x?xf32>
+      // fetch the value of one of the array value's elements
+      %1 = fir.array_fetch %v, %i, %j : (!fir.array<?x?xf32>, index, index) -> f32
+    ```
+
+    It is only possible to use `array_fetch` on an `array_load` result value.
+  }];
+
+  let arguments = (ins
+    fir_SequenceType:$sequence,
+    Variadic<AnyCoordinateType>:$indices
+  );
+
+  let results = (outs AnyType:$element);
+
+  let assemblyFormat = [{
+    $sequence `,` $indices attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto arrTy = sequence().getType().cast<fir::SequenceType>();
+    if (indices().size() != arrTy.getDimension())
+      return emitOpError("number of indices != dimension of array");
+    if (element().getType() != arrTy.getEleTy())
+      return emitOpError("return type does not match array");
+    if (!isa<fir::ArrayLoadOp>(sequence().getDefiningOp()))
+      return emitOpError("argument #0 must be result of fir.array_load");
+    return mlir::success();
+  }];
+}
+
+def fir_ArrayUpdateOp : fir_Op<"array_update", [NoSideEffect]> {
+
+  let summary = "Update the value of an element of an array value";
+
+  let description = [{
+    Updates the value of an element in an array value. A new array value is
+    returned where all element values of the input array are identical except
+    for the selected element which is the value passed in the update.
+
+    ```fortran
+      real :: a(n,m)
+      ...
+      a = ...
+    ```
+
+    One can use `fir.array_update` to update the (implied) value of `a(i,j)`
+    in an array expression as shown above.
+
+    ```mlir
+      %s = fir.shape %n, %m : (index, index) -> !fir.shape<2>
+      // load the entire array 'a'
+      %v = fir.array_load %a(%s) : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>) -> !fir.array<?x?xf32>
+      // update the value of one of the array value's elements
+      // %r_{ij} = %f  if (i,j) = (%i,%j),   %v_{ij} otherwise
+      %r = fir.array_update %v, %f, %i, %j : (!fir.array<?x?xf32>, f32, index, index) -> !fir.array<?x?xf32>
+      fir.array_merge_store %v, %r to %a : !fir.ref<!fir.array<?x?xf32>>
+    ```
+
+    An array value update behaves as if a mapping function from the indices
+    to the new value has been added, replacing the previous mapping. These
+    mappings can be added to the ssa-value, but will not be materialized in
+    memory until the `fir.array_merge_store` is performed.
+  }];
+
+  let arguments = (ins
+    fir_SequenceType:$sequence,
+    AnyType:$merge,
+    Variadic<AnyCoordinateType>:$indices
+  );
+
+  let results = (outs fir_SequenceType);
+
+  let assemblyFormat = [{
+    $sequence `,` $merge `,` $indices attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto arrTy = sequence().getType().cast<fir::SequenceType>();
+    if (merge().getType() != arrTy.getEleTy())
+      return emitOpError("merged value does not have element type");
+    if (indices().size() != arrTy.getDimension())
+      return emitOpError("number of indices != dimension of array");
+    return mlir::success();
+  }];
+}
+
+def fir_ArrayMergeStoreOp : fir_Op<"array_merge_store", [
+    TypesMatchWith<"type of 'original' matches element type of 'memref'",
+                     "memref", "original",
+                     "fir::dyn_cast_ptrOrBoxEleTy($_self)">,
+    TypesMatchWith<"type of 'sequence' matches element type of 'memref'",
+                     "memref", "sequence",
+                     "fir::dyn_cast_ptrOrBoxEleTy($_self)">]> {
+
+  let summary = "Store merged array value to memory.";
+
+  let description = [{
+    Store a merged array value to memory.
+
+    ```fortran
+      real :: a(n,m)
+      ...
+      a = ...
+    ```
+
+    One can use `fir.array_merge_store` to merge/copy the value of `a` in an
+    array expression as shown above.
+
+    ```mlir
+      %v = fir.array_load %a(%shape) : ...
+      %r = fir.array_update %v, %f, %i, %j : (!fir.array<?x?xf32>, f32, index, index) -> !fir.array<?x?xf32>
+      fir.array_merge_store %v, %r to %a : !fir.ref<!fir.array<?x?xf32>>
+    ```
+
+    This operation merges the original loaded array value, `%v`, with the
+    chained updates, `%r`, and stores the result to the array at address, `%a`.
+  }];
+
+  let arguments = (ins
+    fir_SequenceType:$original,
+    fir_SequenceType:$sequence,
+    Arg<AnyRefOrBox, "", [MemWrite]>:$memref
+  );
+
+  let assemblyFormat = "$original `,` $sequence `to` $memref attr-dict `:` type($memref)";
+
+  let verifier = [{
+    if (!isa<ArrayLoadOp>(original().getDefiningOp()))
+       return emitOpError("operand #0 must be result of a fir.array_load op");
+    return mlir::success();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Record and array type operations
+//===----------------------------------------------------------------------===//
+
+def fir_ArrayCoorOp : fir_Op<"array_coor",
+    [NoSideEffect, AttrSizedOperandSegments]> {
+
+  let summary = "Find the coordinate of an element of an array";
+
+  let description = [{
+    Compute the location of an element in an array when the shape of the
+    array is only known at runtime.
+
+    This operation is intended to capture all the runtime values needed to
+    compute the address of an array reference in a single high-level op. Given
+    the following Fortran input:
+
+    ```fortran
+      real :: a(n,m)
+      ...
+      ... a(i,j) ...
+    ```
+
+    One can use `fir.array_coor` to determine the address of `a(i,j)`.
+
+    ```mlir
+      %s = fir.shape %n, %m : (index, index) -> !fir.shape<2>
+      %1 = fir.array_coor %a(%s) %i, %j : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+    ```
+  }];
+
+  let arguments = (ins
+    AnyRefOrBox:$memref,
+    Optional<AnyShapeOrShiftType>:$shape,
+    Optional<fir_SliceType>:$slice,
+    Variadic<AnyCoordinateType>:$indices,
+    Variadic<AnyIntegerType>:$lenParams
+  );
+
+  let results = (outs fir_ReferenceType);
+
+  let assemblyFormat = [{
+    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lenParams^)? attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{ return ::verify(*this); }];
+}
 
 def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
+
   let summary = "Finds the coordinate (location) of a value in memory";
 
   let description = [{
@@ -1724,18 +1927,218 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
     }
   }];
 
-  let builders = [
-    OpBuilderDAG<(ins "StringRef":$fieldName, "Type":$recTy,
-      CArg<"ValueRange", "{}">:$operands),
+  let builders = [OpBuilderDAG<(ins "llvm::StringRef":$fieldName,
+      "mlir::Type":$recTy, CArg<"mlir::ValueRange","{}">:$operands),
     [{
-      $_state.addAttribute(fieldAttrName(), $_builder.getStringAttr(fieldName));
+      $_state.addAttribute(fieldAttrName(),
+        $_builder.getStringAttr(fieldName));
       $_state.addAttribute(typeAttrName(), TypeAttr::get(recTy));
       $_state.addOperands(operands);
-    }]>];
+    }]
+  >];
 
   let extraClassDeclaration = [{
     static constexpr llvm::StringRef fieldAttrName() { return "field_id"; }
     static constexpr llvm::StringRef typeAttrName() { return "on_type"; }
+    llvm::StringRef getFieldName() { return field_id(); }
+  }];
+}
+
+def fir_ShapeOp : fir_Op<"shape", [NoSideEffect]> {
+
+  let summary = "generate an abstract shape vector of type `!fir.shape`";
+
+  let description = [{
+    The arguments are an ordered list of integral type values that define the
+    runtime extent of each dimension of an array. The shape information is
+    given in the same row-to-column order as Fortran. This abstract shape value
+    must be applied to a reified object, so all shape information must be
+    specified.  The extent must be nonnegative.
+
+    ```mlir
+      %d = fir.shape %row_sz, %col_sz : (index, index) -> !fir.shape<2>
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyIntegerType>:$extents);
+
+  let results = (outs fir_ShapeType);
+
+  let assemblyFormat = [{
+    operands attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto size = extents().size();
+    auto shapeTy = getType().dyn_cast<fir::ShapeType>();
+    assert(shapeTy && "must be a shape type");
+    if (shapeTy.getRank() != size)
+      return emitOpError("shape type rank mismatch");
+    return mlir::success();
+  }];
+
+  let extraClassDeclaration = [{
+    std::vector<mlir::Value> getExtents() {
+      return {extents().begin(), extents().end()};
+    }
+  }];
+}
+
+def fir_ShapeShiftOp : fir_Op<"shape_shift", [NoSideEffect]> {
+
+  let summary = [{
+    generate an abstract shape and shift vector of type `!fir.shapeshift`
+  }];
+
+  let description = [{
+    The arguments are an ordered list of integral type values that is a multiple
+    of 2 in length. Each such pair is defined as: the lower bound and the
+    extent for that dimension. The shifted shape information is given in the
+    same row-to-column order as Fortran. This abstract shifted shape value must
+    be applied to a reified object, so all shifted shape information must be
+    specified.  The extent must be nonnegative.
+
+    ```mlir
+      %d = fir.shape_shift %lo, %extent : (index, index) -> !fir.shapeshift<1>
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyIntegerType>:$pairs);
+
+  let results = (outs fir_ShapeShiftType);
+
+  let assemblyFormat = [{
+    operands attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto size = pairs().size();
+    if (size < 2 || size > 16 * 2)
+      return emitOpError("incorrect number of args");
+    if (size % 2 != 0)
+      return emitOpError("requires a multiple of 2 args");
+    auto shapeTy = getType().dyn_cast<fir::ShapeShiftType>();
+    assert(shapeTy && "must be a shape shift type");
+    if (shapeTy.getRank() * 2 != size)
+      return emitOpError("shape type rank mismatch");
+    return mlir::success();
+  }];
+
+  let extraClassDeclaration = [{
+    // Logically unzip the origins from the extent values.
+    std::vector<mlir::Value> getOrigins() {
+      std::vector<mlir::Value> result;
+      for (auto i : llvm::enumerate(pairs()))
+        if (!(i.index() & 1))
+          result.push_back(i.value());
+      return result;
+    }
+
+    // Logically unzip the extents from the origin values.
+    std::vector<mlir::Value> getExtents() {
+      std::vector<mlir::Value> result;
+      for (auto i : llvm::enumerate(pairs()))
+        if (i.index() & 1)
+          result.push_back(i.value());
+      return result;
+    }
+  }];
+}
+
+def fir_ShiftOp : fir_Op<"shift", [NoSideEffect]> {
+
+  let summary = "generate an abstract shift vector of type `!fir.shift`";
+
+  let description = [{
+    The arguments are an ordered list of integral type values that define the
+    runtime lower bound of each dimension of an array. The shape information is
+    given in the same row-to-column order as Fortran. This abstract shift value
+    must be applied to a reified object, so all shift information must be
+    specified.
+
+    ```mlir
+      %d = fir.shift %row_lb, %col_lb : (index, index) -> !fir.shift<2>
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyIntegerType>:$origins);
+
+  let results = (outs fir_ShiftType);
+
+  let assemblyFormat = [{
+    operands attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto size = origins().size();
+    auto shiftTy = getType().dyn_cast<fir::ShiftType>();
+    assert(shiftTy && "must be a shift type");
+    if (shiftTy.getRank() != size)
+      return emitOpError("shift type rank mismatch");
+    return mlir::success();
+  }];
+
+  let extraClassDeclaration = [{
+    std::vector<mlir::Value> getOrigins() {
+      return {origins().begin(), origins().end()};
+    }
+  }];
+}
+
+def fir_SliceOp : fir_Op<"slice", [NoSideEffect, AttrSizedOperandSegments]> {
+
+  let summary = "generate an abstract slice vector of type `!fir.slice`";
+
+  let description = [{
+    The array slicing arguments are an ordered list of integral type values
+    that must be a multiple of 3 in length.  Each such triple is defined as:
+    the lower bound, the upper bound, and the stride for that dimension, as in
+    Fortran syntax. Both bounds are inclusive. The array slice information is
+    given in the same row-to-column order as Fortran. This abstract slice value
+    must be applied to a reified object, so all slice information must be
+    specified.  The extent must be nonnegative and the stride must not be zero.
+
+    ```mlir
+      %d = fir.slice %lo, %hi, %step : (index, index, index) -> !fir.slice<1>
+    ```
+
+    To support generalized slicing of Fortran's dynamic derived types, a slice
+    op can be given a component path (narrowing from the product type of the
+    original array to the specific elemental type of the sliced projection).
+
+    ```mlir
+      %fld = fir.field_index component, !fir.type<t{...component:ct...}>
+      %d = fir.slice %lo, %hi, %step path %fld : (index, index, index, !fir.field) -> !fir.slice<1>
+    ```
+  }];
+
+  let arguments = (ins
+    Variadic<AnyCoordinateType>:$triples,
+    Variadic<AnyComponentType>:$fields
+  );
+
+  let results = (outs fir_SliceType);
+
+  let assemblyFormat = [{
+    $triples (`path` $fields^)? attr-dict `:` functional-type(operands, results)
+  }];
+
+  let verifier = [{
+    auto size = triples().size();
+    if (size < 3 || size > 16 * 3)
+      return emitOpError("incorrect number of args for triple");
+    if (size % 3 != 0)
+      return emitOpError("requires a multiple of 3 args");
+    auto sliceTy = getType().dyn_cast<fir::SliceType>();
+    assert(sliceTy && "must be a slice type");
+    if (sliceTy.getRank() * 3 != size)
+      return emitOpError("slice type rank mismatch");
+    return mlir::success();
+  }];
+
+  let extraClassDeclaration = [{
+    unsigned getOutRank() { return getOutputRank(triples()); }
+    static unsigned getOutputRank(mlir::ValueRange triples);
   }];
 }
 
@@ -2213,7 +2616,7 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
     if (!(type.isa<fir::CharacterType>() || type.isa<mlir::IntegerType>()))
       return parser.emitError(parser.getCurrentLocation(),
                               "must have character type");
-    type = fir::SequenceType::get({sz.getInt()}, type);
+    type = fir::SequenceType::get(type.getContext(), {sz.getInt()}, type, {});
     if (!type || parser.addTypesToList(type, result.types))
       return mlir::failure();
     return mlir::success();
