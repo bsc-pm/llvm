@@ -840,6 +840,31 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
       OSSClauseChecker.getImplicitFirstprivate().begin(),
       OSSClauseChecker.getImplicitFirstprivate().end());
 
+  // TODO: Can we just put this in the previous
+  // loop over clauses?
+  // I think no, here is an example:
+  //   void foo(int a) {
+  //     #pragma oss task cost(a) in(a)
+  //   }
+  // Here we expect 'a' to be shared because of the dependency
+  // but as we find cost before we register firstprivate
+  for (auto *Clause : Clauses) {
+    if (isa<OSSCostClause>(Clause) || isa<OSSPriorityClause>(Clause)) {
+      // TODO: Stmt is not used, remove
+      DSAAttrChecker DSAChecker(DSAStack, *this, nullptr);
+      DSAChecker.VisitOSSClause(Clause);
+      // FIXME: how to handle an error?
+      if (DSAChecker.isErrorFound())
+        ErrorFound = true;
+      ImplicitShared.append(
+        DSAChecker.getImplicitShared().begin(),
+        DSAChecker.getImplicitShared().end());
+      ImplicitFirstprivate.append(
+        DSAChecker.getImplicitFirstprivate().begin(),
+        DSAChecker.getImplicitFirstprivate().end());
+    }
+  }
+
   if (!ImplicitShared.empty()) {
     if (OSSClause *Implicit = ActOnOmpSsSharedClause(
             ImplicitShared, SourceLocation(), SourceLocation(),

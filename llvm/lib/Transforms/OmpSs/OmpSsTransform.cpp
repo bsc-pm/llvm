@@ -936,7 +936,7 @@ struct OmpSs {
     }
   }
 
-  void unpackCostAndRewrite(Module &M, Value *Cost, Function *F,
+  void unpackCostAndRewrite(Module &M, const DirectiveCostInfo &CostInfo, Function *F,
                             const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
@@ -949,6 +949,7 @@ struct OmpSs {
 
     Value *GEPConstraints = BBBuilder.CreateGEP(
           Constraints, Idx, "gep_" + Constraints->getName());
+    Value *Cost = BBBuilder.CreateCall(CostInfo.Fun, CostInfo.Args);
     Value *CostCast = BBBuilder.CreateZExt(Cost, Nanos6TaskConstraints::getInstance(M).getType()->getElementType(0));
     BBBuilder.CreateStore(CostCast, GEPConstraints);
     for (Instruction &I : Entry) {
@@ -961,13 +962,16 @@ struct OmpSs {
     }
   }
 
-  void unpackPriorityAndRewrite(Module &M, Value *Priority, Function *F,
-                                const MapVector<Value *, size_t> &StructToIdxMap) {
+  void unpackPriorityAndRewrite(
+      Module &M, const DirectivePriorityInfo &PriorityInfo, Function *F,
+      const MapVector<Value *, size_t> &StructToIdxMap) {
     BasicBlock::Create(M.getContext(), "entry", F);
     BasicBlock &Entry = F->getEntryBlock();
     F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
     IRBuilder<> BBBuilder(&F->getEntryBlock().back());
     Value *PriorityArg = &*(F->arg_end() - 1);
+
+    Value *Priority = BBBuilder.CreateCall(PriorityInfo.Fun, PriorityInfo.Args);
     Value *PrioritySExt = BBBuilder.CreateSExt(Priority, Type::getInt64Ty(M.getContext()));
     BBBuilder.CreateStore(PrioritySExt, PriorityArg);
     for (Instruction &I : Entry) {
@@ -1728,8 +1732,9 @@ struct OmpSs {
       ArrayRef<Type *> TaskTypeList, ArrayRef<StringRef> TaskNameList) {
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+    const DirectiveCostInfo &CostInfo = DirEnv.CostInfo;
 
-    if (!DirEnv.Cost)
+    if (!CostInfo.Fun)
       return nullptr;
 
     SmallVector<Type *, 4> TaskExtraTypeList;
@@ -1743,7 +1748,7 @@ struct OmpSs {
                                ("nanos6_unpacked_constraints_" + F.getName() + Twine(taskNum)).str(),
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
-    unpackCostAndRewrite(M, DirEnv.Cost, UnpackConstraintsFuncVar, TaskArgsToStructIdxMap);
+    unpackCostAndRewrite(M, CostInfo, UnpackConstraintsFuncVar, TaskArgsToStructIdxMap);
 
     Function *OlConstraintsFuncVar
       = createUnpackOlFunction(M, F,
@@ -1782,8 +1787,9 @@ struct OmpSs {
       ArrayRef<Type *> TaskTypeList, ArrayRef<StringRef> TaskNameList) {
 
     const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+    const DirectivePriorityInfo &PriorityInfo = DirEnv.PriorityInfo;
 
-    if (!DirEnv.Priority)
+    if (!PriorityInfo.Fun)
       return nullptr;
 
     SmallVector<Type *, 4> TaskExtraTypeList;
@@ -1798,7 +1804,7 @@ struct OmpSs {
                                ("nanos6_unpacked_priority_" + F.getName() + Twine(taskNum)).str(),
                                TaskTypeList, TaskNameList,
                                TaskExtraTypeList, TaskExtraNameList);
-    unpackPriorityAndRewrite(M, DirEnv.Priority, UnpackPriorityFuncVar, TaskArgsToStructIdxMap);
+    unpackPriorityAndRewrite(M, PriorityInfo, UnpackPriorityFuncVar, TaskArgsToStructIdxMap);
 
     Function *OlPriorityFuncVar
       = createUnpackOlFunction(M, F,

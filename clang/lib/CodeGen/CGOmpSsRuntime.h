@@ -170,6 +170,13 @@ private:
   // List of OmpSs-2 specific metadata to be added to llvm.module.flags
   SmallVector<llvm::Metadata *, 4> MetadataList;
 
+  // This is used by cost/priority clauses to build a bundle with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
   void EmitDSAShared(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo,
@@ -258,9 +265,17 @@ public:
   // returns the innermost nested task NormalCleanupDestSlot address
   void setTaskNormalCleanupDestSlot(Address Addr);
 
-
   llvm::AllocaInst *createTaskAwareAlloca(
     CodeGenFunction &CGF, llvm::Type *Ty, const Twine &Name, llvm::Value *ArraySize);
+
+  llvm::Function *createCallWrapperFunc(
+      CodeGenFunction &CGF,
+      const llvm::MapVector<const VarDecl *, LValue> &ExprInvolvedVarList,
+      const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
+      const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
+      ArrayRef<QualType> RetTypes,
+      bool HasThis, std::string FuncName, std::string RetName,
+      llvm::function_ref<void(CodeGenFunction &)> Body);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,

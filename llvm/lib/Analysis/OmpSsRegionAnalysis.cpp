@@ -269,15 +269,21 @@ void DirectiveEnvironment::gatherIfInfo(OperandBundleDef &OB) {
 }
 
 void DirectiveEnvironment::gatherCostInfo(OperandBundleDef &OB) {
-  assert(!Cost && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  Cost = OB.inputs()[0];
+  assert(OB.input_size() > 0 &&
+    "Cost OperandBundle must have at least function");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  CostInfo.Fun = cast<Function>(OBArgs[0]);
+  for (size_t i = 1; i < OBArgs.size(); ++i)
+    CostInfo.Args.push_back(OBArgs[i]);
 }
 
 void DirectiveEnvironment::gatherPriorityInfo(OperandBundleDef &OB) {
-  assert(!Priority && "Only allowed one OperandBundle with this Id");
-  assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
-  Priority = OB.inputs()[0];
+  assert(OB.input_size() > 0 &&
+    "Priority OperandBundle must have at least function");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  PriorityInfo.Fun = cast<Function>(OBArgs[0]);
+  for (size_t i = 1; i < OBArgs.size(); ++i)
+    PriorityInfo.Args.push_back(OBArgs[i]);
 }
 
 void DirectiveEnvironment::gatherLabelInfo(OperandBundleDef &OB) {
@@ -446,6 +452,22 @@ void DirectiveEnvironment::verifyReductionInitCombInfo() {
       llvm_unreachable("Missing reduction initializer");
     if (!RedInitCombMap.second.Comb)
       llvm_unreachable("Missing reduction combiner");
+  }
+}
+
+void DirectiveEnvironment::verifyCostInfo() {
+  for (auto *V : CostInfo.Args) {
+    if (!valueInDSABundles(DSAInfo, V)
+        && !valueInCapturedBundle(CapturedInfo, V))
+      llvm_unreachable("Cost function argument has no associated DSA or capture");
+  }
+}
+
+void DirectiveEnvironment::verifyPriorityInfo() {
+  for (auto *V : PriorityInfo.Args) {
+    if (!valueInDSABundles(DSAInfo, V)
+        && !valueInCapturedBundle(CapturedInfo, V))
+      llvm_unreachable("Priority function argument has no associated DSA or capture");
   }
 }
 

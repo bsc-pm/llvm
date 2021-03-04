@@ -132,6 +132,18 @@ struct ReductionInitCombInfo {
 
 using DirectiveReductionsInitCombInfo = MapVector<Value *, ReductionInitCombInfo>;
 
+struct DirectiveCostInfo {
+  Function *Fun = nullptr;
+  // The arguments of the call to function.
+  SmallVector<Value *, 4> Args;
+};
+
+struct DirectivePriorityInfo {
+  Function *Fun = nullptr;
+  // The arguments of the call to function.
+  SmallVector<Value *, 4> Args;
+};
+
 struct DirectiveLoopInfo {
   enum {
     LT, // <
@@ -179,11 +191,11 @@ struct DirectiveEnvironment {
   DirectiveVLADimsInfo VLADimsInfo;
   DirectiveDependsInfo DependsInfo;
   DirectiveReductionsInitCombInfo ReductionsInitCombInfo;
+  DirectiveCostInfo CostInfo;
+  DirectivePriorityInfo PriorityInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
-  Value *Priority = nullptr;
   Value *Label = nullptr;
-  Value *Cost = nullptr;
   Value *Wait = nullptr;
   DirectiveCapturedInfo CapturedInfo;
   DirectiveNonPODsInfo NonPODsInfo;
@@ -227,6 +239,8 @@ private:
   void verifyVLADimsInfo();
   void verifyDependInfo();
   void verifyReductionInitCombInfo();
+  void verifyCostInfo();
+  void verifyPriorityInfo();
   void verifyNonPODInfo();
   void verifyLoopInfo();
   void verifyMultiDependInfo();
