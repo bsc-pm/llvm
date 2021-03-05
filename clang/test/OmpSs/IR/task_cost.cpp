@@ -21,7 +21,7 @@ void bar(int n) {
 
 // CHECK: %3 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.COST"(i32 ()* @compute_cost) ]
 // CHECK: %4 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %n.addr), "QUAL.OSS.COST"(i32 (i32*)* @compute_cost.1, i32* %n.addr) ]
-// CHECK: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.COST"(i32 (i32*, i64)* @compute_cost.2, i32* %vla), "QUAL.OSS.CAPTURED"(i64 %1) ]
+// CHECK: %5 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %vla), "QUAL.OSS.VLA.DIMS"(i32* %vla, i64 %1), "QUAL.OSS.COST"(i32 (i32*, i64)* @compute_cost.2, i32* %vla, i64 %1), "QUAL.OSS.CAPTURED"(i64 %1) ]
 // CHECK: %6 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.COST"(i32 ()* @compute_cost.3), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo1:5:9\00") ]
 // CHECK: %8 = call token @llvm.directive.region.entry() [ "DIR.OSS"([5 x i8] c"TASK\00"), "QUAL.OSS.FIRSTPRIVATE"(i32* %call_arg), "QUAL.OSS.COST"(i32 (i32*)* @compute_cost.4, i32* %call_arg), "QUAL.OSS.DECL.SOURCE"([9 x i8] c"foo2:7:9\00") ]
 
