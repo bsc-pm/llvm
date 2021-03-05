@@ -308,7 +308,6 @@ class DSAAttrChecker final : public StmtVisitor<DSAAttrChecker, void> {
   DSAStackTy *Stack;
   Sema &SemaRef;
   bool ErrorFound = false;
-  Stmt *CS = nullptr;
   llvm::SmallVector<Expr *, 4> ImplicitShared;
   llvm::SmallVector<Expr *, 4> ImplicitFirstprivate;
   llvm::SmallSet<ValueDecl *, 4> InnerDecls;
@@ -481,8 +480,8 @@ public:
   ArrayRef<Expr *> getImplicitShared() const { return ImplicitShared; }
   ArrayRef<Expr *> getImplicitFirstprivate() const { return ImplicitFirstprivate; }
 
-  DSAAttrChecker(DSAStackTy *S, Sema &SemaRef, Stmt *CS)
-      : Stack(S), SemaRef(SemaRef), ErrorFound(false), CS(CS) {}
+  DSAAttrChecker(DSAStackTy *S, Sema &SemaRef)
+      : Stack(S), SemaRef(SemaRef), ErrorFound(false) {}
 };
 
 // OSSClauseDSAChecker gathers for each expression in a clause
@@ -850,8 +849,7 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
   // but as we find cost before we register firstprivate
   for (auto *Clause : Clauses) {
     if (isa<OSSCostClause>(Clause) || isa<OSSPriorityClause>(Clause)) {
-      // TODO: Stmt is not used, remove
-      DSAAttrChecker DSAChecker(DSAStack, *this, nullptr);
+      DSAAttrChecker DSAChecker(DSAStack, *this);
       DSAChecker.VisitOSSClause(Clause);
       // FIXME: how to handle an error?
       if (DSAChecker.isErrorFound())
@@ -1366,7 +1364,7 @@ StmtResult Sema::ActOnOmpSsExecutableDirective(ArrayRef<OSSClause *> Clauses,
   ClausesWithImplicit.append(Clauses.begin(), Clauses.end());
   if (AStmt && !CurContext->isDependentContext()) {
     // Check default data sharing attributes for referenced variables.
-    DSAAttrChecker DSAChecker(DSAStack, *this, AStmt);
+    DSAAttrChecker DSAChecker(DSAStack, *this);
     Stmt *S = AStmt;
 
     if (isOmpSsLoopDirective(Kind)) {
