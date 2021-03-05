@@ -712,10 +712,12 @@ bool macho::link(ArrayRef<const char *> argsArr, bool canExitEarly,
   lld::stdoutOS = &stdoutOS;
   lld::stderrOS = &stderrOS;
 
+  errorHandler().cleanupCallback = []() { freeArena(); };
+
+  errorHandler().logName = args::getFilenameWithoutExe(argsArr[0]);
   stderrOS.enable_colors(stderrOS.has_colors());
   // TODO: Set up error handler properly, e.g. the errorLimitExceededMsg
 
-  errorHandler().cleanupCallback = []() { freeArena(); };
 
   MachOOptTable parser;
   opt::InputArgList args = parser.parse(argsArr.slice(1));
@@ -758,6 +760,10 @@ bool macho::link(ArrayRef<const char *> argsArr, bool canExitEarly,
     config->explicitUndefineds.push_back(symtab->addUndefined(
         arg->getValue(), /*file=*/nullptr, /*isWeakRef=*/false));
   }
+
+  for (auto *arg : args.filtered(OPT_U))
+    symtab->addDynamicLookup(arg->getValue());
+
   config->outputFile = args.getLastArgValue(OPT_o, "a.out");
   config->installName =
       args.getLastArgValue(OPT_install_name, config->outputFile);
@@ -790,11 +796,6 @@ bool macho::link(ArrayRef<const char *> argsArr, bool canExitEarly,
     config->namespaceKind = arg->getOption().getID() == OPT_twolevel_namespace
                                 ? NamespaceKind::twolevel
                                 : NamespaceKind::flat;
-    if (config->namespaceKind == NamespaceKind::flat) {
-      warn("Option '" + arg->getOption().getPrefixedName() +
-           "' is not yet implemented. Stay tuned...");
-      config->namespaceKind = NamespaceKind::twolevel;
-    }
   }
 
   config->systemLibraryRoots = getSystemLibraryRoots(args);
@@ -811,6 +812,24 @@ bool macho::link(ArrayRef<const char *> argsArr, bool canExitEarly,
       parseDylibVersion(args, OPT_compatibility_version);
   config->dylibCurrentVersion = parseDylibVersion(args, OPT_current_version);
 
+  // Reject every special character except '.' and '$'
+  // TODO(gkm): verify that this is the proper set of invalid chars
+  StringRef invalidNameChars("!\"#%&'()*+,-/:;<=>?@[\\]^`{|}~");
+  auto validName = [invalidNameChars](StringRef s) {
+    if (s.find_first_of(invalidNameChars) != StringRef::npos)
+      error("invalid name for segment or section: " + s);
+    return s;
+  };
+  for (opt::Arg *arg : args.filtered(OPT_rename_section)) {
+    config->sectionRenameMap[{validName(arg->getValue(0)),
+                              validName(arg->getValue(1))}] = {
+        validName(arg->getValue(2)), validName(arg->getValue(3))};
+  }
+  for (opt::Arg *arg : args.filtered(OPT_rename_segment)) {
+    config->segmentRenameMap[validName(arg->getValue(0))] =
+        validName(arg->getValue(1));
+  }
+
   config->saveTemps = args.hasArg(OPT_save_temps);
 
   if (args.hasArg(OPT_v)) {
@@ -823,8 +842,6 @@ bool macho::link(ArrayRef<const char *> argsArr, bool canExitEarly,
             (config->frameworkSearchPaths.size()
                  ? "\n\t" + join(config->frameworkSearchPaths, "\n\t")
                  : ""));
-    freeArena();
-    return !errorCount();
   }
 
   initLLVM(); // must be run before any call to addFile()
