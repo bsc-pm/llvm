@@ -3026,20 +3026,24 @@ static inline int __kmp_execute_tasks_template(
     // but there might be proxy tasks still executing.
     if (final_spin &&
         KMP_ATOMIC_LD_ACQ(&current_task->td_incomplete_child_tasks) == 0) {
+      if (thread->th.is_unshackled && !*thread_finished) {
+        // Unshackled threads do not decrement
+        *thread_finished = TRUE;
       // First, decrement the #unfinished threads, if that has not already been
       // done.  This decrement might be to the spin location, and result in the
       // termination condition being satisfied.
-      if (!*thread_finished) {
-        // Unshackled threads do not decrement
-        if (!thread->th.is_unshackled) {
+      } else if (!thread->th.is_unshackled && !*thread_finished) {
+        // At least one unshackled thread is in my task_team. It can potencially
+        // create tasks so I stay here.
+        if (KMP_ATOMIC_LD_ACQ(&task_team->tt.tt_unfinished_unshackleds) == 0) {
           kmp_int32 count;
 
           count = KMP_ATOMIC_DEC(unfinished_threads) - 1;
           KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d dec "
                         "unfinished_threads to %d task_team=%p\n",
                         gtid, count, task_team));
+          *thread_finished = TRUE;
         }
-        *thread_finished = TRUE;
       }
 
       // It is now unsafe to reference thread->th.th_team !!!
@@ -3425,6 +3429,7 @@ static kmp_task_team_t *__kmp_allocate_task_team(kmp_info_t *thread,
   task_team->tt.tt_nproc = nthreads = team->t.t_nproc;
 
   KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_threads, nthreads);
+  KMP_ATOMIC_ST_REL(&task_team->tt.tt_unfinished_unshackleds, 0);
   TCW_4(task_team->tt.tt_active, TRUE);
 
   KA_TRACE(20, ("__kmp_allocate_task_team: T#%d exiting; task_team = %p "

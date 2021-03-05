@@ -2354,6 +2354,9 @@ typedef struct kmp_base_task_team {
   std::atomic<kmp_int32> tt_unfinished_threads; /* #threads still active */
 
   KMP_ALIGN_CACHE
+  std::atomic<kmp_int32> tt_unfinished_unshackleds; /* #unshackled threads still active */
+
+  KMP_ALIGN_CACHE
   volatile kmp_uint32
       tt_active; /* is the team still actively executing tasks */
 } kmp_base_task_team_t;

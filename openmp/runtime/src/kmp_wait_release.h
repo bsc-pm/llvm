@@ -347,9 +347,9 @@ final_spin=FALSE)
             // x86 needs this.
             updateHWFPControl(__kmp_threads[i]->th.th_team);
 
-            std::atomic<kmp_int32> *unfinished_threads;
-            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_threads);
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
             break;
           }
         }
@@ -377,9 +377,9 @@ final_spin=FALSE)
         }
         // Unshackled clean up
         if (this_thr->th.is_unshackled) {
-            std::atomic<kmp_int32> *unfinished_threads;
-            unfinished_threads = &(task_team->tt.tt_unfinished_threads);
-            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_threads);
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
         }
