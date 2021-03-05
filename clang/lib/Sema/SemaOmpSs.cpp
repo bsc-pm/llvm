@@ -3755,6 +3755,10 @@ ExprResult Sema::CheckNonNegativeIntegerValue(Expr *ValExpr,
     return ExprError();
 
   ValExpr = Res.get();
+
+  if (ValExpr->containsErrors())
+    return Res.get();
+
   // The expression must evaluate to a non-negative integer value.
   if (Optional<llvm::APSInt> Result =
           ValExpr->getIntegerConstantExpr(Context)) {
@@ -3853,7 +3857,7 @@ ExprResult Sema::CheckSignedIntegerValue(Expr *ValExpr) {
       return ExprError();
     return Value.get();
   }
-  return ExprEmpty();
+  return ValExpr;
 }
 
 OSSClause *Sema::ActOnOmpSsPriorityClause(Expr *E,
