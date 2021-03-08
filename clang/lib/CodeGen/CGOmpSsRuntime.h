@@ -107,11 +107,13 @@ struct OSSTaskDataTy final {
   const Expr *Priority = nullptr;
   const Expr *Label = nullptr;
   bool Wait = false;
+  const Expr *Onready = nullptr;
 
   bool empty() const {
     return DSAs.empty() && Deps.empty() &&
       Reductions.empty() &&
-      !If && !Final && !Cost && !Priority;
+      !If && !Final && !Cost && !Priority &&
+      !Label && !Onready;
   }
 };
 
@@ -170,9 +172,24 @@ private:
   // List of OmpSs-2 specific metadata to be added to llvm.module.flags
   SmallVector<llvm::Metadata *, 4> MetadataList;
 
-  // This is used by cost/priority clauses to build a bundle with the form
+  // This is used by cost/priority/onready clauses to build a bundle with the form
   // (func_ptr, arg0, arg1... argN)
   void EmitWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &)> Body,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  // This is used by cost/priority clauses to build a bundle with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitScalarWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
+
+  // This is used by onready clauses to build a bundle with the form
+  // (func_ptr, arg0, arg1... argN)
+  void EmitIgnoredWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);

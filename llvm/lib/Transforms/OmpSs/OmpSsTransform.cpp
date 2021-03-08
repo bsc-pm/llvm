@@ -221,6 +221,10 @@ struct OmpSs {
         Type *RegisterInfoFuncTy =
           FunctionType::get(Type::getVoidTy(M.getContext()),
                             /*IsVarArgs=*/false)->getPointerTo();
+        // void (*onready_action)(void *args_block);
+        Type *OnreadyActionFuncTy =
+          FunctionType::get(Type::getVoidTy(M.getContext()),
+                            /*IsVarArgs=*/false)->getPointerTo();
         // void (*get_priority)(void *, nanos6_priority_t *);
         // void (*get_priority)(void *, long int *);
         Type *GetPriorityFuncTy =
@@ -250,7 +254,7 @@ struct OmpSs {
         Type *TaskTypeDataTy =
           Type::getInt8PtrTy(M.getContext());
 
-        instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, GetPriorityFuncTy,
+        instance->Ty->setBody({NumSymbolsTy, RegisterInfoFuncTy, OnreadyActionFuncTy, GetPriorityFuncTy,
                                ImplCountTy, TaskImplInfoTy, DestroyArgsBlockFuncTy,
                                DuplicateArgsBlockFuncTy, ReductInitsFuncTy, ReductCombsFuncTy,
                                TaskTypeDataTy
@@ -974,6 +978,25 @@ struct OmpSs {
     Value *Priority = BBBuilder.CreateCall(PriorityInfo.Fun, PriorityInfo.Args);
     Value *PrioritySExt = BBBuilder.CreateSExt(Priority, Type::getInt64Ty(M.getContext()));
     BBBuilder.CreateStore(PrioritySExt, PriorityArg);
+    for (Instruction &I : Entry) {
+      Function::arg_iterator AI = F->arg_begin();
+      for (auto It = StructToIdxMap.begin();
+             It != StructToIdxMap.end(); ++It, ++AI) {
+        if (isReplaceableValue(It->first))
+          I.replaceUsesOfWith(It->first, &*AI);
+      }
+    }
+  }
+
+  void unpackOnreadyAndRewrite(
+      Module &M, const DirectiveOnreadyInfo &OnreadyInfo, Function *F,
+      const MapVector<Value *, size_t> &StructToIdxMap) {
+    BasicBlock::Create(M.getContext(), "entry", F);
+    BasicBlock &Entry = F->getEntryBlock();
+    F->getEntryBlock().getInstList().push_back(ReturnInst::Create(M.getContext()));
+    IRBuilder<> BBBuilder(&F->getEntryBlock().back());
+
+    BBBuilder.CreateCall(OnreadyInfo.Fun, OnreadyInfo.Args);
     for (Instruction &I : Entry) {
       Function::arg_iterator AI = F->arg_begin();
       for (auto It = StructToIdxMap.begin();
@@ -1816,6 +1839,33 @@ struct OmpSs {
     return OlPriorityFuncVar;
   }
 
+  Function *createOnreadyOlFunc(
+      Module &M, Function &F, int taskNum,
+      const MapVector<Value *, size_t> &TaskArgsToStructIdxMap,
+      StructType *TaskArgsTy, const DirectiveInfo &DirInfo,
+      ArrayRef<Type *> TaskTypeList, ArrayRef<StringRef> TaskNameList) {
+
+    const DirectiveEnvironment &DirEnv = DirInfo.DirEnv;
+    const DirectiveOnreadyInfo &OnreadyInfo = DirEnv.OnreadyInfo;
+
+    if (!OnreadyInfo.Fun)
+      return nullptr;
+
+    Function *UnpackOnreadyFuncVar = createUnpackOlFunction(M, F,
+                               ("nanos6_unpacked_onready_" + F.getName() + Twine(taskNum)).str(),
+                               TaskTypeList, TaskNameList, {}, {});
+    unpackOnreadyAndRewrite(M, OnreadyInfo, UnpackOnreadyFuncVar, TaskArgsToStructIdxMap);
+
+    Function *OlOnreadyFuncVar
+      = createUnpackOlFunction(M, F,
+                               ("nanos6_ol_priority_" + F.getName() + Twine(taskNum)).str(),
+                               {TaskArgsTy->getPointerTo()}, {"task_args"},
+                               {}, {});
+    olCallToUnpack(M, DirInfo, TaskArgsToStructIdxMap, OlOnreadyFuncVar, UnpackOnreadyFuncVar);
+
+    return OlOnreadyFuncVar;
+  }
+
   // typedef enum {
   //         //! Specifies that the task will be a final task
   //         nanos6_final_task = (1 << 0),
@@ -2002,6 +2052,9 @@ struct OmpSs {
     Function *OlPriorityFuncVar =
       createPriorityOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
 
+    Function *OlOnreadyFuncVar =
+      createOnreadyOlFunc(M, F, taskNum, TaskArgsToStructIdxMap, TaskArgsTy, DirInfo, TaskTypeList, TaskNameList);
+
     // 3. Create Nanos6 task data structures info
     GlobalVariable *TaskInvInfoVar =
       cast<GlobalVariable>(
@@ -2098,23 +2151,27 @@ struct OmpSs {
         ? ConstantExpr::getPointerCast(OlDepsFuncVar,
                                        Nanos6TaskInfo::getInstance(M).getType()->getElementType(1))
         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(1))),
-      OlPriorityFuncVar
-        ? ConstantExpr::getPointerCast(OlPriorityFuncVar,
+      OlOnreadyFuncVar
+        ? ConstantExpr::getPointerCast(OlOnreadyFuncVar,
                                        Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))
         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(2))),
-      ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3), 1),
-      ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(4)),
+      OlPriorityFuncVar
+        ? ConstantExpr::getPointerCast(OlPriorityFuncVar,
+                                       Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))
+        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(3))),
+      ConstantInt::get(Nanos6TaskInfo::getInstance(M).getType()->getElementType(4), 1),
+      ConstantExpr::getPointerCast(TaskImplInfoVar, Nanos6TaskInfo::getInstance(M).getType()->getElementType(5)),
       OlDestroyArgsFuncVar
         ? ConstantExpr::getPointerCast(OlDestroyArgsFuncVar,
-                                       Nanos6TaskInfo::getInstance(M).getType()->getElementType(5))
-        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(5))),
-      OlDuplicateArgsFuncVar
-        ? ConstantExpr::getPointerCast(OlDuplicateArgsFuncVar,
                                        Nanos6TaskInfo::getInstance(M).getType()->getElementType(6))
         : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(6))),
-      ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
-      ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
-      ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9)))));
+      OlDuplicateArgsFuncVar
+        ? ConstantExpr::getPointerCast(OlDuplicateArgsFuncVar,
+                                       Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))
+        : ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(7))),
+      ConstantExpr::getPointerCast(TaskRedInitsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(8))),
+      ConstantExpr::getPointerCast(TaskRedCombsVar, cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(9))),
+      ConstantPointerNull::get(cast<PointerType>(Nanos6TaskInfo::getInstance(M).getType()->getElementType(10)))));
 
     registerTaskInfo(M, TaskInfoVar);
 

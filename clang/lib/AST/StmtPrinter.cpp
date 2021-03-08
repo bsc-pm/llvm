@@ -722,6 +722,12 @@ void OSSClausePrinter::VisitOSSWaitClause(OSSWaitClause *Node) {
   OS << "wait";
 }
 
+void OSSClausePrinter::VisitOSSOnreadyClause(OSSOnreadyClause *Node) {
+  OS << "onready(";
+  Node->getExpression()->printPretty(OS, nullptr, Policy, 0);
+  OS << ")";
+}
+
 void OSSClausePrinter::VisitOSSDefaultClause(OSSDefaultClause *Node) {
   OS << "default("
      << getOmpSsSimpleClauseTypeName(OSSC_default, Node->getDefaultKind())

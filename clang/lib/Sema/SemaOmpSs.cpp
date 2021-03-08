@@ -848,7 +848,8 @@ void Sema::ActOnOmpSsAfterClauseGathering(SmallVectorImpl<OSSClause *>& Clauses)
   // Here we expect 'a' to be shared because of the dependency
   // but as we find cost before we register firstprivate
   for (auto *Clause : Clauses) {
-    if (isa<OSSCostClause>(Clause) || isa<OSSPriorityClause>(Clause)) {
+    if (isa<OSSCostClause>(Clause) || isa<OSSPriorityClause>(Clause)
+        || isa<OSSOnreadyClause>(Clause)) {
       DSAAttrChecker DSAChecker(DSAStack, *this);
       DSAChecker.VisitOSSClause(Clause);
       // FIXME: how to handle an error?
@@ -2166,7 +2167,7 @@ static void checkOutlineDependency(Sema &S, Expr *RefExpr, bool OSSSyntax=false)
 Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     DeclGroupPtrTy DG,
     Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-    Expr *Label,
+    Expr *Label, Expr *Onready,
     bool Wait,
     ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
     ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -2229,7 +2230,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     ++ParI;
   }
 
-  ExprResult IfRes, FinalRes, CostRes, PriorityRes, LabelRes;
+  ExprResult IfRes, FinalRes, CostRes, PriorityRes, LabelRes, OnreadyRes;
   if (If) {
     IfRes = VerifyBooleanConditionWithCleanups(If, If->getExprLoc());
   }
@@ -2245,6 +2246,9 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
   }
   if (Label) {
     LabelRes = CheckIsConstCharPtrConvertibleExpr(Label);
+  }
+  if (Onready) {
+    OnreadyRes = Onready;
   }
   for (Expr *RefExpr : Ins) {
     checkOutlineDependency(*this, RefExpr, /*OSSSyntax=*/true);
@@ -2312,6 +2316,7 @@ Sema::DeclGroupPtrTy Sema::ActOnOmpSsDeclareTaskDirective(
     IfRes.get(), FinalRes.get(), CostRes.get(), PriorityRes.get(),
     LabelRes.get(),
     Wait,
+    OnreadyRes.get(),
     const_cast<Expr **>(Ins.data()), Ins.size(),
     const_cast<Expr **>(Outs.data()), Outs.size(),
     const_cast<Expr **>(Inouts.data()), Inouts.size(),
@@ -3882,6 +3887,16 @@ OSSClause *Sema::ActOnOmpSsLabelClause(Expr *E,
   return new (Context) OSSLabelClause(Res.get(), StartLoc, LParenLoc, EndLoc);
 }
 
+OSSClause *Sema::ActOnOmpSsOnreadyClause(Expr *E,
+                                         SourceLocation StartLoc,
+                                         SourceLocation LParenLoc,
+                                         SourceLocation EndLoc) {
+  if (!E)
+    return nullptr;
+
+  return new (Context) OSSOnreadyClause(E, StartLoc, LParenLoc, EndLoc);
+}
+
 OSSClause *Sema::ActOnOmpSsChunksizeClause(
     Expr *E, SourceLocation StartLoc,
     SourceLocation LParenLoc, SourceLocation EndLoc) {
@@ -3928,6 +3943,9 @@ OSSClause *Sema::ActOnOmpSsSingleExprClause(OmpSsClauseKind Kind, Expr *Expr,
     break;
   case OSSC_label:
     Res = ActOnOmpSsLabelClause(Expr, StartLoc, LParenLoc, EndLoc);
+    break;
+  case OSSC_onready:
+    Res = ActOnOmpSsOnreadyClause(Expr, StartLoc, LParenLoc, EndLoc);
     break;
   case OSSC_chunksize:
     Res = ActOnOmpSsChunksizeClause(Expr, StartLoc, LParenLoc, EndLoc);

@@ -319,6 +319,11 @@ LLVMContext::LLVMContext() : pImpl(new LLVMContextImpl(*this)) {
   assert(OSSDeclSourceEntry->second == LLVMContext::OB_oss_decl_source &&
          "oss_decl_source operand bundle id drifted!");
   (void)OSSDeclSourceEntry;
+
+  auto *OSSOnreadyEntry = pImpl->getOrInsertBundleTag("QUAL.OSS.ONREADY");
+  assert(OSSOnreadyEntry->second == LLVMContext::OB_oss_onready &&
+         "oss_onready operand bundle id drifted!");
+  (void)OSSOnreadyEntry;
   // END OmpSs IDs
 
   SyncScope::ID SingleThreadSSID =

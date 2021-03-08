@@ -3468,6 +3468,7 @@ def OSSTaskDecl : Attr {
     ExprArgument<"CostExpr">, ExprArgument<"PriorityExpr">,
     ExprArgument<"LabelExpr">,
     BoolArgument<"Wait", 0>,
+    ExprArgument<"OnreadyExpr">,
     // in()
     VariadicExprArgument<"Ins">, VariadicExprArgument<"Outs">,
     VariadicExprArgument<"Inouts">,

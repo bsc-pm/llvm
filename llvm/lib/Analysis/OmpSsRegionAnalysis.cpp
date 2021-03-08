@@ -292,6 +292,15 @@ void DirectiveEnvironment::gatherLabelInfo(OperandBundleDef &OB) {
   Label = OB.inputs()[0];
 }
 
+void DirectiveEnvironment::gatherOnreadyInfo(OperandBundleDef &OB) {
+  assert(OB.input_size() > 0 &&
+    "Onready OperandBundle must have at least function");
+  ArrayRef<Value *> OBArgs = OB.inputs();
+  OnreadyInfo.Fun = cast<Function>(OBArgs[0]);
+  for (size_t i = 1; i < OBArgs.size(); ++i)
+    OnreadyInfo.Args.push_back(OBArgs[i]);
+}
+
 void DirectiveEnvironment::gatherWaitInfo(OperandBundleDef &OB) {
   assert(!Wait && "Only allowed one OperandBundle with this Id");
   assert(OB.input_size() == 1 && "Only allowed one Value per OperandBundle");
@@ -471,6 +480,14 @@ void DirectiveEnvironment::verifyPriorityInfo() {
   }
 }
 
+void DirectiveEnvironment::verifyOnreadyInfo() {
+  for (auto *V : OnreadyInfo.Args) {
+    if (!valueInDSABundles(DSAInfo, V)
+        && !valueInCapturedBundle(CapturedInfo, V))
+      llvm_unreachable("Onready function argument has no associated DSA or capture");
+  }
+}
+
 void DirectiveEnvironment::verifyNonPODInfo() {
   for (const auto &InitMap : NonPODsInfo.Inits) {
     // INIT may only be in private clauses
@@ -521,6 +538,9 @@ void DirectiveEnvironment::verify() {
     verifyDependInfo();
 
   verifyReductionInitCombInfo();
+  verifyCostInfo();
+  verifyPriorityInfo();
+  verifyOnreadyInfo();
   verifyNonPODInfo();
   verifyLoopInfo();
   verifyMultiDependInfo();
@@ -582,6 +602,9 @@ DirectiveEnvironment::DirectiveEnvironment(const Instruction *I) {
       break;
     case LLVMContext::OB_oss_label:
       gatherLabelInfo(OBDef);
+      break;
+    case LLVMContext::OB_oss_onready:
+      gatherOnreadyInfo(OBDef);
       break;
     case LLVMContext::OB_oss_wait:
       gatherWaitInfo(OBDef);

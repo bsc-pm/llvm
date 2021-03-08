@@ -59,6 +59,7 @@ enum OmpSsBundleKind {
   OSSB_chunksize,
   OSSB_grainsize,
   OSSB_wait,
+  OSSB_onready,
   OSSB_in,
   OSSB_out,
   OSSB_inout,
@@ -135,6 +136,8 @@ const char *getBundleStr(OmpSsBundleKind Kind) {
     return "QUAL.OSS.LOOP.GRAINSIZE";
   case OSSB_wait:
     return "QUAL.OSS.WAIT";
+  case OSSB_onready:
+    return "QUAL.OSS.ONREADY";
   case OSSB_in:
     return "QUAL.OSS.DEP.IN";
   case OSSB_out:
@@ -1538,7 +1541,8 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 
 void CGOmpSsRuntime::EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
-    CodeGenFunction &CGF, const Expr *E,
+    CodeGenFunction &CGF, const Expr *E, QualType Q,
+    llvm::function_ref<void(CodeGenFunction &)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   OSSExprInfoGathering CallVisitor(CGF);
@@ -1546,14 +1550,7 @@ void CGOmpSsRuntime::EmitWrapperCallBundle(
 
   CodeGenFunction NewCGF(CGF.CGM);
 
-  SmallVector<QualType, 1> RetTypes{E->getType()};
-
-  auto Body = [&E](CodeGenFunction &NewCGF) {
-    llvm::Value *V = NewCGF.EmitScalarExpr(E);
-
-    Address RetAddr = NewCGF.ReturnValue;
-    NewCGF.Builder.CreateStore(V, RetAddr);
-  };
+  SmallVector<QualType, 1> RetTypes{Q};
 
   auto *Func = createCallWrapperFunc(
     CGF,
@@ -1585,6 +1582,45 @@ void CGOmpSsRuntime::EmitWrapperCallBundle(
   }
 
   TaskInfo.emplace_back(Name, List);
+}
+
+void CGOmpSsRuntime::EmitScalarWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
+  auto Body = [&E](CodeGenFunction &NewCGF) {
+    llvm::Value *V = NewCGF.EmitScalarExpr(E);
+
+    Address RetAddr = NewCGF.ReturnValue;
+    NewCGF.Builder.CreateStore(V, RetAddr);
+  };
+  EmitWrapperCallBundle(
+    Name, FuncName, CGF, E, E->getType(), Body, TaskInfo);
+
+}
+
+void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
+    std::string Name, std::string FuncName,
+    CodeGenFunction &CGF, const Expr *E,
+    SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
+
+  auto Body = [&E](CodeGenFunction &NewCGF) {
+    if (const auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (DRE->isNonOdrUse() == NOUR_Unevaluated)
+        return;
+
+      CodeGenFunction::ConstantEmission CE = NewCGF.tryEmitAsConstant(const_cast<DeclRefExpr*>(DRE));
+      if (CE && !CE.isReference())
+        // Constant value, no need to annotate it.
+        return;
+    }
+
+    NewCGF.EmitIgnoredExpr(E);
+  };
+  EmitWrapperCallBundle(
+    Name, FuncName, CGF, E, CGF.getContext().VoidTy, Body, TaskInfo);
+
 }
 
 void CGOmpSsRuntime::EmitDependencyList(
@@ -2451,11 +2487,11 @@ void CGOmpSsRuntime::EmitDirectiveData(
   }
 
   if (Data.Cost) {
-    EmitWrapperCallBundle(
+    EmitScalarWrapperCallBundle(
       getBundleStr(OSSB_cost), "compute_cost", CGF, Data.Cost, TaskInfo);
   }
   if (Data.Priority) {
-    EmitWrapperCallBundle(
+    EmitScalarWrapperCallBundle(
       getBundleStr(OSSB_priority), "compute_priority", CGF, Data.Priority, TaskInfo);
   }
   if (Data.Label) {
@@ -2466,6 +2502,10 @@ void CGOmpSsRuntime::EmitDirectiveData(
     TaskInfo.emplace_back(
         getBundleStr(OSSB_wait),
         llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
+  }
+  if (Data.Onready) {
+    EmitIgnoredWrapperCallBundle(
+      getBundleStr(OSSB_onready), "compute_onready", CGF, Data.Onready, TaskInfo);
   }
 
   if (!LoopData.empty()) {
@@ -2656,11 +2696,11 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       TaskInfo.emplace_back(getBundleStr(OSSB_final), CGF.EvaluateExprAsBool(E));
     }
     if (const Expr *E = Attr->getCostExpr()) {
-      EmitWrapperCallBundle(
+      EmitScalarWrapperCallBundle(
         getBundleStr(OSSB_cost), "compute_cost", CGF, E, TaskInfo);
     }
     if (const Expr *E = Attr->getPriorityExpr()) {
-      EmitWrapperCallBundle(
+      EmitScalarWrapperCallBundle(
         getBundleStr(OSSB_priority), "compute_priority", CGF, E, TaskInfo);
     }
     if (const Expr *E = Attr->getLabelExpr()) {
@@ -2671,6 +2711,10 @@ RValue CGOmpSsRuntime::emitTaskFunction(CodeGenFunction &CGF,
       TaskInfo.emplace_back(
           getBundleStr(OSSB_wait),
           llvm::ConstantInt::getTrue(CGM.getLLVMContext()));
+    }
+    if (const Expr *E = Attr->getOnreadyExpr()) {
+      EmitIgnoredWrapperCallBundle(
+        getBundleStr(OSSB_onready), "compute_onready", CGF, E, TaskInfo);
     }
     // in()
     for (const Expr *E : Attr->ins()) {

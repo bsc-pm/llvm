@@ -91,13 +91,14 @@ static ExprResult *getSingleClause(
     OmpSsClauseKind CKind,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &LabelRes) {
+    ExprResult &LabelRes, ExprResult &OnreadyRes) {
 
     if (CKind == OSSC_if) return &IfRes;
     if (CKind == OSSC_final) return &FinalRes;
     if (CKind == OSSC_cost) return &CostRes;
     if (CKind == OSSC_priority) return &PriorityRes;
     if (CKind == OSSC_label) return &LabelRes;
+    if (CKind == OSSC_onready) return &OnreadyRes;
     return nullptr;
 }
 
@@ -166,7 +167,7 @@ static bool parseDeclareTaskClauses(
     Parser &P,
     ExprResult &IfRes, ExprResult &FinalRes,
     ExprResult &CostRes, ExprResult &PriorityRes,
-    ExprResult &LabelRes,
+    ExprResult &LabelRes, ExprResult &OnreadyRes,
     bool &Wait,
     SmallVectorImpl<Expr *> &Ins, SmallVectorImpl<Expr *> &Outs,
     SmallVectorImpl<Expr *> &Inouts, SmallVectorImpl<Expr *> &Concurrents,
@@ -216,7 +217,8 @@ static bool parseDeclareTaskClauses(
     case OSSC_final:
     case OSSC_cost:
     case OSSC_priority:
-    case OSSC_label: {
+    case OSSC_label:
+    case OSSC_onready: {
       P.ConsumeToken();
       if (FirstClauses[CKind]) {
         P.Diag(Tok, diag::err_oss_more_one_clause)
@@ -226,7 +228,7 @@ static bool parseDeclareTaskClauses(
       SourceLocation RLoc;
       SingleClause = getSingleClause(CKind, IfRes, FinalRes,
                                      CostRes, PriorityRes,
-                                     LabelRes);
+                                     LabelRes, OnreadyRes);
       *SingleClause = P.ParseOmpSsParensExpr(getOmpSsClauseName(CKind), RLoc);
 
       if (SingleClause->isInvalid())
@@ -338,6 +340,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
   ExprResult CostRes;
   ExprResult PriorityRes;
   ExprResult LabelRes;
+  ExprResult OnreadyRes;
   bool Wait = false;
   SmallVector<Expr *, 4> Ins;
   SmallVector<Expr *, 4> Outs;
@@ -364,7 +367,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       parseDeclareTaskClauses(*this,
                               IfRes, FinalRes,
                               CostRes, PriorityRes,
-                              LabelRes,
+                              LabelRes, OnreadyRes,
                               Wait,
                               Ins, Outs, Inouts,
                               Concurrents, Commutatives,
@@ -389,7 +392,7 @@ Parser::ParseOSSDeclareTaskClauses(Parser::DeclGroupPtrTy Ptr,
       Ptr,
       IfRes.get(), FinalRes.get(),
       CostRes.get(), PriorityRes.get(),
-      LabelRes.get(),
+      LabelRes.get(), OnreadyRes.get(),
       Wait,
       Ins, Outs, Inouts,
       Concurrents, Commutatives,
@@ -755,6 +758,7 @@ OSSClause *Parser::ParseOmpSsClause(OmpSsDirectiveKind DKind,
   case OSSC_cost:
   case OSSC_priority:
   case OSSC_label:
+  case OSSC_onready:
   case OSSC_chunksize:
   case OSSC_grainsize:
     if (!FirstClause) {

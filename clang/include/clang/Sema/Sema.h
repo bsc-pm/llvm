@@ -11346,7 +11346,7 @@ public:
   DeclGroupPtrTy ActOnOmpSsDeclareTaskDirective(
       DeclGroupPtrTy DG,
       Expr *If, Expr *Final, Expr *Cost, Expr *Priority,
-      Expr *Label,
+      Expr *Label, Expr *Onready,
       bool Wait,
       ArrayRef<Expr *> Ins, ArrayRef<Expr *> Outs, ArrayRef<Expr *> Inouts,
       ArrayRef<Expr *> Concurrents, ArrayRef<Expr *> Commutatives,
@@ -11452,6 +11452,10 @@ public:
                                       SourceLocation EndLoc);
   /// Called on well-formed 'label' clause.
   OSSClause *ActOnOmpSsLabelClause(Expr *E, SourceLocation StartLoc,
+                                   SourceLocation LParenLoc,
+                                   SourceLocation EndLoc);
+  /// Called on well-formed 'onready' clause.
+  OSSClause *ActOnOmpSsOnreadyClause(Expr *E, SourceLocation StartLoc,
                                    SourceLocation LParenLoc,
                                    SourceLocation EndLoc);
   /// Called on well-formed 'chunksize' clause.

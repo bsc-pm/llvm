@@ -196,6 +196,11 @@ void OSSTaskDeclAttr::printPrettyPragma(
   }
   if (getWait())
       OS << " wait";
+  if (auto *E = getOnreadyExpr()) {
+    OS << " onready(";
+    E->printPretty(OS, nullptr, Policy);
+    OS << ")";
+  }
 }
 
 void OMPDeclareTargetDeclAttr::printPrettyPragma(

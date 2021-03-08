@@ -1639,6 +1639,17 @@ public:
                                            EndLoc);
   }
 
+  /// Build a new OmpSs 'onready' clause.
+  ///
+  /// By default, performs semantic analysis to build the new OmpSs clause.
+  /// Subclasses may override this routine to provide different behavior.
+  OSSClause *RebuildOSSOnreadyClause(
+      Expr *E, SourceLocation StartLoc,
+      SourceLocation LParenLoc, SourceLocation EndLoc) {
+    return getSema().ActOnOmpSsOnreadyClause(
+      E, StartLoc, LParenLoc, EndLoc);
+  }
+
   /// Build a new OmpSs 'chunksize' clause.
   ///
   /// By default, performs semantic analysis to build the new OmpSs clause.
@@ -10361,6 +10372,15 @@ OSSClause *TreeTransform<Derived>::TransformOSSLabelClause(OSSLabelClause *C) {
     return nullptr;
   return getDerived().RebuildOSSLabelClause(E.get(), C->getBeginLoc(),
                                             C->getLParenLoc(), C->getEndLoc());
+}
+
+template <typename Derived>
+OSSClause *TreeTransform<Derived>::TransformOSSOnreadyClause(OSSOnreadyClause *C) {
+  ExprResult E = getDerived().TransformExpr(C->getExpression());
+  if (E.isInvalid())
+    return nullptr;
+  return getDerived().RebuildOSSOnreadyClause(
+    E.get(), C->getBeginLoc(), C->getLParenLoc(), C->getEndLoc());
 }
 
 template <typename Derived>

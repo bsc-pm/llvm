@@ -144,6 +144,12 @@ struct DirectivePriorityInfo {
   SmallVector<Value *, 4> Args;
 };
 
+struct DirectiveOnreadyInfo {
+  Function *Fun = nullptr;
+  // The arguments of the call to function.
+  SmallVector<Value *, 4> Args;
+};
+
 struct DirectiveLoopInfo {
   enum {
     LT, // <
@@ -193,6 +199,7 @@ struct DirectiveEnvironment {
   DirectiveReductionsInitCombInfo ReductionsInitCombInfo;
   DirectiveCostInfo CostInfo;
   DirectivePriorityInfo PriorityInfo;
+  DirectiveOnreadyInfo OnreadyInfo;
   Value *Final = nullptr;
   Value *If = nullptr;
   Value *Label = nullptr;
@@ -221,6 +228,7 @@ private:
   void gatherCostInfo(OperandBundleDef &OBDef);
   void gatherPriorityInfo(OperandBundleDef &OBDef);
   void gatherLabelInfo(OperandBundleDef &OBDef);
+  void gatherOnreadyInfo(OperandBundleDef &OBDef);
   void gatherWaitInfo(OperandBundleDef &OBDef);
   void gatherCapturedInfo(OperandBundleDef &OBDef);
   void gatherNonPODInitInfo(OperandBundleDef &OBDef);
@@ -241,6 +249,7 @@ private:
   void verifyReductionInitCombInfo();
   void verifyCostInfo();
   void verifyPriorityInfo();
+  void verifyOnreadyInfo();
   void verifyNonPODInfo();
   void verifyLoopInfo();
   void verifyMultiDependInfo();

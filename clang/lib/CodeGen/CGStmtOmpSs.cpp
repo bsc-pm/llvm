@@ -169,6 +169,15 @@ static void AddWaitData(const OSSExecutableDirective &S, bool &Wait) {
   }
 }
 
+static void AddOnreadyData(const OSSExecutableDirective &S, const Expr * &OnreadyExpr) {
+  bool Found = false;
+  for (const auto *C : S.getClausesOfKind<OSSOnreadyClause>()) {
+    assert(!Found);
+    Found = true;
+    OnreadyExpr = C->getExpression();
+  }
+}
+
 static void AddReductionData(const OSSExecutableDirective &S, OSSTaskReductionDataTy &Reductions) {
   for (const auto *C : S.getClausesOfKind<OSSReductionClause>()) {
     auto LHSRef = C->lhs_exprs().begin();
@@ -199,6 +208,7 @@ static void AddTaskData(const OSSExecutableDirective &S, OSSTaskDataTy &TaskData
   AddPriorityData(S, TaskData.Priority);
   AddLabelData(S, TaskData.Label);
   AddWaitData(S, TaskData.Wait);
+  AddOnreadyData(S, TaskData.Onready);
   AddReductionData(S, TaskData.Reductions);
 }
 
