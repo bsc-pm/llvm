@@ -4413,6 +4413,12 @@ kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
     (kmp_taskdata_t *)__kmp_allocate(sizeof(kmp_taskdata_t) * 1);
   thread->th.th_current_task = task;
 
+  thread->th.allowed_teams_capacity = 2;
+  thread->th.allowed_teams_length = 0;
+  thread->th.allowed_teams = (kmp_task_team_t **)__kmp_allocate(
+      sizeof(kmp_task_team_t *) * thread->th.allowed_teams_capacity);
+  __kmp_init_bootstrap_lock(&thread->th.allowed_teams_lock);
+
   KF_TRACE(
       10,
       ("__kmp_allocate_unshackled_thread(enter): T#:%d team=%p task=%p, reinit=%s\n",

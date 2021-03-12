@@ -319,6 +319,10 @@ final_spin=FALSE)
   oversubscribed = (TCR_4(__kmp_nth) > __kmp_avail_proc);
   KMP_MB();
 
+  // Unshackleds threads will try to pick work from the same team if possible.
+  // Once exhausted we will cycle through them.
+  int team_task_to_pick = 0;
+
     // Main wait spin loop
   while (flag->notdone_check()) {
     kmp_task_team_t *task_team = NULL;
@@ -332,34 +336,39 @@ final_spin=FALSE)
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
       if (this_thr->th.is_unshackled && *this_thr->th.is_unshackled_active) {
-        // This is an unshackled thread, give it a chance to execute work from
-        // some other task team.
-        for (int i = 0; i < __kmp_threads_capacity; i++) {
-          if (__kmp_threads[i] == NULL)
-            continue;
-          if (__kmp_threads[i] != this_thr &&
-              !__kmp_threads[i]->th.is_unshackled &&
-              __kmp_threads[i]->th.th_team != NULL &&
-              __kmp_threads[i]->th.th_task_team != NULL) {
-            task_team = __kmp_threads[i]->th.th_task_team;
+        __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+        // FIXME: don't always start from 0 once we add the initial task_teams
+        // for (int i = 0; i < this_thr->th.allowed_teams_length; i++)
+        if (team_task_to_pick < this_thr->th.allowed_teams_length)
+        {
+            task_team = this_thr->th.allowed_teams[team_task_to_pick];
             this_thr->th.th_task_team = task_team;
 
-            // x86 needs this.
-            updateHWFPControl(__kmp_threads[i]->th.th_team);
+            // FIXME - Why we need this :(
+            // x86 needs this?
+            updateHWFPControl(
+                task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
             std::atomic<kmp_int32> *unfinished_unshackleds;
             unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
             /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
             break;
-          }
+        }
+        if (task_team == NULL) {
+          __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
         }
       }
       if (task_team != NULL) {
         if (TCR_SYNC_4(task_team->tt.tt_active)) {
           if (KMP_TASKING_ENABLED(task_team)) {
-            flag->execute_tasks(
+            bool something_was_executed = flag->execute_tasks(
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+            if (this_thr->th.is_unshackled && !something_was_executed) {
+              // This team seems exhausted so consider another one.
+              team_task_to_pick =
+                  (team_task_to_pick + 1) % this_thr->th.allowed_teams_length;
+            }
           } else {
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           }
@@ -382,6 +391,7 @@ final_spin=FALSE)
             /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+            __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
         }
       } else {
         this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;

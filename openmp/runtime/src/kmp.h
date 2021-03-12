@@ -2555,6 +2555,13 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   bool *is_unshackled_active; // Reference to the is_unshackled_thread_active array.
                               // This is for convenience.
   int unshackled_id;
+
+  // List of teams we can enter as an unshackled.
+  kmp_bootstrap_lock_t allowed_teams_lock;
+  int allowed_teams_capacity;
+  int allowed_teams_length;
+  kmp_task_team_t** allowed_teams;
+
 } kmp_base_info_t;
 
 typedef union KMP_ALIGN_CACHE kmp_info {
@@ -3960,6 +3967,11 @@ int __kmp_get_unshackled_id();
 // created yet.
 void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
                                                bool active);
+
+void __kmp_add_allowed_task_team(kmp_info_t *unshackled,
+                                 kmp_task_team_t *task_team);
+void __kmp_remove_allowed_task_team(kmp_info_t *unshackled,
+                                    kmp_task_team_t *task_team);
 
 #ifdef __cplusplus
 }

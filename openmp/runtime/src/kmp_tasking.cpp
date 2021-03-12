@@ -3602,6 +3602,16 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
                     ((team != NULL) ? team->t.t_id : -1), other_team));
     }
   }
+
+  // Allow unshackleds to use this task team
+  kmp_task_team_t* task_team = team->t.t_task_team[this_thr->th.th_task_state];
+
+  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+    kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
+    __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+    __kmp_add_allowed_task_team(unshackled, task_team);
+    __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+  }
 }
 
 // __kmp_task_team_sync: Propagation of task team data from team to threads
@@ -3651,6 +3661,13 @@ void __kmp_task_team_wait(
                              &task_team->tt.tt_unfinished_threads),
                        0U);
       flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
+    }
+    // This team is not allowed anymore for unshackleds
+    for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+      kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
+      __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+      __kmp_remove_allowed_task_team(unshackled, task_team);
+      __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
     }
     // Deactivate the old task team, so that the worker threads will stop
     // referencing it while spinning.
@@ -4632,4 +4649,50 @@ void __kmpc_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
     __kmpc_end_taskgroup(loc, gtid);
   }
   KA_TRACE(20, ("__kmpc_taskloop(exit): T#%d\n", gtid));
+}
+
+// These two functions assume the mutex of allowed_teams has been acquire.
+void __kmp_add_allowed_task_team(kmp_info_t *unshackled,
+                                 kmp_task_team_t *task_team) {
+  // Realloc if needed.
+  if (unshackled->th.allowed_teams_length ==
+      unshackled->th.allowed_teams_capacity) {
+    unshackled->th.allowed_teams_capacity *= 2;
+    kmp_task_team_t **new_buffer = (kmp_task_team_t **)__kmp_allocate(
+        sizeof(kmp_task_team_t *) * unshackled->th.allowed_teams_capacity);
+    KMP_MEMCPY_S(
+        new_buffer,
+        sizeof(kmp_task_team_t *) * unshackled->th.allowed_teams_capacity,
+        unshackled->th.allowed_teams,
+        sizeof(kmp_task_team_t *) * unshackled->th.allowed_teams_length);
+    unshackled->th.allowed_teams = new_buffer;
+    KMP_ASSERT(unshackled->th.allowed_teams_length + 1 <
+               unshackled->th.allowed_teams_capacity);
+  }
+
+  unshackled->th.allowed_teams[unshackled->th.allowed_teams_length] = task_team;
+  unshackled->th.allowed_teams_length++;
+}
+
+void __kmp_remove_allowed_task_team(kmp_info_t *unshackled,
+                                    kmp_task_team_t *task_team) {
+  int index = -1;
+  for (int i = 0; i < unshackled->th.allowed_teams_length; i++) {
+    if (unshackled->th.allowed_teams[i] == task_team) {
+      index = i;
+      break;
+    }
+  }
+
+  // The team we attempt to remove was indeed allowed.:w
+  KMP_ASSERT(index >= 0);
+
+  // Compact the sequence.
+  if (index + 1 < unshackled->th.allowed_teams_length) {
+    memmove(&unshackled->th.allowed_teams[index],
+            &unshackled->th.allowed_teams[index + 1],
+            (unshackled->th.allowed_teams_length - index - 1) *
+                sizeof(kmp_task_team_t *));
+  }
+  unshackled->th.allowed_teams_length--;
 }
