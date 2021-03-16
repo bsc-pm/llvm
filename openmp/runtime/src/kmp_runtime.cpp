@@ -3530,13 +3530,29 @@ static int __kmp_expand_threads(int nNeed) {
 // FIXME - Sort this.
 static kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid);
 
+// Start unshackled threads
 static void __kmp_create_unshackled_threads(void) {
-  /* Allocate unshackled threads here */
   int gtid = __kmp_entry_gtid();
   kmp_root_t *root = __kmp_threads[gtid]->th.th_root;
 
-  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
+  for (int i = 0; i < root->r.num_unshackled_threads; i++) {
+    kmp_info_t *new_thr = root->r.unshackled_threads[i];
+    int new_gtid = new_thr->th.th_info.ds.ds_gtid;
+    /* actually fork it and create the new worker thread */
+    KF_TRACE(
+        10, ("__kmp_create_unshackled_threads: before __kmp_create_worker: %p\n", new_thr));
+    __kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
+    KF_TRACE(10,
+            ("__kmp_create_unshackled_threads: after __kmp_create_worker: %p\n", new_thr));
 
+    KA_TRACE(20, ("__kmp_create_unshackled_threads: T#%d forked T#%d\n", __kmp_get_gtid(),
+                  new_gtid));
+  }
+}
+
+// Allocate unshackled threads
+static void __kmp_allocate_unshackled_threads(kmp_root_t *root) {
+  root->r.num_unshackled_threads = __kmp_num_unshackled_threads;
   root->r.unshackled_threads = (kmp_info_t**)__kmp_allocate(
       sizeof(*root->r.unshackled_threads) * root->r.num_unshackled_threads);
   for (int i = 0; i < root->r.num_unshackled_threads; i++) {
@@ -3781,6 +3797,8 @@ int __kmp_register_root(int initial_thread) {
   for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
     root->r.is_unshackled_thread_active[i] = thread_starts_active;
   }
+
+  __kmp_allocate_unshackled_threads(root);
 
   // The root team is a serial team, so enable tasking for it
   // if we have unshackled threads.
@@ -4163,7 +4181,7 @@ static void __kmp_initialize_info(kmp_info_t *this_thr, kmp_team_t *team,
    caller should check on this first. */
    static
 kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
-                                  int new_tid) {
+                                  int new_tid, bool is_unshackled) {
   kmp_team_t *serial_team;
   kmp_info_t *new_thr;
   int new_gtid;
@@ -4379,17 +4397,22 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
   }
 #endif /* KMP_ADJUST_BLOCKTIME */
 
-  new_thr->th.is_unshackled = false;
+  if (!is_unshackled) {
+    new_thr->th.is_unshackled = false;
 
-  /* actually fork it and create the new worker thread */
-  KF_TRACE(
-      10, ("__kmp_allocate_thread: before __kmp_create_worker: %p\n", new_thr));
-  __kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
-  KF_TRACE(10,
-           ("__kmp_allocate_thread: after __kmp_create_worker: %p\n", new_thr));
+    /* actually fork it and create the new worker thread */
+    KF_TRACE(
+        10, ("__kmp_allocate_thread: before __kmp_create_worker: %p\n", new_thr));
+    __kmp_create_worker(new_gtid, new_thr, __kmp_stksize);
+    KF_TRACE(10,
+            ("__kmp_allocate_thread: after __kmp_create_worker: %p\n", new_thr));
 
-  KA_TRACE(20, ("__kmp_allocate_thread: T#%d forked T#%d\n", __kmp_get_gtid(),
-                new_gtid));
+    KA_TRACE(20, ("__kmp_allocate_thread: T#%d forked T#%d\n", __kmp_get_gtid(),
+                  new_gtid));
+  } else {
+    /* Worker creation is posponed, we need to keep the gtid */
+    new_thr->th.th_info.ds.ds_gtid = new_gtid;
+  }
   KMP_MB();
   return new_thr;
 }
@@ -4397,13 +4420,13 @@ kmp_info_t *__kmp_allocate_thread_common(kmp_root_t *root, kmp_team_t *team,
 kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
                                   int new_tid) {
   KMP_DEBUG_ASSERT(root && team);
-  return __kmp_allocate_thread_common(root, team, new_tid);
+  return __kmp_allocate_thread_common(root, team, new_tid, false);
 }
 
 static
 kmp_info_t *__kmp_allocate_unshackled_thread(kmp_root_t *root, int new_tid) {
   // FIXME - Copied from __kmp_init_implicit_task.
-  kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid);
+  kmp_info_t *thread = __kmp_allocate_thread_common(root, NULL, new_tid, true);
   // Unshackleds don't have a team so __kmp_allocate_thread_common won't give it a root.
   thread->th.th_root = root;
   thread->th.is_unshackled = true;
@@ -6911,7 +6934,7 @@ static void __kmp_do_middle_initialize(void) {
 
 #endif /* KMP_ADJUST_BLOCKTIME */
 
-  // Initialize unshackled threads here.
+  /* Create and start unshackled threads here. */
   __kmp_create_unshackled_threads();
 
   /* we have finished middle initialization */
