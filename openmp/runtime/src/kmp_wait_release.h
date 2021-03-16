@@ -344,15 +344,19 @@ final_spin=FALSE)
             task_team = this_thr->th.allowed_teams[team_task_to_pick];
             this_thr->th.th_task_team = task_team;
 
-            // FIXME - Why we need this :(
-            // x86 needs this?
-            updateHWFPControl(
-                task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
+            if (task_team->tt.tt_threads_data) {
 
-            std::atomic<kmp_int32> *unfinished_unshackleds;
-            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
-            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
-            break;
+              // FIXME - Why we need this :(
+              // x86 needs this?
+              updateHWFPControl(
+                  task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
+
+              std::atomic<kmp_int32> *unfinished_unshackleds;
+              unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+              /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+            } else {
+              task_team = NULL;
+            }
         }
         if (task_team == NULL) {
           __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
