@@ -68,6 +68,7 @@ private:
     const Expr * RefExpr;
     bool Ignore = false;
     bool IsBase = true;
+    bool Implicit = true;
   };
   using DeclSAMapTy = llvm::MapVector<const ValueDecl *, DSAInfo>;
 
@@ -118,7 +119,7 @@ public:
 
   /// Adds explicit data sharing attribute to the specified declaration.
   void addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-              bool Ignore, bool IsBase);
+              bool Ignore, bool IsBase, bool Implicit=true);
 
   void addLoopControlVariable(const ValueDecl *D, const Expr *E);
 
@@ -178,6 +179,8 @@ public:
     assert(!isStackEmpty());
     ImplicitDSAs IDSAs;
     for (const auto &p : Stack.back().SharingMap) {
+      if (!p.second.Implicit)
+        continue;
       switch (p.second.Attributes) {
       case OSSC_shared:
         IDSAs.Shareds.push_back(const_cast<Expr*>(p.second.RefExpr));
@@ -261,7 +264,7 @@ DSAStackTy::DSAVarData DSAStackTy::getDSA(iterator &Iter,
 }
 
 void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
-                        bool Ignore, bool IsBase) {
+                        bool Ignore, bool IsBase, bool Implicit) {
   D = getCanonicalDecl(D);
   assert(!isStackEmpty() && "Data-sharing attributes stack is empty");
   DSAInfo &Data = Stack.back().SharingMap[D];
@@ -269,6 +272,7 @@ void DSAStackTy::addDSA(const ValueDecl *D, const Expr *E, OmpSsClauseKind A,
   Data.RefExpr = E;
   Data.Ignore = Ignore;
   Data.IsBase = IsBase;
+  Data.Implicit = Implicit;
 }
 
 void DSAStackTy::addLoopControlVariable(const ValueDecl *D, const Expr *E) {
@@ -3520,7 +3524,7 @@ Sema::ActOnOmpSsSharedClause(ArrayRef<Expr *> Vars,
                                           << getOmpSsClauseName(OSSC_shared);
       continue;
     }
-    DSAStack->addDSA(D, RefExpr, OSSC_shared, /*Ignore=*/false, /*IsBase=*/true);
+    DSAStack->addDSA(D, RefExpr, OSSC_shared, /*Ignore=*/false, /*IsBase=*/true, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
   }
 
@@ -3584,7 +3588,7 @@ Sema::ActOnOmpSsPrivateClause(ArrayRef<Expr *> Vars,
     DeclRefExpr *VDPrivateRefExpr = buildDeclRefExpr(
         *this, VDPrivate, Type, RefExpr->getExprLoc());
 
-    DSAStack->addDSA(D, RefExpr, OSSC_private, /*Ignore=*/false, /*IsBase=*/true);
+    DSAStack->addDSA(D, RefExpr, OSSC_private, /*Ignore=*/false, /*IsBase=*/true, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
     PrivateCopies.push_back(VDPrivateRefExpr);
   }
@@ -3659,7 +3663,7 @@ Sema::ActOnOmpSsFirstprivateClause(ArrayRef<Expr *> Vars,
     DeclRefExpr *VDPrivateRefExpr = buildDeclRefExpr(
         *this, VDPrivate, Type, RefExpr->getExprLoc());
 
-    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, /*Ignore=*/false, /*IsBase=*/true);
+    DSAStack->addDSA(D, RefExpr, OSSC_firstprivate, /*Ignore=*/false, /*IsBase=*/true, /*Implicit=*/false);
     ClauseVars.push_back(RefExpr);
     PrivateCopies.push_back(VDPrivateRefExpr);
     Inits.push_back(VDInitRefExpr);
