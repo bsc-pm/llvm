@@ -3564,6 +3564,8 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
                   this_thr->th.th_task_state));
   }
 
+  kmp_task_team_t* other_task_team = NULL;
+
   // After threads exit the release, they will call sync, and then point to this
   // other task_team; make sure it is allocated and properly initialized. As
   // threads spin in the barrier release phase, they will continue to use the
@@ -3581,6 +3583,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
                     __kmp_gtid_from_thread(this_thr),
                     team->t.t_task_team[other_team],
                     ((team != NULL) ? team->t.t_id : -1), other_team));
+      other_task_team = team->t.t_task_team[other_team];
     } else { // Leave the old task team struct in place for the upcoming region;
       // adjust as needed
       kmp_task_team_t *task_team = team->t.t_task_team[other_team];
@@ -3610,6 +3613,8 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
     kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
     __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
     __kmp_add_allowed_task_team(unshackled, task_team);
+    if (other_task_team)
+      __kmp_add_allowed_task_team(unshackled, other_task_team);
     __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
   }
 }
@@ -3662,13 +3667,6 @@ void __kmp_task_team_wait(
                        0U);
       flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
     }
-    // This team is not allowed anymore for unshackleds
-    for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
-      kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
-      __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
-      __kmp_remove_allowed_task_team(unshackled, task_team);
-      __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
-    }
     // Deactivate the old task team, so that the worker threads will stop
     // referencing it while spinning.
     KA_TRACE(
@@ -3684,6 +3682,14 @@ void __kmp_task_team_wait(
     KMP_MB();
 
     TCW_PTR(this_thr->th.th_task_team, NULL);
+  }
+
+  // This team is not allowed anymore for unshackleds
+  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+    kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
+    __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+    __kmp_remove_allowed_task_team(unshackled, task_team);
+    __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
   }
 }
 
