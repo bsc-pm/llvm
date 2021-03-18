@@ -357,6 +357,12 @@ final_spin=FALSE)
             } else {
               task_team = NULL;
             }
+
+            // Always cycle through task teams
+            team_task_to_pick =
+              (team_task_to_pick + 1) % this_thr->th.allowed_teams_length;
+        } else {
+          team_task_to_pick = 0;
         }
         if (task_team == NULL) {
           __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
@@ -365,14 +371,9 @@ final_spin=FALSE)
       if (task_team != NULL) {
         if (TCR_SYNC_4(task_team->tt.tt_active)) {
           if (KMP_TASKING_ENABLED(task_team)) {
-            bool something_was_executed = flag->execute_tasks(
+            flag->execute_tasks(
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
-            if (this_thr->th.is_unshackled && !something_was_executed) {
-              // This team seems exhausted so consider another one.
-              team_task_to_pick =
-                  (team_task_to_pick + 1) % this_thr->th.allowed_teams_length;
-            }
           } else {
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
           }
