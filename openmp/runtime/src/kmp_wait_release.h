@@ -344,15 +344,17 @@ final_spin=FALSE)
             task_team = this_thr->th.allowed_teams[team_task_to_pick];
             this_thr->th.th_task_team = task_team;
 
-            if (task_team->tt.tt_threads_data) {
-
+            // If tasking is not enabled for this task team,
+            // there is no point in entering it to execute tasks.
+            if (KMP_TASKING_ENABLED(task_team)) {
               // FIXME - Why we need this :(
               // x86 needs this?
               updateHWFPControl(
                   task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
               std::atomic<kmp_int32> *unfinished_unshackleds;
-              unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+              unfinished_unshackleds =
+                  &(task_team->tt.tt_unfinished_unshackleds);
               /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
             } else {
               task_team = NULL;
