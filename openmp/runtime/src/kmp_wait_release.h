@@ -319,9 +319,6 @@ final_spin=FALSE)
   oversubscribed = (TCR_4(__kmp_nth) > __kmp_avail_proc);
   KMP_MB();
 
-  // Unshackleds threads will try to pick work from the same team if possible.
-  // Once exhausted we will cycle through them.
-  int team_task_to_pick = 0;
 
     // Main wait spin loop
   while (flag->notdone_check()) {
@@ -339,32 +336,28 @@ final_spin=FALSE)
         __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
         // FIXME: don't always start from 0 once we add the initial task_teams
         // for (int i = 0; i < this_thr->th.allowed_teams_length; i++)
-        if (team_task_to_pick < this_thr->th.allowed_teams_length)
-        {
-            task_team = this_thr->th.allowed_teams[team_task_to_pick];
-            this_thr->th.th_task_team = task_team;
+        for (int team_task_to_pick = 0;
+             team_task_to_pick < this_thr->th.allowed_teams_length;
+             team_task_to_pick++) {
+          task_team = this_thr->th.allowed_teams[team_task_to_pick];
+          this_thr->th.th_task_team = task_team;
 
-            // If tasking is not enabled for this task team,
-            // there is no point in entering it to execute tasks.
-            if (KMP_TASKING_ENABLED(task_team)) {
-              // FIXME - Why we need this :(
-              // x86 needs this?
-              updateHWFPControl(
-                  task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
+          // If tasking is not enabled for this task team,
+          // there is no point in entering it to execute tasks.
+          // Also skip inactive task teams.
+          if (KMP_TASKING_ENABLED(task_team) && task_team->tt.tt_active) {
+            // FIXME - Why we need this :(
+            // x86 needs this?
+            updateHWFPControl(
+                task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
-              std::atomic<kmp_int32> *unfinished_unshackleds;
-              unfinished_unshackleds =
-                  &(task_team->tt.tt_unfinished_unshackleds);
-              /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
-            } else {
-              task_team = NULL;
-            }
-
-            // Always cycle through task teams
-            team_task_to_pick =
-              (team_task_to_pick + 1) % this_thr->th.allowed_teams_length;
-        } else {
-          team_task_to_pick = 0;
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+            break;
+          } else {
+            task_team = NULL;
+          }
         }
         if (task_team == NULL) {
           __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);

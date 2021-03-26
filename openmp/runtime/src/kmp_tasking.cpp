@@ -2943,22 +2943,17 @@ static inline int __kmp_execute_tasks_template(
                                   unfinished_threads, thread_finished,
                                   is_constrained);
         }
-        if (!thread->th.is_unshackled) {
-          if (task != NULL) { // set last stolen to victim
-            if (threads_data[tid].td.td_deque_last_stolen != victim_tid) {
-              threads_data[tid].td.td_deque_last_stolen = victim_tid;
-              // The pre-refactored code did not try more than 1 successful new
-              // vicitm, unless the last one generated more local tasks;
-              // new_victim keeps track of this
-              new_victim = 1;
-            }
-          } else { // No tasks found; unset last_stolen
-            KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
-            victim_tid = -2; // no successful victim found
+        if (task != NULL) { // set last stolen to victim
+          if (threads_data[tid].td.td_deque_last_stolen != victim_tid) {
+            threads_data[tid].td.td_deque_last_stolen = victim_tid;
+            // The pre-refactored code did not try more than 1 successful new
+            // vicitm, unless the last one generated more local tasks;
+            // new_victim keeps track of this
+            new_victim = 1;
           }
-        } else if (task != NULL) {
-          // Unshackled threads will try to steal all the tasks from the thread.
-          new_victim = 1;
+        } else { // No tasks found; unset last_stolen
+          KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
+          victim_tid = -2; // no successful victim found
         }
       }
 
