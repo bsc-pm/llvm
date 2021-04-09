@@ -2866,6 +2866,11 @@ static inline int __kmp_execute_tasks_template(
                    task_team->tt.tt_found_proxy_tasks);
   KMP_DEBUG_ASSERT(*unfinished_threads >= 0);
 
+  // Used by unshackleds to perform a steal of
+  // every thread of the team one time before exit.
+  // Note that we exclude tid 0.
+  int unshackled_victim_tid = 1;
+
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
     while (1) { // Inner loop to find a task and execute it
@@ -2902,9 +2907,16 @@ static inline int __kmp_execute_tasks_template(
             // Pick a random thread. Initial plan was to cycle through all the
             // threads, and only return if we tried to steal from every thread,
             // and failed.  Arch says that's not such a great idea.
-            victim_tid = __kmp_get_random(thread) % (nthreads - 1);
-            if (victim_tid >= tid) {
-              ++victim_tid; // Adjusts random distribution to exclude self
+            if (thread->th.is_unshackled) {
+              // Tried all threads, exit
+              if (unshackled_victim_tid == nthreads)
+                break;
+              victim_tid = unshackled_victim_tid++;
+            } else {
+              victim_tid = __kmp_get_random(thread) % (nthreads - 1);
+              if (victim_tid >= tid) {
+                ++victim_tid; // Adjusts random distribution to exclude self
+              }
             }
             // Found a potential victim
             other_thread = threads_data[victim_tid].td.td_thr;
@@ -2991,8 +3003,7 @@ static inline int __kmp_execute_tasks_template(
       }
       KMP_YIELD(__kmp_library == library_throughput); // Yield before next task
       // If execution of a stolen task results in more tasks being placed on our
-      // run queue and we are not an unshackled (an unshackled doesn't have a queue!),
-      // reset use_own_tasks
+      // run queue, reset use_own_tasks
       if (!use_own_tasks && TCR_4(threads_data[tid].td.td_deque_ntasks) != 0) {
         KA_TRACE(20, ("__kmp_execute_tasks_template: T#%d stolen task spawned "
                       "other tasks, restart\n",
@@ -3063,6 +3074,8 @@ static inline int __kmp_execute_tasks_template(
     // thread, keep trying to execute tasks from own queue
     if (nthreads == 1 && !thread->th.is_unshackled) {
       use_own_tasks = 1;
+    } else if (thread->th.is_unshackled && unshackled_victim_tid < nthreads) {
+      continue;
     } else {
       KA_TRACE(15,
                ("__kmp_execute_tasks_template: T#%d can't find work\n", gtid));
