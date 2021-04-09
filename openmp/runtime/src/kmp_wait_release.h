@@ -336,45 +336,61 @@ final_spin=FALSE)
         __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
         // FIXME: don't always start from 0 once we add the initial task_teams
         // for (int i = 0; i < this_thr->th.allowed_teams_length; i++)
-        for (int team_task_to_pick = 0;
-             team_task_to_pick < this_thr->th.allowed_teams_length;
-             team_task_to_pick++) {
-          task_team = this_thr->th.allowed_teams[team_task_to_pick];
-          this_thr->th.th_task_team = task_team;
+        while (1) {
+          int empty_task_teams_cnt = 0;
+          for (int team_task_to_pick = 0;
+               team_task_to_pick < this_thr->th.allowed_teams_length;
+               team_task_to_pick++) {
+            task_team = this_thr->th.allowed_teams[team_task_to_pick];
+            this_thr->th.th_task_team = task_team;
 
-          // If tasking is not enabled for this task team,
-          // there is no point in entering it to execute tasks.
-          // Also skip inactive task teams.
-          if (KMP_TASKING_ENABLED(task_team) && task_team->tt.tt_active) {
-            // FIXME - Why we need this :(
-            // x86 needs this?
-            updateHWFPControl(
-                task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
+            // If tasking is not enabled for this task team,
+            // there is no point in entering it to execute tasks.
+            // Also skip inactive task teams.
+            if (KMP_TASKING_ENABLED(task_team) && TCR_SYNC_4(task_team->tt.tt_active)) {
+              // FIXME - Why we need this :(
+              // x86 needs this?
+              updateHWFPControl(
+                  task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
-            std::atomic<kmp_int32> *unfinished_unshackleds;
-            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
-            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+              std::atomic<kmp_int32> *unfinished_unshackleds;
+              unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+              /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+
+              int ret = flag->execute_tasks(
+                  this_thr, th_gtid, final_spin,
+                  &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+
+              // TODO: execute_tasks does not return if task was executed
+              // 
+              // empty_task_teams_cnt += !ret;
+              empty_task_teams_cnt += 1;
+
+              /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
+              this_thr->th.th_task_team = NULL;
+              this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+            } else {
+              empty_task_teams_cnt += 1;
+            }
+          }
+          // Not able to execute any task.
+          if (empty_task_teams_cnt == this_thr->th.allowed_teams_length)
             break;
-          } else {
-            task_team = NULL;
-          }
         }
-        if (task_team == NULL) {
-          __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
-        }
-      }
-      if (task_team != NULL) {
-        if (TCR_SYNC_4(task_team->tt.tt_active)) {
-          if (KMP_TASKING_ENABLED(task_team)) {
-            flag->execute_tasks(
-                this_thr, th_gtid, final_spin,
-                &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+        // Reset task_team to 0 to make unshackled able to suspend
+        task_team = NULL;
+        __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+      } else if (!this_thr->th.is_unshackled) {
+        if (task_team != NULL) {
+          if (TCR_SYNC_4(task_team->tt.tt_active)) {
+            if (KMP_TASKING_ENABLED(task_team)) {
+              flag->execute_tasks(
+                  this_thr, th_gtid, final_spin,
+                  &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+            } else {
+              this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+            }
           } else {
-            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-          }
-        } else if (!this_thr->th.is_unshackled) {
-            // Unshackled threads are never master of any team, so they
-            // don't have to do any of this.
             KMP_DEBUG_ASSERT(!KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid));
 #if OMPT_SUPPORT
             // task-team is done now, other cases should be catched above
@@ -383,20 +399,12 @@ final_spin=FALSE)
 #endif
             this_thr->th.th_task_team = NULL;
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-        }
-        // Unshackled clean up
-        if (this_thr->th.is_unshackled) {
-            std::atomic<kmp_int32> *unfinished_unshackleds;
-            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
-            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
-            this_thr->th.th_task_team = NULL;
-            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-            __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
-        }
-      } else {
-        this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+          }
+        } else {
+          this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+        } // if
       } // if
-    } // if
+    }
 
     KMP_FSYNC_SPIN_PREPARE(CCAST(void *, spin));
     if (TCR_4(__kmp_global.g.g_done)) {

@@ -2881,15 +2881,11 @@ static inline int __kmp_execute_tasks_template(
         use_own_tasks = 0;
         // Try to steal from the last place I stole from successfully
         // if this is not an unshackled thread.
-        if (!thread->th.is_unshackled) {
-          if (victim_tid == -2) { // haven't stolen anything yet
-            victim_tid = threads_data[tid].td.td_deque_last_stolen;
-            if (victim_tid !=
-                -1) // if we have a last stolen from victim, get the thread
-              other_thread = threads_data[victim_tid].td.td_thr;
-          }
-        } else {
-          victim_tid = -1;
+        if (victim_tid == -2) { // haven't stolen anything yet
+          victim_tid = threads_data[tid].td.td_deque_last_stolen;
+          if (victim_tid !=
+              -1) // if we have a last stolen from victim, get the thread
+            other_thread = threads_data[victim_tid].td.td_thr;
         }
         // victim_tid is either -1 or a real tid.
         KMP_DEBUG_ASSERT(victim_tid != -2);
