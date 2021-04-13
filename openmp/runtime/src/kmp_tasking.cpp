@@ -2870,6 +2870,9 @@ static inline int __kmp_execute_tasks_template(
   // every thread of the team one time before exit.
   // Note that we exclude tid 0.
   int unshackled_victim_tid = 1;
+  // unshackled threads use victim_tid as last_stolen directly
+  if (thread->th.is_unshackled)
+    victim_tid = -1;
 
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
@@ -2953,16 +2956,22 @@ static inline int __kmp_execute_tasks_template(
                                   is_constrained);
         }
         if (task != NULL) { // set last stolen to victim
-          if (threads_data[tid].td.td_deque_last_stolen != victim_tid) {
-            threads_data[tid].td.td_deque_last_stolen = victim_tid;
-            // The pre-refactored code did not try more than 1 successful new
-            // vicitm, unless the last one generated more local tasks;
-            // new_victim keeps track of this
-            new_victim = 1;
+          if (!thread->th.is_unshackled) {
+            if (threads_data[tid].td.td_deque_last_stolen != victim_tid)
+              threads_data[tid].td.td_deque_last_stolen = victim_tid;
           }
+          // The pre-refactored code did not try more than 1 successful new
+          // victim, unless the last one generated more local tasks;
+          // new_victim keeps track of this
+          new_victim = 1;
         } else { // No tasks found; unset last_stolen
-          KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
-          victim_tid = -2; // no successful victim found
+          if (thread->th.is_unshackled) {
+            // unshackled threads use victim_tid as last_stolen directly
+            victim_tid = -1;
+          } else {
+            KMP_CHECK_UPDATE(threads_data[tid].td.td_deque_last_stolen, -1);
+            victim_tid = -2; // no successful victim found
+          }
         }
       }
 
