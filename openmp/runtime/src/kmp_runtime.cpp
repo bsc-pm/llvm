@@ -1094,7 +1094,7 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
         this_thr->th.th_task_team ==
         this_thr->th.th_team->t.t_task_team[this_thr->th.th_task_state]);
     KMP_DEBUG_ASSERT(serial_team->t.t_task_team[this_thr->th.th_task_state] ==
-                     NULL);
+                     NULL || __kmp_num_unshackled_threads != 0);
     KA_TRACE(20, ("__kmpc_serialized_parallel: T#%d pushing task_team %p / "
                   "team %p, new task_team = NULL\n",
                   global_tid, this_thr->th.th_task_team, this_thr->th.th_team));
