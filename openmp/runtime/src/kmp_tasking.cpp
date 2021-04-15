@@ -4067,7 +4067,8 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src) {
 
   // Only need to keep track of child task counts if team parallel and tasking
   // not serialized
-  if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser)) {
+  if (!(taskdata->td_flags.team_serial || taskdata->td_flags.tasking_ser)
+      || __kmp_num_unshackled_threads != 0) {
     KMP_ATOMIC_INC(&parent_task->td_incomplete_child_tasks);
     if (parent_task->td_taskgroup)
       KMP_ATOMIC_INC(&parent_task->td_taskgroup->count);
