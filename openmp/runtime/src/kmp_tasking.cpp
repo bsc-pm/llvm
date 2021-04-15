@@ -2911,10 +2911,7 @@ static inline int __kmp_execute_tasks_template(
             // threads, and only return if we tried to steal from every thread,
             // and failed.  Arch says that's not such a great idea.
             if (thread->th.is_unshackled) {
-              // Tried all threads, exit
-              if (unshackled_victim_tid == nthreads)
-                break;
-              victim_tid = unshackled_victim_tid++;
+              victim_tid = unshackled_victim_tid;
             } else {
               victim_tid = __kmp_get_random(thread) % (nthreads - 1);
               if (victim_tid >= tid) {
@@ -3083,7 +3080,7 @@ static inline int __kmp_execute_tasks_template(
     // thread, keep trying to execute tasks from own queue
     if (nthreads == 1 && !thread->th.is_unshackled) {
       use_own_tasks = 1;
-    } else if (thread->th.is_unshackled && unshackled_victim_tid < nthreads) {
+    } else if (thread->th.is_unshackled && ++unshackled_victim_tid < nthreads) {
       continue;
     } else {
       KA_TRACE(15,
