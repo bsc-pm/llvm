@@ -274,7 +274,8 @@ final_spin=FALSE)
 #if OMPT_SUPPORT
   ompt_state_t ompt_entry_state;
   ompt_data_t *tId;
-  if (ompt_enabled.enabled) {
+  if (ompt_enabled.enabled
+      && !this_thr->th.is_free_agent) {
     ompt_entry_state = this_thr->th.ompt_thread_info.state;
     if (!final_spin || ompt_entry_state != ompt_state_wait_barrier_implicit ||
         KMP_MASTER_TID(this_thr->th.th_info.ds.ds_tid)) {

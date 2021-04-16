@@ -5878,7 +5878,8 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
     this_thr->th.ompt_thread_info.parallel_flags = 0;
     if (ompt_enabled.ompt_callback_thread_begin) {
       ompt_callbacks.ompt_callback(ompt_callback_thread_begin)(
-          ompt_thread_worker, thread_data);
+          this_thr->th.is_free_agent ? ompt_thread_other : ompt_thread_worker,
+          thread_data);
     }
     this_thr->th.ompt_thread_info.state = ompt_state_idle;
   }
