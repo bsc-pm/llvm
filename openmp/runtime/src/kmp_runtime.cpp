@@ -6857,7 +6857,11 @@ static void __kmp_do_middle_initialize(void) {
   // for each root thread that is currently registered with the RTL.
   for (i = 0; i < __kmp_threads_capacity; i++) {
     if (TCR_PTR(__kmp_threads[i]) != NULL) {
-      __kmp_affinity_set_init_mask(i, TRUE);
+      // Unshackled threads may have been allocated at this point,
+      // and they are not root threads
+      if (!__kmp_threads[i]->th.is_unshackled) {
+        __kmp_affinity_set_init_mask(i, TRUE);
+      }
     }
   }
 #endif /* KMP_AFFINITY_SUPPORTED */
