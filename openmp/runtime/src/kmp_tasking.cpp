@@ -3001,6 +3001,10 @@ static inline int __kmp_execute_tasks_template(
              gtid));
         return TRUE;
       }
+      if (thread->th.is_unshackled && !*thread->th.is_unshackled_active) {
+        return TRUE;
+      }
+
       if (thread->th.th_task_team == NULL) {
         break;
       }
