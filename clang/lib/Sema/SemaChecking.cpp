@@ -91,6 +91,7 @@
 #include <algorithm>
 #include <bitset>
 #include <cassert>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -837,7 +838,8 @@ static bool checkOpenCLBlockArgs(Sema &S, Expr *BlockArg) {
 }
 
 static bool checkOpenCLSubgroupExt(Sema &S, CallExpr *Call) {
-  if (!S.getOpenCLOptions().isEnabled("cl_khr_subgroups")) {
+  if (!S.getOpenCLOptions().isAvailableOption("cl_khr_subgroups",
+                                              S.getLangOpts())) {
     S.Diag(Call->getBeginLoc(), diag::err_opencl_requires_extension)
         << 1 << Call->getDirectCallee() << "cl_khr_subgroups";
     return true;
@@ -1965,6 +1967,26 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
 
   case Builtin::BI__builtin_matrix_column_major_store:
     return SemaBuiltinMatrixColumnMajorStore(TheCall, TheCallResult);
+
+  case Builtin::BI__builtin_get_device_side_mangled_name: {
+    auto Check = [](CallExpr *TheCall) {
+      if (TheCall->getNumArgs() != 1)
+        return false;
+      auto *DRE = dyn_cast<DeclRefExpr>(TheCall->getArg(0)->IgnoreImpCasts());
+      if (!DRE)
+        return false;
+      auto *D = DRE->getDecl();
+      if (!isa<FunctionDecl>(D) && !isa<VarDecl>(D))
+        return false;
+      return D->hasAttr<CUDAGlobalAttr>() || D->hasAttr<CUDADeviceAttr>() ||
+             D->hasAttr<CUDAConstantAttr>() || D->hasAttr<HIPManagedAttr>();
+    };
+    if (!Check(TheCall)) {
+      Diag(TheCall->getBeginLoc(),
+           diag::err_hip_invalid_args_builtin_mangled_name);
+      return ExprError();
+    }
+  }
   }
 
   // Since the target specific builtins for each arch overlap, only check those
@@ -3362,20 +3384,27 @@ bool Sema::CheckAMDGCNBuiltinFunctionCall(unsigned BuiltinID,
   if (!ArgExpr->EvaluateAsInt(ArgResult, Context))
     return Diag(ArgExpr->getExprLoc(), diag::err_typecheck_expect_int)
            << ArgExpr->getType();
-  int ord = ArgResult.Val.getInt().getZExtValue();
+  auto Ord = ArgResult.Val.getInt().getZExtValue();
 
   // Check valididty of memory ordering as per C11 / C++11's memody model.
-  switch (static_cast<llvm::AtomicOrderingCABI>(ord)) {
+  // Only fence needs check. Atomic dec/inc allow all memory orders.
+  if (!llvm::isValidAtomicOrderingCABI(Ord))
+    return Diag(ArgExpr->getBeginLoc(),
+                diag::warn_atomic_op_has_invalid_memory_order)
+           << ArgExpr->getSourceRange();
+  switch (static_cast<llvm::AtomicOrderingCABI>(Ord)) {
+  case llvm::AtomicOrderingCABI::relaxed:
+  case llvm::AtomicOrderingCABI::consume:
+    if (BuiltinID == AMDGPU::BI__builtin_amdgcn_fence)
+      return Diag(ArgExpr->getBeginLoc(),
+                  diag::warn_atomic_op_has_invalid_memory_order)
+             << ArgExpr->getSourceRange();
+    break;
   case llvm::AtomicOrderingCABI::acquire:
   case llvm::AtomicOrderingCABI::release:
   case llvm::AtomicOrderingCABI::acq_rel:
   case llvm::AtomicOrderingCABI::seq_cst:
     break;
-  default: {
-    return Diag(ArgExpr->getBeginLoc(),
-                diag::warn_atomic_op_has_invalid_memory_order)
-           << ArgExpr->getSourceRange();
-  }
   }
 
   Arg = TheCall->getArg(ScopeIndex);
@@ -3392,18 +3421,35 @@ bool Sema::CheckAMDGCNBuiltinFunctionCall(unsigned BuiltinID,
 bool Sema::CheckRISCVBuiltinFunctionCall(const TargetInfo &TI,
                                          unsigned BuiltinID,
                                          CallExpr *TheCall) {
-  switch (BuiltinID) {
-  default:
-    break;
-#define RISCVV_BUILTIN(ID, TYPE, ATTRS) case RISCV::BI##ID:
-#include "clang/Basic/BuiltinsRISCV.def"
-    if (!TI.hasFeature("experimental-v"))
-      return Diag(TheCall->getBeginLoc(), diag::err_riscvv_builtin_requires_v)
-             << TheCall->getSourceRange();
-    break;
+  // CodeGenFunction can also detect this, but this gives a better error
+  // message.
+  bool FeatureMissing = false;
+  SmallVector<StringRef> ReqFeatures;
+  StringRef Features = Context.BuiltinInfo.getRequiredFeatures(BuiltinID);
+  Features.split(ReqFeatures, ',');
+
+  // Check if each required feature is included
+  for (StringRef F : ReqFeatures) {
+    if (TI.hasFeature(F))
+      continue;
+
+    // If the feature is 64bit, alter the string so it will print better in
+    // the diagnostic.
+    if (F == "64bit")
+      F = "RV64";
+
+    // Convert features like "zbr" and "experimental-zbr" to "Zbr".
+    F.consume_front("experimental-");
+    std::string FeatureStr = F.str();
+    FeatureStr[0] = std::toupper(FeatureStr[0]);
+
+    // Error message
+    FeatureMissing = true;
+    Diag(TheCall->getBeginLoc(), diag::err_riscv_builtin_requires_extension)
+        << TheCall->getSourceRange() << StringRef(FeatureStr);
   }
 
-  return false;
+  return FeatureMissing;
 }
 
 bool Sema::CheckSystemZBuiltinFunctionCall(unsigned BuiltinID,
@@ -4471,6 +4517,44 @@ static void CheckNonNullArguments(Sema &S,
   }
 }
 
+/// Warn if a pointer or reference argument passed to a function points to an
+/// object that is less aligned than the parameter. This can happen when
+/// creating a typedef with a lower alignment than the original type and then
+/// calling functions defined in terms of the original type.
+void Sema::CheckArgAlignment(SourceLocation Loc, NamedDecl *FDecl,
+                             StringRef ParamName, QualType ArgTy,
+                             QualType ParamTy) {
+
+  // If a function accepts a pointer or reference type
+  if (!ParamTy->isPointerType() && !ParamTy->isReferenceType())
+    return;
+
+  // If the parameter is a pointer type, get the pointee type for the
+  // argument too. If the parameter is a reference type, don't try to get
+  // the pointee type for the argument.
+  if (ParamTy->isPointerType())
+    ArgTy = ArgTy->getPointeeType();
+
+  // Remove reference or pointer
+  ParamTy = ParamTy->getPointeeType();
+
+  // Find expected alignment, and the actual alignment of the passed object.
+  // getTypeAlignInChars requires complete types
+  if (ParamTy->isIncompleteType() || ArgTy->isIncompleteType() ||
+      ParamTy->isUndeducedType() || ArgTy->isUndeducedType())
+    return;
+
+  CharUnits ParamAlign = Context.getTypeAlignInChars(ParamTy);
+  CharUnits ArgAlign = Context.getTypeAlignInChars(ArgTy);
+
+  // If the argument is less aligned than the parameter, there is a
+  // potential alignment issue.
+  if (ArgAlign < ParamAlign)
+    Diag(Loc, diag::warn_param_mismatched_alignment)
+        << (int)ArgAlign.getQuantity() << (int)ParamAlign.getQuantity()
+        << ParamName << FDecl;
+}
+
 /// Handles the checks for format strings, non-POD arguments to vararg
 /// functions, NULL arguments passed to non-NULL parameters, and diagnose_if
 /// attributes.
@@ -4525,6 +4609,28 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
     }
   }
 
+  // Check that passed arguments match the alignment of original arguments.
+  // Try to get the missing prototype from the declaration.
+  if (!Proto && FDecl) {
+    const auto *FT = FDecl->getFunctionType();
+    if (isa_and_nonnull<FunctionProtoType>(FT))
+      Proto = cast<FunctionProtoType>(FDecl->getFunctionType());
+  }
+  if (Proto) {
+    // For variadic functions, we may have more args than parameters.
+    // For some K&R functions, we may have less args than parameters.
+    const auto N = std::min<unsigned>(Proto->getNumParams(), Args.size());
+    for (unsigned ArgIdx = 0; ArgIdx < N; ++ArgIdx) {
+      // Args[ArgIdx] can be null in malformed code.
+      if (const Expr *Arg = Args[ArgIdx]) {
+        QualType ParamTy = Proto->getParamType(ArgIdx);
+        QualType ArgTy = Arg->getType();
+        CheckArgAlignment(Arg->getExprLoc(), FDecl, std::to_string(ArgIdx + 1),
+                          ArgTy, ParamTy);
+      }
+    }
+  }
+
   if (FDecl && FDecl->hasAttr<AllocAlignAttr>()) {
     auto *AA = FDecl->getAttr<AllocAlignAttr>();
     const Expr *Arg = Args[AA->getParamIndex().getASTIndex()];
@@ -4549,12 +4655,17 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
 
 /// CheckConstructorCall - Check a constructor call for correctness and safety
 /// properties not enforced by the C type system.
-void Sema::CheckConstructorCall(FunctionDecl *FDecl,
+void Sema::CheckConstructorCall(FunctionDecl *FDecl, QualType ThisType,
                                 ArrayRef<const Expr *> Args,
                                 const FunctionProtoType *Proto,
                                 SourceLocation Loc) {
   VariadicCallType CallType =
-    Proto->isVariadic() ? VariadicConstructor : VariadicDoesNotApply;
+      Proto->isVariadic() ? VariadicConstructor : VariadicDoesNotApply;
+
+  auto *Ctor = cast<CXXConstructorDecl>(FDecl);
+  CheckArgAlignment(Loc, FDecl, "'this'", Context.getPointerType(ThisType),
+                    Context.getPointerType(Ctor->getThisObjectType()));
+
   checkCall(FDecl, Proto, /*ThisArg=*/nullptr, Args, /*IsMemberFunction=*/true,
             Loc, SourceRange(), CallType);
 }
@@ -4583,6 +4694,22 @@ bool Sema::CheckFunctionCall(FunctionDecl *FDecl, CallExpr *TheCall,
   } else if (IsMemberFunction)
     ImplicitThis =
         cast<CXXMemberCallExpr>(TheCall)->getImplicitObjectArgument();
+
+  if (ImplicitThis) {
+    // ImplicitThis may or may not be a pointer, depending on whether . or -> is
+    // used.
+    QualType ThisType = ImplicitThis->getType();
+    if (!ThisType->isPointerType()) {
+      assert(!ThisType->isReferenceType());
+      ThisType = Context.getPointerType(ThisType);
+    }
+
+    QualType ThisTypeFromDecl =
+        Context.getPointerType(cast<CXXMethodDecl>(FDecl)->getThisObjectType());
+
+    CheckArgAlignment(TheCall->getRParenLoc(), FDecl, "'this'", ThisType,
+                      ThisTypeFromDecl);
+  }
 
   checkCall(FDecl, Proto, ImplicitThis, llvm::makeArrayRef(Args, NumArgs),
             IsMemberFunction, TheCall->getRParenLoc(),
@@ -4817,7 +4944,8 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
   case AtomicExpr::AO__atomic_add_fetch:
   case AtomicExpr::AO__atomic_sub_fetch:
     IsAddSub = true;
-    LLVM_FALLTHROUGH;
+    Form = Arithmetic;
+    break;
   case AtomicExpr::AO__c11_atomic_fetch_and:
   case AtomicExpr::AO__c11_atomic_fetch_or:
   case AtomicExpr::AO__c11_atomic_fetch_xor:
@@ -4832,6 +4960,8 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
   case AtomicExpr::AO__atomic_or_fetch:
   case AtomicExpr::AO__atomic_xor_fetch:
   case AtomicExpr::AO__atomic_nand_fetch:
+    Form = Arithmetic;
+    break;
   case AtomicExpr::AO__c11_atomic_fetch_min:
   case AtomicExpr::AO__c11_atomic_fetch_max:
   case AtomicExpr::AO__opencl_atomic_fetch_min:
@@ -4924,10 +5054,24 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
 
   // For an arithmetic operation, the implied arithmetic must be well-formed.
   if (Form == Arithmetic) {
-    // gcc does not enforce these rules for GNU atomics, but we do so for sanity.
-    if (IsAddSub && !ValType->isIntegerType()
-        && !ValType->isPointerType()) {
-      Diag(ExprRange.getBegin(), diag::err_atomic_op_needs_atomic_int_or_ptr)
+    // gcc does not enforce these rules for GNU atomics, but we do so for
+    // sanity.
+    auto IsAllowedValueType = [&](QualType ValType) {
+      if (ValType->isIntegerType())
+        return true;
+      if (ValType->isPointerType())
+        return true;
+      if (!ValType->isFloatingType())
+        return false;
+      // LLVM Parser does not allow atomicrmw with x86_fp80 type.
+      if (ValType->isSpecificBuiltinType(BuiltinType::LongDouble) &&
+          &Context.getTargetInfo().getLongDoubleFormat() ==
+              &llvm::APFloat::x87DoubleExtended())
+        return false;
+      return true;
+    };
+    if (IsAddSub && !IsAllowedValueType(ValType)) {
+      Diag(ExprRange.getBegin(), diag::err_atomic_op_needs_atomic_int_ptr_or_fp)
           << IsC11 << Ptr->getType() << Ptr->getSourceRange();
       return ExprError();
     }
@@ -5054,7 +5198,9 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
         // passed by address. For the rest, GNU uses by-address and C11 uses
         // by-value.
         assert(Form != Load);
-        if (Form == Init || (Form == Arithmetic && ValType->isIntegerType()))
+        if (Form == Arithmetic && ValType->isPointerType())
+          Ty = Context.getPointerDiffType();
+        else if (Form == Init || Form == Arithmetic)
           Ty = ValType;
         else if (Form == Copy || Form == Xchg) {
           if (IsPassedByAddress) {
@@ -5063,9 +5209,7 @@ ExprResult Sema::BuildAtomicExpr(SourceRange CallRange, SourceRange ExprRange,
                                  ExprRange.getBegin());
           }
           Ty = ByValType;
-        } else if (Form == Arithmetic)
-          Ty = Context.getPointerDiffType();
-        else {
+        } else {
           Expr *ValArg = APIOrderedArgs[i];
           // The value pointer is always dereferenced, a nullptr is undefined.
           CheckNonNullArgument(*this, ValArg, ExprRange.getBegin());
@@ -8653,8 +8797,11 @@ CheckPrintfHandler::checkFormatExpr(const analyze_printf::PrintfSpecifier &FS,
   } else if (const CharacterLiteral *CL = dyn_cast<CharacterLiteral>(E)) {
     // Special case for 'a', which has type 'int' in C.
     // Note, however, that we do /not/ want to treat multibyte constants like
-    // 'MooV' as characters! This form is deprecated but still exists.
-    if (ExprTy == S.Context.IntTy)
+    // 'MooV' as characters! This form is deprecated but still exists. In
+    // addition, don't treat expressions as of type 'char' if one byte length
+    // modifier is provided.
+    if (ExprTy == S.Context.IntTy &&
+        FS.getLengthModifier().getKind() != LengthModifier::AsChar)
       if (llvm::isUIntN(S.Context.getCharWidth(), CL->getValue()))
         ExprTy = S.Context.CharTy;
   }
@@ -10319,11 +10466,18 @@ void CheckFreeArgumentsCast(Sema &S, const std::string &CalleeName,
                             const CastExpr *Cast) {
   SmallString<128> SizeString;
   llvm::raw_svector_ostream OS(SizeString);
+
+  clang::CastKind Kind = Cast->getCastKind();
+  if (Kind == clang::CK_BitCast &&
+      !Cast->getSubExpr()->getType()->isFunctionPointerType())
+    return;
+  if (Kind == clang::CK_IntegralToPointer &&
+      !isa<IntegerLiteral>(
+          Cast->getSubExpr()->IgnoreParenImpCasts()->IgnoreParens()))
+    return;
+
   switch (Cast->getCastKind()) {
   case clang::CK_BitCast:
-    if (!Cast->getSubExpr()->getType()->isFunctionPointerType())
-      return;
-    LLVM_FALLTHROUGH;
   case clang::CK_IntegralToPointer:
   case clang::CK_FunctionToPointerDecay:
     OS << '\'';
@@ -11292,11 +11446,14 @@ static bool CheckTautologicalComparison(Sema &S, BinaryOperator *E,
             << OtherIsBooleanDespiteType << *Result
             << E->getLHS()->getSourceRange() << E->getRHS()->getSourceRange());
   } else {
-    unsigned Diag = (isKnownToHaveUnsignedValue(OriginalOther) && Value == 0)
-                        ? (HasEnumType(OriginalOther)
-                               ? diag::warn_unsigned_enum_always_true_comparison
-                               : diag::warn_unsigned_always_true_comparison)
-                        : diag::warn_tautological_constant_compare;
+    bool IsCharTy = OtherT.withoutLocalFastQualifiers() == S.Context.CharTy;
+    unsigned Diag =
+        (isKnownToHaveUnsignedValue(OriginalOther) && Value == 0)
+            ? (HasEnumType(OriginalOther)
+                   ? diag::warn_unsigned_enum_always_true_comparison
+                   : IsCharTy ? diag::warn_unsigned_char_always_true_comparison
+                              : diag::warn_unsigned_always_true_comparison)
+            : diag::warn_tautological_constant_compare;
 
     S.Diag(E->getOperatorLoc(), Diag)
         << RhsConstant << OtherT << E->getOpcodeStr() << OS.str() << *Result

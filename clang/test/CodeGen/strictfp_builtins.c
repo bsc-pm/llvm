@@ -109,6 +109,60 @@ void test_double_isinf(double d) {
   return;
 }
 
+// CHECK-LABEL: @test_fp16_isfinite(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[LD_ADDR:%.*]] = alloca half, align 2
+// CHECK-NEXT:    store half [[H:%.*]], half* [[LD_ADDR]], align 2
+// CHECK-NEXT:    [[TMP0:%.*]] = load half, half* [[LD_ADDR]], align 2
+// CHECK-NEXT:    [[BITCAST:%.*]] = bitcast half [[TMP0]] to i16
+// CHECK-NEXT:    [[SHL1:%.*]] = shl i16 [[BITCAST]], 1
+// CHECK-NEXT:    [[CMP:%.*]] = icmp ult i16 [[SHL1]], -2048
+// CHECK-NEXT:    [[RES:%.*]] = zext i1 [[CMP]] to i32
+// CHECK-NEXT:    call void @p(i8* getelementptr inbounds ([12 x i8], [12 x i8]* @.str.[[#STRID:STRID+1]], i64 0, i64 0), i32 [[RES]]) [[ATTR4]]
+// CHECK-NEXT:    ret void
+//
+void test_fp16_isfinite(__fp16 h) {
+  P(isfinite, (h));
+
+  return;
+}
+
+// CHECK-LABEL: @test_float_isfinite(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[LD_ADDR:%.*]] = alloca float, align 4
+// CHECK-NEXT:    store float [[F:%.*]], float* [[LD_ADDR]], align 4
+// CHECK-NEXT:    [[TMP0:%.*]] = load float, float* [[LD_ADDR]], align 4
+// CHECK-NEXT:    [[BITCAST:%.*]] = bitcast float [[TMP0]] to i32
+// CHECK-NEXT:    [[SHL1:%.*]] = shl i32 [[BITCAST]], 1
+// CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[SHL1]], -16777216
+// CHECK-NEXT:    [[RES:%.*]] = zext i1 [[CMP]] to i32
+// CHECK-NEXT:    call void @p(i8* getelementptr inbounds ([12 x i8], [12 x i8]* @.str.[[#STRID:STRID+1]], i64 0, i64 0), i32 [[RES]]) [[ATTR4]]
+// CHECK-NEXT:    ret void
+//
+void test_float_isfinite(float f) {
+  P(isfinite, (f));
+
+  return;
+}
+
+// CHECK-LABEL: @test_double_isfinite(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[LD_ADDR:%.*]] = alloca double, align 8
+// CHECK-NEXT:    store double [[D:%.*]], double* [[LD_ADDR]], align 8
+// CHECK-NEXT:    [[TMP0:%.*]] = load double, double* [[LD_ADDR]], align 8
+// CHECK-NEXT:    [[BITCAST:%.*]] = bitcast double [[TMP0]] to i64
+// CHECK-NEXT:    [[SHL1:%.*]] = shl i64 [[BITCAST]], 1
+// CHECK-NEXT:    [[CMP:%.*]] = icmp ult i64 [[SHL1]], -9007199254740992
+// CHECK-NEXT:    [[RES:%.*]] = zext i1 [[CMP]] to i32
+// CHECK-NEXT:    call void @p(i8* getelementptr inbounds ([12 x i8], [12 x i8]* @.str.[[#STRID:STRID+1]], i64 0, i64 0), i32 [[RES]]) [[ATTR4]]
+// CHECK-NEXT:    ret void
+//
+void test_double_isfinite(double d) {
+  P(isfinite, (d));
+
+  return;
+}
+
 // CHECK-LABEL: @test_isinf_sign(
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    [[D_ADDR:%.*]] = alloca double, align 8

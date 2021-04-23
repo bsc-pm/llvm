@@ -86,6 +86,13 @@ enum OpenMPOffloadingRequiresDirFlags {
   OMP_REQ_DYNAMIC_ALLOCATORS      = 0x010
 };
 
+enum TargetAllocTy : int32_t {
+  TARGET_ALLOC_DEVICE = 0,
+  TARGET_ALLOC_HOST,
+  TARGET_ALLOC_SHARED,
+  TARGET_ALLOC_DEFAULT
+};
+
 /// This struct is a record of an entry point or global. For a function
 /// entry point the size is expected to be zero
 struct __tgt_offload_entry {
@@ -177,18 +184,25 @@ int omp_get_num_devices(void);
 int omp_get_initial_device(void);
 void *omp_target_alloc(size_t size, int device_num);
 void omp_target_free(void *device_ptr, int device_num);
-int omp_target_is_present(void *ptr, int device_num);
-int omp_target_memcpy(void *dst, void *src, size_t length, size_t dst_offset,
-                      size_t src_offset, int dst_device, int src_device);
-int omp_target_memcpy_rect(void *dst, void *src, size_t element_size,
+int omp_target_is_present(const void *ptr, int device_num);
+int omp_target_memcpy(void *dst, const void *src, size_t length,
+                      size_t dst_offset, size_t src_offset, int dst_device,
+                      int src_device);
+int omp_target_memcpy_rect(void *dst, const void *src, size_t element_size,
                            int num_dims, const size_t *volume,
                            const size_t *dst_offsets, const size_t *src_offsets,
                            const size_t *dst_dimensions,
                            const size_t *src_dimensions, int dst_device,
                            int src_device);
-int omp_target_associate_ptr(void *host_ptr, void *device_ptr, size_t size,
-                             size_t device_offset, int device_num);
-int omp_target_disassociate_ptr(void *host_ptr, int device_num);
+int omp_target_associate_ptr(const void *host_ptr, const void *device_ptr,
+                             size_t size, size_t device_offset, int device_num);
+int omp_target_disassociate_ptr(const void *host_ptr, int device_num);
+
+/// Explicit target memory allocators
+/// Using the llvm_ prefix until they become part of the OpenMP standard.
+void *llvm_omp_target_alloc_device(size_t size, int device_num);
+void *llvm_omp_target_alloc_host(size_t size, int device_num);
+void *llvm_omp_target_alloc_shared(size_t size, int device_num);
 
 /// add the clauses of the requires directives in a given file
 void __tgt_register_requires(int64_t flags);
@@ -312,8 +326,10 @@ int __tgt_target_teams_nowait_mapper(
     int32_t thread_limit, int32_t depNum, void *depList, int32_t noAliasDepNum,
     void *noAliasDepList);
 
-void __kmpc_push_target_tripcount(ident_t *loc, int64_t device_id,
-                                  uint64_t loop_tripcount);
+void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
+
+void __kmpc_push_target_tripcount_mapper(ident_t *loc, int64_t device_id,
+                                         uint64_t loop_tripcount);
 
 #ifdef __cplusplus
 }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/AliasSetTracker.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/GuardUtils.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
@@ -62,9 +63,9 @@ void AliasSet::mergeSetIn(AliasSet &AS, AliasSetTracker &AST) {
     PointerRec *R = AS.getSomePointer();
 
     // If the pointers are not a must-alias pair, this set becomes a may alias.
-    if (AA.alias(MemoryLocation(L->getValue(), L->getSize(), L->getAAInfo()),
-                 MemoryLocation(R->getValue(), R->getSize(), R->getAAInfo())) !=
-        MustAlias)
+    if (!AA.isMustAlias(
+            MemoryLocation(L->getValue(), L->getSize(), L->getAAInfo()),
+            MemoryLocation(R->getValue(), R->getSize(), R->getAAInfo())))
       Alias = SetMayAlias;
   }
 
@@ -140,11 +141,11 @@ void AliasSet::addPointer(AliasSetTracker &AST, PointerRec &Entry,
         AliasResult Result = AA.alias(
             MemoryLocation(P->getValue(), P->getSize(), P->getAAInfo()),
             MemoryLocation(Entry.getValue(), Size, AAInfo));
-        if (Result != MustAlias) {
+        if (Result != AliasResult::MustAlias) {
           Alias = SetMayAlias;
           AST.TotalMayAliasSetSize += size();
         }
-        assert(Result != NoAlias && "Cannot be part of must set!");
+        assert(Result != AliasResult::NoAlias && "Cannot be part of must set!");
       } else if (!SkipSizeUpdate)
         P->updateSizeAndAAInfo(Size, AAInfo);
     }
@@ -194,7 +195,7 @@ AliasResult AliasSet::aliasesPointer(const Value *Ptr, LocationSize Size,
                                      const AAMDNodes &AAInfo,
                                      AliasAnalysis &AA) const {
   if (AliasAny)
-    return MayAlias;
+    return AliasResult::MayAlias;
 
   if (Alias == SetMustAlias) {
     assert(UnknownInsts.empty() && "Illegal must alias set!");
@@ -210,11 +211,13 @@ AliasResult AliasSet::aliasesPointer(const Value *Ptr, LocationSize Size,
 
   // If this is a may-alias set, we have to check all of the pointers in the set
   // to be sure it doesn't alias the set...
-  for (iterator I = begin(), E = end(); I != E; ++I)
-    if (AliasResult AR = AA.alias(
-            MemoryLocation(Ptr, Size, AAInfo),
-            MemoryLocation(I.getPointer(), I.getSize(), I.getAAInfo())))
+  for (iterator I = begin(), E = end(); I != E; ++I) {
+    AliasResult AR =
+        AA.alias(MemoryLocation(Ptr, Size, AAInfo),
+                 MemoryLocation(I.getPointer(), I.getSize(), I.getAAInfo()));
+    if (AR != AliasResult::NoAlias)
       return AR;
+  }
 
   // Check the unknown instructions...
   if (!UnknownInsts.empty()) {
@@ -222,10 +225,10 @@ AliasResult AliasSet::aliasesPointer(const Value *Ptr, LocationSize Size,
       if (auto *Inst = getUnknownInst(i))
         if (isModOrRefSet(
                 AA.getModRefInfo(Inst, MemoryLocation(Ptr, Size, AAInfo))))
-          return MayAlias;
+          return AliasResult::MayAlias;
   }
 
-  return NoAlias;
+  return AliasResult::NoAlias;
 }
 
 bool AliasSet::aliasesUnknownInst(const Instruction *Inst,
@@ -300,17 +303,17 @@ AliasSet *AliasSetTracker::mergeAliasSetsForPointer(const Value *Ptr,
                                                     const AAMDNodes &AAInfo,
                                                     bool &MustAliasAll) {
   AliasSet *FoundSet = nullptr;
-  AliasResult AllAR = MustAlias;
+  MustAliasAll = true;
   for (AliasSet &AS : llvm::make_early_inc_range(*this)) {
     if (AS.Forward)
       continue;
 
     AliasResult AR = AS.aliasesPointer(Ptr, Size, AAInfo, AA);
-    if (AR == NoAlias)
+    if (AR == AliasResult::NoAlias)
       continue;
 
-    AllAR =
-        AliasResult(AllAR & AR); // Possible downgrade to May/Partial, even No
+    if (AR != AliasResult::MustAlias)
+      MustAliasAll = false;
 
     if (!FoundSet) {
       // If this is the first alias set ptr can go into, remember it.
@@ -321,7 +324,6 @@ AliasSet *AliasSetTracker::mergeAliasSetsForPointer(const Value *Ptr,
     }
   }
 
-  MustAliasAll = (AllAR == MustAlias);
   return FoundSet;
 }
 

@@ -42,8 +42,7 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
   case hsail:          return "hsail";
   case kalimba:        return "kalimba";
   case lanai:          return "lanai";
-  case le32:           return "le32";
-  case le64:           return "le64";
+  case m68k:           return "m68k";
   case mips64:         return "mips64";
   case mips64el:       return "mips64el";
   case mips:           return "mips";
@@ -105,6 +104,8 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
   case ppc:
   case ppcle:       return "ppc";
 
+  case m68k:        return "m68k";
+
   case mips:
   case mipsel:
   case mips64:
@@ -132,9 +133,6 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
   // NVPTX intrinsics are namespaced under nvvm.
   case nvptx:       return "nvvm";
   case nvptx64:     return "nvvm";
-
-  case le32:        return "le32";
-  case le64:        return "le64";
 
   case amdil:
   case amdil64:     return "amdil";
@@ -247,6 +245,7 @@ StringRef Triple::getEnvironmentTypeName(EnvironmentType Kind) {
   case Musl: return "musl";
   case MuslEABI: return "musleabi";
   case MuslEABIHF: return "musleabihf";
+  case MuslX32: return "muslx32";
   case Simulator: return "simulator";
   }
 
@@ -281,6 +280,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("armeb", armeb)
     .Case("avr", avr)
     .StartsWith("bpf", BPFArch)
+    .Case("m68k", m68k)
     .Case("mips", mips)
     .Case("mipsel", mipsel)
     .Case("mips64", mips64)
@@ -310,8 +310,6 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("xcore", xcore)
     .Case("nvptx", nvptx)
     .Case("nvptx64", nvptx64)
-    .Case("le32", le32)
-    .Case("le64", le64)
     .Case("amdil", amdil)
     .Case("amdil64", amdil64)
     .Case("hsail", hsail)
@@ -419,6 +417,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("thumb", Triple::thumb)
     .Case("thumbeb", Triple::thumbeb)
     .Case("avr", Triple::avr)
+    .Case("m68k", Triple::m68k)
     .Case("msp430", Triple::msp430)
     .Cases("mips", "mipseb", "mipsallegrex", "mipsisa32r6",
            "mipsr6", Triple::mips)
@@ -442,8 +441,6 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("xcore", Triple::xcore)
     .Case("nvptx", Triple::nvptx)
     .Case("nvptx64", Triple::nvptx64)
-    .Case("le32", Triple::le32)
-    .Case("le64", Triple::le64)
     .Case("amdil", Triple::amdil)
     .Case("amdil64", Triple::amdil64)
     .Case("hsail", Triple::hsail)
@@ -550,6 +547,7 @@ static Triple::EnvironmentType parseEnvironment(StringRef EnvironmentName) {
       .StartsWith("android", Triple::Android)
       .StartsWith("musleabihf", Triple::MuslEABIHF)
       .StartsWith("musleabi", Triple::MuslEABI)
+      .StartsWith("muslx32", Triple::MuslX32)
       .StartsWith("musl", Triple::Musl)
       .StartsWith("msvc", Triple::MSVC)
       .StartsWith("itanium", Triple::Itanium)
@@ -702,8 +700,7 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::hsail:
   case Triple::kalimba:
   case Triple::lanai:
-  case Triple::le32:
-  case Triple::le64:
+  case Triple::m68k:
   case Triple::mips64:
   case Triple::mips64el:
   case Triple::mips:
@@ -1276,7 +1273,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::hsail:
   case llvm::Triple::kalimba:
   case llvm::Triple::lanai:
-  case llvm::Triple::le32:
+  case llvm::Triple::m68k:
   case llvm::Triple::mips:
   case llvm::Triple::mipsel:
   case llvm::Triple::nvptx:
@@ -1305,7 +1302,6 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::bpfeb:
   case llvm::Triple::bpfel:
   case llvm::Triple::hsail64:
-  case llvm::Triple::le64:
   case llvm::Triple::mips64:
   case llvm::Triple::mips64el:
   case llvm::Triple::nvptx64:
@@ -1360,7 +1356,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::hsail:
   case Triple::kalimba:
   case Triple::lanai:
-  case Triple::le32:
+  case Triple::m68k:
   case Triple::mips:
   case Triple::mipsel:
   case Triple::nvptx:
@@ -1387,7 +1383,6 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::aarch64_be:     T.setArch(Triple::armeb);   break;
   case Triple::amdil64:        T.setArch(Triple::amdil);   break;
   case Triple::hsail64:        T.setArch(Triple::hsail);   break;
-  case Triple::le64:           T.setArch(Triple::le32);    break;
   case Triple::mips64:         T.setArch(Triple::mips);    break;
   case Triple::mips64el:       T.setArch(Triple::mipsel);  break;
   case Triple::nvptx64:        T.setArch(Triple::nvptx);   break;
@@ -1413,6 +1408,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::hexagon:
   case Triple::kalimba:
   case Triple::lanai:
+  case Triple::m68k:
   case Triple::msp430:
   case Triple::r600:
   case Triple::shave:
@@ -1430,7 +1426,6 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::bpfeb:
   case Triple::bpfel:
   case Triple::hsail64:
-  case Triple::le64:
   case Triple::mips64:
   case Triple::mips64el:
   case Triple::nvptx64:
@@ -1452,7 +1447,6 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::arm:             T.setArch(Triple::aarch64);    break;
   case Triple::armeb:           T.setArch(Triple::aarch64_be); break;
   case Triple::hsail:           T.setArch(Triple::hsail64);    break;
-  case Triple::le32:            T.setArch(Triple::le64);       break;
   case Triple::mips:            T.setArch(Triple::mips64);     break;
   case Triple::mipsel:          T.setArch(Triple::mips64el);   break;
   case Triple::nvptx:           T.setArch(Triple::nvptx64);    break;
@@ -1485,8 +1479,6 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::hsail64:
   case Triple::hsail:
   case Triple::kalimba:
-  case Triple::le32:
-  case Triple::le64:
   case Triple::msp430:
   case Triple::nvptx64:
   case Triple::nvptx:
@@ -1537,6 +1529,7 @@ Triple Triple::getLittleEndianArchVariant() const {
   case Triple::lanai:
   case Triple::sparcv9:
   case Triple::systemz:
+  case Triple::m68k:
 
   // ARM is intentionally unsupported here, changing the architecture would
   // drop any arch suffixes.
@@ -1574,8 +1567,6 @@ bool Triple::isLittleEndian() const {
   case Triple::hsail64:
   case Triple::hsail:
   case Triple::kalimba:
-  case Triple::le32:
-  case Triple::le64:
   case Triple::mips64el:
   case Triple::mipsel:
   case Triple::msp430:
@@ -1704,7 +1695,9 @@ StringRef Triple::getARMCPUForArch(StringRef MArch) const {
     break;
   case llvm::Triple::Win32:
     // FIXME: this is invalid for WindowsCE
-    return "cortex-a9";
+    if (ARM::parseArchVersion(MArch) <= 7)
+      return "cortex-a9";
+    break;
   case llvm::Triple::IOS:
   case llvm::Triple::MacOSX:
   case llvm::Triple::TvOS:

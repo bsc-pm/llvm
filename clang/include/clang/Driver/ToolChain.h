@@ -444,8 +444,8 @@ public:
   // Returns target specific runtime path if it exists.
   virtual Optional<std::string> getRuntimePath() const;
 
-  // Returns target specific C++ library path if it exists.
-  virtual Optional<std::string> getCXXStdlibPath() const;
+  // Returns target specific standard library path if it exists.
+  virtual Optional<std::string> getStdlibPath() const;
 
   // Returns <ResourceDir>/lib/<OSName>/<arch>.  This is used by runtimes (such
   // as OpenMP) to find arch-specific libraries.
@@ -602,6 +602,9 @@ public:
   // GetUnwindLibType - Determine the unwind library type to use with the
   // given compilation arguments.
   virtual UnwindLibType GetUnwindLibType(const llvm::opt::ArgList &Args) const;
+
+  // Detect the highest available version of libc++ in include path.
+  virtual std::string detectLibcxxVersion(StringRef IncludePath) const;
 
   /// AddClangCXXStdlibIncludeArgs - Add the clang -cc1 level arguments to set
   /// the include paths to use for the given C++ standard library type.

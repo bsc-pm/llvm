@@ -53,6 +53,7 @@ def CombiningKind : BitEnumAttr<
      COMBINING_KIND_MAX, COMBINING_KIND_AND, COMBINING_KIND_OR,
      COMBINING_KIND_XOR]> {
   let cppNamespace = "::mlir::vector";
+  let genSpecializedAttr = 0;
 }
 
 def Vector_CombiningKindAttr : DialectAttr<
@@ -199,9 +200,9 @@ def Vector_ContractionOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
       "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes)>,
-    OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
       "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
       "ArrayRef<StringRef>":$iteratorTypes)>
   ];
@@ -371,7 +372,7 @@ def Vector_ShuffleOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$v1, "Value":$v2, "ArrayRef<int64_t>")>
+    OpBuilder<(ins "Value":$v1, "Value":$v2, "ArrayRef<int64_t>")>
   ];
   let extraClassDeclaration = [{
     static StringRef getMaskAttrName() { return "mask"; }
@@ -414,8 +415,8 @@ def Vector_ExtractElementOp :
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "int64_t":$position)>,
-    OpBuilderDAG<(ins "Value":$source, "Value":$position)>
+    OpBuilder<(ins "Value":$source, "int64_t":$position)>,
+    OpBuilder<(ins "Value":$source, "Value":$position)>
   ];
   let extraClassDeclaration = [{
     VectorType getVectorType() {
@@ -443,10 +444,10 @@ def Vector_ExtractOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "ArrayRef<int64_t>":$position)>,
+    OpBuilder<(ins "Value":$source, "ArrayRef<int64_t>":$position)>,
     // Convenience builder which assumes the values in `position` are defined by
     // ConstantIndexOp.
-    OpBuilderDAG<(ins "Value":$source, "ValueRange":$position)>
+    OpBuilder<(ins "Value":$source, "ValueRange":$position)>
   ];
   let extraClassDeclaration = [{
     static StringRef getPositionAttrName() { return "position"; }
@@ -493,7 +494,7 @@ def Vector_ExtractSlicesOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "TupleType":$tupleType, "Value":$vector,
+    OpBuilder<(ins "TupleType":$tupleType, "Value":$vector,
       "ArrayRef<int64_t>":$sizes, "ArrayRef<int64_t>":$strides)>
   ];
   let extraClassDeclaration = [{
@@ -562,7 +563,7 @@ def Vector_ExtractMapOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$vector, "ValueRange":$ids,
+    OpBuilder<(ins "Value":$vector, "ValueRange":$ids,
                   "ArrayRef<int64_t>":$multiplicity,
                   "AffineMap":$map)>];
   let extraClassDeclaration = [{
@@ -609,7 +610,7 @@ def Vector_FMAOp :
   let verifier = ?;
   let assemblyFormat = "$lhs `,` $rhs `,` $acc attr-dict `:` type($lhs)";
   let builders = [
-    OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs, "Value":$acc),
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc),
     [{build($_builder, $_state, lhs.getType(), lhs, rhs, acc);}]>
   ];
   let extraClassDeclaration = [{
@@ -649,8 +650,8 @@ def Vector_InsertElementOp :
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "Value":$dest, "int64_t":$position)>,
-    OpBuilderDAG<(ins "Value":$source, "Value":$dest, "Value":$position)>
+    OpBuilder<(ins "Value":$source, "Value":$dest, "int64_t":$position)>,
+    OpBuilder<(ins "Value":$source, "Value":$dest, "Value":$position)>
   ];
   let extraClassDeclaration = [{
     Type getSourceType() { return source().getType(); }
@@ -686,10 +687,10 @@ def Vector_InsertOp :
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "Value":$dest,
+    OpBuilder<(ins "Value":$source, "Value":$dest,
       "ArrayRef<int64_t>":$position)>,
     // Convenience builder which assumes all values are constant indices.
-    OpBuilderDAG<(ins "Value":$source, "Value":$dest, "ValueRange":$position)>
+    OpBuilder<(ins "Value":$source, "Value":$dest, "ValueRange":$position)>
   ];
   let extraClassDeclaration = [{
     static StringRef getPositionAttrName() { return "position"; }
@@ -806,7 +807,7 @@ def Vector_InsertMapOp :
       into vector<64x4x32xf32>
     ```
   }];
-  let builders = [OpBuilderDAG<(ins "Value":$vector, "Value":$dest,
+  let builders = [OpBuilder<(ins "Value":$vector, "Value":$dest,
                                 "ValueRange":$ids)>];
   let extraClassDeclaration = [{
     VectorType getSourceVectorType() {
@@ -859,7 +860,7 @@ def Vector_InsertStridedSliceOp :
   }];
 
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "Value":$dest,
+    OpBuilder<(ins "Value":$source, "Value":$dest,
       "ArrayRef<int64_t>":$offsets, "ArrayRef<int64_t>":$strides)>
   ];
   let extraClassDeclaration = [{
@@ -935,7 +936,7 @@ def Vector_OuterProductOp :
   }];
   let builders = [
     // Build an op without mask, use the type of `acc` as the return type.
-    OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs, "Value":$acc)>
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc)>
   ];
   let extraClassDeclaration = [{
     VectorType getOperandVectorTypeLHS() {
@@ -1115,7 +1116,7 @@ def Vector_ExtractStridedSliceOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$source, "ArrayRef<int64_t>":$offsets,
+    OpBuilder<(ins "Value":$source, "ArrayRef<int64_t>":$offsets,
       "ArrayRef<int64_t>":$sizes, "ArrayRef<int64_t>":$strides)>
   ];
   let extraClassDeclaration = [{
@@ -1134,11 +1135,13 @@ def Vector_TransferReadOp :
   Vector_Op<"transfer_read", [
       DeclareOpInterfaceMethods<VectorTransferOpInterface>,
       DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
-      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      AttrSizedOperandSegments
     ]>,
     Arguments<(ins AnyShaped:$source, Variadic<Index>:$indices,
                AffineMapAttr:$permutation_map, AnyType:$padding,
-               OptionalAttr<BoolArrayAttr>:$masked)>,
+               Optional<VectorOf<[I1]>>:$mask,
+               OptionalAttr<BoolArrayAttr>:$in_bounds)>,
     Results<(outs AnyVector:$vector)> {
 
   let summary = "Reads a supervector from memory into an SSA vector value.";
@@ -1165,15 +1168,20 @@ def Vector_TransferReadOp :
     The size of the slice is specified by the size of the vector, given as the
     return type.
 
-    An `ssa-value` of the same elemental type as the MemRef/Tensor is provided
-    as the last operand to specify padding in the case of out-of-bounds
-    accesses.
+    An SSA value `padding` of the same elemental type as the MemRef/Tensor is
+    provided to specify a fallback value in the case of out-of-bounds accesses
+    and/or masking.
+
+    An optional SSA value `mask` of the same shape as the vector type may be
+    specified to mask out elements. Such elements will be replaces with
+    `padding`. Elements whose corresponding mask element is `0` are masked out.
 
     An optional boolean array attribute is provided to specify which dimensions
-    of the transfer need masking. When a dimension is specified as not requiring
-    masking, the `vector.transfer_read` may be lowered to simple loads. The
-    absence of this `masked` attribute signifies that all dimensions of the
-    transfer need to be masked.
+    of the transfer are guaranteed to be within bounds. The absence of this
+    `in_bounds` attribute signifies that any dimension of the transfer may be
+    out-of-bounds. A `vector.transfer_read` can be lowered to a simple load if
+    all dimensions are specified to be within bounds and no `mask` was
+    specified.
 
     This operation is called 'read' by opposition to 'load' because the
     super-vector granularity is generally not representable with a single
@@ -1288,17 +1296,25 @@ def Vector_TransferReadOp :
 
   let builders = [
     // Builder that sets padding to zero.
-    OpBuilderDAG<(ins "VectorType":$vector, "Value":$source,
+    OpBuilder<(ins "VectorType":$vector, "Value":$source,
       "ValueRange":$indices, "AffineMap":$permutationMap,
-      CArg<"ArrayRef<bool>", "{}">:$maybeMasked)>,
+      CArg<"ArrayRef<bool>", "{}">:$inBounds)>,
     // Builder that sets padding to 'getMinorIdentityMap'.
-    OpBuilderDAG<(ins "VectorType":$vector, "Value":$source,
+    OpBuilder<(ins "VectorType":$vector, "Value":$source,
       "ValueRange":$indices, "Value":$padding,
-      CArg<"ArrayRef<bool>", "{}">:$maybeMasked)>,
+      CArg<"ArrayRef<bool>", "{}">:$inBounds)>,
     // Builder that sets permutation map (resp. padding) to
     // 'getMinorIdentityMap' (resp. zero).
-    OpBuilderDAG<(ins "VectorType":$vector, "Value":$source,
-      "ValueRange":$indices, CArg<"ArrayRef<bool>", "{}">:$maybeMasked)>
+    OpBuilder<(ins "VectorType":$vector, "Value":$source,
+      "ValueRange":$indices, CArg<"ArrayRef<bool>", "{}">:$inBounds)>,
+    // Builder that does not set mask.
+    OpBuilder<(ins "Type":$vector, "Value":$source,
+      "ValueRange":$indices, "AffineMapAttr":$permutationMap, "Value":$padding,
+      "ArrayAttr":$inBounds)>,
+    // Builder that does not set mask.
+    OpBuilder<(ins "Type":$vector, "Value":$source,
+      "ValueRange":$indices, "AffineMap":$permutationMap, "Value":$padding,
+      "ArrayAttr":$inBounds)>
   ];
 
   let hasFolder = 1;
@@ -1308,12 +1324,14 @@ def Vector_TransferWriteOp :
   Vector_Op<"transfer_write", [
       DeclareOpInterfaceMethods<VectorTransferOpInterface>,
       DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
-      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      AttrSizedOperandSegments
   ]>,
     Arguments<(ins AnyVector:$vector, AnyShaped:$source,
                Variadic<Index>:$indices,
                AffineMapAttr:$permutation_map,
-               OptionalAttr<BoolArrayAttr>:$masked)>,
+               Optional<VectorOf<[I1]>>:$mask,
+               OptionalAttr<BoolArrayAttr>:$in_bounds)>,
     Results<(outs Optional<AnyRankedTensor>:$result)> {
 
   let summary = "The vector.transfer_write op writes a supervector to memory.";
@@ -1341,11 +1359,16 @@ def Vector_TransferWriteOp :
 
     The size of the slice is specified by the size of the vector.
 
+    An optional SSA value `mask` of the same shape as the vector type may be
+    specified to mask out elements. Elements whose corresponding mask element
+    is `0` are masked out.
+
     An optional boolean array attribute is provided to specify which dimensions
-    of the transfer need masking. When a dimension is specified as not requiring
-    masking, the `vector.transfer_write` may be lowered to simple stores. The
-    absence of this `mask` attribute signifies that all dimensions of the
-    transfer need to be masked.
+    of the transfer are guaranteed to be within bounds. The absence of this
+    `in_bounds` attribute signifies that any dimension of the transfer may be
+    out-of-bounds. A `vector.transfer_write` can be lowered to a simple store
+    if all dimensions are specified to be within bounds and no `mask` was
+    specified.
 
     This operation is called 'write' by opposition to 'store' because the
     super-vector granularity is generally not representable with a single
@@ -1385,17 +1408,20 @@ def Vector_TransferWriteOp :
 
   let builders = [
     // Builder that sets permutation map to 'getMinorIdentityMap'.
-    OpBuilderDAG<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
-      CArg<"ArrayRef<bool>", "{}">:$maybeMasked)>,
-    OpBuilderDAG<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
+    OpBuilder<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
+      CArg<"ArrayRef<bool>", "{}">:$inBounds)>,
+    OpBuilder<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
       "AffineMap":$permutationMap)>,
-    OpBuilderDAG<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
-      "AffineMapAttr":$permutationMap, "ArrayAttr":$masked)>,
-    OpBuilderDAG<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
-      "AffineMap":$permutationMap, "ArrayAttr":$masked)>,
+    OpBuilder<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
+      "AffineMapAttr":$permutationMap, "ArrayAttr":$inBounds)>,
+    OpBuilder<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
+      "AffineMap":$permutationMap, "Value":$mask, "ArrayAttr":$inBounds)>,
+    OpBuilder<(ins "Value":$vector, "Value":$source, "ValueRange":$indices,
+      "AffineMap":$permutationMap, "ArrayAttr":$inBounds)>,
   ];
 
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def Vector_LoadOp : Vector_Op<"load"> {
@@ -1659,7 +1685,7 @@ def Vector_GatherOp :
   Vector_Op<"gather">,
     Arguments<(ins Arg<AnyMemRef, "", [MemRead]>:$base,
                Variadic<Index>:$indices,
-	       VectorOfRankAndType<[1], [AnyInteger]>:$index_vec,
+	       VectorOfRankAndType<[1], [AnyInteger, Index]>:$index_vec,
                VectorOfRankAndType<[1], [I1]>:$mask,
                VectorOfRank<[1]>:$pass_thru)>,
     Results<(outs VectorOfRank<[1]>:$result)> {
@@ -1724,7 +1750,7 @@ def Vector_ScatterOp :
   Vector_Op<"scatter">,
     Arguments<(ins Arg<AnyMemRef, "", [MemWrite]>:$base,
                Variadic<Index>:$indices,
-	       VectorOfRankAndType<[1], [AnyInteger]>:$index_vec,
+	       VectorOfRankAndType<[1], [AnyInteger, Index]>:$index_vec,
                VectorOfRankAndType<[1], [I1]>:$mask,
                VectorOfRank<[1]>:$valueToStore)> {
 
@@ -2016,7 +2042,7 @@ def Vector_TypeCastOp :
 
   /// Build the canonical memRefType with a single vector.
   /// E.g. memref<4 x 5 x vector<6 x f32>> -> memref<vector<4 x 5 x 6 x f32>>.
-  let builders = [OpBuilderDAG<(ins "Value":$source)>];
+  let builders = [OpBuilder<(ins "Value":$source)>];
 
   let extraClassDeclaration = [{
     MemRefType getMemRefType() {
@@ -2172,7 +2198,7 @@ def Vector_TransposeOp :
     ```
   }];
   let builders = [
-    OpBuilderDAG<(ins "Value":$vector, "ArrayRef<int64_t>":$transp)>
+    OpBuilder<(ins "Value":$vector, "ArrayRef<int64_t>":$transp)>
   ];
   let extraClassDeclaration = [{
     VectorType getVectorType() {
@@ -2282,13 +2308,13 @@ def Vector_MatmulOp : Vector_Op<"matrix_multiply", [NoSideEffect,
       Arguments<(
         // TODO: tighten vector element types that make sense.
         ins VectorOfRankAndType<[1],
-              [AnySignlessInteger, AnySignedInteger, AnyFloat]>:$lhs,
+              [AnySignlessInteger, AnySignedInteger, Index, AnyFloat]>:$lhs,
             VectorOfRankAndType<[1],
-              [AnySignlessInteger, AnySignedInteger, AnyFloat]>:$rhs,
+              [AnySignlessInteger, AnySignedInteger, Index, AnyFloat]>:$rhs,
             I32Attr:$lhs_rows, I32Attr:$lhs_columns, I32Attr:$rhs_columns)>,
       Results<(
         outs VectorOfRankAndType<[1],
-               [AnySignlessInteger, AnySignedInteger, AnyFloat]>:$res)>
+               [AnySignlessInteger, AnySignedInteger, Index, AnyFloat]>:$res)>
 {
   let summary = "Vector matrix multiplication op that operates on flattened 1-D"
     " MLIR vectors";
@@ -2318,7 +2344,7 @@ def Vector_MatmulOp : Vector_Op<"matrix_multiply", [NoSideEffect,
     ```
   }];
   let builders = [
-   OpBuilderDAG<(ins "Value":$lhs, "Value":$rhs, "unsigned":$lhsRows,
+   OpBuilder<(ins "Value":$lhs, "Value":$rhs, "unsigned":$lhsRows,
      "unsigned":$lhsColumns, "unsigned":$rhsColumns),
    [{
      $_state.addOperands({lhs, rhs});
@@ -2345,11 +2371,11 @@ def Vector_FlatTransposeOp : Vector_Op<"flat_transpose", [NoSideEffect,
     Arguments<(
       // TODO: tighten vector element types that make sense.
       ins VectorOfRankAndType<[1],
-            [AnySignlessInteger, AnySignedInteger, AnyFloat]>:$matrix,
+            [AnySignlessInteger, AnySignedInteger, Index, AnyFloat]>:$matrix,
           I32Attr:$rows, I32Attr:$columns)>,
     Results<(
       outs VectorOfRankAndType<[1],
-             [AnySignlessInteger, AnySignedInteger, AnyFloat]>:$res)> {
+             [AnySignlessInteger, AnySignedInteger, Index, AnyFloat]>:$res)> {
   let summary = "Vector matrix transposition on flattened 1-D MLIR vectors";
   let description = [{
     This is the counterpart of llvm.matrix.transpose in MLIR. It serves

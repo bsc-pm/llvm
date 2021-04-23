@@ -46,7 +46,13 @@ sections with improvements to Clang's support for those languages.
 Major New Features
 ------------------
 
-- ...
+- Guaranteed tail calls are now supported with statement attributes
+  ``[[clang::musttail]]`` in C++ and ``__attribute__((musttail))`` in C. The
+  attribute is applied to a return statement (not a function declaration),
+  and an error is emitted if a tail call cannot be guaranteed, for example if
+  the function signatures of caller and callee are not compatible. Guaranteed
+  tail calls enable a class of algorithms that would otherwise use an
+  arbitrary amount of stack space.
 
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -72,6 +78,13 @@ Modified Compiler Flags
 -----------------------
 
 - -Wshadow now also checks for shadowed structured bindings
+- ``-B <prefix>`` (when ``<prefix>`` is a directory) was overloaded to additionally
+  detect GCC installations under ``<prefix>`` (``lib{,32,64}/gcc{,-cross}/$triple``).
+  This behavior was incompatible with GCC, caused interop issues with
+  ``--gcc-toolchain``, and was thus dropped. Specify ``--gcc-toolchain=<dir>``
+  instead. ``-B``'s other GCC-compatible semantics are preserved:
+  ``$prefix/$triple-$file`` and ``$prefix$file`` are searched for executables,
+  libraries, includes, and data files used by the compiler.
 
 Removed Compiler Flags
 -------------------------
@@ -104,9 +117,16 @@ C Language Changes in Clang
 C++ Language Changes in Clang
 -----------------------------
 
+- The oldest supported GNU libstdc++ is now 4.8.3 (released 2014-05-22).
+  Clang workarounds for bugs in earlier versions have been removed.
+
 - ...
 
-C++1z Feature Support
+C++20 Feature Support
+^^^^^^^^^^^^^^^^^^^^^
+...
+
+C++2b Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
 ...
 
@@ -170,8 +190,8 @@ clang-format
 
 - Option ``SortIncludes`` has been updated from a ``bool`` to an
   ``enum`` with backwards compatibility. In addition to the previous
-  ``true``/``false`` states (now ``CaseInsensitive``/``Never``), a third
-  state has been added (``CaseSensitive``) which causes an alphabetical sort
+  ``true``/``false`` states (now ``CaseSensitive``/``Never``), a third
+  state has been added (``CaseInsensitive``) which causes an alphabetical sort
   with case used as a tie-breaker.
 
   .. code-block:: c++
@@ -183,14 +203,14 @@ clang-format
     #include "A/b.h"
     #include "B/a.h"
 
-    // CaseInsensitive (previously true)
+    // CaseSensitive (previously true)
     #include "A/B.h"
     #include "A/b.h"
     #include "B/A.h"
     #include "B/a.h"
     #include "a/b.h"
 
-    // CaseSensitive
+    // CaseInsensitive
     #include "A/B.h"
     #include "A/b.h"
     #include "a/b.h"
@@ -205,6 +225,16 @@ clang-format
 
 - Option ``ShortNamespaceLines`` has been added to give better control
   over ``FixNamespaceComments`` when determining a namespace length.
+
+- Support for Whitesmiths has been improved, with fixes for ``namespace`` blocks
+  and ``case`` blocks and labels.
+
+- Option ``EmptyLineAfterAccessModifier`` has been added to remove, force or keep
+  new lines after access modifiers.
+
+- Checks for newlines in option ``EmptyLineBeforeAccessModifier`` are now based
+  on the formatted new lines and not on the new lines in the file. (Fixes
+  https://llvm.org/PR41870.)
 
 libclang
 --------

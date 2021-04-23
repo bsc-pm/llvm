@@ -53,7 +53,7 @@
     __cpp_lib_constexpr_iterator                   201811L [C++20]
     __cpp_lib_constexpr_memory                     201811L [C++20]
     __cpp_lib_constexpr_numeric                    201911L [C++20]
-    __cpp_lib_constexpr_string                     201907L [C++20]
+    __cpp_lib_constexpr_string                     201811L [C++20]
     __cpp_lib_constexpr_string_view                201811L [C++20]
     __cpp_lib_constexpr_tuple                      201811L [C++20]
     __cpp_lib_constexpr_utility                    201811L [C++20]
@@ -140,6 +140,7 @@
     __cpp_lib_to_address                           201711L [C++20]
     __cpp_lib_to_array                             201907L [C++20]
     __cpp_lib_to_chars                             201611L [C++17]
+    __cpp_lib_to_underlying                        202102L [C++2b]
     __cpp_lib_transformation_trait_aliases         201304L [C++14]
     __cpp_lib_transparent_operators                201210L [C++14]
                                                    201510L [C++17]
@@ -149,7 +150,7 @@
     __cpp_lib_uncaught_exceptions                  201411L [C++17]
     __cpp_lib_unordered_map_try_emplace            201411L [C++17]
     __cpp_lib_unwrap_ref                           201811L [C++20]
-    __cpp_lib_variant                              201606L [C++17]
+    __cpp_lib_variant                              202102L [C++17]
     __cpp_lib_void_t                               201411L [C++17]
 */
 
@@ -640,6 +641,10 @@
 
 # ifdef __cpp_lib_to_chars
 #   error "__cpp_lib_to_chars should not be defined before c++17"
+# endif
+
+# ifdef __cpp_lib_to_underlying
+#   error "__cpp_lib_to_underlying should not be defined before c++2b"
 # endif
 
 # ifdef __cpp_lib_transformation_trait_aliases
@@ -1220,6 +1225,10 @@
 
 # ifdef __cpp_lib_to_chars
 #   error "__cpp_lib_to_chars should not be defined before c++17"
+# endif
+
+# ifdef __cpp_lib_to_underlying
+#   error "__cpp_lib_to_underlying should not be defined before c++2b"
 # endif
 
 # ifndef __cpp_lib_transformation_trait_aliases
@@ -2021,6 +2030,10 @@
 #   endif
 # endif
 
+# ifdef __cpp_lib_to_underlying
+#   error "__cpp_lib_to_underlying should not be defined before c++2b"
+# endif
+
 # ifndef __cpp_lib_transformation_trait_aliases
 #   error "__cpp_lib_transformation_trait_aliases should be defined in c++17"
 # endif
@@ -2077,8 +2090,8 @@
 # ifndef __cpp_lib_variant
 #   error "__cpp_lib_variant should be defined in c++17"
 # endif
-# if __cpp_lib_variant != 201606L
-#   error "__cpp_lib_variant should have the value 201606L in c++17"
+# if __cpp_lib_variant != 202102L
+#   error "__cpp_lib_variant should have the value 202102L in c++17"
 # endif
 
 # ifndef __cpp_lib_void_t
@@ -2376,17 +2389,11 @@
 #   error "__cpp_lib_complex_udls should have the value 201309L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_concepts
-#     error "__cpp_lib_concepts should be defined in c++20"
-#   endif
-#   if __cpp_lib_concepts != 202002L
-#     error "__cpp_lib_concepts should have the value 202002L in c++20"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_concepts
-#     error "__cpp_lib_concepts should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_concepts
+#   error "__cpp_lib_concepts should be defined in c++20"
+# endif
+# if __cpp_lib_concepts != 202002L
+#   error "__cpp_lib_concepts should have the value 202002L in c++20"
 # endif
 
 # ifndef __cpp_lib_constexpr_algorithms
@@ -2423,17 +2430,11 @@
 #   error "__cpp_lib_constexpr_functional should have the value 201907L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_iterator
-#     error "__cpp_lib_constexpr_iterator should be defined in c++20"
-#   endif
-#   if __cpp_lib_constexpr_iterator != 201811L
-#     error "__cpp_lib_constexpr_iterator should have the value 201811L in c++20"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_iterator
-#     error "__cpp_lib_constexpr_iterator should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_iterator
+#   error "__cpp_lib_constexpr_iterator should be defined in c++20"
+# endif
+# if __cpp_lib_constexpr_iterator != 201811L
+#   error "__cpp_lib_constexpr_iterator should have the value 201811L in c++20"
 # endif
 
 # ifndef __cpp_lib_constexpr_memory
@@ -2450,43 +2451,25 @@
 #   error "__cpp_lib_constexpr_numeric should have the value 201911L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_string
-#     error "__cpp_lib_constexpr_string should be defined in c++20"
-#   endif
-#   if __cpp_lib_constexpr_string != 201907L
-#     error "__cpp_lib_constexpr_string should have the value 201907L in c++20"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_string
-#     error "__cpp_lib_constexpr_string should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_string
+#   error "__cpp_lib_constexpr_string should be defined in c++20"
+# endif
+# if __cpp_lib_constexpr_string != 201811L
+#   error "__cpp_lib_constexpr_string should have the value 201811L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_string_view
-#     error "__cpp_lib_constexpr_string_view should be defined in c++20"
-#   endif
-#   if __cpp_lib_constexpr_string_view != 201811L
-#     error "__cpp_lib_constexpr_string_view should have the value 201811L in c++20"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_string_view
-#     error "__cpp_lib_constexpr_string_view should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_string_view
+#   error "__cpp_lib_constexpr_string_view should be defined in c++20"
+# endif
+# if __cpp_lib_constexpr_string_view != 201811L
+#   error "__cpp_lib_constexpr_string_view should have the value 201811L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_tuple
-#     error "__cpp_lib_constexpr_tuple should be defined in c++20"
-#   endif
-#   if __cpp_lib_constexpr_tuple != 201811L
-#     error "__cpp_lib_constexpr_tuple should have the value 201811L in c++20"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_tuple
-#     error "__cpp_lib_constexpr_tuple should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_tuple
+#   error "__cpp_lib_constexpr_tuple should be defined in c++20"
+# endif
+# if __cpp_lib_constexpr_tuple != 201811L
+#   error "__cpp_lib_constexpr_tuple should have the value 201811L in c++20"
 # endif
 
 # ifndef __cpp_lib_constexpr_utility
@@ -2670,16 +2653,16 @@
 #   error "__cpp_lib_int_pow2 should have the value 202002L in c++20"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
+# if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 #   ifndef __cpp_lib_integer_comparison_functions
 #     error "__cpp_lib_integer_comparison_functions should be defined in c++20"
 #   endif
 #   if __cpp_lib_integer_comparison_functions != 202002L
 #     error "__cpp_lib_integer_comparison_functions should have the value 202002L in c++20"
 #   endif
-# else // _LIBCPP_VERSION
+# else
 #   ifdef __cpp_lib_integer_comparison_functions
-#     error "__cpp_lib_integer_comparison_functions should not be defined because it is unimplemented in libc++!"
+#     error "__cpp_lib_integer_comparison_functions should not be defined when defined(__cpp_concepts) && __cpp_concepts >= 201907L is not defined!"
 #   endif
 # endif
 
@@ -2877,7 +2860,7 @@
 #   error "__cpp_lib_map_try_emplace should have the value 201411L in c++20"
 # endif
 
-# ifndef _LIBCPP_HAS_NO_CONCEPTS
+# if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 #   ifndef __cpp_lib_math_constants
 #     error "__cpp_lib_math_constants should be defined in c++20"
 #   endif
@@ -2888,7 +2871,7 @@
 #   ifdef __cpp_lib_math_constants
 #     error "__cpp_lib_math_constants should not be defined when defined(__cpp_concepts) && __cpp_concepts >= 201907L is not defined!"
 #   endif
-# endif // _LIBCPP_HAS_NO_CONCEPTS
+# endif
 
 # if !defined(_LIBCPP_VERSION)
 #   ifndef __cpp_lib_math_special_functions
@@ -3225,6 +3208,10 @@
 #   endif
 # endif
 
+# ifdef __cpp_lib_to_underlying
+#   error "__cpp_lib_to_underlying should not be defined before c++2b"
+# endif
+
 # ifndef __cpp_lib_transformation_trait_aliases
 #   error "__cpp_lib_transformation_trait_aliases should be defined in c++20"
 # endif
@@ -3284,8 +3271,8 @@
 # ifndef __cpp_lib_variant
 #   error "__cpp_lib_variant should be defined in c++20"
 # endif
-# if __cpp_lib_variant != 201606L
-#   error "__cpp_lib_variant should have the value 201606L in c++20"
+# if __cpp_lib_variant != 202102L
+#   error "__cpp_lib_variant should have the value 202102L in c++20"
 # endif
 
 # ifndef __cpp_lib_void_t
@@ -3583,17 +3570,11 @@
 #   error "__cpp_lib_complex_udls should have the value 201309L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_concepts
-#     error "__cpp_lib_concepts should be defined in c++2b"
-#   endif
-#   if __cpp_lib_concepts != 202002L
-#     error "__cpp_lib_concepts should have the value 202002L in c++2b"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_concepts
-#     error "__cpp_lib_concepts should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_concepts
+#   error "__cpp_lib_concepts should be defined in c++2b"
+# endif
+# if __cpp_lib_concepts != 202002L
+#   error "__cpp_lib_concepts should have the value 202002L in c++2b"
 # endif
 
 # ifndef __cpp_lib_constexpr_algorithms
@@ -3630,17 +3611,11 @@
 #   error "__cpp_lib_constexpr_functional should have the value 201907L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_iterator
-#     error "__cpp_lib_constexpr_iterator should be defined in c++2b"
-#   endif
-#   if __cpp_lib_constexpr_iterator != 201811L
-#     error "__cpp_lib_constexpr_iterator should have the value 201811L in c++2b"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_iterator
-#     error "__cpp_lib_constexpr_iterator should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_iterator
+#   error "__cpp_lib_constexpr_iterator should be defined in c++2b"
+# endif
+# if __cpp_lib_constexpr_iterator != 201811L
+#   error "__cpp_lib_constexpr_iterator should have the value 201811L in c++2b"
 # endif
 
 # ifndef __cpp_lib_constexpr_memory
@@ -3657,43 +3632,25 @@
 #   error "__cpp_lib_constexpr_numeric should have the value 201911L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_string
-#     error "__cpp_lib_constexpr_string should be defined in c++2b"
-#   endif
-#   if __cpp_lib_constexpr_string != 201907L
-#     error "__cpp_lib_constexpr_string should have the value 201907L in c++2b"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_string
-#     error "__cpp_lib_constexpr_string should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_string
+#   error "__cpp_lib_constexpr_string should be defined in c++2b"
+# endif
+# if __cpp_lib_constexpr_string != 201811L
+#   error "__cpp_lib_constexpr_string should have the value 201811L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_string_view
-#     error "__cpp_lib_constexpr_string_view should be defined in c++2b"
-#   endif
-#   if __cpp_lib_constexpr_string_view != 201811L
-#     error "__cpp_lib_constexpr_string_view should have the value 201811L in c++2b"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_string_view
-#     error "__cpp_lib_constexpr_string_view should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_string_view
+#   error "__cpp_lib_constexpr_string_view should be defined in c++2b"
+# endif
+# if __cpp_lib_constexpr_string_view != 201811L
+#   error "__cpp_lib_constexpr_string_view should have the value 201811L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
-#   ifndef __cpp_lib_constexpr_tuple
-#     error "__cpp_lib_constexpr_tuple should be defined in c++2b"
-#   endif
-#   if __cpp_lib_constexpr_tuple != 201811L
-#     error "__cpp_lib_constexpr_tuple should have the value 201811L in c++2b"
-#   endif
-# else // _LIBCPP_VERSION
-#   ifdef __cpp_lib_constexpr_tuple
-#     error "__cpp_lib_constexpr_tuple should not be defined because it is unimplemented in libc++!"
-#   endif
+# ifndef __cpp_lib_constexpr_tuple
+#   error "__cpp_lib_constexpr_tuple should be defined in c++2b"
+# endif
+# if __cpp_lib_constexpr_tuple != 201811L
+#   error "__cpp_lib_constexpr_tuple should have the value 201811L in c++2b"
 # endif
 
 # ifndef __cpp_lib_constexpr_utility
@@ -3877,16 +3834,16 @@
 #   error "__cpp_lib_int_pow2 should have the value 202002L in c++2b"
 # endif
 
-# if !defined(_LIBCPP_VERSION)
+# if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 #   ifndef __cpp_lib_integer_comparison_functions
 #     error "__cpp_lib_integer_comparison_functions should be defined in c++2b"
 #   endif
 #   if __cpp_lib_integer_comparison_functions != 202002L
 #     error "__cpp_lib_integer_comparison_functions should have the value 202002L in c++2b"
 #   endif
-# else // _LIBCPP_VERSION
+# else
 #   ifdef __cpp_lib_integer_comparison_functions
-#     error "__cpp_lib_integer_comparison_functions should not be defined because it is unimplemented in libc++!"
+#     error "__cpp_lib_integer_comparison_functions should not be defined when defined(__cpp_concepts) && __cpp_concepts >= 201907L is not defined!"
 #   endif
 # endif
 
@@ -4087,7 +4044,7 @@
 #   error "__cpp_lib_map_try_emplace should have the value 201411L in c++2b"
 # endif
 
-# if !_LIBCPP_HAS_NO_CONCEPTS
+# if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 #   ifndef __cpp_lib_math_constants
 #     error "__cpp_lib_math_constants should be defined in c++2b"
 #   endif
@@ -4098,7 +4055,7 @@
 #   ifdef __cpp_lib_math_constants
 #     error "__cpp_lib_math_constants should not be defined when defined(__cpp_concepts) && __cpp_concepts >= 201907L is not defined!"
 #   endif
-# endif // !_LIBCPP_HAS_NO_CONCEPTS
+# endif
 
 # if !defined(_LIBCPP_VERSION)
 #   ifndef __cpp_lib_math_special_functions
@@ -4456,6 +4413,13 @@
 #   endif
 # endif
 
+# ifndef __cpp_lib_to_underlying
+#   error "__cpp_lib_to_underlying should be defined in c++2b"
+# endif
+# if __cpp_lib_to_underlying != 202102L
+#   error "__cpp_lib_to_underlying should have the value 202102L in c++2b"
+# endif
+
 # ifndef __cpp_lib_transformation_trait_aliases
 #   error "__cpp_lib_transformation_trait_aliases should be defined in c++2b"
 # endif
@@ -4515,8 +4479,8 @@
 # ifndef __cpp_lib_variant
 #   error "__cpp_lib_variant should be defined in c++2b"
 # endif
-# if __cpp_lib_variant != 201606L
-#   error "__cpp_lib_variant should have the value 201606L in c++2b"
+# if __cpp_lib_variant != 202102L
+#   error "__cpp_lib_variant should have the value 202102L in c++2b"
 # endif
 
 # ifndef __cpp_lib_void_t

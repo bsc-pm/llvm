@@ -7,7 +7,7 @@ struct S {
 };
 
 void S::foo() {
-    auto l = []() {
+    auto l = []() { // expected-note {{explicitly capture 'this'}}
         #pragma oss task
         { a++; } // expected-error {{'this' cannot be implicitly captured in this context}}
     };

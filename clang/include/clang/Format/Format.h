@@ -19,6 +19,7 @@
 #include "clang/Tooling/Inclusions/IncludeStyle.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Regex.h"
+#include "llvm/Support/SourceMgr.h"
 #include <system_error>
 
 namespace llvm {
@@ -1890,6 +1891,54 @@ struct FormatStyle {
   /// Disables formatting completely.
   bool DisableFormat;
 
+  /// Different styles for empty line after access modifiers.
+  /// ``EmptyLineBeforeAccessModifier`` configuration handles the number of
+  /// empty lines between two access modifiers.
+  enum EmptyLineAfterAccessModifierStyle : unsigned char {
+    /// Remove all empty lines after access modifiers.
+    /// \code
+    ///   struct foo {
+    ///   private:
+    ///     int i;
+    ///   protected:
+    ///     int j;
+    ///     /* comment */
+    ///   public:
+    ///     foo() {}
+    ///   private:
+    ///   protected:
+    ///   };
+    /// \endcode
+    ELAAMS_Never,
+    /// Keep existing empty lines after access modifiers.
+    /// MaxEmptyLinesToKeep is applied instead.
+    ELAAMS_Leave,
+    /// Always add empty line after access modifiers if there are none.
+    /// MaxEmptyLinesToKeep is applied also.
+    /// \code
+    ///   struct foo {
+    ///   private:
+    ///
+    ///     int i;
+    ///   protected:
+    ///
+    ///     int j;
+    ///     /* comment */
+    ///   public:
+    ///
+    ///     foo() {}
+    ///   private:
+    ///
+    ///   protected:
+    ///
+    ///   };
+    /// \endcode
+    ELAAMS_Always,
+  };
+
+  /// Defines in which cases to put empty line after access modifiers.
+  EmptyLineAfterAccessModifierStyle EmptyLineAfterAccessModifier;
+
   /// Different styles for empty line before access modifiers.
   enum EmptyLineBeforeAccessModifierStyle : unsigned char {
     /// Remove all empty lines before access modifiers.
@@ -2678,24 +2727,24 @@ struct FormatStyle {
     ///    #include "B/a.h"
     /// \endcode
     SI_Never,
-    /// Includes are sorted in an ASCIIbetical or case insensitive fashion.
+    /// Includes are sorted in an ASCIIbetical or case sensitive fashion.
     /// \code
     ///    #include "A/B.h"
     ///    #include "A/b.h"
     ///    #include "B/A.h"
     ///    #include "B/a.h"
     ///    #include "a/b.h"
-    /// \endcode
-    SI_CaseInsensitive,
-    /// Includes are sorted in an alphabetical or case sensitive fashion.
-    /// \code
-    ///    #include "A/B.h"
-    ///    #include "A/b.h"
-    ///    #include "a/b.h"
-    ///    #include "B/A.h"
-    ///    #include "B/a.h"
     /// \endcode
     SI_CaseSensitive,
+    /// Includes are sorted in an alphabetical or case insensitive fashion.
+    /// \code
+    ///    #include "A/B.h"
+    ///    #include "A/b.h"
+    ///    #include "a/b.h"
+    ///    #include "B/A.h"
+    ///    #include "B/a.h"
+    /// \endcode
+    SI_CaseInsensitive,
   };
 
   /// Controls if and how clang-format will sort ``#includes``.
@@ -3199,6 +3248,7 @@ struct FormatStyle {
            DeriveLineEnding == R.DeriveLineEnding &&
            DerivePointerAlignment == R.DerivePointerAlignment &&
            DisableFormat == R.DisableFormat &&
+           EmptyLineAfterAccessModifier == R.EmptyLineAfterAccessModifier &&
            EmptyLineBeforeAccessModifier == R.EmptyLineBeforeAccessModifier &&
            ExperimentalAutoDetectBinPacking ==
                R.ExperimentalAutoDetectBinPacking &&
@@ -3320,9 +3370,11 @@ struct FormatStyle {
 private:
   FormatStyleSet StyleSet;
 
-  friend std::error_code parseConfiguration(llvm::MemoryBufferRef Config,
-                                            FormatStyle *Style,
-                                            bool AllowUnknownOptions);
+  friend std::error_code
+  parseConfiguration(llvm::MemoryBufferRef Config, FormatStyle *Style,
+                     bool AllowUnknownOptions,
+                     llvm::SourceMgr::DiagHandlerTy DiagHandler,
+                     void *DiagHandlerCtxt);
 };
 
 /// Returns a format style complying with the LLVM coding standards:
@@ -3380,9 +3432,13 @@ bool getPredefinedStyle(StringRef Name, FormatStyle::LanguageKind Language,
 ///
 /// If AllowUnknownOptions is true, no errors are emitted if unknown
 /// format options are occured.
-std::error_code parseConfiguration(llvm::MemoryBufferRef Config,
-                                   FormatStyle *Style,
-                                   bool AllowUnknownOptions = false);
+///
+/// If set all diagnostics are emitted through the DiagHandler.
+std::error_code
+parseConfiguration(llvm::MemoryBufferRef Config, FormatStyle *Style,
+                   bool AllowUnknownOptions = false,
+                   llvm::SourceMgr::DiagHandlerTy DiagHandler = nullptr,
+                   void *DiagHandlerCtx = nullptr);
 
 /// Like above but accepts an unnamed buffer.
 inline std::error_code parseConfiguration(StringRef Config, FormatStyle *Style,

@@ -48,9 +48,6 @@ public:
     /// Look for compilation databases, rather than using compile commands
     /// set via LSP (extensions) only.
     bool UseDirBasedCDB = true;
-    /// A fixed directory to search for a compilation database in.
-    /// If not set, we search upward from the source file.
-    llvm::Optional<Path> CompileCommandsDir;
     /// The offset-encoding to use, or None to negotiate it over LSP.
     llvm::Optional<OffsetEncoding> Encoding;
     /// If set, periodically called to release memory.
@@ -87,6 +84,7 @@ private:
                           std::vector<Diag> Diagnostics) override;
   void onFileUpdated(PathRef File, const TUStatus &Status) override;
   void onBackgroundIndexProgress(const BackgroundQueue::Stats &Stats) override;
+  void onSemanticsMaybeChanged(PathRef File) override;
 
   // LSP methods. Notifications have signature void(const Params&).
   // Calls have signature void(const Params&, Callback<Response>).
@@ -147,6 +145,7 @@ private:
   void onCallHierarchyOutgoingCalls(
       const CallHierarchyOutgoingCallsParams &,
       Callback<std::vector<CallHierarchyOutgoingCall>>);
+  void onInlayHints(const InlayHintsParams &, Callback<std::vector<InlayHint>>);
   void onChangeConfiguration(const DidChangeConfigurationParams &);
   void onSymbolInfo(const TextDocumentPositionParams &,
                     Callback<std::vector<SymbolDetails>>);
@@ -181,11 +180,12 @@ private:
       ReportWorkDoneProgress;
   LSPBinder::OutgoingNotification<ProgressParams<WorkDoneProgressEnd>>
       EndWorkDoneProgress;
+  LSPBinder::OutgoingMethod<NoParams, std::nullptr_t> SemanticTokensRefresh;
 
   void applyEdit(WorkspaceEdit WE, llvm::json::Value Success,
                  Callback<llvm::json::Value> Reply);
 
-  void bindMethods(LSPBinder &);
+  void bindMethods(LSPBinder &, const ClientCapabilities &Caps);
   std::vector<Fix> getFixes(StringRef File, const clangd::Diagnostic &D);
 
   /// Checks if completion request should be ignored. We need this due to the

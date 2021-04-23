@@ -128,6 +128,7 @@ class ItaniumMangleContextImpl : public ItaniumMangleContext {
   llvm::DenseMap<const NamedDecl*, unsigned> Uniquifier;
 
   bool IsDevCtx = false;
+  bool NeedsUniqueInternalLinkageNames = false;
 
 public:
   explicit ItaniumMangleContextImpl(ASTContext &Context,
@@ -140,6 +141,11 @@ public:
   bool shouldMangleCXXName(const NamedDecl *D) override;
   bool shouldMangleStringLiteral(const StringLiteral *) override {
     return false;
+  }
+
+  bool isUniqueInternalLinkageDecl(const NamedDecl *ND) override;
+  void needsUniqueInternalLinkageNames() override {
+    NeedsUniqueInternalLinkageNames = true;
   }
 
   bool isDeviceMangleContext() const override { return IsDevCtx; }
@@ -613,6 +619,36 @@ private:
   AbiTagList makeVariableTypeTags(const VarDecl *VD);
 };
 
+}
+
+static bool isInternalLinkageDecl(const NamedDecl *ND) {
+  if (ND && ND->getFormalLinkage() == InternalLinkage &&
+      !ND->isExternallyVisible() &&
+      getEffectiveDeclContext(ND)->isFileContext() &&
+      !ND->isInAnonymousNamespace())
+    return true;
+  return false;
+}
+
+// Check if this Function Decl needs a unique internal linkage name.
+bool ItaniumMangleContextImpl::isUniqueInternalLinkageDecl(
+    const NamedDecl *ND) {
+  if (!NeedsUniqueInternalLinkageNames || !ND)
+    return false;
+
+  const auto *FD = dyn_cast<FunctionDecl>(ND);
+  if (!FD)
+    return false;
+
+  // For C functions without prototypes, return false as their
+  // names should not be mangled.
+  if (!FD->hasPrototype())
+    return false;
+
+  if (isInternalLinkageDecl(ND))
+    return true;
+
+  return false;
 }
 
 bool ItaniumMangleContextImpl::shouldMangleCXXName(const NamedDecl *D) {
@@ -1378,10 +1414,7 @@ void CXXNameMangler::mangleUnqualifiedName(GlobalDecl GD,
       // 12_GLOBAL__N_1 mangling is quite sufficient there, and this better
       // matches GCC anyway, because GCC does not treat anonymous namespaces as
       // implying internal linkage.
-      if (ND && ND->getFormalLinkage() == InternalLinkage &&
-          !ND->isExternallyVisible() &&
-          getEffectiveDeclContext(ND)->isFileContext() &&
-          !ND->isInAnonymousNamespace())
+      if (isInternalLinkageDecl(ND))
         Out << 'L';
 
       auto *FD = dyn_cast<FunctionDecl>(ND);
@@ -3175,7 +3208,11 @@ void CXXNameMangler::mangleType(const VariableArrayType *T) {
 }
 void CXXNameMangler::mangleType(const DependentSizedArrayType *T) {
   Out << 'A';
-  mangleExpression(T->getSizeExpr());
+  // A DependentSizedArrayType might not have size expression as below
+  //
+  // template<int ...N> int arr[] = {N...};
+  if (T->getSizeExpr())
+    mangleExpression(T->getSizeExpr());
   Out << '_';
   mangleType(T->getElementType());
 }

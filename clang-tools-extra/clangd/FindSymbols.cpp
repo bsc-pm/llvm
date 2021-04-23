@@ -88,7 +88,7 @@ llvm::Expected<std::vector<SymbolInformation>>
 getWorkspaceSymbols(llvm::StringRef Query, int Limit,
                     const SymbolIndex *const Index, llvm::StringRef HintPath) {
   std::vector<SymbolInformation> Result;
-  if (Query.empty() || !Index)
+  if (!Index)
     return Result;
 
   // Lookup for qualified names are performed as:
@@ -376,10 +376,10 @@ public:
 
   /// Builds the document outline for the generated AST.
   std::vector<DocumentSymbol> build() {
-    SymBuilder DummyRoot;
+    SymBuilder Root;
     for (auto &TopLevel : AST.getLocalTopLevelDecls())
-      traverseDecl(TopLevel, DummyRoot);
-    return std::move(std::move(DummyRoot).build().children);
+      traverseDecl(TopLevel, Root);
+    return std::move(std::move(Root).build().children);
   }
 
 private:

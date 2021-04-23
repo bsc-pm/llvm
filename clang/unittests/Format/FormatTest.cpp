@@ -9177,6 +9177,590 @@ TEST_F(FormatTest, FormatsAccessModifiers) {
                "  int j;\n"
                "};\n",
                Style);
+
+  FormatStyle NoEmptyLines = getLLVMStyle();
+  NoEmptyLines.MaxEmptyLinesToKeep = 0;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "public:\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               NoEmptyLines);
+
+  NoEmptyLines.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Never;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "private:\n"
+               "  int i;\n"
+               "public:\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               NoEmptyLines);
+
+  NoEmptyLines.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "public:\n"
+               "\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               NoEmptyLines);
+}
+
+TEST_F(FormatTest, FormatsAfterAccessModifiers) {
+
+  FormatStyle Style = getLLVMStyle();
+  EXPECT_EQ(Style.EmptyLineAfterAccessModifier, FormatStyle::ELAAMS_Never);
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               Style);
+
+  // Check if lines are removed.
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "\n"
+               "  int j;\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "\n"
+               "  int j;\n"
+               "};\n",
+               Style);
+
+  // Check if lines are added.
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "\n"
+               "  int j;\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               Style);
+
+  // Leave tests rely on the code layout, test::messUp can not be used.
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Leave;
+  Style.MaxEmptyLinesToKeep = 0u;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  void f() {}\n"
+               "\n"
+               "private:\n"
+               "  int i;\n"
+               "\n"
+               "protected:\n"
+               "  int j;\n"
+               "};\n",
+               Style);
+
+  // Check if MaxEmptyLinesToKeep is respected.
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "  void f() {}\n"
+            "\n"
+            "private:\n"
+            "  int i;\n"
+            "\n"
+            "protected:\n"
+            "  int j;\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  void f() {}\n"
+                   "\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  int i;\n"
+                   "\n"
+                   "protected:\n"
+                   "\n\n\n"
+                   "  int j;\n"
+                   "};\n",
+                   Style));
+
+  Style.MaxEmptyLinesToKeep = 1u;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n"
+            "  void f() {}\n"
+            "\n"
+            "private:\n"
+            "\n"
+            "  int i;\n"
+            "\n"
+            "protected:\n"
+            "\n"
+            "  int j;\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n"
+                   "  void f() {}\n"
+                   "\n"
+                   "private:\n"
+                   "\n"
+                   "  int i;\n"
+                   "\n"
+                   "protected:\n"
+                   "\n"
+                   "  int j;\n"
+                   "};\n",
+                   Style));
+  // Check if no lines are kept.
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "  void f() {}\n"
+            "\n"
+            "private:\n"
+            "  int i;\n"
+            "\n"
+            "protected:\n"
+            "  int j;\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "  void f() {}\n"
+                   "\n"
+                   "private:\n"
+                   "  int i;\n"
+                   "\n"
+                   "protected:\n"
+                   "  int j;\n"
+                   "};\n",
+                   Style));
+  // Check if MaxEmptyLinesToKeep is respected.
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n"
+            "  void f() {}\n"
+            "\n"
+            "private:\n"
+            "\n"
+            "  int i;\n"
+            "\n"
+            "protected:\n"
+            "\n"
+            "  int j;\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  void f() {}\n"
+                   "\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  int i;\n"
+                   "\n"
+                   "protected:\n"
+                   "\n\n\n"
+                   "  int j;\n"
+                   "};\n",
+                   Style));
+
+  Style.MaxEmptyLinesToKeep = 10u;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "  void f() {}\n"
+            "\n"
+            "private:\n"
+            "\n\n\n"
+            "  int i;\n"
+            "\n"
+            "protected:\n"
+            "\n\n\n"
+            "  int j;\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  void f() {}\n"
+                   "\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "  int i;\n"
+                   "\n"
+                   "protected:\n"
+                   "\n\n\n"
+                   "  int j;\n"
+                   "};\n",
+                   Style));
+
+  // Test with comments.
+  Style = getLLVMStyle();
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "  int i;\n"
+               "};\n",
+               Style);
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "  int i;\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "\n"
+               "  int i;\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "\n"
+               "  int i;\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "  int i;\n"
+               "};\n",
+               Style);
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "  // comment\n"
+               "  void f() {}\n"
+               "\n"
+               "private: /* comment */\n"
+               "\n"
+               "  int i;\n"
+               "};\n",
+               Style);
+
+  // Test with preprocessor defines.
+  Style = getLLVMStyle();
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               Style);
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               Style);
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "#ifdef FOO\n"
+               "#endif\n"
+               "  void f() {}\n"
+               "};\n",
+               Style);
+}
+
+TEST_F(FormatTest, FormatsAfterAndBeforeAccessModifiersInteraction) {
+  // Combined tests of EmptyLineAfterAccessModifier and
+  // EmptyLineBeforeAccessModifier.
+  FormatStyle Style = getLLVMStyle();
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Always;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  Style.MaxEmptyLinesToKeep = 10u;
+  // Both remove all new lines.
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Never;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Never;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  // Leave tests rely on the code layout, test::messUp can not be used.
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Leave;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Leave;
+  Style.MaxEmptyLinesToKeep = 10u;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style));
+  Style.MaxEmptyLinesToKeep = 3u;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style));
+  Style.MaxEmptyLinesToKeep = 1u;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style)); // Based on new lines in original document and not
+                            // on the setting.
+
+  Style.MaxEmptyLinesToKeep = 10u;
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Always;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Leave;
+  // Newlines are kept if they are greater than zero,
+  // test::messUp removes all new lines which changes the logic
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style));
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Leave;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  // test::messUp removes all new lines which changes the logic
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style));
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Leave;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Never;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style)); // test::messUp removes all new lines which changes
+                            // the logic.
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Never;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Leave;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Always;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Never;
+  EXPECT_EQ("struct foo {\n"
+            "private:\n"
+            "\n\n\n"
+            "protected:\n"
+            "};\n",
+            format("struct foo {\n"
+                   "private:\n"
+                   "\n\n\n"
+                   "protected:\n"
+                   "};\n",
+                   Style)); // test::messUp removes all new lines which changes
+                            // the logic.
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_Never;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_LogicalBlock;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Always;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_LogicalBlock;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Leave;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
+
+  Style.EmptyLineBeforeAccessModifier = FormatStyle::ELBAMS_LogicalBlock;
+  Style.EmptyLineAfterAccessModifier = FormatStyle::ELAAMS_Never;
+  verifyFormat("struct foo {\n"
+               "private:\n"
+               "protected:\n"
+               "};\n",
+               "struct foo {\n"
+               "private:\n"
+               "\n\n\n"
+               "protected:\n"
+               "};\n",
+               Style);
 }
 
 TEST_F(FormatTest, FormatsArrays) {
@@ -12731,6 +13315,27 @@ TEST_F(FormatTest, ConfigurableSpaceAroundPointerQualifiers) {
   verifyQualifierSpaces("void * const *x = NULL;", PAS_Right, SAPQ_Both);
   verifyQualifierSpaces("void * const * x = NULL;", PAS_Middle, SAPQ_Both);
 
+  verifyQualifierSpaces("Foo::operator void const*();", PAS_Left, SAPQ_Default);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Right,
+                        SAPQ_Default);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Middle,
+                        SAPQ_Default);
+
+  verifyQualifierSpaces("Foo::operator void const*();", PAS_Left, SAPQ_Before);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Right,
+                        SAPQ_Before);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Middle,
+                        SAPQ_Before);
+
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Left, SAPQ_After);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Right, SAPQ_After);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Middle,
+                        SAPQ_After);
+
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Left, SAPQ_Both);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Right, SAPQ_Both);
+  verifyQualifierSpaces("Foo::operator void const *();", PAS_Middle, SAPQ_Both);
+
 #undef verifyQualifierSpaces
 
   FormatStyle Spaces = getLLVMStyle();
@@ -14297,6 +14902,102 @@ TEST_F(FormatTest, AlignConsecutiveDeclarations) {
                Alignment);
 }
 
+TEST_F(FormatTest, AlignWithLineBreaks) {
+  auto Style = getLLVMStyleWithColumns(120);
+
+  EXPECT_EQ(Style.AlignConsecutiveAssignments, FormatStyle::ACS_None);
+  EXPECT_EQ(Style.AlignConsecutiveDeclarations, FormatStyle::ACS_None);
+  verifyFormat("void foo() {\n"
+               "  int myVar = 5;\n"
+               "  double x = 3.14;\n"
+               "  auto str = \"Hello \"\n"
+               "             \"World\";\n"
+               "  auto s = \"Hello \"\n"
+               "           \"Again\";\n"
+               "}",
+               Style);
+
+  // clang-format off
+  verifyFormat("void foo() {\n"
+               "  const int capacityBefore = Entries.capacity();\n"
+               "  const auto newEntry = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                            std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "  const X newEntry2 = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                          std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "}",
+               Style);
+  // clang-format on
+
+  Style.AlignConsecutiveAssignments = FormatStyle::ACS_Consecutive;
+  verifyFormat("void foo() {\n"
+               "  int myVar = 5;\n"
+               "  double x  = 3.14;\n"
+               "  auto str  = \"Hello \"\n"
+               "              \"World\";\n"
+               "  auto s    = \"Hello \"\n"
+               "              \"Again\";\n"
+               "}",
+               Style);
+
+  // clang-format off
+  verifyFormat("void foo() {\n"
+               "  const int capacityBefore = Entries.capacity();\n"
+               "  const auto newEntry      = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                                 std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "  const X newEntry2        = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                                 std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "}",
+               Style);
+  // clang-format on
+
+  Style.AlignConsecutiveAssignments = FormatStyle::ACS_None;
+  Style.AlignConsecutiveDeclarations = FormatStyle::ACS_Consecutive;
+  verifyFormat("void foo() {\n"
+               "  int    myVar = 5;\n"
+               "  double x = 3.14;\n"
+               "  auto   str = \"Hello \"\n"
+               "               \"World\";\n"
+               "  auto   s = \"Hello \"\n"
+               "             \"Again\";\n"
+               "}",
+               Style);
+
+  // clang-format off
+  verifyFormat("void foo() {\n"
+               "  const int  capacityBefore = Entries.capacity();\n"
+               "  const auto newEntry = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                            std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "  const X    newEntry2 = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                             std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "}",
+               Style);
+  // clang-format on
+
+  Style.AlignConsecutiveAssignments = FormatStyle::ACS_Consecutive;
+  Style.AlignConsecutiveDeclarations = FormatStyle::ACS_Consecutive;
+
+  verifyFormat("void foo() {\n"
+               "  int    myVar = 5;\n"
+               "  double x     = 3.14;\n"
+               "  auto   str   = \"Hello \"\n"
+               "                 \"World\";\n"
+               "  auto   s     = \"Hello \"\n"
+               "                 \"Again\";\n"
+               "}",
+               Style);
+
+  // clang-format off
+  verifyFormat("void foo() {\n"
+               "  const int  capacityBefore = Entries.capacity();\n"
+               "  const auto newEntry       = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                                  std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "  const X    newEntry2      = Entries.emplaceHint(std::piecewise_construct, std::forward_as_tuple(uniqueId),\n"
+               "                                                  std::forward_as_tuple(id, uniqueId, name, threadCreation));\n"
+               "}",
+               Style);
+  // clang-format on
+}
+
 TEST_F(FormatTest, LinuxBraceBreaking) {
   FormatStyle LinuxBraceStyle = getLLVMStyle();
   LinuxBraceStyle.BreakBeforeBraces = FormatStyle::BS_Linux;
@@ -14767,6 +15468,7 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                WhitesmithsBraceStyle);
   */
 
+  WhitesmithsBraceStyle.NamespaceIndentation = FormatStyle::NI_None;
   verifyFormat("namespace a\n"
                "  {\n"
                "class A\n"
@@ -14789,6 +15491,89 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "  int x;\n"
                "  };\n"
                "  } // namespace a",
+               WhitesmithsBraceStyle);
+
+  verifyFormat("namespace a\n"
+               "  {\n"
+               "namespace b\n"
+               "  {\n"
+               "class A\n"
+               "  {\n"
+               "  void f()\n"
+               "    {\n"
+               "    if (true)\n"
+               "      {\n"
+               "      a();\n"
+               "      b();\n"
+               "      }\n"
+               "    }\n"
+               "  void g()\n"
+               "    {\n"
+               "    return;\n"
+               "    }\n"
+               "  };\n"
+               "struct B\n"
+               "  {\n"
+               "  int x;\n"
+               "  };\n"
+               "  } // namespace b\n"
+               "  } // namespace a",
+               WhitesmithsBraceStyle);
+
+  WhitesmithsBraceStyle.NamespaceIndentation = FormatStyle::NI_Inner;
+  verifyFormat("namespace a\n"
+               "  {\n"
+               "namespace b\n"
+               "  {\n"
+               "  class A\n"
+               "    {\n"
+               "    void f()\n"
+               "      {\n"
+               "      if (true)\n"
+               "        {\n"
+               "        a();\n"
+               "        b();\n"
+               "        }\n"
+               "      }\n"
+               "    void g()\n"
+               "      {\n"
+               "      return;\n"
+               "      }\n"
+               "    };\n"
+               "  struct B\n"
+               "    {\n"
+               "    int x;\n"
+               "    };\n"
+               "  } // namespace b\n"
+               "  } // namespace a",
+               WhitesmithsBraceStyle);
+
+  WhitesmithsBraceStyle.NamespaceIndentation = FormatStyle::NI_All;
+  verifyFormat("namespace a\n"
+               "  {\n"
+               "  namespace b\n"
+               "    {\n"
+               "    class A\n"
+               "      {\n"
+               "      void f()\n"
+               "        {\n"
+               "        if (true)\n"
+               "          {\n"
+               "          a();\n"
+               "          b();\n"
+               "          }\n"
+               "        }\n"
+               "      void g()\n"
+               "        {\n"
+               "        return;\n"
+               "        }\n"
+               "      };\n"
+               "    struct B\n"
+               "      {\n"
+               "      int x;\n"
+               "      };\n"
+               "    } // namespace b\n"
+               "  }   // namespace a",
                WhitesmithsBraceStyle);
 
   verifyFormat("void f()\n"
@@ -14825,7 +15610,7 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "  }\n",
                WhitesmithsBraceStyle);
 
-  WhitesmithsBraceStyle.IndentCaseBlocks = true;
+  WhitesmithsBraceStyle.IndentCaseLabels = true;
   verifyFormat("void switchTest1(int a)\n"
                "  {\n"
                "  switch (a)\n"
@@ -14833,7 +15618,7 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "    case 2:\n"
                "      {\n"
                "      }\n"
-               "    break;\n"
+               "      break;\n"
                "    }\n"
                "  }\n",
                WhitesmithsBraceStyle);
@@ -14843,7 +15628,7 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "  switch (a)\n"
                "    {\n"
                "    case 0:\n"
-               "    break;\n"
+               "      break;\n"
                "    case 1:\n"
                "      {\n"
                "      break;\n"
@@ -14851,9 +15636,9 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "    case 2:\n"
                "      {\n"
                "      }\n"
-               "    break;\n"
+               "      break;\n"
                "    default:\n"
-               "    break;\n"
+               "      break;\n"
                "    }\n"
                "  }\n",
                WhitesmithsBraceStyle);
@@ -14866,17 +15651,17 @@ TEST_F(FormatTest, WhitesmithsBraceBreaking) {
                "      {\n"
                "      foo(x);\n"
                "      }\n"
-               "    break;\n"
+               "      break;\n"
                "    default:\n"
                "      {\n"
                "      foo(1);\n"
                "      }\n"
-               "    break;\n"
+               "      break;\n"
                "    }\n"
                "  }\n",
                WhitesmithsBraceStyle);
 
-  WhitesmithsBraceStyle.IndentCaseBlocks = false;
+  WhitesmithsBraceStyle.IndentCaseLabels = false;
 
   verifyFormat("void switchTest4(int a)\n"
                "  {\n"
@@ -16007,7 +16792,7 @@ TEST_F(FormatTest, ParsesConfiguration) {
 
   Style.SortIncludes = FormatStyle::SI_Never;
   CHECK_PARSE("SortIncludes: true", SortIncludes,
-              FormatStyle::SI_CaseInsensitive);
+              FormatStyle::SI_CaseSensitive);
   CHECK_PARSE("SortIncludes: false", SortIncludes, FormatStyle::SI_Never);
   CHECK_PARSE("SortIncludes: CaseInsensitive", SortIncludes,
               FormatStyle::SI_CaseInsensitive);
@@ -18131,7 +18916,7 @@ TEST_F(ReplacementTest, SortIncludesAfterReplacement) {
                             "#include \"b.h\"\n")});
 
   format::FormatStyle Style = format::getLLVMStyle();
-  Style.SortIncludes = FormatStyle::SI_CaseInsensitive;
+  Style.SortIncludes = FormatStyle::SI_CaseSensitive;
   auto FormattedReplaces = formatReplacements(Code, Replaces, Style);
   EXPECT_TRUE(static_cast<bool>(FormattedReplaces))
       << llvm::toString(FormattedReplaces.takeError()) << "\n";
@@ -18555,6 +19340,10 @@ TEST_F(FormatTest, OperatorSpacing) {
   verifyFormat("Foo::operator void **();", Style);
   verifyFormat("Foo::operator void *&();", Style);
   verifyFormat("Foo::operator void *&&();", Style);
+  verifyFormat("Foo::operator void const *();", Style);
+  verifyFormat("Foo::operator void const **();", Style);
+  verifyFormat("Foo::operator void const *&();", Style);
+  verifyFormat("Foo::operator void const *&&();", Style);
   verifyFormat("Foo::operator()(void *);", Style);
   verifyFormat("Foo::operator*(void *);", Style);
   verifyFormat("Foo::operator*();", Style);
@@ -18576,6 +19365,7 @@ TEST_F(FormatTest, OperatorSpacing) {
 
   verifyFormat("Foo::operator&();", Style);
   verifyFormat("Foo::operator void &();", Style);
+  verifyFormat("Foo::operator void const &();", Style);
   verifyFormat("Foo::operator()(void &);", Style);
   verifyFormat("Foo::operator&(void &);", Style);
   verifyFormat("Foo::operator&();", Style);
@@ -18584,6 +19374,7 @@ TEST_F(FormatTest, OperatorSpacing) {
   verifyFormat("Foo::operator&&();", Style);
   verifyFormat("Foo::operator**();", Style);
   verifyFormat("Foo::operator void &&();", Style);
+  verifyFormat("Foo::operator void const &&();", Style);
   verifyFormat("Foo::operator()(void &&);", Style);
   verifyFormat("Foo::operator&&(void &&);", Style);
   verifyFormat("Foo::operator&&();", Style);
@@ -18604,6 +19395,11 @@ TEST_F(FormatTest, OperatorSpacing) {
   verifyFormat("Foo::operator void*();", Style);
   verifyFormat("Foo::operator void**();", Style);
   verifyFormat("Foo::operator void*&();", Style);
+  verifyFormat("Foo::operator void*&&();", Style);
+  verifyFormat("Foo::operator void const*();", Style);
+  verifyFormat("Foo::operator void const**();", Style);
+  verifyFormat("Foo::operator void const*&();", Style);
+  verifyFormat("Foo::operator void const*&&();", Style);
   verifyFormat("Foo::operator/*comment*/ void*();", Style);
   verifyFormat("Foo::operator/*a*/ const /*b*/ void*();", Style);
   verifyFormat("Foo::operator/*a*/ volatile /*b*/ void*();", Style);
@@ -18625,6 +19421,7 @@ TEST_F(FormatTest, OperatorSpacing) {
 
   verifyFormat("Foo::operator&();", Style);
   verifyFormat("Foo::operator void&();", Style);
+  verifyFormat("Foo::operator void const&();", Style);
   verifyFormat("Foo::operator/*comment*/ void&();", Style);
   verifyFormat("Foo::operator/*a*/ const /*b*/ void&();", Style);
   verifyFormat("Foo::operator/*a*/ volatile /*b*/ void&();", Style);
@@ -18635,6 +19432,7 @@ TEST_F(FormatTest, OperatorSpacing) {
 
   verifyFormat("Foo::operator&&();", Style);
   verifyFormat("Foo::operator void&&();", Style);
+  verifyFormat("Foo::operator void const&&();", Style);
   verifyFormat("Foo::operator/*comment*/ void&&();", Style);
   verifyFormat("Foo::operator/*a*/ const /*b*/ void&&();", Style);
   verifyFormat("Foo::operator/*a*/ volatile /*b*/ void&&();", Style);
@@ -18670,6 +19468,7 @@ TEST_F(FormatTest, OperatorSpacing) {
 
   verifyFormat("Foo::operator&();", Style);
   verifyFormat("Foo::operator void &();", Style);
+  verifyFormat("Foo::operator void const &();", Style);
   verifyFormat("Foo::operator()(void &);", Style);
   verifyFormat("Foo::operator&(void &);", Style);
   verifyFormat("Foo::operator&();", Style);
@@ -18677,6 +19476,7 @@ TEST_F(FormatTest, OperatorSpacing) {
 
   verifyFormat("Foo::operator&&();", Style);
   verifyFormat("Foo::operator void &&();", Style);
+  verifyFormat("Foo::operator void const &&();", Style);
   verifyFormat("Foo::operator()(void &&);", Style);
   verifyFormat("Foo::operator&&(void &&);", Style);
   verifyFormat("Foo::operator&&();", Style);

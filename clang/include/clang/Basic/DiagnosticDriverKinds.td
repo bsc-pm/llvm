@@ -67,6 +67,8 @@ def err_drv_no_hip_runtime : Error<
   "cannot find HIP runtime. Provide its path via --rocm-path, or pass "
   "-nogpuinc to build without HIP runtime.">;
 
+def err_drv_undetermined_amdgpu_arch : Error<
+  "Cannot determine AMDGPU architecture: %0. Consider passing it via --march.">;
 def err_drv_cuda_version_unsupported : Error<
   "GPU arch %0 is supported by CUDA versions between %1 and %2 (inclusive), "
   "but installation at %3 is %4. Use --cuda-path to specify a different CUDA "
@@ -342,6 +344,10 @@ def warn_drv_disabling_vptr_no_rtti_default : Warning<
 def warn_drv_object_size_disabled_O0 : Warning<
   "the object size sanitizer has no effect at -O0, but is explicitly enabled: %0">,
   InGroup<InvalidCommandLineArgument>, DefaultWarnNoWerror;
+def warn_ignoring_verify_debuginfo_preserve_export : Warning<
+  "ignoring -fverify-debuginfo-preserve-export=%0 because "
+  "-fverify-debuginfo-preserve wasn't enabled">,
+  InGroup<UnusedCommandLineArgument>;
 def err_invalid_branch_protection: Error <
   "invalid branch protection option '%0' in '%1'">;
 def err_invalid_sls_hardening : Error<

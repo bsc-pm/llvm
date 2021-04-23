@@ -205,24 +205,119 @@ static int InitLibrary(DeviceTy &Device) {
   return OFFLOAD_SUCCESS;
 }
 
-// Check whether a device has been initialized, global ctors have been
-// executed and global data has been mapped; do so if not already done.
-int CheckDeviceAndCtors(int64_t device_id) {
+void handleTargetOutcome(bool Success, ident_t *Loc) {
+  switch (PM->TargetOffloadPolicy) {
+  case tgt_disabled:
+    if (Success) {
+      FATAL_MESSAGE0(1, "expected no offloading while offloading is disabled");
+    }
+    break;
+  case tgt_default:
+    FATAL_MESSAGE0(1, "default offloading policy must be switched to "
+                      "mandatory or disabled");
+    break;
+  case tgt_mandatory:
+    if (!Success) {
+      if (getInfoLevel() & OMP_INFOTYPE_DUMP_TABLE)
+        for (auto &Device : PM->Devices)
+          dumpTargetPointerMappings(Loc, Device);
+      else
+        FAILURE_MESSAGE("Run with LIBOMPTARGET_INFO=%d to dump host-target "
+                        "pointer mappings.\n",
+                        OMP_INFOTYPE_DUMP_TABLE);
+
+      SourceInfo info(Loc);
+      if (info.isAvailible())
+        fprintf(stderr, "%s:%d:%d: ", info.getFilename(), info.getLine(),
+                info.getColumn());
+      else
+        FAILURE_MESSAGE("Source location information not present. Compile with "
+                        "-g or -gline-tables-only.\n");
+      FATAL_MESSAGE0(
+          1, "failure of target construct while offloading is mandatory");
+    } else {
+      if (getInfoLevel() & OMP_INFOTYPE_DUMP_TABLE)
+        for (auto &Device : PM->Devices)
+          dumpTargetPointerMappings(Loc, Device);
+    }
+    break;
+  }
+}
+
+static void handleDefaultTargetOffload() {
+  PM->TargetOffloadMtx.lock();
+  if (PM->TargetOffloadPolicy == tgt_default) {
+    if (omp_get_num_devices() > 0) {
+      DP("Default TARGET OFFLOAD policy is now mandatory "
+         "(devices were found)\n");
+      PM->TargetOffloadPolicy = tgt_mandatory;
+    } else {
+      DP("Default TARGET OFFLOAD policy is now disabled "
+         "(no devices were found)\n");
+      PM->TargetOffloadPolicy = tgt_disabled;
+    }
+  }
+  PM->TargetOffloadMtx.unlock();
+}
+
+static bool isOffloadDisabled() {
+  if (PM->TargetOffloadPolicy == tgt_default)
+    handleDefaultTargetOffload();
+  return PM->TargetOffloadPolicy == tgt_disabled;
+}
+
+// If offload is enabled, ensure that device DeviceID has been initialized,
+// global ctors have been executed, and global data has been mapped.
+//
+// There are three possible results:
+// - Return OFFLOAD_SUCCESS if the device is ready for offload.
+// - Return OFFLOAD_FAIL without reporting a runtime error if offload is
+//   disabled, perhaps because the initial device was specified.
+// - Report a runtime error and return OFFLOAD_FAIL.
+//
+// If DeviceID == OFFLOAD_DEVICE_DEFAULT, set DeviceID to the default device.
+// This step might be skipped if offload is disabled.
+int checkDeviceAndCtors(int64_t &DeviceID, ident_t *Loc) {
+  if (isOffloadDisabled()) {
+    DP("Offload is disabled\n");
+    return OFFLOAD_FAIL;
+  }
+
+  if (DeviceID == OFFLOAD_DEVICE_DEFAULT) {
+    DeviceID = omp_get_default_device();
+    DP("Use default device id %" PRId64 "\n", DeviceID);
+  }
+
+  // Proposed behavior for OpenMP 5.2 in OpenMP spec github issue 2669.
+  if (omp_get_num_devices() == 0) {
+    DP("omp_get_num_devices() == 0 but offload is manadatory\n");
+    handleTargetOutcome(false, Loc);
+    return OFFLOAD_FAIL;
+  }
+
+  if (DeviceID == omp_get_initial_device()) {
+    DP("Device is host (%" PRId64 "), returning as if offload is disabled\n",
+       DeviceID);
+    return OFFLOAD_FAIL;
+  }
+
   // Is device ready?
-  if (!device_is_ready(device_id)) {
-    REPORT("Device %" PRId64 " is not ready.\n", device_id);
+  if (!device_is_ready(DeviceID)) {
+    REPORT("Device %" PRId64 " is not ready.\n", DeviceID);
+    handleTargetOutcome(false, Loc);
     return OFFLOAD_FAIL;
   }
 
   // Get device info.
-  DeviceTy &Device = PM->Devices[device_id];
+  DeviceTy &Device = PM->Devices[DeviceID];
 
   // Check whether global data has been mapped for this device
   Device.PendingGlobalsMtx.lock();
   bool hasPendingGlobals = Device.HasPendingGlobals;
   Device.PendingGlobalsMtx.unlock();
   if (hasPendingGlobals && InitLibrary(Device) != OFFLOAD_SUCCESS) {
-    REPORT("Failed to init globals on device %" PRId64 "\n", device_id);
+    REPORT("Failed to init globals on device %" PRId64 "\n", DeviceID);
+    handleTargetOutcome(false, Loc);
     return OFFLOAD_FAIL;
   }
 
@@ -231,6 +326,35 @@ int CheckDeviceAndCtors(int64_t device_id) {
 
 static int32_t getParentIndex(int64_t type) {
   return ((type & OMP_TGT_MAPTYPE_MEMBER_OF) >> 48) - 1;
+}
+
+void *targetAllocExplicit(size_t size, int device_num, int kind,
+                          const char *name) {
+  TIMESCOPE();
+  DP("Call to %s for device %d requesting %zu bytes\n", name, device_num, size);
+
+  if (size <= 0) {
+    DP("Call to %s with non-positive length\n", name);
+    return NULL;
+  }
+
+  void *rc = NULL;
+
+  if (device_num == omp_get_initial_device()) {
+    rc = malloc(size);
+    DP("%s returns host ptr " DPxMOD "\n", name, DPxPTR(rc));
+    return rc;
+  }
+
+  if (!device_is_ready(device_num)) {
+    DP("%s returns NULL ptr\n", name);
+    return NULL;
+  }
+
+  DeviceTy &Device = PM->Devices[device_num];
+  rc = Device.allocData(size, nullptr, kind);
+  DP("%s returns device ptr " DPxMOD "\n", name, DPxPTR(rc));
+  return rc;
 }
 
 /// Call the user-defined mapper function followed by the appropriate
@@ -259,9 +383,7 @@ int targetDataMapper(ident_t *loc, DeviceTy &Device, void *arg_base, void *arg,
   std::vector<void *> MapperArgNames(MapperComponents.Components.size());
 
   for (unsigned I = 0, E = MapperComponents.Components.size(); I < E; ++I) {
-    auto &C =
-        MapperComponents
-            .Components[target_data_function == targetDataEnd ? E - I - 1 : I];
+    auto &C = MapperComponents.Components[I];
     MapperArgsBase[I] = C.Base;
     MapperArgs[I] = C.Begin;
     MapperArgSizes[I] = C.Size;
@@ -348,7 +470,8 @@ int targetDataBegin(ident_t *loc, DeviceTy &Device, int32_t arg_num,
     // then no argument is marked as TARGET_PARAM ("omp target data map" is not
     // associated with a target region, so there are no target parameters). This
     // may be considered a hack, we could revise the scheme in the future.
-    bool UpdateRef = !(arg_types[i] & OMP_TGT_MAPTYPE_MEMBER_OF);
+    bool UpdateRef =
+        !(arg_types[i] & OMP_TGT_MAPTYPE_MEMBER_OF) && !(FromMapper && i == 0);
     if (arg_types[i] & OMP_TGT_MAPTYPE_PTR_AND_OBJ) {
       DP("Has a pointer entry: \n");
       // Base is address of pointer.
@@ -491,6 +614,7 @@ int targetDataEnd(ident_t *loc, DeviceTy &Device, int32_t ArgNum,
                   void **ArgMappers, AsyncInfoTy &AsyncInfo, bool FromMapper) {
   int Ret;
   std::vector<DeallocTgtPtrInfo> DeallocTgtPtrs;
+  void *FromMapperBase = nullptr;
   // process each input.
   for (int32_t I = ArgNum - 1; I >= 0; --I) {
     // Ignore private variables and arrays - there is no mapping for them.
@@ -540,9 +664,9 @@ int targetDataEnd(ident_t *loc, DeviceTy &Device, int32_t ArgNum,
 
     bool IsLast, IsHostPtr;
     bool IsImplicit = ArgTypes[I] & OMP_TGT_MAPTYPE_IMPLICIT;
-    bool UpdateRef = !(ArgTypes[I] & OMP_TGT_MAPTYPE_MEMBER_OF) ||
-                     (ArgTypes[I] & OMP_TGT_MAPTYPE_PTR_AND_OBJ &&
-                      (!FromMapper || I != ArgNum - 1));
+    bool UpdateRef = (!(ArgTypes[I] & OMP_TGT_MAPTYPE_MEMBER_OF) ||
+                      (ArgTypes[I] & OMP_TGT_MAPTYPE_PTR_AND_OBJ)) &&
+                     !(FromMapper && I == 0);
     bool ForceDelete = ArgTypes[I] & OMP_TGT_MAPTYPE_DELETE;
     bool HasCloseModifier = ArgTypes[I] & OMP_TGT_MAPTYPE_CLOSE;
     bool HasPresentModifier = ArgTypes[I] & OMP_TGT_MAPTYPE_PRESENT;
@@ -593,10 +717,8 @@ int targetDataEnd(ident_t *loc, DeviceTy &Device, int32_t ArgNum,
     // If the last element from the mapper (for end transfer args comes in
     // reverse order), do not remove the partial entry, the parent struct still
     // exists.
-    if (((ArgTypes[I] & OMP_TGT_MAPTYPE_MEMBER_OF) &&
-         !(ArgTypes[I] & OMP_TGT_MAPTYPE_PTR_AND_OBJ)) ||
-        (ArgTypes[I] & OMP_TGT_MAPTYPE_PTR_AND_OBJ && FromMapper &&
-         I == ArgNum - 1)) {
+    if ((ArgTypes[I] & OMP_TGT_MAPTYPE_MEMBER_OF) &&
+        !(ArgTypes[I] & OMP_TGT_MAPTYPE_PTR_AND_OBJ)) {
       DelEntry = false; // protect parent struct from being deallocated
     }
 
@@ -630,6 +752,10 @@ int targetDataEnd(ident_t *loc, DeviceTy &Device, int32_t ArgNum,
             return OFFLOAD_FAIL;
           }
         }
+      }
+      if (DelEntry && FromMapper && I == 0) {
+        DelEntry = false;
+        FromMapperBase = HstPtrBegin;
       }
 
       // If we copied back to the host a struct/array containing pointers, we
@@ -686,6 +812,8 @@ int targetDataEnd(ident_t *loc, DeviceTy &Device, int32_t ArgNum,
 
   // Deallocate target pointer
   for (DeallocTgtPtrInfo &Info : DeallocTgtPtrs) {
+    if (FromMapperBase && FromMapperBase == Info.HstPtrBegin)
+      continue;
     Ret = Device.deallocTgtPtr(Info.HstPtrBegin, Info.DataSize,
                                Info.ForceDelete, Info.HasCloseModifier);
     if (Ret != OFFLOAD_SUCCESS) {
@@ -928,8 +1056,8 @@ TableMap *getTableMap(void *HostPtr) {
 
 /// Get loop trip count
 /// FIXME: This function will not work right if calling
-/// __kmpc_push_target_tripcount in one thread but doing offloading in another
-/// thread, which might occur when we call task yield.
+/// __kmpc_push_target_tripcount_mapper in one thread but doing offloading in
+/// another thread, which might occur when we call task yield.
 uint64_t getLoopTripCount(int64_t DeviceId) {
   DeviceTy &Device = PM->Devices[DeviceId];
   uint64_t LoopTripCount = 0;

@@ -1319,8 +1319,7 @@ entry:
 define arm_aapcs_vfpcc <8 x half> @oneoff21_f16(<8 x half> %src1, <8 x half> %src2) {
 ; CHECK-LABEL: oneoff21_f16:
 ; CHECK:       @ %bb.0: @ %entry
-; CHECK-NEXT:    vmov r0, s0
-; CHECK-NEXT:    vmov.16 q1[3], r0
+; CHECK-NEXT:    vins.f16 s5, s0
 ; CHECK-NEXT:    vmov q0, q1
 ; CHECK-NEXT:    bx lr
 entry:
@@ -1679,8 +1678,7 @@ entry:
 define arm_aapcs_vfpcc i64 @extract_i64_0(<2 x i64> %a) {
 ; CHECK-LABEL: extract_i64_0:
 ; CHECK:       @ %bb.0: @ %entry
-; CHECK-NEXT:    vmov r0, s0
-; CHECK-NEXT:    vmov r1, s1
+; CHECK-NEXT:    vmov r0, r1, d0
 ; CHECK-NEXT:    bx lr
 entry:
   %res = extractelement <2 x i64> %a, i32 0
@@ -1690,8 +1688,7 @@ entry:
 define arm_aapcs_vfpcc i64 @extract_i64_1(<2 x i64> %a) {
 ; CHECK-LABEL: extract_i64_1:
 ; CHECK:       @ %bb.0: @ %entry
-; CHECK-NEXT:    vmov r0, s2
-; CHECK-NEXT:    vmov r1, s3
+; CHECK-NEXT:    vmov r0, r1, d1
 ; CHECK-NEXT:    bx lr
 entry:
   %res = extractelement <2 x i64> %a, i32 1

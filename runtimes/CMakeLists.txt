@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.13.4)
 project(Runtimes C CXX ASM)
 
-set(LLVM_ALL_RUNTIMES "compiler-rt;libcxx;libcxxabi;libunwind;openmp")
+set(LLVM_ALL_RUNTIMES "compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp")
 set(LLVM_ENABLE_RUNTIMES "" CACHE STRING
   "Semicolon-separated list of runtimes to build (${LLVM_ALL_RUNTIMES}), or \"all\".")
 if(LLVM_ENABLE_RUNTIMES STREQUAL "all" )
@@ -99,7 +99,7 @@ if(CMAKE_HOST_APPLE AND APPLE)
 endif()
 
 # This can be used to detect whether we're in the runtimes build.
-set(RUNTIMES_BUILD ON)
+set(LLVM_RUNTIMES_BUILD ON)
 
 foreach(entry ${runtimes})
   get_filename_component(projName ${entry} NAME)

@@ -383,6 +383,10 @@ class CrashLogFormatException(Exception):
     pass
 
 
+class CrashLogParseException(Exception):
+   pass
+
+
 class CrashLogParser:
     def parse(self, debugger, path, verbose):
         try:
@@ -409,18 +413,18 @@ class JSONCrashLogParser:
         except ValueError:
             raise CrashLogFormatException()
 
-        self.parse_process_info(self.data)
-        self.parse_images(self.data['usedImages'])
-        self.parse_threads(self.data['threads'])
-
-        thread = self.crashlog.threads[self.crashlog.crashed_thread_idx]
-        thread.reason = self.parse_crash_reason(self.data['exception'])
-        thread.registers = self.parse_thread_registers(self.data['threadState'])
+        try:
+            self.parse_process_info(self.data)
+            self.parse_images(self.data['usedImages'])
+            self.parse_threads(self.data['threads'])
+            thread = self.crashlog.threads[self.crashlog.crashed_thread_idx]
+            thread.reason = self.parse_crash_reason(self.data['exception'])
+        except (KeyError, ValueError, TypeError) as e:
+           raise CrashLogParseException(
+               'Failed to parse JSON crashlog: {}: {}'.format(
+                   type(e).__name__, e))
 
         return self.crashlog
-
-    def get_image_extra_info(self, idx):
-        return self.data['legacyInfo']['imageExtraInfo'][idx]
 
     def get_used_image(self, idx):
         return self.data['usedImages'][idx]
@@ -440,18 +444,17 @@ class JSONCrashLogParser:
         else:
             exception_extra = ""
         return "{} ({}){}".format(exception_type, exception_signal,
-                                            exception_extra)
+                                  exception_extra)
 
     def parse_images(self, json_images):
         idx = 0
-        for json_images in json_images:
-            img_uuid = uuid.UUID(json_images[0])
-            low = int(json_images[1])
-            high = 0
-            extra_info = self.get_image_extra_info(idx)
-            name = extra_info['name']
-            path = extra_info['path']
-            version = ""
+        for json_image in json_images:
+            img_uuid = uuid.UUID(json_image['uuid'])
+            low = int(json_image['base'])
+            high = int(0)
+            name = json_image['name'] if 'name' in json_image else ''
+            path = json_image['path'] if 'path' in json_image else ''
+            version = ''
             darwin_image = self.crashlog.DarwinImage(low, high, name, version,
                                                      img_uuid, path,
                                                      self.verbose)
@@ -461,16 +464,14 @@ class JSONCrashLogParser:
     def parse_frames(self, thread, json_frames):
         idx = 0
         for json_frame in json_frames:
-            image_id = int(json_frame[0])
-
-            ident = self.get_image_extra_info(image_id)['name']
+            image_id = int(json_frame['imageIndex'])
+            ident = self.get_used_image(image_id)['name']
             thread.add_ident(ident)
             if ident not in self.crashlog.idents:
                 self.crashlog.idents.append(ident)
 
-            frame_offset = int(json_frame[1])
-            image = self.get_used_image(image_id)
-            image_addr = int(image[1])
+            frame_offset = int(json_frame['imageOffset'])
+            image_addr = self.get_used_image(image_id)['base']
             pc = image_addr + frame_offset
             thread.frames.append(self.crashlog.Frame(idx, pc, frame_offset))
             idx += 1
@@ -481,6 +482,8 @@ class JSONCrashLogParser:
             thread = self.crashlog.Thread(idx, False)
             if json_thread.get('triggered', False):
                 self.crashlog.crashed_thread_idx = idx
+                self.registers = self.parse_thread_registers(
+                    json_thread['threadState'])
             thread.queue = json_thread.get('queue')
             self.parse_frames(thread, json_thread.get('frames', []))
             self.crashlog.threads.append(thread)
@@ -489,15 +492,16 @@ class JSONCrashLogParser:
     def parse_thread_registers(self, json_thread_state):
         idx = 0
         registers = dict()
-        for reg in json_thread_state.get('x', []):
+        for json_reg in json_thread_state.get('x', []):
             key = str('x{}'.format(idx))
-            value = int(reg)
+            value = int(json_reg['value'])
             registers[key] = value
             idx += 1
 
         for register in ['lr', 'cpsr', 'fp', 'sp', 'esr', 'pc']:
             if register in json_thread_state:
-                registers[register] = int(json_thread_state[register])
+                json_reg = json_thread_state[register]
+                registers[register] = int(json_reg['value'])
 
         return registers
 

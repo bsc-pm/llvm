@@ -82,16 +82,16 @@ def FSD : RVInstS<0b011, OPC_STORE_FP, (outs),
           Sched<[WriteFST64, ReadStoreData, ReadFMemBase]>;
 
 def FMADD_D  : FPFMAD_rrr_frm<OPC_MADD, "fmadd.d">,
-               Sched<[WriteFMulAdd64, ReadFMulAdd64, ReadFMulAdd64, ReadFMulAdd64]>;
+               Sched<[WriteFMA64, ReadFMA64, ReadFMA64, ReadFMA64]>;
 def          : FPFMADDynFrmAlias<FMADD_D, "fmadd.d">;
 def FMSUB_D  : FPFMAD_rrr_frm<OPC_MSUB, "fmsub.d">,
-               Sched<[WriteFMulSub64, ReadFMulSub64, ReadFMulSub64, ReadFMulSub64]>;
+               Sched<[WriteFMA64, ReadFMA64, ReadFMA64, ReadFMA64]>;
 def          : FPFMADDynFrmAlias<FMSUB_D, "fmsub.d">;
 def FNMSUB_D : FPFMAD_rrr_frm<OPC_NMSUB, "fnmsub.d">,
-               Sched<[WriteFMulSub64, ReadFMulSub64, ReadFMulSub64, ReadFMulSub64]>;
+               Sched<[WriteFMA64, ReadFMA64, ReadFMA64, ReadFMA64]>;
 def          : FPFMADDynFrmAlias<FNMSUB_D, "fnmsub.d">;
 def FNMADD_D : FPFMAD_rrr_frm<OPC_NMADD, "fnmadd.d">,
-               Sched<[WriteFMulAdd64, ReadFMulAdd64, ReadFMulAdd64, ReadFMulAdd64]>;
+               Sched<[WriteFMA64, ReadFMA64, ReadFMA64, ReadFMA64]>;
 def          : FPFMADDynFrmAlias<FNMADD_D, "fnmadd.d">;
 
 def FADD_D : FPALUD_rr_frm<0b0000001, "fadd.d">,
@@ -281,11 +281,8 @@ def : Pat<(fma (fneg FPR64:$rs1), FPR64:$rs2, FPR64:$rs3),
 def : Pat<(fma (fneg FPR64:$rs1), FPR64:$rs2, (fneg FPR64:$rs3)),
           (FNMADD_D FPR64:$rs1, FPR64:$rs2, FPR64:$rs3, 0b111)>;
 
-// The RISC-V 2.2 user-level ISA spec defines fmin and fmax as returning the
-// canonical NaN when giving a signaling NaN. This doesn't match the LLVM
-// behaviour (see https://bugs.llvm.org/show_bug.cgi?id=27363). However, the
-// draft 2.3 ISA spec changes the definition of fmin and fmax in a way that
-// matches LLVM's fminnum and fmaxnum
+// The ratified 20191213 ISA spec defines fmin and fmax in a way that matches
+// LLVM's fminnum and fmaxnum.
 // <https://github.com/riscv/riscv-isa-manual/commit/cd20cee7efd9bac7c5aa127ec3b451749d2b3cce>.
 def : PatFpr64Fpr64<fminnum, FMIN_D>;
 def : PatFpr64Fpr64<fmaxnum, FMAX_D>;

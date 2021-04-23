@@ -409,8 +409,8 @@ void FreeBSD::addLibCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
 void FreeBSD::addLibStdCxxIncludePaths(
     const llvm::opt::ArgList &DriverArgs,
     llvm::opt::ArgStringList &CC1Args) const {
-  addLibStdCXXIncludePaths(getDriver().SysRoot, "/usr/include/c++/4.2", "", "",
-                           "", "", DriverArgs, CC1Args);
+  addLibStdCXXIncludePaths(getDriver().SysRoot + "/usr/include/c++/4.2", "", "",
+                           DriverArgs, CC1Args);
 }
 
 void FreeBSD::AddCXXStdlibLibArgs(const ArgList &Args,
@@ -467,6 +467,7 @@ bool FreeBSD::IsUnwindTablesDefault(const ArgList &Args) const { return true; }
 bool FreeBSD::isPIEDefault() const { return getSanitizerArgs().requiresPIE(); }
 
 SanitizerMask FreeBSD::getSupportedSanitizers() const {
+  const bool IsAArch64 = getTriple().getArch() == llvm::Triple::aarch64;
   const bool IsX86 = getTriple().getArch() == llvm::Triple::x86;
   const bool IsX86_64 = getTriple().getArch() == llvm::Triple::x86_64;
   const bool IsMIPS64 = getTriple().isMIPS64();
@@ -485,8 +486,13 @@ SanitizerMask FreeBSD::getSupportedSanitizers() const {
     Res |= SanitizerKind::Fuzzer;
     Res |= SanitizerKind::FuzzerNoLink;
   }
-  if (IsX86_64)
+  if (IsAArch64 || IsX86_64) {
+    Res |= SanitizerKind::KernelAddress;
+    Res |= SanitizerKind::KernelMemory;
+  }
+  if (IsX86_64) {
     Res |= SanitizerKind::Memory;
+  }
   return Res;
 }
 

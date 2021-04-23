@@ -16,9 +16,38 @@
 /// issues within their own code.
 ///
 /// The analysis is based on automatic propagation of data flow labels (also
-/// known as taint labels) through a program as it performs computation.  Each
-/// byte of application memory is backed by two bytes of shadow memory which
-/// hold the label.  On Linux/x86_64, memory is laid out as follows:
+/// known as taint labels) through a program as it performs computation.
+///
+/// There are two possible memory layouts. In the first one, each byte of
+/// application memory is backed by a shadow memory byte. The shadow byte can
+/// represent up to 8 labels. To enable this you must specify the
+/// -dfsan-fast-8-labels flag. On Linux/x86_64, memory is then laid out as
+/// follows:
+///
+/// +--------------------+ 0x800000000000 (top of memory)
+/// | application memory |
+/// +--------------------+ 0x700000008000 (kAppAddr)
+/// |                    |
+/// |       unused       |
+/// |                    |
+/// +--------------------+ 0x300200000000 (kUnusedAddr)
+/// |    union table     |
+/// +--------------------+ 0x300000000000 (kUnionTableAddr)
+/// |       origin       |
+/// +--------------------+ 0x200000008000 (kOriginAddr)
+/// |   shadow memory    |
+/// +--------------------+ 0x100000008000 (kShadowAddr)
+/// |       unused       |
+/// +--------------------+ 0x000000010000
+/// | reserved by kernel |
+/// +--------------------+ 0x000000000000
+///
+///
+/// In the second memory layout, each byte of application memory is backed by
+/// two bytes of shadow memory which hold the label. That means we can represent
+/// either 16 labels (with -dfsan-fast-16-labels flag) or 2^16 labels (on the
+/// default legacy mode) per byte. On Linux/x86_64, memory is then laid out as
+/// follows:
 ///
 /// +--------------------+ 0x800000000000 (top of memory)
 /// | application memory |
@@ -35,6 +64,7 @@
 /// +--------------------+ 0x000000010000 (kShadowAddr)
 /// | reserved by kernel |
 /// +--------------------+ 0x000000000000
+///
 ///
 /// To derive a shadow memory address from an application memory address,
 /// bits 44-46 are cleared to bring the address into the range
@@ -200,12 +230,28 @@ static cl::opt<bool> ClFast16Labels(
              "labels to 16."),
     cl::Hidden, cl::init(false));
 
+// Use a distinct bit for each base label, enabling faster unions with less
+// instrumentation.  Limits the max number of base labels to 8.
+static cl::opt<bool> ClFast8Labels(
+    "dfsan-fast-8-labels",
+    cl::desc("Use more efficient instrumentation, limiting the number of "
+             "labels to 8."),
+    cl::Hidden, cl::init(false));
+
 // Controls whether the pass tracks the control flow of select instructions.
 static cl::opt<bool> ClTrackSelectControlFlow(
     "dfsan-track-select-control-flow",
     cl::desc("Propagate labels from condition values of select instructions "
              "to results."),
     cl::Hidden, cl::init(true));
+
+// TODO: This default value follows MSan. DFSan may use a different value.
+static cl::opt<int> ClInstrumentWithCallThreshold(
+    "dfsan-instrument-with-call-threshold",
+    cl::desc("If the function being instrumented requires more than "
+             "this number of origin stores, use callbacks instead of "
+             "inline checks (-1 means never use callbacks)."),
+    cl::Hidden, cl::init(3500));
 
 // Controls how to track origins.
 // * 0: do not track origins.
@@ -333,8 +379,6 @@ class DataFlowSanitizer {
   friend class DFSanVisitor;
 
   enum {
-    ShadowWidthBits = 16,
-    ShadowWidthBytes = ShadowWidthBits / 8,
     OriginWidthBits = 32,
     OriginWidthBytes = OriginWidthBits / 8
   };
@@ -375,6 +419,9 @@ class DataFlowSanitizer {
     WK_Custom
   };
 
+  unsigned ShadowWidthBits;
+  unsigned ShadowWidthBytes;
+
   Module *Mod;
   LLVMContext *Ctx;
   Type *Int8Ptr;
@@ -411,7 +458,7 @@ class DataFlowSanitizer {
   FunctionCallee DFSanUnionFn;
   FunctionCallee DFSanCheckedUnionFn;
   FunctionCallee DFSanUnionLoadFn;
-  FunctionCallee DFSanUnionLoadFast16LabelsFn;
+  FunctionCallee DFSanUnionLoadFastLabelsFn;
   FunctionCallee DFSanLoadLabelAndOriginFn;
   FunctionCallee DFSanUnimplementedFn;
   FunctionCallee DFSanSetLabelFn;
@@ -426,6 +473,7 @@ class DataFlowSanitizer {
   FunctionCallee DFSanMaybeStoreOriginFn;
   SmallPtrSet<Value *, 16> DFSanRuntimeFunctions;
   MDNode *ColdCallWeights;
+  MDNode *OriginStoreWeights;
   DFSanABIList ABIList;
   DenseMap<Value *, Function *> UnwrappedFnMap;
   AttrBuilder ReadOnlyNoneAttrs;
@@ -433,6 +481,7 @@ class DataFlowSanitizer {
 
   Value *getShadowOffset(Value *Addr, IRBuilder<> &IRB);
   Value *getShadowAddress(Value *Addr, Instruction *Pos);
+  Value *getShadowAddress(Value *Addr, Instruction *Pos, Value *ShadowOffset);
   std::pair<Value *, Value *>
   getShadowOriginAddress(Value *Addr, Align InstAlignment, Instruction *Pos);
   bool isInstrumented(const Function *F);
@@ -452,6 +501,13 @@ class DataFlowSanitizer {
   void injectMetadataGlobals(Module &M);
 
   bool init(Module &M);
+
+  /// Returns whether fast8 or fast16 mode has been specified.
+  bool hasFastLabelsEnabled();
+
+  /// Returns whether the given load byte size is amenable to inlined
+  /// optimization patterns.
+  bool hasLoadSizeForFastPath(uint64_t Size);
 
   /// Returns whether the pass tracks origins. Support only fast16 mode in TLS
   /// ABI mode.
@@ -509,7 +565,13 @@ struct DFSanFunction {
   DenseMap<AllocaInst *, AllocaInst *> AllocaShadowMap;
   DenseMap<AllocaInst *, AllocaInst *> AllocaOriginMap;
 
-  std::vector<std::pair<PHINode *, PHINode *>> PHIFixups;
+  struct PHIFixupElement {
+    PHINode *Phi;
+    PHINode *ShadowPhi;
+    PHINode *OriginPhi;
+  };
+  std::vector<PHIFixupElement> PHIFixups;
+
   DenseSet<Instruction *> SkipInsts;
   std::vector<Value *> NonZeroChecks;
   bool AvoidNewBlocks;
@@ -578,8 +640,9 @@ struct DFSanFunction {
   std::pair<Value *, Value *> loadShadowOrigin(Value *ShadowAddr, uint64_t Size,
                                                Align InstAlignment,
                                                Instruction *Pos);
-  void storePrimitiveShadow(Value *Addr, uint64_t Size, Align Alignment,
-                            Value *PrimitiveShadow, Instruction *Pos);
+  void storePrimitiveShadowOrigin(Value *Addr, uint64_t Size,
+                                  Align InstAlignment, Value *PrimitiveShadow,
+                                  Value *Origin, Instruction *Pos);
   /// Applies PrimitiveShadow to all primitive subtypes of T, returning
   /// the expanded shadow value.
   ///
@@ -633,6 +696,33 @@ private:
   /// checks if it is possible to load labels and origins without using the
   /// callback function.
   bool useCallbackLoadLabelAndOrigin(uint64_t Size, Align InstAlignment);
+
+  /// Returns a chain at the current stack with previous origin V.
+  Value *updateOrigin(Value *V, IRBuilder<> &IRB);
+
+  /// Creates an Intptr = Origin | Origin << 32 if Intptr's size is 64. Returns
+  /// Origin otherwise.
+  Value *originToIntptr(IRBuilder<> &IRB, Value *Origin);
+
+  /// Stores Origin into the address range [StoreOriginAddr, StoreOriginAddr +
+  /// Size).
+  void paintOrigin(IRBuilder<> &IRB, Value *Origin, Value *StoreOriginAddr,
+                   uint64_t StoreOriginSize, Align Alignment);
+
+  /// Stores Origin in terms of its Shadow value.
+  /// * Do not write origins for zero shadows because we do not trace origins
+  ///   for untainted sinks.
+  /// * Use __dfsan_maybe_store_origin if there are too many origin store
+  ///   instrumentations.
+  void storeOrigin(Instruction *Pos, Value *Addr, uint64_t Size, Value *Shadow,
+                   Value *Origin, Value *StoreOriginAddr, Align InstAlignment);
+
+  /// Convert a scalar value to an i1 by comparing with 0.
+  Value *convertToBool(Value *V, IRBuilder<> &IRB, const Twine &Name = "");
+
+  bool shouldInstrumentWithCall();
+
+  int NumOriginStores = 0;
 };
 
 class DFSanVisitor : public InstVisitor<DFSanVisitor> {
@@ -690,6 +780,14 @@ private:
 
 DataFlowSanitizer::DataFlowSanitizer(
     const std::vector<std::string> &ABIListFiles) {
+  if (ClFast8Labels && ClFast16Labels) {
+    report_fatal_error(
+        "cannot set both -dfsan-fast-8-labels and -dfsan-fast-16-labels");
+  }
+
+  ShadowWidthBits = ClFast8Labels ? 8 : 16;
+  ShadowWidthBytes = ShadowWidthBits / 8;
+
   std::vector<std::string> AllABIListFiles(std::move(ABIListFiles));
   llvm::append_range(AllABIListFiles, ClABIListFiles);
   // FIXME: should we propagate vfs::FileSystem to this constructor?
@@ -784,15 +882,26 @@ bool DataFlowSanitizer::isZeroShadow(Value *V) {
   return isa<ConstantAggregateZero>(V);
 }
 
+bool DataFlowSanitizer::hasFastLabelsEnabled() {
+  static const bool HasFastLabelsEnabled = ClFast8Labels || ClFast16Labels;
+  return HasFastLabelsEnabled;
+}
+
+bool DataFlowSanitizer::hasLoadSizeForFastPath(uint64_t Size) {
+  uint64_t ShadowSize = Size * ShadowWidthBytes;
+  return ShadowSize % 8 == 0 || ShadowSize == 4;
+}
+
 bool DataFlowSanitizer::shouldTrackOrigins() {
   static const bool ShouldTrackOrigins =
       ClTrackOrigins && getInstrumentedABI() == DataFlowSanitizer::IA_TLS &&
-      ClFast16Labels;
+      hasFastLabelsEnabled();
   return ShouldTrackOrigins;
 }
 
 bool DataFlowSanitizer::shouldTrackFieldsAndIndices() {
-  return getInstrumentedABI() == DataFlowSanitizer::IA_TLS && ClFast16Labels;
+  return getInstrumentedABI() == DataFlowSanitizer::IA_TLS &&
+         hasFastLabelsEnabled();
 }
 
 Constant *DataFlowSanitizer::getZeroShadow(Type *OrigTy) {
@@ -835,6 +944,11 @@ static Value *expandFromPrimitiveShadowRecursive(
     return Shadow;
   }
   llvm_unreachable("Unexpected shadow type");
+}
+
+bool DFSanFunction::shouldInstrumentWithCall() {
+  return ClInstrumentWithCallThreshold >= 0 &&
+         NumOriginStores >= ClInstrumentWithCallThreshold;
 }
 
 Value *DFSanFunction::expandFromPrimitiveShadow(Type *T, Value *PrimitiveShadow,
@@ -952,11 +1066,15 @@ bool DataFlowSanitizer::init(Module &M) {
 
   switch (TargetTriple.getArch()) {
   case Triple::x86_64:
-    ShadowPtrMask = ConstantInt::getSigned(IntptrTy, ~0x700000000000LL);
+    ShadowPtrMask = ClFast8Labels
+                        ? ConstantInt::getSigned(IntptrTy, ~0x600000000000LL)
+                        : ConstantInt::getSigned(IntptrTy, ~0x700000000000LL);
     break;
   case Triple::mips64:
   case Triple::mips64el:
-    ShadowPtrMask = ConstantInt::getSigned(IntptrTy, ~0xF000000000LL);
+    ShadowPtrMask = ClFast8Labels
+                        ? ConstantInt::getSigned(IntptrTy, ~0xE000000000LL)
+                        : ConstantInt::getSigned(IntptrTy, ~0xF000000000LL);
     break;
   case Triple::aarch64:
   case Triple::aarch64_be:
@@ -1009,6 +1127,7 @@ bool DataFlowSanitizer::init(Module &M) {
                         /*isVarArg=*/false);
 
   ColdCallWeights = MDBuilder(*Ctx).createBranchWeights(1, 1000);
+  OriginStoreWeights = MDBuilder(*Ctx).createBranchWeights(1, 1000);
   return true;
 }
 
@@ -1189,7 +1308,7 @@ void DataFlowSanitizer::initializeRuntimeFunctions(Module &M) {
                          Attribute::ReadOnly);
     AL = AL.addAttribute(M.getContext(), AttributeList::ReturnIndex,
                          Attribute::ZExt);
-    DFSanUnionLoadFast16LabelsFn = Mod->getOrInsertFunction(
+    DFSanUnionLoadFastLabelsFn = Mod->getOrInsertFunction(
         "__dfsan_union_load_fast16labels", DFSanUnionLoadFnTy, AL);
   }
   {
@@ -1241,7 +1360,7 @@ void DataFlowSanitizer::initializeRuntimeFunctions(Module &M) {
   DFSanRuntimeFunctions.insert(
       DFSanUnionLoadFn.getCallee()->stripPointerCasts());
   DFSanRuntimeFunctions.insert(
-      DFSanUnionLoadFast16LabelsFn.getCallee()->stripPointerCasts());
+      DFSanUnionLoadFastLabelsFn.getCallee()->stripPointerCasts());
   DFSanRuntimeFunctions.insert(
       DFSanLoadLabelAndOriginFn.getCallee()->stripPointerCasts());
   DFSanRuntimeFunctions.insert(
@@ -1520,12 +1639,14 @@ bool DataFlowSanitizer::runImpl(Module &M) {
     // until we have visited every block.  Therefore, the code that handles phi
     // nodes adds them to the PHIFixups list so that they can be properly
     // handled here.
-    for (auto PHIFixup : DFSF.PHIFixups) {
-      PHINode *PN, *ShadowPN;
-      std::tie(PN, ShadowPN) = PHIFixup;
-      for (unsigned Val = 0, N = PN->getNumIncomingValues(); Val < N; ++Val) {
-        ShadowPN->setIncomingValue(Val,
-                                   DFSF.getShadow(PN->getIncomingValue(Val)));
+    for (DFSanFunction::PHIFixupElement &P : DFSF.PHIFixups) {
+      for (unsigned Val = 0, N = P.Phi->getNumIncomingValues(); Val != N;
+           ++Val) {
+        P.ShadowPhi->setIncomingValue(
+            Val, DFSF.getShadow(P.Phi->getIncomingValue(Val)));
+        if (P.OriginPhi)
+          P.OriginPhi->setIncomingValue(
+              Val, DFSF.getOrigin(P.Phi->getIncomingValue(Val)));
       }
     }
 
@@ -1706,8 +1827,7 @@ DataFlowSanitizer::getShadowOriginAddress(Value *Addr, Align InstAlignment,
   // Returns ((Addr & shadow_mask) + origin_base) & ~4UL
   IRBuilder<> IRB(Pos);
   Value *ShadowOffset = getShadowOffset(Addr, IRB);
-  Value *ShadowPtr = IRB.CreateIntToPtr(
-      IRB.CreateMul(ShadowOffset, ShadowPtrMul), PrimitiveShadowPtrTy);
+  Value *ShadowPtr = getShadowAddress(Addr, Pos, ShadowOffset);
   Value *OriginPtr = nullptr;
   if (shouldTrackOrigins()) {
     Value *OriginLong = IRB.CreateAdd(ShadowOffset, OriginBase);
@@ -1723,12 +1843,21 @@ DataFlowSanitizer::getShadowOriginAddress(Value *Addr, Align InstAlignment,
   return {ShadowPtr, OriginPtr};
 }
 
+Value *DataFlowSanitizer::getShadowAddress(Value *Addr, Instruction *Pos,
+                                           Value *ShadowOffset) {
+  IRBuilder<> IRB(Pos);
+
+  if (!ShadowPtrMul->isOne())
+    ShadowOffset = IRB.CreateMul(ShadowOffset, ShadowPtrMul);
+
+  return IRB.CreateIntToPtr(ShadowOffset, PrimitiveShadowPtrTy);
+}
+
 Value *DataFlowSanitizer::getShadowAddress(Value *Addr, Instruction *Pos) {
   // Returns (Addr & shadow_mask) x 2
   IRBuilder<> IRB(Pos);
   Value *ShadowOffset = getShadowOffset(Addr, IRB);
-  return IRB.CreateIntToPtr(IRB.CreateMul(ShadowOffset, ShadowPtrMul),
-                            PrimitiveShadowPtrTy);
+  return getShadowAddress(Addr, Pos, ShadowOffset);
 }
 
 Value *DFSanFunction::combineShadowsThenConvert(Type *T, Value *V1, Value *V2,
@@ -1778,7 +1907,7 @@ Value *DFSanFunction::combineShadows(Value *V1, Value *V2, Instruction *Pos) {
   Value *PV2 = collapseToPrimitiveShadow(V2, Pos);
 
   IRBuilder<> IRB(Pos);
-  if (ClFast16Labels) {
+  if (DFS.hasFastLabelsEnabled()) {
     CCS.Block = Pos->getParent();
     CCS.Shadow = IRB.CreateOr(PV1, PV2);
   } else if (AvoidNewBlocks) {
@@ -1917,37 +2046,59 @@ bool DFSanFunction::useCallbackLoadLabelAndOrigin(uint64_t Size,
     return false;
 
   const Align Alignment = llvm::assumeAligned(InstAlignment.value());
-  if (Alignment >= MinOriginAlignment &&
-      Size % (64 / DFS.ShadowWidthBits) == 0)
-    return false;
-
-  return true;
+  return Alignment < MinOriginAlignment || !DFS.hasLoadSizeForFastPath(Size);
 }
 
 std::pair<Value *, Value *> DFSanFunction::loadFast16ShadowFast(
     Value *ShadowAddr, Value *OriginAddr, uint64_t Size, Align ShadowAlign,
     Align OriginAlign, Value *FirstOrigin, Instruction *Pos) {
-  // First OR all the WideShadows, then OR individual shadows within the
-  // combined WideShadow. This is fewer instructions than ORing shadows
-  // individually.
   const bool ShouldTrackOrigins = DFS.shouldTrackOrigins();
+  const uint64_t ShadowSize = Size * DFS.ShadowWidthBytes;
+
+  assert(Size >= 4 && "Not large enough load size for fast path!");
+
+  // Used for origin tracking.
   std::vector<Value *> Shadows;
   std::vector<Value *> Origins;
+
+  // Load instructions in LLVM can have arbitrary byte sizes (e.g., 3, 12, 20)
+  // but this function is only used in a subset of cases that make it possible
+  // to optimize the instrumentation.
+  //
+  // Specifically, when the shadow size in bytes (i.e., loaded bytes x shadow
+  // per byte) is either:
+  // - a multiple of 8  (common)
+  // - equal to 4       (only for load32 in fast-8 mode)
+  //
+  // For the second case, we can fit the wide shadow in a 32-bit integer. In all
+  // other cases, we use a 64-bit integer to hold the wide shadow.
+  Type *WideShadowTy =
+      ShadowSize == 4 ? Type::getInt32Ty(*DFS.Ctx) : Type::getInt64Ty(*DFS.Ctx);
+
   IRBuilder<> IRB(Pos);
-  Value *WideAddr =
-      IRB.CreateBitCast(ShadowAddr, Type::getInt64PtrTy(*DFS.Ctx));
+  Value *WideAddr = IRB.CreateBitCast(ShadowAddr, WideShadowTy->getPointerTo());
   Value *CombinedWideShadow =
-      IRB.CreateAlignedLoad(IRB.getInt64Ty(), WideAddr, ShadowAlign);
+      IRB.CreateAlignedLoad(WideShadowTy, WideAddr, ShadowAlign);
+
   if (ShouldTrackOrigins) {
     Shadows.push_back(CombinedWideShadow);
     Origins.push_back(FirstOrigin);
   }
-  for (uint64_t Ofs = 64 / DFS.ShadowWidthBits; Ofs != Size;
-       Ofs += 64 / DFS.ShadowWidthBits) {
-    WideAddr = IRB.CreateGEP(Type::getInt64Ty(*DFS.Ctx), WideAddr,
+
+  // First OR all the WideShadows (i.e., 64bit or 32bit shadow chunks) linearly;
+  // then OR individual shadows within the combined WideShadow by binary ORing.
+  // This is fewer instructions than ORing shadows individually, since it
+  // needs logN shift/or instructions (N being the bytes of the combined wide
+  // shadow).
+  unsigned WideShadowBitWidth = WideShadowTy->getIntegerBitWidth();
+  const uint64_t BytesPerWideShadow = WideShadowBitWidth / DFS.ShadowWidthBits;
+
+  for (uint64_t ByteOfs = BytesPerWideShadow; ByteOfs < Size;
+       ByteOfs += BytesPerWideShadow) {
+    WideAddr = IRB.CreateGEP(WideShadowTy, WideAddr,
                              ConstantInt::get(DFS.IntptrTy, 1));
     Value *NextWideShadow =
-        IRB.CreateAlignedLoad(IRB.getInt64Ty(), WideAddr, ShadowAlign);
+        IRB.CreateAlignedLoad(WideShadowTy, WideAddr, ShadowAlign);
     CombinedWideShadow = IRB.CreateOr(CombinedWideShadow, NextWideShadow);
     if (ShouldTrackOrigins) {
       Shadows.push_back(NextWideShadow);
@@ -1957,7 +2108,8 @@ std::pair<Value *, Value *> DFSanFunction::loadFast16ShadowFast(
           IRB.CreateAlignedLoad(DFS.OriginTy, OriginAddr, OriginAlign));
     }
   }
-  for (unsigned Width = 32; Width >= DFS.ShadowWidthBits; Width >>= 1) {
+  for (unsigned Width = WideShadowBitWidth / 2; Width >= DFS.ShadowWidthBits;
+       Width >>= 1) {
     Value *ShrShadow = IRB.CreateLShr(CombinedWideShadow, Width);
     CombinedWideShadow = IRB.CreateOr(CombinedWideShadow, ShrShadow);
   }
@@ -1972,24 +2124,33 @@ Value *DFSanFunction::loadLegacyShadowFast(Value *ShadowAddr, uint64_t Size,
                                            Align ShadowAlign,
                                            Instruction *Pos) {
   // Fast path for the common case where each byte has identical shadow: load
-  // shadow 64 bits at a time, fall out to a __dfsan_union_load call if any
-  // shadow is non-equal.
+  // shadow 64 (or 32) bits at a time, fall out to a __dfsan_union_load call if
+  // any shadow is non-equal.
   BasicBlock *FallbackBB = BasicBlock::Create(*DFS.Ctx, "", F);
   IRBuilder<> FallbackIRB(FallbackBB);
   CallInst *FallbackCall = FallbackIRB.CreateCall(
       DFS.DFSanUnionLoadFn, {ShadowAddr, ConstantInt::get(DFS.IntptrTy, Size)});
   FallbackCall->addAttribute(AttributeList::ReturnIndex, Attribute::ZExt);
 
+  const uint64_t ShadowSize = Size * DFS.ShadowWidthBytes;
+  assert(Size >= 4 && "Not large enough load size for fast path!");
+
+  // Same as in loadFast16AShadowsFast. In the case of load32, we can fit the
+  // wide shadow in a 32-bit integer instead.
+  Type *WideShadowTy =
+      ShadowSize == 4 ? Type::getInt32Ty(*DFS.Ctx) : Type::getInt64Ty(*DFS.Ctx);
+
   // Compare each of the shadows stored in the loaded 64 bits to each other,
   // by computing (WideShadow rotl ShadowWidthBits) == WideShadow.
   IRBuilder<> IRB(Pos);
-  Value *WideAddr =
-      IRB.CreateBitCast(ShadowAddr, Type::getInt64PtrTy(*DFS.Ctx));
+  unsigned WideShadowBitWidth = WideShadowTy->getIntegerBitWidth();
+  Value *WideAddr = IRB.CreateBitCast(ShadowAddr, WideShadowTy->getPointerTo());
   Value *WideShadow =
-      IRB.CreateAlignedLoad(IRB.getInt64Ty(), WideAddr, ShadowAlign);
+      IRB.CreateAlignedLoad(WideShadowTy, WideAddr, ShadowAlign);
   Value *TruncShadow = IRB.CreateTrunc(WideShadow, DFS.PrimitiveShadowTy);
   Value *ShlShadow = IRB.CreateShl(WideShadow, DFS.ShadowWidthBits);
-  Value *ShrShadow = IRB.CreateLShr(WideShadow, 64 - DFS.ShadowWidthBits);
+  Value *ShrShadow =
+      IRB.CreateLShr(WideShadow, WideShadowBitWidth - DFS.ShadowWidthBits);
   Value *RotShadow = IRB.CreateOr(ShlShadow, ShrShadow);
   Value *ShadowsEq = IRB.CreateICmpEQ(WideShadow, RotShadow);
 
@@ -2012,15 +2173,17 @@ Value *DFSanFunction::loadLegacyShadowFast(Value *ShadowAddr, uint64_t Size,
   ReplaceInstWithInst(Head->getTerminator(), LastBr);
   DT.addNewBlock(FallbackBB, Head);
 
-  for (uint64_t Ofs = 64 / DFS.ShadowWidthBits; Ofs != Size;
-       Ofs += 64 / DFS.ShadowWidthBits) {
+  const uint64_t BytesPerWideShadow = WideShadowBitWidth / DFS.ShadowWidthBits;
+
+  for (uint64_t ByteOfs = BytesPerWideShadow; ByteOfs < Size;
+       ByteOfs += BytesPerWideShadow) {
     BasicBlock *NextBB = BasicBlock::Create(*DFS.Ctx, "", F);
     DT.addNewBlock(NextBB, LastBr->getParent());
     IRBuilder<> NextIRB(NextBB);
-    WideAddr = NextIRB.CreateGEP(Type::getInt64Ty(*DFS.Ctx), WideAddr,
+    WideAddr = NextIRB.CreateGEP(WideShadowTy, WideAddr,
                                  ConstantInt::get(DFS.IntptrTy, 1));
     Value *NextWideShadow =
-        NextIRB.CreateAlignedLoad(NextIRB.getInt64Ty(), WideAddr, ShadowAlign);
+        NextIRB.CreateAlignedLoad(WideShadowTy, WideAddr, ShadowAlign);
     ShadowsEq = NextIRB.CreateICmpEQ(WideShadow, NextWideShadow);
     LastBr->setSuccessor(0, NextBB);
     LastBr = NextIRB.CreateCondBr(ShadowsEq, FallbackBB, FallbackBB);
@@ -2107,6 +2270,8 @@ std::pair<Value *, Value *> DFSanFunction::loadShadowOrigin(Value *Addr,
     Origin = IRB.CreateAlignedLoad(DFS.OriginTy, OriginAddr, OriginAlign);
   }
 
+  // When the byte size is small enough, we can load the shadow directly with
+  // just a few instructions.
   switch (Size) {
   case 1: {
     LoadInst *LI = new LoadInst(DFS.PrimitiveShadowTy, ShadowAddr, "", Pos);
@@ -2124,17 +2289,20 @@ std::pair<Value *, Value *> DFSanFunction::loadShadowOrigin(Value *Addr,
     return {combineShadows(Load, Load1, Pos), Origin};
   }
   }
+  bool HasSizeForFastPath = DFS.hasLoadSizeForFastPath(Size);
+  bool HasFastLabelsEnabled = DFS.hasFastLabelsEnabled();
 
-  if (ClFast16Labels && Size % (64 / DFS.ShadowWidthBits) == 0)
+  if (HasFastLabelsEnabled && HasSizeForFastPath)
     return loadFast16ShadowFast(ShadowAddr, OriginAddr, Size, ShadowAlign,
                                 OriginAlign, Origin, Pos);
 
-  if (!AvoidNewBlocks && Size % (64 / DFS.ShadowWidthBits) == 0)
+  if (!AvoidNewBlocks && HasSizeForFastPath)
     return {loadLegacyShadowFast(ShadowAddr, Size, ShadowAlign, Pos), Origin};
 
   IRBuilder<> IRB(Pos);
-  FunctionCallee &UnionLoadFn =
-      ClFast16Labels ? DFS.DFSanUnionLoadFast16LabelsFn : DFS.DFSanUnionLoadFn;
+  FunctionCallee &UnionLoadFn = HasFastLabelsEnabled
+                                    ? DFS.DFSanUnionLoadFastLabelsFn
+                                    : DFS.DFSanUnionLoadFn;
   CallInst *FallbackCall = IRB.CreateCall(
       UnionLoadFn, {ShadowAddr, ConstantInt::get(DFS.IntptrTy, Size)});
   FallbackCall->addAttribute(AttributeList::ReturnIndex, Attribute::ZExt);
@@ -2212,6 +2380,99 @@ void DFSanVisitor::visitLoadInst(LoadInst &LI) {
   }
 }
 
+Value *DFSanFunction::updateOrigin(Value *V, IRBuilder<> &IRB) {
+  if (!DFS.shouldTrackOrigins())
+    return V;
+  return IRB.CreateCall(DFS.DFSanChainOriginFn, V);
+}
+
+Value *DFSanFunction::originToIntptr(IRBuilder<> &IRB, Value *Origin) {
+  const unsigned OriginSize = DataFlowSanitizer::OriginWidthBytes;
+  const DataLayout &DL = F->getParent()->getDataLayout();
+  unsigned IntptrSize = DL.getTypeStoreSize(DFS.IntptrTy);
+  if (IntptrSize == OriginSize)
+    return Origin;
+  assert(IntptrSize == OriginSize * 2);
+  Origin = IRB.CreateIntCast(Origin, DFS.IntptrTy, /* isSigned */ false);
+  return IRB.CreateOr(Origin, IRB.CreateShl(Origin, OriginSize * 8));
+}
+
+void DFSanFunction::paintOrigin(IRBuilder<> &IRB, Value *Origin,
+                                Value *StoreOriginAddr,
+                                uint64_t StoreOriginSize, Align Alignment) {
+  const unsigned OriginSize = DataFlowSanitizer::OriginWidthBytes;
+  const DataLayout &DL = F->getParent()->getDataLayout();
+  const Align IntptrAlignment = DL.getABITypeAlign(DFS.IntptrTy);
+  unsigned IntptrSize = DL.getTypeStoreSize(DFS.IntptrTy);
+  assert(IntptrAlignment >= MinOriginAlignment);
+  assert(IntptrSize >= OriginSize);
+
+  unsigned Ofs = 0;
+  Align CurrentAlignment = Alignment;
+  if (Alignment >= IntptrAlignment && IntptrSize > OriginSize) {
+    Value *IntptrOrigin = originToIntptr(IRB, Origin);
+    Value *IntptrStoreOriginPtr = IRB.CreatePointerCast(
+        StoreOriginAddr, PointerType::get(DFS.IntptrTy, 0));
+    for (unsigned I = 0; I < StoreOriginSize / IntptrSize; ++I) {
+      Value *Ptr =
+          I ? IRB.CreateConstGEP1_32(DFS.IntptrTy, IntptrStoreOriginPtr, I)
+            : IntptrStoreOriginPtr;
+      IRB.CreateAlignedStore(IntptrOrigin, Ptr, CurrentAlignment);
+      Ofs += IntptrSize / OriginSize;
+      CurrentAlignment = IntptrAlignment;
+    }
+  }
+
+  for (unsigned I = Ofs; I < (StoreOriginSize + OriginSize - 1) / OriginSize;
+       ++I) {
+    Value *GEP = I ? IRB.CreateConstGEP1_32(DFS.OriginTy, StoreOriginAddr, I)
+                   : StoreOriginAddr;
+    IRB.CreateAlignedStore(Origin, GEP, CurrentAlignment);
+    CurrentAlignment = MinOriginAlignment;
+  }
+}
+
+Value *DFSanFunction::convertToBool(Value *V, IRBuilder<> &IRB,
+                                    const Twine &Name) {
+  Type *VTy = V->getType();
+  assert(VTy->isIntegerTy());
+  if (VTy->getIntegerBitWidth() == 1)
+    // Just converting a bool to a bool, so do nothing.
+    return V;
+  return IRB.CreateICmpNE(V, ConstantInt::get(VTy, 0), Name);
+}
+
+void DFSanFunction::storeOrigin(Instruction *Pos, Value *Addr, uint64_t Size,
+                                Value *Shadow, Value *Origin,
+                                Value *StoreOriginAddr, Align InstAlignment) {
+  // Do not write origins for zero shadows because we do not trace origins for
+  // untainted sinks.
+  const Align OriginAlignment = getOriginAlign(InstAlignment);
+  Value *CollapsedShadow = collapseToPrimitiveShadow(Shadow, Pos);
+  IRBuilder<> IRB(Pos);
+  if (auto *ConstantShadow = dyn_cast<Constant>(CollapsedShadow)) {
+    if (!ConstantShadow->isZeroValue())
+      paintOrigin(IRB, updateOrigin(Origin, IRB), StoreOriginAddr, Size,
+                  OriginAlignment);
+    return;
+  }
+
+  if (shouldInstrumentWithCall()) {
+    IRB.CreateCall(DFS.DFSanMaybeStoreOriginFn,
+                   {CollapsedShadow,
+                    IRB.CreatePointerCast(Addr, IRB.getInt8PtrTy()),
+                    ConstantInt::get(DFS.IntptrTy, Size), Origin});
+  } else {
+    Value *Cmp = convertToBool(CollapsedShadow, IRB, "_dfscmp");
+    Instruction *CheckTerm = SplitBlockAndInsertIfThen(
+        Cmp, &*IRB.GetInsertPoint(), false, DFS.OriginStoreWeights, &DT);
+    IRBuilder<> IRBNew(CheckTerm);
+    paintOrigin(IRBNew, updateOrigin(Origin, IRBNew), StoreOriginAddr, Size,
+                OriginAlignment);
+    ++NumOriginStores;
+  }
+}
+
 void DFSanFunction::storeZeroPrimitiveShadow(Value *Addr, uint64_t Size,
                                              Align ShadowAlign,
                                              Instruction *Pos) {
@@ -2226,30 +2487,49 @@ void DFSanFunction::storeZeroPrimitiveShadow(Value *Addr, uint64_t Size,
   // Do not write origins for 0 shadows because we do not trace origins for
   // untainted sinks.
 }
-void DFSanFunction::storePrimitiveShadow(Value *Addr, uint64_t Size,
-                                         Align Alignment,
-                                         Value *PrimitiveShadow,
-                                         Instruction *Pos) {
+
+void DFSanFunction::storePrimitiveShadowOrigin(Value *Addr, uint64_t Size,
+                                               Align InstAlignment,
+                                               Value *PrimitiveShadow,
+                                               Value *Origin,
+                                               Instruction *Pos) {
+  const bool ShouldTrackOrigins = DFS.shouldTrackOrigins() && Origin;
+
   if (AllocaInst *AI = dyn_cast<AllocaInst>(Addr)) {
-    const auto I = AllocaShadowMap.find(AI);
-    if (I != AllocaShadowMap.end()) {
+    const auto SI = AllocaShadowMap.find(AI);
+    if (SI != AllocaShadowMap.end()) {
       IRBuilder<> IRB(Pos);
-      IRB.CreateStore(PrimitiveShadow, I->second);
+      IRB.CreateStore(PrimitiveShadow, SI->second);
+
+      // Do not write origins for 0 shadows because we do not trace origins for
+      // untainted sinks.
+      if (ShouldTrackOrigins && !DFS.isZeroShadow(PrimitiveShadow)) {
+        const auto OI = AllocaOriginMap.find(AI);
+        assert(OI != AllocaOriginMap.end() && Origin);
+        IRB.CreateStore(Origin, OI->second);
+      }
       return;
     }
   }
 
-  const Align ShadowAlign(Alignment.value() * DFS.ShadowWidthBytes);
+  const Align ShadowAlign = getShadowAlign(InstAlignment);
   if (DFS.isZeroShadow(PrimitiveShadow)) {
     storeZeroPrimitiveShadow(Addr, Size, ShadowAlign, Pos);
     return;
   }
 
   IRBuilder<> IRB(Pos);
-  Value *ShadowAddr = DFS.getShadowAddress(Addr, Pos);
-  const unsigned ShadowVecSize = 128 / DFS.ShadowWidthBits;
+  Value *ShadowAddr, *OriginAddr;
+  std::tie(ShadowAddr, OriginAddr) =
+      DFS.getShadowOriginAddress(Addr, InstAlignment, Pos);
+
+  const unsigned ShadowVecSize = 8;
+  assert(ShadowVecSize * DFS.ShadowWidthBits <= 128 &&
+         "Shadow vector is too large!");
+
   uint64_t Offset = 0;
-  if (Size >= ShadowVecSize) {
+  uint64_t LeftSize = Size;
+  if (LeftSize >= ShadowVecSize) {
     auto *ShadowVecTy =
         FixedVectorType::get(DFS.PrimitiveShadowTy, ShadowVecSize);
     Value *ShadowVec = UndefValue::get(ShadowVecTy);
@@ -2264,17 +2544,22 @@ void DFSanFunction::storePrimitiveShadow(Value *Addr, uint64_t Size,
       Value *CurShadowVecAddr =
           IRB.CreateConstGEP1_32(ShadowVecTy, ShadowVecAddr, Offset);
       IRB.CreateAlignedStore(ShadowVec, CurShadowVecAddr, ShadowAlign);
-      Size -= ShadowVecSize;
+      LeftSize -= ShadowVecSize;
       ++Offset;
-    } while (Size >= ShadowVecSize);
+    } while (LeftSize >= ShadowVecSize);
     Offset *= ShadowVecSize;
   }
-  while (Size > 0) {
+  while (LeftSize > 0) {
     Value *CurShadowAddr =
         IRB.CreateConstGEP1_32(DFS.PrimitiveShadowTy, ShadowAddr, Offset);
     IRB.CreateAlignedStore(PrimitiveShadow, CurShadowAddr, ShadowAlign);
-    --Size;
+    --LeftSize;
     ++Offset;
+  }
+
+  if (ShouldTrackOrigins) {
+    storeOrigin(Pos, Addr, Size, PrimitiveShadow, Origin, OriginAddr,
+                InstAlignment);
   }
 }
 
@@ -2310,19 +2595,35 @@ void DFSanVisitor::visitStoreInst(StoreInst &SI) {
   if (SI.isAtomic())
     SI.setOrdering(addReleaseOrdering(SI.getOrdering()));
 
-  const Align Alignment = ClPreserveAlignment ? SI.getAlign() : Align(1);
+  const bool ShouldTrackOrigins =
+      DFSF.DFS.shouldTrackOrigins() && !SI.isAtomic();
+  std::vector<Value *> Shadows;
+  std::vector<Value *> Origins;
 
   Value *Shadow =
       SI.isAtomic() ? DFSF.DFS.getZeroShadow(Val) : DFSF.getShadow(Val);
+
+  if (ShouldTrackOrigins) {
+    Shadows.push_back(Shadow);
+    Origins.push_back(DFSF.getOrigin(Val));
+  }
+
   Value *PrimitiveShadow;
   if (ClCombinePointerLabelsOnStore) {
     Value *PtrShadow = DFSF.getShadow(SI.getPointerOperand());
+    if (ShouldTrackOrigins) {
+      Shadows.push_back(PtrShadow);
+      Origins.push_back(DFSF.getOrigin(SI.getPointerOperand()));
+    }
     PrimitiveShadow = DFSF.combineShadows(Shadow, PtrShadow, &SI);
   } else {
     PrimitiveShadow = DFSF.collapseToPrimitiveShadow(Shadow, &SI);
   }
-  DFSF.storePrimitiveShadow(SI.getPointerOperand(), Size, Alignment,
-                            PrimitiveShadow, &SI);
+  Value *Origin = nullptr;
+  if (ShouldTrackOrigins)
+    Origin = DFSF.combineOrigins(Shadows, Origins, &SI);
+  DFSF.storePrimitiveShadowOrigin(SI.getPointerOperand(), Size, SI.getAlign(),
+                                  PrimitiveShadow, Origin, &SI);
   if (ClEventCallbacks) {
     IRBuilder<> IRB(&SI);
     Value *Addr8 = IRB.CreateBitCast(SI.getPointerOperand(), DFSF.DFS.Int8Ptr);
@@ -2346,6 +2647,7 @@ void DFSanVisitor::visitCASOrRMW(Align InstAlignment, Instruction &I) {
   const Align ShadowAlign = DFSF.getShadowAlign(InstAlignment);
   DFSF.storeZeroPrimitiveShadow(Addr, Size, ShadowAlign, &I);
   DFSF.setShadow(&I, DFSF.DFS.getZeroShadow(&I));
+  DFSF.setOrigin(&I, DFSF.DFS.ZeroOrigin);
 }
 
 void DFSanVisitor::visitAtomicRMWInst(AtomicRMWInst &I) {
@@ -2518,6 +2820,17 @@ void DFSanVisitor::visitMemSetInst(MemSetInst &I) {
 
 void DFSanVisitor::visitMemTransferInst(MemTransferInst &I) {
   IRBuilder<> IRB(&I);
+
+  // CopyOrMoveOrigin transfers origins by refering to their shadows. So we
+  // need to move origins before moving shadows.
+  if (DFSF.DFS.shouldTrackOrigins()) {
+    IRB.CreateCall(
+        DFSF.DFS.DFSanMemOriginTransferFn,
+        {IRB.CreatePointerCast(I.getArgOperand(0), IRB.getInt8PtrTy()),
+         IRB.CreatePointerCast(I.getArgOperand(1), IRB.getInt8PtrTy()),
+         IRB.CreateIntCast(I.getArgOperand(2), DFSF.DFS.IntptrTy, false)});
+  }
+
   Value *RawDestShadow = DFSF.DFS.getShadowAddress(I.getDest(), &I);
   Value *SrcShadow = DFSF.DFS.getShadowAddress(I.getSource(), &I);
   Value *LenShadow =
@@ -2938,8 +3251,19 @@ void DFSanVisitor::visitPHINode(PHINode &PN) {
   for (BasicBlock *BB : PN.blocks())
     ShadowPN->addIncoming(UndefShadow, BB);
 
-  DFSF.PHIFixups.push_back(std::make_pair(&PN, ShadowPN));
   DFSF.setShadow(&PN, ShadowPN);
+
+  PHINode *OriginPN = nullptr;
+  if (DFSF.DFS.shouldTrackOrigins()) {
+    OriginPN =
+        PHINode::Create(DFSF.DFS.OriginTy, PN.getNumIncomingValues(), "", &PN);
+    Value *UndefOrigin = UndefValue::get(DFSF.DFS.OriginTy);
+    for (BasicBlock *BB : PN.blocks())
+      OriginPN->addIncoming(UndefOrigin, BB);
+    DFSF.setOrigin(&PN, OriginPN);
+  }
+
+  DFSF.PHIFixups.push_back({&PN, ShadowPN, OriginPN});
 }
 
 namespace {

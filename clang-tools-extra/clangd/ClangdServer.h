@@ -12,10 +12,11 @@
 #include "../clang-tidy/ClangTidyOptions.h"
 #include "CodeComplete.h"
 #include "ConfigProvider.h"
+#include "Diagnostics.h"
 #include "DraftStore.h"
+#include "FeatureModule.h"
 #include "GlobalCompilationDatabase.h"
 #include "Hover.h"
-#include "Module.h"
 #include "Protocol.h"
 #include "SemanticHighlighting.h"
 #include "TUScheduler.h"
@@ -28,6 +29,7 @@
 #include "support/Cancellation.h"
 #include "support/Function.h"
 #include "support/MemoryTree.h"
+#include "support/Path.h"
 #include "support/ThreadsafeFS.h"
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Core/Replacement.h"
@@ -36,9 +38,11 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include <functional>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace clang {
 namespace clangd {
@@ -63,6 +67,8 @@ public:
     virtual ~Callbacks() = default;
 
     /// Called by ClangdServer when \p Diagnostics for \p File are ready.
+    /// These pushed diagnostics might correspond to an older version of the
+    /// file, they do not interfere with "pull-based" ClangdServer::diagnostics.
     /// May be called concurrently for separate files, not for a single file.
     virtual void onDiagnosticsReady(PathRef File, llvm::StringRef Version,
                                     std::vector<Diag> Diagnostics) {}
@@ -74,6 +80,14 @@ public:
     /// Not called concurrently.
     virtual void
     onBackgroundIndexProgress(const BackgroundQueue::Stats &Stats) {}
+
+    /// Called when the meaning of a source code may have changed without an
+    /// edit. Usually clients assume that responses to requests are valid until
+    /// they next edit the file. If they're invalidated at other times, we
+    /// should tell the client. In particular, when an asynchronous preamble
+    /// build finishes, we can provide more accurate semantic tokens, so we
+    /// should tell the client to refresh.
+    virtual void onSemanticsMaybeChanged(PathRef File) {}
   };
   /// Creates a context provider that loads and installs config.
   /// Errors in loading config are reported as diagnostics via Callbacks.
@@ -137,6 +151,12 @@ public:
         /*RebuildRatio=*/1,
     };
 
+    /// Cancel certain requests if the file changes before they begin running.
+    /// This is useful for "transient" actions like enumerateTweaks that were
+    /// likely implicitly generated, and avoids redundant work if clients forget
+    /// to cancel. Clients that always cancel stale requests should clear this.
+    bool ImplicitCancellation = true;
+
     /// Clangd will execute compiler drivers matching one of these globs to
     /// fetch system include path.
     std::vector<std::string> QueryDriverGlobs;
@@ -144,7 +164,7 @@ public:
     /// Enable preview of FoldingRanges feature.
     bool FoldingRanges = false;
 
-    ModuleSet *Modules = nullptr;
+    FeatureModuleSet *FeatureModules = nullptr;
 
     explicit operator TUScheduler::Options() const;
   };
@@ -163,13 +183,13 @@ public:
                const Options &Opts, Callbacks *Callbacks = nullptr);
   ~ClangdServer();
 
-  /// Gets the installed module of a given type, if any.
-  /// This exposes access the public interface of modules that have one.
-  template <typename Mod> Mod *getModule() {
-    return Modules ? Modules->get<Mod>() : nullptr;
+  /// Gets the installed feature module of a given type, if any.
+  /// This exposes access the public interface of feature modules that have one.
+  template <typename Mod> Mod *featureModule() {
+    return FeatureModules ? FeatureModules->get<Mod>() : nullptr;
   }
-  template <typename Mod> const Mod *getModule() const {
-    return Modules ? Modules->get<Mod>() : nullptr;
+  template <typename Mod> const Mod *featureModule() const {
+    return FeatureModules ? FeatureModules->get<Mod>() : nullptr;
   }
 
   /// Add a \p File to the list of tracked C++ files or update the contents if
@@ -241,6 +261,9 @@ public:
   /// Resolve incoming calls for a given call hierarchy item.
   void incomingCalls(const CallHierarchyItem &Item,
                      Callback<std::vector<CallHierarchyIncomingCall>>);
+
+  /// Resolve inlay hints for a given document.
+  void inlayHints(PathRef File, Callback<std::vector<InlayHint>>);
 
   /// Retrieve the top symbols from the workspace matching a query.
   void workspaceSymbols(StringRef Query, int Limit,
@@ -330,6 +353,14 @@ public:
   void customAction(PathRef File, llvm::StringRef Name,
                     Callback<InputsAndAST> Action);
 
+  /// Fetches diagnostics for current version of the \p File. This might fail if
+  /// server is busy (building a preamble) and would require a long time to
+  /// prepare diagnostics. If it fails, clients should wait for
+  /// onSemanticsMaybeChanged and then retry.
+  /// These 'pulled' diagnostics do not interfere with the diagnostics 'pushed'
+  /// to Callbacks::onDiagnosticsReady, and clients may use either or both.
+  void diagnostics(PathRef File, Callback<std::vector<Diag>> CB);
+
   /// Returns estimated memory usage and other statistics for each of the
   /// currently open files.
   /// Overall memory usage of clangd may be significantly more than reported
@@ -339,7 +370,9 @@ public:
   /// FIXME: those metrics might be useful too, we should add them.
   llvm::StringMap<TUScheduler::FileStats> fileStats() const;
 
-  llvm::Optional<std::string> getDraft(PathRef File) const;
+  /// Gets the contents of a currently tracked file. Returns nullptr if the file
+  /// isn't being tracked.
+  std::shared_ptr<const std::string> getDraft(PathRef File) const;
 
   // Blocks the main thread until the server is idle. Only for use in tests.
   // Returns false if the timeout expires.
@@ -352,7 +385,7 @@ public:
   void profile(MemoryTree &MT) const;
 
 private:
-  ModuleSet *Modules;
+  FeatureModuleSet *FeatureModules;
   const GlobalCompilationDatabase &CDB;
   const ThreadsafeFS &TFS;
 
@@ -380,11 +413,14 @@ private:
 
   llvm::Optional<std::string> WorkspaceRoot;
   llvm::Optional<TUScheduler> WorkScheduler;
+  // Invalidation policy used for actions that we assume are "transient".
+  TUScheduler::ASTActionInvalidation Transient;
 
   // Store of the current versions of the open documents.
   // Only written from the main thread (despite being threadsafe).
-  // FIXME: TUScheduler also keeps these, unify?
   DraftStore DraftMgr;
+
+  std::unique_ptr<ThreadsafeFS> DirtyFS;
 };
 
 } // namespace clangd

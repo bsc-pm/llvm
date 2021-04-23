@@ -50,6 +50,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -91,14 +92,11 @@ static bool findRefEdges(ModuleSummaryIndex &Index, const User *CurUser,
                          SmallPtrSet<const User *, 8> &Visited) {
   bool HasBlockAddress = false;
   SmallVector<const User *, 32> Worklist;
-  Worklist.push_back(CurUser);
+  if (Visited.insert(CurUser).second)
+    Worklist.push_back(CurUser);
 
   while (!Worklist.empty()) {
     const User *U = Worklist.pop_back_val();
-
-    if (!Visited.insert(U).second)
-      continue;
-
     const auto *CB = dyn_cast<CallBase>(U);
 
     for (const auto &OI : U->operands()) {
@@ -117,7 +115,8 @@ static bool findRefEdges(ModuleSummaryIndex &Index, const User *CurUser,
           RefEdges.insert(Index.getOrInsertValueInfo(GV));
         continue;
       }
-      Worklist.push_back(Operand);
+      if (Visited.insert(Operand).second)
+        Worklist.push_back(Operand);
     }
   }
   return HasBlockAddress;
@@ -178,11 +177,7 @@ static void addIntrinsicToSummary(
     // Intrinsics that are assumed are relevant only to the devirtualization
     // pass, not the type test lowering pass.
     bool HasNonAssumeUses = llvm::any_of(CI->uses(), [](const Use &CIU) {
-      auto *AssumeCI = dyn_cast<CallInst>(CIU.getUser());
-      if (!AssumeCI)
-        return true;
-      Function *F = AssumeCI->getCalledFunction();
-      return !F || F->getIntrinsicID() != Intrinsic::assume;
+      return !isa<AssumeInst>(CIU.getUser());
     });
     if (HasNonAssumeUses)
       TypeTests.insert(Guid);

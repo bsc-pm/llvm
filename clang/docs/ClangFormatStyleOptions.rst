@@ -37,7 +37,7 @@ The configuration file can consist of several sections each having different
 ``Language:`` parameter denoting the programming language this section of the
 configuration is targeted at. See the description of the **Language** option
 below for the list of supported languages. The first section may have no
-language set, it will set the default style options for all lanugages.
+language set, it will set the default style options for all languages.
 Configuration sections for specific language will override options set in the
 default section.
 
@@ -2128,6 +2128,56 @@ the configuration (without a prefix: ``Auto``).
 **DisableFormat** (``bool``)
   Disables formatting completely.
 
+**EmptyLineAfterAccessModifier** (``EmptyLineAfterAccessModifierStyle``)
+  Defines when to put an empty line after access modifiers.
+  ``EmptyLineBeforeAccessModifier`` configuration handles the number of
+  empty lines between two access modifiers.
+
+  Possible values:
+
+  * ``ELAAMS_Never`` (in configuration: ``Never``)
+    Remove all empty lines after access modifiers.
+
+    .. code-block:: c++
+
+      struct foo {
+      private:
+        int i;
+      protected:
+        int j;
+        /* comment */
+      public:
+        foo() {}
+      private:
+      protected:
+      };
+
+  * ``ELAAMS_Leave`` (in configuration: ``Leave``)
+    Keep existing empty lines after access modifiers.
+    MaxEmptyLinesToKeep is applied instead.
+
+  * ``ELAAMS_Always`` (in configuration: ``Always``)
+    Always add empty line after access modifiers if there are none.
+    MaxEmptyLinesToKeep is applied also.
+
+    .. code-block:: c++
+
+      struct foo {
+      private:
+
+        int i;
+      protected:
+
+        int j;
+        /* comment */
+      public:
+
+        foo() {}
+      private:
+
+      protected:
+      };
+
 **EmptyLineBeforeAccessModifier** (``EmptyLineBeforeAccessModifierStyle``)
   Defines in which cases to put empty line before access modifiers.
 
@@ -2194,8 +2244,6 @@ the configuration (without a prefix: ``Auto``).
 
       protected:
       };
-
-
 
 **ExperimentalAutoDetectBinPacking** (``bool``)
   If ``true``, clang-format detects whether function calls and
@@ -3085,8 +3133,8 @@ the configuration (without a prefix: ``Auto``).
        #include "A/b.h"
        #include "B/a.h"
 
-  * ``SI_CaseInsensitive`` (in configuration: ``CaseInsensitive``)
-    Includes are sorted in an ASCIIbetical or case insensitive fashion.
+  * ``SI_CaseSensitive`` (in configuration: ``CaseSensitive``)
+    Includes are sorted in an ASCIIbetical or case sensitive fashion.
 
     .. code-block:: c++
 
@@ -3096,8 +3144,8 @@ the configuration (without a prefix: ``Auto``).
        #include "B/a.h"
        #include "a/b.h"
 
-  * ``SI_CaseSensitive`` (in configuration: ``CaseSensitive``)
-    Includes are sorted in an alphabetical or case sensitive fashion.
+  * ``SI_CaseInsensitive`` (in configuration: ``CaseInsensitive``)
+    Includes are sorted in an alphabetical or case insensitive fashion.
 
     .. code-block:: c++
 
@@ -3713,7 +3761,7 @@ The result is:
           break;
       }
       if (condition)
-          do_somthing_completely_different();
+          do_something_completely_different();
 
       if (x == y)
       {

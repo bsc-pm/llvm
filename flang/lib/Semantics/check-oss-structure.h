@@ -26,7 +26,7 @@ using OSSClauseSet =
     Fortran::common::EnumSet<llvm::oss::Clause, llvm::oss::Clause_enumSize>;
 
 #define GEN_FLANG_DIRECTIVE_CLAUSE_SETS
-#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
 namespace llvm {
 namespace oss {
@@ -43,7 +43,7 @@ public:
   OSSStructureChecker(SemanticsContext &context)
       : DirectiveStructureChecker(context,
 #define GEN_FLANG_DIRECTIVE_CLAUSE_MAP
-#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
+#include "llvm/Frontend/OmpSs/OSS.inc"
         ) {
   }
 

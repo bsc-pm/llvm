@@ -166,28 +166,30 @@ struct logical_not : unary_function<T, bool>
 };
 
 template <class T> // <class T=void> in C++14
-struct bit_and : unary_function<T, bool>
+struct bit_and : binary_function<T, T, T>
 {
-    bool operator()(const T& x, const T& y) const;
+    T operator()(const T& x, const T& y) const;
 };
 
 template <class T> // <class T=void> in C++14
-struct bit_or : unary_function<T, bool>
+struct bit_or : binary_function<T, T, T>
 {
-    bool operator()(const T& x, const T& y) const;
+    T operator()(const T& x, const T& y) const;
 };
 
 template <class T> // <class T=void> in C++14
-struct bit_xor : unary_function<T, bool>
+struct bit_xor : binary_function<T, T, T>
 {
-    bool operator()(const T& x, const T& y) const;
+    T operator()(const T& x, const T& y) const;
 };
 
 template <class T=void> // C++14
-struct bit_xor : unary_function<T, bool>
+struct bit_not : unary_function<T, T>
 {
-    bool operator()(const T& x) const;
+    T operator()(const T& x) const;
 };
+
+struct identity; // C++20
 
 template <class Predicate>
 class unary_negate // deprecated in C++17
@@ -1650,7 +1652,7 @@ public:
 #ifndef _LIBCPP_NO_RTTI
     virtual const void* target(const type_info&) const _NOEXCEPT = 0;
     virtual const std::type_info& target_type() const _NOEXCEPT = 0;
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 };
 
 // __func implements __base for a given functor type.
@@ -1687,7 +1689,7 @@ public:
 #ifndef _LIBCPP_NO_RTTI
     virtual const void* target(const type_info&) const _NOEXCEPT;
     virtual const std::type_info& target_type() const _NOEXCEPT;
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 };
 
 template<class _Fp, class _Alloc, class _Rp, class ..._ArgTypes>
@@ -1753,7 +1755,7 @@ __func<_Fp, _Alloc, _Rp(_ArgTypes...)>::target_type() const _NOEXCEPT
     return typeid(_Fp);
 }
 
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 
 // __value_func creates a value-type from a __func.
 
@@ -2323,10 +2325,10 @@ public:
     virtual const std::type_info& target_type() const _NOEXCEPT {
         return typeid(__func::__block_type);
     }
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 };
 
-#endif  // _LIBCPP_HAS_EXTENSION_BLOCKS && !_LIBCPP_HAS_OBJC_ARC
+#endif // _LIBCPP_HAS_EXTENSION_BLOCKS && !_LIBCPP_HAS_OBJC_ARC
 
 }  // __function
 
@@ -2429,7 +2431,7 @@ public:
     const std::type_info& target_type() const _NOEXCEPT;
     template <typename _Tp> _Tp* target() _NOEXCEPT;
     template <typename _Tp> const _Tp* target() const _NOEXCEPT;
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 };
 
 #ifndef _LIBCPP_HAS_NO_DEDUCTION_GUIDES
@@ -2588,7 +2590,7 @@ function<_Rp(_ArgTypes...)>::target() const _NOEXCEPT
     return __f_.template target<_Tp>();
 }
 
-#endif  // _LIBCPP_NO_RTTI
+#endif // _LIBCPP_NO_RTTI
 
 template <class _Rp, class... _ArgTypes>
 inline _LIBCPP_INLINE_VISIBILITY
@@ -2980,17 +2982,9 @@ bind(_Fp&& __f, _BoundArgs&&... __bound_args)
     return type(_VSTD::forward<_Fp>(__f), _VSTD::forward<_BoundArgs>(__bound_args)...);
 }
 
-#endif  // _LIBCPP_CXX03_LANG
+#endif // _LIBCPP_CXX03_LANG
 
 #if _LIBCPP_STD_VER > 14
-
-template <class _Fn, class ..._Args>
-_LIBCPP_CONSTEXPR_AFTER_CXX17 invoke_result_t<_Fn, _Args...>
-invoke(_Fn&& __f, _Args&&... __args)
-    noexcept(is_nothrow_invocable_v<_Fn, _Args...>)
-{
-    return _VSTD::__invoke(_VSTD::forward<_Fn>(__f), _VSTD::forward<_Args>(__args)...);
-}
 
 template<class _Op, class _Tuple,
          class _Idxs = typename __make_tuple_indices<tuple_size<_Tuple>::value>::type>
@@ -3182,7 +3176,7 @@ __search(_RandomAccessIterator1 __first1, _RandomAccessIterator1 __last1,
 
 // default searcher
 template<class _ForwardIterator, class _BinaryPredicate = equal_to<>>
-class _LIBCPP_TYPE_VIS default_searcher {
+class _LIBCPP_TEMPLATE_VIS default_searcher {
 public:
     _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR_AFTER_CXX17
     default_searcher(_ForwardIterator __f, _ForwardIterator __l,
@@ -3215,22 +3209,19 @@ template <class _Tp>
 using unwrap_ref_decay_t = typename unwrap_ref_decay<_Tp>::type;
 #endif // > C++17
 
-template <class _Container, class _Predicate>
-inline typename _Container::size_type
-__libcpp_erase_if_container(_Container& __c, _Predicate __pred) {
-  typename _Container::size_type __old_size = __c.size();
+#if _LIBCPP_STD_VER > 17
+// [func.identity]
+struct identity {
+    template<class _Tp>
+    _LIBCPP_NODISCARD_EXT constexpr _Tp&& operator()(_Tp&& __t) const noexcept
+    {
+        return _VSTD::forward<_Tp>(__t);
+    }
 
-  const typename _Container::iterator __last = __c.end();
-  for (typename _Container::iterator __iter = __c.begin(); __iter != __last;) {
-    if (__pred(*__iter))
-      __iter = __c.erase(__iter);
-    else
-      ++__iter;
-  }
-
-  return __old_size - __c.size();
-}
+    using is_transparent = void;
+};
+#endif // _LIBCPP_STD_VER > 17
 
 _LIBCPP_END_NAMESPACE_STD
 
-#endif  // _LIBCPP_FUNCTIONAL
+#endif // _LIBCPP_FUNCTIONAL

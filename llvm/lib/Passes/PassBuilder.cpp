@@ -229,12 +229,12 @@
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Utils/MetaRenamer.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
+#include "llvm/Transforms/Utils/RelLookupTableConverter.h"
 #include "llvm/Transforms/Utils/StripGCRelocates.h"
 #include "llvm/Transforms/Utils/StripNonLineTableDebugInfo.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Utils/UnifyFunctionExitNodes.h"
 #include "llvm/Transforms/Utils/UnifyLoopExits.h"
-#include "llvm/Transforms/Utils/UniqueInternalLinkageNames.h"
 #include "llvm/Transforms/Vectorize/LoadStoreVectorizer.h"
 #include "llvm/Transforms/Vectorize/LoopVectorize.h"
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
@@ -292,7 +292,6 @@ PipelineTuningOptions::PipelineTuningOptions() {
   LicmMssaNoAccForPromotionCap = SetLicmMssaNoAccForPromotionCap;
   CallGraphProfile = true;
   MergeFunctions = false;
-  UniqueLinkageNames = false;
 }
 extern cl::opt<bool> ExtraVectorizerPasses;
 
@@ -303,6 +302,7 @@ extern cl::opt<bool> EnableHotColdSplit;
 extern cl::opt<bool> EnableIROutliner;
 extern cl::opt<bool> EnableOrderFileInstrumentation;
 extern cl::opt<bool> EnableCHR;
+extern cl::opt<bool> EnableLoopInterchange;
 extern cl::opt<bool> EnableUnrollAndJam;
 extern cl::opt<bool> EnableLoopFlatten;
 extern cl::opt<bool> RunNewGVN;
@@ -522,7 +522,7 @@ static void addAnnotationRemarksPass(ModulePassManager &MPM) {
 // Helper to check if the current compilation phase is preparing for LTO
 static bool isLTOPreLink(ThinOrFullLTOPhase Phase) {
   return Phase == ThinOrFullLTOPhase::ThinLTOPreLink ||
-         Phase == ThinOrFullLTOPhase::ThinLTOPreLink;
+         Phase == ThinOrFullLTOPhase::FullLTOPreLink;
 }
 
 // TODO: Investigate the cost/benefit of tail call elimination on debugging.
@@ -571,6 +571,11 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
   LPM1.addPass(LoopInstSimplifyPass());
   LPM1.addPass(LoopSimplifyCFGPass());
 
+  // Try to remove as much code from the loop header as possible,
+  // to reduce amount of IR that will have to be duplicated.
+  // TODO: Investigate promotion cap for O1.
+  LPM1.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
+
   LPM1.addPass(LoopRotatePass(/* Disable header duplication */ true,
                               isLTOPreLink(Phase)));
   // TODO: Investigate promotion cap for O1.
@@ -584,6 +589,10 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
     C(LPM2, Level);
 
   LPM2.addPass(LoopDeletionPass());
+
+  if (EnableLoopInterchange)
+    LPM2.addPass(LoopInterchangePass());
+
   // Do not enable unrolling in PreLinkThinLTO phase during sample PGO
   // because it changes IR to makes profile annotation in back compile
   // inaccurate. The normal unroller doesn't pay attention to forced full unroll
@@ -735,6 +744,11 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   LPM1.addPass(LoopInstSimplifyPass());
   LPM1.addPass(LoopSimplifyCFGPass());
 
+  // Try to remove as much code from the loop header as possible,
+  // to reduce amount of IR that will have to be duplicated.
+  // TODO: Investigate promotion cap for O1.
+  LPM1.addPass(LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap));
+
   // Disable header duplication in loop rotation at -Oz.
   LPM1.addPass(
       LoopRotatePass(Level != OptimizationLevel::Oz, isLTOPreLink(Phase)));
@@ -750,6 +764,10 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
     C(LPM2, Level);
 
   LPM2.addPass(LoopDeletionPass());
+
+  if (EnableLoopInterchange)
+    LPM2.addPass(LoopInterchangePass());
+
   // Do not enable unrolling in PreLinkThinLTO phase during sample PGO
   // because it changes IR to makes profile annotation in back compile
   // inaccurate. The normal unroller doesn't pay attention to forced full unroll
@@ -994,7 +1012,7 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level,
   // Try to perform OpenMP specific optimizations. This is a (quick!) no-op if
   // there are no OpenMP runtime calls present in the module.
   if (Level == OptimizationLevel::O2 || Level == OptimizationLevel::O3)
-    MainCGPipeline.addPass(OpenMPOptPass());
+    MainCGPipeline.addPass(OpenMPOptCGSCCPass());
 
   for (auto &C : CGSCCOptimizerLateEPCallbacks)
     C(MainCGPipeline, Level);
@@ -1011,11 +1029,6 @@ ModulePassManager
 PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
                                                ThinOrFullLTOPhase Phase) {
   ModulePassManager MPM(DebugLogging);
-
-  // Add UniqueInternalLinkageNames Pass which renames internal linkage
-  // symbols with unique names.
-  if (PTO.UniqueLinkageNames)
-    MPM.addPass(UniqueInternalLinkageNamesPass());
 
   // Place pseudo probe instrumentation as the first pass of the pipeline to
   // minimize the impact of optimization changes.
@@ -1056,10 +1069,12 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   // Create an early function pass manager to cleanup the output of the
   // frontend.
   FunctionPassManager EarlyFPM(DebugLogging);
+  // Lower llvm.expect to metadata before attempting transforms.
+  // Compare/branch metadata may alter the behavior of passes like SimplifyCFG.
+  EarlyFPM.addPass(LowerExpectIntrinsicPass());
   EarlyFPM.addPass(SimplifyCFGPass());
   EarlyFPM.addPass(SROA());
   EarlyFPM.addPass(EarlyCSEPass());
-  EarlyFPM.addPass(LowerExpectIntrinsicPass());
   if (PTO.Coroutines)
     EarlyFPM.addPass(CoroEarlyPass());
   if (Level == OptimizationLevel::O3)
@@ -1094,6 +1109,11 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
       MPM.addPass(
           PGOIndirectCallPromotion(true /* IsInLTO */, true /* SamplePGO */));
   }
+
+  // Try to perform OpenMP specific optimizations on the module. This is a
+  // (quick!) no-op if there are no OpenMP runtime calls present in the module.
+  if (Level == OptimizationLevel::O2 || Level == OptimizationLevel::O3)
+    MPM.addPass(OpenMPOptPass());
 
   if (AttributorRun & AttributorRunOption::MODULE)
     MPM.addPass(AttributorPass());
@@ -1407,6 +1427,8 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // ordering here.
   MPM.addPass(GlobalDCEPass());
   MPM.addPass(ConstantMergePass());
+
+  MPM.addPass(RelLookupTableConverterPass());
 
   return MPM;
 }
@@ -1870,11 +1892,6 @@ ModulePassManager PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
          "buildO0DefaultPipeline should only be used with O0");
 
   ModulePassManager MPM(DebugLogging);
-
-  // Add UniqueInternalLinkageNames Pass which renames internal linkage
-  // symbols with unique names.
-  if (PTO.UniqueLinkageNames)
-    MPM.addPass(UniqueInternalLinkageNamesPass());
 
   if (PGOOpt && (PGOOpt->Action == PGOOptions::IRInstr ||
                  PGOOpt->Action == PGOOptions::IRUse))

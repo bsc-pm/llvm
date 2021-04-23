@@ -120,9 +120,9 @@ define amdgpu_ps float @global_xchg_saddr_i32_rtn_2048(i8 addrspace(1)* inreg %s
 ;
 ; GFX10-LABEL: global_xchg_saddr_i32_rtn_2048:
 ; GFX10:       ; %bb.0:
-; GFX10-NEXT:    v_add_co_u32_e64 v0, s[0:1], s2, v0
+; GFX10-NEXT:    v_add_co_u32 v0, s[0:1], s2, v0
 ; GFX10-NEXT:    v_add_co_ci_u32_e64 v3, s[0:1], s3, 0, s[0:1]
-; GFX10-NEXT:    v_add_co_u32_e64 v2, vcc, 0x800, v0
+; GFX10-NEXT:    v_add_co_u32 v2, vcc, 0x800, v0
 ; GFX10-NEXT:    v_add_co_ci_u32_e32 v3, vcc, 0, v3, vcc
 ; GFX10-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
@@ -198,7 +198,6 @@ define amdgpu_ps float @global_xchg_saddr_uniform_ptr_in_vgprs_rtn(i32 %voffset,
 ; GFX10-NEXT:    v_readfirstlane_b32 s1, v3
 ; GFX10-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
-; GFX10-NEXT:    s_nop 2
 ; GFX10-NEXT:    global_atomic_swap v0, v0, v1, s[0:1] glc
 ; GFX10-NEXT:    s_waitcnt vmcnt(0)
 ; GFX10-NEXT:    buffer_gl0_inv
@@ -238,7 +237,6 @@ define amdgpu_ps float @global_xchg_saddr_uniform_ptr_in_vgprs_rtn_immoffset(i32
 ; GFX10-NEXT:    v_readfirstlane_b32 s1, v3
 ; GFX10-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
-; GFX10-NEXT:    s_nop 2
 ; GFX10-NEXT:    global_atomic_swap v0, v0, v1, s[0:1] offset:42 glc
 ; GFX10-NEXT:    s_waitcnt vmcnt(0)
 ; GFX10-NEXT:    buffer_gl0_inv
@@ -279,7 +277,6 @@ define amdgpu_ps void @global_xchg_saddr_uniform_ptr_in_vgprs_nortn(i32 %voffset
 ; GFX10-NEXT:    v_readfirstlane_b32 s1, v3
 ; GFX10-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
-; GFX10-NEXT:    s_nop 2
 ; GFX10-NEXT:    global_atomic_swap v0, v1, s[0:1]
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX10-NEXT:    buffer_gl0_inv
@@ -318,7 +315,6 @@ define amdgpu_ps void @global_xchg_saddr_uniform_ptr_in_vgprs_nortn_immoffset(i3
 ; GFX10-NEXT:    v_readfirstlane_b32 s1, v3
 ; GFX10-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
-; GFX10-NEXT:    s_nop 2
 ; GFX10-NEXT:    global_atomic_swap v0, v1, s[0:1] offset:42
 ; GFX10-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX10-NEXT:    buffer_gl0_inv

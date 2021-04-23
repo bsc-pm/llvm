@@ -58,9 +58,15 @@ struct IncomingArgHandler : public CallLowering::IncomingValueHandler {
       : IncomingValueHandler(MIRBuilder, MRI, AssignFn), StackUsed(0) {}
 
   Register getStackAddress(uint64_t Size, int64_t Offset,
-                           MachinePointerInfo &MPO) override {
+                           MachinePointerInfo &MPO,
+                           ISD::ArgFlagsTy Flags) override {
     auto &MFI = MIRBuilder.getMF().getFrameInfo();
-    int FI = MFI.CreateFixedObject(Size, Offset, true);
+
+    // Byval is assumed to be writable memory, but other stack passed arguments
+    // are not.
+    const bool IsImmutable = !Flags.isByVal();
+
+    int FI = MFI.CreateFixedObject(Size, Offset, IsImmutable);
     MPO = MachinePointerInfo::getFixedStack(MIRBuilder.getMF(), FI);
     auto AddrReg = MIRBuilder.buildFrameIndex(LLT::pointer(0, 64), FI);
     StackUsed = std::max(StackUsed, Size + Offset);
@@ -70,34 +76,7 @@ struct IncomingArgHandler : public CallLowering::IncomingValueHandler {
   void assignValueToReg(Register ValVReg, Register PhysReg,
                         CCValAssign &VA) override {
     markPhysRegUsed(PhysReg);
-    switch (VA.getLocInfo()) {
-    default:
-      MIRBuilder.buildCopy(ValVReg, PhysReg);
-      break;
-    case CCValAssign::LocInfo::ZExt: {
-      auto WideTy = LLT{VA.getLocVT()};
-      auto NarrowTy = MRI.getType(ValVReg);
-      MIRBuilder.buildTrunc(ValVReg,
-                            MIRBuilder.buildAssertZExt(
-                                WideTy, MIRBuilder.buildCopy(WideTy, PhysReg),
-                                NarrowTy.getSizeInBits()));
-      break;
-    }
-    case CCValAssign::LocInfo::SExt: {
-      auto WideTy = LLT{VA.getLocVT()};
-      auto NarrowTy = MRI.getType(ValVReg);
-      MIRBuilder.buildTrunc(ValVReg,
-                            MIRBuilder.buildAssertSExt(
-                                WideTy, MIRBuilder.buildCopy(WideTy, PhysReg),
-                                NarrowTy.getSizeInBits()));
-      break;
-    }
-    case CCValAssign::LocInfo::AExt: {
-      auto Copy = MIRBuilder.buildCopy(LLT{VA.getLocVT()}, PhysReg);
-      MIRBuilder.buildTrunc(ValVReg, Copy);
-      break;
-    }
-    }
+    IncomingValueHandler::assignValueToReg(ValVReg, PhysReg, VA);
   }
 
   void assignValueToAddress(Register ValVReg, Register Addr, uint64_t MemSize,
@@ -189,15 +168,19 @@ struct OutgoingArgHandler : public CallLowering::OutgoingValueHandler {
                      int FPDiff = 0)
       : OutgoingValueHandler(MIRBuilder, MRI, AssignFn), MIB(MIB),
         AssignFnVarArg(AssignFnVarArg), IsTailCall(IsTailCall), FPDiff(FPDiff),
-        StackSize(0), SPReg(0) {}
+        StackSize(0), SPReg(0),
+        Subtarget(MIRBuilder.getMF().getSubtarget<AArch64Subtarget>()) {}
 
   Register getStackAddress(uint64_t Size, int64_t Offset,
-                           MachinePointerInfo &MPO) override {
+                           MachinePointerInfo &MPO,
+                           ISD::ArgFlagsTy Flags) override {
     MachineFunction &MF = MIRBuilder.getMF();
     LLT p0 = LLT::pointer(0, 64);
     LLT s64 = LLT::scalar(64);
 
     if (IsTailCall) {
+      assert(!Flags.isByVal() && "byval unhandled with tail calls");
+
       Offset += FPDiff;
       int FI = MF.getFrameInfo().CreateFixedObject(Size, Offset, true);
       auto FIReg = MIRBuilder.buildFrameIndex(p0, FI);
@@ -258,7 +241,9 @@ struct OutgoingArgHandler : public CallLowering::OutgoingValueHandler {
                  ISD::ArgFlagsTy Flags,
                  CCState &State) override {
     bool Res;
-    if (Info.IsFixed)
+    bool IsCalleeWin = Subtarget.isCallingConvWin64(State.getCallingConv());
+    bool UseVarArgsCCForFixed = IsCalleeWin && State.isVarArg();
+    if (Info.IsFixed && !UseVarArgsCCForFixed)
       Res = AssignFn(ValNo, ValVT, LocVT, LocInfo, Flags, State);
     else
       Res = AssignFnVarArg(ValNo, ValVT, LocVT, LocInfo, Flags, State);
@@ -278,6 +263,8 @@ struct OutgoingArgHandler : public CallLowering::OutgoingValueHandler {
 
   // Cache the SP register vreg if we need it more than once in this call site.
   Register SPReg;
+
+  const AArch64Subtarget &Subtarget;
 };
 } // namespace
 
@@ -375,9 +362,14 @@ bool AArch64CallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
               return false;
             }
           } else {
-            // A scalar extend.
-            CurVReg =
-                MIRBuilder.buildInstr(ExtendOp, {NewLLT}, {CurVReg}).getReg(0);
+            // If the split EVT was a <1 x T> vector, and NewVT is T, then we
+            // don't have to do anything since we don't distinguish between the
+            // two.
+            if (NewLLT != MRI.getType(CurVReg)) {
+              // A scalar extend.
+              CurVReg = MIRBuilder.buildInstr(ExtendOp, {NewLLT}, {CurVReg})
+                            .getReg(0);
+            }
           }
         }
       }
@@ -446,12 +438,20 @@ static void handleMustTailForwardedRegisters(MachineIRBuilder &MIRBuilder,
   }
 }
 
-bool AArch64CallLowering::fallBackToDAGISel(const Function &F) const {
+bool AArch64CallLowering::fallBackToDAGISel(const MachineFunction &MF) const {
+  auto &F = MF.getFunction();
   if (isa<ScalableVectorType>(F.getReturnType()))
     return true;
-  return llvm::any_of(F.args(), [](const Argument &A) {
-    return isa<ScalableVectorType>(A.getType());
-  });
+  if (llvm::any_of(F.args(), [](const Argument &A) {
+        return isa<ScalableVectorType>(A.getType());
+      }))
+    return true;
+  const auto &ST = MF.getSubtarget<AArch64Subtarget>();
+  if (!ST.hasNEON() || !ST.hasFPARMv8()) {
+    LLVM_DEBUG(dbgs() << "Falling back to SDAG because we don't support no-NEON\n");
+    return true;
+  }
+  return false;
 }
 
 bool AArch64CallLowering::lowerFormalArguments(
@@ -468,7 +468,7 @@ bool AArch64CallLowering::lowerFormalArguments(
     if (DL.getTypeStoreSize(Arg.getType()).isZero())
       continue;
 
-    ArgInfo OrigArg{VRegs[i], Arg.getType()};
+    ArgInfo OrigArg{VRegs[i], Arg};
     setArgFlags(OrigArg, i + AttributeList::FirstArgIndex, DL, F);
 
     splitToValueTypes(OrigArg, SplitArgs, DL, F.getCallingConv());

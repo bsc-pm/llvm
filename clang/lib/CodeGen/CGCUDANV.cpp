@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CGCUDARuntime.h"
+#include "CGCXXABI.h"
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
 #include "clang/AST/Decl.h"
@@ -260,10 +261,15 @@ std::string CGNVCUDARuntime::getDeviceSideName(const NamedDecl *ND) {
   else
     GD = GlobalDecl(ND);
   std::string DeviceSideName;
-  if (DeviceMC->shouldMangleDeclName(ND)) {
+  MangleContext *MC;
+  if (CGM.getLangOpts().CUDAIsDevice)
+    MC = &CGM.getCXXABI().getMangleContext();
+  else
+    MC = DeviceMC.get();
+  if (MC->shouldMangleDeclName(ND)) {
     SmallString<256> Buffer;
     llvm::raw_svector_ostream Out(Buffer);
-    DeviceMC->mangleName(GD, Out);
+    MC->mangleName(GD, Out);
     DeviceSideName = std::string(Out.str());
   } else
     DeviceSideName = std::string(ND->getIdentifier()->getName());
@@ -331,7 +337,7 @@ void CGNVCUDARuntime::emitDeviceStubBodyNew(CodeGenFunction &CGF,
   IdentifierInfo &cudaLaunchKernelII =
       CGM.getContext().Idents.get(LaunchKernelName);
   FunctionDecl *cudaLaunchKernelFD = nullptr;
-  for (const auto &Result : DC->lookup(&cudaLaunchKernelII)) {
+  for (auto *Result : DC->lookup(&cudaLaunchKernelII)) {
     if (FunctionDecl *FD = dyn_cast<FunctionDecl>(Result))
       cudaLaunchKernelFD = FD;
   }
@@ -1021,9 +1027,8 @@ void CGNVCUDARuntime::handleVarRegistration(const VarDecl *D,
              D->getType()->isCUDADeviceBuiltinTextureType()) {
     // Builtin surfaces and textures and their template arguments are
     // also registered with CUDA runtime.
-    const ClassTemplateSpecializationDecl *TD =
-        cast<ClassTemplateSpecializationDecl>(
-            D->getType()->getAs<RecordType>()->getDecl());
+    const auto *TD = cast<ClassTemplateSpecializationDecl>(
+        D->getType()->castAs<RecordType>()->getDecl());
     const TemplateArgumentList &Args = TD->getTemplateArgs();
     if (TD->hasAttr<CUDADeviceBuiltinSurfaceTypeAttr>()) {
       assert(Args.size() == 2 &&
@@ -1084,6 +1089,28 @@ void CGNVCUDARuntime::transformManagedVars() {
 llvm::Function *CGNVCUDARuntime::finalizeModule() {
   if (CGM.getLangOpts().CUDAIsDevice) {
     transformManagedVars();
+
+    // Mark ODR-used device variables as compiler used to prevent it from being
+    // eliminated by optimization. This is necessary for device variables
+    // ODR-used by host functions. Sema correctly marks them as ODR-used no
+    // matter whether they are ODR-used by device or host functions.
+    //
+    // We do not need to do this if the variable has used attribute since it
+    // has already been added.
+    //
+    // Static device variables have been externalized at this point, therefore
+    // variables with LLVM private or internal linkage need not be added.
+    for (auto &&Info : DeviceVars) {
+      auto Kind = Info.Flags.getKind();
+      if (!Info.Var->isDeclaration() &&
+          !llvm::GlobalValue::isLocalLinkage(Info.Var->getLinkage()) &&
+          (Kind == DeviceVarFlags::Variable ||
+           Kind == DeviceVarFlags::Surface ||
+           Kind == DeviceVarFlags::Texture) &&
+          Info.D->isUsed() && !Info.D->hasAttr<UsedAttr>()) {
+        CGM.addCompilerUsedGlobal(Info.Var);
+      }
+    }
     return nullptr;
   }
   return makeModuleCtorFunction();

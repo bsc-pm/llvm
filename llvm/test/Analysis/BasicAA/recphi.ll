@@ -34,7 +34,7 @@ end:
 
 ; CHECK-LABEL: Function: notmust: 6 pointers, 0 call sites
 ; CHECK:        MustAlias:    [2 x i32]* %tab, i8* %0
-; CHECK:        PartialAlias: [2 x i32]* %tab, i32* %arrayidx
+; CHECK:        PartialAlias (off 4): [2 x i32]* %tab, i32* %arrayidx
 ; CHECK:        NoAlias:      i32* %arrayidx, i8* %0
 ; CHECK:        MustAlias:    [2 x i32]* %tab, i32* %arrayidx1
 ; CHECK:        MustAlias:    i32* %arrayidx1, i8* %0
@@ -89,7 +89,7 @@ if.end: ; preds = %f.exit
 ; CHECK:         MustAlias:    [10 x i32]* %tab, i8* %0
 ; CHECK:         MustAlias:    [10 x i32]* %tab, i32* %arrayidx
 ; CHECK:         MustAlias:    i32* %arrayidx, i8* %0
-; CHECK:         PartialAlias: [10 x i32]* %tab, i32* %arrayidx1
+; CHECK:         PartialAlias (off 36): [10 x i32]* %tab, i32* %arrayidx1
 ; CHECK:         NoAlias:      i32* %arrayidx1, i8* %0
 ; CHECK:         NoAlias:      i32* %arrayidx, i32* %arrayidx1
 ; CHECK:         MayAlias:     [10 x i32]* %tab, i32* %p.addr.05.i
@@ -141,7 +141,7 @@ if.end: ; preds = %f.exit
 ; CHECK-LABEL: Function: negative: 6 pointers, 1 call sites
 ; CHECK:         NoAlias:      [3 x i16]* %int_arr.10, i16** %argv.6.par
 ; CHECK:         NoAlias:      i16* %_tmp1, i16** %argv.6.par
-; CHECK:         PartialAlias: [3 x i16]* %int_arr.10, i16* %_tmp1
+; CHECK:         PartialAlias (off 4): [3 x i16]* %int_arr.10, i16* %_tmp1
 ; CHECK:         NoAlias:      i16* %ls1.9.0, i16** %argv.6.par
 ; CHECK:         MayAlias:     [3 x i16]* %int_arr.10, i16* %ls1.9.0
 ; CHECK:         MayAlias:     i16* %_tmp1, i16* %ls1.9.0
@@ -150,7 +150,7 @@ if.end: ; preds = %f.exit
 ; CHECK:         MayAlias:     i16* %_tmp1, i16* %_tmp7
 ; CHECK:         NoAlias:      i16* %_tmp7, i16* %ls1.9.0
 ; CHECK:         NoAlias:      i16* %_tmp11, i16** %argv.6.par
-; CHECK:         PartialAlias: [3 x i16]* %int_arr.10, i16* %_tmp11
+; CHECK:         PartialAlias (off 2): [3 x i16]* %int_arr.10, i16* %_tmp11
 ; CHECK:         NoAlias:      i16* %_tmp1, i16* %_tmp11
 ; CHECK:         MayAlias:     i16* %_tmp11, i16* %ls1.9.0
 ; CHECK:         MayAlias:     i16* %_tmp11, i16* %_tmp7
@@ -296,9 +296,9 @@ exit:
 ; CHECK: NoAlias:	i8* %a, i8* %p.base
 ; CHECK: NoAlias:	i8* %a, i8* %p.outer
 ; CHECK: NoAlias:	i8* %a, i8* %p.outer.next
-; CHECK: MayAlias:	i8* %a, i8* %p.inner
+; NO-PHI-VALUES: NoAlias:	i8* %a, i8* %p.inner
+; PHI-VALUES: MayAlias:	i8* %a, i8* %p.inner
 ; CHECK: NoAlias:	i8* %a, i8* %p.inner.next
-; TODO: %p.inner does not alias %a
 define void @nested_loop3(i1 %c, i1 %c2, i8* noalias %p.base) {
 entry:
   %a = alloca i8
@@ -351,9 +351,9 @@ exit:
 ; CHECK: NoAlias:	i8* %a, i8* %p.base
 ; CHECK: NoAlias:	i8* %a, i8* %p1
 ; CHECK: NoAlias:	i8* %a, i8* %p1.next
-; CHECK: MayAlias:	i8* %a, i8* %p2
+; NO-PHI-VALUES: NoAlias:	i8* %a, i8* %p2
+; PHI-VALUES: MayAlias:	i8* %a, i8* %p2
 ; CHECK: NoAlias:	i8* %a, i8* %p2.next
-; TODO: %p2 does not alias %a
 define void @sibling_loop2(i1 %c, i1 %c2, i8* noalias %p.base) {
 entry:
   %a = alloca i8

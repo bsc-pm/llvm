@@ -443,6 +443,32 @@ calls.
   }];
 }
 
+def MustTailDocs : Documentation {
+  let Category = DocCatStmt;
+  let Content = [{
+If a ``return`` statement is marked ``musttail``, this indicates that the
+compiler must generate a tail call for the program to be correct, even when
+optimizations are disabled. This guarantees that the call will not cause
+unbounded stack growth if it is part of a recursive cycle in the call graph.
+
+If the callee is a virtual function that is implemented by a thunk, there is
+no guarantee in general that the thunk tail-calls the implementation of the
+virtual function, so such a call in a recursive cycle can still result in
+unbounded stack growth.
+
+``clang::musttail`` can only be applied to a ``return`` statement whose value
+is the result of a function call (even functions returning void must use
+``return``, although no value is returned). The target function must have the
+same number of arguments as the caller. The types of the return value and all
+arguments must be similar according to C++ rules (differing only in cv
+qualifiers or array size), including the implicit "this" argument, if any.
+Any variables in scope, including all arguments to the function and the
+return value must be trivially destructible. The calling convention of the
+caller and callee must match, and they must not be variadic functions or have
+old style K&R C function declarations.
+  }];
+}
+
 def AssertCapabilityDocs : Documentation {
   let Category = DocCatFunction;
   let Heading = "assert_capability, assert_shared_capability";
@@ -1099,6 +1125,16 @@ def NoDebugDocs : Documentation {
 The ``nodebug`` attribute allows you to suppress debugging information for a
 function or method, for a variable that is not a parameter or a non-static
 data member, or for a typedef or using declaration.
+  }];
+}
+
+def StandaloneDebugDocs : Documentation {
+  let Category = DocCatVariable;
+  let Content = [{
+The ``standalone_debug`` attribute causes debug info to be emitted for a record
+type regardless of the debug info optimizations that are enabled with
+-fno-standalone-debug. This attribute only has an effect when debug info
+optimizations are enabled (e.g. with -fno-standalone-debug), and is C++-only.
   }];
 }
 
@@ -3016,16 +3052,55 @@ It is only supported when using the Microsoft C++ ABI.
 def LifetimeBoundDocs : Documentation {
   let Category = DocCatFunction;
   let Content = [{
-The ``lifetimebound`` attribute indicates that a resource owned by
-a function parameter or implicit object parameter
-is retained by the return value of the annotated function
-(or, for a parameter of a constructor, in the value of the constructed object).
-It is only supported in C++.
+The ``lifetimebound`` attribute on a function parameter or implicit object
+parameter indicates that objects that are referred to by that parameter may
+also be referred to by the return value of the annotated function (or, for a
+parameter of a constructor, by the value of the constructed object). It is only
+supported in C++.
 
-This attribute provides an experimental implementation of the facility
-described in the C++ committee paper `P0936R0 <http://wg21.link/p0936r0>`_,
-and is subject to change as the design of the corresponding functionality
-changes.
+By default, a reference is considered to refer to its referenced object, a
+pointer is considered to refer to its pointee, a ``std::initializer_list<T>``
+is considered to refer to its underlying array, and aggregates (arrays and
+simple ``struct``\s) are considered to refer to all objects that their
+transitive subobjects refer to.
+
+Clang warns if it is able to detect that an object or reference refers to
+another object with a shorter lifetime. For example, Clang will warn if a
+function returns a reference to a local variable, or if a reference is bound to
+a temporary object whose lifetime is not extended. By using the
+``lifetimebound`` attribute, this determination can be extended to look through
+user-declared functions. For example:
+
+.. code-block:: c++
+
+    // Returns m[key] if key is present, or default_value if not.
+    template<typename T, typename U>
+    const U &get_or_default(const std::map<T, U> &m [[clang::lifetimebound]],
+                            const T &key, /* note, not lifetimebound */
+                            const U &default_value [[clang::lifetimebound]]);
+
+    std::map<std::string, std::string> m;
+    // warning: temporary "bar"s that might be bound to local reference 'val'
+    // will be destroyed at the end of the full-expression
+    const std::string &val = get_or_default(m, "foo"s, "bar"s);
+
+    // No warning in this case.
+    std::string def_val = "bar"s;
+    const std::string &val = get_or_default(m, "foo"s, def_val);
+
+The attribute can be applied to the implicit ``this`` parameter of a member
+function by writing the attribute after the function type:
+
+.. code-block:: c++
+
+    struct string {
+      // The returned pointer should not outlive ``*this``.
+      const char *data() const [[clang::lifetimebound]];
+    };
+
+This attribute is inspired by the C++ committee paper `P0936R0
+<http://wg21.link/p0936r0>`_, but does not affect whether temporary objects
+have their lifetimes extended.
   }];
 }
 
@@ -3168,7 +3243,9 @@ def UnrollHintDocs : Documentation {
   let Content = [{
 Loop unrolling optimization hints can be specified with ``#pragma unroll`` and
 ``#pragma nounroll``. The pragma is placed immediately before a for, while,
-do-while, or c++11 range-based for loop.
+do-while, or c++11 range-based for loop. GCC's loop unrolling hints
+``#pragma GCC unroll`` and ``#pragma GCC nounroll`` are also supported and have
+identical semantics to ``#pragma unroll`` and ``#pragma nounroll``.
 
 Specifying ``#pragma unroll`` without a parameter directs the loop unroller to
 attempt to fully unroll the loop if the trip count is known at compile time and
@@ -4800,6 +4877,9 @@ def PatchableFunctionEntryDocs : Documentation {
 before the function entry and N-M NOPs after the function entry. This attribute
 takes precedence over the command line option ``-fpatchable-function-entry=N,M``.
 ``M`` defaults to 0 if omitted.
+
+This attribute is only supported on
+aarch64/aarch64-be/riscv32/riscv64/i386/x86-64 targets.
 }];
 }
 

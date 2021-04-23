@@ -17,6 +17,7 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 using namespace llvm;
 
@@ -414,6 +415,7 @@ codegen::RegisterCodeGenFlags::RegisterCodeGenFlags() {
       cl::values(
           clEnumValN(DebuggerKind::GDB, "gdb", "gdb"),
           clEnumValN(DebuggerKind::LLDB, "lldb", "lldb"),
+          clEnumValN(DebuggerKind::DBX, "dbx", "dbx"),
           clEnumValN(DebuggerKind::SCE, "sce", "SCE targets (e.g. PS4)")));
   CGBINDOPT(DebuggerTuningOpt);
 

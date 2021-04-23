@@ -58,6 +58,7 @@ public:
     bpfeb,          // eBPF or extended BPF or 64-bit BPF (big endian)
     csky,           // CSKY: csky
     hexagon,        // Hexagon: hexagon
+    m68k,           // M68k: Motorola 680x0 family
     mips,           // MIPS: mips, mipsallegrex, mipsr6
     mipsel,         // MIPSEL: mipsel, mipsallegrexe, mipsr6el
     mips64,         // MIPS64: mips64, mips64r6, mipsn32, mipsn32r6
@@ -84,8 +85,6 @@ public:
     xcore,          // XCore: xcore
     nvptx,          // NVPTX: 32-bit
     nvptx64,        // NVPTX: 64-bit
-    le32,           // le32: generic little-endian 32-bit CPU (PNaCl)
-    le64,           // le64: generic little-endian 64-bit CPU (PNaCl)
     amdil,          // AMDIL
     amdil64,        // AMDIL with 64-bit pointers
     hsail,          // AMD HSAIL
@@ -217,6 +216,7 @@ public:
     Musl,
     MuslEABI,
     MuslEABIHF,
+    MuslX32,
 
     MSVC,
     Itanium,
@@ -687,7 +687,8 @@ public:
   bool isMusl() const {
     return getEnvironment() == Triple::Musl ||
            getEnvironment() == Triple::MuslEABI ||
-           getEnvironment() == Triple::MuslEABIHF;
+           getEnvironment() == Triple::MuslEABIHF ||
+           getEnvironment() == Triple::MuslX32;
   }
 
   /// Tests whether the target is SPIR (32- or 64-bit).

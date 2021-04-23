@@ -23,7 +23,6 @@ def OmpSs : DirectiveLanguage {
   let clausePrefix = "OSSC_";
   let makeEnumAvailableInNamespace = true;
   let enableBitmaskEnumInNamespace = true;
-  let includeHeader = "llvm/Frontend/OmpSs/OSS.h.inc";
   let clauseEnumSetClass = "OSSClauseSet";
   let flangClauseBaseClass = "OSSClause";
 }

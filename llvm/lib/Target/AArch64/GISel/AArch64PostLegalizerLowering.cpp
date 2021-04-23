@@ -471,7 +471,7 @@ static bool isVShiftRImm(Register Reg, MachineRegisterInfo &MRI, LLT Ty,
                          int64_t &Cnt) {
   assert(Ty.isVector() && "vector shift count is not a vector type");
   MachineInstr *MI = MRI.getVRegDef(Reg);
-  auto Cst = getBuildVectorConstantSplat(*MI, MRI);
+  auto Cst = getAArch64VectorSplatScalar(*MI, MRI);
   if (!Cst)
     return false;
   Cnt = *Cst;
@@ -661,6 +661,8 @@ bool matchDupLane(MachineInstr &MI, MachineRegisterInfo &MRI,
   case 2:
     if (ScalarSize == 64)
       Opc = AArch64::G_DUPLANE64;
+    else if (ScalarSize == 32)
+      Opc = AArch64::G_DUPLANE32;
     break;
   case 4:
     if (ScalarSize == 32)
@@ -688,11 +690,155 @@ bool matchDupLane(MachineInstr &MI, MachineRegisterInfo &MRI,
 bool applyDupLane(MachineInstr &MI, MachineRegisterInfo &MRI,
                   MachineIRBuilder &B, std::pair<unsigned, int> &MatchInfo) {
   assert(MI.getOpcode() == TargetOpcode::G_SHUFFLE_VECTOR);
+  Register Src1Reg = MI.getOperand(1).getReg();
+  const LLT SrcTy = MRI.getType(Src1Reg);
+
   B.setInstrAndDebugLoc(MI);
   auto Lane = B.buildConstant(LLT::scalar(64), MatchInfo.second);
-  B.buildInstr(MatchInfo.first, {MI.getOperand(0).getReg()},
-               {MI.getOperand(1).getReg(), Lane});
+
+  Register DupSrc = MI.getOperand(1).getReg();
+  // For types like <2 x s32>, we can use G_DUPLANE32, with a <4 x s32> source.
+  // To do this, we can use a G_CONCAT_VECTORS to do the widening.
+  if (SrcTy == LLT::vector(2, LLT::scalar(32))) {
+    assert(MRI.getType(MI.getOperand(0).getReg()).getNumElements() == 2 &&
+           "Unexpected dest elements");
+    auto Undef = B.buildUndef(SrcTy);
+    DupSrc = B.buildConcatVectors(SrcTy.changeNumElements(4),
+                                  {Src1Reg, Undef.getReg(0)})
+                 .getReg(0);
+  }
+  B.buildInstr(MatchInfo.first, {MI.getOperand(0).getReg()}, {DupSrc, Lane});
   MI.eraseFromParent();
+  return true;
+}
+
+static bool matchBuildVectorToDup(MachineInstr &MI, MachineRegisterInfo &MRI) {
+  assert(MI.getOpcode() == TargetOpcode::G_BUILD_VECTOR);
+  auto Splat = getAArch64VectorSplat(MI, MRI);
+  if (!Splat)
+    return false;
+  if (Splat->isReg())
+    return true;
+  // Later, during selection, we'll try to match imported patterns using
+  // immAllOnesV and immAllZerosV. These require G_BUILD_VECTOR. Don't lower
+  // G_BUILD_VECTORs which could match those patterns.
+  int64_t Cst = Splat->getCst();
+  return (Cst != 0 && Cst != -1);
+}
+
+static bool applyBuildVectorToDup(MachineInstr &MI, MachineRegisterInfo &MRI,
+                                  MachineIRBuilder &B) {
+  B.setInstrAndDebugLoc(MI);
+  B.buildInstr(AArch64::G_DUP, {MI.getOperand(0).getReg()},
+               {MI.getOperand(1).getReg()});
+  MI.eraseFromParent();
+  return true;
+}
+
+/// \returns how many instructions would be saved by folding a G_ICMP's shift
+/// and/or extension operations.
+static unsigned getCmpOperandFoldingProfit(Register CmpOp,
+                                           const MachineRegisterInfo &MRI) {
+  // No instructions to save if there's more than one use or no uses.
+  if (!MRI.hasOneNonDBGUse(CmpOp))
+    return 0;
+
+  // FIXME: This is duplicated with the selector. (See: selectShiftedRegister)
+  auto IsSupportedExtend = [&](const MachineInstr &MI) {
+    if (MI.getOpcode() == TargetOpcode::G_SEXT_INREG)
+      return true;
+    if (MI.getOpcode() != TargetOpcode::G_AND)
+      return false;
+    auto ValAndVReg =
+        getConstantVRegValWithLookThrough(MI.getOperand(2).getReg(), MRI);
+    if (!ValAndVReg)
+      return false;
+    uint64_t Mask = ValAndVReg->Value.getZExtValue();
+    return (Mask == 0xFF || Mask == 0xFFFF || Mask == 0xFFFFFFFF);
+  };
+
+  MachineInstr *Def = getDefIgnoringCopies(CmpOp, MRI);
+  if (IsSupportedExtend(*Def))
+    return 1;
+
+  unsigned Opc = Def->getOpcode();
+  if (Opc != TargetOpcode::G_SHL && Opc != TargetOpcode::G_ASHR &&
+      Opc != TargetOpcode::G_LSHR)
+    return 0;
+
+  auto MaybeShiftAmt =
+      getConstantVRegValWithLookThrough(Def->getOperand(2).getReg(), MRI);
+  if (!MaybeShiftAmt)
+    return 0;
+  uint64_t ShiftAmt = MaybeShiftAmt->Value.getZExtValue();
+  MachineInstr *ShiftLHS =
+      getDefIgnoringCopies(Def->getOperand(1).getReg(), MRI);
+
+  // Check if we can fold an extend and a shift.
+  // FIXME: This is duplicated with the selector. (See:
+  // selectArithExtendedRegister)
+  if (IsSupportedExtend(*ShiftLHS))
+    return (ShiftAmt <= 4) ? 2 : 1;
+
+  LLT Ty = MRI.getType(Def->getOperand(0).getReg());
+  if (Ty.isVector())
+    return 0;
+  unsigned ShiftSize = Ty.getSizeInBits();
+  if ((ShiftSize == 32 && ShiftAmt <= 31) ||
+      (ShiftSize == 64 && ShiftAmt <= 63))
+    return 1;
+  return 0;
+}
+
+/// \returns true if it would be profitable to swap the LHS and RHS of a G_ICMP
+/// instruction \p MI.
+static bool trySwapICmpOperands(MachineInstr &MI,
+                                 const MachineRegisterInfo &MRI) {
+  assert(MI.getOpcode() == TargetOpcode::G_ICMP);
+  // Swap the operands if it would introduce a profitable folding opportunity.
+  // (e.g. a shift + extend).
+  //
+  //  For example:
+  //    lsl     w13, w11, #1
+  //    cmp     w13, w12
+  // can be turned into:
+  //    cmp     w12, w11, lsl #1
+
+  // Don't swap if there's a constant on the RHS, because we know we can fold
+  // that.
+  Register RHS = MI.getOperand(3).getReg();
+  auto RHSCst = getConstantVRegValWithLookThrough(RHS, MRI);
+  if (RHSCst && isLegalArithImmed(RHSCst->Value.getSExtValue()))
+    return false;
+
+  Register LHS = MI.getOperand(2).getReg();
+  auto Pred = static_cast<CmpInst::Predicate>(MI.getOperand(1).getPredicate());
+  auto GetRegForProfit = [&](Register Reg) {
+    MachineInstr *Def = getDefIgnoringCopies(Reg, MRI);
+    return isCMN(Def, Pred, MRI) ? Def->getOperand(2).getReg() : Reg;
+  };
+
+  // Don't have a constant on the RHS. If we swap the LHS and RHS of the
+  // compare, would we be able to fold more instructions?
+  Register TheLHS = GetRegForProfit(LHS);
+  Register TheRHS = GetRegForProfit(RHS);
+
+  // If the LHS is more likely to give us a folding opportunity, then swap the
+  // LHS and RHS.
+  return (getCmpOperandFoldingProfit(TheLHS, MRI) >
+          getCmpOperandFoldingProfit(TheRHS, MRI));
+}
+
+static bool applySwapICmpOperands(MachineInstr &MI,
+                                   GISelChangeObserver &Observer) {
+  auto Pred = static_cast<CmpInst::Predicate>(MI.getOperand(1).getPredicate());
+  Register LHS = MI.getOperand(2).getReg();
+  Register RHS = MI.getOperand(3).getReg();
+  Observer.changedInstr(MI);
+  MI.getOperand(1).setPredicate(CmpInst::getSwappedPredicate(Pred));
+  MI.getOperand(2).setReg(RHS);
+  MI.getOperand(3).setReg(LHS);
+  Observer.changedInstr(MI);
   return true;
 }
 

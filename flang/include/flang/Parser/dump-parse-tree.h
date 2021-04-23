@@ -728,7 +728,7 @@ public:
   }
 
 #define GEN_FLANG_DUMP_PARSE_TREE_CLAUSES
-#include "llvm/Frontend/OmpSs/OSS.cpp.inc"
+#include "llvm/Frontend/OmpSs/OSS.inc"
 
   NODE(parser, OSSDependClause)
   NODE(OSSDependClause, InOut)
@@ -842,7 +842,7 @@ protected:
   template <typename T> std::string AsFortran(const T &x) {
     std::string buf;
     llvm::raw_string_ostream ss{buf};
-    if constexpr (std::is_same_v<T, Expr>) {
+    if constexpr (HasTypedExpr<T>::value) {
       if (asFortran_ && x.typedExpr) {
         asFortran_->expr(ss, *x.typedExpr);
       }

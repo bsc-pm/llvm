@@ -18,9 +18,9 @@
 // global data tables
 ////////////////////////////////////////////////////////////////////////////////
 
-extern DEVICE
-    omptarget_nvptx_Queue<omptarget_nvptx_ThreadPrivateContext, OMP_STATE_COUNT>
-        omptarget_nvptx_device_State[MAX_SM];
+extern omptarget_nvptx_Queue<omptarget_nvptx_ThreadPrivateContext,
+                             OMP_STATE_COUNT>
+    omptarget_nvptx_device_State[MAX_SM];
 
 ////////////////////////////////////////////////////////////////////////////////
 // init entry points
@@ -88,11 +88,6 @@ EXTERN void __kmpc_spmd_kernel_init(int ThreadLimit,
   int threadId = GetThreadIdInBlock();
   if (threadId == 0) {
     usedSlotIdx = __kmpc_impl_smid() % MAX_SM;
-    parallelLevel[0] =
-        1 + (GetNumberOfThreadsInBlock() > 1 ? OMP_ACTIVE_PARALLEL_LEVEL : 0);
-  } else if (GetLaneId() == 0) {
-    parallelLevel[GetWarpId()] =
-        1 + (GetNumberOfThreadsInBlock() > 1 ? OMP_ACTIVE_PARALLEL_LEVEL : 0);
   }
   if (!RequiresOMPRuntime) {
     // Runtime is not required - exit.

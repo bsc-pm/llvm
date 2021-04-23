@@ -56,38 +56,6 @@ static bool ignoreCallingConv(LibFunc Func) {
          Func == LibFunc_llabs || Func == LibFunc_strlen;
 }
 
-static bool isCallingConvCCompatible(CallInst *CI) {
-  switch(CI->getCallingConv()) {
-  default:
-    return false;
-  case llvm::CallingConv::C:
-    return true;
-  case llvm::CallingConv::ARM_APCS:
-  case llvm::CallingConv::ARM_AAPCS:
-  case llvm::CallingConv::ARM_AAPCS_VFP: {
-
-    // The iOS ABI diverges from the standard in some cases, so for now don't
-    // try to simplify those calls.
-    if (Triple(CI->getModule()->getTargetTriple()).isiOS())
-      return false;
-
-    auto *FuncTy = CI->getFunctionType();
-
-    if (!FuncTy->getReturnType()->isPointerTy() &&
-        !FuncTy->getReturnType()->isIntegerTy() &&
-        !FuncTy->getReturnType()->isVoidTy())
-      return false;
-
-    for (auto Param : FuncTy->params()) {
-      if (!Param->isPointerTy() && !Param->isIntegerTy())
-        return false;
-    }
-    return true;
-  }
-  }
-  return false;
-}
-
 /// Return true if it is only used in equality comparisons with With.
 static bool isOnlyUsedInEqualityComparison(Value *V, Value *With) {
   for (User *U : V->users()) {
@@ -607,8 +575,10 @@ Value *LibCallSimplifier::optimizeStrNCpy(CallInst *CI, IRBuilderBase &B) {
   }
 
   if (SrcLen == 0) {
-    // strncpy(x, "", y) -> memset(align 1 x, '\0', y)
-    CallInst *NewCI = B.CreateMemSet(Dst, B.getInt8('\0'), Size, Align(1));
+    // strncpy(x, "", y) -> memset(x, '\0', y)
+    Align MemSetAlign =
+        CI->getAttributes().getParamAttributes(0).getAlignment().valueOrOne();
+    CallInst *NewCI = B.CreateMemSet(Dst, B.getInt8('\0'), Size, MemSetAlign);
     AttrBuilder ArgAttrs(CI->getAttributes().getParamAttributes(0));
     NewCI->setAttributes(NewCI->getAttributes().addParamAttributes(
         CI->getContext(), 0, ArgAttrs));
@@ -1704,20 +1674,12 @@ Value *LibCallSimplifier::optimizePow(CallInst *Pow, IRBuilderBase &B) {
   StringRef Name = Callee->getName();
   Type *Ty = Pow->getType();
   Module *M = Pow->getModule();
-  Value *Shrunk = nullptr;
   bool AllowApprox = Pow->hasApproxFunc();
   bool Ignored;
 
   // Propagate the math semantics from the call to any created instructions.
   IRBuilderBase::FastMathFlagGuard Guard(B);
   B.setFastMathFlags(Pow->getFastMathFlags());
-
-  // Shrink pow() to powf() if the arguments are single precision,
-  // unless the result is expected to be double precision.
-  if (UnsafeFPShrink && Name == TLI->getName(LibFunc_pow) &&
-      hasFloatVersion(Name))
-    Shrunk = optimizeBinaryDoubleFP(Pow, B, true);
-
   // Evaluate special cases related to the base.
 
   // pow(1.0, x) -> 1.0
@@ -1818,7 +1780,15 @@ Value *LibCallSimplifier::optimizePow(CallInst *Pow, IRBuilderBase &B) {
       return createPowWithIntegerExponent(Base, ExpoI, M, B);
   }
 
-  return Shrunk;
+  // Shrink pow() to powf() if the arguments are single precision,
+  // unless the result is expected to be double precision.
+  if (UnsafeFPShrink && Name == TLI->getName(LibFunc_pow) &&
+      hasFloatVersion(Name)) {
+    if (Value *Shrunk = optimizeBinaryDoubleFP(Pow, B, true))
+      return Shrunk;
+  }
+
+  return nullptr;
 }
 
 Value *LibCallSimplifier::optimizeExp2(CallInst *CI, IRBuilderBase &B) {
@@ -2418,7 +2388,7 @@ Value *LibCallSimplifier::optimizePrintFString(CallInst *CI, IRBuilderBase &B) {
   }
 
   // printf("foo\n") --> puts("foo")
-  if (FormatStr[FormatStr.size() - 1] == '\n' &&
+  if (FormatStr.back() == '\n' &&
       FormatStr.find('%') == StringRef::npos) { // No format characters.
     // Create a string literal with no \n on it.  We expect the constant merge
     // pass to be run after this pass, to merge duplicate strings.
@@ -2862,9 +2832,10 @@ Value *LibCallSimplifier::optimizeStringMemoryLibCall(CallInst *CI,
   // Check for string/memory library functions.
   if (TLI->getLibFunc(*Callee, Func) && TLI->has(Func)) {
     // Make sure we never change the calling convention.
-    assert((ignoreCallingConv(Func) ||
-            isCallingConvCCompatible(CI)) &&
-      "Optimizing string/memory libcall would change the calling convention");
+    assert(
+        (ignoreCallingConv(Func) ||
+         TargetLibraryInfoImpl::isCallingConvCCompatible(CI)) &&
+        "Optimizing string/memory libcall would change the calling convention");
     switch (Func) {
     case LibFunc_strcat:
       return optimizeStrCat(CI, Builder);
@@ -3048,7 +3019,7 @@ Value *LibCallSimplifier::optimizeCall(CallInst *CI, IRBuilderBase &Builder) {
 
   LibFunc Func;
   Function *Callee = CI->getCalledFunction();
-  bool isCallingConvC = isCallingConvCCompatible(CI);
+  bool IsCallingConvC = TargetLibraryInfoImpl::isCallingConvCCompatible(CI);
 
   SmallVector<OperandBundleDef, 2> OpBundles;
   CI->getOperandBundlesAsDefs(OpBundles);
@@ -3066,7 +3037,7 @@ Value *LibCallSimplifier::optimizeCall(CallInst *CI, IRBuilderBase &Builder) {
 
   // First, check for intrinsics.
   if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI)) {
-    if (!isCallingConvC)
+    if (!IsCallingConvC)
       return nullptr;
     // The FP intrinsics have corresponding constrained versions so we don't
     // need to check for the StrictFP attribute here.
@@ -3119,7 +3090,7 @@ Value *LibCallSimplifier::optimizeCall(CallInst *CI, IRBuilderBase &Builder) {
   // Then check for known library functions.
   if (TLI->getLibFunc(*Callee, Func) && TLI->has(Func)) {
     // We never change the calling convention.
-    if (!ignoreCallingConv(Func) && !isCallingConvC)
+    if (!ignoreCallingConv(Func) && !IsCallingConvC)
       return nullptr;
     if (Value *V = optimizeStringMemoryLibCall(CI, Builder))
       return V;
@@ -3503,7 +3474,7 @@ Value *FortifiedLibCallSimplifier::optimizeCall(CallInst *CI,
 
   LibFunc Func;
   Function *Callee = CI->getCalledFunction();
-  bool isCallingConvC = isCallingConvCCompatible(CI);
+  bool IsCallingConvC = TargetLibraryInfoImpl::isCallingConvCCompatible(CI);
 
   SmallVector<OperandBundleDef, 2> OpBundles;
   CI->getOperandBundlesAsDefs(OpBundles);
@@ -3517,7 +3488,7 @@ Value *FortifiedLibCallSimplifier::optimizeCall(CallInst *CI,
     return nullptr;
 
   // We never change the calling convention.
-  if (!ignoreCallingConv(Func) && !isCallingConvC)
+  if (!ignoreCallingConv(Func) && !IsCallingConvC)
     return nullptr;
 
   switch (Func) {

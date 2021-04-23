@@ -1214,6 +1214,15 @@ public:
   static CallBase *Create(CallBase *CB, ArrayRef<OperandBundleDef> Bundles,
                           Instruction *InsertPt = nullptr);
 
+  /// Create a clone of \p CB with the operand bundle with the tag matching
+  /// \p Bundle's tag replaced with Bundle, and insert it before \p InsertPt.
+  ///
+  /// The returned call instruction is identical \p CI in every way except that
+  /// the specified operand bundle has been replaced.
+  static CallBase *Create(CallBase *CB,
+                          OperandBundleDef Bundle,
+                          Instruction *InsertPt = nullptr);
+
   /// Create a clone of \p CB with operand bundle \p OB added.
   static CallBase *addOperandBundle(CallBase *CB, uint32_t ID,
                                     OperandBundleDef OB,
@@ -1546,6 +1555,15 @@ public:
     setAttributes(PAL);
   }
 
+  /// Removes noundef and other attributes that imply undefined behavior if a
+  /// `undef` or `poison` value is passed from the given argument.
+  void removeParamUndefImplyingAttrs(unsigned ArgNo) {
+    assert(ArgNo < getNumArgOperands() && "Out of bounds");
+    AttributeList PAL = getAttributes();
+    PAL = PAL.removeParamUndefImplyingAttributes(getContext(), ArgNo);
+    setAttributes(PAL);
+  }
+
   /// adds the dereferenceable attribute to the list of attributes.
   void addDereferenceableAttr(unsigned i, uint64_t Bytes) {
     AttributeList PAL = getAttributes();
@@ -1711,6 +1729,10 @@ public:
   /// Extract the alignment for a call or parameter (0=unknown).
   MaybeAlign getParamAlign(unsigned ArgNo) const {
     return Attrs.getParamAlignment(ArgNo);
+  }
+
+  MaybeAlign getParamStackAlign(unsigned ArgNo) const {
+    return Attrs.getParamStackAlignment(ArgNo);
   }
 
   /// Extract the byval type for a call or parameter.
@@ -2004,12 +2026,7 @@ public:
 
   /// Return true if this operand bundle user has operand bundles that
   /// may read from the heap.
-  bool hasReadingOperandBundles() const {
-    // Implementation note: this is a conservative implementation of operand
-    // bundle semantics, where *any* operand bundle forces a callsite to be at
-    // least readonly.
-    return hasOperandBundles();
-  }
+  bool hasReadingOperandBundles() const;
 
   /// Return true if this operand bundle user has operand bundles that
   /// may write to the heap.

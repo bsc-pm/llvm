@@ -654,7 +654,7 @@ void CoroCloner::salvageDebugInfo() {
       if (auto *DDI = dyn_cast<DbgDeclareInst>(&I))
         Worklist.push_back(DDI);
   for (DbgDeclareInst *DDI : Worklist)
-    coro::salvageDebugInfo(DbgPtrAllocaCache, DDI);
+    coro::salvageDebugInfo(DbgPtrAllocaCache, DDI, Shape.ReuseFrameSlot);
 
   // Remove all salvaged dbg.declare intrinsics that became
   // either unreachable or stale due to the CoroSplit transformation.
@@ -759,10 +759,12 @@ Value *CoroCloner::deriveNewFramePointer() {
   // with the active suspend. The frame is located as a tail to the async
   // context header.
   case coro::ABI::Async: {
-    auto *CalleeContext = NewF->getArg(Shape.AsyncLowering.ContextArgNo);
+    auto *ActiveAsyncSuspend = cast<CoroSuspendAsyncInst>(ActiveSuspend);
+    auto *CalleeContext =
+        NewF->getArg(ActiveAsyncSuspend->getStorageArgumentIndex());
     auto *FramePtrTy = Shape.FrameTy->getPointerTo();
-    auto *ProjectionFunc = cast<CoroSuspendAsyncInst>(ActiveSuspend)
-                               ->getAsyncContextProjectionFunction();
+    auto *ProjectionFunc =
+        ActiveAsyncSuspend->getAsyncContextProjectionFunction();
     auto DbgLoc =
         cast<CoroSuspendAsyncInst>(VMap[ActiveSuspend])->getDebugLoc();
     // Calling i8* (i8*)
@@ -845,12 +847,34 @@ void CoroCloner::create() {
   CloneFunctionInto(NewF, &OrigF, VMap,
                     CloneFunctionChangeType::LocalChangesOnly, Returns);
 
+  auto &Context = NewF->getContext();
+
+  // For async functions / continuations, adjust the scope line of the
+  // clone to the line number of the suspend point. The scope line is
+  // associated with all pre-prologue instructions. This avoids a jump
+  // in the linetable from the function declaration to the suspend point.
+  if (DISubprogram *SP = NewF->getSubprogram()) {
+    assert(SP != OrigF.getSubprogram() && SP->isDistinct());
+    if (ActiveSuspend)
+      if (auto DL = ActiveSuspend->getDebugLoc())
+        SP->setScopeLine(DL->getLine());
+    // Update the linkage name to reflect the modified symbol name. It
+    // is necessary to update the linkage name in Swift, since the
+    // mangling changes for resume functions. It might also be the
+    // right thing to do in C++, but due to a limitation in LLVM's
+    // AsmPrinter we can only do this if the function doesn't have an
+    // abstract specification, since the DWARF backend expects the
+    // abstract specification to contain the linkage name and asserts
+    // that they are identical.
+    if (!SP->getDeclaration() && SP->getUnit() &&
+        SP->getUnit()->getSourceLanguage() == dwarf::DW_LANG_Swift)
+      SP->replaceLinkageName(MDString::get(Context, NewF->getName()));
+  }
+
   NewF->setLinkage(savedLinkage);
   NewF->setVisibility(savedVisibility);
   NewF->setUnnamedAddr(savedUnnamedAddr);
   NewF->setDLLStorageClass(savedDLLStorageClass);
-
-  auto &Context = NewF->getContext();
 
   // Replace the attributes of the new function:
   auto OrigAttrs = NewF->getAttributes();
@@ -866,8 +890,13 @@ void CoroCloner::create() {
     addFramePointerAttrs(NewAttrs, Context, 0,
                          Shape.FrameSize, Shape.FrameAlign);
     break;
-  case coro::ABI::Async:
+  case coro::ABI::Async: {
+    // Transfer the original function's attributes.
+    auto FnAttrs = OrigF.getAttributes().getFnAttributes();
+    NewAttrs =
+        NewAttrs.addAttributes(Context, AttributeList::FunctionIndex, FnAttrs);
     break;
+  }
   case coro::ABI::Retcon:
   case coro::ABI::RetconOnce:
     // If we have a continuation prototype, just use its attributes,
@@ -1260,6 +1289,7 @@ static void handleNoSuspendCoroutine(coro::Shape &Shape) {
     } else {
       CoroBegin->replaceAllUsesWith(CoroBegin->getMem());
     }
+
     break;
   }
   case coro::ABI::Async:
@@ -1468,7 +1498,8 @@ static void replaceAsyncResumeFunction(CoroSuspendAsyncInst *Suspend,
   auto *Val = Builder.CreateBitOrPointerCast(Continuation, Int8PtrTy);
   ResumeIntrinsic->replaceAllUsesWith(Val);
   ResumeIntrinsic->eraseFromParent();
-  Suspend->setOperand(0, UndefValue::get(Int8PtrTy));
+  Suspend->setOperand(CoroSuspendAsyncInst::ResumeFunctionArg,
+                      UndefValue::get(Int8PtrTy));
 }
 
 /// Coerce the arguments in \p FnArgs according to \p FnTy in \p CallArgs.
@@ -1563,7 +1594,8 @@ static void splitAsyncCoroutine(Function &F, coro::Shape &Shape,
     // Insert the call to the tail call function and inline it.
     auto *Fn = Suspend->getMustTailCallFunction();
     SmallVector<Value *, 8> Args(Suspend->args());
-    auto FnArgs = ArrayRef<Value *>(Args).drop_front(3);
+    auto FnArgs = ArrayRef<Value *>(Args).drop_front(
+        CoroSuspendAsyncInst::MustTailCallFuncArg + 1);
     auto *TailCall =
         coro::createMustTailCall(Suspend->getDebugLoc(), Fn, FnArgs, Builder);
     Builder.CreateRetVoid();

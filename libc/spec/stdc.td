@@ -5,6 +5,7 @@ def StdC : StandardSpec<"stdc"> {
   RestrictedPtrType FILERestrictedPtr = RestrictedPtrType<FILE>;
   NamedType StructTmType = NamedType<"struct tm">;
   PtrType StructTmPtr = PtrType<StructTmType>;
+  PtrType TimeTTypePtr = PtrType<TimeTType>;
 
   HeaderSpec Assert = HeaderSpec<
       "assert.h",
@@ -361,6 +362,7 @@ def StdC : StandardSpec<"stdc"> {
           FunctionSpec<"fmaxf", RetValSpec<FloatType>, [ArgSpec<FloatType>, ArgSpec<FloatType>]>,
           FunctionSpec<"fmaxl", RetValSpec<LongDoubleType>, [ArgSpec<LongDoubleType>, ArgSpec<LongDoubleType>]>,
 
+          FunctionSpec<"fma", RetValSpec<DoubleType>, [ArgSpec<DoubleType>, ArgSpec<DoubleType>, ArgSpec<DoubleType>]>,
           FunctionSpec<"fmaf", RetValSpec<FloatType>, [ArgSpec<FloatType>, ArgSpec<FloatType>, ArgSpec<FloatType>]>,
 
           FunctionSpec<"frexp", RetValSpec<DoubleType>, [ArgSpec<DoubleType>, ArgSpec<IntPtr>]>,
@@ -597,6 +599,19 @@ def StdC : StandardSpec<"stdc"> {
       ],
       [], // Enumerations
       [
+          FunctionSpec<
+              "gmtime",
+              RetValSpec<StructTmPtr>,
+              [ArgSpec<TimeTTypePtr>]
+          >,
+          FunctionSpec<
+              "gmtime_r",
+              RetValSpec<StructTmPtr>,
+              [
+                  ArgSpec<TimeTTypePtr>,
+                  ArgSpec<StructTmPtr>,
+              ]
+          >,
           FunctionSpec<
               "mktime",
               RetValSpec<TimeTType>,

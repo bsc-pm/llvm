@@ -261,6 +261,9 @@ public:
     case llvm::Triple::arm:
       this->MCountName = "__mcount";
       break;
+    case llvm::Triple::riscv32:
+    case llvm::Triple::riscv64:
+      break;
     }
   }
 };
@@ -490,6 +493,9 @@ public:
     case llvm::Triple::ppc64le:
     case llvm::Triple::sparcv9:
       this->MCountName = "_mcount";
+      break;
+    case llvm::Triple::riscv32:
+    case llvm::Triple::riscv64:
       break;
     }
   }
@@ -788,8 +794,10 @@ public:
   ZOSTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : OSTargetInfo<Target>(Triple, Opts) {
     this->WCharType = TargetInfo::UnsignedInt;
+    this->MaxAlignedAttribute = 128;
     this->UseBitFieldTypeAlignment = false;
     this->UseZeroLengthBitfieldAlignment = true;
+    this->UseLeadingZeroLengthBitfield = false;
     this->ZeroLengthBitfieldBoundary = 32;
     this->MinGlobalAlign = 0;
     this->DefaultAlignForAttributeAligned = 128;
@@ -858,11 +866,9 @@ public:
     } else if (Triple.getArch() == llvm::Triple::x86_64) {
       this->resetDataLayout("e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-"
                             "i64:64-n8:16:32:64-S128");
-    } else if (Triple.getArch() == llvm::Triple::mipsel) {
-      // Handled on mips' setDataLayout.
     } else {
-      assert(Triple.getArch() == llvm::Triple::le32);
-      this->resetDataLayout("e-p:32:32-i64:64");
+      assert(Triple.getArch() == llvm::Triple::mipsel);
+      // Handled on mips' setDataLayout.
     }
   }
 };

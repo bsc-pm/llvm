@@ -1509,26 +1509,28 @@ void MachineVerifier::verifyPreISelGenericInstruction(const MachineInstr *MI) {
 
     break;
   }
+  case TargetOpcode::G_BZERO:
   case TargetOpcode::G_MEMSET: {
     ArrayRef<MachineMemOperand *> MMOs = MI->memoperands();
+    std::string Name = Opc == TargetOpcode::G_MEMSET ? "memset" : "bzero";
     if (MMOs.size() != 1) {
-      report("memset must have 1 memory operand", MI);
+      report(Twine(Name, " must have 1 memory operand"), MI);
       break;
     }
 
     if ((!MMOs[0]->isStore() || MMOs[0]->isLoad())) {
-      report("memset memory operand must be a store", MI);
+      report(Twine(Name, " memory operand must be a store"), MI);
       break;
     }
 
     LLT DstPtrTy = MRI->getType(MI->getOperand(0).getReg());
     if (!DstPtrTy.isPointer()) {
-      report("memset operand must be a pointer", MI);
+      report(Twine(Name, " operand must be a pointer"), MI);
       break;
     }
 
     if (DstPtrTy.getAddressSpace() != MMOs[0]->getAddrSpace())
-      report("inconsistent memset address space", MI);
+      report("inconsistent " + Twine(Name, " address space"), MI);
 
     break;
   }
@@ -1566,6 +1568,28 @@ void MachineVerifier::verifyPreISelGenericInstruction(const MachineInstr *MI) {
       report("Vector reduction requires vector source=", MI);
     break;
   }
+
+  case TargetOpcode::G_SBFX:
+  case TargetOpcode::G_UBFX: {
+    LLT DstTy = MRI->getType(MI->getOperand(0).getReg());
+    if (DstTy.isVector()) {
+      report("Bitfield extraction is not supported on vectors", MI);
+      break;
+    }
+    break;
+  }
+  case TargetOpcode::G_ROTR:
+  case TargetOpcode::G_ROTL: {
+    LLT Src1Ty = MRI->getType(MI->getOperand(1).getReg());
+    LLT Src2Ty = MRI->getType(MI->getOperand(2).getReg());
+    if (Src1Ty.isVector() != Src2Ty.isVector()) {
+      report("Rotate requires operands to be either all scalars or all vectors",
+             MI);
+      break;
+    }
+    break;
+  }
+
   default:
     break;
   }
@@ -1627,7 +1651,7 @@ void MachineVerifier::visitMachineInstrBefore(const MachineInstr *MI) {
   // Other instructions must have one, unless they are inside a bundle.
   if (LiveInts) {
     bool mapped = !LiveInts->isNotInMIMap(*MI);
-    if (MI->isDebugInstr()) {
+    if (MI->isDebugOrPseudoInstr()) {
       if (mapped)
         report("Debug instruction has a slot index", MI);
     } else if (MI->isInsideBundle()) {
@@ -1652,8 +1676,6 @@ void MachineVerifier::visitMachineInstrBefore(const MachineInstr *MI) {
   // Verify properties of various specific instruction types
   switch (MI->getOpcode()) {
   case TargetOpcode::COPY: {
-    if (foundErrors)
-      break;
     const MachineOperand &DstOp = MI->getOperand(0);
     const MachineOperand &SrcOp = MI->getOperand(1);
     LLT DstTy = MRI->getType(DstOp.getReg());
@@ -1762,9 +1784,12 @@ MachineVerifier::visitMachineOperand(const MachineOperand *MO, unsigned MONum) {
       if (MCOI.OperandType == MCOI::OPERAND_REGISTER &&
           !MO->isReg() && !MO->isFI())
         report("Expected a register operand.", MO, MONum);
-      if ((MCOI.OperandType == MCOI::OPERAND_IMMEDIATE ||
-           MCOI.OperandType == MCOI::OPERAND_PCREL) && MO->isReg())
-        report("Expected a non-register operand.", MO, MONum);
+      if (MO->isReg()) {
+        if (MCOI.OperandType == MCOI::OPERAND_IMMEDIATE ||
+            (MCOI.OperandType == MCOI::OPERAND_PCREL &&
+             !TII->isPCRelRegisterOperandLegal(*MO)))
+          report("Expected a non-register operand.", MO, MONum);
+      }
     }
 
     int TiedTo = MCID.getOperandConstraint(MONum, MCOI::TIED_TO);
@@ -2945,6 +2970,15 @@ void MachineVerifier::verifyLiveRangeSegment(const LiveRange &LR,
     // Check that VNI is live-out of all predecessors.
     for (const MachineBasicBlock *Pred : MFI->predecessors()) {
       SlotIndex PEnd = LiveInts->getMBBEndIdx(Pred);
+      // Predecessor of landing pad live-out on last call.
+      if (MFI->isEHPad()) {
+        for (auto I = Pred->rbegin(), E = Pred->rend(); I != E; ++I) {
+          if (I->isCall()) {
+            PEnd = Indexes->getInstructionIndex(*I).getBoundaryIndex();
+            break;
+          }
+        }
+      }
       const VNInfo *PVNI = LR.getVNInfoBefore(PEnd);
 
       // All predecessors must have a live-out value. However for a phi

@@ -366,7 +366,8 @@ public:
 
   bool isUnspillableTerminatorImpl(const MachineInstr *MI) const override {
     return MI->getOpcode() == ARM::t2LoopEndDec ||
-           MI->getOpcode() == ARM::t2DoLoopStartTP;
+           MI->getOpcode() == ARM::t2DoLoopStartTP ||
+           MI->getOpcode() == ARM::t2WhileLoopStartLR;
   }
 
 private:
@@ -646,7 +647,8 @@ static inline bool isJumpTableBranchOpcode(int Opc) {
 
 static inline bool isLowOverheadTerminatorOpcode(int Opc) {
   return Opc == ARM::t2DoLoopStartTP || Opc == ARM::t2WhileLoopStart ||
-         Opc == ARM::t2LoopEnd || Opc == ARM::t2LoopEndDec;
+         Opc == ARM::t2WhileLoopStartLR || Opc == ARM::t2LoopEnd ||
+         Opc == ARM::t2LoopEndDec;
 }
 
 static inline

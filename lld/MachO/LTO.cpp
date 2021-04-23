@@ -11,6 +11,7 @@
 #include "Driver.h"
 #include "InputFiles.h"
 #include "Symbols.h"
+#include "Target.h"
 
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Strings.h"
@@ -24,6 +25,7 @@
 using namespace lld;
 using namespace lld::macho;
 using namespace llvm;
+using namespace llvm::MachO;
 using namespace llvm::sys;
 
 static lto::Config createConfig() {
@@ -36,12 +38,17 @@ static lto::Config createConfig() {
   c.PreCodeGenPassesHook = [](legacy::PassManager &pm) {
     pm.add(createObjCARCContractPass());
   };
+  c.TimeTraceEnabled = config->timeTraceEnabled;
+  c.TimeTraceGranularity = config->timeTraceGranularity;
+  if (config->saveTemps)
+    checkError(c.addSaveTemps(config->outputFile.str() + ".",
+                              /*UseInputModulePath=*/true));
   return c;
 }
 
 BitcodeCompiler::BitcodeCompiler() {
-  auto backend =
-      lto::createInProcessThinBackend(heavyweight_hardware_concurrency());
+  lto::ThinBackend backend = lto::createInProcessThinBackend(
+      heavyweight_hardware_concurrency(config->thinLTOJobs));
   ltoObj = std::make_unique<lto::LTO>(createConfig(), backend);
 }
 
@@ -64,6 +71,12 @@ void BitcodeCompiler::add(BitcodeFile &f) {
     // be removed.
     r.Prevailing = !objSym.isUndefined() && sym->getFile() == &f;
 
+    // FIXME: What about other output types? And we can probably be less
+    // restrictive with -flat_namespace, but it's an infrequent use case.
+    r.VisibleToRegularObj = config->outputType != MH_EXECUTE ||
+                            config->namespaceKind == NamespaceKind::flat ||
+                            sym->isUsedInRegularObj;
+
     // Un-define the symbol so that we don't get duplicate symbol errors when we
     // load the ObjFile emitted by LTO compilation.
     if (r.Prevailing)
@@ -71,7 +84,6 @@ void BitcodeCompiler::add(BitcodeFile &f) {
                                RefState::Strong);
 
     // TODO: set the other resolution configs properly
-    r.VisibleToRegularObj = true;
   }
   checkError(ltoObj->add(std::move(f.obj), resols));
 }
@@ -99,15 +111,15 @@ std::vector<ObjFile *> BitcodeCompiler::compile() {
 
   std::vector<ObjFile *> ret;
   for (unsigned i = 0; i != maxTasks; ++i) {
-    if (buf[i].empty()) {
+    if (buf[i].empty())
       continue;
-    }
     SmallString<261> filePath("/tmp/lto.tmp");
     uint32_t modTime = 0;
     if (!config->ltoObjPath.empty()) {
       filePath = config->ltoObjPath;
       path::append(filePath, Twine(i) + "." +
-                                 getArchitectureName(config->arch) + ".lto.o");
+                                 getArchitectureName(config->arch()) +
+                                 ".lto.o");
       saveBuffer(buf[i], filePath);
       modTime = getModTime(filePath);
     }
