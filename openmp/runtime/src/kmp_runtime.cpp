@@ -8399,6 +8399,14 @@ void __kmp_set_unshackled_thread_active_status(unsigned int thread_num,
     return;
   __kmp_threads[gtid]->th.th_root->r.is_unshackled_thread_active[thread_num] =
       active;
+
+  if (active) {
+    kmp_info_t *unshackled_thread =
+      __kmp_threads[gtid]->th.th_root->r.unshackled_threads[thread_num];
+    __kmp_null_resume_wrapper(
+        unshackled_thread->th.th_info.ds.ds_gtid,
+        unshackled_thread->th.th_sleep_loc);
+  }
 }
 
 int __kmp_get_unshackled_id() {

@@ -431,18 +431,15 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   // Traverse all the unshackled threads, if we find one that is sleeping, resume it
   // so we give it a chance to execute the task.
-  // for (unsigned i = 0; i < __kmp_root[0]->r.)
-  // FIXME: There is an array for unshackled onlys, used that one instead.
-  for (int i = 0; i < __kmp_threads_capacity; i++) {
-    if (__kmp_threads[i] == NULL)
-      continue;
-    if (__kmp_threads[i]->th.is_unshackled
-        && *__kmp_threads[i]->th.is_unshackled_active) {
-      // This is an unshackled thread
-      kmp_flag_64 flag(&__kmp_threads[i]->th.th_bar[bs_forkjoin_barrier].bb.b_go,
-           __kmp_threads[i]);
-      if (flag.is_sleeping()) {
-        flag.resume(i);
+  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+    kmp_info_t *unshackled_thread =
+      __kmp_threads[gtid]->th.th_root->r.unshackled_threads[i];
+    if (*unshackled_thread->th.is_unshackled_active) {
+      kmp_flag_64 *flag = RCAST(kmp_flag_64 *,
+          CCAST(void *, unshackled_thread->th.th_sleep_loc));
+      if (flag && flag->is_sleeping()) {
+        printf("waking up unshackled from task_create\n");
+        flag->resume(unshackled_thread->th.th_info.ds.ds_gtid);
         break;
       }
     }
