@@ -348,6 +348,9 @@ then
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_INCLUDE_TESTS=OFF")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_BUILD_SANITIZERS=ON")
   CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_SANITIZERS_TO_BUILD=asan")
+  # On x86_64 compiler-rt also attempts to build i386 libraries. Avoid that
+  # because more often than not we lack support for 32-bit.
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON")
 fi
 
 ################################################################################
