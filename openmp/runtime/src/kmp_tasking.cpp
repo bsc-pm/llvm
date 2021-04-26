@@ -438,7 +438,6 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
       kmp_flag_64 *flag = RCAST(kmp_flag_64 *,
           CCAST(void *, unshackled_thread->th.th_sleep_loc));
       if (flag && flag->is_sleeping()) {
-        printf("waking up unshackled from task_create\n");
         flag->resume(unshackled_thread->th.th_info.ds.ds_gtid);
         break;
       }
