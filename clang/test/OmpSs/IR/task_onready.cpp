@@ -62,7 +62,7 @@ void bar(int n) {
 
 // CHECK: define internal void @compute_onready.1()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %call = call i32 @_Z3fooIiET_v()
+// CHECK-NEXT:   %call = call{{( signext)?}} i32 @_Z3fooIiET_v()
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 

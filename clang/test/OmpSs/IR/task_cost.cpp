@@ -27,7 +27,7 @@ void bar(int n) {
 
 // CHECK: define internal i32 @compute_cost()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   %call = call i32 @_Z3fooIiET_v()
+// CHECK-NEXT:   %call = call{{( signext)?}} i32 @_Z3fooIiET_v()
 // CHECK-NEXT:   ret i32 %call
 // CHECK-NEXT: }
 
