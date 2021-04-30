@@ -3811,7 +3811,7 @@ struct OpenMPConstruct {
   UNION_CLASS_BOILERPLATE(OpenMPConstruct);
   std::variant<OpenMPStandaloneConstruct, OpenMPSectionsConstruct,
       OpenMPLoopConstruct, OpenMPBlockConstruct, OpenMPAtomicConstruct,
-      OpenMPExecutableAllocate, OpenMPDeclarativeAllocate,
+      OpenMPDeclarativeAllocate, OpenMPExecutableAllocate,
       OpenMPCriticalConstruct>
       u;
 };

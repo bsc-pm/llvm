@@ -45,7 +45,7 @@ bool AArch64TTIImpl::areInlineCompatible(const Function *Caller,
 /// Calculate the cost of materializing a 64-bit value. This helper
 /// method might only calculate a fraction of a larger immediate. Therefore it
 /// is valid to return a cost of ZERO.
-int AArch64TTIImpl::getIntImmCost(int64_t Val) {
+InstructionCost AArch64TTIImpl::getIntImmCost(int64_t Val) {
   // Check if the immediate can be encoded within an instruction.
   if (Val == 0 || AArch64_AM::isLogicalImmediate(Val, 64))
     return 0;
@@ -60,8 +60,8 @@ int AArch64TTIImpl::getIntImmCost(int64_t Val) {
 }
 
 /// Calculate the cost of materializing the given constant.
-int AArch64TTIImpl::getIntImmCost(const APInt &Imm, Type *Ty,
-                                  TTI::TargetCostKind CostKind) {
+InstructionCost AArch64TTIImpl::getIntImmCost(const APInt &Imm, Type *Ty,
+                                              TTI::TargetCostKind CostKind) {
   assert(Ty->isIntegerTy());
 
   unsigned BitSize = Ty->getPrimitiveSizeInBits();
@@ -75,20 +75,20 @@ int AArch64TTIImpl::getIntImmCost(const APInt &Imm, Type *Ty,
 
   // Split the constant into 64-bit chunks and calculate the cost for each
   // chunk.
-  int Cost = 0;
+  InstructionCost Cost = 0;
   for (unsigned ShiftVal = 0; ShiftVal < BitSize; ShiftVal += 64) {
     APInt Tmp = ImmVal.ashr(ShiftVal).sextOrTrunc(64);
     int64_t Val = Tmp.getSExtValue();
     Cost += getIntImmCost(Val);
   }
   // We need at least one instruction to materialze the constant.
-  return std::max(1, Cost);
+  return std::max<InstructionCost>(1, Cost);
 }
 
-int AArch64TTIImpl::getIntImmCostInst(unsigned Opcode, unsigned Idx,
-                                      const APInt &Imm, Type *Ty,
-                                      TTI::TargetCostKind CostKind,
-                                      Instruction *Inst) {
+InstructionCost AArch64TTIImpl::getIntImmCostInst(unsigned Opcode, unsigned Idx,
+                                                  const APInt &Imm, Type *Ty,
+                                                  TTI::TargetCostKind CostKind,
+                                                  Instruction *Inst) {
   assert(Ty->isIntegerTy());
 
   unsigned BitSize = Ty->getPrimitiveSizeInBits();
@@ -145,7 +145,7 @@ int AArch64TTIImpl::getIntImmCostInst(unsigned Opcode, unsigned Idx,
 
   if (Idx == ImmIdx) {
     int NumConstants = (BitSize + 63) / 64;
-    int Cost = AArch64TTIImpl::getIntImmCost(Imm, Ty, CostKind);
+    InstructionCost Cost = AArch64TTIImpl::getIntImmCost(Imm, Ty, CostKind);
     return (Cost <= NumConstants * TTI::TCC_Basic)
                ? static_cast<int>(TTI::TCC_Free)
                : Cost;
@@ -153,9 +153,10 @@ int AArch64TTIImpl::getIntImmCostInst(unsigned Opcode, unsigned Idx,
   return AArch64TTIImpl::getIntImmCost(Imm, Ty, CostKind);
 }
 
-int AArch64TTIImpl::getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
-                                        const APInt &Imm, Type *Ty,
-                                        TTI::TargetCostKind CostKind) {
+InstructionCost
+AArch64TTIImpl::getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
+                                    const APInt &Imm, Type *Ty,
+                                    TTI::TargetCostKind CostKind) {
   assert(Ty->isIntegerTy());
 
   unsigned BitSize = Ty->getPrimitiveSizeInBits();
@@ -181,7 +182,7 @@ int AArch64TTIImpl::getIntImmCostIntrin(Intrinsic::ID IID, unsigned Idx,
   case Intrinsic::umul_with_overflow:
     if (Idx == 1) {
       int NumConstants = (BitSize + 63) / 64;
-      int Cost = AArch64TTIImpl::getIntImmCost(Imm, Ty, CostKind);
+      InstructionCost Cost = AArch64TTIImpl::getIntImmCost(Imm, Ty, CostKind);
       return (Cost <= NumConstants * TTI::TCC_Basic)
                  ? static_cast<int>(TTI::TCC_Free)
                  : Cost;
@@ -280,6 +281,115 @@ AArch64TTIImpl::getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
   return BaseT::getIntrinsicInstrCost(ICA, CostKind);
 }
 
+/// The function will remove redundant reinterprets casting in the presence
+/// of the control flow
+static Optional<Instruction *> processPhiNode(InstCombiner &IC,
+                                              IntrinsicInst &II) {
+  SmallVector<Instruction *, 32> Worklist;
+  auto RequiredType = II.getType();
+
+  auto *PN = dyn_cast<PHINode>(II.getArgOperand(0));
+  assert(PN && "Expected Phi Node!");
+
+  // Don't create a new Phi unless we can remove the old one.
+  if (!PN->hasOneUse())
+    return None;
+
+  for (Value *IncValPhi : PN->incoming_values()) {
+    auto *Reinterpret = dyn_cast<IntrinsicInst>(IncValPhi);
+    if (!Reinterpret ||
+        Reinterpret->getIntrinsicID() !=
+            Intrinsic::aarch64_sve_convert_to_svbool ||
+        RequiredType != Reinterpret->getArgOperand(0)->getType())
+      return None;
+  }
+
+  // Create the new Phi
+  LLVMContext &Ctx = PN->getContext();
+  IRBuilder<> Builder(Ctx);
+  Builder.SetInsertPoint(PN);
+  PHINode *NPN = Builder.CreatePHI(RequiredType, PN->getNumIncomingValues());
+  Worklist.push_back(PN);
+
+  for (unsigned I = 0; I < PN->getNumIncomingValues(); I++) {
+    auto *Reinterpret = cast<Instruction>(PN->getIncomingValue(I));
+    NPN->addIncoming(Reinterpret->getOperand(0), PN->getIncomingBlock(I));
+    Worklist.push_back(Reinterpret);
+  }
+
+  // Cleanup Phi Node and reinterprets
+  return IC.replaceInstUsesWith(II, NPN);
+}
+
+static Optional<Instruction *> instCombineConvertFromSVBool(InstCombiner &IC,
+                                                            IntrinsicInst &II) {
+  // If the reinterpret instruction operand is a PHI Node
+  if (isa<PHINode>(II.getArgOperand(0)))
+    return processPhiNode(IC, II);
+
+  SmallVector<Instruction *, 32> CandidatesForRemoval;
+  Value *Cursor = II.getOperand(0), *EarliestReplacement = nullptr;
+
+  const auto *IVTy = cast<VectorType>(II.getType());
+
+  // Walk the chain of conversions.
+  while (Cursor) {
+    // If the type of the cursor has fewer lanes than the final result, zeroing
+    // must take place, which breaks the equivalence chain.
+    const auto *CursorVTy = cast<VectorType>(Cursor->getType());
+    if (CursorVTy->getElementCount().getKnownMinValue() <
+        IVTy->getElementCount().getKnownMinValue())
+      break;
+
+    // If the cursor has the same type as I, it is a viable replacement.
+    if (Cursor->getType() == IVTy)
+      EarliestReplacement = Cursor;
+
+    auto *IntrinsicCursor = dyn_cast<IntrinsicInst>(Cursor);
+
+    // If this is not an SVE conversion intrinsic, this is the end of the chain.
+    if (!IntrinsicCursor || !(IntrinsicCursor->getIntrinsicID() ==
+                                  Intrinsic::aarch64_sve_convert_to_svbool ||
+                              IntrinsicCursor->getIntrinsicID() ==
+                                  Intrinsic::aarch64_sve_convert_from_svbool))
+      break;
+
+    CandidatesForRemoval.insert(CandidatesForRemoval.begin(), IntrinsicCursor);
+    Cursor = IntrinsicCursor->getOperand(0);
+  }
+
+  // If no viable replacement in the conversion chain was found, there is
+  // nothing to do.
+  if (!EarliestReplacement)
+    return None;
+
+  return IC.replaceInstUsesWith(II, EarliestReplacement);
+}
+
+static Optional<Instruction *> instCombineSVEDup(InstCombiner &IC,
+                                                 IntrinsicInst &II) {
+  IntrinsicInst *Pg = dyn_cast<IntrinsicInst>(II.getArgOperand(1));
+  if (!Pg)
+    return None;
+
+  if (Pg->getIntrinsicID() != Intrinsic::aarch64_sve_ptrue)
+    return None;
+
+  const auto PTruePattern =
+      cast<ConstantInt>(Pg->getOperand(0))->getZExtValue();
+  if (PTruePattern != AArch64SVEPredPattern::vl1)
+    return None;
+
+  // The intrinsic is inserting into lane zero so use an insert instead.
+  auto *IdxTy = Type::getInt64Ty(II.getContext());
+  auto *Insert = InsertElementInst::Create(
+      II.getArgOperand(0), II.getArgOperand(2), ConstantInt::get(IdxTy, 0));
+  Insert->insertBefore(&II);
+  Insert->takeName(&II);
+
+  return IC.replaceInstUsesWith(II, Insert);
+}
+
 static Optional<Instruction *> instCombineSVELast(InstCombiner &IC,
                                                   IntrinsicInst &II) {
   Value *Pg = II.getArgOperand(0);
@@ -367,6 +477,10 @@ AArch64TTIImpl::instCombineIntrinsic(InstCombiner &IC,
   switch (IID) {
   default:
     break;
+  case Intrinsic::aarch64_sve_convert_from_svbool:
+    return instCombineConvertFromSVBool(IC, II);
+  case Intrinsic::aarch64_sve_dup:
+    return instCombineSVEDup(IC, II);
   case Intrinsic::aarch64_sve_lasta:
   case Intrinsic::aarch64_sve_lastb:
     return instCombineSVELast(IC, II);
@@ -940,8 +1054,9 @@ InstructionCost AArch64TTIImpl::getArithmeticInstrCost(
   }
 }
 
-int AArch64TTIImpl::getAddressComputationCost(Type *Ty, ScalarEvolution *SE,
-                                              const SCEV *Ptr) {
+InstructionCost AArch64TTIImpl::getAddressComputationCost(Type *Ty,
+                                                          ScalarEvolution *SE,
+                                                          const SCEV *Ptr) {
   // Address computations in vectorized code with non-consecutive addresses will
   // likely result in more instructions compared to scalar code where the
   // computation can more often be merged into the index mode. The resulting
@@ -1034,6 +1149,17 @@ AArch64TTIImpl::enableMemCmpExpansion(bool OptSize, bool IsZeroCmp) const {
   // they could be used with no holds barred (-O3).
   Options.LoadSizes = {8, 4, 2, 1};
   return Options;
+}
+
+InstructionCost
+AArch64TTIImpl::getMaskedMemoryOpCost(unsigned Opcode, Type *Src,
+                                      Align Alignment, unsigned AddressSpace,
+                                      TTI::TargetCostKind CostKind) {
+  if (!isa<ScalableVectorType>(Src))
+    return BaseT::getMaskedMemoryOpCost(Opcode, Src, Alignment, AddressSpace,
+                                        CostKind);
+  auto LT = TLI->getTypeLegalizationCost(DL, Src);
+  return LT.first * 2;
 }
 
 InstructionCost AArch64TTIImpl::getGatherScatterOpCost(
@@ -1226,6 +1352,38 @@ void AArch64TTIImpl::getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
   if (ST->getProcFamily() == AArch64Subtarget::Falkor &&
       EnableFalkorHWPFUnrollFix)
     getFalkorUnrollingPreferences(L, SE, UP);
+
+  // Scan the loop: don't unroll loops with calls as this could prevent
+  // inlining. Don't unroll vector loops either, as they don't benefit much from
+  // unrolling.
+  for (auto *BB : L->getBlocks()) {
+    for (auto &I : *BB) {
+      // Don't unroll vectorised loop.
+      if (I.getType()->isVectorTy())
+        return;
+
+      if (isa<CallInst>(I) || isa<InvokeInst>(I)) {
+        if (const Function *F = cast<CallBase>(I).getCalledFunction()) {
+          if (!isLoweredToCall(F))
+            continue;
+        }
+        return;
+      }
+    }
+  }
+
+  // Enable runtime unrolling for in-order models
+  // If mcpu is omitted, getProcFamily() returns AArch64Subtarget::Others, so by
+  // checking for that case, we can ensure that the default behaviour is
+  // unchanged
+  if (ST->getProcFamily() != AArch64Subtarget::Others &&
+      !ST->getSchedModel().isOutOfOrder()) {
+    UP.Runtime = true;
+    UP.Partial = true;
+    UP.UpperBound = true;
+    UP.UnrollRemainder = true;
+    UP.DefaultUnrollRuntimeCount = 4;
+  }
 }
 
 void AArch64TTIImpl::getPeelingPreferences(Loop *L, ScalarEvolution &SE,
@@ -1462,6 +1620,7 @@ InstructionCost AArch64TTIImpl::getShuffleCost(TTI::ShuffleKind Kind,
                                                VectorType *Tp,
                                                ArrayRef<int> Mask, int Index,
                                                VectorType *SubTp) {
+  Kind = improveShuffleKindFromMask(Kind, Mask);
   if (Kind == TTI::SK_Broadcast || Kind == TTI::SK_Transpose ||
       Kind == TTI::SK_Select || Kind == TTI::SK_PermuteSingleSrc ||
       Kind == TTI::SK_Reverse) {

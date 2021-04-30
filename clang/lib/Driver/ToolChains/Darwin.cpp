@@ -74,12 +74,12 @@ void darwin::setTripleTypeForMachOArchName(llvm::Triple &T, StringRef Str) {
   const llvm::Triple::ArchType Arch = getArchTypeForMachOArchName(Str);
   llvm::ARM::ArchKind ArchKind = llvm::ARM::parseArch(Str);
   T.setArch(Arch);
-
-  if (Str == "x86_64h" || Str == "arm64e")
+  if (Arch != llvm::Triple::UnknownArch)
     T.setArchName(Str);
-  else if (ArchKind == llvm::ARM::ArchKind::ARMV6M ||
-           ArchKind == llvm::ARM::ArchKind::ARMV7M ||
-           ArchKind == llvm::ARM::ArchKind::ARMV7EM) {
+
+  if (ArchKind == llvm::ARM::ArchKind::ARMV6M ||
+      ArchKind == llvm::ARM::ArchKind::ARMV7M ||
+      ArchKind == llvm::ARM::ArchKind::ARMV7EM) {
     T.setOS(llvm::Triple::UnknownOS);
     T.setObjectFormat(llvm::Triple::MachO);
   }
@@ -615,8 +615,6 @@ void darwin::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_L);
 
-  getToolChain().AddFilePathLibArgs(Args, CmdArgs);
-
   AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs, JA);
   // Build the input file for -filelist (list of linker input files) in case we
   // need it later
@@ -804,7 +802,6 @@ MachO::MachO(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
   getProgramPaths().push_back(getDriver().getInstalledDir());
   if (getDriver().getInstalledDir() != getDriver().Dir)
     getProgramPaths().push_back(getDriver().Dir);
-  getFilePaths().push_back(getDriver().Dir + "/../lib");
 }
 
 /// Darwin - Darwin tool chain for i386 and x86_64.

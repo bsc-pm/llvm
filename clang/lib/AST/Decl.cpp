@@ -3266,6 +3266,8 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
 
   if (const auto *ABAA = getAttr<ArmBuiltinAliasAttr>()) {
     BuiltinID = ABAA->getBuiltinName()->getBuiltinID();
+  } else if (const auto *BAA = getAttr<BuiltinAliasAttr>()) {
+    BuiltinID = BAA->getBuiltinName()->getBuiltinID();
   } else if (const auto *A = getAttr<BuiltinAttr>()) {
     BuiltinID = A->getID();
   }
@@ -3276,7 +3278,7 @@ unsigned FunctionDecl::getBuiltinID(bool ConsiderWrapperFunctions) const {
   // If the function is marked "overloadable", it has a different mangled name
   // and is not the C library function.
   if (!ConsiderWrapperFunctions && hasAttr<OverloadableAttr>() &&
-      !hasAttr<ArmBuiltinAliasAttr>())
+      (!hasAttr<ArmBuiltinAliasAttr>() && !hasAttr<BuiltinAliasAttr>()))
     return 0;
 
   ASTContext &Context = getASTContext();
