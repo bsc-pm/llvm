@@ -333,53 +333,64 @@ final_spin=FALSE)
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
       if (this_thr->th.is_unshackled && *this_thr->th.is_unshackled_active) {
-        __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
-        // FIXME: don't always start from 0 once we add the initial task_teams
-        // for (int i = 0; i < this_thr->th.allowed_teams_length; i++)
-        while (1) {
-          int empty_task_teams_cnt = 0;
-          for (int team_task_to_pick = 0;
-               team_task_to_pick < this_thr->th.allowed_teams_length;
-               team_task_to_pick++) {
-            task_team = this_thr->th.allowed_teams[team_task_to_pick];
+        int empty_task_teams_cnt = 0;
+        int team_task_to_pick = 0;
+        do {
+          __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+          task_team = this_thr->th.allowed_teams[team_task_to_pick];
+          if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) != 0) {
+            // task_team marked as dead, skip
+            empty_task_teams_cnt++;
+            __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+          } else if (KMP_TASKING_ENABLED(task_team) && TCR_SYNC_4(task_team->tt.tt_active)) {
             this_thr->th.th_task_team = task_team;
+            // FIXME - Why we need this :(
+            // x86 needs this?
+            updateHWFPControl(
+                task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
 
+            std::atomic<kmp_int32> *unfinished_unshackleds;
+            unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
+            /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
+
+            // Take the lock and release the list
+            __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+
+            int ret = flag->execute_tasks(
+                this_thr, th_gtid, final_spin,
+                &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+
+            // TODO: execute_tasks does not return if task was executed
+            //
+            // empty_task_teams_cnt += !ret;
+            empty_task_teams_cnt += 1;
+
+            /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
+            this_thr->th.th_task_team = NULL;
+            this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+          } else {
             // If tasking is not enabled for this task team,
             // there is no point in entering it to execute tasks.
             // Also skip inactive task teams.
-            if (KMP_TASKING_ENABLED(task_team) && TCR_SYNC_4(task_team->tt.tt_active)) {
-              // FIXME - Why we need this :(
-              // x86 needs this?
-              updateHWFPControl(
-                  task_team->tt.tt_threads_data[0].td.td_thr->th.th_team);
-
-              std::atomic<kmp_int32> *unfinished_unshackleds;
-              unfinished_unshackleds = &(task_team->tt.tt_unfinished_unshackleds);
-              /* kmp_int32 count = */ KMP_ATOMIC_INC(unfinished_unshackleds);
-
-              int ret = flag->execute_tasks(
-                  this_thr, th_gtid, final_spin,
-                  &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
-
-              // TODO: execute_tasks does not return if task was executed
-              // 
-              // empty_task_teams_cnt += !ret;
-              empty_task_teams_cnt += 1;
-
-              /* kmp_int32 count = */KMP_ATOMIC_DEC(unfinished_unshackleds);
-              this_thr->th.th_task_team = NULL;
-              this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
-            } else {
-              empty_task_teams_cnt += 1;
-            }
+            empty_task_teams_cnt += 1;
+            __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
           }
-          // Not able to execute any task.
-          if (empty_task_teams_cnt == this_thr->th.allowed_teams_length)
+
+          team_task_to_pick++;
+          if (empty_task_teams_cnt == this_thr->th.allowed_teams_length) {
+            // Not able to execute any task.
+            // TODO: Do the list compact here
             break;
-        }
+          }
+          // Processed all task teams, keep going since
+          // we have not executed the break of above
+          if (team_task_to_pick == this_thr->th.allowed_teams_length) {
+            team_task_to_pick = 0;
+            empty_task_teams_cnt = 0;
+          }
+        } while (team_task_to_pick < this_thr->th.allowed_teams_length);
         // Reset task_team to 0 to make unshackled able to suspend
         task_team = NULL;
-        __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
       } else if (!this_thr->th.is_unshackled) {
         if (task_team != NULL) {
           if (TCR_SYNC_4(task_team->tt.tt_active)) {

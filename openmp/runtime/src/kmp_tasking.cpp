@@ -3701,6 +3701,11 @@ void __kmp_task_team_wait(
     __kmp_remove_allowed_task_team(unshackled, task_team);
     __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
   }
+  std::atomic<kmp_uint32> *spin = RCAST(
+      std::atomic<kmp_uint32> *, &task_team->tt.tt_unfinished_unshackleds);
+  kmp_flag_32 spin_flag(spin, 0U);
+  spin_flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
+  // TODO: USE KMP_YIELD??
 }
 
 // __kmp_tasking_barrier:
@@ -4696,20 +4701,10 @@ void __kmp_remove_allowed_task_team(kmp_info_t *unshackled,
   int index = -1;
   for (int i = 0; i < unshackled->th.allowed_teams_length; i++) {
     if (unshackled->th.allowed_teams[i] == task_team) {
-      index = i;
-      break;
+      unshackled->th.allowed_teams[i]
+        = reinterpret_cast<kmp_task_team_t*>(
+            reinterpret_cast<kmp_uintptr_t>(task_team) | 1);
+      return;
     }
   }
-
-  // The team we attempt to remove was indeed allowed.:w
-  KMP_ASSERT(index >= 0);
-
-  // Compact the sequence.
-  if (index + 1 < unshackled->th.allowed_teams_length) {
-    memmove(&unshackled->th.allowed_teams[index],
-            &unshackled->th.allowed_teams[index + 1],
-            (unshackled->th.allowed_teams_length - index - 1) *
-                sizeof(kmp_task_team_t *));
-  }
-  unshackled->th.allowed_teams_length--;
 }
