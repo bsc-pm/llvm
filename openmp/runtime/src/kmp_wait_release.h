@@ -155,6 +155,20 @@ static void __ompt_implicit_task_end(kmp_info_t *this_thr,
 }
 #endif
 
+static void kmp_compact_allowed_teams(kmp_info_t *this_thr) {
+  __kmp_acquire_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+  int new_allowed_teams_length = 0;
+  kmp_task_team_t** allowed_teams = this_thr->th.allowed_teams;
+  for (int i = 0; i < this_thr->th.allowed_teams_length; i++) {
+    kmp_task_team_t *task_team = allowed_teams[i];
+    // Keep only alive task_teams
+    if ((reinterpret_cast<kmp_uintptr_t>(task_team) & 1) == 0)
+      allowed_teams[new_allowed_teams_length++] = task_team;
+  }
+  this_thr->th.allowed_teams_length = new_allowed_teams_length;
+  __kmp_release_bootstrap_lock(&this_thr->th.allowed_teams_lock);
+}
+
 /* Spin wait loop that first does pause/yield, then sleep. A thread that calls
    __kmp_wait_*  must make certain that another thread calls __kmp_release
    to wake it back up to prevent deadlocks!
@@ -379,7 +393,7 @@ final_spin=FALSE)
           team_task_to_pick++;
           if (empty_task_teams_cnt == this_thr->th.allowed_teams_length) {
             // Not able to execute any task.
-            // TODO: Do the list compact here
+            kmp_compact_allowed_teams(this_thr);
             break;
           }
           // Processed all task teams, keep going since
