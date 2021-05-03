@@ -9203,6 +9203,9 @@ void AMDGPUTargetCodeGenInfo::setTargetAttributes(
 
   if (M.getContext().getTargetInfo().allowAMDGPUUnsafeFPAtomics())
     F->addFnAttr("amdgpu-unsafe-fp-atomics", "true");
+
+  if (!getABIInfo().getCodeGenOpts().EmitIEEENaNCompliantInsts)
+    F->addFnAttr("amdgpu-ieee", "false");
 }
 
 unsigned AMDGPUTargetCodeGenInfo::getOpenCLKernelCallingConv() const {

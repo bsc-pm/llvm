@@ -834,7 +834,7 @@ def cl_denorms_are_zero : Flag<["-"], "cl-denorms-are-zero">, Group<opencl_Group
   HelpText<"OpenCL only. Allow denormals to be flushed to zero.">;
 def cl_fp32_correctly_rounded_divide_sqrt : Flag<["-"], "cl-fp32-correctly-rounded-divide-sqrt">, Group<opencl_Group>, Flags<[CC1Option]>,
   HelpText<"OpenCL only. Specify that single precision floating-point divide and sqrt used in the program source are correctly rounded.">,
-  MarshallingInfoFlag<CodeGenOpts<"CorrectlyRoundedDivSqrt">>;
+  MarshallingInfoFlag<CodeGenOpts<"OpenCLCorrectlyRoundedDivSqrt">>;
 def cl_uniform_work_group_size : Flag<["-"], "cl-uniform-work-group-size">, Group<opencl_Group>, Flags<[CC1Option]>,
   HelpText<"OpenCL only. Defines that the global work-size be a multiple of the work-group size specified to clEnqueueNDRangeKernel">,
   MarshallingInfoFlag<CodeGenOpts<"UniformWGSize">>;
@@ -939,6 +939,13 @@ defm hip_new_launch_api : BoolFOption<"hip-new-launch-api",
   LangOpts<"HIPUseNewLaunchAPI">, DefaultFalse,
   PosFlag<SetTrue, [CC1Option], "Use">, NegFlag<SetFalse, [], "Don't use">,
   BothFlags<[], " new kernel launching API for HIP">>;
+defm hip_fp32_correctly_rounded_divide_sqrt : BoolFOption<"hip-fp32-correctly-rounded-divide-sqrt",
+  CodeGenOpts<"HIPCorrectlyRoundedDivSqrt">, DefaultTrue,
+  PosFlag<SetTrue, [], "Specify">,
+  NegFlag<SetFalse, [CC1Option], "Don't specify">,
+  BothFlags<[], " that single precision floating-point divide and sqrt used in "
+  "the program source are correctly rounded (HIP device compilation only)">>,
+  ShouldParseIf<hip.KeyPath>;
 defm gpu_allow_device_init : BoolFOption<"gpu-allow-device-init",
   LangOpts<"GPUAllowDeviceInit">, DefaultFalse,
   PosFlag<SetTrue, [CC1Option], "Allow">, NegFlag<SetFalse, [], "Don't allow">,
@@ -3181,6 +3188,14 @@ def mno_reference_types : Flag<["-"], "mno-reference-types">, Group<m_wasm_Featu
 def mexec_model_EQ : Joined<["-"], "mexec-model=">, Group<m_wasm_Features_Driver_Group>,
                      Values<"command,reactor">,
                      HelpText<"Execution model (WebAssembly only)">;
+
+defm amdgpu_ieee : BoolOption<"m", "amdgpu-ieee",
+  CodeGenOpts<"EmitIEEENaNCompliantInsts">, DefaultTrue,
+  PosFlag<SetTrue, [], "Sets the IEEE bit in the expected default floating point "
+  " mode register. Floating point opcodes that support exception flag "
+  "gathering quiet and propagate signaling NaN inputs per IEEE 754-2008. "
+  "This option changes the ABI. (AMDGPU only)">,
+  NegFlag<SetFalse, [CC1Option]>>, Group<m_Group>;
 
 def mcode_object_version_EQ : Joined<["-"], "mcode-object-version=">, Group<m_Group>,
   HelpText<"Specify code object ABI version. Defaults to 3. (AMDGPU only)">,

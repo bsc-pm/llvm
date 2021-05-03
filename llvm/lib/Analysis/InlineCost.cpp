@@ -1759,8 +1759,8 @@ bool CallAnalyzer::visitExtractValue(ExtractValueInst &I) {
       }))
     return true;
 
-  // SROA can look through these but give them a cost.
-  return false;
+  // SROA can't look through these, but they may be free.
+  return Base::visitExtractValue(I);
 }
 
 bool CallAnalyzer::visitInsertValue(InsertValueInst &I) {
@@ -1772,8 +1772,8 @@ bool CallAnalyzer::visitInsertValue(InsertValueInst &I) {
       }))
     return true;
 
-  // SROA can look through these but give them a cost.
-  return false;
+  // SROA can't look through these, but they may be free.
+  return Base::visitInsertValue(I);
 }
 
 /// Try to simplify a call site.
@@ -2444,7 +2444,7 @@ int llvm::getCallsiteCost(CallBase &Call, const DataLayout &DL) {
       // We approximate the number of loads and stores needed by dividing the
       // size of the byval type by the target's pointer size.
       PointerType *PTy = cast<PointerType>(Call.getArgOperand(I)->getType());
-      unsigned TypeSize = DL.getTypeSizeInBits(PTy->getElementType());
+      unsigned TypeSize = DL.getTypeSizeInBits(Call.getParamByValType(I));
       unsigned AS = PTy->getAddressSpace();
       unsigned PointerSize = DL.getPointerSizeInBits(AS);
       // Ceiling division.
