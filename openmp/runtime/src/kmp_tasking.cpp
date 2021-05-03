@@ -2864,11 +2864,14 @@ static inline int __kmp_execute_tasks_template(
 
   // Used by unshackleds to perform a steal of
   // every thread of the team one time before exit.
-  // Note that we exclude tid 0.
-  int unshackled_victim_tid = 1;
+  int unshackled_victim_tid = -1;
+
   // unshackled threads use victim_tid as last_stolen directly
-  if (thread->th.is_unshackled)
+  if (thread->th.is_unshackled) {
     victim_tid = -1;
+    tid = thread->th.unshackled_id % nthreads;
+    unshackled_victim_tid = (tid + 1) % nthreads;
+  }
 
   while (1) { // Outer loop keeps trying to find tasks in case of single thread
     // getting tasks from target constructs
@@ -2878,7 +2881,7 @@ static inline int __kmp_execute_tasks_template(
       if (use_own_tasks) { // check on own queue first
         if (thread->th.is_unshackled) {
           // Unshackled own queue is tid 0
-          task = __kmp_steal_task(threads_data[0].td.td_thr, gtid, task_team,
+          task = __kmp_steal_task(threads_data[tid].td.td_thr, gtid, task_team,
                                   unfinished_threads, thread_finished,
                                   is_constrained);
         } else {
@@ -3080,8 +3083,10 @@ static inline int __kmp_execute_tasks_template(
     // thread, keep trying to execute tasks from own queue
     if (nthreads == 1 && !thread->th.is_unshackled) {
       use_own_tasks = 1;
-    } else if (thread->th.is_unshackled && ++unshackled_victim_tid < nthreads) {
-      continue;
+    } else if (thread->th.is_unshackled) {
+      unshackled_victim_tid = (unshackled_victim_tid + 1) % nthreads;
+      if (unshackled_victim_tid == tid)
+        return FALSE;
     } else {
       KA_TRACE(15,
                ("__kmp_execute_tasks_template: T#%d can't find work\n", gtid));
