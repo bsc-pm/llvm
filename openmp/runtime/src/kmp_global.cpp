@@ -535,5 +535,9 @@ kmp_pause_status_t __kmp_pause_status = kmp_not_paused;
 kmp_unshackled_thread_start_t
   __kmp_unshackled_thread_start = kmp_unshackled_inactive;
 int __kmp_num_unshackled_threads = 0;
+kmp_proc_bind_t __kmp_unshackled_proc_bind = proc_bind_false;
+char *__kmp_affinity_unshackled_proclist = NULL;
+kmp_affin_mask_t *__kmp_affinity_unshackled_masks = NULL;
+unsigned __kmp_affinity_num_unshackled_masks = 0;
 
 // end of file //

@@ -4745,6 +4745,32 @@ static void __kmp_stg_print_unshackled_thread_start(kmp_str_buf_t *buffer,
   }
 }
 
+// -----------------------------------------------------------------------------
+// KMP_UNSHACKLED_PLACES
+
+static void __kmp_stg_parse_unshackled_places(char const *name,
+                                              char const *value,
+                                              void *data) {
+  // Support only proclist for now
+  if (__kmp_affinity_unshackled_proclist != NULL) {
+    KMP_INTERNAL_FREE((void *)__kmp_affinity_unshackled_proclist);
+    __kmp_affinity_unshackled_proclist = NULL;
+  }
+  if (__kmp_parse_place_list(name, value, &__kmp_affinity_unshackled_proclist)) {
+    __kmp_unshackled_proc_bind = proc_bind_true;
+  }
+}
+
+static void __kmp_stg_print_unshackled_places(kmp_str_buf_t *buffer,
+                                              char const *name,
+                                              void *data) {
+  if (__kmp_unshackled_proc_bind == proc_bind_true) {
+    __kmp_stg_print_str(buffer, name, __kmp_affinity_unshackled_proclist);
+  } else {
+    __kmp_stg_print_str(buffer, name, "");
+  }
+}
+
 // Table.
 
 static kmp_setting_t __kmp_stg_table[] = {
@@ -4992,6 +5018,8 @@ static kmp_setting_t __kmp_stg_table[] = {
       __kmp_stg_print_num_unshackled_threads, NULL, 0, 0},
     {"KMP_UNSHACKLED_THREAD_START", __kmp_stg_parse_unshackled_thread_start,
       __kmp_stg_print_unshackled_thread_start, NULL, 0, 0},
+    {"KMP_UNSHACKLED_PLACES", __kmp_stg_parse_unshackled_places,
+      __kmp_stg_print_unshackled_places, NULL, 0, 0},
 
     {"", NULL, NULL, NULL, 0, 0}}; // settings
 

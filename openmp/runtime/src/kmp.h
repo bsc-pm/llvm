@@ -3958,6 +3958,10 @@ typedef enum kmp_unshackled_thread_start_t {
 } kmp_unshackled_thread_start_t;
 extern kmp_unshackled_thread_start_t __kmp_unshackled_thread_start;
 extern int __kmp_num_unshackled_threads;
+extern kmp_proc_bind_t __kmp_unshackled_proc_bind;
+extern char *__kmp_affinity_unshackled_proclist;
+extern kmp_affin_mask_t *__kmp_affinity_unshackled_masks;
+extern unsigned __kmp_affinity_num_unshackled_masks;
 // Returns the number of unshackled threads. They may not have been created yet.
 unsigned int __kmp_get_num_unshackled_threads();
 // Returns the unshackled thread id
