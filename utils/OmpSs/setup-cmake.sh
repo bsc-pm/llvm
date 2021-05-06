@@ -366,6 +366,50 @@ else
 fi
 
 ################################################################################
+# How to link the C++ library
+################################################################################
+
+# Cross compilation
+if [ "${ENABLE_CROSS_COMPILATION}" = 1 ];
+then
+  # This requires more information. We have already setup the cross compiler
+  # in CMAKE_C_COMPILER and CMAKE_CXX_COMPILER but we need to set the host
+  # compiler.
+  # Example: x86_64 -> aarch64
+  #  cross-compiler: aarch64-unknown-linux-gnu-gcc
+  #  host-compiler: gcc
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_SYSTEM_NAME=Linux")
+
+  if [ -z "$CROSS_SYSTEM_PROCESSOR" ];
+  then
+    die "Need to specify CROSS_SYSTEM_PROCESSOR when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCMAKE_SYSTEM_PROCESSOR=${CROSS_SYSTEM_PROCESSOR}")
+
+  if [ -z "$CROSS_LLVM_TARGET_ARCH" ];
+  then
+    die "Need to specify CROSS_LLVM_TARGET_ARCH when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_TARGET_ARCH=${CROSS_LLVM_TARGET_ARCH}")
+
+  if [ -z "$CROSS_TRIPLET" ];
+  then
+    die "Need to specify CROSS_TRIPLET when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DLLVM_DEFAULT_TARGET_TRIPLE=${CROSS_TRIPLET}")
+
+  if [ -z "$HOST_C_COMPILER" ];
+  then
+    die "Need to specify HOST_C_COMPILER when cross-compiling"
+  fi
+  if [ -z "$HOST_CXX_COMPILER" ];
+  then
+    die "Need to specify HOST_CXX_COMPILER when cross-compiling"
+  fi
+  CMAKE_INVOCATION_EXTRA_FLAGS+=("-DCROSS_TOOLCHAIN_FLAGS_LLVM_NATIVE=-DCMAKE_CXX_COMPILER=${HOST_CXX_COMPILER};-DCMAKE_C_COMPILER=${HOST_C_COMPILER}")
+fi
+
+################################################################################
 # cmake
 ################################################################################
 
