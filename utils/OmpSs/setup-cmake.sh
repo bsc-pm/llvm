@@ -410,13 +410,23 @@ then
 fi
 
 ################################################################################
+# LLVM projects built
+################################################################################
+
+LLVM_ENABLE_PROJECTS="-DLLVM_ENABLE_PROJECTS=clang;openmp"
+if [ "$DISABLE_FORTRAN" != 1 ];
+then
+  LLVM_ENABLE_PROJECTS+=";flang"
+fi
+
+################################################################################
 # cmake
 ################################################################################
 
 info "Running cmake..."
 run cmake -G "${BUILD_SYSTEM}" ${SRCDIR}/llvm \
    -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} \
-   -DLLVM_ENABLE_PROJECTS="clang;flang;openmp" \
+   ${LLVM_ENABLE_PROJECTS} \
    -DLLVM_ENABLE_RUNTIMES="${EXTRA_RUNTIMES}" \
    -DOPENMP_LLVM_LIT_EXECUTABLE="$(pwd)/bin/llvm-lit" \
    -DOPENMP_FILECHECK_EXECUTABLE="$(pwd)/bin/FileCheck" \
