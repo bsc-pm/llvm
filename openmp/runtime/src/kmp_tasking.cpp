@@ -3681,6 +3681,25 @@ void __kmp_task_team_wait(
                              &task_team->tt.tt_unfinished_threads),
                        0U);
       flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
+
+
+      // This team is not allowed anymore for unshackleds
+      for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
+        kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
+        __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+        __kmp_remove_allowed_task_team(unshackled, task_team);
+        __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
+      }
+      if (__kmp_num_unshackled_threads > 0) {
+        std::atomic<kmp_int32> *unfinished_threads;
+        unfinished_threads = &(task_team->tt.tt_unfinished_threads);
+        kmp_int32 count =  KMP_ATOMIC_INC(unfinished_threads);
+        KMP_ASSERT(count == 0);
+
+      }
+      kmp_flag_32 spin_flag(RCAST(
+          std::atomic<kmp_uint32> *, &task_team->tt.tt_unfinished_unshackleds), 0U);
+      spin_flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
     }
     // Deactivate the old task team, so that the worker threads will stop
     // referencing it while spinning.
@@ -3699,17 +3718,6 @@ void __kmp_task_team_wait(
     TCW_PTR(this_thr->th.th_task_team, NULL);
   }
 
-  // This team is not allowed anymore for unshackleds
-  for (int i = 0; i < __kmp_num_unshackled_threads; i++) {
-    kmp_info_t *unshackled = this_thr->th.th_root->r.unshackled_threads[i];
-    __kmp_acquire_bootstrap_lock(&unshackled->th.allowed_teams_lock);
-    __kmp_remove_allowed_task_team(unshackled, task_team);
-    __kmp_release_bootstrap_lock(&unshackled->th.allowed_teams_lock);
-  }
-  std::atomic<kmp_uint32> *spin = RCAST(
-      std::atomic<kmp_uint32> *, &task_team->tt.tt_unfinished_unshackleds);
-  kmp_flag_32 spin_flag(spin, 0U);
-  spin_flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
   // TODO: USE KMP_YIELD??
 }
 

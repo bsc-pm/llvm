@@ -1093,8 +1093,6 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
     KMP_DEBUG_ASSERT(
         this_thr->th.th_task_team ==
         this_thr->th.th_team->t.t_task_team[this_thr->th.th_task_state]);
-    KMP_DEBUG_ASSERT(serial_team->t.t_task_team[this_thr->th.th_task_state] ==
-                     NULL || __kmp_num_unshackled_threads != 0);
     KA_TRACE(20, ("__kmpc_serialized_parallel: T#%d pushing task_team %p / "
                   "team %p, new task_team = NULL\n",
                   global_tid, this_thr->th.th_task_team, this_thr->th.th_team));
@@ -1187,6 +1185,13 @@ void __kmp_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
     serial_team->t.t_sched.sched = this_thr->th.th_team->t.t_sched.sched;
     this_thr->th.th_team = serial_team;
     serial_team->t.t_master_tid = this_thr->th.th_info.ds.ds_tid;
+
+    // reset task_team if exists
+    if (serial_team->t.t_task_team[0]) {
+      TCW_4(serial_team->t.t_task_team[0]->tt.tt_found_tasks, FALSE);
+      TCW_4(serial_team->t.t_task_team[0]->tt.tt_found_proxy_tasks, FALSE);
+      TCW_4(serial_team->t.t_task_team[0]->tt.tt_active, TRUE);
+    }
 
     KF_TRACE(10, ("__kmpc_serialized_parallel: T#d curtask=%p\n", global_tid,
                   this_thr->th.th_current_task));
@@ -2258,8 +2263,9 @@ void __kmp_join_call(ident_t *loc, int gtid
                   __kmp_gtid_from_thread(master_th), team,
                   team->t.t_task_team[master_th->th.th_task_state],
                   master_th->th.th_task_team));
-    KMP_DEBUG_ASSERT(master_th->th.th_task_team ==
-                     team->t.t_task_team[master_th->th.th_task_state]);
+    KMP_DEBUG_ASSERT((master_th->th.th_team == master_th->th.th_serial_team) ||
+                     (master_th->th.th_task_team ==
+                        team->t.t_task_team[master_th->th.th_task_state]));
   }
 #endif
 
