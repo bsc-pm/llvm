@@ -1429,6 +1429,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
       // OmpSs
     case Stmt::OSSArraySectionExprClass:
     case Stmt::OSSArrayShapingExprClass:
+    case Stmt::SYCLUniqueStableNameExprClass:
     case Stmt::TypeTraitExprClass: {
       Bldr.takeNodes(Pred);
       ExplodedNodeSet preVisit;

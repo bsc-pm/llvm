@@ -8,9 +8,6 @@ if(CMAKE_GENERATOR STREQUAL "Ninja")
   set_property(GLOBAL APPEND PROPERTY JOB_POOLS compile_flang=2)
 endif()
 
-option(LINK_WITH_FIR "Link driver with FIR and LLVM" ON)
-option(FLANG_BUILD_NEW_DRIVER "Build the flang compiler driver" ON)
-
 # Flang requires C++17.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
@@ -26,10 +23,6 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR AND NOT MSVC_IDE)
           `CMakeFiles'. Please delete them.")
 endif()
 
-# Add Flang-centric modules to cmake path.
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
-include(AddFlang)
-
 option(FLANG_ENABLE_WERROR "Fail and stop building flang if a warning is triggered." OFF)
 
 # Check for a standalone build and configure as appropriate from
@@ -38,6 +31,11 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message("Building Flang as a standalone project.")
   project(Flang)
   set(FLANG_STANDALONE_BUILD ON)
+
+  # For in-tree builds, this variable is inherited from
+  # llvm-project/llvm/CMakeLists.txt. For out-of-tree builds, we need a
+  # separate definition.
+  option(FLANG_BUILD_NEW_DRIVER "Build the flang compiler driver" ON)
 
   set(FLANG_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
   if (NOT MSVC_IDE)
@@ -212,6 +210,7 @@ else()
   include_directories(SYSTEM ${MLIR_TABLEGEN_OUTPUT_DIR})
 endif()
 set(FLANG_INTRINSIC_MODULES_DIR ${CMAKE_BINARY_DIR}/include/flang)
+set(FLANG_INCLUDE_DIR ${FLANG_BINARY_DIR}/include)
 
 if(FLANG_BUILD_NEW_DRIVER)
     # TODO: Remove when libclangDriver is lifted out of Clang
@@ -236,12 +235,13 @@ endif()
 # Always build tco tool
 set(LLVM_BUILD_TOOLS ON)
 
-# Add Flang-centric modules to cmake path.
 include_directories(BEFORE
   ${FLANG_BINARY_DIR}/include
   ${FLANG_SOURCE_DIR}/include)
 
+# Add Flang-centric modules to cmake path.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+include(AddFlang)
 
 if (NOT DEFAULT_SYSROOT)
   set(DEFAULT_SYSROOT "" CACHE PATH
@@ -454,4 +454,11 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     PATTERN "config.h" EXCLUDE
     PATTERN ".git"     EXCLUDE
     PATTERN "CMakeFiles" EXCLUDE)
+    
+  install(DIRECTORY ${FLANG_INCLUDE_DIR}/flang
+    DESTINATION include
+    COMPONENT flang-headers
+    FILES_MATCHING
+    PATTERN "*.inc"
+    )
 endif()

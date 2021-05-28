@@ -78,6 +78,7 @@ class MaterializeTemporaryExpr;
 class CXXFoldExpr;
 class TypeTraitExpr;
 class ConceptSpecializationExpr;
+class SYCLUniqueStableNameExpr;
 class PredefinedExpr;
 class CallExpr;
 class OffsetOfExpr;
@@ -168,6 +169,7 @@ ExprDependence computeDependence(TypeTraitExpr *E);
 ExprDependence computeDependence(ConceptSpecializationExpr *E,
                                  bool ValueDependent);
 
+ExprDependence computeDependence(SYCLUniqueStableNameExpr *E);
 ExprDependence computeDependence(PredefinedExpr *E);
 ExprDependence computeDependence(CallExpr *E, llvm::ArrayRef<Expr *> PreArgs);
 ExprDependence computeDependence(OffsetOfExpr *E);

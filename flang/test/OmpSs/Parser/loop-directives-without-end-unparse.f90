@@ -1,4 +1,4 @@
-! RUN: %f18 -fompss-2 -funparse %s | FileCheck %s
+! RUN: %flang_fc1 -fompss-2 -fdebug-unparse %s | FileCheck %s
 
 PROGRAM P1
 
