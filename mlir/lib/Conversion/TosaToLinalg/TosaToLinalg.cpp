@@ -956,9 +956,6 @@ convolutionMatchAndRewriterHelper(Operation *op,
   }
 
   if (isa<tosa::DepthwiseConv2DOp>(op)) {
-    if (llvm::any_of(dilation, [](int64_t d) { return d > 1; }))
-      return failure();
-
     ShapedType linalgConvTy =
         RankedTensorType::get({resultShape[0], resultShape[1], resultShape[2],
                                weightShape[2], weightShape[3]},
@@ -969,7 +966,7 @@ convolutionMatchAndRewriterHelper(Operation *op,
     Value conv = rewriter
                      .create<linalg::DepthwiseConvInputNHWCFilterHWCFOp>(
                          loc, linalgConvTy, ValueRange{input, weight},
-                         ValueRange{biasReshape}, strideAttr)
+                         ValueRange{biasReshape}, dilationAttr, strideAttr)
                      .getResult(0);
 
     Value reshape = rewriter.create<tosa::ReshapeOp>(loc, resultTy, conv);
@@ -1191,16 +1188,20 @@ public:
           getIdentityExprs(resultTy.getShape().size())};
 
       auto collapsedTy = RankedTensorType::get({totalElems}, elemTy);
-      Value collapsedOp = rewriter.create<linalg::TensorReshapeOp>(
+      Value collapsedOp = rewriter.create<linalg::TensorCollapseShapeOp>(
           loc, collapsedTy, args[0], collapsingMap);
-      rewriter.replaceOpWithNewOp<linalg::TensorReshapeOp>(
+      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
           reshape, resultTy, collapsedOp, expandingMap);
 
       return success();
     }
 
-    rewriter.replaceOpWithNewOp<linalg::TensorReshapeOp>(
-        reshape, resultTy, args[0], reassociationMap);
+    if (resultTy.getRank() < args[0].getType().cast<ShapedType>().getRank())
+      rewriter.replaceOpWithNewOp<linalg::TensorCollapseShapeOp>(
+          reshape, resultTy, args[0], reassociationMap);
+    else
+      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+          reshape, resultTy, args[0], reassociationMap);
 
     return success();
   }
