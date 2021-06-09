@@ -11231,6 +11231,8 @@ def err_oss_loop_not_canonical_incr : Error<
 def err_oss_wrong_var_in_declare_reduction : Error<"only %select{'omp_priv' or 'omp_orig'|'omp_in' or 'omp_out'}0 variables are allowed in %select{initializer|combiner}0 expression">;
 def err_oss_multidep_discrete_empty : Error<
   "expected a non-empty list">;
+def err_oss_multidep_iterator_scope : Error<
+  "iterator variable of a multidependence cannot be used in its own %select{lower-bound|size|upper-bound|step}0 expression">;
 def err_oss_invalid_scope : Error <
   "'#pragma oss %0' directive must appear only in file scope">;
 def warn_oss_decl_shadow :

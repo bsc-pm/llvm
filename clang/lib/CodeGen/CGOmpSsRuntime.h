@@ -177,7 +177,7 @@ private:
   void EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &)> Body,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo);
 
   // This is used by cost/priority clauses to build a bundle with the form
@@ -291,8 +291,8 @@ public:
       const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
       const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
       ArrayRef<QualType> RetTypes,
-      bool HasThis, std::string FuncName, std::string RetName,
-      llvm::function_ref<void(CodeGenFunction &)> Body);
+      bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
+      llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body);
 
   RValue emitTaskFunction(CodeGenFunction &CGF,
                           const FunctionDecl *FD,

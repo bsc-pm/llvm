@@ -1263,8 +1263,8 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     const llvm::MapVector<const Expr *, llvm::Value *> &VLASizeInvolvedMap,
     const llvm::DenseMap<const VarDecl *, Address> &CaptureInvolvedMap,
     ArrayRef<QualType> RetTypes,
-    bool HasThis, std::string FuncName, std::string RetName,
-    llvm::function_ref<void(CodeGenFunction &)> Body) {
+    bool HasThis, bool HasSwitch, std::string FuncName, std::string RetName,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body) {
 
   InDirectiveEmission = false;
 
@@ -1301,6 +1301,13 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     // NOTE: We have seen 'this' so it's fine to assume we are in a method function
     NewCGF.CurGD = GlobalDecl(cast<CXXMethodDecl>(CGF.CurGD.getDecl()->getNonClosureContext()));
     NewCGF.CGM.getCXXABI().buildThisParam(NewCGF, Args);
+  }
+  if (HasSwitch) {
+    QualType Q = C.getSizeType();
+    auto *Arg =
+      ImplicitParamDecl::Create(
+        C, Q, ImplicitParamDecl::Other);
+    Args.push_back(Arg);
   }
 
   QualType RetQ;
@@ -1392,7 +1399,10 @@ llvm::Function *CGOmpSsRuntime::createCallWrapperFunc(
     (void)InitScope.Privatize();
 
     // Function body generation
-    Body(NewCGF);
+    Optional<llvm::Value *> SwitchValue;
+    if (HasSwitch)
+      SwitchValue = &*(FuncVar->arg_end() - 1);
+    Body(NewCGF, SwitchValue);
   }
 
   NewCGF.EHStack.popTerminate();
@@ -1440,10 +1450,24 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
   // For each iterator we have {init, remap, ub, step}
   SmallVector<QualType, 3 + 1> MultiDepRetTypes(
     MDExpr->getDepInits().size()*(3 + 1), CGF.getContext().IntTy);
+  auto Body = [&MDExpr](CodeGenFunction &NewCGF, Optional<llvm::Value *> Switch) {
+    uint64_t SwitchTyBits =
+      NewCGF.CGM.getDataLayout().getTypeSizeInBits(Switch.getValue()->getType());
 
-  auto Body = [&List, &MDExpr](CodeGenFunction &NewCGF) {
+    llvm::BasicBlock *ContBB = NewCGF.createBasicBlock("", NewCGF.CurFn);
+    llvm::BasicBlock *FallBack = NewCGF.createBasicBlock("", NewCGF.CurFn);
+    llvm::SwitchInst *SI = NewCGF.Builder.CreateSwitch(Switch.getValue(), FallBack);
+    NewCGF.Builder.SetInsertPoint(FallBack);
+    NewCGF.Builder.CreateBr(ContBB);
+
+    Address RetAddr = NewCGF.ReturnValue;
+
     // Emit init/ub/step expressions
     for (size_t i = 0; i < MDExpr->getDepInits().size(); ++i) {
+      llvm::BasicBlock *BB = NewCGF.createBasicBlock("", NewCGF.CurFn);
+      SI->addCase(NewCGF.Builder.getIntN(SwitchTyBits, i), BB);
+      NewCGF.Builder.SetInsertPoint(BB);
+
       const Expr *const IterExpr = MDExpr->getDepIterators()[i];
       const Expr *const InitExpr = MDExpr->getDepInits()[i];
       const Expr *const SizeExpr = MDExpr->getDepSizes()[i];
@@ -1490,17 +1514,14 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
             NewCGF.ConvertType(NewCGF.getContext().IntTy), 1);
         }
       }
-      assert(InitValue && SizeValue && StepValue);
-      List.push_back(InitValue);
-      List.push_back(RemapValue);
-      List.push_back(SizeValue);
-      List.push_back(StepValue);
-
+      assert(InitValue && RemapValue && SizeValue && StepValue);
+      NewCGF.Builder.CreateStore(InitValue, NewCGF.Builder.CreateStructGEP(RetAddr, i*4 + 0));
+      NewCGF.Builder.CreateStore(RemapValue, NewCGF.Builder.CreateStructGEP(RetAddr, i*4 + 1));
+      NewCGF.Builder.CreateStore(SizeValue, NewCGF.Builder.CreateStructGEP(RetAddr, i*4 + 2));
+      NewCGF.Builder.CreateStore(StepValue, NewCGF.Builder.CreateStructGEP(RetAddr, i*4 + 3));
+      NewCGF.Builder.CreateBr(ContBB);
     }
-    Address RetAddr = NewCGF.ReturnValue;
-    for (size_t i = 0; i < List.size(); ++i) {
-      NewCGF.Builder.CreateStore(List[i], NewCGF.Builder.CreateStructGEP(RetAddr, i));
-    }
+    NewCGF.Builder.SetInsertPoint(ContBB);
   };
 
   llvm::Function *ComputeMultiDepFun = createCallWrapperFunc(
@@ -1510,6 +1531,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
     MultiDepInfoGathering.getCaptureInvolvedMap(),
     MultiDepRetTypes,
     MultiDepInfoGathering.hasThis(),
+    /*HasSwitch=*/true,
     "compute_dep", "_depend_unpack_t",
     Body);
 
@@ -1542,7 +1564,7 @@ void CGOmpSsRuntime::EmitMultiDependencyList(
 void CGOmpSsRuntime::EmitWrapperCallBundle(
     std::string Name, std::string FuncName,
     CodeGenFunction &CGF, const Expr *E, QualType Q,
-    llvm::function_ref<void(CodeGenFunction &)> Body,
+    llvm::function_ref<void(CodeGenFunction &, Optional<llvm::Value *>)> Body,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
   OSSExprInfoGathering CallVisitor(CGF);
@@ -1559,6 +1581,7 @@ void CGOmpSsRuntime::EmitWrapperCallBundle(
     CallVisitor.getCaptureInvolvedMap(),
     RetTypes,
     CallVisitor.hasThis(),
+    /*HasSwitch=*/false,
     FuncName, "",
     Body);
 
@@ -1589,7 +1612,7 @@ void CGOmpSsRuntime::EmitScalarWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [&E](CodeGenFunction &NewCGF) {
+  auto Body = [&E](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
     llvm::Value *V = NewCGF.EmitScalarExpr(E);
 
     Address RetAddr = NewCGF.ReturnValue;
@@ -1605,7 +1628,7 @@ void CGOmpSsRuntime::EmitIgnoredWrapperCallBundle(
     CodeGenFunction &CGF, const Expr *E,
     SmallVectorImpl<llvm::OperandBundleDef> &TaskInfo) {
 
-  auto Body = [&E](CodeGenFunction &NewCGF) {
+  auto Body = [&E](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
     if (const auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->isNonOdrUse() == NOUR_Unevaluated)
         return;
@@ -1632,7 +1655,7 @@ void CGOmpSsRuntime::EmitDependencyList(
 
   CodeGenFunction NewCGF(CGF.CGM);
 
-  auto Body = [&List, &Dep](CodeGenFunction &NewCGF) {
+  auto Body = [&List, &Dep](CodeGenFunction &NewCGF, Optional<llvm::Value *>) {
     // C long -> LLVM long
     llvm::Type *OSSArgTy = NewCGF.ConvertType(NewCGF.getContext().LongTy);
 
@@ -1731,6 +1754,7 @@ void CGOmpSsRuntime::EmitDependencyList(
     DependInfoGathering.getCaptureInvolvedMap(),
     DependInfoGathering.getRetTypes(),
     DependInfoGathering.hasThis(),
+    /*HasSwitch=*/false,
     "compute_dep", "_depend_unpack_t",
     Body);
 

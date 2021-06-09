@@ -917,13 +917,58 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
       MultiDepIterators, MultiDepInits, MultiDepSizes,
       MultiDepSteps, DiscreteArrays, MultiDepSizeOrSection, Loc, RLoc);
 
+  // This class emits an error if the iterator
+  // is used in the init/size/step
+  // { v[i], i=i;i:i }
+  class MultidepIterUseChecker final
+      : public ConstStmtVisitor<MultidepIterUseChecker, bool> {
+  public:
+    enum Type {
+      LBound = 0,
+      Size,
+      UBound,
+      Step
+    };
+  private:
+    Sema &SemaRef;
+    const VarDecl *IterVD;
+    enum Type Ty;
+    bool checkDecl(const Expr *E, const ValueDecl *VD) {
+      if (getCanonicalDecl(VD) == getCanonicalDecl(IterVD)) {
+        SemaRef.Diag(E->getExprLoc(), diag::err_oss_multidep_iterator_scope)
+          << Ty;
+        return true;
+      }
+      return false;
+    }
+
+  public:
+    bool VisitDeclRefExpr(const DeclRefExpr *E) {
+      const ValueDecl *VD = E->getDecl();
+      if (isa<VarDecl>(VD))
+        return checkDecl(E, VD);
+      return false;
+    }
+    bool VisitStmt(const Stmt *S) {
+      bool Res = false;
+      for (const Stmt *Child : S->children())
+        Res = (Child && Visit(Child)) || Res;
+      return Res;
+    }
+    explicit MultidepIterUseChecker(
+      Sema &SemaRef, const VarDecl *IterVD, enum Type Ty)
+        : SemaRef(SemaRef), IterVD(IterVD), Ty(Ty)
+          {}
+  };
+
   for (size_t i = 0; i < MultiDepIterators.size(); ++i) {
     Expr *ItE = MultiDepIterators[i];
     VarDecl *ItVD = cast<VarDecl>(cast<DeclRefExpr>(ItE)->getDecl());
 
-    IsError = false;
-
     Expr *InitExpr = MultiDepInits[i];
+    if (MultidepIterUseChecker(
+        *this, ItVD, MultidepIterUseChecker::Type::LBound).Visit(InitExpr))
+      IsError = true;
     Expr *DiscreteArrExpr = nullptr;
     if (InitListExpr *InitList = dyn_cast<InitListExpr>(InitExpr)) {
       // Initialize the iterator to a valid number so it can
@@ -945,6 +990,10 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
 
     Expr *SizeExpr = MultiDepSizes[i];
     if (SizeExpr) {
+      if (MultidepIterUseChecker(*this, ItVD,
+          MultiDepSizeOrSection[i] ? MultidepIterUseChecker::Type::Size
+            : MultidepIterUseChecker::Type::UBound).Visit(SizeExpr))
+        IsError = true;
       ExprResult Res = PerformImplicitConversion(SizeExpr, Context.IntTy, AA_Converting);
       if (Res.isInvalid()) {
         IsError = true;
@@ -956,6 +1005,9 @@ ExprResult Sema::ActOnOSSMultiDepExpression(
 
     Expr *StepExpr = MultiDepSteps[i];
     if (StepExpr) {
+      if (MultidepIterUseChecker(
+          *this, ItVD, MultidepIterUseChecker::Type::Step).Visit(StepExpr))
+        IsError = true;
       ExprResult Res = PerformImplicitConversion(StepExpr, Context.IntTy, AA_Converting);
       if (Res.isInvalid()) {
         IsError = true;
