@@ -593,11 +593,26 @@ struct OmpSs {
 
   void buildLoopForMultiDep(
       Module &M, Function &F, Instruction *Entry, Instruction *Exit,
-      Value *IndVar,
-      const llvm::function_ref<Value *(IRBuilder<> &)> LBoundGen,
-      const llvm::function_ref<Value *(IRBuilder<> &)> RemapGen,
-      const llvm::function_ref<Value *(IRBuilder<> &)> UBoundGen,
-      const llvm::function_ref<Value *(IRBuilder<> &)> IncrGen) {
+      const MultiDependInfo *MultiDepInfo) {
+    DenseMap<Value *, Value *> IndToRemap;
+    for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
+      Value *IndVar = MultiDepInfo->Iters[i];
+      buildLoopForMultiDepImpl(
+        M, F, Entry, Exit, IndVar, i, MultiDepInfo->ComputeMultiDepFun,
+        MultiDepInfo->Args, IndToRemap);
+    }
+  }
+
+  void buildLoopForMultiDepImpl(
+      Module &M, Function &F, Instruction *Entry, Instruction *Exit,
+      Value *IndVar, int IterSelector, Function *ComputeMultiDepFun,
+      ArrayRef<Value *> Args, DenseMap<Value *, Value *> &IndToRemap) {
+
+    DenseSet<Instruction *> InstrToRemap;
+
+    SmallVector<Value *, 4> TmpArgs(Args.begin(), Args.end());
+    // Select what iterator info we want to be computed
+    TmpArgs.push_back(ConstantInt::get(Type::getInt64Ty(M.getContext()), IterSelector));
 
     IRBuilder<> IRB(Entry);
     Type *IndVarTy = IndVar->getType()->getPointerElementType();
@@ -608,7 +623,12 @@ struct OmpSs {
     // assray with random bytes
     IRB.CreateStore(ConstantInt::get(IndVarTy, 0), IndVar);
 
-    Value *LBound = LBoundGen(IRB);
+    Instruction *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
+    InstrToRemap.insert(ComputeMultiDepCall);
+    Value *LBound = IRB.CreateExtractValue(ComputeMultiDepCall, IterSelector*(3 + 1) + 0);
+    Value *UBound = IRB.CreateExtractValue(ComputeMultiDepCall, IterSelector*(3 + 1) + 2);
+    Value *Incr = IRB.CreateExtractValue(ComputeMultiDepCall, IterSelector*(3 + 1) + 3);
+
     IRB.CreateStore(LBound, IndVar);
 
     BasicBlock *CondBB = IRB.saveIP().getBlock()->splitBasicBlock(IRB.saveIP().getPoint());
@@ -616,7 +636,6 @@ struct OmpSs {
 
     IRB.SetInsertPoint(Entry);
 
-    Value *UBound = UBoundGen(IRB);
     Value *IndVarVal = IRB.CreateLoad(IndVar);
     Value *LoopCmp = IRB.CreateICmpSLE(IndVarVal, UBound);
 
@@ -629,9 +648,17 @@ struct OmpSs {
     for (Instruction &I : *BodyBB) {
       I.replaceUsesOfWith(IndVar, IndVarRemap);
     }
+
     IRB.SetInsertPoint(&BodyBB->front());
-    Value *Remap = RemapGen(IRB);
-    IRB.CreateStore(Remap, IndVarRemap);
+
+    // Remap has to be computed every iteration
+    {
+      Instruction *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
+      Value *Remap =
+        IRB.CreateExtractValue(ComputeMultiDepCall, IterSelector*(3 + 1) + 1);
+      InstrToRemap.insert(ComputeMultiDepCall);
+      IRB.CreateStore(Remap, IndVarRemap);
+    }
 
     // Replace default br. by a conditional br. to task.body or task end
     Instruction *OldTerminator = CondBB->getTerminator();
@@ -644,7 +671,6 @@ struct OmpSs {
     // Add a br. to for.cond
     IRB.SetInsertPoint(IncrBB);
 
-    Value *Incr = IncrGen(IRB);
     IndVarVal = IRB.CreateLoad(IndVar);
     Value *IndVarValPlusIncr = IRB.CreateAdd(IndVarVal, Incr);
     IRB.CreateStore(IndVarValPlusIncr, IndVar);
@@ -654,6 +680,16 @@ struct OmpSs {
     OldTerminator = Exit->getParent()->getTerminator();
     assert(OldTerminator->getNumSuccessors() == 1);
     OldTerminator->setSuccessor(0, IncrBB);
+
+    for (Instruction *I : InstrToRemap) {
+      for (const auto &p : IndToRemap) {
+        I->replaceUsesOfWith(p.first, p.second);
+      }
+    }
+
+    // Record remapped iterator for future inner loop
+    // replacing
+    IndToRemap[IndVar] = IndVarRemap;
   }
 
   // Insert a new nanos6 task info registration in
@@ -811,32 +847,9 @@ struct OmpSs {
       std::replace(Args.begin(), Args.end(), IndVar, NewIndVarLBound);
     }
 
-    for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
-      Value *IndVar = MultiDepInfo->Iters[i];
-
-      SmallVector<Value *, 4> TmpArgs = Args;
-      // Select what iterator info we want to be computed
-      TmpArgs.push_back(ConstantInt::get(Type::getInt64Ty(M.getContext()), i));
-
-      auto LBoundGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-        Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-        return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 0);
-      };
-      auto RemapGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-        Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-        return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 1);
-      };
-      auto UBoundGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-        Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-        return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 2);
-      };
-      auto IncrGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-        Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-        return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 3);
-      };
-      buildLoopForMultiDep(
-          M, *F, CallComputeDepStart, RegisterDepCall, IndVar, LBoundGen, RemapGen, UBoundGen, IncrGen);
-    }
+    buildLoopForMultiDep(
+        M, *F, CallComputeDepStart, RegisterDepCall,
+        MultiDepInfo);
   }
 
 
@@ -2358,34 +2371,9 @@ struct OmpSs {
             // Set again the insert point
             IRB.SetInsertPoint(AfterNumDependenciesStore);
 
-            Function *ComputeMultiDepFun = MultiDepInfo->ComputeMultiDepFun;
-            auto Args = MultiDepInfo->Args;
-            for (size_t i = 0; i < MultiDepInfo->Iters.size(); i++) {
-              Value *IndVar = MultiDepInfo->Iters[i];
-
-              SmallVector<Value *, 4> TmpArgs = Args;
-              // Select what iterator info we want to be computed
-              TmpArgs.push_back(ConstantInt::get(Type::getInt64Ty(M.getContext()), i));
-
-              auto LBoundGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-                return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 0);
-              };
-              auto RemapGen = [IndVar](IRBuilder<> &IRB) {
-                // We do not need remap here
-                return IRB.CreateLoad(IndVar);
-              };
-              auto UBoundGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-                return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 2);
-              };
-              auto IncrGen = [ComputeMultiDepFun, &TmpArgs, i](IRBuilder<> &IRB) {
-                Value *ComputeMultiDepCall = IRB.CreateCall(ComputeMultiDepFun, TmpArgs);
-                return IRB.CreateExtractValue(ComputeMultiDepCall, i*(3 + 1) + 3);
-              };
-              buildLoopForMultiDep(
-                  M, F, NumDependenciesLoad, NumDependenciesStore, IndVar, LBoundGen, RemapGen, UBoundGen, IncrGen);
-            }
+            buildLoopForMultiDep(
+                M, F, NumDependenciesLoad, NumDependenciesStore,
+                MultiDepInfo);
           }
         }
       }

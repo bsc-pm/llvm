@@ -135,31 +135,31 @@ entry:
 ; CHECK-NEXT:   store i32 0, i32* %i, align 4
 ; CHECK-NEXT:   %1 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
 ; CHECK-NEXT:   %2 = extractvalue %struct._depend_unpack_t %1, 0
+; CHECK-NEXT:   %3 = extractvalue %struct._depend_unpack_t %1, 2
+; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %1, 3
 ; CHECK-NEXT:   store i32 %2, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.cond
 ; CHECK: for.cond:                                         ; preds = %for.incr, %0
-; CHECK-NEXT:   %3 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
-; CHECK-NEXT:   %4 = extractvalue %struct._depend_unpack_t %3, 2
 ; CHECK-NEXT:   %5 = load i32, i32* %i, align 4
-; CHECK-NEXT:   %6 = icmp sle i32 %5, %4
+; CHECK-NEXT:   %6 = icmp sle i32 %5, %3
 ; CHECK-NEXT:   br i1 %6, label %for.body, label %27
 ; CHECK: for.body:                                         ; preds = %for.cond
 ; CHECK-NEXT:   %7 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
 ; CHECK-NEXT:   %8 = extractvalue %struct._depend_unpack_t %7, 1
 ; CHECK-NEXT:   store i32 %8, i32* %i.remap, align 4
 ; CHECK-NEXT:   store i32 0, i32* %j, align 4
-; CHECK-NEXT:   %9 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 1)
+; CHECK-NEXT:   %9 = call %struct._depend_unpack_t @compute_dep(i32* %i.remap, i32* %j, i64 1)
 ; CHECK-NEXT:   %10 = extractvalue %struct._depend_unpack_t %9, 4
+; CHECK-NEXT:   %11 = extractvalue %struct._depend_unpack_t %9, 6
+; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %9, 7
 ; CHECK-NEXT:   store i32 %10, i32* %j, align 4
 ; CHECK-NEXT:   br label %for.cond1
 ; CHECK: for.cond1:                                        ; preds = %for.incr3, %for.body
-; CHECK-NEXT:   %11 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 1)
-; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %11, 6
 ; CHECK-NEXT:   %13 = load i32, i32* %j, align 4
-; CHECK-NEXT:   %14 = icmp sle i32 %13, %12
+; CHECK-NEXT:   %14 = icmp sle i32 %13, %11
 ; CHECK-NEXT:   br i1 %14, label %for.body2, label %for.incr
 ; CHECK: for.body2:                                        ; preds = %for.cond1
-; CHECK-NEXT:   %15 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 1)
+; CHECK-NEXT:   %15 = call %struct._depend_unpack_t @compute_dep(i32* %i.remap, i32* %j, i64 1)
 ; CHECK-NEXT:   %16 = extractvalue %struct._depend_unpack_t %15, 5
 ; CHECK-NEXT:   store i32 %16, i32* %j.remap, align 4
 ; CHECK-NEXT:   %17 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %i.remap, i32* %j.remap, [10 x [10 x i32]]* %v)
@@ -177,18 +177,14 @@ entry:
 ; CHECK: 27:                                               ; preds = %for.cond
 ; CHECK-NEXT:   ret void
 ; CHECK: for.incr:                                         ; preds = %for.cond1
-; CHECK-NEXT:   %28 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
-; CHECK-NEXT:   %29 = extractvalue %struct._depend_unpack_t %28, 3
-; CHECK-NEXT:   %30 = load i32, i32* %i, align 4
-; CHECK-NEXT:   %31 = add i32 %30, %29
-; CHECK-NEXT:   store i32 %31, i32* %i, align 4
+; CHECK-NEXT:   %28 = load i32, i32* %i, align 4
+; CHECK-NEXT:   %29 = add i32 %28, %4
+; CHECK-NEXT:   store i32 %29, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.cond
 ; CHECK: for.incr3:                                        ; preds = %for.body2
-; CHECK-NEXT:   %32 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 1)
-; CHECK-NEXT:   %33 = extractvalue %struct._depend_unpack_t %32, 7
-; CHECK-NEXT:   %34 = load i32, i32* %j, align 4
-; CHECK-NEXT:   %35 = add i32 %34, %33
-; CHECK-NEXT:   store i32 %35, i32* %j, align 4
+; CHECK-NEXT:   %30 = load i32, i32* %j, align 4
+; CHECK-NEXT:   %31 = add i32 %30, %12
+; CHECK-NEXT:   store i32 %31, i32* %j, align 4
 ; CHECK-NEXT:   br label %for.cond1
 ; CHECK-NEXT: }
 

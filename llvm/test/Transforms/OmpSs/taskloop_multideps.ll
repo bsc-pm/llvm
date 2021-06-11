@@ -127,18 +127,18 @@ entry:
 ; CHECK-NEXT:   br label %10
 ; CHECK: 10:                                               ; preds = %entry
 ; CHECK-NEXT:   store i32 0, i32* %i, align 4
-; CHECK-NEXT:   %11 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j.lb, i64 0)
+; CHECK-NEXT:   %11 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
 ; CHECK-NEXT:   %12 = extractvalue %struct._depend_unpack_t %11, 0
+; CHECK-NEXT:   %13 = extractvalue %struct._depend_unpack_t %11, 2
+; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %11, 3
 ; CHECK-NEXT:   store i32 %12, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.cond
 ; CHECK: for.cond:                                         ; preds = %for.incr, %10
-; CHECK-NEXT:   %13 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j.lb, i64 0)
-; CHECK-NEXT:   %14 = extractvalue %struct._depend_unpack_t %13, 2
 ; CHECK-NEXT:   %15 = load i32, i32* %i, align 4
-; CHECK-NEXT:   %16 = icmp sle i32 %15, %14
+; CHECK-NEXT:   %16 = icmp sle i32 %15, %13
 ; CHECK-NEXT:   br i1 %16, label %for.body, label %26
 ; CHECK: for.body:                                         ; preds = %for.cond
-; CHECK-NEXT:   %17 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j.lb, i64 0)
+; CHECK-NEXT:   %17 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j, i64 0)
 ; CHECK-NEXT:   %18 = extractvalue %struct._depend_unpack_t %17, 1
 ; CHECK-NEXT:   store i32 %18, i32* %i.remap, align 4
 ; CHECK-NEXT:   %19 = call %struct._depend_unpack_t.0 @compute_dep.1(i32* %i.remap, i32* %j.lb, [10 x i32]* %v)
@@ -153,11 +153,9 @@ entry:
 ; CHECK: 26:                                               ; preds = %for.cond
 ; CHECK-NEXT:   ret void
 ; CHECK: for.incr:                                         ; preds = %for.body
-; CHECK-NEXT:   %27 = call %struct._depend_unpack_t @compute_dep(i32* %i, i32* %j.lb, i64 0)
-; CHECK-NEXT:   %28 = extractvalue %struct._depend_unpack_t %27, 3
-; CHECK-NEXT:   %29 = load i32, i32* %i, align 4
-; CHECK-NEXT:   %30 = add i32 %29, %28
-; CHECK-NEXT:   store i32 %30, i32* %i, align 4
+; CHECK-NEXT:   %27 = load i32, i32* %i, align 4
+; CHECK-NEXT:   %28 = add i32 %27, %14
+; CHECK-NEXT:   store i32 %28, i32* %i, align 4
 ; CHECK-NEXT:   br label %for.cond
 ; CHECK-NEXT: }
 
