@@ -1,7 +1,6 @@
 set(LLVM_LINK_COMPONENTS
   FrontendOpenACC
   FrontendOpenMP
-  FrontendOmpSs
   Support
   )
 

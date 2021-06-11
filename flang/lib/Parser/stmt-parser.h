@@ -81,8 +81,7 @@ constexpr auto executionPartErrorRecovery{stmtErrorRecoveryStart >>
     !"END"_tok >> !"CONTAINS"_tok >> !"ELSE"_tok >> !"CASE"_tok >>
     !"TYPE IS"_tok >> !"CLASS"_tok >> !"RANK"_tok >>
     !("!$ACC "_sptok >> "END"_tok) >>
-    !("!$OMP "_sptok >> ("END"_tok || "SECTION"_id)) >>
-    !("!$OSS "_sptok >> "END"_tok) >> skipBadLine};
+    !("!$OMP "_sptok >> ("END"_tok || "SECTION"_id)) >> skipBadLine};
 
 // END statement error recovery
 constexpr auto missingOptionalName{pure<std::optional<Name>>()};

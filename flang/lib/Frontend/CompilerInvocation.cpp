@@ -456,12 +456,7 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   if (args.hasArg(clang::driver::options::OPT_flarge_sizes))
     res.defaultKinds().set_sizeIntegerKind(8);
 
-  // -fompss-2
   // -fopenmp and -fopenacc
-  if (args.hasArg(clang::driver::options::OPT_fompss)) {
-    res.frontendOpts().features_.Enable(
-        Fortran::common::LanguageFeature::OmpSs);
-  }
   if (args.hasArg(clang::driver::options::OPT_fopenacc)) {
     res.frontendOpts().features_.Enable(
         Fortran::common::LanguageFeature::OpenACC);
@@ -505,6 +500,13 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &res,
   unsigned missingArgIndex, missingArgCount;
   llvm::opt::InputArgList args = opts.ParseArgs(
       commandLineArgs, missingArgIndex, missingArgCount, includedFlagsBitmask);
+
+  // Check for missing argument error.
+  if (missingArgCount) {
+    diags.Report(clang::diag::err_drv_missing_argument)
+        << args.getArgString(missingArgIndex) << missingArgCount;
+    success = false;
+  }
 
   // Issue errors on unknown arguments
   for (const auto *a : args.filtered(clang::driver::options::OPT_UNKNOWN)) {
@@ -584,10 +586,6 @@ void CompilerInvocation::setDefaultPredefinitions() {
       "__flang_patchlevel__", FLANG_VERSION_PATCHLEVEL_STRING);
 
   // Add predefinitions based on extensions enabled
-  if (frontendOptions.features_.IsEnabled(
-          Fortran::common::LanguageFeature::OmpSs)) {
-    fortranOptions.predefinitions.emplace_back("_OMPSS_2", "1");
-  }
   if (frontendOptions.features_.IsEnabled(
           Fortran::common::LanguageFeature::OpenACC)) {
     fortranOptions.predefinitions.emplace_back("_OPENACC", "202011");

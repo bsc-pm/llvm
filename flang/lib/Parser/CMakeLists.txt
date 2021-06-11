@@ -1,6 +1,3 @@
-set(OLD_CMAKE_JOB_POOL_COMPILE CMAKE_JOB_POOL_COMPILE)
-set(CMAKE_JOB_POOL_COMPILE "compile_flang")
-
 add_flang_library(FortranParser
   Fortran-parsers.cpp
   char-buffer.cpp
@@ -15,7 +12,6 @@ add_flang_library(FortranParser
   message.cpp
   openacc-parsers.cpp
   openmp-parsers.cpp
-  ompss-parsers.cpp
   parse-tree.cpp
   parsing.cpp
   preprocessor.cpp
@@ -38,7 +34,4 @@ add_flang_library(FortranParser
   DEPENDS
   omp_gen
   acc_gen
-  oss_gen
 )
-
-set(CMAKE_JOB_POOL_COMPILE OLD_CMAKE_JOB_POOL_COMPILE)

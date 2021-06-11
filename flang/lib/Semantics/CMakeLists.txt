@@ -19,7 +19,6 @@ add_flang_library(FortranSemantics
   check-namelist.cpp
   check-nullify.cpp
   check-omp-structure.cpp
-  check-oss-structure.cpp
   check-purity.cpp
   check-return.cpp
   check-select-rank.cpp
@@ -47,7 +46,6 @@ add_flang_library(FortranSemantics
   DEPENDS
   acc_gen
   omp_gen
-  oss_gen
 
   LINK_LIBS
   FortranCommon
@@ -58,5 +56,4 @@ add_flang_library(FortranSemantics
   Support
   FrontendOpenMP
   FrontendOpenACC
-  FrontendOmpSs
 )

@@ -2,12 +2,6 @@ cmake_minimum_required(VERSION 3.13.4)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
-# Some components of flang are extremely memory resource hungry
-# at compile time, so build just few of them at a time.
-if(CMAKE_GENERATOR STREQUAL "Ninja")
-  set_property(GLOBAL APPEND PROPERTY JOB_POOLS compile_flang=2)
-endif()
-
 # Flang requires C++17.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)

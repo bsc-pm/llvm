@@ -514,9 +514,6 @@ int main(int argc, char *const argv[]) {
     } else if (arg == "-fopenmp") {
       options.features.Enable(Fortran::common::LanguageFeature::OpenMP);
       predefinitions.emplace_back("_OPENMP", "201511");
-    } else if (arg == "-fompss-2") {
-      options.features.Enable(Fortran::common::LanguageFeature::OmpSs);
-      predefinitions.emplace_back("_OMPSS", "1");
     } else if (arg.find("-W") != std::string::npos) {
       if (arg == "-Werror")
         driver.warningsAreErrors = true;

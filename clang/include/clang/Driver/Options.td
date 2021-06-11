@@ -2315,7 +2315,7 @@ def fobjc_disable_direct_methods_for_testing :
   MarshallingInfoFlag<LangOpts<"ObjCDisableDirectMethodsForTesting">>;
 
 def fomit_frame_pointer : Flag<["-"], "fomit-frame-pointer">, Group<f_Group>;
-def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, FlangOption, FC1Option]>,
+def fompss : Flag<["-"], "fompss-2">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Parse OmpSs-2 pragmas and generate parallel code.">,
   MarshallingInfoFlag<LangOpts<"OmpSs">>;
 def fdo_not_use_nanos6 : Flag<["-"], "fdo-not-use-nanos6">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
